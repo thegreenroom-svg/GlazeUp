@@ -718,6 +718,89 @@ app.get('/api/qr/booking', async (req, res) => {
 });
 
 /**
+ * POST /api/booking-photos/upload
+ * Staff uploads a photo taken at pieces collection time (e.g. table + QR nameplate)
+ * Accepts base64 image data, stores in Supabase Storage, logs a record linked to booking_id
+ */
+app.post('/api/booking-photos/upload', async (req, res) => {
+  const { studioId, bookingId, photoBase64 } = req.body;
+  if (!studioId || !bookingId || !photoBase64) {
+    return res.status(400).json({ error: 'Missing studioId, bookingId, or photoBase64' });
+  }
+
+  try {
+    // Strip data URL prefix if present (e.g. "data:image/jpeg;base64,...")
+    const base64Data = photoBase64.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    const fileName = `${studioId}/${bookingId}-${Date.now()}.jpg`;
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('booking-photos')
+      .upload(fileName, buffer, { contentType: 'image/jpeg' });
+
+    if (uploadError) {
+      console.error('Photo upload error:', uploadError);
+      return res.status(500).json({ error: uploadError.message });
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from('booking-photos')
+      .getPublicUrl(fileName);
+
+    const photoUrl = publicUrlData.publicUrl;
+
+    const { data: photoRecord, error: dbError } = await supabase
+      .from('booking_photos')
+      .insert({
+        studio_id: studioId,
+        booking_id: bookingId,
+        photo_url: photoUrl
+      })
+      .select()
+      .single();
+
+    if (dbError) {
+      console.error('Photo record save error:', dbError);
+      return res.status(500).json({ error: dbError.message });
+    }
+
+    res.json({ status: 'uploaded', photo: photoRecord });
+  } catch (error) {
+    console.error('Photo upload error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/booking-photos/:bookingId
+ * Fetch all photos taken for a given booking (used at kiln-unload time to identify pieces)
+ */
+app.get('/api/booking-photos/:bookingId', async (req, res) => {
+  const { bookingId } = req.params;
+  const { studioId } = req.query;
+  if (!studioId) {
+    return res.status(400).json({ error: 'studioId required' });
+  }
+
+  try {
+    const { data: photos, error } = await supabase
+      .from('booking_photos')
+      .select('*')
+      .eq('studio_id', studioId)
+      .eq('booking_id', bookingId)
+      .order('taken_at', { ascending: true });
+
+    if (error) throw error;
+
+    res.json({ photos: photos || [] });
+  } catch (error) {
+    console.error('Photo fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * POST /api/pieces/submit-for-dip
  * Staff submits pieces after customer finishes painting
  * Now captures customer data for loyalty foundation
@@ -774,12 +857,18 @@ app.post('/api/pieces/submit-for-dip', async (req, res) => {
           description: `Painted ${insertedPieces.length} piece(s)`
         });
 
-      // Update customer total pieces and points
+      // Update customer total pieces and points (increment, don't overwrite)
+      const { data: currentCustomer } = await supabase
+        .from('customers')
+        .select('total_pieces_painted, loyalty_points')
+        .eq('id', customerId)
+        .single();
+
       await supabase
         .from('customers')
         .update({
-          total_pieces_painted: customerId,
-          loyalty_points: customerId
+          total_pieces_painted: (currentCustomer?.total_pieces_painted || 0) + insertedPieces.length,
+          loyalty_points: (currentCustomer?.loyalty_points || 0) + pointsEarned
         })
         .eq('id', customerId);
     }
@@ -792,6 +881,210 @@ app.post('/api/pieces/submit-for-dip', async (req, res) => {
     });
   } catch (error) {
     console.error('Pieces submission error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/pieces/dipped
+ * Get list of pieces that are dipped and waiting to be assigned to a kiln session
+ */
+app.get('/api/pieces/dipped', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studio_id required' });
+
+  try {
+    const { data: pieces, error } = await supabase
+      .from('pottery_pieces')
+      .select('*')
+      .eq('studio_id', studioId)
+      .eq('status', 'dipped')
+      .is('kiln_session_id', null)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    res.json({ pieces: pieces || [] });
+  } catch (error) {
+    console.error('Error fetching dipped pieces:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/pieces/mark-dipped
+ * Move a set of pieces from ready_for_dip to dipped (staff has actually dipped them in glaze)
+ */
+app.post('/api/pieces/mark-dipped', async (req, res) => {
+  const { studioId, pieceIds } = req.body;
+  if (!studioId || !pieceIds || !Array.isArray(pieceIds)) {
+    return res.status(400).json({ error: 'studioId and pieceIds array required' });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('pottery_pieces')
+      .update({ status: 'dipped', updated_at: new Date().toISOString() })
+      .eq('studio_id', studioId)
+      .in('id', pieceIds)
+      .select('id');
+
+    if (error) throw error;
+
+    res.json({ status: 'updated', piecesCount: data.length });
+  } catch (error) {
+    console.error('Error marking pieces dipped:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/kiln-sessions
+ * Create a new kiln session (firing batch) and assign selected dipped pieces to it
+ */
+app.post('/api/kiln-sessions', async (req, res) => {
+  const { studioId, label, pieceIds } = req.body;
+  if (!studioId || !label) {
+    return res.status(400).json({ error: 'studioId and label required' });
+  }
+
+  try {
+    const { data: session, error: sessionError } = await supabase
+      .from('kiln_sessions')
+      .insert({ studio_id: studioId, label, status: 'loading' })
+      .select()
+      .single();
+
+    if (sessionError) throw sessionError;
+
+    // Assign pieces to this session, if any were provided at creation time
+    if (pieceIds && Array.isArray(pieceIds) && pieceIds.length > 0) {
+      const { error: assignError } = await supabase
+        .from('pottery_pieces')
+        .update({ kiln_session_id: session.id })
+        .eq('studio_id', studioId)
+        .in('id', pieceIds);
+
+      if (assignError) throw assignError;
+    }
+
+    res.json({ status: 'created', session });
+  } catch (error) {
+    console.error('Error creating kiln session:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/kiln-sessions/:sessionId/add-pieces
+ * Add more dipped pieces to an existing (not-yet-fired) kiln session
+ */
+app.post('/api/kiln-sessions/:sessionId/add-pieces', async (req, res) => {
+  const { sessionId } = req.params;
+  const { studioId, pieceIds } = req.body;
+  if (!studioId || !pieceIds || !Array.isArray(pieceIds)) {
+    return res.status(400).json({ error: 'studioId and pieceIds array required' });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('pottery_pieces')
+      .update({ kiln_session_id: sessionId })
+      .eq('studio_id', studioId)
+      .in('id', pieceIds)
+      .select('id');
+
+    if (error) throw error;
+
+    res.json({ status: 'updated', piecesCount: data.length });
+  } catch (error) {
+    console.error('Error adding pieces to session:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/kiln-sessions
+ * List kiln sessions for a studio (with piece counts), most recent first
+ */
+app.get('/api/kiln-sessions', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studio_id required' });
+
+  try {
+    const { data: sessions, error } = await supabase
+      .from('kiln_sessions')
+      .select('*, pottery_pieces(count)')
+      .eq('studio_id', studioId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.json({ sessions: sessions || [] });
+  } catch (error) {
+    console.error('Error fetching kiln sessions:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/kiln-sessions/:sessionId/fire
+ * Mark a kiln session as fired — bulk-updates every piece in the batch to 'fired'
+ */
+app.post('/api/kiln-sessions/:sessionId/fire', async (req, res) => {
+  const { sessionId } = req.params;
+  const { studioId } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    const { data: session, error: sessionError } = await supabase
+      .from('kiln_sessions')
+      .update({ status: 'fired', fired_at: new Date().toISOString() })
+      .eq('id', sessionId)
+      .eq('studio_id', studioId)
+      .select()
+      .single();
+
+    if (sessionError) throw sessionError;
+
+    const { data: pieces, error: piecesError } = await supabase
+      .from('pottery_pieces')
+      .update({ status: 'fired', updated_at: new Date().toISOString() })
+      .eq('kiln_session_id', sessionId)
+      .select('id');
+
+    if (piecesError) throw piecesError;
+
+    res.json({ status: 'fired', session, piecesFired: pieces.length });
+  } catch (error) {
+    console.error('Error firing kiln session:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/pieces/mark-picked-up
+ * Mark fired pieces as collected by the customer
+ */
+app.post('/api/pieces/mark-picked-up', async (req, res) => {
+  const { studioId, pieceIds } = req.body;
+  if (!studioId || !pieceIds || !Array.isArray(pieceIds)) {
+    return res.status(400).json({ error: 'studioId and pieceIds array required' });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('pottery_pieces')
+      .update({ status: 'picked_up', updated_at: new Date().toISOString() })
+      .eq('studio_id', studioId)
+      .in('id', pieceIds)
+      .select('id');
+
+    if (error) throw error;
+
+    res.json({ status: 'updated', piecesCount: data.length });
+  } catch (error) {
+    console.error('Error marking pieces picked up:', error);
     res.status(500).json({ error: error.message });
   }
 });

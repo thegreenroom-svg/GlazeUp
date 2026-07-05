@@ -692,6 +692,27 @@
           <button class="btn-connect" style="margin-top: 16px; width: 100%;" onclick="openQRModal()">📱 Scan QR Code to Submit Pieces</button>
         </div>
 
+        <!-- Kiln Sessions -->
+        <div class="chart-container">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="margin: 0;">Kiln Firing</h3>
+            <button onclick="loadKilnData()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
+          </div>
+
+          <!-- Dipped pieces waiting to go into a session -->
+          <div style="font-size: 12px; color: var(--gu-dust); font-weight: bold; margin-bottom: 8px;">Dipped pieces waiting for kiln:</div>
+          <div id="dipped-pieces-list" style="margin-bottom: 12px;">
+            <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
+          </div>
+          <button class="btn-connect" style="width: 100%; margin-bottom: 20px;" onclick="createKilnSession()">🔥 Create Kiln Session from Selected</button>
+
+          <!-- Existing kiln sessions -->
+          <div style="font-size: 12px; color: var(--gu-dust); font-weight: bold; margin-bottom: 8px; border-top: 1px solid var(--gu-border); padding-top: 12px;">Kiln sessions:</div>
+          <div id="kiln-sessions-list">
+            <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
+          </div>
+        </div>
+
         <!-- Current Inventory -->
         <div class="chart-container">
           <h3>Current Bisque Stock (from Square)</h3>
@@ -1037,6 +1058,14 @@
         </div>
       </div>
 
+      <!-- Collection photos for this booking (helps identify pieces at kiln-unload time) -->
+      <div id="collection-photos-section" style="display: none; margin-bottom: 16px;">
+        <div style="font-size: 12px; color: var(--gu-dust); font-weight: bold; margin-bottom: 8px;">📷 Photos taken at collection:</div>
+        <div id="collection-photos-gallery" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
       <div style="margin-bottom: 16px; font-size: 12px; color: var(--gu-dust);">
         Check <strong>Complete</strong> or <strong>Incomplete</strong> for each piece today. 
         If incomplete, customer can return to finish later.
@@ -1045,6 +1074,20 @@
       <!-- Pieces list (for today's session) -->
       <div id="modal-pieces-list">
         <!-- Populated by JS -->
+      </div>
+
+      <!-- Photo capture: take a photo of the table/nameplate at collection time -->
+      <div style="margin-top: 16px; padding: 12px; background: #f7f7f7; border-radius: 8px;">
+        <div style="font-size: 12px; color: var(--gu-dust); font-weight: bold; margin-bottom: 8px;">
+          📷 Photo of pieces (against QR nameplate)
+        </div>
+        <div id="photo-preview-container" style="display: none; margin-bottom: 8px;">
+          <img id="photo-preview" style="max-width: 100%; border-radius: 6px; max-height: 160px;">
+        </div>
+        <input type="file" id="photo-capture-input" accept="image/*" capture="environment" style="display: none;" onchange="handlePhotoCapture(event)">
+        <button type="button" onclick="document.getElementById('photo-capture-input').click()" style="width: 100%; padding: 10px; background: #fff; border: 1px dashed var(--gu-primary); border-radius: 6px; color: var(--gu-primary); font-weight: 500; cursor: pointer;">
+          <span id="photo-capture-label">Take Photo</span>
+        </button>
       </div>
     </div>
 
@@ -1239,6 +1282,7 @@ function goToTab(tab, event) {
   // Load data for specific tabs
   if (tab === 'staff') {
     loadPiecesAwaitingDip();
+    loadKilnData();
   } else if (tab === 'dashboard') {
     populateDashboard();
   }
@@ -1452,18 +1496,45 @@ function displayPieces(pieces) {
         minute: '2-digit'
       });
 
+      const pieceIdsJson = JSON.stringify(booking.pieces.map(p => p.id)).replace(/"/g, '&quot;');
+
       return `
         <div style="padding: 12px; background: #fff9f0; border-left: 4px solid var(--gu-primary); margin-bottom: 8px; border-radius: 4px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
             <strong>${booking.customerName}</strong>
             <span style="font-size: 11px; color: var(--gu-dust);">Ready ${submitTime}</span>
           </div>
-          <div style="color: var(--gu-dust); font-size: 12px;">
+          <div style="color: var(--gu-dust); font-size: 12px; margin-bottom: 8px;">
             ${piecesList} <span style="float: right; color: var(--gu-primary); font-weight: bold;">${booking.pieces.length} piece${booking.pieces.length !== 1 ? 's' : ''}</span>
           </div>
+          <button onclick='markPiecesDipped(${pieceIdsJson})' style="width: 100%; background: #fff; border: 1px solid var(--gu-primary); color: var(--gu-primary); padding: 6px; border-radius: 6px; font-size: 12px; cursor: pointer;">Mark as Dipped</button>
         </div>
       `;
     }).join('');
+  }
+}
+
+async function markPiecesDipped(pieceIds) {
+  try {
+    if (!apiConnected) {
+      alert('API not connected - cannot mark pieces dipped');
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/api/pieces/mark-dipped`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, pieceIds })
+    });
+
+    if (res.ok) {
+      loadPiecesAwaitingDip();
+      loadDippedPieces();
+    } else {
+      alert('Error marking pieces dipped: ' + res.statusText);
+    }
+  } catch (err) {
+    alert('Could not mark pieces dipped: ' + err.message);
   }
 }
 
@@ -1503,6 +1574,152 @@ function displayMockPieces() {
   
   displayPieces(mockPieces);
 }
+
+// ══════════════════════════════════════════════════════════
+// KILN SESSIONS
+// ══════════════════════════════════════════════════════════
+
+function loadKilnData() {
+  loadDippedPieces();
+  loadKilnSessions();
+}
+
+async function loadDippedPieces() {
+  const container = document.getElementById('dipped-pieces-list');
+  try {
+    if (!apiConnected) {
+      container.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Connect API to load dipped pieces</div>`;
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/api/pieces/dipped?studioId=${studioId}`);
+    if (!res.ok) throw new Error('Failed to load');
+    const data = await res.json();
+
+    if (!data.pieces || data.pieces.length === 0) {
+      container.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">No dipped pieces waiting</div>`;
+      return;
+    }
+
+    const pieceEmojis = { mug: '🍲', plate: '🍽️', bowl: '🥣', tile: '🧱', cup: '☕', planter: '🌿', vase: '🌸' };
+
+    container.innerHTML = data.pieces.map(p => {
+      const emoji = pieceEmojis[p.piece_type?.toLowerCase()] || '🎨';
+      return `
+        <label style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #f7f7f7; border-radius: 6px; margin-bottom: 4px; font-size: 13px; cursor: pointer;">
+          <input type="checkbox" class="dipped-piece-checkbox" value="${p.id}" checked>
+          <span>${emoji} ${p.piece_type}</span>
+        </label>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Error loading dipped pieces:', err);
+    container.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Could not load dipped pieces</div>`;
+  }
+}
+
+async function createKilnSession() {
+  const checkboxes = document.querySelectorAll('.dipped-piece-checkbox:checked');
+  const pieceIds = Array.from(checkboxes).map(cb => cb.value);
+
+  if (pieceIds.length === 0) {
+    alert('Select at least one piece to include in the firing');
+    return;
+  }
+
+  const label = prompt('Name this kiln session (e.g. "Firing #1 - 5th July"):', `Firing - ${new Date().toLocaleDateString('en-GB')}`);
+  if (!label) return;
+
+  try {
+    if (!apiConnected) {
+      alert('API not connected - cannot create kiln session');
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/api/kiln-sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, label, pieceIds })
+    });
+
+    if (res.ok) {
+      alert(`✓ Kiln session "${label}" created with ${pieceIds.length} piece(s)`);
+      loadKilnData();
+    } else {
+      alert('Error creating kiln session: ' + res.statusText);
+    }
+  } catch (err) {
+    alert('Could not create kiln session: ' + err.message);
+  }
+}
+
+async function loadKilnSessions() {
+  const container = document.getElementById('kiln-sessions-list');
+  try {
+    if (!apiConnected) {
+      container.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Connect API to load kiln sessions</div>`;
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/api/kiln-sessions?studioId=${studioId}`);
+    if (!res.ok) throw new Error('Failed to load');
+    const data = await res.json();
+
+    if (!data.sessions || data.sessions.length === 0) {
+      container.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">No kiln sessions yet</div>`;
+      return;
+    }
+
+    const statusColors = { loading: '#999', firing: '#e67e22', fired: '#27ae60' };
+    const statusLabels = { loading: 'Loading', firing: 'Firing', fired: 'Fired ✓' };
+
+    container.innerHTML = data.sessions.map(session => {
+      const pieceCount = session.pottery_pieces?.[0]?.count ?? 0;
+      const color = statusColors[session.status] || '#999';
+      const label = statusLabels[session.status] || session.status;
+
+      return `
+        <div style="padding: 12px; background: #fff9f0; border-left: 4px solid ${color}; margin-bottom: 8px; border-radius: 4px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="font-size: 13px;">${session.label}</strong>
+            <span style="font-size: 11px; color: ${color}; font-weight: bold;">${label}</span>
+          </div>
+          <div style="color: var(--gu-dust); font-size: 12px; margin-top: 4px;">
+            ${pieceCount} piece${pieceCount !== 1 ? 's' : ''}
+            ${session.status !== 'fired' ? `<button onclick="fireKilnSession('${session.id}')" style="float: right; background: var(--gu-primary); color: #fff; border: none; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer;">Mark Fired</button>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Error loading kiln sessions:', err);
+    container.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Could not load kiln sessions</div>`;
+  }
+}
+
+async function fireKilnSession(sessionId) {
+  if (!confirm('Mark this entire kiln session as fired? All pieces in this batch will move to "fired" status.')) return;
+
+  try {
+    const res = await fetch(`${API_URL}/api/kiln-sessions/${sessionId}/fire`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      alert(`✓ Session fired! ${data.piecesFired} piece(s) marked as fired.`);
+      loadKilnData();
+    } else {
+      alert('Error firing kiln session: ' + res.statusText);
+    }
+  } catch (err) {
+    alert('Could not fire kiln session: ' + err.message);
+  }
+}
+
+
 
 // Mock booking data (for demo without API)
 const mockBookings = {
@@ -1557,6 +1774,28 @@ let currentBookingCode = null;
 let currentBookingData = null;
 let pieceStates = {};
 let currentEntryMethod = 'qr'; // 'qr' or 'manual'
+let capturedPhotoBase64 = null;
+
+function handlePhotoCapture(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    capturedPhotoBase64 = e.target.result;
+    document.getElementById('photo-preview').src = capturedPhotoBase64;
+    document.getElementById('photo-preview-container').style.display = 'block';
+    document.getElementById('photo-capture-label').textContent = 'Retake Photo';
+  };
+  reader.readAsDataURL(file);
+}
+
+function resetPhotoCapture() {
+  capturedPhotoBase64 = null;
+  document.getElementById('photo-preview-container').style.display = 'none';
+  document.getElementById('photo-capture-label').textContent = 'Take Photo';
+  document.getElementById('photo-capture-input').value = '';
+}
 
 function setEntryMethod(method) {
   currentEntryMethod = method;
@@ -1632,6 +1871,39 @@ async function loadCustomerManually() {
   }
 }
 
+async function loadBookingPhotos(bookingCode) {
+  const section = document.getElementById('collection-photos-section');
+  const gallery = document.getElementById('collection-photos-gallery');
+
+  try {
+    if (!apiConnected) {
+      section.style.display = 'none';
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/api/booking-photos/${bookingCode}?studioId=${studioId}`);
+    if (!res.ok) {
+      section.style.display = 'none';
+      return;
+    }
+
+    const data = await res.json();
+    if (!data.photos || data.photos.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+
+    gallery.innerHTML = data.photos.map(photo => `
+      <img src="${photo.photo_url}" style="height: 100px; border-radius: 6px; flex-shrink: 0; cursor: pointer;" onclick="window.open('${photo.photo_url}', '_blank')">
+    `).join('');
+
+    section.style.display = 'block';
+  } catch (err) {
+    console.error('Error loading booking photos:', err);
+    section.style.display = 'none';
+  }
+}
+
 function displayBookingInfo(customerName, customerEmail, customerPhone) {
   // Update modal header
   const nameDisplay = customerName;
@@ -1639,9 +1911,14 @@ function displayBookingInfo(customerName, customerEmail, customerPhone) {
   document.getElementById('modal-customer-subtitle').textContent = 'Manual entry';
 
   // Store data in hidden fields
-  document.getElementById('modal-booking-code').value = '';
   document.getElementById('modal-customer-email').value = customerEmail || '';
   document.getElementById('modal-customer-phone').value = customerPhone || '';
+
+  // Load any existing collection photos for this booking (useful at kiln-unload time)
+  const bookingCodeForPhotos = document.getElementById('modal-booking-code').value;
+  if (bookingCodeForPhotos) {
+    loadBookingPhotos(bookingCodeForPhotos);
+  }
 
   // Show customer history if returning
   const historySection = document.getElementById('customer-history-section');
@@ -1763,6 +2040,10 @@ function openQRModal(bookingCode) {
   document.getElementById('manual-customer-name').value = '';
   document.getElementById('manual-customer-email').value = '';
   document.getElementById('manual-customer-phone').value = '';
+  document.getElementById('modal-booking-code').value = '';
+
+  // Reset photo capture
+  resetPhotoCapture();
   
   // Open modal
   document.getElementById('qr-modal').classList.add('active');
@@ -1861,8 +2142,27 @@ async function savePiecesToDatabase(bookingCode, pieces, summaryText, customerNa
 
     if (res.ok) {
       const data = await res.json();
+
+      // Upload the collection photo, if one was taken, linked to this booking
+      if (capturedPhotoBase64) {
+        try {
+          await fetch(`${API_URL}/api/booking-photos/upload`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              studioId: studioId,
+              bookingId: bookingCode,
+              photoBase64: capturedPhotoBase64
+            })
+          });
+        } catch (photoErr) {
+          console.error('Photo upload failed (pieces still saved):', photoErr);
+        }
+      }
+
       alert(summaryText + `\n✓ Saved ${data.piecesCount} piece(s) to database` +
             `\n💳 Customer: ${customerName}` +
+            (capturedPhotoBase64 ? `\n📷 Photo saved` : '') +
             (data.pointsEarned ? `\n⭐ Points earned: ${data.pointsEarned}` : ''));
       closeQRModal();
     } else {

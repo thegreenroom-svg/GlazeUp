@@ -476,6 +476,44 @@ All booking/QR/pieces submission/loyalty system now built and integrated.
 
 ---
 
+## Kiln Session Tracking + Collection Photos (2026-07-05)
+
+**Piece lifecycle simplified** to: `ready_for_dip` → `dipped` → `fired` → `picked_up`
+(No separate `in_kiln`/`ready_for_pickup` states — a piece's kiln status is implied by its linked kiln_session's status. Pieces are fired as whole batches, not individually.)
+
+**DB tables added:**
+- `kiln_sessions` (id, studio_id, label, status: loading/firing/fired, fired_at)
+- `pottery_pieces.kiln_session_id` (nullable FK — pieces can sit dipped/unassigned until there's room in a batch, supporting real batching behaviour where leftover pieces wait for a later firing)
+- `booking_photos` (id, studio_id, booking_id, photo_url, taken_at) + Supabase Storage bucket `booking-photos` (public)
+- ⚠️ PENDING: Daisy still needs to run this SQL to properly constrain the simplified status values (not yet confirmed done):
+  ```sql
+  ALTER TABLE pottery_pieces ADD CONSTRAINT pottery_pieces_status_check 
+    CHECK (status IN ('ready_for_dip', 'dipped', 'fired', 'picked_up'));
+  ```
+
+**API endpoints added:**
+- `GET /api/pieces/dipped` — dipped pieces not yet assigned to a kiln session
+- `POST /api/pieces/mark-dipped` — bulk move pieces ready_for_dip → dipped
+- `POST /api/kiln-sessions` — create a session + optionally assign pieces at creation
+- `POST /api/kiln-sessions/:id/add-pieces` — add more dipped pieces to an existing session
+- `GET /api/kiln-sessions` — list sessions with piece counts
+- `POST /api/kiln-sessions/:id/fire` — bulk-fires the whole batch (session → fired, all its pieces → fired)
+- `POST /api/pieces/mark-picked-up` — mark fired pieces as collected
+- `POST /api/booking-photos/upload` — upload a photo (base64) linked to a booking_id, stored in Supabase Storage
+- `GET /api/booking-photos/:bookingId` — fetch photos for a booking (used at kiln-unload time to ID whose pieces are whose)
+
+**Also fixed a pre-existing bug:** loyalty points/total_pieces_painted update was overwriting those fields with the customer's UUID instead of incrementing — now correctly increments.
+
+**Dashboard UI added:**
+- Staff tab → "Mark as Dipped" button per booking group in the Pieces Ready for Dip list
+- Staff tab → new "Kiln Firing" section: shows dipped pieces (checkboxes) → "Create Kiln Session" → lists sessions with status + "Mark Fired" bulk action
+- Pieces submission modal → camera capture ("Take Photo") of the table/nameplate at collection time, uploaded alongside piece submission
+- Booking lookup (QR or manual) → shows any previously-taken collection photos for that booking, so staff can scan the same QR at kiln-unload time to instantly see who the pieces belong to
+
+**Not yet built:** UI for `mark-picked-up` (currently API-only, no button in dashboard yet) — flag for a future session if wanted.
+
+---
+
 ## Future Feature Reminder (Phase 3/4: Billing)
 
 **SPLIT BILLS + MULTI-CUSTOMER LOYALTY**
