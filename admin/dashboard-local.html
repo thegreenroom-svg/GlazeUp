@@ -247,6 +247,24 @@
       opacity: 0.85;
     }
 
+    .staff-subtab-btn {
+      background: #f0f0f0;
+      color: var(--gu-text);
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-family: var(--gu-font-body);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .staff-subtab-btn.active {
+      background: var(--gu-primary);
+      color: #fff;
+    }
+
     .status-badge {
       display: inline-block;
       padding: 4px 10px;
@@ -675,78 +693,161 @@
       <div id="staff-view" class="view" style="display: none;">
         <h2 style="margin-top: 0;">Studio Staff Dashboard</h2>
 
-        <div class="info-banner">
-          <strong>📋 Daily Workflow:</strong> Print bookings card with QR code. Scan at start of session to check in. Scan at end to mark pieces ready for dip.
+        <!-- Sub-navigation for the 3-stage table workflow -->
+        <div style="display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
+          <button onclick="showStaffSection('booking')" id="staff-subtab-booking" class="staff-subtab-btn">1. Booking Details</button>
+          <button onclick="showStaffSection('engagement')" id="staff-subtab-engagement" class="staff-subtab-btn">2. Customer Engagement</button>
+          <button onclick="showStaffSection('completion')" id="staff-subtab-completion" class="staff-subtab-btn">3. Completion</button>
+          <button onclick="showStaffSection('kiln')" id="staff-subtab-kiln" class="staff-subtab-btn">Kiln &amp; Inventory</button>
         </div>
 
-        <!-- Pieces Ready for Dip -->
-        <div class="chart-container">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <h3 style="margin: 0;">Pieces Ready for Dip</h3>
-            <button onclick="loadPiecesAwaitingDip()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
-          </div>
-          <div class="pieces-awaiting-dip-list" id="pieces-list-container">
-            <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading pieces...</div>
+        <!-- ═══════════════════════════════════ -->
+        <!-- SECTION 1: BOOKING DETAILS (arrival) -->
+        <!-- ═══════════════════════════════════ -->
+        <div id="staff-section-booking" class="staff-section">
+          <div class="info-banner">
+            <strong>📋 Step 1:</strong> Look up the booking, check for returning/unfinished pieces, then assign a table and open the session.
           </div>
 
-          <button class="btn-connect" style="margin-top: 16px; width: 100%;" onclick="openQRModal()">📱 Scan QR Code to Submit Pieces</button>
+          <div class="chart-container">
+            <h3>Look Up Booking</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+              <input type="text" id="s1-booking-code" placeholder="Booking code / QR scan" style="padding: 10px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px;">
+              <input type="text" id="s1-customer-name" placeholder="Or customer name" style="padding: 10px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px;">
+            </div>
+            <button class="btn-connect" style="width: 100%;" onclick="lookupBookingSection1()">Look Up Booking</button>
+
+            <div id="s1-result" style="display: none; margin-top: 16px;">
+              <div class="booking-header">
+                <div class="name" id="s1-customer-display">—</div>
+                <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;" id="s1-party-display"></div>
+              </div>
+
+              <div id="s1-returning-section" style="display: none; padding: 12px; background: #fff3f0; border-radius: 8px; margin: 12px 0; border-left: 4px solid #d9534f;">
+                <div style="font-size: 12px; color: #d9534f; font-weight: bold; margin-bottom: 6px;">⚠️ Returning pieces — studio fee payable:</div>
+                <ul id="s1-returning-list" style="margin: 0; padding-left: 16px; font-size: 12px;"></ul>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
+                <input type="text" id="s1-table-number" placeholder="Table number">
+                <input type="number" id="s1-num-places" placeholder="Number of places" min="1">
+              </div>
+              <button class="btn-connect" style="width: 100%; margin-top: 12px;" onclick="openTableSession()">🪑 Open Table</button>
+            </div>
+          </div>
         </div>
 
-        <!-- Kiln Sessions -->
-        <div class="chart-container">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <h3 style="margin: 0;">Kiln Firing</h3>
-            <button onclick="loadKilnData()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
+        <!-- ═══════════════════════════════════════ -->
+        <!-- SECTION 2: CUSTOMER ENGAGEMENT (live)    -->
+        <!-- ═══════════════════════════════════════ -->
+        <div id="staff-section-engagement" class="staff-section" style="display: none;">
+          <div class="info-banner">
+            <strong>🎨 Step 2:</strong> Once seated, log the piece(s) chosen, drinks, and any extra glazes. Come back anytime during the session to add more.
           </div>
 
-          <!-- Dipped pieces waiting to go into a session -->
-          <div style="font-size: 12px; color: var(--gu-dust); font-weight: bold; margin-bottom: 8px;">Dipped pieces waiting for kiln:</div>
-          <div id="dipped-pieces-list" style="margin-bottom: 12px;">
-            <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
+          <div class="chart-container">
+            <h3>Select Table</h3>
+            <select id="s2-table-select" onchange="loadTableOrders('s2')" style="width: 100%; padding: 10px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px;">
+              <option value="">Loading open tables...</option>
+            </select>
           </div>
-          <button class="btn-connect" style="width: 100%; margin-bottom: 20px;" onclick="createKilnSession()">🔥 Create Kiln Session from Selected</button>
 
-          <!-- Existing kiln sessions -->
-          <div style="font-size: 12px; color: var(--gu-dust); font-weight: bold; margin-bottom: 8px; border-top: 1px solid var(--gu-border); padding-top: 12px;">Kiln sessions:</div>
-          <div id="kiln-sessions-list">
-            <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
+          <div id="s2-order-panel" class="chart-container" style="display: none;">
+            <h3 id="s2-table-heading">Table</h3>
+            <div style="display: grid; grid-template-columns: 1fr 2fr auto; gap: 8px; margin-bottom: 12px;">
+              <select id="s2-item-type" style="padding: 8px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px;">
+                <option value="piece">Piece</option>
+                <option value="drink">Drink</option>
+                <option value="glaze">Extra Glaze</option>
+              </select>
+              <input type="text" id="s2-item-name" placeholder="e.g. Mug, Coffee, Ocean Blue" style="padding: 8px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px;">
+              <button class="btn-connect" onclick="addTableOrder()">Add</button>
+            </div>
+            <div id="s2-orders-list"></div>
           </div>
         </div>
 
-        <!-- Current Inventory -->
-        <div class="chart-container">
-          <h3>Current Bisque Stock (from Square)</h3>
-          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
-            <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;">
-              <div style="font-size: 12px; color: var(--gu-dust); margin-bottom: 4px;">Mugs</div>
-              <div style="font-size: 28px; font-weight: bold; color: var(--gu-primary);">24</div>
-              <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;">in stock</div>
-            </div>
-            <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;">
-              <div style="font-size: 12px; color: var(--gu-dust); margin-bottom: 4px;">Plates</div>
-              <div style="font-size: 28px; font-weight: bold; color: var(--gu-primary);">18</div>
-              <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;">in stock</div>
-            </div>
-            <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;">
-              <div style="font-size: 12px; color: var(--gu-dust); margin-bottom: 4px;">Bowls</div>
-              <div style="font-size: 28px; font-weight: bold; color: var(--gu-primary);">12</div>
-              <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;">in stock</div>
-            </div>
-            <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;">
-              <div style="font-size: 12px; color: var(--gu-dust); margin-bottom: 4px;">Tiles</div>
-              <div style="font-size: 28px; font-weight: bold; color: var(--gu-primary);">8</div>
-              <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;">in stock</div>
+        <!-- ═══════════════════════════════ -->
+        <!-- SECTION 3: COMPLETION (end)     -->
+        <!-- ═══════════════════════════════ -->
+        <div id="staff-section-completion" class="staff-section" style="display: none;">
+          <div class="info-banner">
+            <strong>📷 Step 3:</strong> When a piece is finished, take a photo and submit it — this closes the table and sends pieces to the dip/kiln workflow.
+          </div>
+
+          <div class="chart-container">
+            <h3>Open Tables</h3>
+            <div id="s3-open-tables-list">
+              <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
             </div>
           </div>
-          <button class="btn-connect" style="margin-top: 16px; width: 100%;">Sync Inventory from Square</button>
         </div>
 
-        <!-- Quick Actions -->
-        <div class="chart-container">
-          <h3>Quick Actions</h3>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <button class="btn-connect">📦 Create Kiln Session</button>
-            <button class="btn-connect">🔄 Refresh Data</button>
+        <!-- ═══════════════════════════ -->
+        <!-- KILN & INVENTORY (back of house) -->
+        <!-- ═══════════════════════════ -->
+        <div id="staff-section-kiln" class="staff-section" style="display: none;">
+
+          <!-- Pieces Ready for Dip -->
+          <div class="chart-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="margin: 0;">Pieces Ready for Dip</h3>
+              <button onclick="loadPiecesAwaitingDip()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
+            </div>
+            <div class="pieces-awaiting-dip-list" id="pieces-list-container">
+              <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading pieces...</div>
+            </div>
+
+            <button class="btn-connect" style="margin-top: 16px; width: 100%;" onclick="openQRModal()">📱 Scan QR Code to Submit Pieces</button>
+          </div>
+
+          <!-- Kiln Sessions -->
+          <div class="chart-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="margin: 0;">Kiln Firing</h3>
+              <button onclick="loadKilnData()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
+            </div>
+
+            <!-- Dipped pieces waiting to go into a session -->
+            <div style="font-size: 12px; color: var(--gu-dust); font-weight: bold; margin-bottom: 8px;">Dipped pieces waiting for kiln:</div>
+            <div id="dipped-pieces-list" style="margin-bottom: 12px;">
+              <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
+            </div>
+            <button class="btn-connect" style="width: 100%; margin-bottom: 20px;" onclick="createKilnSession()">🔥 Create Kiln Session from Selected</button>
+
+            <!-- Existing kiln sessions -->
+            <div style="font-size: 12px; color: var(--gu-dust); font-weight: bold; margin-bottom: 8px; border-top: 1px solid var(--gu-border); padding-top: 12px;">Kiln sessions:</div>
+            <div id="kiln-sessions-list">
+              <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
+            </div>
+          </div>
+
+          <!-- Current Inventory -->
+          <div class="chart-container">
+            <h3>Current Bisque Stock (from Square)</h3>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+              <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;">
+                <div style="font-size: 12px; color: var(--gu-dust); margin-bottom: 4px;">Mugs</div>
+                <div style="font-size: 28px; font-weight: bold; color: var(--gu-primary);">24</div>
+                <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;">in stock</div>
+              </div>
+              <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;">
+                <div style="font-size: 12px; color: var(--gu-dust); margin-bottom: 4px;">Plates</div>
+                <div style="font-size: 28px; font-weight: bold; color: var(--gu-primary);">18</div>
+                <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;">in stock</div>
+              </div>
+              <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;">
+                <div style="font-size: 12px; color: var(--gu-dust); margin-bottom: 4px;">Bowls</div>
+                <div style="font-size: 28px; font-weight: bold; color: var(--gu-primary);">12</div>
+                <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;">in stock</div>
+              </div>
+              <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;">
+                <div style="font-size: 12px; color: var(--gu-dust); margin-bottom: 4px;">Tiles</div>
+                <div style="font-size: 28px; font-weight: bold; color: var(--gu-primary);">8</div>
+                <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;">in stock</div>
+              </div>
+            </div>
+            <button class="btn-connect" style="margin-top: 16px; width: 100%;">Sync Inventory from Square</button>
           </div>
         </div>
 
@@ -1290,8 +1391,7 @@ function goToTab(tab, event) {
   
   // Load data for specific tabs
   if (tab === 'staff') {
-    loadPiecesAwaitingDip();
-    loadKilnData();
+    showStaffSection('booking');
   } else if (tab === 'dashboard') {
     populateDashboard();
   } else if (tab === 'setup') {
@@ -1675,6 +1775,297 @@ async function saveTableTrackingMode() {
   } catch (err) {
     alert('Could not save setting: ' + err.message);
   }
+}
+
+// ══════════════════════════════════════════════════════════
+// STAFF TAB: 3-SECTION TABLE WORKFLOW
+// (Booking Details → Customer Engagement → Completion)
+// ══════════════════════════════════════════════════════════
+
+let s1LookedUpBooking = null; // holds the booking currently looked up in Section 1
+let s2SelectedTableSessionId = null;
+let completingTableSessionId = null; // set when Section 3 opens the submit modal, so we close the table session after
+
+function showStaffSection(section) {
+  ['booking', 'engagement', 'completion', 'kiln'].forEach(s => {
+    document.getElementById(`staff-section-${s}`).style.display = (s === section) ? 'block' : 'none';
+    document.getElementById(`staff-subtab-${s}`).classList.toggle('active', s === section);
+  });
+
+  if (section === 'engagement') {
+    loadOpenTablesIntoSelect();
+  } else if (section === 'completion') {
+    loadOpenTablesForCompletion();
+  } else if (section === 'kiln') {
+    loadPiecesAwaitingDip();
+    loadKilnData();
+  }
+}
+
+// ── Section 1: Booking Details ──
+
+async function lookupBookingSection1() {
+  const bookingCode = document.getElementById('s1-booking-code').value.trim();
+  const customerName = document.getElementById('s1-customer-name').value.trim();
+
+  if (!bookingCode && !customerName) {
+    alert('Enter a booking code or customer name');
+    return;
+  }
+
+  try {
+    let bookingData;
+
+    if (!apiConnected) {
+      // Fall back to mock data for demo purposes
+      bookingData = mockBookings[bookingCode] || Object.values(mockBookings)[0];
+    } else if (bookingCode) {
+      const res = await fetch(`${API_URL}/api/booking/${bookingCode}?studioId=${studioId}`);
+      if (!res.ok) {
+        alert('Booking not found');
+        return;
+      }
+      const data = await res.json();
+      bookingData = {
+        bookingCode: bookingCode,
+        customerName: data.booking.customerName,
+        partySize: data.booking.partySize,
+        customerHistory: data.customerHistory
+      };
+    } else {
+      // Manual name-only lookup — treat as a fresh walk-in, generate a code
+      bookingData = {
+        bookingCode: `manual-${Date.now()}`,
+        customerName: customerName,
+        partySize: null,
+        customerHistory: { isReturningCustomer: false, unfinishedPieces: [], unfinishedCount: 0 }
+      };
+    }
+
+    s1LookedUpBooking = bookingData;
+
+    document.getElementById('s1-customer-display').textContent = bookingData.customerName;
+    document.getElementById('s1-party-display').textContent = bookingData.partySize ? `Party of ${bookingData.partySize}` : '';
+
+    const returningSection = document.getElementById('s1-returning-section');
+    if (bookingData.customerHistory?.unfinishedCount > 0) {
+      returningSection.style.display = 'block';
+      document.getElementById('s1-returning-list').innerHTML = bookingData.customerHistory.unfinishedPieces.map(p =>
+        `<li>${p.piece_type} — fee payable on completion</li>`
+      ).join('');
+    } else {
+      returningSection.style.display = 'none';
+    }
+
+    // Pre-fill number of places from party size if known
+    if (bookingData.partySize) {
+      document.getElementById('s1-num-places').value = bookingData.partySize;
+    }
+
+    document.getElementById('s1-result').style.display = 'block';
+  } catch (err) {
+    alert('Error looking up booking: ' + err.message);
+  }
+}
+
+async function openTableSession() {
+  if (!s1LookedUpBooking) {
+    alert('Look up a booking first');
+    return;
+  }
+
+  const tableNumber = document.getElementById('s1-table-number').value.trim();
+  const numberOfPlaces = parseInt(document.getElementById('s1-num-places').value) || null;
+
+  try {
+    if (!apiConnected) {
+      alert(`Table opened (demo mode): ${tableNumber || 'unassigned'} for ${s1LookedUpBooking.customerName}`);
+      resetSection1();
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/api/table-sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId,
+        bookingId: s1LookedUpBooking.bookingCode,
+        tableNumber,
+        numberOfPlaces
+      })
+    });
+
+    if (res.ok) {
+      alert(`✓ Table ${tableNumber || ''} opened for ${s1LookedUpBooking.customerName}`);
+      resetSection1();
+    } else {
+      alert('Error opening table: ' + res.statusText);
+    }
+  } catch (err) {
+    alert('Could not open table: ' + err.message);
+  }
+}
+
+function resetSection1() {
+  s1LookedUpBooking = null;
+  document.getElementById('s1-booking-code').value = '';
+  document.getElementById('s1-customer-name').value = '';
+  document.getElementById('s1-table-number').value = '';
+  document.getElementById('s1-num-places').value = '';
+  document.getElementById('s1-result').style.display = 'none';
+}
+
+// ── Section 2: Customer Engagement ──
+
+async function loadOpenTablesIntoSelect() {
+  const select = document.getElementById('s2-table-select');
+  try {
+    if (!apiConnected) {
+      select.innerHTML = `<option value="">Connect API to load open tables</option>`;
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/api/table-sessions?studioId=${studioId}&status=open`);
+    if (!res.ok) throw new Error('Failed to load');
+    const data = await res.json();
+
+    if (!data.sessions || data.sessions.length === 0) {
+      select.innerHTML = `<option value="">No open tables — open one in Step 1</option>`;
+      document.getElementById('s2-order-panel').style.display = 'none';
+      return;
+    }
+
+    select.innerHTML = `<option value="">Select a table...</option>` + data.sessions.map(s =>
+      `<option value="${s.id}" data-booking="${s.booking_id}" data-table="${s.table_number || ''}">Table ${s.table_number || '?'} — ${s.booking_id}</option>`
+    ).join('');
+  } catch (err) {
+    console.error('Error loading open tables:', err);
+    select.innerHTML = `<option value="">Could not load open tables</option>`;
+  }
+}
+
+async function loadTableOrders(prefix) {
+  const select = document.getElementById(`${prefix}-table-select`);
+  const sessionId = select.value;
+  const panel = document.getElementById(`${prefix}-order-panel`);
+
+  if (!sessionId) {
+    panel.style.display = 'none';
+    return;
+  }
+
+  s2SelectedTableSessionId = sessionId;
+  const selectedOption = select.options[select.selectedIndex];
+  document.getElementById(`${prefix}-table-heading`).textContent = `Table ${selectedOption.dataset.table || '?'}`;
+  panel.style.display = 'block';
+
+  await refreshOrdersList(sessionId, prefix);
+}
+
+async function refreshOrdersList(sessionId, prefix) {
+  const listEl = document.getElementById(`${prefix}-orders-list`);
+  try {
+    const res = await fetch(`${API_URL}/api/table-sessions/${sessionId}/orders`);
+    if (!res.ok) throw new Error('Failed to load orders');
+    const data = await res.json();
+
+    const typeEmojis = { piece: '🎨', drink: '☕', glaze: '🖌️' };
+
+    if (!data.orders || data.orders.length === 0) {
+      listEl.innerHTML = `<div style="padding: 8px; color: var(--gu-dust); font-size: 12px;">Nothing added yet</div>`;
+      return;
+    }
+
+    listEl.innerHTML = data.orders.map(o => `
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: #f7f7f7; border-radius: 6px; margin-bottom: 4px; font-size: 13px;">
+        <span>${typeEmojis[o.item_type] || '•'} ${o.item_name} <span style="color: var(--gu-dust); font-size: 11px;">(${o.item_type})</span></span>
+        <button onclick="deleteTableOrder('${o.id}', '${sessionId}', '${prefix}')" style="background: none; border: none; color: #d9534f; cursor: pointer; font-size: 12px;">✕</button>
+      </div>
+    `).join('');
+  } catch (err) {
+    listEl.innerHTML = `<div style="padding: 8px; color: var(--gu-dust); font-size: 12px;">Could not load</div>`;
+  }
+}
+
+async function addTableOrder() {
+  if (!s2SelectedTableSessionId) {
+    alert('Select a table first');
+    return;
+  }
+
+  const itemType = document.getElementById('s2-item-type').value;
+  const itemName = document.getElementById('s2-item-name').value.trim();
+
+  if (!itemName) {
+    alert('Enter what was chosen');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/api/table-sessions/${s2SelectedTableSessionId}/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ itemType, itemName })
+    });
+
+    if (res.ok) {
+      document.getElementById('s2-item-name').value = '';
+      refreshOrdersList(s2SelectedTableSessionId, 's2');
+    } else {
+      alert('Error adding item: ' + res.statusText);
+    }
+  } catch (err) {
+    alert('Could not add item: ' + err.message);
+  }
+}
+
+async function deleteTableOrder(orderId, sessionId, prefix) {
+  try {
+    await fetch(`${API_URL}/api/table-sessions/orders/${orderId}`, { method: 'DELETE' });
+    refreshOrdersList(sessionId, prefix);
+  } catch (err) {
+    alert('Could not remove item: ' + err.message);
+  }
+}
+
+// ── Section 3: Completion ──
+
+async function loadOpenTablesForCompletion() {
+  const listEl = document.getElementById('s3-open-tables-list');
+  try {
+    if (!apiConnected) {
+      listEl.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Connect API to load open tables</div>`;
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/api/table-sessions?studioId=${studioId}&status=open`);
+    if (!res.ok) throw new Error('Failed to load');
+    const data = await res.json();
+
+    if (!data.sessions || data.sessions.length === 0) {
+      listEl.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">No open tables right now</div>`;
+      return;
+    }
+
+    listEl.innerHTML = data.sessions.map(s => `
+      <div style="padding: 12px; background: #fff9f0; border-left: 4px solid var(--gu-primary); margin-bottom: 8px; border-radius: 4px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <strong>Table ${s.table_number || '?'}</strong>
+          <span style="font-size: 11px; color: var(--gu-dust);">${s.booking_id}</span>
+        </div>
+        <button class="btn-connect" style="width: 100%;" onclick="completeTableFromSection3('${s.id}', '${s.booking_id}')">📷 Take Photo &amp; Submit Pieces</button>
+      </div>
+    `).join('');
+  } catch (err) {
+    listEl.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Could not load open tables</div>`;
+  }
+}
+
+function completeTableFromSection3(tableSessionId, bookingCode) {
+  // Reuse the existing pieces-submission modal (QR/manual lookup, photo capture, submit)
+  // and remember which table session to close once submission succeeds
+  completingTableSessionId = tableSessionId;
+  openQRModal(bookingCode);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -2161,6 +2552,7 @@ function closeQRModal() {
   currentBookingCode = null;
   currentBookingData = null;
   pieceStates = {};
+  completingTableSessionId = null;
 }
 
 function handlePieceChange(pieceId) {
@@ -2266,6 +2658,21 @@ async function savePiecesToDatabase(bookingCode, pieces, summaryText, customerNa
             `\n💳 Customer: ${customerName}` +
             (capturedPhotoBase64 ? `\n📷 Photo saved` : '') +
             (data.pointsEarned ? `\n⭐ Points earned: ${data.pointsEarned}` : ''));
+
+      // If this submission came from Section 3 (Completion), close out the table session too
+      if (completingTableSessionId) {
+        try {
+          await fetch(`${API_URL}/api/table-sessions/${completingTableSessionId}/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } catch (sessionErr) {
+          console.error('Could not close table session (pieces still saved):', sessionErr);
+        }
+        completingTableSessionId = null;
+        loadOpenTablesForCompletion();
+      }
+
       closeQRModal();
     } else {
       alert('Error saving pieces: ' + res.statusText);

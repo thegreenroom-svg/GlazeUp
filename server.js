@@ -685,6 +685,167 @@ app.get('/api/booking/:bookingCode', async (req, res) => {
 });
 
 /**
+ * POST /api/table-sessions
+ * Section 1 (Booking Details): "Open" a table — staff have looked up the booking,
+ * assigned a table number, and confirmed number of places
+ */
+app.post('/api/table-sessions', async (req, res) => {
+  const { studioId, bookingId, tableNumber, numberOfPlaces } = req.body;
+  if (!studioId || !bookingId) {
+    return res.status(400).json({ error: 'studioId and bookingId required' });
+  }
+
+  try {
+    const { data: session, error } = await supabase
+      .from('table_sessions')
+      .insert({
+        studio_id: studioId,
+        booking_id: bookingId,
+        table_number: tableNumber || null,
+        number_of_places: numberOfPlaces || null,
+        status: 'open'
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ status: 'opened', session });
+  } catch (error) {
+    console.error('Error opening table session:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/table-sessions
+ * List sessions for a studio, optionally filtered by status (open/completed)
+ * Used by Section 2 (Customer Engagement) and Section 3 (Completion) to pick an active table
+ */
+app.get('/api/table-sessions', async (req, res) => {
+  const { studioId, status } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    let query = supabase
+      .from('table_sessions')
+      .select('*')
+      .eq('studio_id', studioId)
+      .order('created_at', { ascending: false });
+
+    if (status) query = query.eq('status', status);
+
+    const { data: sessions, error } = await query;
+    if (error) throw error;
+
+    res.json({ sessions: sessions || [] });
+  } catch (error) {
+    console.error('Error listing table sessions:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/table-sessions/:sessionId/orders
+ * Section 2 (Customer Engagement): add a piece/drink/glaze to the running list
+ * for this table. Can be called repeatedly throughout the session.
+ */
+app.post('/api/table-sessions/:sessionId/orders', async (req, res) => {
+  const { sessionId } = req.params;
+  const { itemType, itemName, notes } = req.body;
+  if (!itemType || !itemName) {
+    return res.status(400).json({ error: 'itemType and itemName required' });
+  }
+  if (!['piece', 'drink', 'glaze'].includes(itemType)) {
+    return res.status(400).json({ error: 'itemType must be piece, drink, or glaze' });
+  }
+
+  try {
+    const { data: order, error } = await supabase
+      .from('table_session_orders')
+      .insert({
+        table_session_id: sessionId,
+        item_type: itemType,
+        item_name: itemName,
+        notes: notes || null
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ status: 'added', order });
+  } catch (error) {
+    console.error('Error adding table session order:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/table-sessions/:sessionId/orders
+ * Get the running list of pieces/drinks/glazes for a table
+ */
+app.get('/api/table-sessions/:sessionId/orders', async (req, res) => {
+  const { sessionId } = req.params;
+
+  try {
+    const { data: orders, error } = await supabase
+      .from('table_session_orders')
+      .select('*')
+      .eq('table_session_id', sessionId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    res.json({ orders: orders || [] });
+  } catch (error) {
+    console.error('Error fetching table session orders:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * DELETE /api/table-sessions/orders/:orderId
+ * Remove a mistakenly-added item from the running list
+ */
+app.delete('/api/table-sessions/orders/:orderId', async (req, res) => {
+  const { orderId } = req.params;
+
+  try {
+    const { error } = await supabase
+      .from('table_session_orders')
+      .delete()
+      .eq('id', orderId);
+
+    if (error) throw error;
+    res.json({ status: 'deleted' });
+  } catch (error) {
+    console.error('Error deleting table session order:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/table-sessions/:sessionId/complete
+ * Section 3 (Completion): close out a table session once pieces are photographed and submitted
+ */
+app.post('/api/table-sessions/:sessionId/complete', async (req, res) => {
+  const { sessionId } = req.params;
+
+  try {
+    const { data: session, error } = await supabase
+      .from('table_sessions')
+      .update({ status: 'completed', updated_at: new Date().toISOString() })
+      .eq('id', sessionId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ status: 'completed', session });
+  } catch (error) {
+    console.error('Error completing table session:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * POST /api/bookings/sync
  * Sync bookings from Square for today
  * Generates booking_code (for QR) from booking data

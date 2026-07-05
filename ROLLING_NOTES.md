@@ -546,6 +546,55 @@ ALTER TABLE studios ADD COLUMN table_tracking_mode TEXT DEFAULT 'none'
 
 ---
 
+## Staff Tab Restructured into 3-Section Table Workflow (2026-07-05)
+
+Staff tab now mirrors the actual customer journey, with sub-tab navigation: **1. Booking Details → 2. Customer Engagement → 3. Completion**, plus a separate **Kiln & Inventory** area for back-of-house work (previously the whole staff tab).
+
+**New DB tables (Daisy to run if not already done):**
+```sql
+CREATE TABLE table_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  studio_id UUID NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
+  booking_id TEXT NOT NULL,
+  table_number TEXT,
+  number_of_places INT,
+  status TEXT DEFAULT 'open' CHECK (status IN ('open', 'completed')),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX idx_table_sessions_studio ON table_sessions(studio_id);
+CREATE INDEX idx_table_sessions_booking ON table_sessions(booking_id);
+CREATE INDEX idx_table_sessions_status ON table_sessions(status);
+
+CREATE TABLE table_session_orders (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  table_session_id UUID NOT NULL REFERENCES table_sessions(id) ON DELETE CASCADE,
+  item_type TEXT NOT NULL CHECK (item_type IN ('piece', 'drink', 'glaze')),
+  item_name TEXT NOT NULL,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX idx_session_orders_session ON table_session_orders(table_session_id);
+```
+
+**Section 1 — Booking Details (arrival):** staff look up a booking by code or customer name → shows party size + any returning/unfinished pieces with "studio fee payable" flag (reuses existing unfinished-pieces logic) → staff enter table number + number of places → "Open Table" creates a `table_sessions` row (status `open`).
+
+**Section 2 — Customer Engagement (live, all session):** staff pick an open table from a dropdown → add pieces chosen / drinks / extra glazes to a running list (`table_session_orders`) → can return anytime during the session to add more. **No pricing yet** (per Daisy — billing integration still on hold).
+
+**Section 3 — Completion:** lists all open tables → "Take Photo & Submit Pieces" on any table **reuses the existing QR/manual pieces-submission modal** (same photo capture + dip submission built earlier) pre-loaded with that table's booking code → on successful submission, the table session is automatically marked `completed` via `/api/table-sessions/:id/complete`.
+
+**New API endpoints:**
+- `POST /api/table-sessions` — open a table (Section 1)
+- `GET /api/table-sessions?studioId=&status=` — list sessions, filterable by open/completed
+- `POST /api/table-sessions/:id/orders` — add a piece/drink/glaze to the running list (Section 2)
+- `GET /api/table-sessions/:id/orders` — fetch the running list
+- `DELETE /api/table-sessions/orders/:orderId` — remove a mistakenly-added item
+- `POST /api/table-sessions/:id/complete` — close a table session (called automatically from Section 3)
+
+**Not yet built:** pricing/totals for drinks+glazes (deliberately deferred — ties into the Phase 3/4 iPad billing + Square terminal idea flagged earlier). Section 2 is currently a simple staff-facing checklist only.
+
+---
+
 ## Future Feature Reminder (Phase 3/4: Billing)
 
 **SPLIT BILLS + MULTI-CUSTOMER LOYALTY**
