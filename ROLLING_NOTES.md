@@ -3,6 +3,19 @@ GlazeUp · Rolling Product Notes
 Last updated: 5 July 2026
 ═══════════════════════════════════════════════════════════════════════════════
 
+★ ARCHITECTURE (as of 2026-07-05): GlazeUp is now TWO frontends on ONE shared backend:
+  • STAFF app  → /admin/dashboard-local.html  (bookings, tables, kiln, catalog — iPad)
+  • CUSTOMER app → /app?booking=CODE  (customer's phone, booking-linked)
+  Both served by server.js (express.static on /admin and /app). Customer app entry:
+  staff open a table in Section 1 → a "Scan to start painting" QR modal appears
+  (QR generated client-side via qrcodejs CDN) encoding /app?booking=CODE → customer
+  scans with phone camera → lands on their own session, greeted by name, sees loyalty
+  points + unfinished pieces + design-tool tiles. Design tools (Colour Picker, Design
+  Preview, Transfer Designer) are currently "Coming soon" placeholder tiles — these are
+  the previously-built Netlify single-file apps to be rebuilt INTO the customer app,
+  one per session next. STUDIO_ID is hardcoded to Kiln Cafe in app/index.html for now
+  (white-label studios would inject their own).
+
 PRODUCT VISION
 ──────────────
 

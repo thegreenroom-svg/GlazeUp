@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>The Kiln Cafe · Your Session</title>
+  <style>
+    :root {
+      --gu-bg: #faf4ef;
+      --gu-primary: #b03a2e;
+      --gu-accent: #3d1c12;
+      --gu-dust: #7a6360;
+      --gu-border: #ecddd8;
+      --gu-font-display: 'Georgia', serif;
+      --gu-font-body: system-ui, -apple-system, sans-serif;
+
+      --glaze-oxblood-base: #b03a2e;
+      --glaze-oxblood-high: #ec7a5c;
+      --glaze-oxblood-deep: #6b1f15;
+      --glaze-ocean-base: #1d6f77;
+      --glaze-ocean-high: #6fd6dc;
+      --glaze-ocean-deep: #0d3a3f;
+      --glaze-honey-base: #c98a2e;
+      --glaze-honey-high: #ffd680;
+      --glaze-honey-deep: #7a4f14;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: var(--gu-font-body);
+      background: var(--gu-bg);
+      color: var(--gu-accent);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Warm glazed top banner */
+    .app-header {
+      background:
+        radial-gradient(circle at 26% 20%, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0) 45%),
+        linear-gradient(165deg, var(--glaze-oxblood-high) 0%, var(--glaze-oxblood-base) 50%, var(--glaze-oxblood-deep) 100%);
+      color: #fff;
+      padding: 28px 22px 32px;
+      border-radius: 0 0 26px 26px;
+      box-shadow: 0 6px 18px -6px rgba(176,58,46,0.5);
+    }
+
+    .app-header .brand {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-family: var(--gu-font-display);
+      font-size: 17px;
+      font-weight: 700;
+      opacity: 0.95;
+    }
+
+    .app-header .logo-mark {
+      width: 30px; height: 30px;
+      filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));
+    }
+
+    .app-header .greeting {
+      margin-top: 18px;
+      font-family: var(--gu-font-display);
+      font-size: 27px;
+      font-weight: 700;
+      line-height: 1.15;
+    }
+
+    .app-header .sub {
+      margin-top: 6px;
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .content { padding: 20px 18px 60px; }
+
+    .loading, .error-state {
+      text-align: center;
+      padding: 60px 24px;
+      color: var(--gu-dust);
+    }
+    .error-state h2 {
+      font-family: var(--gu-font-display);
+      color: var(--gu-primary);
+    }
+
+    .section-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 600;
+      color: var(--gu-dust);
+      margin: 24px 4px 12px;
+    }
+
+    /* Feature tiles — glossy dipped-glaze cards */
+    .tile {
+      position: relative;
+      display: block;
+      width: 100%;
+      text-align: left;
+      border: none;
+      color: #fff;
+      padding: 20px;
+      border-radius: 20px 24px 20px 26px;
+      margin-bottom: 14px;
+      cursor: pointer;
+      overflow: hidden;
+      font-family: var(--gu-font-body);
+      box-shadow: 0 6px 16px -5px color-mix(in srgb, var(--tile-base) 55%, transparent), inset 0 1px 0 rgba(255,255,255,0.35);
+      transition: transform 0.15s ease, filter 0.15s ease;
+      background:
+        radial-gradient(circle at 26% 20%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 44%),
+        linear-gradient(165deg, var(--tile-high) 0%, var(--tile-base) 50%, var(--tile-deep) 100%);
+    }
+    .tile:active { transform: scale(0.98); filter: brightness(0.98); }
+    .tile .tile-title { font-family: var(--gu-font-display); font-size: 19px; font-weight: 700; }
+    .tile .tile-desc { font-size: 13px; opacity: 0.92; margin-top: 4px; line-height: 1.4; }
+    .tile .tile-icon { font-size: 26px; margin-bottom: 8px; display: block; }
+    .tile.soon { opacity: 0.55; cursor: default; }
+    .tile.soon::after {
+      content: 'Coming soon';
+      position: absolute; top: 14px; right: 16px;
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+      background: rgba(255,255,255,0.25); padding: 3px 8px; border-radius: 20px;
+    }
+
+    .tile-oxblood { --tile-base: var(--glaze-oxblood-base); --tile-high: var(--glaze-oxblood-high); --tile-deep: var(--glaze-oxblood-deep); }
+    .tile-ocean   { --tile-base: var(--glaze-ocean-base);   --tile-high: var(--glaze-ocean-high);   --tile-deep: var(--glaze-ocean-deep); }
+    .tile-honey   { --tile-base: var(--glaze-honey-base);   --tile-high: var(--glaze-honey-high);   --tile-deep: var(--glaze-honey-deep); }
+
+    /* Pieces / info card */
+    .info-card {
+      background: linear-gradient(180deg, #ffffff 0%, #fdf9f6 100%);
+      border: 1px solid var(--gu-border);
+      border-radius: 16px;
+      padding: 16px 18px;
+      margin-bottom: 14px;
+      box-shadow: 0 1px 3px rgba(61,28,18,0.06), inset 0 1px 0 rgba(255,255,255,0.8);
+    }
+    .info-card .row { display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+    .info-card .row + .row { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--gu-border); }
+    .info-card .k { color: var(--gu-dust); }
+    .info-card .v { font-weight: 600; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .tile { transition: none; }
+      .tile:active { transform: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="app-root">
+    <div class="loading">Loading your session…</div>
+  </div>
+
+  <script>
+    const API_URL = window.location.origin;
+    // The Kiln Cafe studio id (pilot). White-label studios would inject their own.
+    const STUDIO_ID = 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3';
+
+    function getParam(name) {
+      return new URLSearchParams(window.location.search).get(name);
+    }
+
+    const logoSvg = `
+      <svg class="logo-mark" viewBox="0 0 64 64" aria-hidden="true">
+        <defs>
+          <linearGradient id="lg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ec7a5c"/><stop offset="50%" stop-color="#b03a2e"/><stop offset="100%" stop-color="#6b1f15"/>
+          </linearGradient>
+        </defs>
+        <path d="M20 18 Q20 12 32 12 Q44 12 44 18 L41 46 Q40 54 32 54 Q24 54 23 46 Z" fill="url(#lg)"/>
+        <ellipse cx="32" cy="17" rx="12" ry="3.5" fill="url(#lg)"/>
+      </svg>`;
+
+    async function init() {
+      const bookingCode = getParam('booking');
+      const root = document.getElementById('app-root');
+
+      if (!bookingCode) {
+        root.innerHTML = `
+          <div class="error-state">
+            <h2>Welcome to The Kiln Cafe</h2>
+            <p>Scan the QR code on your table to open your painting session.</p>
+          </div>`;
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_URL}/api/booking/${bookingCode}?studioId=${STUDIO_ID}`);
+        if (!res.ok) throw new Error('not found');
+        const data = await res.json();
+        renderSession(data);
+      } catch (err) {
+        root.innerHTML = `
+          <div class="error-state">
+            <h2>Session not found</h2>
+            <p>We couldn't find this booking. Please ask a member of staff for help.</p>
+          </div>`;
+      }
+    }
+
+    function renderSession(data) {
+      const b = data.booking || {};
+      const hist = data.customerHistory || {};
+      const firstName = (b.customerName || 'there').split(' ')[0];
+
+      const unfinished = (hist.unfinishedPieces && hist.unfinishedPieces.length)
+        ? `<div class="section-label">Your unfinished pieces</div>
+           <div class="info-card">
+             ${hist.unfinishedPieces.map(p => `<div class="row"><span class="k">${p.piece_type || 'Piece'}</span><span class="v">Waiting for you</span></div>`).join('')}
+           </div>` : '';
+
+      const loyalty = (hist.loyaltyPoints != null)
+        ? `<div class="info-card"><div class="row"><span class="k">⭐ Loyalty points</span><span class="v">${hist.loyaltyPoints}</span></div></div>` : '';
+
+      document.getElementById('app-root').innerHTML = `
+        <div class="app-header">
+          <div class="brand">${logoSvg} The Kiln Cafe</div>
+          <div class="greeting">Hi ${firstName}! 👋</div>
+          <div class="sub">Your painting session is ready. Have fun creating!</div>
+        </div>
+        <div class="content">
+          ${loyalty}
+          ${unfinished}
+
+          <div class="section-label">Design tools</div>
+
+          <button class="tile tile-ocean soon">
+            <span class="tile-icon">🎨</span>
+            <div class="tile-title">Colour Picker</div>
+            <div class="tile-desc">Browse the studio's glaze colours and plan your palette.</div>
+          </button>
+
+          <button class="tile tile-honey soon">
+            <span class="tile-icon">🖼️</span>
+            <div class="tile-title">Design Preview</div>
+            <div class="tile-desc">See how your design looks on your chosen piece before you paint.</div>
+          </button>
+
+          <button class="tile tile-oxblood soon">
+            <span class="tile-icon">✨</span>
+            <div class="tile-title">Transfer Designer</div>
+            <div class="tile-desc">Create and position transfers for your piece.</div>
+          </button>
+        </div>`;
+    }
+
+    init();
+  </script>
+
+</body>
+</html>

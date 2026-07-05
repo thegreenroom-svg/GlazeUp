@@ -44,6 +44,7 @@ app.use(express.json({ limit: '50mb' }));
 // Serve the admin dashboard (and other static frontend files) so they have real URLs
 const path = require('path');
 app.use('/admin', express.static(path.join(__dirname, 'admin')));
+app.use('/app', express.static(path.join(__dirname, 'app')));
 app.get('/', (req, res) => res.redirect('/admin/dashboard-local.html'));
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
