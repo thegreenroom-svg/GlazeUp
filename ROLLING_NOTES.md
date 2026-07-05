@@ -623,6 +623,24 @@ ALTER TABLE table_session_orders ADD CONSTRAINT table_session_orders_item_type_c
 
 ---
 
+## "Dipped Glaze" Visual Design System (2026-07-05)
+
+Daisy asked for a "jazzier, funky, dynamic" look for iPhone/iPad with buttons that look like shiny glazed ceramic. Design approach: rather than a generic UI reskin, buttons are rendered to actually behave like dipped glaze — since that's literally the studio's own material and product.
+
+**Design language:**
+- Kept Daisy's real established brand (cream #faf4ef, oxblood #b03a2e, Georgia display) rather than replacing it — this is a genuine working cafe's existing identity, not a blank slate
+- Added 3 jewel-tone "glaze" colour families as CSS custom properties, each a base/highlight/deep-pool triad (mimicking how real glaze pools darker at the bottom of a dip): **Ocean** (teal, used for Drinks), **Honey** (amber, used for Cakes), **Sage** (green, used for "Fired"/success actions). Oxblood (the existing brand crimson) remains the default/primary glaze.
+- **Signature element — "dipped glaze" buttons:** layered radial specular highlight (top-left, like light catching wet glaze) over a linear gradient that darkens toward the bottom (gravity-pooled colour), a soft *coloured* ambient shadow (not grey) matching the button's own glaze hue, organic asymmetric border-radius (not a uniform rounded rect), and a tactile press animation (scale down + brightness dip on `:active`, lift + brighten on `:hover`) — built for touchscreen use on iPad/iPhone.
+- **Sub-tab nav buttons** get a matching but quieter metaphor: unfired/matte "bisque" look (soft white-to-cream gradient) when inactive, switching to the full glossy oxblood glaze treatment when active — literally "unglazed vs glazed," tying the UI directly to the pottery process.
+- Cards (`.chart-container`, `.setup-card`) got a subtle sheen and softer coloured shadow for cohesion, deliberately kept quiet so the buttons stay the one bold, memorable element (not competing for attention).
+- `prefers-reduced-motion` respected — animations disable cleanly for anyone who needs that.
+- Colour variant classes (`.glaze-ocean`, `.glaze-honey`, `.glaze-sage`) reused across: catalog item buttons in Section 2 (colour-coded by item type: pottery=oxblood, drinks=ocean, cakes=honey, extra glaze=sage), and the "Mark Fired" kiln button (sage, since firing = success/completion).
+- All existing `onclick` wiring untouched — the redesign only changed CSS classes/tokens, so every button across the whole app upgraded automatically without touching markup logic.
+
+**Not yet done:** this pass covered buttons, sub-tab nav, and cards. Full-page layout/typography wasn't touched (kept scope to what was asked — "buttons that look glazed/shiny"). If Daisy wants a broader pass (headers, spacing, a hero moment) that's a natural next step.
+
+---
+
 ## Future Feature Reminder (Phase 3/4: Billing)
 
 **SPLIT BILLS + MULTI-CUSTOMER LOYALTY**
