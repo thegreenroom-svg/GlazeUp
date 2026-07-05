@@ -1632,15 +1632,38 @@ app.get('/api/square/bookings-debug', async (req, res) => {
 
     const squareClient = await getSquareClient(connection.square_access_token);
 
-    // Get locations (bookings are per-location)
-    const locRes = await squareClient.locationsApi.listLocations();
-    const locations = (locRes.result.locations || []).map(l => ({ id: l.id, name: l.name }));
+    let step = 'locations';
+    let locations = [];
+    try {
+      const locRes = await squareClient.locationsApi.listLocations();
+      locations = (locRes.result.locations || []).map(l => ({ id: l.id, name: l.name }));
+    } catch (locErr) {
+      return res.json({
+        connected: true,
+        failedStep: 'listLocations',
+        errorMessage: locErr.message,
+        squareBody: locErr.body || null,
+        squareErrors: locErr.errors || locErr.result?.errors || null
+      });
+    }
 
-    // Get up to 10 bookings spanning the last 30 days through next 30 days
+    step = 'bookings';
     const past = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     const future = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    const bookingsRes = await squareClient.bookingsApi.listBookings(10, undefined, undefined, undefined, undefined, past, future);
-    const bookings = bookingsRes.result.bookings || [];
+    let bookings = [];
+    try {
+      const bookingsRes = await squareClient.bookingsApi.listBookings(10, undefined, undefined, undefined, undefined, past, future);
+      bookings = bookingsRes.result.bookings || [];
+    } catch (bkErr) {
+      return res.json({
+        connected: true,
+        failedStep: 'listBookings',
+        errorMessage: bkErr.message,
+        squareBody: bkErr.body || null,
+        squareErrors: bkErr.errors || bkErr.result?.errors || null,
+        locationsFound: locations
+      });
+    }
 
     res.json({
       connected: true,
