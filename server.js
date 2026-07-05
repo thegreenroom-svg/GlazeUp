@@ -700,6 +700,41 @@ async function findOrCreateCustomer(studioId, customerName, customerEmail, custo
  * Lookup booking by code (when QR scanned)
  * Returns: customer info + unfinished pieces if returning customer
  */
+/**
+ * POST /api/bookings/manual
+ * Create a real booking record for a walk-in customer (no Square booking).
+ * This is needed so the customer QR (which links to this booking code) actually
+ * resolves — a code that only exists in browser memory can never be scanned into.
+ */
+app.post('/api/bookings/manual', async (req, res) => {
+  const { studioId, customerName } = req.body;
+  if (!studioId || !customerName) {
+    return res.status(400).json({ error: 'studioId and customerName required' });
+  }
+
+  try {
+    const bookingCode = `walkin-${Date.now()}`;
+
+    const { data: booking, error } = await supabase
+      .from('bookings')
+      .insert({
+        studio_id: studioId,
+        square_booking_id: null,
+        booking_code: bookingCode,
+        customer_name: customerName,
+        session_start: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ status: 'created', booking });
+  } catch (error) {
+    console.error('Error creating manual booking:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/booking/:bookingCode', async (req, res) => {
   const { bookingCode } = req.params;
   const { studioId } = req.query;

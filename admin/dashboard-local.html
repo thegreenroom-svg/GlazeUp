@@ -2214,9 +2214,23 @@ async function lookupBookingSection1() {
         customerHistory: data.customerHistory
       };
     } else {
-      // Manual name-only lookup — treat as a fresh walk-in, generate a code
+      // Manual name-only lookup — treat as a fresh walk-in.
+      // Create a REAL booking row so the customer QR (which links to this code)
+      // can actually be found later — a code that only lives in memory can't be scanned into.
+      const createRes = await fetch(`${API_URL}/api/bookings/manual`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId, customerName })
+      });
+
+      if (!createRes.ok) {
+        alert('Could not create walk-in booking');
+        return;
+      }
+
+      const createData = await createRes.json();
       bookingData = {
-        bookingCode: `manual-${Date.now()}`,
+        bookingCode: createData.booking.booking_code,
         customerName: customerName,
         partySize: null,
         customerHistory: { isReturningCustomer: false, unfinishedPieces: [], unfinishedCount: 0 }
