@@ -2260,7 +2260,7 @@ async function openTableSession() {
 
   try {
     if (!apiConnected) {
-      alert(`Table opened (demo mode): ${tableNumber || 'unassigned'} for ${s1LookedUpBooking.customerName}`);
+      showCustomerQR(s1LookedUpBooking.bookingCode, s1LookedUpBooking.customerName, tableNumber);
       resetSection1();
       return;
     }
