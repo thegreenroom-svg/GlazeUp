@@ -1657,16 +1657,20 @@ app.get('/api/square/bookings-debug', async (req, res) => {
     } catch (bkErr) {
       return res.json({
         connected: true,
+        _debugVersion: 'v7-28day-window',
         failedStep: 'listBookings',
         errorMessage: bkErr.message,
         squareBody: bkErr.body || null,
         squareErrors: bkErr.errors || bkErr.result?.errors || null,
-        locationsFound: locations
+        locationsFound: locations,
+        attemptedFrom: past,
+        attemptedTo: future
       });
     }
 
     res.json({
       connected: true,
+      _debugVersion: 'v7-28day-window',
       locations,
       searchedFrom: past,
       searchedTo: future,
