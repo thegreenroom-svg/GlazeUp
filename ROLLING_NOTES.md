@@ -595,6 +595,34 @@ CREATE INDEX idx_session_orders_session ON table_session_orders(table_session_id
 
 ---
 
+## Section 2 Upgraded: Square Catalog Browser + Running Bill (2026-07-05)
+
+**Important bug found and fixed:** the installed Square SDK (v38.2.0) uses **property access** for its APIs (`client.catalogApi`, `client.merchantsApi`, `client.ordersApi`, `client.bookingsApi`, `client.teamApi`), not the `client.getXApi()` method-call pattern used throughout the earlier Square integration code. All 4 existing call sites (`getMerchantApi`, `getOrdersApi`, `getBookingsApi`, `getTeamApi`) would have thrown "not a function" errors the moment real Square credentials were connected. Fixed all of them to use the correct property access.
+
+**Schema update (Daisy to run if not already done):**
+```sql
+ALTER TABLE table_session_orders ADD COLUMN IF NOT EXISTS quantity INT DEFAULT 1;
+ALTER TABLE table_session_orders ADD COLUMN IF NOT EXISTS unit_price_cents INT;
+ALTER TABLE table_session_orders ADD COLUMN IF NOT EXISTS square_catalog_id TEXT;
+
+ALTER TABLE table_session_orders DROP CONSTRAINT IF EXISTS table_session_orders_item_type_check;
+ALTER TABLE table_session_orders ADD CONSTRAINT table_session_orders_item_type_check
+  CHECK (item_type IN ('piece', 'drink', 'glaze', 'cake'));
+```
+
+**Decision confirmed with Daisy:** running bill stays **GlazeUp-only for now** — nothing is sent to or created in Square. Sending the finished bill to Square Terminal for payment is a deliberate future step (ties into the Phase 3/4 billing reminder above), not built yet.
+
+**New endpoint:**
+- `GET /api/square/catalog?studioId=` — read-only fetch of the studio's real Square catalog (items + categories, e.g. Pottery/Drinks/Cakes), with prices. Returns `{connected: false, categories: []}` gracefully if Square isn't connected yet, so the dashboard falls back to a demo catalog for testing.
+
+**Section 2 (Customer Engagement) rebuilt:**
+- Category tabs (from Square, or demo Pottery/Drinks/Cakes if not connected) with tap-to-add items showing price
+- "+ Add custom item" fallback for anything not in the Square catalog (e.g. bespoke extra glazes)
+- Running bill list now shows price per item and a **running total** at the bottom, clearly labelled "Not yet sent to Square — for internal reference only"
+- `table_session_orders` now stores `unit_price_cents` and `square_catalog_id` (for when we do eventually wire this to a real Square order)
+
+---
+
 ## Future Feature Reminder (Phase 3/4: Billing)
 
 **SPLIT BILLS + MULTI-CUSTOMER LOYALTY**

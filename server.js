@@ -136,7 +136,7 @@ app.get('/api/square/callback', async (req, res) => {
 
     // Get merchant ID
     const client = await getSquareClient(tokenData.access_token);
-    const merchantRes = await client.getMerchantApi().retrieveMerchant();
+    const merchantRes = await client.merchantsApi.retrieveMerchant();
     const merchantId = merchantRes.result.merchant.id;
 
     // Store in Supabase
@@ -191,7 +191,7 @@ async function syncSquareData(studioId, accessToken) {
 
     // Fetch orders from last 24 hours
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const ordersRes = await client.getOrdersApi().searchOrders({
+    const ordersRes = await client.ordersApi.searchOrders({
       query: {
         filter: {
           dateTimeFilter: {
@@ -278,6 +278,71 @@ app.post('/api/square/sync', async (req, res) => {
 
   syncSquareData(studioId, connection.square_access_token);
   res.json({ status: 'sync started' });
+});
+
+/**
+ * GET /api/square/catalog
+ * Fetch the studio's Square catalog items (pottery, drinks, cakes, etc.),
+ * grouped by category, for browsing in the Customer Engagement running bill.
+ * Read-only — never creates or modifies anything in Square.
+ */
+app.get('/api/square/catalog', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    const { data: connection } = await supabase
+      .from('square_connections')
+      .select('square_access_token')
+      .eq('studio_id', studioId)
+      .single();
+
+    if (!connection) {
+      return res.json({ connected: false, categories: [] });
+    }
+
+    const squareClient = await getSquareClient(connection.square_access_token);
+
+    // Fetch categories first so we can label items by category name
+    const categoriesRes = await squareClient.catalogApi.listCatalog(undefined, 'CATEGORY');
+    const categoryNameById = {};
+    (categoriesRes.result.objects || []).forEach(cat => {
+      categoryNameById[cat.id] = cat.categoryData?.name || 'Other';
+    });
+
+    // Fetch items
+    const itemsRes = await squareClient.catalogApi.listCatalog(undefined, 'ITEM');
+    const items = itemsRes.result.objects || [];
+
+    const grouped = {};
+    items.forEach(item => {
+      const itemData = item.itemData;
+      if (!itemData) return;
+
+      const categoryId = itemData.categoryId || itemData.categories?.[0]?.id;
+      const categoryName = categoryNameById[categoryId] || 'Other';
+
+      const variation = itemData.variations?.[0]?.itemVariationData;
+      const priceCents = variation?.priceMoney?.amount ? Number(variation.priceMoney.amount) : null;
+
+      if (!grouped[categoryName]) grouped[categoryName] = [];
+      grouped[categoryName].push({
+        id: item.id,
+        name: itemData.name,
+        priceCents: priceCents
+      });
+    });
+
+    const categories = Object.entries(grouped).map(([name, catItems]) => ({
+      name,
+      items: catItems
+    }));
+
+    res.json({ connected: true, categories });
+  } catch (error) {
+    console.error('Error fetching Square catalog:', error);
+    res.status(500).json({ connected: false, error: error.message, categories: [] });
+  }
 });
 
 // ═══════════════════════════════════════════
@@ -751,12 +816,12 @@ app.get('/api/table-sessions', async (req, res) => {
  */
 app.post('/api/table-sessions/:sessionId/orders', async (req, res) => {
   const { sessionId } = req.params;
-  const { itemType, itemName, notes } = req.body;
+  const { itemType, itemName, notes, unitPriceCents, squareCatalogId, quantity } = req.body;
   if (!itemType || !itemName) {
     return res.status(400).json({ error: 'itemType and itemName required' });
   }
-  if (!['piece', 'drink', 'glaze'].includes(itemType)) {
-    return res.status(400).json({ error: 'itemType must be piece, drink, or glaze' });
+  if (!['piece', 'drink', 'glaze', 'cake'].includes(itemType)) {
+    return res.status(400).json({ error: 'itemType must be piece, drink, glaze, or cake' });
   }
 
   try {
@@ -766,7 +831,10 @@ app.post('/api/table-sessions/:sessionId/orders', async (req, res) => {
         table_session_id: sessionId,
         item_type: itemType,
         item_name: itemName,
-        notes: notes || null
+        notes: notes || null,
+        unit_price_cents: unitPriceCents ?? null,
+        square_catalog_id: squareCatalogId || null,
+        quantity: quantity || 1
       })
       .select()
       .single();
@@ -878,14 +946,14 @@ app.post('/api/bookings/sync', async (req, res) => {
 
     // Get Square client with studio's token
     const squareClient = await getSquareClient(squareConnection.square_access_token);
-    const bookingsApi = squareClient.getBookingsApi();
+    const bookingsApi = squareClient.bookingsApi;
 
     // If this studio uses "staff members as tables", fetch team member names once
     // so we can map each booking's teamMemberId to a human-readable table name
     let teamMemberNameById = {};
     if (tableTrackingMode === 'staff_as_tables') {
       try {
-        const teamApi = squareClient.getTeamApi();
+        const teamApi = squareClient.teamApi;
         const teamRes = await teamApi.searchTeamMembers({ query: {} });
         (teamRes.result.teamMembers || []).forEach(member => {
           teamMemberNameById[member.id] = member.givenName || member.id;
