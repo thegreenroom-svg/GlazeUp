@@ -1612,6 +1612,47 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
 // HEALTH CHECK & START
 // ═══════════════════════════════════════════
 
+/**
+ * GET /api/square/bookings-debug  (TEMPORARY — read-only diagnostic)
+ * Returns the raw shape of a few real Square bookings so we can build the
+ * sync against reality. Safe: read-only. Remove after bookings sync is finalised.
+ */
+app.get('/api/square/bookings-debug', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    const { data: connection } = await supabase
+      .from('square_connections')
+      .select('square_access_token')
+      .eq('studio_id', studioId)
+      .single();
+
+    if (!connection) return res.json({ connected: false });
+
+    const squareClient = await getSquareClient(connection.square_access_token);
+
+    // Get locations (bookings are per-location)
+    const locRes = await squareClient.locationsApi.listLocations();
+    const locations = (locRes.result.locations || []).map(l => ({ id: l.id, name: l.name }));
+
+    // Get up to 5 upcoming bookings from now
+    const nowIso = new Date().toISOString();
+    const bookingsRes = await squareClient.bookingsApi.listBookings(5, undefined, undefined, undefined, undefined, nowIso);
+    const bookings = bookingsRes.result.bookings || [];
+
+    res.json({
+      connected: true,
+      locations,
+      bookingCount: bookings.length,
+      sampleBookings: bookings
+    });
+  } catch (error) {
+    console.error('Bookings debug error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
