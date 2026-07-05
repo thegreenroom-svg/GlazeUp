@@ -156,8 +156,17 @@ app.get('/api/square/callback', async (req, res) => {
     // Trigger initial sync
     syncSquareData(studioId, tokenData.access_token);
 
-    // Redirect to success page (you'll build this in the admin dashboard)
-    res.redirect(`${process.env.API_URL}/admin/studio/${studioId}?square=connected`);
+    // Show a simple success page instead of redirecting — the admin dashboard
+    // is a standalone file, not hosted by this API server
+    res.send(`
+      <html>
+        <body style="font-family: sans-serif; text-align: center; padding: 60px 20px; background: #faf4ef; color: #3d1c12;">
+          <h1 style="color: #b03a2e;">✓ Square Connected</h1>
+          <p>Your Square account is now linked to GlazeUp (read-only).</p>
+          <p>You can close this tab and go back to the GlazeUp dashboard.</p>
+        </body>
+      </html>
+    `);
   } catch (error) {
     console.error('Square callback error:', error);
     res.status(500).send('OAuth failed: ' + error.message);
