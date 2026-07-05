@@ -1649,7 +1649,7 @@ app.get('/api/square/bookings-debug', async (req, res) => {
 
     step = 'bookings';
     const past = new Date().toISOString();
-    const future = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const future = new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString();
     let bookings = [];
     try {
       const bookingsRes = await squareClient.bookingsApi.listBookings(10, undefined, undefined, undefined, undefined, past, future);
