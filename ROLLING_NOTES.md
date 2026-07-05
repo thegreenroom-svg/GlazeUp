@@ -639,6 +639,8 @@ Daisy asked for a "jazzier, funky, dynamic" look for iPhone/iPad with buttons th
 
 **Not yet done:** this pass covered buttons, sub-tab nav, and cards. Full-page layout/typography wasn't touched (kept scope to what was asked — "buttons that look glazed/shiny"). If Daisy wants a broader pass (headers, spacing, a hero moment) that's a natural next step.
 
+**Logo added (same session):** built a proper icon mark — a glazed pot silhouette (inline SVG) using the same specular-highlight + gravity-pooled gradient technique as the buttons, with a small glaze-drip detail hanging off the base (a nod to real excess glaze dripping during dipping). Sits beside a bolder "GlazeUp" wordmark in the sidebar, sized up and given a drop-shadow so it reads clearly against the crimson sidebar background — replaces the old plain text-only header.
+
 ---
 
 ## Future Feature Reminder (Phase 3/4: Billing)

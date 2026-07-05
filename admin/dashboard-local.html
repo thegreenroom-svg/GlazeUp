@@ -79,10 +79,27 @@
       overflow-y: auto;
     }
 
-    .admin-sidebar h2 {
-      font-size: 16px;
-      margin: 0 0 20px;
+    .glazeup-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 24px;
+    }
+
+    .glazeup-logo-mark {
+      width: 44px;
+      height: 44px;
+      flex-shrink: 0;
+      filter: drop-shadow(0 3px 5px rgba(0,0,0,0.35));
+    }
+
+    .glazeup-logo-text {
       font-family: var(--gu-font-display);
+      font-size: 21px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      color: #fff;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.25);
     }
 
     .admin-sidebar nav a {
@@ -635,7 +652,31 @@
 <div class="admin-wrapper">
   <!-- SIDEBAR -->
   <aside class="admin-sidebar">
-    <h2>GlazeUp</h2>
+    <div class="glazeup-logo">
+      <svg viewBox="0 0 64 64" class="glazeup-logo-mark" aria-hidden="true">
+        <defs>
+          <radialGradient id="logoShine" cx="30%" cy="24%" r="55%">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity="0.75"/>
+            <stop offset="45%" stop-color="#ffffff" stop-opacity="0"/>
+          </radialGradient>
+          <linearGradient id="logoGlaze" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="var(--glaze-oxblood-high)"/>
+            <stop offset="50%" stop-color="var(--glaze-oxblood-base)"/>
+            <stop offset="100%" stop-color="var(--glaze-oxblood-deep)"/>
+          </linearGradient>
+        </defs>
+        <!-- Pot body -->
+        <path d="M20 18 Q20 12 32 12 Q44 12 44 18 L41 46 Q40 54 32 54 Q24 54 23 46 Z" fill="url(#logoGlaze)"/>
+        <!-- Rim -->
+        <ellipse cx="32" cy="18" rx="12" ry="3.5" fill="var(--glaze-oxblood-deep)" opacity="0.5"/>
+        <ellipse cx="32" cy="17" rx="12" ry="3.5" fill="url(#logoGlaze)"/>
+        <!-- Specular shine -->
+        <path d="M20 18 Q20 12 32 12 Q44 12 44 18 L41 46 Q40 54 32 54 Q24 54 23 46 Z" fill="url(#logoShine)"/>
+        <!-- Glaze drip -->
+        <path d="M27 44 Q26 50 28 53 Q30 55 30 51 Q30 47 27 44 Z" fill="var(--glaze-oxblood-base)" opacity="0.9"/>
+      </svg>
+      <span class="glazeup-logo-text">GlazeUp</span>
+    </div>
     <nav>
       <a href="#" class="nav-link active" onclick="goToTab('dashboard', event)">Dashboard</a>
       <a href="#" class="nav-link" onclick="goToTab('staff', event)">Staff</a>
@@ -657,6 +698,7 @@
         <a href="#" onclick="alert('Logged in as demo. Click sidebar to explore.')">Logout</a>
       </div>
     </header>
+
 
     <div class="admin-content">
 
