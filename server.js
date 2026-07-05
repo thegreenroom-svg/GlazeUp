@@ -137,7 +137,7 @@ app.get('/api/square/callback', async (req, res) => {
 
     // Get merchant ID
     const client = await getSquareClient(tokenData.access_token);
-    const merchantRes = await client.merchantsApi.retrieveMerchant();
+    const merchantRes = await client.merchantsApi.retrieveMerchant('me');
     const merchantId = merchantRes.result.merchant.id;
 
     // Store in Supabase
