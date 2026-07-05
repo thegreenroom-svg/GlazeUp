@@ -514,6 +514,38 @@ All booking/QR/pieces submission/loyalty system now built and integrated.
 
 ---
 
+## Real Studio Connect Flow + Flexible Table Tracking (2026-07-05)
+
+**Context:** Investigated Kiln Cafe's actual Wix Bookings setup — tables ARE configured there as resources (Table 1-6, Pottery Wheel), but only one old test booking exists (Oct 2022). Confirmed with Daisy: **Square is the real, live booking system**, not Wix. Table numbers there are represented by Square "staff members" (a workaround).
+
+**Design decision:** table-tracking must be **per-studio configurable**, since other studios won't necessarily use Square staff members to mean tables. Added `studios.table_tracking_mode` column: `'staff_as_tables'` or `'none'` (extensible later for other studios' conventions).
+
+**DB change (Daisy to run if not already done):**
+```sql
+ALTER TABLE studios ADD COLUMN table_tracking_mode TEXT DEFAULT 'none' 
+  CHECK (table_tracking_mode IN ('staff_as_tables', 'none'));
+```
+
+**Bugs fixed while building this:**
+- `/api/bookings/sync` was selecting `access_token` from `square_connections` — actual column is `square_access_token`. Sync would have silently failed. Fixed.
+- Square OAuth authorize/token-exchange URLs were hardcoded to sandbox — now environment-aware via `SQUARE_ENVIRONMENT` env var (sandbox vs production).
+
+**New/updated API endpoints:**
+- `POST /api/studio/settings` — save `table_tracking_mode` per studio
+- `GET /api/studio/connection-status` — real Square/Stripe connection state + table tracking mode (used to replace hardcoded "Connected" placeholder in dashboard)
+- `POST /api/bookings/sync` — now resolves table names via Square Team API lookup when `table_tracking_mode = 'staff_as_tables'`; otherwise leaves table_number null (flexible for studios that don't track tables this way)
+
+**Dashboard (Setup tab) rebuilt:**
+- Real "Connect Square Account" button → opens actual Square OAuth consent screen (via `/api/square/authorize`) in a new tab — no longer a placeholder alert
+- Live status badges for both Square and Stripe, pulled from `/api/studio/connection-status` (was hardcoded "✓ Connected")
+- New dropdown: "How does your studio track tables in Square?" — lets each studio choose `staff_as_tables` or `none`, saved via `/api/studio/settings`
+
+**Still on placeholder credentials by design** (per Daisy: "keep it remote for now, go live later") — SQUARE_CLIENT_ID/SECRET remain placeholders in Render env vars, so clicking "Connect Square Account" won't complete a real OAuth handshake yet. All the plumbing is real and ready; flipping to production just needs real Square app credentials added to Render's environment variables when Daisy's ready.
+
+**Reminder for later:** when going live with real Square credentials, also add `SQUARE_CLIENT_SECRET` to Render env vars (currently not set — only `SQUARE_CLIENT_ID` exists in the .env template) and set `SQUARE_ENVIRONMENT=production` when ready to leave sandbox.
+
+---
+
 ## Future Feature Reminder (Phase 3/4: Billing)
 
 **SPLIT BILLS + MULTI-CUSTOMER LOYALTY**

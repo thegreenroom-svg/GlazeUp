@@ -82,15 +82,20 @@ app.get('/api/square/authorize', (req, res) => {
   // For simplicity, we'll use a query param. In production, use secure session storage
   const state = crypto.randomBytes(16).toString('hex');
 
-  const authUrl = new URL('https://connect.squareupsandbox.com/oauth2/authorize');
+  const isSandbox = process.env.SQUARE_ENVIRONMENT === 'sandbox';
+  const authBaseUrl = isSandbox
+    ? 'https://connect.squareupsandbox.com/oauth2/authorize'
+    : 'https://connect.squareup.com/oauth2/authorize';
+
+  const authUrl = new URL(authBaseUrl);
   authUrl.searchParams.append('client_id', process.env.SQUARE_CLIENT_ID);
-  authUrl.searchParams.append('scope', 'MERCHANT_PROFILE_READ CUSTOMERS_READ ORDERS_READ INVENTORY_READ');
+  authUrl.searchParams.append('scope', 'MERCHANT_PROFILE_READ CUSTOMERS_READ ORDERS_READ INVENTORY_READ APPOINTMENTS_READ TIMECARDS_READ');
   authUrl.searchParams.append('session', 'false');
   authUrl.searchParams.append('redirect_uri', `${process.env.API_URL}/api/square/callback`);
   authUrl.searchParams.append('response_type', 'code');
   authUrl.searchParams.append('state', JSON.stringify({ studioId, codeVerifier }));
 
-  res.json({ authUrl: authUrl.toString() });
+  res.json({ authUrl: authUrl.toString(), environment: isSandbox ? 'sandbox' : 'production' });
 });
 
 /**
@@ -106,8 +111,13 @@ app.get('/api/square/callback', async (req, res) => {
   try {
     const { studioId, codeVerifier } = JSON.parse(state);
 
+    const isSandbox = process.env.SQUARE_ENVIRONMENT === 'sandbox';
+    const tokenBaseUrl = isSandbox
+      ? 'https://connect.squareupsandbox.com/oauth2/token'
+      : 'https://connect.squareup.com/oauth2/token';
+
     // Exchange code for access token
-    const tokenResponse = await fetch('https://connect.squareupsandbox.com/oauth2/token', {
+    const tokenResponse = await fetch(tokenBaseUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -432,6 +442,82 @@ app.post('/api/analytics/activity', async (req, res) => {
 });
 
 /**
+ * POST /api/studio/settings
+ * Save studio-level settings, e.g. how they use Square (table tracking mode)
+ */
+app.post('/api/studio/settings', async (req, res) => {
+  const { studioId, tableTrackingMode } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    const updates = {};
+    if (tableTrackingMode) updates.table_tracking_mode = tableTrackingMode;
+
+    const { data, error } = await supabase
+      .from('studios')
+      .update(updates)
+      .eq('id', studioId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ status: 'saved', studio: data });
+  } catch (error) {
+    console.error('Studio settings error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/studio/connection-status
+ * Real connection state for this studio, so the dashboard can show accurate
+ * Square/Stripe connect buttons instead of hardcoded placeholders
+ */
+app.get('/api/studio/connection-status', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    const { data: studio } = await supabase
+      .from('studios')
+      .select('table_tracking_mode')
+      .eq('id', studioId)
+      .single();
+
+    const { data: squareConn } = await supabase
+      .from('square_connections')
+      .select('square_merchant_id, sync_status, last_synced_at')
+      .eq('studio_id', studioId)
+      .single();
+
+    const { data: stripeSub } = await supabase
+      .from('stripe_subscriptions')
+      .select('plan_id, status, current_period_end')
+      .eq('studio_id', studioId)
+      .single();
+
+    res.json({
+      square: {
+        connected: !!squareConn,
+        merchantId: squareConn?.square_merchant_id || null,
+        syncStatus: squareConn?.sync_status || null,
+        lastSyncedAt: squareConn?.last_synced_at || null
+      },
+      stripe: {
+        connected: !!stripeSub,
+        plan: stripeSub?.plan_id || null,
+        status: stripeSub?.status || null,
+        currentPeriodEnd: stripeSub?.current_period_end || null
+      },
+      tableTrackingMode: studio?.table_tracking_mode || 'none'
+    });
+  } catch (error) {
+    console.error('Connection status error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * POST /api/studio/branding
  * Save studio branding settings
  */
@@ -611,7 +697,7 @@ app.post('/api/bookings/sync', async (req, res) => {
     // Get Square connection for this studio
     const { data: squareConnection, error: connError } = await supabase
       .from('square_connections')
-      .select('access_token')
+      .select('square_access_token')
       .eq('studio_id', studioId)
       .single();
 
@@ -619,9 +705,34 @@ app.post('/api/bookings/sync', async (req, res) => {
       return res.status(400).json({ error: 'Square not connected for this studio' });
     }
 
+    // Get the studio's chosen table-tracking mode (flexible per studio)
+    const { data: studio, error: studioError } = await supabase
+      .from('studios')
+      .select('table_tracking_mode')
+      .eq('id', studioId)
+      .single();
+
+    if (studioError) throw studioError;
+    const tableTrackingMode = studio?.table_tracking_mode || 'none';
+
     // Get Square client with studio's token
-    const squareClient = await getSquareClient(squareConnection.access_token);
+    const squareClient = await getSquareClient(squareConnection.square_access_token);
     const bookingsApi = squareClient.getBookingsApi();
+
+    // If this studio uses "staff members as tables", fetch team member names once
+    // so we can map each booking's teamMemberId to a human-readable table name
+    let teamMemberNameById = {};
+    if (tableTrackingMode === 'staff_as_tables') {
+      try {
+        const teamApi = squareClient.getTeamApi();
+        const teamRes = await teamApi.searchTeamMembers({ query: {} });
+        (teamRes.result.teamMembers || []).forEach(member => {
+          teamMemberNameById[member.id] = member.givenName || member.id;
+        });
+      } catch (teamErr) {
+        console.error('Could not fetch Square team members for table mapping:', teamErr);
+      }
+    }
 
     // Fetch today's bookings
     const today = new Date();
@@ -645,6 +756,14 @@ app.post('/api/bookings/sync', async (req, res) => {
       const customerName = booking.customerNote || booking.customerId || `Walk-in ${idx + 1}`;
       const bookingCode = `booking-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}-${booking.id.substring(0, 8)}`;
 
+      // Resolve table number/name depending on the studio's tracking mode
+      let tableNumber = null;
+      if (tableTrackingMode === 'staff_as_tables') {
+        const teamMemberId = booking.appointmentSegments?.[0]?.teamMemberId;
+        tableNumber = teamMemberNameById[teamMemberId] || null;
+      }
+      // 'none' mode: tableNumber stays null, no table tracking for this studio
+
       return {
         studio_id: studioId,
         square_booking_id: booking.id,
@@ -652,7 +771,7 @@ app.post('/api/bookings/sync', async (req, res) => {
         customer_name: customerName,
         customer_email: booking.customerEmail || null,
         customer_phone: booking.customerPhoneNumber || null,
-        table_number: booking.locationId || null,
+        table_number: tableNumber,
         session_start: booking.startAt,
         session_end: booking.endAt || null,
         party_size: booking.partySize || null,
@@ -678,6 +797,7 @@ app.post('/api/bookings/sync', async (req, res) => {
     res.json({
       status: 'synced',
       bookingsSynced: bookingsToInsert.length,
+      tableTrackingMode,
       bookings: bookingsToInsert.map(b => ({
         bookingCode: b.booking_code,
         customerName: b.customer_name,

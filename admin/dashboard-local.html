@@ -764,25 +764,34 @@
         <!-- Square Connection -->
         <div class="setup-card">
           <h3>1. Connect Your Square Account</h3>
-          <p>We read your transaction history to show you real-time analytics. Your Square account stays in your control.</p>
-          <div style="margin-bottom: 12px;">
-            <span class="status-badge connected">✓ Connected</span>
-            <span style="font-size: 11px; color: var(--gu-dust); margin-left: 8px;">Last synced: 2 hours ago</span>
+          <p>We read your bookings and transaction history to show you real-time analytics. Your Square account stays in your control — this is read-only.</p>
+          <div style="margin-bottom: 12px;" id="square-status-badge">
+            <span class="status-badge pending">Checking status...</span>
           </div>
-          <button class="btn-connect" onclick="alert('Already connected in this demo. In production, click to authorize Square OAuth.')">Manage Square Connection</button>
+          <button class="btn-connect" onclick="connectSquareReal()">Connect Square Account</button>
+
+          <!-- Table tracking mode — flexible per studio -->
+          <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--gu-border);">
+            <div style="font-size: 12px; font-weight: bold; color: var(--gu-text); margin-bottom: 8px;">How does your studio track tables in Square?</div>
+            <select id="table-tracking-mode-select" onchange="saveTableTrackingMode()" style="width: 100%; padding: 8px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px; margin-bottom: 6px;">
+              <option value="none">We don't track tables in Square</option>
+              <option value="staff_as_tables">We use Square "staff members" to represent tables</option>
+            </select>
+            <div style="font-size: 11px; color: var(--gu-dust);">This tells GlazeUp how to read table numbers from your Square bookings.</div>
+          </div>
         </div>
 
         <!-- Stripe Subscription -->
         <div class="setup-card">
           <h3>2. Set Up Monthly Billing</h3>
           <p>Choose your plan. First month is free. No credit card required for the trial.</p>
-          <div style="margin-bottom: 12px;">
-            <span class="status-badge pending">Pending</span>
+          <div style="margin-bottom: 12px;" id="stripe-status-badge">
+            <span class="status-badge pending">Checking status...</span>
           </div>
           <p style="font-size: 12px; color: var(--gu-dust); margin: 12px 0;">
             <strong>Pricing:</strong> Starter £29/mo · Professional £49/mo · Enterprise £79/mo
           </p>
-          <button class="btn-connect" onclick="alert('In production, this opens Stripe setup. For now, you\\'re free for 30 days.')">Set Up Billing</button>
+          <button class="btn-connect" onclick="alert('Stripe checkout coming soon — for now you are on the free trial.')">Set Up Billing</button>
         </div>
 
         <!-- Customisation -->
@@ -1285,6 +1294,8 @@ function goToTab(tab, event) {
     loadKilnData();
   } else if (tab === 'dashboard') {
     populateDashboard();
+  } else if (tab === 'setup') {
+    loadConnectionStatus();
   }
 }
 
@@ -1573,6 +1584,97 @@ function displayMockPieces() {
   ];
   
   displayPieces(mockPieces);
+}
+
+// ══════════════════════════════════════════════════════════
+// STUDIO CONNECTION SETUP (Square, Stripe, table tracking)
+// ══════════════════════════════════════════════════════════
+
+async function loadConnectionStatus() {
+  const squareBadge = document.getElementById('square-status-badge');
+  const stripeBadge = document.getElementById('stripe-status-badge');
+  const modeSelect = document.getElementById('table-tracking-mode-select');
+
+  if (!apiConnected) {
+    squareBadge.innerHTML = `<span class="status-badge pending">API not connected</span>`;
+    stripeBadge.innerHTML = `<span class="status-badge pending">API not connected</span>`;
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/api/studio/connection-status?studioId=${studioId}`);
+    if (!res.ok) throw new Error('Failed to load status');
+    const data = await res.json();
+
+    // Square status
+    if (data.square.connected) {
+      const lastSync = data.square.lastSyncedAt ? new Date(data.square.lastSyncedAt).toLocaleString('en-GB') : 'never';
+      squareBadge.innerHTML = `<span class="status-badge connected">✓ Connected</span> <span style="font-size: 11px; color: var(--gu-dust); margin-left: 8px;">Last synced: ${lastSync}</span>`;
+    } else {
+      squareBadge.innerHTML = `<span class="status-badge pending">Not connected</span>`;
+    }
+
+    // Stripe status
+    if (data.stripe.connected) {
+      stripeBadge.innerHTML = `<span class="status-badge connected">✓ ${data.stripe.plan} plan — ${data.stripe.status}</span>`;
+    } else {
+      stripeBadge.innerHTML = `<span class="status-badge pending">Free trial — no plan yet</span>`;
+    }
+
+    // Table tracking mode
+    if (modeSelect) modeSelect.value = data.tableTrackingMode || 'none';
+  } catch (err) {
+    console.error('Error loading connection status:', err);
+    squareBadge.innerHTML = `<span class="status-badge pending">Could not check status</span>`;
+    stripeBadge.innerHTML = `<span class="status-badge pending">Could not check status</span>`;
+  }
+}
+
+async function connectSquareReal() {
+  if (!apiConnected) {
+    alert('API not connected — cannot start Square connection');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/api/square/authorize?studioId=${studioId}`);
+    if (!res.ok) throw new Error('Failed to get authorization URL');
+    const data = await res.json();
+
+    if (data.authUrl) {
+      // Open Square's real OAuth consent screen in a new tab
+      window.open(data.authUrl, '_blank');
+    } else {
+      alert('Could not start Square connection');
+    }
+  } catch (err) {
+    alert('Error connecting to Square: ' + err.message);
+  }
+}
+
+async function saveTableTrackingMode() {
+  const mode = document.getElementById('table-tracking-mode-select').value;
+
+  try {
+    if (!apiConnected) {
+      alert('API not connected — cannot save setting');
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/api/studio/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, tableTrackingMode: mode })
+    });
+
+    if (res.ok) {
+      console.log('Table tracking mode saved:', mode);
+    } else {
+      alert('Error saving setting: ' + res.statusText);
+    }
+  } catch (err) {
+    alert('Could not save setting: ' + err.message);
+  }
 }
 
 // ══════════════════════════════════════════════════════════
