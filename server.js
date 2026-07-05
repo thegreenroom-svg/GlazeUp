@@ -1652,7 +1652,11 @@ app.get('/api/square/bookings-debug', async (req, res) => {
     });
   } catch (error) {
     console.error('Bookings debug error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({
+      error: error.message,
+      squareErrors: error.errors || error.result?.errors || null,
+      statusCode: error.statusCode || null
+    });
   }
 });
 
