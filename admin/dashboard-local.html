@@ -843,11 +843,14 @@
 
           <div class="chart-container">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-              <h3 style="margin: 0;">Today's Bookings</h3>
+              <div style="display: flex; gap: 6px;">
+                <button id="s1-view-today" class="staff-subtab-btn active" style="padding: 6px 12px; font-size: 12px;" onclick="switchBookingsView('today')">Today</button>
+                <button id="s1-view-upcoming" class="staff-subtab-btn" style="padding: 6px 12px; font-size: 12px;" onclick="switchBookingsView('upcoming')">Next 7 days</button>
+              </div>
               <button class="btn-connect glaze-ocean" style="padding: 6px 14px; font-size: 11px;" onclick="syncBookingsFromSquare()">🔄 Sync from Square</button>
             </div>
             <div id="s1-today-bookings">
-              <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Tap "Sync from Square" to load today's bookings.</div>
+              <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Tap "Sync from Square" to load bookings.</div>
             </div>
           </div>
 
@@ -1974,6 +1977,16 @@ function showStaffSection(section) {
 
 // ── Section 1: Booking Details ──
 
+let s1BookingsView = 'today';
+
+function switchBookingsView(view) {
+  s1BookingsView = view;
+  document.getElementById('s1-view-today').classList.toggle('active', view === 'today');
+  document.getElementById('s1-view-upcoming').classList.toggle('active', view === 'upcoming');
+  if (view === 'today') loadTodaysBookings();
+  else loadUpcomingBookings();
+}
+
 async function syncBookingsFromSquare() {
   const container = document.getElementById('s1-today-bookings');
   container.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Syncing from Square…</div>`;
@@ -1984,7 +1997,7 @@ async function syncBookingsFromSquare() {
       return;
     }
 
-    // Trigger the sync (pulls today's bookings from Square into the database)
+    // Trigger the sync (pulls upcoming bookings from Square into the database)
     const syncRes = await fetch(`${API_URL}/api/bookings/sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1997,10 +2010,26 @@ async function syncBookingsFromSquare() {
       return;
     }
 
-    await loadTodaysBookings();
+    if (s1BookingsView === 'today') await loadTodaysBookings();
+    else await loadUpcomingBookings();
   } catch (err) {
     container.innerHTML = `<div style="padding: 12px; text-align: center; color: #d9534f; font-size: 12px;">Sync error: ${err.message}</div>`;
   }
+}
+
+function renderBookingButton(b) {
+  const time = b.session_start
+    ? new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+    : '';
+  const table = b.table_number ? ` · ${b.table_number}` : '';
+  return `
+    <button onclick='selectTodaysBooking(${JSON.stringify(b).replace(/'/g, "&apos;")})' style="width: 100%; text-align: left; padding: 12px; background: #fff9f0; border: 1px solid var(--gu-border); border-left: 4px solid var(--gu-primary); border-radius: 8px; margin-bottom: 8px; cursor: pointer;">
+      <div style="display: flex; justify-content: space-between;">
+        <strong style="font-size: 13px;">${b.customer_name}</strong>
+        <span style="font-size: 11px; color: var(--gu-dust);">${time}${table}</span>
+      </div>
+    </button>
+  `;
 }
 
 async function loadTodaysBookings() {
@@ -2015,22 +2044,42 @@ async function loadTodaysBookings() {
       return;
     }
 
-    container.innerHTML = data.bookings.map(b => {
-      const time = b.session_start
-        ? new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-        : '';
-      const table = b.table_number ? ` · ${b.table_number}` : '';
-      return `
-        <button onclick='selectTodaysBooking(${JSON.stringify(b).replace(/'/g, "&apos;")})' style="width: 100%; text-align: left; padding: 12px; background: #fff9f0; border: 1px solid var(--gu-border); border-left: 4px solid var(--gu-primary); border-radius: 8px; margin-bottom: 8px; cursor: pointer;">
-          <div style="display: flex; justify-content: space-between;">
-            <strong style="font-size: 13px;">${b.customer_name}</strong>
-            <span style="font-size: 11px; color: var(--gu-dust);">${time}${table}</span>
-          </div>
-        </button>
-      `;
-    }).join('');
+    container.innerHTML = data.bookings.map(renderBookingButton).join('');
   } catch (err) {
     container.innerHTML = `<div style="padding: 12px; text-align: center; color: #d9534f; font-size: 12px;">Could not load bookings.</div>`;
+  }
+}
+
+async function loadUpcomingBookings() {
+  const container = document.getElementById('s1-today-bookings');
+  try {
+    const res = await fetch(`${API_URL}/api/bookings/upcoming?studioId=${studioId}&days=7`);
+    if (!res.ok) throw new Error('Failed to load');
+    const data = await res.json();
+
+    if (!data.bookings || data.bookings.length === 0) {
+      container.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">No bookings in the next 7 days.</div>`;
+      return;
+    }
+
+    // Group by day
+    const byDay = {};
+    data.bookings.forEach(b => {
+      const dayKey = new Date(b.session_start).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
+      if (!byDay[dayKey]) byDay[dayKey] = [];
+      byDay[dayKey].push(b);
+    });
+
+    const todayKey = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
+
+    container.innerHTML = Object.entries(byDay).map(([day, bookings]) => `
+      <div style="font-size: 12px; font-weight: bold; color: var(--gu-accent); margin: 14px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--gu-border);">
+        ${day === todayKey ? 'Today · ' + day : day} <span style="color: var(--gu-dust); font-weight: normal;">(${bookings.length})</span>
+      </div>
+      ${bookings.map(renderBookingButton).join('')}
+    `).join('');
+  } catch (err) {
+    container.innerHTML = `<div style="padding: 12px; text-align: center; color: #d9534f; font-size: 12px;">Could not load upcoming bookings.</div>`;
   }
 }
 

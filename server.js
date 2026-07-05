@@ -970,6 +970,37 @@ app.get('/api/bookings/today', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/bookings/upcoming?studioId=&days=7
+ * List bookings from today through the next N days (default 7), for the look-ahead view
+ */
+app.get('/api/bookings/upcoming', async (req, res) => {
+  const { studioId } = req.query;
+  const days = parseInt(req.query.days) || 7;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + days);
+
+    const { data: bookings, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('studio_id', studioId)
+      .gte('session_start', start.toISOString())
+      .lt('session_start', end.toISOString())
+      .order('session_start', { ascending: true });
+
+    if (error) throw error;
+    res.json({ bookings: bookings || [] });
+  } catch (error) {
+    console.error('Error listing upcoming bookings:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/bookings/sync', async (req, res) => {
   const { studioId } = req.body;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
@@ -1024,19 +1055,14 @@ app.post('/api/bookings/sync', async (req, res) => {
     );
     const allBookings = response.result.bookings || [];
 
-    // Keep only today's bookings for the daily sync
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const todayBookings = allBookings.filter(b => {
-      const bookingTime = new Date(b.startAt);
-      return bookingTime >= today && bookingTime < tomorrow;
-    });
+    // Sync all upcoming bookings in the window, skipping cancelled/declined ones
+    const activeStatuses = ['ACCEPTED', 'PENDING'];
+    const upcomingBookings = allBookings.filter(b =>
+      activeStatuses.includes(b.status) && b.startAt
+    );
 
     // Resolve customer names by looking up each unique customerId via the Customers API
-    const uniqueCustomerIds = [...new Set(todayBookings.map(b => b.customerId).filter(Boolean))];
+    const uniqueCustomerIds = [...new Set(upcomingBookings.map(b => b.customerId).filter(Boolean))];
     const customerById = {};
     await Promise.all(uniqueCustomerIds.map(async (custId) => {
       try {
@@ -1053,10 +1079,12 @@ app.post('/api/bookings/sync', async (req, res) => {
     }));
 
     // Upsert bookings into database
-    const bookingsToInsert = todayBookings.map((booking, idx) => {
+    const bookingsToInsert = upcomingBookings.map((booking, idx) => {
       const cust = customerById[booking.customerId] || {};
       const customerName = cust.name || `Walk-in ${idx + 1}`;
-      const bookingCode = `booking-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}-${booking.id.substring(0, 8)}`;
+      // Derive booking_code from the booking's own start date, so each day is distinct
+      const bStart = new Date(booking.startAt);
+      const bookingCode = `booking-${bStart.getFullYear()}${String(bStart.getMonth() + 1).padStart(2, '0')}${String(bStart.getDate()).padStart(2, '0')}-${booking.id.substring(0, 8)}`;
 
       // Resolve table number/name depending on the studio's tracking mode
       let tableNumber = null;
@@ -1093,7 +1121,7 @@ app.post('/api/bookings/sync', async (req, res) => {
         status: 'synced',
         bookingsSynced: 0,
         tableTrackingMode,
-        message: 'No bookings found for today'
+        message: 'No upcoming bookings found'
       });
     }
 
