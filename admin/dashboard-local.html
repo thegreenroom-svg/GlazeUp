@@ -934,11 +934,17 @@
 
           <div class="chart-container">
             <h3>Look Up Booking</h3>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
-              <input type="text" id="s1-booking-code" placeholder="Booking code / QR scan" style="padding: 10px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px;">
-              <input type="text" id="s1-customer-name" placeholder="Or customer name" style="padding: 10px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px;">
-            </div>
+            <input type="text" id="s1-booking-code" placeholder="Booking code / QR scan" style="width: 100%; padding: 10px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px; margin-bottom: 12px;">
             <button class="btn-connect" style="width: 100%;" onclick="lookupBookingSection1()">Look Up Booking</button>
+
+            <div style="display: flex; align-items: center; gap: 10px; margin: 16px 0;">
+              <div style="flex: 1; height: 1px; background: var(--gu-border);"></div>
+              <span style="font-size: 11px; color: var(--gu-dust);">OR</span>
+              <div style="flex: 1; height: 1px; background: var(--gu-border);"></div>
+            </div>
+
+            <input type="text" id="s1-walkin-name" placeholder="Walk-in customer name" style="width: 100%; padding: 10px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px; margin-bottom: 12px;">
+            <button class="btn-connect glaze-honey" style="width: 100%;" onclick="startWalkIn()">🚶 New Walk-in (no booking)</button>
 
             <div id="s1-result" style="display: none; margin-top: 16px;">
               <div class="booking-header">
@@ -2176,7 +2182,6 @@ async function loadUpcomingBookings() {
 function selectTodaysBooking(booking) {
   // Pre-fill the lookup with this booking's code and run the lookup
   document.getElementById('s1-booking-code').value = booking.booking_code;
-  document.getElementById('s1-customer-name').value = '';
   // Pre-fill table number from Square if available
   lookupBookingSection1().then(() => {
     if (booking.table_number) {
@@ -2187,10 +2192,9 @@ function selectTodaysBooking(booking) {
 
 async function lookupBookingSection1() {
   const bookingCode = document.getElementById('s1-booking-code').value.trim();
-  const customerName = document.getElementById('s1-customer-name').value.trim();
 
-  if (!bookingCode && !customerName) {
-    alert('Enter a booking code or customer name');
+  if (!bookingCode) {
+    alert('Enter a booking code');
     return;
   }
 
@@ -2200,7 +2204,7 @@ async function lookupBookingSection1() {
     if (!apiConnected) {
       // Fall back to mock data for demo purposes
       bookingData = mockBookings[bookingCode] || Object.values(mockBookings)[0];
-    } else if (bookingCode) {
+    } else {
       const res = await fetch(`${API_URL}/api/booking/${bookingCode}?studioId=${studioId}`);
       if (!res.ok) {
         alert('Booking not found');
@@ -2213,8 +2217,33 @@ async function lookupBookingSection1() {
         partySize: data.booking.partySize,
         customerHistory: data.customerHistory
       };
+    }
+
+    displayBookingResult(bookingData);
+  } catch (err) {
+    alert('Error looking up booking: ' + err.message);
+  }
+}
+
+async function startWalkIn() {
+  const customerName = document.getElementById('s1-walkin-name').value.trim();
+
+  if (!customerName) {
+    alert('Enter the customer\'s name');
+    return;
+  }
+
+  try {
+    let bookingData;
+
+    if (!apiConnected) {
+      bookingData = {
+        bookingCode: `walkin-demo-${Date.now()}`,
+        customerName,
+        partySize: null,
+        customerHistory: { isReturningCustomer: false, unfinishedPieces: [], unfinishedCount: 0 }
+      };
     } else {
-      // Manual name-only lookup — treat as a fresh walk-in.
       // Create a REAL booking row so the customer QR (which links to this code)
       // can actually be found later — a code that only lives in memory can't be scanned into.
       const createRes = await fetch(`${API_URL}/api/bookings/manual`, {
@@ -2231,36 +2260,41 @@ async function lookupBookingSection1() {
       const createData = await createRes.json();
       bookingData = {
         bookingCode: createData.booking.booking_code,
-        customerName: customerName,
+        customerName,
         partySize: null,
         customerHistory: { isReturningCustomer: false, unfinishedPieces: [], unfinishedCount: 0 }
       };
     }
 
-    s1LookedUpBooking = bookingData;
-
-    document.getElementById('s1-customer-display').textContent = bookingData.customerName;
-    document.getElementById('s1-party-display').textContent = bookingData.partySize ? `Party of ${bookingData.partySize}` : '';
-
-    const returningSection = document.getElementById('s1-returning-section');
-    if (bookingData.customerHistory?.unfinishedCount > 0) {
-      returningSection.style.display = 'block';
-      document.getElementById('s1-returning-list').innerHTML = bookingData.customerHistory.unfinishedPieces.map(p =>
-        `<li>${p.piece_type} — fee payable on completion</li>`
-      ).join('');
-    } else {
-      returningSection.style.display = 'none';
-    }
-
-    // Pre-fill number of places from party size if known
-    if (bookingData.partySize) {
-      document.getElementById('s1-num-places').value = bookingData.partySize;
-    }
-
-    document.getElementById('s1-result').style.display = 'block';
+    displayBookingResult(bookingData);
+    document.getElementById('s1-walkin-name').value = '';
   } catch (err) {
-    alert('Error looking up booking: ' + err.message);
+    alert('Error starting walk-in: ' + err.message);
   }
+}
+
+function displayBookingResult(bookingData) {
+  s1LookedUpBooking = bookingData;
+
+  document.getElementById('s1-customer-display').textContent = bookingData.customerName;
+  document.getElementById('s1-party-display').textContent = bookingData.partySize ? `Party of ${bookingData.partySize}` : '';
+
+  const returningSection = document.getElementById('s1-returning-section');
+  if (bookingData.customerHistory?.unfinishedCount > 0) {
+    returningSection.style.display = 'block';
+    document.getElementById('s1-returning-list').innerHTML = bookingData.customerHistory.unfinishedPieces.map(p =>
+      `<li>${p.piece_type} — fee payable on completion</li>`
+    ).join('');
+  } else {
+    returningSection.style.display = 'none';
+  }
+
+  // Pre-fill number of places from party size if known
+  if (bookingData.partySize) {
+    document.getElementById('s1-num-places').value = bookingData.partySize;
+  }
+
+  document.getElementById('s1-result').style.display = 'block';
 }
 
 async function openTableSession() {
@@ -2326,7 +2360,7 @@ function closeCustomerQR() {
 function resetSection1() {
   s1LookedUpBooking = null;
   document.getElementById('s1-booking-code').value = '';
-  document.getElementById('s1-customer-name').value = '';
+  document.getElementById('s1-walkin-name').value = '';
   document.getElementById('s1-table-number').value = '';
   document.getElementById('s1-num-places').value = '';
   document.getElementById('s1-result').style.display = 'none';
