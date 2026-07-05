@@ -2253,7 +2253,8 @@ async function startWalkIn() {
       });
 
       if (!createRes.ok) {
-        alert('Could not create walk-in booking');
+        const errData = await createRes.json().catch(() => ({}));
+        alert('Could not create walk-in booking: ' + (errData.error || createRes.statusText));
         return;
       }
 
