@@ -1069,8 +1069,8 @@
 // GlazeUp Admin Dashboard · API Integration
 // ═══════════════════════════════════════════════════════════
 
-const API_URL = localStorage.getItem('glazeup_api_url') || 'http://localhost:3000';
-const studioId = new URLSearchParams(window.location.search).get('studio') || 'demo';
+const API_URL = localStorage.getItem('glazeup_api_url') || 'https://glazeup-api.onrender.com';
+const studioId = new URLSearchParams(window.location.search).get('studio') || 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3'; // The Kiln Cafe (test)
 
 let apiConnected = false;
 

@@ -468,6 +468,12 @@ All booking/QR/pieces submission/loyalty system now built and integrated.
 
 **Note:** Stripe and Square are still placeholder values — real keys needed before those features work (billing, Square sync). Everything else (bookings, pieces, loyalty) is fully live.
 
+**Dashboard wired to live API (2026-07-05):**
+- ✓ admin/dashboard-local.html default API_URL changed to https://glazeup-api.onrender.com
+- ✓ Default studioId changed to The Kiln Cafe's real UUID (fab8b2d2-27b5-47ec-8c56-268bbf821dc3)
+- ✓ Confirmed Square/Stripe "connect" buttons are demo-only alerts, not wired to real endpoints — safe to test dashboard without any risk to live Square account
+- ⚠️ IMPORTANT: Do not add real Square credentials until Daisy explicitly confirms — she wants this running alongside the live Square system for testing only, no integration/billing yet
+
 ---
 
 ## Future Feature Reminder (Phase 3/4: Billing)
