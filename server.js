@@ -95,7 +95,7 @@ app.get('/api/square/authorize', (req, res) => {
 
   const authUrl = new URL(authBaseUrl);
   authUrl.searchParams.append('client_id', process.env.SQUARE_CLIENT_ID);
-  authUrl.searchParams.append('scope', 'MERCHANT_PROFILE_READ CUSTOMERS_READ ORDERS_READ INVENTORY_READ APPOINTMENTS_READ TIMECARDS_READ');
+  authUrl.searchParams.append('scope', 'MERCHANT_PROFILE_READ CUSTOMERS_READ ORDERS_READ INVENTORY_READ ITEMS_READ APPOINTMENTS_READ TIMECARDS_READ');
   authUrl.searchParams.append('session', 'false');
   authUrl.searchParams.append('redirect_uri', `${process.env.API_URL}/api/square/callback`);
   authUrl.searchParams.append('response_type', 'code');
