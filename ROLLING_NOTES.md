@@ -643,6 +643,16 @@ Daisy asked for a "jazzier, funky, dynamic" look for iPhone/iPad with buttons th
 
 ---
 
+## Real Square Connected (Production, Read-Only) — 2026-07-05
+
+Daisy connected her real Kiln Cafe Square account. Confirmed the entire codebase only ever makes read calls to Square (retrieveMerchant, searchOrders, listCatalog, searchTeamMembers, listBookings — no create/update/delete/charge/refund anywhere), and OAuth scopes requested are all `_READ` only. Production credentials added to Render (`SQUARE_CLIENT_ID`, `SQUARE_CLIENT_SECRET`, `SQUARE_ENVIRONMENT=production`), plus `API_URL` (was missing, causing an invalid redirect_uri error on first attempt) and the Production OAuth Redirect URL registered on Square's side (`https://glazeup-api.onrender.com/api/square/callback`).
+
+**Bug found and fixed during connection testing:** `node-fetch` v3 is ESM-only and silently breaks when loaded via `require()` — it returns a module namespace object instead of a callable function, causing "fetch is not a function" during the OAuth token exchange. Fix: removed the `node-fetch` import entirely and rely on Node's native global `fetch` (confirmed available — Render runs Node 26.4.0, well above the v18 threshold where native fetch was introduced).
+
+Square OAuth consent completed successfully by Daisy. Real production connection should now be live — next step is confirming real catalog items/prices are flowing into Section 2 (Customer Engagement) instead of the demo Mug/Coffee/Brownie placeholders.
+
+---
+
 ## Future Feature Reminder (Phase 3/4: Billing)
 
 **SPLIT BILLS + MULTI-CUSTOMER LOYALTY**

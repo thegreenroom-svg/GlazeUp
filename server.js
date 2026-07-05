@@ -13,7 +13,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const fetch = require('node-fetch');
+// Note: no node-fetch import needed — Node 18+ provides a native global fetch()
+// (node-fetch v3 is ESM-only and breaks under require(), so we don't use it)
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const Stripe = require('stripe');
