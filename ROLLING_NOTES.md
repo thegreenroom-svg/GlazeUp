@@ -447,6 +447,29 @@ All booking/QR/pieces submission/loyalty system now built and integrated.
 
 ---
 
+## Phase 1 Polish — LIVE ✓ (Session: 2026-07-05)
+
+- ✓ GitHub repo created: github.com/thegreenroom-svg/GlazeUp (private)
+- ✓ Supabase project created: mdpchpjnlzlmldtlqrns.supabase.co
+- ✓ Database schema deployed (studios, customers, bookings, pottery_pieces, loyalty_transactions, square_connections, stripe_subscriptions)
+- ✓ Fixed package.json "type: module" conflict (server.js uses CommonJS require())
+- ✓ Backend deployed live on Render: https://glazeup-api.onrender.com
+- ✓ Environment variables configured (SUPABASE_URL, SUPABASE_SERVICE_KEY, etc.)
+- ✓ Health check confirmed: /health returns {"status":"ok"}
+- ✓ Real database round-trip confirmed via /api/pieces/awaiting-dip
+- ✓ **The Kiln Cafe created as first real studio**
+  - **Studio ID: fab8b2d2-27b5-47ec-8c56-268bbf821dc3**
+  - slug: kiln-cafe
+
+**Live URLs:**
+- Backend API: https://glazeup-api.onrender.com
+- GitHub repo: https://github.com/thegreenroom-svg/GlazeUp
+- Supabase project: https://mdpchpjnlzlmldtlqrns.supabase.co
+
+**Note:** Stripe and Square are still placeholder values — real keys needed before those features work (billing, Square sync). Everything else (bookings, pieces, loyalty) is fully live.
+
+---
+
 ## Future Feature Reminder (Phase 3/4: Billing)
 
 **SPLIT BILLS + MULTI-CUSTOMER LOYALTY**
