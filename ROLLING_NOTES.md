@@ -666,7 +666,7 @@ Things to come back and finish/verify — deferred to keep momentum:
 5. **Set the studio's `table_tracking_mode`** to `staff_as_tables` — ✓ DONE by Daisy via Setup tab dropdown.
 6. **Consider adding real Stripe keys** when ready (still `sk_test_placeholder`), so billing/subscription features work.
 7. **General UI polish pass** deferred — the glaze redesign covered buttons/nav/cards/logo but not full layout/typography/headers.
-8. **`mark-picked-up` has no UI yet** — API exists, no button in the dashboard to mark fired pieces as collected.
+8. **`mark-picked-up` UI** — ✓ DONE. Added `GET /api/pieces/ready-for-pickup` (lists fired, uncollected pieces) and a "Ready for Pickup" card in the Kiln & Inventory section: fired pieces grouped by booking/customer, each group with a sage "✓ Mark Picked Up" button that flips pieces to `picked_up` status.
 
 ---
 

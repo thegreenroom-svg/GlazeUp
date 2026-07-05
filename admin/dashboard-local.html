@@ -980,6 +980,18 @@
             </div>
           </div>
 
+          <!-- Ready for Pickup -->
+          <div class="chart-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="margin: 0;">Ready for Pickup</h3>
+              <button onclick="loadReadyForPickup()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
+            </div>
+            <div style="font-size: 11px; color: var(--gu-dust); margin-bottom: 10px;">Fired pieces waiting to be collected. Mark as picked up when the customer takes them home.</div>
+            <div id="ready-for-pickup-list">
+              <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
+            </div>
+          </div>
+
           <!-- Current Inventory -->
           <div class="chart-container">
             <h3>Current Bisque Stock (from Square)</h3>
@@ -2430,6 +2442,70 @@ function completeTableFromSection3(tableSessionId, bookingCode) {
 function loadKilnData() {
   loadDippedPieces();
   loadKilnSessions();
+  loadReadyForPickup();
+}
+
+async function loadReadyForPickup() {
+  const container = document.getElementById('ready-for-pickup-list');
+  try {
+    if (!apiConnected) {
+      container.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Connect API to load pieces.</div>`;
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/api/pieces/ready-for-pickup?studioId=${studioId}`);
+    if (!res.ok) throw new Error('Failed to load');
+    const data = await res.json();
+
+    if (!data.pieces || data.pieces.length === 0) {
+      container.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Nothing waiting for collection.</div>`;
+      return;
+    }
+
+    // Group pieces by booking
+    const byBooking = {};
+    data.pieces.forEach(p => {
+      const key = p.booking_id || 'unknown';
+      if (!byBooking[key]) byBooking[key] = [];
+      byBooking[key].push(p);
+    });
+
+    container.innerHTML = Object.entries(byBooking).map(([bookingId, pieces]) => {
+      const names = pieces.map(p => p.piece_type || 'Piece').join(', ');
+      const ids = pieces.map(p => p.id);
+      const customerName = pieces[0].customer_name || bookingId;
+      return `
+        <div style="padding: 12px; background: #f2f8f0; border-left: 4px solid var(--glaze-sage-base); border-radius: 8px; margin-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <strong style="font-size: 13px;">${customerName}</strong>
+            <span style="font-size: 11px; color: var(--gu-dust);">${pieces.length} piece${pieces.length > 1 ? 's' : ''}</span>
+          </div>
+          <div style="font-size: 12px; color: var(--gu-dust); margin-bottom: 10px;">${names}</div>
+          <button class="btn-connect glaze-sage" style="width: 100%; padding: 8px; font-size: 12px;" onclick='markPickedUp(${JSON.stringify(ids)})'>✓ Mark Picked Up</button>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    container.innerHTML = `<div style="padding: 12px; text-align: center; color: #d9534f; font-size: 12px;">Could not load.</div>`;
+  }
+}
+
+async function markPickedUp(pieceIds) {
+  try {
+    const res = await fetch(`${API_URL}/api/pieces/mark-picked-up`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, pieceIds })
+    });
+
+    if (res.ok) {
+      loadReadyForPickup();
+    } else {
+      alert('Error marking picked up: ' + res.statusText);
+    }
+  } catch (err) {
+    alert('Could not mark picked up: ' + err.message);
+  }
 }
 
 async function loadDippedPieces() {

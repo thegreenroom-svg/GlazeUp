@@ -1494,6 +1494,30 @@ app.post('/api/kiln-sessions/:sessionId/fire', async (req, res) => {
 });
 
 /**
+ * GET /api/pieces/ready-for-pickup
+ * List fired pieces not yet collected, grouped for the pickup UI
+ */
+app.get('/api/pieces/ready-for-pickup', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    const { data: pieces, error } = await supabase
+      .from('pottery_pieces')
+      .select('*')
+      .eq('studio_id', studioId)
+      .eq('status', 'fired')
+      .order('updated_at', { ascending: true });
+
+    if (error) throw error;
+    res.json({ pieces: pieces || [] });
+  } catch (error) {
+    console.error('Error fetching ready-for-pickup pieces:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * POST /api/pieces/mark-picked-up
  * Mark fired pieces as collected by the customer
  */
