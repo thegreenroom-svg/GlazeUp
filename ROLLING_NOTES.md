@@ -651,6 +651,23 @@ Daisy connected her real Kiln Cafe Square account. Confirmed the entire codebase
 
 Square OAuth consent completed successfully by Daisy. Real production connection should now be live — next step is confirming real catalog items/prices are flowing into Section 2 (Customer Engagement) instead of the demo Mug/Coffee/Brownie placeholders.
 
+Multiple bugs fixed during the connection session (all pushed live): node-fetch ESM issue; `retrieveMerchant()` needed a `'me'` argument; OAuth callback redirected to a non-existent dashboard route (now shows an inline "Square Connected" success page); and the server now serves the admin dashboard as static files so it has a real browser URL (`https://glazeup-api.onrender.com` → redirects to the dashboard).
+
+---
+
+## ⚠️ OUTSTANDING TIDY-UP (Daisy said "tidy all that up later" — 2026-07-05)
+
+Things to come back and finish/verify — deferred to keep momentum:
+
+1. **Confirm real Square data is actually flowing** — check Setup tab shows "✓ Connected", and Section 2 (Customer Engagement) shows real Kiln Cafe catalog items/prices, not the demo Mug/Coffee/Brownie fallback. If catalog is empty/wrong, debug the `/api/square/catalog` category mapping against the real catalog shape.
+2. **Rotate the exposed Square Production Access Token** — Daisy pasted her full Production Access Token (`EAAAl...`) into chat earlier before we clarified we needed the Application Secret instead. That token grants full account access. She should click "Replace" on it in the Square dashboard to invalidate it (good hygiene — it was never used by the app, but it was exposed).
+3. **The GitHub PAT (`ghp_...`) used for pushes this session** should ideally be rotated too, since it appeared in the working environment.
+4. **Wire real bookings sync** — now Square is connected, test `/api/bookings/sync` pulls real Kiln Cafe bookings (with `table_tracking_mode = staff_as_tables` set) so Section 1 can look up real bookings rather than mock `booking-001`.
+5. **Set the studio's `table_tracking_mode`** to `staff_as_tables` for The Kiln Cafe via the Setup tab dropdown (or confirm it's set).
+6. **Consider adding real Stripe keys** when ready (still `sk_test_placeholder`), so billing/subscription features work.
+7. **General UI polish pass** deferred — the glaze redesign covered buttons/nav/cards/logo but not full layout/typography/headers.
+8. **`mark-picked-up` has no UI yet** — API exists, no button in the dashboard to mark fired pieces as collected.
+
 ---
 
 ## Future Feature Reminder (Phase 3/4: Billing)
