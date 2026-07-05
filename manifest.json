@@ -1,0 +1,15 @@
+{
+  "name": "GlazeUp · Studio Tools",
+  "short_name": "GlazeUp",
+  "description": "Colour matching, transfer preview and print tools for pottery painting studios",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#faf4ef",
+  "theme_color": "#b03a2e",
+  "icons": [
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "categories": ["lifestyle", "utilities"]
+}

@@ -1,0 +1,25 @@
+{
+  "name": "glazeup-backend",
+  "version": "1.0.0",
+  "description": "GlazeUp backend: Square + Stripe integrations",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "sync-square": "node jobs/sync-square.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-cors": "^0.0.1",
+    "@supabase/supabase-js": "^2.38.0",
+    "square": "^39.0.0",
+    "stripe": "^13.0.0",
+    "dotenv": "^16.3.1",
+    "node-cron": "^3.0.2",
+    "axios": "^1.5.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Studio Admin · GlazeUp</title>
+  <link rel="stylesheet" href="../css/app.css">
+  <style>
+    .admin-wrapper {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      height: 100vh;
+    }
+    .admin-sidebar {
+      background: var(--gu-primary);
+      color: #fff;
+      padding: 20px;
+      border-right: 1px solid var(--gu-border);
+      overflow-y: auto;
+    }
+    .admin-sidebar nav a {
+      display: block;
+      padding: 10px 0;
+      color: #fff;
+      text-decoration: none;
+      font-family: var(--gu-font-body);
+      font-size: 13px;
+      border-radius: 4px;
+      padding: 8px 12px;
+      margin-bottom: 4px;
+      transition: background 0.2s;
+    }
+    .admin-sidebar nav a:hover, .admin-sidebar nav a.active {
+      background: rgba(255,255,255,0.2);
+    }
+    .admin-main {
+      display: flex;
+      flex-direction: column;
+      background: var(--gu-secondary);
+    }
+    .admin-header {
+      background: #fff;
+      border-bottom: 1px solid var(--gu-border);
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .admin-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+    }
+    .admin-content > * { max-width: 900px; }
+
+    .setup-card {
+      background: #fff;
+      border: 2px solid var(--gu-border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .setup-card h3 {
+      font-size: 16px;
+      color: var(--gu-accent);
+      margin-bottom: 12px;
+    }
+    .setup-card p {
+      font-family: var(--gu-font-body);
+      font-size: 13px;
+      color: var(--gu-dust);
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .metric-card {
+      background: #fff;
+      border: 1px solid var(--gu-border);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+    .metric-card .label {
+      font-family: var(--gu-font-body);
+      font-size: 11px;
+      color: var(--gu-label);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+    .metric-card .value {
+      font-size: 32px;
+      font-weight: bold;
+      color: var(--gu-primary);
+    }
+    .metric-card .detail {
+      font-family: var(--gu-font-body);
+      font-size: 12px;
+      color: var(--gu-dust);
+      margin-top: 8px;
+    }
+
+    .chart-container {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid var(--gu-border);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .chart-container h3 {
+      font-size: 14px;
+      color: var(--gu-accent);
+      margin-bottom: 16px;
+    }
+    .chart-placeholder {
+      height: 200px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--gu-dust);
+      font-family: var(--gu-font-body);
+      font-size: 13px;
+    }
+
+    .btn-connect {
+      background: var(--gu-primary);
+      color: #fff;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-family: var(--gu-font-body);
+      font-size: 13px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn-connect:hover { opacity: 0.85; }
+    .btn-connect:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-family: var(--gu-font-body);
+    }
+    .status-badge.connected {
+      background: #c8e6c9;
+      color: #1b5e20;
+    }
+    .status-badge.pending {
+      background: #fff3e0;
+      color: #e65100;
+    }
+    .status-badge.error {
+      background: #ffcdd2;
+      color: #b71c1c;
+    }
+
+    #loading { text-align: center; padding: 40px; }
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--gu-border);
+      border-top-color: var(--gu-primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 10px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body style="margin: 0; overflow: hidden;">
+
+<div class="admin-wrapper">
+  <!-- SIDEBAR -->
+  <aside class="admin-sidebar">
+    <h2 style="font-size:16px;margin:0 0 20px;font-family:var(--gu-font-display)">GlazeUp</h2>
+    <nav>
+      <a href="#dashboard" class="nav-link active">Dashboard</a>
+      <a href="#setup" class="nav-link">Setup</a>
+      <a href="#branding" class="nav-link">Branding</a>
+      <a href="#palettes" class="nav-link">Colours</a>
+      <a href="#shapes" class="nav-link">Bisque</a>
+      <a href="#designs" class="nav-link">Designs</a>
+      <a href="#account" class="nav-link">Account</a>
+    </nav>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="admin-main">
+    <header class="admin-header">
+      <h1 style="margin: 0; font-size: 18px; color: var(--gu-accent);" id="studio-name">Loading...</h1>
+      <div style="text-align: right; font-family: var(--gu-font-body); font-size: 12px;">
+        <div id="subscription-status">–</div>
+        <a href="#" onclick="logout()" style="color: var(--gu-dust); text-decoration: none; margin-top: 4px; display: block; font-size: 11px;">Logout</a>
+      </div>
+    </header>
+
+    <div class="admin-content">
+      <!-- DASHBOARD TAB -->
+      <div id="dashboard-view" class="view" style="display: none;">
+        <h2 style="margin-top: 0;">Dashboard</h2>
+
+        <div id="loading" style="display:none">
+          <div class="spinner"></div>
+          <p>Loading analytics…</p>
+        </div>
+
+        <div id="dashboard-content" style="display: none;">
+          <!-- Key metrics -->
+          <div class="dashboard-grid">
+            <div class="metric-card">
+              <div class="label">Revenue (30d)</div>
+              <div class="value" id="metric-revenue">£0</div>
+              <div class="detail">transactions</div>
+            </div>
+            <div class="metric-card">
+              <div class="label">App Sessions</div>
+              <div class="value" id="metric-sessions">0</div>
+              <div class="detail">in 30 days</div>
+            </div>
+            <div class="metric-card">
+              <div class="label">Tool Used Most</div>
+              <div class="value" id="metric-tool">–</div>
+              <div class="detail">by customers</div>
+            </div>
+          </div>
+
+          <!-- Charge notification -->
+          <div style="background: #e3f2fd; border: 1px solid #90caf9; border-radius: 8px; padding: 12px; margin-bottom: 24px; font-family: var(--gu-font-body); font-size: 12px; color: #1565c0;">
+            <strong>Free tier:</strong> You're currently on the free trial. Your first month is free; billing starts next month.
+          </div>
+
+          <!-- Charts -->
+          <div class="chart-container">
+            <h3>Revenue (Last 30 Days)</h3>
+            <canvas id="revenue-chart" style="width: 100%; height: 200px;"></canvas>
+          </div>
+
+          <div class="chart-container">
+            <h3>Most Popular Designs</h3>
+            <div id="top-designs" style="font-family: var(--gu-font-body); font-size: 13px;">
+              <p style="color: var(--gu-dust);">No data yet</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SETUP TAB -->
+      <div id="setup-view" class="view" style="display: none;">
+        <h2 style="margin-top: 0;">Setup</h2>
+        <p style="font-family: var(--gu-font-body); color: var(--gu-dust);">Connect your Square account and enable billing to get started.</p>
+
+        <!-- Square Connection -->
+        <div class="setup-card">
+          <h3>1. Connect Square</h3>
+          <p>We read your transaction history and customer data to show you analytics. Your Square account stays in your control.</p>
+          <div id="square-status" style="margin-bottom: 12px;">
+            <span class="status-badge pending">Not connected</span>
+          </div>
+          <button class="btn-connect" onclick="startSquareOAuth()">Connect Square</button>
+        </div>
+
+        <!-- Stripe Subscription -->
+        <div class="setup-card">
+          <h3>2. Choose Your Plan</h3>
+          <p>GlazeUp is free for the first month. After that, choose the plan that fits your studio.</p>
+          <div id="stripe-status" style="margin-bottom: 12px;">
+            <span class="status-badge pending">Not set up</span>
+          </div>
+          <button class="btn-connect" onclick="setupBilling()">Set Up Billing</button>
+        </div>
+
+        <!-- Customisation -->
+        <div class="setup-card">
+          <h3>3. Customise Your Branding</h3>
+          <p>Set your studio name, logo, colours, and tagline so the app feels like yours.</p>
+          <button class="btn-connect" onclick="goToTab('branding')">Customise Branding</button>
+        </div>
+      </div>
+
+      <!-- BRANDING TAB -->
+      <div id="branding-view" class="view" style="display: none;">
+        <h2 style="margin-top: 0;">Studio Branding</h2>
+        <p style="font-family: var(--gu-font-body); color: var(--gu-dust); margin-bottom: 20px;">
+          Customers will see your studio name and colours in the app.
+        </p>
+
+        <div class="setup-card">
+          <label style="display: block; font-family: var(--gu-font-body); font-size: 12px; color: var(--gu-accent); margin-bottom: 4px;">Studio Name</label>
+          <input type="text" id="branding-name" style="width: 100%; padding: 10px; border: 1px solid var(--gu-border); border-radius: 6px; font-family: var(--gu-font-body); font-size: 13px;" placeholder="e.g. The Kiln Cafe">
+
+          <label style="display: block; font-family: var(--gu-font-body); font-size: 12px; color: var(--gu-accent); margin-bottom: 4px; margin-top: 14px;">Primary Colour</label>
+          <input type="color" id="branding-colour" style="width: 60px; height: 40px; border: 1px solid var(--gu-border); border-radius: 6px; cursor: pointer;">
+
+          <label style="display: block; font-family: var(--gu-font-body); font-size: 12px; color: var(--gu-accent); margin-bottom: 4px; margin-top: 14px;">Tagline</label>
+          <input type="text" id="branding-tagline" style="width: 100%; padding: 10px; border: 1px solid var(--gu-border); border-radius: 6px; font-family: var(--gu-font-body); font-size: 13px;" placeholder="e.g. Paint · Glaze · Create">
+
+          <button class="btn-connect" style="margin-top: 16px;" onclick="saveBranding()">Save Branding</button>
+        </div>
+      </div>
+
+      <!-- Other tabs placeholder -->
+      <div id="palettes-view" class="view" style="display: none;">
+        <h2 style="margin-top: 0;">Colours & Glazes</h2>
+        <p style="font-family: var(--gu-font-body); color: var(--gu-dust);">Coming soon: manage your glaze palette</p>
+      </div>
+      <div id="shapes-view" class="view" style="display: none;">
+        <h2 style="margin-top: 0;">Bisque Shapes</h2>
+        <p style="font-family: var(--gu-font-body); color: var(--gu-dust);">Coming soon: upload your bisque catalogue</p>
+      </div>
+      <div id="designs-view" class="view" style="display: none;">
+        <h2 style="margin-top: 0;">Transfer Designs</h2>
+        <p style="font-family: var(--gu-font-body); color: var(--gu-dust);">Coming soon: upload custom designs</p>
+      </div>
+      <div id="account-view" class="view" style="display: none;">
+        <h2 style="margin-top: 0;">Account</h2>
+        <p style="font-family: var(--gu-font-body); color: var(--gu-dust);">Coming soon: manage your account settings</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_URL = 'http://localhost:3000';  // Change to your deployed API
+const studioId = new URLSearchParams(window.location.search).get('studio') || 'demo';
+
+// ── ROUTING ──
+function goToTab(tab) {
+  document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  document.getElementById(tab + '-view').style.display = 'block';
+  document.querySelector(`[href="#${tab}"]`).classList.add('active');
+}
+
+document.querySelectorAll('.nav-link').forEach(link => {
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    const tab = e.target.getAttribute('href').substring(1);
+    goToTab(tab);
+  });
+});
+
+// ── LOAD DASHBOARD ──
+async function loadDashboard() {
+  try {
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('dashboard-content').style.display = 'none';
+
+    const res = await fetch(`${API_URL}/api/analytics/dashboard?studioId=${studioId}`);
+    const data = await res.json();
+
+    document.getElementById('metric-revenue').textContent = '£' + (data.totalRevenue || 0).toFixed(2);
+    document.getElementById('metric-sessions').textContent = data.appSessions || 0;
+
+    const mostUsed = Object.entries(data.tabUsage || {})
+      .sort((a, b) => b[1] - a[1])[0];
+    document.getElementById('metric-tool').textContent = mostUsed ? mostUsed[0].replace('_', ' ') : '–';
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('dashboard-content').style.display = 'block';
+  } catch (error) {
+    console.error('Error loading dashboard:', error);
+    document.getElementById('loading').textContent = 'Error loading data';
+  }
+}
+
+// ── SQUARE OAUTH ──
+async function startSquareOAuth() {
+  try {
+    const res = await fetch(`${API_URL}/api/square/authorize?studioId=${studioId}`);
+    const { authUrl } = await res.json();
+    window.location.href = authUrl;
+  } catch (error) {
+    alert('Error connecting Square: ' + error.message);
+  }
+}
+
+// ── STRIPE BILLING ──
+async function setupBilling() {
+  const email = prompt('Enter your email for billing:');
+  if (!email) return;
+
+  try {
+    const res = await fetch(`${API_URL}/api/stripe/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId,
+        plan: 'starter',  // Default to starter tier
+        email
+      })
+    });
+    const { clientSecret } = await res.json();
+    alert('Billing set up! You can manage payments in your Stripe dashboard.');
+  } catch (error) {
+    alert('Error setting up billing: ' + error.message);
+  }
+}
+
+// ── BRANDING ──
+async function saveBranding() {
+  const name = document.getElementById('branding-name').value;
+  const colour = document.getElementById('branding-colour').value;
+  const tagline = document.getElementById('branding-tagline').value;
+
+  console.log('Saving branding:', { name, colour, tagline });
+  alert('Branding saved! (Coming soon: persist to Supabase)');
+}
+
+function logout() {
+  window.location.href = '/';
+}
+
+// ── INIT ──
+document.getElementById('studio-name').textContent = 'Studio Dashboard';
+goToTab('dashboard');
+loadDashboard();
+</script>
+</body>
+</html>

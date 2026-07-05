@@ -1,0 +1,1918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Studio Admin · GlazeUp</title>
+  <style>
+    .api-status {
+      position: fixed;
+      top: 0;
+      right: 0;
+      padding: 8px 12px;
+      font-size: 11px;
+      z-index: 9999;
+      border-radius: 0 0 0 4px;
+    }
+    .api-status.connected {
+      background: #c8e6c9;
+      color: #1b5e20;
+    }
+    .api-status.disconnected {
+      background: #ffcdd2;
+      color: #b71c1c;
+    }
+  </style>
+  <style>
+    * { box-sizing: border-box; }
+    
+    :root {
+      --gu-primary: #b03a2e;
+      --gu-secondary: #faf4ef;
+      --gu-accent: #3d1c12;
+      --gu-text: #3d1c12;
+      --gu-dust: #7a6360;
+      --gu-border: #ecddd8;
+      --gu-label: #c8897a;
+      --gu-font-display: 'Georgia', serif;
+      --gu-font-body: system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: var(--gu-font-body);
+      background: var(--gu-secondary);
+      color: var(--gu-text);
+    }
+
+    .admin-wrapper {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      height: 100vh;
+    }
+
+    .admin-sidebar {
+      background: var(--gu-primary);
+      color: #fff;
+      padding: 20px;
+      border-right: 1px solid rgba(0,0,0,0.1);
+      overflow-y: auto;
+    }
+
+    .admin-sidebar h2 {
+      font-size: 16px;
+      margin: 0 0 20px;
+      font-family: var(--gu-font-display);
+    }
+
+    .admin-sidebar nav a {
+      display: block;
+      padding: 8px 12px;
+      color: #fff;
+      text-decoration: none;
+      font-size: 13px;
+      border-radius: 4px;
+      margin-bottom: 4px;
+      transition: background 0.2s;
+      cursor: pointer;
+    }
+
+    .admin-sidebar nav a:hover, .admin-sidebar nav a.active {
+      background: rgba(255,255,255,0.2);
+    }
+
+    .admin-main {
+      display: flex;
+      flex-direction: column;
+      background: var(--gu-secondary);
+    }
+
+    .admin-header {
+      background: #fff;
+      border-bottom: 1px solid var(--gu-border);
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .admin-header h1 {
+      margin: 0;
+      font-size: 18px;
+      color: var(--gu-accent);
+    }
+
+    .admin-header-right {
+      text-align: right;
+      font-size: 12px;
+    }
+
+    .admin-header-right div {
+      margin-bottom: 4px;
+    }
+
+    .admin-header-right a {
+      color: var(--gu-dust);
+      text-decoration: none;
+      font-size: 11px;
+    }
+
+    .admin-header-right a:hover {
+      text-decoration: underline;
+    }
+
+    .admin-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+    }
+
+    .view {
+      max-width: 900px;
+    }
+
+    .setup-card {
+      background: #fff;
+      border: 2px solid var(--gu-border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .setup-card h3 {
+      font-size: 16px;
+      color: var(--gu-accent);
+      margin: 0 0 12px;
+    }
+
+    .setup-card p {
+      font-size: 13px;
+      color: var(--gu-dust);
+      margin: 0 0 12px;
+      line-height: 1.5;
+    }
+
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .metric-card {
+      background: #fff;
+      border: 1px solid var(--gu-border);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .metric-card .label {
+      font-size: 11px;
+      color: var(--gu-label);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    .metric-card .value {
+      font-size: 32px;
+      font-weight: bold;
+      color: var(--gu-primary);
+    }
+
+    .metric-card .detail {
+      font-size: 12px;
+      color: var(--gu-dust);
+      margin-top: 8px;
+    }
+
+    .chart-container {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid var(--gu-border);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .chart-container h3 {
+      font-size: 14px;
+      color: var(--gu-accent);
+      margin: 0 0 16px;
+    }
+
+    .chart-placeholder {
+      height: 200px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--gu-dust);
+      font-size: 13px;
+    }
+
+    .design-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .design-list li {
+      padding: 12px;
+      border-bottom: 1px solid var(--gu-border);
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+    }
+
+    .design-list li:last-child {
+      border-bottom: none;
+    }
+
+    .btn-connect {
+      background: var(--gu-primary);
+      color: #fff;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-family: var(--gu-font-body);
+      font-size: 13px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .btn-connect:hover {
+      opacity: 0.85;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-family: var(--gu-font-body);
+    }
+
+    .status-badge.connected {
+      background: #c8e6c9;
+      color: #1b5e20;
+    }
+
+    .status-badge.pending {
+      background: #fff3e0;
+      color: #e65100;
+    }
+
+    .status-badge.free {
+      background: #e3f2fd;
+      color: #1565c0;
+    }
+
+    .info-banner {
+      background: #e3f2fd;
+      border: 1px solid #90caf9;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 24px;
+      font-size: 12px;
+      color: #1565c0;
+    }
+
+    .info-banner strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--gu-accent);
+      margin-bottom: 4px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid var(--gu-border);
+      border-radius: 6px;
+      font-family: var(--gu-font-body);
+      font-size: 13px;
+    }
+
+    .form-group input[type="color"] {
+      width: 60px;
+      height: 40px;
+      padding: 2px;
+    }
+
+    .chart-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      height: 150px;
+      margin-bottom: 12px;
+    }
+
+    .chart-bar {
+      flex: 1;
+      background: linear-gradient(180deg, var(--gu-primary) 0%, rgba(176, 58, 46, 0.6) 100%);
+      border-radius: 4px 4px 0 0;
+      position: relative;
+      min-height: 20px;
+    }
+
+    .chart-bar-label {
+      position: absolute;
+      bottom: -20px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 11px;
+      color: var(--gu-dust);
+    }
+
+    .chart-bar-value {
+      position: absolute;
+      top: -20px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 12px;
+      font-weight: bold;
+      color: var(--gu-accent);
+    }
+
+    /* ── QR Scan Modal Styles ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+      position: relative;
+    }
+
+    .modal-content h2 {
+      margin: 0 0 16px;
+      font-size: 18px;
+      color: var(--gu-accent);
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: var(--gu-dust);
+      padding: 0;
+      width: 32px;
+      height: 32px;
+    }
+
+    .piece-item {
+      padding: 12px;
+      border: 1px solid var(--gu-border);
+      border-radius: 8px;
+      margin-bottom: 12px;
+      background: #fafafa;
+    }
+
+    .piece-item label {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      margin: 0;
+      font-size: 13px;
+    }
+
+    .piece-item input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .piece-item .piece-name {
+      flex: 1;
+      font-weight: 500;
+      color: var(--gu-accent);
+    }
+
+    .piece-item .piece-emoji {
+      font-size: 16px;
+    }
+
+    .balance-input-group {
+      display: none;
+      margin-top: 8px;
+      padding-top: 12px;
+      border-top: 1px solid var(--gu-border);
+    }
+
+    .balance-input-group.show {
+      display: block;
+    }
+
+    .balance-input-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--gu-accent);
+      margin-bottom: 4px;
+    }
+
+    .balance-input-group input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid var(--gu-border);
+      border-radius: 6px;
+      font-family: var(--gu-font-body);
+      font-size: 13px;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .modal-buttons button {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-family: var(--gu-font-body);
+      font-size: 13px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .modal-buttons .btn-cancel {
+      background: #f0f0f0;
+      color: var(--gu-text);
+    }
+
+    .modal-buttons .btn-cancel:hover {
+      background: #e0e0e0;
+    }
+
+    .modal-buttons .btn-submit {
+      background: var(--gu-primary);
+      color: #fff;
+    }
+
+    .modal-buttons .btn-submit:hover {
+      opacity: 0.9;
+    }
+
+    .qr-input {
+      position: absolute;
+      left: -9999px;
+    }
+
+    .booking-header {
+      background: var(--gu-secondary);
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      border-left: 4px solid var(--gu-primary);
+    }
+
+    .booking-header .name {
+      font-weight: bold;
+      color: var(--gu-accent);
+      font-size: 14px;
+    }
+
+    .booking-header .time {
+      font-size: 12px;
+      color: var(--gu-dust);
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- API Status Indicator -->
+<div class="api-status disconnected" id="api-status">📡 Connecting...</div>
+
+<div class="admin-wrapper">
+  <!-- SIDEBAR -->
+  <aside class="admin-sidebar">
+    <h2>GlazeUp</h2>
+    <nav>
+      <a href="#" class="nav-link active" onclick="goToTab('dashboard', event)">Dashboard</a>
+      <a href="#" class="nav-link" onclick="goToTab('staff', event)">Staff</a>
+      <a href="#" class="nav-link" onclick="goToTab('setup', event)">Setup</a>
+      <a href="#" class="nav-link" onclick="goToTab('branding', event)">Branding</a>
+      <a href="#" class="nav-link" onclick="goToTab('palettes', event)">Colours</a>
+      <a href="#" class="nav-link" onclick="goToTab('shapes', event)">Bisque</a>
+      <a href="#" class="nav-link" onclick="goToTab('designs', event)">Designs</a>
+      <a href="#" class="nav-link" onclick="goToTab('account', event)">Account</a>
+    </nav>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="admin-main">
+    <header class="admin-header">
+      <h1 id="studio-name">The Kiln Cafe</h1>
+      <div class="admin-header-right">
+        <div><span class="status-badge free">Free tier (1st month)</span></div>
+        <a href="#" onclick="alert('Logged in as demo. Click sidebar to explore.')">Logout</a>
+      </div>
+    </header>
+
+    <div class="admin-content">
+
+      <!-- ═════════════════════════════════════════════ -->
+      <!-- DASHBOARD TAB -->
+      <!-- ═════════════════════════════════════════════ -->
+      <div id="dashboard-view" class="view">
+        <h2 style="margin-top: 0;">Dashboard</h2>
+
+        <div class="info-banner">
+          <strong>Welcome to GlazeUp! 🎨</strong>
+          You're on the free trial. Billing starts next month. No credit card required.
+        </div>
+
+        <!-- Key metrics -->
+        <div class="dashboard-grid">
+          <div class="metric-card">
+            <div class="label">Revenue (30d)</div>
+            <div class="value">£1,240</div>
+            <div class="detail">23 transactions</div>
+          </div>
+          <div class="metric-card">
+            <div class="label">App Sessions</div>
+            <div class="value">47</div>
+            <div class="detail">customers used the app</div>
+          </div>
+          <div class="metric-card">
+            <div class="label">Tool Used Most</div>
+            <div class="value">Transfers</div>
+            <div class="detail">41% of sessions</div>
+          </div>
+          <div class="metric-card">
+            <div class="label">Popular Design</div>
+            <div class="value" id="metric-design">Daisy</div>
+            <div class="detail">this month</div>
+          </div>
+        </div>
+
+        <!-- Revenue Chart -->
+        <div class="chart-container">
+          <h3>Revenue (Last 30 Days)</h3>
+          <div class="chart-bars">
+            <div class="chart-bar" style="height: 45%;">
+              <div class="chart-bar-value">£75</div>
+              <div class="chart-bar-label">Jul 05</div>
+            </div>
+            <div class="chart-bar" style="height: 65%;">
+              <div class="chart-bar-value">£110</div>
+              <div class="chart-bar-label">Jul 06</div>
+            </div>
+            <div class="chart-bar" style="height: 72%;">
+              <div class="chart-bar-value">£120</div>
+              <div class="chart-bar-label">Jul 07</div>
+            </div>
+            <div class="chart-bar" style="height: 55%;">
+              <div class="chart-bar-value">£95</div>
+              <div class="chart-bar-label">Jul 08</div>
+            </div>
+            <div class="chart-bar" style="height: 80%;">
+              <div class="chart-bar-value">£140</div>
+              <div class="chart-bar-label">Jul 09</div>
+            </div>
+            <div class="chart-bar" style="height: 60%;">
+              <div class="chart-bar-value">£105</div>
+              <div class="chart-bar-label">Jul 10</div>
+            </div>
+            <div class="chart-bar" style="height: 40%;">
+              <div class="chart-bar-value">£60</div>
+              <div class="chart-bar-label">Today</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Most Popular Designs -->
+        <div class="chart-container">
+          <h3>Most Popular Designs</h3>
+          <ul class="design-list" id="top-designs-list">
+            <li>
+              <span>🌼 Daisy</span>
+              <strong>12 uses</strong>
+            </li>
+            <li>
+              <span>🌹 Rose</span>
+              <strong>9 uses</strong>
+            </li>
+            <li>
+              <span>🦋 Butterfly</span>
+              <strong>8 uses</strong>
+            </li>
+            <li>
+              <span>💚 Love Heart</span>
+              <strong>7 uses</strong>
+            </li>
+            <li>
+              <span>❄️ Snowflake</span>
+              <strong>5 uses</strong>
+            </li>
+          </ul>
+        </div>
+
+        <!-- App Usage -->
+        <div class="chart-container">
+          <h3>Which Tools Do Customers Use?</h3>
+          <ul class="design-list tool-usage-list">
+            <li>
+              <span>Transfer Preview</span>
+              <strong>19 sessions (41%)</strong>
+            </li>
+            <li>
+              <span>Colour Matcher</span>
+              <strong>18 sessions (38%)</strong>
+            </li>
+            <li>
+              <span>Print Tool</span>
+              <strong>10 sessions (21%)</strong>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ═════════════════════════════════════════════ -->
+      <!-- STAFF TAB -->
+      <!-- ═════════════════════════════════════════════ -->
+      <div id="staff-view" class="view" style="display: none;">
+        <h2 style="margin-top: 0;">Studio Staff Dashboard</h2>
+
+        <div class="info-banner">
+          <strong>📋 Daily Workflow:</strong> Print bookings card with QR code. Scan at start of session to check in. Scan at end to mark pieces ready for dip.
+        </div>
+
+        <!-- Pieces Ready for Dip -->
+        <div class="chart-container">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="margin: 0;">Pieces Ready for Dip</h3>
+            <button onclick="loadPiecesAwaitingDip()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
+          </div>
+          <div class="pieces-awaiting-dip-list" id="pieces-list-container">
+            <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading pieces...</div>
+          </div>
+
+          <button class="btn-connect" style="margin-top: 16px; width: 100%;" onclick="openQRModal()">📱 Scan QR Code to Submit Pieces</button>
+        </div>
+
+        <!-- Current Inventory -->
+        <div class="chart-container">
+          <h3>Current Bisque Stock (from Square)</h3>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+            <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;">
+              <div style="font-size: 12px; color: var(--gu-dust); margin-bottom: 4px;">Mugs</div>
+              <div style="font-size: 28px; font-weight: bold; color: var(--gu-primary);">24</div>
+              <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;">in stock</div>
+            </div>
+            <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;">
+              <div style="font-size: 12px; color: var(--gu-dust); margin-bottom: 4px;">Plates</div>
+              <div style="font-size: 28px; font-weight: bold; color: var(--gu-primary);">18</div>
+              <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;">in stock</div>
+            </div>
+            <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;">
+              <div style="font-size: 12px; color: var(--gu-dust); margin-bottom: 4px;">Bowls</div>
+              <div style="font-size: 28px; font-weight: bold; color: var(--gu-primary);">12</div>
+              <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;">in stock</div>
+            </div>
+            <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;">
+              <div style="font-size: 12px; color: var(--gu-dust); margin-bottom: 4px;">Tiles</div>
+              <div style="font-size: 28px; font-weight: bold; color: var(--gu-primary);">8</div>
+              <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;">in stock</div>
+            </div>
+          </div>
+          <button class="btn-connect" style="margin-top: 16px; width: 100%;">Sync Inventory from Square</button>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="chart-container">
+          <h3>Quick Actions</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <button class="btn-connect">📦 Create Kiln Session</button>
+            <button class="btn-connect">🔄 Refresh Data</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ═════════════════════════════════════════════ -->
+      <!-- SETUP TAB -->
+      <!-- ═════════════════════════════════════════════ -->
+      <div id="setup-view" class="view" style="display: none;">
+        <h2 style="margin-top: 0;">Setup Checklist</h2>
+        <p style="color: var(--gu-dust); line-height: 1.6;">
+          Complete these three steps to unlock analytics and billing. You're already on the free trial!
+        </p>
+
+        <!-- Square Connection -->
+        <div class="setup-card">
+          <h3>1. Connect Your Square Account</h3>
+          <p>We read your transaction history to show you real-time analytics. Your Square account stays in your control.</p>
+          <div style="margin-bottom: 12px;">
+            <span class="status-badge connected">✓ Connected</span>
+            <span style="font-size: 11px; color: var(--gu-dust); margin-left: 8px;">Last synced: 2 hours ago</span>
+          </div>
+          <button class="btn-connect" onclick="alert('Already connected in this demo. In production, click to authorize Square OAuth.')">Manage Square Connection</button>
+        </div>
+
+        <!-- Stripe Subscription -->
+        <div class="setup-card">
+          <h3>2. Set Up Monthly Billing</h3>
+          <p>Choose your plan. First month is free. No credit card required for the trial.</p>
+          <div style="margin-bottom: 12px;">
+            <span class="status-badge pending">Pending</span>
+          </div>
+          <p style="font-size: 12px; color: var(--gu-dust); margin: 12px 0;">
+            <strong>Pricing:</strong> Starter £29/mo · Professional £49/mo · Enterprise £79/mo
+          </p>
+          <button class="btn-connect" onclick="alert('In production, this opens Stripe setup. For now, you\\'re free for 30 days.')">Set Up Billing</button>
+        </div>
+
+        <!-- Customisation -->
+        <div class="setup-card">
+          <h3>3. Customize Your Studio Branding</h3>
+          <p>Make the app feel like your studio with your name, logo, and colours.</p>
+          <button class="btn-connect" onclick="goToTab('branding', event)">Customize Branding →</button>
+        </div>
+
+        <div class="setup-card" style="background: #c8e6c9; border-color: #7cb342;">
+          <h3 style="color: #1b5e20;">✓ What's Happening Automatically</h3>
+          <p style="color: #2e7d32; margin-bottom: 0;">
+            <strong>Every night at midnight:</strong> We pull your Square transactions from the last 24 hours and update your analytics dashboard. Revenue, customer counts, and popular items all update automatically.
+          </p>
+        </div>
+      </div>
+
+      <!-- ═════════════════════════════════════════════ -->
+      <!-- BRANDING TAB -->
+      <!-- ═════════════════════════════════════════════ -->
+      <div id="branding-view" class="view" style="display: none;">
+        <h2 style="margin-top: 0;">Studio Branding</h2>
+        <p style="color: var(--gu-dust); margin-bottom: 20px;">
+          Customers will see your studio name and brand colours in the app.
+        </p>
+
+        <div class="setup-card">
+          <div class="form-group">
+            <label>Studio Name</label>
+            <input type="text" id="branding-name" value="The Kiln Cafe" placeholder="e.g. The Kiln Cafe">
+          </div>
+
+          <div class="form-group">
+            <label>Studio Tagline</label>
+            <input type="text" id="branding-tagline" value="Paint · Glaze · Create" placeholder="e.g. Paint · Glaze · Create">
+          </div>
+
+          <div class="form-group">
+            <label>Primary Colour (your brand colour)</label>
+            <input type="color" id="branding-primary" value="#b03a2e">
+          </div>
+
+          <div class="form-group">
+            <label>Background Colour</label>
+            <input type="color" id="branding-secondary" value="#faf4ef">
+          </div>
+
+          <div class="form-group">
+            <label>Footer Text</label>
+            <input type="text" id="branding-footer" value="The Kiln Cafe · The Old Bank · Langport · Somerset · TA10 9PD" placeholder="Address or contact info">
+          </div>
+
+          <button class="btn-connect" onclick="saveBrandingForm()">Save Branding Changes</button>
+        </div>
+
+        <div class="chart-container">
+          <h3>Preview (How Customers See It)</h3>
+          <div style="background: linear-gradient(135deg, #faf4ef 0%, #fff 100%); padding: 16px; border-radius: 8px; text-align: center;">
+            <div style="font-family: Georgia, serif; font-size: 20px; color: #b03a2e; margin-bottom: 4px;">
+              🎨 The Kiln Cafe
+            </div>
+            <div style="font-size: 12px; color: #7a6360;">
+              Paint · Glaze · Create
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═════════════════════════════════════════════ -->
+      <!-- COLOURS TAB -->
+      <!-- ═════════════════════════════════════════════ -->
+      <div id="palettes-view" class="view" style="display: none;">
+        <h2 style="margin-top: 0;">Glaze Colours & Underglaze Palette</h2>
+        <p style="color: var(--gu-dust); margin-bottom: 20px;">
+          Configure which Stroke & Coat colours you have in stock. Customers see only these when they use the colour matcher.
+        </p>
+
+        <div class="setup-card">
+          <h3>Your Palette (19 colours in stock)</h3>
+          <ul class="design-list">
+            <li><span>🟥 Hot Tamale (SC-74)</span> <strong>#D94030</strong></li>
+            <li><span>🟥 Burgundy (SC-45)</span> <strong>#662428</strong></li>
+            <li><span>🟧 Tangerine (SC-39)</span> <strong>#E89C3F</strong></li>
+            <li><span>🟨 Golden Yellow (SC-38)</span> <strong>#F4C649</strong></li>
+            <li><span>🟦 Royal Blue (SC-80)</span> <strong>#003DA5</strong></li>
+            <li><span>🟩 Kelly Green (SC-84)</span> <strong>#2D9C5D</strong></li>
+            <li><span>🟪 Purple Majesty (SC-87)</span> <strong>#6B3FA0</strong></li>
+            <li><span>⬜ Pure White (SC-10)</span> <strong>#FFFFFF</strong></li>
+          </ul>
+          <p style="font-size: 12px; color: var(--gu-dust); margin-top: 16px;">
+            + 11 more in stock
+          </p>
+          <button class="btn-connect" style="margin-top: 12px;">Edit Palette</button>
+        </div>
+
+        <div class="info-banner">
+          <strong>💡 Tip:</strong> When customers use the colour matcher, it compares their photo to your in-stock colours. If a colour is out of stock, remove it from this list so customers don't get frustrated looking for it.
+        </div>
+      </div>
+
+      <!-- ═════════════════════════════════════════════ -->
+      <!-- BISQUE TAB -->
+      <!-- ═════════════════════════════════════════════ -->
+      <div id="shapes-view" class="view" style="display: none;">
+        <h2 style="margin-top: 0;">Bisque Shapes & Catalogue</h2>
+        <p style="color: var(--gu-dust); margin-bottom: 20px;">
+          Upload your bisque catalogue so customers can preview how their designs will look on each piece.
+        </p>
+
+        <div class="setup-card">
+          <h3>Currently Using 8 Built-In Shapes</h3>
+          <ul class="design-list">
+            <li>🍲 Mug</li>
+            <li>🍽️ Plate</li>
+            <li>🥣 Bowl</li>
+            <li>🏺 Vase</li>
+            <li>🟫 Tile / Coaster</li>
+            <li>❤️ Heart Dish</li>
+            <li>🥚 Egg Cup</li>
+            <li>🐕 Figurine</li>
+          </ul>
+          <p style="font-size: 12px; color: var(--gu-dust); margin-top: 16px;">
+            Coming soon: Upload your own bisque photos to match your inventory.
+          </p>
+        </div>
+      </div>
+
+      <!-- ═════════════════════════════════════════════ -->
+      <!-- DESIGNS TAB -->
+      <!-- ═════════════════════════════════════════════ -->
+      <div id="designs-view" class="view" style="display: none;">
+        <h2 style="margin-top: 0;">Transfer Designs</h2>
+        <p style="color: var(--gu-dust); margin-bottom: 20px;">
+          Manage which designs customers can choose from in the app.
+        </p>
+
+        <div class="setup-card">
+          <h3>Built-In Designs (22 designs)</h3>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; font-size: 13px;">
+            <div style="padding: 8px; background: #f5f5f5; border-radius: 6px;">
+              <strong>Florals</strong>
+              <ul style="margin: 4px 0 0; padding-left: 16px; color: var(--gu-dust);">
+                <li>Daisy</li>
+                <li>Rose</li>
+                <li>Sunflower</li>
+                <li>Wildflowers</li>
+                <li>Wreath</li>
+              </ul>
+            </div>
+            <div style="padding: 8px; background: #f5f5f5; border-radius: 6px;">
+              <strong>Geometric</strong>
+              <ul style="margin: 4px 0 0; padding-left: 16px; color: var(--gu-dust);">
+                <li>Polka Dots</li>
+                <li>Chevrons</li>
+                <li>Mandala</li>
+                <li>Stripes</li>
+                <li>Diamonds</li>
+              </ul>
+            </div>
+            <div style="padding: 8px; background: #f5f5f5; border-radius: 6px;">
+              <strong>Text & Love</strong>
+              <ul style="margin: 4px 0 0; padding-left: 16px; color: var(--gu-dust);">
+                <li>Happy Birthday</li>
+                <li>Love Heart</li>
+                <li>Name Plate</li>
+                <li>Best Mum</li>
+              </ul>
+            </div>
+            <div style="padding: 8px; background: #f5f5f5; border-radius: 6px;">
+              <strong>Nature & Seasonal</strong>
+              <ul style="margin: 4px 0 0; padding-left: 16px; color: var(--gu-dust);">
+                <li>Butterfly</li>
+                <li>Leaf</li>
+                <li>Paw Prints</li>
+                <li>Snowflake</li>
+              </ul>
+            </div>
+          </div>
+          <p style="font-size: 12px; color: var(--gu-dust); margin-top: 16px;">
+            Coming soon: Upload your own SVG/PNG designs.
+          </p>
+        </div>
+      </div>
+
+      <!-- ═════════════════════════════════════════════ -->
+      <!-- ACCOUNT TAB -->
+      <!-- ═════════════════════════════════════════════ -->
+      <div id="account-view" class="view" style="display: none;">
+        <h2 style="margin-top: 0;">Account Settings</h2>
+
+        <div class="setup-card">
+          <h3>Studio Email</h3>
+          <input type="email" value="daisy@thekilncafe.co.uk" style="width: 100%; padding: 10px; border: 1px solid var(--gu-border); border-radius: 6px;">
+          <button class="btn-connect" style="margin-top: 12px;">Update Email</button>
+        </div>
+
+        <div class="setup-card">
+          <h3>Staff Accounts</h3>
+          <p style="color: var(--gu-dust);">Free tier: 1 staff account. Professional tier: 5 accounts. Enterprise tier: unlimited.</p>
+          <button class="btn-connect">Manage Staff</button>
+        </div>
+
+        <div class="setup-card">
+          <h3>Danger Zone</h3>
+          <p style="color: var(--gu-dust); margin-bottom: 16px;">These actions cannot be undone.</p>
+          <button class="btn-connect" style="background: #c62828; margin-right: 8px;" onclick="alert('In production, this would pause your subscription.')">Pause Subscription</button>
+          <button class="btn-connect" style="background: #c62828;" onclick="alert('In production, this would delete your account and all data.')">Delete Account</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- QR Scan Modal -->
+<div class="modal-overlay" id="qr-modal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeQRModal()">✕</button>
+    <h2>Mark Pieces Ready for Dip</h2>
+    
+    <!-- Entry Method Selector (only shown on first open) -->
+    <div id="entry-method-selector" style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--gu-border);">
+      <div style="font-size: 12px; color: var(--gu-dust); margin-bottom: 12px;">Choose how to find customer:</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <button onclick="setEntryMethod('qr')" id="btn-qr-method" class="entry-method-btn" style="background: var(--gu-primary); color: #fff; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 500;">📱 Scan QR Code</button>
+        <button onclick="setEntryMethod('manual')" id="btn-manual-method" class="entry-method-btn" style="background: #f0f0f0; color: var(--gu-text); border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 500;">✏️ Enter Manually</button>
+      </div>
+    </div>
+
+    <!-- QR Entry Method -->
+    <div id="qr-entry-section" style="display: none;">
+      <div style="margin-bottom: 16px; font-size: 12px; color: var(--gu-dust);">
+        Place the QR code in front of the scanner
+      </div>
+      <input type="text" class="qr-input" id="qr-input" placeholder="Scan QR code here...">
+    </div>
+
+    <!-- Manual Entry Method -->
+    <div id="manual-entry-section" style="display: none;">
+      <div style="margin-bottom: 16px;">
+        <div style="font-size: 12px; color: var(--gu-dust); margin-bottom: 8px;">Customer name:</div>
+        <input type="text" id="manual-customer-name" placeholder="e.g. John Smith" style="width: 100%; padding: 8px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px; margin-bottom: 8px;">
+        <div style="font-size: 12px; color: var(--gu-dust); margin-bottom: 4px;">(optional)</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+          <input type="email" id="manual-customer-email" placeholder="Email" style="padding: 8px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px;">
+          <input type="tel" id="manual-customer-phone" placeholder="Phone" style="padding: 8px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px;">
+        </div>
+        <button onclick="loadCustomerManually()" style="width: 100%; background: var(--gu-primary); color: #fff; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: 500;">Load Customer</button>
+      </div>
+    </div>
+
+    <!-- Booking/Customer Info (loaded from API or manual entry) -->
+    <div id="booking-info-section" style="display: none;">
+      <div class="booking-header">
+        <div class="name" id="modal-customer-name">Loading...</div>
+        <div class="time" id="modal-customer-subtitle" style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;"></div>
+      </div>
+
+      <!-- Customer History (if returning) -->
+      <div id="customer-history-section" style="display: none; padding: 12px; background: #f0f8ff; border-radius: 8px; margin-bottom: 16px; border-left: 4px solid #0066cc;">
+        <div style="font-size: 12px; color: #0066cc; font-weight: bold; margin-bottom: 8px;">✨ Returning Customer</div>
+        <div style="font-size: 12px; color: #333; margin-bottom: 6px;">
+          ⭐ <strong id="loyalty-points">0</strong> loyalty points
+        </div>
+        <div style="font-size: 12px; color: #333; margin-bottom: 8px;">
+          🎨 <strong id="total-pieces">0</strong> total pieces painted
+        </div>
+        <div id="unfinished-pieces-section" style="display: none;">
+          <div style="font-size: 12px; color: #d9534f; font-weight: bold; margin-bottom: 6px;">⚠️ Unfinished pieces from previous visits:</div>
+          <ul id="unfinished-list" style="margin: 0; padding-left: 16px; font-size: 12px;">
+            <!-- Populated by JS -->
+          </ul>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 16px; font-size: 12px; color: var(--gu-dust);">
+        Check <strong>Complete</strong> or <strong>Incomplete</strong> for each piece today. 
+        If incomplete, customer can return to finish later.
+      </div>
+
+      <!-- Pieces list (for today's session) -->
+      <div id="modal-pieces-list">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- Hidden fields (pre-populated from booking) -->
+    <input type="hidden" id="modal-booking-code">
+    <input type="hidden" id="modal-customer-email">
+    <input type="hidden" id="modal-customer-phone">
+    <input type="hidden" id="modal-customer-id">
+
+    <!-- Hidden QR input (listens for barcode scans) -->
+    <input type="text" class="qr-input" id="qr-input" placeholder="Scan QR code here">
+
+    <div class="modal-buttons">
+      <button class="btn-cancel" onclick="closeQRModal()">Cancel</button>
+      <button class="btn-submit" onclick="submitPieces()">Submit for Dip</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// GlazeUp Admin Dashboard · API Integration
+// ═══════════════════════════════════════════════════════════
+
+const API_URL = localStorage.getItem('glazeup_api_url') || 'http://localhost:3000';
+const studioId = new URLSearchParams(window.location.search).get('studio') || 'demo';
+
+let apiConnected = false;
+
+// Mock data (fallback if API is down)
+const mockData = {
+  totalRevenue: 1240,
+  appSessions: 47,
+  revenueByDay: [
+    { date: '2026-07-05', revenue: 75 },
+    { date: '2026-07-06', revenue: 110 },
+    { date: '2026-07-07', revenue: 120 },
+    { date: '2026-07-08', revenue: 95 },
+    { date: '2026-07-09', revenue: 140 },
+    { date: '2026-07-10', revenue: 105 },
+    { date: '2026-07-05', revenue: 60 }
+  ],
+  tabUsage: {
+    preview: 19,
+    colours: 18,
+    print: 10
+  },
+  topDesigns: [
+    { designId: 'daisy', count: 12 },
+    { designId: 'rose', count: 9 },
+    { designId: 'butterfly', count: 8 },
+    { designId: 'heart', count: 7 },
+    { designId: 'snowflake', count: 5 }
+  ]
+};
+
+// ──────────────────────────────────────────────────
+// API FUNCTIONS
+// ──────────────────────────────────────────────────
+
+async function checkAPIConnection() {
+  try {
+    const res = await fetch(`${API_URL}/health`, { 
+      method: 'GET',
+      mode: 'cors'
+    });
+    if (res.ok) {
+      apiConnected = true;
+      updateAPIStatus(true);
+      return true;
+    }
+  } catch (err) {
+    console.log('API not available, using mock data');
+  }
+  apiConnected = false;
+  updateAPIStatus(false);
+  return false;
+}
+
+async function loadDashboardData() {
+  try {
+    if (!apiConnected) {
+      throw new Error('API not connected');
+    }
+    
+    const res = await fetch(`${API_URL}/api/analytics/dashboard?studioId=${studioId}`);
+    if (!res.ok) throw new Error('Dashboard fetch failed');
+    
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    console.log('Using mock data:', err.message);
+    return mockData;
+  }
+}
+
+async function submitBranding(formData) {
+  try {
+    if (!apiConnected) {
+      alert('API not connected. Changes saved locally (not persisted).');
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/api/studio/branding`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId,
+        ...formData
+      })
+    });
+
+    if (res.ok) {
+      alert('✓ Branding saved!');
+    } else {
+      alert('Error saving branding: ' + res.statusText);
+    }
+  } catch (err) {
+    alert('Could not save branding: ' + err.message);
+  }
+}
+
+async function startSquareOAuth() {
+  try {
+    if (!apiConnected) {
+      alert('API not connected. Cannot start OAuth flow.\n\nMake sure backend is running: npm start');
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/api/square/authorize?studioId=${studioId}`);
+    const { authUrl } = await res.json();
+    window.location.href = authUrl;
+  } catch (err) {
+    alert('Error connecting Square: ' + err.message);
+  }
+}
+
+async function setupBilling() {
+  const email = prompt('Enter your email for billing:');
+  if (!email) return;
+
+  try {
+    if (!apiConnected) {
+      alert('API not connected. Cannot set up billing.\n\nMake sure backend is running: npm start');
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/api/stripe/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId,
+        plan: 'starter',
+        email
+      })
+    });
+
+    if (res.ok) {
+      alert('✓ Billing set up! Check your email for next steps.');
+    } else {
+      alert('Error: ' + res.statusText);
+    }
+  } catch (err) {
+    alert('Error setting up billing: ' + err.message);
+  }
+}
+
+function updateAPIStatus(connected) {
+  const status = document.getElementById('api-status');
+  if (connected) {
+    status.className = 'api-status connected';
+    status.textContent = '✓ API Connected';
+  } else {
+    status.className = 'api-status disconnected';
+    status.textContent = '✗ Using Mock Data';
+  }
+}
+
+// ──────────────────────────────────────────────────
+// UI FUNCTIONS
+// ──────────────────────────────────────────────────
+
+function goToTab(tab, event) {
+  if (event) event.preventDefault();
+  
+  document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  
+  document.getElementById(tab + '-view').style.display = 'block';
+  document.querySelector(`a[onclick*="${tab}"]`).classList.add('active');
+  
+  // Load data for specific tabs
+  if (tab === 'staff') {
+    loadPiecesAwaitingDip();
+  } else if (tab === 'dashboard') {
+    populateDashboard();
+  }
+}
+
+async function populateDashboard() {
+  try {
+    const data = await loadDashboardData();
+    
+    // Update metrics
+    document.getElementById('metric-revenue').textContent = '£' + (data.totalRevenue || 0).toFixed(2);
+    document.getElementById('metric-sessions').textContent = (data.appSessions || 0);
+    
+    const mostUsed = Object.entries(data.tabUsage || {})
+      .sort((a, b) => b[1] - a[1])[0];
+    document.getElementById('metric-tool').textContent = mostUsed 
+      ? mostUsed[0].charAt(0).toUpperCase() + mostUsed[0].slice(1) 
+      : '–';
+    
+    const topDesign = (data.topDesigns || [])[0];
+    document.getElementById('metric-design').textContent = topDesign 
+      ? topDesign.designId.charAt(0).toUpperCase() + topDesign.designId.slice(1)
+      : '–';
+    
+    // Update charts
+    updateRevenueChart(data.revenueByDay || []);
+    updateDesignList(data.topDesigns || []);
+    updateToolUsage(data.tabUsage || {});
+  } catch (err) {
+    console.error('Error populating dashboard:', err);
+  }
+}
+
+function updateRevenueChart(data) {
+  const container = document.querySelector('.chart-bars');
+  if (!container || !data.length) return;
+  
+  const maxRevenue = Math.max(...data.map(d => d.metric_value?.revenue_cents || d.revenue || 0)) / 100;
+  
+  container.innerHTML = data.slice(-7).map(day => {
+    const revenue = (day.metric_value?.revenue_cents || day.revenue || 0) / 100;
+    const height = (revenue / maxRevenue) * 100;
+    const dateStr = day.metric_date || day.date;
+    const date = new Date(dateStr);
+    const label = date.getDate();
+    
+    return `
+      <div class="chart-bar" style="height: ${height}%;">
+        <div class="chart-bar-value">£${revenue.toFixed(0)}</div>
+        <div class="chart-bar-label">Jul ${label}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function updateDesignList(designs) {
+  const container = document.getElementById('top-designs-list') || document.querySelector('.design-list');
+  if (!container) return;
+  
+  const emojis = {
+    daisy: '🌼',
+    rose: '🌹',
+    butterfly: '🦋',
+    heart: '💚',
+    snowflake: '❄️'
+  };
+  
+  container.innerHTML = designs.slice(0, 5).map(design => `
+    <li>
+      <span>${emojis[design.designId] || '🎨'} ${design.designId.charAt(0).toUpperCase() + design.designId.slice(1)}</span>
+      <strong>${design.count} uses</strong>
+    </li>
+  `).join('');
+}
+
+function updateToolUsage(usage) {
+  const container = document.querySelector('.tool-usage-list');
+  if (!container) return;
+  
+  const total = Object.values(usage).reduce((a, b) => a + b, 0);
+  
+  container.innerHTML = Object.entries(usage).map(([tool, count]) => `
+    <li>
+      <span>${tool.charAt(0).toUpperCase() + tool.slice(1)}</span>
+      <strong>${count} sessions (${((count / total) * 100).toFixed(0)}%)</strong>
+    </li>
+  `).join('');
+}
+
+// ──────────────────────────────────────────────────
+// INIT
+// ──────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('studio-name').textContent = 'The Kiln Cafe';
+  
+  // Check API connection
+  await checkAPIConnection();
+  
+  // Load dashboard data
+  await populateDashboard();
+  
+  // Show dashboard
+  goToTab('dashboard');
+  
+  // If studio ID in URL, update it
+  if (new URLSearchParams(window.location.search).get('studio')) {
+    document.title = `${studioId} · GlazeUp Admin`;
+  }
+  
+  // Set up API URL if user wants to change it
+  console.log(`📡 Using API: ${API_URL}`);
+  console.log(`🏪 Studio ID: ${studioId}`);
+  console.log(`💾 API Status: ${apiConnected ? 'Connected ✓' : 'Disconnected (using mocks)'}`);
+});
+
+// Allow user to change API URL
+function changeAPIUrl() {
+  const newUrl = prompt('Enter API URL:', API_URL);
+  if (newUrl) {
+    localStorage.setItem('glazeup_api_url', newUrl);
+    location.reload();
+  }
+}
+
+// Save branding form
+function saveBrandingForm() {
+  const formData = {
+    name: document.getElementById('branding-name').value,
+    tagline: document.getElementById('branding-tagline').value,
+    primaryColour: document.getElementById('branding-primary').value,
+    secondaryColour: document.getElementById('branding-secondary').value,
+    footer: document.getElementById('branding-footer').value
+  };
+  submitBranding(formData);
+}
+
+// Load pieces awaiting dip for Staff dashboard
+async function loadPiecesAwaitingDip() {
+  try {
+    if (!apiConnected) {
+      console.log('API not connected, using mock data');
+      displayMockPieces();
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/api/pieces/awaiting-dip?studioId=${studioId}`);
+    if (!res.ok) {
+      console.error('Failed to load pieces');
+      displayMockPieces();
+      return;
+    }
+
+    const data = await res.json();
+    displayPieces(data.pieces || []);
+  } catch (err) {
+    console.error('Error loading pieces:', err);
+    displayMockPieces();
+  }
+}
+
+function displayPieces(pieces) {
+  if (!pieces || pieces.length === 0) {
+    const container = document.querySelector('.pieces-awaiting-dip-list') || 
+                     document.getElementById('pieces-list-container');
+    if (container) {
+      container.innerHTML = `
+        <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">
+          No pieces awaiting dip right now
+        </div>
+      `;
+    }
+    return;
+  }
+
+  // Group pieces by booking_id
+  const groupedByBooking = {};
+  pieces.forEach(piece => {
+    if (!groupedByBooking[piece.booking_id]) {
+      groupedByBooking[piece.booking_id] = {
+        bookingId: piece.booking_id,
+        customerName: piece.customer_id ? 'Customer' : 'Walk-in', // Would ideally join with customer table
+        pieces: []
+      };
+    }
+    groupedByBooking[piece.booking_id].pieces.push(piece);
+  });
+
+  // Display grouped pieces
+  const container = document.querySelector('.pieces-awaiting-dip-list') || 
+                   document.getElementById('pieces-list-container');
+  if (container) {
+    container.innerHTML = Object.values(groupedByBooking).map(booking => {
+      const pieceEmojis = {
+        'mug': '🍲',
+        'plate': '🍽️',
+        'bowl': '🥣',
+        'tile': '🧱',
+        'cup': '☕',
+        'planter': '🌿',
+        'vase': '🌸'
+      };
+
+      const piecesList = booking.pieces.map(p => {
+        const emoji = pieceEmojis[p.piece_type?.toLowerCase()] || '🎨';
+        return `${emoji} ${p.piece_type}`;
+      }).join(', ');
+
+      const submitTime = new Date(booking.pieces[0].created_at).toLocaleTimeString('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      return `
+        <div style="padding: 12px; background: #fff9f0; border-left: 4px solid var(--gu-primary); margin-bottom: 8px; border-radius: 4px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <strong>${booking.customerName}</strong>
+            <span style="font-size: 11px; color: var(--gu-dust);">Ready ${submitTime}</span>
+          </div>
+          <div style="color: var(--gu-dust); font-size: 12px;">
+            ${piecesList} <span style="float: right; color: var(--gu-primary); font-weight: bold;">${booking.pieces.length} piece${booking.pieces.length !== 1 ? 's' : ''}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+function displayMockPieces() {
+  const mockPieces = [
+    {
+      booking_id: 'booking-001',
+      customer_name: 'Table 3 (John Smith)',
+      piece_type: 'Mug',
+      created_at: new Date(Date.now() - 300000).toISOString()
+    },
+    {
+      booking_id: 'booking-001',
+      customer_name: 'Table 3 (John Smith)',
+      piece_type: 'Plate',
+      created_at: new Date(Date.now() - 300000).toISOString()
+    },
+    {
+      booking_id: 'booking-002',
+      customer_name: 'Birthday Party (Sarah)',
+      piece_type: 'Mug',
+      created_at: new Date(Date.now() - 150000).toISOString()
+    },
+    {
+      booking_id: 'booking-002',
+      customer_name: 'Birthday Party (Sarah)',
+      piece_type: 'Plate',
+      created_at: new Date(Date.now() - 150000).toISOString()
+    },
+    {
+      booking_id: 'booking-002',
+      customer_name: 'Birthday Party (Sarah)',
+      piece_type: 'Bowl',
+      created_at: new Date(Date.now() - 150000).toISOString()
+    }
+  ];
+  
+  displayPieces(mockPieces);
+}
+
+// Mock booking data (for demo without API)
+const mockBookings = {
+  'booking-001': {
+    id: 'booking-001',
+    bookingCode: 'booking-001',
+    customerName: 'Table 3: John Smith',
+    customerEmail: 'john@example.com',
+    customerPhone: '07700000000',
+    tableNumber: '3',
+    partySize: 2,
+    pieces: [
+      { id: 'p1', name: 'Mug', emoji: '🍲' },
+      { id: 'p2', name: 'Plate', emoji: '🍽️' },
+      { id: 'p3', name: 'Bowl', emoji: '🥣' }
+    ],
+    customerHistory: {
+      isReturningCustomer: true,
+      loyaltyPoints: 5,
+      totalPiecesPainted: 5,
+      unfinishedCount: 1,
+      unfinishedPieces: [
+        { id: 'uf1', piece_type: 'bowl', created_at: '2026-07-04' }
+      ]
+    }
+  },
+  'booking-002': {
+    id: 'booking-002',
+    bookingCode: 'booking-002',
+    customerName: 'Birthday Party: Sarah\'s 8th',
+    customerEmail: null,
+    customerPhone: null,
+    tableNumber: '5',
+    partySize: 8,
+    pieces: [
+      { id: 'p4', name: 'Mug', emoji: '🍲' },
+      { id: 'p5', name: 'Mug', emoji: '🍲' },
+      { id: 'p6', name: 'Plate', emoji: '🍽️' },
+      { id: 'p7', name: 'Bowl', emoji: '🥣' }
+    ],
+    customerHistory: {
+      isReturningCustomer: false,
+      loyaltyPoints: 0,
+      totalPiecesPainted: 0,
+      unfinishedCount: 0,
+      unfinishedPieces: []
+    }
+  }
+};
+
+let currentBookingCode = null;
+let currentBookingData = null;
+let pieceStates = {};
+let currentEntryMethod = 'qr'; // 'qr' or 'manual'
+
+function setEntryMethod(method) {
+  currentEntryMethod = method;
+  
+  // Update button styles
+  document.getElementById('btn-qr-method').style.background = method === 'qr' ? 'var(--gu-primary)' : '#f0f0f0';
+  document.getElementById('btn-qr-method').style.color = method === 'qr' ? '#fff' : 'var(--gu-text)';
+  document.getElementById('btn-manual-method').style.background = method === 'manual' ? 'var(--gu-primary)' : '#f0f0f0';
+  document.getElementById('btn-manual-method').style.color = method === 'manual' ? '#fff' : 'var(--gu-text)';
+  
+  // Hide entry method selector
+  document.getElementById('entry-method-selector').style.display = 'none';
+  
+  // Show appropriate entry section
+  if (method === 'qr') {
+    document.getElementById('qr-entry-section').style.display = 'block';
+    document.getElementById('manual-entry-section').style.display = 'none';
+    document.getElementById('qr-input').focus();
+  } else {
+    document.getElementById('qr-entry-section').style.display = 'none';
+    document.getElementById('manual-entry-section').style.display = 'block';
+    document.getElementById('manual-customer-name').focus();
+  }
+  
+  // Hide booking info until loaded
+  document.getElementById('booking-info-section').style.display = 'none';
+}
+
+async function loadCustomerManually() {
+  const customerName = document.getElementById('manual-customer-name').value;
+  const customerEmail = document.getElementById('manual-customer-email').value || null;
+  const customerPhone = document.getElementById('manual-customer-phone').value || null;
+  
+  if (!customerName) {
+    alert('Please enter a customer name');
+    return;
+  }
+  
+  try {
+    // Try to find customer in database or create new one
+    if (apiConnected) {
+      // In a real scenario, we'd call an API endpoint to search/create
+      // For now, we'll just use the manual data
+      console.log('Would search API for customer:', customerName);
+    }
+    
+    // Mock customer data structure
+    currentBookingData = {
+      bookingCode: null,
+      customerName: customerName,
+      customerEmail: customerEmail,
+      customerPhone: customerPhone,
+      tableNumber: null,
+      partySize: null,
+      pieces: [
+        { id: 'p1', name: 'Mug', emoji: '🍲' },
+        { id: 'p2', name: 'Plate', emoji: '🍽️' },
+        { id: 'p3', name: 'Bowl', emoji: '🥣' }
+      ],
+      customerHistory: {
+        isReturningCustomer: false,
+        loyaltyPoints: 0,
+        totalPiecesPainted: 0,
+        unfinishedCount: 0,
+        unfinishedPieces: []
+      }
+    };
+    
+    // Display booking info
+    displayBookingInfo(customerName, customerEmail, customerPhone);
+  } catch (err) {
+    alert('Error loading customer: ' + err.message);
+  }
+}
+
+function displayBookingInfo(customerName, customerEmail, customerPhone) {
+  // Update modal header
+  const nameDisplay = customerName;
+  document.getElementById('modal-customer-name').textContent = nameDisplay;
+  document.getElementById('modal-customer-subtitle').textContent = 'Manual entry';
+
+  // Store data in hidden fields
+  document.getElementById('modal-booking-code').value = '';
+  document.getElementById('modal-customer-email').value = customerEmail || '';
+  document.getElementById('modal-customer-phone').value = customerPhone || '';
+
+  // Show customer history if returning
+  const historySection = document.getElementById('customer-history-section');
+  if (currentBookingData.customerHistory.isReturningCustomer) {
+    historySection.style.display = 'block';
+    document.getElementById('loyalty-points').textContent = currentBookingData.customerHistory.loyaltyPoints;
+    document.getElementById('total-pieces').textContent = currentBookingData.customerHistory.totalPiecesPainted;
+
+    // Show unfinished pieces if any
+    if (currentBookingData.customerHistory.unfinishedCount > 0) {
+      const unfinishedSection = document.getElementById('unfinished-pieces-section');
+      unfinishedSection.style.display = 'block';
+      
+      const unfinishedList = document.getElementById('unfinished-list');
+      unfinishedList.innerHTML = currentBookingData.customerHistory.unfinishedPieces.map(piece => `
+        <li>${piece.piece_type} (painted ${piece.created_at})</li>
+      `).join('');
+    }
+  } else {
+    historySection.style.display = 'none';
+  }
+
+  // Build pieces list for today
+  const piecesList = document.getElementById('modal-pieces-list');
+  piecesList.innerHTML = currentBookingData.pieces.map(piece => `
+    <div class="piece-item">
+      <label>
+        <input type="checkbox" class="piece-complete" data-piece-id="${piece.id}" 
+               onchange="handlePieceChange('${piece.id}')" checked>
+        <span class="piece-emoji">${piece.emoji}</span>
+        <span class="piece-name">${piece.name}</span>
+        <span style="color: var(--gu-label); font-size: 12px;">Complete</span>
+      </label>
+      <div class="balance-input-group" id="balance-${piece.id}">
+        <label>Return fee needed (£):</label>
+        <input type="number" placeholder="0.00" step="0.01" 
+               id="balance-input-${piece.id}" min="0">
+      </div>
+    </div>
+  `).join('');
+
+  // Reset piece states
+  pieceStates = {};
+  currentBookingData.pieces.forEach(p => {
+    pieceStates[p.id] = { complete: true, balance: 0 };
+  });
+
+  // Hide entry sections, show booking info
+  document.getElementById('entry-method-selector').style.display = 'none';
+  document.getElementById('qr-entry-section').style.display = 'none';
+  document.getElementById('manual-entry-section').style.display = 'none';
+  document.getElementById('booking-info-section').style.display = 'block';
+}
+
+async function loadBookingData(bookingCode) {
+  try {
+    if (!apiConnected) {
+      // Use mock data
+      currentBookingData = mockBookings[bookingCode];
+      if (!currentBookingData) {
+        alert('Booking not found: ' + bookingCode);
+        return;
+      }
+    } else {
+      // Fetch real data from API
+      const res = await fetch(`${API_URL}/api/booking/${bookingCode}?studioId=${studioId}`);
+      if (!res.ok) {
+        alert('Booking not found');
+        return;
+      }
+      const data = await res.json();
+      currentBookingData = {
+        ...data.booking,
+        pieces: [
+          { id: 'p1', name: 'Mug', emoji: '🍲' },
+          { id: 'p2', name: 'Plate', emoji: '🍽️' },
+          { id: 'p3', name: 'Bowl', emoji: '🥣' }
+        ],
+        customerHistory: data.customerHistory
+      };
+    }
+
+    // Store booking code
+    document.getElementById('modal-booking-code').value = bookingCode;
+
+    // Get display info
+    const nameDisplay = currentBookingData.tableNumber 
+      ? `Table ${currentBookingData.tableNumber}: ${currentBookingData.customerName}`
+      : currentBookingData.customerName;
+    
+    // Display booking info
+    displayBookingInfo(nameDisplay, currentBookingData.customerEmail, currentBookingData.customerPhone);
+  } catch (err) {
+    alert('Error loading booking: ' + err.message);
+  }
+}
+
+function openQRModal(bookingCode) {
+  // Reset to entry method selector
+  currentBookingCode = null;
+  currentBookingData = null;
+  pieceStates = {};
+  currentEntryMethod = 'qr';
+  
+  // Show entry method selector
+  document.getElementById('entry-method-selector').style.display = 'block';
+  document.getElementById('qr-entry-section').style.display = 'none';
+  document.getElementById('manual-entry-section').style.display = 'none';
+  document.getElementById('booking-info-section').style.display = 'none';
+  
+  // Reset buttons
+  document.getElementById('btn-qr-method').style.background = 'var(--gu-primary)';
+  document.getElementById('btn-qr-method').style.color = '#fff';
+  document.getElementById('btn-manual-method').style.background = '#f0f0f0';
+  document.getElementById('btn-manual-method').style.color = 'var(--gu-text)';
+  
+  // Clear inputs
+  document.getElementById('qr-input').value = '';
+  document.getElementById('manual-customer-name').value = '';
+  document.getElementById('manual-customer-email').value = '';
+  document.getElementById('manual-customer-phone').value = '';
+  
+  // Open modal
+  document.getElementById('qr-modal').classList.add('active');
+  
+  // If booking code provided, skip selector and load directly
+  if (bookingCode) {
+    loadBookingData(bookingCode);
+  }
+}
+
+function closeQRModal() {
+  document.getElementById('qr-modal').classList.remove('active');
+  currentBookingCode = null;
+  currentBookingData = null;
+  pieceStates = {};
+}
+
+function handlePieceChange(pieceId) {
+  const checkbox = document.querySelector(`input.piece-complete[data-piece-id="${pieceId}"]`);
+  const balanceGroup = document.getElementById(`balance-${pieceId}`);
+  const isComplete = checkbox.checked;
+
+  pieceStates[pieceId].complete = isComplete;
+
+  // Show balance input only if marked incomplete
+  if (!isComplete) {
+    balanceGroup.classList.add('show');
+  } else {
+    balanceGroup.classList.remove('show');
+    pieceStates[pieceId].balance = 0;
+  }
+}
+
+function submitPieces() {
+  if (!currentBookingData) {
+    alert('No customer loaded');
+    return;
+  }
+
+  const bookingCode = document.getElementById('modal-booking-code').value || null;
+  const customerEmail = document.getElementById('modal-customer-email').value || null;
+  const customerPhone = document.getElementById('modal-customer-phone').value || null;
+  const customerName = currentBookingData.customerName;
+
+  const piecesToSubmit = [];
+  let summaryText = `Pieces submitted for dip:\n\n`;
+
+  currentBookingData.pieces.forEach(piece => {
+    const state = pieceStates[piece.id];
+    const balanceInput = document.getElementById(`balance-input-${piece.id}`);
+    const balance = state.complete ? 0 : (parseFloat(balanceInput?.value) || 0);
+
+    pieceStates[piece.id].balance = balance;
+
+    piecesToSubmit.push({
+      type: piece.name,
+      isComplete: state.complete,
+      outstandingBalance: 0  // Return fee only charged when they return (not on first visit)
+    });
+
+    if (state.complete) {
+      summaryText += `✓ ${piece.emoji} ${piece.name} — Ready for dip\n`;
+    } else {
+      summaryText += `⚠️ ${piece.emoji} ${piece.name} — Incomplete (they can return to finish)\n`;
+    }
+  });
+
+  // Generate booking code if using manual entry
+  const finalBookingCode = bookingCode || `manual-${Date.now()}`;
+
+  // Send to API
+  savePiecesToDatabase(finalBookingCode, piecesToSubmit, summaryText, customerName, customerEmail, customerPhone);
+}
+
+async function savePiecesToDatabase(bookingCode, pieces, summaryText, customerName, customerEmail, customerPhone) {
+  try {
+    if (!apiConnected) {
+      // Fallback: just show alert if no API
+      alert(summaryText + '\n\n(API not connected - data not saved)');
+      closeQRModal();
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/api/pieces/submit-for-dip`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId: studioId,
+        bookingId: bookingCode,
+        pieces: pieces,
+        customerName: customerName,
+        customerEmail: customerEmail,
+        customerPhone: customerPhone
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      alert(summaryText + `\n✓ Saved ${data.piecesCount} piece(s) to database` +
+            `\n💳 Customer: ${customerName}` +
+            (data.pointsEarned ? `\n⭐ Points earned: ${data.pointsEarned}` : ''));
+      closeQRModal();
+    } else {
+      alert('Error saving pieces: ' + res.statusText);
+    }
+  } catch (err) {
+    alert('Could not save pieces: ' + err.message + '\n\nMake sure backend is running: npm start');
+  }
+}
+
+function updateDashboardPieces(bookingId) {
+  const booking = mockBookings[bookingId];
+  
+  // Find and update the booking card on the dashboard
+  // For now, just show the summary - full integration comes next
+  console.log('Updated pieces for booking:', bookingId, pieceStates);
+}
+
+// QR input listener (auto-load booking when QR is scanned)
+document.addEventListener('DOMContentLoaded', function() {
+  const qrInput = document.getElementById('qr-input');
+  
+  qrInput?.addEventListener('change', function() {
+    const scannedValue = this.value;
+    console.log('QR scanned:', scannedValue);
+    
+    // Extract booking code from scanned value
+    // Could be: full URL, just code, or anything in between
+    let bookingCode = null;
+    
+    if (scannedValue.includes('booking-')) {
+      // Extract the booking code (e.g., booking-20260705-abc123)
+      const match = scannedValue.match(/booking-[\w\d-]+/);
+      bookingCode = match ? match[0] : scannedValue;
+    } else {
+      bookingCode = scannedValue;
+    }
+    
+    // Load booking data
+    if (bookingCode) {
+      loadBookingData(bookingCode);
+    } else {
+      alert('Invalid QR code');
+    }
+    
+    this.value = '';
+  });
+});
+
+</script>
+
+</body>
+</html>

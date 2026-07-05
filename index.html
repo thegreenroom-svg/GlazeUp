@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="GlazeUp">
+  <meta name="theme-color" content="#b03a2e">
+  <meta name="description" content="Colour matching, transfer preview and print tools for pottery painting studios">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="assets/icons/favicon.svg">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+  <title>GlazeUp</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<!-- ═══════ HEADER ═══════ -->
+<header class="header">
+  <img class="header-logo" id="studio-logo" src="" alt="Studio logo">
+  <div class="header-text">
+    <h1 id="studio-name">GlazeUp</h1>
+    <p id="studio-tagline">Paint · Glaze · Create</p>
+  </div>
+  <span class="powered-by">Powered by GlazeUp</span>
+</header>
+
+<!-- ═══════ SCROLLABLE CONTENT ═══════ -->
+<div class="main-scroll">
+
+  <!-- ── COLOUR MATCHER ── -->
+  <div id="tab-colours" class="tab-content active">
+    <div class="intro">
+      <h2>Colour Matcher</h2>
+      <p>Snap your inspiration — we'll match it to our glazes</p>
+    </div>
+
+    <div id="colour-capture">
+      <div class="btn-grid">
+        <button class="btn" onclick="document.getElementById('col-cam').click()">
+          <span class="icon">📷</span>Take a photo
+        </button>
+        <button class="btn outline" onclick="document.getElementById('col-file').click()">
+          <span class="icon">🖼️</span>Choose image
+        </button>
+      </div>
+    </div>
+    <input type="file" id="col-cam" accept="image/*" capture="environment" hidden>
+    <input type="file" id="col-file" accept="image/*" hidden>
+    <canvas id="col-canvas" class="hidden"></canvas>
+
+    <div id="colour-loading" style="display:none">
+      <div class="spinner-wrap"><div class="spinner"></div>
+      <p style="font-family:var(--gu-font-body);font-size:12px;color:var(--gu-dust)">Matching colours…</p></div>
+    </div>
+
+    <div id="colour-preview" style="display:none">
+      <img id="colour-preview-img" class="colour-preview-img" alt="Your photo">
+      <button class="retake-btn" onclick="colourReset()">↩ Take another photo</button>
+    </div>
+
+    <div id="colour-results" style="display:none">
+      <p class="section-label">Best matches</p>
+      <div id="match-list"></div>
+    </div>
+
+    <hr class="divider">
+    <p class="section-label">Our palette</p>
+    <div class="palette-grid" id="palette-grid"></div>
+  </div>
+
+  <!-- ── TRANSFER PREVIEW ── -->
+  <div id="tab-preview" class="tab-content">
+    <div class="intro">
+      <h2>Transfer Preview</h2>
+      <p>See how a decal will look on your piece before printing</p>
+    </div>
+
+    <!-- Step 1: Bisque -->
+    <div id="preview-step1">
+      <p class="step-label">1 · Your piece</p>
+      <div class="btn-grid">
+        <button class="btn" onclick="document.getElementById('bisque-cam').click()">
+          <span class="icon">📷</span>Photo your piece
+        </button>
+        <button class="btn outline" onclick="showBisqueShapes()">
+          <span class="icon">🏺</span>Pick a shape
+        </button>
+      </div>
+      <input type="file" id="bisque-cam" accept="image/*" capture="environment" hidden>
+    </div>
+
+    <!-- Step 1b: Shape picker -->
+    <div id="bisque-shapes" style="display:none">
+      <p class="step-label">Pick a shape</p>
+      <div class="design-grid" id="shape-grid"></div>
+      <button class="retake-btn" onclick="backToStep1()">↩ Back</button>
+    </div>
+
+    <!-- Step 2: Design picker -->
+    <div id="preview-step2" style="display:none">
+      <p class="step-label">2 · Choose a transfer design</p>
+      <div class="library-cats" id="design-cats"></div>
+      <div class="design-grid" id="design-grid"></div>
+    </div>
+
+    <!-- Step 3: Preview + controls -->
+    <div id="preview-step3" style="display:none">
+      <p class="step-label">3 · Position your transfer</p>
+      <div class="preview-canvas-wrap" id="canvas-wrap">
+        <canvas id="bisque-canvas"></canvas>
+        <canvas id="overlay-canvas"></canvas>
+      </div>
+      <div class="controls-row">
+        <span class="cl">Opacity</span>
+        <input type="range" id="ctrl-opacity" min="20" max="100" value="80">
+        <span class="cv" id="val-opacity">80%</span>
+      </div>
+      <div class="controls-row">
+        <span class="cl">Size</span>
+        <input type="range" id="ctrl-size" min="20" max="200" value="80">
+        <span class="cv" id="val-size">80%</span>
+      </div>
+      <div class="controls-row">
+        <span class="cl">Rotate</span>
+        <input type="range" id="ctrl-rotate" min="0" max="360" value="0">
+        <span class="cv" id="val-rotate">0°</span>
+      </div>
+      <div class="ctrl-btns">
+        <button class="btn small" onclick="centreOverlay()"><span class="icon">⊕</span>Centre</button>
+        <button class="btn small outline" onclick="resetOverlay()"><span class="icon">↩</span>Reset</button>
+        <button class="btn small" onclick="changeDesign()"><span class="icon">🎨</span>Change</button>
+        <button class="btn small outline" onclick="startOver()"><span class="icon">✕</span>Start over</button>
+      </div>
+      <button class="btn full" onclick="sendToPrint()"><span class="icon">🖨️</span>Send to Print</button>
+    </div>
+  </div>
+
+  <!-- ── PRINT ── -->
+  <div id="tab-print" class="tab-content">
+    <div class="intro">
+      <h2>Print Transfer</h2>
+      <p>Scale your design and print onto transfer paper</p>
+    </div>
+
+    <div id="print-empty">
+      <p style="text-align:center;color:var(--gu-dust);font-family:var(--gu-font-body);font-size:13px;padding:30px 0">
+        Preview a transfer first, then send it here to print
+      </p>
+      <button class="btn outline full" onclick="switchTab('preview')">
+        <span class="icon">🎨</span>Go to Transfer Preview
+      </button>
+    </div>
+
+    <div id="print-ready" style="display:none">
+      <div class="print-preview-wrap">
+        <canvas id="print-canvas" width="400" height="400"></canvas>
+        <p class="size-info" id="print-size-info">100mm × 100mm</p>
+      </div>
+      <div class="controls-row">
+        <span class="cl">Width (mm)</span>
+        <input type="range" id="print-width" min="20" max="300" value="100">
+        <span class="cv" id="val-print-w">100</span>
+      </div>
+      <div class="controls-row">
+        <span class="cl">Copies</span>
+        <input type="range" id="print-copies" min="1" max="9" value="1">
+        <span class="cv" id="val-print-copies">1</span>
+      </div>
+      <div class="print-actions">
+        <button class="btn" onclick="doPrint()"><span class="icon">🖨️</span>Print</button>
+        <button class="btn outline" onclick="downloadDesign()"><span class="icon">💾</span>Save PNG</button>
+      </div>
+      <button class="btn outline full" style="margin-top:8px" onclick="downloadTiled()">
+        <span class="icon">📄</span>Save full sheet
+      </button>
+    </div>
+  </div>
+
+  <!-- Hidden print render -->
+  <div id="print-output" style="display:none">
+    <canvas id="print-render"></canvas>
+  </div>
+
+  <footer class="footer" id="studio-footer">
+    Powered by GlazeUp
+  </footer>
+</div>
+
+<!-- ═══════ TAB BAR ═══════ -->
+<nav class="tab-bar">
+  <button class="tab-btn active" data-tab="colours">
+    <span class="tab-icon">🎨</span>Colours
+  </button>
+  <button class="tab-btn" data-tab="preview">
+    <span class="tab-icon">🏺</span>Transfers
+  </button>
+  <button class="tab-btn" data-tab="print">
+    <span class="tab-icon">🖨️</span>Print
+  </button>
+</nav>
+
+<script>
+  // Register service worker for PWA
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+</script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
