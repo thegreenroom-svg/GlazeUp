@@ -889,7 +889,7 @@
 
             <!-- Browse Square catalog (pottery, drinks, cakes) -->
             <div style="margin-bottom: 16px;">
-              <div id="s2-catalog-tabs" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;"></div>
+              <div id="s2-catalog-tabs" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 10px; -webkit-overflow-scrolling: touch;"></div>
               <div id="s2-catalog-items" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 240px; overflow-y: auto;"></div>
             </div>
 
@@ -2156,7 +2156,7 @@ async function loadSquareCatalog() {
 function renderCatalogTabs() {
   const tabsEl = document.getElementById('s2-catalog-tabs');
   tabsEl.innerHTML = squareCatalogCategories.map((cat, idx) => `
-    <button onclick="showCatalogCategory(${idx})" id="s2-cat-tab-${idx}" class="staff-subtab-btn" style="padding: 6px 12px; font-size: 12px;">${cat.name}</button>
+    <button onclick="showCatalogCategory(${idx})" id="s2-cat-tab-${idx}" class="staff-subtab-btn" style="padding: 6px 12px; font-size: 12px; flex-shrink: 0; white-space: nowrap;">${cat.name}</button>
   `).join('');
 
   if (squareCatalogCategories.length > 0) showCatalogCategory(0);

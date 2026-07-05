@@ -659,7 +659,7 @@ Multiple bugs fixed during the connection session (all pushed live): node-fetch 
 
 Things to come back and finish/verify — deferred to keep momentum:
 
-1. **Confirm real Square data is actually flowing** — check Setup tab shows "✓ Connected", and Section 2 (Customer Engagement) shows real Kiln Cafe catalog items/prices, not the demo Mug/Coffee/Brownie fallback. If catalog is empty/wrong, debug the `/api/square/catalog` category mapping against the real catalog shape.
+1. **Confirm real Square data is actually flowing** — ✓ DONE. Fixed by adding `ITEMS_READ` scope (was missing — Square returned 403 on catalog reads) and having Daisy revoke + reconnect so a fresh token carried the new scope. Real full Kiln Cafe catalog now flows (Hot/Cold Drinks, Cakes, and ~20 "PB" bisque categories with correct prices). Section 2 category tabs made horizontally scrollable to handle ~23 categories on iPad; item-type inference (drink/cake/piece) confirmed correct against real category names.
 2. **Rotate the exposed Square Production Access Token** — Daisy pasted her full Production Access Token (`EAAAl...`) into chat earlier before we clarified we needed the Application Secret instead. That token grants full account access. She should click "Replace" on it in the Square dashboard to invalidate it (good hygiene — it was never used by the app, but it was exposed).
 3. **The GitHub PAT (`ghp_...`) used for pushes this session** should ideally be rotated too, since it appeared in the working environment.
 4. **Wire real bookings sync** — now Square is connected, test `/api/bookings/sync` pulls real Kiln Cafe bookings (with `table_tracking_mode = staff_as_tables` set) so Section 1 can look up real bookings rather than mock `booking-001`.
