@@ -670,6 +670,19 @@ Things to come back and finish/verify — deferred to keep momentum:
 
 ---
 
+## Brainstorm Captured (not yet built — 2026-07-05): Phone-QR + Per-Studio Kiln Reconciliation
+
+**Physical QR — decided against a physical card entirely.** No plastic/printed card. Instead: the iPad displays a QR the customer scans with their own phone at arrival. That loads *their* booking/pieces page onto their phone → both sides now hold it (studio in DB, customer on phone). The customer's phone effectively becomes the QR; staff scan it off the phone screen at each stage. Benefits: no printing/lamination cost, nothing to survive water/glaze, and the customer gets a live link to their pieces (status, photos, loyalty).
+
+**The unavoidable kiln gap:** a scannable QR cannot survive the kiln, and the customer's phone isn't in the fire. So reconciling *which fired piece belongs to whom* at the unload step needs its own solution. Decision: make this a **per-studio setting** (`kiln_reconciliation_mode`), same pattern as `table_tracking_mode`, since studios fire differently. Three modes to offer:
+  1. **Photo-matching** (Kiln Cafe's current way) — tech eyeballs the pre-fire collection photos against the batch. No marking on pieces. (Bones already built: kiln sessions group by booking, collection photos already captured.)
+  2. **Written base number** — staff write a kiln-safe underglaze code on each piece base pre-fire; tech reads + enters it post-fire to pull up the booking.
+  3. **Booking-batch grouping** — a booking's pieces always fired together and kept physically grouped (labelled shelf/bat); tech identifies by batch, not individual piece.
+
+Implementation shape when built: the setting just changes what the tech sees at the "unload kiln" step (photos to eyeball / a number-entry box / a batch-shelf label). Everything downstream (mark fired → notify customer on their phone → ready for pickup) is the same regardless of mode.
+
+---
+
 ## Future Feature Reminder (Phase 3/4: Billing)
 
 **SPLIT BILLS + MULTI-CUSTOMER LOYALTY**
