@@ -842,6 +842,16 @@
           </div>
 
           <div class="chart-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="margin: 0;">Today's Bookings</h3>
+              <button class="btn-connect glaze-ocean" style="padding: 6px 14px; font-size: 11px;" onclick="syncBookingsFromSquare()">🔄 Sync from Square</button>
+            </div>
+            <div id="s1-today-bookings">
+              <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Tap "Sync from Square" to load today's bookings.</div>
+            </div>
+          </div>
+
+          <div class="chart-container">
             <h3>Look Up Booking</h3>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
               <input type="text" id="s1-booking-code" placeholder="Booking code / QR scan" style="padding: 10px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px;">
@@ -1951,6 +1961,78 @@ function showStaffSection(section) {
 }
 
 // ── Section 1: Booking Details ──
+
+async function syncBookingsFromSquare() {
+  const container = document.getElementById('s1-today-bookings');
+  container.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Syncing from Square…</div>`;
+
+  try {
+    if (!apiConnected) {
+      container.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">API not connected.</div>`;
+      return;
+    }
+
+    // Trigger the sync (pulls today's bookings from Square into the database)
+    const syncRes = await fetch(`${API_URL}/api/bookings/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId })
+    });
+
+    if (!syncRes.ok) {
+      const err = await syncRes.json().catch(() => ({}));
+      container.innerHTML = `<div style="padding: 12px; text-align: center; color: #d9534f; font-size: 12px;">Sync failed: ${err.error || syncRes.statusText}</div>`;
+      return;
+    }
+
+    await loadTodaysBookings();
+  } catch (err) {
+    container.innerHTML = `<div style="padding: 12px; text-align: center; color: #d9534f; font-size: 12px;">Sync error: ${err.message}</div>`;
+  }
+}
+
+async function loadTodaysBookings() {
+  const container = document.getElementById('s1-today-bookings');
+  try {
+    const res = await fetch(`${API_URL}/api/bookings/today?studioId=${studioId}`);
+    if (!res.ok) throw new Error('Failed to load');
+    const data = await res.json();
+
+    if (!data.bookings || data.bookings.length === 0) {
+      container.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">No bookings for today.</div>`;
+      return;
+    }
+
+    container.innerHTML = data.bookings.map(b => {
+      const time = b.session_start
+        ? new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+        : '';
+      const table = b.table_number ? ` · ${b.table_number}` : '';
+      return `
+        <button onclick='selectTodaysBooking(${JSON.stringify(b).replace(/'/g, "&apos;")})' style="width: 100%; text-align: left; padding: 12px; background: #fff9f0; border: 1px solid var(--gu-border); border-left: 4px solid var(--gu-primary); border-radius: 8px; margin-bottom: 8px; cursor: pointer;">
+          <div style="display: flex; justify-content: space-between;">
+            <strong style="font-size: 13px;">${b.customer_name}</strong>
+            <span style="font-size: 11px; color: var(--gu-dust);">${time}${table}</span>
+          </div>
+        </button>
+      `;
+    }).join('');
+  } catch (err) {
+    container.innerHTML = `<div style="padding: 12px; text-align: center; color: #d9534f; font-size: 12px;">Could not load bookings.</div>`;
+  }
+}
+
+function selectTodaysBooking(booking) {
+  // Pre-fill the lookup with this booking's code and run the lookup
+  document.getElementById('s1-booking-code').value = booking.booking_code;
+  document.getElementById('s1-customer-name').value = '';
+  // Pre-fill table number from Square if available
+  lookupBookingSection1().then(() => {
+    if (booking.table_number) {
+      document.getElementById('s1-table-number').value = booking.table_number;
+    }
+  });
+}
 
 async function lookupBookingSection1() {
   const bookingCode = document.getElementById('s1-booking-code').value.trim();

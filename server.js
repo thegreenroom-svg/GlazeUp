@@ -940,6 +940,36 @@ app.post('/api/table-sessions/:sessionId/complete', async (req, res) => {
  * Sync bookings from Square for today
  * Generates booking_code (for QR) from booking data
  */
+/**
+ * GET /api/bookings/today
+ * List today's bookings already synced into the database (for Section 1 to display)
+ */
+app.get('/api/bookings/today', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const { data: bookings, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('studio_id', studioId)
+      .gte('session_start', today.toISOString())
+      .lt('session_start', tomorrow.toISOString())
+      .order('session_start', { ascending: true });
+
+    if (error) throw error;
+    res.json({ bookings: bookings || [] });
+  } catch (error) {
+    console.error('Error listing today bookings:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/bookings/sync', async (req, res) => {
   const { studioId } = req.body;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
@@ -975,36 +1005,57 @@ app.post('/api/bookings/sync', async (req, res) => {
     let teamMemberNameById = {};
     if (tableTrackingMode === 'staff_as_tables') {
       try {
-        const teamApi = squareClient.teamApi;
-        const teamRes = await teamApi.searchTeamMembers({ query: {} });
+        const teamRes = await squareClient.teamApi.searchTeamMembers({ query: {} });
         (teamRes.result.teamMembers || []).forEach(member => {
-          teamMemberNameById[member.id] = member.givenName || member.id;
+          const name = [member.givenName, member.familyName].filter(Boolean).join(' ');
+          teamMemberNameById[member.id] = name || member.id;
         });
       } catch (teamErr) {
         console.error('Could not fetch Square team members for table mapping:', teamErr);
       }
     }
 
-    // Fetch today's bookings
+    // Fetch bookings from now through the next 28 days (Square caps the window at 31 days)
+    const startMin = new Date().toISOString();
+    const startMax = new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString();
+
+    const response = await bookingsApi.listBookings(
+      100, undefined, undefined, undefined, undefined, startMin, startMax
+    );
+    const allBookings = response.result.bookings || [];
+
+    // Keep only today's bookings for the daily sync
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const response = await bookingsApi.listBookings({
-      limit: 100,
-      locationId: null  // Could filter by location if needed
-    });
-
-    const bookings = response.result.bookings || [];
-    const todayBookings = bookings.filter(b => {
+    const todayBookings = allBookings.filter(b => {
       const bookingTime = new Date(b.startAt);
       return bookingTime >= today && bookingTime < tomorrow;
     });
 
+    // Resolve customer names by looking up each unique customerId via the Customers API
+    const uniqueCustomerIds = [...new Set(todayBookings.map(b => b.customerId).filter(Boolean))];
+    const customerById = {};
+    await Promise.all(uniqueCustomerIds.map(async (custId) => {
+      try {
+        const custRes = await squareClient.customersApi.retrieveCustomer(custId);
+        const c = custRes.result.customer;
+        customerById[custId] = {
+          name: [c.givenName, c.familyName].filter(Boolean).join(' ') || c.companyName || 'Customer',
+          email: c.emailAddress || null,
+          phone: c.phoneNumber || null
+        };
+      } catch (custErr) {
+        console.error(`Could not fetch Square customer ${custId}:`, custErr.message);
+      }
+    }));
+
     // Upsert bookings into database
     const bookingsToInsert = todayBookings.map((booking, idx) => {
-      const customerName = booking.customerNote || booking.customerId || `Walk-in ${idx + 1}`;
+      const cust = customerById[booking.customerId] || {};
+      const customerName = cust.name || `Walk-in ${idx + 1}`;
       const bookingCode = `booking-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}-${booking.id.substring(0, 8)}`;
 
       // Resolve table number/name depending on the studio's tracking mode
@@ -1015,18 +1066,25 @@ app.post('/api/bookings/sync', async (req, res) => {
       }
       // 'none' mode: tableNumber stays null, no table tracking for this studio
 
+      // Derive party size from the service name if present (e.g. "Up to 2 people"), else null
+      const segment = booking.appointmentSegments?.[0];
+      const durationMinutes = segment?.durationMinutes || null;
+      const sessionEnd = durationMinutes
+        ? new Date(new Date(booking.startAt).getTime() + durationMinutes * 60000).toISOString()
+        : null;
+
       return {
         studio_id: studioId,
         square_booking_id: booking.id,
         booking_code: bookingCode,
         customer_name: customerName,
-        customer_email: booking.customerEmail || null,
-        customer_phone: booking.customerPhoneNumber || null,
+        customer_email: cust.email || null,
+        customer_phone: cust.phone || null,
         table_number: tableNumber,
         session_start: booking.startAt,
-        session_end: booking.endAt || null,
-        party_size: booking.partySize || null,
-        notes: booking.note || null
+        session_end: sessionEnd,
+        party_size: null,
+        notes: booking.sellerNote || booking.customerNote || null
       };
     });
 
@@ -1034,6 +1092,7 @@ app.post('/api/bookings/sync', async (req, res) => {
       return res.json({
         status: 'synced',
         bookingsSynced: 0,
+        tableTrackingMode,
         message: 'No bookings found for today'
       });
     }
@@ -1052,7 +1111,8 @@ app.post('/api/bookings/sync', async (req, res) => {
       bookings: bookingsToInsert.map(b => ({
         bookingCode: b.booking_code,
         customerName: b.customer_name,
-        tableNumber: b.table_number
+        tableNumber: b.table_number,
+        sessionStart: b.session_start
       }))
     });
   } catch (error) {
