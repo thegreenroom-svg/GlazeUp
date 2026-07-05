@@ -26,6 +26,13 @@ const { Client, Environment } = require('square');
 
 const app = express();
 
+// Square's SDK returns some numbers as BigInt, which JSON.stringify cannot
+// serialize by default. Teach BigInt to serialize as a string, globally,
+// so no response anywhere can crash on it.
+if (typeof BigInt.prototype.toJSON !== 'function') {
+  BigInt.prototype.toJSON = function () { return this.toString(); };
+}
+
 // CORS configuration
 app.use(cors({
   origin: '*',  // Allow all origins for development
