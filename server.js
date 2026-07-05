@@ -1668,15 +1668,19 @@ app.get('/api/square/bookings-debug', async (req, res) => {
       });
     }
 
-    res.json({
+    // Square returns some values as BigInt which JSON.stringify can't handle —
+    // convert via a replacer that turns BigInt into strings
+    const safeJson = (obj) => JSON.parse(JSON.stringify(obj, (k, v) => typeof v === 'bigint' ? v.toString() : v));
+
+    res.json(safeJson({
       connected: true,
-      _debugVersion: 'v7-28day-window',
+      _debugVersion: 'v8-bigint-safe',
       locations,
       searchedFrom: past,
       searchedTo: future,
       bookingCount: bookings.length,
       sampleBookings: bookings
-    });
+    }));
   } catch (error) {
     console.error('Bookings debug error:', error);
     res.status(500).json({
