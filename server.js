@@ -1636,14 +1636,17 @@ app.get('/api/square/bookings-debug', async (req, res) => {
     const locRes = await squareClient.locationsApi.listLocations();
     const locations = (locRes.result.locations || []).map(l => ({ id: l.id, name: l.name }));
 
-    // Get up to 5 upcoming bookings from now
-    const nowIso = new Date().toISOString();
-    const bookingsRes = await squareClient.bookingsApi.listBookings(5, undefined, undefined, undefined, undefined, nowIso);
+    // Get up to 10 bookings spanning the last 30 days through next 30 days
+    const past = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const future = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const bookingsRes = await squareClient.bookingsApi.listBookings(10, undefined, undefined, undefined, undefined, past, future);
     const bookings = bookingsRes.result.bookings || [];
 
     res.json({
       connected: true,
       locations,
+      searchedFrom: past,
+      searchedTo: future,
       bookingCount: bookings.length,
       sampleBookings: bookings
     });
