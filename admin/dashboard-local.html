@@ -957,6 +957,8 @@
                 <ul id="s1-returning-list" style="margin: 0; padding-left: 16px; font-size: 12px;"></ul>
               </div>
 
+              <button class="btn-connect glaze-ocean" style="width: 100%; margin-top: 12px;" onclick="showCustomerQRFromResult()">📱 Show Customer QR</button>
+
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
                 <input type="text" id="s1-table-number" placeholder="Table number">
                 <input type="number" id="s1-num-places" placeholder="Number of places" min="1">
@@ -2334,6 +2336,17 @@ async function openTableSession() {
   } catch (err) {
     alert('Could not open table: ' + err.message);
   }
+}
+
+// Show the QR immediately from the currently looked-up/created booking —
+// available before a table is even assigned, since the QR only needs a booking code
+function showCustomerQRFromResult() {
+  if (!s1LookedUpBooking) {
+    alert('Look up or create a booking first');
+    return;
+  }
+  const tableNumber = document.getElementById('s1-table-number').value.trim();
+  showCustomerQR(s1LookedUpBooking.bookingCode, s1LookedUpBooking.customerName, tableNumber);
 }
 
 // Show a scannable QR that opens the customer app on their phone, linked to this booking

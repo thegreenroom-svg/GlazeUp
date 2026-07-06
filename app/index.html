@@ -210,6 +210,10 @@
       const hist = data.customerHistory || {};
       const firstName = (b.customerName || 'there').split(' ')[0];
 
+      // Keep booking details available globally so the persistent QR badge
+      // can be shown full-size from any screen, at any time
+      window.currentBooking = { code: getParam('booking'), name: b.customerName || firstName };
+
       const unfinished = (hist.unfinishedPieces && hist.unfinishedPieces.length)
         ? `<div class="section-label">Your unfinished pieces</div>
            <div class="info-card">
@@ -219,9 +223,16 @@
       const loyalty = (hist.loyaltyPoints != null)
         ? `<div class="info-card"><div class="row"><span class="k">⭐ Loyalty points</span><span class="v">${hist.loyaltyPoints}</span></div></div>` : '';
 
+      const qrThumbUrl = `https://api.qrserver.com/v1/create-qr-code/?size=90x90&margin=4&data=${encodeURIComponent(window.location.href)}`;
+
       document.getElementById('app-root').innerHTML = `
         <div class="app-header">
-          <div class="brand">${logoSvg} The Kiln Cafe</div>
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div class="brand">${logoSvg} The Kiln Cafe</div>
+            <button onclick="showMyQR()" style="background:rgba(255,255,255,0.18); border:2px solid rgba(255,255,255,0.5); border-radius:12px; padding:4px; cursor:pointer;" aria-label="Show my QR code">
+              <img src="${qrThumbUrl}" width="46" height="46" style="display:block; border-radius:6px;" alt="Your QR code">
+            </button>
+          </div>
           <div class="greeting">Hi ${firstName}! 👋</div>
           <div class="sub">Your painting session is ready. Have fun creating!</div>
         </div>
@@ -248,7 +259,25 @@
             <div class="tile-title">Transfer Designer</div>
             <div class="tile-desc">Create and position transfers for your piece.</div>
           </button>
+        </div>
+
+        <!-- Full-size QR modal, reachable from anywhere via the header badge -->
+        <div id="my-qr-modal" style="display:none; position:fixed; inset:0; background:rgba(61,28,18,0.6); z-index:1000; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this) closeMyQR()">
+          <div style="background:#fff; border-radius:22px; padding:28px 24px; max-width:320px; width:100%; text-align:center;">
+            <div style="font-family:Georgia,serif; font-size:18px; font-weight:700; color:var(--gu-primary); margin-bottom:4px;">Your Session QR</div>
+            <div style="font-size:13px; color:var(--gu-dust); margin-bottom:16px;">${window.currentBooking.name}</div>
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(window.location.href)}" width="220" height="220" style="display:block; margin:0 auto 16px; border-radius:8px;" alt="Your QR code">
+            <div style="font-size:12px; color:var(--gu-dust); line-height:1.5; margin-bottom:18px;">Show this to staff any time so they know which pieces are yours.</div>
+            <button onclick="closeMyQR()" style="width:100%; background:var(--glaze-oxblood-base); color:#fff; border:none; padding:12px; border-radius:14px; font-weight:600; cursor:pointer;">Done</button>
+          </div>
         </div>`;
+    }
+
+    function showMyQR() {
+      document.getElementById('my-qr-modal').style.display = 'flex';
+    }
+    function closeMyQR() {
+      document.getElementById('my-qr-modal').style.display = 'none';
     }
 
     init();
