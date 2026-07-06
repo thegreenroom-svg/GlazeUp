@@ -679,6 +679,12 @@ ALTER TABLE pottery_pieces ADD COLUMN IF NOT EXISTS scheduled_firing_date DATE;
 
 **Not yet built:** a staff-side tool to actually scan/decode the QR back out of a stored photo at the kiln-unload step (currently staff would just read the stamped text/QR by eye, which is already a big improvement, but a proper scan-to-lookup tool is the natural next step).
 
+**Step 3 — Kiln unload scan-to-confirm (2026-07-05):** Added the actual staff-side tool from the note above. New "Kiln Unload — Confirm Ready for Collection" card in Kiln & Inventory: staff scan (or paste) the QR/link from a piece's stamped photo → `POST /api/pieces/confirm-ready-by-scan` looks up the booking, marks that booking's dipped/in-kiln pieces as `fired` individually (finer-grained than bulk-firing a whole kiln session), and returns the customer name + count confirmed.
+
+**Zero-external-service notification, as agreed:** no email/SMS. Instead, `GET /api/booking/:bookingCode` now also returns `piecesReadyForPickup` — any fired-but-not-collected pieces for that booking. The customer app shows a celebratory "🎉 Ready for collection!" banner automatically the next time they open their page (home-screen icon or saved tab), reflecting live status with zero manual send step.
+
+**Add to Home Screen (2026-07-05):** solves "how does the customer get back in after leaving the studio" without any account/login. Added `app/manifest.json`, generated real PNG icons (192/512/apple-touch, using the same glazed-pot design, rendered via cairosvg since ImageMagick's SVG delegate wasn't available in the sandbox), and a platform-aware banner: real one-tap install button on Android/Chrome (`beforeinstallprompt`), manual "tap Share → Add to Home Screen" instructions on iOS (which doesn't allow programmatic install). Saves a proper home-screen icon pointing at the customer's exact booking URL — dismissible, remembered per-booking via localStorage so it doesn't nag.
+
 ---
 
 ## Real Square Connected (Production, Read-Only) — 2026-07-05

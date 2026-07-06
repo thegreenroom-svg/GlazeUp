@@ -250,6 +250,13 @@
       // can be shown full-size from any screen, at any time
       window.currentBooking = { code: getParam('booking'), name: b.customerName || firstName };
 
+      const readyPieces = data.piecesReadyForPickup || [];
+      const readyBanner = readyPieces.length > 0
+        ? `<div class="info-card" style="background: linear-gradient(180deg, #f2f8f0, #e9f3e4); border-color: var(--glaze-sage-base);">
+             <div style="font-family: var(--gu-font-display); font-weight: 700; color: var(--glaze-sage-deep); font-size: 16px; margin-bottom: 4px;">🎉 Ready for collection!</div>
+             <div style="font-size: 13px; color: var(--gu-accent);">${readyPieces.length} piece${readyPieces.length > 1 ? 's are' : ' is'} fired and waiting for you at the studio.</div>
+           </div>` : '';
+
       const unfinished = (hist.unfinishedPieces && hist.unfinishedPieces.length)
         ? `<div class="section-label">Your unfinished pieces</div>
            <div class="info-card">
@@ -273,6 +280,7 @@
           <div class="sub">Your painting session is ready. Have fun creating!</div>
         </div>
         <div class="content">
+          ${readyBanner}
           ${loyalty}
           ${unfinished}
 

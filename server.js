@@ -774,6 +774,14 @@ app.get('/api/booking/:bookingCode', async (req, res) => {
       unfinishedPieces = pieces || [];
     }
 
+    // Pieces from THIS booking that are fired and waiting for collection —
+    // used to show a "ready for collection!" banner on the customer's live page
+    const { data: readyPieces } = await supabase
+      .from('pottery_pieces')
+      .select('id, piece_type')
+      .eq('booking_id', bookingCode)
+      .eq('status', 'fired');
+
     res.json({
       booking: {
         id: booking.id,
@@ -788,6 +796,7 @@ app.get('/api/booking/:bookingCode', async (req, res) => {
         sessionEnd: booking.session_end,
         notes: booking.notes
       },
+      piecesReadyForPickup: readyPieces || [],
       customerHistory: existingCustomer ? {
         customerId: existingCustomer.id,
         loyaltyPoints: existingCustomer.loyalty_points,
@@ -1586,6 +1595,56 @@ app.get('/api/pieces/ready-for-pickup', async (req, res) => {
  * POST /api/pieces/mark-picked-up
  * Mark fired pieces as collected by the customer
  */
+/**
+ * POST /api/pieces/confirm-ready-by-scan
+ * Kiln unload step: technician scans/pastes a booking's QR (from the stamped
+ * collection photo) to confirm those pieces are out of the kiln and ready for
+ * collection. Marks matching pieces as 'fired' individually, by booking — a
+ * finer-grained alternative to bulk-firing a whole kiln session at once.
+ * No external notification service — the customer's live QR page picks up
+ * the status change automatically the next time they open it.
+ */
+app.post('/api/pieces/confirm-ready-by-scan', async (req, res) => {
+  const { studioId, bookingCode } = req.body;
+  if (!studioId || !bookingCode) {
+    return res.status(400).json({ error: 'studioId and bookingCode required' });
+  }
+
+  try {
+    const { data: booking } = await supabase
+      .from('bookings')
+      .select('customer_name')
+      .eq('studio_id', studioId)
+      .eq('booking_code', bookingCode)
+      .single();
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found for this QR code' });
+    }
+
+    // Mark pieces for this booking that are dipped/in-kiln as fired.
+    // (If they were already fired via a bulk kiln-session action, this simply finds none — safe either way.)
+    const { data: updatedPieces, error } = await supabase
+      .from('pottery_pieces')
+      .update({ status: 'fired', updated_at: new Date().toISOString() })
+      .eq('studio_id', studioId)
+      .eq('booking_id', bookingCode)
+      .in('status', ['dipped', 'in_kiln'])
+      .select('id, piece_type');
+
+    if (error) throw error;
+
+    res.json({
+      status: 'confirmed',
+      customerName: booking.customer_name,
+      piecesMarkedReady: updatedPieces || []
+    });
+  } catch (error) {
+    console.error('Error confirming pieces ready by scan:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/pieces/mark-picked-up', async (req, res) => {
   const { studioId, pieceIds } = req.body;
   if (!studioId || !pieceIds || !Array.isArray(pieceIds)) {

@@ -1048,6 +1048,19 @@
             <button class="btn-connect" style="margin-top: 16px; width: 100%;" onclick="openQRModal()">📱 Scan QR Code to Submit Pieces</button>
           </div>
 
+          <!-- Kiln Unload: scan the stamped photo's QR to confirm pieces are out and ready -->
+          <div class="chart-container">
+            <h3>Kiln Unload — Confirm Ready for Collection</h3>
+            <div style="font-size: 11px; color: var(--gu-dust); margin-bottom: 10px;">
+              After visually matching a fired piece to its stamped photo, scan (or paste) the QR from that photo here to confirm it's ready. The customer's own page updates automatically — nothing to send manually.
+            </div>
+            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+              <input type="text" id="kiln-unload-scan-input" placeholder="Scan QR or paste booking link/code" style="flex: 1; padding: 10px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px;" onkeydown="if(event.key==='Enter') confirmReadyByScan()">
+              <button class="btn-connect glaze-sage" style="padding: 10px 16px;" onclick="confirmReadyByScan()">✓ Confirm</button>
+            </div>
+            <div id="kiln-unload-result"></div>
+          </div>
+
           <!-- Kiln Sessions -->
           <div class="chart-container">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
@@ -2715,6 +2728,52 @@ async function loadReadyForPickup() {
     }).join('');
   } catch (err) {
     container.innerHTML = `<div style="padding: 12px; text-align: center; color: #d9534f; font-size: 12px;">Could not load.</div>`;
+  }
+}
+
+async function confirmReadyByScan() {
+  const input = document.getElementById('kiln-unload-scan-input');
+  const raw = input.value.trim();
+  const resultEl = document.getElementById('kiln-unload-result');
+
+  if (!raw) return;
+
+  // The scan may come in as a full URL (…/app?booking=CODE) or just the raw code
+  let bookingCode = raw;
+  try {
+    const url = new URL(raw);
+    const paramCode = url.searchParams.get('booking');
+    if (paramCode) bookingCode = paramCode;
+  } catch {
+    // Not a URL — treat the whole input as the booking code
+  }
+
+  resultEl.innerHTML = `<div style="padding: 10px; color: var(--gu-dust); font-size: 12px;">Checking…</div>`;
+
+  try {
+    const res = await fetch(`${API_URL}/api/pieces/confirm-ready-by-scan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, bookingCode })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      resultEl.innerHTML = `<div style="padding: 10px; background: #fdeceb; color: #d9534f; border-radius: 8px; font-size: 12px;">${data.error || 'Could not confirm'}</div>`;
+      return;
+    }
+
+    if (data.piecesMarkedReady.length === 0) {
+      resultEl.innerHTML = `<div style="padding: 10px; background: #fff9f0; border-left: 4px solid var(--glaze-honey-base); border-radius: 8px; font-size: 12px;">Found <strong>${data.customerName}</strong>, but no pieces were waiting to be marked ready (already confirmed, or not yet dipped).</div>`;
+    } else {
+      resultEl.innerHTML = `<div style="padding: 10px; background: #f2f8f0; border-left: 4px solid var(--glaze-sage-base); border-radius: 8px; font-size: 12px;">✓ <strong>${data.customerName}</strong> — ${data.piecesMarkedReady.length} piece${data.piecesMarkedReady.length > 1 ? 's' : ''} confirmed ready. Their page will now show it's ready for collection.</div>`;
+    }
+
+    input.value = '';
+    loadReadyForPickup();
+  } catch (err) {
+    resultEl.innerHTML = `<div style="padding: 10px; background: #fdeceb; color: #d9534f; border-radius: 8px; font-size: 12px;">Error: ${err.message}</div>`;
   }
 }
 
