@@ -1035,17 +1035,32 @@
         <!-- ═══════════════════════════ -->
         <div id="staff-section-kiln" class="staff-section" style="display: none;">
 
-          <!-- Pieces Ready for Dip -->
+          <!-- Firing Pipeline: Ready for Dip → Dipped/Kiln → Kiln Sessions, combined into one flow -->
           <div class="chart-container">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-              <h3 style="margin: 0;">Pieces Ready for Dip</h3>
-              <button onclick="loadPiecesAwaitingDip()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <h3 style="margin: 0;">Firing Pipeline</h3>
+              <button onclick="loadKilnData()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
             </div>
+
+            <!-- Stage 1: Ready for Dip -->
+            <div style="font-size: 12px; color: var(--gu-dust); font-weight: bold; margin: 14px 0 8px;">Ready for dip:</div>
             <div class="pieces-awaiting-dip-list" id="pieces-list-container">
               <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading pieces...</div>
             </div>
+            <button class="btn-connect" style="margin-top: 10px; width: 100%;" onclick="openQRModal()">📱 Scan QR Code to Submit Pieces</button>
 
-            <button class="btn-connect" style="margin-top: 16px; width: 100%;" onclick="openQRModal()">📱 Scan QR Code to Submit Pieces</button>
+            <!-- Stage 2: Dipped, waiting for kiln -->
+            <div style="font-size: 12px; color: var(--gu-dust); font-weight: bold; margin: 20px 0 8px; border-top: 1px solid var(--gu-border); padding-top: 14px;">Dipped, waiting for kiln:</div>
+            <div id="dipped-pieces-list" style="margin-bottom: 12px;">
+              <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
+            </div>
+            <button class="btn-connect glaze-honey" style="width: 100%;" onclick="createKilnSession()">🔥 Create Kiln Session from Selected</button>
+
+            <!-- Stage 3: Kiln sessions -->
+            <div style="font-size: 12px; color: var(--gu-dust); font-weight: bold; margin: 20px 0 8px; border-top: 1px solid var(--gu-border); padding-top: 14px;">Kiln sessions:</div>
+            <div id="kiln-sessions-list">
+              <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
+            </div>
           </div>
 
           <!-- Kiln Unload: scan the stamped photo's QR to confirm pieces are out and ready -->
@@ -1059,27 +1074,6 @@
               <button class="btn-connect glaze-sage" style="padding: 10px 16px;" onclick="confirmReadyByScan()">✓ Confirm</button>
             </div>
             <div id="kiln-unload-result"></div>
-          </div>
-
-          <!-- Kiln Sessions -->
-          <div class="chart-container">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-              <h3 style="margin: 0;">Kiln Firing</h3>
-              <button onclick="loadKilnData()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
-            </div>
-
-            <!-- Dipped pieces waiting to go into a session -->
-            <div style="font-size: 12px; color: var(--gu-dust); font-weight: bold; margin-bottom: 8px;">Dipped pieces waiting for kiln:</div>
-            <div id="dipped-pieces-list" style="margin-bottom: 12px;">
-              <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
-            </div>
-            <button class="btn-connect" style="width: 100%; margin-bottom: 20px;" onclick="createKilnSession()">🔥 Create Kiln Session from Selected</button>
-
-            <!-- Existing kiln sessions -->
-            <div style="font-size: 12px; color: var(--gu-dust); font-weight: bold; margin-bottom: 8px; border-top: 1px solid var(--gu-border); padding-top: 12px;">Kiln sessions:</div>
-            <div id="kiln-sessions-list">
-              <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
-            </div>
           </div>
 
           <!-- Ready for Pickup -->
@@ -2086,7 +2080,6 @@ function showStaffSection(section) {
   } else if (section === 'completion') {
     loadOpenTablesForCompletion();
   } else if (section === 'kiln') {
-    loadPiecesAwaitingDip();
     loadKilnData();
   }
 }
@@ -2681,6 +2674,7 @@ function completeTableFromSection3(tableSessionId, bookingCode) {
 // ══════════════════════════════════════════════════════════
 
 function loadKilnData() {
+  loadPiecesAwaitingDip();
   loadDippedPieces();
   loadKilnSessions();
   loadReadyForPickup();
