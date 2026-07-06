@@ -1301,7 +1301,7 @@ app.get('/api/booking-photos/:bookingId', async (req, res) => {
  * Now captures customer data for loyalty foundation
  */
 app.post('/api/pieces/submit-for-dip', async (req, res) => {
-  const { studioId, bookingId, pieces, customerName, customerEmail, customerPhone } = req.body;
+  const { studioId, bookingId, pieces, customerName, customerEmail, customerPhone, scheduledFiringDate } = req.body;
   if (!studioId || !bookingId || !pieces || !Array.isArray(pieces)) {
     return res.status(400).json({ error: 'Missing studioId, bookingId, or pieces array' });
   }
@@ -1327,7 +1327,8 @@ app.post('/api/pieces/submit-for-dip', async (req, res) => {
         is_complete: isComplete,
         outstanding_balance: isComplete ? 0 : 0,  // Always 0 on submission
         status: 'ready_for_dip',
-        notes: piece.notes || null
+        notes: piece.notes || null,
+        scheduled_firing_date: scheduledFiringDate || null
       };
     });
 

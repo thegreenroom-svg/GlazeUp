@@ -1450,6 +1450,10 @@
         <div style="font-size: 12px; color: var(--gu-dust); font-weight: bold; margin-bottom: 8px;">
           📷 Photo of pieces (against QR nameplate)
         </div>
+
+        <label style="font-size: 11px; color: var(--gu-dust); display: block; margin-bottom: 4px;">Scheduled firing date (if known)</label>
+        <input type="date" id="modal-firing-date" style="width: 100%; padding: 8px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px; margin-bottom: 10px;">
+
         <div id="photo-preview-container" style="display: none; margin-bottom: 8px;">
           <img id="photo-preview" style="max-width: 100%; border-radius: 6px; max-height: 160px;">
         </div>
@@ -1488,6 +1492,7 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.0.3/qrcode.min.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════
 // GlazeUp Admin Dashboard · API Integration
@@ -2929,12 +2934,95 @@ function handlePhotoCapture(event) {
 
   const reader = new FileReader();
   reader.onload = function(e) {
-    capturedPhotoBase64 = e.target.result;
-    document.getElementById('photo-preview').src = capturedPhotoBase64;
-    document.getElementById('photo-preview-container').style.display = 'block';
-    document.getElementById('photo-capture-label').textContent = 'Retake Photo';
+    const img = new Image();
+    img.onload = function() {
+      capturedPhotoBase64 = compositePhotoWithDetails(img);
+      document.getElementById('photo-preview').src = capturedPhotoBase64;
+      document.getElementById('photo-preview-container').style.display = 'block';
+      document.getElementById('photo-capture-label').textContent = 'Retake Photo';
+    };
+    img.src = e.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+// Stamp the customer's QR code, name, booking details, and finishing/firing dates
+// directly onto the collection photo. This matters because the physical QR can't
+// survive the kiln, but a photo of the piece does — so the photo becomes the
+// permanent, scannable record linking a fired piece back to its booking.
+function compositePhotoWithDetails(img) {
+  const canvas = document.createElement('canvas');
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const ctx = canvas.getContext('2d');
+
+  // Draw the original photo
+  ctx.drawImage(img, 0, 0);
+
+  // Gather the details to stamp
+  const customerName = currentBookingData?.customerName || 'Customer';
+  const bookingCode = currentBookingCode || currentBookingData?.bookingCode || '';
+  const tableNumber = currentBookingData?.tableNumber || '';
+  const finishedDate = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const firingDateInput = document.getElementById('modal-firing-date')?.value;
+  const firingDate = firingDateInput
+    ? new Date(firingDateInput).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    : null;
+
+  // Bottom info strip — sized proportionally to the photo
+  const stripHeight = Math.round(canvas.height * 0.16);
+  const stripY = canvas.height - stripHeight;
+  const qrSize = Math.round(stripHeight * 0.8);
+  const qrMargin = Math.round(stripHeight * 0.1);
+  const padding = Math.round(stripHeight * 0.08);
+
+  ctx.fillStyle = 'rgba(61, 28, 18, 0.82)';
+  ctx.fillRect(0, stripY, canvas.width, stripHeight);
+
+  // QR code, drawn as raw pixels — no image loading, so no CORS/canvas-taint risk
+  try {
+    const customerUrl = `${API_URL}/app?booking=${encodeURIComponent(bookingCode)}`;
+    const qr = qrcode(0, 'M');
+    qr.addData(customerUrl);
+    qr.make();
+    const moduleCount = qr.getModuleCount();
+    const cellSize = qrSize / moduleCount;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(qrMargin, stripY + qrMargin, qrSize, qrSize);
+    ctx.fillStyle = '#000000';
+    for (let row = 0; row < moduleCount; row++) {
+      for (let col = 0; col < moduleCount; col++) {
+        if (qr.isDark(row, col)) {
+          ctx.fillRect(qrMargin + col * cellSize, stripY + qrMargin + row * cellSize, Math.ceil(cellSize), Math.ceil(cellSize));
+        }
+      }
+    }
+  } catch (qrErr) {
+    console.error('Could not draw QR onto photo:', qrErr);
+  }
+
+  // Text details, to the right of the QR
+  const textX = qrMargin + qrSize + padding * 2;
+  const nameFontSize = Math.max(14, Math.round(stripHeight * 0.24));
+  const detailFontSize = Math.max(11, Math.round(stripHeight * 0.16));
+
+  ctx.fillStyle = '#ffffff';
+  ctx.textBaseline = 'top';
+  ctx.font = `bold ${nameFontSize}px system-ui, sans-serif`;
+  ctx.fillText(customerName + (tableNumber ? ` · Table ${tableNumber}` : ''), textX, stripY + padding);
+
+  ctx.font = `${detailFontSize}px system-ui, sans-serif`;
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  const line2Y = stripY + padding + nameFontSize + Math.round(padding * 0.5);
+  ctx.fillText(`Finished: ${finishedDate}`, textX, line2Y);
+
+  if (firingDate) {
+    const line3Y = line2Y + detailFontSize + Math.round(padding * 0.4);
+    ctx.fillText(`Scheduled firing: ${firingDate}`, textX, line3Y);
+  }
+
+  return canvas.toDataURL('image/jpeg', 0.9);
 }
 
 function resetPhotoCapture() {
@@ -3207,6 +3295,9 @@ function closeQRModal() {
   currentBookingData = null;
   pieceStates = {};
   completingTableSessionId = null;
+  resetPhotoCapture();
+  const firingDateInput = document.getElementById('modal-firing-date');
+  if (firingDateInput) firingDateInput.value = '';
 }
 
 function handlePieceChange(pieceId) {
@@ -3284,7 +3375,8 @@ async function savePiecesToDatabase(bookingCode, pieces, summaryText, customerNa
         pieces: pieces,
         customerName: customerName,
         customerEmail: customerEmail,
-        customerPhone: customerPhone
+        customerPhone: customerPhone,
+        scheduledFiringDate: document.getElementById('modal-firing-date')?.value || null
       })
     });
 

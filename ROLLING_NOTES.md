@@ -656,6 +656,31 @@ Daisy asked for a "jazzier, funky, dynamic" look for iPhone/iPad with buttons th
 
 ---
 
+## QR System, Step by Step (2026-07-05)
+
+Building toward Daisy's "kiln to grave" QR tracking idea: QR generated at booking creation, present everywhere, and embedded directly into collection photos so a piece can always be traced back to its booking even after firing destroys any physical QR.
+
+**Step 1 — QR available immediately, not gated behind table-open:**
+- Section 1 now has a **"📱 Show Customer QR"** button available right after a booking is found/created, before a table is even assigned (`showCustomerQRFromResult()`).
+- Customer app (`/app`) now shows a **persistent small QR badge** in the header on every screen, tap to enlarge to full-size with the customer's name — so they can show it to staff again anytime during their visit, not just once at arrival.
+
+**Step 2 — QR + customer details + dates stamped directly onto the collection photo:**
+When staff take the collection photo (in the pieces-submission modal), it's no longer just a plain photo — it's composited on-device (via HTML canvas) with:
+  - The booking's QR code (drawn as raw pixels using the `qrcode-generator` library — deliberately NOT a fetched image, since a cross-origin image would taint the canvas and block export; this library computes the QR grid locally with zero network calls)
+  - Customer name + table number
+  - **Finished date** (today, automatic)
+  - **Scheduled firing date** — a new optional date-picker field in the modal (`#modal-firing-date`), since staff usually know the firing schedule at collection time even though it's not always knowable (volume-dependent)
+This solves the "kiln gap" from the earlier phone-QR brainstorm: the physical QR can't survive firing, but the *photo* does, and now the photo carries the QR + all identifying details baked permanently into the image itself — turning photo-matching at kiln-unload from eyeballing into something exact and scannable.
+
+**Schema update needed (Daisy to run):**
+```sql
+ALTER TABLE pottery_pieces ADD COLUMN IF NOT EXISTS scheduled_firing_date DATE;
+```
+
+**Not yet built:** a staff-side tool to actually scan/decode the QR back out of a stored photo at the kiln-unload step (currently staff would just read the stamped text/QR by eye, which is already a big improvement, but a proper scan-to-lookup tool is the natural next step).
+
+---
+
 ## Real Square Connected (Production, Read-Only) — 2026-07-05
 
 Daisy connected her real Kiln Cafe Square account. Confirmed the entire codebase only ever makes read calls to Square (retrieveMerchant, searchOrders, listCatalog, searchTeamMembers, listBookings — no create/update/delete/charge/refund anywhere), and OAuth scopes requested are all `_READ` only. Production credentials added to Render (`SQUARE_CLIENT_ID`, `SQUARE_CLIENT_SECRET`, `SQUARE_ENVIRONMENT=production`), plus `API_URL` (was missing, causing an invalid redirect_uri error on first attempt) and the Production OAuth Redirect URL registered on Square's side (`https://glazeup-api.onrender.com/api/square/callback`).
