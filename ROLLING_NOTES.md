@@ -681,6 +681,20 @@ ALTER TABLE pottery_pieces ADD COLUMN IF NOT EXISTS scheduled_firing_date DATE;
 
 **Step 3 — Kiln unload scan-to-confirm (2026-07-05):** Added the actual staff-side tool from the note above. New "Kiln Unload — Confirm Ready for Collection" card in Kiln & Inventory: staff scan (or paste) the QR/link from a piece's stamped photo → `POST /api/pieces/confirm-ready-by-scan` looks up the booking, marks that booking's dipped/in-kiln pieces as `fired` individually (finer-grained than bulk-firing a whole kiln session), and returns the customer name + count confirmed.
 
+---
+
+## Kiln Section Simplified: One "Kiln Room" Card (2026-07-05)
+
+Daisy pointed out the "Firing Pipeline" (ready-for-dip → dipped-waiting-for-kiln-with-checkboxes → create-kiln-session → kiln-sessions-list) was too messy — in reality, a booking's pieces are photographed at the table, then go to the kiln room and dip + fire together as one batch. No need to track dip and fire as separate manual steps.
+
+**Collapsed to one simple card**, styled consistently with Ready for Pickup (grouped by booking, one action button per group — no more checkboxes, no more naming/creating a "kiln session"):
+- New endpoint `GET /api/pieces/in-kiln-room` — everything with status `ready_for_dip`/`dipped`/`in_kiln`, grouped by booking
+- New endpoint `POST /api/pieces/mark-fired-by-booking` — one button fires an entire booking's batch straight to `fired`, no intermediate session object needed
+- Removed the old `loadPiecesAwaitingDip`/`loadDippedPieces`/`createKilnSession`/`loadKilnSessions`/`fireKilnSession` functions and their UI (checkboxes, "Create Kiln Session" naming prompt, separate sessions list) — all replaced by `loadKilnRoom()` + `markBookingFired()`.
+- The old `kiln_sessions` table/endpoints (`/api/kiln-sessions*`) are left in place in `server.js` but are now unused by the UI — harmless, not deleted, in case multi-batch kiln-load tracking is wanted again later.
+
+**Bonus fix caught while doing this:** `pottery_pieces` has no `customer_name` column, so both Ready for Pickup and the old dip list were silently falling back to showing the raw booking code instead of the customer's actual name. Added a shared `enrichPiecesWithCustomerName()` helper (joins `booking_id` against `bookings.booking_code`) used by both `/api/pieces/in-kiln-room` and `/api/pieces/ready-for-pickup` now, so real names show correctly in both.
+
 **Zero-external-service notification, as agreed:** no email/SMS. Instead, `GET /api/booking/:bookingCode` now also returns `piecesReadyForPickup` — any fired-but-not-collected pieces for that booking. The customer app shows a celebratory "🎉 Ready for collection!" banner automatically the next time they open their page (home-screen icon or saved tab), reflecting live status with zero manual send step.
 
 **Add to Home Screen (2026-07-05):** solves "how does the customer get back in after leaving the studio" without any account/login. Added `app/manifest.json`, generated real PNG icons (192/512/apple-touch, using the same glazed-pot design, rendered via cairosvg since ImageMagick's SVG delegate wasn't available in the sandbox), and a platform-aware banner: real one-tap install button on Android/Chrome (`beforeinstallprompt`), manual "tap Share → Add to Home Screen" instructions on iOS (which doesn't allow programmatic install). Saves a proper home-screen icon pointing at the customer's exact booking URL — dismissible, remembered per-booking via localStorage so it doesn't nag.

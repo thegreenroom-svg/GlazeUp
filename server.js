@@ -1571,6 +1571,85 @@ app.post('/api/kiln-sessions/:sessionId/fire', async (req, res) => {
  * GET /api/pieces/ready-for-pickup
  * List fired pieces not yet collected, grouped for the pickup UI
  */
+/**
+ * GET /api/pieces/in-kiln-room
+ * Everything between "submitted" and "fired" — ready_for_dip, dipped, in_kiln —
+ * since in practice a booking's pieces move through dip and firing together as
+ * one batch. Enriched with the real customer name (pottery_pieces itself only
+ * stores booking_id/customer_id, not a name) so the UI can group by booking
+ * without a second round-trip.
+ */
+app.get('/api/pieces/in-kiln-room', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    const { data: pieces, error } = await supabase
+      .from('pottery_pieces')
+      .select('*')
+      .eq('studio_id', studioId)
+      .in('status', ['ready_for_dip', 'dipped', 'in_kiln'])
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const enriched = await enrichPiecesWithCustomerName(studioId, pieces || []);
+    res.json({ pieces: enriched });
+  } catch (error) {
+    console.error('Error fetching kiln room pieces:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/pieces/mark-fired-by-booking
+ * Move an entire booking's batch straight to 'fired' in one action —
+ * no separate dip/kiln-session selection step needed.
+ */
+app.post('/api/pieces/mark-fired-by-booking', async (req, res) => {
+  const { studioId, bookingId } = req.body;
+  if (!studioId || !bookingId) {
+    return res.status(400).json({ error: 'studioId and bookingId required' });
+  }
+
+  try {
+    const { data: updated, error } = await supabase
+      .from('pottery_pieces')
+      .update({ status: 'fired', updated_at: new Date().toISOString() })
+      .eq('studio_id', studioId)
+      .eq('booking_id', bookingId)
+      .in('status', ['ready_for_dip', 'dipped', 'in_kiln'])
+      .select('id, piece_type');
+
+    if (error) throw error;
+    res.json({ status: 'fired', piecesMarkedFired: updated || [] });
+  } catch (error) {
+    console.error('Error marking booking fired:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Shared helper: attach a real customer_name to each piece by looking up its
+// booking_id against the bookings table (pottery_pieces has no name column itself)
+async function enrichPiecesWithCustomerName(studioId, pieces) {
+  const bookingIds = [...new Set(pieces.map(p => p.booking_id).filter(Boolean))];
+  if (bookingIds.length === 0) return pieces;
+
+  const { data: bookings } = await supabase
+    .from('bookings')
+    .select('booking_code, customer_name')
+    .eq('studio_id', studioId)
+    .in('booking_code', bookingIds);
+
+  const nameByBookingCode = {};
+  (bookings || []).forEach(b => { nameByBookingCode[b.booking_code] = b.customer_name; });
+
+  return pieces.map(p => ({
+    ...p,
+    customer_name: nameByBookingCode[p.booking_id] || p.booking_id || 'Unknown'
+  }));
+}
+
 app.get('/api/pieces/ready-for-pickup', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
@@ -1584,7 +1663,9 @@ app.get('/api/pieces/ready-for-pickup', async (req, res) => {
       .order('updated_at', { ascending: true });
 
     if (error) throw error;
-    res.json({ pieces: pieces || [] });
+
+    const enriched = await enrichPiecesWithCustomerName(studioId, pieces || []);
+    res.json({ pieces: enriched });
   } catch (error) {
     console.error('Error fetching ready-for-pickup pieces:', error);
     res.status(500).json({ error: error.message });

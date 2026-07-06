@@ -1035,32 +1035,20 @@
         <!-- ═══════════════════════════ -->
         <div id="staff-section-kiln" class="staff-section" style="display: none;">
 
-          <!-- Firing Pipeline: Ready for Dip → Dipped/Kiln → Kiln Sessions, combined into one flow -->
+          <!-- Kiln Room: everything submitted but not yet fired, grouped by booking.
+               Pieces move through dip + firing together as one batch, so this is
+               deliberately one simple list with one action per booking, not a
+               multi-step pipeline. -->
           <div class="chart-container">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-              <h3 style="margin: 0;">Firing Pipeline</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="margin: 0;">Kiln Room</h3>
               <button onclick="loadKilnData()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
             </div>
-
-            <!-- Stage 1: Ready for Dip -->
-            <div style="font-size: 12px; color: var(--gu-dust); font-weight: bold; margin: 14px 0 8px;">Ready for dip:</div>
-            <div class="pieces-awaiting-dip-list" id="pieces-list-container">
-              <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading pieces...</div>
-            </div>
-            <button class="btn-connect" style="margin-top: 10px; width: 100%;" onclick="openQRModal()">📱 Scan QR Code to Submit Pieces</button>
-
-            <!-- Stage 2: Dipped, waiting for kiln -->
-            <div style="font-size: 12px; color: var(--gu-dust); font-weight: bold; margin: 20px 0 8px; border-top: 1px solid var(--gu-border); padding-top: 14px;">Dipped, waiting for kiln:</div>
-            <div id="dipped-pieces-list" style="margin-bottom: 12px;">
+            <div style="font-size: 11px; color: var(--gu-dust); margin-bottom: 10px;">Pieces submitted and in the kiln room, dipping and firing as a batch. Mark a batch fired once it's out.</div>
+            <div id="kiln-room-list">
               <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
             </div>
-            <button class="btn-connect glaze-honey" style="width: 100%;" onclick="createKilnSession()">🔥 Create Kiln Session from Selected</button>
-
-            <!-- Stage 3: Kiln sessions -->
-            <div style="font-size: 12px; color: var(--gu-dust); font-weight: bold; margin: 20px 0 8px; border-top: 1px solid var(--gu-border); padding-top: 14px;">Kiln sessions:</div>
-            <div id="kiln-sessions-list">
-              <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
-            </div>
+            <button class="btn-connect" style="margin-top: 12px; width: 100%;" onclick="openQRModal()">📱 Scan QR Code to Submit Pieces</button>
           </div>
 
           <!-- Kiln Unload: scan the stamped photo's QR to confirm pieces are out and ready -->
@@ -1815,158 +1803,91 @@ function saveBrandingForm() {
 }
 
 // Load pieces awaiting dip for Staff dashboard
-async function loadPiecesAwaitingDip() {
+async function loadKilnRoom() {
+  const container = document.getElementById('kiln-room-list');
   try {
     if (!apiConnected) {
-      console.log('API not connected, using mock data');
-      displayMockPieces();
+      displayMockKilnRoom();
       return;
     }
 
-    const res = await fetch(`${API_URL}/api/pieces/awaiting-dip?studioId=${studioId}`);
-    if (!res.ok) {
-      console.error('Failed to load pieces');
-      displayMockPieces();
-      return;
-    }
-
+    const res = await fetch(`${API_URL}/api/pieces/in-kiln-room?studioId=${studioId}`);
+    if (!res.ok) throw new Error('Failed to load');
     const data = await res.json();
-    displayPieces(data.pieces || []);
+    renderKilnRoom(data.pieces || []);
   } catch (err) {
-    console.error('Error loading pieces:', err);
-    displayMockPieces();
+    console.error('Error loading kiln room:', err);
+    displayMockKilnRoom();
   }
 }
 
-function displayPieces(pieces) {
+function renderKilnRoom(pieces) {
+  const container = document.getElementById('kiln-room-list');
+
   if (!pieces || pieces.length === 0) {
-    const container = document.querySelector('.pieces-awaiting-dip-list') || 
-                     document.getElementById('pieces-list-container');
-    if (container) {
-      container.innerHTML = `
-        <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">
-          No pieces awaiting dip right now
-        </div>
-      `;
-    }
+    container.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Nothing in the kiln room right now.</div>`;
     return;
   }
 
-  // Group pieces by booking_id
-  const groupedByBooking = {};
-  pieces.forEach(piece => {
-    if (!groupedByBooking[piece.booking_id]) {
-      groupedByBooking[piece.booking_id] = {
-        bookingId: piece.booking_id,
-        customerName: piece.customer_id ? 'Customer' : 'Walk-in', // Would ideally join with customer table
-        pieces: []
-      };
-    }
-    groupedByBooking[piece.booking_id].pieces.push(piece);
+  const pieceEmojis = { mug: '🍲', plate: '🍽️', bowl: '🥣', tile: '🧱', cup: '☕', planter: '🌿', vase: '🌸' };
+
+  // Group by booking — one card, one action, per batch
+  const byBooking = {};
+  pieces.forEach(p => {
+    const key = p.booking_id || 'unknown';
+    if (!byBooking[key]) byBooking[key] = [];
+    byBooking[key].push(p);
   });
 
-  // Display grouped pieces
-  const container = document.querySelector('.pieces-awaiting-dip-list') || 
-                   document.getElementById('pieces-list-container');
-  if (container) {
-    container.innerHTML = Object.values(groupedByBooking).map(booking => {
-      const pieceEmojis = {
-        'mug': '🍲',
-        'plate': '🍽️',
-        'bowl': '🥣',
-        'tile': '🧱',
-        'cup': '☕',
-        'planter': '🌿',
-        'vase': '🌸'
-      };
+  container.innerHTML = Object.entries(byBooking).map(([bookingId, batch]) => {
+    const customerName = batch[0].customer_name || bookingId;
+    const piecesList = batch.map(p => `${pieceEmojis[p.piece_type?.toLowerCase()] || '🎨'} ${p.piece_type}`).join(', ');
+    const submitTime = batch[0].created_at
+      ? new Date(batch[0].created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+      : '';
 
-      const piecesList = booking.pieces.map(p => {
-        const emoji = pieceEmojis[p.piece_type?.toLowerCase()] || '🎨';
-        return `${emoji} ${p.piece_type}`;
-      }).join(', ');
-
-      const submitTime = new Date(booking.pieces[0].created_at).toLocaleTimeString('en-GB', {
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-
-      const pieceIdsJson = JSON.stringify(booking.pieces.map(p => p.id)).replace(/"/g, '&quot;');
-
-      return `
-        <div style="padding: 12px; background: #fff9f0; border-left: 4px solid var(--gu-primary); margin-bottom: 8px; border-radius: 4px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-            <strong>${booking.customerName}</strong>
-            <span style="font-size: 11px; color: var(--gu-dust);">Ready ${submitTime}</span>
-          </div>
-          <div style="color: var(--gu-dust); font-size: 12px; margin-bottom: 8px;">
-            ${piecesList} <span style="float: right; color: var(--gu-primary); font-weight: bold;">${booking.pieces.length} piece${booking.pieces.length !== 1 ? 's' : ''}</span>
-          </div>
-          <button onclick='markPiecesDipped(${pieceIdsJson})' style="width: 100%; background: #fff; border: 1px solid var(--gu-primary); color: var(--gu-primary); padding: 6px; border-radius: 6px; font-size: 12px; cursor: pointer;">Mark as Dipped</button>
+    return `
+      <div style="padding: 12px; background: #fff9f0; border-left: 4px solid var(--gu-primary); margin-bottom: 8px; border-radius: 4px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <strong style="font-size: 13px;">${customerName}</strong>
+          <span style="font-size: 11px; color: var(--gu-dust);">${submitTime ? `In since ${submitTime}` : ''}</span>
         </div>
-      `;
-    }).join('');
-  }
+        <div style="color: var(--gu-dust); font-size: 12px; margin-bottom: 10px;">
+          ${piecesList} <span style="float: right; color: var(--gu-primary); font-weight: bold;">${batch.length} piece${batch.length !== 1 ? 's' : ''}</span>
+        </div>
+        <button class="btn-connect glaze-sage" style="width: 100%; padding: 8px; font-size: 12px;" onclick="markBookingFired('${bookingId}')">🔥 Mark Fired</button>
+      </div>
+    `;
+  }).join('');
 }
 
-async function markPiecesDipped(pieceIds) {
-  try {
-    if (!apiConnected) {
-      alert('API not connected - cannot mark pieces dipped');
-      return;
-    }
+function displayMockKilnRoom() {
+  renderKilnRoom([
+    { booking_id: 'booking-001', customer_name: 'Table 3 (John Smith)', piece_type: 'Mug', created_at: new Date(Date.now() - 300000).toISOString() },
+    { booking_id: 'booking-001', customer_name: 'Table 3 (John Smith)', piece_type: 'Plate', created_at: new Date(Date.now() - 300000).toISOString() },
+    { booking_id: 'booking-002', customer_name: 'Birthday Party (Sarah)', piece_type: 'Mug', created_at: new Date(Date.now() - 150000).toISOString() },
+    { booking_id: 'booking-002', customer_name: 'Birthday Party (Sarah)', piece_type: 'Bowl', created_at: new Date(Date.now() - 150000).toISOString() }
+  ]);
+}
 
-    const res = await fetch(`${API_URL}/api/pieces/mark-dipped`, {
+async function markBookingFired(bookingId) {
+  if (!confirm('Mark this batch as fired? All its pieces will move to "ready for pickup".')) return;
+
+  try {
+    const res = await fetch(`${API_URL}/api/pieces/mark-fired-by-booking`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studioId, pieceIds })
+      body: JSON.stringify({ studioId, bookingId })
     });
 
     if (res.ok) {
-      loadPiecesAwaitingDip();
-      loadDippedPieces();
+      loadKilnData();
     } else {
-      alert('Error marking pieces dipped: ' + res.statusText);
+      alert('Error marking fired: ' + res.statusText);
     }
   } catch (err) {
-    alert('Could not mark pieces dipped: ' + err.message);
+    alert('Could not mark fired: ' + err.message);
   }
-}
-
-function displayMockPieces() {
-  const mockPieces = [
-    {
-      booking_id: 'booking-001',
-      customer_name: 'Table 3 (John Smith)',
-      piece_type: 'Mug',
-      created_at: new Date(Date.now() - 300000).toISOString()
-    },
-    {
-      booking_id: 'booking-001',
-      customer_name: 'Table 3 (John Smith)',
-      piece_type: 'Plate',
-      created_at: new Date(Date.now() - 300000).toISOString()
-    },
-    {
-      booking_id: 'booking-002',
-      customer_name: 'Birthday Party (Sarah)',
-      piece_type: 'Mug',
-      created_at: new Date(Date.now() - 150000).toISOString()
-    },
-    {
-      booking_id: 'booking-002',
-      customer_name: 'Birthday Party (Sarah)',
-      piece_type: 'Plate',
-      created_at: new Date(Date.now() - 150000).toISOString()
-    },
-    {
-      booking_id: 'booking-002',
-      customer_name: 'Birthday Party (Sarah)',
-      piece_type: 'Bowl',
-      created_at: new Date(Date.now() - 150000).toISOString()
-    }
-  ];
-  
-  displayPieces(mockPieces);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -2674,9 +2595,7 @@ function completeTableFromSection3(tableSessionId, bookingCode) {
 // ══════════════════════════════════════════════════════════
 
 function loadKilnData() {
-  loadPiecesAwaitingDip();
-  loadDippedPieces();
-  loadKilnSessions();
+  loadKilnRoom();
   loadReadyForPickup();
 }
 
@@ -2788,143 +2707,6 @@ async function markPickedUp(pieceIds) {
     alert('Could not mark picked up: ' + err.message);
   }
 }
-
-async function loadDippedPieces() {
-  const container = document.getElementById('dipped-pieces-list');
-  try {
-    if (!apiConnected) {
-      container.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Connect API to load dipped pieces</div>`;
-      return;
-    }
-
-    const res = await fetch(`${API_URL}/api/pieces/dipped?studioId=${studioId}`);
-    if (!res.ok) throw new Error('Failed to load');
-    const data = await res.json();
-
-    if (!data.pieces || data.pieces.length === 0) {
-      container.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">No dipped pieces waiting</div>`;
-      return;
-    }
-
-    const pieceEmojis = { mug: '🍲', plate: '🍽️', bowl: '🥣', tile: '🧱', cup: '☕', planter: '🌿', vase: '🌸' };
-
-    container.innerHTML = data.pieces.map(p => {
-      const emoji = pieceEmojis[p.piece_type?.toLowerCase()] || '🎨';
-      return `
-        <label style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #f7f7f7; border-radius: 6px; margin-bottom: 4px; font-size: 13px; cursor: pointer;">
-          <input type="checkbox" class="dipped-piece-checkbox" value="${p.id}" checked>
-          <span>${emoji} ${p.piece_type}</span>
-        </label>
-      `;
-    }).join('');
-  } catch (err) {
-    console.error('Error loading dipped pieces:', err);
-    container.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Could not load dipped pieces</div>`;
-  }
-}
-
-async function createKilnSession() {
-  const checkboxes = document.querySelectorAll('.dipped-piece-checkbox:checked');
-  const pieceIds = Array.from(checkboxes).map(cb => cb.value);
-
-  if (pieceIds.length === 0) {
-    alert('Select at least one piece to include in the firing');
-    return;
-  }
-
-  const label = prompt('Name this kiln session (e.g. "Firing #1 - 5th July"):', `Firing - ${new Date().toLocaleDateString('en-GB')}`);
-  if (!label) return;
-
-  try {
-    if (!apiConnected) {
-      alert('API not connected - cannot create kiln session');
-      return;
-    }
-
-    const res = await fetch(`${API_URL}/api/kiln-sessions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studioId, label, pieceIds })
-    });
-
-    if (res.ok) {
-      alert(`✓ Kiln session "${label}" created with ${pieceIds.length} piece(s)`);
-      loadKilnData();
-    } else {
-      alert('Error creating kiln session: ' + res.statusText);
-    }
-  } catch (err) {
-    alert('Could not create kiln session: ' + err.message);
-  }
-}
-
-async function loadKilnSessions() {
-  const container = document.getElementById('kiln-sessions-list');
-  try {
-    if (!apiConnected) {
-      container.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Connect API to load kiln sessions</div>`;
-      return;
-    }
-
-    const res = await fetch(`${API_URL}/api/kiln-sessions?studioId=${studioId}`);
-    if (!res.ok) throw new Error('Failed to load');
-    const data = await res.json();
-
-    if (!data.sessions || data.sessions.length === 0) {
-      container.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">No kiln sessions yet</div>`;
-      return;
-    }
-
-    const statusColors = { loading: '#999', firing: '#e67e22', fired: '#27ae60' };
-    const statusLabels = { loading: 'Loading', firing: 'Firing', fired: 'Fired ✓' };
-
-    container.innerHTML = data.sessions.map(session => {
-      const pieceCount = session.pottery_pieces?.[0]?.count ?? 0;
-      const color = statusColors[session.status] || '#999';
-      const label = statusLabels[session.status] || session.status;
-
-      return `
-        <div style="padding: 12px; background: #fff9f0; border-left: 4px solid ${color}; margin-bottom: 8px; border-radius: 4px;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <strong style="font-size: 13px;">${session.label}</strong>
-            <span style="font-size: 11px; color: ${color}; font-weight: bold;">${label}</span>
-          </div>
-          <div style="color: var(--gu-dust); font-size: 12px; margin-top: 4px;">
-            ${pieceCount} piece${pieceCount !== 1 ? 's' : ''}
-            ${session.status !== 'fired' ? `<button onclick="fireKilnSession('${session.id}')" class="btn-connect glaze-sage" style="float: right; padding: 6px 14px; font-size: 11px;">Mark Fired</button>` : ''}
-          </div>
-        </div>
-      `;
-    }).join('');
-  } catch (err) {
-    console.error('Error loading kiln sessions:', err);
-    container.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Could not load kiln sessions</div>`;
-  }
-}
-
-async function fireKilnSession(sessionId) {
-  if (!confirm('Mark this entire kiln session as fired? All pieces in this batch will move to "fired" status.')) return;
-
-  try {
-    const res = await fetch(`${API_URL}/api/kiln-sessions/${sessionId}/fire`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studioId })
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      alert(`✓ Session fired! ${data.piecesFired} piece(s) marked as fired.`);
-      loadKilnData();
-    } else {
-      alert('Error firing kiln session: ' + res.statusText);
-    }
-  } catch (err) {
-    alert('Could not fire kiln session: ' + err.message);
-  }
-}
-
-
 
 // Mock booking data (for demo without API)
 const mockBookings = {
