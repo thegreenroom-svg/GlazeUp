@@ -4,6 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>The Kiln Cafe · Your Session</title>
+  <link rel="manifest" href="/app/manifest.json">
+  <link rel="apple-touch-icon" href="/app/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Kiln Cafe">
+  <meta name="theme-color" content="#b03a2e">
   <style>
     :root {
       --gu-bg: #faf4ef;
@@ -150,6 +156,34 @@
       .tile { transition: none; }
       .tile:active { transform: none; }
     }
+
+    .a2hs-banner {
+      position: fixed;
+      left: 14px; right: 14px; bottom: 14px;
+      background: linear-gradient(180deg, #ffffff 0%, #fdf9f6 100%);
+      border: 1px solid var(--gu-border);
+      border-radius: 16px;
+      padding: 14px 16px;
+      box-shadow: 0 10px 28px -8px rgba(61,28,18,0.35);
+      z-index: 900;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .a2hs-banner .a2hs-icon { font-size: 22px; flex-shrink: 0; }
+    .a2hs-banner .a2hs-text { flex: 1; font-size: 12.5px; line-height: 1.4; color: var(--gu-accent); }
+    .a2hs-banner .a2hs-text b { color: var(--gu-primary); }
+    .a2hs-banner button {
+      flex-shrink: 0;
+      border: none;
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .a2hs-banner .a2hs-dismiss { background: none; color: var(--gu-dust); }
+    .a2hs-banner .a2hs-install { background: var(--glaze-oxblood-base); color: #fff; }
   </style>
 </head>
 <body>
@@ -157,6 +191,7 @@
   <div id="app-root">
     <div class="loading">Loading your session…</div>
   </div>
+  <div id="a2hs-banner"></div>
 
   <script>
     const API_URL = window.location.origin;
@@ -196,6 +231,7 @@
         if (!res.ok) throw new Error('not found');
         const data = await res.json();
         renderSession(data);
+        showA2HSBanner();
       } catch (err) {
         root.innerHTML = `
           <div class="error-state">
@@ -279,6 +315,67 @@
     function closeMyQR() {
       document.getElementById('my-qr-modal').style.display = 'none';
     }
+
+    // ── Add to Home Screen: so the customer can get back to THEIR exact booking
+    // page anytime, even after fully closing the tab — no email/SMS needed. ──
+
+    let deferredInstallPrompt = null;
+    const bookingCodeForA2HS = getParam('booking');
+    const dismissKey = bookingCodeForA2HS ? `a2hs_dismissed_${bookingCodeForA2HS}` : null;
+
+    function isStandalone() {
+      return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    }
+    function isIOS() {
+      return /iphone|ipad|ipod/i.test(navigator.userAgent);
+    }
+
+    function showA2HSBanner() {
+      if (!bookingCodeForA2HS) return; // nothing to save without a booking
+      if (isStandalone()) return; // already installed
+      if (dismissKey && localStorage.getItem(dismissKey)) return; // already dismissed for this booking
+
+      const banner = document.getElementById('a2hs-banner');
+
+      if (isIOS()) {
+        banner.innerHTML = `
+          <span class="a2hs-icon">📲</span>
+          <span class="a2hs-text">Save this page so you can check back anytime: tap <b>Share</b> then <b>"Add to Home Screen."</b></span>
+          <button class="a2hs-dismiss" onclick="dismissA2HS()">Got it</button>`;
+      } else if (deferredInstallPrompt) {
+        banner.innerHTML = `
+          <span class="a2hs-icon">📲</span>
+          <span class="a2hs-text">Save this page to your home screen so you can check back anytime.</span>
+          <button class="a2hs-install" onclick="triggerInstall()">Add</button>
+          <button class="a2hs-dismiss" onclick="dismissA2HS()">✕</button>`;
+      } else {
+        // Android/other without a native prompt available yet — generic hint
+        banner.innerHTML = `
+          <span class="a2hs-icon">📲</span>
+          <span class="a2hs-text">Bookmark this page or add it to your home screen so you can check back anytime.</span>
+          <button class="a2hs-dismiss" onclick="dismissA2HS()">Got it</button>`;
+      }
+
+      banner.style.display = 'flex';
+    }
+
+    function dismissA2HS() {
+      document.getElementById('a2hs-banner').style.display = 'none';
+      if (dismissKey) localStorage.setItem(dismissKey, '1');
+    }
+
+    async function triggerInstall() {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      dismissA2HS();
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+    });
 
     init();
   </script>
