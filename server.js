@@ -1447,6 +1447,139 @@ app.post('/api/pieces/mark-dipped', async (req, res) => {
  * POST /api/kiln-sessions
  * Create a new kiln session (firing batch) and assign selected dipped pieces to it
  */
+/**
+ * POST /api/kiln-batches/start
+ * Start a new kiln firing batch: pulls in EVERY piece currently waiting in the
+ * kiln room (regardless of which day/booking it came from — a firing often
+ * combines 2-3 days' worth of accumulated pieces) and gives the whole batch a
+ * single scannable code. That code gets scanned once at the end of firing to
+ * mark everything in it fired together, in one action.
+ */
+app.post('/api/kiln-batches/start', async (req, res) => {
+  const { studioId } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    // Every piece in the kiln room not already part of another active batch
+    const { data: pendingPieces, error: pendingError } = await supabase
+      .from('pottery_pieces')
+      .select('id, booking_id')
+      .eq('studio_id', studioId)
+      .in('status', ['ready_for_dip', 'dipped', 'in_kiln'])
+      .is('kiln_session_id', null);
+
+    if (pendingError) throw pendingError;
+
+    if (!pendingPieces || pendingPieces.length === 0) {
+      return res.status(400).json({ error: 'Nothing waiting in the kiln room to start a firing with' });
+    }
+
+    // Short, scan/type-friendly batch code
+    const batchCode = `KILN-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
+
+    const { data: session, error: sessionError } = await supabase
+      .from('kiln_sessions')
+      .insert({
+        studio_id: studioId,
+        label: `Firing ${new Date().toLocaleDateString('en-GB')}`,
+        status: 'loading',
+        batch_code: batchCode
+      })
+      .select()
+      .single();
+
+    if (sessionError) throw sessionError;
+
+    const pieceIds = pendingPieces.map(p => p.id);
+    const { error: assignError } = await supabase
+      .from('pottery_pieces')
+      .update({ kiln_session_id: session.id })
+      .in('id', pieceIds);
+
+    if (assignError) throw assignError;
+
+    const bookingsIncluded = [...new Set(pendingPieces.map(p => p.booking_id).filter(Boolean))];
+
+    res.json({
+      status: 'started',
+      session,
+      batchCode,
+      piecesIncluded: pieceIds.length,
+      bookingsIncluded: bookingsIncluded.length
+    });
+  } catch (error) {
+    console.error('Error starting kiln batch:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/kiln-batches/active
+ * List not-yet-fired kiln batches, with piece counts, so staff can see what's
+ * currently loaded/firing and re-view a batch's QR if needed.
+ */
+app.get('/api/kiln-batches/active', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    const { data: sessions, error } = await supabase
+      .from('kiln_sessions')
+      .select('*, pottery_pieces(count)')
+      .eq('studio_id', studioId)
+      .neq('status', 'fired')
+      .not('batch_code', 'is', null)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json({ batches: sessions || [] });
+  } catch (error) {
+    console.error('Error listing active kiln batches:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/kiln-batches/fire-by-code
+ * Scan (or paste) a batch code to fire every piece in that batch at once —
+ * whether it represents one booking or several days combined.
+ */
+app.post('/api/kiln-batches/fire-by-code', async (req, res) => {
+  const { studioId, batchCode } = req.body;
+  if (!studioId || !batchCode) {
+    return res.status(400).json({ error: 'studioId and batchCode required' });
+  }
+
+  try {
+    const { data: session, error: sessionError } = await supabase
+      .from('kiln_sessions')
+      .update({ status: 'fired', fired_at: new Date().toISOString() })
+      .eq('studio_id', studioId)
+      .eq('batch_code', batchCode)
+      .select()
+      .single();
+
+    if (sessionError || !session) {
+      return res.status(404).json({ error: 'Batch not found for this code' });
+    }
+
+    const { data: pieces, error: piecesError } = await supabase
+      .from('pottery_pieces')
+      .update({ status: 'fired', updated_at: new Date().toISOString() })
+      .eq('kiln_session_id', session.id)
+      .select('id, booking_id');
+
+    if (piecesError) throw piecesError;
+
+    const bookingsFired = [...new Set((pieces || []).map(p => p.booking_id).filter(Boolean))];
+
+    res.json({ status: 'fired', piecesFired: pieces.length, bookingsFired: bookingsFired.length });
+  } catch (error) {
+    console.error('Error firing kiln batch by code:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/kiln-sessions', async (req, res) => {
   const { studioId, label, pieceIds } = req.body;
   if (!studioId || !label) {

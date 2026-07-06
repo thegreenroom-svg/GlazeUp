@@ -1044,11 +1044,18 @@
               <h3 style="margin: 0;">Kiln Room</h3>
               <button onclick="loadKilnData()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
             </div>
-            <div style="font-size: 11px; color: var(--gu-dust); margin-bottom: 10px;">Pieces submitted and in the kiln room, dipping and firing as a batch. Mark a batch fired once it's out.</div>
+            <div style="font-size: 11px; color: var(--gu-dust); margin-bottom: 10px;">Pieces submitted and in the kiln room, dipping and firing as a batch. Mark a single booking fired below, or combine everything waiting into one firing.</div>
             <div id="kiln-room-list">
               <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
             </div>
             <button class="btn-connect" style="margin-top: 12px; width: 100%;" onclick="openQRModal()">📱 Scan QR Code to Submit Pieces</button>
+
+            <div style="border-top: 1px solid var(--gu-border); margin-top: 18px; padding-top: 16px;">
+              <div style="font-size: 12px; color: var(--gu-dust); font-weight: bold; margin-bottom: 8px;">Combine into one firing:</div>
+              <div style="font-size: 11px; color: var(--gu-dust); margin-bottom: 10px;">If a firing includes a few days' worth of pieces, start a batch here — it pulls in everything currently waiting and gives you one code to scan when it's done, whatever combination of bookings it covers.</div>
+              <button class="btn-connect glaze-honey" style="width: 100%; margin-bottom: 12px;" onclick="startKilnBatch()">🔥 Start New Firing (combine all pending)</button>
+              <div id="active-kiln-batches-list"></div>
+            </div>
           </div>
 
           <!-- Kiln Unload: scan the stamped photo's QR to confirm pieces are out and ready -->
@@ -1487,6 +1494,18 @@
   </div>
 </div>
 
+<!-- Kiln batch QR modal — represents a whole firing, possibly spanning several days -->
+<div id="batch-qr-modal" style="display:none; position:fixed; inset:0; background:rgba(61,28,18,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:linear-gradient(180deg,#fff,#fdf9f6); border-radius:22px; padding:28px 24px; max-width:340px; width:100%; text-align:center; box-shadow:0 20px 50px -12px rgba(61,28,18,0.5);">
+    <div style="font-family:Georgia,serif; font-size:20px; font-weight:700; color:var(--glaze-honey-deep); margin-bottom:4px;">Firing Batch Code</div>
+    <div id="bqr-heading" style="font-size:13px; color:var(--gu-dust); margin-bottom:18px;"></div>
+    <div id="bqr-code" style="display:flex; align-items:center; justify-content:center; min-height:220px; margin-bottom:14px;"></div>
+    <div id="bqr-code-text" style="font-family: monospace; font-size:15px; font-weight:600; color: var(--gu-accent); margin-bottom:14px; letter-spacing: 0.05em;"></div>
+    <div style="font-size:12px; color:var(--gu-dust); line-height:1.5; margin-bottom:18px;">Keep this with the kiln load — print it, screenshot it, or write the code on a tag. Scan or type it back in at "Kiln Unload" once this firing is done to mark everything in it ready together.</div>
+    <button class="btn-connect glaze-honey" style="width:100%;" onclick="closeBatchQR()">Done</button>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.0.3/qrcode.min.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════
@@ -1887,6 +1906,115 @@ async function markBookingFired(bookingId) {
     }
   } catch (err) {
     alert('Could not mark fired: ' + err.message);
+  }
+}
+
+// ── Kiln firing batches: combine everything currently waiting (possibly
+// several days' worth) into one firing, identified by a single scannable code ──
+
+async function startKilnBatch() {
+  if (!confirm('Start a new firing? This pulls in everything currently waiting in the kiln room, whatever day it arrived.')) return;
+
+  try {
+    const res = await fetch(`${API_URL}/api/kiln-batches/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.error || 'Could not start firing');
+      return;
+    }
+
+    showBatchQR(data.batchCode, `${data.piecesIncluded} piece${data.piecesIncluded !== 1 ? 's' : ''} from ${data.bookingsIncluded} booking${data.bookingsIncluded !== 1 ? 's' : ''}`);
+    loadKilnData();
+  } catch (err) {
+    alert('Could not start firing: ' + err.message);
+  }
+}
+
+function showBatchQR(batchCode, description) {
+  document.getElementById('bqr-heading').textContent = description || '';
+  document.getElementById('bqr-code-text').textContent = batchCode;
+
+  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=${encodeURIComponent(batchCode)}`;
+  document.getElementById('bqr-code').innerHTML = `<img src="${qrImageUrl}" width="220" height="220" alt="Firing batch QR code" style="display:block; border-radius:8px;">`;
+
+  document.getElementById('batch-qr-modal').style.display = 'flex';
+}
+
+function closeBatchQR() {
+  document.getElementById('batch-qr-modal').style.display = 'none';
+}
+
+async function loadActiveKilnBatches() {
+  const container = document.getElementById('active-kiln-batches-list');
+  if (!container) return;
+
+  try {
+    if (!apiConnected) {
+      container.innerHTML = '';
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/api/kiln-batches/active?studioId=${studioId}`);
+    if (!res.ok) throw new Error('Failed to load');
+    const data = await res.json();
+
+    if (!data.batches || data.batches.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+
+    container.innerHTML = data.batches.map(b => {
+      const pieceCount = b.pottery_pieces?.[0]?.count ?? 0;
+      return `
+        <div style="padding: 10px 12px; background: #fff9f0; border-left: 4px solid var(--glaze-honey-base); border-radius: 8px; margin-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-family: monospace; font-size: 12px; font-weight: 600;">${b.batch_code}</span>
+            <span style="font-size: 11px; color: var(--gu-dust);">${pieceCount} piece${pieceCount !== 1 ? 's' : ''}</span>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button class="btn-connect" style="flex: 1; padding: 6px; font-size: 11px;" onclick="showBatchQR('${b.batch_code}', '${pieceCount} piece${pieceCount !== 1 ? 's' : ''}')">View QR</button>
+            <button class="btn-connect glaze-sage" style="flex: 1; padding: 6px; font-size: 11px;" onclick="fireBatchDirectly('${b.batch_code}')">🔥 Mark Fired</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Error loading active kiln batches:', err);
+  }
+}
+
+async function fireBatchDirectly(batchCode) {
+  if (!confirm(`Mark firing ${batchCode} as fired? Everything in it will move to ready for pickup.`)) return;
+  await fireKilnBatchByCode(batchCode, true);
+}
+
+async function fireKilnBatchByCode(batchCode, showAlert) {
+  try {
+    const res = await fetch(`${API_URL}/api/kiln-batches/fire-by-code`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, batchCode })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      if (showAlert) alert(data.error || 'Could not fire batch');
+      return { ok: false, error: data.error };
+    }
+
+    if (showAlert) alert(`✓ ${data.piecesFired} piece(s) across ${data.bookingsFired} booking(s) confirmed fired.`);
+    loadKilnData();
+    return { ok: true, data };
+  } catch (err) {
+    if (showAlert) alert('Could not fire batch: ' + err.message);
+    return { ok: false, error: err.message };
   }
 }
 
@@ -2597,6 +2725,7 @@ function completeTableFromSection3(tableSessionId, bookingCode) {
 function loadKilnData() {
   loadKilnRoom();
   loadReadyForPickup();
+  loadActiveKilnBatches();
 }
 
 async function loadReadyForPickup() {
@@ -2651,17 +2780,30 @@ async function confirmReadyByScan() {
 
   if (!raw) return;
 
-  // The scan may come in as a full URL (…/app?booking=CODE) or just the raw code
+  // The scan may come in as a full URL (…/app?booking=CODE), a raw booking code,
+  // or a kiln firing batch code (format: KILN-YYYYMMDD-XXXX)
   let bookingCode = raw;
   try {
     const url = new URL(raw);
     const paramCode = url.searchParams.get('booking');
     if (paramCode) bookingCode = paramCode;
   } catch {
-    // Not a URL — treat the whole input as the booking code
+    // Not a URL — treat the whole input as-is
   }
 
   resultEl.innerHTML = `<div style="padding: 10px; color: var(--gu-dust); font-size: 12px;">Checking…</div>`;
+
+  // A firing batch code covers potentially several days/bookings in one scan
+  if (/^KILN-/i.test(bookingCode)) {
+    const result = await fireKilnBatchByCode(bookingCode.toUpperCase(), false);
+    if (result.ok) {
+      resultEl.innerHTML = `<div style="padding: 10px; background: #f2f8f0; border-left: 4px solid var(--glaze-sage-base); border-radius: 8px; font-size: 12px;">✓ Firing <strong>${bookingCode.toUpperCase()}</strong> confirmed — ${result.data.piecesFired} piece(s) across ${result.data.bookingsFired} booking(s) now ready for collection.</div>`;
+      input.value = '';
+    } else {
+      resultEl.innerHTML = `<div style="padding: 10px; background: #fdeceb; color: #d9534f; border-radius: 8px; font-size: 12px;">${result.error || 'Could not confirm this firing batch'}</div>`;
+    }
+    return;
+  }
 
   try {
     const res = await fetch(`${API_URL}/api/pieces/confirm-ready-by-scan`, {

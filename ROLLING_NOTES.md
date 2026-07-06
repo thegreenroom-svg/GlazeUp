@@ -695,6 +695,28 @@ Daisy pointed out the "Firing Pipeline" (ready-for-dip → dipped-waiting-for-ki
 
 **Bonus fix caught while doing this:** `pottery_pieces` has no `customer_name` column, so both Ready for Pickup and the old dip list were silently falling back to showing the raw booking code instead of the customer's actual name. Added a shared `enrichPiecesWithCustomerName()` helper (joins `booking_id` against `bookings.booking_code`) used by both `/api/pieces/in-kiln-room` and `/api/pieces/ready-for-pickup` now, so real names show correctly in both.
 
+---
+
+## Kiln Firing Batch QR (2026-07-05)
+
+Daisy's insight: individual customer QR codes work fine day-to-day, but a firing often combines 2-3 days' worth of accumulated pieces from different bookings. Rather than firing per-booking one at a time, she wanted a single code representing the whole physical kiln load — generated when loading starts, scanned once when firing is done to close out everything in it together, regardless of how many days/bookings it spans.
+
+**Brought back the existing (previously unused) `kiln_sessions` table + `pottery_pieces.kiln_session_id` link** for this, rather than building new plumbing — this is exactly what that machinery was for.
+
+**Schema update (Daisy to run):**
+```sql
+ALTER TABLE kiln_sessions ADD COLUMN IF NOT EXISTS batch_code TEXT UNIQUE;
+```
+
+**New endpoints:**
+- `POST /api/kiln-batches/start` — pulls in EVERY piece currently sitting in the kiln room (any status among ready_for_dip/dipped/in_kiln, not already in another batch), regardless of which day/booking it came from, and gives the whole batch a short scannable code (format `KILN-YYYYMMDD-XXXX`)
+- `GET /api/kiln-batches/active` — lists not-yet-fired batches with piece counts, so staff can re-view a batch's QR later
+- `POST /api/kiln-batches/fire-by-code` — fires every piece in a batch at once by its code
+
+**UI (Kiln Room card):** new "🔥 Start New Firing (combine all pending)" button shows the resulting batch's QR in a modal (honey-glazed, matching the batch's colour distinct from the customer QR's oxblood) — meant to be screenshotted, printed, or hand-written onto a tag kept with the physical kiln load. An "Active Kiln Batches" mini-list shows any batches still firing, each with "View QR" (re-show it) and "🔥 Mark Fired" (fire directly without scanning) buttons.
+
+**Kiln Unload scan card now handles both code types in one input:** codes starting `KILN-` are detected and routed to fire the whole batch; anything else is treated as an individual booking code (existing per-booking behaviour unchanged, still useful for single-booking/no-batch fires). No separate scan flows to remember — one input does both.
+
 **Zero-external-service notification, as agreed:** no email/SMS. Instead, `GET /api/booking/:bookingCode` now also returns `piecesReadyForPickup` — any fired-but-not-collected pieces for that booking. The customer app shows a celebratory "🎉 Ready for collection!" banner automatically the next time they open their page (home-screen icon or saved tab), reflecting live status with zero manual send step.
 
 **Add to Home Screen (2026-07-05):** solves "how does the customer get back in after leaving the studio" without any account/login. Added `app/manifest.json`, generated real PNG icons (192/512/apple-touch, using the same glazed-pot design, rendered via cairosvg since ImageMagick's SVG delegate wasn't available in the sandbox), and a platform-aware banner: real one-tap install button on Android/Chrome (`beforeinstallprompt`), manual "tap Share → Add to Home Screen" instructions on iOS (which doesn't allow programmatic install). Saves a proper home-screen icon pointing at the customer's exact booking URL — dismissible, remembered per-booking via localStorage so it doesn't nag.
