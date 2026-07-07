@@ -181,25 +181,41 @@
     }
 
     .admin-header {
-      background: linear-gradient(180deg, #ffffff 0%, #fdf9f6 100%);
-      border-bottom: 1px solid var(--gu-border);
+      position: relative;
+      background:
+        repeating-linear-gradient(115deg, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 1px, rgba(0,0,0,0.03) 1px, rgba(0,0,0,0.03) 2px),
+        linear-gradient(100deg, #a8adb2 0%, #8b9095 45%, #9aa0a6 100%);
+      border-bottom: 1px solid rgba(0,0,0,0.15);
       padding: 18px 28px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      box-shadow: 0 1px 0 rgba(255,255,255,0.9);
+      overflow: hidden;
+    }
+
+    .admin-header::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(100deg, transparent 40%, rgba(255,255,255,0.22) 50%, transparent 60%);
+      pointer-events: none;
     }
 
     .admin-header h1 {
+      position: relative;
+      z-index: 1;
       margin: 0;
       font-family: var(--gu-font-display);
       font-size: 21px;
       font-weight: 700;
-      color: var(--gu-accent);
+      color: #2a2d30;
       letter-spacing: -0.01em;
+      text-shadow: 0 1px 0 rgba(255,255,255,0.3);
     }
 
     .admin-header-right {
+      position: relative;
+      z-index: 1;
       text-align: right;
       font-size: 12px;
     }
@@ -209,7 +225,7 @@
     }
 
     .admin-header-right a {
-      color: var(--gu-dust);
+      color: #3a3d40;
       text-decoration: none;
       font-size: 11px;
     }
@@ -256,8 +272,10 @@
     }
 
     .setup-card {
-      background: linear-gradient(180deg, #ffffff 0%, #fdfaf8 100%);
-      border: 1px solid var(--gu-border);
+      background:
+        linear-gradient(180deg, #ffffff 0%, #fdfaf8 100%) padding-box,
+        linear-gradient(135deg, #d4d7da, #9aa0a6, #d4d7da) border-box;
+      border: 1.5px solid transparent;
       border-radius: 16px;
       padding: 20px;
       margin-bottom: 16px;
@@ -328,9 +346,11 @@
     }
 
     .chart-container {
-      background: linear-gradient(180deg, #ffffff 0%, #fdfaf8 100%);
+      background:
+        linear-gradient(180deg, #ffffff 0%, #fdfaf8 100%) padding-box,
+        linear-gradient(135deg, #d4d7da, #9aa0a6, #d4d7da) border-box;
       border-radius: 16px;
-      border: 1px solid var(--gu-border);
+      border: 1.5px solid transparent;
       padding: 20px;
       margin-bottom: 16px;
       box-shadow: 0 1px 3px rgba(61,28,18,0.06), inset 0 1px 0 rgba(255,255,255,0.8);
@@ -641,7 +661,10 @@
     }
 
     .modal-content {
-      background: #fff;
+      background:
+        linear-gradient(180deg, #ffffff 0%, #fdfaf8 100%) padding-box,
+        linear-gradient(135deg, #d4d7da, #9aa0a6, #d4d7da) border-box;
+      border: 1.5px solid transparent;
       border-radius: 12px;
       padding: 24px;
       max-width: 500px;
