@@ -750,6 +750,28 @@ Daisy connected her real Kiln Cafe Square account. Confirmed the entire codebase
 
 Square OAuth consent completed successfully by Daisy. Real production connection should now be live — next step is confirming real catalog items/prices are flowing into Section 2 (Customer Engagement) instead of the demo Mug/Coffee/Brownie placeholders.
 
+---
+
+## Depth/Blur + Micro-Interactions Pass — Both Apps (2026-07-06)
+
+First step toward Daisy's "more modern app feel" request. Kept scoped and buildable in plain CSS/JS (no framework rebuild) rather than attempting the full native-app-feel list in one go. Covered:
+
+**Staff dashboard:**
+- Tab switches (`goToTab`) and Staff sub-section switches (`showStaffSection`) now fade+slide in (`.fade-in` class, `viewFadeIn` keyframe) instead of snapping instantly
+- All modal overlays (customer QR, batch QR, pieces-submission modal) now have `backdrop-filter: blur(6px)` — genuine frosted-glass feel instead of a flat dark tint — plus a fade-in animation on open
+- Shimmer skeleton loading state (`.skeleton-line`, animated gradient sweep) replacing plain "Loading..." text in Kiln Room, Ready for Pickup, and Open Tables cards
+- `.tap-row` utility class (subtle scale-down on `:active`) added to plain list-row buttons that had no press feedback (e.g. today's bookings rows)
+
+**Customer app:**
+- Initial "Loading your session…" replaced with a shimmer skeleton that mimics the real header + card layout about to appear (`.skel-header`, `.skel-block`)
+- My QR modal now has the same frosted-glass blur treatment
+- Design Preview now slides up from the bottom (`transform: translateY(100%)` → `0`, eased with `cubic-bezier(0.32, 0.72, 0, 1)` — the standard "sheet" motion feel) instead of instantly appearing/disappearing
+
+All animations respect `prefers-reduced-motion`.
+
+**Not yet done (from the fuller "modern app" list discussed):** a bottom nav bar for the customer app (currently everything lives on one scrolling page — the biggest remaining "feels native" gap), a consistent spacing grid pass, and broader micro-interactions across every remaining button/card. Good next steps when picking this up again.
+
+---
 Multiple bugs fixed during the connection session (all pushed live): node-fetch ESM issue; `retrieveMerchant()` needed a `'me'` argument; OAuth callback redirected to a non-existent dashboard route (now shows an inline "Square Connected" success page); and the server now serves the admin dashboard as static files so it has a real browser URL (`https://glazeup-api.onrender.com` → redirects to the dashboard).
 
 ---

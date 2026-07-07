@@ -93,6 +93,30 @@
       color: var(--gu-primary);
     }
 
+    /* Shimmer skeleton shown while the booking loads — mimics the real layout */
+    .skel-header {
+      height: 130px;
+      border-radius: 0 0 26px 26px;
+      background: linear-gradient(90deg, #e8d9d0 25%, #f2e6df 37%, #e8d9d0 63%);
+      background-size: 400% 100%;
+      animation: skelShimmer 1.4s ease infinite;
+    }
+    .skel-block {
+      height: 64px;
+      border-radius: 16px;
+      margin: 16px 18px;
+      background: linear-gradient(90deg, #ede2da 25%, #f5ede7 37%, #ede2da 63%);
+      background-size: 400% 100%;
+      animation: skelShimmer 1.4s ease infinite;
+    }
+    @keyframes skelShimmer {
+      0% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .skel-header, .skel-block { animation: none; }
+    }
+
     .section-label {
       font-size: 11px;
       text-transform: uppercase;
@@ -193,6 +217,14 @@
       z-index: 2000;
       display: none;
       flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    #design-preview-screen.open {
+      transform: translateY(0);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #design-preview-screen { transition: none; }
     }
 
     .dp-header {
@@ -368,7 +400,10 @@
 <body>
 
   <div id="app-root">
-    <div class="loading">Loading your session…</div>
+    <div class="skel-header"></div>
+    <div class="skel-block"></div>
+    <div class="skel-block"></div>
+    <div class="skel-block"></div>
   </div>
   <div id="a2hs-banner"></div>
 
@@ -538,7 +573,7 @@
         </div>
 
         <!-- Full-size QR modal, reachable from anywhere via the header badge -->
-        <div id="my-qr-modal" style="display:none; position:fixed; inset:0; background:rgba(61,28,18,0.6); z-index:1000; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this) closeMyQR()">
+        <div id="my-qr-modal" style="display:none; position:fixed; inset:0; background:rgba(61,28,18,0.45); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); z-index:1000; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this) closeMyQR()">
           <div style="background:#fff; border-radius:22px; padding:28px 24px; max-width:320px; width:100%; text-align:center;">
             <div style="font-family:Georgia,serif; font-size:18px; font-weight:700; color:var(--gu-primary); margin-bottom:4px;">Your Session QR</div>
             <div style="font-size:13px; color:var(--gu-dust); margin-bottom:16px;">${window.currentBooking.name}</div>
@@ -651,11 +686,16 @@
     let dpStickerCounter = 0;
 
     function openDesignPreview() {
-      document.getElementById('design-preview-screen').style.display = 'flex';
+      const screen = document.getElementById('design-preview-screen');
+      screen.style.display = 'flex';
+      void screen.offsetWidth; // force reflow so the transition actually plays
+      screen.classList.add('open');
       if (document.getElementById('dp-palette').children.length === 0) renderDpPalette();
     }
     function closeDesignPreview() {
-      document.getElementById('design-preview-screen').style.display = 'none';
+      const screen = document.getElementById('design-preview-screen');
+      screen.classList.remove('open');
+      setTimeout(() => { screen.style.display = 'none'; }, 280);
     }
 
     function renderDpPalette() {

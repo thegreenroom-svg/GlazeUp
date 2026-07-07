@@ -217,6 +217,19 @@
       margin: 0 auto;
     }
 
+    .view.fade-in {
+      animation: viewFadeIn 0.28s ease;
+    }
+
+    @keyframes viewFadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .view.fade-in { animation: none; }
+    }
+
     .view > h2 {
       font-family: var(--gu-font-display);
       font-size: 24px;
@@ -559,7 +572,9 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(0,0,0,0.5);
+      background: rgba(61,28,18,0.4);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
       z-index: 1000;
       align-items: center;
       justify-content: center;
@@ -567,6 +582,46 @@
 
     .modal-overlay.active {
       display: flex;
+      animation: modalFadeIn 0.2s ease;
+    }
+
+    @keyframes modalFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .modal-overlay.active { animation: none; }
+    }
+
+    /* Shimmer skeleton loading state — used in place of plain "Loading…" text */
+    .skeleton-line {
+      height: 14px;
+      border-radius: 6px;
+      background: linear-gradient(90deg, #f0e8e2 25%, #f8f2ee 37%, #f0e8e2 63%);
+      background-size: 400% 100%;
+      animation: skeletonShimmer 1.4s ease infinite;
+      margin-bottom: 8px;
+    }
+
+    @keyframes skeletonShimmer {
+      0% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .skeleton-line { animation: none; background: #f0e8e2; }
+    }
+
+    /* Subtle press feedback for plain list-row buttons (booking rows, kiln cards, etc.) */
+    .tap-row {
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+    .tap-row:active {
+      transform: scale(0.98);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .tap-row:active { transform: none; }
     }
 
     .modal-content {
@@ -1025,7 +1080,7 @@
           <div class="chart-container">
             <h3>Open Tables</h3>
             <div id="s3-open-tables-list">
-              <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
+              <div style="padding: 4px 0;"><div class="skeleton-line" style="width: 70%;"></div><div class="skeleton-line" style="width: 45%;"></div></div>
             </div>
           </div>
         </div>
@@ -1046,7 +1101,7 @@
             </div>
             <div style="font-size: 11px; color: var(--gu-dust); margin-bottom: 10px;">Pieces submitted and in the kiln room, dipping and firing as a batch. Mark a single booking fired below, or combine everything waiting into one firing.</div>
             <div id="kiln-room-list">
-              <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
+              <div style="padding: 4px 0;"><div class="skeleton-line" style="width: 70%;"></div><div class="skeleton-line" style="width: 45%;"></div></div>
             </div>
             <button class="btn-connect" style="margin-top: 12px; width: 100%;" onclick="openQRModal()">📱 Scan QR Code to Submit Pieces</button>
 
@@ -1079,7 +1134,7 @@
             </div>
             <div style="font-size: 11px; color: var(--gu-dust); margin-bottom: 10px;">Fired pieces waiting to be collected. Mark as picked up when the customer takes them home.</div>
             <div id="ready-for-pickup-list">
-              <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
+              <div style="padding: 4px 0;"><div class="skeleton-line" style="width: 70%;"></div><div class="skeleton-line" style="width: 45%;"></div></div>
             </div>
           </div>
 
@@ -1473,7 +1528,7 @@
 </div>
 
 <!-- Customer QR handoff modal -->
-<div id="customer-qr-modal" style="display:none; position:fixed; inset:0; background:rgba(61,28,18,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+<div id="customer-qr-modal" style="display:none; position:fixed; inset:0; background:rgba(61,28,18,0.4); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); z-index:1000; align-items:center; justify-content:center; padding:20px;">
   <div style="background:linear-gradient(180deg,#fff,#fdf9f6); border-radius:22px; padding:28px 24px; max-width:340px; width:100%; text-align:center; box-shadow:0 20px 50px -12px rgba(61,28,18,0.5);">
     <div style="font-family:Georgia,serif; font-size:20px; font-weight:700; color:var(--gu-primary); margin-bottom:4px;">Scan to start painting</div>
     <div id="cqr-heading" style="font-size:13px; color:var(--gu-dust); margin-bottom:18px;"></div>
@@ -1485,7 +1540,7 @@
 </div>
 
 <!-- Kiln batch QR modal — represents a whole firing, possibly spanning several days -->
-<div id="batch-qr-modal" style="display:none; position:fixed; inset:0; background:rgba(61,28,18,0.55); z-index:1000; align-items:center; justify-content:center; padding:20px;">
+<div id="batch-qr-modal" style="display:none; position:fixed; inset:0; background:rgba(61,28,18,0.4); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); z-index:1000; align-items:center; justify-content:center; padding:20px;">
   <div style="background:linear-gradient(180deg,#fff,#fdf9f6); border-radius:22px; padding:28px 24px; max-width:340px; width:100%; text-align:center; box-shadow:0 20px 50px -12px rgba(61,28,18,0.5);">
     <div style="font-family:Georgia,serif; font-size:20px; font-weight:700; color:var(--glaze-honey-deep); margin-bottom:4px;">Firing Batch Code</div>
     <div id="bqr-heading" style="font-size:13px; color:var(--gu-dust); margin-bottom:18px;"></div>
@@ -1662,11 +1717,15 @@ function updateAPIStatus(connected) {
 
 function goToTab(tab, event) {
   if (event) event.preventDefault();
-  
-  document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+
+  document.querySelectorAll('.view').forEach(v => { v.style.display = 'none'; v.classList.remove('fade-in'); });
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-  
-  document.getElementById(tab + '-view').style.display = 'block';
+
+  const targetView = document.getElementById(tab + '-view');
+  targetView.style.display = 'block';
+  // Trigger reflow so the animation replays every time, not just on first show
+  void targetView.offsetWidth;
+  targetView.classList.add('fade-in');
   document.querySelector(`a[onclick*="${tab}"]`).classList.add('active');
   
   // Load data for specific tabs
@@ -2112,9 +2171,15 @@ let completingTableSessionId = null; // set when Section 3 opens the submit moda
 
 function showStaffSection(section) {
   ['booking', 'engagement', 'completion', 'kiln'].forEach(s => {
-    document.getElementById(`staff-section-${s}`).style.display = (s === section) ? 'block' : 'none';
+    const el = document.getElementById(`staff-section-${s}`);
+    el.style.display = (s === section) ? 'block' : 'none';
+    el.classList.remove('fade-in');
     document.getElementById(`staff-subtab-${s}`).classList.toggle('active', s === section);
   });
+
+  const activeEl = document.getElementById(`staff-section-${section}`);
+  void activeEl.offsetWidth;
+  activeEl.classList.add('fade-in');
 
   if (section === 'engagement') {
     loadOpenTablesIntoSelect();
@@ -2173,7 +2238,7 @@ function renderBookingButton(b) {
     : '';
   const table = b.table_number ? ` · ${b.table_number}` : '';
   return `
-    <button onclick='selectTodaysBooking(${JSON.stringify(b).replace(/'/g, "&apos;")})' style="width: 100%; text-align: left; padding: 12px; background: #fff9f0; border: 1px solid var(--gu-border); border-left: 4px solid var(--gu-primary); border-radius: 8px; margin-bottom: 8px; cursor: pointer;">
+    <button class="tap-row" onclick='selectTodaysBooking(${JSON.stringify(b).replace(/'/g, "&apos;")})' style="width: 100%; text-align: left; padding: 12px; background: #fff9f0; border: 1px solid var(--gu-border); border-left: 4px solid var(--gu-primary); border-radius: 8px; margin-bottom: 8px; cursor: pointer;">
       <div style="display: flex; justify-content: space-between;">
         <strong style="font-size: 13px;">${b.customer_name}</strong>
         <span style="font-size: 11px; color: var(--gu-dust);">${time}${table}</span>
