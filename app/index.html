@@ -9,29 +9,38 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Kiln Cafe">
-  <meta name="theme-color" content="#b03a2e">
+  <meta name="theme-color" content="#2B2724">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --gu-bg: #faf4ef;
-      --gu-primary: #b03a2e;
-      --gu-accent: #3d1c12;
-      --gu-dust: #7a6360;
-      --gu-border: #ecddd8;
-      --gu-font-display: 'Georgia', serif;
-      --gu-font-body: system-ui, -apple-system, sans-serif;
+      --link-charcoal: #2B2724;
+      --link-clay: #B87946;
+      --link-sand: #E8D9C4;
+      --link-ivory: #F7F4EE;
+      --link-stone: #C8BFB2;
 
-      --glaze-oxblood-base: #b03a2e;
-      --glaze-oxblood-high: #ec7a5c;
-      --glaze-oxblood-deep: #6b1f15;
-      --glaze-ocean-base: #1d6f77;
-      --glaze-ocean-high: #6fd6dc;
-      --glaze-ocean-deep: #0d3a3f;
-      --glaze-honey-base: #c98a2e;
-      --glaze-honey-high: #ffd680;
-      --glaze-honey-deep: #7a4f14;
-      --glaze-sage-base: #5c7a4f;
-      --glaze-sage-high: #a8d68f;
-      --glaze-sage-deep: #33452b;
+      --gu-bg: var(--link-ivory);
+      --gu-primary: var(--link-clay);
+      --gu-accent: var(--link-charcoal);
+      --gu-dust: #8a8175;
+      --gu-border: var(--link-stone);
+      --gu-font-display: 'Instrument Sans', 'Inter', -apple-system, system-ui, sans-serif;
+      --gu-font-body: 'Instrument Sans', 'Inter', -apple-system, system-ui, sans-serif;
+
+      --glaze-oxblood-base: var(--link-clay);
+      --glaze-oxblood-high: #d19867;
+      --glaze-oxblood-deep: #8f5c32;
+      --glaze-ocean-base: #5b6b68;
+      --glaze-ocean-high: #7f9490;
+      --glaze-ocean-deep: #3e4a47;
+      --glaze-honey-base: #c9a06b;
+      --glaze-honey-high: #ddb98a;
+      --glaze-honey-deep: #8f6a3f;
+      --glaze-sage-base: #6b7561;
+      --glaze-sage-high: #93a086;
+      --glaze-sage-deep: #454d3d;
     }
 
     * { box-sizing: border-box; }
@@ -46,13 +55,11 @@
 
     /* Warm glazed top banner */
     .app-header {
-      background:
-        radial-gradient(circle at 26% 20%, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0) 45%),
-        linear-gradient(165deg, var(--glaze-oxblood-high) 0%, var(--glaze-oxblood-base) 50%, var(--glaze-oxblood-deep) 100%);
+      background: var(--link-charcoal);
       color: #fff;
       padding: 28px 22px 32px;
-      border-radius: 0 0 26px 26px;
-      box-shadow: 0 6px 18px -6px rgba(176,58,46,0.5);
+      border-radius: 0 0 20px 20px;
+      box-shadow: 0 4px 14px -4px rgba(43,39,36,0.3);
     }
 
     .app-header .brand {
@@ -60,28 +67,27 @@
       align-items: center;
       gap: 9px;
       font-family: var(--gu-font-display);
-      font-size: 17px;
-      font-weight: 700;
-      opacity: 0.95;
+      font-size: 15px;
+      font-weight: 600;
+      opacity: 0.85;
     }
 
     .app-header .logo-mark {
-      width: 30px; height: 30px;
-      filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));
+      width: 26px; height: 26px;
     }
 
     .app-header .greeting {
       margin-top: 18px;
       font-family: var(--gu-font-display);
-      font-size: 27px;
-      font-weight: 700;
+      font-size: 26px;
+      font-weight: 600;
       line-height: 1.15;
     }
 
     .app-header .sub {
       margin-top: 6px;
       font-size: 13px;
-      opacity: 0.9;
+      opacity: 0.85;
     }
 
     .content { padding: 20px 18px 60px; }
@@ -138,33 +144,22 @@
       border: none;
       color: #fff;
       padding: 20px;
-      border-radius: 20px 24px 20px 26px;
+      border-radius: 16px;
       margin-bottom: 14px;
       cursor: pointer;
-      overflow: hidden;
       font-family: var(--gu-font-body);
-      box-shadow:
-        0 1px 2px rgba(0,0,0,0.12),
-        0 8px 18px -6px color-mix(in srgb, var(--tile-base) 55%, transparent),
-        inset 0 1px 0 rgba(255,255,255,0.4),
-        inset 0 -3px 5px rgba(0,0,0,0.14);
-      transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
-      background:
-        radial-gradient(circle at 26% 20%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 44%),
-        linear-gradient(165deg, var(--tile-high) 0%, var(--tile-base) 50%, var(--tile-deep) 100%);
+      box-shadow: 0 1px 2px rgba(43,39,36,0.1), 0 6px 16px -6px rgba(43,39,36,0.18);
+      transition: transform 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+      background: var(--tile-base);
     }
     .tile:active {
       transform: scale(0.98);
-      filter: brightness(0.98);
-      box-shadow:
-        0 1px 2px rgba(0,0,0,0.14),
-        0 2px 6px -2px color-mix(in srgb, var(--tile-base) 55%, transparent),
-        inset 0 2px 4px rgba(0,0,0,0.2);
+      opacity: 0.92;
     }
-    .tile .tile-title { font-family: var(--gu-font-display); font-size: 19px; font-weight: 700; }
-    .tile .tile-desc { font-size: 13px; opacity: 0.92; margin-top: 4px; line-height: 1.4; }
-    .tile .tile-icon { font-size: 26px; margin-bottom: 8px; display: block; }
-    .tile.soon { opacity: 0.55; cursor: default; }
+    .tile .tile-title { font-family: var(--gu-font-display); font-size: 18px; font-weight: 600; }
+    .tile .tile-desc { font-size: 13px; opacity: 0.9; margin-top: 4px; line-height: 1.4; }
+    .tile .tile-icon { font-size: 24px; margin-bottom: 8px; display: block; }
+    .tile.soon { opacity: 0.5; cursor: default; }
     .tile.soon::after {
       content: 'Coming soon';
       position: absolute; top: 14px; right: 16px;
@@ -172,10 +167,10 @@
       background: rgba(255,255,255,0.25); padding: 3px 8px; border-radius: 20px;
     }
 
-    .tile-oxblood { --tile-base: var(--glaze-oxblood-base); --tile-high: var(--glaze-oxblood-high); --tile-deep: var(--glaze-oxblood-deep); }
-    .tile-sage { --tile-base: var(--glaze-sage-base); --tile-high: var(--glaze-sage-high); --tile-deep: var(--glaze-sage-deep); }
-    .tile-ocean   { --tile-base: var(--glaze-ocean-base);   --tile-high: var(--glaze-ocean-high);   --tile-deep: var(--glaze-ocean-deep); }
-    .tile-honey   { --tile-base: var(--glaze-honey-base);   --tile-high: var(--glaze-honey-high);   --tile-deep: var(--glaze-honey-deep); }
+    .tile-oxblood { --tile-base: var(--link-clay); }
+    .tile-sage { --tile-base: var(--glaze-sage-base); }
+    .tile-ocean { --tile-base: var(--glaze-ocean-base); }
+    .tile-honey { --tile-base: var(--glaze-honey-base); }
 
     /* Pieces / info card */
     .info-card {
@@ -240,6 +235,63 @@
     }
     @media (prefers-reduced-motion: reduce) {
       #design-preview-screen { transition: none; }
+    }
+
+    /* ── Splash / launch screen — shown once per app open, tap anywhere to continue ── */
+    #splash-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 5000;
+      background: var(--link-ivory);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 32px;
+      opacity: 0;
+      animation: splashFadeIn 0.4s ease forwards;
+      cursor: pointer;
+    }
+    #splash-screen.fading-out {
+      animation: splashFadeOut 0.3s ease forwards;
+    }
+    @keyframes splashFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes splashFadeOut {
+      from { opacity: 1; }
+      to { opacity: 0; }
+    }
+    .splash-word {
+      font-family: var(--gu-font-display);
+      font-weight: 700;
+      font-size: 64px;
+      letter-spacing: 0.03em;
+      color: var(--link-charcoal);
+      line-height: 1;
+    }
+    .splash-tagline {
+      margin-top: 14px;
+      font-family: Georgia, serif;
+      font-style: italic;
+      font-size: 15px;
+      color: var(--gu-dust);
+    }
+    .splash-hint {
+      position: absolute;
+      bottom: 48px;
+      left: 0; right: 0;
+      text-align: center;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--gu-dust);
+      opacity: 0.7;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #splash-screen, #splash-screen.fading-out { animation: none; opacity: 1; }
     }
 
     .dp-header {
@@ -414,6 +466,12 @@
 </head>
 <body>
 
+  <div id="splash-screen">
+    <div class="splash-word">LINK</div>
+    <div class="splash-tagline">Connect. Create. Belong.</div>
+    <div class="splash-hint">Tap anywhere to continue</div>
+  </div>
+
   <div id="app-root">
     <div class="skel-header"></div>
     <div class="skel-block"></div>
@@ -484,16 +542,7 @@
       return new URLSearchParams(window.location.search).get(name);
     }
 
-    const logoSvg = `
-      <svg class="logo-mark" viewBox="0 0 64 64" aria-hidden="true">
-        <defs>
-          <linearGradient id="lg" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#ec7a5c"/><stop offset="50%" stop-color="#b03a2e"/><stop offset="100%" stop-color="#6b1f15"/>
-          </linearGradient>
-        </defs>
-        <path d="M20 18 Q20 12 32 12 Q44 12 44 18 L41 46 Q40 54 32 54 Q24 54 23 46 Z" fill="url(#lg)"/>
-        <ellipse cx="32" cy="17" rx="12" ry="3.5" fill="url(#lg)"/>
-      </svg>`;
+    const logoSvg = `<span style="font-family: var(--gu-font-display); font-weight: 700; letter-spacing: 0.04em;">LINK</span>`;
 
     async function init() {
       const bookingCode = getParam('booking');
@@ -553,7 +602,7 @@
       document.getElementById('app-root').innerHTML = `
         <div class="app-header">
           <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-            <div class="brand">${logoSvg} The Kiln Cafe</div>
+            <div class="brand">${logoSvg} <span style="opacity:0.65; font-weight:400;">· The Kiln Cafe</span></div>
             <button onclick="showMyQR()" style="background:rgba(255,255,255,0.18); border:2px solid rgba(255,255,255,0.5); border-radius:12px; padding:4px; cursor:pointer;" aria-label="Show my QR code">
               <img src="${qrThumbUrl}" width="46" height="46" style="display:block; border-radius:6px;" alt="Your QR code">
             </button>
@@ -1011,6 +1060,21 @@
       window.addEventListener('touchmove', move, { passive: false });
       window.addEventListener('touchend', end);
     }
+
+    // ── Splash screen: shown every time the app opens. Content loads
+    // silently underneath while it's displayed, so it's ready the moment
+    // the splash dismisses. No spinner, no progress bar — just a calm wait. ──
+    let splashDismissed = false;
+    function dismissSplash() {
+      if (splashDismissed) return;
+      splashDismissed = true;
+      const splash = document.getElementById('splash-screen');
+      splash.classList.add('fading-out');
+      setTimeout(() => { splash.remove(); }, 300);
+    }
+
+    document.getElementById('splash-screen').addEventListener('click', dismissSplash);
+    setTimeout(dismissSplash, 2600); // auto-continue if no tap
 
     init();
   </script>
