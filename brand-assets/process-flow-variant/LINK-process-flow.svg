@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-20 -55 281 165">
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#B87946"/>
+    </marker>
+  </defs>
+
+  <rect x="-20" y="-55" width="281" height="165" fill="#F7F4EE"/>
+
+  <!-- base wordmark -->
+  <path d="M5.00,82.00 L5.00,10.00 L20.41,10.00 L20.41,82.00 L5.00,82.00 Z M12.20,82.00 L12.20,70.20 L55.00,70.20 L55.00,82.00 L12.20,82.00 Z" fill="#2B2724"/>
+  <path d="M64.00,82.00 L64.00,10.00 L79.41,10.00 L79.41,82.00 L64.00,82.00 Z" fill="#2B2724"/>
+  <path d="M 101.41,82.00 L 107.41,82.00 L 107.41,40.00 C 107.41,20.00 115.41,12.00 125.41,12.00 C 135.41,12.00 143.41,20.00 143.41,40.00 L 143.41,82.00 L 149.41,82.00" fill="none" stroke="#B87946" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M165.41,82.00 L165.41,10.00 L180.81,10.00 L180.81,82.00 L165.41,82.00 Z M175.91,44.59 L208.31,10.00 L228.81,10.00 L194.61,44.59 L175.91,44.59 Z M209.91,82.00 L175.70,44.59 L194.61,44.59 L230.81,82.00 L209.91,82.00 Z" fill="#2B2724"/>
+
+  <!-- flame on top of the kiln arch -->
+  <g transform="translate(125,-6)">
+    <path d="M0,2 C-7,-6 -5,-16 0,-24 C3,-16 7,-14 5,-6 C10,-10 11,-17 8,-22 C16,-15 15,-3 6,3 C11,1 13,-4 13,-9 C17,-2 13,5 6,7 C-2,9 -5,3 0,2 Z" fill="#E8874A"/>
+  </g>
+
+  <!-- Arrow 1: K top -> over the kiln arch -> I top -->
+  <path d="M 208,9 C 208,-38 42,-38 71,9" fill="none" stroke="#B87946" stroke-width="3.2" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+
+  <!-- Arrow 2: I top -> L top -->
+  <path d="M 71,9 C 71,-14 12,-14 12,9" fill="none" stroke="#B87946" stroke-width="3.2" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+
+  <!-- Arrow 3: L bottom -> into the kiln (final firing) -->
+  <path d="M 28,83 C 28,108 88,108 106,58" fill="none" stroke="#B87946" stroke-width="3.2" stroke-linecap="round" marker-end="url(#arrowhead)"/>
+</svg>
