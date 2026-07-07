@@ -29,6 +29,9 @@
       --glaze-honey-base: #c98a2e;
       --glaze-honey-high: #ffd680;
       --glaze-honey-deep: #7a4f14;
+      --glaze-sage-base: #5c7a4f;
+      --glaze-sage-high: #a8d68f;
+      --glaze-sage-deep: #33452b;
     }
 
     * { box-sizing: border-box; }
@@ -170,6 +173,7 @@
     }
 
     .tile-oxblood { --tile-base: var(--glaze-oxblood-base); --tile-high: var(--glaze-oxblood-high); --tile-deep: var(--glaze-oxblood-deep); }
+    .tile-sage { --tile-base: var(--glaze-sage-base); --tile-high: var(--glaze-sage-high); --tile-deep: var(--glaze-sage-deep); }
     .tile-ocean   { --tile-base: var(--glaze-ocean-base);   --tile-high: var(--glaze-ocean-high);   --tile-deep: var(--glaze-ocean-deep); }
     .tile-honey   { --tile-base: var(--glaze-honey-base);   --tile-high: var(--glaze-honey-high);   --tile-deep: var(--glaze-honey-deep); }
 
@@ -561,6 +565,14 @@
           ${readyBanner}
           ${loyalty}
           ${unfinished}
+
+          <div class="section-label">Getting started</div>
+
+          <button class="tile tile-sage" onclick="window.open('https://www.thekilncafe.com/how-to-video', '_blank')">
+            <span class="tile-icon">🎥</span>
+            <div class="tile-title">Painting Guide</div>
+            <div class="tile-desc">New to painting pottery? Watch our quick how-to before you start.</div>
+          </button>
 
           <div class="section-label">Design tools</div>
 
