@@ -88,8 +88,7 @@
       .admin-sidebar {
         padding: 16px 10px !important;
       }
-      .link-logo-main,
-      .link-logo-echo,
+      .link-logo,
       .admin-sidebar nav a span.nav-label {
         display: none;
       }
@@ -119,26 +118,11 @@
       margin: 0 0 26px;
     }
 
-    .link-logo-main {
-      font-family: var(--gu-font-display);
-      font-size: 30px;
-      font-weight: 800;
-      letter-spacing: 0.02em;
-      color: #fff;
-      text-align: right;
-      line-height: 1;
-      text-shadow: 0 2px 5px rgba(0,0,0,0.3);
-    }
-
-    .link-logo-echo {
-      font-family: var(--gu-font-display);
-      font-size: 14px;
-      font-weight: 600;
-      letter-spacing: 0.22em;
-      color: rgba(255,255,255,0.4);
-      text-align: right;
-      line-height: 1;
-      margin-top: 3px;
+    .link-logo-svg {
+      width: 100%;
+      height: auto;
+      display: block;
+      filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3));
     }
 
     .admin-sidebar nav a {
@@ -913,8 +897,12 @@
   <!-- SIDEBAR -->
   <aside class="admin-sidebar">
     <div class="link-logo">
-      <div class="link-logo-main">LINK</div>
-      <div class="link-logo-echo">NLIK</div>
+      <svg viewBox="0 0 241 98" class="link-logo-svg" aria-hidden="true">
+        <path d="M5.00,82.00 L5.00,10.00 L20.41,10.00 L20.41,82.00 L5.00,82.00 Z M12.20,82.00 L12.20,70.20 L55.00,70.20 L55.00,82.00 L12.20,82.00 Z" fill="#fff"/>
+        <path d="M64.00,82.00 L64.00,10.00 L79.41,10.00 L79.41,82.00 L64.00,82.00 Z" fill="#fff"/>
+        <path d="M 101.41,82.00 L 107.41,82.00 L 107.41,40.00 C 107.41,20.00 115.41,12.00 125.41,12.00 C 135.41,12.00 143.41,20.00 143.41,40.00 L 143.41,82.00 L 149.41,82.00" fill="none" stroke="#B87946" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M165.41,82.00 L165.41,10.00 L180.81,10.00 L180.81,82.00 L165.41,82.00 Z M175.91,44.59 L208.31,10.00 L228.81,10.00 L194.61,44.59 L175.91,44.59 Z M209.91,82.00 L175.70,44.59 L194.61,44.59 L230.81,82.00 L209.91,82.00 Z" fill="#fff"/>
+      </svg>
     </div>
     <nav>
       <a href="#" class="nav-link active" onclick="goToTab('dashboard', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="currentColor"><rect x="3" y="10" width="3.2" height="7" rx="1"/><rect x="8.4" y="5" width="3.2" height="12" rx="1"/><rect x="13.8" y="8" width="3.2" height="9" rx="1"/></svg></span><span class="nav-label">Dashboard</span></a>
