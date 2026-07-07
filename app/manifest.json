@@ -3,8 +3,8 @@
   "short_name": "Kiln Cafe",
   "start_url": "/app/",
   "display": "standalone",
-  "background_color": "#faf4ef",
-  "theme_color": "#b03a2e",
+  "background_color": "#F7F4EE",
+  "theme_color": "#2B2724",
   "icons": [
     {
       "src": "/app/icon-192.png",

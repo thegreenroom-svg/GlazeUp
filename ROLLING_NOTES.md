@@ -17,6 +17,18 @@ Last updated: 5 July 2026
 
   **Not yet done:** the full sophisticated connected-wordmark logo (single continuous stroke integrating the kiln-arch/link-wave shapes into the letterforms, as in the concept artwork) — current logo is a simpler stacked-text version. Icon set across the rest of the app (Bisque tab silhouettes, category tabs, etc.) hasn't been converted to the "2px stroke, rounded ends, no fill unless active" line-icon style yet — only the sidebar nav icons were addressed. The Branding tab's studio-customization colour defaults were deliberately left alone (that's per-studio branding, a different concern from the platform's own identity). GitHub repo name and Render service URL still say "glazeup" — same as the earlier product rename, changing those is a separate infrastructure step outside a normal code push.
 
+★ BRAND ASSET DELIVERABLES + SPLASH REFINEMENT (2026-07-06): Daisy sent a refined spec with three deliverables: Master Logo, App Icon, and an updated Splash Screen behaviour.
+
+**Splash screen refined:** background changed from ivory to dark Charcoal (per spec), added a "Built by KILN" endorsement line below the tagline, fade duration changed to 0.6s (was 0.4s in / 0.3s out). Tap-anywhere-to-continue and the ~2.6s auto-advance both still work.
+
+**Master Logo — built as genuine editable vector artwork, not text-with-a-font-dependency:** downloaded the real Instrument Sans Bold font (via the `@fontsource/instrument-sans` npm package, converted WOFF2→TTF with fontTools since that's what was available), then used matplotlib's `TextPath` to convert "LINK" and "NLIK" into actual bezier curve outlines — real vector paths, not `<text>` elements — so the file is genuinely portable/editable without needing the font installed wherever it's opened. Saved to `brand-assets/master-logo/`:
+  - `LINK-master-logo.svg` (source of truth)
+  - `LINK-master-logo.pdf`, `LINK-master-logo.eps` (converted via ghostscript, installed for this)
+  - `LINK-master-logo@1x/@2x/@3x.png`
+  - **No native `.ai` file** — that's Adobe's proprietary format and can't be genuinely produced outside Illustrator itself. The SVG/PDF/EPS are the correct open equivalents and open natively in Illustrator (File → Open).
+
+**App Icon — built fresh, a "simplified chain/link icon without text" per spec:** a classic two-interlocking-rounded-rectangle chain-link glyph (the universal hyperlink icon shape), rotated diagonally, in Ivory + Clay on a Charcoal background, at 1024×1024. Saved to `brand-assets/app-icon/`: `LINK-app-icon.svg`, `LINK-app-icon-1024.png`, `LINK-app-icon.pdf`. **This replaced the actual live PWA icons** (`app/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`) — the old glazed-pot silhouette is gone, customers' home-screen icon now shows the new chain-link mark. `manifest.json` theme/background colours also updated to Charcoal/Ivory.
+
 ★ ARCHITECTURE (as of 2026-07-05): GlazeUp is now TWO frontends on ONE shared backend:
   • STAFF app  → /admin/dashboard-local.html  (bookings, tables, kiln, catalog — iPad)
   • CUSTOMER app → /app?booking=CODE  (customer's phone, booking-linked)
