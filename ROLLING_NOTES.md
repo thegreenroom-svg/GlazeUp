@@ -3,6 +3,8 @@ GlazeUp · Rolling Product Notes
 Last updated: 5 July 2026
 ═══════════════════════════════════════════════════════════════════════════════
 
+★ RENAMED (2026-07-06): The product is now called **Link**, not GlazeUp. Logo mark: "LINK" in bold caps, with "NLIK" (KILN spelled backwards) underneath, both right-aligned so the shared K lands in the same column — a nod to the fact KILN and LINK are anagrams (same 4 letters). Renamed everywhere in the staff dashboard (title, sidebar wordmark, welcome banner, server log) and server.js. The customer app (`/app`) already showed studio-specific branding ("The Kiln Cafe") rather than the platform name, so nothing needed changing there. Historical entries below still say "GlazeUp" since they're a dated log of what was actually built at the time — not rewritten, just noting the name going forward is Link.
+
 ★ ARCHITECTURE (as of 2026-07-05): GlazeUp is now TWO frontends on ONE shared backend:
   • STAFF app  → /admin/dashboard-local.html  (bookings, tables, kiln, catalog — iPad)
   • CUSTOMER app → /app?booking=CODE  (customer's phone, booking-linked)

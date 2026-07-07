@@ -1,5 +1,5 @@
 /**
- * GlazeUp Backend Server
+ * Link Backend Server
  *
  * Handles:
  *   - Square OAuth and data sync
@@ -175,8 +175,8 @@ app.get('/api/square/callback', async (req, res) => {
       <html>
         <body style="font-family: sans-serif; text-align: center; padding: 60px 20px; background: #faf4ef; color: #3d1c12;">
           <h1 style="color: #b03a2e;">✓ Square Connected</h1>
-          <p>Your Square account is now linked to GlazeUp (read-only).</p>
-          <p>You can close this tab and go back to the GlazeUp dashboard.</p>
+          <p>Your Square account is now linked to Link (read-only).</p>
+          <p>You can close this tab and go back to the Link dashboard.</p>
         </body>
       </html>
     `);
@@ -2125,7 +2125,7 @@ app.get('/health', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`✓ GlazeUp server running on port ${port}`);
+  console.log(`✓ Link server running on port ${port}`);
   console.log(`  Square OAuth: ${process.env.SQUARE_CLIENT_ID ? '✓' : '✗'}`);
   console.log(`  Stripe: ${process.env.STRIPE_SECRET_KEY ? '✓' : '✗'}`);
   console.log(`  Supabase: ${process.env.SUPABASE_URL ? '✓' : '✗'}`);
