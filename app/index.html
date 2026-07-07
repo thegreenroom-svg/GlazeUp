@@ -383,8 +383,12 @@
       <div id="dp-photo-prompt">
         <div style="font-size: 40px; margin-bottom: 8px;">📷</div>
         <div style="font-size: 15px; line-height: 1.5;">Take a photo of your piece, then preview colours right on it.</div>
-        <button onclick="document.getElementById('dp-photo-input').click()">Take Photo</button>
-        <input type="file" id="dp-photo-input" accept="image/*" capture="environment" style="display:none;" onchange="handleDesignPhotoCapture(event)">
+        <div style="display: flex; gap: 10px; justify-content: center; margin-top: 16px; flex-wrap: wrap;">
+          <button onclick="document.getElementById('dp-photo-input-camera').click()">📷 Take Photo</button>
+          <button onclick="document.getElementById('dp-photo-input-library').click()" style="background: rgba(255,255,255,0.15); color: #fff;">🖼️ Choose from Photos</button>
+        </div>
+        <input type="file" id="dp-photo-input-camera" accept="image/*" capture="environment" style="display:none;" onchange="handleDesignPhotoCapture(event)">
+        <input type="file" id="dp-photo-input-library" accept="image/*" style="display:none;" onchange="handleDesignPhotoCapture(event)">
       </div>
       <div class="dp-canvas-stack" id="dp-canvas-stack">
         <canvas id="dp-base-canvas"></canvas>
@@ -415,7 +419,8 @@
       <div class="dp-actions">
         <button onclick="dpUndo()">↩️ Undo</button>
         <button onclick="dpClear()">🗑️ Clear All</button>
-        <button onclick="document.getElementById('dp-photo-input').click()">📷 Retake</button>
+        <button onclick="document.getElementById('dp-photo-input-camera').click()">📷 Retake</button>
+        <button onclick="document.getElementById('dp-photo-input-library').click()">🖼️ New Photo</button>
       </div>
     </div>
   </div>
