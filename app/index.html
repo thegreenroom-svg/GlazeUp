@@ -252,9 +252,10 @@
       opacity: 0;
       animation: splashFadeIn 0.6s ease forwards;
       cursor: pointer;
+      overflow: hidden;
     }
     #splash-screen.fading-out {
-      animation: splashFadeOut 0.6s ease forwards;
+      animation: splashFadeOut 0.5s ease forwards;
     }
     @keyframes splashFadeIn {
       from { opacity: 0; }
@@ -264,20 +265,56 @@
       from { opacity: 1; }
       to { opacity: 0; }
     }
+
     .splash-word {
+      display: flex;
+      justify-content: center;
       font-family: var(--gu-font-display);
       font-weight: 700;
-      font-size: 64px;
+      font-size: 68px;
       letter-spacing: 0.03em;
       color: #fff;
       line-height: 1;
     }
+
+    .splash-letter {
+      display: inline-block;
+      opacity: 0;
+      transform: rotate(-280deg) scale(0.25) translateY(30px);
+      animation: letterSpinIn 0.85s cubic-bezier(0.34, 1.4, 0.4, 1) forwards;
+    }
+    .splash-letter:nth-child(1) { animation-delay: 0.15s; }
+    .splash-letter:nth-child(2) { animation-delay: 0.28s; }
+    .splash-letter:nth-child(3) { animation-delay: 0.41s; }
+    .splash-letter:nth-child(4) { animation-delay: 0.54s; }
+
+    @keyframes letterSpinIn {
+      0% { opacity: 0; transform: rotate(-280deg) scale(0.25) translateY(30px); }
+      65% { opacity: 1; transform: rotate(14deg) scale(1.08) translateY(0); }
+      100% { opacity: 1; transform: rotate(0deg) scale(1) translateY(0); }
+    }
+
+    .splash-strapline {
+      margin-top: 16px;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--link-clay);
+      opacity: 0;
+      animation: splashLineFadeUp 0.6s ease forwards;
+      animation-delay: 1.05s;
+    }
+
     .splash-tagline {
       margin-top: 14px;
       font-family: Georgia, serif;
       font-style: italic;
       font-size: 15px;
       color: rgba(255,255,255,0.75);
+      opacity: 0;
+      animation: splashLineFadeUp 0.6s ease forwards;
+      animation-delay: 1.25s;
     }
     .splash-endorsement {
       margin-top: 22px;
@@ -285,6 +322,13 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: rgba(255,255,255,0.4);
+      opacity: 0;
+      animation: splashLineFadeUp 0.6s ease forwards;
+      animation-delay: 1.45s;
+    }
+    @keyframes splashLineFadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
     }
     .splash-hint {
       position: absolute;
@@ -295,9 +339,15 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: rgba(255,255,255,0.45);
+      opacity: 0;
+      animation: splashLineFadeUp 0.6s ease forwards;
+      animation-delay: 1.75s;
     }
     @media (prefers-reduced-motion: reduce) {
       #splash-screen, #splash-screen.fading-out { animation: none; opacity: 1; }
+      .splash-letter, .splash-strapline, .splash-tagline, .splash-endorsement, .splash-hint {
+        animation: none; opacity: 1; transform: none;
+      }
     }
 
     .dp-header {
@@ -473,7 +523,10 @@
 <body>
 
   <div id="splash-screen">
-    <div class="splash-word">LINK</div>
+    <div class="splash-word">
+      <span class="splash-letter">L</span><span class="splash-letter">I</span><span class="splash-letter">N</span><span class="splash-letter">K</span>
+    </div>
+    <div class="splash-strapline">Studio · Community · Ritual</div>
     <div class="splash-tagline">Connect. Create. Belong.</div>
     <div class="splash-endorsement">Built by KILN</div>
     <div class="splash-hint">Tap anywhere to continue</div>
