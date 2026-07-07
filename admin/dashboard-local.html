@@ -90,12 +90,28 @@
     }
 
     .admin-sidebar {
+      position: relative;
       background:
-        linear-gradient(180deg, color-mix(in srgb, var(--gu-primary) 88%, #fff) 0%, var(--gu-primary) 45%, var(--glaze-oxblood-deep) 100%);
+        repeating-linear-gradient(115deg, rgba(255,255,255,0.07) 0px, rgba(255,255,255,0.07) 1px, rgba(0,0,0,0.04) 1px, rgba(0,0,0,0.04) 2px),
+        linear-gradient(160deg, #9aa0a6 0%, #7d8388 40%, #6b7075 70%, #575c60 100%);
       color: #fff;
       padding: 22px 16px;
-      border-right: 1px solid rgba(0,0,0,0.12);
+      border-right: 1px solid rgba(0,0,0,0.2);
       overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    .admin-sidebar::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.16) 48%, rgba(255,255,255,0.04) 55%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .glazeup-logo, .admin-sidebar nav {
+      position: relative;
+      z-index: 1;
     }
 
     .glazeup-logo {
