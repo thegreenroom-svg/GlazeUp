@@ -723,6 +723,25 @@ ALTER TABLE kiln_sessions ADD COLUMN IF NOT EXISTS batch_code TEXT UNIQUE;
 
 ---
 
+## Design Preview Tool Built (Customer App) — 2026-07-06
+
+Daisy's call on the old "overlay" design-preview concept: rather than a customer picking from a fixed illustrated shape/overlay (the old, dated approach), they **photograph their own real physical piece** and preview colours directly on that actual photo. More personal and accurate than a generic template.
+
+**Activated the "Design Preview" tile** in the customer app (`/app`) — was a "Coming soon" placeholder, now a full working tool, full-screen overlay (`#design-preview-screen`):
+
+- **Photo capture** — same camera-capture pattern used elsewhere (`capture="environment"`), photo becomes the base layer on an HTML canvas
+- **Three tools, all requested together:**
+  1. **Brush** — freehand painting, translucent colour strokes directly onto the photo. 3 brush sizes (fine/medium/thick) + an opacity slider
+  2. **Fill area** — tap-to-fill, a real flood-fill algorithm (stack-based, tolerance-based colour similarity) that samples the *original photo* to decide which pixels belong together, but paints onto a separate transparent layer — so the photo itself is never destructively altered and repeat fills stay accurate
+  3. **Colour sticker** — a draggable, resizable translucent circle customers can position and scale by hand over any part of the photo (drag to move, corner handle to resize, × to remove)
+- **Palette:** a starter set of ~14 common Stroke & Coat colours (Really Red, Kiwi, Turquoise Delight, etc.) — **PLACEHOLDER**, needs swapping for Daisy's exact confirmed-in-stock shades when she has the list to hand
+- **Undo** (steps back through brush/fill actions via saved canvas snapshots) and **Clear All**
+- Two-canvas architecture: `dp-base-canvas` (the photo, read-only) + `dp-paint-canvas` (everything the customer paints), so the flood-fill can always sample true original photo colours regardless of what's already been painted
+
+**Not yet done:** no save/export of the finished preview (customer can screenshot for now); palette is a placeholder, not Daisy's real stocked colours.
+
+---
+
 ## Real Square Connected (Production, Read-Only) — 2026-07-05
 
 Daisy connected her real Kiln Cafe Square account. Confirmed the entire codebase only ever makes read calls to Square (retrieveMerchant, searchOrders, listCatalog, searchTeamMembers, listBookings — no create/update/delete/charge/refund anywhere), and OAuth scopes requested are all `_READ` only. Production credentials added to Render (`SQUARE_CLIENT_ID`, `SQUARE_CLIENT_SECRET`, `SQUARE_ENVIRONMENT=production`), plus `API_URL` (was missing, causing an invalid redirect_uri error on first attempt) and the Production OAuth Redirect URL registered on Square's side (`https://glazeup-api.onrender.com/api/square/callback`).

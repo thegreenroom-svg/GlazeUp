@@ -184,6 +184,185 @@
     }
     .a2hs-banner .a2hs-dismiss { background: none; color: var(--gu-dust); }
     .a2hs-banner .a2hs-install { background: var(--glaze-oxblood-base); color: #fff; }
+
+    /* ── Design Preview tool ── */
+    #design-preview-screen {
+      position: fixed;
+      inset: 0;
+      background: #1a1210;
+      z-index: 2000;
+      display: none;
+      flex-direction: column;
+    }
+
+    .dp-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      background: #241a17;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .dp-header .dp-title { font-family: var(--gu-font-display); font-size: 17px; font-weight: 700; }
+    .dp-header button {
+      background: rgba(255,255,255,0.12);
+      border: none;
+      color: #fff;
+      border-radius: 10px;
+      padding: 7px 12px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .dp-canvas-area {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    #dp-photo-prompt {
+      text-align: center;
+      color: rgba(255,255,255,0.85);
+      padding: 24px;
+    }
+    #dp-photo-prompt button {
+      margin-top: 16px;
+      background: var(--glaze-honey-base);
+      color: #3d1c12;
+      border: none;
+      padding: 14px 22px;
+      border-radius: 16px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .dp-canvas-stack {
+      position: relative;
+      max-width: 100%;
+      max-height: 100%;
+      display: none;
+    }
+    .dp-canvas-stack canvas {
+      display: block;
+      max-width: 100%;
+      max-height: 100%;
+      position: absolute;
+      top: 0; left: 0;
+    }
+    .dp-sticker {
+      position: absolute;
+      border-radius: 50%;
+      opacity: 0.55;
+      touch-action: none;
+      cursor: grab;
+      border: 2px solid rgba(255,255,255,0.6);
+    }
+    .dp-sticker .dp-sticker-resize {
+      position: absolute;
+      right: -6px; bottom: -6px;
+      width: 18px; height: 18px;
+      background: #fff;
+      border-radius: 50%;
+      border: 2px solid var(--gu-primary);
+      cursor: nwse-resize;
+    }
+    .dp-sticker .dp-sticker-remove {
+      position: absolute;
+      top: -8px; right: -8px;
+      width: 20px; height: 20px;
+      background: #d9534f;
+      color: #fff;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px;
+      cursor: pointer;
+      border: 2px solid #fff;
+    }
+
+    .dp-toolbar {
+      flex-shrink: 0;
+      background: #241a17;
+      padding: 10px 12px 14px;
+    }
+
+    .dp-tool-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .dp-tool-btn {
+      flex: 1;
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.85);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      padding: 10px 6px;
+      font-size: 11px;
+      text-align: center;
+      cursor: pointer;
+    }
+    .dp-tool-btn.active {
+      background: var(--glaze-honey-base);
+      color: #3d1c12;
+      font-weight: 700;
+      border-color: transparent;
+    }
+    .dp-tool-btn .dp-tool-icon { font-size: 18px; display: block; margin-bottom: 2px; }
+
+    .dp-sub-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .dp-sub-row label { font-size: 11px; color: rgba(255,255,255,0.7); flex-shrink: 0; }
+    .dp-sub-row input[type="range"] { flex: 1; }
+
+    .dp-brush-sizes { display: flex; gap: 6px; }
+    .dp-brush-size-btn {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.25);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    .dp-brush-size-btn .dot { background: #fff; border-radius: 50%; }
+    .dp-brush-size-btn.active { border-color: var(--glaze-honey-base); background: rgba(255,214,128,0.2); }
+
+    .dp-palette {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .dp-swatch {
+      flex-shrink: 0;
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.3);
+      cursor: pointer;
+    }
+    .dp-swatch.active { border-color: #fff; box-shadow: 0 0 0 2px var(--glaze-honey-base); }
+
+    .dp-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .dp-actions button {
+      flex: 1;
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 10px;
+      padding: 9px;
+      font-size: 12px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -192,6 +371,54 @@
     <div class="loading">Loading your session…</div>
   </div>
   <div id="a2hs-banner"></div>
+
+  <!-- Design Preview: photograph your real piece, preview colours directly on it -->
+  <div id="design-preview-screen">
+    <div class="dp-header">
+      <span class="dp-title">Design Preview</span>
+      <button onclick="closeDesignPreview()">✕ Close</button>
+    </div>
+
+    <div class="dp-canvas-area" id="dp-canvas-area">
+      <div id="dp-photo-prompt">
+        <div style="font-size: 40px; margin-bottom: 8px;">📷</div>
+        <div style="font-size: 15px; line-height: 1.5;">Take a photo of your piece, then preview colours right on it.</div>
+        <button onclick="document.getElementById('dp-photo-input').click()">Take Photo</button>
+        <input type="file" id="dp-photo-input" accept="image/*" capture="environment" style="display:none;" onchange="handleDesignPhotoCapture(event)">
+      </div>
+      <div class="dp-canvas-stack" id="dp-canvas-stack">
+        <canvas id="dp-base-canvas"></canvas>
+        <canvas id="dp-paint-canvas"></canvas>
+      </div>
+    </div>
+
+    <div class="dp-toolbar">
+      <div class="dp-tool-row">
+        <div class="dp-tool-btn active" id="dp-tool-brush" onclick="setDpTool('brush')"><span class="dp-tool-icon">🖌️</span>Brush</div>
+        <div class="dp-tool-btn" id="dp-tool-fill" onclick="setDpTool('fill')"><span class="dp-tool-icon">🪣</span>Fill area</div>
+        <div class="dp-tool-btn" id="dp-tool-sticker" onclick="setDpTool('sticker')"><span class="dp-tool-icon">⭐</span>Colour sticker</div>
+      </div>
+
+      <div class="dp-sub-row" id="dp-brush-controls">
+        <label>Brush</label>
+        <div class="dp-brush-sizes">
+          <div class="dp-brush-size-btn" data-size="10" onclick="setDpBrushSize(10, this)"><div class="dot" style="width:6px;height:6px;"></div></div>
+          <div class="dp-brush-size-btn active" data-size="22" onclick="setDpBrushSize(22, this)"><div class="dot" style="width:12px;height:12px;"></div></div>
+          <div class="dp-brush-size-btn" data-size="38" onclick="setDpBrushSize(38, this)"><div class="dot" style="width:20px;height:20px;"></div></div>
+        </div>
+        <label>Opacity</label>
+        <input type="range" id="dp-opacity" min="20" max="90" value="55" oninput="setDpOpacity(this.value)">
+      </div>
+
+      <div class="dp-palette" id="dp-palette"></div>
+
+      <div class="dp-actions">
+        <button onclick="dpUndo()">↩️ Undo</button>
+        <button onclick="dpClear()">🗑️ Clear All</button>
+        <button onclick="document.getElementById('dp-photo-input').click()">📷 Retake</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     const API_URL = window.location.origin;
@@ -292,10 +519,10 @@
             <div class="tile-desc">Browse the studio's glaze colours and plan your palette.</div>
           </button>
 
-          <button class="tile tile-honey soon">
+          <button class="tile tile-honey" onclick="openDesignPreview()">
             <span class="tile-icon">🖼️</span>
             <div class="tile-title">Design Preview</div>
-            <div class="tile-desc">See how your design looks on your chosen piece before you paint.</div>
+            <div class="tile-desc">Photograph your real piece, then preview colours right on it.</div>
           </button>
 
           <button class="tile tile-oxblood soon">
@@ -384,6 +611,338 @@
       e.preventDefault();
       deferredInstallPrompt = e;
     });
+
+    // ══════════════════════════════════════════════════════════
+    // DESIGN PREVIEW: photograph the real piece, preview colours on it
+    // ══════════════════════════════════════════════════════════
+
+    // Starter palette — common Stroke & Coat shades. PLACEHOLDER: swap for
+    // the studio's exact confirmed-in-stock colours when known.
+    const DP_PALETTE = [
+      { name: 'Really Red', hex: '#c0392b' },
+      { name: 'Orange You Glad', hex: '#e07a2c' },
+      { name: 'Lemon Yellow', hex: '#f0d64a' },
+      { name: 'Kiwi', hex: '#8bb83c' },
+      { name: 'Forest Green', hex: '#2f6b3a' },
+      { name: 'Turquoise Delight', hex: '#2fa89a' },
+      { name: 'True Blue', hex: '#2c5fa8' },
+      { name: 'Blue Bayou', hex: '#1d3d6b' },
+      { name: 'Purple Dust', hex: '#7a5ba8' },
+      { name: 'Shell Pink', hex: '#e8a3b0' },
+      { name: 'Chocolate Brown', hex: '#5a3825' },
+      { name: 'Coal', hex: '#2a2a2a' },
+      { name: 'Cotton Tail', hex: '#f5f0e6' },
+      { name: 'Silver Lining', hex: '#a8a8a8' }
+    ];
+
+    let dpTool = 'brush';
+    let dpBrushSize = 22;
+    let dpOpacity = 0.55;
+    let dpColor = DP_PALETTE[0].hex;
+    let dpBaseCtx, dpPaintCtx;
+    let dpDrawing = false;
+    let dpLastPoint = null;
+    let dpUndoStack = [];
+    let dpStickerCounter = 0;
+
+    function openDesignPreview() {
+      document.getElementById('design-preview-screen').style.display = 'flex';
+      if (document.getElementById('dp-palette').children.length === 0) renderDpPalette();
+    }
+    function closeDesignPreview() {
+      document.getElementById('design-preview-screen').style.display = 'none';
+    }
+
+    function renderDpPalette() {
+      const el = document.getElementById('dp-palette');
+      el.innerHTML = DP_PALETTE.map((c, i) => `
+        <div class="dp-swatch ${i === 0 ? 'active' : ''}" style="background:${c.hex};" onclick="selectDpColor('${c.hex}', this)" title="${c.name}"></div>
+      `).join('');
+    }
+
+    function selectDpColor(hex, el) {
+      dpColor = hex;
+      document.querySelectorAll('.dp-swatch').forEach(s => s.classList.remove('active'));
+      el.classList.add('active');
+    }
+
+    function setDpTool(tool) {
+      dpTool = tool;
+      document.querySelectorAll('.dp-tool-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(`dp-tool-${tool}`).classList.add('active');
+      document.getElementById('dp-brush-controls').style.display = (tool === 'brush') ? 'flex' : 'none';
+    }
+
+    function setDpBrushSize(size, el) {
+      dpBrushSize = size;
+      document.querySelectorAll('.dp-brush-size-btn').forEach(b => b.classList.remove('active'));
+      el.classList.add('active');
+    }
+
+    function setDpOpacity(val) {
+      dpOpacity = val / 100;
+    }
+
+    function handleDesignPhotoCapture(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          setupDpCanvases(img);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function setupDpCanvases(img) {
+      const area = document.getElementById('dp-canvas-area');
+      const stack = document.getElementById('dp-canvas-stack');
+      const maxW = area.clientWidth;
+      const maxH = area.clientHeight;
+      const scale = Math.min(maxW / img.width, maxH / img.height, 1);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+
+      const baseCanvas = document.getElementById('dp-base-canvas');
+      const paintCanvas = document.getElementById('dp-paint-canvas');
+      baseCanvas.width = w; baseCanvas.height = h;
+      paintCanvas.width = w; paintCanvas.height = h;
+      stack.style.width = w + 'px';
+      stack.style.height = h + 'px';
+
+      dpBaseCtx = baseCanvas.getContext('2d');
+      dpPaintCtx = paintCanvas.getContext('2d');
+      dpBaseCtx.drawImage(img, 0, 0, w, h);
+      dpPaintCtx.clearRect(0, 0, w, h);
+      dpUndoStack = [];
+
+      document.getElementById('dp-photo-prompt').style.display = 'none';
+      stack.style.display = 'block';
+
+      wireDpPointerEvents(paintCanvas);
+    }
+
+    function dpSaveUndoState() {
+      dpUndoStack.push(dpPaintCtx.getImageData(0, 0, dpPaintCtx.canvas.width, dpPaintCtx.canvas.height));
+      if (dpUndoStack.length > 20) dpUndoStack.shift();
+    }
+
+    function dpUndo() {
+      if (dpUndoStack.length === 0) return;
+      const prev = dpUndoStack.pop();
+      dpPaintCtx.putImageData(prev, 0, 0);
+    }
+
+    function dpClear() {
+      if (!dpPaintCtx) return;
+      dpSaveUndoState();
+      dpPaintCtx.clearRect(0, 0, dpPaintCtx.canvas.width, dpPaintCtx.canvas.height);
+      document.querySelectorAll('.dp-sticker').forEach(s => s.remove());
+    }
+
+    function getCanvasPoint(canvas, evt) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+      const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+      return {
+        x: (clientX - rect.left) * (canvas.width / rect.width),
+        y: (clientY - rect.top) * (canvas.height / rect.height)
+      };
+    }
+
+    function wireDpPointerEvents(canvas) {
+      const start = (evt) => {
+        evt.preventDefault();
+        const pt = getCanvasPoint(canvas, evt);
+
+        if (dpTool === 'brush') {
+          dpSaveUndoState();
+          dpDrawing = true;
+          dpLastPoint = pt;
+          dpPaintDot(pt);
+        } else if (dpTool === 'fill') {
+          dpSaveUndoState();
+          dpFloodFill(pt);
+        } else if (dpTool === 'sticker') {
+          addDpSticker(pt);
+        }
+      };
+      const move = (evt) => {
+        if (!dpDrawing || dpTool !== 'brush') return;
+        evt.preventDefault();
+        const pt = getCanvasPoint(canvas, evt);
+        dpPaintLine(dpLastPoint, pt);
+        dpLastPoint = pt;
+      };
+      const end = () => { dpDrawing = false; dpLastPoint = null; };
+
+      canvas.addEventListener('mousedown', start);
+      canvas.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', end);
+      canvas.addEventListener('touchstart', start, { passive: false });
+      canvas.addEventListener('touchmove', move, { passive: false });
+      canvas.addEventListener('touchend', end);
+    }
+
+    function dpPaintDot(pt) {
+      dpPaintCtx.globalAlpha = dpOpacity;
+      dpPaintCtx.fillStyle = dpColor;
+      dpPaintCtx.beginPath();
+      dpPaintCtx.arc(pt.x, pt.y, dpBrushSize / 2, 0, Math.PI * 2);
+      dpPaintCtx.fill();
+    }
+
+    function dpPaintLine(from, to) {
+      dpPaintCtx.globalAlpha = dpOpacity;
+      dpPaintCtx.strokeStyle = dpColor;
+      dpPaintCtx.lineWidth = dpBrushSize;
+      dpPaintCtx.lineCap = 'round';
+      dpPaintCtx.lineJoin = 'round';
+      dpPaintCtx.beginPath();
+      dpPaintCtx.moveTo(from.x, from.y);
+      dpPaintCtx.lineTo(to.x, to.y);
+      dpPaintCtx.stroke();
+    }
+
+    // Flood fill: samples the ORIGINAL photo (base canvas) to decide which
+    // pixels belong to the tapped region, but paints the result onto the
+    // paint layer — so the photo itself is never altered and repeated fills
+    // stay based on the real photo, not previous paint.
+    function dpFloodFill(startPt) {
+      const w = dpBaseCtx.canvas.width, h = dpBaseCtx.canvas.height;
+      const baseData = dpBaseCtx.getImageData(0, 0, w, h).data;
+      const paintData = dpPaintCtx.getImageData(0, 0, w, h);
+
+      const startX = Math.floor(startPt.x), startY = Math.floor(startPt.y);
+      if (startX < 0 || startY < 0 || startX >= w || startY >= h) return;
+
+      const idx = (x, y) => (y * w + x) * 4;
+      const startIdx = idx(startX, startY);
+      const targetR = baseData[startIdx], targetG = baseData[startIdx + 1], targetB = baseData[startIdx + 2];
+      const tolerance = 42;
+
+      const fillRgb = hexToRgb(dpColor);
+      const fillAlpha = Math.round(dpOpacity * 255);
+
+      const visited = new Uint8Array(w * h);
+      const stack = [[startX, startY]];
+
+      while (stack.length) {
+        const [x, y] = stack.pop();
+        if (x < 0 || y < 0 || x >= w || y >= h) continue;
+        const pos = y * w + x;
+        if (visited[pos]) continue;
+
+        const i = pos * 4;
+        const dr = baseData[i] - targetR, dg = baseData[i + 1] - targetG, db = baseData[i + 2] - targetB;
+        const dist = Math.sqrt(dr * dr + dg * dg + db * db);
+        if (dist > tolerance) continue;
+
+        visited[pos] = 1;
+
+        // Blend the fill colour onto the existing paint pixel (simple alpha blend)
+        const pi = pos * 4;
+        const existingAlpha = paintData.data[pi + 3] / 255;
+        const outAlpha = fillAlpha / 255 + existingAlpha * (1 - fillAlpha / 255);
+        if (outAlpha > 0) {
+          paintData.data[pi] = Math.round((fillRgb.r * (fillAlpha / 255) + paintData.data[pi] * existingAlpha * (1 - fillAlpha / 255)) / outAlpha);
+          paintData.data[pi + 1] = Math.round((fillRgb.g * (fillAlpha / 255) + paintData.data[pi + 1] * existingAlpha * (1 - fillAlpha / 255)) / outAlpha);
+          paintData.data[pi + 2] = Math.round((fillRgb.b * (fillAlpha / 255) + paintData.data[pi + 2] * existingAlpha * (1 - fillAlpha / 255)) / outAlpha);
+        }
+        paintData.data[pi + 3] = Math.round(outAlpha * 255);
+
+        stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+      }
+
+      dpPaintCtx.putImageData(paintData, 0, 0);
+    }
+
+    function hexToRgb(hex) {
+      const v = parseInt(hex.slice(1), 16);
+      return { r: (v >> 16) & 255, g: (v >> 8) & 255, b: v & 255 };
+    }
+
+    // Draggable, resizable colour "sticker" — a simple translucent overlay
+    // shape the customer can position and resize over the photo by hand
+    function addDpSticker(pt) {
+      dpStickerCounter++;
+      const stack = document.getElementById('dp-canvas-stack');
+      const size = 70;
+
+      const sticker = document.createElement('div');
+      sticker.className = 'dp-sticker';
+      sticker.style.width = size + 'px';
+      sticker.style.height = size + 'px';
+      sticker.style.left = (pt.x - size / 2) + 'px';
+      sticker.style.top = (pt.y - size / 2) + 'px';
+      sticker.style.background = dpColor;
+      sticker.dataset.id = dpStickerCounter;
+
+      const removeBtn = document.createElement('div');
+      removeBtn.className = 'dp-sticker-remove';
+      removeBtn.textContent = '✕';
+      removeBtn.onclick = (e) => { e.stopPropagation(); sticker.remove(); };
+      sticker.appendChild(removeBtn);
+
+      const resizeHandle = document.createElement('div');
+      resizeHandle.className = 'dp-sticker-resize';
+      sticker.appendChild(resizeHandle);
+
+      makeDpStickerInteractive(sticker, resizeHandle);
+      stack.appendChild(sticker);
+    }
+
+    function makeDpStickerInteractive(sticker, resizeHandle) {
+      let dragging = false, resizing = false;
+      let startX, startY, startLeft, startTop, startW, startH;
+
+      function getXY(evt) {
+        return evt.touches ? { x: evt.touches[0].clientX, y: evt.touches[0].clientY } : { x: evt.clientX, y: evt.clientY };
+      }
+
+      sticker.addEventListener('mousedown', (e) => { if (e.target === resizeHandle) return; startDrag(e); });
+      sticker.addEventListener('touchstart', (e) => { if (e.target === resizeHandle) return; startDrag(e); }, { passive: false });
+      resizeHandle.addEventListener('mousedown', startResize);
+      resizeHandle.addEventListener('touchstart', startResize, { passive: false });
+
+      function startDrag(e) {
+        e.preventDefault(); e.stopPropagation();
+        dragging = true;
+        const p = getXY(e);
+        startX = p.x; startY = p.y;
+        startLeft = parseFloat(sticker.style.left);
+        startTop = parseFloat(sticker.style.top);
+      }
+      function startResize(e) {
+        e.preventDefault(); e.stopPropagation();
+        resizing = true;
+        const p = getXY(e);
+        startX = p.x; startY = p.y;
+        startW = sticker.offsetWidth; startH = sticker.offsetHeight;
+      }
+      function move(e) {
+        if (!dragging && !resizing) return;
+        const p = getXY(e);
+        if (dragging) {
+          sticker.style.left = (startLeft + (p.x - startX)) + 'px';
+          sticker.style.top = (startTop + (p.y - startY)) + 'px';
+        } else if (resizing) {
+          const newSize = Math.max(24, startW + (p.x - startX));
+          sticker.style.width = newSize + 'px';
+          sticker.style.height = newSize + 'px';
+        }
+      }
+      function end() { dragging = false; resizing = false; }
+
+      window.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', end);
+      window.addEventListener('touchmove', move, { passive: false });
+      window.addEventListener('touchend', end);
+    }
 
     init();
   </script>
