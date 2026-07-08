@@ -2234,40 +2234,68 @@
     async function loadOrderMenu() {
       const menuEl = document.getElementById('order-menu');
       try {
-        const res = await fetch(`${API_URL}/api/kds/menu?studioId=${STUDIO_ID}`);
-        const data = await res.json();
+        // Fetch menu, specials, and hidden items in parallel
+        const [menuRes, specialsRes, hiddenRes] = await Promise.all([
+          fetch(`${API_URL}/api/kds/menu?studioId=${STUDIO_ID}`),
+          fetch(`${API_URL}/api/menu/specials?studioId=${STUDIO_ID}`),
+          fetch(`${API_URL}/api/menu/hidden?studioId=${STUDIO_ID}`),
+        ]);
+        const menuData = await menuRes.json();
+        const specialsData = await specialsRes.json();
+        const hiddenData = await hiddenRes.json();
+        const hiddenIds = new Set(hiddenData.hiddenIds || []);
+        const specials = specialsData.specials || [];
 
-        if (!data.categories?.length) {
-          menuEl.innerHTML = `<div style="color:rgba(255,255,255,0.4);text-align:center;padding:32px;font-size:13px;line-height:1.6;">No food or drink items found in your Square catalogue yet.<br><br>Add drinks and cakes to Square and they'll appear here automatically.</div>`;
+        let html = '';
+
+        // Today's specials at the top
+        if (specials.length) {
+          html += `<div style="margin-bottom:24px;">
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e8c99a;margin-bottom:10px;">⭐ Today's Specials</div>
+            ${specials.map(s => renderOrderItem(`special-${s.id}`, '', s.name, s.price_cents || 0, null)).join('')}
+          </div>`;
+        }
+
+        // Square catalogue items, filtered
+        const visibleCats = (menuData.categories || []).map(cat => ({
+          ...cat,
+          items: cat.items.filter(i => !hiddenIds.has(i.id))
+        })).filter(cat => cat.items.length);
+
+        if (!visibleCats.length && !specials.length) {
+          menuEl.innerHTML = `<div style="color:rgba(255,255,255,0.4);text-align:center;padding:32px;font-size:13px;line-height:1.6;">The menu isn't available right now.<br>Please ask a member of staff.</div>`;
           return;
         }
 
-        menuEl.innerHTML = data.categories.map(cat => `
+        html += visibleCats.map(cat => `
           <div style="margin-bottom:24px;">
             <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-bottom:10px;">${cat.name}</div>
-            ${cat.items.map(item => `
-              <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
-                <div style="flex:1;min-width:0;">
-                  <div style="font-size:14px;font-weight:600;color:white;">${item.name}</div>
-                  ${item.description ? `<div style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:2px;">${item.description}</div>` : ''}
-                  ${item.priceCents ? `<div style="font-size:12px;color:#B87946;font-weight:600;margin-top:2px;">£${(item.priceCents/100).toFixed(2)}</div>` : ''}
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:12px;">
-                  <button onclick="orderAdjust('${item.id}','${item.variationId || ''}','${item.name.replace(/'/g,"\\'")}',${item.priceCents||0},-1)"
-                    style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,0.1);border:none;color:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">−</button>
-                  <span id="order-qty-${item.id}" style="min-width:20px;text-align:center;font-size:14px;font-weight:700;color:white;">0</span>
-                  <button onclick="orderAdjust('${item.id}','${item.variationId || ''}','${item.name.replace(/'/g,"\\'")}',${item.priceCents||0},+1)"
-                    style="width:30px;height:30px;border-radius:50%;background:#B87946;border:none;color:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">+</button>
-                </div>
-              </div>
-            `).join('')}
+            ${cat.items.map(item => renderOrderItem(item.id, item.variationId || '', item.name, item.priceCents || 0, item.description)).join('')}
           </div>
         `).join('');
 
+        menuEl.innerHTML = html;
         orderMenuLoaded = true;
       } catch (err) {
         menuEl.innerHTML = `<div style="color:rgba(255,255,255,0.4);text-align:center;padding:32px;font-size:13px;">Could not load the menu. Please ask a member of staff.</div>`;
       }
+    }
+
+    function renderOrderItem(id, variationId, name, priceCents, description) {
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:600;color:white;">${name}</div>
+          ${description ? `<div style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:2px;">${description}</div>` : ''}
+          ${priceCents ? `<div style="font-size:12px;color:#B87946;font-weight:600;margin-top:2px;">£${(priceCents/100).toFixed(2)}</div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:12px;">
+          <button onclick="orderAdjust('${id}','${variationId}','${name.replace(/'/g,"\\'")}',${priceCents},-1)"
+            style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,0.1);border:none;color:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;">−</button>
+          <span id="order-qty-${id}" style="min-width:20px;text-align:center;font-size:14px;font-weight:700;color:white;">0</span>
+          <button onclick="orderAdjust('${id}','${variationId}','${name.replace(/'/g,"\\'")}',${priceCents},+1)"
+            style="width:30px;height:30px;border-radius:50%;background:#B87946;border:none;color:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;">+</button>
+        </div>
+      </div>`;
     }
 
     function orderAdjust(id, variationId, name, priceCents, delta) {
@@ -2307,7 +2335,7 @@
       btn.disabled = true;
 
       try {
-        const res = await fetch(`${API_URL}/api/kds/order`, {
+        const res = await fetch(`${API_URL}/api/kds/dispatch`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -500,6 +500,181 @@ app.get('/api/kds/menu', async (req, res) => {
   }
 });
 
+// ── Daily specials: items staff add on the fly for today only ──
+// GET /api/menu/specials — today's specials for this studio
+app.get('/api/menu/specials', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const today = new Date(); today.setHours(0,0,0,0);
+  const { data } = await supabase.from('daily_specials')
+    .select('*').eq('studio_id', studioId)
+    .gte('created_at', today.toISOString())
+    .order('created_at', { ascending: true });
+  res.json({ specials: data || [] });
+});
+
+// POST /api/menu/specials — add a special
+app.post('/api/menu/specials', async (req, res) => {
+  const { studioId, name, priceCents } = req.body;
+  if (!studioId || !name) return res.status(400).json({ error: 'studioId and name required' });
+  const { data, error } = await supabase.from('daily_specials').insert({
+    studio_id: studioId, name, price_cents: priceCents || 0
+  }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ special: data });
+});
+
+// DELETE /api/menu/specials/:id — remove a special
+app.delete('/api/menu/specials/:id', async (req, res) => {
+  const { studioId } = req.query;
+  await supabase.from('daily_specials').delete().eq('id', req.params.id).eq('studio_id', studioId);
+  res.json({ deleted: true });
+});
+
+// ── Hidden items: staff can hide specific Square catalogue items from
+// the customer menu for today without removing them from Square ──
+// POST /api/menu/hidden — toggle an item hidden/visible
+app.post('/api/menu/hidden', async (req, res) => {
+  const { studioId, itemId, hidden } = req.body;
+  if (!studioId || !itemId) return res.status(400).json({ error: 'studioId and itemId required' });
+  if (hidden) {
+    await supabase.from('menu_hidden_items').upsert({
+      studio_id: studioId, item_id: itemId, hidden_date: new Date().toISOString().split('T')[0]
+    }, { onConflict: 'studio_id,item_id,hidden_date' });
+  } else {
+    await supabase.from('menu_hidden_items').delete()
+      .eq('studio_id', studioId).eq('item_id', itemId)
+      .eq('hidden_date', new Date().toISOString().split('T')[0]);
+  }
+  res.json({ ok: true });
+});
+
+// GET /api/menu/hidden — get today's hidden item IDs
+app.get('/api/menu/hidden', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const today = new Date().toISOString().split('T')[0];
+  const { data } = await supabase.from('menu_hidden_items').select('item_id')
+    .eq('studio_id', studioId).eq('hidden_date', today);
+  res.json({ hiddenIds: (data || []).map(r => r.item_id) });
+});
+
+// ── KDS Configuration — per-studio, supports multiple system types ──
+// GET /api/kds/config — get this studio's KDS setup
+app.get('/api/kds/config', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data } = await supabase.from('kds_config').select('*').eq('studio_id', studioId).single();
+  res.json({ config: data || { type: 'square', active: true } });
+});
+
+// POST /api/kds/config — save KDS config
+app.post('/api/kds/config', async (req, res) => {
+  const { studioId, type, webhookUrl, printerIp, emailAddress, active } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data, error } = await supabase.from('kds_config').upsert({
+    studio_id: studioId, type: type || 'square',
+    webhook_url: webhookUrl || null, printer_ip: printerIp || null,
+    email_address: emailAddress || null, active: active !== false
+  }, { onConflict: 'studio_id' }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ config: data });
+});
+
+// ── KDS order dispatcher — routes to the right system based on config ──
+// This replaces the simple Square-only /api/kds/order endpoint.
+// Existing endpoint still works for Square; this adds routing logic.
+app.post('/api/kds/dispatch', async (req, res) => {
+  const { studioId, bookingCode, customerName, items } = req.body;
+  if (!studioId || !items?.length) return res.status(400).json({ error: 'studioId and items required' });
+
+  try {
+    const { data: config } = await supabase.from('kds_config').select('*').eq('studio_id', studioId).single();
+    const kdsType = config?.type || 'square';
+
+    if (kdsType === 'square' || !config) {
+      // Route through existing Square order creation
+      const mockReq = { body: req.body };
+      const mockRes = {
+        json: (d) => res.json(d),
+        status: (c) => ({ json: (d) => res.status(c).json(d) })
+      };
+      // Re-use the /api/kds/order handler logic inline
+      const { data: conn } = await supabase.from('square_connections')
+        .select('square_access_token').eq('studio_id', studioId).single();
+      if (!conn) return res.status(404).json({ error: 'Square not connected' });
+      const squareClient = await getSquareClient(conn.square_access_token);
+      const locRes = await squareClient.locationsApi.listLocations();
+      const locationId = locRes.result.locations?.[0]?.id;
+      const lineItems = items.map(item => {
+        const li = { quantity: String(item.quantity || 1), note: `Table: ${bookingCode || 'walk-in'}${customerName ? ` · ${customerName}` : ''}` };
+        if (item.variationId) li.catalogObjectId = item.variationId;
+        else { li.name = item.name; if (item.priceCents) li.basePriceMoney = { amount: BigInt(item.priceCents), currency: 'GBP' }; }
+        return li;
+      });
+      const orderRes = await squareClient.ordersApi.createOrder({
+        order: { locationId, lineItems, referenceId: bookingCode || undefined, note: `kilnLINK · ${customerName || bookingCode || 'Customer'}`, state: 'OPEN' },
+        idempotencyKey: `klnk-${bookingCode || 'wk'}-${Date.now()}`,
+      });
+      return res.json({ status: 'sent', system: 'square', orderId: orderRes.result.order?.id });
+
+    } else if (kdsType === 'webhook' && config.webhook_url) {
+      // POST order as JSON to the studio's own webhook endpoint
+      const https = require('https'), http = require('http');
+      const url = new URL(config.webhook_url);
+      const body = JSON.stringify({ bookingCode, customerName, items, studio: studioId, source: 'kilnLINK' });
+      const proto = url.protocol === 'https:' ? https : http;
+      await new Promise((resolve, reject) => {
+        const reqOut = proto.request({ hostname: url.hostname, port: url.port || (url.protocol === 'https:' ? 443 : 80), path: url.pathname + url.search, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } }, (r) => resolve(r));
+        reqOut.on('error', reject);
+        reqOut.write(body);
+        reqOut.end();
+      });
+      return res.json({ status: 'sent', system: 'webhook' });
+
+    } else if (kdsType === 'email' && config.email_address) {
+      // Log order — email delivery would require an email service like SendGrid
+      // For now, store in a kds_orders table for polling / manual pickup
+      await supabase.from('kds_orders').insert({
+        studio_id: studioId, booking_code: bookingCode, customer_name: customerName,
+        items: JSON.stringify(items), status: 'pending', kds_type: 'email', created_at: new Date().toISOString()
+      });
+      return res.json({ status: 'queued', system: 'email', note: 'Order stored — email delivery requires SendGrid config' });
+
+    } else if (kdsType === 'manual') {
+      // Store for staff to see on their KDS screen in the dashboard
+      await supabase.from('kds_orders').insert({
+        studio_id: studioId, booking_code: bookingCode, customer_name: customerName,
+        items: JSON.stringify(items), status: 'pending', kds_type: 'manual', created_at: new Date().toISOString()
+      });
+      return res.json({ status: 'queued', system: 'manual' });
+    }
+
+    res.status(400).json({ error: `Unknown KDS type: ${kdsType}` });
+  } catch (err) {
+    console.error('KDS dispatch error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/kds/orders — manual KDS polling for studios without a real KDS
+app.get('/api/kds/orders', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const today = new Date(); today.setHours(0,0,0,0);
+  const { data } = await supabase.from('kds_orders').select('*')
+    .eq('studio_id', studioId).gte('created_at', today.toISOString())
+    .order('created_at', { ascending: false });
+  res.json({ orders: data || [] });
+});
+
+// PATCH /api/kds/orders/:id — mark an order done/complete
+app.patch('/api/kds/orders/:id', async (req, res) => {
+  const { status } = req.body;
+  await supabase.from('kds_orders').update({ status }).eq('id', req.params.id);
+  res.json({ ok: true });
+});
+
 // ═══════════════════════════════════════════
 // STRIPE BILLING ROUTES
 // ═══════════════════════════════════════════
