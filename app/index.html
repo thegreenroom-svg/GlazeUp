@@ -237,7 +237,7 @@
       #design-preview-screen { transition: none; }
     }
 
-    #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen {
+    #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen, #new-booking-screen {
       position: fixed;
       inset: 0;
       background: var(--link-charcoal);
@@ -247,11 +247,11 @@
       transform: translateY(100%);
       transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
     }
-    #community-share-screen.open, #community-feed-screen.open, #colour-picker-screen.open, #my-bookings-screen.open {
+    #community-share-screen.open, #community-feed-screen.open, #colour-picker-screen.open, #my-bookings-screen.open, #new-booking-screen.open {
       transform: translateY(0);
     }
     @media (prefers-reduced-motion: reduce) {
-      #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen { transition: none; }
+      #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen, #new-booking-screen { transition: none; }
     }
 
     .cp-tab {
@@ -336,6 +336,34 @@
     .mb-card .mb-date { color: #fff; font-weight: 700; font-size: 14px; }
     .mb-card .mb-meta { color: rgba(255,255,255,0.6); font-size: 12px; margin-top: 3px; }
     .mb-empty { color: rgba(255,255,255,0.5); text-align: center; padding: 20px; font-size: 13px; }
+
+    .nb-date-chip {
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.06);
+      border: 1.5px solid transparent;
+      border-radius: 14px;
+      padding: 10px 14px;
+      text-align: center;
+      cursor: pointer;
+      min-width: 58px;
+    }
+    .nb-date-chip .nb-day { color: rgba(255,255,255,0.6); font-size: 10px; text-transform: uppercase; font-weight: 600; }
+    .nb-date-chip .nb-num { color: #fff; font-size: 18px; font-weight: 700; margin-top: 2px; }
+    .nb-date-chip.active { background: var(--link-clay); border-color: var(--link-clay); }
+
+    .nb-slot {
+      background: rgba(255,255,255,0.06);
+      border: 1.5px solid transparent;
+      border-radius: 12px;
+      padding: 12px 8px;
+      text-align: center;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .nb-slot.active { background: var(--link-clay); }
+    .nb-slot.full { opacity: 0.3; cursor: not-allowed; }
 
     .cf-post {
       background: rgba(255,255,255,0.06);
@@ -829,6 +857,11 @@
       <button onclick="closeMyBookings()">✕ Close</button>
     </div>
     <div style="flex:1; overflow-y:auto; padding:16px;">
+      <button class="tile tile-oxblood" style="margin-bottom:20px;" onclick="openNewBooking()">
+        <span class="tile-icon">➕</span>
+        <div class="tile-title">Book a New Session</div>
+        <div class="tile-desc">Pick a date and time that works for you.</div>
+      </button>
       <div id="mb-upcoming-section">
         <div style="color:#fff; font-weight:700; font-size:14px; margin-bottom:10px;">Upcoming</div>
         <div id="mb-upcoming-list" style="margin-bottom:24px;"></div>
@@ -836,6 +869,42 @@
       <div id="mb-past-section">
         <div style="color:#fff; font-weight:700; font-size:14px; margin-bottom:10px;">Past visits</div>
         <div id="mb-past-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Booking: date + time slot picker. PREVIEW ONLY for now — shows
+       mock availability, doesn't write a real booking yet. Real Square
+       write-access is a separate step to be connected later. -->
+  <div id="new-booking-screen">
+    <div class="dp-header">
+      <span class="dp-title">Book a New Session</span>
+      <button onclick="closeNewBooking()">✕ Close</button>
+    </div>
+    <div style="padding:12px 16px 0;">
+      <div style="background:rgba(184,121,70,0.18); border:1px solid rgba(184,121,70,0.4); border-radius:12px; padding:10px 12px; font-size:12px; color:#fff; margin-bottom:16px; line-height:1.5;">
+        🚧 Preview — showing sample availability. Real-time booking connects to the studio calendar soon.
+      </div>
+    </div>
+    <div style="padding:0 16px;">
+      <div style="color:#fff; font-weight:700; font-size:14px; margin-bottom:10px;">Choose a date</div>
+      <div id="nb-date-strip" style="display:flex; gap:8px; overflow-x:auto; padding-bottom:14px;"></div>
+    </div>
+    <div style="padding:0 16px; flex:1; overflow-y:auto;">
+      <div id="nb-slots-label" style="color:#fff; font-weight:700; font-size:14px; margin-bottom:10px;"></div>
+      <div id="nb-slots-grid" style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:20px;"></div>
+      <div id="nb-confirm-area" style="display:none; padding-bottom:24px;">
+        <div style="background:rgba(255,255,255,0.06); border-radius:14px; padding:16px; margin-bottom:14px;">
+          <div style="color:rgba(255,255,255,0.6); font-size:12px; margin-bottom:4px;">You've selected</div>
+          <div id="nb-selected-summary" style="color:#fff; font-weight:700; font-size:16px;"></div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="font-size:12px; font-weight:600; color:#fff; display:block; margin-bottom:4px;">How many people?</label>
+          <input type="number" id="nb-party-size" min="1" max="20" value="2" style="width:100%; padding:12px; border-radius:12px; border:none; font-size:14px; box-sizing:border-box;">
+        </div>
+        <button class="tile tile-oxblood" style="width:100%;" onclick="confirmNewBooking()">
+          <div class="tile-title">Request This Time</div>
+        </button>
       </div>
     </div>
   </div>
@@ -1475,6 +1544,99 @@
       } catch (err) {
         upcomingEl.innerHTML = `<div class="mb-empty">Could not load your bookings.</div>`;
       }
+    }
+
+    // ── New Booking flow: date + time slot picker. PREVIEW ONLY — mock
+    // availability generated client-side, nothing is actually written to
+    // Square yet. Structured so swapping in a real availability API call
+    // later only touches generateMockAvailability(), not the UI/flow. ──
+    let nbSelectedDate = null;
+    let nbSelectedSlot = null;
+
+    function openNewBooking() {
+      const screen = document.getElementById('new-booking-screen');
+      screen.style.display = 'flex';
+      void screen.offsetWidth;
+      screen.classList.add('open');
+      renderNbDateStrip();
+    }
+    function closeNewBooking() {
+      const screen = document.getElementById('new-booking-screen');
+      screen.classList.remove('open');
+      setTimeout(() => { screen.style.display = 'none'; }, 280);
+      nbSelectedDate = null;
+      nbSelectedSlot = null;
+      document.getElementById('nb-confirm-area').style.display = 'none';
+    }
+
+    function renderNbDateStrip() {
+      const strip = document.getElementById('nb-date-strip');
+      const today = new Date();
+      const dates = [];
+      for (let i = 0; i < 14; i++) {
+        const d = new Date(today);
+        d.setDate(d.getDate() + i);
+        dates.push(d);
+      }
+      strip.innerHTML = dates.map((d, i) => `
+        <div class="nb-date-chip" data-index="${i}" onclick="selectNbDate(${i})">
+          <div class="nb-day">${d.toLocaleDateString('en-GB', { weekday: 'short' })}</div>
+          <div class="nb-num">${d.getDate()}</div>
+        </div>
+      `).join('');
+      window._nbDates = dates;
+      selectNbDate(0);
+    }
+
+    function selectNbDate(index) {
+      nbSelectedDate = window._nbDates[index];
+      nbSelectedSlot = null;
+      document.querySelectorAll('.nb-date-chip').forEach((el, i) => el.classList.toggle('active', i === index));
+      document.getElementById('nb-confirm-area').style.display = 'none';
+
+      const label = document.getElementById('nb-slots-label');
+      label.textContent = nbSelectedDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+
+      renderNbSlots(generateMockAvailability(nbSelectedDate));
+    }
+
+    // Mock availability — replace with a real Square availability call later.
+    // Deterministic per-day (not random each render) so it doesn't jump
+    // around distractingly while someone's looking at it.
+    function generateMockAvailability(date) {
+      const slots = ['10:00', '11:00', '12:00', '13:30', '14:30', '15:30', '16:30', '17:30'];
+      const seed = date.getDate();
+      return slots.map((time, i) => ({
+        time,
+        available: (seed + i) % 4 !== 0 // roughly 3/4 of slots open, stable per day
+      }));
+    }
+
+    function renderNbSlots(slots) {
+      const grid = document.getElementById('nb-slots-grid');
+      grid.innerHTML = slots.map((s, i) => `
+        <div class="nb-slot ${s.available ? '' : 'full'}" onclick="${s.available ? `selectNbSlot(${i}, '${s.time}')` : ''}">
+          ${s.time}${!s.available ? '<br><span style="font-size:10px; opacity:0.8;">Full</span>' : ''}
+        </div>
+      `).join('');
+    }
+
+    function selectNbSlot(index, time) {
+      nbSelectedSlot = time;
+      document.querySelectorAll('.nb-slot').forEach((el, i) => el.classList.toggle('active', i === index));
+
+      document.getElementById('nb-selected-summary').textContent =
+        nbSelectedDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) + ' at ' + time;
+      document.getElementById('nb-confirm-area').style.display = 'block';
+    }
+
+    function confirmNewBooking() {
+      const partySize = document.getElementById('nb-party-size').value;
+      const summary = document.getElementById('nb-selected-summary').textContent;
+      // Preview only — no real booking is created yet. Once Square write-access
+      // is connected, this becomes a real POST to create the appointment.
+      alert(`Preview only for now!\n\nWhen this connects to the studio calendar, this would request:\n${summary}\nParty of ${partySize}`);
+      closeNewBooking();
     }
 
     function renderDpPalette() {
