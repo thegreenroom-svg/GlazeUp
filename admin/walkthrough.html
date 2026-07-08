@@ -22,8 +22,6 @@
   .wt-screen-wrap { flex:1; display:flex; align-items:center; justify-content:center; padding:10px 16px; position:relative; overflow:hidden; }
   .wt-screen { width:100%; max-width:580px; position:relative; }
   .wt-screen svg.main { width:100%; border-radius:10px; box-shadow:0 4px 20px rgba(43,39,36,0.18); display:block; }
-  .wt-arrow-layer { position:absolute; inset:0; pointer-events:none; }
-  .wt-arrow-layer svg { width:100%; height:100%; overflow:visible; }
   .wt-controls { padding:12px 20px 18px; display:flex; flex-direction:column; align-items:center; gap:10px; background:white; border-top:1px solid #e0d8d0; }
   .wt-btn-row { display:flex; gap:8px; }
   .wt-btn { background:#f0ebe4; border:1px solid #d0c8c0; color:var(--charcoal); border-radius:8px; padding:10px 18px; font-size:13px; font-weight:600; cursor:pointer; }
@@ -50,8 +48,8 @@
   <div class="wt-screen" id="screen-wrap">
     <svg class="main" id="main-svg" viewBox="0 0 280 180">
       <g id="screen-content"></g>
+      <g id="arrow-layer"></g>
     </svg>
-    <div class="wt-arrow-layer" id="arrow-layer"></div>
   </div>
 </div>
 <div class="wt-controls">
@@ -472,67 +470,69 @@ function render() {
 function renderArrows() {
   const step = STEPS[cur];
   const layer = document.getElementById('arrow-layer');
-  if (!step.arrows.length) { layer.innerHTML = ''; return; }
+  layer.innerHTML = '';
+  if (!step.arrows.length) return;
 
-  const svgEl = document.getElementById('main-svg');
-  const svgRect = svgEl.getBoundingClientRect();
-  const wrapRect = document.getElementById('screen-wrap').getBoundingClientRect();
-
-  // ViewBox is 280x180
-  const scaleX = svgRect.width / 280;
-  const scaleY = svgRect.height / 180;
-  const offX = svgRect.left - wrapRect.left;
-  const offY = svgRect.top - wrapRect.top;
-
-  const bounce = Math.sin(bounceAngle) * 6;
+  const bounce = Math.sin(bounceAngle) * 3;
   const ns = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('style', 'position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;');
 
   step.arrows.forEach(a => {
-    const ax = offX + a.vx * scaleX;
-    const ay = offY + a.vy * scaleY;
+    // All coordinates are in SVG viewBox space (280x180) — no DOM math needed
+    const ax = a.vx, ay = a.vy;
     const isUp = a.dir === 'up';
     const isRight = a.dir === 'right';
 
-    const arrowTip = isUp ? ay - 12 + bounce : isRight ? ay : ay + 12 - bounce;
-    const arrowX = isRight ? ax + 12 - bounce : ax;
-    const labelY = isUp ? ay - 26 : isRight ? ay - 8 : ay + 24;
-    const labelX = isRight ? ax + 30 : ax;
-    const labelW = a.label.length * 6.5 + 16;
-
     const g = document.createElementNS(ns, 'g');
 
+    // Arrow triangle — bounces in place
+    const tri = document.createElementNS(ns, 'polygon');
+    let pts, labelX, labelY;
+
+    if (isRight) {
+      const tipX = ax + 4 + bounce;
+      pts = `${tipX},${ay} ${tipX-9},${ay-5} ${tipX-9},${ay+5}`;
+      labelX = tipX + 16;
+      labelY = ay;
+    } else if (isUp) {
+      const tipY = ay - 8 + bounce;
+      pts = `${ax},${tipY} ${ax-6},${tipY+9} ${ax+6},${tipY+9}`;
+      labelX = ax;
+      labelY = tipY - 12;
+    } else {
+      const tipY = ay + 8 - bounce;
+      pts = `${ax},${tipY} ${ax-6},${tipY-9} ${ax+6},${tipY-9}`;
+      labelX = ax;
+      labelY = tipY + 16;
+    }
+
+    tri.setAttribute('points', pts);
+    tri.setAttribute('fill', CLAY);
+    g.appendChild(tri);
+
+    // Label bubble
+    const labelW = a.label.length * 2.2 + 8;
     const bg = document.createElementNS(ns, 'rect');
-    bg.setAttribute('x', labelX - labelW/2); bg.setAttribute('y', labelY - 10);
-    bg.setAttribute('width', labelW); bg.setAttribute('height', 16);
-    bg.setAttribute('rx', '8'); bg.setAttribute('fill', CLAY);
+    bg.setAttribute('x', labelX - labelW/2);
+    bg.setAttribute('y', isRight ? labelY - 4 : labelY - 7);
+    bg.setAttribute('width', labelW);
+    bg.setAttribute('height', 9);
+    bg.setAttribute('rx', '4');
+    bg.setAttribute('fill', CLAY);
     g.appendChild(bg);
 
     const t = document.createElementNS(ns, 'text');
-    t.setAttribute('x', labelX); t.setAttribute('y', labelY + 2);
-    t.setAttribute('fill', 'white'); t.setAttribute('font-size', '11');
-    t.setAttribute('font-weight', '700'); t.setAttribute('font-family', 'sans-serif');
+    t.setAttribute('x', labelX);
+    t.setAttribute('y', isRight ? labelY + 2 : labelY - 0.5);
+    t.setAttribute('fill', 'white');
+    t.setAttribute('font-size', '4.5');
+    t.setAttribute('font-weight', '700');
+    t.setAttribute('font-family', 'sans-serif');
     t.setAttribute('text-anchor', 'middle');
     t.textContent = a.label;
     g.appendChild(t);
 
-    const tri = document.createElementNS(ns, 'polygon');
-    let pts;
-    if (isRight) {
-      pts = `${arrowX},${ay} ${arrowX-13},${ay-7} ${arrowX-13},${ay+7}`;
-    } else if (isUp) {
-      pts = `${ax},${arrowTip} ${ax-8},${arrowTip+13} ${ax+8},${arrowTip+13}`;
-    } else {
-      pts = `${ax},${arrowTip} ${ax-8},${arrowTip-13} ${ax+8},${arrowTip-13}`;
-    }
-    tri.setAttribute('points', pts); tri.setAttribute('fill', CLAY);
-    g.appendChild(tri);
-    svg.appendChild(g);
+    layer.appendChild(g);
   });
-
-  layer.innerHTML = '';
-  layer.appendChild(svg);
 }
 
 function goTo(i) {
@@ -573,12 +573,11 @@ function scheduleNext() {
 }
 
 function animateArrows() {
-  bounceAngle += 0.08;
+  bounceAngle += 0.06;
   renderArrows();
   requestAnimationFrame(animateArrows);
 }
 
-window.addEventListener('resize', renderArrows);
 render();
 animateArrows();
 </script>
