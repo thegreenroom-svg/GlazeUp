@@ -5438,6 +5438,166 @@ function resetIdleTimer() {
 });
 resetIdleTimer();
 
+// ═══════════════════════════════════════════════════════
+// EXTRAS ALERT SYSTEM
+// Polls every 30 seconds for new app extra charges.
+// Plays an audible ping + shows a toast when anything new
+// comes in from the customer app (glazes, tools, tablet etc).
+// Staff can mute from the alert badge.
+// ═══════════════════════════════════════════════════════
+
+let extrasAlertMuted = localStorage.getItem('klnk_alert_muted') === '1';
+let extrasLastSeenIds = new Set();
+let extrasAlertTimer = null;
+let audioCtx = null;
+
+// Synthesise a clean double-ping using Web Audio API —
+// no external files needed, works offline.
+function playExtrasPing() {
+  if (extrasAlertMuted) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = audioCtx;
+    const playTone = (freq, startTime, duration) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, startTime);
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(0.35, startTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    };
+    const now = ctx.currentTime;
+    playTone(880, now, 0.18);        // first ping
+    playTone(1100, now + 0.22, 0.18); // second ping — slightly higher
+  } catch (e) {
+    // Web Audio not available — silent fail
+  }
+}
+
+function showExtrasToast(items) {
+  const existing = document.getElementById('extras-alert-toast');
+  if (existing) existing.remove();
+
+  const names = items.map(i => i.item_name).join(' · ');
+  const total = items.reduce((s, i) => s + (i.amount_cents || 0), 0);
+  const toast = document.createElement('div');
+  toast.id = 'extras-alert-toast';
+  toast.innerHTML = `
+    <div style="display:flex;align-items:flex-start;gap:12px;">
+      <div style="font-size:22px;flex-shrink:0;">🔔</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:700;color:#2B2724;margin-bottom:3px;">New app extras charged</div>
+        <div style="font-size:12px;color:#8a8175;line-height:1.4;word-break:break-word;">${names}</div>
+        ${total ? `<div style="font-size:13px;font-weight:700;color:#B87946;margin-top:4px;">+£${(total/100).toFixed(2)} to add at checkout</div>` : ''}
+      </div>
+      <button onclick="this.closest('#extras-alert-toast').remove()" style="background:none;border:none;color:#8a8175;font-size:16px;cursor:pointer;flex-shrink:0;padding:0;line-height:1;">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button onclick="goToTab('dashboard');this.closest('#extras-alert-toast').remove()" style="flex:1;background:#2B2724;color:white;border:none;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;">View dashboard</button>
+      <button onclick="toggleExtrasAlertMute()" id="extras-mute-btn" style="background:none;border:1px solid #C8BFB2;border-radius:8px;padding:8px 12px;font-size:11px;color:#8a8175;cursor:pointer;">${extrasAlertMuted ? '🔔 Unmute' : '🔇 Mute alerts'}</button>
+    </div>
+  `;
+  toast.style.cssText = `
+    position:fixed;bottom:24px;right:16px;z-index:9500;
+    background:white;border-radius:16px;padding:16px;
+    box-shadow:0 8px 32px rgba(43,39,36,0.25);
+    max-width:320px;width:calc(100vw - 32px);
+    border:1px solid #E8D9C4;
+    animation:toastSlideIn .3s ease;
+  `;
+  document.body.appendChild(toast);
+
+  // Auto-dismiss after 8 seconds
+  setTimeout(() => { if (toast.parentNode) toast.remove(); }, 8000);
+}
+
+function toggleExtrasAlertMute() {
+  extrasAlertMuted = !extrasAlertMuted;
+  localStorage.setItem('klnk_alert_muted', extrasAlertMuted ? '1' : '0');
+  const btn = document.getElementById('extras-mute-btn');
+  if (btn) btn.textContent = extrasAlertMuted ? '🔔 Unmute' : '🔇 Mute alerts';
+  // Show a quick status
+  const status = document.createElement('div');
+  status.textContent = extrasAlertMuted ? '🔇 Alerts muted' : '🔔 Alerts on';
+  status.style.cssText = 'position:fixed;top:70px;right:16px;z-index:9600;background:#2B2724;color:white;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;';
+  document.body.appendChild(status);
+  setTimeout(() => status.remove(), 2000);
+}
+
+async function pollExtrasForAlerts() {
+  if (!apiConnected || !studioId) return;
+  try {
+    const res = await fetch(`${API_URL}/api/extras/today?studioId=${studioId}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.bookings) return;
+
+    // Flatten all individual charge items with unique IDs
+    const newItems = [];
+    data.bookings.forEach(b => {
+      (b.items || []).forEach(item => {
+        if (item.id && !extrasLastSeenIds.has(item.id)) {
+          newItems.push(item);
+        }
+      });
+    });
+
+    if (newItems.length > 0) {
+      // Mark all as seen
+      data.bookings.forEach(b => {
+        (b.items || []).forEach(item => { if (item.id) extrasLastSeenIds.add(item.id); });
+      });
+
+      playExtrasPing();
+      showExtrasToast(newItems);
+
+      // Refresh the extras panel if on dashboard tab
+      const dashView = document.getElementById('dashboard-view');
+      if (dashView && dashView.style.display !== 'none') {
+        loadTodaysExtraCharges();
+      }
+    } else {
+      // Seed the seen set on first poll (don't alert for existing charges)
+      data.bookings.forEach(b => {
+        (b.items || []).forEach(item => { if (item.id) extrasLastSeenIds.add(item.id); });
+      });
+    }
+  } catch (e) { /* silent — network hiccup */ }
+}
+
+// Add toast animation keyframe
+const alertStyle = document.createElement('style');
+alertStyle.textContent = `
+  @keyframes toastSlideIn {
+    from { transform: translateX(110%); opacity: 0; }
+    to   { transform: translateX(0);    opacity: 1; }
+  }
+`;
+document.head.appendChild(alertStyle);
+
+// Start polling once the dashboard is loaded.
+// We delay the first poll so we can seed the seen IDs
+// without firing alerts for existing charges from before this session.
+function startExtrasPolling() {
+  // Seed on first load
+  pollExtrasForAlerts().then(() => {
+    // Then poll every 30 seconds
+    extrasAlertTimer = setInterval(pollExtrasForAlerts, 30 * 1000);
+  });
+}
+
+// Wire into populateDashboard — start polling when the dashboard loads
+const _origPopulate = populateDashboard;
+populateDashboard = async function() {
+  await _origPopulate();
+  if (!extrasAlertTimer) startExtrasPolling();
+};
+
 </script>
 
 </body>
