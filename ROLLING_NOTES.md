@@ -69,7 +69,7 @@ Each step hides the others (`display:none` toggling via `s1ChooseWalkIn()`, `s1C
 
 ★ PAID TOOLS PAYWALL — PROTOTYPE FOR APPRAISAL (2026-07-08): Daisy wants some customer app tools free, others chargeable, tallied against the booking rather than charged directly — real payment processing to be wired up once billing is properly sorted. Built as a genuine working prototype:
 
-**Free:** Design Preview, Colour Picker (unchanged). **Paid:** Transfer Designer, £1/visit (easy to change — see `PAID_TOOL_PRICE_CENTS` in app/index.html).
+**Free:** Colour Picker only. **Paid:** Design Preview AND Transfer Designer, £1/visit each (Daisy's follow-up: "make the palette colour selector free and make the other one a pound as well" — generalized the paywall from a single hardcoded tool to a `PAID_TOOLS` config object so adding/removing paid tools is now a one-line change rather than duplicated logic).
 
 - New table `app_extra_charges` (studio_id, booking_code, item_name, amount_cents, created_at) — deliberately NOT tied to `table_session_id`, since a customer may open the app before staff have opened their table in Section 1/2; this works regardless of that timing.
 - `GET /api/extras/unlocked` — checks if this booking already paid for this tool this visit (so reopening the app later doesn't charge again)

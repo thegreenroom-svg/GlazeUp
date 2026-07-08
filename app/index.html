@@ -1026,11 +1026,11 @@
   <div id="extra-charge-modal" style="display:none; position:fixed; inset:0; background:rgba(43,39,36,0.7); backdrop-filter:blur(4px); z-index:3000; align-items:center; justify-content:center; padding:20px;">
     <div style="background:#fff; border-radius:16px; padding:22px; max-width:320px; width:100%; text-align:center;">
       <div style="font-size:32px; margin-bottom:8px;">✨</div>
-      <div style="font-family:var(--gu-font-display); font-weight:700; font-size:17px; color:var(--gu-accent); margin-bottom:6px;">Unlock Transfer Designer</div>
+      <div id="ecm-title" style="font-family:var(--gu-font-display); font-weight:700; font-size:17px; color:var(--gu-accent); margin-bottom:6px;">Unlock this tool</div>
       <div id="ecm-body" style="font-size:13px; color:var(--gu-dust); line-height:1.5; margin-bottom:18px;">
         This tool is <strong>£1 for your visit</strong> — added to your bill, no payment needed now.
       </div>
-      <button onclick="confirmUnlockTransferDesigner()" id="ecm-confirm-btn" style="width:100%; background:var(--link-charcoal); color:#fff; border:none; padding:13px; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; margin-bottom:8px;">Unlock for £1</button>
+      <button onclick="confirmUnlockPaidTool()" id="ecm-confirm-btn" style="width:100%; background:var(--link-charcoal); color:#fff; border:none; padding:13px; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; margin-bottom:8px;">Unlock for £1</button>
       <button onclick="closeExtraChargeModal()" style="width:100%; background:none; color:var(--gu-dust); border:none; padding:10px; font-size:13px; cursor:pointer;">Not now</button>
     </div>
   </div>
@@ -1275,10 +1275,11 @@
             <div class="tile-desc">Browse the studio's glaze colours and plan your palette.</div>
           </button>
 
-          <button class="tile tile-honey" onclick="openDesignPreview()">
+          <button class="tile tile-honey" onclick="openDesignPreviewGated()" style="position: relative;">
             <span class="tile-icon">🖼️</span>
             <div class="tile-title">Design Preview</div>
             <div class="tile-desc">Photograph your real piece, then preview colours right on it.</div>
+            <span style="position:absolute; top:14px; right:16px; background:rgba(255,255,255,0.25); font-size:10px; font-weight:700; padding:3px 9px; border-radius:20px;">£1</span>
           </button>
 
           <button class="tile tile-oxblood" onclick="openTransferDesignerGated()" style="position: relative;">
@@ -1919,41 +1920,56 @@
     let tdUndoStack = [];
 
     // ── Paid tools paywall — PROTOTYPE, for appraisal, not wired to real
-    // payment processing yet. Design Preview and Colour Picker stay free;
-    // Transfer Designer is £1/visit, tallied against the booking (checked
-    // at checkout), not charged directly through the app. ──
-    const PAID_TOOL_PRICE_CENTS = 100; // £1
-    const PAID_TOOL_NAME = 'Transfer Designer';
+    // payment processing yet. Colour Picker stays free; Design Preview and
+    // Transfer Designer are £1/visit each, tallied against the booking
+    // (checked at checkout), not charged directly through the app. ──
+    const PAID_TOOLS = {
+      designPreview: { name: 'Design Preview', priceCents: 100, openFn: openDesignPreview },
+      transferDesigner: { name: 'Transfer Designer', priceCents: 100, openFn: openTransferDesigner }
+    };
+    let pendingPaidTool = null;
 
-    async function openTransferDesignerGated() {
+    async function openPaidTool(toolKey) {
+      const tool = PAID_TOOLS[toolKey];
       const bookingCode = window.currentBooking ? window.currentBooking.code : null;
       if (!bookingCode) {
         // No booking context (e.g. testing without a code) — just open it
-        openTransferDesigner();
+        tool.openFn();
         return;
       }
 
       try {
-        const res = await fetch(`${API_URL}/api/extras/unlocked?studioId=${STUDIO_ID}&bookingCode=${encodeURIComponent(bookingCode)}&itemName=${encodeURIComponent(PAID_TOOL_NAME)}`);
+        const res = await fetch(`${API_URL}/api/extras/unlocked?studioId=${STUDIO_ID}&bookingCode=${encodeURIComponent(bookingCode)}&itemName=${encodeURIComponent(tool.name)}`);
         const data = await res.json();
         if (data.unlocked) {
-          openTransferDesigner(); // already paid for this visit
+          tool.openFn(); // already paid for this visit
         } else {
+          pendingPaidTool = toolKey;
+          document.getElementById('ecm-title').textContent = `Unlock ${tool.name}`;
+          document.getElementById('ecm-body').innerHTML = `This tool is <strong>£${(tool.priceCents / 100).toFixed(2)} for your visit</strong> — added to your bill, no payment needed now.`;
+          document.getElementById('ecm-confirm-btn').textContent = `Unlock for £${(tool.priceCents / 100).toFixed(2)}`;
           document.getElementById('extra-charge-modal').style.display = 'flex';
         }
       } catch (err) {
         // If the check fails, don't block the customer — just open it
-        openTransferDesigner();
+        tool.openFn();
       }
     }
 
+    function openTransferDesignerGated() { openPaidTool('transferDesigner'); }
+    function openDesignPreviewGated() { openPaidTool('designPreview'); }
+
     function closeExtraChargeModal() {
       document.getElementById('extra-charge-modal').style.display = 'none';
+      pendingPaidTool = null;
     }
 
-    async function confirmUnlockTransferDesigner() {
+    async function confirmUnlockPaidTool() {
+      if (!pendingPaidTool) return;
+      const tool = PAID_TOOLS[pendingPaidTool];
       const bookingCode = window.currentBooking ? window.currentBooking.code : null;
       const btn = document.getElementById('ecm-confirm-btn');
+      const originalLabel = btn.textContent;
       btn.textContent = 'Unlocking…';
       btn.disabled = true;
 
@@ -1964,18 +1980,19 @@
           body: JSON.stringify({
             studioId: STUDIO_ID,
             bookingCode,
-            itemName: PAID_TOOL_NAME,
-            amountCents: PAID_TOOL_PRICE_CENTS
+            itemName: tool.name,
+            amountCents: tool.priceCents
           })
         });
       } catch (err) {
         console.error('Could not record charge, opening anyway:', err);
       }
 
+      const openFn = tool.openFn;
       closeExtraChargeModal();
-      btn.textContent = 'Unlock for £1';
+      btn.textContent = originalLabel;
       btn.disabled = false;
-      openTransferDesigner();
+      openFn();
     }
 
     function openTransferDesigner() {
