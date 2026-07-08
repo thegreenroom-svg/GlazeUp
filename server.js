@@ -1980,6 +1980,80 @@ app.get('/api/community/feed', async (req, res) => {
   }
 });
 
+// GET /api/community/global — cross-studio discover feed (all public posts)
+app.get('/api/community/global', async (req, res) => {
+  try {
+    const { data: posts, error } = await supabase
+      .from('community_posts')
+      .select('*, studios(city, country, public_bio, instagram_handle)')
+      .in('visibility', ['global', 'studio'])
+      .order('created_at', { ascending: false })
+      .limit(80);
+    if (error) throw error;
+    res.json({ posts: posts || [] });
+  } catch (err) {
+    console.error('Error fetching global feed:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/community/posts/:postId/feature — staff feature a post (boosts to global)
+app.post('/api/community/posts/:postId/feature', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await supabase.from('community_posts').update({ is_featured: true, visibility: 'global' }).eq('id', req.params.postId);
+    res.json({ status: 'featured' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/marketplace — browse listed designs
+app.get('/api/marketplace', async (req, res) => {
+  const { studioId } = req.query;
+  try {
+    let query = supabase.from('marketplace_designs').select('id, studio_id, customer_display_name, title, description, image_data, price_cents, download_count, created_at').order('created_at', { ascending: false }).limit(60);
+    if (studioId) query = query.eq('studio_id', studioId);
+    const { data, error } = await query;
+    if (error) throw error;
+    res.json({ designs: data || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/marketplace — list a design for sale
+app.post('/api/marketplace', async (req, res) => {
+  const { studioId, bookingCode, customerDisplayName, title, description, imageData, priceCents } = req.body;
+  if (!studioId || !imageData || !title) return res.status(400).json({ error: 'studioId, title and imageData required' });
+  try {
+    const { data, error } = await supabase.from('marketplace_designs').insert({
+      studio_id: studioId, booking_code: bookingCode || null,
+      customer_display_name: customerDisplayName || 'A customer',
+      title, description: description || null, image_data: imageData,
+      price_cents: priceCents || 100
+    }).select().single();
+    if (error) throw error;
+    res.json({ status: 'listed', design: data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/marketplace/:id/use — customer uses a design (pre-loads into Transfer Designer)
+app.post('/api/marketplace/:id/use', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await supabase.from('marketplace_designs').update({ download_count: supabase.rpc('increment', { row_id: id }) }).eq('id', id);
+    const { data, error } = await supabase.from('marketplace_designs').select('image_data, title').eq('id', id).single();
+    if (error) throw error;
+    res.json({ imageData: data.image_data, title: data.title });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 /**
  * POST /api/community/posts/:postId/like
  * Simple like toggle, deduped by a device fingerprint (no login required)

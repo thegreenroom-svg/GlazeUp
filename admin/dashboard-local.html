@@ -3639,18 +3639,30 @@ async function loadStaffCommunityFeed() {
     }
 
     listEl.innerHTML = data.posts.map(p => `
-      <div style="display: flex; gap: 12px; padding: 12px; background: #fff9f0; border-left: 4px solid var(--gu-primary); border-radius: 4px; margin-bottom: 8px;">
+      <div style="display: flex; gap: 12px; padding: 12px; background: #fff9f0; border-left: 4px solid ${p.is_featured ? '#B87946' : 'var(--gu-primary)'}; border-radius: 4px; margin-bottom: 8px;">
         <img src="${p.photo_url}" style="width: 64px; height: 64px; object-fit: cover; border-radius: 8px; flex-shrink: 0;">
         <div style="flex: 1; min-width: 0;">
-          <div style="font-size: 13px; font-weight: 600;">${p.customer_display_name || 'A customer'}${p.piece_type ? ' · ' + p.piece_type : ''}</div>
+          <div style="font-size: 13px; font-weight: 600;">${p.customer_display_name || 'A customer'}${p.piece_type ? ' · ' + p.piece_type : ''}${p.is_featured ? ' ✨' : ''}</div>
           ${p.caption ? `<div style="font-size: 12px; color: var(--gu-dust); margin-top: 2px;">${p.caption}</div>` : ''}
           <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;">❤️ ${p.likes_count || 0} · ${new Date(p.created_at).toLocaleDateString('en-GB')}</div>
         </div>
-        <button onclick="removeCommunityPost('${p.id}')" style="background: none; border: 1px solid var(--gu-border); border-radius: 8px; padding: 6px 10px; font-size: 11px; color: #d9534f; cursor: pointer; align-self: flex-start; flex-shrink: 0;">Remove</button>
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          ${!p.is_featured ? `<button onclick="featureCommunityPost('${p.id}')" style="background: var(--link-clay); border: none; border-radius: 8px; padding: 6px 8px; font-size: 10px; color: #fff; cursor: pointer; font-weight:600;">✨ Feature</button>` : '<span style="font-size:10px;color:var(--link-clay);font-weight:700;">Featured</span>'}
+          <button onclick="removeCommunityPost('${p.id}')" style="background: none; border: 1px solid var(--gu-border); border-radius: 8px; padding: 6px 8px; font-size: 11px; color: #d9534f; cursor: pointer;">Remove</button>
+        </div>
       </div>
     `).join('');
   } catch (err) {
     listEl.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Could not load your feed.</div>`;
+  }
+}
+
+async function featureCommunityPost(postId) {
+  try {
+    await fetch(`${API_URL}/api/community/posts/${postId}/feature`, { method: 'POST' });
+    loadCommunityFeed();
+  } catch (err) {
+    alert('Could not feature post: ' + err.message);
   }
 }
 

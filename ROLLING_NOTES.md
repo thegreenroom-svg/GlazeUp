@@ -132,6 +132,28 @@ Also surfaced two smaller real-world variations worth knowing about but not yet 
 
 ★ TRANSFER DESIGNER BUILT (2026-07-08): The last remaining "Coming soon" customer app tool activated — completes the full set of three design tools (Design Preview, Colour Picker, Transfer Designer). Photo of the real piece as the base (same camera-capture pattern as Design Preview/Community share), then customers add draggable/resizable/rotatable elements on top: typed text (4 font choices) or simple motif shapes (star, heart, flower, swirl, dot), any of 7 colours. Each element has three handles when selected — a rotate handle (top), resize handle (bottom-right corner), and remove handle (top-right, red ✕). Genuinely full drag+resize+rotate (not just drag+resize like Design Preview's stickers) since transfers commonly need rotating for placement on curved pottery. Elements are plain DOM divs (not canvas), so text stays live/editable-feeling rather than being baked into pixels.
 
+★ COMMUNITY EXPANSION (2026-07-08): Three new community/income stream features built together:
+
+1. **Shareable Piece Cards** — after sharing to the studio community, customers can tap "✨ Create Instagram/TikTok Card" to generate a branded 1080×1080px image: piece photo fills the frame, dark gradient footer with kilnLINK wordmark, "Made by [FirstName]", studio name, and hashtags. Saves directly to camera roll. Each card shared to social media is free viral marketing that reaches people who've never heard of kilnLINK.
+
+2. **Global 🌍 Worldwide feed** — community feed now has two tabs: "Our Studio" (per-studio as before) and "🌍 Worldwide" (all posts from all studios on kilnLINK, ordered by recency). Staff can "✨ Feature" any post, which marks `is_featured=true` and promotes it to global visibility. Featured posts shown with a clay-coloured border in the moderation panel.
+
+3. **Design Marketplace** — new "🎨 Design Marketplace" tile on the home screen (golden gradient, stands out). Two-tab screen: Browse (grid of community designs, tap to load into Transfer Designer) and List a Design (customer lists their Transfer Designer work for others to use, sets a price £1–£5). Transfer Designer now has a "🏪 List in Design Marketplace" button. Uses new `marketplace_designs` table. Income model: when a customer uses someone else's design, the studio can add the price to their bill (full billing integration a future step).
+
+**New SQL to run in Supabase:**
+```sql
+ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT FALSE;
+CREATE TABLE IF NOT EXISTS marketplace_designs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  studio_id UUID NOT NULL REFERENCES studios(id) ON DELETE CASCADE,
+  booking_code TEXT, customer_display_name TEXT,
+  title TEXT NOT NULL, description TEXT, image_data TEXT NOT NULL,
+  price_cents INT DEFAULT 100, download_count INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_marketplace_designs_global ON marketplace_designs(created_at DESC);
+```
+
 ★ ARCHITECTURE (as of 2026-07-05): GlazeUp is now TWO frontends on ONE shared backend:
   • STAFF app  → /admin/dashboard-local.html  (bookings, tables, kiln, catalog — iPad)
   • CUSTOMER app → /app?booking=CODE  (customer's phone, booking-linked)
