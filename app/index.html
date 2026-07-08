@@ -237,7 +237,7 @@
       #design-preview-screen { transition: none; }
     }
 
-    #community-share-screen, #community-feed-screen {
+    #community-share-screen, #community-feed-screen, #colour-picker-screen {
       position: fixed;
       inset: 0;
       background: var(--link-charcoal);
@@ -247,11 +247,77 @@
       transform: translateY(100%);
       transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
     }
-    #community-share-screen.open, #community-feed-screen.open {
+    #community-share-screen.open, #community-feed-screen.open, #colour-picker-screen.open {
       transform: translateY(0);
     }
     @media (prefers-reduced-motion: reduce) {
-      #community-share-screen, #community-feed-screen { transition: none; }
+      #community-share-screen, #community-feed-screen, #colour-picker-screen { transition: none; }
+    }
+
+    .cp-tab {
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.7);
+      border: none;
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .cp-tab.active {
+      background: var(--link-clay);
+      color: #fff;
+    }
+    .cp-swatch {
+      background: rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 10px;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+    }
+    .cp-swatch .cp-swatch-color {
+      width: 100%;
+      aspect-ratio: 1;
+      border-radius: 10px;
+      margin-bottom: 6px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15);
+    }
+    .cp-swatch .cp-swatch-name {
+      color: #fff;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .cp-swatch .cp-fav-badge {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      font-size: 13px;
+    }
+    .cp-palette-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+    }
+    .cp-palette-row .cp-swatch-color {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      flex-shrink: 0;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15);
+    }
+    .cp-palette-row .cp-name { color: #fff; font-size: 13px; font-weight: 500; flex: 1; }
+    .cp-palette-row button {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.25);
+      color: rgba(255,255,255,0.7);
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 11px;
+      cursor: pointer;
     }
 
     .cf-post {
@@ -716,6 +782,29 @@
     <div id="cf-feed-list" style="flex:1; overflow-y:auto; padding:16px;"></div>
   </div>
 
+  <!-- Colour Picker: the studio's real glaze colours, browse + build a palette -->
+  <div id="colour-picker-screen">
+    <div class="dp-header">
+      <span class="dp-title">Colour Picker</span>
+      <button onclick="closeColourPicker()">✕ Close</button>
+    </div>
+    <div style="padding:14px 16px 0;">
+      <div style="display:flex; gap:8px; margin-bottom:12px;">
+        <button id="cp-tab-browse" class="cp-tab active" onclick="switchColourTab('browse')">Browse</button>
+        <button id="cp-tab-palette" class="cp-tab" onclick="switchColourTab('palette')">My Palette (<span id="cp-palette-count">0</span>)</button>
+      </div>
+      <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-bottom:14px; line-height:1.5;">
+        Colours shown are sampled from the studio's real glaze tile as a guide — always check the number on the physical bottle in-studio.
+      </div>
+    </div>
+    <div id="cp-browse-view" style="flex:1; overflow-y:auto; padding:0 16px 20px;">
+      <div id="cp-swatch-grid" style="display:grid; grid-template-columns:repeat(3,1fr); gap:12px;"></div>
+    </div>
+    <div id="cp-palette-view" style="display:none; flex:1; overflow-y:auto; padding:0 16px 20px;">
+      <div id="cp-palette-list"></div>
+    </div>
+  </div>
+
   <script>
     const API_URL = window.location.origin;
     // The Kiln Cafe studio id (pilot). White-label studios would inject their own.
@@ -824,7 +913,7 @@
 
           <div class="section-label">Design tools</div>
 
-          <button class="tile tile-ocean soon">
+          <button class="tile tile-ocean" onclick="openColourPicker()">
             <span class="tile-icon">🎨</span>
             <div class="tile-title">Colour Picker</div>
             <div class="tile-desc">Browse the studio's glaze colours and plan your palette.</div>
@@ -1104,6 +1193,105 @@
       } catch (err) {
         console.error('Could not like post:', err);
       }
+    }
+
+    // ── Colour Picker: real colours sampled from the studio's own glaze
+    // tile (Rosalie's instruction sheet), not a generic palette. Exact
+    // bottle numbers couldn't be reliably read from the photo, so these
+    // are shown as a browsing/inspiration guide rather than a precise
+    // lookup — customers should still check the number on the real bottle. ──
+    const STUDIO_COLOURS = [
+      { hex: '#713a2e', name: 'Red 1' }, { hex: '#306cf5', name: 'Blue 1' },
+      { hex: '#591508', name: 'Deep Red' }, { hex: '#f93029', name: 'Red 2' },
+      { hex: '#f88501', name: 'Orange 1' }, { hex: '#78d705', name: 'Yellow' },
+      { hex: '#22534f', name: 'Deep Teal' }, { hex: '#d4b497', name: 'Orange 2' },
+      { hex: '#c38de7', name: 'Purple' }, { hex: '#581d76', name: 'Deep Purple' },
+      { hex: '#374e01', name: 'Deep Yellow' }, { hex: '#bad1c7', name: 'Pale Teal 1' },
+      { hex: '#c8d802', name: 'Gold 1' }, { hex: '#eac309', name: 'Gold 2' },
+      { hex: '#1e5778', name: 'Deep Sky Blue' }, { hex: '#467e0f', name: 'Deep Green' },
+      { hex: '#38bcf8', name: 'Sky Blue' }, { hex: '#e74224', name: 'Red 3' },
+      { hex: '#0523cb', name: 'Blue 2' }, { hex: '#0c1014', name: 'Coal Black' },
+      { hex: '#d366c2', name: 'Magenta' }, { hex: '#5b686b', name: 'Charcoal Grey' },
+      { hex: '#151aa4', name: 'Blue 3' }, { hex: '#a3edda', name: 'Pale Teal 2' },
+      { hex: '#9cc6f0', name: 'Pale Sky Blue' }, { hex: '#a6030c', name: 'Red 4' },
+      { hex: '#dee4d7', name: 'Pale Yellow' }, { hex: '#aedfbb', name: 'Pale Green' },
+      { hex: '#bb8705', name: 'Gold 3' }, { hex: '#e20e0c', name: 'Red 5' },
+      { hex: '#dd8eb2', name: 'Pink' }, { hex: '#8e6f57', name: 'Dusty Orange' },
+      { hex: '#f33d5a', name: 'Red 6' }, { hex: '#e8e40b', name: 'Gold 4' }
+    ];
+
+    function getMyPalette() {
+      try {
+        return JSON.parse(localStorage.getItem('link_my_palette') || '[]');
+      } catch { return []; }
+    }
+    function setMyPalette(arr) {
+      localStorage.setItem('link_my_palette', JSON.stringify(arr));
+      document.getElementById('cp-palette-count').textContent = arr.length;
+    }
+
+    function openColourPicker() {
+      const screen = document.getElementById('colour-picker-screen');
+      screen.style.display = 'flex';
+      void screen.offsetWidth;
+      screen.classList.add('open');
+      renderColourSwatches();
+      setMyPalette(getMyPalette());
+    }
+    function closeColourPicker() {
+      const screen = document.getElementById('colour-picker-screen');
+      screen.classList.remove('open');
+      setTimeout(() => { screen.style.display = 'none'; }, 280);
+    }
+
+    function switchColourTab(tab) {
+      document.getElementById('cp-tab-browse').classList.toggle('active', tab === 'browse');
+      document.getElementById('cp-tab-palette').classList.toggle('active', tab === 'palette');
+      document.getElementById('cp-browse-view').style.display = tab === 'browse' ? 'block' : 'none';
+      document.getElementById('cp-palette-view').style.display = tab === 'palette' ? 'block' : 'none';
+      if (tab === 'palette') renderMyPalette();
+    }
+
+    function renderColourSwatches() {
+      const grid = document.getElementById('cp-swatch-grid');
+      const palette = getMyPalette();
+      grid.innerHTML = STUDIO_COLOURS.map(c => {
+        const isFav = palette.some(p => p.hex === c.hex);
+        return `
+          <div class="cp-swatch" onclick="toggleFavColour('${c.hex}', '${c.name}')">
+            ${isFav ? '<span class="cp-fav-badge">❤️</span>' : ''}
+            <div class="cp-swatch-color" style="background:${c.hex};"></div>
+            <div class="cp-swatch-name">${c.name}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function toggleFavColour(hex, name) {
+      let palette = getMyPalette();
+      if (palette.some(p => p.hex === hex)) {
+        palette = palette.filter(p => p.hex !== hex);
+      } else {
+        palette.push({ hex, name });
+      }
+      setMyPalette(palette);
+      renderColourSwatches();
+    }
+
+    function renderMyPalette() {
+      const listEl = document.getElementById('cp-palette-list');
+      const palette = getMyPalette();
+      if (palette.length === 0) {
+        listEl.innerHTML = `<div style="color:rgba(255,255,255,0.5); text-align:center; padding:30px; font-size:13px;">Tap the heart on any colour to save it here.</div>`;
+        return;
+      }
+      listEl.innerHTML = palette.map(c => `
+        <div class="cp-palette-row">
+          <div class="cp-swatch-color" style="background:${c.hex};"></div>
+          <div class="cp-name">${c.name}</div>
+          <button onclick="toggleFavColour('${c.hex}', '${c.name}'); renderMyPalette();">Remove</button>
+        </div>
+      `).join('');
     }
 
     function renderDpPalette() {
