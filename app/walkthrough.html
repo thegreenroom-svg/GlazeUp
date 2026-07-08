@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>kilnLINK — App Tour</title>
+<style>
+  :root {
+    --clay: #B87946; --charcoal: #2B2724; --ivory: #F7F4EE;
+    --sand: #E8D9C4; --stone: #C8BFB2; --sage: #6b7561;
+    --dust: #8a8175; --ocean: #5b6b68;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--charcoal); font-family: 'Inter', -apple-system, system-ui, sans-serif; color: white; min-height: 100vh; display: flex; flex-direction: column; }
+
+  .wt-header { padding: 16px 20px 0; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .wt-logo { font-size: 22px; font-weight: 700; }
+  .wt-logo span { color: var(--clay); font-weight: 400; font-size: 18px; }
+  .wt-close { background: rgba(255,255,255,0.12); border: none; color: white; border-radius: 20px; padding: 7px 16px; font-size: 13px; cursor: pointer; }
+
+  .wt-progress-bar { height: 3px; background: rgba(255,255,255,0.15); margin: 14px 20px 0; border-radius: 2px; }
+  .wt-progress-fill { height: 100%; background: var(--clay); border-radius: 2px; transition: width 0.4s ease; }
+
+  .wt-step-label { text-align: center; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--clay); font-weight: 600; margin: 10px 0 4px; }
+
+  .wt-title { text-align: center; font-size: 18px; font-weight: 700; padding: 0 24px; line-height: 1.25; }
+  .wt-body { text-align: center; font-size: 13px; color: rgba(255,255,255,0.65); padding: 6px 28px 0; line-height: 1.6; min-height: 48px; }
+
+  .wt-screen-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 12px 16px; position: relative; }
+
+  .wt-phone { width: 200px; height: 400px; flex-shrink: 0; position: relative; }
+  .wt-phone svg { width: 100%; height: 100%; }
+
+  .wt-arrow-layer { position: absolute; inset: 0; pointer-events: none; }
+  .wt-arrow-layer svg { width: 100%; height: 100%; }
+
+  .wt-controls { padding: 12px 20px 20px; display: flex; flex-direction: column; align-items: center; gap: 12px; flex-shrink: 0; }
+  .wt-btn-row { display: flex; gap: 10px; }
+  .wt-btn { background: rgba(255,255,255,0.12); border: none; color: white; border-radius: 10px; padding: 11px 22px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .wt-btn-primary { background: var(--clay); }
+  .wt-btn:disabled { opacity: 0.35; cursor: default; }
+
+  .wt-dots { display: flex; gap: 5px; }
+  .wt-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.25); border: none; cursor: pointer; transition: all 0.2s; padding: 0; }
+  .wt-dot.active { background: var(--clay); width: 20px; border-radius: 4px; }
+
+  @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+  .bounce { animation: bounce 1s ease-in-out infinite; }
+</style>
+</head>
+<body>
+
+<div class="wt-header">
+  <div class="wt-logo"><span>kiln</span>LINK · App Tour</div>
+  <button class="wt-close" onclick="history.back()">✕ Close</button>
+</div>
+
+<div class="wt-progress-bar"><div class="wt-progress-fill" id="progress"></div></div>
+<div class="wt-step-label" id="step-label">Step 1 of 9</div>
+<div class="wt-title" id="step-title"></div>
+<div class="wt-body" id="step-body"></div>
+
+<div class="wt-screen-wrap">
+  <div class="wt-phone">
+    <!-- Static phone SVG — screen content swaps via JS -->
+    <svg viewBox="0 0 110 220" id="phone-svg">
+      <!-- Shell -->
+      <rect x="1" y="1" width="108" height="218" rx="14" fill="#111"/>
+      <rect x="3" y="3" width="104" height="214" rx="12" fill="#1a1612"/>
+      <!-- Screen -->
+      <rect x="4" y="4" width="102" height="212" rx="10" fill="#F7F4EE" id="screen-bg"/>
+      <!-- Notch -->
+      <rect x="35" y="4" width="40" height="5" rx="2.5" fill="#111"/>
+      <!-- Dynamic content group -->
+      <g id="screen-content" transform="translate(4,9)" clip-path="url(#sc)">
+        <defs><clipPath id="sc"><rect width="102" height="207" rx="8"/></clipPath></defs>
+        <rect width="102" height="207" fill="#F7F4EE"/>
+      </g>
+    </svg>
+  </div>
+  <!-- Arrow overlay, sized to match phone position -->
+  <div class="wt-arrow-layer" id="arrow-layer" style="position:absolute;pointer-events:none;"></div>
+</div>
+
+<div class="wt-controls">
+  <div class="wt-btn-row">
+    <button class="wt-btn" id="btn-back" onclick="goTo(cur-1)">← Back</button>
+    <button class="wt-btn wt-btn-primary" id="btn-play" onclick="togglePlay()">▶ Play</button>
+    <button class="wt-btn" id="btn-next" onclick="goTo(cur+1)">Next →</button>
+  </div>
+  <div class="wt-dots" id="dots"></div>
+</div>
+
+<script>
+// ── Screen SVG definitions ──
+const CLAY='#B87946', CHARCOAL='#2B2724', IVORY='#F7F4EE', SAND='#E8D9C4', STONE='#C8BFB2';
+
+function homeScreen() {
+  return `
+    <rect width="102" height="207" fill="${IVORY}"/>
+    <!-- Header -->
+    <rect width="102" height="18" fill="${CHARCOAL}"/>
+    <text x="6" y="8" fill="${CLAY}" font-size="5" font-weight="700" font-family="sans-serif">kiln</text>
+    <text x="16" y="8.5" fill="white" font-size="6" font-weight="700" font-family="sans-serif">LINK</text>
+    <text x="6" y="14" fill="rgba(255,255,255,0.5)" font-size="3" font-family="sans-serif">· The Kiln Cafe</text>
+    <!-- Welcome card -->
+    <rect x="6" y="21" width="90" height="10" rx="3" fill="${SAND}"/>
+    <text x="11" y="27" fill="${CHARCOAL}" font-size="3.5" font-weight="700" font-family="sans-serif">Welcome back, Sarah 🎨</text>
+    <text x="11" y="29.5" fill="#8a8175" font-size="2.8" font-family="sans-serif">Your session is open — happy painting!</text>
+    <!-- Section label -->
+    <text x="6" y="37" fill="#8a8175" font-size="2.8" font-weight="700" font-family="sans-serif" letter-spacing="0.05em">GETTING STARTED</text>
+    <!-- Tablet tile -->
+    <rect x="6" y="39" width="90" height="12" rx="3" fill="#c9a06b"/>
+    <text x="12" y="46" fill="white" font-size="5">📱</text>
+    <text x="22" y="44.5" fill="white" font-size="3.5" font-weight="700" font-family="sans-serif">Studio Tablet &amp; Stylus</text>
+    <text x="22" y="48.5" fill="rgba(255,255,255,0.75)" font-size="2.8" font-family="sans-serif">Request a tablet for your table</text>
+    <rect x="82" y="41" width="10" height="5" rx="2.5" fill="rgba(255,255,255,0.25)"/>
+    <text x="87" y="44.5" fill="white" font-size="2.5" font-weight="700" font-family="sans-serif" text-anchor="middle">£3</text>
+    <!-- Section label 2 -->
+    <text x="6" y="57" fill="#8a8175" font-size="2.8" font-weight="700" font-family="sans-serif" letter-spacing="0.05em">DESIGN TOOLS</text>
+    <!-- Take It Home tile -->
+    <rect x="6" y="59" width="90" height="12" rx="3" fill="#1a0a3d"/>
+    <text x="12" y="66" fill="white" font-size="5">🏠</text>
+    <text x="22" y="64" fill="white" font-size="3.5" font-weight="700" font-family="sans-serif">Take It Home</text>
+    <text x="22" y="68" fill="rgba(255,255,255,0.7)" font-size="2.8" font-family="sans-serif">Unlock all tools on your device</text>
+    <rect x="82" y="61" width="10" height="5" rx="2.5" fill="${CLAY}"/>
+    <text x="87" y="64.5" fill="white" font-size="2.5" font-weight="700" font-family="sans-serif" text-anchor="middle">£5</text>
+    <!-- Colour Picker tile -->
+    <rect x="6" y="73" width="90" height="12" rx="3" fill="#6b7561"/>
+    <text x="12" y="80" fill="white" font-size="5">🎨</text>
+    <text x="22" y="78" fill="white" font-size="3.5" font-weight="700" font-family="sans-serif">Colour Picker</text>
+    <text x="22" y="82" fill="rgba(255,255,255,0.7)" font-size="2.8" font-family="sans-serif">Browse all 82 Mayco glazes — free</text>
+    <!-- Design Preview tile -->
+    <rect x="6" y="87" width="90" height="12" rx="3" fill="#c9a06b"/>
+    <text x="12" y="94" fill="white" font-size="5">🖼️</text>
+    <text x="22" y="92" fill="white" font-size="3.5" font-weight="700" font-family="sans-serif">Design Preview</text>
+    <text x="22" y="96" fill="rgba(255,255,255,0.7)" font-size="2.8" font-family="sans-serif">Try colours on your piece photo</text>
+    <rect x="82" y="89" width="10" height="5" rx="2.5" fill="rgba(255,255,255,0.25)"/>
+    <text x="87" y="92.5" fill="white" font-size="2.5" font-weight="700" font-family="sans-serif" text-anchor="middle">£1</text>
+    <!-- Transfer Designer tile -->
+    <rect x="6" y="101" width="90" height="12" rx="3" fill="${CLAY}"/>
+    <text x="12" y="108" fill="white" font-size="5">✨</text>
+    <text x="22" y="106" fill="white" font-size="3.5" font-weight="700" font-family="sans-serif">Transfer Designer</text>
+    <text x="22" y="110" fill="rgba(255,255,255,0.7)" font-size="2.8" font-family="sans-serif">Sketch, text, motifs — print</text>
+    <rect x="82" y="103" width="10" height="5" rx="2.5" fill="rgba(255,255,255,0.25)"/>
+    <text x="87" y="106.5" fill="white" font-size="2.5" font-weight="700" font-family="sans-serif" text-anchor="middle">£1</text>
+    <!-- Community tile -->
+    <rect x="6" y="115" width="90" height="12" rx="3" fill="#5b6b68"/>
+    <text x="12" y="122" fill="white" font-size="5">💬</text>
+    <text x="22" y="120" fill="white" font-size="3.5" font-weight="700" font-family="sans-serif">Community</text>
+    <text x="22" y="124" fill="rgba(255,255,255,0.7)" font-size="2.8" font-family="sans-serif">Share your work, see others</text>
+    <!-- Marketplace tile -->
+    <rect x="6" y="129" width="90" height="12" rx="3" fill="#7a4a20"/>
+    <text x="12" y="136" fill="white" font-size="5">🎨</text>
+    <text x="22" y="134" fill="white" font-size="3.5" font-weight="700" font-family="sans-serif">Design Marketplace</text>
+    <text x="22" y="138" fill="rgba(255,255,255,0.7)" font-size="2.8" font-family="sans-serif">Buy &amp; sell original designs</text>
+    <rect x="82" y="131" width="10" height="5" rx="2.5" fill="rgba(255,255,255,0.25)"/>
+    <text x="87" y="134.5" fill="white" font-size="2.5" font-weight="700" font-family="sans-serif" text-anchor="middle">NEW</text>
+    <!-- Tour button -->
+    <rect x="72" y="197" width="26" height="8" rx="4" fill="${CHARCOAL}"/>
+    <text x="85" y="202" fill="white" font-size="3" font-weight="700" font-family="sans-serif" text-anchor="middle">🎯 App Tour</text>
+  `;
+}
+
+function communityScreen() {
+  return `
+    <rect width="102" height="207" fill="${CHARCOAL}"/>
+    <rect width="102" height="18" fill="#1a1612"/>
+    <text x="6" y="8" fill="${CLAY}" font-size="5" font-weight="700" font-family="sans-serif">kiln</text>
+    <text x="16" y="8.5" fill="white" font-size="6" font-weight="700" font-family="sans-serif">LINK</text>
+    <text x="32" y="9" fill="rgba(255,255,255,0.8)" font-size="4" font-weight="700" font-family="sans-serif">Community</text>
+    <!-- Tabs -->
+    <rect x="6" y="20" width="40" height="7" rx="3" fill="${CLAY}"/>
+    <text x="26" y="25" fill="white" font-size="3.2" font-weight="700" font-family="sans-serif" text-anchor="middle">Our Studio</text>
+    <rect x="50" y="20" width="46" height="7" rx="3" fill="rgba(255,255,255,0.1)"/>
+    <text x="73" y="25" fill="rgba(255,255,255,0.6)" font-size="3.2" font-family="sans-serif" text-anchor="middle">🌍 Worldwide</text>
+    <!-- Feed posts -->
+    <rect x="6" y="30" width="90" height="40" rx="3" fill="rgba(255,255,255,0.07)"/>
+    <rect x="8" y="32" width="86" height="24" rx="2" fill="#8B6B4A" opacity="0.7"/>
+    <text x="10" y="60" fill="white" font-size="3.2" font-weight="600" font-family="sans-serif">Alice · Mug</text>
+    <text x="10" y="64" fill="rgba(255,255,255,0.5)" font-size="2.8" font-family="sans-serif">Made something beautiful ✨</text>
+    <rect x="80" y="60" width="14" height="5" rx="2" fill="rgba(255,255,255,0.1)"/>
+    <text x="87" y="64" fill="rgba(255,255,255,0.5)" font-size="2.5" font-family="sans-serif" text-anchor="middle">❤️ 12</text>
+
+    <rect x="6" y="73" width="90" height="32" rx="3" fill="rgba(255,255,255,0.07)"/>
+    <rect x="8" y="75" width="86" height="18" rx="2" fill="#5b6b68" opacity="0.7"/>
+    <text x="10" y="97" fill="white" font-size="3.2" font-weight="600" font-family="sans-serif">Ben · Bowl</text>
+    <text x="10" y="101" fill="rgba(255,255,255,0.5)" font-size="2.8" font-family="sans-serif">First time, so happy!</text>
+
+    <!-- Bottom action bar -->
+    <rect x="0" y="181" width="102" height="26" fill="rgba(26,22,18,0.97)"/>
+    <rect x="0" y="181" width="102" height="0.5" fill="rgba(255,255,255,0.1)"/>
+    <rect x="4" y="185" width="44" height="10" rx="3" fill="#6b7561"/>
+    <text x="26" y="191.5" fill="white" font-size="3.2" font-weight="700" font-family="sans-serif" text-anchor="middle">📸 Share My Piece</text>
+    <rect x="52" y="185" width="46" height="10" rx="3" fill="${CLAY}"/>
+    <text x="75" y="191.5" fill="white" font-size="3.2" font-weight="700" font-family="sans-serif" text-anchor="middle">✨ Create Share Card</text>
+  `;
+}
+
+function designPreviewScreen() {
+  return `
+    <rect width="102" height="207" fill="#241a17"/>
+    <rect width="102" height="16" fill="#1a0f0c"/>
+    <text x="6" y="9" fill="${CLAY}" font-size="5" font-weight="700" font-family="sans-serif">kiln</text>
+    <text x="16" y="9.5" fill="white" font-size="6" font-weight="700" font-family="sans-serif">LINK</text>
+    <text x="34" y="10" fill="rgba(255,255,255,0.8)" font-size="3.8" font-weight="700" font-family="sans-serif">Design Preview</text>
+    <text x="94" y="10" fill="rgba(255,255,255,0.6)" font-size="4" font-family="sans-serif">✕</text>
+    <!-- Photo area -->
+    <rect x="4" y="18" width="94" height="100" rx="4" fill="#8B6B4A" opacity="0.8"/>
+    <text x="51" y="65" fill="rgba(255,255,255,0.4)" font-size="8" font-family="sans-serif" text-anchor="middle">🏺</text>
+    <text x="51" y="75" fill="rgba(255,255,255,0.5)" font-size="3" font-family="sans-serif" text-anchor="middle">Photograph your piece to start</text>
+    <!-- Colour brush strokes overlay -->
+    <circle cx="30" cy="45" r="8" fill="#c0392b" opacity="0.6"/>
+    <circle cx="55" cy="55" r="10" fill="#2980b9" opacity="0.5"/>
+    <circle cx="75" cy="40" r="7" fill="#27ae60" opacity="0.55"/>
+    <!-- Toolbar -->
+    <rect x="0" y="120" width="102" height="87" fill="#241a17"/>
+    <rect x="4" y="123" width="30" height="9" rx="3" fill="${CLAY}"/>
+    <text x="19" y="128.5" fill="white" font-size="3" font-weight="700" font-family="sans-serif" text-anchor="middle">🖌 Brush</text>
+    <rect x="37" y="123" width="28" height="9" rx="3" fill="rgba(255,255,255,0.1)"/>
+    <text x="51" y="128.5" fill="white" font-size="3" font-family="sans-serif" text-anchor="middle">🪣 Fill</text>
+    <rect x="68" y="123" width="30" height="9" rx="3" fill="rgba(255,255,255,0.1)"/>
+    <text x="83" y="128.5" fill="white" font-size="3" font-family="sans-serif" text-anchor="middle">💾 Save</text>
+    <!-- Palette -->
+    ${['#c0392b','#e67e22','#f1c40f','#2ecc71','#3498db','#9b59b6','#1abc9c','#e74c3c','#ecf0f1','#2c3e50','#B87946','#ffffff'].map((c,i)=>`<circle cx="${8+(i%6)*16}" cy="${i<6?140:150}" r="5" fill="${c}" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>`).join('')}
+    <!-- Action buttons -->
+    <rect x="4" y="162" width="94" height="9" rx="3" fill="${CLAY}"/>
+    <text x="51" y="167.5" fill="white" font-size="3.2" font-weight="700" font-family="sans-serif" text-anchor="middle">🖨️ Print as Transfer — £1</text>
+    <rect x="4" y="174" width="94" height="9" rx="3" fill="rgba(255,255,255,0.1)"/>
+    <text x="51" y="179.5" fill="white" font-size="3" font-family="sans-serif" text-anchor="middle">📷 Retake   🗑 Clear   ↩ Undo</text>
+  `;
+}
+
+// ── Step definitions ──
+const STEPS = [
+  {
+    screen: homeScreen,
+    title: "Your session home screen",
+    body: "Everything for your visit in one place. Scroll down to see all your tools.",
+    arrows: []
+  },
+  {
+    screen: homeScreen,
+    title: "Tap Colour Picker — it's free",
+    body: "Browse all 82 real Mayco glaze colours stocked in the studio. Tap any to save it to your personal palette.",
+    arrows: [{ px: 51, py: 79, label: "Colour Picker — FREE", dir: "up" }]
+  },
+  {
+    screen: designPreviewScreen,
+    title: "Design Preview — photograph & paint",
+    body: "Take a photo of your bisque piece, then brush or fill colours directly on it. Save up to 10 designs to work on at home.",
+    arrows: [{ px: 51, py: 30, label: "Your piece photo here", dir: "down" }]
+  },
+  {
+    screen: homeScreen,
+    title: "Tap Transfer Designer",
+    body: "Sketch, add text in different fonts, drop in motifs — then tap Print as Transfer to send it to staff for printing.",
+    arrows: [{ px: 51, py: 107, label: "Transfer Designer — £1", dir: "up" }]
+  },
+  {
+    screen: homeScreen,
+    title: "Take It Home — £5 one-off",
+    body: "Unlocks all three design tools on your own phone forever, not just in the studio. Tap here and ask staff to add it to your bill.",
+    arrows: [{ px: 51, py: 65, label: "Tap here — £5 unlocks everything", dir: "up" }]
+  },
+  {
+    screen: homeScreen,
+    title: "Tap Community",
+    body: "See what other painters have made at this studio and worldwide. Like pieces, share your own, and create a branded Instagram card.",
+    arrows: [{ px: 51, py: 121, label: "Community", dir: "up" }]
+  },
+  {
+    screen: communityScreen,
+    title: "Share your piece & create a card",
+    body: "Inside Community, these two buttons are always at the bottom. Share to the feed, or create a branded square card to post on Instagram or TikTok.",
+    arrows: [
+      { px: 26, py: 186, label: "Share My Piece", dir: "up" },
+      { px: 75, py: 186, label: "Create Share Card", dir: "up" }
+    ]
+  },
+  {
+    screen: homeScreen,
+    title: "Design Marketplace",
+    body: "Browse designs from other customers and use them on your piece. Or list your own Transfer Designer work for others to buy.",
+    arrows: [{ px: 51, py: 135, label: "Design Marketplace", dir: "up" }]
+  },
+  {
+    screen: homeScreen,
+    title: "App Tour always available",
+    body: "Tap the 🎯 App Tour button any time to replay this walkthrough. Happy painting!",
+    arrows: [{ px: 85, py: 197, label: "🎯 App Tour", dir: "up" }]
+  }
+];
+
+let cur = 0, playing = false, playTimer = null, bounceTimer = null, bounceAngle = 0;
+
+function render() {
+  const step = STEPS[cur];
+  document.getElementById('progress').style.width = `${((cur+1)/STEPS.length)*100}%`;
+  document.getElementById('step-label').textContent = `Step ${cur+1} of ${STEPS.length}`;
+  document.getElementById('step-title').textContent = step.title;
+  document.getElementById('step-body').textContent = step.body;
+  document.getElementById('screen-content').innerHTML = step.screen();
+  document.getElementById('btn-back').disabled = cur === 0;
+  document.getElementById('btn-next').disabled = cur === STEPS.length - 1;
+  document.getElementById('btn-play').textContent = playing ? '⏸ Pause' : cur === STEPS.length-1 ? '↺ Replay' : '▶ Play';
+
+  // Dots
+  const dots = document.getElementById('dots');
+  dots.innerHTML = STEPS.map((_,i) =>
+    `<button class="wt-dot${i===cur?' active':''}" onclick="goTo(${i})" title="Step ${i+1}"></button>`
+  ).join('');
+
+  renderArrows();
+}
+
+function renderArrows() {
+  const step = STEPS[cur];
+  if (!step.arrows.length) { document.getElementById('arrow-layer').innerHTML=''; return; }
+
+  // Get phone bounding box to calculate absolute pixel positions
+  const phoneSvg = document.getElementById('phone-svg');
+  const rect = phoneSvg.getBoundingClientRect();
+  const wrapRect = document.querySelector('.wt-screen-wrap').getBoundingClientRect();
+
+  // Phone SVG viewBox is 110x220, screen content starts at x=4,y=9 with 102x207 area
+  const scaleX = rect.width / 110;
+  const scaleY = rect.height / 220;
+  const phoneLeft = rect.left - wrapRect.left;
+  const phoneTop = rect.top - wrapRect.top;
+
+  // Content area offset within phone
+  const contentOffX = 4, contentOffY = 9;
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('style', 'position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;');
+
+  step.arrows.forEach(a => {
+    // Convert screen-space coords to absolute overlay coords
+    const ax = phoneLeft + (contentOffX + a.px) * scaleX;
+    const ay = phoneTop + (contentOffY + a.py) * scaleY;
+    const isUp = a.dir === 'up';
+    const bounce = Math.sin(bounceAngle) * 6;
+    const arrowTip = isUp ? ay - 14 + bounce : ay + 14 - bounce;
+    const labelY = isUp ? ay - 28 : ay + 28;
+
+    const g = document.createElementNS(svgNS, 'g');
+
+    // Label bubble
+    const labelW = a.label.length * 7 + 16;
+    const rect2 = document.createElementNS(svgNS, 'rect');
+    rect2.setAttribute('x', ax - labelW/2); rect2.setAttribute('y', labelY - 11);
+    rect2.setAttribute('width', labelW); rect2.setAttribute('height', 16);
+    rect2.setAttribute('rx', '8'); rect2.setAttribute('fill', '#B87946');
+    g.appendChild(rect2);
+
+    const text = document.createElementNS(svgNS, 'text');
+    text.setAttribute('x', ax); text.setAttribute('y', labelY + 1);
+    text.setAttribute('fill', 'white'); text.setAttribute('font-size', '11');
+    text.setAttribute('font-weight', '700'); text.setAttribute('font-family', 'sans-serif');
+    text.setAttribute('text-anchor', 'middle');
+    text.textContent = a.label;
+    g.appendChild(text);
+
+    // Arrow triangle
+    const tri = document.createElementNS(svgNS, 'polygon');
+    const tipX = ax, tipY = arrowTip;
+    const pts = isUp
+      ? `${tipX},${tipY} ${tipX-8},${tipY+14} ${tipX+8},${tipY+14}`
+      : `${tipX},${tipY} ${tipX-8},${tipY-14} ${tipX+8},${tipY-14}`;
+    tri.setAttribute('points', pts); tri.setAttribute('fill', '#B87946');
+    g.appendChild(tri);
+
+    svg.appendChild(g);
+  });
+
+  document.getElementById('arrow-layer').innerHTML = '';
+  document.getElementById('arrow-layer').appendChild(svg);
+}
+
+function goTo(i) {
+  if (i < 0 || i >= STEPS.length) return;
+  cur = i;
+  render();
+}
+
+function togglePlay() {
+  if (cur === STEPS.length - 1 && !playing) { cur = 0; }
+  playing = !playing;
+  if (playing) scheduleNext();
+  else { clearTimeout(playTimer); }
+  document.getElementById('btn-play').textContent = playing ? '⏸ Pause' : '▶ Play';
+}
+
+function scheduleNext() {
+  if (!playing) return;
+  playTimer = setTimeout(() => {
+    if (cur < STEPS.length - 1) { cur++; render(); scheduleNext(); }
+    else { playing = false; document.getElementById('btn-play').textContent = '↺ Replay'; }
+  }, 3500);
+}
+
+// Bounce animation loop
+function animateArrows() {
+  bounceAngle += 0.08;
+  renderArrows();
+  requestAnimationFrame(animateArrows);
+}
+
+// Re-render arrows on resize
+window.addEventListener('resize', renderArrows);
+
+render();
+animateArrows();
+</script>
+</body>
+</html>

@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>kilnLINK — Staff Tour</title>
+<style>
+  :root { --clay:#B87946; --charcoal:#2B2724; --ivory:#F7F4EE; --sand:#E8D9C4; --stone:#C8BFB2; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:#f0ebe4; font-family:'Inter',-apple-system,system-ui,sans-serif; min-height:100vh; display:flex; flex-direction:column; }
+  .wt-header { background:var(--charcoal); padding:14px 20px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+  .wt-logo { color:white; font-size:18px; font-weight:700; }
+  .wt-logo span { color:var(--clay); font-weight:400; }
+  .wt-close { background:rgba(255,255,255,0.12); border:none; color:white; border-radius:20px; padding:7px 16px; font-size:13px; cursor:pointer; }
+  .wt-progress-bar { height:3px; background:rgba(0,0,0,0.1); }
+  .wt-progress-fill { height:100%; background:var(--clay); transition:width 0.4s ease; }
+  .wt-info { padding:12px 20px 10px; }
+  .wt-step-label { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--clay); font-weight:600; margin-bottom:4px; }
+  .wt-title { font-size:17px; font-weight:700; color:var(--charcoal); line-height:1.25; margin-bottom:5px; }
+  .wt-body { font-size:13px; color:#6b5f56; line-height:1.6; min-height:44px; }
+  .wt-screen-wrap { flex:1; display:flex; align-items:center; justify-content:center; padding:10px 16px; position:relative; overflow:hidden; }
+  .wt-screen { width:100%; max-width:580px; position:relative; }
+  .wt-screen svg.main { width:100%; border-radius:10px; box-shadow:0 4px 20px rgba(43,39,36,0.18); display:block; }
+  .wt-arrow-layer { position:absolute; inset:0; pointer-events:none; }
+  .wt-arrow-layer svg { width:100%; height:100%; overflow:visible; }
+  .wt-controls { padding:12px 20px 18px; display:flex; flex-direction:column; align-items:center; gap:10px; background:white; border-top:1px solid #e0d8d0; }
+  .wt-btn-row { display:flex; gap:8px; }
+  .wt-btn { background:#f0ebe4; border:1px solid #d0c8c0; color:var(--charcoal); border-radius:8px; padding:10px 18px; font-size:13px; font-weight:600; cursor:pointer; }
+  .wt-btn-primary { background:var(--clay); color:white; border-color:var(--clay); }
+  .wt-btn:disabled { opacity:.35; cursor:default; }
+  .wt-dots { display:flex; gap:5px; flex-wrap:wrap; justify-content:center; }
+  .wt-dot { width:7px; height:7px; border-radius:50%; background:#d0c8c0; border:none; cursor:pointer; padding:0; transition:all .2s; }
+  .wt-dot.active { background:var(--clay); width:20px; border-radius:4px; }
+</style>
+</head>
+<body>
+<div class="wt-header">
+  <div class="wt-logo"><span>kiln</span>LINK Staff Tour</div>
+  <button class="wt-close" onclick="history.back()">✕ Close</button>
+</div>
+<div class="wt-progress-bar"><div class="wt-progress-fill" id="progress"></div></div>
+<div class="wt-info">
+  <div class="wt-step-label" id="step-label">Step 1 of 11</div>
+  <div class="wt-title" id="step-title"></div>
+  <div class="wt-body" id="step-body"></div>
+</div>
+<div class="wt-screen-wrap">
+  <div class="wt-screen" id="screen-wrap">
+    <svg class="main" id="main-svg" viewBox="0 0 280 180">
+      <g id="screen-content"></g>
+    </svg>
+    <div class="wt-arrow-layer" id="arrow-layer"></div>
+  </div>
+</div>
+<div class="wt-controls">
+  <div class="wt-btn-row">
+    <button class="wt-btn" id="btn-back" onclick="goTo(cur-1)">← Back</button>
+    <button class="wt-btn wt-btn-primary" id="btn-play" onclick="togglePlay()">▶ Play</button>
+    <button class="wt-btn" id="btn-next" onclick="goTo(cur+1)">Next →</button>
+  </div>
+  <div class="wt-dots" id="dots"></div>
+</div>
+
+<script>
+const CLAY='#B87946',CHARCOAL='#2B2724',IVORY='#F7F4EE',SAND='#E8D9C4',STONE='#C8BFB2';
+
+// ── Sidebar SVG (shared across all screens) ──
+function sidebar(activeTab) {
+  const items = [
+    {id:'dashboard',icon:'▦',label:'Dashboard'},
+    {id:'setup',icon:'⚙',label:'Setup'},
+    {id:'staff',icon:'👤',label:'Daily Bookings'},
+    {id:'community',icon:'🌐',label:'Community'},
+    {id:'printqueue',icon:'🖨',label:'Print Queue'},
+    {id:'stock',icon:'⊞',label:'Stock'},
+    {id:'branding',icon:'✎',label:'Branding'},
+    {id:'account',icon:'○',label:'Account'},
+  ];
+  return `
+    <rect width="58" height="180" fill="${CHARCOAL}"/>
+    <text x="6" y="12" fill="${CLAY}" font-size="7" font-weight="700" font-family="sans-serif">kiln</text>
+    <text x="22" y="13" fill="white" font-size="8" font-weight="700" font-family="sans-serif">LINK</text>
+    ${items.map((item,i)=>`
+      <rect x="2" y="${24+i*17}" width="54" height="14" rx="3" fill="${activeTab===item.id?CLAY:'transparent'}" opacity="${activeTab===item.id?0.9:1}"/>
+      <text x="8" y="${32+i*17}" fill="${activeTab===item.id?'white':'rgba(255,255,255,0.5)'}" font-size="6" font-family="sans-serif">${item.icon}</text>
+      <text x="17" y="${32+i*17}" fill="${activeTab===item.id?'white':'rgba(255,255,255,0.5)'}" font-size="5" font-family="sans-serif">${item.label}</text>
+    `).join('')}
+    <rect x="2" y="165" width="54" height="12" rx="3" fill="rgba(255,255,255,0.08)"/>
+    <text x="29" y="172.5" fill="rgba(255,255,255,0.6)" font-size="5" font-family="sans-serif" text-anchor="middle">🎯 Staff Tour</text>
+  `;
+}
+
+// ── Screen content builders ──
+function dashboardScreen() {
+  return sidebar('dashboard') + `
+    <rect x="60" y="0" width="220" height="180" fill="${IVORY}"/>
+    <text x="65" y="14" fill="${CHARCOAL}" font-size="9" font-weight="700" font-family="sans-serif">Dashboard</text>
+    <!-- Metric cards -->
+    <rect x="65" y="18" width="60" height="28" rx="4" fill="${SAND}"/>
+    <text x="70" y="26" fill="#8a8175" font-size="4.5" font-family="sans-serif">Revenue (30d)</text>
+    <text x="70" y="38" fill="${CHARCOAL}" font-size="11" font-weight="700" font-family="sans-serif">£1,240</text>
+    <rect x="132" y="18" width="60" height="28" rx="4" fill="${SAND}"/>
+    <text x="137" y="26" fill="#8a8175" font-size="4.5" font-family="sans-serif">Sessions today</text>
+    <text x="137" y="38" fill="${CHARCOAL}" font-size="11" font-weight="700" font-family="sans-serif">14</text>
+    <rect x="199" y="18" width="60" height="28" rx="4" fill="${SAND}"/>
+    <text x="204" y="26" fill="#8a8175" font-size="4.5" font-family="sans-serif">App tools used</text>
+    <text x="204" y="38" fill="${CHARCOAL}" font-size="11" font-weight="700" font-family="sans-serif">6</text>
+    <!-- Extra charges card -->
+    <rect x="65" y="50" width="194" height="120" rx="4" fill="white" stroke="${STONE}" stroke-width="1"/>
+    <text x="72" y="62" fill="${CHARCOAL}" font-size="6.5" font-weight="700" font-family="sans-serif">💷 Extra Charges Today</text>
+    <text x="72" y="70" fill="#8a8175" font-size="4.5" font-family="sans-serif">Add these to the till at checkout — not charged automatically</text>
+    ${[
+      {code:'WALK-2341',items:'Studio Tablet & Stylus',total:'£3.00'},
+      {code:'BK-7892',items:'Design Preview, Transfer Designer',total:'£2.00'},
+      {code:'WALK-2342',items:'Home Access — all design tools',total:'£5.00'},
+      {code:'BK-9001',items:'Studio Tablet & Stylus',total:'£3.00'},
+    ].map((c,i)=>`
+      <rect x="68" y="${76+i*20}" width="188" height="16" rx="3" fill="#fff9f0" stroke="${CLAY}" stroke-width="0.5"/>
+      <text x="73" y="${83+i*20}" fill="${CHARCOAL}" font-size="5.5" font-weight="600" font-family="sans-serif">${c.code}</text>
+      <text x="73" y="${89+i*20}" fill="#8a8175" font-size="4" font-family="sans-serif">${c.items}</text>
+      <text x="248" y="${86+i*20}" fill="${CLAY}" font-size="6" font-weight="700" font-family="sans-serif" text-anchor="end">${c.total}</text>
+    `).join('')}
+  `;
+}
+
+function bookingsStep1Screen() {
+  return sidebar('staff') + `
+    <rect x="60" y="0" width="220" height="180" fill="${IVORY}"/>
+    <text x="65" y="14" fill="${CHARCOAL}" font-size="8" font-weight="700" font-family="sans-serif">Daily Bookings &amp; Customer Engagement</text>
+    <rect x="65" y="18" width="212" height="152" rx="4" fill="white" stroke="${STONE}" stroke-width="1"/>
+    <rect x="68" y="20" width="206" height="8" rx="2" fill="#dff0d8"/>
+    <text x="73" y="25.5" fill="#3c763d" font-size="4.5" font-weight="700" font-family="sans-serif">📋 Step 1: Look up the booking, check for returning pieces, assign a table.</text>
+    <!-- Name input -->
+    <text x="70" y="36" fill="${CHARCOAL}" font-size="5.5" font-weight="700" font-family="sans-serif">Customer Name</text>
+    <rect x="68" y="39" width="206" height="18" rx="3" fill="${SAND}" stroke="${STONE}" stroke-width="0.5"/>
+    <text x="74" y="50.5" fill="#8a8175" font-size="5.5" font-family="sans-serif">Type the customer or party name…</text>
+    <!-- Fork tiles -->
+    <rect x="68" y="62" width="98" height="40" rx="4" fill="#c9a06b"/>
+    <text x="117" y="78" fill="white" font-size="16" font-family="sans-serif" text-anchor="middle">🚶</text>
+    <text x="117" y="94" fill="white" font-size="6" font-weight="700" font-family="sans-serif" text-anchor="middle">New Walk-in</text>
+    <rect x="172" y="62" width="100" height="40" rx="4" fill="#5b6b68"/>
+    <text x="222" y="78" fill="white" font-size="16" font-family="sans-serif" text-anchor="middle">📅</text>
+    <text x="222" y="94" fill="white" font-size="6" font-weight="700" font-family="sans-serif" text-anchor="middle">Existing Booking</text>
+    <!-- Tablet/Home checkboxes -->
+    <rect x="68" y="108" width="206" height="14" rx="3" fill="#fff9f0" stroke="${STONE}" stroke-width="0.5"/>
+    <rect x="72" y="112" width="8" height="8" rx="1.5" fill="${STONE}"/>
+    <text x="84" y="118" fill="${CHARCOAL}" font-size="5" font-family="sans-serif">📱 Providing studio tablet &amp; stylus</text>
+    <text x="256" y="118" fill="${CLAY}" font-size="5.5" font-weight="700" font-family="sans-serif" text-anchor="end">+£3.00</text>
+    <rect x="68" y="125" width="206" height="14" rx="3" fill="#f0f4ff" stroke="${STONE}" stroke-width="0.5"/>
+    <rect x="72" y="129" width="8" height="8" rx="1.5" fill="${STONE}"/>
+    <text x="84" y="135" fill="${CHARCOAL}" font-size="5" font-family="sans-serif">🏠 Home Access — all design tools, forever</text>
+    <text x="256" y="135" fill="${CLAY}" font-size="5.5" font-weight="700" font-family="sans-serif" text-anchor="end">+£5.00</text>
+    <!-- Open table button -->
+    <rect x="68" y="142" width="206" height="16" rx="4" fill="${CHARCOAL}"/>
+    <text x="171" y="152" fill="white" font-size="6.5" font-weight="700" font-family="sans-serif" text-anchor="middle">🪑 Open Table</text>
+  `;
+}
+
+function engagementScreen() {
+  return sidebar('staff') + `
+    <rect x="60" y="0" width="220" height="180" fill="${IVORY}"/>
+    <text x="65" y="14" fill="${CHARCOAL}" font-size="8" font-weight="700" font-family="sans-serif">Step 2 — Customer Engagement</text>
+    <!-- Table selector -->
+    <rect x="65" y="18" width="212" height="30" rx="4" fill="white" stroke="${STONE}" stroke-width="1"/>
+    <text x="70" y="26" fill="${CHARCOAL}" font-size="5.5" font-weight="700" font-family="sans-serif">Table 3 · Sarah Thompson</text>
+    <rect x="68" y="29" width="206" height="14" rx="3" fill="${SAND}" stroke="${STONE}" stroke-width="0.5"/>
+    <text x="74" y="38" fill="#8a8175" font-size="5" font-family="sans-serif">Select a table to view its bill →</text>
+    <!-- Catalog tabs -->
+    <rect x="65" y="52" width="212" height="90" rx="4" fill="white" stroke="${STONE}" stroke-width="1"/>
+    <rect x="68" y="55" width="38" height="10" rx="3" fill="${CLAY}"/>
+    <text x="87" y="61.5" fill="white" font-size="4.5" font-weight="700" font-family="sans-serif" text-anchor="middle">Pottery</text>
+    <rect x="109" y="55" width="34" height="10" rx="3" fill="${SAND}"/>
+    <text x="126" y="61.5" fill="${CHARCOAL}" font-size="4.5" font-family="sans-serif" text-anchor="middle">Drinks</text>
+    <rect x="146" y="55" width="26" height="10" rx="3" fill="${SAND}"/>
+    <text x="159" y="61.5" fill="${CHARCOAL}" font-size="4.5" font-family="sans-serif" text-anchor="middle">Cakes</text>
+    <!-- Items grid -->
+    ${[['Sm Mug','£7.50'],['Med Mug','£8.50'],['Bowl','£10.00'],['Plate','£9.00'],['Vase','£11.00'],['Tile','£6.00']].map((item,i)=>`
+      <rect x="${70+i%3*46}" y="${70+Math.floor(i/3)*24}" width="42" height="20" rx="3" fill="${SAND}"/>
+      <text x="${91+i%3*46}" y="${78+Math.floor(i/3)*24}" fill="${CHARCOAL}" font-size="5" font-weight="600" font-family="sans-serif" text-anchor="middle">${item[0]}</text>
+      <text x="${91+i%3*46}" y="${85+Math.floor(i/3)*24}" fill="${CLAY}" font-size="4.5" font-weight="700" font-family="sans-serif" text-anchor="middle">${item[1]}</text>
+    `).join('')}
+    <!-- Mayco panel -->
+    <rect x="65" y="146" width="212" height="28" rx="4" fill="white" stroke="${STONE}" stroke-width="1"/>
+    <text x="70" y="155" fill="${CHARCOAL}" font-size="5.5" font-weight="700" font-family="sans-serif">✨ Mayco Specialist Glazes</text>
+    <text x="224" y="155" fill="#8a8175" font-size="4.5" font-family="sans-serif">tap to browse →</text>
+    ${[['#6B2DA8','Royal Fantasy','CG-785'],['#2979CC',"Bloomin' Blue",'CG-974'],['#7CB87C','Pistachio','CG-717'],['#E53935','Firecracker','CG-756'],['#00796B','Mystic Jade','CG-780']].map((g,i)=>`
+      <circle cx="${73+i*36}" cy="166" r="6" fill="${g[0]}"/>
+      <text x="${73+i*36}" y="175" fill="#8a8175" font-size="3.5" font-family="sans-serif" text-anchor="middle">${g[2]}</text>
+    `).join('')}
+  `;
+}
+
+function completionScreen() {
+  return sidebar('staff') + `
+    <rect x="60" y="0" width="220" height="180" fill="${IVORY}"/>
+    <text x="65" y="14" fill="${CHARCOAL}" font-size="8" font-weight="700" font-family="sans-serif">Step 3 — Complete &amp; Submit Pieces</text>
+    <rect x="65" y="18" width="212" height="152" rx="4" fill="white" stroke="${STONE}" stroke-width="1"/>
+    <rect x="68" y="21" width="206" height="8" rx="2" fill="#d9edf7"/>
+    <text x="73" y="26.5" fill="#31708f" font-size="4.5" font-weight="700" font-family="sans-serif">📷 Step 3: Photograph pieces — stamps name &amp; date automatically.</text>
+    <!-- Open tables -->
+    ${[{name:'Table 3 · Sarah Thompson'},{name:'Table 7 · The Williams Party'}].map((t,i)=>`
+      <rect x="68" y="${34+i*54}" width="206" height="48" rx="3" fill="#fff9f0" stroke="${CLAY}" stroke-width="0.7"/>
+      <text x="73" y="${42+i*54}" fill="${CHARCOAL}" font-size="6" font-weight="700" font-family="sans-serif">${t.name}</text>
+      <!-- Home access checkbox -->
+      <rect x="72" y="${46+i*54}" width="200" height="10" rx="2" fill="#f0f4ff" stroke="${STONE}" stroke-width="0.5"/>
+      <rect x="74" y="${48+i*54}" width="6" height="6" rx="1" fill="${STONE}"/>
+      <text x="84" y="${53.5+i*54}" fill="${CHARCOAL}" font-size="4" font-family="sans-serif">🏠 Add Home Access — forever</text>
+      <text x="270" y="${53.5+i*54}" fill="${CLAY}" font-size="4.5" font-weight="700" font-family="sans-serif" text-anchor="end">+£5</text>
+      <!-- Photo button -->
+      <rect x="68" y="${59+i*54}" width="206" height="16" rx="3" fill="${CHARCOAL}"/>
+      <text x="171" y="${69+i*54}" fill="white" font-size="5.5" font-weight="700" font-family="sans-serif" text-anchor="middle">📷 Take Photo &amp; Submit Pieces</text>
+    `).join('')}
+  `;
+}
+
+function printQueueScreen() {
+  return sidebar('printqueue') + `
+    <rect x="60" y="0" width="220" height="180" fill="${IVORY}"/>
+    <text x="65" y="14" fill="${CHARCOAL}" font-size="8" font-weight="700" font-family="sans-serif">Print Queue</text>
+    <text x="65" y="22" fill="#8a8175" font-size="4.5" font-family="sans-serif">Check design &amp; sizing before approving. Approving charges £1 and can't be undone.</text>
+    ${[
+      {name:'Sarah T.',tool:'Transfer Designer',time:'14:23'},
+      {name:'Ben W.',tool:'Design Preview',time:'15:01'},
+    ].map((r,i)=>`
+      <rect x="65" y="${28+i*72}" width="212" height="66" rx="4" fill="white" stroke="${STONE}" stroke-width="1"/>
+      <!-- Design preview area -->
+      <rect x="68" y="${31+i*72}" width="206" height="36" rx="3" fill="#e8e0d8" stroke="${STONE}" stroke-width="0.5"/>
+      <text x="171" y="${52+i*72}" fill="#8a8175" font-size="5.5" font-family="sans-serif" text-anchor="middle">Design preview thumbnail</text>
+      <!-- Info row -->
+      <text x="70" y="${74+i*72}" fill="${CHARCOAL}" font-size="5.5" font-weight="700" font-family="sans-serif">${r.name}</text>
+      <text x="70" y="${80+i*72}" fill="#8a8175" font-size="4.5" font-family="sans-serif">${r.tool} · ${r.time}</text>
+      <!-- Approve / Reject -->
+      <rect x="155" y="${70+i*72}" width="58" height="14" rx="3" fill="#3c763d"/>
+      <text x="184" y="${78.5+i*72}" fill="white" font-size="5" font-weight="700" font-family="sans-serif" text-anchor="middle">✅ Approve — £1</text>
+      <rect x="218" y="${70+i*72}" width="56" height="14" rx="3" fill="#d9534f"/>
+      <text x="246" y="${78.5+i*72}" fill="white" font-size="5" font-weight="700" font-family="sans-serif" text-anchor="middle">❌ Reject</text>
+    `).join('')}
+  `;
+}
+
+function stockScreen() {
+  return sidebar('stock') + `
+    <rect x="60" y="0" width="220" height="180" fill="${IVORY}"/>
+    <text x="65" y="14" fill="${CHARCOAL}" font-size="8" font-weight="700" font-family="sans-serif">Studio Stock</text>
+    <!-- Add piece -->
+    <rect x="65" y="18" width="212" height="56" rx="4" fill="white" stroke="${STONE}" stroke-width="1"/>
+    <text x="70" y="26" fill="${CHARCOAL}" font-size="5.5" font-weight="700" font-family="sans-serif">Add a Piece</text>
+    <rect x="68" y="29" width="100" height="12" rx="3" fill="${SAND}" stroke="${STONE}" stroke-width="0.5"/>
+    <text x="73" y="36.5" fill="#8a8175" font-size="4.5" font-family="sans-serif">Piece name (e.g. Medium Mug)</text>
+    <rect x="172" y="29" width="100" height="12" rx="3" fill="${SAND}" stroke="${STONE}" stroke-width="0.5"/>
+    <text x="177" y="36.5" fill="#8a8175" font-size="4.5" font-family="sans-serif">Category (e.g. Mugs)</text>
+    <rect x="68" y="44" width="100" height="12" rx="3" fill="#e8f0e8" stroke="${STONE}" stroke-width="0.5"/>
+    <text x="118" y="52" fill="#2a5a2a" font-size="5" font-weight="600" font-family="sans-serif" text-anchor="middle">📷 Take Photo</text>
+    <rect x="172" y="44" width="100" height="12" rx="3" fill="${CHARCOAL}"/>
+    <text x="222" y="52" fill="white" font-size="5" font-weight="700" font-family="sans-serif" text-anchor="middle">+ Add to Catalogue</text>
+    <!-- Reservations -->
+    <rect x="65" y="78" width="212" height="46" rx="4" fill="white" stroke="${STONE}" stroke-width="1"/>
+    <text x="70" y="87" fill="${CHARCOAL}" font-size="5.5" font-weight="700" font-family="sans-serif">📌 Pending Reservations</text>
+    ${[
+      {piece:'Large Bowl',customer:'Emma R.',code:'BK-7892'},
+      {piece:'Classic Mug',customer:'Mark T.',code:'WALK-2341'},
+    ].map((r,i)=>`
+      <rect x="68" y="${91+i*15}" width="206" height="12" rx="2" fill="${SAND}"/>
+      <text x="73" y="${96.5+i*15}" fill="${CHARCOAL}" font-size="5" font-weight="600" font-family="sans-serif">${r.piece}</text>
+      <text x="73" y="${101+i*15}" fill="#8a8175" font-size="4" font-family="sans-serif">${r.customer} · ${r.code}</text>
+      <rect x="234" y="${93+i*15}" width="38" height="8" rx="2" fill="#3c763d"/>
+      <text x="253" y="${98.5+i*15}" fill="white" font-size="4" font-weight="700" font-family="sans-serif" text-anchor="middle">✓ Confirm</text>
+    `).join('')}
+    <!-- Catalogue grid -->
+    <rect x="65" y="128" width="212" height="46" rx="4" fill="white" stroke="${STONE}" stroke-width="1"/>
+    <text x="70" y="137" fill="${CHARCOAL}" font-size="5.5" font-weight="700" font-family="sans-serif">Current Catalogue</text>
+    ${[['Sm Mug','£7.50'],['Med Mug','£8.50'],['Bowl','£10.00'],['Plate','£9.00']].map((item,i)=>`
+      <rect x="${68+i*52}" y="141" width="48" height="28" rx="3" fill="${SAND}"/>
+      <rect x="${70+i*52}" y="143" width="44" height="16" rx="2" fill="#c8b4a0" opacity="0.7"/>
+      <text x="${92+i*52}" y="152" fill="rgba(255,255,255,0.6)" font-size="8" font-family="sans-serif" text-anchor="middle">🏺</text>
+      <text x="${92+i*52}" y="163" fill="${CHARCOAL}" font-size="4.5" font-weight="600" font-family="sans-serif" text-anchor="middle">${item[0]}</text>
+      <text x="${92+i*52}" y="167" fill="${CLAY}" font-size="4" font-weight="700" font-family="sans-serif" text-anchor="middle">${item[1]}</text>
+    `).join('')}
+  `;
+}
+
+function communityScreen() {
+  return sidebar('community') + `
+    <rect x="60" y="0" width="220" height="180" fill="${IVORY}"/>
+    <text x="65" y="14" fill="${CHARCOAL}" font-size="8" font-weight="700" font-family="sans-serif">Community Feed</text>
+    <rect x="65" y="18" width="212" height="152" rx="4" fill="white" stroke="${STONE}" stroke-width="1"/>
+    ${[
+      {name:"Alice · Mug",caption:"My first ever pottery piece 🎉",likes:12,color:'#8B6B4A',featured:false},
+      {name:"Ben · Bowl",caption:"Going back next week for sure",likes:5,color:'#5b6b68',featured:true},
+      {name:"Claire · Vase",caption:"The crystals are incredible ✨",likes:23,color:'#6b7561',featured:false},
+    ].map((p,i)=>`
+      <rect x="68" y="${22+i*46}" width="206" height="42" rx="3" fill="${i%2===0?IVORY:SAND}"/>
+      <rect x="70" y="${24+i*46}" width="60" height="34" rx="2" fill="${p.color}" opacity="0.8"/>
+      <text x="100" y="${43+i*46}" fill="rgba(255,255,255,0.4)" font-size="12" font-family="sans-serif" text-anchor="middle">🏺</text>
+      <text x="135" y="${32+i*46}" fill="${CHARCOAL}" font-size="5.5" font-weight="700" font-family="sans-serif">${p.name}</text>
+      <text x="135" y="${39+i*46}" fill="#8a8175" font-size="4.5" font-family="sans-serif">${p.caption}</text>
+      <text x="135" y="${54+i*46}" fill="#8a8175" font-size="4.5" font-family="sans-serif">❤️ ${p.likes}</text>
+      ${p.featured
+        ? `<rect x="218" y="${27+i*46}" width="52" height="10" rx="3" fill="${CLAY}"/>
+           <text x="244" y="${33.5+i*46}" fill="white" font-size="4.5" font-weight="700" font-family="sans-serif" text-anchor="middle">✨ Featured</text>`
+        : `<rect x="218" y="${27+i*46}" width="52" height="10" rx="3" fill="rgba(0,0,0,0.06)"/>
+           <text x="244" y="${33.5+i*46}" fill="#8a8175" font-size="4.5" font-family="sans-serif" text-anchor="middle">✨ Feature</text>
+           <rect x="218" y="${40+i*46}" width="52" height="10" rx="3" fill="rgba(217,83,79,0.12)"/>
+           <text x="244" y="${46.5+i*46}" fill="#d9534f" font-size="4.5" font-family="sans-serif" text-anchor="middle">Remove</text>`
+      }
+    `).join('')}
+  `;
+}
+
+// ── Step definitions ──
+const STEPS = [
+  {
+    screen: dashboardScreen,
+    nav: 'dashboard',
+    title: "Dashboard — your daily overview",
+    body: "The first screen you see. Shows revenue, sessions, and the Extra Charges Today card — everything charged through the app that needs adding to the till at checkout.",
+    arrows: []
+  },
+  {
+    screen: dashboardScreen,
+    nav: 'dashboard',
+    title: "Extra Charges Today — add to the till",
+    body: "This card shows all app charges grouped by booking. At checkout, add these to the customer's bill on the till. Nothing is charged automatically.",
+    arrows: [{vx:171,vy:87,label:"Add these to the bill",dir:"down"}]
+  },
+  {
+    screen: null,
+    nav: 'staff',
+    title: "Tap Daily Bookings in the sidebar",
+    body: "Every customer session starts here. Tap Daily Bookings in the sidebar — this opens the full session flow.",
+    arrows: [{vx:29,vy:55,label:"Daily Bookings",dir:"right"}]
+  },
+  {
+    screen: bookingsStep1Screen,
+    nav: 'staff',
+    title: "Step 1 — type the customer name",
+    body: "Type the customer's name in the big field at the top. Then tap New Walk-in for a drop-in, or Existing Booking to pull in their Square reservation.",
+    arrows: [{vx:171,vy:48,label:"Type name here first",dir:"down"}]
+  },
+  {
+    screen: bookingsStep1Screen,
+    nav: 'staff',
+    title: "Choose walk-in or existing booking",
+    body: "Two big tiles — tap the right one. Walk-in creates a new session on the spot. Existing Booking finds their Square reservation and imports their history.",
+    arrows: [
+      {vx:117,vy:62,label:"New Walk-in",dir:"up"},
+      {vx:222,vy:62,label:"Existing Booking",dir:"up"}
+    ]
+  },
+  {
+    screen: engagementScreen,
+    nav: 'staff',
+    title: "Step 2 — log pieces, drinks & glazes",
+    body: "Once seated, log everything from the Square catalogue — pottery, drinks, cakes. Tap the Mayco Specialist Glazes panel at the bottom to add crystal or dimensional glazes in one tap.",
+    arrows: [{vx:171,vy:163,label:"Mayco Glazes — one tap to add",dir:"down"}]
+  },
+  {
+    screen: completionScreen,
+    nav: 'staff',
+    title: "Step 3 — photograph & complete",
+    body: "When a customer finishes, tap Take Photo & Submit Pieces. The photo is stamped with their name and date. Tick Home Access or tablet charges before submitting.",
+    arrows: [{vx:171,vy:76,label:"Tap to photograph & complete",dir:"down"}]
+  },
+  {
+    screen: printQueueScreen,
+    nav: 'printqueue',
+    title: "Print Queue — review transfer designs",
+    body: "When customers submit designs for ceramic transfer printing, they appear here. Check the design and sizing — Approve to charge £1 and print, Reject with no charge.",
+    arrows: [
+      {vx:184,vy:70,label:"Approve — charges £1",dir:"up"},
+      {vx:246,vy:70,label:"Reject — no charge",dir:"up"}
+    ]
+  },
+  {
+    screen: stockScreen,
+    nav: 'stock',
+    title: "Stock — catalogue & reservations",
+    body: "Photograph bisque pieces and add them to the catalogue. Customers can browse, design on them at home, and reserve for their next visit. Pending reservations appear above.",
+    arrows: [{vx:118,vy:56,label:"📷 Take Photo to add",dir:"up"}]
+  },
+  {
+    screen: communityScreen,
+    nav: 'community',
+    title: "Community — feature great work",
+    body: "See everything customers have shared. Tap Feature on any post to push it to the worldwide kilnLINK feed — great for showing off brilliant pieces.",
+    arrows: [{vx:244,vy:29,label:"Tap Feature to boost worldwide",dir:"down"}]
+  },
+  {
+    screen: dashboardScreen,
+    nav: 'dashboard',
+    title: "Daily flow — that's it!",
+    body: "Open booking → log items in Step 2 → photograph & complete in Step 3 → kiln fires → mark ready for pickup. Tap 🎯 Staff Tour any time to replay.",
+    arrows: [{vx:29,vy:165,label:"🎯 Staff Tour — always here",dir:"up"}]
+  }
+];
+
+let cur = 0, playing = false, playTimer = null, bounceAngle = 0;
+let screenCache = {};
+
+function getScreen(stepIdx) {
+  const step = STEPS[stepIdx];
+  if (step.screen) return step.screen();
+  // Steps without a screen fn use the previous cached screen
+  return screenCache[stepIdx] || dashboardScreen();
+}
+
+function render() {
+  const step = STEPS[cur];
+
+  document.getElementById('progress').style.width = `${((cur+1)/STEPS.length)*100}%`;
+  document.getElementById('step-label').textContent = `Step ${cur+1} of ${STEPS.length}`;
+  document.getElementById('step-title').textContent = step.title;
+  document.getElementById('step-body').textContent = step.body;
+
+  const content = getScreen(cur);
+  screenCache[cur] = content;
+  document.getElementById('screen-content').innerHTML = content;
+
+  document.getElementById('btn-back').disabled = cur === 0;
+  document.getElementById('btn-next').disabled = cur === STEPS.length - 1;
+  document.getElementById('btn-play').textContent = playing ? '⏸ Pause' : cur === STEPS.length-1 ? '↺ Replay' : '▶ Play';
+
+  const dots = document.getElementById('dots');
+  dots.innerHTML = STEPS.map((_,i) =>
+    `<button class="wt-dot${i===cur?' active':''}" onclick="goTo(${i})" title="Step ${i+1}"></button>`
+  ).join('');
+
+  renderArrows();
+}
+
+function renderArrows() {
+  const step = STEPS[cur];
+  const layer = document.getElementById('arrow-layer');
+  if (!step.arrows.length) { layer.innerHTML = ''; return; }
+
+  const svgEl = document.getElementById('main-svg');
+  const svgRect = svgEl.getBoundingClientRect();
+  const wrapRect = document.getElementById('screen-wrap').getBoundingClientRect();
+
+  // ViewBox is 280x180
+  const scaleX = svgRect.width / 280;
+  const scaleY = svgRect.height / 180;
+  const offX = svgRect.left - wrapRect.left;
+  const offY = svgRect.top - wrapRect.top;
+
+  const bounce = Math.sin(bounceAngle) * 6;
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('style', 'position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;');
+
+  step.arrows.forEach(a => {
+    const ax = offX + a.vx * scaleX;
+    const ay = offY + a.vy * scaleY;
+    const isUp = a.dir === 'up';
+    const isRight = a.dir === 'right';
+
+    const arrowTip = isUp ? ay - 12 + bounce : isRight ? ay : ay + 12 - bounce;
+    const arrowX = isRight ? ax + 12 - bounce : ax;
+    const labelY = isUp ? ay - 26 : isRight ? ay - 8 : ay + 24;
+    const labelX = isRight ? ax + 30 : ax;
+    const labelW = a.label.length * 6.5 + 16;
+
+    const g = document.createElementNS(ns, 'g');
+
+    const bg = document.createElementNS(ns, 'rect');
+    bg.setAttribute('x', labelX - labelW/2); bg.setAttribute('y', labelY - 10);
+    bg.setAttribute('width', labelW); bg.setAttribute('height', 16);
+    bg.setAttribute('rx', '8'); bg.setAttribute('fill', CLAY);
+    g.appendChild(bg);
+
+    const t = document.createElementNS(ns, 'text');
+    t.setAttribute('x', labelX); t.setAttribute('y', labelY + 2);
+    t.setAttribute('fill', 'white'); t.setAttribute('font-size', '11');
+    t.setAttribute('font-weight', '700'); t.setAttribute('font-family', 'sans-serif');
+    t.setAttribute('text-anchor', 'middle');
+    t.textContent = a.label;
+    g.appendChild(t);
+
+    const tri = document.createElementNS(ns, 'polygon');
+    let pts;
+    if (isRight) {
+      pts = `${arrowX},${ay} ${arrowX-13},${ay-7} ${arrowX-13},${ay+7}`;
+    } else if (isUp) {
+      pts = `${ax},${arrowTip} ${ax-8},${arrowTip+13} ${ax+8},${arrowTip+13}`;
+    } else {
+      pts = `${ax},${arrowTip} ${ax-8},${arrowTip-13} ${ax+8},${arrowTip-13}`;
+    }
+    tri.setAttribute('points', pts); tri.setAttribute('fill', CLAY);
+    g.appendChild(tri);
+    svg.appendChild(g);
+  });
+
+  layer.innerHTML = '';
+  layer.appendChild(svg);
+}
+
+function goTo(i) {
+  if (i < 0 || i >= STEPS.length) return;
+  cur = i;
+  render();
+}
+
+function togglePlay() {
+  if (cur === STEPS.length - 1 && !playing) cur = 0;
+  playing = !playing;
+  if (playing) scheduleNext();
+  else clearTimeout(playTimer);
+  document.getElementById('btn-play').textContent = playing ? '⏸ Pause' : '▶ Play';
+}
+
+function scheduleNext() {
+  if (!playing) return;
+  playTimer = setTimeout(() => {
+    if (cur < STEPS.length - 1) { cur++; render(); scheduleNext(); }
+    else { playing = false; document.getElementById('btn-play').textContent = '↺ Replay'; }
+  }, 3800);
+}
+
+function animateArrows() {
+  bounceAngle += 0.08;
+  renderArrows();
+  requestAnimationFrame(animateArrows);
+}
+
+window.addEventListener('resize', renderArrows);
+render();
+animateArrows();
+</script>
+</body>
+</html>
