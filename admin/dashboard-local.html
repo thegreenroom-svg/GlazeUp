@@ -3962,7 +3962,7 @@ let splashDismissed = false;
 function wireSplash() {
   const el = document.getElementById('splash-screen');
   if (el) el.addEventListener('click', dismissSplash);
-  requestAnimationFrame(() => requestAnimationFrame(drawSplashArrows));
+  setTimeout(drawSplashArrows, 1500); // wait for letters to actually land first
 }
 
 // Animated arrow motif (splash only) — traces K, over the kiln, to I,
