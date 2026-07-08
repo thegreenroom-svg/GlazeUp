@@ -1878,6 +1878,121 @@ app.post('/api/community/posts/:postId/like', async (req, res) => {
   }
 });
 
+/**
+ * DELETE /api/community/posts/:postId
+ * Staff moderation — remove an inappropriate or unwanted post from their studio's feed
+ */
+app.delete('/api/community/posts/:postId', async (req, res) => {
+  const { postId } = req.params;
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    const { error } = await supabase
+      .from('community_posts')
+      .delete()
+      .eq('id', postId)
+      .eq('studio_id', studioId); // scoped so a studio can only delete its own posts
+
+    if (error) throw error;
+    res.json({ status: 'removed' });
+  } catch (error) {
+    console.error('Error removing community post:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/studio/:studioId/social-profile
+ * A studio's own social/directory profile (for the settings screen)
+ */
+app.get('/api/studio/:studioId/social-profile', async (req, res) => {
+  const { studioId } = req.params;
+
+  try {
+    const { data: studio, error } = await supabase
+      .from('studios')
+      .select('id, name, instagram_handle, facebook_url, tiktok_handle, website_url, public_bio, city, country, directory_visible')
+      .eq('id', studioId)
+      .single();
+
+    if (error) throw error;
+    res.json({ studio });
+  } catch (error) {
+    console.error('Error fetching studio social profile:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * PUT /api/studio/:studioId/social-profile
+ * Update a studio's connected social handles and directory listing details
+ */
+app.put('/api/studio/:studioId/social-profile', async (req, res) => {
+  const { studioId } = req.params;
+  const { instagramHandle, facebookUrl, tiktokHandle, websiteUrl, publicBio, city, country, directoryVisible } = req.body;
+
+  try {
+    const { data: studio, error } = await supabase
+      .from('studios')
+      .update({
+        instagram_handle: instagramHandle ?? null,
+        facebook_url: facebookUrl ?? null,
+        tiktok_handle: tiktokHandle ?? null,
+        website_url: websiteUrl ?? null,
+        public_bio: publicBio ?? null,
+        city: city ?? null,
+        country: country ?? null,
+        directory_visible: directoryVisible !== undefined ? directoryVisible : true
+      })
+      .eq('id', studioId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ status: 'updated', studio });
+  } catch (error) {
+    console.error('Error updating studio social profile:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/studios/directory
+ * The worldwide directory of studios on LINK — the network-effect / sales-driving view.
+ * Only shows studios that have opted in (directory_visible) and filled in at least
+ * a name, so it doesn't show empty/incomplete profiles.
+ */
+app.get('/api/studios/directory', async (req, res) => {
+  try {
+    const { data: studios, error } = await supabase
+      .from('studios')
+      .select('id, name, instagram_handle, facebook_url, tiktok_handle, website_url, public_bio, city, country')
+      .eq('directory_visible', true)
+      .not('name', 'is', null)
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+
+    // Attach a lightweight activity signal (posts shared in the last 30 days)
+    // so the directory feels alive, not just a static list
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const studiosWithActivity = await Promise.all((studios || []).map(async (studio) => {
+      const { count } = await supabase
+        .from('community_posts')
+        .select('id', { count: 'exact', head: true })
+        .eq('studio_id', studio.id)
+        .gte('created_at', thirtyDaysAgo);
+      return { ...studio, recentPostCount: count || 0 };
+    }));
+
+    res.json({ studios: studiosWithActivity });
+  } catch (error) {
+    console.error('Error fetching studio directory:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/pieces/ready-for-pickup', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });

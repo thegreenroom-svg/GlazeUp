@@ -1136,6 +1136,7 @@
       <a href="#" class="nav-link active" onclick="goToTab('dashboard', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="currentColor"><rect x="3" y="10" width="3.2" height="7" rx="1"/><rect x="8.4" y="5" width="3.2" height="12" rx="1"/><rect x="13.8" y="8" width="3.2" height="9" rx="1"/></svg></span><span class="nav-label">Dashboard</span></a>
       <a href="#" class="nav-link" onclick="goToTab('setup', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.8"/><path d="M10 3v1.8M10 15.2V17M17 10h-1.8M4.8 10H3M14.9 5.1l-1.3 1.3M6.4 13.6l-1.3 1.3M14.9 14.9l-1.3-1.3M6.4 6.4L5.1 5.1"/></svg></span><span class="nav-label">Setup</span></a>
       <a href="#" class="nav-link" onclick="goToTab('staff', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="6.5" r="3.3"/><path d="M10 11c-4 0-7 2.4-7 6.5h14c0-4.1-3-6.5-7-6.5z"/></svg></span><span class="nav-label">Staff</span></a>
+      <a href="#" class="nav-link" onclick="goToTab('community', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.3"/><path d="M2.9 10h14.2M10 2.9c2 2 3.1 4.5 3.1 7.1s-1.1 5.1-3.1 7.1c-2-2-3.1-4.5-3.1-7.1s1.1-5.1 3.1-7.1z"/></svg></span><span class="nav-label">Community</span></a>
       <a href="#" class="nav-link" onclick="goToTab('branding', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.2 2.8l3 3-7.6 7.6c-.7.7-1.8.7-2.5 0l-.5-.5c-.7-.7-.7-1.8 0-2.5l7.6-7.6z"/><path d="M6.2 12.3L4 17.5l5.2-2.2"/></svg></span><span class="nav-label">Branding</span></a>
       <a href="#" class="nav-link" onclick="goToTab('palettes', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 3a7 7 0 100 14c1 0 1.6-.5 1.6-1.3 0-.4-.2-.7-.4-1-.2-.3-.4-.6-.4-1 0-.8.6-1.4 1.4-1.4h1.3A3.5 3.5 0 0017 8.5C17 5.5 13.9 3 10 3z"/><circle cx="7" cy="8.2" r="1" fill="currentColor" stroke="none"/><circle cx="10.3" cy="6.4" r="1" fill="currentColor" stroke="none"/><circle cx="13.2" cy="8.6" r="1" fill="currentColor" stroke="none"/></svg></span><span class="nav-label">Colours</span></a>
       <a href="#" class="nav-link" onclick="goToTab('shapes', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.5 5.5C6.5 4 8 3 10 3s3.5 1 3.5 2.5L13 13c-.1 2-1.4 3.5-3 3.5s-2.9-1.5-3-3.5L6.5 5.5z"/><ellipse cx="10" cy="5.3" rx="3.5" ry="1"/></svg></span><span class="nav-label">Bisque</span></a>
@@ -1568,8 +1569,96 @@
       </div>
 
       <!-- ═════════════════════════════════════════════ -->
-      <!-- BRANDING TAB -->
+      <!-- COMMUNITY TAB -->
       <!-- ═════════════════════════════════════════════ -->
+      <div id="community-view" class="view" style="display: none;">
+        <h2 style="margin-top: 0;">Community</h2>
+        <p style="color: var(--gu-dust); margin-bottom: 20px;">
+          Connect your studio to the wider LINK community — moderate what your customers share, tell other studios who you are, and see who else is on LINK worldwide.
+        </p>
+
+        <div style="display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
+          <button onclick="showCommunitySection('feed')" id="community-subtab-feed" class="staff-subtab-btn active">Our Feed</button>
+          <button onclick="showCommunitySection('profile')" id="community-subtab-profile" class="staff-subtab-btn">Our Profile</button>
+          <button onclick="showCommunitySection('directory')" id="community-subtab-directory" class="staff-subtab-btn">Studios Worldwide</button>
+        </div>
+
+        <!-- Our Feed: moderate what customers have shared -->
+        <div id="community-section-feed" class="community-section">
+          <div class="chart-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="margin: 0;">Shared by your customers</h3>
+              <button onclick="loadStaffCommunityFeed()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
+            </div>
+            <div id="staff-community-feed-list">
+              <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Our Profile: connect socials, set directory listing -->
+        <div id="community-section-profile" class="community-section" style="display: none;">
+          <div class="setup-card">
+            <h3>Your LINK Directory Profile</h3>
+            <p style="font-size: 12px; color: var(--gu-dust); margin-bottom: 16px;">This is what other studios see about you in the worldwide directory.</p>
+
+            <div class="form-group">
+              <label style="font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px;">Short bio</label>
+              <textarea id="profile-bio" rows="3" placeholder="A family-run pottery painting studio in Langport, Somerset..." style="width: 100%; padding: 10px; border: 1px solid var(--gu-border); border-radius: 8px; font-family: inherit; font-size: 13px; box-sizing: border-box;"></textarea>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div class="form-group">
+                <label style="font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px;">City</label>
+                <input type="text" id="profile-city" placeholder="Langport" style="width: 100%; padding: 10px; border: 1px solid var(--gu-border); border-radius: 8px; font-size: 13px; box-sizing: border-box;">
+              </div>
+              <div class="form-group">
+                <label style="font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px;">Country</label>
+                <input type="text" id="profile-country" placeholder="United Kingdom" style="width: 100%; padding: 10px; border: 1px solid var(--gu-border); border-radius: 8px; font-size: 13px; box-sizing: border-box;">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label style="font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px;">Instagram</label>
+              <input type="text" id="profile-instagram" placeholder="@thekilncafe" style="width: 100%; padding: 10px; border: 1px solid var(--gu-border); border-radius: 8px; font-size: 13px; box-sizing: border-box;">
+            </div>
+            <div class="form-group">
+              <label style="font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px;">Facebook</label>
+              <input type="text" id="profile-facebook" placeholder="https://facebook.com/thekilncafe" style="width: 100%; padding: 10px; border: 1px solid var(--gu-border); border-radius: 8px; font-size: 13px; box-sizing: border-box;">
+            </div>
+            <div class="form-group">
+              <label style="font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px;">TikTok</label>
+              <input type="text" id="profile-tiktok" placeholder="@thekilncafe" style="width: 100%; padding: 10px; border: 1px solid var(--gu-border); border-radius: 8px; font-size: 13px; box-sizing: border-box;">
+            </div>
+            <div class="form-group">
+              <label style="font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px;">Website</label>
+              <input type="text" id="profile-website" placeholder="https://thekilncafe.com" style="width: 100%; padding: 10px; border: 1px solid var(--gu-border); border-radius: 8px; font-size: 13px; box-sizing: border-box;">
+            </div>
+
+            <label style="display: flex; align-items: center; gap: 8px; margin: 16px 0; font-size: 13px; cursor: pointer;">
+              <input type="checkbox" id="profile-visible" checked style="width: 16px; height: 16px;">
+              List us in the worldwide studio directory
+            </label>
+
+            <button class="btn-connect" style="width: 100%;" onclick="saveStudioProfile()">Save Profile</button>
+            <div id="profile-save-status" style="font-size: 12px; color: var(--glaze-sage-base); margin-top: 8px; text-align: center;"></div>
+          </div>
+        </div>
+
+        <!-- Studios Worldwide: the network directory -->
+        <div id="community-section-directory" class="community-section" style="display: none;">
+          <div class="chart-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="margin: 0;">Studios on LINK</h3>
+              <button onclick="loadStudioDirectory()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
+            </div>
+            <div id="studio-directory-list">
+              <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div id="branding-view" class="view" style="display: none;">
         <h2 style="margin-top: 0;">Studio Branding</h2>
         <p style="color: var(--gu-dust); margin-bottom: 20px;">
@@ -2078,6 +2167,8 @@ function goToTab(tab, event) {
     loadConnectionStatus();
   } else if (tab === 'shapes') {
     loadBisqueCatalog();
+  } else if (tab === 'community') {
+    showCommunitySection('feed');
   }
 }
 
@@ -2942,6 +3033,153 @@ function renderCatalogTabs() {
 // ══════════════════════════════════════════════════════════
 
 let bisqueCatalogCategories = [];
+
+// ══════════════════════════════════════════════════════════
+// COMMUNITY TAB
+// ══════════════════════════════════════════════════════════
+
+function showCommunitySection(section) {
+  ['feed', 'profile', 'directory'].forEach(s => {
+    document.getElementById(`community-section-${s}`).style.display = (s === section) ? 'block' : 'none';
+    document.getElementById(`community-subtab-${s}`).classList.toggle('active', s === section);
+  });
+
+  if (section === 'feed') loadStaffCommunityFeed();
+  else if (section === 'profile') loadStudioProfile();
+  else if (section === 'directory') loadStudioDirectory();
+}
+
+async function loadStaffCommunityFeed() {
+  const listEl = document.getElementById('staff-community-feed-list');
+  try {
+    if (!apiConnected) {
+      listEl.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Connect the API to load your feed.</div>`;
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/api/community/feed?studioId=${studioId}`);
+    const data = await res.json();
+
+    if (!data.posts || data.posts.length === 0) {
+      listEl.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Nothing shared yet.</div>`;
+      return;
+    }
+
+    listEl.innerHTML = data.posts.map(p => `
+      <div style="display: flex; gap: 12px; padding: 12px; background: #fff9f0; border-left: 4px solid var(--gu-primary); border-radius: 4px; margin-bottom: 8px;">
+        <img src="${p.photo_url}" style="width: 64px; height: 64px; object-fit: cover; border-radius: 8px; flex-shrink: 0;">
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-size: 13px; font-weight: 600;">${p.customer_display_name || 'A customer'}${p.piece_type ? ' · ' + p.piece_type : ''}</div>
+          ${p.caption ? `<div style="font-size: 12px; color: var(--gu-dust); margin-top: 2px;">${p.caption}</div>` : ''}
+          <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;">❤️ ${p.likes_count || 0} · ${new Date(p.created_at).toLocaleDateString('en-GB')}</div>
+        </div>
+        <button onclick="removeCommunityPost('${p.id}')" style="background: none; border: 1px solid var(--gu-border); border-radius: 8px; padding: 6px 10px; font-size: 11px; color: #d9534f; cursor: pointer; align-self: flex-start; flex-shrink: 0;">Remove</button>
+      </div>
+    `).join('');
+  } catch (err) {
+    listEl.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Could not load your feed.</div>`;
+  }
+}
+
+async function removeCommunityPost(postId) {
+  if (!confirm('Remove this post from your community feed?')) return;
+  try {
+    await fetch(`${API_URL}/api/community/posts/${postId}?studioId=${studioId}`, { method: 'DELETE' });
+    loadStaffCommunityFeed();
+  } catch (err) {
+    alert('Could not remove post: ' + err.message);
+  }
+}
+
+async function loadStudioProfile() {
+  try {
+    if (!apiConnected) return;
+    const res = await fetch(`${API_URL}/api/studio/${studioId}/social-profile`);
+    const data = await res.json();
+    const s = data.studio || {};
+
+    document.getElementById('profile-bio').value = s.public_bio || '';
+    document.getElementById('profile-city').value = s.city || '';
+    document.getElementById('profile-country').value = s.country || '';
+    document.getElementById('profile-instagram').value = s.instagram_handle || '';
+    document.getElementById('profile-facebook').value = s.facebook_url || '';
+    document.getElementById('profile-tiktok').value = s.tiktok_handle || '';
+    document.getElementById('profile-website').value = s.website_url || '';
+    document.getElementById('profile-visible').checked = s.directory_visible !== false;
+  } catch (err) {
+    console.error('Could not load studio profile:', err);
+  }
+}
+
+async function saveStudioProfile() {
+  const statusEl = document.getElementById('profile-save-status');
+  try {
+    const res = await fetch(`${API_URL}/api/studio/${studioId}/social-profile`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        publicBio: document.getElementById('profile-bio').value.trim(),
+        city: document.getElementById('profile-city').value.trim(),
+        country: document.getElementById('profile-country').value.trim(),
+        instagramHandle: document.getElementById('profile-instagram').value.trim(),
+        facebookUrl: document.getElementById('profile-facebook').value.trim(),
+        tiktokHandle: document.getElementById('profile-tiktok').value.trim(),
+        websiteUrl: document.getElementById('profile-website').value.trim(),
+        directoryVisible: document.getElementById('profile-visible').checked
+      })
+    });
+
+    if (res.ok) {
+      statusEl.textContent = '✓ Saved';
+      setTimeout(() => { statusEl.textContent = ''; }, 2500);
+    } else {
+      statusEl.textContent = 'Could not save — try again';
+      statusEl.style.color = '#d9534f';
+    }
+  } catch (err) {
+    statusEl.textContent = 'Error: ' + err.message;
+    statusEl.style.color = '#d9534f';
+  }
+}
+
+async function loadStudioDirectory() {
+  const listEl = document.getElementById('studio-directory-list');
+  try {
+    if (!apiConnected) {
+      listEl.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Connect the API to browse studios.</div>`;
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/api/studios/directory`);
+    const data = await res.json();
+
+    if (!data.studios || data.studios.length === 0) {
+      listEl.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">No studios listed yet — be the first to set up your profile!</div>`;
+      return;
+    }
+
+    listEl.innerHTML = data.studios.map(s => {
+      const location = [s.city, s.country].filter(Boolean).join(', ');
+      const socialLinks = [];
+      if (s.instagram_handle) socialLinks.push(`<a href="https://instagram.com/${s.instagram_handle.replace('@','')}" target="_blank" style="color: var(--gu-primary); text-decoration: none; font-size: 11px;">Instagram</a>`);
+      if (s.website_url) socialLinks.push(`<a href="${s.website_url}" target="_blank" style="color: var(--gu-primary); text-decoration: none; font-size: 11px;">Website</a>`);
+
+      return `
+        <div style="padding: 14px; background: #fff9f0; border-left: 4px solid var(--link-clay); border-radius: 4px; margin-bottom: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <strong style="font-size: 14px;">${s.name}</strong>
+            ${s.recentPostCount > 0 ? `<span style="font-size: 10px; background: var(--glaze-sage-base); color: #fff; padding: 3px 8px; border-radius: 20px;">🔥 ${s.recentPostCount} shared this month</span>` : ''}
+          </div>
+          ${location ? `<div style="font-size: 12px; color: var(--gu-dust); margin-top: 2px;">${location}</div>` : ''}
+          ${s.public_bio ? `<div style="font-size: 12px; color: var(--gu-text); margin-top: 6px;">${s.public_bio}</div>` : ''}
+          ${socialLinks.length ? `<div style="margin-top: 8px; display: flex; gap: 12px;">${socialLinks.join('')}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    listEl.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Could not load the studio directory.</div>`;
+  }
+}
 
 async function loadBisqueCatalog() {
   const gridEl = document.getElementById('bisque-catalog-grid');
