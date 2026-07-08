@@ -1157,16 +1157,16 @@
           <span style="font-size: 15px;">You're on the free trial. Billing starts next month. No credit card required.</span>
         </div>
 
-        <!-- App Extras tally — PROTOTYPE, for appraisal. Not real payment
-             processing yet: this is a running tally of paid-tool unlocks
-             (currently Transfer Designer, £1/visit) to add to bills at
+        <!-- Extra Charges tally — PROTOTYPE, for appraisal. Not real payment
+             processing yet: this is a running tally of paid-tool unlocks and
+             studio equipment charges (tablet/stylus) to add to bills at
              checkout, until proper billing is wired up. -->
         <div class="chart-container">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <h3 style="margin: 0;">📱 App Extras Today <span style="font-size: 11px; font-weight: 500; color: var(--gu-dust);">(prototype)</span></h3>
+            <h3 style="margin: 0;">💷 Extra Charges Today <span style="font-size: 11px; font-weight: 500; color: var(--gu-dust);">(prototype)</span></h3>
             <button onclick="loadTodaysExtraCharges()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
           </div>
-          <div style="font-size: 11px; color: var(--gu-dust); margin-bottom: 10px;">Customers who've unlocked paid app tools this visit — add these to their bill at checkout. Not charged automatically yet.</div>
+          <div style="font-size: 11px; color: var(--gu-dust); margin-bottom: 10px;">Paid app tools and studio equipment (tablet/stylus) used this visit — add these to the bill at checkout. Not charged automatically yet.</div>
           <div id="extras-today-list">
             <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
           </div>
@@ -1380,7 +1380,13 @@
               <input type="text" id="s1-table-number" placeholder="Table number">
               <input type="number" id="s1-num-places" placeholder="Number of places" min="1">
             </div>
-            <button class="btn-connect" style="width: 100%; margin-top: 12px;" onclick="openTableSession()">🪑 Open Table</button>
+
+            <label style="display: flex; align-items: center; gap: 10px; margin: 14px 0; padding: 12px; background: #fff9f0; border-radius: 10px; border: 1px solid var(--gu-border); cursor: pointer; font-size: 13px;">
+              <input type="checkbox" id="s1-tablet-charge" style="width: 18px; height: 18px; flex-shrink: 0;">
+              📱 Providing studio tablet &amp; stylus <span style="color: var(--link-clay); font-weight: 700; margin-left: auto;">+£3.00</span>
+            </label>
+
+            <button class="btn-connect" style="width: 100%; margin-top: 4px;" onclick="openTableSession()">🪑 Open Table</button>
           </div>
         </div>
 
@@ -2865,6 +2871,7 @@ function s1BackToStart() {
   document.getElementById('s1-result').style.display = 'none';
   document.getElementById('s1-customer-name').value = '';
   document.getElementById('s1-booking-code').value = '';
+  document.getElementById('s1-tablet-charge').checked = false;
   s1LookedUpBooking = null;
 }
 
@@ -2948,6 +2955,7 @@ async function openTableSession() {
 
   const tableNumber = document.getElementById('s1-table-number').value.trim();
   const numberOfPlaces = parseInt(document.getElementById('s1-num-places').value) || null;
+  const chargeForTablet = document.getElementById('s1-tablet-charge').checked;
 
   try {
     if (!apiConnected) {
@@ -2968,6 +2976,21 @@ async function openTableSession() {
     });
 
     if (res.ok) {
+      // Studio equipment charge — PROTOTYPE, tallied like the app-tool
+      // unlocks, not charged directly. £3/session for tablet + stylus.
+      if (chargeForTablet) {
+        fetch(`${API_URL}/api/extras/charge`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studioId,
+            bookingCode: s1LookedUpBooking.bookingCode,
+            itemName: 'Studio Tablet & Stylus',
+            amountCents: 300
+          })
+        }).catch(err => console.error('Could not record tablet charge:', err));
+      }
+
       showCustomerQR(s1LookedUpBooking.bookingCode, s1LookedUpBooking.customerName, tableNumber);
       resetSection1();
     } else {
@@ -3031,6 +3054,7 @@ function resetSection1() {
   document.getElementById('s1-customer-name').value = '';
   document.getElementById('s1-table-number').value = '';
   document.getElementById('s1-num-places').value = '';
+  document.getElementById('s1-tablet-charge').checked = false;
   document.getElementById('s1-step-start').style.display = 'block';
   document.getElementById('s1-step-existing').style.display = 'none';
   document.getElementById('s1-result').style.display = 'none';
