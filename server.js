@@ -372,6 +372,135 @@ app.get('/api/square/catalog', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════
+// SQUARE KDS — Customer food & drink orders
+// Creates a Square order when a customer orders
+// from the app — goes straight to your KDS.
+// ═══════════════════════════════════════════
+
+// POST /api/kds/order — customer places a food/drink order
+app.post('/api/kds/order', async (req, res) => {
+  const { studioId, bookingCode, customerName, items } = req.body;
+  if (!studioId || !items?.length) return res.status(400).json({ error: 'studioId and items required' });
+
+  try {
+    // Get Square connection for this studio
+    const { data: connection } = await supabase
+      .from('square_connections')
+      .select('square_access_token')
+      .eq('studio_id', studioId)
+      .single();
+
+    if (!connection) return res.status(404).json({ error: 'Square not connected for this studio' });
+
+    const squareClient = await getSquareClient(connection.square_access_token);
+
+    // Get location ID
+    const locRes = await squareClient.locationsApi.listLocations();
+    const locationId = locRes.result.locations?.[0]?.id;
+    if (!locationId) return res.status(500).json({ error: 'No Square location found' });
+
+    // Build line items — each item needs a catalogObjectId (variation ID) or basePriceMoney
+    const lineItems = items.map(item => {
+      const li = {
+        quantity: String(item.quantity || 1),
+        note: `Table: ${bookingCode || 'walk-in'}${customerName ? ` · ${customerName}` : ''}`,
+      };
+      if (item.variationId) {
+        li.catalogObjectId = item.variationId;
+      } else {
+        // Fallback: name + manual price
+        li.name = item.name;
+        if (item.priceCents) {
+          li.basePriceMoney = { amount: BigInt(item.priceCents), currency: 'GBP' };
+        }
+      }
+      return li;
+    });
+
+    // Create the order — Square KDS will pick this up automatically
+    const idempotencyKey = `klnk-${bookingCode || 'wk'}-${Date.now()}`;
+    const orderRes = await squareClient.ordersApi.createOrder({
+      order: {
+        locationId,
+        lineItems,
+        referenceId: bookingCode || undefined,
+        note: `kilnLINK app order · ${customerName || bookingCode || 'Customer'}`,
+        state: 'OPEN',
+      },
+      idempotencyKey,
+    });
+
+    const orderId = orderRes.result.order?.id;
+    res.json({ status: 'sent', orderId, locationId });
+
+  } catch (err) {
+    console.error('KDS order error:', err);
+    res.status(500).json({ error: err.message || 'Failed to send to KDS' });
+  }
+});
+
+// GET /api/kds/menu — fetch food & drink items from Square catalogue
+// (filters to categories that look like food/drink — excludes pottery)
+app.get('/api/kds/menu', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    const { data: connection } = await supabase
+      .from('square_connections')
+      .select('square_access_token')
+      .eq('studio_id', studioId)
+      .single();
+
+    if (!connection) return res.json({ categories: [] });
+
+    const squareClient = await getSquareClient(connection.square_access_token);
+
+    const [catRes, itemRes] = await Promise.all([
+      squareClient.catalogApi.listCatalog(undefined, 'CATEGORY'),
+      squareClient.catalogApi.listCatalog(undefined, 'ITEM'),
+    ]);
+
+    const catById = {};
+    (catRes.result.objects || []).forEach(c => {
+      catById[c.id] = c.categoryData?.name || 'Other';
+    });
+
+    // Pottery-related keywords to exclude
+    const EXCLUDE_KEYWORDS = /pottery|bisque|mug|bowl|plate|vase|tile|glaze|firing|kiln|piece|paint/i;
+
+    const grouped = {};
+    (itemRes.result.objects || []).forEach(item => {
+      const d = item.itemData;
+      if (!d) return;
+      const catId = d.categoryId || d.categories?.[0]?.id;
+      const catName = catById[catId] || 'Other';
+      if (EXCLUDE_KEYWORDS.test(catName) || EXCLUDE_KEYWORDS.test(d.name)) return;
+
+      const variation = d.variations?.[0];
+      const priceCents = variation?.itemVariationData?.priceMoney?.amount
+        ? Number(variation.itemVariationData.priceMoney.amount) : null;
+
+      if (!grouped[catName]) grouped[catName] = [];
+      grouped[catName].push({
+        id: item.id,
+        variationId: variation?.id,
+        name: d.name,
+        description: d.description || null,
+        priceCents,
+      });
+    });
+
+    const categories = Object.entries(grouped).map(([name, items]) => ({ name, items }));
+    res.json({ categories });
+
+  } catch (err) {
+    console.error('KDS menu error:', err);
+    res.status(500).json({ error: err.message, categories: [] });
+  }
+});
+
+// ═══════════════════════════════════════════
 // STRIPE BILLING ROUTES
 // ═══════════════════════════════════════════
 

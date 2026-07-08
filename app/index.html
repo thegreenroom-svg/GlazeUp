@@ -237,7 +237,7 @@
       #design-preview-screen { transition: none; }
     }
 
-    #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen, #new-booking-screen, #transfer-designer-screen, #browse-design-screen, #marketplace-screen {
+    #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen, #new-booking-screen, #transfer-designer-screen, #browse-design-screen, #marketplace-screen, #order-screen {
       position: fixed;
       inset: 0;
       background: var(--link-charcoal);
@@ -247,11 +247,11 @@
       transform: translateY(100%);
       transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
     }
-    #community-share-screen.open, #community-feed-screen.open, #colour-picker-screen.open, #my-bookings-screen.open, #new-booking-screen.open, #transfer-designer-screen.open, #browse-design-screen.open {
+    #community-share-screen.open, #community-feed-screen.open, #colour-picker-screen.open, #my-bookings-screen.open, #new-booking-screen.open, #transfer-designer-screen.open, #browse-design-screen.open, #order-screen.open {
       transform: translateY(0);
     }
     @media (prefers-reduced-motion: reduce) {
-      #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen, #new-booking-screen, #transfer-designer-screen, #browse-design-screen, #marketplace-screen { transition: none; }
+      #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen, #new-booking-screen, #transfer-designer-screen, #browse-design-screen, #marketplace-screen, #order-screen { transition: none; }
     }
 
     .cp-tab {
@@ -1283,6 +1283,31 @@
     </div>
   </div>
 
+  <!-- Food & Drink Order Screen — sends straight to Square KDS -->
+  <div id="order-screen">
+    <div class="dp-header" style="background:#1a120a;">
+      <span class="dp-title" style="color:#fff;">☕ Order Food & Drinks</span>
+      <button onclick="closeOrderScreen()" style="color:rgba(255,255,255,0.7);">✕ Close</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;background:#1a120a;">
+      <!-- Basket summary -->
+      <div id="order-basket-bar" style="display:none;position:sticky;top:0;z-index:10;background:#2B2724;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.1);">
+        <div>
+          <span style="font-size:13px;font-weight:700;color:white;" id="order-basket-label">0 items</span>
+          <span style="font-size:12px;color:rgba(255,255,255,0.5);margin-left:8px;" id="order-basket-total"></span>
+        </div>
+        <button onclick="submitOrder()" id="order-submit-btn" style="background:#B87946;color:white;border:none;border-radius:10px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;">
+          Send to kitchen →
+        </button>
+      </div>
+
+      <!-- Menu -->
+      <div id="order-menu" style="padding:16px;">
+        <div style="color:rgba(255,255,255,0.4);text-align:center;padding:32px;font-size:13px;">Loading menu…</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Design Marketplace: browse, use, and list designs -->
   <div id="marketplace-screen">
     <div class="dp-header" style="background: linear-gradient(135deg, #1a0a3d 0%, #2d1065 100%);">
@@ -1744,6 +1769,12 @@
             <div class="tile-desc">See what other Kiln Cafe painters have been creating.</div>
           </button>
 
+          <button class="tile" onclick="openOrderScreen()" style="background:linear-gradient(135deg,#3d1f0a 0%,#1a0e05 100%);border:1.5px solid rgba(255,255,255,0.15);position:relative;">
+            <span class="tile-icon">☕</span>
+            <div class="tile-title" style="color:#fff;">Food & Drinks</div>
+            <div class="tile-desc" style="color:rgba(255,255,255,0.75);">Order drinks, cakes, and snacks — sent straight to the kitchen.</div>
+          </button>
+
           <button class="tile" onclick="openMarketplace()" style="position:relative; overflow:hidden; background:linear-gradient(135deg, #B87946 0%, #7a4a20 100%); border:1.5px solid rgba(255,255,255,0.2);">
             <span class="tile-icon">🎨</span>
             <div class="tile-title" style="color:#fff;">Design Marketplace</div>
@@ -2181,6 +2212,144 @@
     // ── Design Marketplace ──
     let mktSelectedImageData = null;
     let mktPriceCents = 100;
+
+    // ── Food & Drink Ordering — Square KDS ──
+    let orderBasket = []; // { id, variationId, name, priceCents, quantity }
+    let orderMenuLoaded = false;
+
+    function openOrderScreen() {
+      const screen = document.getElementById('order-screen');
+      screen.style.display = 'flex';
+      void screen.offsetWidth;
+      screen.classList.add('open');
+      if (!orderMenuLoaded) loadOrderMenu();
+    }
+
+    function closeOrderScreen() {
+      const screen = document.getElementById('order-screen');
+      screen.classList.remove('open');
+      setTimeout(() => { screen.style.display = 'none'; }, 280);
+    }
+
+    async function loadOrderMenu() {
+      const menuEl = document.getElementById('order-menu');
+      try {
+        const res = await fetch(`${API_URL}/api/kds/menu?studioId=${STUDIO_ID}`);
+        const data = await res.json();
+
+        if (!data.categories?.length) {
+          menuEl.innerHTML = `<div style="color:rgba(255,255,255,0.4);text-align:center;padding:32px;font-size:13px;line-height:1.6;">No food or drink items found in your Square catalogue yet.<br><br>Add drinks and cakes to Square and they'll appear here automatically.</div>`;
+          return;
+        }
+
+        menuEl.innerHTML = data.categories.map(cat => `
+          <div style="margin-bottom:24px;">
+            <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-bottom:10px;">${cat.name}</div>
+            ${cat.items.map(item => `
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:14px;font-weight:600;color:white;">${item.name}</div>
+                  ${item.description ? `<div style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:2px;">${item.description}</div>` : ''}
+                  ${item.priceCents ? `<div style="font-size:12px;color:#B87946;font-weight:600;margin-top:2px;">£${(item.priceCents/100).toFixed(2)}</div>` : ''}
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:12px;">
+                  <button onclick="orderAdjust('${item.id}','${item.variationId || ''}','${item.name.replace(/'/g,"\\'")}',${item.priceCents||0},-1)"
+                    style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,0.1);border:none;color:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">−</button>
+                  <span id="order-qty-${item.id}" style="min-width:20px;text-align:center;font-size:14px;font-weight:700;color:white;">0</span>
+                  <button onclick="orderAdjust('${item.id}','${item.variationId || ''}','${item.name.replace(/'/g,"\\'")}',${item.priceCents||0},+1)"
+                    style="width:30px;height:30px;border-radius:50%;background:#B87946;border:none;color:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;">+</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `).join('');
+
+        orderMenuLoaded = true;
+      } catch (err) {
+        menuEl.innerHTML = `<div style="color:rgba(255,255,255,0.4);text-align:center;padding:32px;font-size:13px;">Could not load the menu. Please ask a member of staff.</div>`;
+      }
+    }
+
+    function orderAdjust(id, variationId, name, priceCents, delta) {
+      const existing = orderBasket.find(i => i.id === id);
+      if (existing) {
+        existing.quantity = Math.max(0, existing.quantity + delta);
+        if (existing.quantity === 0) orderBasket = orderBasket.filter(i => i.id !== id);
+      } else if (delta > 0) {
+        orderBasket.push({ id, variationId, name, priceCents, quantity: 1 });
+      }
+      // Update qty display
+      const qtyEl = document.getElementById(`order-qty-${id}`);
+      const item = orderBasket.find(i => i.id === id);
+      if (qtyEl) qtyEl.textContent = item?.quantity || 0;
+      updateOrderBasketBar();
+    }
+
+    function updateOrderBasketBar() {
+      const bar = document.getElementById('order-basket-bar');
+      const label = document.getElementById('order-basket-label');
+      const total = document.getElementById('order-basket-total');
+      const count = orderBasket.reduce((s, i) => s + i.quantity, 0);
+      const totalPence = orderBasket.reduce((s, i) => s + (i.priceCents * i.quantity), 0);
+      if (count > 0) {
+        bar.style.display = 'flex';
+        label.textContent = `${count} item${count > 1 ? 's' : ''} in order`;
+        total.textContent = totalPence ? `£${(totalPence/100).toFixed(2)}` : '';
+      } else {
+        bar.style.display = 'none';
+      }
+    }
+
+    async function submitOrder() {
+      if (!orderBasket.length) return;
+      const btn = document.getElementById('order-submit-btn');
+      btn.textContent = 'Sending…';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch(`${API_URL}/api/kds/order`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studioId: STUDIO_ID,
+            bookingCode: window.currentBooking?.code || null,
+            customerName: window.currentBooking?.name || null,
+            items: orderBasket.map(i => ({
+              variationId: i.variationId || null,
+              name: i.name,
+              priceCents: i.priceCents,
+              quantity: i.quantity,
+            }))
+          })
+        });
+        const data = await res.json();
+
+        if (data.status === 'sent') {
+          btn.textContent = '✓ Order sent to kitchen!';
+          btn.style.background = '#2e7d32';
+          // Reset basket
+          orderBasket = [];
+          document.querySelectorAll('[id^="order-qty-"]').forEach(el => el.textContent = '0');
+          document.getElementById('order-basket-bar').style.display = 'none';
+          setTimeout(() => {
+            btn.textContent = 'Send to kitchen →';
+            btn.style.background = '#B87946';
+            btn.disabled = false;
+            closeOrderScreen();
+          }, 2500);
+        } else {
+          throw new Error(data.error || 'Unknown error');
+        }
+      } catch (err) {
+        btn.textContent = 'Failed — please ask staff';
+        btn.style.background = '#c62828';
+        setTimeout(() => {
+          btn.textContent = 'Send to kitchen →';
+          btn.style.background = '#B87946';
+          btn.disabled = false;
+        }, 3000);
+      }
+    }
 
     function openMarketplace() {
       const screen = document.getElementById('marketplace-screen');
