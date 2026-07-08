@@ -237,7 +237,7 @@
       #design-preview-screen { transition: none; }
     }
 
-    #community-share-screen, #community-feed-screen, #colour-picker-screen {
+    #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen {
       position: fixed;
       inset: 0;
       background: var(--link-charcoal);
@@ -247,11 +247,11 @@
       transform: translateY(100%);
       transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
     }
-    #community-share-screen.open, #community-feed-screen.open, #colour-picker-screen.open {
+    #community-share-screen.open, #community-feed-screen.open, #colour-picker-screen.open, #my-bookings-screen.open {
       transform: translateY(0);
     }
     @media (prefers-reduced-motion: reduce) {
-      #community-share-screen, #community-feed-screen, #colour-picker-screen { transition: none; }
+      #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen { transition: none; }
     }
 
     .cp-tab {
@@ -324,6 +324,18 @@
       font-size: 11px;
       cursor: pointer;
     }
+
+    .mb-card {
+      background: rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 10px;
+      border-left: 4px solid var(--link-clay);
+    }
+    .mb-card.past { border-left-color: rgba(255,255,255,0.25); opacity: 0.75; }
+    .mb-card .mb-date { color: #fff; font-weight: 700; font-size: 14px; }
+    .mb-card .mb-meta { color: rgba(255,255,255,0.6); font-size: 12px; margin-top: 3px; }
+    .mb-empty { color: rgba(255,255,255,0.5); text-align: center; padding: 20px; font-size: 13px; }
 
     .cf-post {
       background: rgba(255,255,255,0.06);
@@ -810,6 +822,24 @@
     </div>
   </div>
 
+  <!-- My Bookings: past and upcoming visits, matched by phone/email -->
+  <div id="my-bookings-screen">
+    <div class="dp-header">
+      <span class="dp-title">My Bookings</span>
+      <button onclick="closeMyBookings()">✕ Close</button>
+    </div>
+    <div style="flex:1; overflow-y:auto; padding:16px;">
+      <div id="mb-upcoming-section">
+        <div style="color:#fff; font-weight:700; font-size:14px; margin-bottom:10px;">Upcoming</div>
+        <div id="mb-upcoming-list" style="margin-bottom:24px;"></div>
+      </div>
+      <div id="mb-past-section">
+        <div style="color:#fff; font-weight:700; font-size:14px; margin-bottom:10px;">Past visits</div>
+        <div id="mb-past-list"></div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const API_URL = window.location.origin;
     // The Kiln Cafe studio id (pilot). White-label studios would inject their own.
@@ -903,6 +933,12 @@
           ${unfinished}
 
           <div class="section-label">Getting started</div>
+
+          <button class="tile tile-oxblood" onclick="openMyBookings()">
+            <span class="tile-icon">📅</span>
+            <div class="tile-title">My Bookings</div>
+            <div class="tile-desc">See your past visits and anything coming up.</div>
+          </button>
 
           <button class="tile tile-sage" onclick="window.open('https://www.thekilncafe.com/how-to-video', '_blank')">
             <span class="tile-icon">🎥</span>
@@ -1377,6 +1413,68 @@
       setMyPalette(palette);
       renderMyPalette();
       renderColourSwatches();
+    }
+
+    // ── My Bookings: past and upcoming visits, matched by the phone/email
+    // on the customer's current booking (no login system, so this is how
+    // we find "their" other visits). Read-only — booking a NEW session
+    // still needs Square write-access, a separate step. ──
+    function openMyBookings() {
+      const screen = document.getElementById('my-bookings-screen');
+      screen.style.display = 'flex';
+      void screen.offsetWidth;
+      screen.classList.add('open');
+      loadMyBookings();
+    }
+    function closeMyBookings() {
+      const screen = document.getElementById('my-bookings-screen');
+      screen.classList.remove('open');
+      setTimeout(() => { screen.style.display = 'none'; }, 280);
+    }
+
+    function formatBookingDate(iso) {
+      if (!iso) return 'Date TBC';
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) +
+        ' · ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    async function loadMyBookings() {
+      const upcomingEl = document.getElementById('mb-upcoming-list');
+      const pastEl = document.getElementById('mb-past-list');
+      upcomingEl.innerHTML = `<div class="mb-empty">Loading…</div>`;
+      pastEl.innerHTML = '';
+
+      try {
+        const bookingCode = window.currentBooking ? window.currentBooking.code : null;
+        if (!bookingCode) {
+          upcomingEl.innerHTML = `<div class="mb-empty">No booking session found.</div>`;
+          return;
+        }
+
+        const res = await fetch(`${API_URL}/api/customer/my-bookings?studioId=${STUDIO_ID}&bookingCode=${encodeURIComponent(bookingCode)}`);
+        const data = await res.json();
+
+        upcomingEl.innerHTML = (data.upcoming && data.upcoming.length > 0)
+          ? data.upcoming.map(b => `
+              <div class="mb-card">
+                <div class="mb-date">${formatBookingDate(b.session_start)}</div>
+                <div class="mb-meta">${b.table_number ? b.table_number + ' · ' : ''}${b.party_size ? b.party_size + ' people' : ''}</div>
+              </div>
+            `).join('')
+          : `<div class="mb-empty">Nothing booked yet — see you soon!</div>`;
+
+        pastEl.innerHTML = (data.past && data.past.length > 0)
+          ? data.past.map(b => `
+              <div class="mb-card past">
+                <div class="mb-date">${formatBookingDate(b.session_start)}</div>
+                <div class="mb-meta">${b.table_number ? b.table_number + ' · ' : ''}${b.party_size ? b.party_size + ' people' : ''}</div>
+              </div>
+            `).join('')
+          : `<div class="mb-empty">This is your first visit — welcome!</div>`;
+      } catch (err) {
+        upcomingEl.innerHTML = `<div class="mb-empty">Could not load your bookings.</div>`;
+      }
     }
 
     function renderDpPalette() {

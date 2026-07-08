@@ -1046,6 +1046,64 @@ app.get('/api/bookings/upcoming', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/customer/my-bookings
+ * A customer's own bookings — past, current, and future — matched by the
+ * phone/email on their current booking (there's no login system, so this
+ * is how we find "their" other visits). Split into past/upcoming so the
+ * customer app can show them separately.
+ */
+app.get('/api/customer/my-bookings', async (req, res) => {
+  const { studioId, bookingCode } = req.query;
+  if (!studioId || !bookingCode) {
+    return res.status(400).json({ error: 'studioId and bookingCode required' });
+  }
+
+  try {
+    // First, find the current booking to get the customer's contact details
+    const { data: currentBooking, error: currentError } = await supabase
+      .from('bookings')
+      .select('customer_name, customer_email, customer_phone')
+      .eq('studio_id', studioId)
+      .eq('booking_code', bookingCode)
+      .single();
+
+    if (currentError || !currentBooking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    // Match other bookings by phone or email (whichever is present) — name
+    // alone is too unreliable (shared names, typos) to identify a customer
+    let query = supabase.from('bookings').select('*').eq('studio_id', studioId);
+
+    if (currentBooking.customer_phone) {
+      query = query.eq('customer_phone', currentBooking.customer_phone);
+    } else if (currentBooking.customer_email) {
+      query = query.eq('customer_email', currentBooking.customer_email);
+    } else {
+      query = query.eq('customer_name', currentBooking.customer_name);
+    }
+
+    const { data: allBookings, error } = await query.order('session_start', { ascending: false });
+    if (error) throw error;
+
+    const now = new Date();
+    const upcoming = [];
+    const past = [];
+    (allBookings || []).forEach(b => {
+      const target = b.session_start ? new Date(b.session_start) : null;
+      if (target && target >= now) upcoming.push(b);
+      else past.push(b);
+    });
+    upcoming.sort((a, b) => new Date(a.session_start) - new Date(b.session_start)); // soonest first
+
+    res.json({ upcoming, past });
+  } catch (error) {
+    console.error('Error fetching customer bookings:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/bookings/sync', async (req, res) => {
   const { studioId } = req.body;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
