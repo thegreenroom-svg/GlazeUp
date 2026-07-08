@@ -18,6 +18,7 @@
   .wt-step-label { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--clay); font-weight:600; margin-bottom:4px; }
   .wt-title { font-size:17px; font-weight:700; color:var(--charcoal); line-height:1.25; margin-bottom:5px; }
   .wt-body { font-size:13px; color:#6b5f56; line-height:1.6; min-height:44px; }
+  .wt-narration { font-size:13px; color:var(--clay); line-height:1.65; margin-top:8px; padding:10px 12px; background:rgba(184,121,70,0.08); border-left:3px solid var(--clay); border-radius:0 6px 6px 0; display:none; font-style:italic; }
   .wt-screen-wrap { flex:1; display:flex; align-items:center; justify-content:center; padding:10px 16px; position:relative; overflow:hidden; }
   .wt-screen { width:100%; max-width:580px; position:relative; }
   .wt-screen svg.main { width:100%; border-radius:10px; box-shadow:0 4px 20px rgba(43,39,36,0.18); display:block; }
@@ -43,6 +44,7 @@
   <div class="wt-step-label" id="step-label">Step 1 of 11</div>
   <div class="wt-title" id="step-title"></div>
   <div class="wt-body" id="step-body"></div>
+  <div class="wt-narration" id="step-narration"></div>
 </div>
 <div class="wt-screen-wrap">
   <div class="wt-screen" id="screen-wrap">
@@ -399,8 +401,8 @@ let cur = 0, playing = false, playTimer = null, bounceAngle = 0;
 let screenCache = {}, voiceOn = false;
 
 // ── Voice narration ──
-function speak(text) {
-  if (!window.speechSynthesis || !text) return;
+function speak(text, onEnd) {
+  if (!window.speechSynthesis || !text) { if (onEnd) onEnd(); return; }
   window.speechSynthesis.cancel();
   const utt = new SpeechSynthesisUtterance(text);
   utt.rate = 0.92; utt.pitch = 1.02; utt.lang = 'en-GB';
@@ -408,7 +410,12 @@ function speak(text) {
   const v = voices.find(v => v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en'));
   if (v) utt.voice = v;
   utt.onstart = () => { const b = document.getElementById('btn-voice'); if(b) b.textContent='🔊 Speaking…'; };
-  utt.onend = () => { const b = document.getElementById('btn-voice'); if(b) b.textContent='🔊 Read aloud'; };
+  utt.onend = () => {
+    const b = document.getElementById('btn-voice');
+    if(b) b.textContent='🔊 Read aloud';
+    if (onEnd) onEnd();
+  };
+  utt.onerror = () => { if (onEnd) onEnd(); };
   window.speechSynthesis.speak(utt);
 }
 function stopVoice() { if (window.speechSynthesis) window.speechSynthesis.cancel(); }
@@ -418,6 +425,8 @@ function toggleVoice() {
   btn.style.background = voiceOn ? '#B87946' : '';
   btn.style.color = voiceOn ? 'white' : '';
   btn.style.borderColor = voiceOn ? '#B87946' : '';
+  const narration = document.getElementById('step-narration');
+  narration.style.display = voiceOn ? 'block' : 'none';
   if (voiceOn) speak(STEPS[cur].voice);
   else stopVoice();
 }
@@ -439,6 +448,9 @@ function render() {
   document.getElementById('step-label').textContent = `Step ${cur+1} of ${STEPS.length}`;
   document.getElementById('step-title').textContent = step.title;
   document.getElementById('step-body').textContent = step.body;
+  const narEl = document.getElementById('step-narration');
+  narEl.textContent = step.voice;
+  narEl.style.display = voiceOn ? 'block' : 'none';
 
   const content = getScreen(cur);
   screenCache[cur] = content;
@@ -540,10 +552,24 @@ function togglePlay() {
 
 function scheduleNext() {
   if (!playing) return;
-  playTimer = setTimeout(() => {
-    if (cur < STEPS.length - 1) { cur++; render(); scheduleNext(); }
-    else { playing = false; document.getElementById('btn-play').textContent = '↺ Replay'; }
-  }, 3800);
+  if (voiceOn && STEPS[cur].voice) {
+    // Speak current step, then advance when speech finishes (plus a short pause)
+    speak(STEPS[cur].voice, () => {
+      if (!playing) return;
+      setTimeout(() => {
+        if (!playing) return;
+        if (cur < STEPS.length - 1) { cur++; render(); scheduleNext(); }
+        else { playing = false; document.getElementById('btn-play').textContent = '↺ Replay'; }
+      }, 800);
+    });
+  } else {
+    // No voice — use fixed 4 second timer
+    playTimer = setTimeout(() => {
+      if (!playing) return;
+      if (cur < STEPS.length - 1) { cur++; render(); scheduleNext(); }
+      else { playing = false; document.getElementById('btn-play').textContent = '↺ Replay'; }
+    }, 4000);
+  }
 }
 
 function animateArrows() {

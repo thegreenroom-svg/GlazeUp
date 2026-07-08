@@ -25,6 +25,7 @@
 
   .wt-title { text-align: center; font-size: 18px; font-weight: 700; padding: 0 24px; line-height: 1.25; }
   .wt-body { text-align: center; font-size: 13px; color: rgba(255,255,255,0.65); padding: 6px 28px 0; line-height: 1.6; min-height: 48px; }
+  .wt-narration { font-size: 13px; color: #e8c99a; line-height: 1.65; margin: 8px 24px 0; padding: 10px 14px; background: rgba(184,121,70,0.15); border-left: 3px solid #B87946; border-radius: 0 8px 8px 0; display: none; font-style: italic; text-align: left; }
 
   .wt-screen-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 12px 16px; position: relative; }
 
@@ -59,6 +60,7 @@
 <div class="wt-step-label" id="step-label">Step 1 of 9</div>
 <div class="wt-title" id="step-title"></div>
 <div class="wt-body" id="step-body"></div>
+<div class="wt-narration" id="step-narration"></div>
 
 <div class="wt-screen-wrap">
   <div class="wt-phone">
@@ -306,8 +308,8 @@ let cur = 0, playing = false, playTimer = null, bounceTimer = null, bounceAngle 
 let voiceOn = false;
 
 // ── Voice narration ──
-function speak(text) {
-  if (!window.speechSynthesis || !text) return;
+function speak(text, onEnd) {
+  if (!window.speechSynthesis || !text) { if (onEnd) onEnd(); return; }
   window.speechSynthesis.cancel();
   const utt = new SpeechSynthesisUtterance(text);
   utt.rate = 0.92; utt.pitch = 1.05; utt.lang = 'en-GB';
@@ -317,7 +319,9 @@ function speak(text) {
   utt.onend = () => {
     const btn = document.getElementById('btn-voice');
     if (btn) btn.textContent = '🔊 Read aloud';
+    if (onEnd) onEnd();
   };
+  utt.onerror = () => { if (onEnd) onEnd(); };
   utt.onstart = () => {
     const btn = document.getElementById('btn-voice');
     if (btn) btn.textContent = '🔊 Speaking…';
@@ -332,13 +336,16 @@ function stopVoice() {
 function toggleVoice() {
   voiceOn = !voiceOn;
   const btn = document.getElementById('btn-voice');
+  const narEl = document.getElementById('step-narration');
   if (voiceOn) {
     btn.style.background = '#B87946';
     btn.style.color = 'white';
+    narEl.style.display = 'block';
     speak(STEPS[cur].voice);
   } else {
     btn.style.background = '';
     btn.style.color = '';
+    narEl.style.display = 'none';
     stopVoice();
   }
 }
@@ -355,6 +362,9 @@ function render() {
   document.getElementById('step-label').textContent = `Step ${cur+1} of ${STEPS.length}`;
   document.getElementById('step-title').textContent = step.title;
   document.getElementById('step-body').textContent = step.body;
+  const narEl = document.getElementById('step-narration');
+  narEl.textContent = step.voice;
+  narEl.style.display = voiceOn ? 'block' : 'none';
   document.getElementById('screen-content').innerHTML = step.screen();
   document.getElementById('btn-back').disabled = cur === 0;
   document.getElementById('btn-next').disabled = cur === STEPS.length - 1;
@@ -451,10 +461,22 @@ function togglePlay() {
 
 function scheduleNext() {
   if (!playing) return;
-  playTimer = setTimeout(() => {
-    if (cur < STEPS.length - 1) { cur++; render(); scheduleNext(); }
-    else { playing = false; document.getElementById('btn-play').textContent = '↺ Replay'; }
-  }, 3500);
+  if (voiceOn && STEPS[cur].voice) {
+    speak(STEPS[cur].voice, () => {
+      if (!playing) return;
+      setTimeout(() => {
+        if (!playing) return;
+        if (cur < STEPS.length - 1) { cur++; render(); scheduleNext(); }
+        else { playing = false; document.getElementById('btn-play').textContent = '↺ Replay'; }
+      }, 800);
+    });
+  } else {
+    playTimer = setTimeout(() => {
+      if (!playing) return;
+      if (cur < STEPS.length - 1) { cur++; render(); scheduleNext(); }
+      else { playing = false; document.getElementById('btn-play').textContent = '↺ Replay'; }
+    }, 4000);
+  }
 }
 
 // Bounce animation loop
