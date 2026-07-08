@@ -56,6 +56,17 @@ Last updated: 5 July 2026
   2. **Multi-platform integrations** — currently hard-wired to Square (POS/bookings) and implicitly assumes Wix (website). Other studios may use different POS/stock systems (Clover, Shopify POS, Lightspeed, etc.) or website builders (Squarespace, WordPress). File structure/architecture should be organized to make adding alternate integrations realistic later, not just Square-only.
   3. **Internationalization** — "at some point, return to the international aspect" for worldwide sales. Daisy has a contact in translation software. Not started — currently English-only, GBP-only, UK date/phone formats hardcoded in places.
 
+★ DAILY BOOKINGS & CUSTOMER ENGAGEMENT — RENAMED + SECTION 1 REDESIGNED AS A PROPER STEP FLOW (2026-07-08): Daisy: the "Staff" nav label was confusing, and Section 1 felt "clumsy" — everything (today's bookings list, lookup box, walk-in box) shown at once instead of a clear step-by-step flow.
+
+**Renamed:** sidebar nav label "Staff" → "Daily Bookings", page header → "Daily Bookings & Customer Engagement".
+
+**Section 1 rebuilt as a proper 3-step flow, matching the customer app's chunky tile feel:**
+1. **Start** — a single prominent "Customer Name" input, then a big two-tile fork: "🚶 New Walk-in" / "📅 Existing Booking" (using the `.till-tile` style from the earlier till-screen pass)
+2. **Existing Booking** (only shown if that's chosen) — Today's/Next-7-days bookings list + lookup-by-code, with a "← Back" to return to the fork
+3. **Result** — customer found/created, returning-pieces warning, QR button, table+places, open table — with a "← Start Over" to reset everything
+
+Each step hides the others (`display:none` toggling via `s1ChooseWalkIn()`, `s1ChooseExisting()`, `s1BackToStart()`), so only one step is ever visible at a time — genuinely "press button, next step" rather than a wall of options. `startWalkIn()` now takes the name as a parameter (from the top field) rather than its own separate input field, since that field no longer exists. Tested the full flow (start→walk-in→result, start→existing→back, start-over resets everything correctly) with Playwright before pushing.
+
 ★ PAID TOOLS PAYWALL — PROTOTYPE FOR APPRAISAL (2026-07-08): Daisy wants some customer app tools free, others chargeable, tallied against the booking rather than charged directly — real payment processing to be wired up once billing is properly sorted. Built as a genuine working prototype:
 
 **Free:** Design Preview, Colour Picker (unchanged). **Paid:** Transfer Designer, £1/visit (easy to change — see `PAID_TOOL_PRICE_CENTS` in app/index.html).

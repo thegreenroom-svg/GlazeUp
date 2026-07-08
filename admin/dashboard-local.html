@@ -1123,7 +1123,7 @@
     <nav>
       <a href="#" class="nav-link active" onclick="goToTab('dashboard', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="currentColor"><rect x="3" y="10" width="3.2" height="7" rx="1"/><rect x="8.4" y="5" width="3.2" height="12" rx="1"/><rect x="13.8" y="8" width="3.2" height="9" rx="1"/></svg></span><span class="nav-label">Dashboard</span></a>
       <a href="#" class="nav-link" onclick="goToTab('setup', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.8"/><path d="M10 3v1.8M10 15.2V17M17 10h-1.8M4.8 10H3M14.9 5.1l-1.3 1.3M6.4 13.6l-1.3 1.3M14.9 14.9l-1.3-1.3M6.4 6.4L5.1 5.1"/></svg></span><span class="nav-label">Setup</span></a>
-      <a href="#" class="nav-link" onclick="goToTab('staff', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="6.5" r="3.3"/><path d="M10 11c-4 0-7 2.4-7 6.5h14c0-4.1-3-6.5-7-6.5z"/></svg></span><span class="nav-label">Staff</span></a>
+      <a href="#" class="nav-link" onclick="goToTab('staff', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="6.5" r="3.3"/><path d="M10 11c-4 0-7 2.4-7 6.5h14c0-4.1-3-6.5-7-6.5z"/></svg></span><span class="nav-label">Daily Bookings</span></a>
       <a href="#" class="nav-link" onclick="goToTab('community', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.3"/><path d="M2.9 10h14.2M10 2.9c2 2 3.1 4.5 3.1 7.1s-1.1 5.1-3.1 7.1c-2-2-3.1-4.5-3.1-7.1s1.1-5.1 3.1-7.1z"/></svg></span><span class="nav-label">Community</span></a>
       <a href="#" class="nav-link" onclick="goToTab('branding', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.2 2.8l3 3-7.6 7.6c-.7.7-1.8.7-2.5 0l-.5-.5c-.7-.7-.7-1.8 0-2.5l7.6-7.6z"/><path d="M6.2 12.3L4 17.5l5.2-2.2"/></svg></span><span class="nav-label">Branding</span></a>
       <a href="#" class="nav-link" onclick="goToTab('palettes', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 3a7 7 0 100 14c1 0 1.6-.5 1.6-1.3 0-.4-.2-.7-.4-1-.2-.3-.4-.6-.4-1 0-.8.6-1.4 1.4-1.4h1.3A3.5 3.5 0 0017 8.5C17 5.5 13.9 3 10 3z"/><circle cx="7" cy="8.2" r="1" fill="currentColor" stroke="none"/><circle cx="10.3" cy="6.4" r="1" fill="currentColor" stroke="none"/><circle cx="13.2" cy="8.6" r="1" fill="currentColor" stroke="none"/></svg></span><span class="nav-label">Colours</span></a>
@@ -1282,7 +1282,7 @@
       <!-- STAFF TAB -->
       <!-- ═════════════════════════════════════════════ -->
       <div id="staff-view" class="view" style="display: none;">
-        <h2 style="margin-top: 0;">Studio Staff Dashboard</h2>
+        <h2 style="margin-top: 0;">Daily Bookings &amp; Customer Engagement</h2>
 
         <!-- Process flow: each stage as a connected step, arrows showing how work moves through -->
         <div class="flow-nav">
@@ -1319,52 +1319,68 @@
             <strong>📋 Step 1:</strong> Look up the booking, check for returning/unfinished pieces, then assign a table and open the session.
           </div>
 
-          <div class="chart-container">
+          <!-- STEP A: name + the big fork choice -->
+          <div id="s1-step-start" class="chart-container">
+            <h3 style="margin-top:0;">Customer Name</h3>
+            <input type="text" id="s1-customer-name" placeholder="Type the customer or party name…" style="width: 100%; padding: 14px; border: 1.5px solid var(--gu-border); border-radius: 12px; font-size: 16px; font-weight: 600; margin-bottom: 18px; box-sizing: border-box;">
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <button class="till-tile glaze-honey" style="min-height: 100px;" onclick="s1ChooseWalkIn()">
+                <span style="font-size: 26px;">🚶</span>
+                <span class="till-tile-name">New Walk-in</span>
+              </button>
+              <button class="till-tile glaze-ocean" style="min-height: 100px;" onclick="s1ChooseExisting()">
+                <span style="font-size: 26px;">📅</span>
+                <span class="till-tile-name">Existing Booking</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- STEP B: find an existing booking (only shown after choosing "Existing Booking") -->
+          <div id="s1-step-existing" class="chart-container" style="display: none;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-              <div style="display: flex; gap: 6px;">
-                <button id="s1-view-today" class="staff-subtab-btn active" style="padding: 6px 12px; font-size: 12px;" onclick="switchBookingsView('today')">Today</button>
-                <button id="s1-view-upcoming" class="staff-subtab-btn" style="padding: 6px 12px; font-size: 12px;" onclick="switchBookingsView('upcoming')">Next 7 days</button>
-              </div>
+              <button onclick="s1BackToStart()" style="background:none; border:none; color:var(--gu-dust); font-size:13px; cursor:pointer; padding:0;">← Back</button>
               <button class="btn-connect glaze-ocean" style="padding: 6px 14px; font-size: 11px;" onclick="syncBookingsFromSquare()">🔄 Sync from Square</button>
+            </div>
+
+            <div style="display: flex; gap: 6px; margin-bottom: 12px;">
+              <button id="s1-view-today" class="staff-subtab-btn active" style="padding: 6px 12px; font-size: 12px;" onclick="switchBookingsView('today')">Today</button>
+              <button id="s1-view-upcoming" class="staff-subtab-btn" style="padding: 6px 12px; font-size: 12px;" onclick="switchBookingsView('upcoming')">Next 7 days</button>
             </div>
             <div id="s1-today-bookings">
               <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Tap "Sync from Square" to load bookings.</div>
             </div>
+
+            <div style="display: flex; align-items: center; gap: 10px; margin: 18px 0;">
+              <div style="flex: 1; height: 1px; background: var(--gu-border);"></div>
+              <span style="font-size: 11px; color: var(--gu-dust);">OR LOOK UP BY CODE</span>
+              <div style="flex: 1; height: 1px; background: var(--gu-border);"></div>
+            </div>
+            <input type="text" id="s1-booking-code" placeholder="Booking code / QR scan" style="width: 100%; padding: 12px; border: 1.5px solid var(--gu-border); border-radius: 10px; font-size: 14px; margin-bottom: 12px; box-sizing: border-box;">
+            <button class="btn-connect" style="width: 100%;" onclick="lookupBookingSection1()">Look Up Booking</button>
           </div>
 
-          <div class="chart-container">
-            <h3>Look Up Booking</h3>
-            <input type="text" id="s1-booking-code" placeholder="Booking code / QR scan" style="width: 100%; padding: 10px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px; margin-bottom: 12px;">
-            <button class="btn-connect" style="width: 100%;" onclick="lookupBookingSection1()">Look Up Booking</button>
+          <!-- STEP C: result — customer found/created, assign table, open session -->
+          <div class="chart-container" id="s1-result" style="display: none;">
+            <button onclick="s1BackToStart()" style="background:none; border:none; color:var(--gu-dust); font-size:13px; cursor:pointer; padding:0; margin-bottom:12px;">← Start Over</button>
 
-            <div style="display: flex; align-items: center; gap: 10px; margin: 16px 0;">
-              <div style="flex: 1; height: 1px; background: var(--gu-border);"></div>
-              <span style="font-size: 11px; color: var(--gu-dust);">OR</span>
-              <div style="flex: 1; height: 1px; background: var(--gu-border);"></div>
+            <div class="booking-header">
+              <div class="name" id="s1-customer-display">—</div>
+              <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;" id="s1-party-display"></div>
             </div>
 
-            <input type="text" id="s1-walkin-name" placeholder="Walk-in customer name" style="width: 100%; padding: 10px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px; margin-bottom: 12px;">
-            <button class="btn-connect glaze-honey" style="width: 100%;" onclick="startWalkIn()">🚶 New Walk-in (no booking)</button>
-
-            <div id="s1-result" style="display: none; margin-top: 16px;">
-              <div class="booking-header">
-                <div class="name" id="s1-customer-display">—</div>
-                <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;" id="s1-party-display"></div>
-              </div>
-
-              <div id="s1-returning-section" style="display: none; padding: 12px; background: #fff3f0; border-radius: 8px; margin: 12px 0; border-left: 4px solid #d9534f;">
-                <div style="font-size: 12px; color: #d9534f; font-weight: bold; margin-bottom: 6px;">⚠️ Returning pieces — studio fee payable:</div>
-                <ul id="s1-returning-list" style="margin: 0; padding-left: 16px; font-size: 12px;"></ul>
-              </div>
-
-              <button class="btn-connect glaze-ocean" style="width: 100%; margin-top: 12px;" onclick="showCustomerQRFromResult()">📱 Show Customer QR</button>
-
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
-                <input type="text" id="s1-table-number" placeholder="Table number">
-                <input type="number" id="s1-num-places" placeholder="Number of places" min="1">
-              </div>
-              <button class="btn-connect" style="width: 100%; margin-top: 12px;" onclick="openTableSession()">🪑 Open Table</button>
+            <div id="s1-returning-section" style="display: none; padding: 12px; background: #fff3f0; border-radius: 8px; margin: 12px 0; border-left: 4px solid #d9534f;">
+              <div style="font-size: 12px; color: #d9534f; font-weight: bold; margin-bottom: 6px;">⚠️ Returning pieces — studio fee payable:</div>
+              <ul id="s1-returning-list" style="margin: 0; padding-left: 16px; font-size: 12px;"></ul>
             </div>
+
+            <button class="btn-connect glaze-ocean" style="width: 100%; margin-top: 12px;" onclick="showCustomerQRFromResult()">📱 Show Customer QR</button>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
+              <input type="text" id="s1-table-number" placeholder="Table number">
+              <input type="number" id="s1-num-places" placeholder="Number of places" min="1">
+            </div>
+            <button class="btn-connect" style="width: 100%; margin-top: 12px;" onclick="openTableSession()">🪑 Open Table</button>
           </div>
         </div>
 
@@ -2828,9 +2844,31 @@ async function lookupBookingSection1() {
   }
 }
 
-async function startWalkIn() {
-  const customerName = document.getElementById('s1-walkin-name').value.trim();
+// ── Section 1 step navigation: name -> fork (walk-in vs existing) -> result ──
+function s1ChooseWalkIn() {
+  const name = document.getElementById('s1-customer-name').value.trim();
+  if (!name) {
+    alert("Pop in the customer's name first");
+    return;
+  }
+  startWalkIn(name);
+}
 
+function s1ChooseExisting() {
+  document.getElementById('s1-step-start').style.display = 'none';
+  document.getElementById('s1-step-existing').style.display = 'block';
+}
+
+function s1BackToStart() {
+  document.getElementById('s1-step-start').style.display = 'block';
+  document.getElementById('s1-step-existing').style.display = 'none';
+  document.getElementById('s1-result').style.display = 'none';
+  document.getElementById('s1-customer-name').value = '';
+  document.getElementById('s1-booking-code').value = '';
+  s1LookedUpBooking = null;
+}
+
+async function startWalkIn(customerName) {
   if (!customerName) {
     alert('Enter the customer\'s name');
     return;
@@ -2871,7 +2909,6 @@ async function startWalkIn() {
     }
 
     displayBookingResult(bookingData);
-    document.getElementById('s1-walkin-name').value = '';
   } catch (err) {
     alert('Error starting walk-in: ' + err.message);
   }
@@ -2898,6 +2935,8 @@ function displayBookingResult(bookingData) {
     document.getElementById('s1-num-places').value = bookingData.partySize;
   }
 
+  document.getElementById('s1-step-start').style.display = 'none';
+  document.getElementById('s1-step-existing').style.display = 'none';
   document.getElementById('s1-result').style.display = 'block';
 }
 
@@ -2989,9 +3028,11 @@ function closeCustomerQR() {
 function resetSection1() {
   s1LookedUpBooking = null;
   document.getElementById('s1-booking-code').value = '';
-  document.getElementById('s1-walkin-name').value = '';
+  document.getElementById('s1-customer-name').value = '';
   document.getElementById('s1-table-number').value = '';
   document.getElementById('s1-num-places').value = '';
+  document.getElementById('s1-step-start').style.display = 'block';
+  document.getElementById('s1-step-existing').style.display = 'none';
   document.getElementById('s1-result').style.display = 'none';
 }
 
