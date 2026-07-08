@@ -57,6 +57,7 @@
     <button class="wt-btn" id="btn-back" onclick="goTo(cur-1)">← Back</button>
     <button class="wt-btn wt-btn-primary" id="btn-play" onclick="togglePlay()">▶ Play</button>
     <button class="wt-btn" id="btn-next" onclick="goTo(cur+1)">Next →</button>
+    <button class="wt-btn" id="btn-voice" onclick="toggleVoice()">🔊 Read aloud</button>
   </div>
   <div class="wt-dots" id="dots"></div>
 </div>
@@ -310,97 +311,124 @@ function communityScreen() {
 // ── Step definitions ──
 const STEPS = [
   {
-    screen: dashboardScreen,
-    nav: 'dashboard',
+    screen: dashboardScreen, nav: 'dashboard',
     title: "Dashboard — your daily overview",
     body: "The first screen you see. Shows revenue, sessions, and the Extra Charges Today card — everything charged through the app that needs adding to the till at checkout.",
-    arrows: []
+    arrows: [],
+    voice: "Welcome to the kilnLINK staff app. This is your Dashboard — the first thing you see each day. It shows today's revenue, how many sessions are open, and a running tally of all the extras charged through the app that you'll need to add to customer bills at checkout."
   },
   {
-    screen: dashboardScreen,
-    nav: 'dashboard',
+    screen: dashboardScreen, nav: 'dashboard',
     title: "Extra Charges Today — add to the till",
     body: "This card shows all app charges grouped by booking. At checkout, add these to the customer's bill on the till. Nothing is charged automatically.",
-    arrows: [{vx:171,vy:87,label:"Add these to the bill",dir:"down"}]
+    arrows: [{vx:171,vy:87,label:"Add these to the bill",dir:"down"}],
+    voice: "This is the Extra Charges Today card. It shows everything customers have unlocked through the app — tablet hire, home access, design tools — grouped by booking code. At checkout, add these totals to the customer's bill on the till. Nothing is charged automatically through the app."
   },
   {
-    screen: null,
-    nav: 'staff',
+    screen: null, nav: 'staff',
     title: "Tap Daily Bookings in the sidebar",
     body: "Every customer session starts here. Tap Daily Bookings in the sidebar — this opens the full session flow.",
-    arrows: [{vx:29,vy:55,label:"Daily Bookings",dir:"right"}]
+    arrows: [{vx:29,vy:55,label:"Daily Bookings",dir:"right"}],
+    voice: "Every customer session starts in Daily Bookings. Tap it in the sidebar here. This opens the full four-step session flow — from opening a booking right through to completion."
   },
   {
-    screen: bookingsStep1Screen,
-    nav: 'staff',
+    screen: bookingsStep1Screen, nav: 'staff',
     title: "Step 1 — type the customer name",
     body: "Type the customer's name in the big field at the top. Then tap New Walk-in for a drop-in, or Existing Booking to pull in their Square reservation.",
-    arrows: [{vx:171,vy:48,label:"Type name here first",dir:"down"}]
+    arrows: [{vx:171,vy:48,label:"Type name here first",dir:"down"}],
+    voice: "Step 1 is all about identifying the customer. Type their name in this big field at the top. The app will pull in their visit history and flag any returning pieces waiting for them."
   },
   {
-    screen: bookingsStep1Screen,
-    nav: 'staff',
+    screen: bookingsStep1Screen, nav: 'staff',
     title: "Choose walk-in or existing booking",
     body: "Two big tiles — tap the right one. Walk-in creates a new session on the spot. Existing Booking finds their Square reservation and imports their history.",
     arrows: [
       {vx:117,vy:62,label:"New Walk-in",dir:"up"},
       {vx:222,vy:62,label:"Existing Booking",dir:"up"}
-    ]
+    ],
+    voice: "Once you've typed their name, choose one of these two options. New Walk-in creates a fresh session on the spot — no reservation needed. Existing Booking pulls in their Square appointment and imports everything automatically. You can also tick boxes here to add a tablet hire charge or home access."
   },
   {
-    screen: engagementScreen,
-    nav: 'staff',
+    screen: engagementScreen, nav: 'staff',
     title: "Step 2 — log pieces, drinks & glazes",
     body: "Once seated, log everything from the Square catalogue — pottery, drinks, cakes. Tap the Mayco Specialist Glazes panel at the bottom to add crystal or dimensional glazes in one tap.",
-    arrows: [{vx:171,vy:163,label:"Mayco Glazes — one tap to add",dir:"down"}]
+    arrows: [{vx:171,vy:163,label:"Mayco Glazes — one tap to add",dir:"down"}],
+    voice: "Step 2 is Customer Engagement. Once the customer is seated and has chosen their piece, log everything here — pottery, drinks, and cakes all come from the Square catalogue. Scroll down to find the Mayco Specialist Glazes panel. Tap any Jungle Gem, Elements, or French Dimensions glaze to add it to the running bill instantly."
   },
   {
-    screen: completionScreen,
-    nav: 'staff',
+    screen: completionScreen, nav: 'staff',
     title: "Step 3 — photograph & complete",
     body: "When a customer finishes, tap Take Photo & Submit Pieces. The photo is stamped with their name and date. Tick Home Access or tablet charges before submitting.",
-    arrows: [{vx:171,vy:76,label:"Tap to photograph & complete",dir:"down"}]
+    arrows: [{vx:171,vy:76,label:"Tap to photograph & complete",dir:"down"}],
+    voice: "Step 3 is completion. When a customer has finished painting, tap Take Photo and Submit Pieces. The photo is automatically stamped with their name and the date. Before submitting, make sure to tick any outstanding charges — tablet hire, or the five pound home access if they want it."
   },
   {
-    screen: printQueueScreen,
-    nav: 'printqueue',
+    screen: printQueueScreen, nav: 'printqueue',
     title: "Print Queue — review transfer designs",
     body: "When customers submit designs for ceramic transfer printing, they appear here. Check the design and sizing — Approve to charge £1 and print, Reject with no charge.",
     arrows: [
       {vx:184,vy:70,label:"Approve — charges £1",dir:"up"},
       {vx:246,vy:70,label:"Reject — no charge",dir:"up"}
-    ]
+    ],
+    voice: "The Print Queue shows all customer-submitted designs for ceramic transfer printing. Each card shows the actual design, who submitted it, and the time. Check the design and sizing carefully — Approve sends it to the printer and charges one pound to their bill. Reject sends nothing and there's no charge."
   },
   {
-    screen: stockScreen,
-    nav: 'stock',
+    screen: stockScreen, nav: 'stock',
     title: "Stock — catalogue & reservations",
     body: "Photograph bisque pieces and add them to the catalogue. Customers can browse, design on them at home, and reserve for their next visit. Pending reservations appear above.",
-    arrows: [{vx:118,vy:56,label:"📷 Take Photo to add",dir:"up"}]
+    arrows: [{vx:118,vy:56,label:"📷 Take Photo to add",dir:"up"}],
+    voice: "The Stock tab is where you manage the bisque catalogue. Photograph pieces from the studio using the Take Photo button, give them a name, category, and price, and they'll appear in the customer app for browsing. Customers can design on piece photos at home and reserve them for their next visit. Pending reservations show up here for you to confirm."
   },
   {
-    screen: communityScreen,
-    nav: 'community',
+    screen: communityScreen, nav: 'community',
     title: "Community — feature great work",
     body: "See everything customers have shared. Tap Feature on any post to push it to the worldwide kilnLINK feed — great for showing off brilliant pieces.",
-    arrows: [{vx:244,vy:29,label:"Tap Feature to boost worldwide",dir:"down"}]
+    arrows: [{vx:244,vy:29,label:"Tap Feature to boost worldwide",dir:"down"}],
+    voice: "The Community tab shows everything customers have shared from your studio. You can remove inappropriate posts, or tap Feature on any post to push it to the worldwide kilnLINK feed — visible to customers at every studio on the platform. A great way to showcase brilliant work and build the studio's reputation."
   },
   {
-    screen: dashboardScreen,
-    nav: 'dashboard',
+    screen: dashboardScreen, nav: 'dashboard',
     title: "Daily flow — that's it!",
     body: "Open booking → log items in Step 2 → photograph & complete in Step 3 → kiln fires → mark ready for pickup. Tap 🎯 Staff Tour any time to replay.",
-    arrows: [{vx:29,vy:165,label:"🎯 Staff Tour — always here",dir:"up"}]
+    arrows: [{vx:29,vy:165,label:"🎯 Staff Tour — always here",dir:"up"}],
+    voice: "That's the complete staff tour. The daily flow is simple — open a booking, log the pieces and drinks in Step 2, photograph and complete in Step 3, then manage firing and pickup through the kiln section. The Staff Tour button is always in the sidebar, so any new team member can replay this at any time. Good luck!"
   }
 ];
 
 let cur = 0, playing = false, playTimer = null, bounceAngle = 0;
-let screenCache = {};
+let screenCache = {}, voiceOn = false;
+
+// ── Voice narration ──
+function speak(text) {
+  if (!window.speechSynthesis || !text) return;
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.rate = 0.92; utt.pitch = 1.02; utt.lang = 'en-GB';
+  const voices = window.speechSynthesis.getVoices();
+  const v = voices.find(v => v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en'));
+  if (v) utt.voice = v;
+  utt.onstart = () => { const b = document.getElementById('btn-voice'); if(b) b.textContent='🔊 Speaking…'; };
+  utt.onend = () => { const b = document.getElementById('btn-voice'); if(b) b.textContent='🔊 Read aloud'; };
+  window.speechSynthesis.speak(utt);
+}
+function stopVoice() { if (window.speechSynthesis) window.speechSynthesis.cancel(); }
+function toggleVoice() {
+  voiceOn = !voiceOn;
+  const btn = document.getElementById('btn-voice');
+  btn.style.background = voiceOn ? '#B87946' : '';
+  btn.style.color = voiceOn ? 'white' : '';
+  btn.style.borderColor = voiceOn ? '#B87946' : '';
+  if (voiceOn) speak(STEPS[cur].voice);
+  else stopVoice();
+}
+if (window.speechSynthesis) {
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+}
 
 function getScreen(stepIdx) {
   const step = STEPS[stepIdx];
   if (step.screen) return step.screen();
-  // Steps without a screen fn use the previous cached screen
   return screenCache[stepIdx] || dashboardScreen();
 }
 
@@ -425,6 +453,7 @@ function render() {
     `<button class="wt-dot${i===cur?' active':''}" onclick="goTo(${i})" title="Step ${i+1}"></button>`
   ).join('');
 
+  if (voiceOn) speak(step.voice);
   renderArrows();
 }
 
@@ -496,6 +525,7 @@ function renderArrows() {
 
 function goTo(i) {
   if (i < 0 || i >= STEPS.length) return;
+  stopVoice();
   cur = i;
   render();
 }
@@ -504,7 +534,7 @@ function togglePlay() {
   if (cur === STEPS.length - 1 && !playing) cur = 0;
   playing = !playing;
   if (playing) scheduleNext();
-  else clearTimeout(playTimer);
+  else { clearTimeout(playTimer); stopVoice(); }
   document.getElementById('btn-play').textContent = playing ? '⏸ Pause' : '▶ Play';
 }
 

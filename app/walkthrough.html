@@ -87,6 +87,7 @@
     <button class="wt-btn" id="btn-back" onclick="goTo(cur-1)">← Back</button>
     <button class="wt-btn wt-btn-primary" id="btn-play" onclick="togglePlay()">▶ Play</button>
     <button class="wt-btn" id="btn-next" onclick="goTo(cur+1)">Next →</button>
+    <button class="wt-btn" id="btn-voice" onclick="toggleVoice()" style="background:rgba(255,255,255,0.12)">🔊 Read aloud</button>
   </div>
   <div class="wt-dots" id="dots"></div>
 </div>
@@ -237,37 +238,43 @@ const STEPS = [
     screen: homeScreen,
     title: "Your session home screen",
     body: "Everything for your visit in one place. Scroll down to see all your tools.",
-    arrows: []
+    arrows: [],
+    voice: "Welcome to kilnLINK — your personal pottery studio companion. This is your session home screen. Everything for your visit today is right here. Let's take a quick tour."
   },
   {
     screen: homeScreen,
     title: "Tap Colour Picker — it's free",
     body: "Browse all 82 real Mayco glaze colours stocked in the studio. Tap any to save it to your personal palette.",
-    arrows: [{ px: 51, py: 79, label: "Colour Picker — FREE", dir: "up" }]
+    arrows: [{ px: 51, py: 79, label: "Colour Picker — FREE", dir: "up" }],
+    voice: "The Colour Picker is completely free. Tap it to browse all 82 real Mayco Stroke and Coat colours stocked in this studio — with their actual codes. Tap any colour to save it to your personal palette before you start painting."
   },
   {
     screen: designPreviewScreen,
     title: "Design Preview — photograph & paint",
     body: "Take a photo of your bisque piece, then brush or fill colours directly on it. Save up to 10 designs to work on at home.",
-    arrows: [{ px: 51, py: 30, label: "Your piece photo here", dir: "down" }]
+    arrows: [{ px: 51, py: 30, label: "Your piece photo here", dir: "down" }],
+    voice: "Design Preview lets you photograph your actual bisque piece, then try out colours directly on the photo before you commit. Use the brush, pen, or fill tools to plan your design. You can save up to 10 designs to work on at home."
   },
   {
     screen: homeScreen,
     title: "Tap Transfer Designer",
     body: "Sketch, add text in different fonts, drop in motifs — then tap Print as Transfer to send it to staff for printing.",
-    arrows: [{ px: 51, py: 107, label: "Transfer Designer — £1", dir: "up" }]
+    arrows: [{ px: 51, py: 107, label: "Transfer Designer — £1", dir: "up" }],
+    voice: "Transfer Designer is a creative tool for making ceramic transfers. Sketch freehand, add text in different fonts, drop in motifs and shapes. When you're happy with your design, tap Print as Transfer to send it straight to a member of staff for printing onto your piece."
   },
   {
     screen: homeScreen,
     title: "Take It Home — £5 one-off",
     body: "Unlocks all three design tools on your own phone forever, not just in the studio. Tap here and ask staff to add it to your bill.",
-    arrows: [{ px: 51, py: 65, label: "Tap here — £5 unlocks everything", dir: "up" }]
+    arrows: [{ px: 51, py: 65, label: "Tap here — £5 unlocks everything", dir: "up" }],
+    voice: "For just five pounds, Take It Home unlocks all three design tools — Colour Picker, Design Preview, and Transfer Designer — on your own phone or tablet, forever. Not just when you're in the studio. You can also photograph pieces in the studio to design on at home. Ask a member of staff to add it to your bill."
   },
   {
     screen: homeScreen,
     title: "Tap Community",
     body: "See what other painters have made at this studio and worldwide. Like pieces, share your own, and create a branded Instagram card.",
-    arrows: [{ px: 51, py: 121, label: "Community", dir: "up" }]
+    arrows: [{ px: 51, py: 121, label: "Community", dir: "up" }],
+    voice: "The Community feed shows finished pieces from painters at this studio — and from kilnLINK studios worldwide. You can like pieces, leave comments, and share your own finished work. There's also a Worldwide tab to see what people are creating around the globe."
   },
   {
     screen: communityScreen,
@@ -276,23 +283,71 @@ const STEPS = [
     arrows: [
       { px: 26, py: 186, label: "Share My Piece", dir: "up" },
       { px: 75, py: 186, label: "Create Share Card", dir: "up" }
-    ]
+    ],
+    voice: "At the bottom of the Community screen, you'll always see these two buttons. Share My Piece adds your photo to the studio community feed. Create Share Card generates a beautiful branded square image — with the kilnLINK logo, your name, and the studio name — ready to post straight to Instagram or TikTok."
   },
   {
     screen: homeScreen,
     title: "Design Marketplace",
     body: "Browse designs from other customers and use them on your piece. Or list your own Transfer Designer work for others to buy.",
-    arrows: [{ px: 51, py: 135, label: "Design Marketplace", dir: "up" }]
+    arrows: [{ px: 51, py: 135, label: "Design Marketplace", dir: "up" }],
+    voice: "The Design Marketplace is where customers buy and sell original designs. Browse what other painters have created and load any design straight into Transfer Designer to use on your own piece. Or list your own Transfer Designer artwork for others to buy — you set the price."
   },
   {
     screen: homeScreen,
     title: "App Tour always available",
     body: "Tap the 🎯 App Tour button any time to replay this walkthrough. Happy painting!",
-    arrows: [{ px: 85, py: 197, label: "🎯 App Tour", dir: "up" }]
+    arrows: [{ px: 85, py: 197, label: "🎯 App Tour", dir: "up" }],
+    voice: "That's the full tour! The App Tour button is always in the bottom corner whenever you need a reminder. Enjoy your session, and happy painting!"
   }
 ];
 
 let cur = 0, playing = false, playTimer = null, bounceTimer = null, bounceAngle = 0;
+let voiceOn = false;
+
+// ── Voice narration ──
+function speak(text) {
+  if (!window.speechSynthesis || !text) return;
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.rate = 0.92; utt.pitch = 1.05; utt.lang = 'en-GB';
+  const voices = window.speechSynthesis.getVoices();
+  const v = voices.find(v => v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en'));
+  if (v) utt.voice = v;
+  utt.onend = () => {
+    const btn = document.getElementById('btn-voice');
+    if (btn) btn.textContent = '🔊 Read aloud';
+  };
+  utt.onstart = () => {
+    const btn = document.getElementById('btn-voice');
+    if (btn) btn.textContent = '🔊 Speaking…';
+  };
+  window.speechSynthesis.speak(utt);
+}
+
+function stopVoice() {
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+}
+
+function toggleVoice() {
+  voiceOn = !voiceOn;
+  const btn = document.getElementById('btn-voice');
+  if (voiceOn) {
+    btn.style.background = '#B87946';
+    btn.style.color = 'white';
+    speak(STEPS[cur].voice);
+  } else {
+    btn.style.background = '';
+    btn.style.color = '';
+    stopVoice();
+  }
+}
+
+// Preload voices (Chrome loads them async)
+if (window.speechSynthesis) {
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+}
 
 function render() {
   const step = STEPS[cur];
@@ -305,12 +360,12 @@ function render() {
   document.getElementById('btn-next').disabled = cur === STEPS.length - 1;
   document.getElementById('btn-play').textContent = playing ? '⏸ Pause' : cur === STEPS.length-1 ? '↺ Replay' : '▶ Play';
 
-  // Dots
   const dots = document.getElementById('dots');
   dots.innerHTML = STEPS.map((_,i) =>
     `<button class="wt-dot${i===cur?' active':''}" onclick="goTo(${i})" title="Step ${i+1}"></button>`
   ).join('');
 
+  if (voiceOn) speak(step.voice);
   renderArrows();
 }
 
@@ -381,6 +436,7 @@ function renderArrows() {
 
 function goTo(i) {
   if (i < 0 || i >= STEPS.length) return;
+  stopVoice();
   cur = i;
   render();
 }
@@ -389,7 +445,7 @@ function togglePlay() {
   if (cur === STEPS.length - 1 && !playing) { cur = 0; }
   playing = !playing;
   if (playing) scheduleNext();
-  else { clearTimeout(playTimer); }
+  else { clearTimeout(playTimer); stopVoice(); }
   document.getElementById('btn-play').textContent = playing ? '⏸ Pause' : '▶ Play';
 }
 
