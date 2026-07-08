@@ -61,7 +61,7 @@
     <button class="wt-btn" id="btn-back" onclick="goTo(cur-1)">← Back</button>
     <button class="wt-btn wt-btn-primary" id="btn-play" onclick="togglePlay()">▶ Play</button>
     <button class="wt-btn" id="btn-next" onclick="goTo(cur+1)">Next →</button>
-    <button class="wt-btn" id="btn-voice" onclick="toggleVoice()">🔊 Read aloud</button>
+    <button class="wt-btn" id="btn-voice" onclick="toggleVoice()" style="background:#B87946;color:white;border-color:#B87946">🔇 Mute</button>
   </div>
   <div class="wt-dots" id="dots"></div>
 </div>
@@ -388,34 +388,78 @@ const STEPS = [
 ];
 
 // ── Voice ──
-let voiceOn = false;
+let voiceOn = true;
+
+function getBestVoice() {
+  const voices = window.speechSynthesis.getVoices();
+  // Prefer soft female UK English voices — try by name first
+  const preferred = [
+    'Google UK English Female',
+    'Microsoft Sonia Online (Natural) - English (United Kingdom)',
+    'Microsoft Libby Online (Natural) - English (United Kingdom)',
+    'Karen', 'Moira', 'Samantha', 'Victoria', 'Fiona',
+  ];
+  for (const name of preferred) {
+    const v = voices.find(v => v.name === name);
+    if (v) return v;
+  }
+  // Fall back: any female-sounding en-GB voice
+  const gbFemale = voices.find(v => v.lang === 'en-GB' && /female|woman|girl/i.test(v.name));
+  if (gbFemale) return gbFemale;
+  // Any en-GB
+  const gb = voices.find(v => v.lang === 'en-GB');
+  if (gb) return gb;
+  // Any English
+  return voices.find(v => v.lang.startsWith('en')) || null;
+}
+
 function speak(text, onEnd) {
   if (!window.speechSynthesis || !text) { if (onEnd) onEnd(); return; }
   window.speechSynthesis.cancel();
   const utt = new SpeechSynthesisUtterance(text);
-  utt.rate = 0.92; utt.pitch = 1.05; utt.lang = 'en-GB';
-  const voices = window.speechSynthesis.getVoices();
-  const v = voices.find(v => v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en'));
+  utt.rate = 0.88; utt.pitch = 1.1; utt.lang = 'en-GB';
+  const v = getBestVoice();
   if (v) utt.voice = v;
   utt.onstart = () => { const b = document.getElementById('btn-voice'); if (b) b.textContent = '🔊 Speaking…'; };
-  utt.onend = () => { const b = document.getElementById('btn-voice'); if (b) b.textContent = '🔊 Read aloud'; if (onEnd) onEnd(); };
+  utt.onend = () => { const b = document.getElementById('btn-voice'); if (b) b.textContent = '🔇 Mute'; if (onEnd) onEnd(); };
   utt.onerror = () => { if (onEnd) onEnd(); };
   window.speechSynthesis.speak(utt);
 }
 function stopVoice() { if (window.speechSynthesis) window.speechSynthesis.cancel(); }
+
 function toggleVoice() {
   voiceOn = !voiceOn;
   const btn = document.getElementById('btn-voice');
   const narEl = document.getElementById('step-narration');
-  btn.style.background = voiceOn ? '#B87946' : '';
-  btn.style.color = voiceOn ? 'white' : '';
-  btn.style.borderColor = voiceOn ? '#B87946' : '';
-  narEl.style.display = voiceOn ? 'block' : 'none';
-  if (voiceOn) speak(STEPS[cur].voice); else stopVoice();
+  if (voiceOn) {
+    btn.textContent = '🔇 Mute';
+    btn.style.background = '#B87946'; btn.style.color = 'white'; btn.style.borderColor = '#B87946';
+    narEl.style.display = 'block';
+    speak(STEPS[cur].voice);
+  } else {
+    btn.textContent = '🔊 Unmute';
+    btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = '';
+    narEl.style.display = 'none';
+    stopVoice();
+  }
 }
-if (window.speechSynthesis) {
-  window.speechSynthesis.getVoices();
-  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+
+// Voices load async in Chrome — retry speaking once they're ready
+function initVoice() {
+  if (!window.speechSynthesis) return;
+  const tryStart = () => {
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      // Voices ready — update button and speak first step
+      const btn = document.getElementById('btn-voice');
+      if (btn) { btn.textContent = '🔇 Mute'; btn.style.background = '#B87946'; btn.style.color = 'white'; btn.style.borderColor = '#B87946'; }
+      document.getElementById('step-narration').style.display = 'block';
+      speak(STEPS[0].voice);
+    }
+  };
+  window.speechSynthesis.onvoiceschanged = tryStart;
+  // Also try immediately in case already loaded (Firefox/Safari)
+  setTimeout(tryStart, 300);
 }
 
 // ── Render ──
@@ -429,7 +473,7 @@ function render() {
   document.getElementById('step-body').textContent = step.body;
   const narEl = document.getElementById('step-narration');
   narEl.textContent = step.voice;
-  narEl.style.display = voiceOn ? 'block' : 'none';
+  narEl.style.display = 'block';
   document.getElementById('screen-content').innerHTML = step.screen();
   document.getElementById('btn-back').disabled = cur === 0;
   document.getElementById('btn-next').disabled = cur === STEPS.length - 1;
@@ -510,6 +554,7 @@ function animateArrows() { bounceAngle += 0.06; renderArrows(); requestAnimation
 
 render();
 animateArrows();
+initVoice();
 </script>
 </body>
 </html>
