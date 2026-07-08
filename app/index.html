@@ -1229,7 +1229,12 @@
 
       // Keep booking details available globally so the persistent QR badge
       // can be shown full-size from any screen, at any time
-      window.currentBooking = { code: getParam('booking'), name: b.customerName || firstName };
+      window.currentBooking = {
+        code: getParam('booking'),
+        name: b.customerName || firstName,
+        homeAccessUnlocked: b.homeAccessUnlocked || false
+      };
+      updateHomeAccessTile();
 
       const readyPieces = data.piecesReadyForPickup || [];
       const readyBanner = readyPieces.length > 0
@@ -1294,6 +1299,17 @@
           </button>
 
           <div class="section-label">Design tools</div>
+
+          <!-- Home Access tile — shown to everyone, dynamically updated once
+               booking loads to reflect whether they've already purchased it -->
+          <div id="home-access-tile-wrap">
+            <button class="tile tile-charcoal" onclick="showHomeAccessInfo()" id="home-access-tile" style="position:relative; background: linear-gradient(135deg, var(--link-charcoal) 0%, #3d342f 100%);">
+              <span class="tile-icon">🏠</span>
+              <div class="tile-title">Take It Home</div>
+              <div class="tile-desc">Unlock all three design tools on your own device, 24/7 — ask staff to add it to your bill.</div>
+              <span id="home-access-badge" style="position:absolute; top:14px; right:16px; background:var(--link-clay); font-size:10px; font-weight:700; padding:3px 9px; border-radius:20px; color:#fff;">£5</span>
+            </button>
+          </div>
 
           <button class="tile tile-ocean" onclick="openColourPicker()">
             <span class="tile-icon">🎨</span>
@@ -1962,9 +1978,37 @@
       alert('✅ Request sent! A member of staff will bring you a tablet and stylus shortly.');
     }
 
+    // Home Access tile — updates dynamically once the booking loads
+    function updateHomeAccessTile() {
+      const tile = document.getElementById('home-access-tile');
+      const badge = document.getElementById('home-access-badge');
+      if (!tile || !badge) return;
+
+      if (window.currentBooking?.homeAccessUnlocked) {
+        tile.style.background = 'linear-gradient(135deg, #2f6b3a 0%, #1e4a28 100%)';
+        badge.textContent = '✓ Active';
+        badge.style.background = 'rgba(255,255,255,0.25)';
+        tile.querySelector('.tile-title').textContent = 'Home Access Active';
+        tile.querySelector('.tile-desc').textContent = 'All three design tools are unlocked on this device, forever. Design anytime, anywhere.';
+        tile.onclick = null; // already unlocked, no action needed
+      }
+    }
+
+    function showHomeAccessInfo() {
+      alert('🏠 Take It Home — £5\n\nUnlocks all three design tools (Colour Picker, Design Preview, Transfer Designer) on your own phone or tablet, 24/7 — not just when you\'re in the studio.\n\nAsk a member of staff to add it to your bill today.');
+    }
+
+
     async function openPaidTool(toolKey) {
       const tool = PAID_TOOLS[toolKey];
       const bookingCode = window.currentBooking ? window.currentBooking.code : null;
+
+      // Home access unlocked — skip ALL paywalls, tools are free at home 24/7
+      if (window.currentBooking?.homeAccessUnlocked && !tool.isRequest) {
+        tool.openFn();
+        return;
+      }
+
       if (!bookingCode) {
         // No booking context (e.g. testing without a code) — just open it
         tool.openFn();

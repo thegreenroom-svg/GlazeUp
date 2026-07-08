@@ -774,6 +774,43 @@ app.post('/api/bookings/self-checkin', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/bookings/:bookingCode/grant-home-access
+ * Staff grants home access (£5 one-off) — permanently unlocks all three
+ * design tools for this customer's app link, usable from home 24/7.
+ * Charge tallied like the other extras (checked at checkout), not charged
+ * directly through the app yet.
+ */
+app.post('/api/bookings/:bookingCode/grant-home-access', async (req, res) => {
+  const { bookingCode } = req.params;
+  const { studioId } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    // Mark the booking as home-access unlocked
+    const { error: updateError } = await supabase
+      .from('bookings')
+      .update({ home_access_unlocked: true })
+      .eq('booking_code', bookingCode)
+      .eq('studio_id', studioId);
+
+    if (updateError) throw updateError;
+
+    // Tally the £5 charge like the other extras
+    await supabase.from('app_extra_charges').insert({
+      studio_id: studioId,
+      booking_code: bookingCode,
+      item_name: 'Home Access — all design tools',
+      amount_cents: 500
+    });
+
+    res.json({ status: 'granted' });
+  } catch (error) {
+    console.error('Error granting home access:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/booking/:bookingCode', async (req, res) => {
   const { bookingCode } = req.params;
   const { studioId } = req.query;
@@ -833,7 +870,8 @@ app.get('/api/booking/:bookingCode', async (req, res) => {
         partySize: booking.party_size,
         sessionStart: booking.session_start,
         sessionEnd: booking.session_end,
-        notes: booking.notes
+        notes: booking.notes,
+        homeAccessUnlocked: booking.home_access_unlocked || false
       },
       piecesReadyForPickup: readyPieces || [],
       customerHistory: existingCustomer ? {

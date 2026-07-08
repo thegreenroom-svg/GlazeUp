@@ -1387,6 +1387,11 @@
               📱 Providing studio tablet &amp; stylus <span style="color: var(--link-clay); font-weight: 700; margin-left: auto;">+£3.00</span>
             </label>
 
+            <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding: 12px; background: #f0f4ff; border-radius: 10px; border: 1px solid #c8d4f5; cursor: pointer; font-size: 13px;">
+              <input type="checkbox" id="s1-home-access" style="width: 18px; height: 18px; flex-shrink: 0;">
+              🏠 Home Access — all design tools, forever <span style="color: var(--link-clay); font-weight: 700; margin-left: auto;">+£5.00</span>
+            </label>
+
             <button class="btn-connect" style="width: 100%; margin-top: 4px;" onclick="openTableSession()">🪑 Open Table</button>
           </div>
         </div>
@@ -2964,6 +2969,7 @@ function s1BackToStart() {
   document.getElementById('s1-customer-name').value = '';
   document.getElementById('s1-booking-code').value = '';
   document.getElementById('s1-tablet-charge').checked = false;
+  document.getElementById('s1-home-access').checked = false;
   s1LookedUpBooking = null;
 }
 
@@ -3048,6 +3054,7 @@ async function openTableSession() {
   const tableNumber = document.getElementById('s1-table-number').value.trim();
   const numberOfPlaces = parseInt(document.getElementById('s1-num-places').value) || null;
   const chargeForTablet = document.getElementById('s1-tablet-charge').checked;
+  const grantHomeAccess = document.getElementById('s1-home-access').checked;
 
   try {
     if (!apiConnected) {
@@ -3068,8 +3075,6 @@ async function openTableSession() {
     });
 
     if (res.ok) {
-      // Studio equipment charge — PROTOTYPE, tallied like the app-tool
-      // unlocks, not charged directly. £3/session for tablet + stylus.
       if (chargeForTablet) {
         fetch(`${API_URL}/api/extras/charge`, {
           method: 'POST',
@@ -3081,6 +3086,15 @@ async function openTableSession() {
             amountCents: 300
           })
         }).catch(err => console.error('Could not record tablet charge:', err));
+      }
+
+      // Home access — marks the booking permanently and tallies £5
+      if (grantHomeAccess) {
+        fetch(`${API_URL}/api/bookings/${encodeURIComponent(s1LookedUpBooking.bookingCode)}/grant-home-access`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studioId })
+        }).catch(err => console.error('Could not grant home access:', err));
       }
 
       showCustomerQR(s1LookedUpBooking.bookingCode, s1LookedUpBooking.customerName, tableNumber);
@@ -3147,6 +3161,7 @@ function resetSection1() {
   document.getElementById('s1-table-number').value = '';
   document.getElementById('s1-num-places').value = '';
   document.getElementById('s1-tablet-charge').checked = false;
+  document.getElementById('s1-home-access').checked = false;
   document.getElementById('s1-step-start').style.display = 'block';
   document.getElementById('s1-step-existing').style.display = 'none';
   document.getElementById('s1-result').style.display = 'none';
@@ -3672,6 +3687,10 @@ async function loadOpenTablesForCompletion() {
           <strong style="font-size: 16px; font-weight: 700;">Table ${s.table_number || '?'}</strong>
           <span style="font-size: 11px; color: var(--gu-dust); font-weight: 600;">${s.booking_id}</span>
         </div>
+        <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding: 10px 12px; background: #fff; border-radius: 10px; border: 1px solid var(--gu-border); cursor: pointer; font-size: 13px;">
+          <input type="checkbox" id="home-access-${s.id}" style="width:16px; height:16px; flex-shrink:0;">
+          🏠 Add Home Access — all design tools, forever <span style="color: var(--link-clay); font-weight: 700; margin-left: auto;">+£5</span>
+        </label>
         <button class="till-tile" style="width: 100%; min-height: 56px; padding: 12px;" onclick="completeTableFromSection3('${s.id}', '${s.booking_id}')">
           <span class="till-tile-name">📷 Take Photo &amp; Submit Pieces</span>
         </button>
@@ -3683,6 +3702,17 @@ async function loadOpenTablesForCompletion() {
 }
 
 function completeTableFromSection3(tableSessionId, bookingCode) {
+  // Grant home access if the checkbox was ticked — fire and forget,
+  // non-blocking (the photo/piece submission flow continues regardless)
+  const homeAccessCheckbox = document.getElementById(`home-access-${tableSessionId}`);
+  if (homeAccessCheckbox?.checked && apiConnected) {
+    fetch(`${API_URL}/api/bookings/${encodeURIComponent(bookingCode)}/grant-home-access`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId })
+    }).catch(err => console.error('Could not grant home access:', err));
+  }
+
   // Reuse the existing pieces-submission modal (QR/manual lookup, photo capture, submit)
   // and remember which table session to close once submission succeeds
   completingTableSessionId = tableSessionId;
