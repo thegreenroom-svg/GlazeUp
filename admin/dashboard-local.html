@@ -1006,7 +1006,7 @@
       color: var(--link-clay);
       opacity: 0;
       animation: splashLineFadeUp 0.6s ease forwards;
-      animation-delay: 6.0s;
+      animation-delay: 2.7s;
     }
     .splash-tagline {
       margin-top: 14px;
@@ -1016,7 +1016,7 @@
       color: rgba(255,255,255,0.75);
       opacity: 0;
       animation: splashLineFadeUp 0.6s ease forwards;
-      animation-delay: 6.2s;
+      animation-delay: 2.9s;
     }
     .splash-endorsement {
       margin-top: 22px;
@@ -1026,7 +1026,7 @@
       color: rgba(255,255,255,0.4);
       opacity: 0;
       animation: splashLineFadeUp 0.6s ease forwards;
-      animation-delay: 6.4s;
+      animation-delay: 3.1s;
     }
     @keyframes splashLineFadeUp {
       from { opacity: 0; transform: translateY(8px); }
@@ -1043,7 +1043,7 @@
       color: rgba(255,255,255,0.45);
       opacity: 0;
       animation: splashLineFadeUp 0.6s ease forwards;
-      animation-delay: 6.7s;
+      animation-delay: 3.4s;
     }
 
     /* ── Animated arrow motif — splash only. Traces K, over the kiln, to I,
@@ -3962,7 +3962,7 @@ let splashDismissed = false;
 function wireSplash() {
   const el = document.getElementById('splash-screen');
   if (el) el.addEventListener('click', dismissSplash);
-  setTimeout(drawSplashArrows, 1500); // wait for letters to actually land first
+  // Arrow motif removed for now - back to the simple, clean spin-in + N-flip
 }
 
 // Animated arrow motif (splash only) — traces K, over the kiln, to I,
