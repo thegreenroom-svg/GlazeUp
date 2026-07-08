@@ -1249,6 +1249,13 @@
 
           <div class="section-label">Getting started</div>
 
+          <button class="tile tile-honey" onclick="requestTabletGated()" style="position: relative;">
+            <span class="tile-icon">📱</span>
+            <div class="tile-title">Studio Tablet &amp; Stylus</div>
+            <div class="tile-desc">Want to use the design tools properly? Request a tablet and stylus for your table.</div>
+            <span style="position:absolute; top:14px; right:16px; background:rgba(255,255,255,0.25); font-size:10px; font-weight:700; padding:3px 9px; border-radius:20px;">£3</span>
+          </button>
+
           <button class="tile tile-oxblood" onclick="openMyBookings()">
             <span class="tile-icon">📅</span>
             <div class="tile-title">My Bookings</div>
@@ -1921,13 +1928,20 @@
 
     // ── Paid tools paywall — PROTOTYPE, for appraisal, not wired to real
     // payment processing yet. Colour Picker stays free; Design Preview and
-    // Transfer Designer are £1/visit each, tallied against the booking
-    // (checked at checkout), not charged directly through the app. ──
+    // Transfer Designer are £1/visit each; Studio Tablet & Stylus is a
+    // £3/visit equipment request (not a screen to open — confirming just
+    // shows a "staff will bring one over" message). All tallied against
+    // the booking, checked at checkout, not charged directly through the app. ──
     const PAID_TOOLS = {
       designPreview: { name: 'Design Preview', priceCents: 100, openFn: openDesignPreview },
-      transferDesigner: { name: 'Transfer Designer', priceCents: 100, openFn: openTransferDesigner }
+      transferDesigner: { name: 'Transfer Designer', priceCents: 100, openFn: openTransferDesigner },
+      tablet: { name: 'Studio Tablet & Stylus', priceCents: 300, openFn: showTabletRequestedConfirmation, isRequest: true }
     };
     let pendingPaidTool = null;
+
+    function showTabletRequestedConfirmation() {
+      alert('✅ Request sent! A member of staff will bring you a tablet and stylus shortly.');
+    }
 
     async function openPaidTool(toolKey) {
       const tool = PAID_TOOLS[toolKey];
@@ -1942,12 +1956,17 @@
         const res = await fetch(`${API_URL}/api/extras/unlocked?studioId=${STUDIO_ID}&bookingCode=${encodeURIComponent(bookingCode)}&itemName=${encodeURIComponent(tool.name)}`);
         const data = await res.json();
         if (data.unlocked) {
-          tool.openFn(); // already paid for this visit
+          if (tool.isRequest) {
+            alert('You\'ve already requested this — a staff member should be on their way!');
+          } else {
+            tool.openFn(); // already paid for this visit
+          }
         } else {
           pendingPaidTool = toolKey;
-          document.getElementById('ecm-title').textContent = `Unlock ${tool.name}`;
-          document.getElementById('ecm-body').innerHTML = `This tool is <strong>£${(tool.priceCents / 100).toFixed(2)} for your visit</strong> — added to your bill, no payment needed now.`;
-          document.getElementById('ecm-confirm-btn').textContent = `Unlock for £${(tool.priceCents / 100).toFixed(2)}`;
+          const verb = tool.isRequest ? 'Request' : 'Unlock';
+          document.getElementById('ecm-title').textContent = `${verb} ${tool.name}`;
+          document.getElementById('ecm-body').innerHTML = `This is <strong>£${(tool.priceCents / 100).toFixed(2)} for your visit</strong> — added to your bill, no payment needed now.`;
+          document.getElementById('ecm-confirm-btn').textContent = `${verb} for £${(tool.priceCents / 100).toFixed(2)}`;
           document.getElementById('extra-charge-modal').style.display = 'flex';
         }
       } catch (err) {
@@ -1958,6 +1977,7 @@
 
     function openTransferDesignerGated() { openPaidTool('transferDesigner'); }
     function openDesignPreviewGated() { openPaidTool('designPreview'); }
+    function requestTabletGated() { openPaidTool('tablet'); }
 
     function closeExtraChargeModal() {
       document.getElementById('extra-charge-modal').style.display = 'none';
@@ -1970,7 +1990,7 @@
       const bookingCode = window.currentBooking ? window.currentBooking.code : null;
       const btn = document.getElementById('ecm-confirm-btn');
       const originalLabel = btn.textContent;
-      btn.textContent = 'Unlocking…';
+      btn.textContent = tool.isRequest ? 'Sending…' : 'Unlocking…';
       btn.disabled = true;
 
       try {
