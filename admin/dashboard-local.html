@@ -3991,7 +3991,7 @@ function drawSplashArrows() {
   const archRect = kids[2].getBoundingClientRect();
   const archEntry = {
     x: (archRect.left - wordRect.left) + archRect.width * 0.5,
-    y: (archRect.bottom - wordRect.top) - archRect.height * 0.28
+    y: (archRect.bottom - wordRect.top) + 6
   };
   const kTop = pt(kids[3], 0.45, 'top');
 
