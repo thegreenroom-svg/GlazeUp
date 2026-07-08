@@ -1399,6 +1399,9 @@
             </div>
 
             <button class="btn-connect glaze-ocean" style="width: 100%; margin-top: 12px;" onclick="showCustomerQRFromResult()">📱 Show Customer QR</button>
+            <button class="till-tile glaze-ocean" style="width: 100%; min-height: 52px; margin-top: 8px;" onclick="openCustomerAppDirect()">
+              <span class="till-tile-name">🔗 Open Customer App on This Device</span>
+            </button>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
               <input type="text" id="s1-table-number" placeholder="Table number">
@@ -1462,6 +1465,114 @@
             <div id="s2-orders-list"></div>
             <div id="s2-running-total" style="text-align: right; font-weight: bold; padding: 10px 0; font-size: 14px; border-top: 1px solid var(--gu-border); margin-top: 8px;"></div>
             <div style="font-size: 11px; color: var(--gu-dust); text-align: right;">Not yet sent to Square — for internal reference only</div>
+
+            <!-- ── Mayco Specialist Glazes: point-of-sale upsell panel ── -->
+            <details id="mayco-glazes-panel" style="margin-top: 16px; border-top: 1px solid var(--gu-border); padding-top: 14px;">
+              <summary style="cursor: pointer; font-size: 13px; font-weight: 700; color: var(--gu-accent); list-style: none; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                ✨ Mayco Specialist Glazes <span style="font-size: 11px; font-weight: 500; color: var(--gu-dust);">tap to browse →</span>
+              </summary>
+
+              <div style="font-size: 11px; color: var(--gu-dust); line-height: 1.5; margin-bottom: 14px;">
+                These are sold at the session — add them to the customer's bill above once they've chosen.
+              </div>
+
+              <!-- Jungle Gems / Crystal Glazes -->
+              <div style="margin-bottom: 18px;">
+                <div style="font-size: 12px; font-weight: 700; color: var(--gu-accent); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                  <span style="background: linear-gradient(135deg, #8B2FC9, #E040FB); color:#fff; font-size:10px; padding:2px 8px; border-radius:20px; font-weight:700;">Jungle Gems™</span>
+                  Crystal Glazes — "Art in a Jar"
+                </div>
+                <div style="font-size: 11px; color: var(--gu-dust); line-height: 1.5; margin-bottom: 10px; background: #f5f0f8; border-radius: 8px; padding: 8px 10px;">
+                  Glass frit crystals that <strong>bloom and burst into colour in the kiln</strong>. Brush 2–3 coats onto bisque. Don't apply clear glaze over. Crystals can run — keep away from the base. Each piece comes out unique. <em>Not recommended for food surfaces.</em>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                  ${[
+                    ['CG-785', 'Royal Fantasy', '#6B2DA8'],
+                    ['CG-974', "Bloomin' Blue", '#2979CC'],
+                    ['CG-717', 'Pistachio', '#7CB87C'],
+                    ['CG-756', 'Firecracker', '#E53935'],
+                    ['CG-962', 'Blue Azure', '#1565C0'],
+                    ['CG-780', 'Mystic Jade', '#00796B'],
+                    ['CG-798', 'Black Iris', '#1A1A2E'],
+                    ['CG-965', 'Mocha Marble', '#795548'],
+                    ['CG-718', 'Blue Caprice', '#4FC3F7'],
+                    ['CG-753', 'Sassy Orange', '#F57C00'],
+                    ['CG-964', 'Kaleidoscope', '#AA00FF'],
+                    ['CG-970', 'Masquerade', '#880E4F'],
+                    ['CG-1000', 'Mardi Gras', '#9C27B0'],
+                    ['CG-1001', 'Gogh Iris', '#5C6BC0'],
+                    ['CG-1002', 'Day Lily', '#F48FB1'],
+                    ['CG-1004', 'Berry Tart', '#AD1457'],
+                  ].map(([code, name, colour]) => `
+                    <button class="till-tile" style="min-height:auto; padding:10px; background:#fff9f0; border:1px solid var(--gu-border); flex-direction:row; gap:8px; justify-content:flex-start;" onclick="addMaycoGlaze('${code}', '${name.replace(/'/g,"\\'")}')">
+                      <div style="width:24px;height:24px;border-radius:50%;background:${colour};flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.15);"></div>
+                      <div style="text-align:left;">
+                        <div class="till-tile-name" style="font-size:12px; color:var(--gu-accent);">${name}</div>
+                        <div style="font-size:10px; color:var(--gu-dust); font-weight:500;">${code}</div>
+                      </div>
+                    </button>
+                  `).join('')}
+                </div>
+              </div>
+
+              <!-- Elements Glazes -->
+              <div style="margin-bottom: 18px;">
+                <div style="font-size: 12px; font-weight: 700; color: var(--gu-accent); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                  <span style="background: linear-gradient(135deg, #B87946, #E8A64C); color:#fff; font-size:10px; padding:2px 8px; border-radius:20px; font-weight:700;">Elements™</span>
+                  Moving, Reactive Glazes
+                </div>
+                <div style="font-size: 11px; color: var(--gu-dust); line-height: 1.5; margin-bottom: 10px; background: #fdf8f0; border-radius: 8px; padding: 8px 10px;">
+                  <strong>Flow and move in the kiln</strong>, revealing surprising colour shifts and breaking over texture. Layer with Stroke &amp; Coat for dramatic effects.
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                  ${[
+                    ['EL-101', 'Rainforest', '#2E7D32'],
+                    ['EL-102', 'Ocean', '#01579B'],
+                    ['EL-103', 'Sahara', '#E65100'],
+                    ['EL-104', 'Sedona', '#BF360C'],
+                    ['EL-105', 'Midnight', '#1A237E'],
+                    ['EL-106', 'Shale', '#546E7A'],
+                    ['EL-107', 'Sandstone', '#8D6E63'],
+                    ['EL-108', 'Copper', '#BF8040'],
+                  ].map(([code, name, colour]) => `
+                    <button class="till-tile" style="min-height:auto; padding:10px; background:#fff9f0; border:1px solid var(--gu-border); flex-direction:row; gap:8px; justify-content:flex-start;" onclick="addMaycoGlaze('${code}', '${name}')">
+                      <div style="width:24px;height:24px;border-radius:50%;background:${colour};flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.15);"></div>
+                      <div style="text-align:left;">
+                        <div class="till-tile-name" style="font-size:12px; color:var(--gu-accent);">${name}</div>
+                        <div style="font-size:10px; color:var(--gu-dust); font-weight:500;">${code}</div>
+                      </div>
+                    </button>
+                  `).join('')}
+                </div>
+              </div>
+
+              <!-- French Dimensions -->
+              <div>
+                <div style="font-size: 12px; font-weight: 700; color: var(--gu-accent); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                  <span style="background: linear-gradient(135deg, #1565C0, #42A5F5); color:#fff; font-size:10px; padding:2px 8px; border-radius:20px; font-weight:700;">French Dimensions™</span>
+                  Dimensional Texture Glaze
+                </div>
+                <div style="font-size: 11px; color: var(--gu-dust); line-height: 1.5; margin-bottom: 10px; background: #f0f4fa; border-radius: 8px; padding: 8px 10px;">
+                  Creates a <strong>raised, dimensional texture</strong> on the surface. Apply over Stroke &amp; Coat or directly to bisque. Excellent for borders, dots, and patterns.
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                  ${[
+                    ['FD-200', 'White', '#F5F5F5'],
+                    ['FD-201', 'Ivory', '#F5E6C8'],
+                    ['FD-202', 'Black', '#1A1A1A'],
+                    ['FD-203', 'Gold', '#C9A43A'],
+                  ].map(([code, name, colour]) => `
+                    <button class="till-tile" style="min-height:auto; padding:10px; background:#fff9f0; border:1px solid var(--gu-border); flex-direction:row; gap:8px; justify-content:flex-start;" onclick="addMaycoGlaze('${code}', '${name} Dimension')">
+                      <div style="width:24px;height:24px;border-radius:50%;background:${colour};flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.15);"></div>
+                      <div style="text-align:left;">
+                        <div class="till-tile-name" style="font-size:12px; color:var(--gu-accent);">${name} Dimension</div>
+                        <div style="font-size:10px; color:var(--gu-dust); font-weight:500;">${code}</div>
+                      </div>
+                    </button>
+                  `).join('')}
+                </div>
+              </div>
+            </details>
           </div>
         </div>
 
@@ -2098,6 +2209,9 @@
     <div id="cqr-code" style="display:flex; align-items:center; justify-content:center; min-height:220px; margin-bottom:14px;"></div>
     <div id="cqr-link" style="font-size:11px; color:var(--gu-dust); margin-bottom:14px; word-break:break-all;"></div>
     <div style="font-size:12px; color:var(--gu-dust); line-height:1.5; margin-bottom:18px;">Ask the customer to scan this with their phone camera. It opens their painting session with colour tools and their pieces.</div>
+    <button id="cqr-open-btn" class="till-tile glaze-ocean" style="width:100%; min-height:56px; margin-bottom:10px;">
+      <span class="till-tile-name">📱 Open Customer App on This Device</span>
+    </button>
     <button class="btn-connect" style="width:100%;" onclick="closeCustomerQR()">Done</button>
   </div>
 </div>
@@ -3323,6 +3437,12 @@ async function openTableSession() {
 
 // Show the QR immediately from the currently looked-up/created booking —
 // available before a table is even assigned, since the QR only needs a booking code
+function openCustomerAppDirect() {
+  if (!s1LookedUpBooking) { alert('Look up a booking first'); return; }
+  const url = `${API_URL}/app?booking=${encodeURIComponent(s1LookedUpBooking.bookingCode)}`;
+  window.open(url, '_blank');
+}
+
 function showCustomerQRFromResult() {
   if (!s1LookedUpBooking) {
     alert('Look up or create a booking first');
@@ -3355,11 +3475,12 @@ function showCustomerQR(bookingCode, customerName, tableNumber) {
   document.getElementById('cqr-heading').textContent = `Table ${tableNumber || ''} · ${firstName}`;
   const qrBox = document.getElementById('cqr-code');
 
-  // Generate the QR as a plain image via a dedicated QR image service —
-  // more reliable across devices/networks than a client-side JS library
   const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${encodeURIComponent(customerUrl)}`;
   qrBox.innerHTML = `<img src="${qrImageUrl}" width="240" height="240" alt="Scan to open your painting session" style="display:block; border-radius:8px;">`;
   document.getElementById('cqr-link').innerHTML = `Or open directly: <a href="${customerUrl}" target="_blank" style="color:var(--gu-primary);">${customerUrl}</a>`;
+
+  // Store the URL so the open button can use it
+  document.getElementById('cqr-open-btn').onclick = () => window.open(customerUrl, '_blank');
 
   modal.style.display = 'flex';
 }
@@ -3832,6 +3953,23 @@ async function refreshOrdersList(sessionId, prefix) {
     }
   } catch (err) {
     listEl.innerHTML = `<div style="padding: 8px; color: var(--gu-dust); font-size: 12px;">Could not load</div>`;
+  }
+}
+
+// Add a Mayco specialist glaze directly to the running bill
+function addMaycoGlaze(code, name) {
+  const itemNameEl = document.getElementById('s2-item-name');
+  const itemTypeEl = document.getElementById('s2-item-type');
+  if (!itemNameEl || !itemTypeEl) return;
+  // Pre-fill the manual entry fields and trigger the add
+  itemNameEl.value = `${name} (${code})`;
+  itemTypeEl.value = 'glaze';
+  addTableOrder();
+  // Flash the Mayco panel summary so staff see it was added
+  const panel = document.getElementById('mayco-glazes-panel');
+  if (panel) {
+    panel.style.background = '#e8f5e9';
+    setTimeout(() => { panel.style.background = ''; }, 600);
   }
 }
 
