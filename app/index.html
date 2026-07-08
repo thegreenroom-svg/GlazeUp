@@ -288,6 +288,11 @@
       font-size: 11px;
       font-weight: 500;
     }
+    .cp-swatch .cp-swatch-code {
+      color: rgba(255,255,255,0.5);
+      font-size: 10px;
+      margin-top: 1px;
+    }
     .cp-swatch .cp-fav-badge {
       position: absolute;
       top: 6px;
@@ -785,7 +790,7 @@
   <!-- Colour Picker: the studio's real glaze colours, browse + build a palette -->
   <div id="colour-picker-screen">
     <div class="dp-header">
-      <span class="dp-title">Colour Picker</span>
+      <span class="dp-title">Mayco Colour Picker</span>
       <button onclick="closeColourPicker()">✕ Close</button>
     </div>
     <div style="padding:14px 16px 0;">
@@ -794,7 +799,7 @@
         <button id="cp-tab-palette" class="cp-tab" onclick="switchColourTab('palette')">My Palette (<span id="cp-palette-count">0</span>)</button>
       </div>
       <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-bottom:14px; line-height:1.5;">
-        Colours shown are sampled from the studio's real glaze tile as a guide — always check the number on the physical bottle in-studio.
+        Real Mayco Stroke &amp; Coat® names and codes. On-screen shades are a close guide — fired colour can vary by kiln, so always check the number on the physical bottle in-studio.
       </div>
     </div>
     <div id="cp-browse-view" style="flex:1; overflow-y:auto; padding:0 16px 20px;">
@@ -1195,29 +1200,95 @@
       }
     }
 
-    // ── Colour Picker: real colours sampled from the studio's own glaze
-    // tile (Rosalie's instruction sheet), not a generic palette. Exact
-    // bottle numbers couldn't be reliably read from the photo, so these
-    // are shown as a browsing/inspiration guide rather than a precise
-    // lookup — customers should still check the number on the real bottle. ──
+    // ── Colour Picker: the real Mayco Stroke & Coat® range — the actual
+    // brand and product codes stocked in-studio (e.g. "SC-73 Candy Apple
+    // Red"), sourced from Mayco's own official colour listing. On-screen
+    // shades are a close approximation, not a spectrophotometer reading —
+    // Mayco's own literature notes fired colour varies by kiln/clay body,
+    // so always check the number on the physical bottle in-studio. ──
     const STUDIO_COLOURS = [
-      { hex: '#713a2e', name: 'Red 1' }, { hex: '#306cf5', name: 'Blue 1' },
-      { hex: '#591508', name: 'Deep Red' }, { hex: '#f93029', name: 'Red 2' },
-      { hex: '#f88501', name: 'Orange 1' }, { hex: '#78d705', name: 'Yellow' },
-      { hex: '#22534f', name: 'Deep Teal' }, { hex: '#d4b497', name: 'Orange 2' },
-      { hex: '#c38de7', name: 'Purple' }, { hex: '#581d76', name: 'Deep Purple' },
-      { hex: '#374e01', name: 'Deep Yellow' }, { hex: '#bad1c7', name: 'Pale Teal 1' },
-      { hex: '#c8d802', name: 'Gold 1' }, { hex: '#eac309', name: 'Gold 2' },
-      { hex: '#1e5778', name: 'Deep Sky Blue' }, { hex: '#467e0f', name: 'Deep Green' },
-      { hex: '#38bcf8', name: 'Sky Blue' }, { hex: '#e74224', name: 'Red 3' },
-      { hex: '#0523cb', name: 'Blue 2' }, { hex: '#0c1014', name: 'Coal Black' },
-      { hex: '#d366c2', name: 'Magenta' }, { hex: '#5b686b', name: 'Charcoal Grey' },
-      { hex: '#151aa4', name: 'Blue 3' }, { hex: '#a3edda', name: 'Pale Teal 2' },
-      { hex: '#9cc6f0', name: 'Pale Sky Blue' }, { hex: '#a6030c', name: 'Red 4' },
-      { hex: '#dee4d7', name: 'Pale Yellow' }, { hex: '#aedfbb', name: 'Pale Green' },
-      { hex: '#bb8705', name: 'Gold 3' }, { hex: '#e20e0c', name: 'Red 5' },
-      { hex: '#dd8eb2', name: 'Pink' }, { hex: '#8e6f57', name: 'Dusty Orange' },
-      { hex: '#f33d5a', name: 'Red 6' }, { hex: '#e8e40b', name: 'Gold 4' }
+      { hex: '#f5f0e6', name: 'Cotton Tail', code: 'SC-16' },
+      { hex: '#f0e6d2', name: 'Ivory Tower', code: 'SC-37' },
+      { hex: '#f5d020', name: 'Yella Bout It', code: 'SC-55' },
+      { hex: '#f7c948', name: 'Sunkissed', code: 'SC-6' },
+      { hex: '#f9e17a', name: 'Butter Me Up', code: 'SC-42' },
+      { hex: '#f9d423', name: 'Dandelion', code: 'SC-24' },
+      { hex: '#f4a13a', name: 'Cant-elope', code: 'SC-97' },
+      { hex: '#f6b98a', name: 'Just Peachy', code: 'SC-102' },
+      { hex: '#e8721f', name: 'Jack O\'Lantern', code: 'SC-23' },
+      { hex: '#eb7a1f', name: 'Orange-A-Peel', code: 'SC-75' },
+      { hex: '#f0862a', name: 'Orange Ya Happy', code: 'SC-50' },
+      { hex: '#f0836b', name: 'Melon-choly', code: 'SC-2' },
+      { hex: '#f27a63', name: 'Cutie Pie Coral', code: 'SC-89' },
+      { hex: '#e8437a', name: 'Tu Tu Tango', code: 'SC-88' },
+      { hex: '#c81e2c', name: 'Candy Apple Red', code: 'SC-73' },
+      { hex: '#d8331f', name: 'Hot Tamale', code: 'SC-74' },
+      { hex: '#a3162a', name: 'Ruby Slippers', code: 'SC-87' },
+      { hex: '#9c4a2e', name: 'Cinnamon Stix', code: 'SC-81' },
+      { hex: '#f2a8c0', name: 'Pink-A-Boo', code: 'SC-1' },
+      { hex: '#f0b8be', name: 'Makin Me Blush', code: 'SC-100' },
+      { hex: '#eb9fb8', name: 'Pink-A-Dot', code: 'SC-70' },
+      { hex: '#f3a9c4', name: 'Pinkie Swear', code: 'SC-95' },
+      { hex: '#e8799f', name: 'Cheeky Pinky', code: 'SC-17' },
+      { hex: '#d9738c', name: 'Rosey Posey', code: 'SC-18' },
+      { hex: '#5e1a2e', name: 'Wine About It', code: 'SC-3' },
+      { hex: '#2c4f9e', name: 'Blueberry Hill', code: 'SC-40' },
+      { hex: '#5b3a7a', name: 'Grapel', code: 'SC-13' },
+      { hex: '#9a5bb0', name: 'Orkid', code: 'SC-85' },
+      { hex: '#b39ddb', name: 'Lavendear', code: 'SC-103' },
+      { hex: '#6a3b96', name: 'Purple Haze', code: 'SC-53' },
+      { hex: '#4a2560', name: 'Grape Jelly', code: 'SC-72' },
+      { hex: '#7a3d99', name: 'Purple-Licious', code: 'SC-71' },
+      { hex: '#42225c', name: 'Fruit Of The Vine', code: 'SC-33' },
+      { hex: '#6e3f8f', name: 'Grape Expectations', code: 'SC-104' },
+      { hex: '#5b9bd5', name: 'My Blue Heaven', code: 'SC-45' },
+      { hex: '#7fc7c2', name: 'Seabreeze', code: 'SC-91' },
+      { hex: '#7b8fd6', name: 'Peri-Twinkle', code: 'SC-65' },
+      { hex: '#2f6fb0', name: 'Blue Dawn', code: 'SC-30' },
+      { hex: '#274b8f', name: 'The Blues', code: 'SC-31' },
+      { hex: '#3a6fb5', name: 'Blue Yonder', code: 'SC-11' },
+      { hex: '#3c5a8c', name: '501 Blues', code: 'SC-58' },
+      { hex: '#1c94a8', name: 'Cara-bein Blue', code: 'SC-76' },
+      { hex: '#345a8a', name: 'Moody Blue', code: 'SC-12' },
+      { hex: '#4fb8b0', name: 'Aqu-ward', code: 'SC-96' },
+      { hex: '#3c6e4f', name: 'Spruce It Up', code: 'SC-101' },
+      { hex: '#3c8f6e', name: 'Jaded', code: 'SC-9' },
+      { hex: '#2e8f9e', name: 'Blue Isle', code: 'SC-28' },
+      { hex: '#1f7d7a', name: 'Teal Next Time', code: 'SC-10' },
+      { hex: '#4a8f7e', name: 'Blue Grass', code: 'SC-29' },
+      { hex: '#1c3f6e', name: 'Bluebeard', code: 'SC-32' },
+      { hex: '#c8dca0', name: 'Honeydew List', code: 'SC-93' },
+      { hex: '#7bab4a', name: 'Lettuce Alone', code: 'SC-43' },
+      { hex: '#8dc63f', name: 'Leapin\' Lizard', code: 'SC-7' },
+      { hex: '#4f8f3a', name: 'Green Thumb', code: 'SC-26' },
+      { hex: '#6fae3e', name: 'Just Froggy', code: 'SC-8' },
+      { hex: '#2e7d3e', name: 'Irish Luck', code: 'SC-36' },
+      { hex: '#9fd83a', name: 'Glo-Worm', code: 'SC-77' },
+      { hex: '#c4e034', name: 'Lime Light', code: 'SC-78' },
+      { hex: '#a8c93a', name: 'Slime Time', code: 'SC-98' },
+      { hex: '#9ecb3f', name: 'Sour Apple', code: 'SC-27' },
+      { hex: '#5e8f4a', name: 'Toad-ily Green', code: 'SC-52' },
+      { hex: '#8fa878', name: 'It\'s Sage', code: 'SC-79' },
+      { hex: '#5e6b3e', name: 'Army Surplus', code: 'SC-39' },
+      { hex: '#f2e8d5', name: 'Old Lace', code: 'SC-86' },
+      { hex: '#f0dfc0', name: 'Vanilla Dip', code: 'SC-54' },
+      { hex: '#c9a877', name: 'Cashew Later', code: 'SC-20' },
+      { hex: '#b78a5e', name: 'Rawhide', code: 'SC-46' },
+      { hex: '#7a5230', name: 'Poo Bear', code: 'SC-51' },
+      { hex: '#c9752e', name: 'Tiger Tail', code: 'SC-5' },
+      { hex: '#6e4423', name: 'Crackerjack Brown', code: 'SC-25' },
+      { hex: '#a85a2e', name: 'Basketball', code: 'SC-80' },
+      { hex: '#5c3b23', name: 'Brown Cow', code: 'SC-41' },
+      { hex: '#c9a06a', name: 'Camel Back', code: 'SC-48' },
+      { hex: '#3c2718', name: 'Java Bean', code: 'SC-14' },
+      { hex: '#6e5233', name: 'Down To Earth', code: 'SC-34' },
+      { hex: '#5e3d24', name: 'Café Ole', code: 'SC-92' },
+      { hex: '#8a7d6e', name: 'Elephant Ears', code: 'SC-90' },
+      { hex: '#a89684', name: 'Tip Taupe', code: 'SC-83' },
+      { hex: '#a8adb0', name: 'Silver Lining', code: 'SC-60' },
+      { hex: '#7e8286', name: 'Gray Hare', code: 'SC-35' },
+      { hex: '#4a4a4a', name: 'Char-ming', code: 'SC-99' },
+      { hex: '#1a1a1a', name: 'Tuxedo', code: 'SC-15' }
     ];
 
     function getMyPalette() {
@@ -1255,24 +1326,30 @@
     function renderColourSwatches() {
       const grid = document.getElementById('cp-swatch-grid');
       const palette = getMyPalette();
-      grid.innerHTML = STUDIO_COLOURS.map(c => {
+      grid.innerHTML = STUDIO_COLOURS.map((c, i) => {
         const isFav = palette.some(p => p.hex === c.hex);
         return `
-          <div class="cp-swatch" onclick="toggleFavColour('${c.hex}', '${c.name}')">
+          <div class="cp-swatch" data-index="${i}" onclick="toggleFavColourByIndex(${i})">
             ${isFav ? '<span class="cp-fav-badge">❤️</span>' : ''}
             <div class="cp-swatch-color" style="background:${c.hex};"></div>
             <div class="cp-swatch-name">${c.name}</div>
+            <div class="cp-swatch-code">${c.code}</div>
           </div>
         `;
       }).join('');
     }
 
-    function toggleFavColour(hex, name) {
+    function toggleFavColourByIndex(i) {
+      const c = STUDIO_COLOURS[i];
+      toggleFavColour(c.hex, c.name, c.code);
+    }
+
+    function toggleFavColour(hex, name, code) {
       let palette = getMyPalette();
       if (palette.some(p => p.hex === hex)) {
         palette = palette.filter(p => p.hex !== hex);
       } else {
-        palette.push({ hex, name });
+        palette.push({ hex, name, code });
       }
       setMyPalette(palette);
       renderColourSwatches();
@@ -1285,13 +1362,21 @@
         listEl.innerHTML = `<div style="color:rgba(255,255,255,0.5); text-align:center; padding:30px; font-size:13px;">Tap the heart on any colour to save it here.</div>`;
         return;
       }
-      listEl.innerHTML = palette.map(c => `
+      listEl.innerHTML = palette.map((c, i) => `
         <div class="cp-palette-row">
           <div class="cp-swatch-color" style="background:${c.hex};"></div>
-          <div class="cp-name">${c.name}</div>
-          <button onclick="toggleFavColour('${c.hex}', '${c.name}'); renderMyPalette();">Remove</button>
+          <div class="cp-name">${c.name}${c.code ? ` <span style="opacity:0.55;">· ${c.code}</span>` : ''}</div>
+          <button onclick="removeFromPaletteByIndex(${i})">Remove</button>
         </div>
       `).join('');
+    }
+
+    function removeFromPaletteByIndex(i) {
+      const palette = getMyPalette();
+      palette.splice(i, 1);
+      setMyPalette(palette);
+      renderMyPalette();
+      renderColourSwatches();
     }
 
     function renderDpPalette() {
