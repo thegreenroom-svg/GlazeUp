@@ -2134,12 +2134,35 @@
     const PAID_TOOLS = {
       designPreview: { name: 'Design Preview', priceCents: 100, openFn: openDesignPreview },
       transferDesigner: { name: 'Transfer Designer', priceCents: 100, openFn: openTransferDesigner },
-      tablet: { name: 'Studio Tablet & Stylus', priceCents: 300, openFn: showTabletRequestedConfirmation, isRequest: true }
+      tablet: { name: 'Studio Tablet & Stylus', priceCents: 300, openFn: showTabletRequestedConfirmation, isRequest: true },
+      takeItHome: { name: 'Home Access — all design tools', priceCents: 500, openFn: afterHomeAccessGranted, isRequest: true, isHomeAccess: true }
     };
     let pendingPaidTool = null;
 
     function showTabletRequestedConfirmation() {
       alert('✅ Request sent! A member of staff will bring you a tablet and stylus shortly.');
+    }
+
+    // Called after home access is confirmed + charged
+    async function afterHomeAccessGranted() {
+      // Also hit the grant endpoint to set home_access_unlocked on the booking
+      const bookingCode = window.currentBooking?.code;
+      if (bookingCode) {
+        try {
+          await fetch(`${API_URL}/api/bookings/${encodeURIComponent(bookingCode)}/grant-home-access`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ studioId: STUDIO_ID })
+          });
+          // Update local state so the tile goes green immediately
+          if (window.currentBooking) window.currentBooking.homeAccessUnlocked = true;
+          updateHomeAccessTile();
+        } catch (err) {
+          console.error('Could not mark home access on booking:', err);
+        }
+      }
+      alert('✅ Home Access unlocked! All three design tools are now available on your device anytime.');
+      showTakeHomeOptions();
     }
 
     // Home Access tile — updates dynamically once the booking loads
@@ -2168,11 +2191,11 @@
 
     function openTakeItHome() {
       if (window.currentBooking?.homeAccessUnlocked) {
-        // Already unlocked — go straight to the useful bit: save a photo or browse
+        // Already unlocked — go straight to the useful bit
         showTakeHomeOptions();
       } else {
-        // Not unlocked — show the info / ask staff to add to bill
-        alert('🏠 Take It Home — £5\n\nUnlocks all three design tools (Colour Picker, Design Preview, Transfer Designer) on your phone 24/7.\n\nAlso lets you photograph any piece in the studio to design on at home, and reserve it for your next visit.\n\nAsk a member of staff to add it to your bill today.');
+        // Not yet — go through the proper paywall/tally system like all other paid items
+        openPaidTool('takeItHome');
       }
     }
 
@@ -2432,9 +2455,11 @@
         } else {
           pendingPaidTool = toolKey;
           const verb = tool.isRequest ? 'Request' : 'Unlock';
-          document.getElementById('ecm-title').textContent = `${verb} ${tool.name}`;
-          document.getElementById('ecm-body').innerHTML = `This is <strong>£${(tool.priceCents / 100).toFixed(2)} for your visit</strong> — added to your bill, no payment needed now.`;
-          document.getElementById('ecm-confirm-btn').textContent = `${verb} for £${(tool.priceCents / 100).toFixed(2)}`;
+          document.getElementById('ecm-title').textContent = tool.isHomeAccess ? 'Take It Home — £5' : `${verb} ${tool.name}`;
+          document.getElementById('ecm-body').innerHTML = tool.isHomeAccess
+            ? `Unlocks <strong>all three design tools</strong> on your own phone, 24/7 — Design Preview, Transfer Designer, and Colour Picker. Plus photo-save any piece to work on at home. <strong>£5 added to your bill today</strong>, no payment needed now.`
+            : `This is <strong>£${(tool.priceCents / 100).toFixed(2)} for your visit</strong> — added to your bill, no payment needed now.`;
+          document.getElementById('ecm-confirm-btn').textContent = tool.isHomeAccess ? 'Unlock Home Access — £5' : `${verb} for £${(tool.priceCents / 100).toFixed(2)}`;
           document.getElementById('extra-charge-modal').style.display = 'flex';
         }
       } catch (err) {
