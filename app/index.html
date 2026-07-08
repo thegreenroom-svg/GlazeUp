@@ -337,6 +337,143 @@
     .mb-card .mb-meta { color: rgba(255,255,255,0.6); font-size: 12px; margin-top: 3px; }
     .mb-empty { color: rgba(255,255,255,0.5); text-align: center; padding: 20px; font-size: 13px; }
 
+    /* ── Walkthrough overlay ── */
+    #wt-overlay {
+      position: fixed; inset: 0; z-index: 9000;
+      pointer-events: none;
+    }
+    #wt-backdrop {
+      position: absolute; inset: 0;
+      background: rgba(43,39,36,0.78);
+      backdrop-filter: blur(2px);
+      transition: opacity 0.3s;
+    }
+    #wt-spotlight {
+      position: absolute;
+      border-radius: 16px;
+      box-shadow: 0 0 0 9999px rgba(43,39,36,0.78);
+      transition: all 0.4s cubic-bezier(0.34,1.2,0.4,1);
+      pointer-events: none;
+    }
+    #wt-card {
+      position: absolute;
+      background: #fff;
+      border-radius: 20px;
+      padding: 20px 18px 16px;
+      max-width: 320px;
+      width: calc(100vw - 40px);
+      box-shadow: 0 12px 40px rgba(43,39,36,0.35);
+      pointer-events: all;
+      transition: all 0.35s cubic-bezier(0.34,1.2,0.4,1);
+    }
+    #wt-step-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--link-clay);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    #wt-title {
+      font-family: var(--gu-font-display);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--link-charcoal);
+      margin-bottom: 6px;
+      line-height: 1.25;
+    }
+    #wt-body {
+      font-size: 13px;
+      color: var(--gu-dust);
+      line-height: 1.55;
+      margin-bottom: 16px;
+    }
+    #wt-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    #wt-next-btn {
+      flex: 1;
+      background: var(--link-charcoal);
+      color: #fff;
+      border: none;
+      padding: 12px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    #wt-skip-btn {
+      background: none;
+      border: none;
+      color: var(--gu-dust);
+      font-size: 12px;
+      cursor: pointer;
+      padding: 8px;
+    }
+    #wt-dots {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+    .wt-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--link-stone);
+      transition: all 0.2s;
+    }
+    .wt-dot.active {
+      background: var(--link-clay);
+      width: 18px;
+      border-radius: 3px;
+    }
+    #wt-arrow {
+      position: absolute;
+      font-size: 28px;
+      animation: wt-bounce 1s ease-in-out infinite;
+      pointer-events: none;
+      transition: all 0.4s cubic-bezier(0.34,1.2,0.4,1);
+    }
+    @keyframes wt-bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    #wt-voice-btn {
+      background: none;
+      border: 1.5px solid var(--link-stone);
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 11px;
+      color: var(--gu-dust);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    #wt-voice-btn.speaking {
+      background: var(--link-clay);
+      color: #fff;
+      border-color: var(--link-clay);
+    }
+    /* Tour trigger button — shown on home screen */
+    #wt-trigger {
+      position: fixed;
+      bottom: 24px;
+      right: 16px;
+      z-index: 8000;
+      background: var(--link-charcoal);
+      color: #fff;
+      border: none;
+      border-radius: 24px;
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(43,39,36,0.3);
+      display: none;
+      gap: 6px;
+      align-items: center;
+    }
+
     .mkt-card {
       background: rgba(255,255,255,0.06);
       border-radius: 14px;
@@ -920,6 +1057,29 @@
   </style>
 </head>
 <body>
+
+  <!-- ── Walkthrough overlay: tap-through tour of the app ── -->
+  <div id="wt-overlay" style="display:none;">
+    <div id="wt-backdrop"></div>
+    <div id="wt-spotlight"></div>
+    <div id="wt-arrow">👇</div>
+    <div id="wt-card">
+      <div id="wt-step-label">Step 1 of 8</div>
+      <div id="wt-title">Welcome to kilnLINK</div>
+      <div id="wt-body">Your personal pottery studio companion. Let's take a quick tour!</div>
+      <div id="wt-actions">
+        <div id="wt-dots"></div>
+        <button id="wt-voice-btn" onclick="wtToggleVoice()">🔊 Read aloud</button>
+        <button id="wt-next-btn" onclick="wtNext()">Next →</button>
+      </div>
+      <button id="wt-skip-btn" onclick="wtEnd()">Skip tour</button>
+    </div>
+  </div>
+
+  <!-- Floating tour trigger — shown on home screen -->
+  <button id="wt-trigger" onclick="wtStart()" style="display:none;">
+    🎯 App Tour
+  </button>
 
   <div id="splash-screen">
     <div style="display:flex; align-items:baseline; justify-content:center; gap:0;">
@@ -1585,6 +1745,7 @@
         </div>`;
 
       updateHomeAccessTile();
+      wtShowTrigger();
     }
 
     function showMyQR() {
@@ -3464,6 +3625,254 @@
     function dpSaveUndoState() {
       dpUndoStack.push(dpPaintCtx.getImageData(0, 0, dpPaintCtx.canvas.width, dpPaintCtx.canvas.height));
       if (dpUndoStack.length > 20) dpUndoStack.shift();
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // APP WALKTHROUGH: tap-through tour with spotlight + voice
+    // ══════════════════════════════════════════════════════════
+
+    const WT_STEPS = [
+      {
+        title: 'Welcome to kilnLINK! 🎨',
+        body: 'Your personal pottery studio companion. This quick tour shows you everything you can do. Tap Next to begin — or Skip if you\'re already a pro!',
+        target: null,
+        arrow: null,
+        voice: 'Welcome to kiln LINK — your personal pottery studio companion. Let me show you around!'
+      },
+      {
+        title: 'Your Session',
+        body: 'This is your home screen. It shows everything linked to your visit today — pieces in progress, ready for collection, and all your tools.',
+        target: '.app-header',
+        arrow: 'down',
+        voice: 'This is your session home screen. Everything for your visit today is right here.'
+      },
+      {
+        title: '🎨 Colour Picker',
+        body: 'Browse all 82 real Mayco Stroke & Coat colours stocked in the studio — with their actual codes. Tap a colour to save it to your personal palette.',
+        target: '[onclick="openColourPicker()"]',
+        arrow: 'up',
+        voice: 'The Colour Picker shows all 82 real Mayco glazes stocked in the studio. Tap any colour to save it to your palette.'
+      },
+      {
+        title: '🖼️ Design Preview',
+        body: 'Photograph your bisque piece, then paint and preview colours directly on the photo before you commit. Save up to 10 designs to work on at home.',
+        target: '[onclick="openDesignPreviewGated()"]',
+        arrow: 'up',
+        voice: 'Design Preview lets you photograph your piece and try out colours on the actual photo before painting. You can save designs to work on at home too.'
+      },
+      {
+        title: '✨ Transfer Designer',
+        body: 'Design your own ceramic transfers — sketch, add text in different fonts, drop in motifs, and submit to staff for printing straight onto your piece.',
+        target: '[onclick="openTransferDesignerGated()"]',
+        arrow: 'up',
+        voice: 'Transfer Designer lets you create and submit designs for the studio\'s ceramic transfer printer. Sketch, add text, drop in shapes — then send it straight to staff.'
+      },
+      {
+        title: '🏠 Take It Home',
+        body: 'For £5, unlock all three design tools on your own phone forever — not just when you\'re in the studio. Design at home, browse stock, and reserve pieces for your next visit.',
+        target: '#home-access-tile',
+        arrow: 'up',
+        voice: 'For just five pounds, Take It Home unlocks all three design tools on your own device forever. Design at home, browse the studio catalogue, and reserve pieces anytime.'
+      },
+      {
+        title: '💬 Community',
+        body: 'See what other painters have been creating — in this studio and worldwide. Share your own finished pieces and create a branded card to post on Instagram or TikTok.',
+        target: '[onclick="openCommunityFeed()"]',
+        arrow: 'up',
+        voice: 'The Community feed shows finished pieces from painters here and worldwide. Share your work, like others\', and create a branded share card for Instagram or TikTok.'
+      },
+      {
+        title: '🎨 Design Marketplace',
+        body: 'Browse designs created by other customers and use them on your own piece. Or list your own Transfer Designer artwork for others to buy — you set the price.',
+        target: '[onclick="openMarketplace()"]',
+        arrow: 'up',
+        voice: 'The Design Marketplace lets you browse and buy other customers\' designs, or sell your own. A great way to get a stunning piece even if you\'re not sure what to paint.'
+      },
+      {
+        title: '📅 My Bookings',
+        body: 'See your past visits and anything coming up. You can also book a new session straight from the app.',
+        target: '[onclick="openMyBookings()"]',
+        arrow: 'up',
+        voice: 'My Bookings shows your visit history and upcoming sessions. You can even book a new session directly from here.'
+      },
+      {
+        title: 'You\'re all set! 🎉',
+        body: 'That\'s the full tour. Enjoy your session — and don\'t hesitate to ask a member of staff if you need anything. Happy painting!',
+        target: null,
+        arrow: null,
+        voice: 'That\'s the full tour! Enjoy your session at The Kiln Cafe, and happy painting!'
+      }
+    ];
+
+    let wtStep = 0;
+    let wtVoiceOn = false;
+    let wtSpeaking = false;
+
+    function wtStart() {
+      wtStep = 0;
+      document.getElementById('wt-trigger').style.display = 'none';
+      document.getElementById('wt-overlay').style.display = 'block';
+      wtRender();
+    }
+
+    function wtEnd() {
+      document.getElementById('wt-overlay').style.display = 'none';
+      document.getElementById('wt-spotlight').style.cssText = '';
+      document.getElementById('wt-arrow').style.display = 'none';
+      document.getElementById('wt-trigger').style.display = 'flex';
+      wtStopVoice();
+      // Remember they've done the tour
+      localStorage.setItem('wt_done', '1');
+    }
+
+    function wtNext() {
+      wtStopVoice();
+      wtStep++;
+      if (wtStep >= WT_STEPS.length) { wtEnd(); return; }
+      wtRender();
+    }
+
+    function wtRender() {
+      const step = WT_STEPS[wtStep];
+      const overlay = document.getElementById('wt-overlay');
+      const card = document.getElementById('wt-card');
+      const spotlight = document.getElementById('wt-spotlight');
+      const arrow = document.getElementById('wt-arrow');
+
+      // Update text
+      document.getElementById('wt-step-label').textContent = `Step ${wtStep + 1} of ${WT_STEPS.length}`;
+      document.getElementById('wt-title').textContent = step.title;
+      document.getElementById('wt-body').textContent = step.body;
+      document.getElementById('wt-next-btn').textContent =
+        wtStep === WT_STEPS.length - 1 ? 'Done ✓' : 'Next →';
+
+      // Progress dots
+      const dots = document.getElementById('wt-dots');
+      dots.innerHTML = WT_STEPS.map((_, i) =>
+        `<div class="wt-dot ${i === wtStep ? 'active' : ''}"></div>`
+      ).join('');
+
+      // Spotlight a real element
+      if (step.target) {
+        const el = document.querySelector(step.target);
+        if (el) {
+          const r = el.getBoundingClientRect();
+          const pad = 8;
+          spotlight.style.cssText = `
+            left: ${r.left - pad}px; top: ${r.top - pad}px;
+            width: ${r.width + pad * 2}px; height: ${r.height + pad * 2}px;
+            border-radius: 14px; position: absolute;
+            box-shadow: 0 0 0 9999px rgba(43,39,36,0.82);
+            border: 2px solid var(--link-clay);
+          `;
+          spotlight.style.display = 'block';
+
+          // Position arrow
+          arrow.style.display = 'block';
+          if (step.arrow === 'down') {
+            arrow.textContent = '👇';
+            arrow.style.cssText = `
+              left: ${r.left + r.width/2 - 16}px;
+              top: ${r.bottom + 10}px;
+              display: block; position: absolute; font-size: 28px;
+              animation: wt-bounce 1s ease-in-out infinite;
+            `;
+          } else {
+            arrow.textContent = '👆';
+            arrow.style.cssText = `
+              left: ${r.left + r.width/2 - 16}px;
+              top: ${r.top - 52}px;
+              display: block; position: absolute; font-size: 28px;
+              animation: wt-bounce 1s ease-in-out infinite;
+            `;
+          }
+
+          // Position card above or below the spotlight
+          const vp = window.innerHeight;
+          const cardH = 220;
+          if (r.top > vp / 2) {
+            // Target is lower half — card goes at top
+            card.style.cssText = `top: 20px; left: 50%; transform: translateX(-50%);`;
+          } else {
+            // Target is upper half — card goes at bottom
+            card.style.cssText = `bottom: 20px; left: 50%; transform: translateX(-50%);`;
+          }
+        } else {
+          wtCentreCard();
+          spotlight.style.display = 'none';
+          arrow.style.display = 'none';
+        }
+      } else {
+        spotlight.style.display = 'none';
+        arrow.style.display = 'none';
+        wtCentreCard();
+      }
+
+      // Auto-speak if voice is on
+      if (wtVoiceOn && step.voice) wtSpeak(step.voice);
+    }
+
+    function wtCentreCard() {
+      const card = document.getElementById('wt-card');
+      card.style.cssText = 'top: 50%; left: 50%; transform: translate(-50%, -50%);';
+    }
+
+    // ── Web Speech API voice ──
+    function wtToggleVoice() {
+      wtVoiceOn = !wtVoiceOn;
+      const btn = document.getElementById('wt-voice-btn');
+      btn.textContent = wtVoiceOn ? '🔊 Speaking…' : '🔊 Read aloud';
+      btn.classList.toggle('speaking', wtVoiceOn);
+      if (wtVoiceOn) {
+        wtSpeak(WT_STEPS[wtStep].voice);
+      } else {
+        wtStopVoice();
+      }
+    }
+
+    function wtSpeak(text) {
+      if (!window.speechSynthesis || !text) return;
+      wtStopVoice();
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.rate = 0.95;
+      utt.pitch = 1;
+      utt.lang = 'en-GB';
+      // Prefer a UK English voice if available
+      const voices = window.speechSynthesis.getVoices();
+      const ukVoice = voices.find(v => v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en'));
+      if (ukVoice) utt.voice = ukVoice;
+      utt.onstart = () => {
+        const btn = document.getElementById('wt-voice-btn');
+        if (btn) { btn.textContent = '🔊 Speaking…'; btn.classList.add('speaking'); }
+      };
+      utt.onend = () => {
+        const btn = document.getElementById('wt-voice-btn');
+        if (btn) { btn.textContent = '🔊 Read aloud'; btn.classList.remove('speaking'); }
+        wtSpeaking = false;
+      };
+      wtSpeaking = true;
+      window.speechSynthesis.speak(utt);
+    }
+
+    function wtStopVoice() {
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      wtSpeaking = false;
+    }
+
+    // Show the trigger button once the session loads
+    function wtShowTrigger() {
+      if (!localStorage.getItem('wt_done')) {
+        // First time — auto-start after a short delay
+        setTimeout(() => {
+          if (document.getElementById('wt-overlay').style.display === 'none' ||
+              document.getElementById('wt-overlay').style.display === '') {
+            document.getElementById('wt-trigger').style.display = 'flex';
+          }
+        }, 1500);
+      } else {
+        // Already done — just show the trigger in case they want it again
+        document.getElementById('wt-trigger').style.display = 'flex';
+      }
     }
 
     function dpUndo() {
