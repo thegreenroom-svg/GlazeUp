@@ -1194,10 +1194,19 @@
       window.addEventListener('touchend', end);
     }
 
-    // ── Splash screen: shown every time the app opens. Content loads
-    // silently underneath while it's displayed, so it's ready the moment
-    // the splash dismisses. No spinner, no progress bar — just a calm wait. ──
+    // ── Splash screen: shown on open, AND as a "resting" state whenever the
+    // app goes idle for a while — so a shared/left-open session settles back
+    // to the branded moment, with the animation genuinely replaying each
+    // time (not just re-shown statically). Re-inserting a fresh copy of the
+    // splash markup is the simplest reliable way to restart CSS animations. ──
+    const splashTemplate = document.getElementById('splash-screen').outerHTML;
     let splashDismissed = false;
+
+    function wireSplash() {
+      const el = document.getElementById('splash-screen');
+      if (el) el.addEventListener('click', dismissSplash);
+    }
+
     function dismissSplash() {
       if (splashDismissed) return;
       splashDismissed = true;
@@ -1206,7 +1215,26 @@
       setTimeout(() => { splash.remove(); }, 600);
     }
 
-    document.getElementById('splash-screen').addEventListener('click', dismissSplash);
+    function showSplash() {
+      if (document.getElementById('splash-screen')) return; // already showing
+      splashDismissed = false;
+      document.body.insertAdjacentHTML('afterbegin', splashTemplate);
+      wireSplash();
+    }
+
+    wireSplash();
+
+    // Idle detection: after a few minutes with no interaction, rest back on the splash
+    const IDLE_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
+    let idleTimer = null;
+    function resetIdleTimer() {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(showSplash, IDLE_TIMEOUT_MS);
+    }
+    ['touchstart', 'mousedown', 'keydown', 'scroll'].forEach(evt => {
+      document.addEventListener(evt, resetIdleTimer, { passive: true });
+    });
+    resetIdleTimer();
 
     init();
   </script>
