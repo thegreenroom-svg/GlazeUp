@@ -1174,6 +1174,29 @@
     </div>
   </div>
 
+  <!-- Take It Home — photo save modal: shown after paying, lets them
+       photograph a piece right now to design on later at home -->
+  <div id="take-home-photo-modal" style="display:none; position:fixed; inset:0; background:rgba(43,39,36,0.85); backdrop-filter:blur(6px); z-index:3100; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#fff; border-radius:16px; padding:22px; max-width:340px; width:100%; text-align:center;">
+      <div style="font-size:32px; margin-bottom:8px;">📷</div>
+      <div style="font-family:var(--gu-font-display); font-weight:700; font-size:17px; color:var(--gu-accent); margin-bottom:8px;">Save a Piece for Home</div>
+      <div style="font-size:13px; color:var(--gu-dust); line-height:1.5; margin-bottom:16px;">Photograph a piece in the studio now — it'll be saved in your Design Preview so you can work on it at home.</div>
+      <img id="thpm-preview" style="display:none; width:100%; border-radius:12px; margin-bottom:12px; max-height:200px; object-fit:cover;">
+      <div style="display:flex; gap:8px; margin-bottom:14px;">
+        <label style="flex:1; padding:12px; background:#f5f0ea; border:1px dashed var(--gu-border); border-radius:10px; text-align:center; cursor:pointer; font-size:13px; color:var(--gu-dust); font-weight:600;">
+          <input type="file" id="thpm-camera" accept="image/*" capture="environment" style="display:none;" onchange="handleTakeHomePhoto(event)">
+          📷 Take Photo
+        </label>
+        <label style="flex:1; padding:12px; background:#f5f0ea; border:1px dashed var(--gu-border); border-radius:10px; text-align:center; cursor:pointer; font-size:13px; color:var(--gu-dust); font-weight:600;">
+          <input type="file" id="thpm-library" accept="image/*" style="display:none;" onchange="handleTakeHomePhoto(event)">
+          🖼️ Choose
+        </label>
+      </div>
+      <button id="thpm-save-btn" onclick="saveTakeHomePhoto()" style="display:none; width:100%; background:var(--link-charcoal); color:#fff; border:none; padding:13px; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; margin-bottom:8px;">💾 Save for Home</button>
+      <button onclick="closeTakeHomePhotoModal()" style="width:100%; background:none; color:var(--gu-dust); border:none; padding:10px; font-size:13px; cursor:pointer;">Maybe Later</button>
+    </div>
+  </div>
+
   <div id="extra-charge-modal" style="display:none; position:fixed; inset:0; background:rgba(43,39,36,0.7); backdrop-filter:blur(4px); z-index:3000; align-items:center; justify-content:center; padding:20px;">
     <div style="background:#fff; border-radius:16px; padding:22px; max-width:320px; width:100%; text-align:center;">
       <div style="font-size:32px; margin-bottom:8px;">✨</div>
@@ -1367,7 +1390,7 @@
         name: b.customerName || firstName,
         homeAccessUnlocked: b.homeAccessUnlocked || false
       };
-      updateHomeAccessTile();
+      // updateHomeAccessTile() called below, after root.innerHTML is set
 
       const readyPieces = data.piecesReadyForPickup || [];
       const readyBanner = readyPieces.length > 0
@@ -1433,30 +1456,21 @@
 
           <div class="section-label">Design tools</div>
 
-          <!-- Browse & Design — the flashy one. Animated shimmer, stands out. -->
-          <button class="tile" onclick="openBrowseDesign()" id="browse-design-tile" style="
+          <!-- Combined "Take It Home" tile — unlocks all three tools AND
+               offers to save a piece photo to design on at home. Animates
+               to stand out. Dynamically updated once booking loads. -->
+          <button class="tile" onclick="openTakeItHome()" id="home-access-tile" style="
             position: relative; overflow: hidden;
             background: linear-gradient(135deg, #1a0a3d 0%, #2d1065 50%, #1a0a3d 100%);
             border: 1.5px solid rgba(184,121,70,0.5);
             animation: browse-pulse 3s ease-in-out infinite;
           ">
-            <span class="tile-icon" style="font-size:28px;">✨</span>
-            <div class="tile-title" style="color:#fff;">Browse &amp; Design at Home</div>
-            <div class="tile-desc" style="color:rgba(255,255,255,0.75);">See what's in the studio right now. Design on a real photo of the piece — then reserve it for your next visit.</div>
-            <span style="position:absolute; top:14px; right:16px; background:var(--link-clay); font-size:10px; font-weight:700; padding:3px 9px; border-radius:20px; color:#fff; letter-spacing:0.03em;">NEW</span>
-            <div id="browse-shimmer" style="position:absolute; inset:0; background:linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%); animation: browse-shimmer 2.5s ease-in-out infinite;"></div>
+            <span class="tile-icon" style="font-size:28px;" id="home-access-icon">🏠</span>
+            <div class="tile-title" style="color:#fff;" id="home-access-title">Take It Home</div>
+            <div class="tile-desc" style="color:rgba(255,255,255,0.75);" id="home-access-desc">Unlock all three design tools on your own device, 24/7. Photograph a piece to design on at home — then reserve it for your next visit.</div>
+            <span id="home-access-badge" style="position:absolute; top:14px; right:16px; background:var(--link-clay); font-size:10px; font-weight:700; padding:3px 9px; border-radius:20px; color:#fff; letter-spacing:0.03em;">£5</span>
+            <div style="position:absolute; inset:0; background:linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%); animation: browse-shimmer 2.5s ease-in-out infinite;" id="home-access-shimmer"></div>
           </button>
-
-          <!-- Home Access tile — shown to everyone, dynamically updated once
-               booking loads to reflect whether they've already purchased it -->
-          <div id="home-access-tile-wrap">
-            <button class="tile tile-charcoal" onclick="showHomeAccessInfo()" id="home-access-tile" style="position:relative; background: linear-gradient(135deg, var(--link-charcoal) 0%, #3d342f 100%);">
-              <span class="tile-icon">🏠</span>
-              <div class="tile-title">Take It Home</div>
-              <div class="tile-desc">Unlock all three design tools on your own device, 24/7 — ask staff to add it to your bill.</div>
-              <span id="home-access-badge" style="position:absolute; top:14px; right:16px; background:var(--link-clay); font-size:10px; font-weight:700; padding:3px 9px; border-radius:20px; color:#fff;">£5</span>
-            </button>
-          </div>
 
           <button class="tile tile-ocean" onclick="openColourPicker()">
             <span class="tile-icon">🎨</span>
@@ -1489,6 +1503,8 @@
             <button onclick="closeMyQR()" style="width:100%; background:var(--glaze-oxblood-base); color:#fff; border:none; padding:12px; border-radius:14px; font-weight:600; cursor:pointer;">Done</button>
           </div>
         </div>`;
+
+      updateHomeAccessTile();
     }
 
     function showMyQR() {
@@ -2127,27 +2143,106 @@
     }
 
     // Home Access tile — updates dynamically once the booking loads
+    // ── Combined "Take It Home" tile: one entry point for both the £5
+    // home-access unlock AND the photo-save feature. If already unlocked,
+    // goes straight to the photo-save + browse flow. ──
+
     function updateHomeAccessTile() {
       const tile = document.getElementById('home-access-tile');
       const badge = document.getElementById('home-access-badge');
+      const shimmer = document.getElementById('home-access-shimmer');
       if (!tile || !badge) return;
 
       if (window.currentBooking?.homeAccessUnlocked) {
         tile.style.background = 'linear-gradient(135deg, #2f6b3a 0%, #1e4a28 100%)';
+        tile.style.borderColor = 'rgba(100,200,100,0.4)';
+        tile.style.animation = 'none';
+        if (shimmer) shimmer.style.display = 'none';
         badge.textContent = '✓ Active';
         badge.style.background = 'rgba(255,255,255,0.25)';
-        tile.querySelector('.tile-title').textContent = 'Home Access Active';
-        tile.querySelector('.tile-desc').textContent = 'All three design tools are unlocked on this device, forever. Design anytime, anywhere.';
-        tile.onclick = null; // already unlocked, no action needed
+        document.getElementById('home-access-icon').textContent = '✅';
+        document.getElementById('home-access-title').textContent = 'Design at Home';
+        document.getElementById('home-access-desc').textContent = 'Your tools are unlocked. Save a photo of any piece to design on at home — or browse the full studio catalogue.';
       }
     }
 
-    function showHomeAccessInfo() {
-      alert('🏠 Take It Home — £5\n\nUnlocks all three design tools (Colour Picker, Design Preview, Transfer Designer) on your own phone or tablet, 24/7 — not just when you\'re in the studio.\n\nAsk a member of staff to add it to your bill today.');
+    function openTakeItHome() {
+      if (window.currentBooking?.homeAccessUnlocked) {
+        // Already unlocked — go straight to the useful bit: save a photo or browse
+        showTakeHomeOptions();
+      } else {
+        // Not unlocked — show the info / ask staff to add to bill
+        alert('🏠 Take It Home — £5\n\nUnlocks all three design tools (Colour Picker, Design Preview, Transfer Designer) on your phone 24/7.\n\nAlso lets you photograph any piece in the studio to design on at home, and reserve it for your next visit.\n\nAsk a member of staff to add it to your bill today.');
+      }
     }
 
-    // ── Browse & Design: see real studio stock photos, sketch a design
-    // on them, and/or reserve a piece for your next visit. ──
+    function showTakeHomeOptions() {
+      // Two quick actions: take a photo now, or open the browse catalogue
+      const choice = confirm('What would you like to do?\n\nOK — 📷 Photograph a piece to design at home\nCancel — ✨ Browse the studio catalogue');
+      if (choice) {
+        openTakeHomePhotoModal();
+      } else {
+        openBrowseDesign();
+      }
+    }
+
+    // Take-home photo modal: photograph a piece right now, saves into
+    // Design Preview's saved-designs tray for later use at home
+    let thpmPhotoData = null;
+
+    function openTakeHomePhotoModal() {
+      thpmPhotoData = null;
+      document.getElementById('thpm-preview').style.display = 'none';
+      document.getElementById('thpm-save-btn').style.display = 'none';
+      document.getElementById('take-home-photo-modal').style.display = 'flex';
+    }
+    function closeTakeHomePhotoModal() {
+      document.getElementById('take-home-photo-modal').style.display = 'none';
+      thpmPhotoData = null;
+    }
+
+    function handleTakeHomePhoto(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        thpmPhotoData = e.target.result;
+        const preview = document.getElementById('thpm-preview');
+        preview.src = thpmPhotoData;
+        preview.style.display = 'block';
+        document.getElementById('thpm-save-btn').style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function saveTakeHomePhoto() {
+      if (!thpmPhotoData) return;
+      // Compress to a thumbnail and save into the Design Preview saved-designs tray
+      const img = new Image();
+      img.onload = () => {
+        const thumb = document.createElement('canvas');
+        const maxSide = 480;
+        const scale = Math.min(maxSide / img.width, maxSide / img.height, 1);
+        thumb.width = Math.round(img.width * scale);
+        thumb.height = Math.round(img.height * scale);
+        thumb.getContext('2d').drawImage(img, 0, 0, thumb.width, thumb.height);
+
+        const saved = dpGetSaved();
+        if (saved.length >= DP_MAX_SAVED) {
+          alert(`You've got ${DP_MAX_SAVED} saved designs already — open Design Preview and delete one first.`);
+          closeTakeHomePhotoModal();
+          return;
+        }
+        const entry = { id: Date.now(), imageData: thumb.toDataURL('image/jpeg', 0.7), savedAt: new Date().toISOString() };
+        saved.unshift(entry);
+        dpPutSaved(saved);
+        closeTakeHomePhotoModal();
+        alert('✅ Saved! Open Design Preview at home to find it in your saved designs and start painting on it.');
+      };
+      img.src = thpmPhotoData;
+    }
+
+    // ── Browse studio catalogue (accessible from the combined tile once unlocked) ──
     let bdAllStock = [];
     let bdFilterCategory = 'All';
     let bdSelectedPiece = null;
