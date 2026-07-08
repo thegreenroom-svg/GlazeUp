@@ -2863,6 +2863,15 @@ app.listen(port, () => {
   console.log(`  Square OAuth: ${process.env.SQUARE_CLIENT_ID ? '✓' : '✗'}`);
   console.log(`  Stripe: ${process.env.STRIPE_SECRET_KEY ? '✓' : '✗'}`);
   console.log(`  Supabase: ${process.env.SUPABASE_URL ? '✓' : '✗'}`);
+
+  // Keep-alive: ping ourselves every 14 minutes so Render's free tier
+  // never spins down (it sleeps after 15 minutes of inactivity).
+  // This means the app is always instant to load — no cold-start delay.
+  const SELF_URL = process.env.API_URL || `http://localhost:${port}`;
+  setInterval(() => {
+    const http = SELF_URL.startsWith('https') ? require('https') : require('http');
+    http.get(`${SELF_URL}/health`, () => {}).on('error', () => {});
+  }, 14 * 60 * 1000); // every 14 minutes
 });
 
 module.exports = app;
