@@ -267,6 +267,7 @@
     }
 
     .splash-word {
+      position: relative;
       display: flex;
       align-items: baseline;
       justify-content: center;
@@ -358,7 +359,7 @@
       color: var(--link-clay);
       opacity: 0;
       animation: splashLineFadeUp 0.6s ease forwards;
-      animation-delay: 2.7s;
+      animation-delay: 6.0s;
     }
 
     .splash-tagline {
@@ -369,7 +370,7 @@
       color: rgba(255,255,255,0.75);
       opacity: 0;
       animation: splashLineFadeUp 0.6s ease forwards;
-      animation-delay: 2.9s;
+      animation-delay: 6.2s;
     }
     .splash-endorsement {
       margin-top: 22px;
@@ -379,7 +380,7 @@
       color: rgba(255,255,255,0.4);
       opacity: 0;
       animation: splashLineFadeUp 0.6s ease forwards;
-      animation-delay: 3.1s;
+      animation-delay: 6.4s;
     }
     @keyframes splashLineFadeUp {
       from { opacity: 0; transform: translateY(8px); }
@@ -396,7 +397,44 @@
       color: rgba(255,255,255,0.45);
       opacity: 0;
       animation: splashLineFadeUp 0.6s ease forwards;
-      animation-delay: 3.4s;
+      animation-delay: 6.7s;
+    }
+
+    /* ── Animated arrow motif — splash only. Traces K, over the kiln, to I,
+       to L, then dips back into the kiln for a final stop. Matches the
+       flowing arrow motif from thekilncafe.com. Drawn with real measured
+       coordinates (see drawSplashArrows in JS) so it lines up exactly
+       with the rendered letters regardless of layout. ── */
+    #splash-arrow-overlay {
+      position: absolute;
+      pointer-events: none;
+      overflow: visible;
+    }
+    .splash-arrow-path {
+      fill: none;
+      stroke: #B87946;
+      stroke-width: 3;
+      stroke-linecap: round;
+      opacity: 0;
+    }
+    .splash-arrow-path.drawing {
+      opacity: 1;
+      animation: splashArrowDraw 0.9s cubic-bezier(0.65,0,0.35,1) forwards;
+    }
+    @keyframes splashArrowDraw {
+      from { stroke-dashoffset: var(--len); }
+      to { stroke-dashoffset: 0; }
+    }
+    .splash-flame {
+      opacity: 0;
+      transform: scale(0.6) translateY(4px);
+      transform-origin: center bottom;
+    }
+    .splash-flame.showing {
+      animation: splashFlameIn 0.5s ease forwards;
+    }
+    @keyframes splashFlameIn {
+      to { opacity: 1; transform: scale(1) translateY(0); }
     }
     @media (prefers-reduced-motion: reduce) {
       #splash-screen, #splash-screen.fading-out { animation: none; opacity: 1; }
@@ -404,6 +442,7 @@
         animation: none; opacity: 1; transform: none;
       }
       .n-flip-inner { animation: none; }
+      .splash-arrow-path, .splash-flame { animation: none; opacity: 1; }
     }
 
     .dp-header {
@@ -1205,6 +1244,108 @@
     function wireSplash() {
       const el = document.getElementById('splash-screen');
       if (el) el.addEventListener('click', dismissSplash);
+      requestAnimationFrame(() => requestAnimationFrame(drawSplashArrows));
+    }
+
+    // Animated arrow motif (splash only) — traces K, over the kiln, to I,
+    // to L, then dips back into the kiln for a final stop. Positions are
+    // measured from the REAL rendered letters (not hand-guessed coordinates)
+    // so it lines up exactly regardless of layout.
+    function drawSplashArrows() {
+      const wordEl = document.querySelector('.splash-word');
+      if (!wordEl) return;
+      const kids = wordEl.children; // [L, I, n-flip-stage(arch), K]
+      if (kids.length < 4) return;
+
+      const wordRect = wordEl.getBoundingClientRect();
+      const pt = (el, xFrac, yEdge) => {
+        const r = el.getBoundingClientRect();
+        return {
+          x: (r.left - wordRect.left) + r.width * xFrac,
+          y: (r[yEdge] - wordRect.top)
+        };
+      };
+
+      const lTop = pt(kids[0], 0.5, 'top');
+      const lBottom = pt(kids[0], 0.5, 'bottom');
+      const iTop = pt(kids[1], 0.5, 'top');
+      const archTop = pt(kids[2], 0.5, 'top');
+      const archRect = kids[2].getBoundingClientRect();
+      const archEntry = {
+        x: (archRect.left - wordRect.left) + archRect.width * 0.5,
+        y: (archRect.bottom - wordRect.top) - archRect.height * 0.28
+      };
+      const kTop = pt(kids[3], 0.45, 'top');
+
+      const svgNS = 'http://www.w3.org/2000/svg';
+      const overlay = document.createElementNS(svgNS, 'svg');
+      overlay.id = 'splash-arrow-overlay';
+      overlay.setAttribute('viewBox', `0 0 ${wordRect.width} ${wordRect.height}`);
+      overlay.style.width = wordRect.width + 'px';
+      overlay.style.height = wordRect.height + 'px';
+      overlay.style.top = '0';
+      overlay.style.left = '0';
+
+      const defs = document.createElementNS(svgNS, 'defs');
+      const marker = document.createElementNS(svgNS, 'marker');
+      marker.id = 'splashArrowhead';
+      marker.setAttribute('markerWidth', '8');
+      marker.setAttribute('markerHeight', '8');
+      marker.setAttribute('refX', '4');
+      marker.setAttribute('refY', '4');
+      marker.setAttribute('orient', 'auto');
+      const arrowShape = document.createElementNS(svgNS, 'path');
+      arrowShape.setAttribute('d', 'M0,0 L8,4 L0,8 Z');
+      arrowShape.setAttribute('fill', '#B87946');
+      marker.appendChild(arrowShape);
+      defs.appendChild(marker);
+      overlay.appendChild(defs);
+
+      const arcAbove = (from, to, liftAbove) => {
+        const midY = Math.min(from.y, to.y) - liftAbove;
+        return `M ${from.x},${from.y} C ${from.x},${midY} ${to.x},${midY} ${to.x},${to.y}`;
+      };
+      const dipBelow = (from, to, dropBelow) => {
+        const midY = Math.max(from.y, to.y) + dropBelow;
+        return `M ${from.x},${from.y} C ${from.x},${midY} ${to.x},${midY} ${to.x},${to.y}`;
+      };
+
+      const pathDefs = [
+        arcAbove(kTop, iTop, wordRect.height * 0.55),   // K -> over the kiln -> I
+        arcAbove(iTop, lTop, wordRect.height * 0.28),   // I -> L
+        dipBelow(lBottom, archEntry, wordRect.height * 0.35) // L -> into the kiln, final stop
+      ];
+
+      const paths = pathDefs.map(d => {
+        const p = document.createElementNS(svgNS, 'path');
+        p.setAttribute('d', d);
+        p.setAttribute('class', 'splash-arrow-path');
+        p.setAttribute('marker-end', 'url(#splashArrowhead)');
+        overlay.appendChild(p);
+        const len = p.getTotalLength();
+        p.style.setProperty('--len', len);
+        p.style.strokeDasharray = len;
+        p.style.strokeDashoffset = len;
+        return p;
+      });
+
+      // Small flame above the kiln, shown once the arrows finish
+      const flame = document.createElementNS(svgNS, 'g');
+      flame.setAttribute('class', 'splash-flame');
+      flame.setAttribute('transform', `translate(${archTop.x - 12}, ${archTop.y - 30})`);
+      const flamePath = document.createElementNS(svgNS, 'path');
+      flamePath.setAttribute('d', 'M12,26 C5,18 7,8 12,2 C14,9 18,11 17,18 C22,15 23,9 20,4 C27,10 27,20 19,26 C23,24 25,20 25,15 C28,21 25,27 19,29 C11,31 8,26 12,26 Z');
+      flamePath.setAttribute('fill', '#E8874A');
+      flame.appendChild(flamePath);
+      overlay.appendChild(flame);
+
+      wordEl.appendChild(overlay);
+
+      // Sequence: arrow 1, arrow 2, arrow 3, then the flame
+      setTimeout(() => paths[0].classList.add('drawing'), 2700);
+      setTimeout(() => paths[1].classList.add('drawing'), 3700);
+      setTimeout(() => paths[2].classList.add('drawing'), 4400);
+      setTimeout(() => flame.classList.add('showing'), 5300);
     }
 
     function dismissSplash() {
