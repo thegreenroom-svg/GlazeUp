@@ -335,62 +335,13 @@
     }
     .splash-letter:nth-child(1) { animation-delay: 0.15s; }
     .splash-letter:nth-child(2) { animation-delay: 0.28s; }
+    .splash-letter:nth-child(3) { animation-delay: 0.41s; }
     .splash-letter:nth-child(4) { animation-delay: 0.54s; }
 
     @keyframes letterSpinIn {
       0% { opacity: 0; transform: rotate(-280deg) scale(0.25) translateY(30px); }
       65% { opacity: 1; transform: rotate(14deg) scale(1.08) translateY(0); }
       100% { opacity: 1; transform: rotate(0deg) scale(1) translateY(0); }
-    }
-
-    /* ── The N is secretly the link: reads as the arch from the KILN mark,
-       but shortly after landing it does a quiet 3D flip — revealing an
-       interlocking chain-link glyph on its hidden "back face" for a
-       moment, then continues rotating back to the arch. A real flip
-       (CSS 3D + backface-visibility), not a fake crossfade, so it holds
-       up on close inspection the way restrained motion on Apple/Linear/
-       Arc/Notion does. ── */
-    .n-flip-stage {
-      display: inline-block;
-      opacity: 0;
-      animation: letterSpinIn 0.85s cubic-bezier(0.34, 1.4, 0.4, 1) forwards;
-      animation-delay: 0.41s;
-      -webkit-perspective: 300px;
-      perspective: 300px;
-    }
-    .n-flip-inner {
-      position: relative;
-      width: 0.65em;
-      height: 1em;
-      -webkit-transform-style: preserve-3d;
-      transform-style: preserve-3d;
-      animation: nFlipReveal 1s cubic-bezier(0.65, 0, 0.35, 1) forwards;
-      animation-delay: 1.55s;
-    }
-    .n-face {
-      position: absolute;
-      inset: 0;
-      -webkit-backface-visibility: hidden;
-      backface-visibility: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .n-face-front svg {
-      height: 1em;
-      width: auto;
-    }
-    .n-face-back {
-      -webkit-transform: rotateY(180deg);
-      transform: rotateY(180deg);
-    }
-    .n-face-back svg {
-      width: 78%;
-      height: 78%;
-    }
-    @keyframes nFlipReveal {
-      0%   { -webkit-transform: rotateY(0deg); transform: rotateY(0deg); }
-      100% { -webkit-transform: rotateY(360deg); transform: rotateY(360deg); }
     }
 
     .splash-strapline {
@@ -481,10 +432,9 @@
     }
     @media (prefers-reduced-motion: reduce) {
       #splash-screen, #splash-screen.fading-out { animation: none; opacity: 1; }
-      .splash-letter, .splash-strapline, .splash-tagline, .splash-endorsement, .splash-hint, .n-flip-stage {
+      .splash-letter, .splash-strapline, .splash-tagline, .splash-endorsement, .splash-hint {
         animation: none; opacity: 1; transform: none;
       }
-      .n-flip-inner { animation: none; }
       .splash-arrow-path, .splash-flame { animation: none; opacity: 1; }
     }
 
@@ -662,19 +612,7 @@
 
   <div id="splash-screen">
     <div class="splash-word">
-      <span class="splash-letter"><svg viewBox="0 0 58 80" aria-hidden="true"><path d="M4.00,76.00 L4.00,4.00 L19.41,4.00 L19.41,76.00 L4.00,76.00 Z M11.20,76.00 L11.20,64.20 L54.00,64.20 L54.00,76.00 L11.20,76.00 Z" fill="#fff"/></svg></span><span class="splash-letter"><svg viewBox="0 0 23.4 80" aria-hidden="true"><path d="M4.00,76.00 L4.00,4.00 L19.41,4.00 L19.41,76.00 L4.00,76.00 Z" fill="#fff"/></svg></span><span class="n-flip-stage"><span class="n-flip-inner">
-        <span class="n-face n-face-front">
-          <svg viewBox="-10 -10 72 92" aria-hidden="true">
-            <path d="M 4,72 L 10,72 L 10,30 C 10,10 18,2 28,2 C 38,2 46,10 46,30 L 46,72 L 52,72" fill="none" stroke="#B87946" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </span>
-        <span class="n-face n-face-back">
-          <svg viewBox="0 0 62 100" aria-hidden="true">
-            <rect x="6" y="4" width="50" height="52" rx="25" fill="none" stroke="#ffffff" stroke-width="11"/>
-            <rect x="6" y="44" width="50" height="52" rx="25" fill="none" stroke="#B87946" stroke-width="11"/>
-          </svg>
-        </span>
-      </span></span><span class="splash-letter"><svg viewBox="0 0 73.4 80" aria-hidden="true"><path d="M4.00,76.00 L4.00,4.00 L19.41,4.00 L19.41,76.00 L4.00,76.00 Z M14.50,38.59 L46.91,4.00 L67.41,4.00 L33.20,38.59 L14.50,38.59 Z M48.50,76.00 L14.30,38.59 L33.20,38.59 L69.41,76.00 L48.50,76.00 Z" fill="#fff"/></svg></span>
+      <span class="splash-letter"><svg viewBox="0 0 58 80" aria-hidden="true"><path d="M4.00,76.00 L4.00,4.00 L19.41,4.00 L19.41,76.00 L4.00,76.00 Z M11.20,76.00 L11.20,64.20 L54.00,64.20 L54.00,76.00 L11.20,76.00 Z" fill="#fff"/></svg></span><span class="splash-letter"><svg viewBox="0 0 23.4 80" aria-hidden="true"><path d="M4.00,76.00 L4.00,4.00 L19.41,4.00 L19.41,76.00 L4.00,76.00 Z" fill="#fff"/></svg></span><span class="splash-letter"><svg viewBox="-10 -10 72 92" aria-hidden="true"><path d="M 4,72 L 10,72 L 10,30 C 10,10 18,2 28,2 C 38,2 46,10 46,30 L 46,72 L 52,72" fill="none" stroke="#B87946" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="splash-letter"><svg viewBox="0 0 73.4 80" aria-hidden="true"><path d="M4.00,76.00 L4.00,4.00 L19.41,4.00 L19.41,76.00 L4.00,76.00 Z M14.50,38.59 L46.91,4.00 L67.41,4.00 L33.20,38.59 L14.50,38.59 Z M48.50,76.00 L14.30,38.59 L33.20,38.59 L69.41,76.00 L48.50,76.00 Z" fill="#fff"/></svg></span>
     </div>
     <div class="splash-strapline">Studio · Community · Ritual</div>
     <div class="splash-tagline">Connect. Create. Belong.</div>
@@ -1476,7 +1414,7 @@
     function drawSplashArrows() {
       const wordEl = document.querySelector('.splash-word');
       if (!wordEl) return;
-      const kids = wordEl.children; // [L, I, n-flip-stage(arch), K]
+      const kids = wordEl.children; // [L, I, N(arch), K]
       if (kids.length < 4) return;
 
       const wordRect = wordEl.getBoundingClientRect();
