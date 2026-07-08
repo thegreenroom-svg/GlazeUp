@@ -1126,6 +1126,7 @@
       <a href="#" class="nav-link" onclick="goToTab('staff', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="6.5" r="3.3"/><path d="M10 11c-4 0-7 2.4-7 6.5h14c0-4.1-3-6.5-7-6.5z"/></svg></span><span class="nav-label">Daily Bookings</span></a>
       <a href="#" class="nav-link" onclick="goToTab('community', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.3"/><path d="M2.9 10h14.2M10 2.9c2 2 3.1 4.5 3.1 7.1s-1.1 5.1-3.1 7.1c-2-2-3.1-4.5-3.1-7.1s1.1-5.1 3.1-7.1z"/></svg></span><span class="nav-label">Community</span></a>
       <a href="#" class="nav-link" onclick="goToTab('printqueue', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8V3.5h10V8M5 8H3.5A1.5 1.5 0 002 9.5v4A1.5 1.5 0 003.5 15H5M5 8h10m0 0h1.5A1.5 1.5 0 0118 9.5v4a1.5 1.5 0 01-1.5 1.5H15M5 12h10v4.5H5V12z"/></svg></span><span class="nav-label">Print Queue</span></a>
+      <a href="#" class="nav-link" onclick="goToTab('stock', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg></span><span class="nav-label">Stock</span></a>
       <a href="#" class="nav-link" onclick="goToTab('branding', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.2 2.8l3 3-7.6 7.6c-.7.7-1.8.7-2.5 0l-.5-.5c-.7-.7-.7-1.8 0-2.5l7.6-7.6z"/><path d="M6.2 12.3L4 17.5l5.2-2.2"/></svg></span><span class="nav-label">Branding</span></a>
       <a href="#" class="nav-link" onclick="goToTab('palettes', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 3a7 7 0 100 14c1 0 1.6-.5 1.6-1.3 0-.4-.2-.7-.4-1-.2-.3-.4-.6-.4-1 0-.8.6-1.4 1.4-1.4h1.3A3.5 3.5 0 0017 8.5C17 5.5 13.9 3 10 3z"/><circle cx="7" cy="8.2" r="1" fill="currentColor" stroke="none"/><circle cx="10.3" cy="6.4" r="1" fill="currentColor" stroke="none"/><circle cx="13.2" cy="8.6" r="1" fill="currentColor" stroke="none"/></svg></span><span class="nav-label">Colours</span></a>
       <a href="#" class="nav-link" onclick="goToTab('shapes', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.5 5.5C6.5 4 8 3 10 3s3.5 1 3.5 2.5L13 13c-.1 2-1.4 3.5-3 3.5s-2.9-1.5-3-3.5L6.5 5.5z"/><ellipse cx="10" cy="5.3" rx="3.5" ry="1"/></svg></span><span class="nav-label">Bisque</span></a>
@@ -1609,6 +1610,58 @@
       <!-- ═════════════════════════════════════════════ -->
       <!-- COMMUNITY TAB -->
       <!-- ═════════════════════════════════════════════ -->
+      <!-- ═════════════════════════════════════════════ -->
+      <!-- STOCK TAB -->
+      <!-- ═════════════════════════════════════════════ -->
+      <div id="stock-view" class="view" style="display: none;">
+        <h2 style="margin-top: 0;">Studio Stock</h2>
+        <p style="color: var(--gu-dust); margin-bottom: 20px;">Photograph pieces and add them to the catalogue so customers can browse and design at home.</p>
+
+        <!-- Add a new piece -->
+        <div class="chart-container" style="margin-bottom: 20px;">
+          <h3 style="margin-top: 0;">Add a Piece</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+            <input type="text" id="stock-new-name" placeholder="Piece name (e.g. Medium Mug)" style="padding: 10px; border: 1px solid var(--gu-border); border-radius: 8px; font-size: 13px;">
+            <input type="text" id="stock-new-cat" placeholder="Category (e.g. Mugs)" style="padding: 10px; border: 1px solid var(--gu-border); border-radius: 8px; font-size: 13px;">
+          </div>
+          <input type="number" id="stock-new-price" placeholder="Price in pence (e.g. 850 = £8.50)" style="width: 100%; padding: 10px; border: 1px solid var(--gu-border); border-radius: 8px; font-size: 13px; margin-bottom: 10px; box-sizing: border-box;">
+          <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <label style="flex:1; padding:12px; background:#f5f0ea; border:1px dashed var(--gu-border); border-radius:10px; text-align:center; cursor:pointer; font-size:13px; color:var(--gu-dust);">
+              <input type="file" id="stock-new-photo-camera" accept="image/*" capture="environment" style="display:none;" onchange="previewStockPhoto(event)">
+              📷 Take Photo
+            </label>
+            <label style="flex:1; padding:12px; background:#f5f0ea; border:1px dashed var(--gu-border); border-radius:10px; text-align:center; cursor:pointer; font-size:13px; color:var(--gu-dust);">
+              <input type="file" id="stock-new-photo-library" accept="image/*" style="display:none;" onchange="previewStockPhoto(event)">
+              🖼️ Choose Photo
+            </label>
+          </div>
+          <img id="stock-new-preview" style="display:none; width:100%; max-height:180px; object-fit:cover; border-radius:10px; margin-bottom:10px;">
+          <button class="till-tile" style="width:100%; min-height:52px;" onclick="addStockItem()">
+            <span class="till-tile-name">+ Add to Catalogue</span>
+          </button>
+        </div>
+
+        <!-- Reservations pending -->
+        <div class="chart-container" style="margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="margin: 0;">📌 Pending Reservations</h3>
+            <button onclick="loadStockReservations()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄</button>
+          </div>
+          <div id="stock-reservations-list">
+            <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
+          </div>
+        </div>
+
+        <!-- Existing catalogue -->
+        <div class="chart-container">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="margin: 0;">Current Catalogue</h3>
+            <button onclick="loadStockCatalogue()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄</button>
+          </div>
+          <div id="stock-catalogue-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;"></div>
+        </div>
+      </div>
+
       <!-- ═════════════════════════════════════════════ -->
       <!-- PRINT QUEUE TAB -->
       <!-- ═════════════════════════════════════════════ -->
@@ -2229,12 +2282,151 @@ function goToTab(tab, event) {
     showCommunitySection('feed');
   } else if (tab === 'printqueue') {
     loadPrintQueue();
+  } else if (tab === 'stock') {
+    loadStockCatalogue();
+    loadStockReservations();
   }
 }
 
 // App Extras — PROTOTYPE tally of paid-tool unlocks, for appraisal.
 // Not real payment processing: just shows staff what's owed per booking
 // so it can be added to the bill at checkout.
+// ── Studio Stock: staff add/photo pieces, customers browse and reserve ──
+let stockNewPhotoData = null;
+
+function previewStockPhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    stockNewPhotoData = e.target.result;
+    const preview = document.getElementById('stock-new-preview');
+    preview.src = stockNewPhotoData;
+    preview.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function addStockItem() {
+  const name = document.getElementById('stock-new-name').value.trim();
+  const cat = document.getElementById('stock-new-cat').value.trim();
+  const price = document.getElementById('stock-new-price').value;
+
+  if (!name) { alert('Please enter a piece name.'); return; }
+  if (!apiConnected) { alert('Connect the API to add stock.'); return; }
+
+  try {
+    await fetch(`${API_URL}/api/stock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId,
+        name,
+        category: cat || null,
+        priceCents: price ? parseInt(price) : null,
+        photoData: stockNewPhotoData || null
+      })
+    });
+    // Reset form
+    document.getElementById('stock-new-name').value = '';
+    document.getElementById('stock-new-cat').value = '';
+    document.getElementById('stock-new-price').value = '';
+    document.getElementById('stock-new-preview').style.display = 'none';
+    stockNewPhotoData = null;
+    loadStockCatalogue();
+  } catch (err) {
+    alert('Could not add item: ' + err.message);
+  }
+}
+
+async function loadStockCatalogue() {
+  const listEl = document.getElementById('stock-catalogue-list');
+  if (!listEl || !apiConnected) {
+    if (listEl) listEl.innerHTML = `<div style="grid-column:1/-1; padding:12px; text-align:center; color:var(--gu-dust); font-size:12px;">Connect the API to manage stock.</div>`;
+    return;
+  }
+  try {
+    const res = await fetch(`${API_URL}/api/stock?studioId=${studioId}`);
+    const data = await res.json();
+    if (!data.stock?.length) {
+      listEl.innerHTML = `<div style="grid-column:1/-1; padding:12px; text-align:center; color:var(--gu-dust); font-size:12px;">No pieces yet — add one above.</div>`;
+      return;
+    }
+    listEl.innerHTML = data.stock.map(item => `
+      <div style="background: #fff9f0; border-radius: 12px; overflow: hidden; border: 1px solid var(--gu-border);">
+        ${item.photo_data
+          ? `<img src="${item.photo_data}" style="width:100%; height:100px; object-fit:cover; display:block;">`
+          : `<div style="width:100%; height:100px; background:#f0e8e0; display:flex; align-items:center; justify-content:center; font-size:32px;">🏺</div>`}
+        <div style="padding: 8px 10px;">
+          <div style="font-size: 13px; font-weight: 700; margin-bottom: 2px;">${item.name}</div>
+          ${item.price_cents ? `<div style="font-size: 11px; color: var(--link-clay); font-weight: 700;">£${(item.price_cents / 100).toFixed(2)}</div>` : ''}
+          <div style="display: flex; gap: 6px; margin-top: 8px;">
+            <label style="flex:1; text-align:center; padding:6px 4px; background:#e8f0e8; border-radius:6px; font-size:10px; font-weight:600; cursor:pointer; color:#2a5a2a;">
+              📷 Photo
+              <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="updateStockPhoto('${item.id}', event)">
+            </label>
+            <button onclick="removeStockItem('${item.id}')" style="flex:1; padding:6px 4px; background:#fce8e8; border:none; border-radius:6px; font-size:10px; font-weight:600; cursor:pointer; color:#d9534f;">Remove</button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    listEl.innerHTML = `<div style="grid-column:1/-1; padding:12px; text-align:center; color:var(--gu-dust); font-size:12px;">Could not load stock.</div>`;
+  }
+}
+
+async function updateStockPhoto(id, event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    await fetch(`${API_URL}/api/stock/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ photoData: e.target.result })
+    });
+    loadStockCatalogue();
+  };
+  reader.readAsDataURL(file);
+}
+
+async function removeStockItem(id) {
+  if (!confirm('Remove this piece from the catalogue?')) return;
+  await fetch(`${API_URL}/api/stock/${id}`, { method: 'DELETE' });
+  loadStockCatalogue();
+}
+
+async function loadStockReservations() {
+  const listEl = document.getElementById('stock-reservations-list');
+  if (!listEl || !apiConnected) return;
+  try {
+    const res = await fetch(`${API_URL}/api/stock/reservations?studioId=${studioId}`);
+    const data = await res.json();
+    if (!data.reservations?.length) {
+      listEl.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">No reservations pending.</div>`;
+      return;
+    }
+    listEl.innerHTML = data.reservations.map(r => `
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: #fff9f0; border-left: 4px solid var(--link-clay); border-radius: 4px; margin-bottom: 8px;">
+        <div>
+          <div style="font-size: 13px; font-weight: 700;">${r.studio_stock?.name || 'Unknown piece'}</div>
+          <div style="font-size: 11px; color: var(--gu-dust);">${r.customer_name || r.booking_code || '—'}</div>
+        </div>
+        <button class="till-tile glaze-sage" style="min-height:36px; padding:6px 12px;" onclick="confirmReservation('${r.id}')">
+          <span class="till-tile-name" style="font-size:11px;">✓ Confirm</span>
+        </button>
+      </div>
+    `).join('');
+  } catch (err) {
+    listEl.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Could not load reservations.</div>`;
+  }
+}
+
+async function confirmReservation(id) {
+  await fetch(`${API_URL}/api/stock/reservations/${id}/confirm`, { method: 'POST' });
+  loadStockReservations();
+}
+
 // Print Queue — PROTOTYPE. Customer-submitted designs waiting for staff
 // to check before printing on the studio's ceramic transfer printer.
 // Approving charges £1 (tallied like the other extras); rejecting doesn't.

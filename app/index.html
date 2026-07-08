@@ -237,7 +237,7 @@
       #design-preview-screen { transition: none; }
     }
 
-    #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen, #new-booking-screen, #transfer-designer-screen {
+    #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen, #new-booking-screen, #transfer-designer-screen, #browse-design-screen {
       position: fixed;
       inset: 0;
       background: var(--link-charcoal);
@@ -247,11 +247,11 @@
       transform: translateY(100%);
       transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
     }
-    #community-share-screen.open, #community-feed-screen.open, #colour-picker-screen.open, #my-bookings-screen.open, #new-booking-screen.open, #transfer-designer-screen.open {
+    #community-share-screen.open, #community-feed-screen.open, #colour-picker-screen.open, #my-bookings-screen.open, #new-booking-screen.open, #transfer-designer-screen.open, #browse-design-screen.open {
       transform: translateY(0);
     }
     @media (prefers-reduced-motion: reduce) {
-      #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen, #new-booking-screen, #transfer-designer-screen { transition: none; }
+      #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen, #new-booking-screen, #transfer-designer-screen, #browse-design-screen { transition: none; }
     }
 
     .cp-tab {
@@ -336,6 +336,63 @@
     .mb-card .mb-date { color: #fff; font-weight: 700; font-size: 14px; }
     .mb-card .mb-meta { color: rgba(255,255,255,0.6); font-size: 12px; margin-top: 3px; }
     .mb-empty { color: rgba(255,255,255,0.5); text-align: center; padding: 20px; font-size: 13px; }
+
+    #browse-design-screen { background: #12082a; }
+
+    @keyframes browse-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(184,121,70,0); }
+      50% { box-shadow: 0 0 0 6px rgba(184,121,70,0.25); }
+    }
+    @keyframes browse-shimmer {
+      0% { transform: translateX(-100%); }
+      60%, 100% { transform: translateX(100%); }
+    }
+
+    .bd-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      padding: 16px;
+    }
+    .bd-card {
+      background: rgba(255,255,255,0.06);
+      border-radius: 14px;
+      overflow: hidden;
+      cursor: pointer;
+      position: relative;
+    }
+    .bd-card img {
+      width: 100%; aspect-ratio: 1;
+      object-fit: cover; display: block;
+      background: rgba(255,255,255,0.04);
+    }
+    .bd-card .bd-no-photo {
+      width: 100%; aspect-ratio: 1;
+      display: flex; align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      background: rgba(255,255,255,0.04);
+    }
+    .bd-card .bd-info {
+      padding: 8px 10px 10px;
+    }
+    .bd-card .bd-name { color: #fff; font-size: 12px; font-weight: 600; line-height: 1.3; }
+    .bd-card .bd-price { color: var(--link-clay); font-size: 11px; font-weight: 700; margin-top: 2px; }
+    .bd-card .bd-actions { display: flex; gap: 6px; padding: 0 8px 10px; }
+    .bd-card .bd-actions button {
+      flex: 1; background: rgba(255,255,255,0.1); color: #fff;
+      border: none; border-radius: 8px; padding: 7px 4px;
+      font-size: 10px; font-weight: 600; cursor: pointer;
+    }
+    .bd-card .bd-actions button.reserve {
+      background: var(--link-clay);
+    }
+    .bd-reserved-badge {
+      position: absolute; top: 8px; right: 8px;
+      background: var(--glaze-sage-base); color: #fff;
+      font-size: 9px; font-weight: 700; padding: 2px 7px;
+      border-radius: 20px;
+    }
 
     .nb-date-chip {
       flex-shrink: 0;
@@ -1026,6 +1083,45 @@
        the booking, to be added to the final bill once billing is sorted. -->
   <!-- Print as Transfer: submit a finished design for staff review before
        printing on the studio's ceramic transfer printer. PROTOTYPE. -->
+  <!-- Browse & Design: see real studio stock photos, design on them,
+       reserve for next visit. Flashy feature — home-use hook for returning customers. -->
+  <div id="browse-design-screen">
+    <div class="dp-header" style="background: linear-gradient(135deg, #1a0a3d 0%, #2d1065 100%); border-bottom:1px solid rgba(184,121,70,0.3);">
+      <span class="dp-title" style="color:#fff;">Browse &amp; Design</span>
+      <button onclick="closeBrowseDesign()" style="color:rgba(255,255,255,0.8);">✕ Close</button>
+    </div>
+    <div style="padding:12px 16px 0;">
+      <div style="font-size:12px; color:rgba(255,255,255,0.55); line-height:1.5; margin-bottom:12px;">
+        Tap any piece to design on it at home — or reserve it for your next visit.
+      </div>
+      <div style="display:flex; gap:8px; margin-bottom:14px; overflow-x:auto; padding-bottom:4px;" id="bd-category-strip"></div>
+    </div>
+    <div style="flex:1; overflow-y:auto;">
+      <div id="bd-grid" class="bd-grid"></div>
+      <div id="bd-empty" style="display:none; padding:40px 20px; text-align:center; color:rgba(255,255,255,0.4); font-size:13px; line-height:1.6;">
+        No pieces in the catalogue yet.<br>Staff can add photos from the studio app.
+      </div>
+    </div>
+  </div>
+
+  <!-- Piece detail: design on it or reserve it -->
+  <div id="browse-piece-modal" style="display:none; position:fixed; inset:0; background:rgba(43,39,36,0.85); backdrop-filter:blur(6px); z-index:3100; align-items:flex-end; justify-content:center; padding:0;">
+    <div style="background:#fff; border-radius:20px 20px 0 0; padding:22px; width:100%; max-width:460px; max-height:85vh; overflow-y:auto;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px;">
+        <div>
+          <div id="bpm-name" style="font-family:var(--gu-font-display); font-size:18px; font-weight:700; color:var(--gu-accent);"></div>
+          <div id="bpm-price" style="font-size:14px; color:var(--link-clay); font-weight:700; margin-top:2px;"></div>
+        </div>
+        <button onclick="closePieceModal()" style="background:none; border:none; font-size:20px; color:var(--gu-dust); cursor:pointer;">✕</button>
+      </div>
+      <img id="bpm-img" style="width:100%; border-radius:14px; margin-bottom:14px; max-height:260px; object-fit:cover; display:none;">
+      <div id="bpm-no-photo" style="width:100%; height:160px; border-radius:14px; background:#f5f0ea; display:flex; align-items:center; justify-content:center; font-size:56px; margin-bottom:14px;">🏺</div>
+      <button onclick="designThisPiece()" style="width:100%; background:linear-gradient(135deg,#1a0a3d,#2d1065); color:#fff; border:none; padding:14px; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; margin-bottom:10px;">✏️ Design on This Piece</button>
+      <button onclick="reserveThisPiece()" id="bpm-reserve-btn" style="width:100%; background:var(--link-clay); color:#fff; border:none; padding:14px; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; margin-bottom:10px;">📌 Reserve for My Next Visit</button>
+      <button onclick="closePieceModal()" style="width:100%; background:none; color:var(--gu-dust); border:none; padding:10px; font-size:13px; cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+
   <div id="print-request-modal" style="display:none; position:fixed; inset:0; background:rgba(43,39,36,0.7); backdrop-filter:blur(4px); z-index:3000; align-items:center; justify-content:center; padding:20px;">
     <div style="background:#fff; border-radius:16px; padding:22px; max-width:340px; width:100%; text-align:center;">
       <div style="font-size:32px; margin-bottom:8px;">🖨️</div>
@@ -1299,6 +1395,20 @@
           </button>
 
           <div class="section-label">Design tools</div>
+
+          <!-- Browse & Design — the flashy one. Animated shimmer, stands out. -->
+          <button class="tile" onclick="openBrowseDesign()" id="browse-design-tile" style="
+            position: relative; overflow: hidden;
+            background: linear-gradient(135deg, #1a0a3d 0%, #2d1065 50%, #1a0a3d 100%);
+            border: 1.5px solid rgba(184,121,70,0.5);
+            animation: browse-pulse 3s ease-in-out infinite;
+          ">
+            <span class="tile-icon" style="font-size:28px;">✨</span>
+            <div class="tile-title" style="color:#fff;">Browse &amp; Design at Home</div>
+            <div class="tile-desc" style="color:rgba(255,255,255,0.75);">See what's in the studio right now. Design on a real photo of the piece — then reserve it for your next visit.</div>
+            <span style="position:absolute; top:14px; right:16px; background:var(--link-clay); font-size:10px; font-weight:700; padding:3px 9px; border-radius:20px; color:#fff; letter-spacing:0.03em;">NEW</span>
+            <div id="browse-shimmer" style="position:absolute; inset:0; background:linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%); animation: browse-shimmer 2.5s ease-in-out infinite;"></div>
+          </button>
 
           <!-- Home Access tile — shown to everyone, dynamically updated once
                booking loads to reflect whether they've already purchased it -->
@@ -1996,6 +2106,168 @@
 
     function showHomeAccessInfo() {
       alert('🏠 Take It Home — £5\n\nUnlocks all three design tools (Colour Picker, Design Preview, Transfer Designer) on your own phone or tablet, 24/7 — not just when you\'re in the studio.\n\nAsk a member of staff to add it to your bill today.');
+    }
+
+    // ── Browse & Design: see real studio stock photos, sketch a design
+    // on them, and/or reserve a piece for your next visit. ──
+    let bdAllStock = [];
+    let bdFilterCategory = 'All';
+    let bdSelectedPiece = null;
+    let bdReservedIds = new Set();
+
+    async function openBrowseDesign() {
+      const screen = document.getElementById('browse-design-screen');
+      screen.style.display = 'flex';
+      void screen.offsetWidth;
+      screen.classList.add('open');
+      loadBrowseStock();
+    }
+    function closeBrowseDesign() {
+      const screen = document.getElementById('browse-design-screen');
+      screen.classList.remove('open');
+      setTimeout(() => { screen.style.display = 'none'; }, 280);
+    }
+
+    async function loadBrowseStock() {
+      const grid = document.getElementById('bd-grid');
+      const emptyEl = document.getElementById('bd-empty');
+      grid.innerHTML = '<div style="grid-column:1/-1; padding:40px; text-align:center; color:rgba(255,255,255,0.4); font-size:13px;">Loading…</div>';
+
+      try {
+        const res = await fetch(`${API_URL}/api/stock?studioId=${STUDIO_ID}`);
+        const data = await res.json();
+        bdAllStock = data.stock || [];
+
+        // Build category strip
+        const cats = ['All', ...new Set(bdAllStock.map(s => s.category).filter(Boolean))];
+        const strip = document.getElementById('bd-category-strip');
+        strip.innerHTML = cats.map(c => `
+          <button onclick="filterBdCategory('${c}')" class="cp-tab ${c === bdFilterCategory ? 'active' : ''}" id="bd-cat-${c.replace(/\s/g,'-')}">${c}</button>
+        `).join('');
+
+        renderBdGrid();
+      } catch (err) {
+        grid.innerHTML = '<div style="grid-column:1/-1; padding:40px; text-align:center; color:rgba(255,255,255,0.4); font-size:13px;">Could not load stock.</div>';
+      }
+    }
+
+    function filterBdCategory(cat) {
+      bdFilterCategory = cat;
+      document.querySelectorAll('#bd-category-strip .cp-tab').forEach(b => b.classList.remove('active'));
+      const btn = document.getElementById(`bd-cat-${cat.replace(/\s/g,'-')}`);
+      if (btn) btn.classList.add('active');
+      renderBdGrid();
+    }
+
+    function renderBdGrid() {
+      const grid = document.getElementById('bd-grid');
+      const emptyEl = document.getElementById('bd-empty');
+      const items = bdFilterCategory === 'All' ? bdAllStock : bdAllStock.filter(s => s.category === bdFilterCategory);
+
+      if (items.length === 0) {
+        grid.innerHTML = '';
+        emptyEl.style.display = 'block';
+        return;
+      }
+      emptyEl.style.display = 'none';
+
+      grid.innerHTML = items.map(item => `
+        <div class="bd-card" onclick="openPieceModal('${item.id}')">
+          ${bdReservedIds.has(item.id) ? '<span class="bd-reserved-badge">Reserved</span>' : ''}
+          ${item.photo_data
+            ? `<img src="${item.photo_data}" loading="lazy" alt="${item.name}">`
+            : `<div class="bd-no-photo">🏺</div>`}
+          <div class="bd-info">
+            <div class="bd-name">${item.name}</div>
+            ${item.price_cents ? `<div class="bd-price">£${(item.price_cents / 100).toFixed(2)}</div>` : ''}
+          </div>
+          <div class="bd-actions">
+            <button onclick="event.stopPropagation(); openPieceModal('${item.id}'); setTimeout(designThisPiece, 100)">✏️ Design</button>
+            <button class="reserve" onclick="event.stopPropagation(); quickReserve('${item.id}')">📌 Reserve</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function openPieceModal(stockId) {
+      const item = bdAllStock.find(s => s.id === stockId);
+      if (!item) return;
+      bdSelectedPiece = item;
+
+      document.getElementById('bpm-name').textContent = item.name;
+      document.getElementById('bpm-price').textContent = item.price_cents ? `£${(item.price_cents / 100).toFixed(2)}` : '';
+
+      const img = document.getElementById('bpm-img');
+      const noPhoto = document.getElementById('bpm-no-photo');
+      if (item.photo_data) {
+        img.src = item.photo_data;
+        img.style.display = 'block';
+        noPhoto.style.display = 'none';
+      } else {
+        img.style.display = 'none';
+        noPhoto.style.display = 'flex';
+      }
+
+      const reserveBtn = document.getElementById('bpm-reserve-btn');
+      reserveBtn.textContent = bdReservedIds.has(item.id) ? '✓ Already Reserved' : '📌 Reserve for My Next Visit';
+      reserveBtn.disabled = bdReservedIds.has(item.id);
+
+      document.getElementById('browse-piece-modal').style.display = 'flex';
+    }
+    function closePieceModal() {
+      document.getElementById('browse-piece-modal').style.display = 'none';
+      bdSelectedPiece = null;
+    }
+
+    // Opens Design Preview with the piece photo pre-loaded
+    function designThisPiece() {
+      if (!bdSelectedPiece?.photo_data) {
+        alert('No photo available for this piece yet — ask staff to add one, or take your own photo in Design Preview.');
+        closePieceModal();
+        openDesignPreviewGated();
+        return;
+      }
+      closePieceModal();
+      closeBrowseDesign();
+
+      // Open Design Preview and pre-load the piece photo
+      openDesignPreviewGated();
+      // Give the screen a moment to open, then inject the photo
+      setTimeout(() => {
+        const img = new Image();
+        img.onload = () => setupDpCanvases(img);
+        img.src = bdSelectedPiece.photo_data;
+      }, 400);
+    }
+
+    async function quickReserve(stockId) {
+      const item = bdAllStock.find(s => s.id === stockId);
+      if (!item || bdReservedIds.has(stockId)) return;
+      await doReserve(stockId, item.name);
+    }
+    async function reserveThisPiece() {
+      if (!bdSelectedPiece) return;
+      await doReserve(bdSelectedPiece.id, bdSelectedPiece.name);
+      closePieceModal();
+    }
+    async function doReserve(stockId, name) {
+      try {
+        await fetch(`${API_URL}/api/stock/reserve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studioId: STUDIO_ID,
+            stockId,
+            bookingCode: window.currentBooking?.code || null,
+            customerName: window.currentBooking?.name || null
+          })
+        });
+        bdReservedIds.add(stockId);
+        renderBdGrid();
+        alert(`✅ "${name}" has been reserved for your next visit! A member of staff will have it ready.`);
+      } catch (err) {
+        alert('Could not complete the reservation — please ask a member of staff.');
+      }
     }
 
 

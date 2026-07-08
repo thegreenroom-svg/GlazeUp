@@ -2260,6 +2260,110 @@ app.post('/api/print-requests', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════
+// STUDIO STOCK — browse, photo, reserve, design at home
+// ═══════════════════════════════════════════════════════════
+
+app.get('/api/stock', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const { data, error } = await supabase
+      .from('studio_stock')
+      .select('id, name, category, price_cents, photo_data, available, created_at')
+      .eq('studio_id', studioId)
+      .eq('available', true)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json({ stock: data || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/stock', async (req, res) => {
+  const { studioId, name, category, priceCents, photoData } = req.body;
+  if (!studioId || !name) return res.status(400).json({ error: 'studioId and name required' });
+  try {
+    const { data, error } = await supabase
+      .from('studio_stock')
+      .insert({ studio_id: studioId, name, category: category || null, price_cents: priceCents || null, photo_data: photoData || null })
+      .select().single();
+    if (error) throw error;
+    res.json({ status: 'added', item: data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/stock/:id', async (req, res) => {
+  const { id } = req.params;
+  const updates = {};
+  if (req.body.photoData !== undefined) updates.photo_data = req.body.photoData;
+  if (req.body.available !== undefined) updates.available = req.body.available;
+  if (req.body.name !== undefined) updates.name = req.body.name;
+  if (req.body.priceCents !== undefined) updates.price_cents = req.body.priceCents;
+  try {
+    const { error } = await supabase.from('studio_stock').update(updates).eq('id', id);
+    if (error) throw error;
+    res.json({ status: 'updated' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/stock/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await supabase.from('studio_stock').update({ available: false }).eq('id', id);
+    res.json({ status: 'removed' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/stock/reserve', async (req, res) => {
+  const { studioId, stockId, bookingCode, customerName } = req.body;
+  if (!studioId || !stockId) return res.status(400).json({ error: 'studioId and stockId required' });
+  try {
+    const { data, error } = await supabase
+      .from('stock_reservations')
+      .insert({ studio_id: studioId, stock_id: stockId, booking_code: bookingCode || null, customer_name: customerName || null })
+      .select().single();
+    if (error) throw error;
+    res.json({ status: 'reserved', reservation: data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/stock/reservations', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const { data, error } = await supabase
+      .from('stock_reservations')
+      .select('*, studio_stock(name, photo_data, price_cents)')
+      .eq('studio_id', studioId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json({ reservations: data || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/stock/reservations/:id/confirm', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await supabase.from('stock_reservations').update({ status: 'confirmed' }).eq('id', id);
+    res.json({ status: 'confirmed' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/print-requests — staff view, defaults to pending queue
 app.get('/api/print-requests', async (req, res) => {
   const { studioId, status } = req.query;
