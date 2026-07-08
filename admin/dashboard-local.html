@@ -1125,6 +1125,7 @@
       <a href="#" class="nav-link" onclick="goToTab('setup', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.8"/><path d="M10 3v1.8M10 15.2V17M17 10h-1.8M4.8 10H3M14.9 5.1l-1.3 1.3M6.4 13.6l-1.3 1.3M14.9 14.9l-1.3-1.3M6.4 6.4L5.1 5.1"/></svg></span><span class="nav-label">Setup</span></a>
       <a href="#" class="nav-link" onclick="goToTab('staff', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="6.5" r="3.3"/><path d="M10 11c-4 0-7 2.4-7 6.5h14c0-4.1-3-6.5-7-6.5z"/></svg></span><span class="nav-label">Daily Bookings</span></a>
       <a href="#" class="nav-link" onclick="goToTab('community', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.3"/><path d="M2.9 10h14.2M10 2.9c2 2 3.1 4.5 3.1 7.1s-1.1 5.1-3.1 7.1c-2-2-3.1-4.5-3.1-7.1s1.1-5.1 3.1-7.1z"/></svg></span><span class="nav-label">Community</span></a>
+      <a href="#" class="nav-link" onclick="goToTab('printqueue', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8V3.5h10V8M5 8H3.5A1.5 1.5 0 002 9.5v4A1.5 1.5 0 003.5 15H5M5 8h10m0 0h1.5A1.5 1.5 0 0118 9.5v4a1.5 1.5 0 01-1.5 1.5H15M5 12h10v4.5H5V12z"/></svg></span><span class="nav-label">Print Queue</span></a>
       <a href="#" class="nav-link" onclick="goToTab('branding', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.2 2.8l3 3-7.6 7.6c-.7.7-1.8.7-2.5 0l-.5-.5c-.7-.7-.7-1.8 0-2.5l7.6-7.6z"/><path d="M6.2 12.3L4 17.5l5.2-2.2"/></svg></span><span class="nav-label">Branding</span></a>
       <a href="#" class="nav-link" onclick="goToTab('palettes', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 3a7 7 0 100 14c1 0 1.6-.5 1.6-1.3 0-.4-.2-.7-.4-1-.2-.3-.4-.6-.4-1 0-.8.6-1.4 1.4-1.4h1.3A3.5 3.5 0 0017 8.5C17 5.5 13.9 3 10 3z"/><circle cx="7" cy="8.2" r="1" fill="currentColor" stroke="none"/><circle cx="10.3" cy="6.4" r="1" fill="currentColor" stroke="none"/><circle cx="13.2" cy="8.6" r="1" fill="currentColor" stroke="none"/></svg></span><span class="nav-label">Colours</span></a>
       <a href="#" class="nav-link" onclick="goToTab('shapes', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.5 5.5C6.5 4 8 3 10 3s3.5 1 3.5 2.5L13 13c-.1 2-1.4 3.5-3 3.5s-2.9-1.5-3-3.5L6.5 5.5z"/><ellipse cx="10" cy="5.3" rx="3.5" ry="1"/></svg></span><span class="nav-label">Bisque</span></a>
@@ -1603,6 +1604,26 @@
       <!-- ═════════════════════════════════════════════ -->
       <!-- COMMUNITY TAB -->
       <!-- ═════════════════════════════════════════════ -->
+      <!-- ═════════════════════════════════════════════ -->
+      <!-- PRINT QUEUE TAB -->
+      <!-- ═════════════════════════════════════════════ -->
+      <div id="printqueue-view" class="view" style="display: none;">
+        <h2 style="margin-top: 0;">Print Queue</h2>
+        <p style="color: var(--gu-dust); margin-bottom: 20px;">
+          Designs customers have submitted to print as ceramic transfers. Check the design and sizing before approving — approving charges £1 to their bill and can't be undone once printed.
+        </p>
+
+        <div class="chart-container">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="margin: 0;">Pending Review</h3>
+            <button onclick="loadPrintQueue()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
+          </div>
+          <div id="print-queue-list">
+            <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
+          </div>
+        </div>
+      </div>
+
       <div id="community-view" class="view" style="display: none;">
         <h2 style="margin-top: 0;">Community</h2>
         <p style="color: var(--gu-dust); margin-bottom: 20px;">
@@ -2201,12 +2222,83 @@ function goToTab(tab, event) {
     loadBisqueCatalog();
   } else if (tab === 'community') {
     showCommunitySection('feed');
+  } else if (tab === 'printqueue') {
+    loadPrintQueue();
   }
 }
 
 // App Extras — PROTOTYPE tally of paid-tool unlocks, for appraisal.
 // Not real payment processing: just shows staff what's owed per booking
 // so it can be added to the bill at checkout.
+// Print Queue — PROTOTYPE. Customer-submitted designs waiting for staff
+// to check before printing on the studio's ceramic transfer printer.
+// Approving charges £1 (tallied like the other extras); rejecting doesn't.
+async function loadPrintQueue() {
+  const listEl = document.getElementById('print-queue-list');
+  if (!listEl) return;
+
+  try {
+    if (!apiConnected) {
+      listEl.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Connect the API to see submitted designs.</div>`;
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/api/print-requests?studioId=${studioId}&status=pending`);
+    const data = await res.json();
+
+    if (!data.requests || data.requests.length === 0) {
+      listEl.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Nothing waiting for review.</div>`;
+      return;
+    }
+
+    listEl.innerHTML = data.requests.map(r => `
+      <div style="background: #fff9f0; border-left: 4px solid var(--link-clay); border-radius: 14px; padding: 14px; margin-bottom: 12px;">
+        <img src="${r.image_data}" style="width: 100%; max-height: 220px; object-fit: contain; border-radius: 10px; background: #fff; margin-bottom: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <div>
+            <div style="font-size: 14px; font-weight: 700;">${r.customer_name || r.booking_code}</div>
+            <div style="font-size: 11px; color: var(--gu-dust);">${r.source_tool || 'Unknown tool'} · ${new Date(r.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="till-tile glaze-sage" style="flex:1; min-height:48px; padding:10px;" onclick="approvePrintRequest('${r.id}')">
+            <span class="till-tile-name" style="font-size:13px;">✅ Approve &amp; Print — £1</span>
+          </button>
+          <button class="till-tile" style="flex:1; min-height:48px; padding:10px; background: rgba(217,83,79,0.9);" onclick="rejectPrintRequest('${r.id}')">
+            <span class="till-tile-name" style="font-size:13px;">❌ Reject</span>
+          </button>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    listEl.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Could not load the print queue.</div>`;
+  }
+}
+
+async function approvePrintRequest(id) {
+  if (!confirm('Approve and print this transfer? £1 will be added to their bill — this can\'t be undone once printed.')) return;
+  try {
+    await fetch(`${API_URL}/api/print-requests/${id}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId })
+    });
+    loadPrintQueue();
+  } catch (err) {
+    alert('Could not approve: ' + err.message);
+  }
+}
+
+async function rejectPrintRequest(id) {
+  if (!confirm('Reject this design? The customer won\'t be charged.')) return;
+  try {
+    await fetch(`${API_URL}/api/print-requests/${id}/reject`, { method: 'POST' });
+    loadPrintQueue();
+  } catch (err) {
+    alert('Could not reject: ' + err.message);
+  }
+}
+
 async function loadTodaysExtraCharges() {
   const listEl = document.getElementById('extras-today-list');
   if (!listEl) return;

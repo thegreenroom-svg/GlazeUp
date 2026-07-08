@@ -56,6 +56,24 @@ Last updated: 5 July 2026
   2. **Multi-platform integrations** — currently hard-wired to Square (POS/bookings) and implicitly assumes Wix (website). Other studios may use different POS/stock systems (Clover, Shopify POS, Lightspeed, etc.) or website builders (Squarespace, WordPress). File structure/architecture should be organized to make adding alternate integrations realistic later, not just Square-only.
   3. **Internationalization** — "at some point, return to the international aspect" for worldwide sales. Daisy has a contact in translation software. Not started — currently English-only, GBP-only, UK date/phone formats hardcoded in places.
 
+★ PRINT AS TRANSFER — CERAMIC TRANSFER PRINTER WORKFLOW, PROTOTYPE (2026-07-08): Daisy wants any customer-facing creative tool (Design Preview, Transfer Designer, future ones) to offer printing the finished design onto a real ceramic transfer via the studio's own printer — staff review design/sizing first, £1/transfer flat regardless of size, explicit disclaimer that printed errors can't be corrected.
+
+**New table** `transfer_print_requests` (studio_id, booking_code, customer_name, source_tool, image_data, status: pending/approved/rejected, timestamps).
+
+**Customer side — "🖨️ Print as Transfer — £1" button in both tools:**
+- Flattens the ENTIRE current design into one real image before submitting — not just the canvas. This was the genuinely hard part: Design Preview and Transfer Designer both layer draggable DOM elements (coloured stickers; draggable text and motif shapes) on top of the drawing canvas, so a proper export needs compositing all of it into one flat picture, not just `canvas.toDataURL()` on its own.
+  - `flattenDesignPreviewImage()` — draws base photo + paint layer, then redraws each `.dp-sticker` as a coloured circle at its real on-screen position/size/opacity
+  - `flattenTransferDesignerImage()` — draws base photo + paint layer, then for each `.td-element` reads its real position and rotation and redraws either the text (matching font/weight/colour) or the motif (serializes its SVG, loads it as an Image, draws it) at the correct spot
+- Shows a preview of the flattened image + the confirmation modal with the exact wording requested: staff will check design/sizing, £1 regardless of size, mistakes can't be corrected once printed
+- Submits via `POST /api/print-requests` — **not charged yet at this point**, since staff haven't reviewed it
+
+**Staff side — new "Print Queue" nav item:**
+- Shows all pending submissions with the actual design image, customer name, source tool, and time
+- **"✅ Approve & Print — £1"** — marks approved AND records the £1 charge (via the same `app_extra_charges` tally used elsewhere), with a confirmation dialog restating it can't be undone
+- **"❌ Reject"** — marks rejected, no charge
+
+Tested the full pipeline end-to-end with Playwright: added real text + a motif in Transfer Designer, flattened it, confirmed the resulting image was a genuine non-empty PNG (not blank), submitted it, then loaded the staff Print Queue and confirmed the design/name displayed correctly and approving called the backend with the right data.
+
 ★ TABLET/STYLUS REQUEST — NOW ALSO CUSTOMER-FACING (2026-07-08): Daisy noted the £3 tablet/stylus charge wasn't in the customer app — it had only been built as a staff-triggered checkbox in Section 1. Added a matching customer-facing "📱 Studio Tablet & Stylus" tile (top of Getting Started, £3 badge). Generalized `PAID_TOOLS` to support a "request" style entry (`isRequest: true`) alongside the existing "unlock a screen" style entries — wording adapts automatically ("Request Studio Tablet & Stylus" / "Request for £3.00" vs "Unlock Design Preview" / "Unlock for £1.00"), and confirming shows a friendly "✅ Request sent! A member of staff will bring you a tablet and stylus shortly" message instead of opening a tool screen. Both the staff checkbox and the customer tile write to the same `app_extra_charges` tally, so either path shows up together on the Dashboard's Extra Charges Today card. Tested end-to-end: correct modal wording, correct charge payload, correct confirmation message.
 
 ★ POINTER EVENTS UPGRADE — REAL STYLUS PRESSURE SENSITIVITY (2026-07-08): Daisy confirmed pressure-sensitivity matters for the creative tools (planning to issue Android tablets + stylus pens as studio kit), so upgraded both drawing canvases (Design Preview's brush, Transfer Designer's brush/pen) from basic Touch Events to the Pointer Events API (`pointerdown`/`pointermove`/`pointerup`/`pointercancel` + `canvas.setPointerCapture()`), which unifies mouse/touch/pen input AND exposes real `pressure` data (0–1) from active styluses.

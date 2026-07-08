@@ -2182,6 +2182,125 @@ app.get('/api/extras/today', async (req, res) => {
   }
 });
 
+/**
+ * PROTOTYPE — ceramic transfer print requests, for appraisal.
+ * Customer submits a finished design (from Design Preview, Transfer
+ * Designer, or any future creative tool) for staff to review before
+ * printing on the studio's transfer printer. £1/transfer, charged only
+ * once staff approve and actually print it — not on submission, since
+ * staff check design/sizing first. Flat fee regardless of size; once
+ * printed, errors can't be corrected (customer-facing disclaimer shown
+ * before they submit).
+ */
+
+// POST /api/print-requests — customer submits a design for review
+app.post('/api/print-requests', async (req, res) => {
+  const { studioId, bookingCode, customerName, sourceTool, imageData } = req.body;
+  if (!studioId || !bookingCode || !imageData) {
+    return res.status(400).json({ error: 'studioId, bookingCode and imageData required' });
+  }
+
+  try {
+    const { data: request, error } = await supabase
+      .from('transfer_print_requests')
+      .insert({
+        studio_id: studioId,
+        booking_code: bookingCode,
+        customer_name: customerName || null,
+        source_tool: sourceTool || null,
+        image_data: imageData,
+        status: 'pending'
+      })
+      .select('id, status, created_at')
+      .single();
+
+    if (error) throw error;
+    res.json({ status: 'submitted', request });
+  } catch (error) {
+    console.error('Error submitting print request:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/print-requests — staff view, defaults to pending queue
+app.get('/api/print-requests', async (req, res) => {
+  const { studioId, status } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    let query = supabase
+      .from('transfer_print_requests')
+      .select('*')
+      .eq('studio_id', studioId)
+      .order('created_at', { ascending: false });
+
+    if (status) query = query.eq('status', status);
+    else query = query.eq('status', 'pending');
+
+    const { data: requests, error } = await query;
+    if (error) throw error;
+    res.json({ requests: requests || [] });
+  } catch (error) {
+    console.error('Error fetching print requests:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/print-requests/:id/approve — staff approves, triggers the £1 charge
+app.post('/api/print-requests/:id/approve', async (req, res) => {
+  const { id } = req.params;
+  const { studioId } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    const { data: request, error: fetchError } = await supabase
+      .from('transfer_print_requests')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !request) return res.status(404).json({ error: 'Print request not found' });
+
+    const { error: updateError } = await supabase
+      .from('transfer_print_requests')
+      .update({ status: 'approved', reviewed_at: new Date().toISOString() })
+      .eq('id', id);
+
+    if (updateError) throw updateError;
+
+    // £1/transfer, flat, regardless of size — tallied like the other extras
+    await supabase.from('app_extra_charges').insert({
+      studio_id: studioId,
+      booking_code: request.booking_code,
+      item_name: 'Ceramic Transfer Print',
+      amount_cents: 100
+    });
+
+    res.json({ status: 'approved' });
+  } catch (error) {
+    console.error('Error approving print request:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/print-requests/:id/reject — staff rejects, no charge
+app.post('/api/print-requests/:id/reject', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { error } = await supabase
+      .from('transfer_print_requests')
+      .update({ status: 'rejected', reviewed_at: new Date().toISOString() })
+      .eq('id', id);
+
+    if (error) throw error;
+    res.json({ status: 'rejected' });
+  } catch (error) {
+    console.error('Error rejecting print request:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/pieces/ready-for-pickup', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });

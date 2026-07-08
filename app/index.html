@@ -898,6 +898,7 @@
         <button onclick="document.getElementById('dp-photo-input-camera').click()">📷 Retake</button>
         <button onclick="document.getElementById('dp-photo-input-library').click()">🖼️ New Photo</button>
       </div>
+      <button onclick="openPrintRequestFor('designPreview')" style="width:100%; margin-top:8px; background:var(--glaze-oxblood-base); color:#fff; border:none; padding:12px; border-radius:12px; font-weight:700; font-size:13px; cursor:pointer;">🖨️ Print as Transfer — £1</button>
     </div>
   </div>
 
@@ -1023,6 +1024,23 @@
   <!-- Paywall confirmation — prototype for appraisal. Not wired to real
        payment processing yet: confirming just tallies the charge against
        the booking, to be added to the final bill once billing is sorted. -->
+  <!-- Print as Transfer: submit a finished design for staff review before
+       printing on the studio's ceramic transfer printer. PROTOTYPE. -->
+  <div id="print-request-modal" style="display:none; position:fixed; inset:0; background:rgba(43,39,36,0.7); backdrop-filter:blur(4px); z-index:3000; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#fff; border-radius:16px; padding:22px; max-width:340px; width:100%; text-align:center;">
+      <div style="font-size:32px; margin-bottom:8px;">🖨️</div>
+      <div style="font-family:var(--gu-font-display); font-weight:700; font-size:17px; color:var(--gu-accent); margin-bottom:6px;">Print as a Transfer</div>
+      <div id="prm-preview-wrap" style="margin-bottom:14px;">
+        <img id="prm-preview-img" style="width:100%; border-radius:10px; border:1px solid var(--gu-border);">
+      </div>
+      <div style="font-size:12px; color: var(--gu-dust); line-height:1.5; margin-bottom:14px; text-align:left; background:#fff9f0; border-radius:10px; padding:10px 12px;">
+        A member of staff will check your design and sizing before printing. <strong>£1 per transfer</strong> — added to your bill — <strong>regardless of size</strong>. Once printed, <strong>mistakes can't be corrected</strong>, so do check it looks right first!
+      </div>
+      <button onclick="confirmSubmitPrintRequest()" id="prm-confirm-btn" style="width:100%; background:var(--link-charcoal); color:#fff; border:none; padding:13px; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; margin-bottom:8px;">Submit for Review — £1</button>
+      <button onclick="closePrintRequestModal()" style="width:100%; background:none; color:var(--gu-dust); border:none; padding:10px; font-size:13px; cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+
   <div id="extra-charge-modal" style="display:none; position:fixed; inset:0; background:rgba(43,39,36,0.7); backdrop-filter:blur(4px); z-index:3000; align-items:center; justify-content:center; padding:20px;">
     <div style="background:#fff; border-radius:16px; padding:22px; max-width:320px; width:100%; text-align:center;">
       <div style="font-size:32px; margin-bottom:8px;">✨</div>
@@ -1102,6 +1120,7 @@
         <button onclick="tdRemoveSelected()">🗑️ Remove Selected</button>
         <button onclick="tdClearAll()">🧹 Clear All</button>
       </div>
+      <button onclick="openPrintRequestFor('transferDesigner')" style="width:100%; margin-top:8px; background:var(--glaze-oxblood-base); color:#fff; border:none; padding:12px; border-radius:12px; font-weight:700; font-size:13px; cursor:pointer;">🖨️ Print as Transfer — £1</button>
     </div>
   </div>
 
@@ -2396,6 +2415,164 @@
       if (tdPaintCtx) {
         tdSaveUndoState();
         tdPaintCtx.clearRect(0, 0, tdPaintCtx.canvas.width, tdPaintCtx.canvas.height);
+      }
+    }
+
+    // ── Print as Transfer: flatten the current design (photo + drawing +
+    // any draggable text/motif/sticker elements) into one image, submit to
+    // staff for review before it's printed on the studio's ceramic
+    // transfer printer. PROTOTYPE — £1/transfer, charged only once staff
+    // approve (see /api/print-requests/:id/approve), not on submission. ──
+    let pendingPrintSource = null;
+    let pendingPrintImage = null;
+
+    function loadSvgAsImage(svgString) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
+      });
+    }
+
+    function flattenBaseAndPaint(baseCanvasId, paintCanvasId) {
+      const base = document.getElementById(baseCanvasId);
+      const paint = document.getElementById(paintCanvasId);
+      const out = document.createElement('canvas');
+      out.width = base.width;
+      out.height = base.height;
+      const ctx = out.getContext('2d');
+      ctx.drawImage(base, 0, 0);
+      ctx.drawImage(paint, 0, 0);
+      return { canvas: out, ctx };
+    }
+
+    // Design Preview: base + paint canvases, plus any coloured sticker divs
+    async function flattenDesignPreviewImage() {
+      const stack = document.getElementById('dp-canvas-stack');
+      const stackRect = stack.getBoundingClientRect();
+      const { canvas, ctx } = flattenBaseAndPaint('dp-base-canvas', 'dp-paint-canvas');
+      const scaleX = canvas.width / stackRect.width;
+      const scaleY = canvas.height / stackRect.height;
+
+      stack.querySelectorAll('.dp-sticker').forEach(el => {
+        const rect = el.getBoundingClientRect();
+        const cx = (rect.left + rect.width / 2 - stackRect.left) * scaleX;
+        const cy = (rect.top + rect.height / 2 - stackRect.top) * scaleY;
+        const r = (rect.width / 2) * scaleX;
+        ctx.save();
+        ctx.globalAlpha = parseFloat(getComputedStyle(el).opacity) || 0.55;
+        ctx.fillStyle = getComputedStyle(el).backgroundColor;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+
+      return canvas.toDataURL('image/png');
+    }
+
+    // Transfer Designer: base + paint canvases, plus draggable text/motif elements
+    async function flattenTransferDesignerImage() {
+      const stack = document.getElementById('td-canvas-stack');
+      const stackRect = stack.getBoundingClientRect();
+      const { canvas, ctx } = flattenBaseAndPaint('td-base-canvas', 'td-paint-canvas');
+      const scaleX = canvas.width / stackRect.width;
+      const scaleY = canvas.height / stackRect.height;
+
+      const elements = Array.from(stack.querySelectorAll('.td-element'));
+      for (const el of elements) {
+        const rect = el.getBoundingClientRect();
+        const cx = (rect.left + rect.width / 2 - stackRect.left) * scaleX;
+        const cy = (rect.top + rect.height / 2 - stackRect.top) * scaleY;
+
+        const transform = el.style.transform || '';
+        const angleMatch = transform.match(/rotate\(([-\d.]+)deg\)/);
+        const angle = angleMatch ? parseFloat(angleMatch[1]) * Math.PI / 180 : 0;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+
+        const textEl = el.querySelector('.td-text-content');
+        const motifEl = el.querySelector('.td-motif-content');
+
+        if (textEl) {
+          const cs = getComputedStyle(textEl);
+          const fontSize = parseFloat(cs.fontSize) * scaleX;
+          ctx.font = `${cs.fontWeight} ${fontSize}px ${cs.fontFamily}`;
+          ctx.fillStyle = cs.color;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(textEl.textContent, 0, 0);
+        } else if (motifEl) {
+          const svgEl = motifEl.querySelector('svg');
+          if (svgEl) {
+            try {
+              const svgString = new XMLSerializer().serializeToString(svgEl);
+              const img = await loadSvgAsImage(svgString);
+              const w = rect.width * scaleX, h = rect.height * scaleY;
+              ctx.drawImage(img, -w / 2, -h / 2, w, h);
+            } catch (e) { console.error('Could not flatten motif:', e); }
+          }
+        }
+        ctx.restore();
+      }
+
+      return canvas.toDataURL('image/png');
+    }
+
+    const PRINT_SOURCES = {
+      designPreview: { name: 'Design Preview', flattenFn: flattenDesignPreviewImage },
+      transferDesigner: { name: 'Transfer Designer', flattenFn: flattenTransferDesignerImage }
+    };
+
+    async function openPrintRequestFor(sourceKey) {
+      pendingPrintSource = sourceKey;
+      try {
+        pendingPrintImage = await PRINT_SOURCES[sourceKey].flattenFn();
+        document.getElementById('prm-preview-img').src = pendingPrintImage;
+        document.getElementById('print-request-modal').style.display = 'flex';
+      } catch (err) {
+        alert('Could not prepare your design for printing: ' + err.message);
+      }
+    }
+
+    function closePrintRequestModal() {
+      document.getElementById('print-request-modal').style.display = 'none';
+      pendingPrintSource = null;
+      pendingPrintImage = null;
+    }
+
+    async function confirmSubmitPrintRequest() {
+      const btn = document.getElementById('prm-confirm-btn');
+      btn.textContent = 'Submitting…';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch(`${API_URL}/api/print-requests`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studioId: STUDIO_ID,
+            bookingCode: window.currentBooking ? window.currentBooking.code : null,
+            customerName: window.currentBooking ? window.currentBooking.name : null,
+            sourceTool: PRINT_SOURCES[pendingPrintSource]?.name,
+            imageData: pendingPrintImage
+          })
+        });
+
+        if (res.ok) {
+          closePrintRequestModal();
+          alert('✅ Sent for review! A member of staff will check your design and let you know once it\'s printed.');
+        } else {
+          alert('Could not submit — please ask a member of staff.');
+        }
+      } catch (err) {
+        alert('Could not submit: ' + err.message);
+      } finally {
+        btn.textContent = 'Submit for Review — £1';
+        btn.disabled = false;
       }
     }
 
