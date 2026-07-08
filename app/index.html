@@ -1188,6 +1188,41 @@
       </div>
       <button onclick="dpToggleSavedTray()" id="dp-saved-btn" style="width:100%; margin-top:8px; background:rgba(255,255,255,0.08); color:#fff; border:none; padding:10px; border-radius:12px; font-weight:600; font-size:12px; cursor:pointer; display:none;">📂 Saved Designs (<span id="dp-saved-count-btn">0</span>)</button>
 
+      <!-- Specialist Glazes — Jungle Gems, Elements, French Dimensions -->
+      <div style="margin-top:10px;">
+        <button onclick="dpToggleSpecialistGlazes()" style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#fff;padding:10px 14px;border-radius:12px;font-weight:600;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;" id="dp-specialist-btn">
+          <span>✨ Specialist Glazes</span>
+          <span style="font-size:11px;color:rgba(255,255,255,0.5);">+£2.00 each  ▾</span>
+        </button>
+        <div id="dp-specialist-panel" style="display:none;margin-top:8px;background:rgba(255,255,255,0.05);border-radius:12px;padding:12px;">
+          <div style="font-size:11px;color:rgba(255,255,255,0.5);line-height:1.5;margin-bottom:10px;">
+            These specialist glazes create stunning effects in the kiln — crystals, reactive metallics, and dimensional raised finishes. Each one adds <strong style="color:var(--link-clay);">£2.00</strong> to your bill, added automatically when you select it.
+          </div>
+
+          <!-- Jungle Gems -->
+          <div style="font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#CE93D8;margin-bottom:6px;">✨ Jungle Gems™ — Crystal Glazes</div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:8px;line-height:1.4;">Fire to create magical crystal formations. No two pieces are ever the same.</div>
+          <div id="dp-jungle-gems" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;"></div>
+
+          <!-- Elements -->
+          <div style="font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#FFCC80;margin-bottom:6px;">🌋 Elements™ — Reactive Glazes</div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:8px;line-height:1.4;">Shift and move in the kiln to create rich, layered colour effects.</div>
+          <div id="dp-elements" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;"></div>
+
+          <!-- French Dimensions -->
+          <div style="font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#90CAF9;margin-bottom:6px;">🎨 French Dimensions™ — Dimensional Glaze</div>
+          <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:8px;line-height:1.4;">Raised, textured finishes that stand proud of the surface after firing.</div>
+          <div id="dp-french-dims" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;"></div>
+
+          <div id="dp-specialist-selected" style="display:none;background:rgba(184,121,70,0.15);border:1px solid rgba(184,121,70,0.3);border-radius:10px;padding:10px;margin-top:10px;">
+            <div style="font-size:12px;font-weight:700;color:white;margin-bottom:4px;" id="dp-specialist-name"></div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:8px;" id="dp-specialist-code"></div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:8px;line-height:1.4;" id="dp-specialist-desc"></div>
+            <button onclick="dpConfirmSpecialistGlaze()" style="width:100%;background:var(--link-clay);color:#fff;border:none;padding:9px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;">Add to my bill — £2.00 ✓</button>
+          </div>
+        </div>
+      </div>
+
       <button onclick="openPrintRequestFor('designPreview')" style="width:100%; margin-top:8px; background:var(--glaze-oxblood-base); color:#fff; border:none; padding:12px; border-radius:12px; font-weight:700; font-size:13px; cursor:pointer;">🖨️ Print as Transfer — £1</button>
     </div>
   </div>
@@ -3643,6 +3678,126 @@
       dpColor = dpLastMatchedColour;
       renderDpPalette();
       setDpTool('brush'); // switch to brush so they can start painting
+    }
+
+    // ── Specialist Glazes in Design Preview ──
+    const DP_SPECIALIST_GLAZES = {
+      jungleGems: [
+        { code:'CG-785', name:'Royal Fantasy', hex:'#6B2DA8', desc:'Deep purple crystals — dramatic and regal.' },
+        { code:'CG-974', name:"Bloomin' Blue", hex:'#2979CC', desc:'Sky blue crystals that bloom beautifully.' },
+        { code:'CG-717', name:'Pistachio', hex:'#7CB87C', desc:'Soft green crystals, fresh and organic.' },
+        { code:'CG-756', name:'Firecracker', hex:'#E53935', desc:'Vivid red crystals — bold and striking.' },
+        { code:'CG-962', name:'Blue Azure', hex:'#1565C0', desc:'Deep ocean blue crystal formations.' },
+        { code:'CG-780', name:'Mystic Jade', hex:'#00796B', desc:'Teal jade crystals, serene and beautiful.' },
+        { code:'CG-798', name:'Black Iris', hex:'#37306B', desc:'Dark purple-black with violet crystals.' },
+        { code:'CG-965', name:'Mocha Marble', hex:'#795548', desc:'Warm brown with golden crystal flecks.' },
+        { code:'CG-718', name:'Blue Caprice', hex:'#4FC3F7', desc:'Pale ice blue crystals, delicate and dreamy.' },
+        { code:'CG-753', name:'Sassy Orange', hex:'#F57C00', desc:'Warm amber crystals, energetic and warm.' },
+        { code:'CG-964', name:'Kaleidoscope', hex:'#AA00FF', desc:'Multi-colour shifting crystals.' },
+        { code:'CG-970', name:'Masquerade', hex:'#880E4F', desc:'Deep rose pink crystals.' },
+        { code:'CG-1000', name:'Mardi Gras', hex:'#9C27B0', desc:'Festive purple crystal celebrations.' },
+        { code:'CG-1001', name:'Gogh Iris', hex:'#5C6BC0', desc:'Soft blue-violet iris-inspired crystals.' },
+        { code:'CG-1002', name:'Day Lily', hex:'#F48FB1', desc:'Pretty blush pink crystal petals.' },
+        { code:'CG-1004', name:'Berry Tart', hex:'#AD1457', desc:'Rich berry red crystals.' },
+      ],
+      elements: [
+        { code:'EL-101', name:'Rainforest', hex:'#2E7D32', desc:'Rich greens that shift and move like a forest canopy.' },
+        { code:'EL-102', name:'Ocean', hex:'#01579B', desc:'Deep ocean blues that pool and flow.' },
+        { code:'EL-103', name:'Sahara', hex:'#E65100', desc:'Warm desert orange that breaks and bleeds.' },
+        { code:'EL-104', name:'Sedona', hex:'#BF360C', desc:'Deep terracotta red, earthy and raw.' },
+        { code:'EL-105', name:'Midnight', hex:'#1A237E', desc:'Dark indigo that shifts to blue-black.' },
+        { code:'EL-106', name:'Shale', hex:'#546E7A', desc:'Cool grey-blue, mineral and textured.' },
+        { code:'EL-107', name:'Sandstone', hex:'#8D6E63', desc:'Warm sandy tan with earthy movement.' },
+        { code:'EL-108', name:'Copper', hex:'#BF8040', desc:'Metallic copper tones that oxidise beautifully.' },
+      ],
+      frenchDims: [
+        { code:'FD-200', name:'White', hex:'#F0EEE8', desc:'Raised white dimensional lines and dots.' },
+        { code:'FD-201', name:'Ivory', hex:'#E8DFC0', desc:'Soft ivory raised texture.' },
+        { code:'FD-202', name:'Black', hex:'#2a2a2a', desc:'Bold black raised dimensional outlines.' },
+        { code:'FD-203', name:'Gold', hex:'#C9A43A', desc:'Luxurious gold raised accents.' },
+      ],
+    };
+
+    let dpPendingSpecialist = null;
+
+    function dpRenderSpecialistGlazes() {
+      const groups = [
+        { key:'jungleGems', elId:'dp-jungle-gems' },
+        { key:'elements',   elId:'dp-elements'    },
+        { key:'frenchDims', elId:'dp-french-dims'  },
+      ];
+      groups.forEach(({ key, elId }) => {
+        const el = document.getElementById(elId);
+        if (!el || el.children.length) return;
+        el.innerHTML = DP_SPECIALIST_GLAZES[key].map(g => `
+          <div onclick="dpSelectSpecialist('${key}','${g.code}')"
+            title="${g.name} (${g.code})"
+            id="dp-sg-${g.code}"
+            style="width:34px;height:34px;border-radius:8px;background:${g.hex};
+              border:2px solid rgba(255,255,255,0.15);cursor:pointer;flex-shrink:0;
+              transition:transform .15s,border-color .15s;"
+            onmouseover="this.style.transform='scale(1.15)'"
+            onmouseout="this.style.transform='scale(1)'">
+          </div>
+        `).join('');
+      });
+    }
+
+    function dpSelectSpecialist(group, code) {
+      const glaze = DP_SPECIALIST_GLAZES[group].find(g => g.code === code);
+      if (!glaze) return;
+      dpPendingSpecialist = glaze;
+      document.querySelectorAll('[id^="dp-sg-"]').forEach(el => el.style.outline = 'none');
+      const sw = document.getElementById(`dp-sg-${code}`);
+      if (sw) sw.style.outline = '2px solid var(--link-clay)';
+      document.getElementById('dp-specialist-name').textContent = glaze.name;
+      document.getElementById('dp-specialist-code').textContent = `${code} · £2.00 added to your bill`;
+      document.getElementById('dp-specialist-desc').textContent = glaze.desc;
+      document.getElementById('dp-specialist-selected').style.display = 'block';
+    }
+
+    function dpToggleSpecialistGlazes() {
+      const panel = document.getElementById('dp-specialist-panel');
+      const open = panel.style.display !== 'none';
+      panel.style.display = open ? 'none' : 'block';
+      if (!open) dpRenderSpecialistGlazes();
+    }
+
+    async function dpConfirmSpecialistGlaze() {
+      if (!dpPendingSpecialist) return;
+      const glaze = dpPendingSpecialist;
+      const btn = document.querySelector('#dp-specialist-selected button');
+      btn.textContent = 'Adding…'; btn.disabled = true;
+      try {
+        const bookingCode = window.currentBooking?.code;
+        if (bookingCode) {
+          await fetch(`${API_URL}/api/extras/charge`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              studioId: STUDIO_ID, bookingCode,
+              itemName: `Specialist Glaze: ${glaze.name} (${glaze.code})`,
+              amountCents: 200
+            })
+          });
+        }
+      } catch(e) { /* fail silently — still let them paint */ }
+
+      // Use the colour and switch to brush
+      dpColor = glaze.hex;
+      renderDpPalette();
+      setDpTool('brush');
+
+      btn.textContent = '✓ Added — happy painting!';
+      btn.style.background = '#2e7d32';
+      setTimeout(() => {
+        document.getElementById('dp-specialist-selected').style.display = 'none';
+        document.getElementById('dp-specialist-panel').style.display = 'none';
+        btn.textContent = 'Add to my bill — £2.00 ✓';
+        btn.style.background = 'var(--link-clay)';
+        btn.disabled = false;
+        dpPendingSpecialist = null;
+      }, 2000);
     }
 
     function setDpBrushSize(size, el) {
