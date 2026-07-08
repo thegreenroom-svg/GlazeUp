@@ -3174,6 +3174,209 @@ app.post('/api/pieces/complete-unfinished', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════
+// LOYALTY SYSTEM
+// Silver / Gold / Platinum tiers
+// Points earned on visits, spend, drinks orders
+// Rewards: free bisque, discounts, free drinks,
+// priority booking, Take It Home unlock
+// ═══════════════════════════════════════════
+
+const LOYALTY_TIERS = {
+  silver:   { name: 'Silver',   emoji: '🥈', minVisits: 3,  minSpend: 5000,  color: '#9E9E9E' },
+  gold:     { name: 'Gold',     emoji: '🥇', minVisits: 8,  minSpend: 15000, color: '#F9A825' },
+  platinum: { name: 'Platinum', emoji: '💎', minVisits: 15, minSpend: 30000, color: '#7B1FA2' },
+};
+
+const LOYALTY_REWARDS = {
+  silver:   { freeBisque: 'Small piece (e.g. mug)', glazingDiscount: 5,  freeDrink: false, priorityBooking: false, takeItHome: false },
+  gold:     { freeBisque: 'Medium piece (e.g. bowl)', glazingDiscount: 10, freeDrink: true,  priorityBooking: true,  takeItHome: false },
+  platinum: { freeBisque: 'Large piece — your choice', glazingDiscount: 15, freeDrink: true,  priorityBooking: true,  takeItHome: true },
+};
+
+function calcLoyaltyTier(visits, totalSpendCents) {
+  if (visits >= LOYALTY_TIERS.platinum.minVisits || totalSpendCents >= LOYALTY_TIERS.platinum.minSpend) return 'platinum';
+  if (visits >= LOYALTY_TIERS.gold.minVisits || totalSpendCents >= LOYALTY_TIERS.gold.minSpend) return 'gold';
+  if (visits >= LOYALTY_TIERS.silver.minVisits || totalSpendCents >= LOYALTY_TIERS.silver.minSpend) return 'silver';
+  return null;
+}
+
+function loyaltyProgress(visits, totalSpendCents) {
+  const tier = calcLoyaltyTier(visits, totalSpendCents);
+  if (tier === 'platinum') return { nextTier: null, pct: 100, message: 'Maximum tier reached!' };
+
+  const next = tier === 'gold' ? 'platinum' : tier === 'silver' ? 'gold' : 'silver';
+  const t = LOYALTY_TIERS[next];
+  const visitPct = Math.min(100, Math.round((visits / t.minVisits) * 100));
+  const spendPct = Math.min(100, Math.round((totalSpendCents / t.minSpend) * 100));
+  const pct = Math.max(visitPct, spendPct);
+  const visitsNeeded = Math.max(0, t.minVisits - visits);
+  const spendNeeded = Math.max(0, t.minSpend - totalSpendCents);
+  let message = '';
+  if (visitsNeeded === 0) message = `${spendNeeded > 0 ? `Spend £${(spendNeeded/100).toFixed(0)} more for` : 'Ready for'} ${LOYALTY_TIERS[next].name}!`;
+  else if (spendNeeded === 0) message = `${visitsNeeded} more visit${visitsNeeded > 1 ? 's' : ''} for ${LOYALTY_TIERS[next].name}!`;
+  else message = `${visitsNeeded} more visit${visitsNeeded > 1 ? 's' : ''} or spend £${(spendNeeded/100).toFixed(0)} more for ${LOYALTY_TIERS[next].name}`;
+  return { nextTier: next, pct, message };
+}
+
+// GET /api/loyalty/customer — get full loyalty profile for a customer by name
+app.get('/api/loyalty/customer', async (req, res) => {
+  const { studioId, customerName, customerId } = req.query;
+  if (!studioId || (!customerName && !customerId)) return res.status(400).json({ error: 'studioId and customerName or customerId required' });
+
+  try {
+    let query = supabase.from('customers').select('*').eq('studio_id', studioId);
+    if (customerId) query = query.eq('id', customerId);
+    else query = query.ilike('name', `%${customerName}%`);
+    const { data: customers } = await query.limit(5);
+
+    if (!customers?.length) return res.json({ found: false });
+
+    const customer = customers[0];
+    const visits = customer.visit_count || 0;
+    const totalSpend = customer.total_spend_cents || 0;
+    const tier = calcLoyaltyTier(visits, totalSpend);
+    const progress = loyaltyProgress(visits, totalSpend);
+
+    // Get recent transactions
+    const { data: transactions } = await supabase
+      .from('loyalty_transactions')
+      .select('*')
+      .eq('customer_id', customer.id)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    res.json({
+      found: true,
+      customer: {
+        id: customer.id,
+        name: customer.name,
+        email: customer.email,
+        visits,
+        totalSpendCents: totalSpend,
+        totalSpendFormatted: `£${(totalSpend/100).toFixed(2)}`,
+        loyaltyPoints: customer.loyalty_points || 0,
+        totalPiecesPainted: customer.total_pieces_painted || 0,
+        tier,
+        tierInfo: tier ? { ...LOYALTY_TIERS[tier], rewards: LOYALTY_REWARDS[tier] } : null,
+        progress,
+        rewards: tier ? LOYALTY_REWARDS[tier] : null,
+        joinedAt: customer.created_at,
+      },
+      recentTransactions: transactions || [],
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/loyalty/visit — record a visit and award visit points
+app.post('/api/loyalty/visit', async (req, res) => {
+  const { studioId, customerId, bookingCode, spendCents } = req.body;
+  if (!studioId || !customerId) return res.status(400).json({ error: 'studioId and customerId required' });
+
+  try {
+    const { data: customer } = await supabase.from('customers').select('*').eq('id', customerId).single();
+    if (!customer) return res.status(404).json({ error: 'Customer not found' });
+
+    const newVisits = (customer.visit_count || 0) + 1;
+    const newSpend = (customer.total_spend_cents || 0) + (spendCents || 0);
+    const visitPoints = 10; // 10 points per visit
+    const spendPoints = Math.floor((spendCents || 0) / 100); // 1 point per £1
+    const totalNewPoints = visitPoints + spendPoints;
+    const newPoints = (customer.loyalty_points || 0) + totalNewPoints;
+
+    const prevTier = calcLoyaltyTier(customer.visit_count || 0, customer.total_spend_cents || 0);
+    const newTier = calcLoyaltyTier(newVisits, newSpend);
+    const tierUpgrade = newTier !== prevTier && newTier !== null;
+
+    // Update customer
+    await supabase.from('customers').update({
+      visit_count: newVisits,
+      total_spend_cents: newSpend,
+      loyalty_points: newPoints,
+      loyalty_tier: newTier || customer.loyalty_tier,
+      last_visit_at: new Date().toISOString(),
+    }).eq('id', customerId);
+
+    // Log transaction
+    await supabase.from('loyalty_transactions').insert({
+      studio_id: studioId,
+      customer_id: customerId,
+      booking_code: bookingCode || null,
+      points_earned: totalNewPoints,
+      transaction_type: 'visit',
+      description: `Visit #${newVisits} — ${visitPoints} visit points + ${spendPoints} spend points${spendCents ? ` (£${(spendCents/100).toFixed(2)} spent)` : ''}`,
+    });
+
+    res.json({
+      visitCount: newVisits,
+      pointsEarned: totalNewPoints,
+      totalPoints: newPoints,
+      tier: newTier,
+      tierUpgrade,
+      progress: loyaltyProgress(newVisits, newSpend),
+      rewards: newTier ? LOYALTY_REWARDS[newTier] : null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/loyalty/drinks-points — award bonus points for a drinks order
+app.post('/api/loyalty/drinks-points', async (req, res) => {
+  const { studioId, customerId, bookingCode, itemCount } = req.body;
+  if (!studioId || !customerId) return res.status(400).json({ error: 'missing fields' });
+  const bonusPoints = (itemCount || 1) * 5; // 5 points per drink item
+  try {
+    const { data: customer } = await supabase.from('customers').select('loyalty_points').eq('id', customerId).single();
+    await supabase.from('customers').update({ loyalty_points: (customer?.loyalty_points || 0) + bonusPoints }).eq('id', customerId);
+    await supabase.from('loyalty_transactions').insert({
+      studio_id: studioId, customer_id: customerId, booking_code: bookingCode || null,
+      points_earned: bonusPoints, transaction_type: 'drinks',
+      description: `Drinks order — ${bonusPoints} bonus points`,
+    });
+    res.json({ pointsEarned: bonusPoints });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/loyalty/redeem — staff redeem a reward for a customer
+app.post('/api/loyalty/redeem', async (req, res) => {
+  const { studioId, customerId, bookingCode, rewardType } = req.body;
+  if (!studioId || !customerId || !rewardType) return res.status(400).json({ error: 'missing fields' });
+  const rewardLabels = {
+    free_bisque: 'Free bisque piece redeemed',
+    free_drink: 'Free drink redeemed',
+    discount_applied: 'Glazing discount applied',
+    take_it_home: 'Take It Home unlock redeemed',
+  };
+  try {
+    await supabase.from('loyalty_transactions').insert({
+      studio_id: studioId, customer_id: customerId, booking_code: bookingCode || null,
+      points_earned: 0, transaction_type: 'redeem',
+      description: rewardLabels[rewardType] || rewardType,
+    });
+    res.json({ redeemed: true, reward: rewardType });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/loyalty/leaderboard — top customers by tier/points for a studio
+app.get('/api/loyalty/leaderboard', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data } = await supabase.from('customers')
+    .select('name, loyalty_points, visit_count, total_spend_cents, loyalty_tier')
+    .eq('studio_id', studioId)
+    .not('loyalty_tier', 'is', null)
+    .order('loyalty_points', { ascending: false })
+    .limit(20);
+  res.json({ customers: data || [] });
+});
+
+// ═══════════════════════════════════════════
 // WEBHOOK HANDLERS
 // ═══════════════════════════════════════════
 

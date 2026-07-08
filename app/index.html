@@ -1757,6 +1757,23 @@
             <div class="tile-desc">See your past visits and anything coming up.</div>
           </button>
 
+          <!-- Loyalty card — populated dynamically once booking loads -->
+          <div id="loyalty-tile" style="display:none; border-radius:16px; overflow:hidden; margin-bottom:2px;">
+            <div id="loyalty-tile-inner" style="padding:16px; position:relative; min-height:90px;">
+              <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,0.6);margin-bottom:4px;" id="loyalty-tile-label">Loyalty</div>
+              <div style="font-size:20px;font-weight:700;color:white;margin-bottom:2px;" id="loyalty-tile-tier">Loading…</div>
+              <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-bottom:10px;" id="loyalty-tile-progress"></div>
+              <!-- Progress bar -->
+              <div style="height:4px;background:rgba(255,255,255,0.2);border-radius:2px;overflow:hidden;">
+                <div id="loyalty-tile-bar" style="height:100%;background:white;border-radius:2px;transition:width .6s ease;width:0%;"></div>
+              </div>
+              <!-- Rewards summary -->
+              <div id="loyalty-tile-rewards" style="margin-top:10px;font-size:11px;color:rgba(255,255,255,0.8);line-height:1.5;"></div>
+              <!-- Tier badge -->
+              <div id="loyalty-tile-badge" style="position:absolute;top:14px;right:14px;font-size:28px;"></div>
+            </div>
+          </div>
+
           <button class="tile tile-sage" onclick="window.open('https://www.thekilncafe.com/how-to-video', '_blank')">
             <span class="tile-icon">🎥</span>
             <div class="tile-title">Painting Guide</div>
@@ -1834,6 +1851,7 @@
 
       updateHomeAccessTile();
       wtShowTrigger();
+      loadLoyaltyTile();
     }
 
     function showMyQR() {
@@ -2695,6 +2713,68 @@
     // on the customer's current booking (no login system, so this is how
     // we find "their" other visits). Read-only — booking a NEW session
     // still needs Square write-access, a separate step. ──
+    // ── Loyalty System ──
+    const TIER_COLORS = { silver: '#757575', gold: '#F9A825', platinum: '#7B1FA2' };
+    const TIER_GRADIENTS = {
+      silver:   'linear-gradient(135deg, #616161 0%, #9E9E9E 100%)',
+      gold:     'linear-gradient(135deg, #F57F17 0%, #FDD835 100%)',
+      platinum: 'linear-gradient(135deg, #4A148C 0%, #9C27B0 100%)',
+    };
+    const TIER_EMOJIS = { silver: '🥈', gold: '🥇', platinum: '💎' };
+
+    async function loadLoyaltyTile() {
+      const customerName = window.currentBooking?.name;
+      if (!customerName) return;
+      try {
+        const res = await fetch(`${API_URL}/api/loyalty/customer?studioId=${STUDIO_ID}&customerName=${encodeURIComponent(customerName)}`);
+        const data = await res.json();
+        if (!data.found) {
+          // Show a "start earning" state
+          const tile = document.getElementById('loyalty-tile');
+          const inner = document.getElementById('loyalty-tile-inner');
+          tile.style.display = 'block';
+          inner.style.background = 'linear-gradient(135deg, #2B2724 0%, #4a3f38 100%)';
+          document.getElementById('loyalty-tile-badge').textContent = '⭐';
+          document.getElementById('loyalty-tile-tier').textContent = 'Start earning rewards';
+          document.getElementById('loyalty-tile-progress').textContent = '3 visits or £50 spent for Silver';
+          document.getElementById('loyalty-tile-rewards').textContent = '';
+          document.getElementById('loyalty-tile-bar').style.width = '0%';
+          return;
+        }
+        const { customer } = data;
+        const tile = document.getElementById('loyalty-tile');
+        const inner = document.getElementById('loyalty-tile-inner');
+        tile.style.display = 'block';
+
+        if (customer.tier) {
+          inner.style.background = TIER_GRADIENTS[customer.tier];
+          document.getElementById('loyalty-tile-badge').textContent = TIER_EMOJIS[customer.tier];
+          document.getElementById('loyalty-tile-tier').textContent = `${TIER_EMOJIS[customer.tier]} ${customer.tierInfo.name} Member`;
+          document.getElementById('loyalty-tile-label').textContent = `${customer.visits} visit${customer.visits !== 1 ? 's' : ''} · ${customer.totalSpendFormatted} spent`;
+          document.getElementById('loyalty-tile-progress').textContent = customer.progress.message;
+          document.getElementById('loyalty-tile-bar').style.width = customer.progress.pct + '%';
+
+          const r = customer.rewards;
+          const rewardLines = [
+            `🎁 Free bisque: ${r.freeBisque}`,
+            `🎨 ${r.glazingDiscount}% off glazing`,
+            r.freeDrink ? '☕ Free drink each visit' : null,
+            r.priorityBooking ? '⚡ Priority booking' : null,
+            r.takeItHome ? '🏠 Take It Home — free' : null,
+          ].filter(Boolean);
+          document.getElementById('loyalty-tile-rewards').innerHTML = rewardLines.map(l => `<div>${l}</div>`).join('');
+        } else {
+          inner.style.background = 'linear-gradient(135deg, #2B2724 0%, #4a3f38 100%)';
+          document.getElementById('loyalty-tile-badge').textContent = '⭐';
+          document.getElementById('loyalty-tile-tier').textContent = 'Start earning rewards';
+          document.getElementById('loyalty-tile-label').textContent = `${customer.visits} visit${customer.visits !== 1 ? 's' : ''} so far`;
+          document.getElementById('loyalty-tile-progress').textContent = customer.progress.message;
+          document.getElementById('loyalty-tile-bar').style.width = customer.progress.pct + '%';
+          document.getElementById('loyalty-tile-rewards').textContent = 'Reach Silver for your first rewards';
+        }
+      } catch (e) { /* silent */ }
+    }
+
     function openMyBookings() {
       const screen = document.getElementById('my-bookings-screen');
       screen.style.display = 'flex';

@@ -1249,6 +1249,16 @@
           </div>
         </div>
 
+        <!-- Loyalty Leaderboard -->
+        <div class="chart-container">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <h3 style="margin:0;">🏆 Loyal Customers</h3>
+            <button onclick="loadLoyaltyLeaderboard()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
+          </div>
+          <div style="font-size:11px;color:var(--gu-dust);margin-bottom:12px;">Your top customers by loyalty tier and points. Tier is awarded automatically based on visit count or total spend.</div>
+          <div id="loyalty-leaderboard-list"><div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">Loading…</div></div>
+        </div>
+
         <!-- Device slots panel -->
         <div class="chart-container">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
@@ -1456,6 +1466,16 @@
             <div class="booking-header">
               <div class="name" id="s1-customer-display">—</div>
               <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;" id="s1-party-display"></div>
+            </div>
+
+            <!-- Loyalty status panel -->
+            <div id="s1-loyalty-panel" style="display:none; border-radius:10px; padding:12px 14px; margin:10px 0; position:relative; overflow:hidden;">
+              <div style="font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,0.65);margin-bottom:3px;" id="s1-loyalty-label">Loyalty</div>
+              <div style="font-size:16px;font-weight:700;color:white;" id="s1-loyalty-tier"></div>
+              <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:2px;" id="s1-loyalty-stats"></div>
+              <div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,0.85);line-height:1.55;" id="s1-loyalty-rewards"></div>
+              <div style="position:absolute;top:12px;right:12px;font-size:24px;" id="s1-loyalty-badge"></div>
+              <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;" id="s1-loyalty-actions"></div>
             </div>
 
             <div id="s1-returning-section" style="display: none; padding: 12px; background: #fff3f0; border-radius: 8px; margin: 12px 0; border-left: 4px solid #d9534f;">
@@ -3002,6 +3022,82 @@ function swtShowTrigger() {
   }, 2000);
 }
 
+// ── Loyalty System ──
+const STAFF_TIER_GRADIENTS = {
+  silver:   'linear-gradient(135deg,#616161,#9E9E9E)',
+  gold:     'linear-gradient(135deg,#F57F17,#FDD835)',
+  platinum: 'linear-gradient(135deg,#4A148C,#9C27B0)',
+  none:     'linear-gradient(135deg,#4a3f38,#2B2724)',
+};
+const STAFF_TIER_EMOJIS = { silver:'🥈', gold:'🥇', platinum:'💎', none:'⭐' };
+
+async function loadS1LoyaltyPanel(customerName) {
+  const panel = document.getElementById('s1-loyalty-panel');
+  if (!panel || !customerName) return;
+  try {
+    const res = await fetch(`${API_URL}/api/loyalty/customer?studioId=${studioId}&customerName=${encodeURIComponent(customerName)}`);
+    const data = await res.json();
+
+    panel.style.display = 'block';
+    if (!data.found) {
+      panel.style.background = STAFF_TIER_GRADIENTS.none;
+      document.getElementById('s1-loyalty-badge').textContent = '⭐';
+      document.getElementById('s1-loyalty-tier').textContent = 'New customer — no loyalty history yet';
+      document.getElementById('s1-loyalty-stats').textContent = '3 visits or £50 spend earns Silver';
+      document.getElementById('s1-loyalty-rewards').textContent = '';
+      document.getElementById('s1-loyalty-actions').innerHTML = '';
+      return;
+    }
+
+    const { customer } = data;
+    const tier = customer.tier || 'none';
+    panel.style.background = STAFF_TIER_GRADIENTS[tier] || STAFF_TIER_GRADIENTS.none;
+    document.getElementById('s1-loyalty-badge').textContent = STAFF_TIER_EMOJIS[tier] || '⭐';
+    document.getElementById('s1-loyalty-label').textContent = `${customer.visits} visit${customer.visits !== 1?'s':''} · ${customer.totalSpendFormatted} spent · ${customer.loyaltyPoints} pts`;
+
+    if (tier && tier !== 'none') {
+      document.getElementById('s1-loyalty-tier').textContent = `${STAFF_TIER_EMOJIS[tier]} ${customer.tierInfo.name} Member`;
+      const r = customer.rewards;
+      document.getElementById('s1-loyalty-rewards').innerHTML = [
+        `🎁 Free bisque: ${r.freeBisque}`,
+        `🎨 ${r.glazingDiscount}% glazing discount`,
+        r.freeDrink ? '☕ Free drink this visit' : null,
+        r.priorityBooking ? '⚡ Priority booking' : null,
+        r.takeItHome ? '🏠 Take It Home — free' : null,
+      ].filter(Boolean).map(l=>`<div>${l}</div>`).join('');
+
+      // Reward action buttons for staff to tick off
+      const actions = [];
+      if (r.freeBisque) actions.push(`<button onclick="redeemLoyaltyReward('${customer.id}','free_bisque')" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:5px 10px;font-size:11px;color:white;cursor:pointer;">✓ Redeem free bisque</button>`);
+      if (r.freeDrink) actions.push(`<button onclick="redeemLoyaltyReward('${customer.id}','free_drink')" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:5px 10px;font-size:11px;color:white;cursor:pointer;">✓ Redeem free drink</button>`);
+      if (r.glazingDiscount) actions.push(`<button onclick="redeemLoyaltyReward('${customer.id}','discount_applied')" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:5px 10px;font-size:11px;color:white;cursor:pointer;">✓ Apply ${r.glazingDiscount}% discount</button>`);
+      if (r.takeItHome) actions.push(`<button onclick="redeemLoyaltyReward('${customer.id}','take_it_home')" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:5px 10px;font-size:11px;color:white;cursor:pointer;">✓ Grant Take It Home free</button>`);
+      document.getElementById('s1-loyalty-actions').innerHTML = actions.join('');
+    } else {
+      document.getElementById('s1-loyalty-tier').textContent = 'Working towards Silver';
+      document.getElementById('s1-loyalty-rewards').textContent = customer.progress.message;
+      document.getElementById('s1-loyalty-actions').innerHTML = '';
+    }
+  } catch(e) {
+    const panel = document.getElementById('s1-loyalty-panel');
+    if (panel) panel.style.display = 'none';
+  }
+}
+
+async function redeemLoyaltyReward(customerId, rewardType) {
+  const bookingCode = document.getElementById('s1-result').dataset.bookingCode || null;
+  try {
+    await fetch(`${API_URL}/api/loyalty/redeem`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ studioId, customerId, bookingCode, rewardType })
+    });
+    // Find and update the button
+    event.target.textContent = '✓ Redeemed';
+    event.target.style.background = 'rgba(255,255,255,0.4)';
+    event.target.disabled = true;
+  } catch(e) { alert('Could not record redemption: ' + e.message); }
+}
+
 // ── KDS Configuration ──
 function onKdsTypeChange() {
   const type = document.getElementById('kds-type').value;
@@ -3045,12 +3141,7 @@ async function saveKdsConfig() {
   }
 }
 
-// Load KDS config when setup tab is opened
-const _origLoadConnection = loadConnectionStatus;
-loadConnectionStatus = async function() {
-  await _origLoadConnection();
-  loadKdsConfig();
-};
+// Load KDS config when setup tab is opened — called directly from loadConnectionStatus
 
 // ── Daily Menu management ──
 async function loadDailyMenu() {
@@ -3214,10 +3305,42 @@ async function loadTodaysExtraCharges() {
   }
 }
 
+async function loadLoyaltyLeaderboard() {
+  const el = document.getElementById('loyalty-leaderboard-list');
+  if (!el) return;
+  try {
+    const res = await fetch(`${API_URL}/api/loyalty/leaderboard?studioId=${studioId}`);
+    const data = await res.json();
+    if (!data.customers?.length) {
+      el.innerHTML = '<p style="color:var(--gu-dust);font-size:13px;padding:8px 0;">No loyalty members yet — tiers are awarded automatically as customers visit and spend.</p>';
+      return;
+    }
+    const EMOJIS = { silver:'🥈', gold:'🥇', platinum:'💎' };
+    const COLORS = { silver:'#9E9E9E', gold:'#F9A825', platinum:'#7B1FA2' };
+    el.innerHTML = data.customers.map((c, i) => `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--gu-bg);border-radius:8px;margin-bottom:6px;border-left:4px solid ${COLORS[c.loyalty_tier]||'var(--gu-border)'};">
+        <div style="font-size:18px;flex-shrink:0;">${EMOJIS[c.loyalty_tier]||'⭐'}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;">${c.name}</div>
+          <div style="font-size:11px;color:var(--gu-dust);">${c.visit_count||0} visits · £${((c.total_spend_cents||0)/100).toFixed(0)} spent</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:12px;font-weight:700;color:${COLORS[c.loyalty_tier]||'var(--gu-dust)'};">${c.loyalty_tier ? c.loyalty_tier.charAt(0).toUpperCase()+c.loyalty_tier.slice(1) : '—'}</div>
+          <div style="font-size:11px;color:var(--gu-dust);">${c.loyalty_points||0} pts</div>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) {
+    el.innerHTML = '<p style="color:var(--gu-dust);font-size:13px;">Could not load loyalty data.</p>';
+  }
+}
+
 async function populateDashboard() {
   loadTodaysExtraCharges();
   loadDevicePanel();
+  loadLoyaltyLeaderboard();
   swtShowTrigger();
+  startExtrasPollingOnLoad();
   try {
     const data = await loadDashboardData();
     
@@ -3589,6 +3712,8 @@ async function loadConnectionStatus() {
 
     // Table tracking mode
     if (modeSelect) modeSelect.value = data.tableTrackingMode || 'none';
+    // Also load KDS config
+    loadKdsConfig();
   } catch (err) {
     console.error('Error loading connection status:', err);
     squareBadge.innerHTML = `<span class="status-badge pending">Could not check status</span>`;
@@ -3923,6 +4048,10 @@ function displayBookingResult(bookingData) {
   document.getElementById('s1-step-start').style.display = 'none';
   document.getElementById('s1-step-existing').style.display = 'none';
   document.getElementById('s1-result').style.display = 'block';
+  document.getElementById('s1-result').dataset.bookingCode = bookingData.bookingCode || '';
+
+  // Load loyalty panel for this customer
+  loadS1LoyaltyPanel(bookingData.customerName);
 }
 
 async function openTableSession() {
@@ -5854,11 +5983,13 @@ function startExtrasPolling() {
 }
 
 // Wire into populateDashboard — start polling when the dashboard loads
-const _origPopulate = populateDashboard;
-populateDashboard = async function() {
-  await _origPopulate();
-  if (!extrasAlertTimer) startExtrasPolling();
-};
+function startExtrasPollingOnLoad() {
+  if (!extrasAlertTimer) {
+    pollExtrasForAlerts().then(() => {
+      extrasAlertTimer = setInterval(pollExtrasForAlerts, 30 * 1000);
+    });
+  }
+}
 
 </script>
 
