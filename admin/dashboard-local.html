@@ -462,6 +462,45 @@
     .glaze-honey { background: #c9a06b; }
     .glaze-sage  { background: var(--glaze-sage-base); }
 
+    /* ── Till-screen tiles: big, bold, square, tap-through-the-flow style,
+       matching the customer app's chunky tile feel — used for the
+       item-selection / action buttons staff tap repeatedly during service ── */
+    .till-tile {
+      background: var(--link-charcoal);
+      color: #fff;
+      border: none;
+      border-radius: 16px;
+      padding: 18px 14px;
+      min-height: 84px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      gap: 4px;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(43,39,36,0.1), 0 6px 16px -6px rgba(43,39,36,0.2);
+      transition: transform 0.12s ease, opacity 0.12s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .till-tile:active {
+      transform: scale(0.96);
+      opacity: 0.85;
+    }
+    .till-tile-name {
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+    .till-tile-price {
+      font-size: 13px;
+      font-weight: 600;
+      opacity: 0.85;
+    }
+    .till-tile.glaze-ocean, .till-tile.glaze-honey, .till-tile.glaze-sage {
+      color: #fff;
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .btn-connect, .btn-connect:hover, .btn-connect:active {
         transition: none;
@@ -1335,7 +1374,7 @@
             <!-- Browse Square catalog (pottery, drinks, cakes) -->
             <div style="margin-bottom: 16px;">
               <div id="s2-catalog-tabs" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 10px; -webkit-overflow-scrolling: touch;"></div>
-              <div id="s2-catalog-items" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 240px; overflow-y: auto;"></div>
+              <div id="s2-catalog-items" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-height: 320px; overflow-y: auto; padding: 2px;"></div>
             </div>
 
             <!-- Manual entry fallback (for extra glazes or anything not in Square) -->
@@ -2619,10 +2658,10 @@ function renderBookingButton(b) {
     : '';
   const table = b.table_number ? ` · ${b.table_number}` : '';
   return `
-    <button class="tap-row" onclick='selectTodaysBooking(${JSON.stringify(b).replace(/'/g, "&apos;")})' style="width: 100%; text-align: left; padding: 12px; background: #fff9f0; border: 1px solid var(--gu-border); border-left: 4px solid var(--gu-primary); border-radius: 8px; margin-bottom: 8px; cursor: pointer;">
-      <div style="display: flex; justify-content: space-between;">
-        <strong style="font-size: 13px;">${b.customer_name}</strong>
-        <span style="font-size: 11px; color: var(--gu-dust);">${time}${table}</span>
+    <button class="tap-row" onclick='selectTodaysBooking(${JSON.stringify(b).replace(/'/g, "&apos;")})' style="width: 100%; text-align: left; padding: 16px; background: #fff9f0; border: 1.5px solid var(--gu-border); border-left: 5px solid var(--link-clay); border-radius: 14px; margin-bottom: 10px; cursor: pointer;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <strong style="font-size: 16px; font-weight: 700;">${b.customer_name}</strong>
+        <span style="font-size: 12px; color: var(--gu-dust); font-weight: 600;">${time}${table}</span>
       </div>
     </button>
   `;
@@ -3249,9 +3288,9 @@ function showCatalogCategory(idx) {
   const glazeClass = itemTypeGlazeClass(itemTypeForCategory);
 
   itemsEl.innerHTML = category.items.map(item => `
-    <button onclick='addCatalogItemToOrder(${JSON.stringify(item).replace(/'/g, "&apos;")}, "${itemTypeForCategory}")' class="btn-connect ${glazeClass}" style="text-align: left; display: block;">
-      <div>${item.name}</div>
-      ${item.priceCents != null ? `<div style="opacity: 0.85; font-size: 11px; margin-top: 2px; font-weight: 400;">£${(item.priceCents / 100).toFixed(2)}</div>` : ''}
+    <button onclick='addCatalogItemToOrder(${JSON.stringify(item).replace(/'/g, "&apos;")}, "${itemTypeForCategory}")' class="till-tile ${glazeClass}">
+      <div class="till-tile-name">${item.name}</div>
+      ${item.priceCents != null ? `<div class="till-tile-price">£${(item.priceCents / 100).toFixed(2)}</div>` : ''}
     </button>
   `).join('');
 }
