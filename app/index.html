@@ -237,6 +237,49 @@
       #design-preview-screen { transition: none; }
     }
 
+    #community-share-screen, #community-feed-screen {
+      position: fixed;
+      inset: 0;
+      background: var(--link-charcoal);
+      z-index: 2000;
+      display: none;
+      flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    #community-share-screen.open, #community-feed-screen.open {
+      transform: translateY(0);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #community-share-screen, #community-feed-screen { transition: none; }
+    }
+
+    .cf-post {
+      background: rgba(255,255,255,0.06);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .cf-post img { width: 100%; display: block; }
+    .cf-post .cf-body { padding: 12px 14px; }
+    .cf-post .cf-name { color: #fff; font-weight: 600; font-size: 13px; }
+    .cf-post .cf-caption { color: rgba(255,255,255,0.7); font-size: 13px; margin-top: 3px; }
+    .cf-post .cf-like-btn {
+      margin-top: 8px;
+      background: none;
+      border: 1px solid rgba(255,255,255,0.25);
+      color: rgba(255,255,255,0.8);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .cf-post .cf-like-btn.liked {
+      background: var(--glaze-oxblood-base);
+      border-color: transparent;
+      color: #fff;
+    }
+
     /* ── Splash / launch screen — shown once per app open, tap anywhere to continue ── */
     #splash-screen {
       position: fixed;
@@ -700,6 +743,41 @@
     </div>
   </div>
 
+  <!-- Share to Community: opt-in, piece photo only, first name shown -->
+  <div id="community-share-screen">
+    <div class="dp-header">
+      <span class="dp-title">Share to Community</span>
+      <button onclick="closeCommunityShare()">✕ Close</button>
+    </div>
+    <div style="flex:1; overflow-y:auto; padding:20px; color:#fff;">
+      <p style="font-size:13px; color:rgba(255,255,255,0.7); line-height:1.5; margin-bottom:18px;">
+        Show off your finished piece to other Kiln Cafe painters. We'll show your first name only — no faces needed, just your piece!
+      </p>
+      <div id="cs-photo-prompt" style="text-align:center; padding:20px 0;">
+        <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+          <button onclick="document.getElementById('cs-photo-camera').click()" style="background:var(--glaze-sage-base); color:#fff; border:none; padding:13px 20px; border-radius:14px; font-weight:600; cursor:pointer;">📷 Take Photo</button>
+          <button onclick="document.getElementById('cs-photo-library').click()" style="background:rgba(255,255,255,0.15); color:#fff; border:none; padding:13px 20px; border-radius:14px; font-weight:600; cursor:pointer;">🖼️ Choose Photo</button>
+        </div>
+        <input type="file" id="cs-photo-camera" accept="image/*" capture="environment" style="display:none;" onchange="handleCommunityPhoto(event)">
+        <input type="file" id="cs-photo-library" accept="image/*" style="display:none;" onchange="handleCommunityPhoto(event)">
+      </div>
+      <div id="cs-photo-preview-wrap" style="display:none;">
+        <img id="cs-photo-preview" style="width:100%; border-radius:14px; margin-bottom:14px;">
+        <input type="text" id="cs-caption" maxlength="80" placeholder="Add a caption (optional)" style="width:100%; padding:12px; border-radius:12px; border:none; font-size:14px; margin-bottom:14px; box-sizing:border-box;">
+        <button onclick="submitCommunityPost()" id="cs-submit-btn" style="width:100%; background:var(--glaze-sage-base); color:#fff; border:none; padding:13px; border-radius:14px; font-weight:700; font-size:14px; cursor:pointer;">Share to Community</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Community Feed: the studio's shared-pieces gallery -->
+  <div id="community-feed-screen">
+    <div class="dp-header">
+      <span class="dp-title">Kiln Cafe Community</span>
+      <button onclick="closeCommunityFeed()">✕ Close</button>
+    </div>
+    <div id="cf-feed-list" style="flex:1; overflow-y:auto; padding:16px;"></div>
+  </div>
+
   <script>
     const API_URL = window.location.origin;
     // The Kiln Cafe studio id (pilot). White-label studios would inject their own.
@@ -757,7 +835,8 @@
       const readyBanner = readyPieces.length > 0
         ? `<div class="info-card" style="background: linear-gradient(180deg, #f2f8f0, #e9f3e4); border-color: var(--glaze-sage-base);">
              <div style="font-family: var(--gu-font-display); font-weight: 700; color: var(--glaze-sage-deep); font-size: 16px; margin-bottom: 4px;">🎉 Ready for collection!</div>
-             <div style="font-size: 13px; color: var(--gu-accent);">${readyPieces.length} piece${readyPieces.length > 1 ? 's are' : ' is'} fired and waiting for you at the studio.</div>
+             <div style="font-size: 13px; color: var(--gu-accent); margin-bottom: 12px;">${readyPieces.length} piece${readyPieces.length > 1 ? 's are' : ' is'} fired and waiting for you at the studio.</div>
+             <button onclick="openCommunityShare()" style="width:100%; background: var(--glaze-sage-base); color:#fff; border:none; padding:11px; border-radius:12px; font-weight:600; font-size:13px; cursor:pointer;">📸 Share to Community</button>
            </div>` : '';
 
       const unfinished = (hist.unfinishedPieces && hist.unfinishedPieces.length)
@@ -793,6 +872,12 @@
             <span class="tile-icon">🎥</span>
             <div class="tile-title">Painting Guide</div>
             <div class="tile-desc">New to painting pottery? Watch our quick how-to before you start.</div>
+          </button>
+
+          <button class="tile tile-ocean" onclick="openCommunityFeed()">
+            <span class="tile-icon">💬</span>
+            <div class="tile-title">Community</div>
+            <div class="tile-desc">See what other Kiln Cafe painters have been creating.</div>
           </button>
 
           <div class="section-label">Design tools</div>
@@ -940,6 +1025,143 @@
       const screen = document.getElementById('design-preview-screen');
       screen.classList.remove('open');
       setTimeout(() => { screen.style.display = 'none'; }, 280);
+    }
+
+    // ── Share to Community ──
+    let communityPhotoBase64 = null;
+
+    function openCommunityShare() {
+      const screen = document.getElementById('community-share-screen');
+      screen.style.display = 'flex';
+      void screen.offsetWidth;
+      screen.classList.add('open');
+    }
+    function closeCommunityShare() {
+      const screen = document.getElementById('community-share-screen');
+      screen.classList.remove('open');
+      setTimeout(() => { screen.style.display = 'none'; }, 280);
+    }
+
+    function handleCommunityPhoto(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        communityPhotoBase64 = e.target.result;
+        document.getElementById('cs-photo-preview').src = communityPhotoBase64;
+        document.getElementById('cs-photo-prompt').style.display = 'none';
+        document.getElementById('cs-photo-preview-wrap').style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function submitCommunityPost() {
+      if (!communityPhotoBase64) return;
+      const btn = document.getElementById('cs-submit-btn');
+      btn.textContent = 'Sharing…';
+      btn.disabled = true;
+
+      try {
+        const caption = document.getElementById('cs-caption').value.trim();
+        const customerName = (window.currentBooking && window.currentBooking.name) || '';
+
+        const res = await fetch(`${API_URL}/api/community/posts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studioId: STUDIO_ID,
+            bookingId: window.currentBooking ? window.currentBooking.code : null,
+            photoUrl: communityPhotoBase64,
+            caption,
+            customerName
+          })
+        });
+
+        if (res.ok) {
+          closeCommunityShare();
+          communityPhotoBase64 = null;
+          document.getElementById('cs-photo-prompt').style.display = 'block';
+          document.getElementById('cs-photo-preview-wrap').style.display = 'none';
+          document.getElementById('cs-caption').value = '';
+        } else {
+          alert('Could not share right now — please try again.');
+        }
+      } catch (err) {
+        alert('Could not share: ' + err.message);
+      } finally {
+        btn.textContent = 'Share to Community';
+        btn.disabled = false;
+      }
+    }
+
+    // ── Community Feed ──
+    function openCommunityFeed() {
+      const screen = document.getElementById('community-feed-screen');
+      screen.style.display = 'flex';
+      void screen.offsetWidth;
+      screen.classList.add('open');
+      loadCommunityFeed();
+    }
+    function closeCommunityFeed() {
+      const screen = document.getElementById('community-feed-screen');
+      screen.classList.remove('open');
+      setTimeout(() => { screen.style.display = 'none'; }, 280);
+    }
+
+    function getDeviceFingerprint() {
+      let fp = localStorage.getItem('link_device_fp');
+      if (!fp) {
+        fp = 'fp_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        localStorage.setItem('link_device_fp', fp);
+      }
+      return fp;
+    }
+
+    async function loadCommunityFeed() {
+      const listEl = document.getElementById('cf-feed-list');
+      listEl.innerHTML = `<div style="color:rgba(255,255,255,0.5); text-align:center; padding:30px; font-size:13px;">Loading…</div>`;
+
+      try {
+        const res = await fetch(`${API_URL}/api/community/feed?studioId=${STUDIO_ID}`);
+        const data = await res.json();
+
+        if (!data.posts || data.posts.length === 0) {
+          listEl.innerHTML = `<div style="color:rgba(255,255,255,0.5); text-align:center; padding:30px; font-size:13px;">No pieces shared yet — be the first! 🎉</div>`;
+          return;
+        }
+
+        const fp = getDeviceFingerprint();
+        listEl.innerHTML = data.posts.map(p => `
+          <div class="cf-post">
+            <img src="${p.photo_url}" alt="Shared piece">
+            <div class="cf-body">
+              <div class="cf-name">${p.customer_display_name || 'A customer'}${p.piece_type ? ' · ' + p.piece_type : ''}</div>
+              ${p.caption ? `<div class="cf-caption">${p.caption}</div>` : ''}
+              <button class="cf-like-btn" onclick="likeCommunityPost('${p.id}', this)">❤️ ${p.likes_count || 0}</button>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        listEl.innerHTML = `<div style="color:rgba(255,255,255,0.5); text-align:center; padding:30px; font-size:13px;">Could not load the community feed.</div>`;
+      }
+    }
+
+    async function likeCommunityPost(postId, btnEl) {
+      if (btnEl.classList.contains('liked')) return;
+      btnEl.classList.add('liked');
+      try {
+        const res = await fetch(`${API_URL}/api/community/posts/${postId}/like`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fingerprint: getDeviceFingerprint() })
+        });
+        const data = await res.json();
+        if (data.likesCount != null) {
+          btnEl.textContent = `❤️ ${data.likesCount}`;
+        }
+      } catch (err) {
+        console.error('Could not like post:', err);
+      }
     }
 
     function renderDpPalette() {

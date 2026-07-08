@@ -1783,6 +1783,101 @@ async function enrichPiecesWithCustomerName(studioId, pieces) {
   }));
 }
 
+/**
+ * POST /api/community/posts
+ * Customer opts in to share a finished piece to their studio's community gallery.
+ * Deliberately simple: piece photo + optional caption + first-name-only display,
+ * no faces required (uses the existing collection photo, which is piece-focused).
+ */
+app.post('/api/community/posts', async (req, res) => {
+  const { studioId, bookingId, pieceType, photoUrl, caption, customerName } = req.body;
+  if (!studioId || !photoUrl) {
+    return res.status(400).json({ error: 'studioId and photoUrl required' });
+  }
+
+  try {
+    // First name only, for a bit of privacy by default
+    const displayName = customerName ? customerName.trim().split(' ')[0] : 'A customer';
+
+    const { data: post, error } = await supabase
+      .from('community_posts')
+      .insert({
+        studio_id: studioId,
+        booking_id: bookingId || null,
+        piece_type: pieceType || null,
+        photo_url: photoUrl,
+        caption: caption || null,
+        customer_display_name: displayName,
+        visibility: 'studio'
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ status: 'shared', post });
+  } catch (error) {
+    console.error('Error creating community post:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/community/feed
+ * A studio's community gallery — real finished pieces, opted-in by customers.
+ */
+app.get('/api/community/feed', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    const { data: posts, error } = await supabase
+      .from('community_posts')
+      .select('*')
+      .eq('studio_id', studioId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) throw error;
+    res.json({ posts: posts || [] });
+  } catch (error) {
+    console.error('Error fetching community feed:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/community/posts/:postId/like
+ * Simple like toggle, deduped by a device fingerprint (no login required)
+ */
+app.post('/api/community/posts/:postId/like', async (req, res) => {
+  const { postId } = req.params;
+  const { fingerprint } = req.body;
+  if (!fingerprint) return res.status(400).json({ error: 'fingerprint required' });
+
+  try {
+    const { error: likeError } = await supabase
+      .from('community_post_likes')
+      .insert({ post_id: postId, liker_fingerprint: fingerprint });
+
+    if (likeError && likeError.code !== '23505') throw likeError; // 23505 = already liked, treat as success
+
+    const { count } = await supabase
+      .from('community_post_likes')
+      .select('id', { count: 'exact', head: true })
+      .eq('post_id', postId);
+
+    await supabase
+      .from('community_posts')
+      .update({ likes_count: count || 0 })
+      .eq('id', postId);
+
+    res.json({ status: 'liked', likesCount: count || 0 });
+  } catch (error) {
+    console.error('Error liking post:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/pieces/ready-for-pickup', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });

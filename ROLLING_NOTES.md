@@ -29,6 +29,18 @@ Last updated: 5 July 2026
 
 **App Icon — built fresh, a "simplified chain/link icon without text" per spec:** a classic two-interlocking-rounded-rectangle chain-link glyph (the universal hyperlink icon shape), rotated diagonally, in Ivory + Clay on a Charcoal background, at 1024×1024. Saved to `brand-assets/app-icon/`: `LINK-app-icon.svg`, `LINK-app-icon-1024.png`, `LINK-app-icon.pdf`. **This replaced the actual live PWA icons** (`app/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`) — the old glazed-pot silhouette is gone, customers' home-screen icon now shows the new chain-link mark. `manifest.json` theme/background colours also updated to Charcoal/Ivory.
 
+★ COMMUNITY / SOCIALS FEATURE (2026-07-08): First step toward Daisy's "drive the whole app worldwide, viral growth, low/no cost" ask. Architected as: (1) studio-level customer feed [BUILT], (2) shareable piece cards driving external social sharing [not yet built], (3) global cross-studio feed [not yet built], (4) studio-to-studio referral loop [not yet built] — deliberately phased since each layer's content feeds the next layer's marketing value.
+
+**Built (customer app only so far):**
+- New tables `community_posts` + `community_post_likes` (Daisy needs to run the CREATE TABLE SQL)
+- `POST /api/community/posts` — customer opts in to share a finished piece (piece photo only, first-name-only display — deliberate child-safety consideration since real kids paint at the studio; no login/face required)
+- `GET /api/community/feed?studioId=` — studio's gallery, newest first
+- `POST /api/community/posts/:id/like` — simple like, deduped via a localStorage device fingerprint (no account system needed)
+- Customer app: "📸 Share to Community" button appears on the Ready-for-Collection banner; new "Community" tile opens the studio's gallery feed (full-screen overlay, same slide-up pattern as Design Preview)
+- Photos currently stored as base64 directly in the `photo_url` column (works, but not optimal at scale — revisit with real Supabase Storage upload if the feed gets busy)
+
+**Not yet built:** staff dashboard has no community/moderation view yet (worth adding — studios will want to see/moderate their own feed); shareable external piece cards (the actual growth-engine layer); global cross-studio feed; studio referral program; any reporting/moderation flow for inappropriate content (needed before this goes fully public-facing at scale).
+
 ★ ARCHITECTURE (as of 2026-07-05): GlazeUp is now TWO frontends on ONE shared backend:
   • STAFF app  → /admin/dashboard-local.html  (bookings, tables, kiln, catalog — iPad)
   • CUSTOMER app → /app?booking=CODE  (customer's phone, booking-linked)
