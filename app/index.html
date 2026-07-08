@@ -1084,15 +1084,65 @@
       <path d="M165.41,82.00 L165.41,10.00 L180.81,10.00 L180.81,82.00 L165.41,82.00 Z M175.91,44.59 L208.31,10.00 L228.81,10.00 L194.61,44.59 L175.91,44.59 Z M209.91,82.00 L175.70,44.59 L194.61,44.59 L230.81,82.00 L209.91,82.00 Z" fill="#fff"/>
     </svg>`;
 
+    // Self-service walk-in: for studios with no booking system at all, or
+    // a customer who's arrived without one. Creates their own session
+    // record directly, no staff action needed, then reloads into it.
+    async function submitSelfCheckin() {
+      const name = document.getElementById('sc-name').value.trim();
+      const party = document.getElementById('sc-party').value;
+      const errorEl = document.getElementById('sc-error');
+      const btn = document.getElementById('sc-submit-btn');
+
+      if (!name) {
+        errorEl.textContent = 'Please pop in your name.';
+        return;
+      }
+
+      btn.textContent = 'Starting…';
+      btn.disabled = true;
+      errorEl.textContent = '';
+
+      try {
+        const res = await fetch(`${API_URL}/api/bookings/self-checkin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studioId: STUDIO_ID, customerName: name, partySize: party })
+        });
+        const data = await res.json();
+
+        if (res.ok && data.booking) {
+          const url = new URL(window.location);
+          url.searchParams.set('booking', data.booking.booking_code);
+          window.location.href = url.toString();
+        } else {
+          errorEl.textContent = 'Could not start your visit — please ask a member of staff.';
+          btn.textContent = 'Start My Visit';
+          btn.disabled = false;
+        }
+      } catch (err) {
+        errorEl.textContent = 'Could not start your visit — please ask a member of staff.';
+        btn.textContent = 'Start My Visit';
+        btn.disabled = false;
+      }
+    }
+
     async function init() {
       const bookingCode = getParam('booking');
       const root = document.getElementById('app-root');
 
       if (!bookingCode) {
         root.innerHTML = `
-          <div class="error-state">
-            <h2>Welcome to The Kiln Cafe</h2>
-            <p>Scan the QR code on your table to open your painting session.</p>
+          <div style="padding: 60px 24px 24px; text-align: center;">
+            <h2 style="font-family: var(--gu-font-display); color: var(--gu-accent); margin-bottom: 8px;">Welcome to The Kiln Cafe</h2>
+            <p style="color: var(--gu-dust); font-size: 14px; margin-bottom: 28px;">Starting a walk-in session? Just pop in your details below.</p>
+            <div style="max-width: 340px; margin: 0 auto; text-align: left;">
+              <label style="font-size: 12px; font-weight: 600; color: var(--gu-accent); display: block; margin-bottom: 4px;">Your name</label>
+              <input type="text" id="sc-name" placeholder="e.g. Sarah" style="width: 100%; padding: 12px; border: 1px solid var(--gu-border); border-radius: 10px; font-size: 14px; margin-bottom: 14px; box-sizing: border-box;">
+              <label style="font-size: 12px; font-weight: 600; color: var(--gu-accent); display: block; margin-bottom: 4px;">How many in your group?</label>
+              <input type="number" id="sc-party" min="1" max="20" value="1" style="width: 100%; padding: 12px; border: 1px solid var(--gu-border); border-radius: 10px; font-size: 14px; margin-bottom: 20px; box-sizing: border-box;">
+              <button onclick="submitSelfCheckin()" id="sc-submit-btn" style="width: 100%; background: var(--link-charcoal); color: #fff; border: none; padding: 14px; border-radius: 12px; font-weight: 700; font-size: 14px; cursor: pointer;">Start My Visit</button>
+              <div id="sc-error" style="color: #c0392b; font-size: 12px; margin-top: 10px; text-align: center;"></div>
+            </div>
           </div>`;
         return;
       }

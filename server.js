@@ -735,6 +735,45 @@ app.post('/api/bookings/manual', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/bookings/self-checkin
+ * Customer-initiated walk-in — for studios that take no bookings at all
+ * (scan-a-static-QR-and-go). Unlike /api/bookings/manual, this is called
+ * directly by the customer app, not by staff, so no staff action is needed
+ * before a customer can start their own session. Same underlying record
+ * shape as a staff-created walk-in, just a different front door.
+ */
+app.post('/api/bookings/self-checkin', async (req, res) => {
+  const { studioId, customerName, partySize, tableNumber } = req.body;
+  if (!studioId || !customerName) {
+    return res.status(400).json({ error: 'studioId and customerName required' });
+  }
+
+  try {
+    const bookingCode = `selfcheckin-${Date.now()}`;
+
+    const { data: booking, error } = await supabase
+      .from('bookings')
+      .insert({
+        studio_id: studioId,
+        square_booking_id: null,
+        booking_code: bookingCode,
+        customer_name: customerName,
+        party_size: partySize || null,
+        table_number: tableNumber || null,
+        session_start: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ status: 'created', booking });
+  } catch (error) {
+    console.error('Error creating self-checkin booking:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/booking/:bookingCode', async (req, res) => {
   const { bookingCode } = req.params;
   const { studioId } = req.query;

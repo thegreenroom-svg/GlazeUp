@@ -1508,6 +1508,13 @@
           Complete these three steps to unlock analytics and billing. You're already on the free trial!
         </p>
 
+        <!-- Static Walk-in QR: print once, works forever, no booking needed -->
+        <div class="setup-card">
+          <h3>🚶 Walk-in QR (print &amp; leave on tables)</h3>
+          <p>A permanent QR code that lets any customer start their own session on the spot — no booking needed. Print it once and leave it on tables, or by the door.</p>
+          <button class="btn-connect" onclick="showStaticWalkinQR()">Show Walk-in QR</button>
+        </div>
+
         <!-- Square Connection -->
         <div class="setup-card">
           <h3>1. Connect Your Square Account</h3>
@@ -2890,6 +2897,20 @@ function showCustomerQRFromResult() {
   }
   const tableNumber = document.getElementById('s1-table-number').value.trim();
   showCustomerQR(s1LookedUpBooking.bookingCode, s1LookedUpBooking.customerName, tableNumber);
+}
+
+// Static walk-in QR: no booking code needed at all — lands customers on
+// their own self-checkin form. Print once, works forever, for studios
+// that take no bookings or for walk-ins arriving without one.
+function showStaticWalkinQR() {
+  const customerUrl = `${API_URL}/app`;
+  const modal = document.getElementById('customer-qr-modal');
+  document.getElementById('cqr-heading').textContent = 'Walk-in QR — start your own visit';
+  const qrBox = document.getElementById('cqr-code');
+  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${encodeURIComponent(customerUrl)}`;
+  qrBox.innerHTML = `<img src="${qrImageUrl}" width="240" height="240" alt="Scan to start your visit" style="display:block; border-radius:8px;">`;
+  document.getElementById('cqr-link').innerHTML = `Or open directly: <a href="${customerUrl}" target="_blank" style="color:var(--gu-primary);">${customerUrl}</a>`;
+  modal.style.display = 'flex';
 }
 
 // Show a scannable QR that opens the customer app on their phone, linked to this booking
