@@ -2090,6 +2090,98 @@ app.get('/api/studios/directory', async (req, res) => {
   }
 });
 
+/**
+ * PROTOTYPE — app tool paywall / tally system, for appraisal.
+ * Not wired to real payment processing yet: this just records what's
+ * owed, tallied against the booking, to be charged for real once
+ * proper billing is sorted. £1 per extra tool, per session.
+ */
+
+// GET /api/extras/unlocked — has this booking already paid for this tool
+// this visit? Prevents charging again if they close/reopen the app.
+app.get('/api/extras/unlocked', async (req, res) => {
+  const { studioId, bookingCode, itemName } = req.query;
+  if (!studioId || !bookingCode || !itemName) {
+    return res.status(400).json({ error: 'studioId, bookingCode and itemName required' });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('app_extra_charges')
+      .select('id')
+      .eq('studio_id', studioId)
+      .eq('booking_code', bookingCode)
+      .eq('item_name', itemName)
+      .limit(1);
+
+    if (error) throw error;
+    res.json({ unlocked: (data || []).length > 0 });
+  } catch (error) {
+    console.error('Error checking unlock status:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/extras/charge — record a £1 (or whatever) charge against this booking
+app.post('/api/extras/charge', async (req, res) => {
+  const { studioId, bookingCode, itemName, amountCents } = req.body;
+  if (!studioId || !bookingCode || !itemName) {
+    return res.status(400).json({ error: 'studioId, bookingCode and itemName required' });
+  }
+
+  try {
+    const { data: charge, error } = await supabase
+      .from('app_extra_charges')
+      .insert({
+        studio_id: studioId,
+        booking_code: bookingCode,
+        item_name: itemName,
+        amount_cents: amountCents || 100 // default £1
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ status: 'charged', charge });
+  } catch (error) {
+    console.error('Error recording extra charge:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/extras/today — staff-visible tally of today's app-extra charges,
+// grouped by booking, so there's a clear running total to add to final bills
+app.get('/api/extras/today', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const { data: charges, error } = await supabase
+      .from('app_extra_charges')
+      .select('*')
+      .eq('studio_id', studioId)
+      .gte('created_at', startOfDay.toISOString())
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const byBooking = {};
+    (charges || []).forEach(c => {
+      if (!byBooking[c.booking_code]) byBooking[c.booking_code] = { bookingCode: c.booking_code, items: [], totalCents: 0 };
+      byBooking[c.booking_code].items.push(c);
+      byBooking[c.booking_code].totalCents += c.amount_cents;
+    });
+
+    res.json({ bookings: Object.values(byBooking) });
+  } catch (error) {
+    console.error('Error fetching today\'s extra charges:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/pieces/ready-for-pickup', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });

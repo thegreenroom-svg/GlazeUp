@@ -1020,6 +1020,21 @@
 
   <!-- Transfer Designer: photograph the piece, add/position text and simple
        motif "transfers" on top to plan placement before applying real decals -->
+  <!-- Paywall confirmation — prototype for appraisal. Not wired to real
+       payment processing yet: confirming just tallies the charge against
+       the booking, to be added to the final bill once billing is sorted. -->
+  <div id="extra-charge-modal" style="display:none; position:fixed; inset:0; background:rgba(43,39,36,0.7); backdrop-filter:blur(4px); z-index:3000; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#fff; border-radius:16px; padding:22px; max-width:320px; width:100%; text-align:center;">
+      <div style="font-size:32px; margin-bottom:8px;">✨</div>
+      <div style="font-family:var(--gu-font-display); font-weight:700; font-size:17px; color:var(--gu-accent); margin-bottom:6px;">Unlock Transfer Designer</div>
+      <div id="ecm-body" style="font-size:13px; color:var(--gu-dust); line-height:1.5; margin-bottom:18px;">
+        This tool is <strong>£1 for your visit</strong> — added to your bill, no payment needed now.
+      </div>
+      <button onclick="confirmUnlockTransferDesigner()" id="ecm-confirm-btn" style="width:100%; background:var(--link-charcoal); color:#fff; border:none; padding:13px; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; margin-bottom:8px;">Unlock for £1</button>
+      <button onclick="closeExtraChargeModal()" style="width:100%; background:none; color:var(--gu-dust); border:none; padding:10px; font-size:13px; cursor:pointer;">Not now</button>
+    </div>
+  </div>
+
   <div id="transfer-designer-screen">
     <div class="dp-header">
       <span class="dp-title">Transfer Designer</span>
@@ -1266,10 +1281,11 @@
             <div class="tile-desc">Photograph your real piece, then preview colours right on it.</div>
           </button>
 
-          <button class="tile tile-oxblood" onclick="openTransferDesigner()">
+          <button class="tile tile-oxblood" onclick="openTransferDesignerGated()" style="position: relative;">
             <span class="tile-icon">✨</span>
             <div class="tile-title">Transfer Designer</div>
             <div class="tile-desc">Create and position transfers for your piece.</div>
+            <span id="td-price-badge" style="position:absolute; top:14px; right:16px; background:rgba(255,255,255,0.25); font-size:10px; font-weight:700; padding:3px 9px; border-radius:20px;">£1</span>
           </button>
         </div>
 
@@ -1901,6 +1917,66 @@
     let tdDrawing = false;
     let tdLastPoint = null;
     let tdUndoStack = [];
+
+    // ── Paid tools paywall — PROTOTYPE, for appraisal, not wired to real
+    // payment processing yet. Design Preview and Colour Picker stay free;
+    // Transfer Designer is £1/visit, tallied against the booking (checked
+    // at checkout), not charged directly through the app. ──
+    const PAID_TOOL_PRICE_CENTS = 100; // £1
+    const PAID_TOOL_NAME = 'Transfer Designer';
+
+    async function openTransferDesignerGated() {
+      const bookingCode = window.currentBooking ? window.currentBooking.code : null;
+      if (!bookingCode) {
+        // No booking context (e.g. testing without a code) — just open it
+        openTransferDesigner();
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_URL}/api/extras/unlocked?studioId=${STUDIO_ID}&bookingCode=${encodeURIComponent(bookingCode)}&itemName=${encodeURIComponent(PAID_TOOL_NAME)}`);
+        const data = await res.json();
+        if (data.unlocked) {
+          openTransferDesigner(); // already paid for this visit
+        } else {
+          document.getElementById('extra-charge-modal').style.display = 'flex';
+        }
+      } catch (err) {
+        // If the check fails, don't block the customer — just open it
+        openTransferDesigner();
+      }
+    }
+
+    function closeExtraChargeModal() {
+      document.getElementById('extra-charge-modal').style.display = 'none';
+    }
+
+    async function confirmUnlockTransferDesigner() {
+      const bookingCode = window.currentBooking ? window.currentBooking.code : null;
+      const btn = document.getElementById('ecm-confirm-btn');
+      btn.textContent = 'Unlocking…';
+      btn.disabled = true;
+
+      try {
+        await fetch(`${API_URL}/api/extras/charge`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studioId: STUDIO_ID,
+            bookingCode,
+            itemName: PAID_TOOL_NAME,
+            amountCents: PAID_TOOL_PRICE_CENTS
+          })
+        });
+      } catch (err) {
+        console.error('Could not record charge, opening anyway:', err);
+      }
+
+      closeExtraChargeModal();
+      btn.textContent = 'Unlock for £1';
+      btn.disabled = false;
+      openTransferDesigner();
+    }
 
     function openTransferDesigner() {
       document.getElementById('transfer-designer-screen').style.display = 'flex';

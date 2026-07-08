@@ -1157,6 +1157,21 @@
           <span style="font-size: 15px;">You're on the free trial. Billing starts next month. No credit card required.</span>
         </div>
 
+        <!-- App Extras tally — PROTOTYPE, for appraisal. Not real payment
+             processing yet: this is a running tally of paid-tool unlocks
+             (currently Transfer Designer, £1/visit) to add to bills at
+             checkout, until proper billing is wired up. -->
+        <div class="chart-container">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="margin: 0;">📱 App Extras Today <span style="font-size: 11px; font-weight: 500; color: var(--gu-dust);">(prototype)</span></h3>
+            <button onclick="loadTodaysExtraCharges()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
+          </div>
+          <div style="font-size: 11px; color: var(--gu-dust); margin-bottom: 10px;">Customers who've unlocked paid app tools this visit — add these to their bill at checkout. Not charged automatically yet.</div>
+          <div id="extras-today-list">
+            <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
+          </div>
+        </div>
+
         <!-- Key metrics -->
         <div class="dashboard-grid">
           <div class="metric-card">
@@ -2167,7 +2182,43 @@ function goToTab(tab, event) {
   }
 }
 
+// App Extras — PROTOTYPE tally of paid-tool unlocks, for appraisal.
+// Not real payment processing: just shows staff what's owed per booking
+// so it can be added to the bill at checkout.
+async function loadTodaysExtraCharges() {
+  const listEl = document.getElementById('extras-today-list');
+  if (!listEl) return;
+
+  try {
+    if (!apiConnected) {
+      listEl.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Connect the API to see today's extras.</div>`;
+      return;
+    }
+
+    const res = await fetch(`${API_URL}/api/extras/today?studioId=${studioId}`);
+    const data = await res.json();
+
+    if (!data.bookings || data.bookings.length === 0) {
+      listEl.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Nothing unlocked today yet.</div>`;
+      return;
+    }
+
+    listEl.innerHTML = data.bookings.map(b => `
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: #fff9f0; border-left: 4px solid var(--link-clay); border-radius: 4px; margin-bottom: 8px;">
+        <div>
+          <div style="font-size: 13px; font-weight: 600;">${b.bookingCode}</div>
+          <div style="font-size: 11px; color: var(--gu-dust);">${b.items.map(i => i.item_name).join(', ')}</div>
+        </div>
+        <div style="font-weight: 700; color: var(--link-clay);">£${(b.totalCents / 100).toFixed(2)}</div>
+      </div>
+    `).join('');
+  } catch (err) {
+    listEl.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Could not load today's extras.</div>`;
+  }
+}
+
 async function populateDashboard() {
+  loadTodaysExtraCharges();
   try {
     const data = await loadDashboardData();
     

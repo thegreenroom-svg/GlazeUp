@@ -56,6 +56,21 @@ Last updated: 5 July 2026
   2. **Multi-platform integrations** — currently hard-wired to Square (POS/bookings) and implicitly assumes Wix (website). Other studios may use different POS/stock systems (Clover, Shopify POS, Lightspeed, etc.) or website builders (Squarespace, WordPress). File structure/architecture should be organized to make adding alternate integrations realistic later, not just Square-only.
   3. **Internationalization** — "at some point, return to the international aspect" for worldwide sales. Daisy has a contact in translation software. Not started — currently English-only, GBP-only, UK date/phone formats hardcoded in places.
 
+★ PAID TOOLS PAYWALL — PROTOTYPE FOR APPRAISAL (2026-07-08): Daisy wants some customer app tools free, others chargeable, tallied against the booking rather than charged directly — real payment processing to be wired up once billing is properly sorted. Built as a genuine working prototype:
+
+**Free:** Design Preview, Colour Picker (unchanged). **Paid:** Transfer Designer, £1/visit (easy to change — see `PAID_TOOL_PRICE_CENTS` in app/index.html).
+
+- New table `app_extra_charges` (studio_id, booking_code, item_name, amount_cents, created_at) — deliberately NOT tied to `table_session_id`, since a customer may open the app before staff have opened their table in Section 1/2; this works regardless of that timing.
+- `GET /api/extras/unlocked` — checks if this booking already paid for this tool this visit (so reopening the app later doesn't charge again)
+- `POST /api/extras/charge` — records the £1 charge
+- `GET /api/extras/today` — staff-facing tally, grouped by booking
+- Customer app: tapping the Transfer Designer tile (now shows a small "£1" badge) checks unlock status first; if not yet unlocked, shows a confirmation modal ("Unlock for £1 — added to your bill, no payment needed now") before opening; if already unlocked this visit, opens straight away. Fails open (opens the tool anyway) if the network check itself fails, so a backend hiccup never blocks a paying customer from something they may have already unlocked.
+- Staff dashboard: new "📱 App Extras Today (prototype)" card on the Dashboard tab, tallied per booking, so staff can add it to the bill at checkout.
+
+**Tested properly before pushing** (learned from the last two rounds): used Playwright with mocked API responses to confirm the actual flow works end-to-end — booking context loads, modal shows when not unlocked, confirming calls the charge endpoint, tool opens after. All confirmed working, not just assumed.
+
+**Explicitly a prototype, not final billing:** no real payment is taken through the app; this only tallies what's owed for staff to add to the till at checkout, per Daisy's brief ("for testing purposes").
+
 ★ TRANSFER DESIGNER: FREEHAND DRAWING ADDED (2026-07-08): Daisy wanted a proper Canva/Paint-style drawing layer (brush, pen, fill, colours) added to Transfer Designer, alongside the existing text/motif tools, with clear on-screen messaging that it's a planning sketch, not the real painting. Built as a new "✏️ Sketch" mode (now the default tab, before Add Text/Add Motif):
   - **Brush** — soft, semi-transparent strokes at the chosen nib size (3 sizes)
   - **Pen** — half the chosen nib size, fully opaque (hard-edged fineliner feel)
