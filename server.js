@@ -448,6 +448,139 @@ app.get('/api/stripe/subscription', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════
+// DEVICE SESSION MANAGEMENT
+// Controls how many iPads/devices can run the
+// staff dashboard simultaneously per studio.
+// Plans: solo=1 slot, studio=3 slots, multi=6 slots
+// ═══════════════════════════════════════════
+
+const PLAN_SLOTS = { solo: 1, studio: 3, multi: 6, pilot: 3 };
+const SESSION_TTL_HOURS = 8;
+
+// GET /api/devices/check-in
+// Called on every staff dashboard load. Returns whether this device
+// has a valid slot, how many are in use, and the plan limit.
+app.post('/api/devices/check-in', async (req, res) => {
+  const { studioId, deviceId, deviceName } = req.body;
+  if (!studioId || !deviceId) return res.status(400).json({ error: 'studioId and deviceId required' });
+
+  try {
+    // Get plan for this studio
+    const { data: sub } = await supabase
+      .from('stripe_subscriptions')
+      .select('plan_id, status')
+      .eq('studio_id', studioId)
+      .single();
+
+    const plan = sub?.plan_id || 'pilot';
+    const maxSlots = PLAN_SLOTS[plan] || 1;
+
+    // Expire old sessions (inactive > 8 hours)
+    const expiry = new Date(Date.now() - SESSION_TTL_HOURS * 60 * 60 * 1000).toISOString();
+    await supabase.from('device_sessions')
+      .delete()
+      .eq('studio_id', studioId)
+      .lt('last_seen_at', expiry);
+
+    // Check if this device already has a session
+    const { data: existing } = await supabase
+      .from('device_sessions')
+      .select('*')
+      .eq('studio_id', studioId)
+      .eq('device_id', deviceId)
+      .single();
+
+    if (existing) {
+      // Refresh the heartbeat
+      await supabase.from('device_sessions')
+        .update({ last_seen_at: new Date().toISOString(), device_name: deviceName || existing.device_name })
+        .eq('id', existing.id);
+      const { data: all } = await supabase.from('device_sessions').select('*').eq('studio_id', studioId);
+      return res.json({ allowed: true, plan, maxSlots, activeCount: all?.length || 1, deviceId });
+    }
+
+    // Count active sessions
+    const { data: activeSessions } = await supabase
+      .from('device_sessions')
+      .select('*')
+      .eq('studio_id', studioId);
+
+    const activeCount = activeSessions?.length || 0;
+
+    if (activeCount >= maxSlots) {
+      return res.json({
+        allowed: false, plan, maxSlots, activeCount, deviceId,
+        activeSessions: activeSessions.map(s => ({
+          deviceId: s.device_id,
+          deviceName: s.device_name || 'Unnamed device',
+          lastSeen: s.last_seen_at
+        }))
+      });
+    }
+
+    // Grant a new slot
+    await supabase.from('device_sessions').insert({
+      studio_id: studioId, device_id: deviceId,
+      device_name: deviceName || `Device ${activeCount + 1}`,
+      last_seen_at: new Date().toISOString()
+    });
+
+    return res.json({ allowed: true, plan, maxSlots, activeCount: activeCount + 1, deviceId });
+  } catch (err) {
+    console.error('Device check-in error:', err);
+    // Fail open — don't lock out a studio due to a server error
+    return res.json({ allowed: true, plan: 'pilot', maxSlots: 3, activeCount: 1, deviceId, failOpen: true });
+  }
+});
+
+// POST /api/devices/heartbeat — keep session alive (called every 5 min)
+app.post('/api/devices/heartbeat', async (req, res) => {
+  const { studioId, deviceId } = req.body;
+  if (!studioId || !deviceId) return res.status(400).json({ error: 'missing fields' });
+  await supabase.from('device_sessions')
+    .update({ last_seen_at: new Date().toISOString() })
+    .eq('studio_id', studioId).eq('device_id', deviceId);
+  res.json({ ok: true });
+});
+
+// POST /api/devices/release — release a slot (on tab close, or remote release)
+app.post('/api/devices/release', async (req, res) => {
+  const { studioId, deviceId } = req.body;
+  if (!studioId || !deviceId) return res.status(400).json({ error: 'missing fields' });
+  await supabase.from('device_sessions')
+    .delete().eq('studio_id', studioId).eq('device_id', deviceId);
+  res.json({ released: true });
+});
+
+// GET /api/devices/active — list active devices for this studio (for the management panel)
+app.get('/api/devices/active', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const expiry = new Date(Date.now() - SESSION_TTL_HOURS * 60 * 60 * 1000).toISOString();
+    await supabase.from('device_sessions').delete().eq('studio_id', studioId).lt('last_seen_at', expiry);
+    const { data: sub } = await supabase.from('stripe_subscriptions').select('plan_id').eq('studio_id', studioId).single();
+    const plan = sub?.plan_id || 'pilot';
+    const maxSlots = PLAN_SLOTS[plan] || 3;
+    const { data: sessions } = await supabase.from('device_sessions').select('*').eq('studio_id', studioId).order('last_seen_at', { ascending: false });
+    res.json({ plan, maxSlots, sessions: sessions || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/devices/:deviceId — owner remotely releases a specific device slot
+app.delete('/api/devices/:deviceId', async (req, res) => {
+  const { studioId } = req.query;
+  const { deviceId } = req.params;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  await supabase.from('device_sessions').delete().eq('studio_id', studioId).eq('device_id', deviceId);
+  res.json({ released: true });
+});
+
+
+
+// ═══════════════════════════════════════════
 // ANALYTICS ROUTES
 // ═══════════════════════════════════════════
 

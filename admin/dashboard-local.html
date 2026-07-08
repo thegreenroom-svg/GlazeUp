@@ -1248,6 +1248,18 @@
           </div>
         </div>
 
+        <!-- Device slots panel -->
+        <div class="chart-container">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <h3 style="margin:0;">📱 Active Devices</h3>
+            <button onclick="loadDevicePanel()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
+          </div>
+          <div style="font-size:11px;color:var(--gu-dust);margin-bottom:10px;">Devices currently using this dashboard. Your plan controls how many can be active at once. Release a device to free up a slot.</div>
+          <div id="device-panel-content">
+            <p style="color:var(--gu-dust);font-size:13px;padding:8px 0;">Loading…</p>
+          </div>
+        </div>
+
         <!-- Key metrics -->
         <div class="dashboard-grid">
           <div class="metric-card">
@@ -2942,6 +2954,7 @@ async function loadTodaysExtraCharges() {
 
 async function populateDashboard() {
   loadTodaysExtraCharges();
+  loadDevicePanel();
   swtShowTrigger();
   try {
     const data = await loadDashboardData();
@@ -5207,7 +5220,10 @@ function dismissSplash() {
   splashDismissed = true;
   const splash = document.getElementById('splash-screen');
   splash.classList.add('fading-out');
-  setTimeout(() => { splash.remove(); }, 600);
+  setTimeout(async () => {
+    splash.remove();
+    await deviceCheckIn(); // ← gate runs on every splash dismiss
+  }, 600);
 }
 
 function showSplash() {
@@ -5218,6 +5234,197 @@ function showSplash() {
 }
 
 wireSplash();
+
+// ═══════════════════════════════════════════
+// DEVICE SESSION GATE
+// Checks whether this iPad is allowed to run
+// the staff dashboard right now.
+// ═══════════════════════════════════════════
+
+const PLAN_LABELS = { solo: 'Solo', studio: 'Studio', multi: 'Multi', pilot: 'Pilot' };
+const PLAN_PRICES = { solo: '£29/mo', studio: '£59/mo', multi: '£99/mo', pilot: 'Pilot' };
+
+// Generate or retrieve a persistent device ID for this browser
+function getDeviceId() {
+  let id = localStorage.getItem('klnk_device_id');
+  if (!id) {
+    id = 'dev_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem('klnk_device_id', id);
+  }
+  return id;
+}
+
+function getDeviceName() {
+  let name = localStorage.getItem('klnk_device_name');
+  if (!name) {
+    const ua = navigator.userAgent;
+    if (/iPad/.test(ua)) name = 'iPad';
+    else if (/iPhone/.test(ua)) name = 'iPhone';
+    else if (/Android/.test(ua)) name = 'Android device';
+    else name = 'Desktop browser';
+    localStorage.setItem('klnk_device_name', name);
+  }
+  return name;
+}
+
+let deviceHeartbeatTimer = null;
+
+async function deviceCheckIn() {
+  const deviceId = getDeviceId();
+  const deviceName = getDeviceName();
+
+  try {
+    const res = await fetch(`${API_URL}/api/devices/check-in`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, deviceId, deviceName })
+    });
+    const data = await res.json();
+
+    if (data.allowed) {
+      // Start heartbeat to keep slot alive
+      clearInterval(deviceHeartbeatTimer);
+      deviceHeartbeatTimer = setInterval(() => {
+        fetch(`${API_URL}/api/devices/heartbeat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studioId, deviceId })
+        }).catch(() => {});
+      }, 5 * 60 * 1000); // every 5 minutes
+
+      // Release slot when tab closes
+      window.addEventListener('beforeunload', () => {
+        navigator.sendBeacon(`${API_URL}/api/devices/release`,
+          new Blob([JSON.stringify({ studioId, deviceId })], { type: 'application/json' })
+        );
+      });
+
+    } else {
+      // All slots in use — show the gate screen
+      showDeviceGate(data);
+      return; // Don't load dashboard
+    }
+  } catch (err) {
+    // Network error — fail open, let them in
+    console.warn('Device check-in failed, failing open:', err);
+  }
+
+  // All good — load the dashboard
+  populateDashboard();
+  swtShowTrigger();
+}
+
+function showDeviceGate(data) {
+  const activeList = (data.activeSessions || []).map(s => {
+    const mins = Math.round((Date.now() - new Date(s.lastSeen).getTime()) / 60000);
+    const ago = mins < 2 ? 'Just now' : `${mins} min ago`;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#fff9f0;border-radius:8px;margin-bottom:6px;">
+      <div>
+        <div style="font-size:14px;font-weight:600;color:#2B2724">${s.deviceName}</div>
+        <div style="font-size:12px;color:#8a8175">Last active: ${ago}</div>
+      </div>
+      <button onclick="remoteReleaseDevice('${s.deviceId}', this)" style="background:none;border:1px solid #d0c8c0;border-radius:6px;padding:5px 10px;font-size:12px;color:#d9534f;cursor:pointer;">Release</button>
+    </div>`;
+  }).join('');
+
+  const planLabel = PLAN_LABELS[data.plan] || data.plan;
+  const upgradeHint = data.plan === 'solo'
+    ? `<p style="font-size:13px;color:#8a8175;margin-top:12px;">Upgrade to <strong>Studio</strong> (£59/mo) for 3 device slots, or <strong>Multi</strong> (£99/mo) for 6.</p>`
+    : data.plan === 'studio'
+    ? `<p style="font-size:13px;color:#8a8175;margin-top:12px;">Upgrade to <strong>Multi</strong> (£99/mo) for 6 device slots.</p>`
+    : '';
+
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="device-gate" style="position:fixed;inset:0;background:#F7F4EE;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;">
+      <div style="max-width:400px;width:100%;text-align:center;">
+        <div style="font-size:36px;margin-bottom:12px;">🔒</div>
+        <h2 style="font-size:22px;font-weight:700;color:#2B2724;margin-bottom:6px;">All device slots in use</h2>
+        <p style="font-size:14px;color:#8a8175;margin-bottom:20px;">
+          Your <strong>${planLabel}</strong> plan allows <strong>${data.maxSlots} device${data.maxSlots > 1 ? 's' : ''}</strong> at once.
+          ${data.activeCount} ${data.activeCount === 1 ? 'is' : 'are'} currently active.
+        </p>
+        <div style="text-align:left;margin-bottom:16px;">
+          <div style="font-size:12px;font-weight:700;color:#8a8175;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;">Active devices</div>
+          ${activeList || '<p style="font-size:13px;color:#8a8175;">No active devices found — please try again.</p>'}
+        </div>
+        ${upgradeHint}
+        <div style="display:flex;gap:10px;margin-top:20px;">
+          <button onclick="retryDeviceCheckIn()" style="flex:1;background:#2B2724;color:white;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;">🔄 Try Again</button>
+          <button onclick="setDeviceName()" style="flex:1;background:none;border:1px solid #C8BFB2;border-radius:10px;padding:14px;font-size:13px;color:#2B2724;cursor:pointer;">✏️ Name this device</button>
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+async function remoteReleaseDevice(targetDeviceId, btn) {
+  btn.textContent = 'Releasing…';
+  btn.disabled = true;
+  try {
+    await fetch(`${API_URL}/api/devices/${targetDeviceId}?studioId=${studioId}`, { method: 'DELETE' });
+    btn.closest('div[style*="flex"]').style.opacity = '0.4';
+    btn.textContent = 'Released';
+    setTimeout(() => retryDeviceCheckIn(), 1000);
+  } catch (err) {
+    btn.textContent = 'Failed';
+    btn.disabled = false;
+  }
+}
+
+async function retryDeviceCheckIn() {
+  const gate = document.getElementById('device-gate');
+  if (gate) gate.remove();
+  await deviceCheckIn();
+}
+
+function setDeviceName() {
+  const name = prompt('Give this device a name (e.g. "Main Counter iPad"):');
+  if (name && name.trim()) {
+    localStorage.setItem('klnk_device_name', name.trim());
+    retryDeviceCheckIn();
+  }
+}
+
+// Device management panel — shown in dashboard for studio owner
+async function loadDevicePanel() {
+  const panel = document.getElementById('device-panel-content');
+  if (!panel) return;
+  panel.innerHTML = '<p style="color:#8a8175;font-size:13px;padding:12px;">Loading…</p>';
+  try {
+    const res = await fetch(`${API_URL}/api/devices/active?studioId=${studioId}`);
+    const data = await res.json();
+    const myDeviceId = getDeviceId();
+    const planLabel = PLAN_LABELS[data.plan] || data.plan;
+    const slotsUsed = data.sessions?.length || 0;
+
+    panel.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div>
+          <span style="font-size:13px;font-weight:700;color:#2B2724">${planLabel} plan</span>
+          <span style="font-size:12px;color:#8a8175;margin-left:8px;">${slotsUsed} of ${data.maxSlots} slots in use</span>
+        </div>
+        <div style="display:flex;gap:4px;">
+          ${Array.from({length:data.maxSlots},(_,i)=>`<div style="width:14px;height:14px;border-radius:50%;background:${i<slotsUsed?'#B87946':'#C8BFB2'};"></div>`).join('')}
+        </div>
+      </div>
+      ${(data.sessions || []).map(s => {
+        const mins = Math.round((Date.now() - new Date(s.last_seen_at).getTime()) / 60000);
+        const ago = mins < 2 ? 'Active now' : `${mins} min ago`;
+        const isMe = s.device_id === myDeviceId;
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:${isMe?'#fff9f0':'#f7f4ee'};border-radius:8px;margin-bottom:6px;border:1px solid ${isMe?'#B87946':'#e0d8d0'};">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#2B2724">${s.device_name || 'Unnamed device'}${isMe?' <span style="color:#B87946;font-size:11px;">(this device)</span>':''}</div>
+            <div style="font-size:11px;color:#8a8175">${ago}</div>
+          </div>
+          ${!isMe ? `<button onclick="remoteReleaseDevice('${s.device_id}', this)" style="background:none;border:1px solid #d0c8c0;border-radius:6px;padding:4px 9px;font-size:11px;color:#d9534f;cursor:pointer;">Release</button>` : '<span style="font-size:11px;color:#B87946;font-weight:600;">●&nbsp;You</span>'}
+        </div>`;
+      }).join('') || '<p style="font-size:13px;color:#8a8175;padding:8px 0;">No active devices found.</p>'}
+      <button onclick="setDeviceName()" style="background:none;border:1px solid #C8BFB2;border-radius:8px;padding:8px 14px;font-size:12px;color:#2B2724;cursor:pointer;margin-top:4px;">✏️ Rename this device</button>
+    `;
+  } catch (err) {
+    panel.innerHTML = `<p style="color:#8a8175;font-size:13px;padding:12px;">Could not load device info.</p>`;
+  }
+}
 
 // Idle detection: after a few minutes with no interaction, rest back on the splash
 const IDLE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes — shared studio iPad
