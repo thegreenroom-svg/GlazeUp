@@ -237,7 +237,7 @@
       #design-preview-screen { transition: none; }
     }
 
-    #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen, #new-booking-screen {
+    #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen, #new-booking-screen, #transfer-designer-screen {
       position: fixed;
       inset: 0;
       background: var(--link-charcoal);
@@ -247,11 +247,11 @@
       transform: translateY(100%);
       transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
     }
-    #community-share-screen.open, #community-feed-screen.open, #colour-picker-screen.open, #my-bookings-screen.open, #new-booking-screen.open {
+    #community-share-screen.open, #community-feed-screen.open, #colour-picker-screen.open, #my-bookings-screen.open, #new-booking-screen.open, #transfer-designer-screen.open {
       transform: translateY(0);
     }
     @media (prefers-reduced-motion: reduce) {
-      #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen, #new-booking-screen { transition: none; }
+      #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen, #new-booking-screen, #transfer-designer-screen { transition: none; }
     }
 
     .cp-tab {
@@ -717,6 +717,112 @@
       font-size: 12px;
       cursor: pointer;
     }
+
+    /* ── Transfer Designer ── */
+    .td-canvas-stack {
+      position: relative;
+      max-width: 100%;
+      max-height: 100%;
+      display: none;
+    }
+    .td-canvas-stack img {
+      display: block;
+      max-width: 100%;
+      max-height: 70vh;
+    }
+    .td-element {
+      position: absolute;
+      top: 40%; left: 30%;
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+      padding: 4px 8px;
+      border: 2px dashed transparent;
+    }
+    .td-element.selected {
+      border-color: rgba(255,255,255,0.7);
+    }
+    .td-element .td-remove-handle {
+      position: absolute;
+      top: -12px; right: -12px;
+      width: 22px; height: 22px;
+      background: #d9534f;
+      color: #fff;
+      border-radius: 50%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      cursor: pointer;
+      border: 2px solid #fff;
+    }
+    .td-element .td-resize-handle {
+      position: absolute;
+      bottom: -10px; right: -10px;
+      width: 18px; height: 18px;
+      background: #fff;
+      border: 2px solid var(--glaze-oxblood-base);
+      border-radius: 50%;
+      display: none;
+      cursor: nwse-resize;
+    }
+    .td-element .td-rotate-handle {
+      position: absolute;
+      top: -30px; left: 50%;
+      transform: translateX(-50%);
+      width: 18px; height: 18px;
+      background: #fff;
+      border: 2px solid var(--glaze-oxblood-base);
+      border-radius: 50%;
+      display: none;
+      cursor: grab;
+      font-size: 10px;
+      align-items: center;
+      justify-content: center;
+    }
+    .td-element.selected .td-remove-handle,
+    .td-element.selected .td-resize-handle,
+    .td-element.selected .td-rotate-handle {
+      display: flex;
+    }
+    .td-text-content {
+      font-size: 28px;
+      font-weight: 700;
+      white-space: nowrap;
+      color: #2B2724;
+    }
+    .td-motif-content svg { width: 44px; height: 44px; display: block; }
+
+    .td-font-row, #td-motif-row {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      margin-bottom: 10px;
+    }
+    .td-font-btn {
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      border: 1.5px solid rgba(255,255,255,0.2);
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .td-font-btn.active { border-color: var(--glaze-oxblood-base); background: rgba(184,58,46,0.25); }
+    .td-motif-btn {
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.08);
+      border: 1.5px solid rgba(255,255,255,0.2);
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .td-motif-btn svg { width: 26px; height: 26px; }
   </style>
 </head>
 <body>
@@ -909,6 +1015,55 @@
     </div>
   </div>
 
+  <!-- Transfer Designer: photograph the piece, add/position text and simple
+       motif "transfers" on top to plan placement before applying real decals -->
+  <div id="transfer-designer-screen">
+    <div class="dp-header">
+      <span class="dp-title">Transfer Designer</span>
+      <button onclick="closeTransferDesigner()">✕ Close</button>
+    </div>
+
+    <div class="dp-canvas-area" id="td-canvas-area">
+      <div id="td-photo-prompt">
+        <div style="font-size: 40px; margin-bottom: 8px;">✨</div>
+        <div style="font-size: 15px; line-height: 1.5;">Photograph your piece, then add text or motifs to plan your transfer placement.</div>
+        <div style="display: flex; gap: 10px; justify-content: center; margin-top: 16px; flex-wrap: wrap;">
+          <button onclick="document.getElementById('td-photo-camera').click()">📷 Take Photo</button>
+          <button onclick="document.getElementById('td-photo-library').click()" style="background: rgba(255,255,255,0.15); color: #fff;">🖼️ Choose Photo</button>
+        </div>
+        <input type="file" id="td-photo-camera" accept="image/*" capture="environment" style="display:none;" onchange="handleTransferPhoto(event)">
+        <input type="file" id="td-photo-library" accept="image/*" style="display:none;" onchange="handleTransferPhoto(event)">
+      </div>
+      <div class="td-canvas-stack" id="td-canvas-stack">
+        <img id="td-photo-img" alt="Your piece">
+      </div>
+    </div>
+
+    <div class="dp-toolbar">
+      <div class="dp-tool-row">
+        <div class="dp-tool-btn active" id="td-tool-text" onclick="setTdMode('text')"><span class="dp-tool-icon">🔤</span>Add Text</div>
+        <div class="dp-tool-btn" id="td-tool-motif" onclick="setTdMode('motif')"><span class="dp-tool-icon">✨</span>Add Motif</div>
+      </div>
+
+      <div id="td-text-controls">
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <input type="text" id="td-text-input" maxlength="20" placeholder="Type your text…" style="flex:1; padding:11px; border-radius:10px; border:none; font-size:14px;">
+          <button onclick="addTransferText()" style="background:var(--glaze-oxblood-base); color:#fff; border:none; border-radius:10px; padding:0 16px; font-weight:700; cursor:pointer;">Add</button>
+        </div>
+        <div class="td-font-row" id="td-font-row"></div>
+      </div>
+
+      <div id="td-motif-row" style="display:none;"></div>
+
+      <div class="dp-palette" id="td-colour-row"></div>
+
+      <div class="dp-actions">
+        <button onclick="tdRemoveSelected()">🗑️ Remove Selected</button>
+        <button onclick="tdClearAll()">🧹 Clear All</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const API_URL = window.location.origin;
     // The Kiln Cafe studio id (pilot). White-label studios would inject their own.
@@ -1035,7 +1190,7 @@
             <div class="tile-desc">Photograph your real piece, then preview colours right on it.</div>
           </button>
 
-          <button class="tile tile-oxblood soon">
+          <button class="tile tile-oxblood" onclick="openTransferDesigner()">
             <span class="tile-icon">✨</span>
             <div class="tile-title">Transfer Designer</div>
             <div class="tile-desc">Create and position transfers for your piece.</div>
@@ -1637,6 +1792,228 @@
       // is connected, this becomes a real POST to create the appointment.
       alert(`Preview only for now!\n\nWhen this connects to the studio calendar, this would request:\n${summary}\nParty of ${partySize}`);
       closeNewBooking();
+    }
+
+    // ── Transfer Designer: photo of the real piece, then add draggable/
+    // resizable/rotatable text and simple motif shapes on top — planning
+    // where a real transfer/decal will go before applying it in-studio. ──
+    const TD_FONTS = [
+      { label: 'Aa', family: "'Georgia', serif" },
+      { label: 'Aa', family: "'Instrument Sans', sans-serif", weight: '700' },
+      { label: 'Aa', family: "'Brush Script MT', cursive" },
+      { label: 'Aa', family: "'Courier New', monospace" }
+    ];
+    const TD_MOTIFS = [
+      { name: 'Star', svg: '<svg viewBox="0 0 24 24"><path d="M12 1l3.1 6.7 7.4.9-5.5 5 1.6 7.3L12 17.3 5.4 20.9 7 13.6 1.5 8.6l7.4-.9L12 1z" fill="CURRENT"/></svg>' },
+      { name: 'Heart', svg: '<svg viewBox="0 0 24 24"><path d="M12 21s-8-4.9-8-11.2C4 6.6 6.6 4 9.6 4 11 4 12 4.7 12 4.7S13 4 14.4 4C17.4 4 20 6.6 20 9.8 20 16.1 12 21 12 21z" fill="CURRENT"/></svg>' },
+      { name: 'Flower', svg: '<svg viewBox="0 0 24 24"><g fill="CURRENT"><circle cx="12" cy="6" r="3.4"/><circle cx="12" cy="18" r="3.4"/><circle cx="6" cy="12" r="3.4"/><circle cx="18" cy="12" r="3.4"/><circle cx="12" cy="12" r="2.6" fill="#fff"/></g></svg>' },
+      { name: 'Swirl', svg: '<svg viewBox="0 0 24 24"><path d="M12 3C7 3 4 6.5 4 10.5c0 3 2.2 5 5 5 2.2 0 3.8-1.4 3.8-3.4 0-1.6-1.1-2.6-2.4-2.6-1 0-1.8.7-1.8 1.7" fill="none" stroke="CURRENT" stroke-width="2" stroke-linecap="round"/></svg>' },
+      { name: 'Dot', svg: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7" fill="CURRENT"/></svg>' }
+    ];
+    const TD_COLOURS = ['#2B2724', '#B87946', '#c0392b', '#2f6b3a', '#1d6f77', '#6a4fa0', '#ffffff'];
+
+    let tdMode = 'text';
+    let tdSelectedFont = TD_FONTS[0];
+    let tdSelectedColour = TD_COLOURS[0];
+    let tdSelectedElement = null;
+    let tdElementCounter = 0;
+
+    function openTransferDesigner() {
+      document.getElementById('transfer-designer-screen').style.display = 'flex';
+      void document.getElementById('transfer-designer-screen').offsetWidth;
+      document.getElementById('transfer-designer-screen').classList.add('open');
+      if (document.getElementById('td-font-row').children.length === 0) renderTdFonts();
+      if (document.getElementById('td-motif-row').children.length === 0) renderTdMotifs();
+      if (document.getElementById('td-colour-row').children.length === 0) renderTdColours();
+    }
+    function closeTransferDesigner() {
+      const screen = document.getElementById('transfer-designer-screen');
+      screen.classList.remove('open');
+      setTimeout(() => { screen.style.display = 'none'; }, 280);
+    }
+
+    function handleTransferPhoto(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        document.getElementById('td-photo-img').src = e.target.result;
+        document.getElementById('td-photo-prompt').style.display = 'none';
+        document.getElementById('td-canvas-stack').style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function setTdMode(mode) {
+      tdMode = mode;
+      document.getElementById('td-tool-text').classList.toggle('active', mode === 'text');
+      document.getElementById('td-tool-motif').classList.toggle('active', mode === 'motif');
+      document.getElementById('td-text-controls').style.display = mode === 'text' ? 'block' : 'none';
+      document.getElementById('td-motif-row').style.display = mode === 'motif' ? 'flex' : 'none';
+    }
+
+    function renderTdFonts() {
+      const el = document.getElementById('td-font-row');
+      el.innerHTML = TD_FONTS.map((f, i) => `
+        <div class="td-font-btn ${i === 0 ? 'active' : ''}" style="font-family:${f.family}; font-weight:${f.weight || 'normal'};" onclick="selectTdFont(${i}, this)">${f.label}</div>
+      `).join('');
+    }
+    function selectTdFont(i, el) {
+      tdSelectedFont = TD_FONTS[i];
+      document.querySelectorAll('.td-font-btn').forEach(b => b.classList.remove('active'));
+      el.classList.add('active');
+    }
+
+    function renderTdMotifs() {
+      const el = document.getElementById('td-motif-row');
+      el.innerHTML = TD_MOTIFS.map((m, i) => `
+        <div class="td-motif-btn" onclick="addTransferMotif(${i})" title="${m.name}">${m.svg.replace(/CURRENT/g, tdSelectedColour)}</div>
+      `).join('');
+    }
+
+    function renderTdColours() {
+      const el = document.getElementById('td-colour-row');
+      el.innerHTML = TD_COLOURS.map((c, i) => `
+        <div class="dp-swatch ${i === 0 ? 'active' : ''}" style="background:${c}; ${c === '#ffffff' ? 'box-shadow: inset 0 0 0 1px rgba(0,0,0,0.2);' : ''}" onclick="selectTdColour('${c}', this)"></div>
+      `).join('');
+    }
+    function selectTdColour(hex, el) {
+      tdSelectedColour = hex;
+      document.querySelectorAll('#td-colour-row .dp-swatch').forEach(s => s.classList.remove('active'));
+      el.classList.add('active');
+      renderTdMotifs(); // refresh motif preview colours
+    }
+
+    function addTransferText() {
+      const input = document.getElementById('td-text-input');
+      const text = input.value.trim();
+      if (!text) return;
+      const el = document.createElement('div');
+      el.className = 'td-element';
+      el.innerHTML = `<div class="td-text-content" style="font-family:${tdSelectedFont.family}; font-weight:${tdSelectedFont.weight || '700'}; color:${tdSelectedColour};">${text}</div>` + tdHandlesHTML();
+      document.getElementById('td-canvas-stack').appendChild(el);
+      makeTdElementInteractive(el);
+      selectTdElement(el);
+      input.value = '';
+    }
+
+    function addTransferMotif(motifIndex) {
+      const motif = TD_MOTIFS[motifIndex];
+      const el = document.createElement('div');
+      el.className = 'td-element';
+      el.innerHTML = `<div class="td-motif-content">${motif.svg.replace(/CURRENT/g, tdSelectedColour)}</div>` + tdHandlesHTML();
+      document.getElementById('td-canvas-stack').appendChild(el);
+      makeTdElementInteractive(el);
+      selectTdElement(el);
+    }
+
+    function tdHandlesHTML() {
+      return `
+        <div class="td-remove-handle" onclick="event.stopPropagation(); this.parentElement.remove();">✕</div>
+        <div class="td-rotate-handle">↻</div>
+        <div class="td-resize-handle"></div>
+      `;
+    }
+
+    function selectTdElement(el) {
+      document.querySelectorAll('.td-element').forEach(e => e.classList.remove('selected'));
+      el.classList.add('selected');
+      tdSelectedElement = el;
+    }
+
+    function makeTdElementInteractive(el) {
+      let state = null; // 'drag' | 'resize' | 'rotate'
+      let startX, startY, startLeft, startTop, startScale = 1, startAngle = 0, startDist, startElAngle;
+      const rotateHandle = el.querySelector('.td-rotate-handle');
+      const resizeHandle = el.querySelector('.td-resize-handle');
+
+      function getXY(e) {
+        return e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY };
+      }
+      function currentTransform() {
+        const m = el.style.transform.match(/rotate\(([-\d.]+)deg\) scale\(([\d.]+)\)/);
+        return m ? { angle: parseFloat(m[1]), scale: parseFloat(m[2]) } : { angle: 0, scale: 1 };
+      }
+
+      el.addEventListener('mousedown', start);
+      el.addEventListener('touchstart', start, { passive: false });
+
+      function start(e) {
+        if (e.target === resizeHandle || e.target === rotateHandle) return;
+        e.preventDefault(); e.stopPropagation();
+        selectTdElement(el);
+        state = 'drag';
+        const p = getXY(e);
+        startX = p.x; startY = p.y;
+        startLeft = parseFloat(el.style.left) || el.offsetLeft;
+        startTop = parseFloat(el.style.top) || el.offsetTop;
+      }
+
+      resizeHandle.addEventListener('mousedown', startResize);
+      resizeHandle.addEventListener('touchstart', startResize, { passive: false });
+      function startResize(e) {
+        e.preventDefault(); e.stopPropagation();
+        selectTdElement(el);
+        state = 'resize';
+        const p = getXY(e);
+        startX = p.x; startY = p.y;
+        startScale = currentTransform().scale;
+        const rect = el.getBoundingClientRect();
+        startDist = Math.hypot(p.x - (rect.left + rect.width/2), p.y - (rect.top + rect.height/2));
+      }
+
+      rotateHandle.addEventListener('mousedown', startRotate);
+      rotateHandle.addEventListener('touchstart', startRotate, { passive: false });
+      function startRotate(e) {
+        e.preventDefault(); e.stopPropagation();
+        selectTdElement(el);
+        state = 'rotate';
+        startElAngle = currentTransform().angle;
+        const rect = el.getBoundingClientRect();
+        const p = getXY(e);
+        startAngle = Math.atan2(p.y - (rect.top + rect.height/2), p.x - (rect.left + rect.width/2)) * 180 / Math.PI;
+      }
+
+      function move(e) {
+        if (!state) return;
+        e.preventDefault();
+        const p = getXY(e);
+        if (state === 'drag') {
+          el.style.left = (startLeft + (p.x - startX)) + 'px';
+          el.style.top = (startTop + (p.y - startY)) + 'px';
+        } else if (state === 'resize') {
+          const rect = el.getBoundingClientRect();
+          const dist = Math.hypot(p.x - (rect.left + rect.width/2), p.y - (rect.top + rect.height/2));
+          const newScale = Math.max(0.3, Math.min(4, startScale * (dist / startDist)));
+          const t = currentTransform();
+          el.style.transform = `rotate(${t.angle}deg) scale(${newScale})`;
+        } else if (state === 'rotate') {
+          const rect = el.getBoundingClientRect();
+          const angle = Math.atan2(p.y - (rect.top + rect.height/2), p.x - (rect.left + rect.width/2)) * 180 / Math.PI;
+          const newAngle = startElAngle + (angle - startAngle);
+          const t = currentTransform();
+          el.style.transform = `rotate(${newAngle}deg) scale(${t.scale})`;
+        }
+      }
+      function end() { state = null; }
+
+      window.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', end);
+      window.addEventListener('touchmove', move, { passive: false });
+      window.addEventListener('touchend', end);
+
+      el.style.transform = 'rotate(0deg) scale(1)';
+    }
+
+    function tdRemoveSelected() {
+      if (tdSelectedElement) {
+        tdSelectedElement.remove();
+        tdSelectedElement = null;
+      }
+    }
+    function tdClearAll() {
+      document.querySelectorAll('.td-element').forEach(e => e.remove());
+      tdSelectedElement = null;
     }
 
     function renderDpPalette() {
