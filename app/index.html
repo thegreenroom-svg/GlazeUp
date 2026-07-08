@@ -725,10 +725,13 @@
       max-height: 100%;
       display: none;
     }
-    .td-canvas-stack img {
+    .td-canvas-stack canvas {
       display: block;
       max-width: 100%;
       max-height: 70vh;
+      position: absolute;
+      top: 0;
+      left: 0;
     }
     .td-element {
       position: absolute;
@@ -1023,10 +1026,14 @@
       <button onclick="closeTransferDesigner()">✕ Close</button>
     </div>
 
+    <div style="background: rgba(184,121,70,0.18); border: 1px solid rgba(184,121,70,0.4); border-radius: 12px; padding: 10px 14px; margin: 12px 16px 0; font-size: 12px; color: #fff; line-height: 1.5;">
+      ✏️ <strong>This is a quick sketch to plan your idea</strong> — not the real thing! Once you've got a design you like, you'll do the actual painting with real glaze in the studio.
+    </div>
+
     <div class="dp-canvas-area" id="td-canvas-area">
       <div id="td-photo-prompt">
         <div style="font-size: 40px; margin-bottom: 8px;">✨</div>
-        <div style="font-size: 15px; line-height: 1.5;">Photograph your piece, then add text or motifs to plan your transfer placement.</div>
+        <div style="font-size: 15px; line-height: 1.5;">Photograph your piece, then sketch, add text, or place motifs to plan your design.</div>
         <div style="display: flex; gap: 10px; justify-content: center; margin-top: 16px; flex-wrap: wrap;">
           <button onclick="document.getElementById('td-photo-camera').click()">📷 Take Photo</button>
           <button onclick="document.getElementById('td-photo-library').click()" style="background: rgba(255,255,255,0.15); color: #fff;">🖼️ Choose Photo</button>
@@ -1035,17 +1042,35 @@
         <input type="file" id="td-photo-library" accept="image/*" style="display:none;" onchange="handleTransferPhoto(event)">
       </div>
       <div class="td-canvas-stack" id="td-canvas-stack">
-        <img id="td-photo-img" alt="Your piece">
+        <canvas id="td-base-canvas"></canvas>
+        <canvas id="td-paint-canvas"></canvas>
       </div>
     </div>
 
     <div class="dp-toolbar">
       <div class="dp-tool-row">
-        <div class="dp-tool-btn active" id="td-tool-text" onclick="setTdMode('text')"><span class="dp-tool-icon">🔤</span>Add Text</div>
+        <div class="dp-tool-btn active" id="td-tool-draw" onclick="setTdMode('draw')"><span class="dp-tool-icon">✏️</span>Sketch</div>
+        <div class="dp-tool-btn" id="td-tool-text" onclick="setTdMode('text')"><span class="dp-tool-icon">🔤</span>Add Text</div>
         <div class="dp-tool-btn" id="td-tool-motif" onclick="setTdMode('motif')"><span class="dp-tool-icon">✨</span>Add Motif</div>
       </div>
 
-      <div id="td-text-controls">
+      <div id="td-draw-controls">
+        <div class="dp-tool-row" style="margin-bottom: 10px;">
+          <div class="dp-tool-btn active" id="td-draw-brush" onclick="setTdDrawTool('brush')" style="flex:1;"><span class="dp-tool-icon">🖌️</span>Brush</div>
+          <div class="dp-tool-btn" id="td-draw-pen" onclick="setTdDrawTool('pen')" style="flex:1;"><span class="dp-tool-icon">✒️</span>Pen</div>
+          <div class="dp-tool-btn" id="td-draw-fill" onclick="setTdDrawTool('fill')" style="flex:1;"><span class="dp-tool-icon">🪣</span>Fill</div>
+        </div>
+        <div class="dp-sub-row" id="td-brush-size-row">
+          <label>Nib size</label>
+          <div class="dp-brush-sizes">
+            <div class="dp-brush-size-btn" data-size="6" onclick="setTdBrushSize(6, this)"><div class="dot" style="width:5px;height:5px;"></div></div>
+            <div class="dp-brush-size-btn active" data-size="16" onclick="setTdBrushSize(16, this)"><div class="dot" style="width:10px;height:10px;"></div></div>
+            <div class="dp-brush-size-btn" data-size="30" onclick="setTdBrushSize(30, this)"><div class="dot" style="width:18px;height:18px;"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="td-text-controls" style="display:none;">
         <div style="display:flex; gap:8px; margin-bottom:10px;">
           <input type="text" id="td-text-input" maxlength="20" placeholder="Type your text…" style="flex:1; padding:11px; border-radius:10px; border:none; font-size:14px;">
           <button onclick="addTransferText()" style="background:var(--glaze-oxblood-base); color:#fff; border:none; border-radius:10px; padding:0 16px; font-weight:700; cursor:pointer;">Add</button>
@@ -1058,6 +1083,7 @@
       <div class="dp-palette" id="td-colour-row"></div>
 
       <div class="dp-actions">
+        <button onclick="tdUndo()">↩️ Undo</button>
         <button onclick="tdRemoveSelected()">🗑️ Remove Selected</button>
         <button onclick="tdClearAll()">🧹 Clear All</button>
       </div>
@@ -1862,11 +1888,19 @@
     ];
     const TD_COLOURS = ['#2B2724', '#B87946', '#c0392b', '#2f6b3a', '#1d6f77', '#6a4fa0', '#ffffff'];
 
-    let tdMode = 'text';
+    let tdMode = 'draw';
     let tdSelectedFont = TD_FONTS[0];
     let tdSelectedColour = TD_COLOURS[0];
     let tdSelectedElement = null;
     let tdElementCounter = 0;
+
+    // Drawing layer state (separate from Design Preview's dp* state)
+    let tdDrawTool = 'brush';
+    let tdBrushSize = 16;
+    let tdBaseCtx, tdPaintCtx;
+    let tdDrawing = false;
+    let tdLastPoint = null;
+    let tdUndoStack = [];
 
     function openTransferDesigner() {
       document.getElementById('transfer-designer-screen').style.display = 'flex';
@@ -1887,17 +1921,190 @@
       if (!file) return;
       const reader = new FileReader();
       reader.onload = (e) => {
-        document.getElementById('td-photo-img').src = e.target.result;
-        document.getElementById('td-photo-prompt').style.display = 'none';
-        document.getElementById('td-canvas-stack').style.display = 'block';
+        const img = new Image();
+        img.onload = () => setupTdCanvases(img);
+        img.src = e.target.result;
       };
       reader.readAsDataURL(file);
     }
 
+    function setupTdCanvases(img) {
+      const area = document.getElementById('td-canvas-area');
+      const stack = document.getElementById('td-canvas-stack');
+      const maxW = area.clientWidth;
+      const maxH = area.clientHeight;
+      const scale = Math.min(maxW / img.width, maxH / img.height, 1);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+
+      const baseCanvas = document.getElementById('td-base-canvas');
+      const paintCanvas = document.getElementById('td-paint-canvas');
+      baseCanvas.width = w; baseCanvas.height = h;
+      paintCanvas.width = w; paintCanvas.height = h;
+      stack.style.width = w + 'px';
+      stack.style.height = h + 'px';
+
+      tdBaseCtx = baseCanvas.getContext('2d');
+      tdPaintCtx = paintCanvas.getContext('2d');
+      tdBaseCtx.drawImage(img, 0, 0, w, h);
+      tdPaintCtx.clearRect(0, 0, w, h);
+      tdUndoStack = [];
+
+      document.getElementById('td-photo-prompt').style.display = 'none';
+      stack.style.display = 'block';
+
+      wireTdPointerEvents(paintCanvas);
+    }
+
+    function wireTdPointerEvents(canvas) {
+      const getPt = (evt) => {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+        const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+        return {
+          x: (clientX - rect.left) * (canvas.width / rect.width),
+          y: (clientY - rect.top) * (canvas.height / rect.height)
+        };
+      };
+      const start = (evt) => {
+        if (tdMode !== 'draw') return;
+        evt.preventDefault();
+        const pt = getPt(evt);
+        if (tdDrawTool === 'fill') {
+          tdSaveUndoState();
+          tdFloodFill(pt);
+        } else {
+          tdSaveUndoState();
+          tdDrawing = true;
+          tdLastPoint = pt;
+          tdPaintDot(pt);
+        }
+      };
+      const move = (evt) => {
+        if (!tdDrawing || tdMode !== 'draw' || tdDrawTool === 'fill') return;
+        evt.preventDefault();
+        const pt = getPt(evt);
+        tdPaintLine(tdLastPoint, pt);
+        tdLastPoint = pt;
+      };
+      const end = () => { tdDrawing = false; tdLastPoint = null; };
+
+      canvas.addEventListener('mousedown', start);
+      canvas.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', end);
+      canvas.addEventListener('touchstart', start, { passive: false });
+      canvas.addEventListener('touchmove', move, { passive: false });
+      canvas.addEventListener('touchend', end);
+    }
+
+    // Pen = half the chosen nib size, fully opaque, hard edge (fineliner feel)
+    // Brush = full chosen size, softer/semi-transparent (paintbrush feel)
+    function tdEffectiveSizeAndOpacity() {
+      return tdDrawTool === 'pen'
+        ? { size: Math.max(2, tdBrushSize / 2), opacity: 1 }
+        : { size: tdBrushSize, opacity: 0.6 };
+    }
+
+    function tdPaintDot(pt) {
+      const { size, opacity } = tdEffectiveSizeAndOpacity();
+      tdPaintCtx.globalAlpha = opacity;
+      tdPaintCtx.fillStyle = tdSelectedColour;
+      tdPaintCtx.beginPath();
+      tdPaintCtx.arc(pt.x, pt.y, size / 2, 0, Math.PI * 2);
+      tdPaintCtx.fill();
+    }
+    function tdPaintLine(from, to) {
+      const { size, opacity } = tdEffectiveSizeAndOpacity();
+      tdPaintCtx.globalAlpha = opacity;
+      tdPaintCtx.strokeStyle = tdSelectedColour;
+      tdPaintCtx.lineWidth = size;
+      tdPaintCtx.lineCap = 'round';
+      tdPaintCtx.lineJoin = 'round';
+      tdPaintCtx.beginPath();
+      tdPaintCtx.moveTo(from.x, from.y);
+      tdPaintCtx.lineTo(to.x, to.y);
+      tdPaintCtx.stroke();
+    }
+
+    // Same proven flood-fill approach as Design Preview: samples the
+    // original photo so repeated fills stay accurate, paints onto the
+    // separate paint layer so the photo itself is never altered.
+    function tdFloodFill(startPt) {
+      const w = tdBaseCtx.canvas.width, h = tdBaseCtx.canvas.height;
+      const baseData = tdBaseCtx.getImageData(0, 0, w, h).data;
+      const paintData = tdPaintCtx.getImageData(0, 0, w, h);
+
+      const startX = Math.floor(startPt.x), startY = Math.floor(startPt.y);
+      if (startX < 0 || startY < 0 || startX >= w || startY >= h) return;
+
+      const idx = (x, y) => (y * w + x) * 4;
+      const startIdx = idx(startX, startY);
+      const targetR = baseData[startIdx], targetG = baseData[startIdx + 1], targetB = baseData[startIdx + 2];
+      const tolerance = 42;
+
+      const fillRgb = hexToRgb(tdSelectedColour);
+      const fillAlpha = Math.round(0.85 * 255);
+
+      const visited = new Uint8Array(w * h);
+      const stack = [[startX, startY]];
+
+      while (stack.length) {
+        const [x, y] = stack.pop();
+        if (x < 0 || y < 0 || x >= w || y >= h) continue;
+        const pos = y * w + x;
+        if (visited[pos]) continue;
+
+        const i = pos * 4;
+        const dr = baseData[i] - targetR, dg = baseData[i + 1] - targetG, db = baseData[i + 2] - targetB;
+        const dist = Math.sqrt(dr * dr + dg * dg + db * db);
+        if (dist > tolerance) continue;
+
+        visited[pos] = 1;
+        const pi = pos * 4;
+        const existingAlpha = paintData.data[pi + 3] / 255;
+        const outAlpha = fillAlpha / 255 + existingAlpha * (1 - fillAlpha / 255);
+        if (outAlpha > 0) {
+          paintData.data[pi] = Math.round((fillRgb.r * (fillAlpha / 255) + paintData.data[pi] * existingAlpha * (1 - fillAlpha / 255)) / outAlpha);
+          paintData.data[pi + 1] = Math.round((fillRgb.g * (fillAlpha / 255) + paintData.data[pi + 1] * existingAlpha * (1 - fillAlpha / 255)) / outAlpha);
+          paintData.data[pi + 2] = Math.round((fillRgb.b * (fillAlpha / 255) + paintData.data[pi + 2] * existingAlpha * (1 - fillAlpha / 255)) / outAlpha);
+        }
+        paintData.data[pi + 3] = Math.round(outAlpha * 255);
+
+        stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+      }
+      tdPaintCtx.putImageData(paintData, 0, 0);
+    }
+
+    function tdSaveUndoState() {
+      if (!tdPaintCtx) return;
+      tdUndoStack.push(tdPaintCtx.getImageData(0, 0, tdPaintCtx.canvas.width, tdPaintCtx.canvas.height));
+      if (tdUndoStack.length > 20) tdUndoStack.shift();
+    }
+    function tdUndo() {
+      if (tdUndoStack.length === 0) return;
+      const prev = tdUndoStack.pop();
+      tdPaintCtx.putImageData(prev, 0, 0);
+    }
+
+    function setTdDrawTool(tool) {
+      tdDrawTool = tool;
+      document.getElementById('td-draw-brush').classList.toggle('active', tool === 'brush');
+      document.getElementById('td-draw-pen').classList.toggle('active', tool === 'pen');
+      document.getElementById('td-draw-fill').classList.toggle('active', tool === 'fill');
+      document.getElementById('td-brush-size-row').style.display = tool === 'fill' ? 'none' : 'flex';
+    }
+    function setTdBrushSize(size, el) {
+      tdBrushSize = size;
+      document.querySelectorAll('#td-brush-size-row .dp-brush-size-btn').forEach(b => b.classList.remove('active'));
+      el.classList.add('active');
+    }
+
     function setTdMode(mode) {
       tdMode = mode;
+      document.getElementById('td-tool-draw').classList.toggle('active', mode === 'draw');
       document.getElementById('td-tool-text').classList.toggle('active', mode === 'text');
       document.getElementById('td-tool-motif').classList.toggle('active', mode === 'motif');
+      document.getElementById('td-draw-controls').style.display = mode === 'draw' ? 'block' : 'none';
       document.getElementById('td-text-controls').style.display = mode === 'text' ? 'block' : 'none';
       document.getElementById('td-motif-row').style.display = mode === 'motif' ? 'flex' : 'none';
     }
@@ -2064,6 +2271,10 @@
     function tdClearAll() {
       document.querySelectorAll('.td-element').forEach(e => e.remove());
       tdSelectedElement = null;
+      if (tdPaintCtx) {
+        tdSaveUndoState();
+        tdPaintCtx.clearRect(0, 0, tdPaintCtx.canvas.width, tdPaintCtx.canvas.height);
+      }
     }
 
     function renderDpPalette() {
