@@ -1106,9 +1106,61 @@
       }
       .splash-arrow-path, .splash-flame { animation: none; opacity: 1; }
     }
+
+    /* ── Staff walkthrough ── */
+    #swt-overlay { position: fixed; inset: 0; z-index: 9000; pointer-events: none; display: none; }
+    #swt-backdrop { position: absolute; inset: 0; background: rgba(43,39,36,0.8); backdrop-filter: blur(2px); }
+    #swt-spotlight {
+      position: absolute; pointer-events: none;
+      transition: all 0.4s cubic-bezier(0.34,1.2,0.4,1);
+      box-shadow: 0 0 0 9999px rgba(43,39,36,0.8);
+      border: 2px solid #B87946; border-radius: 12px;
+    }
+    #swt-arrow {
+      position: absolute; font-size: 26px; pointer-events: none;
+      animation: swt-bounce 1s ease-in-out infinite;
+    }
+    @keyframes swt-bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
+    #swt-card {
+      position: absolute; background: #fff; border-radius: 18px;
+      padding: 18px 16px 14px; max-width: 310px; width: calc(100vw - 32px);
+      box-shadow: 0 12px 40px rgba(43,39,36,0.35);
+      pointer-events: all; transition: all 0.3s cubic-bezier(0.34,1.2,0.4,1);
+    }
+    #swt-step-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: #B87946; text-transform: uppercase; margin-bottom: 5px; }
+    #swt-title { font-size: 16px; font-weight: 700; color: #2B2724; margin-bottom: 5px; line-height: 1.25; }
+    #swt-body { font-size: 12px; color: #8a8175; line-height: 1.55; margin-bottom: 14px; }
+    #swt-actions { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
+    #swt-next-btn { flex: 1; background: #2B2724; color: #fff; border: none; padding: 11px; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; }
+    #swt-skip-btn { background: none; border: none; color: #8a8175; font-size: 11px; cursor: pointer; padding: 6px; }
+    #swt-dots { display: flex; gap: 4px; align-items: center; }
+    .swt-dot { width: 5px; height: 5px; border-radius: 50%; background: #C8BFB2; transition: all 0.2s; }
+    .swt-dot.active { background: #B87946; width: 16px; border-radius: 3px; }
+    #swt-voice-btn { background: none; border: 1.5px solid #C8BFB2; border-radius: 20px; padding: 4px 10px; font-size: 10px; color: #8a8175; cursor: pointer; }
+    #swt-voice-btn.speaking { background: #B87946; color: #fff; border-color: #B87946; }
+    #swt-trigger { position: fixed; bottom: 20px; right: 16px; z-index: 8000; background: #2B2724; color: #fff; border: none; border-radius: 22px; padding: 9px 14px; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 14px rgba(43,39,36,0.3); display: none; align-items: center; gap: 5px; }
   </style>
 </head>
 <body>
+
+<!-- Staff app walkthrough -->
+<div id="swt-overlay">
+  <div id="swt-backdrop"></div>
+  <div id="swt-spotlight"></div>
+  <div id="swt-arrow">👇</div>
+  <div id="swt-card">
+    <div id="swt-step-label">Step 1 of 12</div>
+    <div id="swt-title">Welcome to kilnLINK Staff</div>
+    <div id="swt-body">Your studio management app. Let's walk through the whole thing — takes about 2 minutes.</div>
+    <div id="swt-actions">
+      <div id="swt-dots"></div>
+      <button id="swt-voice-btn" onclick="swtToggleVoice()">🔊 Read aloud</button>
+      <button id="swt-next-btn" onclick="swtNext()">Next →</button>
+    </div>
+    <button id="swt-skip-btn" onclick="swtEnd()">Skip tour</button>
+  </div>
+</div>
+<button id="swt-trigger" onclick="swtStart()">🎯 Staff Tour</button>
 
 <!-- Splash / resting screen -->
 <div id="splash-screen">
@@ -2632,6 +2684,230 @@ async function rejectPrintRequest(id) {
   }
 }
 
+// ══════════════════════════════════════════════════════════
+// STAFF APP WALKTHROUGH
+// ══════════════════════════════════════════════════════════
+
+const SWT_STEPS = [
+  {
+    title: 'Welcome to the Staff App 👋',
+    body: 'This is your daily studio management dashboard. Everything you need — from opening a table to firing pieces — is here. Let\'s walk through it.',
+    target: null, arrow: null,
+    voice: 'Welcome to the kilnLINK staff app. This is your complete studio management dashboard. Let\'s take a quick tour.'
+  },
+  {
+    title: 'Dashboard',
+    body: 'Your daily overview — revenue, app extras charged today (tablet, home access, tools), and the Extra Charges tally to add to customer bills at checkout.',
+    target: '.nav-link:nth-child(1)', arrow: 'right',
+    nav: 'dashboard',
+    voice: 'The Dashboard shows your daily overview — revenue, session stats, and a running tally of all app extras to add to bills at checkout.'
+  },
+  {
+    title: 'Daily Bookings — Step 1',
+    body: 'Start here for every customer. Type their name, then choose New Walk-in or Existing Booking. The app finds their history and any returning pieces automatically.',
+    target: '#staff-section-booking',
+    nav: 'staff', arrow: 'up',
+    voice: 'Daily Bookings is where every session starts. Type the customer name, choose walk-in or existing booking, and the app finds their history automatically.'
+  },
+  {
+    title: 'Step 2 — Customer Engagement',
+    body: 'Add pottery pieces, drinks, and cakes to the running bill. The Mayco Specialist Glazes panel is here too — tap a glaze to add it instantly.',
+    target: '#staff-section-engagement',
+    nav: 'staff', arrow: 'up',
+    voice: 'Customer Engagement is where you log pottery pieces, drinks, and cakes to the running bill. The Mayco specialist glazes panel is here for quick add-ons.'
+  },
+  {
+    title: 'Step 3 — Completion',
+    body: 'When a customer finishes, photograph their pieces here. The photo gets stamped with their name and date. Tick Home Access or tablet charges before submitting.',
+    target: '#staff-section-completion',
+    nav: 'staff', arrow: 'up',
+    voice: 'At completion, photograph the customer\'s pieces. The photo is stamped with their name and date. Add any extra charges like home access before submitting.'
+  },
+  {
+    title: 'Step 4 — Kiln & Pickup',
+    body: 'Mark pieces as fired, group them into kiln batches with a scannable QR, and mark them ready for collection when done. All tracked by booking.',
+    target: '#staff-section-kiln',
+    nav: 'staff', arrow: 'up',
+    voice: 'The Kiln section lets you mark pieces as fired, group them into batches with a QR code, and mark them ready for collection.'
+  },
+  {
+    title: 'Community & Featuring',
+    body: 'See everything customers have shared from this studio. Tap ✨ Feature on any post to push it to the worldwide kilnLINK feed — great for showcasing brilliant work.',
+    target: '.nav-link[onclick*="community"]', arrow: 'right',
+    nav: 'community',
+    voice: 'The Community tab shows all customer-shared pieces. Tap Feature on any post to push it to the worldwide kilnLINK feed.'
+  },
+  {
+    title: 'Print Queue',
+    body: 'Customer-submitted transfer designs land here for your review. Check the design and sizing, then Approve to charge £1 and print — or Reject with no charge.',
+    target: '.nav-link[onclick*="printqueue"]', arrow: 'right',
+    nav: 'printqueue',
+    voice: 'The Print Queue shows customer designs submitted for ceramic transfer printing. Approve to charge one pound and print, or reject with no charge.'
+  },
+  {
+    title: 'Stock Catalogue',
+    body: 'Photograph bisque pieces from the studio and add them here. Customers can then browse, design on them at home, and reserve pieces for their next visit.',
+    target: '.nav-link[onclick*="stock"]', arrow: 'right',
+    nav: 'stock',
+    voice: 'The Stock tab lets you photograph and catalogue bisque pieces. Customers can browse, design on them at home, and reserve pieces for their next visit.'
+  },
+  {
+    title: 'Extra Charges Today',
+    body: 'Everything customers have been charged through the app — tablet hire, home access, design tools — appears here grouped by booking. Add these to the bill at checkout.',
+    target: '#extras-today-list',
+    nav: 'dashboard', arrow: 'up',
+    voice: 'The Extra Charges Today card shows everything charged through the app, grouped by booking. Add these to the till when customers pay.'
+  },
+  {
+    title: 'Setup',
+    body: 'Connect your Square account, configure table tracking, and print the static walk-in QR code — one code for your door, works forever for drop-in customers.',
+    target: '.nav-link[onclick*="setup"]', arrow: 'right',
+    nav: 'setup',
+    voice: 'Setup is where you connect Square, configure table tracking, and print the permanent walk-in QR code for your door.'
+  },
+  {
+    title: 'You\'re ready! 🎉',
+    body: 'That\'s the full staff walkthrough. The flow every session: open a booking → engage → complete → kiln → pickup. Tap the 🎯 button anytime to replay.',
+    target: null, arrow: null,
+    voice: 'That\'s the full staff tour! The daily flow is: open a booking, log items, complete with a photo, then manage firing and pickup. Good luck!'
+  }
+];
+
+let swtStep = 0;
+let swtVoiceOn = false;
+
+function swtStart() {
+  swtStep = 0;
+  document.getElementById('swt-trigger').style.display = 'none';
+  document.getElementById('swt-overlay').style.display = 'block';
+  swtRender();
+}
+
+function swtEnd() {
+  document.getElementById('swt-overlay').style.display = 'none';
+  document.getElementById('swt-spotlight').style.cssText = 'display:none';
+  document.getElementById('swt-arrow').style.display = 'none';
+  document.getElementById('swt-trigger').style.display = 'flex';
+  swtStopVoice();
+  localStorage.setItem('swt_done', '1');
+}
+
+function swtNext() {
+  swtStopVoice();
+  swtStep++;
+  if (swtStep >= SWT_STEPS.length) { swtEnd(); return; }
+  swtRender();
+}
+
+function swtRender() {
+  const step = SWT_STEPS[swtStep];
+
+  // Navigate to the right tab if needed
+  if (step.nav) {
+    goToTab(step.nav);
+    setTimeout(() => swtPositionCard(step), 350);
+  } else {
+    swtPositionCard(step);
+  }
+
+  document.getElementById('swt-step-label').textContent = `Step ${swtStep + 1} of ${SWT_STEPS.length}`;
+  document.getElementById('swt-title').textContent = step.title;
+  document.getElementById('swt-body').textContent = step.body;
+  document.getElementById('swt-next-btn').textContent = swtStep === SWT_STEPS.length - 1 ? 'Done ✓' : 'Next →';
+
+  const dots = document.getElementById('swt-dots');
+  dots.innerHTML = SWT_STEPS.map((_,i) =>
+    `<div class="swt-dot ${i===swtStep?'active':''}"></div>`
+  ).join('');
+
+  if (swtVoiceOn && step.voice) swtSpeak(step.voice);
+}
+
+function swtPositionCard(step) {
+  const spotlight = document.getElementById('swt-spotlight');
+  const arrow = document.getElementById('swt-arrow');
+  const card = document.getElementById('swt-card');
+
+  if (step.target) {
+    const el = document.querySelector(step.target);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      const pad = 6;
+      spotlight.style.cssText = `
+        display:block; position:absolute;
+        left:${r.left-pad}px; top:${r.top-pad}px;
+        width:${r.width+pad*2}px; height:${r.height+pad*2}px;
+        border-radius:12px;
+        box-shadow:0 0 0 9999px rgba(43,39,36,0.82);
+        border:2px solid #B87946;
+      `;
+
+      arrow.style.display = 'block';
+      if (step.arrow === 'right') {
+        arrow.textContent = '👈';
+        arrow.style.cssText = `display:block;position:absolute;font-size:26px;left:${r.right+6}px;top:${r.top+r.height/2-16}px;animation:swt-bounce 1s ease-in-out infinite;`;
+      } else if (step.arrow === 'up') {
+        arrow.textContent = '👆';
+        arrow.style.cssText = `display:block;position:absolute;font-size:26px;left:${r.left+r.width/2-13}px;top:${r.top-48}px;animation:swt-bounce 1s ease-in-out infinite;`;
+      } else {
+        arrow.textContent = '👇';
+        arrow.style.cssText = `display:block;position:absolute;font-size:26px;left:${r.left+r.width/2-13}px;top:${r.bottom+8}px;animation:swt-bounce 1s ease-in-out infinite;`;
+      }
+
+      // Position card to not cover the spotlight
+      const vp = window.innerHeight;
+      const cardW = Math.min(310, window.innerWidth - 32);
+      if (r.top > vp * 0.55) {
+        card.style.cssText = `top:16px;left:50%;transform:translateX(-50%);max-width:${cardW}px;`;
+      } else {
+        card.style.cssText = `bottom:16px;left:50%;transform:translateX(-50%);max-width:${cardW}px;`;
+      }
+      return;
+    }
+  }
+
+  spotlight.style.cssText = 'display:none';
+  arrow.style.display = 'none';
+  card.style.cssText = 'top:50%;left:50%;transform:translate(-50%,-50%);max-width:310px;';
+}
+
+function swtToggleVoice() {
+  swtVoiceOn = !swtVoiceOn;
+  const btn = document.getElementById('swt-voice-btn');
+  btn.classList.toggle('speaking', swtVoiceOn);
+  btn.textContent = swtVoiceOn ? '🔊 Speaking…' : '🔊 Read aloud';
+  if (swtVoiceOn) swtSpeak(SWT_STEPS[swtStep].voice);
+  else swtStopVoice();
+}
+
+function swtSpeak(text) {
+  if (!window.speechSynthesis || !text) return;
+  swtStopVoice();
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.rate = 0.95; utt.pitch = 1; utt.lang = 'en-GB';
+  const voices = window.speechSynthesis.getVoices();
+  const v = voices.find(v => v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en'));
+  if (v) utt.voice = v;
+  utt.onend = () => {
+    const btn = document.getElementById('swt-voice-btn');
+    if (btn) { btn.textContent = '🔊 Read aloud'; btn.classList.remove('speaking'); }
+  };
+  window.speechSynthesis.speak(utt);
+}
+
+function swtStopVoice() {
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+}
+
+// Show trigger after the dashboard loads
+function swtShowTrigger() {
+  setTimeout(() => {
+    const t = document.getElementById('swt-trigger');
+    if (t) t.style.display = 'flex';
+    if (!localStorage.getItem('swt_done')) swtStart();
+  }, 2000);
+}
+
 async function loadTodaysExtraCharges() {
   const listEl = document.getElementById('extras-today-list');
   if (!listEl) return;
@@ -2666,6 +2942,7 @@ async function loadTodaysExtraCharges() {
 
 async function populateDashboard() {
   loadTodaysExtraCharges();
+  swtShowTrigger();
   try {
     const data = await loadDashboardData();
     
