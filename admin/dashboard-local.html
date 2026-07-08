@@ -972,6 +972,25 @@
       line-height: 1;
     }
 
+    .splash-prefix {
+      font-family: var(--gu-font-display);
+      font-weight: 400;
+      font-size: 36px;
+      letter-spacing: 0.04em;
+      color: rgba(255,255,255,0.7);
+      line-height: 1;
+      align-self: flex-end;
+      padding-bottom: 6px;
+      margin-right: 1px;
+      opacity: 0;
+      animation: splashPrefixFadeIn 0.5s ease forwards;
+      animation-delay: 0.05s;
+    }
+    @keyframes splashPrefixFadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
     .splash-letter {
       display: inline-block;
       opacity: 0;
@@ -1093,8 +1112,11 @@
 
 <!-- Splash / resting screen -->
 <div id="splash-screen">
-  <div class="splash-word">
-  <span class="splash-letter"><svg viewBox="0 0 58 80" aria-hidden="true"><path d="M4.00,76.00 L4.00,4.00 L19.41,4.00 L19.41,76.00 L4.00,76.00 Z M11.20,76.00 L11.20,64.20 L54.00,64.20 L54.00,76.00 L11.20,76.00 Z" fill="#fff"/></svg></span><span class="splash-letter"><svg viewBox="0 0 23.4 80" aria-hidden="true"><path d="M4.00,76.00 L4.00,4.00 L19.41,4.00 L19.41,76.00 L4.00,76.00 Z" fill="#fff"/></svg></span><span class="splash-letter"><svg viewBox="-10 -32 72 114" aria-hidden="true"><path d="M 4,72 L 10,72 L 10,30 C 10,10 18,2 28,2 C 38,2 46,10 46,30 L 46,72 L 52,72" fill="none" stroke="#B87946" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/><rect x="23" y="-10" width="9" height="13" rx="1.5" fill="#B87946"/><circle cx="28" cy="-15" r="3.4" fill="#B87946" opacity="0.6"/><circle cx="31" cy="-21" r="2.6" fill="#B87946" opacity="0.45"/><circle cx="29.5" cy="-27" r="1.9" fill="#B87946" opacity="0.3"/></svg></span><span class="splash-letter"><svg viewBox="0 0 73.4 80" aria-hidden="true"><path d="M4.00,76.00 L4.00,4.00 L19.41,4.00 L19.41,76.00 L4.00,76.00 Z M14.50,38.59 L46.91,4.00 L67.41,4.00 L33.20,38.59 L14.50,38.59 Z M48.50,76.00 L14.30,38.59 L33.20,38.59 L69.41,76.00 L48.50,76.00 Z" fill="#fff"/></svg></span>
+  <div style="display:flex; align-items:baseline; justify-content:center; gap:0;">
+    <div class="splash-prefix">kiln</div>
+    <div class="splash-word">
+    <span class="splash-letter"><svg viewBox="0 0 58 80" aria-hidden="true"><path d="M4.00,76.00 L4.00,4.00 L19.41,4.00 L19.41,76.00 L4.00,76.00 Z M11.20,76.00 L11.20,64.20 L54.00,64.20 L54.00,76.00 L11.20,76.00 Z" fill="#fff"/></svg></span><span class="splash-letter"><svg viewBox="0 0 23.4 80" aria-hidden="true"><path d="M4.00,76.00 L4.00,4.00 L19.41,4.00 L19.41,76.00 L4.00,76.00 Z" fill="#fff"/></svg></span><span class="splash-letter"><svg viewBox="-10 -32 72 114" aria-hidden="true"><path d="M 4,72 L 10,72 L 10,30 C 10,10 18,2 28,2 C 38,2 46,10 46,30 L 46,72 L 52,72" fill="none" stroke="#B87946" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/><rect x="23" y="-10" width="9" height="13" rx="1.5" fill="#B87946"/><circle cx="28" cy="-15" r="3.4" fill="#B87946" opacity="0.6"/><circle cx="31" cy="-21" r="2.6" fill="#B87946" opacity="0.45"/><circle cx="29.5" cy="-27" r="1.9" fill="#B87946" opacity="0.3"/><!-- small vase silhouette inside the kiln arch --><path d="M23,65 L33,65 C36,65 40,58 40,50 C40,40 36,33 29,27 L29,21 L27,21 L27,27 C20,33 16,40 16,50 C16,58 20,65 23,65 Z" fill="#B87946" opacity="0.55"/></svg></span><span class="splash-letter"><svg viewBox="0 0 73.4 80" aria-hidden="true"><path d="M4.00,76.00 L4.00,4.00 L19.41,4.00 L19.41,76.00 L4.00,76.00 Z M14.50,38.59 L46.91,4.00 L67.41,4.00 L33.20,38.59 L14.50,38.59 Z M48.50,76.00 L14.30,38.59 L33.20,38.59 L69.41,76.00 L48.50,76.00 Z" fill="#fff"/></svg></span>
+    </div>
   </div>
   <div class="splash-strapline">Studio · Community · Ritual</div>
   <div class="splash-tagline">Connect. Create. Belong.</div>
