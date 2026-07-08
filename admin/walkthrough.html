@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-GB">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -30,36 +30,65 @@
   .wt-dots { display:flex; gap:5px; flex-wrap:wrap; justify-content:center; }
   .wt-dot { width:7px; height:7px; border-radius:50%; background:#d0c8c0; border:none; cursor:pointer; padding:0; transition:all .2s; }
   .wt-dot.active { background:var(--clay); width:20px; border-radius:4px; }
+
+  /* ── Accessibility ── */
+  :focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  .wt-btn:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  .wt-dot:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+  .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+
+  /* High contrast / forced colours mode */
+  @media (forced-colors: active) {
+    .wt-btn { border: 2px solid ButtonText; forced-color-adjust: none; }
+    .wt-btn-primary, #btn-voice { background: Highlight; color: HighlightText; border-color: Highlight; }
+    .wt-dot.active { background: Highlight; }
+    .wt-progress-fill { background: Highlight; }
+    .wt-narration { border-left-color: Highlight; color: ButtonText; background: transparent; }
+  }
+
+  /* Reduce motion */
+  @media (prefers-reduced-motion: reduce) {
+    .wt-progress-fill { transition: none; }
+    .wt-dot { transition: none; }
+  }
+
+  /* Large text / zoom support */
+  @media (min-width: 1px) {
+    .wt-btn { min-height: 44px; min-width: 44px; }
+    .wt-dot { min-width: 24px; min-height: 24px; border-radius: 50%; }
+    .wt-dot.active { border-radius: 4px; }
+  }
 </style>
 </head>
 <body>
-<div class="wt-header">
-  <div class="wt-logo"><span>kiln</span>LINK Staff Tour</div>
-  <button class="wt-close" onclick="history.back()">✕ Close</button>
+<a href="#wt-main-content" class="sr-only" style="position:absolute;top:4px;left:4px;padding:8px 16px;background:#B87946;color:white;border-radius:6px;font-weight:700;font-size:14px;z-index:99999;text-decoration:none;">Skip to content</a>
+<div class="wt-header" role="banner">
+  <div class="wt-logo" aria-label="kilnLINK Staff Tour"><span aria-hidden="true">kiln</span><span aria-hidden="true">LINK</span><span class="sr-only">kilnLINK</span> Staff Tour</div>
+  <button class="wt-close" onclick="history.back()" aria-label="Close walkthrough and go back">✕ Close</button>
 </div>
-<div class="wt-progress-bar"><div class="wt-progress-fill" id="progress"></div></div>
-<div class="wt-info">
-  <div class="wt-step-label" id="step-label">Step 1 of 11</div>
-  <div class="wt-title" id="step-title"></div>
-  <div class="wt-body" id="step-body"></div>
-  <div class="wt-narration" id="step-narration"></div>
+<div class="wt-progress-bar" role="progressbar" aria-valuemin="1" aria-valuemax="100" aria-valuenow="11" aria-label="Tour progress" id="progress-bar"><div class="wt-progress-fill" id="progress"></div></div>
+<div class="wt-info" id="wt-main-content">
+  <div class="wt-step-label" id="step-label" aria-live="polite" aria-atomic="true">Step 1 of 11</div>
+  <h1 class="wt-title" id="step-title" aria-live="assertive" aria-atomic="true"></h1>
+  <p class="wt-body" id="step-body" aria-live="polite" aria-atomic="true"></p>
+  <p class="wt-narration" id="step-narration" aria-live="polite" aria-label="Narration text"></p>
 </div>
 <div class="wt-screen-wrap">
   <div class="wt-screen" id="screen-wrap">
-    <svg class="main" id="main-svg" viewBox="0 0 280 180">
+    <svg class="main" id="main-svg" viewBox="0 0 280 180" role="img" aria-labelledby="svg-title svg-desc"><title id="svg-title">Staff dashboard screen mockup</title><desc id="svg-desc">An annotated illustration of the kilnLINK staff dashboard for this step</desc>
       <g id="screen-content"></g>
       <g id="arrow-layer"></g>
     </svg>
   </div>
 </div>
-<div class="wt-controls">
-  <div class="wt-btn-row">
-    <button class="wt-btn" id="btn-back" onclick="goTo(cur-1)">← Back</button>
-    <button class="wt-btn wt-btn-primary" id="btn-play" onclick="togglePlay()">▶ Play</button>
-    <button class="wt-btn" id="btn-next" onclick="goTo(cur+1)">Next →</button>
+<div class="wt-controls" role="navigation" aria-label="Tour controls">
+  <div class="wt-btn-row" role="group" aria-label="Navigation buttons">
+    <button class="wt-btn" id="btn-back" onclick="goTo(cur-1)" aria-label="Go to previous step">← Back</button>
+    <button class="wt-btn wt-btn-primary" id="btn-play" onclick="togglePlay()" aria-label="Play automatic tour">▶ Play</button>
+    <button class="wt-btn" id="btn-next" onclick="goTo(cur+1)" aria-label="Go to next step">Next →</button>
     <button class="wt-btn" id="btn-voice" onclick="toggleVoice()" style="background:#B87946;color:white;border-color:#B87946">🔇 Mute</button>
   </div>
-  <div class="wt-dots" id="dots"></div>
+  <div class="wt-dots" id="dots" role="tablist" aria-label="Jump to step"></div>
 </div>
 
 <script>
@@ -492,11 +521,12 @@ function render() {
 
   const dots = document.getElementById('dots');
   dots.innerHTML = STEPS.map((_,i) =>
-    `<button class="wt-dot${i===cur?' active':''}" onclick="goTo(${i})" title="Step ${i+1}"></button>`
+    `<button class="wt-dot${i===cur?' active':''}" onclick="goTo(${i})" role="tab" aria-selected="${i===cur}" aria-label="Go to step ${i+1}" title="Step ${i+1}"></button>`
   ).join('');
 
   if (voiceOn) speak(step.voice);
   renderArrows();
+  if (typeof updateProgressAria !== 'undefined') updateProgressAria();
 }
 
 function renderArrows() {
@@ -610,9 +640,35 @@ function animateArrows() {
   requestAnimationFrame(animateArrows);
 }
 
+
+// ── Keyboard navigation ──
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  switch(e.key) {
+    case 'ArrowRight': case 'ArrowDown': e.preventDefault(); goTo(cur+1); break;
+    case 'ArrowLeft':  case 'ArrowUp':   e.preventDefault(); goTo(cur-1); break;
+    case ' ': e.preventDefault(); togglePlay(); break;
+    case 'm': case 'M': toggleVoice(); break;
+    case 'Home': e.preventDefault(); goTo(0); break;
+    case 'End':  e.preventDefault(); goTo(STEPS.length-1); break;
+    case 'Escape': history.back(); break;
+  }
+});
+
+// ── Update ARIA progress bar ──
+function updateProgressAria() {
+  const bar = document.getElementById('progress-bar');
+  if (bar) {
+    const pct = Math.round(((cur+1)/STEPS.length)*100);
+    bar.setAttribute('aria-valuenow', pct);
+    bar.setAttribute('aria-label', `Step ${cur+1} of ${STEPS.length}`);
+  }
+}
+
 render();
 animateArrows();
 initVoice();
+updateProgressAria();
 </script>
 </body>
 </html>
