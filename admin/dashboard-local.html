@@ -1628,7 +1628,14 @@
             </button>
 
             <!-- ═══════════════ NUMBERED FLOW ═══════════════ -->
-            <div style="margin-top:20px;">
+            <div style="margin-top:20px; position:relative;">
+
+              <!-- Sticky back-to-start button, stays visible while scrolling the flow -->
+              <div style="position:sticky; top:8px; z-index:5; margin-bottom:14px;">
+                <button onclick="s1BackToStart()" style="background:white;border:1.5px solid var(--gu-border);color:var(--gu-dust);border-radius:20px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.1);display:inline-flex;align-items:center;gap:5px;">
+                  ← Back to name lookup
+                </button>
+              </div>
 
               <!-- STEP 1: Table & Guests -->
               <div class="flow-step">
@@ -1698,6 +1705,9 @@
                   <button id="s1-checklist-ready-btn" onclick="markTableReady()" disabled
                     style="width:100%;padding:18px;border:none;border-radius:14px;font-size:16px;font-weight:800;cursor:not-allowed;background:#e0e0e0;color:#aaa;transition:all .3s;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
                     ✓ Table Ready — Open Session
+                  </button>
+                  <button onclick="scrollToFlowStep(0)" style="width:100%;background:none;border:1px solid var(--gu-border);color:var(--gu-dust);border-radius:10px;padding:10px;font-size:12px;font-weight:600;cursor:pointer;margin-top:8px;">
+                    ↑ Back to table selection
                   </button>
                 </div>
               </div>
@@ -5660,6 +5670,15 @@ function s1BackToStart() {
   document.getElementById('s1-tablet-charge').checked = false;
   document.getElementById('s1-home-access').checked = false;
   s1LookedUpBooking = null;
+}
+
+// Scroll smoothly back up to a given numbered step within the flow
+// (0 = table selection, top of the flow)
+function scrollToFlowStep(stepIndex) {
+  const badges = document.querySelectorAll('#s1-result .flow-badge');
+  if (badges[stepIndex]) {
+    badges[stepIndex].closest('.flow-step').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
 
 async function startWalkIn(customerName) {
