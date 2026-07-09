@@ -685,16 +685,19 @@ function toggleVoice() {
 
 function initVoice() {
   if (!window.speechSynthesis) return;
+  // NOTE: this only sets up the voice/UI state — it must NOT call speak()
+  // itself. render() (called once on page load, below) already speaks the
+  // first step. If both fired, the browser's speech queue would get two
+  // overlapping utterances for the same line, heard as a stutter/repeat.
   let started = false;
   const tryStart = () => {
-    if (started) return; // guard against onvoiceschanged AND the timeout both firing
+    if (started) return;
     const voices = window.speechSynthesis.getVoices();
     if (voices.length > 0) {
       started = true;
       const btn = document.getElementById('btn-voice');
       if (btn) { btn.textContent = '🔇 Mute'; btn.style.background = '#B87946'; btn.style.color = 'white'; btn.style.borderColor = '#B87946'; }
       document.getElementById('step-narration').style.display = 'block';
-      speak(STEPS[0].voice);
     }
   };
   window.speechSynthesis.onvoiceschanged = tryStart;
