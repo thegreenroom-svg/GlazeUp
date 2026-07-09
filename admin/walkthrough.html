@@ -685,9 +685,12 @@ function toggleVoice() {
 
 function initVoice() {
   if (!window.speechSynthesis) return;
+  let started = false;
   const tryStart = () => {
+    if (started) return; // guard against onvoiceschanged AND the timeout both firing
     const voices = window.speechSynthesis.getVoices();
     if (voices.length > 0) {
+      started = true;
       const btn = document.getElementById('btn-voice');
       if (btn) { btn.textContent = '🔇 Mute'; btn.style.background = '#B87946'; btn.style.color = 'white'; btn.style.borderColor = '#B87946'; }
       document.getElementById('step-narration').style.display = 'block';
@@ -728,7 +731,11 @@ function render() {
     `<button class="wt-dot${i===cur?' active':''}" onclick="goTo(${i})" role="tab" aria-selected="${i===cur}" aria-label="Go to step ${i+1}" title="Step ${i+1}"></button>`
   ).join('');
 
-  if (voiceOn) speak(step.voice);
+  // Only speak here when not auto-playing — during Play mode, scheduleNext()
+  // owns speech (it needs the onEnd callback to know when to advance). If
+  // render() also called speak() independently, the two would race and
+  // cancel/restart each other, causing the voice to stutter or repeat.
+  if (voiceOn && !playing) speak(step.voice);
   renderArrows();
   if (typeof updateProgressAria !== 'undefined') updateProgressAria();
 }
