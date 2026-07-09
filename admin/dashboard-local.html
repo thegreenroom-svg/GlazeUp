@@ -1551,14 +1551,15 @@
             <div id="s2-running-total" style="text-align: right; font-weight: bold; padding: 10px 0; font-size: 14px; border-top: 1px solid var(--gu-border); margin-top: 8px;"></div>
             <div style="font-size: 11px; color: var(--gu-dust); text-align: right;">Not yet sent to Square — for internal reference only</div>
 
-            <!-- ── Mayco Specialist Glazes: point-of-sale upsell panel ── -->
-            <details id="mayco-glazes-panel" style="margin-top: 16px; border-top: 1px solid var(--gu-border); padding-top: 14px;">
-              <summary style="cursor: pointer; font-size: 13px; font-weight: 700; color: var(--gu-accent); list-style: none; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                ✨ Mayco Specialist Glazes <span style="font-size: 11px; font-weight: 500; color: var(--gu-dust);">tap to browse →</span>
-              </summary>
+            <!-- ── Mayco Specialist Glazes: pinned open, always visible ── -->
+            <div id="mayco-glazes-panel" style="margin-top: 16px; border-top: 2px solid var(--gu-border); padding-top: 14px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                <div style="font-size:13px; font-weight:700; color:var(--gu-accent);">✨ Mayco Specialist Glazes</div>
+                <span style="background:var(--link-clay);color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;">+£2.00 each</span>
+              </div>
 
               <div style="font-size: 11px; color: var(--gu-dust); line-height: 1.5; margin-bottom: 14px;">
-                These are sold at the session — add them to the customer's bill above once they've chosen.
+                Tap any glaze to add it to the customer's bill instantly. Charge £2 per glaze.
               </div>
 
               <!-- Jungle Gems / Crystal Glazes -->
@@ -1657,7 +1658,7 @@
                   `).join('')}
                 </div>
               </div>
-            </details>
+            </div>
           </div>
         </div>
 
@@ -4650,20 +4651,49 @@ async function refreshOrdersList(sessionId, prefix) {
 }
 
 // Add a Mayco specialist glaze directly to the running bill
-function addMaycoGlaze(code, name) {
+async function addMaycoGlaze(code, name) {
   const itemNameEl = document.getElementById('s2-item-name');
   const itemTypeEl = document.getElementById('s2-item-type');
   if (!itemNameEl || !itemTypeEl) return;
-  // Pre-fill the manual entry fields and trigger the add
-  itemNameEl.value = `${name} (${code})`;
+
+  // Pre-fill and add to the Square running bill
+  itemNameEl.value = `${name} (${code}) — Specialist Glaze`;
   itemTypeEl.value = 'glaze';
   addTableOrder();
-  // Flash the Mayco panel summary so staff see it was added
+
+  // Also charge £2 to the app extras tally
+  try {
+    const tableSelect = document.getElementById('s2-table-select');
+    const selectedOption = tableSelect?.options[tableSelect.selectedIndex];
+    const bookingCode = selectedOption?.dataset?.bookingCode || null;
+    if (bookingCode) {
+      await fetch(`${API_URL}/api/extras/charge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studioId,
+          bookingCode,
+          itemName: `Specialist Glaze: ${name} (${code})`,
+          amountCents: 200
+        })
+      });
+    }
+  } catch(e) { /* silent — bill already added via Square */ }
+
+  // Flash confirmation on the panel
   const panel = document.getElementById('mayco-glazes-panel');
   if (panel) {
+    const prev = panel.style.background;
     panel.style.background = '#e8f5e9';
-    setTimeout(() => { panel.style.background = ''; }, 600);
+    setTimeout(() => { panel.style.background = prev; }, 700);
   }
+
+  // Brief toast
+  const toast = document.createElement('div');
+  toast.textContent = `✓ ${name} (${code}) — £2.00 added`;
+  toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#2B2724;color:white;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;white-space:nowrap;';
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
 }
 
 async function addTableOrder() {
