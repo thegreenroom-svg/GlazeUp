@@ -99,17 +99,19 @@
     }
 
     /* Real phone widths (staff assistants/baristas on their own iPhone/Android) —
-       the sidebar becomes a bottom tab bar, and the top-right header buttons
-       (alert bell, shift badge, headset) collapse into a single menu button
-       so they don't overlap on a ~375-414px screen. */
+       the sidebar becomes a horizontal tab bar pinned at the top (below the
+       header menu), and the top-right header buttons (alert bell, shift badge,
+       headset, steps) collapse into a single menu bar so they don't overlap
+       on a ~375-414px screen. */
     @media (max-width: 520px) {
       .admin-wrapper {
         grid-template-columns: 1fr;
-        grid-template-rows: 1fr 60px;
+        grid-template-rows: 52px 1fr;
+        padding-top: 44px; /* space for #phone-header-menu, which is fixed */
       }
       .admin-sidebar {
-        grid-row: 2;
-        order: 2;
+        grid-row: 1;
+        order: 1;
         display: flex;
         flex-direction: row;
         align-items: center;
@@ -117,7 +119,7 @@
         padding: 6px 4px !important;
         overflow-x: auto;
         overflow-y: hidden;
-        box-shadow: 0 -4px 16px -4px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 16px -4px rgba(0,0,0,0.2);
       }
       .link-logo { display: none; }
       .admin-sidebar nav {
