@@ -1613,10 +1613,7 @@
       <a href="#" class="nav-link" onclick="goToTab('team', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="6" r="2.5"/><circle cx="14" cy="7" r="2"/><path d="M2.5 16c0-2.8 2-4.5 4.5-4.5s4.5 1.7 4.5 4.5"/><path d="M12 12c2 0 3.5 1.5 3.5 4"/></svg></span><span class="nav-label">Team &amp; Duties</span></a>
       <a href="#" class="nav-link" onclick="goToTab('progress', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l4-4 3 3 6-7"/><path d="M13 9h4v4"/></svg></span><span class="nav-label">Daily Progress</span></a>
       <a href="#" class="nav-link" onclick="goToTab('branding', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.2 2.8l3 3-7.6 7.6c-.7.7-1.8.7-2.5 0l-.5-.5c-.7-.7-.7-1.8 0-2.5l7.6-7.6z"/><path d="M6.2 12.3L4 17.5l5.2-2.2"/></svg></span><span class="nav-label">Branding</span></a>
-      <a href="#" class="nav-link" onclick="goToTab('palettes', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 3a7 7 0 100 14c1 0 1.6-.5 1.6-1.3 0-.4-.2-.7-.4-1-.2-.3-.4-.6-.4-1 0-.8.6-1.4 1.4-1.4h1.3A3.5 3.5 0 0017 8.5C17 5.5 13.9 3 10 3z"/><circle cx="7" cy="8.2" r="1" fill="currentColor" stroke="none"/><circle cx="10.3" cy="6.4" r="1" fill="currentColor" stroke="none"/><circle cx="13.2" cy="8.6" r="1" fill="currentColor" stroke="none"/></svg></span><span class="nav-label">Colours</span></a>
       <a href="#" class="nav-link" onclick="goToTab('shapes', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.5 5.5C6.5 4 8 3 10 3s3.5 1 3.5 2.5L13 13c-.1 2-1.4 3.5-3 3.5s-2.9-1.5-3-3.5L6.5 5.5z"/><ellipse cx="10" cy="5.3" rx="3.5" ry="1"/></svg></span><span class="nav-label">Bisque</span></a>
-      <a href="#" class="nav-link" onclick="goToTab('designs', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 2l1.6 5.4L17 9l-5.4 1.6L10 16l-1.6-5.4L3 9l5.4-1.6L10 2z"/></svg></span><span class="nav-label">Designs</span></a>
-      <a href="#" class="nav-link" onclick="goToTab('account', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="8.3" r="2.2" fill="currentColor" stroke="none"/><path d="M4.8 15.5c.8-2.2 2.8-3.6 5.2-3.6s4.4 1.4 5.2 3.6"/></svg></span><span class="nav-label">Account</span></a>
     </nav>
   </aside>
 
@@ -1848,7 +1845,7 @@
           <!-- STEP B: find an existing booking (only shown after choosing "Existing Booking") -->
           <div id="s1-step-existing" class="chart-container" style="display: none;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-              <button onclick="s1BackToStart()" style="background:none; border:none; color:var(--gu-dust); font-size:13px; cursor:pointer; padding:0;">← Back</button>
+              <button onclick="s1BackToStart()" style="background:none; border:none; color:var(--gu-dust); font-size:13px; cursor:pointer; padding:0;">← New Search</button>
               <button class="btn-connect glaze-ocean" style="padding: 6px 14px; font-size: 11px;" onclick="syncBookingsFromSquare()">🔄 Sync from Square</button>
             </div>
 
@@ -1871,7 +1868,7 @@
 
           <!-- STEP C: result — customer found/created, assign table, open session -->
           <div class="chart-container" id="s1-result" style="display: none;">
-            <button onclick="s1BackToStart()" style="background:none; border:none; color:var(--gu-dust); font-size:13px; cursor:pointer; padding:0; margin-bottom:12px;">← Start Over</button>
+            <button onclick="s1BackToStart()" style="background:none; border:none; color:var(--gu-dust); font-size:13px; cursor:pointer; padding:0; margin-bottom:12px;">← New Search</button>
 
             <div class="booking-header">
               <div class="name" id="s1-customer-display">—</div>
@@ -1904,7 +1901,7 @@
               <!-- Sticky back-to-start button, stays visible while scrolling the flow -->
               <div style="position:sticky; top:8px; z-index:5; margin-bottom:14px;">
                 <button onclick="s1BackToStart()" style="background:white;border:1.5px solid var(--gu-border);color:var(--gu-dust);border-radius:20px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.1);display:inline-flex;align-items:center;gap:5px;">
-                  ← Back to name lookup
+                  ← New Search
                 </button>
               </div>
 
@@ -2133,32 +2130,16 @@
             </div>
           </div>
 
-          <!-- Current Inventory -->
+          <!-- Bisque stock lives in its own tab — link across rather than
+               duplicating it here with stale placeholder numbers -->
           <div class="chart-container">
-            <h3>Current Bisque Stock (from Square)</h3>
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
-              <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;">
-                <div style="font-size: 12px; color: var(--gu-dust); margin-bottom: 4px;">Mugs</div>
-                <div style="font-size: 28px; font-weight: bold; color: var(--gu-primary);">24</div>
-                <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;">in stock</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <h3 style="margin:0 0 4px;">Bisque Stock</h3>
+                <div style="font-size:12px;color:var(--gu-dust);">Manage your full catalogue and reservations in Stock.</div>
               </div>
-              <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;">
-                <div style="font-size: 12px; color: var(--gu-dust); margin-bottom: 4px;">Plates</div>
-                <div style="font-size: 28px; font-weight: bold; color: var(--gu-primary);">18</div>
-                <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;">in stock</div>
-              </div>
-              <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;">
-                <div style="font-size: 12px; color: var(--gu-dust); margin-bottom: 4px;">Bowls</div>
-                <div style="font-size: 28px; font-weight: bold; color: var(--gu-primary);">12</div>
-                <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;">in stock</div>
-              </div>
-              <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;">
-                <div style="font-size: 12px; color: var(--gu-dust); margin-bottom: 4px;">Tiles</div>
-                <div style="font-size: 28px; font-weight: bold; color: var(--gu-primary);">8</div>
-                <div style="font-size: 11px; color: var(--gu-dust); margin-top: 4px;">in stock</div>
-              </div>
+              <button class="btn-connect" onclick="goToTab('stock', event)" style="white-space:nowrap;">Manage Stock →</button>
             </div>
-            <button class="btn-connect" style="margin-top: 16px; width: 100%;">Sync Inventory from Square</button>
           </div>
         </div>
 
@@ -2202,7 +2183,7 @@
 
         <!-- Stripe Subscription -->
         <div class="setup-card">
-          <h3>2. Set Up Monthly Billing</h3>
+          <h3>2. Monthly Billing</h3>
           <p>Choose your plan. First month is free. No credit card required for the trial.</p>
           <div style="margin-bottom: 12px;" id="stripe-status-badge">
             <span class="status-badge pending">Checking status...</span>
@@ -2210,7 +2191,7 @@
           <p style="font-size: 12px; color: var(--gu-dust); margin: 12px 0;">
             <strong>Pricing:</strong> Starter £29/mo · Professional £49/mo · Enterprise £79/mo
           </p>
-          <button class="btn-connect" onclick="alert('Stripe checkout coming soon — for now you are on the free trial.')">Set Up Billing</button>
+          <button class="btn-connect" disabled style="opacity:0.5;cursor:not-allowed;">Billing setup not yet available — you're on the free trial</button>
         </div>
 
         <!-- Customisation -->
@@ -2409,12 +2390,22 @@
       <!-- ── Team & Duties ── -->
       <div id="team-view" class="view" style="display: none;">
         <h2 style="margin-top:0;">👥 Team &amp; Duties</h2>
-        <p style="font-size:13px;color:var(--gu-dust);margin-bottom:20px;line-height:1.5;">
+        <p style="font-size:13px;color:var(--gu-dust);margin-bottom:16px;line-height:1.5;">
           Manage your team, set default duties per role, and assign extra duties to any staff member. Duties get ticked off per session as staff work through their tables.
         </p>
 
+        <!-- Jump nav — this tab covers a lot, so give a quick way to skip to a section -->
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px;position:sticky;top:0;background:var(--gu-bg-page,#F7F4EE);padding:8px 0;z-index:5;">
+          <a href="#team-section-members" style="background:white;border:1px solid var(--gu-border);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--gu-text);text-decoration:none;">👥 Team</a>
+          <a href="#team-section-duties" style="background:white;border:1px solid var(--gu-border);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--gu-text);text-decoration:none;">✅ Duties</a>
+          <a href="#team-section-alerts" style="background:white;border:1px solid var(--gu-border);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--gu-text);text-decoration:none;">🚨 Alerts</a>
+          <a href="#team-section-process" style="background:white;border:1px solid var(--gu-border);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--gu-text);text-decoration:none;">🔗 Process</a>
+          <a href="#team-section-time" style="background:white;border:1px solid var(--gu-border);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--gu-text);text-decoration:none;">🕐 Time</a>
+          <a href="#team-section-holiday" style="background:white;border:1px solid var(--gu-border);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--gu-text);text-decoration:none;">🏖️ Holiday</a>
+        </div>
+
         <!-- Team members -->
-        <div class="chart-container" style="margin-bottom:20px;">
+        <div class="chart-container" style="margin-bottom:20px;" id="team-section-members">
           <h3 style="margin:0 0 6px;">Team Members</h3>
           <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Add each team member with their role. Roles determine their default duty list.</p>
           <div id="team-members-list" style="margin-bottom:14px;"></div>
@@ -2438,7 +2429,7 @@
         </div>
 
         <!-- Duty lists per role -->
-        <div class="chart-container">
+        <div class="chart-container" id="team-section-duties">
           <h3 style="margin:0 0 6px;">Duty Lists by Role</h3>
           <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Edit the default duties for each role. Update any time — great for a weekly review. Changes apply to all future sessions.</p>
           <div id="duty-role-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;"></div>
@@ -2446,7 +2437,7 @@
         </div>
 
         <!-- Alert Settings -->
-        <div class="chart-container" style="margin-top:20px;">
+        <div class="chart-container" style="margin-top:20px;" id="team-section-alerts">
           <h3 style="margin:0 0 6px;">🚨 Alert &amp; Reminder Settings</h3>
           <p style="font-size:12px;color:var(--gu-dust);margin-bottom:16px;line-height:1.5;">
             Control how insistent handoff alerts and tasks are. An unactioned alert will keep flashing and re-alerting at this interval until someone taps Complete/Actioned.
@@ -2478,7 +2469,7 @@
         </div>
 
         <!-- Process Builder — the handoff chain -->
-        <div class="chart-container" style="margin-top:20px;">
+        <div class="chart-container" style="margin-top:20px;" id="team-section-process">
           <h3 style="margin:0 0 6px;">🔗 Process Builder — Task Handoff Chain</h3>
           <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;line-height:1.5;">
             Define what happens when something finishes. Each step says: <strong>when this happens</strong> → <strong>notify this role</strong> → <strong>with this message</strong> → <strong>optionally trigger the next step</strong>. Staff logged in as that role get the task on their tablet automatically, with vibration and voice.
@@ -2515,7 +2506,7 @@
         </div>
 
         <!-- Timekeeping -->
-        <div class="chart-container" style="margin-top:20px;">
+        <div class="chart-container" style="margin-top:20px;" id="team-section-time">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
             <h3 style="margin:0;">🕐 Timekeeping</h3>
             <a href="#" id="timesheet-export-link" onclick="downloadTimesheetCSV();return false;" style="font-size:12px;font-weight:700;color:var(--gu-primary);text-decoration:none;">⬇ Export CSV</a>
@@ -2533,7 +2524,7 @@
         </div>
 
         <!-- Holiday Requests -->
-        <div class="chart-container" style="margin-top:20px;">
+        <div class="chart-container" style="margin-top:20px;" id="team-section-holiday">
           <h3 style="margin:0 0 6px;">🏖️ Holiday Requests</h3>
           <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Approve or reject time-off requests. Set each person's annual allowance below — this is tracked, not calculated for pay.</p>
 
@@ -2762,35 +2753,6 @@
       <!-- ═════════════════════════════════════════════ -->
       <!-- COLOURS TAB -->
       <!-- ═════════════════════════════════════════════ -->
-      <div id="palettes-view" class="view" style="display: none;">
-        <h2 style="margin-top: 0;">Glaze Colours & Underglaze Palette</h2>
-        <p style="color: var(--gu-dust); margin-bottom: 20px;">
-          Configure which Stroke & Coat colours you have in stock. Customers see only these when they use the colour matcher.
-        </p>
-
-        <div class="setup-card">
-          <h3>Your Palette (19 colours in stock)</h3>
-          <ul class="design-list">
-            <li><span>🟥 Hot Tamale (SC-74)</span> <strong>#D94030</strong></li>
-            <li><span>🟥 Burgundy (SC-45)</span> <strong>#662428</strong></li>
-            <li><span>🟧 Tangerine (SC-39)</span> <strong>#E89C3F</strong></li>
-            <li><span>🟨 Golden Yellow (SC-38)</span> <strong>#F4C649</strong></li>
-            <li><span>🟦 Royal Blue (SC-80)</span> <strong>#003DA5</strong></li>
-            <li><span>🟩 Kelly Green (SC-84)</span> <strong>#2D9C5D</strong></li>
-            <li><span>🟪 Purple Majesty (SC-87)</span> <strong>#6B3FA0</strong></li>
-            <li><span>⬜ Pure White (SC-10)</span> <strong>#FFFFFF</strong></li>
-          </ul>
-          <p style="font-size: 12px; color: var(--gu-dust); margin-top: 16px;">
-            + 11 more in stock
-          </p>
-          <button class="btn-connect" style="margin-top: 12px;">Edit Palette</button>
-        </div>
-
-        <div class="info-banner">
-          <strong>💡 Tip:</strong> When customers use the colour matcher, it compares their photo to your in-stock colours. If a colour is out of stock, remove it from this list so customers don't get frustrated looking for it.
-        </div>
-      </div>
-
       <!-- ═════════════════════════════════════════════ -->
       <!-- BISQUE TAB -->
       <!-- ═════════════════════════════════════════════ -->
@@ -2805,89 +2767,6 @@
           <div id="bisque-catalog-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px;">
             <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px; grid-column: 1 / -1;">Loading catalogue...</div>
           </div>
-        </div>
-      </div>
-
-      <!-- ═════════════════════════════════════════════ -->
-      <!-- DESIGNS TAB -->
-      <!-- ═════════════════════════════════════════════ -->
-      <div id="designs-view" class="view" style="display: none;">
-        <h2 style="margin-top: 0;">Transfer Designs</h2>
-        <p style="color: var(--gu-dust); margin-bottom: 20px;">
-          Manage which designs customers can choose from in the app.
-        </p>
-
-        <div class="setup-card">
-          <h3>Built-In Designs (22 designs)</h3>
-          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; font-size: 13px;">
-            <div style="padding: 8px; background: #f5f5f5; border-radius: 6px;">
-              <strong>Florals</strong>
-              <ul style="margin: 4px 0 0; padding-left: 16px; color: var(--gu-dust);">
-                <li>Daisy</li>
-                <li>Rose</li>
-                <li>Sunflower</li>
-                <li>Wildflowers</li>
-                <li>Wreath</li>
-              </ul>
-            </div>
-            <div style="padding: 8px; background: #f5f5f5; border-radius: 6px;">
-              <strong>Geometric</strong>
-              <ul style="margin: 4px 0 0; padding-left: 16px; color: var(--gu-dust);">
-                <li>Polka Dots</li>
-                <li>Chevrons</li>
-                <li>Mandala</li>
-                <li>Stripes</li>
-                <li>Diamonds</li>
-              </ul>
-            </div>
-            <div style="padding: 8px; background: #f5f5f5; border-radius: 6px;">
-              <strong>Text & Love</strong>
-              <ul style="margin: 4px 0 0; padding-left: 16px; color: var(--gu-dust);">
-                <li>Happy Birthday</li>
-                <li>Love Heart</li>
-                <li>Name Plate</li>
-                <li>Best Mum</li>
-              </ul>
-            </div>
-            <div style="padding: 8px; background: #f5f5f5; border-radius: 6px;">
-              <strong>Nature & Seasonal</strong>
-              <ul style="margin: 4px 0 0; padding-left: 16px; color: var(--gu-dust);">
-                <li>Butterfly</li>
-                <li>Leaf</li>
-                <li>Paw Prints</li>
-                <li>Snowflake</li>
-              </ul>
-            </div>
-          </div>
-          <p style="font-size: 12px; color: var(--gu-dust); margin-top: 16px;">
-            Coming soon: Upload your own SVG/PNG designs.
-          </p>
-        </div>
-      </div>
-
-      <!-- ═════════════════════════════════════════════ -->
-      <!-- ACCOUNT TAB -->
-      <!-- ═════════════════════════════════════════════ -->
-      <div id="account-view" class="view" style="display: none;">
-        <h2 style="margin-top: 0;">Account Settings</h2>
-
-        <div class="setup-card">
-          <h3>Studio Email</h3>
-          <input type="email" value="daisy@thekilncafe.co.uk" style="width: 100%; padding: 10px; border: 1px solid var(--gu-border); border-radius: 6px;">
-          <button class="btn-connect" style="margin-top: 12px;">Update Email</button>
-        </div>
-
-        <div class="setup-card">
-          <h3>Staff Accounts</h3>
-          <p style="color: var(--gu-dust);">Free tier: 1 staff account. Professional tier: 5 accounts. Enterprise tier: unlimited.</p>
-          <button class="btn-connect">Manage Staff</button>
-        </div>
-
-        <div class="setup-card">
-          <h3>Danger Zone</h3>
-          <p style="color: var(--gu-dust); margin-bottom: 16px;">These actions cannot be undone.</p>
-          <button class="btn-connect" style="background: #c62828; margin-right: 8px;" onclick="alert('In production, this would pause your subscription.')">Pause Subscription</button>
-          <button class="btn-connect" style="background: #c62828;" onclick="alert('In production, this would delete your account and all data.')">Delete Account</button>
         </div>
       </div>
 
@@ -7070,6 +6949,9 @@ async function openTableSession() {
       }
 
       showCustomerQR(s1LookedUpBooking.bookingCode, s1LookedUpBooking.customerName, tableNumber);
+      // Remember which booking was just opened so Step 2 can jump straight
+      // to it instead of making staff re-pick the same table from a dropdown.
+      window.lastOpenedBookingCode = s1LookedUpBooking.bookingCode;
       resetSection1();
     } else {
       alert('Error opening table: ' + res.statusText);
@@ -7169,6 +7051,17 @@ async function loadOpenTablesIntoSelect() {
     select.innerHTML = `<option value="">Select a table...</option>` + data.sessions.map(s =>
       `<option value="${s.id}" data-booking="${s.booking_id}" data-table="${s.table_number || ''}">Table ${s.table_number || '?'} — ${s.booking_id}</option>`
     ).join('');
+
+    // If we just opened a table in Step 1, jump straight to it here —
+    // no need to make staff pick the same table again from this dropdown.
+    if (window.lastOpenedBookingCode) {
+      const match = data.sessions.find(s => s.booking_id === window.lastOpenedBookingCode);
+      if (match) {
+        select.value = match.id;
+        loadTableOrders('s2');
+      }
+      window.lastOpenedBookingCode = null; // one-shot, don't re-trigger on later refreshes
+    }
   } catch (err) {
     console.error('Error loading open tables:', err);
     select.innerHTML = `<option value="">Could not load open tables</option>`;
