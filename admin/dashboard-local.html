@@ -1231,6 +1231,7 @@
       <a href="#" class="nav-link" onclick="goToTab('printqueue', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8V3.5h10V8M5 8H3.5A1.5 1.5 0 002 9.5v4A1.5 1.5 0 003.5 15H5M5 8h10m0 0h1.5A1.5 1.5 0 0118 9.5v4a1.5 1.5 0 01-1.5 1.5H15M5 12h10v4.5H5V12z"/></svg></span><span class="nav-label">Print Queue</span></a>
       <a href="#" class="nav-link" onclick="goToTab('stock', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg></span><span class="nav-label">Stock</span></a>
       <a href="#" class="nav-link" onclick="goToTab('menu', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h12M4 10h12M4 14h7"/><circle cx="15" cy="14" r="2.5"/><path d="M15 11.5v-7"/></svg></span><span class="nav-label">Daily Menu</span></a>
+      <a href="#" class="nav-link" onclick="goToTab('team', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="6" r="2.5"/><circle cx="14" cy="7" r="2"/><path d="M2.5 16c0-2.8 2-4.5 4.5-4.5s4.5 1.7 4.5 4.5"/><path d="M12 12c2 0 3.5 1.5 3.5 4"/></svg></span><span class="nav-label">Team &amp; Duties</span></a>
       <a href="#" class="nav-link" onclick="goToTab('branding', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.2 2.8l3 3-7.6 7.6c-.7.7-1.8.7-2.5 0l-.5-.5c-.7-.7-.7-1.8 0-2.5l7.6-7.6z"/><path d="M6.2 12.3L4 17.5l5.2-2.2"/></svg></span><span class="nav-label">Branding</span></a>
       <a href="#" class="nav-link" onclick="goToTab('palettes', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 3a7 7 0 100 14c1 0 1.6-.5 1.6-1.3 0-.4-.2-.7-.4-1-.2-.3-.4-.6-.4-1 0-.8.6-1.4 1.4-1.4h1.3A3.5 3.5 0 0017 8.5C17 5.5 13.9 3 10 3z"/><circle cx="7" cy="8.2" r="1" fill="currentColor" stroke="none"/><circle cx="10.3" cy="6.4" r="1" fill="currentColor" stroke="none"/><circle cx="13.2" cy="8.6" r="1" fill="currentColor" stroke="none"/></svg></span><span class="nav-label">Colours</span></a>
       <a href="#" class="nav-link" onclick="goToTab('shapes', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.5 5.5C6.5 4 8 3 10 3s3.5 1 3.5 2.5L13 13c-.1 2-1.4 3.5-3 3.5s-2.9-1.5-3-3.5L6.5 5.5z"/><ellipse cx="10" cy="5.3" rx="3.5" ry="1"/></svg></span><span class="nav-label">Bisque</span></a>
@@ -1541,6 +1542,22 @@
             </label>
 
             <!-- ── Table Setup Checklist ── -->
+            <!-- Session Duty Assignment -->
+            <div id="s1-duties-panel" style="margin-bottom:14px;border:1px solid var(--gu-border);border-radius:14px;overflow:hidden;">
+              <div style="background:#5E35B1;color:white;padding:10px 14px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:space-between;">
+                <span>👤 Assign Duties for This Session</span>
+              </div>
+              <div style="padding:12px 14px;">
+                <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:10px;">
+                  <select id="s1-duty-staff-select" onchange="onDutyStaffChange()" style="padding:9px 12px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;background:white;">
+                    <option value="">Select staff member…</option>
+                  </select>
+                  <button onclick="assignSessionDuties()" style="background:#5E35B1;color:white;border:none;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">+ Assign</button>
+                </div>
+                <div id="s1-assigned-duties-list"></div>
+              </div>
+            </div>
+
             <div id="s1-checklist" style="margin-bottom:14px;border:1px solid var(--gu-border);border-radius:14px;overflow:hidden;">
               <div style="background:var(--gu-primary);color:white;padding:10px 14px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:space-between;">
                 <span>✅ Table Setup Checklist</span>
@@ -2067,6 +2084,46 @@
           <div id="menu-square-items">
             <div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading from Square…</div>
           </div>
+        </div>
+      </div>
+
+      <!-- ── Team & Duties ── -->
+      <div id="team-view" class="view" style="display: none;">
+        <h2 style="margin-top:0;">👥 Team &amp; Duties</h2>
+        <p style="font-size:13px;color:var(--gu-dust);margin-bottom:20px;line-height:1.5;">
+          Manage your team, set default duties per role, and assign extra duties to any staff member. Duties get ticked off per session as staff work through their tables.
+        </p>
+
+        <!-- Team members -->
+        <div class="chart-container" style="margin-bottom:20px;">
+          <h3 style="margin:0 0 6px;">Team Members</h3>
+          <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Add each team member with their role. Roles determine their default duty list.</p>
+          <div id="team-members-list" style="margin-bottom:14px;"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;">
+            <div>
+              <label style="font-size:11px;font-weight:600;color:var(--gu-dust);display:block;margin-bottom:4px;">Name</label>
+              <input type="text" id="new-team-name" placeholder="e.g. Lucy" style="width:100%;padding:9px 12px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;">
+            </div>
+            <div>
+              <label style="font-size:11px;font-weight:600;color:var(--gu-dust);display:block;margin-bottom:4px;">Role</label>
+              <select id="new-team-role" style="width:100%;padding:9px 12px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;background:white;">
+                <option>Ceramic Technician</option>
+                <option>Studio Manager</option>
+                <option>Studio Assistant</option>
+                <option>Studio Executive</option>
+                <option>Barista</option>
+              </select>
+            </div>
+            <button onclick="addTeamMember()" style="background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">+ Add</button>
+          </div>
+        </div>
+
+        <!-- Duty lists per role -->
+        <div class="chart-container">
+          <h3 style="margin:0 0 6px;">Duty Lists by Role</h3>
+          <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Edit the default duties for each role. Update any time — great for a weekly review. Changes apply to all future sessions.</p>
+          <div id="duty-role-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;"></div>
+          <div id="duty-role-editor"></div>
         </div>
       </div>
 
@@ -2678,6 +2735,8 @@ function goToTab(tab, event) {
     loadStockReservations();
   } else if (tab === 'menu') {
     loadDailyMenu();
+  } else if (tab === 'team') {
+    loadTeamAndDuties();
   }
 }
 
@@ -3728,6 +3787,265 @@ async function redeemLoyaltyReward(customerId, rewardType) {
   } catch(e) { alert('Could not record redemption: ' + e.message); }
 }
 
+// ── Session Duty Assignment (Step 1) ──
+let sessionDutiesAssigned = [];
+
+async function populateDutyStaffSelect() {
+  const select = document.getElementById('s1-duty-staff-select');
+  if (!select) return;
+  if (!teamMembers.length) await loadTeamMembers();
+  select.innerHTML = '<option value="">Select staff member…</option>' +
+    teamMembers.map(m => `<option value="${m.id}" data-name="${m.name}" data-role="${m.role}">${m.name} — ${m.role}</option>`).join('');
+}
+
+function onDutyStaffChange() {
+  // Just used to enable/preview — actual assignment happens on button click
+}
+
+async function assignSessionDuties() {
+  const select = document.getElementById('s1-duty-staff-select');
+  const opt = select.options[select.selectedIndex];
+  if (!opt || !opt.value) { alert('Select a staff member first'); return; }
+
+  const staffMemberId = opt.value;
+  const staffName = opt.dataset.name;
+  const role = opt.dataset.role;
+  const bookingCode = document.getElementById('s1-result').dataset.bookingCode || '';
+
+  // Get default duties for this role
+  const config = dutyConfig.find(d => d.role === role);
+  const duties = config ? config.duties : (DEFAULT_ROLE_DUTIES_CLIENT[role] || []);
+
+  if (!duties.length) {
+    alert(`No duties configured for ${role} yet. Add some in Team & Duties first.`);
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/api/staff/session-duties`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ studioId, bookingCode, staffMemberId, staffName, role, duties })
+    });
+    const data = await res.json();
+    sessionDutiesAssigned = [...sessionDutiesAssigned, ...(data.sessionDuties || [])];
+    renderAssignedDuties();
+    select.value = '';
+  } catch(e) { alert('Could not assign duties: ' + e.message); }
+}
+
+async function loadSessionDuties() {
+  const bookingCode = document.getElementById('s1-result').dataset.bookingCode || '';
+  if (!bookingCode) { sessionDutiesAssigned = []; renderAssignedDuties(); return; }
+  try {
+    const res = await fetch(`${API_URL}/api/staff/session-duties?studioId=${studioId}&bookingCode=${bookingCode}`);
+    const data = await res.json();
+    sessionDutiesAssigned = data.sessionDuties || [];
+    renderAssignedDuties();
+  } catch(e) { sessionDutiesAssigned = []; renderAssignedDuties(); }
+}
+
+function renderAssignedDuties() {
+  const el = document.getElementById('s1-assigned-duties-list');
+  if (!el) return;
+  if (!sessionDutiesAssigned.length) {
+    el.innerHTML = '<p style="color:var(--gu-dust);font-size:12px;padding:4px 0;">No duties assigned to this session yet.</p>';
+    return;
+  }
+  // Group by staff member
+  const byStaff = {};
+  sessionDutiesAssigned.forEach(d => {
+    if (!byStaff[d.staff_name]) byStaff[d.staff_name] = [];
+    byStaff[d.staff_name].push(d);
+  });
+
+  el.innerHTML = Object.entries(byStaff).map(([name, duties]) => {
+    const done = duties.filter(d => d.completed).length;
+    return `
+      <div style="margin-bottom:10px;">
+        <div style="font-size:11px;font-weight:700;color:#5E35B1;margin-bottom:6px;">${name} — ${done}/${duties.length} done</div>
+        ${duties.map(d => `
+          <label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;cursor:pointer;margin-bottom:3px;background:${d.completed?'#f3e9ff':'var(--gu-bg)'};">
+            <input type="checkbox" ${d.completed?'checked':''} onchange="toggleSessionDuty('${d.id}',this.checked)" style="width:16px;height:16px;accent-color:#5E35B1;cursor:pointer;">
+            <span style="font-size:12px;color:${d.completed?'#5E35B1':'var(--gu-text)'};text-decoration:${d.completed?'line-through':''};flex:1;">${d.duty_text}</span>
+            <button onclick="removeSessionDuty('${d.id}')" style="background:none;border:none;color:#d9534f;font-size:14px;cursor:pointer;padding:0 2px;">×</button>
+          </label>
+        `).join('')}
+      </div>`;
+  }).join('');
+}
+
+async function toggleSessionDuty(id, completed) {
+  await fetch(`${API_URL}/api/staff/session-duties/${id}`, {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ completed })
+  });
+  const duty = sessionDutiesAssigned.find(d => d.id === id);
+  if (duty) duty.completed = completed;
+  renderAssignedDuties();
+}
+
+async function removeSessionDuty(id) {
+  await fetch(`${API_URL}/api/staff/session-duties/${id}`, { method:'DELETE' });
+  sessionDutiesAssigned = sessionDutiesAssigned.filter(d => d.id !== id);
+  renderAssignedDuties();
+}
+
+// Client-side fallback defaults, mirrors server DEFAULT_ROLE_DUTIES
+const DEFAULT_ROLE_DUTIES_CLIENT = {
+  'Ceramic Technician': ['Check kiln temperature and firing schedule','Load and unload kiln safely','Inspect fired pieces for defects','Mix and prepare glazes as needed','Maintain kiln room cleanliness'],
+  'Studio Manager': ['Open/close studio checklist','Staff rota and cover','Stock ordering and supplier contact','Handle customer queries and complaints','Daily takings reconciliation'],
+  'Studio Assistant': ['Clear tables after each session','Clean tables and set up for next booking','Fill paint pots and check paint levels','Clean paint brushes and pots','Restock coasters and placemats','Write and place name cards'],
+  'Studio Executive': ['Oversee daily studio operations','Review revenue and booking reports','Liaise with Head Office / franchise','Staff performance check-ins'],
+  'Barista': ['Set up coffee machine and drinks station','Prepare and serve drinks orders','Keep drinks station stocked and clean','Manage cake/food display'],
+};
+
+// ── Team & Duties Management ──
+const STAFF_ROLES = ['Ceramic Technician', 'Studio Manager', 'Studio Assistant', 'Studio Executive', 'Barista'];
+let teamMembers = [];
+let dutyConfig = [];
+let activeDutyRole = STAFF_ROLES[0];
+
+async function loadTeamAndDuties() {
+  await loadTeamMembers();
+  await loadDutyConfig();
+}
+
+async function loadTeamMembers() {
+  try {
+    const res = await fetch(`${API_URL}/api/staff/team?studioId=${studioId}`);
+    const data = await res.json();
+    teamMembers = data.team || [];
+    renderTeamMembers();
+  } catch(e) {
+    document.getElementById('team-members-list').innerHTML = '<p style="color:var(--gu-dust);font-size:12px;">Could not load team.</p>';
+  }
+}
+
+function renderTeamMembers() {
+  const el = document.getElementById('team-members-list');
+  if (!el) return;
+  if (!teamMembers.length) {
+    el.innerHTML = '<p style="color:var(--gu-dust);font-size:12px;padding:8px 0;">No team members added yet.</p>';
+    return;
+  }
+  const ROLE_COLORS = {
+    'Ceramic Technician':'#8D6E63', 'Studio Manager':'#5E35B1', 'Studio Assistant':'#00897B',
+    'Studio Executive':'#1E88E5', 'Barista':'#F4511E'
+  };
+  el.innerHTML = teamMembers.map(m => `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--gu-bg);border-radius:8px;margin-bottom:6px;border:1px solid var(--gu-border);border-left:4px solid ${ROLE_COLORS[m.role]||'var(--gu-border)'};">
+      <span style="font-size:13px;font-weight:600;flex:1;">${m.name}</span>
+      <span style="font-size:11px;color:white;background:${ROLE_COLORS[m.role]||'#999'};padding:3px 10px;border-radius:20px;">${m.role}</span>
+      <button onclick="removeTeamMember('${m.id}')" style="background:none;border:none;color:#d9534f;font-size:18px;cursor:pointer;padding:0 2px;line-height:1;">×</button>
+    </div>
+  `).join('');
+}
+
+async function addTeamMember() {
+  const name = document.getElementById('new-team-name').value.trim();
+  const role = document.getElementById('new-team-role').value;
+  if (!name) { alert('Enter a name'); return; }
+  try {
+    const res = await fetch(`${API_URL}/api/staff/team`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ studioId, name, role })
+    });
+    const data = await res.json();
+    teamMembers.push(data.member);
+    renderTeamMembers();
+    document.getElementById('new-team-name').value = '';
+  } catch(e) { alert('Could not add team member: ' + e.message); }
+}
+
+async function removeTeamMember(id) {
+  await fetch(`${API_URL}/api/staff/team/${id}?studioId=${studioId}`, { method:'DELETE' });
+  teamMembers = teamMembers.filter(m => m.id !== id);
+  renderTeamMembers();
+}
+
+async function loadDutyConfig() {
+  try {
+    const res = await fetch(`${API_URL}/api/staff/duties?studioId=${studioId}`);
+    const data = await res.json();
+    dutyConfig = data.dutyConfig || [];
+    renderDutyRoleTabs();
+    renderDutyEditor();
+  } catch(e) { /* silent */ }
+}
+
+function renderDutyRoleTabs() {
+  const el = document.getElementById('duty-role-tabs');
+  if (!el) return;
+  el.innerHTML = STAFF_ROLES.map(role => `
+    <button onclick="switchDutyRole('${role}')"
+      style="padding:6px 14px;border-radius:20px;border:1px solid var(--gu-border);font-size:12px;font-weight:600;cursor:pointer;
+        background:${activeDutyRole===role?'var(--gu-primary)':'white'};color:${activeDutyRole===role?'white':'var(--gu-text)'};">
+      ${role}
+    </button>
+  `).join('');
+}
+
+function switchDutyRole(role) {
+  activeDutyRole = role;
+  renderDutyRoleTabs();
+  renderDutyEditor();
+}
+
+function renderDutyEditor() {
+  const el = document.getElementById('duty-role-editor');
+  if (!el) return;
+  const config = dutyConfig.find(d => d.role === activeDutyRole);
+  const duties = config ? config.duties : [];
+
+  el.innerHTML = `
+    <div id="duty-items-${activeDutyRole.replace(/\s/g,'')}" style="margin-bottom:12px;">
+      ${duties.map((d, i) => `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--gu-bg);border-radius:8px;margin-bottom:5px;">
+          <span style="font-size:13px;flex:1;">${d}</span>
+          <button onclick="removeDutyItem(${i})" style="background:none;border:none;color:#d9534f;font-size:16px;cursor:pointer;padding:0 4px;">×</button>
+        </div>
+      `).join('') || '<p style="color:var(--gu-dust);font-size:12px;padding:8px 0;">No duties set for this role yet.</p>'}
+    </div>
+    <div style="display:flex;gap:8px;">
+      <input type="text" id="new-duty-text" placeholder="Add a duty for ${activeDutyRole}…" style="flex:1;padding:9px 12px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;">
+      <button onclick="addDutyItem()" style="background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;">+ Add</button>
+    </div>
+    <button onclick="saveDutyConfig()" style="margin-top:12px;background:var(--link-clay);color:white;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;">💾 Save ${activeDutyRole} Duties</button>
+    <span id="duty-save-status" style="font-size:12px;color:var(--gu-dust);margin-left:10px;"></span>
+  `;
+}
+
+function addDutyItem() {
+  const input = document.getElementById('new-duty-text');
+  const text = input.value.trim();
+  if (!text) return;
+  let config = dutyConfig.find(d => d.role === activeDutyRole);
+  if (!config) { config = { role: activeDutyRole, duties: [] }; dutyConfig.push(config); }
+  config.duties.push(text);
+  input.value = '';
+  renderDutyEditor();
+}
+
+function removeDutyItem(index) {
+  const config = dutyConfig.find(d => d.role === activeDutyRole);
+  if (config) { config.duties.splice(index, 1); renderDutyEditor(); }
+}
+
+async function saveDutyConfig() {
+  const config = dutyConfig.find(d => d.role === activeDutyRole);
+  const duties = config ? config.duties : [];
+  const status = document.getElementById('duty-save-status');
+  status.textContent = 'Saving…';
+  try {
+    await fetch(`${API_URL}/api/staff/duties`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ studioId, role: activeDutyRole, duties })
+    });
+    status.textContent = '✓ Saved';
+    setTimeout(() => status.textContent = '', 3000);
+  } catch(e) { status.textContent = '✗ Failed'; }
+}
+
 // ── Studio Table Configuration (Setup tab) ──
 let tableConfigList = [];
 
@@ -4749,6 +5067,8 @@ function displayBookingResult(bookingData) {
   selectedTable = null;
   loadTablePicker();
   initChecklist();
+  populateDutyStaffSelect();
+  loadSessionDuties();
 }
 
 async function openTableSession() {

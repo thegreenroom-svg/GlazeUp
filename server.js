@@ -3177,6 +3177,156 @@ app.post('/api/pieces/complete-unfinished', async (req, res) => {
 // STUDIO TABLE MANAGEMENT
 // ═══════════════════════════════════════════
 
+// ═══════════════════════════════════════════
+// STAFF DUTIES SYSTEM
+// Team members, roles, weekly-editable duty lists,
+// and per-session duty tracking tied to whoever's
+// working that table/booking.
+// ═══════════════════════════════════════════
+
+// Default duty templates per role — studios can add/edit their own via
+// the duties config endpoint, these are just sensible starting points.
+const DEFAULT_ROLE_DUTIES = {
+  'Ceramic Technician': [
+    'Check kiln temperature and firing schedule',
+    'Load and unload kiln safely',
+    'Inspect fired pieces for defects',
+    'Mix and prepare glazes as needed',
+    'Maintain kiln room cleanliness',
+  ],
+  'Studio Manager': [
+    'Open/close studio checklist',
+    'Staff rota and cover',
+    'Stock ordering and supplier contact',
+    'Handle customer queries and complaints',
+    'Daily takings reconciliation',
+  ],
+  'Studio Assistant': [
+    'Clear tables after each session',
+    'Clean tables and set up for next booking',
+    'Fill paint pots and check paint levels',
+    'Clean paint brushes and pots',
+    'Restock coasters and placemats',
+    'Write and place name cards',
+  ],
+  'Studio Executive': [
+    'Oversee daily studio operations',
+    'Review revenue and booking reports',
+    'Liaise with Head Office / franchise',
+    'Staff performance check-ins',
+  ],
+  'Barista': [
+    'Set up coffee machine and drinks station',
+    'Prepare and serve drinks orders',
+    'Keep drinks station stocked and clean',
+    'Manage cake/food display',
+  ],
+};
+
+// GET /api/staff/team — list team members for a studio
+app.get('/api/staff/team', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data } = await supabase.from('staff_team').select('*').eq('studio_id', studioId).order('name');
+  res.json({ team: data || [] });
+});
+
+// POST /api/staff/team — add or update a team member
+app.post('/api/staff/team', async (req, res) => {
+  const { studioId, id, name, role, active } = req.body;
+  if (!studioId || !name || !role) return res.status(400).json({ error: 'studioId, name, role required' });
+  if (id) {
+    const { data, error } = await supabase.from('staff_team')
+      .update({ name, role, active: active !== false })
+      .eq('id', id).eq('studio_id', studioId).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ member: data });
+  }
+  const { data, error } = await supabase.from('staff_team')
+    .insert({ studio_id: studioId, name, role, active: true }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ member: data });
+});
+
+// DELETE /api/staff/team/:id — remove a team member
+app.delete('/api/staff/team/:id', async (req, res) => {
+  const { studioId } = req.query;
+  await supabase.from('staff_team').delete().eq('id', req.params.id).eq('studio_id', studioId);
+  res.json({ deleted: true });
+});
+
+// GET /api/staff/duties — get the duty list config for a studio (role duties + extra duties)
+app.get('/api/staff/duties', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data } = await supabase.from('staff_duty_config').select('*').eq('studio_id', studioId);
+
+  // If no config saved yet, return defaults
+  if (!data || !data.length) {
+    const defaults = Object.entries(DEFAULT_ROLE_DUTIES).map(([role, duties]) => ({
+      role, duties, isDefault: true
+    }));
+    return res.json({ dutyConfig: defaults });
+  }
+  res.json({ dutyConfig: data.map(d => ({ role: d.role, duties: d.duties, isDefault: false })) });
+});
+
+// POST /api/staff/duties — save/update duty list for a role (studio admin edits weekly)
+app.post('/api/staff/duties', async (req, res) => {
+  const { studioId, role, duties } = req.body;
+  if (!studioId || !role || !Array.isArray(duties)) return res.status(400).json({ error: 'studioId, role, duties[] required' });
+  const { data, error } = await supabase.from('staff_duty_config')
+    .upsert({ studio_id: studioId, role, duties, updated_at: new Date().toISOString() }, { onConflict: 'studio_id,role' })
+    .select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ config: data });
+});
+
+// GET /api/staff/session-duties — get duty checklist state for a specific booking/table session
+app.get('/api/staff/session-duties', async (req, res) => {
+  const { studioId, bookingCode } = req.query;
+  if (!studioId || !bookingCode) return res.status(400).json({ error: 'studioId and bookingCode required' });
+  const { data } = await supabase.from('session_duties')
+    .select('*').eq('studio_id', studioId).eq('booking_code', bookingCode);
+  res.json({ sessionDuties: data || [] });
+});
+
+// POST /api/staff/session-duties — assign duties to a staff member for this session
+app.post('/api/staff/session-duties', async (req, res) => {
+  const { studioId, bookingCode, staffMemberId, staffName, role, duties } = req.body;
+  if (!studioId || !bookingCode || !staffName || !Array.isArray(duties)) {
+    return res.status(400).json({ error: 'studioId, bookingCode, staffName, duties[] required' });
+  }
+  const rows = duties.map(d => ({
+    studio_id: studioId, booking_code: bookingCode,
+    staff_member_id: staffMemberId || null, staff_name: staffName, role: role || null,
+    duty_text: d, completed: false,
+  }));
+  const { data, error } = await supabase.from('session_duties').insert(rows).select();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ sessionDuties: data });
+});
+
+// PATCH /api/staff/session-duties/:id — tick/untick a specific duty
+app.patch('/api/staff/session-duties/:id', async (req, res) => {
+  const { completed } = req.body;
+  const { data, error } = await supabase.from('session_duties')
+    .update({ completed, completed_at: completed ? new Date().toISOString() : null })
+    .eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ duty: data });
+});
+
+// DELETE /api/staff/session-duties/:id — remove a duty assignment
+app.delete('/api/staff/session-duties/:id', async (req, res) => {
+  await supabase.from('session_duties').delete().eq('id', req.params.id);
+  res.json({ deleted: true });
+});
+
+// ═══════════════════════════════════════════
+// STUDIO TABLE MANAGEMENT
+// ═══════════════════════════════════════════
+
 app.get('/api/studio/tables', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
