@@ -1162,6 +1162,35 @@
 </div>
 <button id="swt-trigger" onclick="window.location.href='/admin/walkthrough.html'">🎯 Staff Tour</button>
 
+<!-- Morning Opening Checklist Modal -->
+<div id="opening-checklist-modal" style="display:none;position:fixed;inset:0;z-index:9100;background:rgba(43,39,36,0.7);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:20px;max-width:480px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(43,39,36,0.4);">
+    <!-- Header -->
+    <div style="background:var(--gu-primary);border-radius:20px 20px 0 0;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;" id="opening-modal-header">
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,0.6);margin-bottom:3px;">Good morning ☀️</div>
+        <div style="font-size:18px;font-weight:700;color:white;" id="opening-modal-date"></div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:11px;color:rgba(255,255,255,0.6);" id="opening-check-count">0 of 14 done</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:2px;">Studio opening checklist</div>
+      </div>
+    </div>
+    <!-- Items -->
+    <div style="overflow-y:auto;flex:1;padding:12px 16px;" id="opening-checklist-items"></div>
+    <!-- Footer -->
+    <div style="padding:14px 16px 18px;border-top:1px solid #f0ebe4;">
+      <button id="opening-ready-btn" onclick="completeOpeningChecklist()" disabled
+        style="width:100%;padding:14px;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:not-allowed;background:#e0e0e0;color:#aaa;transition:all .3s;">
+        ✓ Studio Open — Start the Day!
+      </button>
+      <button onclick="skipOpeningChecklist()" style="width:100%;background:none;border:none;color:var(--gu-dust);font-size:12px;cursor:pointer;padding:10px;margin-top:4px;">
+        Skip for now
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Splash / resting screen -->
 <div id="splash-screen">
   <div style="display:flex; align-items:baseline; justify-content:center; gap:0;">
@@ -3212,6 +3241,119 @@ showStaffSection = function(section) {
   }
 };
 
+// ── Morning Opening Checklist ──
+const OPENING_CHECKLIST = [
+  // Studio
+  { id:'o_unlocked',     icon:'🔓', text:'Studio unlocked and alarm off',                          cat:'Studio' },
+  { id:'o_lights',       icon:'💡', text:'Lights on throughout the studio',                        cat:'Studio' },
+  { id:'o_music',        icon:'🎵', text:'Background music on at a comfortable level',              cat:'Studio' },
+  { id:'o_temp',         icon:'🌡️', text:'Temperature comfortable — heating/cooling on if needed', cat:'Studio' },
+  // Tables
+  { id:'o_tables',       icon:'🪑', text:'All tables clean and wiped down',                        cat:'Tables' },
+  { id:'o_placements',   icon:'🗺️', text:'Instruction sheets/placements stocked at each station',  cat:'Tables' },
+  { id:'o_brushes',      icon:'🖌️', text:'Brushes cleaned, sorted, and ready at each table',      cat:'Tables' },
+  { id:'o_sponges',      icon:'🧽', text:'Sponges and water pots fresh and filled',                cat:'Tables' },
+  { id:'o_water',        icon:'💧', text:'Water station stocked',                                  cat:'Tables' },
+  // Stock & Glazes
+  { id:'o_bisque',       icon:'🏺', text:'Bisque stock checked and displayed',                     cat:'Stock & Glazes' },
+  { id:'o_glazes',       icon:'🎨', text:'All Mayco glazes stocked, lids on, none running low',   cat:'Stock & Glazes' },
+  { id:'o_specialist',   icon:'✨', text:'Specialist glazes (Jungle Gems etc) available and ready',cat:'Stock & Glazes' },
+  // Cafe & Service
+  { id:'o_drinks',       icon:'☕', text:'Drinks station stocked and ready — coffee machine on',   cat:'Café & Service' },
+  { id:'o_till',         icon:'💷', text:'Till open, card machine on and working',                 cat:'Café & Service' },
+];
+
+let openingCheckState = {};
+
+function showOpeningChecklist() {
+  const today = new Date().toDateString();
+  const doneKey = `klnk_opening_${today}`;
+  if (localStorage.getItem(doneKey)) return; // already done today
+
+  openingCheckState = {};
+  OPENING_CHECKLIST.forEach(i => { openingCheckState[i.id] = false; });
+
+  // Set date header
+  const dateEl = document.getElementById('opening-modal-date');
+  if (dateEl) {
+    dateEl.textContent = new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
+  }
+
+  renderOpeningChecklist();
+  document.getElementById('opening-checklist-modal').style.display = 'flex';
+}
+
+function renderOpeningChecklist() {
+  const container = document.getElementById('opening-checklist-items');
+  if (!container) return;
+
+  const cats = [...new Set(OPENING_CHECKLIST.map(i => i.cat))];
+  const catIcons = { 'Studio':'🏠', 'Tables':'🪑', 'Stock & Glazes':'🎨', 'Café & Service':'☕' };
+
+  container.innerHTML = cats.map(cat => {
+    const items = OPENING_CHECKLIST.filter(i => i.cat === cat);
+    return `
+      <div style="margin-bottom:12px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gu-dust);margin:10px 0 6px;">${catIcons[cat]||''} ${cat}</div>
+        ${items.map(item => {
+          const done = openingCheckState[item.id];
+          return `<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;margin-bottom:4px;background:${done?'#e8f5e9':'#f9f6f2'};transition:background .2s;">
+            <input type="checkbox" ${done?'checked':''} onchange="toggleOpeningItem('${item.id}',this.checked)"
+              style="width:18px;height:18px;flex-shrink:0;accent-color:#2e7d32;cursor:pointer;">
+            <span style="font-size:16px;flex-shrink:0;">${item.icon}</span>
+            <span style="font-size:13px;color:${done?'#2e7d32':'#2B2724'};text-decoration:${done?'line-through':''};line-height:1.35;">${item.text}</span>
+            ${done?'<span style="margin-left:auto;color:#2e7d32;font-size:14px;flex-shrink:0;">✓</span>':''}
+          </label>`;
+        }).join('')}
+      </div>`;
+  }).join('');
+
+  updateOpeningProgress();
+}
+
+function toggleOpeningItem(id, checked) {
+  openingCheckState[id] = checked;
+  renderOpeningChecklist();
+}
+
+function updateOpeningProgress() {
+  const total = OPENING_CHECKLIST.length;
+  const done = Object.values(openingCheckState).filter(Boolean).length;
+  const countEl = document.getElementById('opening-check-count');
+  const btn = document.getElementById('opening-ready-btn');
+  const header = document.getElementById('opening-modal-header');
+  const allDone = done === total;
+
+  if (countEl) countEl.textContent = `${done} of ${total} done`;
+  if (btn) {
+    btn.disabled = !allDone;
+    btn.style.background = allDone ? '#2e7d32' : '#e0e0e0';
+    btn.style.color = allDone ? 'white' : '#aaa';
+    btn.style.cursor = allDone ? 'pointer' : 'not-allowed';
+    btn.textContent = allDone ? '✅ Studio Open — Start the Day!' : `✓ Studio Open — ${total - done} items left`;
+  }
+  if (header) header.style.background = allDone ? '#2e7d32' : 'var(--gu-primary)';
+}
+
+function completeOpeningChecklist() {
+  const today = new Date().toDateString();
+  localStorage.setItem(`klnk_opening_${today}`, '1');
+  const modal = document.getElementById('opening-checklist-modal');
+  modal.style.opacity = '0';
+  modal.style.transition = 'opacity .4s';
+  setTimeout(() => { modal.style.display = 'none'; modal.style.opacity = '1'; }, 400);
+  // Show a quick toast
+  const toast = document.createElement('div');
+  toast.textContent = '✅ Studio open — have a great day!';
+  toast.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);background:#2e7d32;color:white;padding:12px 24px;border-radius:12px;font-size:14px;font-weight:700;z-index:9999;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.2);';
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+function skipOpeningChecklist() {
+  document.getElementById('opening-checklist-modal').style.display = 'none';
+}
+
 // ── Table Setup Checklist ──
 const SETUP_CHECKLIST = [
   { id:'table_set',      icon:'🪑', text:'Table set up correctly for the number of guests',         category:'Table' },
@@ -3671,6 +3813,8 @@ async function populateDashboard() {
   loadLoyaltyLeaderboard();
   swtShowTrigger();
   startExtrasPollingOnLoad();
+  // Show morning opening checklist if not done today
+  setTimeout(showOpeningChecklist, 800);
   try {
     const data = await loadDashboardData();
     
