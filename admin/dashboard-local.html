@@ -1503,7 +1503,22 @@
               🏠 Home Access — all design tools, forever <span style="color: var(--link-clay); font-weight: 700; margin-left: auto;">+£5.00</span>
             </label>
 
-            <button class="btn-connect" style="width: 100%; margin-top: 4px;" onclick="openTableSession()">🪑 Open Table</button>
+            <!-- ── Table Setup Checklist ── -->
+            <div id="s1-checklist" style="margin-bottom:14px;border:1px solid var(--gu-border);border-radius:14px;overflow:hidden;">
+              <div style="background:var(--gu-primary);color:white;padding:10px 14px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:space-between;">
+                <span>✅ Table Setup Checklist</span>
+                <span id="s1-checklist-count" style="font-size:11px;font-weight:500;opacity:.8;">0 of 12 done</span>
+              </div>
+              <div id="s1-checklist-items" style="padding:8px 0;"></div>
+              <div style="padding:10px 14px;border-top:1px solid var(--gu-border);">
+                <button id="s1-checklist-ready-btn" onclick="markTableReady()" disabled
+                  style="width:100%;padding:13px;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:not-allowed;background:#e0e0e0;color:#aaa;transition:all .3s;">
+                  ✓ Table Ready — Open Session
+                </button>
+              </div>
+            </div>
+
+            <button class="btn-connect" style="width: 100%; margin-top: 4px; display:none;" id="s1-open-table-btn" onclick="openTableSession()">🪑 Open Table</button>
           </div>
         </div>
 
@@ -3197,6 +3212,106 @@ showStaffSection = function(section) {
   }
 };
 
+// ── Table Setup Checklist ──
+const SETUP_CHECKLIST = [
+  { id:'table_set',      icon:'🪑', text:'Table set up correctly for the number of guests',         category:'Table' },
+  { id:'name_card',      icon:'📛', text:'Customer name card handwritten and placed on table',       category:'Table' },
+  { id:'water',          icon:'💧', text:'Water jug and glasses on the table',                       category:'Table' },
+  { id:'placement',      icon:'🗺️', text:'Studio placement mat / instruction sheet on the table',    category:'Table' },
+  { id:'brushes',        icon:'🖌️', text:'Full set of brushes in good condition',                   category:'Tools' },
+  { id:'sponges',        icon:'🧽', text:'Sponges and water pot available',                         category:'Tools' },
+  { id:'palette',        icon:'🎨', text:'Colour palette / glaze card accessible',                  category:'Tools' },
+  { id:'piece_ready',    icon:'🏺', text:'Bisque piece(s) ready and placed on the table',           category:'Piece' },
+  { id:'piece_checked',  icon:'🔍', text:'Piece(s) checked — no cracks, clean, ready to paint',    category:'Piece' },
+  { id:'drink_offered',  icon:'☕', text:'Drinks offered and order taken if required',               category:'Service' },
+  { id:'tour_offered',   icon:'🎯', text:'App tour / QR code offered to customers',                category:'Service' },
+  { id:'happy_to_start', icon:'😊', text:'Customers happy, questions answered, ready to begin',     category:'Service' },
+];
+
+let checklistState = {};
+
+function initChecklist() {
+  checklistState = {};
+  SETUP_CHECKLIST.forEach(item => { checklistState[item.id] = false; });
+  renderChecklist();
+}
+
+function renderChecklist() {
+  const container = document.getElementById('s1-checklist-items');
+  if (!container) return;
+
+  // Group by category
+  const categories = [...new Set(SETUP_CHECKLIST.map(i => i.category))];
+  container.innerHTML = categories.map(cat => {
+    const items = SETUP_CHECKLIST.filter(i => i.category === cat);
+    const catIcons = { Table:'🪑', Tools:'🖌️', Piece:'🏺', Service:'😊' };
+    return `
+      <div style="padding:6px 14px 2px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gu-dust);margin-bottom:4px;">${catIcons[cat]||''} ${cat}</div>
+        ${items.map(item => {
+          const done = checklistState[item.id];
+          return `
+            <label style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;margin-bottom:3px;background:${done?'#e8f5e9':'transparent'};transition:background .2s;">
+              <input type="checkbox" ${done?'checked':''} onchange="toggleChecklistItem('${item.id}',this.checked)"
+                style="width:18px;height:18px;flex-shrink:0;accent-color:#2e7d32;cursor:pointer;">
+              <span style="font-size:15px;flex-shrink:0;">${item.icon}</span>
+              <span style="font-size:13px;color:${done?'#2e7d32':'var(--gu-text)'};text-decoration:${done?'line-through':''};line-height:1.35;">${item.text}</span>
+              ${done?'<span style="margin-left:auto;color:#2e7d32;font-size:14px;flex-shrink:0;">✓</span>':''}
+            </label>`;
+        }).join('')}
+      </div>`;
+  }).join('');
+
+  updateChecklistProgress();
+}
+
+function toggleChecklistItem(id, checked) {
+  checklistState[id] = checked;
+  renderChecklist();
+}
+
+function updateChecklistProgress() {
+  const total = SETUP_CHECKLIST.length;
+  const done = Object.values(checklistState).filter(Boolean).length;
+  const countEl = document.getElementById('s1-checklist-count');
+  const btn = document.getElementById('s1-checklist-ready-btn');
+  const header = document.querySelector('#s1-checklist > div:first-child');
+
+  if (countEl) countEl.textContent = `${done} of ${total} done`;
+
+  const allDone = done === total;
+  if (btn) {
+    btn.disabled = !allDone;
+    btn.style.background = allDone ? '#2e7d32' : '#e0e0e0';
+    btn.style.color = allDone ? 'white' : '#aaa';
+    btn.style.cursor = allDone ? 'pointer' : 'not-allowed';
+    btn.textContent = allDone ? '✅ Table Ready — Open Session!' : `✓ Table Ready — Open Session (${total - done} items left)`;
+    if (allDone) btn.style.animation = 'pulse 1s ease-in-out 2';
+  }
+  if (header) {
+    header.style.background = allDone ? '#2e7d32' : 'var(--gu-primary)';
+  }
+}
+
+function markTableReady() {
+  // All checks done — trigger the normal open table flow
+  document.getElementById('s1-checklist-ready-btn').textContent = '🎉 Opening table…';
+  setTimeout(() => openTableSession(), 500);
+}
+
+// Show checklist when Step 1 result appears, init fresh state
+const _origDisplayBookingResult = typeof displayBookingResult === 'function' ? displayBookingResult : null;
+
+// Add CSS pulse animation
+const _checklistStyle = document.createElement('style');
+_checklistStyle.textContent = `
+  @keyframes pulse {
+    0%,100% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+  }
+`;
+document.head.appendChild(_checklistStyle);
+
 // ── Loyalty System ──
 const STAFF_TIER_GRADIENTS = {
   newcomer:   'linear-gradient(135deg,#558B2F,#8BC34A)',
@@ -4267,6 +4382,9 @@ function displayBookingResult(bookingData) {
 
   // Load loyalty panel for this customer
   loadS1LoyaltyPanel(bookingData.customerName);
+
+  // Init the table setup checklist fresh for each new booking
+  initChecklist();
 }
 
 async function openTableSession() {
