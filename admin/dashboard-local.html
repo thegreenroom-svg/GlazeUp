@@ -98,6 +98,87 @@
       }
     }
 
+    /* Real phone widths (staff assistants/baristas on their own iPhone/Android) —
+       the sidebar becomes a bottom tab bar, and the top-right header buttons
+       (alert bell, shift badge, headset) collapse into a single menu button
+       so they don't overlap on a ~375-414px screen. */
+    @media (max-width: 520px) {
+      .admin-wrapper {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr 60px;
+      }
+      .admin-sidebar {
+        grid-row: 2;
+        order: 2;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-around;
+        padding: 6px 4px !important;
+        overflow-x: auto;
+        overflow-y: hidden;
+        box-shadow: 0 -4px 16px -4px rgba(0,0,0,0.2);
+      }
+      .link-logo { display: none; }
+      .admin-sidebar nav {
+        display: flex;
+        flex-direction: row;
+        width: 100%;
+        justify-content: space-around;
+      }
+      .admin-sidebar nav a {
+        flex-direction: column;
+        gap: 2px;
+        padding: 6px 4px;
+        font-size: 9px;
+        margin-bottom: 0;
+        min-width: 44px;
+      }
+      .admin-sidebar nav a .nav-label {
+        display: block !important;
+        font-size: 8.5px;
+      }
+      .admin-sidebar nav a svg { width: 18px; height: 18px; }
+
+      /* Collapse header buttons into the phone header menu */
+      #alert-bell-btn, #shift-badge, #headset-setup-btn, #step-counter-btn {
+        position: static !important;
+        box-shadow: none !important;
+        width: auto !important;
+        min-width: 36px;
+      }
+      #alert-bell-btn, #headset-setup-btn, #step-counter-btn {
+        width: 36px !important;
+        height: 36px !important;
+        font-size: 16px !important;
+      }
+      #shift-badge {
+        flex: 1;
+        min-width: 0;
+        padding: 6px 10px 6px 6px !important;
+      }
+      #shift-badge-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 90px;
+      }
+      #phone-header-menu {
+        display: flex !important;
+      }
+      .api-status { font-size: 9px; padding: 5px 8px; }
+    }
+
+    /* Phone-only collapsed header — bundles bell/badge/headset into one row */
+    #phone-header-menu {
+      display: none;
+      position: fixed; top: 0; left: 0; right: 0; z-index: 840;
+      background: white; border-bottom: 1px solid var(--gu-border);
+      padding: 8px 12px 8px 52px;
+      align-items: center; gap: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
     .admin-sidebar {
       position: relative;
       background: var(--link-charcoal);
@@ -1208,6 +1289,10 @@
 <!-- API Status Indicator -->
 <div class="api-status disconnected" id="api-status">📡 Connecting...</div>
 
+<!-- On phone widths, these three buttons flow into this horizontal bar instead
+     of stacking as separate fixed-position circles (which overlap on narrow screens) -->
+<div id="phone-header-menu">
+
 <!-- Handoff Alert Bell -->
 <button id="alert-bell-btn" onclick="toggleAlertFeed()" style="position:fixed;top:16px;right:170px;z-index:850;background:#2B2724;color:white;border:none;border-radius:50%;width:44px;height:44px;font-size:19px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;">
   🔔
@@ -1256,6 +1341,47 @@
 <button id="headset-setup-btn" onclick="openHeadsetHelp()" style="display:none;position:fixed;top:16px;right:280px;z-index:850;background:white;border:1.5px solid var(--gu-border);border-radius:50%;width:44px;height:44px;font-size:18px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.12);align-items:center;justify-content:center;">
   🎧
 </button>
+
+<!-- 👟 Step Counter button — just for fun -->
+<button id="step-counter-btn" onclick="openStepLeaderboard()" style="display:none;position:fixed;top:16px;right:336px;z-index:850;background:white;border:1.5px solid var(--gu-border);border-radius:50%;width:44px;height:44px;font-size:18px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.12);align-items:center;justify-content:center;">
+  👟
+</button>
+
+</div> <!-- /phone-header-menu -->
+
+<!-- Step Counter / Leaderboard Modal -->
+<div id="step-leaderboard-modal" style="display:none;position:fixed;inset:0;z-index:9700;background:rgba(43,39,36,0.8);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:white;border-radius:24px;max-width:420px;width:100%;max-height:88vh;overflow-y:auto;box-shadow:0 24px 70px rgba(0,0,0,0.4);">
+    <div style="background:linear-gradient(135deg,#F9A825,#FB8C00);padding:24px;text-align:center;">
+      <div style="font-size:40px;margin-bottom:6px;">👟</div>
+      <div style="font-size:17px;font-weight:800;color:white;">Studio Steps</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.8);margin-top:2px;">Just for fun — a rough estimate, not a medical device!</div>
+    </div>
+
+    <!-- My counter -->
+    <div style="padding:20px 24px;border-bottom:1px solid #f0ebe4;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gu-dust);margin-bottom:8px;">My steps today</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:32px;font-weight:800;color:var(--gu-primary);" id="step-count-display">0</div>
+        <button id="step-toggle-btn" onclick="toggleStepCounting()" style="background:var(--gu-primary);color:white;border:none;border-radius:20px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;">▶ Start counting</button>
+      </div>
+      <div style="font-size:11px;color:var(--gu-dust);margin-top:8px;line-height:1.5;">Uses your device's motion sensor while this tab is open. Estimate only — table bumps and pocket phones will throw the count off, and it won't match your phone's own Health app.</div>
+    </div>
+
+    <!-- Leaderboard -->
+    <div style="padding:20px 24px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gu-dust);">Today's leaderboard</div>
+        <button onclick="loadStepLeaderboard()" style="background:none;border:none;color:var(--gu-primary);font-size:12px;font-weight:700;cursor:pointer;">🔄</button>
+      </div>
+      <div id="step-leaderboard-list"><div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading…</div></div>
+    </div>
+
+    <div style="padding:0 24px 20px;">
+      <button onclick="closeStepLeaderboard()" style="width:100%;background:none;border:1px solid var(--gu-border);color:var(--gu-dust);border-radius:10px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;">Close</button>
+    </div>
+  </div>
+</div>
 
 <!-- Headset / Bluetooth Setup Modal -->
 <div id="headset-help-modal" style="display:none;position:fixed;inset:0;z-index:9700;background:rgba(43,39,36,0.8);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
@@ -4437,9 +4563,13 @@ function skipShiftLogin() {
 }
 
 function logOutOfShift() {
+  if (stepMotionActive) stopStepCounting();
+  stepCount = 0;
   localStorage.removeItem('klnk_shift_staff');
   currentShiftStaff = null;
   document.getElementById('shift-badge').style.display = 'none';
+  document.getElementById('step-counter-btn').style.display = 'none';
+  document.getElementById('headset-setup-btn').style.display = 'none';
   toggleTaskQueue();
   setTimeout(() => document.getElementById('shift-login-modal').style.display = 'flex', 300);
 }
@@ -4451,10 +4581,146 @@ function applyShiftUI() {
   document.getElementById('shift-badge-avatar').textContent = currentShiftStaff.name.charAt(0).toUpperCase();
   document.getElementById('shift-badge-name').textContent = currentShiftStaff.name;
   document.getElementById('headset-setup-btn').style.display = 'flex';
+  document.getElementById('step-counter-btn').style.display = 'flex';
   startTaskPolling();
 }
 
 // ── Headset / Bluetooth help ──
+// ═══════════════════════════════════════════
+// STEP COUNTER (just for fun — DIY motion-based
+// estimate, NOT a precise pedometer. Web apps
+// can't access the phone's real step-counting
+// hardware, so this is a best-effort detector
+// built from raw accelerometer data.)
+// ═══════════════════════════════════════════
+
+let stepCount = 0;
+let stepMotionActive = false;
+let lastStepMagnitude = 0;
+let lastStepTime = 0;
+let stepSaveTimer = null;
+
+function isStepCounterSupported() {
+  return typeof DeviceMotionEvent !== 'undefined';
+}
+
+async function requestStepPermission() {
+  // iOS 13+ requires an explicit permission prompt, triggered by a user tap
+  if (typeof DeviceMotionEvent.requestPermission === 'function') {
+    try {
+      const result = await DeviceMotionEvent.requestPermission();
+      return result === 'granted';
+    } catch (e) {
+      return false;
+    }
+  }
+  // Android / older iOS — no explicit permission API, assume available
+  return true;
+}
+
+function handleMotionForSteps(event) {
+  const acc = event.accelerationIncludingGravity;
+  if (!acc) return;
+  const magnitude = Math.sqrt((acc.x||0)**2 + (acc.y||0)**2 + (acc.z||0)**2);
+
+  // Simple peak-detection step algorithm — deliberately conservative
+  // to avoid over-counting from table bumps etc. This is an ESTIMATE.
+  const now = Date.now();
+  const delta = magnitude - lastStepMagnitude;
+  const THRESHOLD = 1.8; // tuned loosely — real steps produce a sharper acceleration spike
+  const MIN_STEP_INTERVAL_MS = 300; // avoid double-counting one footfall
+
+  if (delta > THRESHOLD && (now - lastStepTime) > MIN_STEP_INTERVAL_MS) {
+    stepCount++;
+    lastStepTime = now;
+    updateStepDisplay();
+  }
+  lastStepMagnitude = magnitude;
+}
+
+async function startStepCounting() {
+  if (!isStepCounterSupported()) {
+    alert('Step counting needs a phone or tablet with a motion sensor — not available on this device/browser.');
+    return;
+  }
+  const granted = await requestStepPermission();
+  if (!granted) {
+    alert('Motion permission was not granted — step counting needs this to work. You can enable it in your browser/device settings.');
+    return;
+  }
+  window.addEventListener('devicemotion', handleMotionForSteps);
+  stepMotionActive = true;
+  updateStepDisplay();
+
+  // Save to server every 30 seconds while active
+  clearInterval(stepSaveTimer);
+  stepSaveTimer = setInterval(saveStepsToServer, 30 * 1000);
+}
+
+function stopStepCounting() {
+  window.removeEventListener('devicemotion', handleMotionForSteps);
+  stepMotionActive = false;
+  clearInterval(stepSaveTimer);
+  saveStepsToServer(); // final save
+  updateStepDisplay();
+}
+
+async function saveStepsToServer() {
+  if (!currentShiftStaff || !studioId) return;
+  try {
+    await fetch(`${API_URL}/api/staff/steps`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ studioId, staffMemberId: currentShiftStaff.id, steps: stepCount })
+    });
+  } catch(e) { /* silent */ }
+}
+
+function updateStepDisplay() {
+  const el = document.getElementById('step-count-display');
+  if (el) el.textContent = stepCount.toLocaleString();
+  const toggleBtn = document.getElementById('step-toggle-btn');
+  if (toggleBtn) toggleBtn.textContent = stepMotionActive ? '⏸ Pause' : '▶ Start counting';
+}
+
+function toggleStepCounting() {
+  if (stepMotionActive) stopStepCounting();
+  else startStepCounting();
+}
+
+async function openStepLeaderboard() {
+  document.getElementById('step-leaderboard-modal').style.display = 'flex';
+  loadStepLeaderboard();
+}
+function closeStepLeaderboard() {
+  document.getElementById('step-leaderboard-modal').style.display = 'none';
+}
+
+async function loadStepLeaderboard() {
+  const el = document.getElementById('step-leaderboard-list');
+  if (!el) return;
+  try {
+    const res = await fetch(`${API_URL}/api/staff/steps/leaderboard?studioId=${studioId}`);
+    const data = await res.json();
+    if (!data.leaderboard?.length) {
+      el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--gu-dust);"><div style="font-size:28px;margin-bottom:8px;">👟</div><div style="font-size:13px;">No steps logged yet today — tap Start Counting on your device to join in!</div></div>';
+      return;
+    }
+    const MEDALS = ['🥇','🥈','🥉'];
+    el.innerHTML = data.leaderboard.map((p, i) => `
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:${i===0?'#fff9e6':'var(--gu-bg)'};border-radius:12px;margin-bottom:8px;border:1px solid ${i===0?'#f0d878':'var(--gu-border)'};">
+        <div style="font-size:20px;width:28px;text-align:center;flex-shrink:0;">${MEDALS[i] || (i+1)}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:700;color:var(--gu-text);">${p.name}</div>
+          <div style="font-size:11px;color:var(--gu-dust);">${p.role} · ${p.distanceKm}km · ~${p.caloriesEst} kcal</div>
+        </div>
+        <div style="font-size:18px;font-weight:800;color:var(--gu-primary);white-space:nowrap;">${p.steps.toLocaleString()}</div>
+      </div>
+    `).join('');
+  } catch(e) {
+    el.innerHTML = '<p style="color:var(--gu-dust);font-size:13px;text-align:center;">Could not load the leaderboard.</p>';
+  }
+}
+
 function openHeadsetHelp() {
   document.getElementById('headset-help-modal').style.display = 'flex';
 }

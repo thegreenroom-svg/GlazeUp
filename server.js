@@ -3649,6 +3649,59 @@ app.patch('/api/staff/tasks/:id/pass', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ═══════════════════════════════════════════
+// STEP COUNTER — just for fun / team banter
+// Best-effort motion-based step estimate from
+// each staff member's own device. Not a medical
+// or precise measurement — purely playful.
+// ═══════════════════════════════════════════
+
+// POST /api/staff/steps — log a step count reading for the current shift
+app.post('/api/staff/steps', async (req, res) => {
+  const { studioId, staffMemberId, steps, shiftDate } = req.body;
+  if (!studioId || !staffMemberId || steps == null) {
+    return res.status(400).json({ error: 'studioId, staffMemberId, steps required' });
+  }
+  const date = shiftDate || new Date().toISOString().split('T')[0];
+
+  const { data, error } = await supabase.from('staff_steps').upsert({
+    studio_id: studioId, staff_member_id: staffMemberId, shift_date: date, steps,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'studio_id,staff_member_id,shift_date' }).select().single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ record: data });
+});
+
+// GET /api/staff/steps/leaderboard — today's step leaderboard for the studio
+app.get('/api/staff/steps/leaderboard', async (req, res) => {
+  const { studioId, date } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const shiftDate = date || new Date().toISOString().split('T')[0];
+
+  const { data: steps } = await supabase.from('staff_steps')
+    .select('staff_member_id, steps').eq('studio_id', studioId).eq('shift_date', shiftDate);
+
+  const { data: team } = await supabase.from('staff_team').select('id, name, role').eq('studio_id', studioId);
+
+  const nameMap = {};
+  (team || []).forEach(m => { nameMap[m.id] = m; });
+
+  const leaderboard = (steps || [])
+    .map(s => ({
+      staffMemberId: s.staff_member_id,
+      name: nameMap[s.staff_member_id]?.name || 'Unknown',
+      role: nameMap[s.staff_member_id]?.role || '',
+      steps: s.steps,
+      // Rough, playful estimate — average stride ~0.75m, ~0.04 kcal per step (varies hugely by person)
+      distanceKm: Math.round((s.steps * 0.00075) * 10) / 10,
+      caloriesEst: Math.round(s.steps * 0.04),
+    }))
+    .sort((a, b) => b.steps - a.steps);
+
+  res.json({ shiftDate, leaderboard });
+});
+
 app.get('/api/staff/team', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
