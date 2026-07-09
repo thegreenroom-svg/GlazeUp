@@ -1491,11 +1491,39 @@
     <div style="font-size:12px;color:rgba(255,255,255,0.75);" id="task-queue-role-label">–</div>
   </div>
   <div id="task-queue-list" style="flex:1;overflow-y:auto;padding:14px;"></div>
-  <div style="padding:12px 14px;border-top:1px solid #e8dfd3;">
+  <div style="padding:12px 14px;border-top:1px solid #e8dfd3;display:flex;flex-direction:column;gap:8px;">
+    <button onclick="openHolidayRequestForm()" style="width:100%;background:#fff9f0;border:1px solid #f0e0c0;color:var(--link-clay);border-radius:8px;padding:9px;font-size:12px;font-weight:600;cursor:pointer;">🏖️ Request holiday</button>
     <button onclick="logOutOfShift()" style="width:100%;background:none;border:1px solid var(--gu-border);color:var(--gu-dust);border-radius:8px;padding:9px;font-size:12px;font-weight:600;cursor:pointer;">🚪 End shift / switch person</button>
   </div>
 </div>
 <div id="task-queue-backdrop" onclick="toggleTaskQueue()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:9250;"></div>
+
+<!-- Holiday Request Form -->
+<div id="holiday-request-modal" style="display:none;position:fixed;inset:0;z-index:9700;background:rgba(43,39,36,0.8);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:white;border-radius:24px;max-width:400px;width:100%;box-shadow:0 24px 70px rgba(0,0,0,0.4);">
+    <div style="background:linear-gradient(135deg,#26A69A,#00897B);padding:24px;text-align:center;">
+      <div style="font-size:40px;margin-bottom:6px;">🏖️</div>
+      <div style="font-size:17px;font-weight:800;color:white;">Request Holiday</div>
+    </div>
+    <div style="padding:24px;">
+      <div id="holiday-my-allowance" style="background:var(--gu-bg);border-radius:10px;padding:12px;margin-bottom:16px;font-size:12px;color:var(--gu-dust);text-align:center;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--gu-dust);display:block;margin-bottom:4px;">From</label>
+          <input type="date" id="holiday-start-date" style="width:100%;padding:9px 10px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--gu-dust);display:block;margin-bottom:4px;">To</label>
+          <input type="date" id="holiday-end-date" style="width:100%;padding:9px 10px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;">
+        </div>
+      </div>
+      <label style="font-size:11px;font-weight:600;color:var(--gu-dust);display:block;margin-bottom:4px;">Notes for your manager (optional)</label>
+      <textarea id="holiday-notes" rows="2" placeholder="e.g. Family holiday, already covered my shifts with Jenny" style="width:100%;padding:9px 10px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;margin-bottom:16px;"></textarea>
+      <button onclick="submitHolidayRequest()" style="width:100%;background:#00897B;color:white;border:none;border-radius:12px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;">Send Request →</button>
+      <button onclick="closeHolidayRequestForm()" style="width:100%;background:none;border:none;color:var(--gu-dust);font-size:13px;cursor:pointer;padding:10px;">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <!-- Big Task Card (full task detail + complete button) -->
 <div id="task-card-modal" style="display:none;position:fixed;inset:0;z-index:9600;background:rgba(43,39,36,0.8);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
@@ -2482,6 +2510,35 @@
 
           <button onclick="saveProcessConfig()" style="margin-top:14px;background:var(--link-clay);color:white;border:none;border-radius:8px;padding:11px 22px;font-size:13px;font-weight:700;cursor:pointer;">💾 Save Process Chain</button>
           <span id="process-save-status" style="font-size:12px;color:var(--gu-dust);margin-left:10px;"></span>
+        </div>
+
+        <!-- Timekeeping -->
+        <div class="chart-container" style="margin-top:20px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <h3 style="margin:0;">🕐 Timekeeping</h3>
+            <a href="#" id="timesheet-export-link" onclick="downloadTimesheetCSV();return false;" style="font-size:12px;font-weight:700;color:var(--gu-primary);text-decoration:none;">⬇ Export CSV</a>
+          </div>
+          <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;line-height:1.5;">
+            Clock-in and clock-out happen automatically when staff log in/out with their PIN. This is hours worked only — <strong>kilnLINK does not calculate pay or tax</strong>. Export the CSV and hand it to your payroll provider or accountant.
+          </p>
+          <div style="display:flex;gap:8px;margin-bottom:14px;">
+            <input type="date" id="timesheet-from" style="flex:1;padding:8px 10px;border:1px solid var(--gu-border);border-radius:8px;font-size:12px;">
+            <input type="date" id="timesheet-to" style="flex:1;padding:8px 10px;border:1px solid var(--gu-border);border-radius:8px;font-size:12px;">
+            <button onclick="loadTimesheetView()" style="background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Filter</button>
+          </div>
+          <div id="timesheet-totals" style="margin-bottom:14px;"></div>
+          <div id="timesheet-shifts-list"><div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading…</div></div>
+        </div>
+
+        <!-- Holiday Requests -->
+        <div class="chart-container" style="margin-top:20px;">
+          <h3 style="margin:0 0 6px;">🏖️ Holiday Requests</h3>
+          <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Approve or reject time-off requests. Set each person's annual allowance below — this is tracked, not calculated for pay.</p>
+
+          <div id="holiday-pending-list" style="margin-bottom:16px;"></div>
+
+          <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gu-dust);margin-bottom:10px;">Annual allowance per person</div>
+          <div id="holiday-allowance-list"></div>
         </div>
       </div>
 
@@ -4583,6 +4640,7 @@ function startAlertPolling() {
 const SHIFT_PIN_LOGIN_ENABLED = false;
 
 let currentShiftStaff = null; // { id, name, role }
+let currentShiftId = null; // timesheet row ID for automatic clock-out
 
 function checkShiftLogin() {
   if (!SHIFT_PIN_LOGIN_ENABLED) {
@@ -4598,6 +4656,7 @@ function checkShiftLogin() {
   if (saved) {
     try {
       currentShiftStaff = JSON.parse(saved);
+      currentShiftId = localStorage.getItem('klnk_shift_id') || null;
       applyShiftUI();
       return;
     } catch(e) {}
@@ -4692,7 +4751,9 @@ async function submitShiftPin() {
     }
     const data = await res.json();
     currentShiftStaff = { id: data.member.id, name: data.member.name, role: data.member.role };
+    currentShiftId = data.shiftId || null;
     localStorage.setItem('klnk_shift_staff', JSON.stringify(currentShiftStaff));
+    if (currentShiftId) localStorage.setItem('klnk_shift_id', currentShiftId);
     document.getElementById('shift-login-modal').style.display = 'none';
     errorEl.style.display = 'none';
     applyShiftUI();
@@ -4730,9 +4791,16 @@ async function submitNewPin() {
       errorEl.style.display = 'block';
       return;
     }
-    // PIN set — log them straight in
-    currentShiftStaff = { id: selectedLoginMember.id, name: selectedLoginMember.name, role: selectedLoginMember.role };
+    // PIN set — now log in properly through shift-login so a clock-in record is created
+    const loginRes = await fetch(`${API_URL}/api/staff/shift-login`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ studioId, pin })
+    });
+    const loginData = await loginRes.json();
+    currentShiftStaff = { id: loginData.member.id, name: loginData.member.name, role: loginData.member.role };
+    currentShiftId = loginData.shiftId || null;
     localStorage.setItem('klnk_shift_staff', JSON.stringify(currentShiftStaff));
+    if (currentShiftId) localStorage.setItem('klnk_shift_id', currentShiftId);
     document.getElementById('shift-login-modal').style.display = 'none';
     applyShiftUI();
   } catch(e) {
@@ -4781,10 +4849,23 @@ function skipShiftLogin() {
   currentShiftStaff = null;
 }
 
-function logOutOfShift() {
+async function logOutOfShift() {
   if (stepMotionActive) stopStepCounting();
   stepCount = 0;
+
+  // Automatic clock-out
+  if (currentShiftStaff && currentShiftStaff.id !== 'testing') {
+    try {
+      await fetch(`${API_URL}/api/staff/clock-out`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ studioId, staffMemberId: currentShiftStaff.id, shiftId: currentShiftId })
+      });
+    } catch(e) { /* silent */ }
+  }
+  currentShiftId = null;
+
   localStorage.removeItem('klnk_shift_staff');
+  localStorage.removeItem('klnk_shift_id');
   currentShiftStaff = null;
   document.getElementById('shift-badge').style.display = 'none';
   document.getElementById('step-counter-btn').style.display = 'none';
@@ -5191,6 +5272,195 @@ function notifyNewTask(task) {
 }
 
 // ── Daily Progress (running completion log) ──
+// ═══════════════════════════════════════════
+// TIMEKEEPING (Team & Duties)
+// ═══════════════════════════════════════════
+
+async function loadTimesheetView() {
+  const listEl = document.getElementById('timesheet-shifts-list');
+  const totalsEl = document.getElementById('timesheet-totals');
+  if (!listEl) return;
+
+  const from = document.getElementById('timesheet-from')?.value;
+  const to = document.getElementById('timesheet-to')?.value;
+  let url = `${API_URL}/api/staff/timesheet?studioId=${studioId}`;
+  if (from) url += `&from=${from}T00:00:00`;
+  if (to) url += `&to=${to}T23:59:59`;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+
+    const totals = data.totalsByPerson || {};
+    if (Object.keys(totals).length) {
+      totalsEl.innerHTML = Object.entries(totals).map(([name, hrs]) => `
+        <span style="display:inline-block;background:var(--gu-bg);border:1px solid var(--gu-border);border-radius:20px;padding:6px 14px;font-size:12px;margin:0 6px 6px 0;">
+          <strong>${name}</strong>: ${hrs.toFixed(1)}h
+        </span>
+      `).join('');
+    } else {
+      totalsEl.innerHTML = '';
+    }
+
+    if (!data.shifts?.length) {
+      listEl.innerHTML = '<p style="color:var(--gu-dust);font-size:13px;text-align:center;padding:16px;">No shifts logged in this period.</p>';
+      return;
+    }
+
+    listEl.innerHTML = data.shifts.map(s => {
+      const inTime = new Date(s.clock_in).toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+      const outTime = s.clock_out ? new Date(s.clock_out).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }) : null;
+      return `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--gu-bg);border-radius:8px;margin-bottom:6px;border:1px solid var(--gu-border);">
+          <div style="flex:1;min-width:0;">
+            <span style="font-size:13px;font-weight:700;">${s.staffName}</span>
+            <span style="font-size:11px;color:var(--gu-dust);"> · ${s.role}</span>
+            <div style="font-size:11px;color:var(--gu-dust);margin-top:2px;">
+              ${inTime} ${outTime ? `→ ${outTime}` : '<span style="color:#F9A825;font-weight:600;">● still clocked in</span>'}
+            </div>
+          </div>
+          ${s.hoursWorked != null ? `<div style="font-size:15px;font-weight:800;color:var(--gu-primary);white-space:nowrap;">${s.hoursWorked}h</div>` : ''}
+        </div>`;
+    }).join('');
+  } catch(e) {
+    listEl.innerHTML = '<p style="color:var(--gu-dust);font-size:13px;">Could not load timesheet.</p>';
+  }
+}
+
+function downloadTimesheetCSV() {
+  const from = document.getElementById('timesheet-from')?.value;
+  const to = document.getElementById('timesheet-to')?.value;
+  let url = `${API_URL}/api/staff/timesheet/export.csv?studioId=${studioId}`;
+  if (from) url += `&from=${from}T00:00:00`;
+  if (to) url += `&to=${to}T23:59:59`;
+  window.open(url, '_blank');
+}
+
+// ═══════════════════════════════════════════
+// HOLIDAY REQUESTS (Team & Duties — manager view)
+// ═══════════════════════════════════════════
+
+async function loadHolidayRequestsView() {
+  await loadHolidayPendingList();
+  await loadHolidayAllowanceList();
+}
+
+async function loadHolidayPendingList() {
+  const el = document.getElementById('holiday-pending-list');
+  if (!el) return;
+  try {
+    const res = await fetch(`${API_URL}/api/staff/holiday-requests?studioId=${studioId}&status=pending`);
+    const data = await res.json();
+    if (!data.requests?.length) {
+      el.innerHTML = '<p style="color:var(--gu-dust);font-size:12px;padding:8px 0;">No pending holiday requests.</p>';
+      return;
+    }
+    el.innerHTML = data.requests.map(r => `
+      <div style="border:1px solid var(--gu-border);border-radius:12px;padding:14px;margin-bottom:8px;background:#fff9f0;">
+        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px;">
+          <div>
+            <div style="font-size:13px;font-weight:700;">${r.staffName}</div>
+            <div style="font-size:12px;color:var(--gu-dust);">${r.start_date} → ${r.end_date} (${r.days_requested} day${r.days_requested>1?'s':''})</div>
+          </div>
+        </div>
+        ${r.notes ? `<div style="font-size:12px;color:var(--gu-text);background:white;border-radius:6px;padding:8px;margin-bottom:8px;">"${r.notes}"</div>` : ''}
+        <div style="display:flex;gap:8px;">
+          <button onclick="decideHolidayRequest('${r.id}','approved')" style="flex:1;background:#2e7d32;color:white;border:none;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;">✓ Approve</button>
+          <button onclick="decideHolidayRequest('${r.id}','rejected')" style="flex:1;background:#e53935;color:white;border:none;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;">✕ Reject</button>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) {
+    el.innerHTML = '<p style="color:var(--gu-dust);font-size:12px;">Could not load holiday requests.</p>';
+  }
+}
+
+async function decideHolidayRequest(id, status) {
+  await fetch(`${API_URL}/api/staff/holiday-requests/${id}`, {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ status })
+  });
+  loadHolidayPendingList();
+  loadHolidayAllowanceList();
+}
+
+async function loadHolidayAllowanceList() {
+  const el = document.getElementById('holiday-allowance-list');
+  if (!el) return;
+  try {
+    const res = await fetch(`${API_URL}/api/staff/holiday-allowance?studioId=${studioId}`);
+    const data = await res.json();
+    if (!data.allowances?.length) {
+      el.innerHTML = '<p style="color:var(--gu-dust);font-size:12px;">No team members yet.</p>';
+      return;
+    }
+    el.innerHTML = data.allowances.map(a => `
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--gu-bg);border-radius:8px;margin-bottom:6px;border:1px solid var(--gu-border);">
+        <span style="font-size:13px;font-weight:600;flex:1;">${a.name}</span>
+        <span style="font-size:12px;color:var(--gu-dust);">${a.usedDays}/${a.totalDays} days used</span>
+        <input type="number" value="${a.totalDays}" min="0" max="60" style="width:50px;padding:5px;border:1px solid var(--gu-border);border-radius:6px;font-size:12px;text-align:center;"
+          onchange="updateHolidayAllowance('${a.staffMemberId}', this.value)">
+      </div>
+    `).join('');
+  } catch(e) {
+    el.innerHTML = '<p style="color:var(--gu-dust);font-size:12px;">Could not load allowances.</p>';
+  }
+}
+
+async function updateHolidayAllowance(staffMemberId, totalDays) {
+  await fetch(`${API_URL}/api/staff/holiday-allowance`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ studioId, staffMemberId, totalDays: parseInt(totalDays) })
+  });
+  loadHolidayAllowanceList();
+}
+
+// ── Staff-side: request holiday ──
+async function openHolidayRequestForm() {
+  document.getElementById('holiday-request-modal').style.display = 'flex';
+  document.getElementById('holiday-start-date').value = '';
+  document.getElementById('holiday-end-date').value = '';
+  document.getElementById('holiday-notes').value = '';
+
+  if (currentShiftStaff && currentShiftStaff.id !== 'testing') {
+    try {
+      const res = await fetch(`${API_URL}/api/staff/holiday-allowance?studioId=${studioId}`);
+      const data = await res.json();
+      const mine = data.allowances?.find(a => a.staffMemberId === currentShiftStaff.id);
+      const el = document.getElementById('holiday-my-allowance');
+      if (mine) {
+        el.textContent = `You've used ${mine.usedDays} of ${mine.totalDays} days this year — ${mine.remainingDays} remaining.`;
+      } else {
+        el.textContent = '';
+      }
+    } catch(e) {}
+  }
+}
+
+function closeHolidayRequestForm() {
+  document.getElementById('holiday-request-modal').style.display = 'none';
+}
+
+async function submitHolidayRequest() {
+  const startDate = document.getElementById('holiday-start-date').value;
+  const endDate = document.getElementById('holiday-end-date').value;
+  const notes = document.getElementById('holiday-notes').value.trim();
+
+  if (!startDate || !endDate) { alert('Please choose start and end dates.'); return; }
+  if (!currentShiftStaff || currentShiftStaff.id === 'testing') { alert('Please log in with your PIN to request holiday.'); return; }
+
+  try {
+    await fetch(`${API_URL}/api/staff/holiday-requests`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ studioId, staffMemberId: currentShiftStaff.id, startDate, endDate, notes })
+    });
+    alert('✓ Holiday request sent to your manager.');
+    closeHolidayRequestForm();
+  } catch(e) {
+    alert('Could not send request: ' + e.message);
+  }
+}
+
 // ── Manager Task Overview (incomplete tasks by role) ──
 const ROLE_COLORS_MGR = { 'Studio Manager':'#5E35B1', 'Studio Executive':'#1E88E5', 'Ceramic Technician':'#8D6E63', 'Studio Assistant':'#00897B', 'Barista':'#F4511E' };
 
@@ -5340,6 +5610,8 @@ async function loadTeamAndDuties() {
   await loadDutyConfig();
   await loadProcessConfig();
   await loadAlertSettingsUI();
+  await loadTimesheetView();
+  await loadHolidayRequestsView();
 }
 
 async function loadTeamMembers() {

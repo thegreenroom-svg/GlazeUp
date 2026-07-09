@@ -3434,7 +3434,216 @@ app.post('/api/staff/shift-login', async (req, res) => {
 
   if (!member || !member.active) return res.status(404).json({ error: 'Staff member not found or inactive' });
 
-  res.json({ member });
+  // Automatic clock-in: close any stray open shift for this person first
+  // (in case they logged out without clocking out properly), then open a new one.
+  await supabase.from('staff_timesheet')
+    .update({ clock_out: new Date().toISOString(), auto_closed: true })
+    .eq('studio_id', studioId).eq('staff_member_id', member.id).is('clock_out', null);
+
+  const { data: shift } = await supabase.from('staff_timesheet').insert({
+    studio_id: studioId, staff_member_id: member.id, clock_in: new Date().toISOString(),
+  }).select().single();
+
+  res.json({ member, shiftId: shift?.id || null });
+});
+
+// POST /api/staff/clock-out — automatic clock-out on shift logout
+app.post('/api/staff/clock-out', async (req, res) => {
+  const { studioId, staffMemberId, shiftId } = req.body;
+  if (!studioId || !staffMemberId) return res.status(400).json({ error: 'studioId and staffMemberId required' });
+
+  let query = supabase.from('staff_timesheet')
+    .update({ clock_out: new Date().toISOString() })
+    .eq('studio_id', studioId).eq('staff_member_id', staffMemberId).is('clock_out', null);
+
+  if (shiftId) query = query.eq('id', shiftId);
+
+  const { data, error } = await query.select();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ closed: data?.length || 0 });
+});
+
+// ═══════════════════════════════════════════
+// TIMEKEEPING — timesheet + CSV export
+// (Hours worked only. No pay/tax calculation —
+// export this to your actual payroll provider.)
+// ═══════════════════════════════════════════
+
+// GET /api/staff/timesheet — hours for a date range, optionally filtered to one person
+app.get('/api/staff/timesheet', async (req, res) => {
+  const { studioId, staffMemberId, from, to } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  const fromDate = from || new Date(Date.now() - 7*24*60*60*1000).toISOString();
+  const toDate = to || new Date().toISOString();
+
+  let query = supabase.from('staff_timesheet')
+    .select('*').eq('studio_id', studioId)
+    .gte('clock_in', fromDate).lte('clock_in', toDate)
+    .order('clock_in', { ascending: false });
+  if (staffMemberId) query = query.eq('staff_member_id', staffMemberId);
+
+  const { data: shifts } = await query;
+  const { data: team } = await supabase.from('staff_team').select('id, name, role').eq('studio_id', studioId);
+  const nameMap = {};
+  (team || []).forEach(m => { nameMap[m.id] = m; });
+
+  const enriched = (shifts || []).map(s => {
+    const clockIn = new Date(s.clock_in);
+    const clockOut = s.clock_out ? new Date(s.clock_out) : null;
+    const hours = clockOut ? Math.round(((clockOut - clockIn) / 3600000) * 100) / 100 : null;
+    return {
+      ...s,
+      staffName: nameMap[s.staff_member_id]?.name || 'Unknown',
+      role: nameMap[s.staff_member_id]?.role || '',
+      hoursWorked: hours,
+      stillClockedIn: !s.clock_out,
+    };
+  });
+
+  // Totals per person
+  const totals = {};
+  enriched.forEach(s => {
+    if (!totals[s.staffName]) totals[s.staffName] = 0;
+    if (s.hoursWorked) totals[s.staffName] += s.hoursWorked;
+  });
+
+  res.json({ shifts: enriched, totalsByPerson: totals });
+});
+
+// GET /api/staff/timesheet/export.csv — CSV download for payroll processing elsewhere
+app.get('/api/staff/timesheet/export.csv', async (req, res) => {
+  const { studioId, from, to } = req.query;
+  if (!studioId) return res.status(400).send('studioId required');
+
+  const fromDate = from || new Date(Date.now() - 30*24*60*60*1000).toISOString();
+  const toDate = to || new Date().toISOString();
+
+  const { data: shifts } = await supabase.from('staff_timesheet')
+    .select('*').eq('studio_id', studioId)
+    .gte('clock_in', fromDate).lte('clock_in', toDate)
+    .order('clock_in', { ascending: true });
+
+  const { data: team } = await supabase.from('staff_team').select('id, name, role').eq('studio_id', studioId);
+  const nameMap = {};
+  (team || []).forEach(m => { nameMap[m.id] = m; });
+
+  const rows = [['Name', 'Role', 'Clock In', 'Clock Out', 'Hours Worked', 'Date']];
+  (shifts || []).forEach(s => {
+    const clockIn = new Date(s.clock_in);
+    const clockOut = s.clock_out ? new Date(s.clock_out) : null;
+    const hours = clockOut ? Math.round(((clockOut - clockIn) / 3600000) * 100) / 100 : '';
+    rows.push([
+      nameMap[s.staff_member_id]?.name || 'Unknown',
+      nameMap[s.staff_member_id]?.role || '',
+      clockIn.toISOString(),
+      clockOut ? clockOut.toISOString() : 'Still clocked in',
+      hours,
+      clockIn.toISOString().split('T')[0],
+    ]);
+  });
+
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename="timesheet-${studioId}-${new Date().toISOString().split('T')[0]}.csv"`);
+  res.send(csv);
+});
+
+// ═══════════════════════════════════════════
+// HOLIDAY REQUESTS
+// Staff request time off, manager approves/
+// rejects. No pay calculation — this just
+// tracks the request and a running allowance
+// count the studio sets manually.
+// ═══════════════════════════════════════════
+
+// GET /api/staff/holiday-requests — all requests for a studio (or one person)
+app.get('/api/staff/holiday-requests', async (req, res) => {
+  const { studioId, staffMemberId, status } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  let query = supabase.from('holiday_requests').select('*').eq('studio_id', studioId).order('created_at', { ascending: false });
+  if (staffMemberId) query = query.eq('staff_member_id', staffMemberId);
+  if (status) query = query.eq('status', status);
+  const { data } = await query;
+
+  const { data: team } = await supabase.from('staff_team').select('id, name, role').eq('studio_id', studioId);
+  const nameMap = {};
+  (team || []).forEach(m => { nameMap[m.id] = m; });
+
+  res.json({ requests: (data || []).map(r => ({ ...r, staffName: nameMap[r.staff_member_id]?.name || 'Unknown' })) });
+});
+
+// POST /api/staff/holiday-requests — staff submit a request
+app.post('/api/staff/holiday-requests', async (req, res) => {
+  const { studioId, staffMemberId, startDate, endDate, notes } = req.body;
+  if (!studioId || !staffMemberId || !startDate || !endDate) {
+    return res.status(400).json({ error: 'studioId, staffMemberId, startDate, endDate required' });
+  }
+  const days = Math.round((new Date(endDate) - new Date(startDate)) / 86400000) + 1;
+
+  const { data, error } = await supabase.from('holiday_requests').insert({
+    studio_id: studioId, staff_member_id: staffMemberId,
+    start_date: startDate, end_date: endDate, days_requested: days,
+    notes: notes || null, status: 'pending',
+  }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+
+  // Notify the manager via the existing alert system
+  await supabase.from('staff_alerts').insert({
+    studio_id: studioId, trigger_type: 'holiday_request', booking_code: null,
+    next_role: 'Studio Manager', icon: '🏖️', label: 'Holiday request',
+    message: `New holiday request: ${days} day${days>1?'s':''}, ${startDate} to ${endDate}`,
+    context: { requestId: data.id }, acknowledged: false,
+  });
+
+  res.json({ request: data });
+});
+
+// PATCH /api/staff/holiday-requests/:id — manager approves/rejects
+app.patch('/api/staff/holiday-requests/:id', async (req, res) => {
+  const { status, managerNotes } = req.body;
+  if (!['approved', 'rejected'].includes(status)) return res.status(400).json({ error: 'status must be approved or rejected' });
+
+  const { data, error } = await supabase.from('holiday_requests')
+    .update({ status, manager_notes: managerNotes || null, decided_at: new Date().toISOString() })
+    .eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ request: data });
+});
+
+// GET /api/staff/holiday-allowance — running allowance per person (set manually by manager)
+app.get('/api/staff/holiday-allowance', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  const { data: allowances } = await supabase.from('holiday_allowance').select('*').eq('studio_id', studioId);
+  const { data: approved } = await supabase.from('holiday_requests')
+    .select('staff_member_id, days_requested').eq('studio_id', studioId).eq('status', 'approved');
+  const { data: team } = await supabase.from('staff_team').select('id, name, role').eq('studio_id', studioId);
+
+  const usedMap = {};
+  (approved || []).forEach(r => { usedMap[r.staff_member_id] = (usedMap[r.staff_member_id] || 0) + r.days_requested; });
+
+  const result = (team || []).map(m => {
+    const allowance = (allowances || []).find(a => a.staff_member_id === m.id);
+    const totalDays = allowance?.total_days ?? 28; // UK statutory default incl. bank holidays, adjust per studio
+    const used = usedMap[m.id] || 0;
+    return { staffMemberId: m.id, name: m.name, role: m.role, totalDays, usedDays: used, remainingDays: totalDays - used };
+  });
+
+  res.json({ allowances: result });
+});
+
+// POST /api/staff/holiday-allowance — manager sets someone's total allowance for the year
+app.post('/api/staff/holiday-allowance', async (req, res) => {
+  const { studioId, staffMemberId, totalDays } = req.body;
+  if (!studioId || !staffMemberId || totalDays == null) return res.status(400).json({ error: 'studioId, staffMemberId, totalDays required' });
+
+  const { data, error } = await supabase.from('holiday_allowance').upsert({
+    studio_id: studioId, staff_member_id: staffMemberId, total_days: totalDays,
+  }, { onConflict: 'studio_id,staff_member_id' }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ allowance: data });
 });
 
 // ═══════════════════════════════════════════
