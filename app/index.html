@@ -194,30 +194,54 @@
     .a2hs-banner {
       position: fixed;
       left: 14px; right: 14px; bottom: 14px;
-      background: linear-gradient(180deg, #ffffff 0%, #fdf9f6 100%);
-      border: 1px solid var(--gu-border);
-      border-radius: 16px;
-      padding: 14px 16px;
-      box-shadow: 0 10px 28px -8px rgba(61,28,18,0.35);
+      background: linear-gradient(135deg, var(--link-charcoal) 0%, #3d2e28 100%);
+      border: 1px solid rgba(184,121,70,0.35);
+      border-radius: 20px;
+      padding: 16px 18px;
+      box-shadow: 0 12px 32px -6px rgba(43,39,36,0.55), 0 0 0 1px rgba(184,121,70,0.15);
       z-index: 900;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
+      animation: a2hsSlideUp 0.4s cubic-bezier(0.34,1.2,0.4,1) both;
     }
-    .a2hs-banner .a2hs-icon { font-size: 22px; flex-shrink: 0; }
-    .a2hs-banner .a2hs-text { flex: 1; font-size: 12.5px; line-height: 1.4; color: var(--gu-accent); }
-    .a2hs-banner .a2hs-text b { color: var(--gu-primary); }
-    .a2hs-banner button {
-      flex-shrink: 0;
-      border: none;
-      border-radius: 10px;
-      padding: 8px 12px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
+    @keyframes a2hsSlideUp {
+      from { transform: translateY(120%); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
     }
-    .a2hs-banner .a2hs-dismiss { background: none; color: var(--gu-dust); }
-    .a2hs-banner .a2hs-install { background: var(--glaze-oxblood-base); color: #fff; }
+    .a2hs-icon-wrap {
+      width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--link-clay) 0%, #8a5520 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; box-shadow: 0 3px 10px rgba(184,121,70,0.4);
+    }
+    .a2hs-banner .a2hs-text {
+      flex: 1; line-height: 1.4;
+    }
+    .a2hs-banner .a2hs-text b {
+      display: block; font-size: 13px; font-weight: 700; color: white; margin-bottom: 2px;
+    }
+    .a2hs-banner .a2hs-text span {
+      font-size: 11px; color: rgba(255,255,255,0.55);
+    }
+    .a2hs-banner .a2hs-buttons {
+      display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;
+    }
+    .a2hs-banner .a2hs-install {
+      background: var(--link-clay);
+      color: white;
+      border: none; border-radius: 10px;
+      padding: 9px 16px; font-size: 12px; font-weight: 700;
+      cursor: pointer; white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(184,121,70,0.4);
+      transition: background 0.2s, transform 0.15s;
+    }
+    .a2hs-banner .a2hs-install:active { transform: scale(0.96); }
+    .a2hs-banner .a2hs-dismiss {
+      background: none; border: none;
+      color: rgba(255,255,255,0.35); font-size: 11px;
+      cursor: pointer; text-align: center; padding: 2px;
+    }
 
     /* ── Design Preview tool ── */
     #design-preview-screen {
@@ -1876,29 +1900,43 @@
     }
 
     function showA2HSBanner() {
-      if (!bookingCodeForA2HS) return; // nothing to save without a booking
-      if (isStandalone()) return; // already installed
-      if (dismissKey && localStorage.getItem(dismissKey)) return; // already dismissed for this booking
+      if (!bookingCodeForA2HS) return;
+      if (isStandalone()) return;
+      if (dismissKey && localStorage.getItem(dismissKey)) return;
 
       const banner = document.getElementById('a2hs-banner');
 
       if (isIOS()) {
         banner.innerHTML = `
-          <span class="a2hs-icon">📲</span>
-          <span class="a2hs-text">Save this page so you can check back anytime: tap <b>Share</b> then <b>"Add to Home Screen."</b></span>
-          <button class="a2hs-dismiss" onclick="dismissA2HS()">Got it</button>`;
+          <div class="a2hs-icon-wrap">📲</div>
+          <div class="a2hs-text">
+            <b>Save to your home screen</b>
+            <span>Tap Share → <strong style="color:rgba(255,255,255,0.8)">Add to Home Screen</strong> to get back to your session anytime.</span>
+          </div>
+          <div class="a2hs-buttons">
+            <button class="a2hs-dismiss" onclick="dismissA2HS()">✕ Dismiss</button>
+          </div>`;
       } else if (deferredInstallPrompt) {
         banner.innerHTML = `
-          <span class="a2hs-icon">📲</span>
-          <span class="a2hs-text">Save this page to your home screen so you can check back anytime.</span>
-          <button class="a2hs-install" onclick="triggerInstall()">Add</button>
-          <button class="a2hs-dismiss" onclick="dismissA2HS()">✕</button>`;
+          <div class="a2hs-icon-wrap">🏺</div>
+          <div class="a2hs-text">
+            <b>Save kilnLINK to your home screen</b>
+            <span>One tap to get back to your session anytime.</span>
+          </div>
+          <div class="a2hs-buttons">
+            <button class="a2hs-install" onclick="triggerInstall()">📲 Add to home screen</button>
+            <button class="a2hs-dismiss" onclick="dismissA2HS()">Not now</button>
+          </div>`;
       } else {
-        // Android/other without a native prompt available yet — generic hint
         banner.innerHTML = `
-          <span class="a2hs-icon">📲</span>
-          <span class="a2hs-text">Bookmark this page or add it to your home screen so you can check back anytime.</span>
-          <button class="a2hs-dismiss" onclick="dismissA2HS()">Got it</button>`;
+          <div class="a2hs-icon-wrap">📲</div>
+          <div class="a2hs-text">
+            <b>Save kilnLINK to your home screen</b>
+            <span>Bookmark this page to check back on your session anytime.</span>
+          </div>
+          <div class="a2hs-buttons">
+            <button class="a2hs-dismiss" onclick="dismissA2HS()">✕ Dismiss</button>
+          </div>`;
       }
 
       banner.style.display = 'flex';
