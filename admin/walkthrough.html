@@ -68,7 +68,7 @@
 </div>
 <div class="wt-progress-bar" role="progressbar" aria-valuemin="1" aria-valuemax="100" aria-valuenow="11" aria-label="Tour progress" id="progress-bar"><div class="wt-progress-fill" id="progress"></div></div>
 <div class="wt-info" id="wt-main-content">
-  <div class="wt-step-label" id="step-label" aria-live="polite" aria-atomic="true">Step 1 of 15</div>
+  <div class="wt-step-label" id="step-label" aria-live="polite" aria-atomic="true">Step 1 of 23</div>
   <h1 class="wt-title" id="step-title" aria-live="assertive" aria-atomic="true"></h1>
   <p class="wt-body" id="step-body" aria-live="polite" aria-atomic="true"></p>
   <p class="wt-narration" id="step-narration" aria-live="polite" aria-label="Narration text"></p>
@@ -341,6 +341,27 @@ function communityScreen() {
 const STEPS = [
   {
     screen: dashboardScreen, nav: 'dashboard',
+    title: "Start your shift — enter your PIN",
+    body: "Every tablet asks who's using it. Enter your personal PIN to start your shift — your name and role are now linked to this device.",
+    arrows: [],
+    voice: "Before anything else, each tablet will ask who's using it. Enter your personal PIN to start your shift. Your studio manager sets this up for you in Team and Duties. Once you're logged in, your name and role appear at the top of the screen, and your personal task list is ready."
+  },
+  {
+    screen: dashboardScreen, nav: 'dashboard',
+    title: "Your shift badge and task queue",
+    body: "Your name badge sits at the top of every screen. Tap it any time to see your personal task queue — only tasks for your role, nothing else cluttering your view.",
+    arrows: [],
+    voice: "Once logged in, you'll see your name badge at the top of the screen with a red count showing how many tasks are waiting for you. Tap it any time to open your personal task queue — this only shows tasks for your role, so you're never wading through things that aren't yours."
+  },
+  {
+    screen: dashboardScreen, nav: 'dashboard',
+    title: "🎧 Pair your headset",
+    body: "Tap the headset icon next to your badge for a quick guide to pairing Bluetooth earbuds. Once paired, all voice alerts and task reminders play through them automatically.",
+    arrows: [],
+    voice: "Next to your shift badge is a headset icon. Tap it for a quick guide to pairing Bluetooth earbuds to this tablet. Once paired at the device level, every voice alert and task reminder plays through your earbuds automatically — no extra setup needed after that."
+  },
+  {
+    screen: dashboardScreen, nav: 'dashboard',
     title: "Morning opening checklist",
     body: "Each morning the studio opening checklist appears automatically. Work through all 14 items across Studio, Tables, Stock, and Café. Once all done the button goes green.",
     arrows: [],
@@ -390,6 +411,13 @@ const STEPS = [
   },
   {
     screen: bookingsStep1Screen, nav: 'staff',
+    title: "Assign duties to your team",
+    body: "Pick a staff member and their role's duties are added to this session automatically. Everyone can see who's doing what, and mark each duty Done or N/A.",
+    arrows: [{vx:171,vy:150,label:"Assign duties for this table",dir:"down"}],
+    voice: "Also on Step 1 is duty assignment. Pick a staff member from the list and their role's duties — clearing tables, filling paint, checking pieces, whatever their role covers — get added to this session automatically. Mark each one Done or Not Applicable as it's completed."
+  },
+  {
+    screen: bookingsStep1Screen, nav: 'staff',
     title: "Table setup checklist — Done or N/A",
     body: "Work through every item before opening the session. Tap ✓ Done or N/A for each one. The Open Session button only activates when all 12 items are complete.",
     arrows: [{vx:171,vy:170,label:"All done → button goes green",dir:"up"}],
@@ -408,6 +436,20 @@ const STEPS = [
     body: "When a customer finishes, tap Take Photo & Submit Pieces. Photo is stamped with name and date. Tick any outstanding charges before submitting.",
     arrows: [{vx:171,vy:76,label:"Tap to photograph & complete",dir:"down"}],
     voice: "Step 3 is completion. When a customer has finished painting, tap Take Photo and Submit Pieces. The photo is automatically stamped with their name and today's date and saved to their gallery. Before submitting, tick any outstanding charges — tablet hire or home access."
+  },
+  {
+    screen: dashboardScreen, nav: 'dashboard',
+    title: "🚨 Flashing alerts — handoffs between roles",
+    body: "When something finishes and affects the next person's job, a big flashing alert appears on their tablet — with sound, voice, and vibration. It keeps repeating every few minutes until someone taps Complete.",
+    arrows: [],
+    voice: "As the day runs, kilnLINK automatically hands tasks between roles. When a piece is finished, the kiln technician gets alerted. When the kiln fires, the studio assistant gets alerted for pickup. These alerts flash red across the screen with sound, voice narration, and vibration on Android devices. If you dismiss one without completing it, it will flash and sound again — by default every five minutes — until someone actually taps Complete. This means nothing gets forgotten."
+  },
+  {
+    screen: dashboardScreen, nav: 'dashboard',
+    title: "Completing a task",
+    body: "Tap any task in your queue to see the full details. Tap Complete when it's done — the next step in the chain is created automatically for whoever's next.",
+    arrows: [],
+    voice: "Tap any task in your queue to open the full task card — a clear description of exactly what's needed. When you're done, tap Complete This Task. If there's a next step in the process, it's created automatically for the next person straight away. If you genuinely can't do it right now, tap Can't Do This Now to release it back to your team, or Later to deal with it shortly — though remember, it will keep reminding you until it's actually completed."
   },
   {
     screen: printQueueScreen, nav: 'printqueue',
@@ -442,10 +484,24 @@ const STEPS = [
   },
   {
     screen: dashboardScreen, nav: 'dashboard',
+    title: "For managers: Team & Duties",
+    body: "Add team members, set their PINs, edit duty lists per role, and build your own handoff process in the Process Builder — define exactly what alerts whom and when.",
+    arrows: [],
+    voice: "If you're a studio manager, the Team and Duties tab is where you run everything. Add team members and set their PIN, edit the default duty list for each role, and use the Process Builder to define your own handoff chain — exactly what happens when something finishes, who gets alerted, and what happens next. You can also set how often unactioned alerts repeat, and whether they escalate to a more senior role if nobody deals with them."
+  },
+  {
+    screen: dashboardScreen, nav: 'dashboard',
+    title: "For managers: Daily Progress",
+    body: "See every incomplete task across the whole team, grouped by role. Send one-off requests straight to a role or a specific person — appears as a flashing alert on their tablet.",
+    arrows: [],
+    voice: "The Daily Progress tab is your live running log. See every booking today and its status, every incomplete task across the whole team grouped by role, and today's takings. You can also send a one-off request straight to any role or a specific person — it appears on their tablet exactly like an automatic alert, flashing until they action it. Perfect for anything ad hoc that doesn't fit the normal process."
+  },
+  {
+    screen: dashboardScreen, nav: 'dashboard',
     title: "Daily flow — that's it!",
-    body: "Morning checklist → open booking → table picker → setup checklist → Step 2 → Step 3 → kiln → pickup. Tap 🎯 Staff Tour any time to replay.",
+    body: "PIN login → morning checklist → open booking → table & duties → setup checklist → Step 2 → Step 3 → handoff alerts → kiln → pickup. Tap 🎯 Staff Tour any time to replay.",
     arrows: [{vx:29,vy:165,label:"🎯 Staff Tour — always here",dir:"up"}],
-    voice: "That's the complete staff tour. The daily flow is: morning opening checklist, look up the customer, assign a table, work through the setup checklist, log everything in Step 2, photograph and complete in Step 3, then manage firing and pickup through the kiln section. The Staff Tour button is always in the sidebar for any new team member. Good luck!"
+    voice: "That's the complete staff tour. The daily flow is: log in with your PIN, work through the morning opening checklist, look up the customer, assign a table and duties, complete the setup checklist, log everything in Step 2, photograph and complete in Step 3, then let the handoff alerts guide pieces through the kiln to pickup. The Staff Tour button is always in the sidebar for any new team member. Good luck!"
   }
 ];
 
