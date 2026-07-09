@@ -1544,7 +1544,7 @@
             <div id="s1-checklist" style="margin-bottom:14px;border:1px solid var(--gu-border);border-radius:14px;overflow:hidden;">
               <div style="background:var(--gu-primary);color:white;padding:10px 14px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:space-between;">
                 <span>✅ Table Setup Checklist</span>
-                <span id="s1-checklist-count" style="font-size:11px;font-weight:500;opacity:.8;">0 of 12 done</span>
+                <span id="s1-checklist-count" style="font-size:11px;font-weight:500;opacity:.8;">0 of 12 complete</span>
               </div>
               <div id="s1-checklist-items" style="padding:8px 0;"></div>
               <div style="padding:10px 14px;border-top:1px solid var(--gu-border);">
@@ -3466,20 +3466,21 @@ function skipOpeningChecklist() {
 
 // ── Table Setup Checklist ──
 const SETUP_CHECKLIST = [
-  { id:'table_set',      icon:'🪑', text:'Table set up correctly for the number of guests',         category:'Table' },
-  { id:'name_card',      icon:'📛', text:'Customer name card handwritten and placed on table',       category:'Table' },
-  { id:'water',          icon:'💧', text:'Water jug and glasses on the table',                       category:'Table' },
-  { id:'placement',      icon:'🗺️', text:'Studio placement mat / instruction sheet on the table',    category:'Table' },
-  { id:'brushes',        icon:'🖌️', text:'Full set of brushes in good condition',                   category:'Tools' },
-  { id:'sponges',        icon:'🧽', text:'Sponges and water pot available',                         category:'Tools' },
-  { id:'palette',        icon:'🎨', text:'Colour palette / glaze card accessible',                  category:'Tools' },
-  { id:'piece_ready',    icon:'🏺', text:'Bisque piece(s) ready and placed on the table',           category:'Piece' },
-  { id:'piece_checked',  icon:'🔍', text:'Piece(s) checked — no cracks, clean, ready to paint',    category:'Piece' },
-  { id:'drink_offered',  icon:'☕', text:'Drinks offered and order taken if required',               category:'Service' },
-  { id:'tour_offered',   icon:'🎯', text:'App tour / QR code offered to customers',                category:'Service' },
-  { id:'happy_to_start', icon:'😊', text:'Customers happy, questions answered, ready to begin',     category:'Service' },
+  { id:'table_set',      icon:'🪑', text:'Table set for the correct number of guests',                          category:'Table' },
+  { id:'name_card',      icon:'🖊️', text:'Name written on chalkboard card and placed in holder on table',      category:'Table' },
+  { id:'water',          icon:'💧', text:'Water jug and glasses on the table',                                  category:'Table' },
+  { id:'placement',      icon:'🗺️', text:'Instruction sheet / placement mat on the table',                     category:'Table' },
+  { id:'brushes',        icon:'🖌️', text:'Full set of brushes in good condition',                              category:'Tools' },
+  { id:'sponges',        icon:'🧽', text:'Sponges and water pot available',                                     category:'Tools' },
+  { id:'palette',        icon:'🎨', text:'Colour palette / glaze card accessible',                             category:'Tools' },
+  { id:'piece_ready',    icon:'🏺', text:'Bisque piece(s) placed on the table',                                category:'Piece' },
+  { id:'piece_checked',  icon:'🔍', text:'Piece(s) checked — no cracks, clean, ready to paint',               category:'Piece' },
+  { id:'drink_offered',  icon:'☕', text:'Drinks offered and order taken',                                      category:'Service' },
+  { id:'tour_offered',   icon:'🎯', text:'App QR code shown and tour offered',                                 category:'Service' },
+  { id:'happy_to_start', icon:'😊', text:'Customers happy and ready to begin',                                 category:'Service' },
 ];
 
+// State: false = untouched, 'done' = ticked, 'na' = not applicable
 let checklistState = {};
 
 function initChecklist() {
@@ -3492,24 +3493,52 @@ function renderChecklist() {
   const container = document.getElementById('s1-checklist-items');
   if (!container) return;
 
-  // Group by category
+  // Check table is selected — name card item should remind staff
+  const tableSelected = document.getElementById('s1-table-number')?.value?.trim();
+
   const categories = [...new Set(SETUP_CHECKLIST.map(i => i.category))];
+  const catIcons = { Table:'🪑', Tools:'🖌️', Piece:'🏺', Service:'😊' };
+
   container.innerHTML = categories.map(cat => {
     const items = SETUP_CHECKLIST.filter(i => i.category === cat);
-    const catIcons = { Table:'🪑', Tools:'🖌️', Piece:'🏺', Service:'😊' };
     return `
       <div style="padding:6px 14px 2px;">
         <div style="font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gu-dust);margin-bottom:4px;">${catIcons[cat]||''} ${cat}</div>
         ${items.map(item => {
-          const done = checklistState[item.id];
+          const state = checklistState[item.id]; // false | 'done' | 'na'
+          const isDone = state === 'done';
+          const isNA   = state === 'na';
+          const isComplete = isDone || isNA;
+
+          // Extra hint for name card once table is selected
+          const hint = (item.id === 'name_card' && tableSelected && !isComplete)
+            ? `<div style="font-size:10px;color:var(--link-clay);margin-top:2px;">Table: <strong>${tableSelected}</strong> — write this name</div>`
+            : '';
+
           return `
-            <label style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;margin-bottom:3px;background:${done?'#e8f5e9':'transparent'};transition:background .2s;">
-              <input type="checkbox" ${done?'checked':''} onchange="toggleChecklistItem('${item.id}',this.checked)"
-                style="width:18px;height:18px;flex-shrink:0;accent-color:#2e7d32;cursor:pointer;">
+            <div style="display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:8px;margin-bottom:3px;
+              background:${isDone?'#e8f5e9':isNA?'#f5f5f5':'transparent'};transition:background .2s;">
               <span style="font-size:15px;flex-shrink:0;">${item.icon}</span>
-              <span style="font-size:13px;color:${done?'#2e7d32':'var(--gu-text)'};text-decoration:${done?'line-through':''};line-height:1.35;">${item.text}</span>
-              ${done?'<span style="margin-left:auto;color:#2e7d32;font-size:14px;flex-shrink:0;">✓</span>':''}
-            </label>`;
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;color:${isDone?'#2e7d32':isNA?'#9e9e9e':'var(--gu-text)'};
+                  text-decoration:${isComplete?'line-through':''};line-height:1.35;">${item.text}</div>
+                ${hint}
+              </div>
+              <div style="display:flex;gap:5px;flex-shrink:0;">
+                <button onclick="setChecklistItem('${item.id}','done')"
+                  style="padding:5px 10px;border-radius:6px;border:1.5px solid ${isDone?'#2e7d32':'#ccc'};
+                    background:${isDone?'#2e7d32':'white'};color:${isDone?'white':'#666'};
+                    font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;">
+                  ✓ Done
+                </button>
+                <button onclick="setChecklistItem('${item.id}','na')"
+                  style="padding:5px 10px;border-radius:6px;border:1.5px solid ${isNA?'#9e9e9e':'#ccc'};
+                    background:${isNA?'#9e9e9e':'white'};color:${isNA?'white':'#999'};
+                    font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;">
+                  N/A
+                </button>
+              </div>
+            </div>`;
         }).join('')}
       </div>`;
   }).join('');
@@ -3517,28 +3546,38 @@ function renderChecklist() {
   updateChecklistProgress();
 }
 
-function toggleChecklistItem(id, checked) {
-  checklistState[id] = checked;
+function setChecklistItem(id, state) {
+  // Toggle off if already in that state
+  checklistState[id] = checklistState[id] === state ? false : state;
   renderChecklist();
 }
 
 function updateChecklistProgress() {
   const total = SETUP_CHECKLIST.length;
-  const done = Object.values(checklistState).filter(Boolean).length;
+  const done = Object.values(checklistState).filter(v => v === 'done' || v === 'na').length;
+  const tableSelected = document.getElementById('s1-table-number')?.value?.trim();
   const countEl = document.getElementById('s1-checklist-count');
   const btn = document.getElementById('s1-checklist-ready-btn');
   const header = document.querySelector('#s1-checklist > div:first-child');
 
-  if (countEl) countEl.textContent = `${done} of ${total} done`;
+  if (countEl) countEl.textContent = `${done} of ${total} complete`;
 
-  const allDone = done === total;
+  const allDone = done === total && !!tableSelected;
+  const allChecked = done === total;
+
   if (btn) {
     btn.disabled = !allDone;
     btn.style.background = allDone ? '#2e7d32' : '#e0e0e0';
     btn.style.color = allDone ? 'white' : '#aaa';
     btn.style.cursor = allDone ? 'pointer' : 'not-allowed';
-    btn.textContent = allDone ? '✅ Table Ready — Open Session!' : `✓ Table Ready — Open Session (${total - done} items left)`;
-    if (allDone) btn.style.animation = 'pulse 1s ease-in-out 2';
+    if (!tableSelected) {
+      btn.textContent = '← Select a table above first';
+    } else if (!allChecked) {
+      btn.textContent = `✓ Table Ready — ${total - done} item${total-done>1?'s':''} left`;
+    } else {
+      btn.textContent = '✅ Table Ready — Open Session!';
+      btn.style.animation = 'pulse 1s ease-in-out 2';
+    }
   }
   if (header) {
     header.style.background = allDone ? '#2e7d32' : 'var(--gu-primary)';
@@ -3546,7 +3585,16 @@ function updateChecklistProgress() {
 }
 
 function markTableReady() {
-  // All checks done — trigger the normal open table flow
+  const tableSelected = document.getElementById('s1-table-number')?.value?.trim();
+  if (!tableSelected) {
+    alert('Please select a table first.');
+    return;
+  }
+  const allDone = Object.values(checklistState).filter(v => v === 'done' || v === 'na').length === SETUP_CHECKLIST.length;
+  if (!allDone) {
+    alert('Please complete or mark all checklist items before opening the table.');
+    return;
+  }
   document.getElementById('s1-checklist-ready-btn').textContent = '🎉 Opening table…';
   setTimeout(() => openTableSession(), 500);
 }
