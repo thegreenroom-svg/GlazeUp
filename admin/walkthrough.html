@@ -89,6 +89,9 @@
     <button class="wt-btn" id="btn-voice" onclick="toggleVoice()" style="background:#B87946;color:white;border-color:#B87946">🔇 Mute</button>
   </div>
   <div class="wt-dots" id="dots" role="tablist" aria-label="Jump to step"></div>
+  <div id="ios-voice-tip" style="display:none;font-size:11px;color:#8a8175;text-align:center;padding:6px 16px 0;line-height:1.4;">
+    On iPhone/iPad this sounds better with an Enhanced voice: Settings → Accessibility → Spoken Content → Voices → English (UK) → download <strong>Stephanie</strong> or <strong>Serena</strong>.
+  </div>
 </div>
 
 <script>
@@ -709,6 +712,18 @@ let screenCache = {}, voiceOn = true;
 // ── Voice narration ──
 function getBestVoice() {
   const voices = window.speechSynthesis.getVoices();
+
+  // iOS/Safari ships several UK English voices, but only the Enhanced/Premium
+  // ones sound natural — the default is the old robotic one. These aren't
+  // downloaded automatically; see the note below the mute button.
+  const iosPreferred = [
+    'Stephanie', 'Serena', 'Kate', 'Martha', // iOS Enhanced/Premium UK female voices
+  ];
+  for (const name of iosPreferred) {
+    const v = voices.find(v => v.name === name && v.lang.startsWith('en-GB'));
+    if (v) return v;
+  }
+
   const preferred = [
     'Google UK English Female',
     'Microsoft Sonia Online (Natural) - English (United Kingdom)',
@@ -728,7 +743,7 @@ function speak(text, onEnd) {
   if (!window.speechSynthesis || !text) { if (onEnd) onEnd(); return; }
   window.speechSynthesis.cancel();
   const utt = new SpeechSynthesisUtterance(text);
-  utt.rate = 0.88; utt.pitch = 1.1; utt.lang = 'en-GB';
+  utt.rate = 0.92; utt.pitch = 1.02; utt.lang = 'en-GB';
   const v = getBestVoice();
   if (v) utt.voice = v;
   utt.onstart = () => { const b = document.getElementById('btn-voice'); if(b) b.textContent='🔊 Speaking…'; };
@@ -773,6 +788,18 @@ function initVoice() {
       const btn = document.getElementById('btn-voice');
       if (btn) { btn.textContent = '🔇 Mute'; btn.style.background = '#B87946'; btn.style.color = 'white'; btn.style.borderColor = '#B87946'; }
       document.getElementById('step-narration').style.display = 'block';
+
+      // On iOS, if none of the Enhanced/Premium voices are installed yet,
+      // show a one-time tip — this is a device setting, nothing in the
+      // page itself can download the voice automatically.
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const hasEnhanced = ['Stephanie','Serena','Kate','Martha'].some(name =>
+        voices.some(v => v.name === name)
+      );
+      if (isIOS && !hasEnhanced) {
+        const tip = document.getElementById('ios-voice-tip');
+        if (tip) tip.style.display = 'block';
+      }
     }
   };
   window.speechSynthesis.onvoiceschanged = tryStart;
