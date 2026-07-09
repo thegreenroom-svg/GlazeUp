@@ -4517,9 +4517,28 @@ function startAlertPolling() {
 // SHIFT LOGIN (PIN)
 // ═══════════════════════════════════════════
 
+// ═══════════════════════════════════════════
+// FEATURE FLAG: shift PIN login
+// Set to true to require staff to log in with a
+// PIN before seeing the dashboard. Set to false
+// (current) to skip the gate entirely for testing —
+// all features (task queue, step counter, headset
+// help) remain visible using a placeholder identity.
+// ═══════════════════════════════════════════
+const SHIFT_PIN_LOGIN_ENABLED = false;
+
 let currentShiftStaff = null; // { id, name, role }
 
 function checkShiftLogin() {
+  if (!SHIFT_PIN_LOGIN_ENABLED) {
+    // PIN login disabled for now — auto-apply a placeholder "Testing" identity
+    // so every role-gated feature (task queue, step counter, headset help)
+    // is still visible without needing to log in. Switch SHIFT_PIN_LOGIN_ENABLED
+    // to true above when ready to go live with real shift PINs.
+    currentShiftStaff = currentShiftStaff || { id: 'testing', name: 'Testing Mode', role: 'Studio Manager' };
+    applyShiftUI();
+    return;
+  }
   const saved = localStorage.getItem('klnk_shift_staff');
   if (saved) {
     try {
@@ -4573,7 +4592,12 @@ function logOutOfShift() {
   document.getElementById('step-counter-btn').style.display = 'none';
   document.getElementById('headset-setup-btn').style.display = 'none';
   toggleTaskQueue();
-  setTimeout(() => document.getElementById('shift-login-modal').style.display = 'flex', 300);
+  if (SHIFT_PIN_LOGIN_ENABLED) {
+    setTimeout(() => document.getElementById('shift-login-modal').style.display = 'flex', 300);
+  } else {
+    // PIN login disabled — just re-apply the testing identity immediately
+    setTimeout(() => checkShiftLogin(), 300);
+  }
 }
 
 function applyShiftUI() {
