@@ -4034,6 +4034,87 @@ app.get('/api/ai-design/usage', async (req, res) => {
   res.json({ count, totalCents, monthLabel: startOfMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) });
 });
 
+// ═══════════════════════════════════════════
+// PLATFORM REVENUE (kilnLINK/Green Room owner view)
+// Not scoped to a single studio — this is revenue
+// coming IN to the platform from every studio's
+// subscription + wholesale AI usage. Separate from
+// any individual studio's own customer revenue.
+// ═══════════════════════════════════════════
+
+const PLAN_MONTHLY_PRICE_CENTS = { pilot: 0, solo: 2900, studio: 5900, multi: 9900 };
+
+// GET /api/platform/revenue — aggregate income across every studio on kilnLINK
+app.get('/api/platform/revenue', async (req, res) => {
+  try {
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1); startOfMonth.setHours(0, 0, 0, 0);
+
+    const [studiosRes, subsRes, aiUsageRes, aiUsageAllTimeRes] = await Promise.all([
+      supabase.from('studios').select('id, name, created_at'),
+      supabase.from('stripe_subscriptions').select('studio_id, plan_id, status'),
+      supabase.from('ai_generation_usage').select('studio_id, wholesale_cost_cents, created_at').gte('created_at', startOfMonth.toISOString()),
+      supabase.from('ai_generation_usage').select('studio_id, wholesale_cost_cents'),
+    ]);
+
+    const studios = studiosRes.data || [];
+    const subs = subsRes.data || [];
+    const aiUsageThisMonth = aiUsageRes.data || [];
+    const aiUsageAllTime = aiUsageAllTimeRes.data || [];
+
+    const subByStudio = {};
+    subs.forEach(s => { subByStudio[s.studio_id] = s; });
+
+    // Monthly recurring revenue from subscriptions
+    const activeSubs = subs.filter(s => s.status === 'active' || s.status === 'trialing');
+    const mrrCents = activeSubs.reduce((sum, s) => sum + (PLAN_MONTHLY_PRICE_CENTS[s.plan_id] || 0), 0);
+
+    // AI wholesale revenue this month and all-time
+    const aiRevenueThisMonthCents = aiUsageThisMonth.reduce((sum, r) => sum + (r.wholesale_cost_cents || 0), 0);
+    const aiRevenueAllTimeCents = aiUsageAllTime.reduce((sum, r) => sum + (r.wholesale_cost_cents || 0), 0);
+    const aiGenerationsThisMonth = aiUsageThisMonth.length;
+    const aiGenerationsAllTime = aiUsageAllTime.length;
+
+    // Per-studio breakdown
+    const aiByStudio = {};
+    aiUsageAllTime.forEach(r => {
+      if (!aiByStudio[r.studio_id]) aiByStudio[r.studio_id] = { count: 0, cents: 0 };
+      aiByStudio[r.studio_id].count++;
+      aiByStudio[r.studio_id].cents += (r.wholesale_cost_cents || 0);
+    });
+
+    const studioBreakdown = studios.map(st => {
+      const sub = subByStudio[st.id];
+      const ai = aiByStudio[st.id] || { count: 0, cents: 0 };
+      return {
+        studioId: st.id,
+        name: st.name || 'Unnamed studio',
+        plan: sub?.plan_id || 'none',
+        status: sub?.status || 'no subscription',
+        monthlySubCents: PLAN_MONTHLY_PRICE_CENTS[sub?.plan_id] || 0,
+        aiGenerationsAllTime: ai.count,
+        aiRevenueAllTimeCents: ai.cents,
+      };
+    }).sort((a, b) => (b.monthlySubCents + b.aiRevenueAllTimeCents) - (a.monthlySubCents + a.aiRevenueAllTimeCents));
+
+    res.json({
+      totalStudios: studios.length,
+      activeSubscriptions: activeSubs.length,
+      mrrCents,
+      aiRevenueThisMonthCents,
+      aiRevenueAllTimeCents,
+      aiGenerationsThisMonth,
+      aiGenerationsAllTime,
+      totalMonthlyRevenueCents: mrrCents + aiRevenueThisMonthCents,
+      studioBreakdown,
+      monthLabel: startOfMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+    });
+  } catch (err) {
+    console.error('Platform revenue error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/ai-design/config — studio's AI generation settings (enabled + their customer pricing)
 app.get('/api/ai-design/config', async (req, res) => {
   const { studioId } = req.query;

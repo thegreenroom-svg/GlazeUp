@@ -1612,6 +1612,7 @@
       <a href="#" class="nav-link" onclick="goToTab('menu', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h12M4 10h12M4 14h7"/><circle cx="15" cy="14" r="2.5"/><path d="M15 11.5v-7"/></svg></span><span class="nav-label">Daily Menu</span></a>
       <a href="#" class="nav-link" onclick="goToTab('team', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="6" r="2.5"/><circle cx="14" cy="7" r="2"/><path d="M2.5 16c0-2.8 2-4.5 4.5-4.5s4.5 1.7 4.5 4.5"/><path d="M12 12c2 0 3.5 1.5 3.5 4"/></svg></span><span class="nav-label">Team &amp; Duties</span></a>
       <a href="#" class="nav-link" onclick="goToTab('progress', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l4-4 3 3 6-7"/><path d="M13 9h4v4"/></svg></span><span class="nav-label">Daily Progress</span></a>
+      <a href="#" class="nav-link" onclick="goToTab('platformrev', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v14h14"/><path d="M6 13l3-4 3 2 4-6"/></svg></span><span class="nav-label">Platform Revenue</span></a>
       <a href="#" class="nav-link" onclick="goToTab('branding', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.2 2.8l3 3-7.6 7.6c-.7.7-1.8.7-2.5 0l-.5-.5c-.7-.7-.7-1.8 0-2.5l7.6-7.6z"/><path d="M6.2 12.3L4 17.5l5.2-2.2"/></svg></span><span class="nav-label">Branding</span></a>
       <a href="#" class="nav-link" onclick="goToTab('shapes', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.5 5.5C6.5 4 8 3 10 3s3.5 1 3.5 2.5L13 13c-.1 2-1.4 3.5-3 3.5s-2.9-1.5-3-3.5L6.5 5.5z"/><ellipse cx="10" cy="5.3" rx="3.5" ry="1"/></svg></span><span class="nav-label">Bisque</span></a>
     </nav>
@@ -2650,6 +2651,62 @@
         </div>
       </div>
 
+      <!-- ── Platform Revenue (kilnLINK owner view — every studio, not just this one) ── -->
+      <div id="platformrev-view" class="view" style="display: none;">
+        <h2 style="margin-top:0;">📈 Platform Revenue</h2>
+        <p style="font-size:13px;color:var(--gu-dust);margin-bottom:20px;line-height:1.5;">
+          Income into kilnLINK/Green Room from every studio on the platform — subscriptions plus wholesale AI design usage. This is separate from The Kiln Cafe's own customer revenue shown elsewhere.
+        </p>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px;">
+          <div style="background:white;border:1px solid var(--gu-border);border-radius:12px;padding:16px;text-align:center;">
+            <div style="font-size:24px;font-weight:800;color:var(--gu-primary);" id="prev-total-studios">–</div>
+            <div style="font-size:11px;color:var(--gu-dust);">Studios on kilnLINK</div>
+          </div>
+          <div style="background:white;border:1px solid var(--gu-border);border-radius:12px;padding:16px;text-align:center;">
+            <div style="font-size:24px;font-weight:800;color:#2e7d32;" id="prev-active-subs">–</div>
+            <div style="font-size:11px;color:var(--gu-dust);">Active subscriptions</div>
+          </div>
+          <div style="background:white;border:1px solid var(--gu-border);border-radius:12px;padding:16px;text-align:center;">
+            <div style="font-size:24px;font-weight:800;color:var(--link-clay);" id="prev-mrr">–</div>
+            <div style="font-size:11px;color:var(--gu-dust);">Monthly recurring revenue</div>
+          </div>
+          <div style="background:white;border:1px solid var(--gu-border);border-radius:12px;padding:16px;text-align:center;">
+            <div style="font-size:24px;font-weight:800;color:#9C27B0;" id="prev-ai-revenue">–</div>
+            <div style="font-size:11px;color:var(--gu-dust);">AI revenue this month</div>
+          </div>
+        </div>
+
+        <div class="chart-container" style="margin-bottom:20px;background:linear-gradient(135deg,rgba(184,121,70,0.08),rgba(156,39,176,0.06));">
+          <h3 style="margin:0 0 4px;">🤖 AI Design Generation — wholesale income</h3>
+          <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Every studio pays kilnLINK 10p per AI design their customers generate — billed automatically on their monthly invoice.</p>
+          <div style="display:flex;gap:24px;flex-wrap:wrap;">
+            <div>
+              <div style="font-size:11px;color:var(--gu-dust);">This month</div>
+              <div style="font-size:20px;font-weight:800;color:var(--gu-text);" id="prev-ai-generations-month">–</div>
+              <div style="font-size:11px;color:var(--gu-dust);">generations</div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--gu-dust);">All-time</div>
+              <div style="font-size:20px;font-weight:800;color:var(--gu-text);" id="prev-ai-generations-total">–</div>
+              <div style="font-size:11px;color:var(--gu-dust);">generations</div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--gu-dust);">All-time revenue</div>
+              <div style="font-size:20px;font-weight:800;color:#9C27B0;" id="prev-ai-revenue-total">–</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="chart-container">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <h3 style="margin:0;">Studio-by-studio breakdown</h3>
+            <button onclick="loadPlatformRevenue()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">🔄 Refresh</button>
+          </div>
+          <div id="prev-studio-list"><div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading…</div></div>
+        </div>
+      </div>
+
       <div id="community-view" class="view" style="display: none;">
         <h2 style="margin-top: 0;">Community</h2>
         <p style="color: var(--gu-dust); margin-bottom: 20px;">
@@ -3152,6 +3209,8 @@ function goToTab(tab, event) {
     loadDailyProgress();
     loadManagerTaskOverview();
     loadTeamMembers().then(() => populateAdhocSelects());
+  } else if (tab === 'platformrev') {
+    loadPlatformRevenue();
   }
 }
 
@@ -5544,6 +5603,46 @@ async function sendAdhocRequest() {
     pollHandoffAlerts();
   } catch(e) {
     status.textContent = '✗ Failed to send';
+  }
+}
+
+// ── Platform Revenue (kilnLINK owner view) ──
+async function loadPlatformRevenue() {
+  try {
+    const res = await fetch(`${API_URL}/api/platform/revenue`);
+    const data = await res.json();
+
+    document.getElementById('prev-total-studios').textContent = data.totalStudios ?? '0';
+    document.getElementById('prev-active-subs').textContent = data.activeSubscriptions ?? '0';
+    document.getElementById('prev-mrr').textContent = `£${((data.mrrCents||0)/100).toFixed(0)}`;
+    document.getElementById('prev-ai-revenue').textContent = `£${((data.aiRevenueThisMonthCents||0)/100).toFixed(2)}`;
+    document.getElementById('prev-ai-generations-month').textContent = data.aiGenerationsThisMonth ?? '0';
+    document.getElementById('prev-ai-generations-total').textContent = data.aiGenerationsAllTime ?? '0';
+    document.getElementById('prev-ai-revenue-total').textContent = `£${((data.aiRevenueAllTimeCents||0)/100).toFixed(2)}`;
+
+    const listEl = document.getElementById('prev-studio-list');
+    if (!data.studioBreakdown?.length) {
+      listEl.innerHTML = '<p style="color:var(--gu-dust);font-size:13px;text-align:center;padding:20px 0;">No studios found yet.</p>';
+      return;
+    }
+
+    const PLAN_LABELS = { pilot:'Pilot', solo:'Solo £29', studio:'Studio £59', multi:'Multi £99', none:'No plan' };
+    const PLAN_COLORS = { pilot:'#999', solo:'#42A5F5', studio:'#B87946', multi:'#9C27B0', none:'#ccc' };
+
+    listEl.innerHTML = data.studioBreakdown.map(s => `
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--gu-bg);border-radius:10px;margin-bottom:8px;border-left:4px solid ${PLAN_COLORS[s.plan]||'#999'};">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:700;">${s.name}</div>
+          <div style="font-size:11px;color:var(--gu-dust);">${s.aiGenerationsAllTime} AI generations all-time</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:11px;font-weight:700;color:${PLAN_COLORS[s.plan]||'#999'};">${PLAN_LABELS[s.plan]||s.plan}</div>
+          <div style="font-size:12px;color:var(--gu-dust);">£${(s.monthlySubCents/100).toFixed(0)}/mo + £${(s.aiRevenueAllTimeCents/100).toFixed(2)} AI</div>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    document.getElementById('prev-studio-list').innerHTML = '<p style="color:var(--gu-dust);font-size:13px;">Could not load platform revenue.</p>';
   }
 }
 
