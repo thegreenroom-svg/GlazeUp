@@ -1227,6 +1227,69 @@
 </div>
 <div id="alert-feed-backdrop" onclick="toggleAlertFeed()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:9150;"></div>
 
+<!-- ═══ SHIFT LOGIN (PIN) ═══ -->
+<div id="shift-login-modal" style="display:none;position:fixed;inset:0;z-index:9800;background:rgba(43,39,36,0.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:white;border-radius:24px;max-width:360px;width:100%;padding:32px 28px;text-align:center;box-shadow:0 24px 70px rgba(0,0,0,0.4);">
+    <div style="font-size:40px;margin-bottom:10px;">👤</div>
+    <div style="font-size:18px;font-weight:800;color:var(--gu-text);margin-bottom:4px;">Who's on this tablet?</div>
+    <div style="font-size:13px;color:var(--gu-dust);margin-bottom:20px;">Enter your PIN to start your shift and see your task list.</div>
+    <input type="password" id="shift-pin-input" inputmode="numeric" maxlength="6" placeholder="• • • •"
+      style="width:100%;text-align:center;font-size:28px;letter-spacing:10px;padding:14px;border:2px solid var(--gu-border);border-radius:14px;margin-bottom:14px;">
+    <div id="shift-pin-error" style="color:#e53935;font-size:12px;margin-bottom:10px;display:none;">Incorrect PIN — try again.</div>
+    <button onclick="submitShiftPin()" style="width:100%;background:var(--gu-primary);color:white;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">
+      Start Shift →
+    </button>
+    <button onclick="skipShiftLogin()" style="width:100%;background:none;border:none;color:var(--gu-dust);font-size:12px;cursor:pointer;padding:8px;">
+      Skip — use shared/manager view
+    </button>
+  </div>
+</div>
+
+<!-- Current shift badge (shows who's logged in) -->
+<button id="shift-badge" onclick="toggleTaskQueue()" style="display:none;position:fixed;top:16px;right:222px;z-index:850;background:white;border:1.5px solid var(--gu-border);border-radius:24px;padding:8px 14px 8px 8px;font-size:12px;font-weight:700;color:var(--gu-text);cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.12);display:flex;align-items:center;gap:6px;">
+  <span id="shift-badge-avatar" style="width:26px;height:26px;border-radius:50%;background:var(--gu-primary);color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">–</span>
+  <span id="shift-badge-name">–</span>
+  <span id="shift-task-count-badge" style="display:none;background:#e53935;color:white;font-size:10px;font-weight:800;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 4px;">0</span>
+</button>
+
+<!-- Personal Task Queue (slide-in) -->
+<div id="task-queue-panel" style="display:none;position:fixed;top:0;right:0;bottom:0;width:360px;max-width:92vw;background:#f7f4ee;z-index:9300;box-shadow:-8px 0 32px rgba(0,0,0,0.2);flex-direction:column;">
+  <div style="background:var(--gu-primary);color:white;padding:18px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <div style="font-size:15px;font-weight:800;">📋 My Task Queue</div>
+      <button onclick="toggleTaskQueue()" style="background:none;border:none;color:rgba(255,255,255,0.7);font-size:18px;cursor:pointer;">✕</button>
+    </div>
+    <div style="font-size:12px;color:rgba(255,255,255,0.75);" id="task-queue-role-label">–</div>
+  </div>
+  <div id="task-queue-list" style="flex:1;overflow-y:auto;padding:14px;"></div>
+  <div style="padding:12px 14px;border-top:1px solid #e8dfd3;">
+    <button onclick="logOutOfShift()" style="width:100%;background:none;border:1px solid var(--gu-border);color:var(--gu-dust);border-radius:8px;padding:9px;font-size:12px;font-weight:600;cursor:pointer;">🚪 End shift / switch person</button>
+  </div>
+</div>
+<div id="task-queue-backdrop" onclick="toggleTaskQueue()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:9250;"></div>
+
+<!-- Big Task Card (full task detail + complete button) -->
+<div id="task-card-modal" style="display:none;position:fixed;inset:0;z-index:9600;background:rgba(43,39,36,0.8);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:white;border-radius:24px;max-width:440px;width:100%;box-shadow:0 24px 70px rgba(0,0,0,0.4);overflow:hidden;animation:handoffPop .35s cubic-bezier(.34,1.4,.4,1);">
+    <div id="task-card-header" style="background:var(--gu-primary);padding:30px 24px 24px;text-align:center;position:relative;">
+      <button onclick="toggleTaskVoice()" id="task-voice-btn" style="position:absolute;top:14px;right:14px;background:rgba(255,255,255,0.2);border:none;color:white;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">🔊 Voice on</button>
+      <div id="task-card-icon" style="font-size:56px;margin-bottom:10px;">📋</div>
+      <div id="task-card-table" style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,0.7);margin-bottom:6px;"></div>
+      <div id="task-card-title" style="font-size:19px;font-weight:800;color:white;line-height:1.3;"></div>
+    </div>
+    <div style="padding:26px 24px;">
+      <div id="task-card-message" style="font-size:15px;color:var(--gu-text);line-height:1.65;text-align:center;margin-bottom:24px;"></div>
+      <button onclick="completeCurrentTask()" style="width:100%;background:#2e7d32;color:white;border:none;border-radius:14px;padding:17px;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 3px 10px rgba(46,125,50,0.3);margin-bottom:10px;">
+        ✓ Complete This Task
+      </button>
+      <div style="display:flex;gap:8px;">
+        <button onclick="passCurrentTask()" style="flex:1;background:#f0ebe4;border:none;color:var(--gu-dust);border-radius:10px;padding:11px;font-size:12px;font-weight:600;cursor:pointer;">↩ Can't do this now</button>
+        <button onclick="closeTaskCard()" style="flex:1;background:none;border:1px solid var(--gu-border);color:var(--gu-dust);border-radius:10px;padding:11px;font-size:12px;font-weight:600;cursor:pointer;">Later</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Big Handoff Alert Popup -->
 <div id="handoff-alert-modal" style="display:none;position:fixed;inset:0;z-index:9500;background:rgba(43,39,36,0.75);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
   <div style="background:white;border-radius:24px;max-width:440px;width:100%;box-shadow:0 24px 70px rgba(0,0,0,0.4);overflow:hidden;animation:handoffPop .35s cubic-bezier(.34,1.4,.4,1);">
@@ -2099,6 +2162,43 @@
           <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Edit the default duties for each role. Update any time — great for a weekly review. Changes apply to all future sessions.</p>
           <div id="duty-role-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;"></div>
           <div id="duty-role-editor"></div>
+        </div>
+
+        <!-- Process Builder — the handoff chain -->
+        <div class="chart-container" style="margin-top:20px;">
+          <h3 style="margin:0 0 6px;">🔗 Process Builder — Task Handoff Chain</h3>
+          <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;line-height:1.5;">
+            Define what happens when something finishes. Each step says: <strong>when this happens</strong> → <strong>notify this role</strong> → <strong>with this message</strong> → <strong>optionally trigger the next step</strong>. Staff logged in as that role get the task on their tablet automatically, with vibration and voice.
+          </p>
+          <div id="process-steps-list" style="margin-bottom:16px;"></div>
+
+          <div style="background:var(--gu-bg);border:1px solid var(--gu-border);border-radius:12px;padding:14px;">
+            <div style="font-size:12px;font-weight:700;color:var(--gu-text);margin-bottom:10px;">+ Add a new step</div>
+            <div style="display:grid;gap:8px;margin-bottom:10px;">
+              <div>
+                <label style="font-size:11px;font-weight:600;color:var(--gu-dust);display:block;margin-bottom:4px;">When this happens (trigger name)</label>
+                <input type="text" id="pb-trigger-label" placeholder="e.g. Table cleared" style="width:100%;padding:9px 12px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;">
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:600;color:var(--gu-dust);display:block;margin-bottom:4px;">Notify this role</label>
+                <select id="pb-role" style="width:100%;padding:9px 12px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;background:white;"></select>
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:600;color:var(--gu-dust);display:block;margin-bottom:4px;">Task message (use {table} or {customerName} as placeholders)</label>
+                <input type="text" id="pb-message" placeholder="e.g. Table {table} needs clearing and resetting" style="width:100%;padding:9px 12px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;">
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:600;color:var(--gu-dust);display:block;margin-bottom:4px;">When they complete it, trigger next step (optional)</label>
+                <select id="pb-next-trigger" style="width:100%;padding:9px 12px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;background:white;">
+                  <option value="">— Nothing, this ends the chain —</option>
+                </select>
+              </div>
+            </div>
+            <button onclick="addProcessStep()" style="background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;">+ Add Step</button>
+          </div>
+
+          <button onclick="saveProcessConfig()" style="margin-top:14px;background:var(--link-clay);color:white;border:none;border-radius:8px;padding:11px 22px;font-size:13px;font-weight:700;cursor:pointer;">💾 Save Process Chain</button>
+          <span id="process-save-status" style="font-size:12px;color:var(--gu-dust);margin-left:10px;"></span>
         </div>
       </div>
 
@@ -3925,6 +4025,20 @@ async function fireHandoffAlert(triggerType, bookingCode, contextData) {
     // Immediately poll so it shows on this device right away
     pollHandoffAlerts();
   } catch(e) { /* silent */ }
+
+  // Also create a personal task queue entry — this is what actually
+  // routes to the right person's device and can chain to the next step
+  try {
+    await fetch(`${API_URL}/api/staff/tasks/create`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        studioId, triggerType, bookingCode,
+        tableName: contextData?.table || null,
+        data: contextData || {},
+      })
+    });
+    pollMyTasks();
+  } catch(e) { /* silent */ }
 }
 
 async function pollHandoffAlerts() {
@@ -4052,6 +4166,251 @@ function startAlertPolling() {
   alertPollTimer = setInterval(pollHandoffAlerts, 20 * 1000);
 }
 
+// ═══════════════════════════════════════════
+// SHIFT LOGIN (PIN)
+// ═══════════════════════════════════════════
+
+let currentShiftStaff = null; // { id, name, role }
+
+function checkShiftLogin() {
+  const saved = localStorage.getItem('klnk_shift_staff');
+  if (saved) {
+    try {
+      currentShiftStaff = JSON.parse(saved);
+      applyShiftUI();
+      return;
+    } catch(e) {}
+  }
+  // No one logged in — show the PIN prompt
+  document.getElementById('shift-login-modal').style.display = 'flex';
+  setTimeout(() => document.getElementById('shift-pin-input')?.focus(), 300);
+}
+
+async function submitShiftPin() {
+  const pin = document.getElementById('shift-pin-input').value.trim();
+  const errorEl = document.getElementById('shift-pin-error');
+  if (!pin) return;
+  try {
+    const res = await fetch(`${API_URL}/api/staff/shift-login`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ studioId, pin })
+    });
+    if (!res.ok) {
+      errorEl.style.display = 'block';
+      document.getElementById('shift-pin-input').value = '';
+      return;
+    }
+    const data = await res.json();
+    currentShiftStaff = { id: data.member.id, name: data.member.name, role: data.member.role };
+    localStorage.setItem('klnk_shift_staff', JSON.stringify(currentShiftStaff));
+    document.getElementById('shift-login-modal').style.display = 'none';
+    errorEl.style.display = 'none';
+    applyShiftUI();
+  } catch(e) {
+    errorEl.textContent = 'Could not check PIN — try again.';
+    errorEl.style.display = 'block';
+  }
+}
+
+function skipShiftLogin() {
+  document.getElementById('shift-login-modal').style.display = 'none';
+  currentShiftStaff = null;
+}
+
+function logOutOfShift() {
+  localStorage.removeItem('klnk_shift_staff');
+  currentShiftStaff = null;
+  document.getElementById('shift-badge').style.display = 'none';
+  toggleTaskQueue();
+  setTimeout(() => document.getElementById('shift-login-modal').style.display = 'flex', 300);
+}
+
+function applyShiftUI() {
+  if (!currentShiftStaff) return;
+  const badge = document.getElementById('shift-badge');
+  badge.style.display = 'flex';
+  document.getElementById('shift-badge-avatar').textContent = currentShiftStaff.name.charAt(0).toUpperCase();
+  document.getElementById('shift-badge-name').textContent = currentShiftStaff.name;
+  startTaskPolling();
+}
+
+// Allow Enter key on PIN input
+document.addEventListener('DOMContentLoaded', () => {
+  const pinInput = document.getElementById('shift-pin-input');
+  if (pinInput) pinInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') submitShiftPin(); });
+});
+
+// ═══════════════════════════════════════════
+// PERSONAL TASK QUEUE
+// ═══════════════════════════════════════════
+
+let myTasks = [];
+let taskPollTimer = null;
+let currentTaskCard = null;
+let taskVoiceEnabled = true;
+
+async function pollMyTasks() {
+  if (!apiConnected || !studioId || !currentShiftStaff) return;
+  try {
+    const res = await fetch(`${API_URL}/api/staff/tasks?studioId=${studioId}&role=${encodeURIComponent(currentShiftStaff.role)}`);
+    const data = await res.json();
+    const prevCount = myTasks.length;
+    const prevIds = new Set(myTasks.map(t => t.id));
+    myTasks = data.tasks || [];
+
+    const newTasks = myTasks.filter(t => !prevIds.has(t.id));
+    if (newTasks.length && prevCount > 0) {
+      // Genuinely new task arrived — alert with vibration + voice
+      notifyNewTask(newTasks[0]);
+    }
+
+    updateTaskCountBadge();
+    if (document.getElementById('task-queue-panel').style.display === 'flex') renderTaskQueue();
+  } catch(e) { /* silent */ }
+}
+
+function startTaskPolling() {
+  if (taskPollTimer) return;
+  pollMyTasks();
+  taskPollTimer = setInterval(pollMyTasks, 15 * 1000);
+}
+
+function updateTaskCountBadge() {
+  const badge = document.getElementById('shift-task-count-badge');
+  if (!badge) return;
+  if (myTasks.length > 0) {
+    badge.style.display = 'flex';
+    badge.textContent = myTasks.length > 9 ? '9+' : myTasks.length;
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function toggleTaskQueue() {
+  const panel = document.getElementById('task-queue-panel');
+  const backdrop = document.getElementById('task-queue-backdrop');
+  const isOpen = panel.style.display === 'flex';
+  panel.style.display = isOpen ? 'none' : 'flex';
+  backdrop.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) renderTaskQueue();
+}
+
+function renderTaskQueue() {
+  const list = document.getElementById('task-queue-list');
+  const roleLabel = document.getElementById('task-queue-role-label');
+  if (!list) return;
+  roleLabel.textContent = currentShiftStaff ? `${currentShiftStaff.name} · ${currentShiftStaff.role}` : '';
+
+  if (!myTasks.length) {
+    list.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--gu-dust);"><div style="font-size:32px;margin-bottom:10px;">✨</div><div style="font-size:13px;">All caught up — no pending tasks.</div></div>';
+    return;
+  }
+
+  list.innerHTML = myTasks.map((t, i) => {
+    const waitMins = Math.round((Date.now() - new Date(t.created_at).getTime()) / 60000);
+    const waitColor = waitMins > 10 ? '#e53935' : waitMins > 5 ? '#F9A825' : 'var(--gu-dust)';
+    return `
+      <div onclick='openTaskCard(${JSON.stringify(t).replace(/'/g,"&apos;")})' style="background:white;border-radius:14px;padding:14px;margin-bottom:10px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.08);border-left:4px solid var(--gu-primary);">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="background:var(--gu-primary);color:white;width:22px;height:22px;border-radius:50%;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${i+1}</span>
+          ${t.table_name ? `<span style="font-size:11px;font-weight:700;color:var(--gu-primary);">${t.table_name}</span>` : ''}
+          <span style="font-size:10px;color:${waitColor};margin-left:auto;">${waitMins < 1 ? 'just now' : waitMins + ' min ago'}</span>
+        </div>
+        <div style="font-size:13px;color:var(--gu-text);line-height:1.4;">${t.task_description}</div>
+      </div>`;
+  }).join('');
+}
+
+function openTaskCard(task) {
+  currentTaskCard = task;
+  document.getElementById('task-card-table').textContent = task.table_name || 'Studio task';
+  document.getElementById('task-card-title').textContent = ALERT_TRIGGERS_CLIENT[task.task_type]?.label || 'Task';
+  document.getElementById('task-card-icon').textContent = ALERT_TRIGGERS_CLIENT[task.task_type]?.icon || '📋';
+  document.getElementById('task-card-message').textContent = task.task_description;
+
+  const ROLE_COLORS = { 'Studio Manager':'#5E35B1', 'Studio Executive':'#1E88E5', 'Ceramic Technician':'#8D6E63', 'Studio Assistant':'#00897B', 'Barista':'#F4511E' };
+  document.getElementById('task-card-header').style.background = ROLE_COLORS[task.assigned_role] || 'var(--gu-primary)';
+
+  document.getElementById('task-card-modal').style.display = 'flex';
+  document.getElementById('task-queue-panel').style.display = 'none';
+  document.getElementById('task-queue-backdrop').style.display = 'none';
+
+  if (taskVoiceEnabled) speakTask(task.task_description);
+}
+
+function closeTaskCard() {
+  document.getElementById('task-card-modal').style.display = 'none';
+  window.speechSynthesis?.cancel();
+}
+
+async function completeCurrentTask() {
+  if (!currentTaskCard) return;
+  try {
+    const res = await fetch(`${API_URL}/api/staff/tasks/${currentTaskCard.id}/complete`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ completedBy: currentShiftStaff?.name || null })
+    });
+    const data = await res.json();
+    myTasks = myTasks.filter(t => t.id !== currentTaskCard.id);
+    updateTaskCountBadge();
+
+    if (data.nextTask) {
+      const toast = document.createElement('div');
+      toast.textContent = `→ Next step created for ${data.nextTask.assigned_role}`;
+      toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#2B2724;color:white;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;white-space:nowrap;';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 2500);
+    }
+  } catch(e) { /* silent */ }
+  closeTaskCard();
+  currentTaskCard = null;
+}
+
+async function passCurrentTask() {
+  if (!currentTaskCard) return;
+  try {
+    await fetch(`${API_URL}/api/staff/tasks/${currentTaskCard.id}/pass`, { method:'PATCH' });
+  } catch(e) {}
+  closeTaskCard();
+  currentTaskCard = null;
+}
+
+function toggleTaskVoice() {
+  taskVoiceEnabled = !taskVoiceEnabled;
+  document.getElementById('task-voice-btn').textContent = taskVoiceEnabled ? '🔊 Voice on' : '🔇 Voice off';
+  if (!taskVoiceEnabled) window.speechSynthesis?.cancel();
+}
+
+// ── Voice narration for tasks (British voice if available) ──
+function speakTask(text) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  const voices = window.speechSynthesis.getVoices();
+  const preferred = voices.find(v => /UK|British|Sonia|Libby|Karen/i.test(v.name)) || voices.find(v => v.lang === 'en-GB');
+  if (preferred) utter.voice = preferred;
+  utter.rate = 0.98;
+  utter.pitch = 1.0;
+  window.speechSynthesis.speak(utter);
+}
+
+// ── Vibration (Android only — iOS Safari does not support this) ──
+function vibrateForTask() {
+  if (navigator.vibrate) {
+    navigator.vibrate([120, 80, 120, 80, 250]); // short-short-long pattern
+  }
+}
+
+function notifyNewTask(task) {
+  vibrateForTask();
+  try { playExtrasPing(); } catch(e) {}
+  if (taskVoiceEnabled) {
+    speakTask(`New task: ${task.task_description}`);
+  }
+  // Auto-open the task card so it's impossible to miss
+  openTaskCard(task);
+}
+
 // ── Daily Progress (running completion log) ──
 async function loadDailyProgress() {
   const listEl = document.getElementById('dp-bookings-list');
@@ -4101,6 +4460,7 @@ let activeDutyRole = STAFF_ROLES[0];
 async function loadTeamAndDuties() {
   await loadTeamMembers();
   await loadDutyConfig();
+  await loadProcessConfig();
 }
 
 async function loadTeamMembers() {
@@ -4129,9 +4489,23 @@ function renderTeamMembers() {
     <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--gu-bg);border-radius:8px;margin-bottom:6px;border:1px solid var(--gu-border);border-left:4px solid ${ROLE_COLORS[m.role]||'var(--gu-border)'};">
       <span style="font-size:13px;font-weight:600;flex:1;">${m.name}</span>
       <span style="font-size:11px;color:white;background:${ROLE_COLORS[m.role]||'#999'};padding:3px 10px;border-radius:20px;">${m.role}</span>
+      <button onclick="promptSetPin('${m.id}','${m.name.replace(/'/g,"\\'")}')" style="background:none;border:1px solid var(--gu-border);color:var(--gu-dust);border-radius:6px;padding:4px 9px;font-size:11px;font-weight:600;cursor:pointer;">🔑 Set PIN</button>
       <button onclick="removeTeamMember('${m.id}')" style="background:none;border:none;color:#d9534f;font-size:18px;cursor:pointer;padding:0 2px;line-height:1;">×</button>
     </div>
   `).join('');
+}
+
+async function promptSetPin(staffId, staffName) {
+  const pin = prompt(`Set a 4-6 digit PIN for ${staffName}. They'll use this to log into the tablet at the start of their shift.`);
+  if (!pin) return;
+  if (!/^\d{4,6}$/.test(pin)) { alert('PIN must be 4-6 digits.'); return; }
+  try {
+    await fetch(`${API_URL}/api/staff/set-pin`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ studioId, staffMemberId: staffId, pin })
+    });
+    alert(`PIN set for ${staffName}.`);
+  } catch(e) { alert('Could not set PIN: ' + e.message); }
 }
 
 async function addTeamMember() {
@@ -4233,6 +4607,102 @@ async function saveDutyConfig() {
     await fetch(`${API_URL}/api/staff/duties`, {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ studioId, role: activeDutyRole, duties })
+    });
+    status.textContent = '✓ Saved';
+    setTimeout(() => status.textContent = '', 3000);
+  } catch(e) { status.textContent = '✗ Failed'; }
+}
+
+// ── Process Builder (task handoff chain) ──
+let processSteps = [];
+
+async function loadProcessConfig() {
+  try {
+    const res = await fetch(`${API_URL}/api/staff/process-config?studioId=${studioId}`);
+    const data = await res.json();
+    processSteps = data.config || [];
+    renderProcessSteps();
+    populateProcessBuilderSelects();
+  } catch(e) { /* silent */ }
+}
+
+function populateProcessBuilderSelects() {
+  const roleSelect = document.getElementById('pb-role');
+  const nextSelect = document.getElementById('pb-next-trigger');
+  if (!roleSelect || !nextSelect) return;
+
+  roleSelect.innerHTML = STAFF_ROLES.map(r => `<option value="${r}">${r}</option>`).join('');
+  nextSelect.innerHTML = '<option value="">— Nothing, this ends the chain —</option>' +
+    processSteps.map(s => `<option value="${s.triggerType}">${s.triggerLabel}</option>`).join('');
+}
+
+const ROLE_COLORS_PB = { 'Studio Manager':'#5E35B1', 'Studio Executive':'#1E88E5', 'Ceramic Technician':'#8D6E63', 'Studio Assistant':'#00897B', 'Barista':'#F4511E' };
+
+function renderProcessSteps() {
+  const el = document.getElementById('process-steps-list');
+  if (!el) return;
+  if (!processSteps.length) {
+    el.innerHTML = '<p style="color:var(--gu-dust);font-size:12px;padding:8px 0;">No process steps yet — add your first one below.</p>';
+    return;
+  }
+
+  el.innerHTML = processSteps.map((s, i) => {
+    const color = ROLE_COLORS_PB[s.assignedRole] || '#999';
+    const nextStep = processSteps.find(n => n.triggerType === s.nextTriggerType);
+    return `
+      <div style="border:1px solid var(--gu-border);border-left:4px solid ${color};border-radius:10px;padding:12px 14px;margin-bottom:8px;background:white;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <div style="font-size:13px;font-weight:700;color:var(--gu-text);">${s.triggerLabel}</div>
+          <button onclick="removeProcessStep(${i})" style="background:none;border:none;color:#d9534f;font-size:16px;cursor:pointer;padding:0 2px;">×</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--gu-dust);margin-bottom:6px;">
+          <span>Notifies</span>
+          <span style="background:${color};color:white;padding:2px 9px;border-radius:20px;font-weight:700;">${s.assignedRole}</span>
+          ${nextStep ? `<span>→ then triggers</span><span style="background:var(--gu-bg);border:1px solid var(--gu-border);padding:2px 9px;border-radius:20px;">${nextStep.triggerLabel}</span>` : ''}
+        </div>
+        <div style="font-size:12px;color:var(--gu-text);background:var(--gu-bg);border-radius:6px;padding:8px 10px;font-style:italic;">"${s.taskMessage}"</div>
+      </div>`;
+  }).join('');
+}
+
+function addProcessStep() {
+  const label = document.getElementById('pb-trigger-label').value.trim();
+  const role = document.getElementById('pb-role').value;
+  const message = document.getElementById('pb-message').value.trim();
+  const nextTrigger = document.getElementById('pb-next-trigger').value;
+
+  if (!label || !message) { alert('Please fill in the trigger name and task message.'); return; }
+
+  // Generate a machine-safe trigger type from the label
+  const triggerType = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') + '_' + Date.now().toString(36).slice(-4);
+
+  processSteps.push({
+    triggerType, triggerLabel: label, assignedRole: role,
+    taskMessage: message, nextTriggerType: nextTrigger || null,
+    sequenceOrder: processSteps.length, active: true,
+  });
+
+  renderProcessSteps();
+  populateProcessBuilderSelects();
+
+  document.getElementById('pb-trigger-label').value = '';
+  document.getElementById('pb-message').value = '';
+  document.getElementById('pb-next-trigger').value = '';
+}
+
+function removeProcessStep(index) {
+  processSteps.splice(index, 1);
+  renderProcessSteps();
+  populateProcessBuilderSelects();
+}
+
+async function saveProcessConfig() {
+  const status = document.getElementById('process-save-status');
+  status.textContent = 'Saving…';
+  try {
+    await fetch(`${API_URL}/api/staff/process-config`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ studioId, steps: processSteps })
     });
     status.textContent = '✓ Saved';
     setTimeout(() => status.textContent = '', 3000);
@@ -4543,6 +5013,7 @@ async function populateDashboard() {
   swtShowTrigger();
   startExtrasPollingOnLoad();
   startAlertPolling();
+  checkShiftLogin();
   // Show morning opening checklist if not done today
   setTimeout(showOpeningChecklist, 800);
   try {

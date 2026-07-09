@@ -3354,6 +3354,195 @@ app.get('/api/staff/daily-progress', async (req, res) => {
   });
 });
 
+// ═══════════════════════════════════════════
+// SHIFT PIN LOGIN
+// ═══════════════════════════════════════════
+
+function hashPin(pin) { return crypto.createHash('sha256').update(String(pin)).digest('hex'); }
+
+// POST /api/staff/set-pin — staff member sets/updates their PIN (done once, in Team & Duties)
+app.post('/api/staff/set-pin', async (req, res) => {
+  const { studioId, staffMemberId, pin } = req.body;
+  if (!studioId || !staffMemberId || !pin) return res.status(400).json({ error: 'studioId, staffMemberId, pin required' });
+  if (!/^\d{4,6}$/.test(String(pin))) return res.status(400).json({ error: 'PIN must be 4-6 digits' });
+
+  const { error } = await supabase.from('staff_pins').upsert({
+    studio_id: studioId, staff_member_id: staffMemberId, pin_hash: hashPin(pin),
+  }, { onConflict: 'studio_id,staff_member_id' });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
+});
+
+// POST /api/staff/shift-login — enter a PIN to start a shift on this device
+app.post('/api/staff/shift-login', async (req, res) => {
+  const { studioId, pin } = req.body;
+  if (!studioId || !pin) return res.status(400).json({ error: 'studioId and pin required' });
+
+  const { data: pinRow } = await supabase.from('staff_pins')
+    .select('staff_member_id').eq('studio_id', studioId).eq('pin_hash', hashPin(pin)).single();
+
+  if (!pinRow) return res.status(401).json({ error: 'Incorrect PIN' });
+
+  const { data: member } = await supabase.from('staff_team')
+    .select('*').eq('id', pinRow.staff_member_id).single();
+
+  if (!member || !member.active) return res.status(404).json({ error: 'Staff member not found or inactive' });
+
+  res.json({ member });
+});
+
+// ═══════════════════════════════════════════
+// PROCESS CONFIG (per-studio configurable
+// task chains — replaces the fixed
+// ALERT_TRIGGERS for studios that customise)
+// ═══════════════════════════════════════════
+
+// Sensible defaults every new studio starts with — mirrors The Kiln Cafe's
+// current process. Studios can edit, delete, or add their own from here.
+const DEFAULT_PROCESS_CONFIG = [
+  { triggerType: 'checklist_done',    triggerLabel: 'Table setup checklist complete', assignedRole: 'Studio Manager',     taskMessage: 'Table {table} is set up and ready for {customerName}. Confirm and open the session.', nextTriggerType: null, sequenceOrder: 1 },
+  { triggerType: 'duties_completed',  triggerLabel: 'Staff duties completed',          assignedRole: 'Studio Manager',     taskMessage: '{staffName} has completed all their duties for {customerName}.',                     nextTriggerType: null, sequenceOrder: 2 },
+  { triggerType: 'piece_finished',    triggerLabel: 'Piece finished & photographed',   assignedRole: 'Ceramic Technician', taskMessage: "{customerName}'s piece is ready to be loaded into the kiln.",                          nextTriggerType: 'kiln_loaded', sequenceOrder: 3 },
+  { triggerType: 'kiln_loaded',       triggerLabel: 'Kiln loaded',                     assignedRole: 'Ceramic Technician', taskMessage: 'Kiln batch {sessionName} is loaded — start the firing when ready.',                   nextTriggerType: 'kiln_fired',   sequenceOrder: 4 },
+  { triggerType: 'kiln_fired',        triggerLabel: 'Kiln fired — ready',              assignedRole: 'Studio Assistant',   taskMessage: 'Kiln batch {sessionName} has finished firing. Move pieces to pickup and notify customers.', nextTriggerType: null, sequenceOrder: 5 },
+  { triggerType: 'booking_completed', triggerLabel: 'Booking completed',               assignedRole: 'Studio Manager',     taskMessage: "{customerName}'s full session is complete — table, pieces, and payment all done.",     nextTriggerType: null, sequenceOrder: 6 },
+  { triggerType: 'table_cleared',     triggerLabel: 'Table cleared',                   assignedRole: 'Studio Assistant',   taskMessage: 'Table {table} has been cleared. Reset and prepare it for the next booking.',           nextTriggerType: null, sequenceOrder: 0 },
+];
+
+// GET /api/staff/process-config — get this studio's process chain (or defaults if unset)
+app.get('/api/staff/process-config', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data } = await supabase.from('process_config').select('*').eq('studio_id', studioId).order('sequence_order');
+
+  if (!data || !data.length) {
+    return res.json({ config: DEFAULT_PROCESS_CONFIG.map(d => ({ ...d, isDefault: true, active: true })) });
+  }
+  res.json({ config: data.map(d => ({
+    id: d.id, triggerType: d.trigger_type, triggerLabel: d.trigger_label,
+    assignedRole: d.assigned_role, taskMessage: d.task_message_template,
+    nextTriggerType: d.next_trigger_type, sequenceOrder: d.sequence_order,
+    active: d.active, isDefault: false,
+  })) });
+});
+
+// POST /api/staff/process-config — save the studio's full process chain (replaces all)
+app.post('/api/staff/process-config', async (req, res) => {
+  const { studioId, steps } = req.body;
+  if (!studioId || !Array.isArray(steps)) return res.status(400).json({ error: 'studioId and steps[] required' });
+
+  await supabase.from('process_config').delete().eq('studio_id', studioId);
+  if (steps.length) {
+    await supabase.from('process_config').insert(steps.map((s, i) => ({
+      studio_id: studioId,
+      trigger_type: s.triggerType,
+      trigger_label: s.triggerLabel,
+      assigned_role: s.assignedRole,
+      task_message_template: s.taskMessage,
+      next_trigger_type: s.nextTriggerType || null,
+      sequence_order: s.sequenceOrder ?? i,
+      active: s.active !== false,
+    })));
+  }
+  const { data } = await supabase.from('process_config').select('*').eq('studio_id', studioId).order('sequence_order');
+  res.json({ config: data || [] });
+});
+
+// Helper: get a studio's active process config (custom or default), as a lookup map
+async function getStudioProcessMap(studioId) {
+  const { data } = await supabase.from('process_config').select('*').eq('studio_id', studioId).eq('active', true);
+  const rows = (data && data.length) ? data : DEFAULT_PROCESS_CONFIG.map(d => ({
+    trigger_type: d.triggerType, trigger_label: d.triggerLabel, assigned_role: d.assignedRole,
+    task_message_template: d.taskMessage, next_trigger_type: d.nextTriggerType,
+  }));
+  const map = {};
+  rows.forEach(r => { map[r.trigger_type] = r; });
+  return map;
+}
+
+function fillTemplate(template, data) {
+  return (template || '').replace(/\{(\w+)\}/g, (_, key) => data?.[key] ?? '');
+}
+
+// ═══════════════════════════════════════════
+// TASK QUEUE
+// Per-role personal task list. Fed by the process
+// config chain — each trigger creates a task for
+// the assigned role; completing it can auto-create
+// the next task in the chain.
+// ═══════════════════════════════════════════
+
+// POST /api/staff/tasks/create — create a task from a trigger (called instead of/alongside fireHandoffAlert)
+app.post('/api/staff/tasks/create', async (req, res) => {
+  const { studioId, triggerType, bookingCode, tableName, data } = req.body;
+  if (!studioId || !triggerType) return res.status(400).json({ error: 'studioId and triggerType required' });
+
+  const processMap = await getStudioProcessMap(studioId);
+  const step = processMap[triggerType];
+  if (!step) return res.status(400).json({ error: `No process step configured for trigger: ${triggerType}` });
+
+  const message = fillTemplate(step.task_message_template, { ...data, table: tableName });
+
+  const { data: task, error } = await supabase.from('task_queue').insert({
+    studio_id: studioId,
+    booking_code: bookingCode || null,
+    table_name: tableName || null,
+    assigned_role: step.assigned_role,
+    task_type: triggerType,
+    task_description: message,
+    next_trigger_type: step.next_trigger_type || null,
+    status: 'pending',
+  }).select().single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ task });
+});
+
+// GET /api/staff/tasks — get pending tasks for a role (personal queue)
+app.get('/api/staff/tasks', async (req, res) => {
+  const { studioId, role } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  let query = supabase.from('task_queue').select('*').eq('studio_id', studioId).eq('status', 'pending');
+  if (role) query = query.eq('assigned_role', role);
+  const { data } = await query.order('created_at', { ascending: true });
+  res.json({ tasks: data || [] });
+});
+
+// PATCH /api/staff/tasks/:id/complete — mark a task complete, auto-create next step if chained
+app.patch('/api/staff/tasks/:id/complete', async (req, res) => {
+  const { completedBy } = req.body;
+  const { data: task } = await supabase.from('task_queue').select('*').eq('id', req.params.id).single();
+  if (!task) return res.status(404).json({ error: 'Task not found' });
+
+  await supabase.from('task_queue').update({
+    status: 'completed', completed_at: new Date().toISOString(), completed_by: completedBy || null,
+  }).eq('id', req.params.id);
+
+  let nextTask = null;
+  if (task.next_trigger_type) {
+    const processMap = await getStudioProcessMap(task.studio_id);
+    const nextStep = processMap[task.next_trigger_type];
+    if (nextStep) {
+      const message = fillTemplate(nextStep.task_message_template, { table: task.table_name });
+      const { data: created } = await supabase.from('task_queue').insert({
+        studio_id: task.studio_id, booking_code: task.booking_code, table_name: task.table_name,
+        assigned_role: nextStep.assigned_role, task_type: task.next_trigger_type,
+        task_description: message, next_trigger_type: nextStep.next_trigger_type || null,
+        status: 'pending',
+      }).select().single();
+      nextTask = created;
+    }
+  }
+
+  res.json({ completed: true, nextTask });
+});
+
+// PATCH /api/staff/tasks/:id/pass — pass a task back into the queue for the same role (someone else picks it up)
+app.patch('/api/staff/tasks/:id/pass', async (req, res) => {
+  await supabase.from('task_queue').update({ status: 'pending', assigned_staff_id: null }).eq('id', req.params.id);
+  res.json({ ok: true });
+});
+
 app.get('/api/staff/team', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
