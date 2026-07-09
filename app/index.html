@@ -2752,13 +2752,23 @@
     // we find "their" other visits). Read-only — booking a NEW session
     // still needs Square write-access, a separate step. ──
     // ── Loyalty System ──
-    const TIER_COLORS = { silver: '#757575', gold: '#F9A825', platinum: '#7B1FA2' };
-    const TIER_GRADIENTS = {
-      silver:   'linear-gradient(135deg, #616161 0%, #9E9E9E 100%)',
-      gold:     'linear-gradient(135deg, #F57F17 0%, #FDD835 100%)',
-      platinum: 'linear-gradient(135deg, #4A148C 0%, #9C27B0 100%)',
+    const TIER_COLORS = {
+      newcomer:'#8BC34A', dabbler:'#26A69A', regular:'#42A5F5',
+      enthusiast:'#FF7043', silver:'#9E9E9E', gold:'#F9A825', platinum:'#7B1FA2'
     };
-    const TIER_EMOJIS = { silver: '🥈', gold: '🥇', platinum: '💎' };
+    const TIER_GRADIENTS = {
+      newcomer:   'linear-gradient(135deg,#558B2F,#8BC34A)',
+      dabbler:    'linear-gradient(135deg,#00695C,#26A69A)',
+      regular:    'linear-gradient(135deg,#1565C0,#42A5F5)',
+      enthusiast: 'linear-gradient(135deg,#BF360C,#FF7043)',
+      silver:     'linear-gradient(135deg,#616161,#9E9E9E)',
+      gold:       'linear-gradient(135deg,#F57F17,#FDD835)',
+      platinum:   'linear-gradient(135deg,#4A148C,#9C27B0)',
+    };
+    const TIER_EMOJIS = {
+      newcomer:'🪴', dabbler:'🎨', regular:'⭐',
+      enthusiast:'🔥', silver:'🥈', gold:'🥇', platinum:'💎'
+    };
 
     async function loadLoyaltyTile() {
       const customerName = window.currentBooking?.name;
@@ -2766,50 +2776,64 @@
       try {
         const res = await fetch(`${API_URL}/api/loyalty/customer?studioId=${STUDIO_ID}&customerName=${encodeURIComponent(customerName)}`);
         const data = await res.json();
-        if (!data.found) {
-          // Show a "start earning" state
-          const tile = document.getElementById('loyalty-tile');
-          const inner = document.getElementById('loyalty-tile-inner');
-          tile.style.display = 'block';
-          inner.style.background = 'linear-gradient(135deg, #2B2724 0%, #4a3f38 100%)';
-          document.getElementById('loyalty-tile-badge').textContent = '⭐';
-          document.getElementById('loyalty-tile-tier').textContent = 'Start earning rewards';
-          document.getElementById('loyalty-tile-progress').textContent = '3 visits or £50 spent for Silver';
-          document.getElementById('loyalty-tile-rewards').textContent = '';
-          document.getElementById('loyalty-tile-bar').style.width = '0%';
-          return;
-        }
-        const { customer } = data;
         const tile = document.getElementById('loyalty-tile');
         const inner = document.getElementById('loyalty-tile-inner');
         tile.style.display = 'block';
 
-        if (customer.tier) {
-          inner.style.background = TIER_GRADIENTS[customer.tier];
-          document.getElementById('loyalty-tile-badge').textContent = TIER_EMOJIS[customer.tier];
-          document.getElementById('loyalty-tile-tier').textContent = `${TIER_EMOJIS[customer.tier]} ${customer.tierInfo.name} Member`;
-          document.getElementById('loyalty-tile-label').textContent = `${customer.visits} visit${customer.visits !== 1 ? 's' : ''} · ${customer.totalSpendFormatted} spent`;
-          document.getElementById('loyalty-tile-progress').textContent = customer.progress.message;
-          document.getElementById('loyalty-tile-bar').style.width = customer.progress.pct + '%';
+        const customer = data.found ? data.customer : null;
+        const tier = customer?.tier || null;
+        const gradient = tier ? TIER_GRADIENTS[tier] : 'linear-gradient(135deg,#2B2724,#4a3f38)';
+        const emoji = tier ? TIER_EMOJIS[tier] : '🪴';
 
-          const r = customer.rewards;
-          const rewardLines = [
-            `🎁 Free bisque: ${r.freeBisque}`,
-            `🎨 ${r.glazingDiscount}% off glazing`,
-            r.freeDrink ? '☕ Free drink each visit' : null,
-            r.priorityBooking ? '⚡ Priority booking' : null,
-            r.takeItHome ? '🏠 Take It Home — free' : null,
-          ].filter(Boolean);
-          document.getElementById('loyalty-tile-rewards').innerHTML = rewardLines.map(l => `<div>${l}</div>`).join('');
-        } else {
-          inner.style.background = 'linear-gradient(135deg, #2B2724 0%, #4a3f38 100%)';
-          document.getElementById('loyalty-tile-badge').textContent = '⭐';
-          document.getElementById('loyalty-tile-tier').textContent = 'Start earning rewards';
-          document.getElementById('loyalty-tile-label').textContent = `${customer.visits} visit${customer.visits !== 1 ? 's' : ''} so far`;
-          document.getElementById('loyalty-tile-progress').textContent = customer.progress.message;
-          document.getElementById('loyalty-tile-bar').style.width = customer.progress.pct + '%';
-          document.getElementById('loyalty-tile-rewards').textContent = 'Reach Silver for your first rewards';
+        inner.style.background = gradient;
+        document.getElementById('loyalty-tile-badge').textContent = emoji;
+
+        if (!data.found) {
+          document.getElementById('loyalty-tile-tier').textContent = 'Join our loyalty scheme';
+          document.getElementById('loyalty-tile-label').textContent = 'Your first visit earns 50 bonus points!';
+          document.getElementById('loyalty-tile-progress').textContent = 'Scan in today to become a 🪴 Newcomer';
+          document.getElementById('loyalty-tile-bar').style.width = '0%';
+          document.getElementById('loyalty-tile-rewards').textContent = '';
+          return;
         }
+
+        document.getElementById('loyalty-tile-tier').textContent = `${emoji} ${customer.tierInfo?.name || 'Newcomer'} Member`;
+        document.getElementById('loyalty-tile-label').textContent =
+          `${customer.visits} visit${customer.visits !== 1?'s':''} · ${customer.totalSpendFormatted} · ${customer.totalPiecesPainted} piece${customer.totalPiecesPainted !== 1?'s':''}`;
+        document.getElementById('loyalty-tile-progress').textContent = customer.progress.message;
+        document.getElementById('loyalty-tile-bar').style.width = customer.progress.pct + '%';
+
+        // Rewards for current tier
+        const r = customer.rewards;
+        const rewardLines = r ? [
+          r.description,
+          r.freeBisque ? `🎁 Free bisque: ${r.freeBisque}` : null,
+          r.glazingDiscount > 0 ? `🎨 ${r.glazingDiscount}% off glazing` : null,
+          r.freeDrink ? '☕ Free drink every visit' : null,
+          r.priorityBooking ? '⚡ Priority booking' : null,
+          r.takeItHome ? '🏠 Take It Home — free' : null,
+        ].filter(Boolean) : ['Your first visit earns 50 bonus points'];
+
+        // Instant rewards active this visit
+        const instant = customer.instantRewards || [];
+
+        document.getElementById('loyalty-tile-rewards').innerHTML = [
+          ...rewardLines.map(l => `<div>${l}</div>`),
+          ...instant.map(ir => `<div style="color:#FFD54F;margin-top:2px;">✨ ${ir.reward}</div>`),
+        ].join('');
+
+        // Tier journey dots
+        const allTiers = customer.allTiers || [];
+        if (allTiers.length) {
+          const dotsHtml = allTiers.slice().reverse().map(t => {
+            const isCurrent = t.key === tier;
+            const achieved = t.achieved;
+            return `<span title="${t.emoji} ${t.name}" style="font-size:${isCurrent?'16':'11'}px;opacity:${achieved?'1':'0.35'};transition:all .3s;">${t.emoji}</span>`;
+          }).join('<span style="font-size:8px;opacity:0.4;margin:0 2px;">›</span>');
+          document.getElementById('loyalty-tile-rewards').innerHTML +=
+            `<div style="margin-top:8px;display:flex;align-items:center;gap:2px;flex-wrap:wrap;">${dotsHtml}</div>`;
+        }
+
       } catch (e) { /* silent */ }
     }
 

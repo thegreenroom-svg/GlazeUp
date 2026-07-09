@@ -3182,40 +3182,97 @@ app.post('/api/pieces/complete-unfinished', async (req, res) => {
 // ═══════════════════════════════════════════
 
 const LOYALTY_TIERS = {
-  silver:   { name: 'Silver',   emoji: '🥈', minVisits: 3,  minSpend: 5000,  color: '#9E9E9E' },
-  gold:     { name: 'Gold',     emoji: '🥇', minVisits: 8,  minSpend: 15000, color: '#F9A825' },
-  platinum: { name: 'Platinum', emoji: '💎', minVisits: 15, minSpend: 30000, color: '#7B1FA2' },
+  newcomer:   { name: 'Newcomer',   emoji: '🪴', minVisits: 1,  minSpend: 0,     minPieces: 0,  color: '#8BC34A' },
+  dabbler:    { name: 'Dabbler',    emoji: '🎨', minVisits: 3,  minSpend: 0,     minPieces: 3,  color: '#26A69A' },
+  regular:    { name: 'Regular',    emoji: '⭐', minVisits: 6,  minSpend: 5000,  minPieces: 0,  color: '#42A5F5' },
+  enthusiast: { name: 'Enthusiast', emoji: '🔥', minVisits: 10, minSpend: 12000, minPieces: 5,  color: '#FF7043' },
+  silver:     { name: 'Silver',     emoji: '🥈', minVisits: 15, minSpend: 20000, minPieces: 0,  color: '#9E9E9E' },
+  gold:       { name: 'Gold',       emoji: '🥇', minVisits: 25, minSpend: 35000, minPieces: 0,  color: '#F9A825' },
+  platinum:   { name: 'Platinum',   emoji: '💎', minVisits: 40, minSpend: 60000, minPieces: 0,  color: '#7B1FA2' },
 };
+
+// Ordered from highest to lowest for tier calculation
+const TIER_ORDER = ['platinum','gold','silver','enthusiast','regular','dabbler','newcomer'];
 
 const LOYALTY_REWARDS = {
-  silver:   { freeBisque: 'Small piece (e.g. mug)', glazingDiscount: 5,  freeDrink: false, priorityBooking: false, takeItHome: false },
-  gold:     { freeBisque: 'Medium piece (e.g. bowl)', glazingDiscount: 10, freeDrink: true,  priorityBooking: true,  takeItHome: false },
-  platinum: { freeBisque: 'Large piece — your choice', glazingDiscount: 15, freeDrink: true,  priorityBooking: true,  takeItHome: true },
+  newcomer:   { description: 'Welcome! 50 bonus points on your first scan.',         freeBisque: null,                  glazingDiscount: 0,  freeDrink: false, priorityBooking: false, takeItHome: false },
+  dabbler:    { description: 'Free hot drink on your next visit.',                   freeBisque: null,                  glazingDiscount: 0,  freeDrink: true,  priorityBooking: false, takeItHome: false },
+  regular:    { description: '5% off glazing + free drink every visit.',             freeBisque: null,                  glazingDiscount: 5,  freeDrink: true,  priorityBooking: false, takeItHome: false },
+  enthusiast: { description: 'Free small bisque piece of your choice.',              freeBisque: 'Small piece (e.g. mug)',glazingDiscount: 5, freeDrink: true,  priorityBooking: false, takeItHome: false },
+  silver:     { description: '10% off glazing + free drink + priority booking.',     freeBisque: 'Small piece (e.g. mug)',glazingDiscount: 10, freeDrink: true,  priorityBooking: true,  takeItHome: false },
+  gold:       { description: 'Free medium bisque piece + 15% off + priority.',       freeBisque: 'Medium piece (e.g. bowl)',glazingDiscount: 15,freeDrink: true,  priorityBooking: true,  takeItHome: false },
+  platinum:   { description: 'Free large bisque + 20% off + Take It Home + gift.',   freeBisque: 'Large piece — your choice',glazingDiscount: 20,freeDrink: true, priorityBooking: true,  takeItHome: true  },
 };
 
-function calcLoyaltyTier(visits, totalSpendCents) {
-  if (visits >= LOYALTY_TIERS.platinum.minVisits || totalSpendCents >= LOYALTY_TIERS.platinum.minSpend) return 'platinum';
-  if (visits >= LOYALTY_TIERS.gold.minVisits || totalSpendCents >= LOYALTY_TIERS.gold.minSpend) return 'gold';
-  if (visits >= LOYALTY_TIERS.silver.minVisits || totalSpendCents >= LOYALTY_TIERS.silver.minSpend) return 'silver';
+// Instant rewards — triggered by specific actions regardless of tier
+const INSTANT_REWARDS = [
+  { id: 'first_visit',       trigger: 'First ever visit',                    reward: '50 bonus points',                    points: 50  },
+  { id: 'book_next_visit',   trigger: 'Booked next visit while in studio',   reward: 'Free drink this visit',              points: 20  },
+  { id: 'fifth_piece',       trigger: '5th piece painted (cumulative)',       reward: 'Choose a free glaze colour',         points: 25  },
+  { id: 'tenth_piece',       trigger: '10th piece painted',                  reward: '50 bonus points',                    points: 50  },
+  { id: 'big_session',       trigger: 'Spent over £45 in one session',       reward: '10% off studio fee this session',    points: 15  },
+  { id: 'community_share',   trigger: 'Shared a piece to the community',     reward: 'Design Preview free this visit',     points: 10  },
+  { id: 'transfer_first',    trigger: 'First Transfer Designer use',         reward: 'Free motif stamp from staff',        points: 0   },
+  { id: 'take_it_home',      trigger: 'Unlocked Take It Home',               reward: '15 bonus points',                   points: 15  },
+];
+
+function calcLoyaltyTier(visits, totalSpendCents, totalPieces) {
+  const pieces = totalPieces || 0;
+  for (const tier of TIER_ORDER) {
+    const t = LOYALTY_TIERS[tier];
+    const meetsVisits = visits >= t.minVisits;
+    const meetsSpend  = t.minSpend  > 0 && totalSpendCents >= t.minSpend;
+    const meetsPieces = t.minPieces > 0 && pieces >= t.minPieces;
+    // newcomer just needs 1 visit; others need visits OR (spend OR pieces)
+    if (tier === 'newcomer' && meetsVisits) return 'newcomer';
+    if (tier !== 'newcomer' && (meetsVisits || meetsSpend || meetsPieces)) return tier;
+  }
   return null;
 }
 
-function loyaltyProgress(visits, totalSpendCents) {
-  const tier = calcLoyaltyTier(visits, totalSpendCents);
-  if (tier === 'platinum') return { nextTier: null, pct: 100, message: 'Maximum tier reached!' };
+function loyaltyProgress(visits, totalSpendCents, totalPieces) {
+  const pieces = totalPieces || 0;
+  const tier = calcLoyaltyTier(visits, totalSpendCents, pieces);
+  if (tier === 'platinum') return { nextTier: null, pct: 100, message: '💎 Maximum tier — thank you!' };
 
-  const next = tier === 'gold' ? 'platinum' : tier === 'silver' ? 'gold' : 'silver';
-  const t = LOYALTY_TIERS[next];
-  const visitPct = Math.min(100, Math.round((visits / t.minVisits) * 100));
-  const spendPct = Math.min(100, Math.round((totalSpendCents / t.minSpend) * 100));
-  const pct = Math.max(visitPct, spendPct);
+  const currentIdx = TIER_ORDER.indexOf(tier);
+  const nextTierKey = TIER_ORDER[currentIdx - 1] || TIER_ORDER[0];
+  const t = LOYALTY_TIERS[nextTierKey];
+
+  const visitPct = t.minVisits  > 0 ? Math.min(100, Math.round((visits / t.minVisits) * 100)) : 0;
+  const spendPct = t.minSpend   > 0 ? Math.min(100, Math.round((totalSpendCents / t.minSpend) * 100)) : 0;
+  const piecePct = t.minPieces  > 0 ? Math.min(100, Math.round((pieces / t.minPieces) * 100)) : 0;
+  const pct = Math.max(visitPct, spendPct, piecePct);
+
   const visitsNeeded = Math.max(0, t.minVisits - visits);
-  const spendNeeded = Math.max(0, t.minSpend - totalSpendCents);
-  let message = '';
-  if (visitsNeeded === 0) message = `${spendNeeded > 0 ? `Spend £${(spendNeeded/100).toFixed(0)} more for` : 'Ready for'} ${LOYALTY_TIERS[next].name}!`;
-  else if (spendNeeded === 0) message = `${visitsNeeded} more visit${visitsNeeded > 1 ? 's' : ''} for ${LOYALTY_TIERS[next].name}!`;
-  else message = `${visitsNeeded} more visit${visitsNeeded > 1 ? 's' : ''} or spend £${(spendNeeded/100).toFixed(0)} more for ${LOYALTY_TIERS[next].name}`;
-  return { nextTier: next, pct, message };
+  const spendNeeded  = t.minSpend  > 0 ? Math.max(0, t.minSpend - totalSpendCents) : null;
+  const piecesNeeded = t.minPieces > 0 ? Math.max(0, t.minPieces - pieces) : null;
+
+  const parts = [];
+  if (visitsNeeded > 0) parts.push(`${visitsNeeded} more visit${visitsNeeded > 1 ? 's' : ''}`);
+  if (spendNeeded)  parts.push(`spend £${(spendNeeded/100).toFixed(0)} more`);
+  if (piecesNeeded) parts.push(`paint ${piecesNeeded} more piece${piecesNeeded > 1 ? 's' : ''}`);
+
+  const message = parts.length
+    ? `${parts.join(' or ')} for ${t.emoji} ${t.name}`
+    : `Ready for ${t.emoji} ${t.name}!`;
+
+  return { nextTier: nextTierKey, pct, message };
+}
+
+// Check which instant rewards apply for this customer right now
+function checkInstantRewards(customer, sessionSpendCents) {
+  const triggered = [];
+  const visits = customer.visit_count || 0;
+  const pieces = customer.total_pieces_painted || 0;
+
+  if (visits === 1) triggered.push(INSTANT_REWARDS.find(r => r.id === 'first_visit'));
+  if (pieces === 5 || pieces === 10) {
+    const r = INSTANT_REWARDS.find(r => r.id === (pieces === 5 ? 'fifth_piece' : 'tenth_piece'));
+    if (r) triggered.push(r);
+  }
+  if (sessionSpendCents >= 4500) triggered.push(INSTANT_REWARDS.find(r => r.id === 'big_session'));
+  return triggered.filter(Boolean);
 }
 
 // GET /api/loyalty/customer — get full loyalty profile for a customer by name
@@ -3234,8 +3291,10 @@ app.get('/api/loyalty/customer', async (req, res) => {
     const customer = customers[0];
     const visits = customer.visit_count || 0;
     const totalSpend = customer.total_spend_cents || 0;
-    const tier = calcLoyaltyTier(visits, totalSpend);
-    const progress = loyaltyProgress(visits, totalSpend);
+    const pieces = customer.total_pieces_painted || 0;
+    const tier = calcLoyaltyTier(visits, totalSpend, pieces);
+    const progress = loyaltyProgress(visits, totalSpend, pieces);
+    const instantRewards = checkInstantRewards(customer, 0);
 
     // Get recent transactions
     const { data: transactions } = await supabase
@@ -3255,11 +3314,18 @@ app.get('/api/loyalty/customer', async (req, res) => {
         totalSpendCents: totalSpend,
         totalSpendFormatted: `£${(totalSpend/100).toFixed(2)}`,
         loyaltyPoints: customer.loyalty_points || 0,
-        totalPiecesPainted: customer.total_pieces_painted || 0,
+        totalPiecesPainted: pieces,
         tier,
         tierInfo: tier ? { ...LOYALTY_TIERS[tier], rewards: LOYALTY_REWARDS[tier] } : null,
         progress,
         rewards: tier ? LOYALTY_REWARDS[tier] : null,
+        instantRewards,
+        allTiers: TIER_ORDER.map(k => ({
+          key: k,
+          ...LOYALTY_TIERS[k],
+          rewards: LOYALTY_REWARDS[k],
+          achieved: tier ? TIER_ORDER.indexOf(k) >= TIER_ORDER.indexOf(tier) : false,
+        })),
         joinedAt: customer.created_at,
       },
       recentTransactions: transactions || [],
@@ -3280,14 +3346,20 @@ app.post('/api/loyalty/visit', async (req, res) => {
 
     const newVisits = (customer.visit_count || 0) + 1;
     const newSpend = (customer.total_spend_cents || 0) + (spendCents || 0);
-    const visitPoints = 10; // 10 points per visit
-    const spendPoints = Math.floor((spendCents || 0) / 100); // 1 point per £1
-    const totalNewPoints = visitPoints + spendPoints;
+    const pieces = customer.total_pieces_painted || 0;
+    const visitPoints = 10;
+    const spendPoints = Math.floor((spendCents || 0) / 100);
+    // First visit bonus
+    const firstVisitBonus = newVisits === 1 ? 50 : 0;
+    // Big session bonus (over £45)
+    const bigSessionBonus = (spendCents || 0) >= 4500 ? 15 : 0;
+    const totalNewPoints = visitPoints + spendPoints + firstVisitBonus + bigSessionBonus;
     const newPoints = (customer.loyalty_points || 0) + totalNewPoints;
 
-    const prevTier = calcLoyaltyTier(customer.visit_count || 0, customer.total_spend_cents || 0);
-    const newTier = calcLoyaltyTier(newVisits, newSpend);
+    const prevTier = calcLoyaltyTier(customer.visit_count || 0, customer.total_spend_cents || 0, pieces);
+    const newTier = calcLoyaltyTier(newVisits, newSpend, pieces);
     const tierUpgrade = newTier !== prevTier && newTier !== null;
+    const instantRewards = checkInstantRewards({ ...customer, visit_count: newVisits, total_pieces_painted: pieces }, spendCents || 0);
 
     // Update customer
     await supabase.from('customers').update({
@@ -3314,8 +3386,9 @@ app.post('/api/loyalty/visit', async (req, res) => {
       totalPoints: newPoints,
       tier: newTier,
       tierUpgrade,
-      progress: loyaltyProgress(newVisits, newSpend),
+      progress: loyaltyProgress(newVisits, newSpend, pieces),
       rewards: newTier ? LOYALTY_REWARDS[newTier] : null,
+      instantRewards,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -3358,6 +3431,47 @@ app.post('/api/loyalty/redeem', async (req, res) => {
       description: rewardLabels[rewardType] || rewardType,
     });
     res.json({ redeemed: true, reward: rewardType });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/loyalty/book-next-visit — customer booked next visit while in studio
+// Awards 20 points + triggers free drink instant reward
+app.post('/api/loyalty/book-next-visit', async (req, res) => {
+  const { studioId, customerId, bookingCode } = req.body;
+  if (!studioId || !customerId) return res.status(400).json({ error: 'missing fields' });
+  const bonusPoints = 20;
+  try {
+    const { data: customer } = await supabase.from('customers').select('loyalty_points').eq('id', customerId).single();
+    await supabase.from('customers').update({ loyalty_points: (customer?.loyalty_points || 0) + bonusPoints }).eq('id', customerId);
+    await supabase.from('loyalty_transactions').insert({
+      studio_id: studioId, customer_id: customerId, booking_code: bookingCode || null,
+      points_earned: bonusPoints, transaction_type: 'book_next_visit',
+      description: 'Booked next visit while in studio — 20 bonus points + free drink this visit',
+    });
+    res.json({ pointsEarned: bonusPoints, instantReward: INSTANT_REWARDS.find(r => r.id === 'book_next_visit') });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/loyalty/piece-milestone — award points when piece count hits 5 or 10
+app.post('/api/loyalty/piece-milestone', async (req, res) => {
+  const { studioId, customerId, bookingCode, pieceCount } = req.body;
+  if (!studioId || !customerId) return res.status(400).json({ error: 'missing fields' });
+  const milestone = pieceCount >= 10 ? 'tenth_piece' : 'fifth_piece';
+  const reward = INSTANT_REWARDS.find(r => r.id === milestone);
+  if (!reward) return res.status(400).json({ error: 'not a milestone' });
+  try {
+    const { data: customer } = await supabase.from('customers').select('loyalty_points').eq('id', customerId).single();
+    await supabase.from('customers').update({ loyalty_points: (customer?.loyalty_points || 0) + reward.points }).eq('id', customerId);
+    await supabase.from('loyalty_transactions').insert({
+      studio_id: studioId, customer_id: customerId, booking_code: bookingCode || null,
+      points_earned: reward.points, transaction_type: milestone,
+      description: `${reward.trigger} — ${reward.reward}`,
+    });
+    res.json({ pointsEarned: reward.points, instantReward: reward });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

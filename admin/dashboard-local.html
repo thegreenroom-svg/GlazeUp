@@ -3199,12 +3199,19 @@ showStaffSection = function(section) {
 
 // ── Loyalty System ──
 const STAFF_TIER_GRADIENTS = {
-  silver:   'linear-gradient(135deg,#616161,#9E9E9E)',
-  gold:     'linear-gradient(135deg,#F57F17,#FDD835)',
-  platinum: 'linear-gradient(135deg,#4A148C,#9C27B0)',
-  none:     'linear-gradient(135deg,#4a3f38,#2B2724)',
+  newcomer:   'linear-gradient(135deg,#558B2F,#8BC34A)',
+  dabbler:    'linear-gradient(135deg,#00695C,#26A69A)',
+  regular:    'linear-gradient(135deg,#1565C0,#42A5F5)',
+  enthusiast: 'linear-gradient(135deg,#BF360C,#FF7043)',
+  silver:     'linear-gradient(135deg,#616161,#9E9E9E)',
+  gold:       'linear-gradient(135deg,#F57F17,#FDD835)',
+  platinum:   'linear-gradient(135deg,#4A148C,#9C27B0)',
+  none:       'linear-gradient(135deg,#4a3f38,#2B2724)',
 };
-const STAFF_TIER_EMOJIS = { silver:'🥈', gold:'🥇', platinum:'💎', none:'⭐' };
+const STAFF_TIER_EMOJIS = {
+  newcomer:'🪴', dabbler:'🎨', regular:'⭐',
+  enthusiast:'🔥', silver:'🥈', gold:'🥇', platinum:'💎', none:'🪴'
+};
 
 async function loadS1LoyaltyPanel(customerName) {
   const panel = document.getElementById('s1-loyalty-panel');
@@ -3212,13 +3219,13 @@ async function loadS1LoyaltyPanel(customerName) {
   try {
     const res = await fetch(`${API_URL}/api/loyalty/customer?studioId=${studioId}&customerName=${encodeURIComponent(customerName)}`);
     const data = await res.json();
-
     panel.style.display = 'block';
+
     if (!data.found) {
       panel.style.background = STAFF_TIER_GRADIENTS.none;
-      document.getElementById('s1-loyalty-badge').textContent = '⭐';
-      document.getElementById('s1-loyalty-tier').textContent = 'New customer — no loyalty history yet';
-      document.getElementById('s1-loyalty-stats').textContent = '3 visits or £50 spend earns Silver';
+      document.getElementById('s1-loyalty-badge').textContent = '🪴';
+      document.getElementById('s1-loyalty-tier').textContent = 'New customer — welcome!';
+      document.getElementById('s1-loyalty-label').textContent = 'First visit earns 50 bonus points + 🪴 Newcomer tier automatically';
       document.getElementById('s1-loyalty-rewards').textContent = '';
       document.getElementById('s1-loyalty-actions').innerHTML = '';
       return;
@@ -3227,36 +3234,69 @@ async function loadS1LoyaltyPanel(customerName) {
     const { customer } = data;
     const tier = customer.tier || 'none';
     panel.style.background = STAFF_TIER_GRADIENTS[tier] || STAFF_TIER_GRADIENTS.none;
-    document.getElementById('s1-loyalty-badge').textContent = STAFF_TIER_EMOJIS[tier] || '⭐';
-    document.getElementById('s1-loyalty-label').textContent = `${customer.visits} visit${customer.visits !== 1?'s':''} · ${customer.totalSpendFormatted} spent · ${customer.loyaltyPoints} pts`;
+    document.getElementById('s1-loyalty-badge').textContent = STAFF_TIER_EMOJIS[tier] || '🪴';
+    document.getElementById('s1-loyalty-label').textContent =
+      `${customer.visits} visit${customer.visits!==1?'s':''} · ${customer.totalSpendFormatted} · ${customer.totalPiecesPainted} piece${customer.totalPiecesPainted!==1?'s':''} · ${customer.loyaltyPoints} pts`;
 
     if (tier && tier !== 'none') {
       document.getElementById('s1-loyalty-tier').textContent = `${STAFF_TIER_EMOJIS[tier]} ${customer.tierInfo.name} Member`;
       const r = customer.rewards;
-      document.getElementById('s1-loyalty-rewards').innerHTML = [
-        `🎁 Free bisque: ${r.freeBisque}`,
-        `🎨 ${r.glazingDiscount}% glazing discount`,
+      const rewardLines = [
+        r.description,
+        r.freeBisque ? `🎁 Free bisque: ${r.freeBisque}` : null,
+        r.glazingDiscount > 0 ? `🎨 ${r.glazingDiscount}% off glazing` : null,
         r.freeDrink ? '☕ Free drink this visit' : null,
         r.priorityBooking ? '⚡ Priority booking' : null,
         r.takeItHome ? '🏠 Take It Home — free' : null,
-      ].filter(Boolean).map(l=>`<div>${l}</div>`).join('');
-
-      // Reward action buttons for staff to tick off
-      const actions = [];
-      if (r.freeBisque) actions.push(`<button onclick="redeemLoyaltyReward('${customer.id}','free_bisque')" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:5px 10px;font-size:11px;color:white;cursor:pointer;">✓ Redeem free bisque</button>`);
-      if (r.freeDrink) actions.push(`<button onclick="redeemLoyaltyReward('${customer.id}','free_drink')" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:5px 10px;font-size:11px;color:white;cursor:pointer;">✓ Redeem free drink</button>`);
-      if (r.glazingDiscount) actions.push(`<button onclick="redeemLoyaltyReward('${customer.id}','discount_applied')" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:5px 10px;font-size:11px;color:white;cursor:pointer;">✓ Apply ${r.glazingDiscount}% discount</button>`);
-      if (r.takeItHome) actions.push(`<button onclick="redeemLoyaltyReward('${customer.id}','take_it_home')" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:5px 10px;font-size:11px;color:white;cursor:pointer;">✓ Grant Take It Home free</button>`);
-      document.getElementById('s1-loyalty-actions').innerHTML = actions.join('');
+      ].filter(Boolean);
+      document.getElementById('s1-loyalty-rewards').innerHTML = rewardLines.map(l=>`<div>${l}</div>`).join('');
     } else {
-      document.getElementById('s1-loyalty-tier').textContent = 'Working towards Silver';
-      document.getElementById('s1-loyalty-rewards').textContent = customer.progress.message;
-      document.getElementById('s1-loyalty-actions').innerHTML = '';
+      document.getElementById('s1-loyalty-tier').textContent = customer.progress.message;
+      document.getElementById('s1-loyalty-rewards').textContent = 'No tier rewards yet — keep visiting!';
     }
+
+    const instant = customer.instantRewards || [];
+    if (instant.length) {
+      document.getElementById('s1-loyalty-rewards').innerHTML +=
+        instant.map(ir => `<div style="color:#FFD54F;font-weight:600;margin-top:4px;">✨ Instant reward: ${ir.reward}</div>`).join('');
+    }
+
+    const allTiers = customer.allTiers || [];
+    if (allTiers.length) {
+      const journey = allTiers.slice().reverse().map(t => {
+        const isCurrent = t.key === tier;
+        return `<span title="${t.name}" style="font-size:${isCurrent?'18':'12'}px;opacity:${t.achieved?'1':'0.3'}">${t.emoji}</span>`;
+      }).join('<span style="font-size:8px;opacity:0.3;margin:0 1px;">›</span>');
+      document.getElementById('s1-loyalty-rewards').innerHTML +=
+        `<div style="margin-top:8px;display:flex;align-items:center;gap:2px;flex-wrap:wrap;">${journey}</div>`;
+    }
+
+    const actions = [];
+    if (customer.rewards?.freeBisque) actions.push(`<button onclick="redeemLoyaltyReward('${customer.id}','free_bisque')" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:5px 10px;font-size:11px;color:white;cursor:pointer;">✓ Redeem free bisque</button>`);
+    if (customer.rewards?.freeDrink) actions.push(`<button onclick="redeemLoyaltyReward('${customer.id}','free_drink')" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:5px 10px;font-size:11px;color:white;cursor:pointer;">✓ Redeem free drink</button>`);
+    if (customer.rewards?.glazingDiscount) actions.push(`<button onclick="redeemLoyaltyReward('${customer.id}','discount_applied')" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:5px 10px;font-size:11px;color:white;cursor:pointer;">✓ Apply ${customer.rewards.glazingDiscount}% discount</button>`);
+    if (customer.rewards?.takeItHome) actions.push(`<button onclick="redeemLoyaltyReward('${customer.id}','take_it_home')" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:5px 10px;font-size:11px;color:white;cursor:pointer;">✓ Grant Take It Home free</button>`);
+    actions.push(`<button onclick="recordBookNextVisit('${customer.id}')" style="background:#F9A825;border:none;border-radius:6px;padding:5px 10px;font-size:11px;color:white;font-weight:700;cursor:pointer;">📅 Book next visit — +20pts + free drink</button>`);
+    document.getElementById('s1-loyalty-actions').innerHTML = actions.join('');
+
   } catch(e) {
     const panel = document.getElementById('s1-loyalty-panel');
     if (panel) panel.style.display = 'none';
   }
+}
+
+async function recordBookNextVisit(customerId) {
+  const bookingCode = document.getElementById('s1-result').dataset.bookingCode || null;
+  try {
+    const res = await fetch(`${API_URL}/api/loyalty/book-next-visit`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ studioId, customerId, bookingCode })
+    });
+    const data = await res.json();
+    event.target.textContent = `✓ Booked — +${data.pointsEarned} pts + free drink this visit!`;
+    event.target.style.background = '#2e7d32';
+    event.target.disabled = true;
+  } catch(e) { alert('Could not record booking: ' + e.message); }
 }
 
 async function redeemLoyaltyReward(customerId, rewardType) {
