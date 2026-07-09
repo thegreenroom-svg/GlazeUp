@@ -3553,6 +3553,67 @@ app.get('/api/staff/tasks', async (req, res) => {
   res.json({ tasks: data || [] });
 });
 
+// GET /api/staff/tasks/all-incomplete — every pending task, grouped by role, for the manager overview
+app.get('/api/staff/tasks/all-incomplete', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data } = await supabase.from('task_queue')
+    .select('*').eq('studio_id', studioId).eq('status', 'pending')
+    .order('created_at', { ascending: true });
+
+  const tasks = data || [];
+  const grouped = {};
+  tasks.forEach(t => {
+    if (!grouped[t.assigned_role]) grouped[t.assigned_role] = [];
+    grouped[t.assigned_role].push(t);
+  });
+
+  res.json({ tasks, grouped, totalCount: tasks.length });
+});
+
+// POST /api/staff/tasks/adhoc — manager pushes a one-off task to a role or specific staff member
+app.post('/api/staff/tasks/adhoc', async (req, res) => {
+  const { studioId, assignedRole, assignedStaffId, taskDescription, tableName, bookingCode, urgent } = req.body;
+  if (!studioId || !assignedRole || !taskDescription) {
+    return res.status(400).json({ error: 'studioId, assignedRole, taskDescription required' });
+  }
+
+  const { data: task, error } = await supabase.from('task_queue').insert({
+    studio_id: studioId,
+    booking_code: bookingCode || null,
+    table_name: tableName || null,
+    assigned_role: assignedRole,
+    assigned_staff_id: assignedStaffId || null,
+    task_type: 'adhoc_request',
+    task_description: taskDescription,
+    next_trigger_type: null,
+    status: 'pending',
+  }).select().single();
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  // Also fire a handoff alert so it shows in the alert feed / big popup immediately
+  await supabase.from('staff_alerts').insert({
+    studio_id: studioId,
+    trigger_type: 'adhoc_request',
+    booking_code: bookingCode || null,
+    next_role: assignedRole,
+    icon: urgent ? '🚨' : '📌',
+    label: urgent ? 'Urgent request' : 'One-off request',
+    message: taskDescription,
+    context: { assignedStaffId, urgent: !!urgent },
+    acknowledged: false,
+  });
+
+  res.json({ task });
+});
+
+// DELETE /api/staff/tasks/:id — cancel a task entirely (manager can pull back a request)
+app.delete('/api/staff/tasks/:id', async (req, res) => {
+  await supabase.from('task_queue').delete().eq('id', req.params.id);
+  res.json({ deleted: true });
+});
+
 // PATCH /api/staff/tasks/:id/complete — mark a task complete, auto-create next step if chained
 app.patch('/api/staff/tasks/:id/complete', async (req, res) => {
   const { completedBy } = req.body;

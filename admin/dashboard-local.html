@@ -2283,6 +2283,48 @@
           </div>
         </div>
 
+        <!-- Incomplete Tasks by Role — Manager overview -->
+        <div class="chart-container" style="margin-bottom:20px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <h3 style="margin:0;">📋 Incomplete Tasks — All Roles</h3>
+            <button onclick="loadManagerTaskOverview()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">🔄 Refresh</button>
+          </div>
+          <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Everything still pending across the whole team right now, grouped by role. Cancel anything that's no longer needed.</p>
+          <div id="manager-tasks-by-role"><div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading…</div></div>
+        </div>
+
+        <!-- Push a one-off / ad-hoc request -->
+        <div class="chart-container" style="margin-bottom:20px;">
+          <h3 style="margin:0 0 6px;">📌 Send a One-Off Request</h3>
+          <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Push an ad-hoc task straight to a role or a specific person. Appears on their tablet exactly like a handoff alert — flashing until actioned.</p>
+          <div style="display:grid;gap:10px;margin-bottom:12px;">
+            <div>
+              <label style="font-size:11px;font-weight:600;color:var(--gu-dust);display:block;margin-bottom:4px;">Send to</label>
+              <select id="adhoc-role-select" onchange="onAdhocRoleChange()" style="width:100%;padding:9px 12px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;background:white;"></select>
+            </div>
+            <div>
+              <label style="font-size:11px;font-weight:600;color:var(--gu-dust);display:block;margin-bottom:4px;">Or a specific person (optional)</label>
+              <select id="adhoc-staff-select" style="width:100%;padding:9px 12px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;background:white;">
+                <option value="">Anyone with this role</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:11px;font-weight:600;color:var(--gu-dust);display:block;margin-bottom:4px;">Table / booking reference (optional)</label>
+              <input type="text" id="adhoc-table" placeholder="e.g. Table 4" style="width:100%;padding:9px 12px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;">
+            </div>
+            <div>
+              <label style="font-size:11px;font-weight:600;color:var(--gu-dust);display:block;margin-bottom:4px;">What do you need done?</label>
+              <textarea id="adhoc-message" rows="2" placeholder="e.g. Please restock the till float from the safe" style="width:100%;padding:9px 12px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;"></textarea>
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--gu-dust);cursor:pointer;">
+              <input type="checkbox" id="adhoc-urgent" style="width:16px;height:16px;">
+              🚨 Mark as urgent
+            </label>
+          </div>
+          <button onclick="sendAdhocRequest()" style="background:var(--link-clay);color:white;border:none;border-radius:8px;padding:11px 22px;font-size:13px;font-weight:700;cursor:pointer;">📤 Send Request</button>
+          <span id="adhoc-send-status" style="font-size:12px;color:var(--gu-dust);margin-left:10px;"></span>
+        </div>
+
         <!-- Per-booking progress -->
         <div class="chart-container">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
@@ -2905,6 +2947,8 @@ function goToTab(tab, event) {
     loadTeamAndDuties();
   } else if (tab === 'progress') {
     loadDailyProgress();
+    loadManagerTaskOverview();
+    loadTeamMembers().then(() => populateAdhocSelects());
   }
 }
 
@@ -4061,6 +4105,7 @@ const ALERT_TRIGGERS_CLIENT = {
   kiln_loaded:        { icon:'🔥', label:'Kiln loaded',              nextRole:'Ceramic Technician' },
   kiln_fired:         { icon:'✨', label:'Kiln fired — ready',       nextRole:'Studio Assistant' },
   booking_completed:  { icon:'🎉', label:'Booking completed',        nextRole:'Studio Manager' },
+  adhoc_request:      { icon:'📌', label:'One-off request',          nextRole:null },
 };
 
 let alertFeedItems = [];
@@ -4384,7 +4429,10 @@ async function pollMyTasks() {
     const data = await res.json();
     const prevCount = myTasks.length;
     const prevIds = new Set(myTasks.map(t => t.id));
-    myTasks = data.tasks || [];
+
+    // If a task has assigned_staff_id set, only show it to that specific person.
+    // Tasks with no staff_id are visible to anyone with the matching role.
+    myTasks = (data.tasks || []).filter(t => !t.assigned_staff_id || t.assigned_staff_id === currentShiftStaff.id);
 
     const newTasks = myTasks.filter(t => !prevIds.has(t.id));
     if (newTasks.length && prevCount > 0) {
@@ -4586,6 +4634,105 @@ function notifyNewTask(task) {
 }
 
 // ── Daily Progress (running completion log) ──
+// ── Manager Task Overview (incomplete tasks by role) ──
+const ROLE_COLORS_MGR = { 'Studio Manager':'#5E35B1', 'Studio Executive':'#1E88E5', 'Ceramic Technician':'#8D6E63', 'Studio Assistant':'#00897B', 'Barista':'#F4511E' };
+
+async function loadManagerTaskOverview() {
+  const el = document.getElementById('manager-tasks-by-role');
+  if (!el) return;
+  try {
+    const res = await fetch(`${API_URL}/api/staff/tasks/all-incomplete?studioId=${studioId}`);
+    const data = await res.json();
+
+    if (!data.totalCount) {
+      el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--gu-dust);"><div style="font-size:28px;margin-bottom:8px;">✨</div><div style="font-size:13px;">Nothing outstanding — the whole team is caught up.</div></div>';
+      return;
+    }
+
+    const roles = Object.keys(data.grouped);
+    el.innerHTML = roles.map(role => {
+      const tasks = data.grouped[role];
+      const color = ROLE_COLORS_MGR[role] || '#999';
+      return `
+        <div style="margin-bottom:16px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span style="background:${color};color:white;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;">${role}</span>
+            <span style="font-size:11px;color:var(--gu-dust);">${tasks.length} pending</span>
+          </div>
+          ${tasks.map(t => {
+            const waitMins = Math.round((Date.now() - new Date(t.created_at).getTime()) / 60000);
+            const waitColor = waitMins > 15 ? '#e53935' : waitMins > 5 ? '#F9A825' : 'var(--gu-dust)';
+            return `
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--gu-bg);border-radius:8px;margin-bottom:6px;border-left:3px solid ${color};">
+                <div style="flex:1;min-width:0;">
+                  ${t.table_name ? `<span style="font-size:11px;font-weight:700;color:${color};">${t.table_name} · </span>` : ''}
+                  <span style="font-size:12.5px;color:var(--gu-text);">${t.task_description}</span>
+                  <div style="font-size:10px;color:${waitColor};margin-top:2px;">${waitMins < 1 ? 'just now' : waitMins + ' min ago'}</div>
+                </div>
+                <button onclick="cancelManagerTask('${t.id}')" style="background:none;border:1px solid var(--gu-border);color:var(--gu-dust);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0;">Cancel</button>
+              </div>`;
+          }).join('')}
+        </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<p style="color:var(--gu-dust);font-size:13px;">Could not load task overview.</p>';
+  }
+}
+
+async function cancelManagerTask(id) {
+  if (!confirm('Cancel this task? It will be removed from that person\'s queue.')) return;
+  await fetch(`${API_URL}/api/staff/tasks/${id}`, { method:'DELETE' });
+  loadManagerTaskOverview();
+}
+
+// ── Ad-hoc / one-off request form ──
+function populateAdhocSelects() {
+  const roleSelect = document.getElementById('adhoc-role-select');
+  if (!roleSelect) return;
+  roleSelect.innerHTML = STAFF_ROLES.map(r => `<option value="${r}">${r}</option>`).join('');
+  onAdhocRoleChange();
+}
+
+function onAdhocRoleChange() {
+  const role = document.getElementById('adhoc-role-select').value;
+  const staffSelect = document.getElementById('adhoc-staff-select');
+  const matching = teamMembers.filter(m => m.role === role);
+  staffSelect.innerHTML = '<option value="">Anyone with this role</option>' +
+    matching.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+}
+
+async function sendAdhocRequest() {
+  const role = document.getElementById('adhoc-role-select').value;
+  const staffId = document.getElementById('adhoc-staff-select').value;
+  const table = document.getElementById('adhoc-table').value.trim();
+  const message = document.getElementById('adhoc-message').value.trim();
+  const urgent = document.getElementById('adhoc-urgent').checked;
+  const status = document.getElementById('adhoc-send-status');
+
+  if (!message) { alert('Please describe what needs doing.'); return; }
+
+  status.textContent = 'Sending…';
+  try {
+    await fetch(`${API_URL}/api/staff/tasks/adhoc`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        studioId, assignedRole: role, assignedStaffId: staffId || null,
+        taskDescription: message, tableName: table || null, urgent,
+      })
+    });
+    status.textContent = '✓ Sent';
+    document.getElementById('adhoc-message').value = '';
+    document.getElementById('adhoc-table').value = '';
+    document.getElementById('adhoc-urgent').checked = false;
+    setTimeout(() => status.textContent = '', 3000);
+    loadManagerTaskOverview();
+    // Refresh alert/task polling immediately so it shows up fast
+    pollHandoffAlerts();
+  } catch(e) {
+    status.textContent = '✗ Failed to send';
+  }
+}
+
 async function loadDailyProgress() {
   const listEl = document.getElementById('dp-bookings-list');
   try {
