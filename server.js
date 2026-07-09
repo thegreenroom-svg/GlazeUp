@@ -3410,6 +3410,51 @@ const DEFAULT_PROCESS_CONFIG = [
 ];
 
 // GET /api/staff/process-config — get this studio's process chain (or defaults if unset)
+// ═══════════════════════════════════════════
+// ALERT SETTINGS
+// Admin-controlled repeat interval and behaviour
+// for unactioned handoff alerts / tasks.
+// ═══════════════════════════════════════════
+
+const DEFAULT_ALERT_SETTINGS = {
+  repeatMinutes: 5,       // re-alert every N minutes until actioned
+  flashUntilActioned: true,
+  escalateAfterRepeats: 3, // after this many repeats, optionally escalate to a more senior role
+  escalateEnabled: false,
+};
+
+// GET /api/staff/alert-settings
+app.get('/api/staff/alert-settings', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data } = await supabase.from('alert_settings').select('*').eq('studio_id', studioId).single();
+  if (!data) return res.json({ settings: DEFAULT_ALERT_SETTINGS });
+  res.json({ settings: {
+    repeatMinutes: data.repeat_minutes,
+    flashUntilActioned: data.flash_until_actioned,
+    escalateAfterRepeats: data.escalate_after_repeats,
+    escalateEnabled: data.escalate_enabled,
+  }});
+});
+
+// POST /api/staff/alert-settings
+app.post('/api/staff/alert-settings', async (req, res) => {
+  const { studioId, repeatMinutes, flashUntilActioned, escalateAfterRepeats, escalateEnabled } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data, error } = await supabase.from('alert_settings').upsert({
+    studio_id: studioId,
+    repeat_minutes: repeatMinutes ?? 5,
+    flash_until_actioned: flashUntilActioned !== false,
+    escalate_after_repeats: escalateAfterRepeats ?? 3,
+    escalate_enabled: escalateEnabled === true,
+  }, { onConflict: 'studio_id' }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ settings: {
+    repeatMinutes: data.repeat_minutes, flashUntilActioned: data.flash_until_actioned,
+    escalateAfterRepeats: data.escalate_after_repeats, escalateEnabled: data.escalate_enabled,
+  }});
+});
+
 app.get('/api/staff/process-config', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });

@@ -1270,12 +1270,13 @@
 
 <!-- Big Task Card (full task detail + complete button) -->
 <div id="task-card-modal" style="display:none;position:fixed;inset:0;z-index:9600;background:rgba(43,39,36,0.8);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
-  <div style="background:white;border-radius:24px;max-width:440px;width:100%;box-shadow:0 24px 70px rgba(0,0,0,0.4);overflow:hidden;animation:handoffPop .35s cubic-bezier(.34,1.4,.4,1);">
+  <div id="task-card-card" style="background:white;border-radius:24px;max-width:440px;width:100%;box-shadow:0 24px 70px rgba(0,0,0,0.4);overflow:hidden;animation:handoffPop .35s cubic-bezier(.34,1.4,.4,1);">
     <div id="task-card-header" style="background:var(--gu-primary);padding:30px 24px 24px;text-align:center;position:relative;">
       <button onclick="toggleTaskVoice()" id="task-voice-btn" style="position:absolute;top:14px;right:14px;background:rgba(255,255,255,0.2);border:none;color:white;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">🔊 Voice on</button>
       <div id="task-card-icon" style="font-size:56px;margin-bottom:10px;">📋</div>
       <div id="task-card-table" style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,0.7);margin-bottom:6px;"></div>
       <div id="task-card-title" style="font-size:19px;font-weight:800;color:white;line-height:1.3;"></div>
+      <div id="task-card-repeat-count" style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:8px;display:none;"></div>
     </div>
     <div style="padding:26px 24px;">
       <div id="task-card-message" style="font-size:15px;color:var(--gu-text);line-height:1.65;text-align:center;margin-bottom:24px;"></div>
@@ -1284,7 +1285,7 @@
       </button>
       <div style="display:flex;gap:8px;">
         <button onclick="passCurrentTask()" style="flex:1;background:#f0ebe4;border:none;color:var(--gu-dust);border-radius:10px;padding:11px;font-size:12px;font-weight:600;cursor:pointer;">↩ Can't do this now</button>
-        <button onclick="closeTaskCard()" style="flex:1;background:none;border:1px solid var(--gu-border);color:var(--gu-dust);border-radius:10px;padding:11px;font-size:12px;font-weight:600;cursor:pointer;">Later</button>
+        <button onclick="closeTaskCard()" style="flex:1;background:none;border:1px solid var(--gu-border);color:var(--gu-dust);border-radius:10px;padding:11px;font-size:12px;font-weight:600;cursor:pointer;">Later — remind me in <span id="task-repeat-mins-label">5</span> min</button>
       </div>
     </div>
   </div>
@@ -1292,11 +1293,12 @@
 
 <!-- Big Handoff Alert Popup -->
 <div id="handoff-alert-modal" style="display:none;position:fixed;inset:0;z-index:9500;background:rgba(43,39,36,0.75);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
-  <div style="background:white;border-radius:24px;max-width:440px;width:100%;box-shadow:0 24px 70px rgba(0,0,0,0.4);overflow:hidden;animation:handoffPop .35s cubic-bezier(.34,1.4,.4,1);">
+  <div id="handoff-alert-card" style="background:white;border-radius:24px;max-width:440px;width:100%;box-shadow:0 24px 70px rgba(0,0,0,0.4);overflow:hidden;animation:handoffPop .35s cubic-bezier(.34,1.4,.4,1);">
     <div id="handoff-alert-header" style="background:var(--gu-primary);padding:28px 24px 22px;text-align:center;">
       <div id="handoff-alert-icon" style="font-size:52px;margin-bottom:10px;">🔔</div>
       <div id="handoff-alert-label" style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,0.7);margin-bottom:6px;"></div>
       <div id="handoff-alert-role" style="font-size:20px;font-weight:800;color:white;"></div>
+      <div id="handoff-alert-repeat-count" style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:8px;display:none;"></div>
     </div>
     <div style="padding:24px;">
       <div id="handoff-alert-message" style="font-size:15px;color:var(--gu-text);line-height:1.6;text-align:center;margin-bottom:20px;"></div>
@@ -1304,7 +1306,7 @@
         ✓ Got it — mark as actioned
       </button>
       <button onclick="dismissHandoffModal()" style="width:100%;background:none;border:none;color:var(--gu-dust);font-size:13px;cursor:pointer;padding:12px;margin-top:2px;">
-        Dismiss for now
+        Dismiss for now — will alert again in <span id="handoff-repeat-mins-label">5</span> min
       </button>
     </div>
   </div>
@@ -1314,6 +1316,16 @@
   0% { transform: scale(0.85); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
 }
+@keyframes urgentFlash {
+  0%, 100% { background: rgba(43,39,36,0.75); }
+  50% { background: rgba(229,57,53,0.55); }
+}
+@keyframes urgentCardPulse {
+  0%, 100% { box-shadow: 0 24px 70px rgba(0,0,0,0.4), 0 0 0 0 rgba(229,57,53,0); }
+  50% { box-shadow: 0 24px 70px rgba(0,0,0,0.4), 0 0 0 14px rgba(229,57,53,0.25); }
+}
+.alert-flashing { animation: urgentFlash 0.9s ease-in-out infinite !important; }
+.alert-card-flashing { animation: handoffPop .35s cubic-bezier(.34,1.4,.4,1), urgentCardPulse 0.9s ease-in-out infinite !important; }
 </style>
 
 <div class="admin-wrapper">
@@ -2172,6 +2184,38 @@
           <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Edit the default duties for each role. Update any time — great for a weekly review. Changes apply to all future sessions.</p>
           <div id="duty-role-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;"></div>
           <div id="duty-role-editor"></div>
+        </div>
+
+        <!-- Alert Settings -->
+        <div class="chart-container" style="margin-top:20px;">
+          <h3 style="margin:0 0 6px;">🚨 Alert &amp; Reminder Settings</h3>
+          <p style="font-size:12px;color:var(--gu-dust);margin-bottom:16px;line-height:1.5;">
+            Control how insistent handoff alerts and tasks are. An unactioned alert will keep flashing and re-alerting at this interval until someone taps Complete/Actioned.
+          </p>
+          <div style="display:grid;gap:14px;margin-bottom:16px;">
+            <div>
+              <label style="font-size:12px;font-weight:600;color:var(--gu-dust);display:block;margin-bottom:6px;">Repeat every</label>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <input type="range" id="alert-repeat-slider" min="1" max="30" value="5" oninput="onAlertRepeatSliderChange(this.value)" style="flex:1;">
+                <span id="alert-repeat-value" style="font-size:14px;font-weight:700;color:var(--gu-primary);min-width:70px;text-align:right;">5 minutes</span>
+              </div>
+            </div>
+            <label style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--gu-bg);border-radius:10px;border:1px solid var(--gu-border);cursor:pointer;font-size:13px;">
+              <input type="checkbox" id="alert-flash-toggle" checked style="width:18px;height:18px;">
+              🚨 Flash the screen red until actioned (recommended — impossible to miss)
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--gu-bg);border-radius:10px;border:1px solid var(--gu-border);cursor:pointer;font-size:13px;">
+              <input type="checkbox" id="alert-escalate-toggle" style="width:18px;height:18px;">
+              📢 Escalate to a more senior role if still unactioned after
+              <select id="alert-escalate-count" style="padding:5px 8px;border:1px solid var(--gu-border);border-radius:6px;font-size:12px;margin-left:4px;">
+                <option value="2">2 repeats</option>
+                <option value="3" selected>3 repeats</option>
+                <option value="5">5 repeats</option>
+              </select>
+            </label>
+          </div>
+          <button onclick="saveAlertSettings()" style="background:var(--link-clay);color:white;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;">💾 Save Alert Settings</button>
+          <span id="alert-settings-status" style="font-size:12px;color:var(--gu-dust);margin-left:10px;"></span>
         </div>
 
         <!-- Process Builder — the handoff chain -->
@@ -4080,9 +4124,26 @@ function updateAlertBellBadge() {
   }
 }
 
+// ── Alert settings (admin-controlled repeat interval) ──
+let alertSettings = { repeatMinutes: 5, flashUntilActioned: true, escalateAfterRepeats: 3, escalateEnabled: false };
+let handoffRepeatTimer = null;
+let handoffRepeatCount = 0;
+
+async function loadAlertSettings() {
+  try {
+    const res = await fetch(`${API_URL}/api/staff/alert-settings?studioId=${studioId}`);
+    const data = await res.json();
+    alertSettings = data.settings || alertSettings;
+    document.querySelectorAll('#handoff-repeat-mins-label, #task-repeat-mins-label').forEach(el => {
+      if (el) el.textContent = alertSettings.repeatMinutes;
+    });
+  } catch(e) { /* silent, use defaults */ }
+}
+
 function showNextHandoffPopup() {
   if (!alertPopupQueue.length) { currentPopupAlert = null; return; }
   currentPopupAlert = alertPopupQueue.shift();
+  handoffRepeatCount = 0;
 
   const modal = document.getElementById('handoff-alert-modal');
   const header = document.getElementById('handoff-alert-header');
@@ -4090,15 +4151,65 @@ function showNextHandoffPopup() {
   document.getElementById('handoff-alert-label').textContent = currentPopupAlert.label || 'Update';
   document.getElementById('handoff-alert-role').textContent = `For: ${currentPopupAlert.next_role || 'Studio Team'}`;
   document.getElementById('handoff-alert-message').textContent = currentPopupAlert.message || '';
+  document.getElementById('handoff-repeat-mins-label').textContent = alertSettings.repeatMinutes;
 
-  // Colour-code header by role
   const ROLE_COLORS = { 'Studio Manager':'#5E35B1', 'Studio Executive':'#1E88E5', 'Ceramic Technician':'#8D6E63', 'Studio Assistant':'#00897B', 'Barista':'#F4511E' };
   header.style.background = ROLE_COLORS[currentPopupAlert.next_role] || 'var(--gu-primary)';
 
   modal.style.display = 'flex';
+  applyAlertFlashing(modal, true);
 
-  // Play a gentle alert tone (reuse existing extras ping pattern if available)
   try { playExtrasPing(); } catch(e) {}
+  startHandoffRepeatTimer();
+}
+
+function applyAlertFlashing(modal, on) {
+  if (!alertSettings.flashUntilActioned) return;
+  const card = modal.querySelector('#handoff-alert-card, #task-card-card') || modal.firstElementChild;
+  if (on) {
+    modal.classList.add('alert-flashing');
+    if (card) card.classList.add('alert-card-flashing');
+  } else {
+    modal.classList.remove('alert-flashing');
+    if (card) card.classList.remove('alert-card-flashing');
+  }
+}
+
+function startHandoffRepeatTimer() {
+  clearInterval(handoffRepeatTimer);
+  const intervalMs = Math.max(1, alertSettings.repeatMinutes) * 60 * 1000;
+  handoffRepeatTimer = setInterval(() => {
+    if (!currentPopupAlert) { clearInterval(handoffRepeatTimer); return; }
+    handoffRepeatCount++;
+    const countEl = document.getElementById('handoff-alert-repeat-count');
+    if (countEl) {
+      countEl.style.display = 'block';
+      countEl.textContent = `⏰ Repeated ${handoffRepeatCount}× — still needs actioning`;
+    }
+    try { playExtrasPing(); } catch(e) {}
+    vibrateForTask();
+    if (taskVoiceEnabled) speakTask(`Reminder: ${currentPopupAlert.message}`);
+
+    // Re-show if it was dismissed but not actioned
+    const modal = document.getElementById('handoff-alert-modal');
+    modal.style.display = 'flex';
+    applyAlertFlashing(modal, true);
+
+    // Optional escalation after N repeats
+    if (alertSettings.escalateEnabled && handoffRepeatCount >= alertSettings.escalateAfterRepeats) {
+      fireHandoffAlert('escalation_unactioned', currentPopupAlert.booking_code, {
+        customerName: currentPopupAlert.message, staffName: currentPopupAlert.next_role
+      });
+    }
+  }, intervalMs);
+}
+
+function stopHandoffRepeatTimer() {
+  clearInterval(handoffRepeatTimer);
+  handoffRepeatTimer = null;
+  handoffRepeatCount = 0;
+  const countEl = document.getElementById('handoff-alert-repeat-count');
+  if (countEl) countEl.style.display = 'none';
 }
 
 async function acknowledgeCurrentAlert() {
@@ -4111,14 +4222,21 @@ async function acknowledgeCurrentAlert() {
     const item = alertFeedItems.find(a => a.id === currentPopupAlert.id);
     if (item) item.acknowledged = true;
   } catch(e) { /* silent */ }
-  document.getElementById('handoff-alert-modal').style.display = 'none';
+  const modal = document.getElementById('handoff-alert-modal');
+  modal.style.display = 'none';
+  applyAlertFlashing(modal, false);
+  stopHandoffRepeatTimer();
   updateAlertBellBadge();
   renderAlertFeed();
   showNextHandoffPopup();
 }
 
 function dismissHandoffModal() {
-  document.getElementById('handoff-alert-modal').style.display = 'none';
+  // Dismissing does NOT stop the repeat timer — it will flash again
+  // in `repeatMinutes` until actually actioned. This is intentional.
+  const modal = document.getElementById('handoff-alert-modal');
+  modal.style.display = 'none';
+  applyAlertFlashing(modal, false);
   showNextHandoffPopup();
 }
 
@@ -4331,25 +4449,66 @@ function renderTaskQueue() {
   }).join('');
 }
 
+let taskRepeatTimer = null;
+let taskRepeatCount = 0;
+
 function openTaskCard(task) {
   currentTaskCard = task;
+  taskRepeatCount = 0;
   document.getElementById('task-card-table').textContent = task.table_name || 'Studio task';
   document.getElementById('task-card-title').textContent = ALERT_TRIGGERS_CLIENT[task.task_type]?.label || 'Task';
   document.getElementById('task-card-icon').textContent = ALERT_TRIGGERS_CLIENT[task.task_type]?.icon || '📋';
   document.getElementById('task-card-message').textContent = task.task_description;
+  document.getElementById('task-repeat-mins-label').textContent = alertSettings.repeatMinutes;
 
   const ROLE_COLORS = { 'Studio Manager':'#5E35B1', 'Studio Executive':'#1E88E5', 'Ceramic Technician':'#8D6E63', 'Studio Assistant':'#00897B', 'Barista':'#F4511E' };
   document.getElementById('task-card-header').style.background = ROLE_COLORS[task.assigned_role] || 'var(--gu-primary)';
 
-  document.getElementById('task-card-modal').style.display = 'flex';
+  const modal = document.getElementById('task-card-modal');
+  modal.style.display = 'flex';
+  applyAlertFlashing(modal, true);
   document.getElementById('task-queue-panel').style.display = 'none';
   document.getElementById('task-queue-backdrop').style.display = 'none';
 
   if (taskVoiceEnabled) speakTask(task.task_description);
+  startTaskRepeatTimer();
+}
+
+function startTaskRepeatTimer() {
+  clearInterval(taskRepeatTimer);
+  const intervalMs = Math.max(1, alertSettings.repeatMinutes) * 60 * 1000;
+  taskRepeatTimer = setInterval(() => {
+    if (!currentTaskCard) { clearInterval(taskRepeatTimer); return; }
+    taskRepeatCount++;
+    const countEl = document.getElementById('task-card-repeat-count');
+    if (countEl) {
+      countEl.style.display = 'block';
+      countEl.textContent = `⏰ Repeated ${taskRepeatCount}× — still needs completing`;
+    }
+    try { playExtrasPing(); } catch(e) {}
+    vibrateForTask();
+    if (taskVoiceEnabled) speakTask(`Reminder: ${currentTaskCard.task_description}`);
+
+    const modal = document.getElementById('task-card-modal');
+    modal.style.display = 'flex';
+    applyAlertFlashing(modal, true);
+  }, intervalMs);
+}
+
+function stopTaskRepeatTimer() {
+  clearInterval(taskRepeatTimer);
+  taskRepeatTimer = null;
+  taskRepeatCount = 0;
+  const countEl = document.getElementById('task-card-repeat-count');
+  if (countEl) countEl.style.display = 'none';
 }
 
 function closeTaskCard() {
-  document.getElementById('task-card-modal').style.display = 'none';
+  // Closing (Later) does NOT stop the repeat timer — it flashes again
+  // in `repeatMinutes` until Complete is actually tapped.
+  const modal = document.getElementById('task-card-modal');
+  modal.style.display = 'none';
+  applyAlertFlashing(modal, false);
   window.speechSynthesis?.cancel();
 }
 
@@ -4372,12 +4531,17 @@ async function completeCurrentTask() {
       setTimeout(() => toast.remove(), 2500);
     }
   } catch(e) { /* silent */ }
-  closeTaskCard();
+  stopTaskRepeatTimer();
+  const modal = document.getElementById('task-card-modal');
+  modal.style.display = 'none';
+  applyAlertFlashing(modal, false);
+  window.speechSynthesis?.cancel();
   currentTaskCard = null;
 }
 
 async function passCurrentTask() {
   if (!currentTaskCard) return;
+  stopTaskRepeatTimer();
   try {
     await fetch(`${API_URL}/api/staff/tasks/${currentTaskCard.id}/pass`, { method:'PATCH' });
   } catch(e) {}
@@ -4471,6 +4635,7 @@ async function loadTeamAndDuties() {
   await loadTeamMembers();
   await loadDutyConfig();
   await loadProcessConfig();
+  await loadAlertSettingsUI();
 }
 
 async function loadTeamMembers() {
@@ -4618,6 +4783,42 @@ async function saveDutyConfig() {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ studioId, role: activeDutyRole, duties })
     });
+    status.textContent = '✓ Saved';
+    setTimeout(() => status.textContent = '', 3000);
+  } catch(e) { status.textContent = '✗ Failed'; }
+}
+
+// ── Alert Settings Admin UI ──
+function onAlertRepeatSliderChange(val) {
+  document.getElementById('alert-repeat-value').textContent = `${val} minute${val > 1 ? 's' : ''}`;
+}
+
+async function loadAlertSettingsUI() {
+  await loadAlertSettings();
+  const slider = document.getElementById('alert-repeat-slider');
+  if (!slider) return;
+  slider.value = alertSettings.repeatMinutes;
+  onAlertRepeatSliderChange(alertSettings.repeatMinutes);
+  document.getElementById('alert-flash-toggle').checked = alertSettings.flashUntilActioned;
+  document.getElementById('alert-escalate-toggle').checked = alertSettings.escalateEnabled;
+  document.getElementById('alert-escalate-count').value = alertSettings.escalateAfterRepeats;
+}
+
+async function saveAlertSettings() {
+  const repeatMinutes = parseInt(document.getElementById('alert-repeat-slider').value);
+  const flashUntilActioned = document.getElementById('alert-flash-toggle').checked;
+  const escalateEnabled = document.getElementById('alert-escalate-toggle').checked;
+  const escalateAfterRepeats = parseInt(document.getElementById('alert-escalate-count').value);
+
+  const status = document.getElementById('alert-settings-status');
+  status.textContent = 'Saving…';
+  try {
+    const res = await fetch(`${API_URL}/api/staff/alert-settings`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ studioId, repeatMinutes, flashUntilActioned, escalateEnabled, escalateAfterRepeats })
+    });
+    const data = await res.json();
+    alertSettings = data.settings;
     status.textContent = '✓ Saved';
     setTimeout(() => status.textContent = '', 3000);
   } catch(e) { status.textContent = '✗ Failed'; }
@@ -5024,6 +5225,7 @@ async function populateDashboard() {
   startExtrasPollingOnLoad();
   startAlertPolling();
   checkShiftLogin();
+  loadAlertSettings();
   // Show morning opening checklist if not done today
   setTimeout(showOpeningChecklist, 800);
   try {
