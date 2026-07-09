@@ -70,7 +70,7 @@
 <div class="wt-progress-bar" role="progressbar" aria-valuemin="1" aria-valuemax="100" aria-valuenow="11" aria-label="Tour progress" id="progress-bar"><div class="wt-progress-fill" id="progress"></div></div>
 
 <div class="wt-info" id="wt-main-content">
-  <div class="wt-step-label" id="step-label" aria-live="polite" aria-atomic="true">Step 1 of 9</div>
+  <div class="wt-step-label" id="step-label" aria-live="polite" aria-atomic="true">Step 1 of 13</div>
   <h1 class="wt-title" id="step-title" aria-live="assertive" aria-atomic="true"></h1>
   <p class="wt-body" id="step-body" aria-live="polite" aria-atomic="true"></p>
   <p class="wt-narration" id="step-narration" aria-live="polite" aria-label="Narration text"></p>
@@ -406,6 +406,34 @@ const STEPS = [
     body: "Browse original designs made by other customers and load them into Transfer Designer. Or list your own designs for others to buy.",
     arrows: [{vx:120,vy:36,label:"Browse & buy designs",dir:"down"}],
     voice: "The Design Marketplace is where customers buy and sell original designs. Browse what other painters have created and tap any design to load it straight into Transfer Designer for your own piece. Or switch to List a Design to sell your own Transfer Designer artwork — you set the price from one to five pounds."
+  },
+  {
+    screen: designPreviewScreen,
+    title: "Design Preview — colour match",
+    body: "Tap 💉 Match, then tap anywhere on your piece photo to sample that colour and find the nearest Mayco glaze. Tap 'Use this colour' and start painting.",
+    arrows: [{vx:60,vy:155,label:"💉 Match — tap to sample",dir:"up"}],
+    voice: "Design Preview also has a colour match tool. Tap the Match button, then tap anywhere on your piece photo to sample that colour. The app finds the nearest Mayco Stroke and Coat glaze and shows you the code. Tap Use this colour and it loads straight into your brush."
+  },
+  {
+    screen: designPreviewScreen,
+    title: "Specialist Glazes — in Design Preview",
+    body: "Tap ✨ Specialist Glazes to browse Jungle Gems, Elements, and French Dimensions. Try them on your piece — £2 each, added to your bill automatically.",
+    arrows: [{vx:120,vy:170,label:"✨ Specialist Glazes — £2 each",dir:"up"}],
+    voice: "Inside Design Preview you can also browse our specialist glazes — Jungle Gems crystal glazes, reactive Elements, and French Dimensions raised finishes. Tap any swatch to preview the colour on your piece. Tap Add to my bill and two pounds is added to your session — staff will see it at checkout."
+  },
+  {
+    screen: homeScreen,
+    title: "☕ Food & Drinks — order from your table",
+    body: "Tap Food & Drinks to browse the menu and build a basket. Tap Send to kitchen — your order goes straight to the kitchen display.",
+    arrows: [{vx:120,vy:130,label:"☕ Food & Drinks",dir:"down"}],
+    voice: "You can order food and drinks directly from the app without leaving your table. Tap Food and Drinks, browse today's menu including any specials, add items to your basket with the plus buttons, and tap Send to kitchen. Your order goes straight to the kitchen — no need to flag down a member of staff."
+  },
+  {
+    screen: homeScreen,
+    title: "Your Loyalty Status",
+    body: "Tap your loyalty card to see your tier, points, and rewards. Earn points on every visit, every pound spent, and every drink ordered.",
+    arrows: [{vx:120,vy:175,label:"Tap to see your full status",dir:"up"}],
+    voice: "Your loyalty card shows your current tier — from Newcomer right through to Platinum. Tap it to see your full status: how many points you have, your visit count, total spend, and exactly what rewards you're entitled to. You also get 50 bonus points just for your first visit, and twenty more points if you book your next session before you leave today — plus a free drink on that visit."
   },
   {
     screen: homeScreen,

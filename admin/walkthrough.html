@@ -68,7 +68,7 @@
 </div>
 <div class="wt-progress-bar" role="progressbar" aria-valuemin="1" aria-valuemax="100" aria-valuenow="11" aria-label="Tour progress" id="progress-bar"><div class="wt-progress-fill" id="progress"></div></div>
 <div class="wt-info" id="wt-main-content">
-  <div class="wt-step-label" id="step-label" aria-live="polite" aria-atomic="true">Step 1 of 11</div>
+  <div class="wt-step-label" id="step-label" aria-live="polite" aria-atomic="true">Step 1 of 15</div>
   <h1 class="wt-title" id="step-title" aria-live="assertive" aria-atomic="true"></h1>
   <p class="wt-body" id="step-body" aria-live="polite" aria-atomic="true"></p>
   <p class="wt-narration" id="step-narration" aria-live="polite" aria-label="Narration text"></p>
@@ -341,86 +341,111 @@ function communityScreen() {
 const STEPS = [
   {
     screen: dashboardScreen, nav: 'dashboard',
-    title: "Dashboard — your daily overview",
-    body: "The first screen you see. Shows revenue, sessions, and the Extra Charges Today card — everything charged through the app that needs adding to the till at checkout.",
+    title: "Morning opening checklist",
+    body: "Each morning the studio opening checklist appears automatically. Work through all 14 items across Studio, Tables, Stock, and Café. Once all done the button goes green.",
     arrows: [],
-    voice: "Welcome to the kilnLINK staff app. This is your Dashboard — the first thing you see each day. It shows today's revenue, how many sessions are open, and a running tally of all the extras charged through the app that you'll need to add to customer bills at checkout."
+    voice: "Good morning. The first thing you'll see each day is the studio opening checklist. It covers fourteen items across four areas — Studio, Tables, Stock and Glazes, and Café and Service. Tick each one off as you go, or mark it Not Applicable if it doesn't apply to your studio. Once all items are complete, the button turns green and you're ready to start the day."
+  },
+  {
+    screen: dashboardScreen, nav: 'dashboard',
+    title: "Dashboard — your daily overview",
+    body: "Today's revenue, open sessions, app extras to add to the till, and your loyal customers leaderboard — all in one place.",
+    arrows: [],
+    voice: "This is your Dashboard — the first screen you see after the opening checklist. It shows today's revenue, how many sessions are currently open, a running tally of all extras charged through the customer app, and a leaderboard of your most loyal customers."
   },
   {
     screen: dashboardScreen, nav: 'dashboard',
     title: "Extra Charges Today — add to the till",
-    body: "This card shows all app charges grouped by booking. At checkout, add these to the customer's bill on the till. Nothing is charged automatically.",
-    arrows: [{vx:171,vy:87,label:"Add these to the bill",dir:"down"}],
-    voice: "This is the Extra Charges Today card. It shows everything customers have unlocked through the app — tablet hire, home access, design tools — grouped by booking code. At checkout, add these totals to the customer's bill on the till. Nothing is charged automatically through the app."
+    body: "Everything customers have unlocked through the app, grouped by booking. Add these to their bill at checkout — nothing is charged automatically.",
+    arrows: [{vx:171,vy:87,label:"Add these to the till at checkout",dir:"down"}],
+    voice: "The Extra Charges Today card shows everything customers have unlocked through their app — tablet hire, home access, design tools, specialist glazes — all grouped by booking code. At checkout, add these totals to the customer's till transaction. Nothing is taken automatically."
   },
   {
     screen: null, nav: 'staff',
     title: "Tap Daily Bookings in the sidebar",
-    body: "Every customer session starts here. Tap Daily Bookings in the sidebar — this opens the full session flow.",
+    body: "Every customer session starts here. Tap Daily Bookings to open the full session flow.",
     arrows: [{vx:29,vy:55,label:"Daily Bookings",dir:"right"}],
-    voice: "Every customer session starts in Daily Bookings. Tap it in the sidebar here. This opens the full four-step session flow — from opening a booking right through to completion."
+    voice: "Every customer session starts in Daily Bookings. Tap it in the sidebar. This opens the full session flow from opening a booking right through to completion."
   },
   {
     screen: bookingsStep1Screen, nav: 'staff',
-    title: "Step 1 — type the customer name",
-    body: "Type the customer's name in the big field at the top. Then tap New Walk-in for a drop-in, or Existing Booking to pull in their Square reservation.",
+    title: "Step 1 — look up the customer",
+    body: "Type their name, then tap New Walk-in or Existing Booking. Their loyalty tier, visit count, and any rewards appear automatically.",
     arrows: [{vx:171,vy:48,label:"Type name here first",dir:"down"}],
-    voice: "Step 1 is all about identifying the customer. Type their name in this big field at the top. The app will pull in their visit history and flag any returning pieces waiting for them."
+    voice: "Step 1 is identifying the customer. Type their name in the field at the top, then choose New Walk-in for a drop-in or Existing Booking to pull in their Square reservation. The app instantly shows their loyalty tier — from Newcomer through to Platinum — their visit count, total spend, and any rewards they're entitled to right now."
   },
   {
     screen: bookingsStep1Screen, nav: 'staff',
-    title: "Choose walk-in or existing booking",
-    body: "Two big tiles — tap the right one. Walk-in creates a new session on the spot. Existing Booking finds their Square reservation and imports their history.",
-    arrows: [
-      {vx:117,vy:62,label:"New Walk-in",dir:"up"},
-      {vx:222,vy:62,label:"Existing Booking",dir:"up"}
-    ],
-    voice: "Once you've typed their name, choose one of these two options. New Walk-in creates a fresh session on the spot — no reservation needed. Existing Booking pulls in their Square appointment and imports everything automatically. You can also tick boxes here to add a tablet hire charge or home access."
+    title: "Loyalty panel — rewards & instant actions",
+    body: "The loyalty panel shows tier, stats, and active rewards. Use the redeem buttons for free bisque, free drink, or discount. Always offer the Book Next Visit button.",
+    arrows: [{vx:171,vy:130,label:"📅 Book Next Visit — always offer this",dir:"down"}],
+    voice: "Once you've looked up the customer, their loyalty panel appears. It shows their tier with the colour-coded gradient, visit and spend stats, and any rewards they're entitled to — free bisque, glazing discount, or a free drink. Tap the redeem buttons to log what you've given them. And always offer to book their next visit — it earns them 20 bonus points and a free drink on that future visit, and means you've got a confirmed booking before they leave."
+  },
+  {
+    screen: bookingsStep1Screen, nav: 'staff',
+    title: "Assign a table",
+    body: "The table picker shows all your studio tables — green for free, red for occupied. Tap a green table to assign this booking. The name card item reminds you which name to write.",
+    arrows: [{vx:120,vy:100,label:"Tap a green table to assign",dir:"down"}],
+    voice: "Below the loyalty panel is your visual table picker. It shows every table in the studio — green means free, red means occupied, and occupied tables show the customer's first name so you can see at a glance who's where. Tap a free table to assign this booking to it. Once selected, the name card checklist item will remind you exactly what to write on the chalkboard."
+  },
+  {
+    screen: bookingsStep1Screen, nav: 'staff',
+    title: "Table setup checklist — Done or N/A",
+    body: "Work through every item before opening the session. Tap ✓ Done or N/A for each one. The Open Session button only activates when all 12 items are complete.",
+    arrows: [{vx:171,vy:170,label:"All done → button goes green",dir:"up"}],
+    voice: "The table setup checklist sits below the table picker. It covers twelve items across four categories — Table, Tools, Piece, and Service. Tap Done when you've completed an item, or N/A if it doesn't apply. Both count as complete. The Open Session button stays grey until every item is either Done or Not Applicable and a table has been selected — so nothing gets forgotten."
   },
   {
     screen: engagementScreen, nav: 'staff',
     title: "Step 2 — log pieces, drinks & glazes",
-    body: "Once seated, log everything from the Square catalogue — pottery, drinks, cakes. Tap the Mayco Specialist Glazes panel at the bottom to add crystal or dimensional glazes in one tap.",
-    arrows: [{vx:171,vy:163,label:"Mayco Glazes — one tap to add",dir:"down"}],
-    voice: "Step 2 is Customer Engagement. Once the customer is seated and has chosen their piece, log everything here — pottery, drinks, and cakes all come from the Square catalogue. Scroll down to find the Mayco Specialist Glazes panel. Tap any Jungle Gem, Elements, or French Dimensions glaze to add it to the running bill instantly."
+    body: "Once seated, log everything from the Square catalogue. The full 82-colour Mayco palette is browsable with search and category tabs. Specialist glazes are pinned below — one tap adds £2 to the bill.",
+    arrows: [{vx:171,vy:163,label:"✨ Specialist Glazes — £2 each",dir:"down"}],
+    voice: "Step 2 is Customer Engagement. Log pottery pieces, drinks, and cakes from the Square catalogue. The full 82-colour Mayco Stroke and Coat palette is available with search and category tabs — tap any colour to add it to the running bill. Below that, the specialist glazes panel is always pinned open — Jungle Gems crystal glazes, reactive Elements, and French Dimensions. Tap any glaze to add it instantly and the two pound charge goes straight to the extras tally."
   },
   {
     screen: completionScreen, nav: 'staff',
     title: "Step 3 — photograph & complete",
-    body: "When a customer finishes, tap Take Photo & Submit Pieces. The photo is stamped with their name and date. Tick Home Access or tablet charges before submitting.",
+    body: "When a customer finishes, tap Take Photo & Submit Pieces. Photo is stamped with name and date. Tick any outstanding charges before submitting.",
     arrows: [{vx:171,vy:76,label:"Tap to photograph & complete",dir:"down"}],
-    voice: "Step 3 is completion. When a customer has finished painting, tap Take Photo and Submit Pieces. The photo is automatically stamped with their name and the date. Before submitting, make sure to tick any outstanding charges — tablet hire, or the five pound home access if they want it."
+    voice: "Step 3 is completion. When a customer has finished painting, tap Take Photo and Submit Pieces. The photo is automatically stamped with their name and today's date and saved to their gallery. Before submitting, tick any outstanding charges — tablet hire or home access."
   },
   {
     screen: printQueueScreen, nav: 'printqueue',
     title: "Print Queue — review transfer designs",
-    body: "When customers submit designs for ceramic transfer printing, they appear here. Check the design and sizing — Approve to charge £1 and print, Reject with no charge.",
+    body: "Customer transfer designs appear here. Check the design carefully — Approve charges £1 and sends to the printer, Reject has no charge.",
     arrows: [
-      {vx:184,vy:70,label:"Approve — charges £1",dir:"up"},
+      {vx:184,vy:70,label:"Approve — £1 charged",dir:"up"},
       {vx:246,vy:70,label:"Reject — no charge",dir:"up"}
     ],
-    voice: "The Print Queue shows all customer-submitted designs for ceramic transfer printing. Each card shows the actual design, who submitted it, and the time. Check the design and sizing carefully — Approve sends it to the printer and charges one pound to their bill. Reject sends nothing and there's no charge."
+    voice: "The Print Queue shows all ceramic transfer designs submitted by customers from their app. Check each design carefully before approving. Approve sends it to the printer and charges one pound to their bill. Reject sends nothing and there's no charge to the customer."
+  },
+  {
+    screen: stockScreen, nav: 'stock',
+    title: "Daily Menu — manage what customers see",
+    body: "Add today's specials with name and price. Toggle Square catalogue items on or off for today. Customers see specials at the top of the Food & Drinks screen.",
+    arrows: [{vx:120,vy:80,label:"Add a special → appears in customer app",dir:"down"}],
+    voice: "The Daily Menu tab is where you manage what customers see in the Food and Drinks section of their app. Add today's specials — like a Victoria Sponge or today's soup — with a name and price, and they appear at the top of the customer menu straight away. You can also hide any Square catalogue item for the day without removing it from Square. Everything resets at midnight."
   },
   {
     screen: stockScreen, nav: 'stock',
     title: "Stock — catalogue & reservations",
-    body: "Photograph bisque pieces and add them to the catalogue. Customers can browse, design on them at home, and reserve for their next visit. Pending reservations appear above.",
-    arrows: [{vx:118,vy:56,label:"📷 Take Photo to add",dir:"up"}],
-    voice: "The Stock tab is where you manage the bisque catalogue. Photograph pieces from the studio using the Take Photo button, give them a name, category, and price, and they'll appear in the customer app for browsing. Customers can design on piece photos at home and reserve them for their next visit. Pending reservations show up here for you to confirm."
+    body: "Photograph bisque pieces and add them to the customer catalogue. Customers can browse and reserve pieces for their next visit from the app.",
+    arrows: [{vx:118,vy:56,label:"📷 Take Photo to add to catalogue",dir:"up"}],
+    voice: "The Stock tab is where you manage the bisque catalogue. Photograph pieces from the studio, give them a name, category, and price, and they appear in the customer app for browsing. Customers can design on piece photos at home and reserve them for their next visit. Pending reservations show up here for you to confirm."
   },
   {
     screen: communityScreen, nav: 'community',
     title: "Community — feature great work",
-    body: "See everything customers have shared. Tap Feature on any post to push it to the worldwide kilnLINK feed — great for showing off brilliant pieces.",
-    arrows: [{vx:244,vy:29,label:"Tap Feature to boost worldwide",dir:"down"}],
-    voice: "The Community tab shows everything customers have shared from your studio. You can remove inappropriate posts, or tap Feature on any post to push it to the worldwide kilnLINK feed — visible to customers at every studio on the platform. A great way to showcase brilliant work and build the studio's reputation."
+    body: "See everything customers have shared. Tap Feature on any post to push it to the worldwide kilnLINK feed.",
+    arrows: [{vx:244,vy:29,label:"Feature — goes worldwide",dir:"down"}],
+    voice: "The Community tab shows everything customers have shared from your studio. Remove inappropriate posts, or tap Feature on any post to push it to the worldwide kilnLINK feed — visible to customers at every kilnLINK studio globally. A great way to showcase your best work."
   },
   {
     screen: dashboardScreen, nav: 'dashboard',
     title: "Daily flow — that's it!",
-    body: "Open booking → log items in Step 2 → photograph & complete in Step 3 → kiln fires → mark ready for pickup. Tap 🎯 Staff Tour any time to replay.",
+    body: "Morning checklist → open booking → table picker → setup checklist → Step 2 → Step 3 → kiln → pickup. Tap 🎯 Staff Tour any time to replay.",
     arrows: [{vx:29,vy:165,label:"🎯 Staff Tour — always here",dir:"up"}],
-    voice: "That's the complete staff tour. The daily flow is simple — open a booking, log the pieces and drinks in Step 2, photograph and complete in Step 3, then manage firing and pickup through the kiln section. The Staff Tour button is always in the sidebar, so any new team member can replay this at any time. Good luck!"
+    voice: "That's the complete staff tour. The daily flow is: morning opening checklist, look up the customer, assign a table, work through the setup checklist, log everything in Step 2, photograph and complete in Step 3, then manage firing and pickup through the kiln section. The Staff Tour button is always in the sidebar for any new team member. Good luck!"
   }
 ];
 
