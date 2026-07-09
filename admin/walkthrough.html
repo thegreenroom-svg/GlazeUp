@@ -446,126 +446,126 @@ const STEPS = [
     title: "Start your shift — tap your name",
     body: "Every tablet asks who's using it. Tap your own name from the list. First time? You'll set your own PIN there and then. After that, just enter it each shift.",
     arrows: [{vx:186,vy:68,label:"NEW — tap to set your PIN",dir:"up"}],
-    voice: "Tap your name to start. First time, you'll set your own PIN."
+    voice: "Tap your name to start your shift. First time here? You'll choose your own PIN."
   },
   {
     screen: pinEntryScreen, nav: 'dashboard',
     title: "Enter your PIN",
     body: "Tap your PIN and tap Start Shift. Clock-in happens automatically the moment you're in — no separate step needed.",
     arrows: [{vx:140,vy:127,label:"Start Shift — clocks you in",dir:"up"}],
-    voice: "Enter your PIN and tap Start Shift — that clocks you in."
+    voice: "Enter your PIN and tap Start Shift. That clocks you in automatically."
   },
   {
     screen: shiftBadgeScreen, nav: 'dashboard',
     title: "Your shift badge and task queue",
     body: "Your name badge sits at the top of every screen. Tap it any time to see your personal task queue — only tasks for your role, nothing else cluttering your view.",
     arrows: [{vx:200,vy:8,label:"Your badge — tap to open queue",dir:"down"}],
-    voice: "Tap your badge any time to see your task queue."
+    voice: "Your badge sits at the top of the screen. Tap it any time to see your task queue."
   },
   {
     screen: shiftBadgeScreen, nav: 'dashboard',
     title: "☕ Taking a break",
     body: "In your task queue, tap Take a Break to pause your shift clock without ending it. Your badge shows a BREAK tag while you're away. Tap again when you're back.",
     arrows: [{vx:215,vy:156,label:"Take a break — pauses the clock",dir:"up"}],
-    voice: "Tap Take a Break to pause the clock — tap again when you're back."
+    voice: "Tap Take a Break to pause your shift clock without ending it. Tap again when you're back."
   },
   {
     screen: shiftBadgeScreen, nav: 'dashboard',
     title: "🎧 Pair your headset",
     body: "Tap the headset icon next to your badge for a quick guide to pairing Bluetooth earbuds. Once paired, all voice alerts and task reminders play through them automatically.",
     arrows: [{vx:262,vy:8,label:"🎧 Headset pairing guide",dir:"down"}],
-    voice: "Tap here to pair Bluetooth earbuds for voice alerts."
+    voice: "Tap here for a quick guide to pairing Bluetooth earbuds. Alerts will then play through them."
   },
   {
     screen: dashboardScreen, nav: 'dashboard',
     title: "Morning opening checklist",
     body: "Each morning the studio opening checklist appears automatically. Work through all 14 items across Studio, Tables, Stock, and Café. Once all done the button goes green.",
     arrows: [{vx:171,vy:20,label:"14 items — goes green when done",dir:"down"}],
-    voice: "Each morning, work through the 14-item opening checklist."
+    voice: "Each morning, work through the 14-item opening checklist. It appears automatically."
   },
   {
     screen: dashboardScreen, nav: 'dashboard',
     title: "Dashboard — your daily overview",
     body: "Today's revenue, open sessions, app extras to add to the till, and your loyal customers leaderboard — all in one place.",
     arrows: [{vx:130,vy:32,label:"Today's numbers at a glance",dir:"down"}],
-    voice: "Your Dashboard — today's revenue and sessions at a glance."
+    voice: "This is your Dashboard. Today's revenue and open sessions, all at a glance."
   },
   {
     screen: dashboardScreen, nav: 'dashboard',
     title: "Extra Charges Today — add to the till",
     body: "Everything customers have unlocked through the app, grouped by booking. Add these to their bill at checkout — nothing is charged automatically.",
     arrows: [{vx:171,vy:87,label:"Add these to the till at checkout",dir:"down"}],
-    voice: "Add these app extras to the till — nothing charges automatically."
+    voice: "This shows everything unlocked through the app. Add these to the till — nothing charges automatically."
   },
   {
     screen: null, nav: 'staff',
     title: "Tap Daily Bookings in the sidebar",
     body: "Every customer session starts here. Tap Daily Bookings to open the full session flow.",
     arrows: [{vx:29,vy:55,label:"Daily Bookings",dir:"right"}],
-    voice: "Every session starts in Daily Bookings."
+    voice: "Every customer session starts here. Tap Daily Bookings to open the full flow."
   },
   {
     screen: bookingsStep1Screen, nav: 'staff',
     title: "Step 1 — look up the customer",
     body: "Type their name, then tap New Walk-in or Existing Booking. Their loyalty tier, visit count, and any rewards appear automatically.",
     arrows: [{vx:171,vy:48,label:"Type name here first",dir:"down"}],
-    voice: "Type their name, then choose Walk-in or Existing Booking."
+    voice: "Type the customer's name, then choose Walk-in or Existing Booking."
   },
   {
     screen: bookingsStep1Screen, nav: 'staff',
     title: "Loyalty panel — rewards & instant actions",
     body: "The loyalty panel shows tier, stats, and active rewards. Use the redeem buttons for free bisque, free drink, or discount. Always offer the Book Next Visit button.",
     arrows: [{vx:171,vy:130,label:"📅 Book Next Visit — always offer this",dir:"down"}],
-    voice: "Their loyalty tier and rewards appear automatically — always offer Book Next Visit."
+    voice: "Their loyalty tier and rewards appear automatically. Always offer to book their next visit."
   },
   {
     screen: bookingsStep1Screen, nav: 'staff',
     title: "Assign a table",
     body: "The table picker shows all your studio tables — green for free, red for occupied. Tap a green table to assign this booking. The name card item reminds you which name to write.",
     arrows: [{vx:120,vy:100,label:"Tap a green table to assign",dir:"down"}],
-    voice: "Green means free — tap a table to assign this booking."
+    voice: "Green means the table's free. Tap it to assign this booking straight away."
   },
   {
     screen: bookingsStep1Screen, nav: 'staff',
     title: "Assign duties to your team",
     body: "Pick a staff member and their role's duties are added to this session automatically. Everyone can see who's doing what, and mark each duty Done or N/A.",
     arrows: [{vx:171,vy:150,label:"Assign duties for this table",dir:"down"}],
-    voice: "Pick a staff member — their duties get added automatically."
+    voice: "Pick a staff member and their role's duties get added to this session automatically."
   },
   {
     screen: bookingsStep1Screen, nav: 'staff',
     title: "Table setup checklist — Done or N/A",
     body: "Work through every item before opening the session. Tap ✓ Done or N/A for each one. The Open Session button only activates when all 12 items are complete.",
     arrows: [{vx:171,vy:170,label:"All done → button goes green",dir:"up"}],
-    voice: "Tick every item Done or N/A — then Open Session goes green."
+    voice: "Tick every item Done or N/A. Once they're all ticked, Open Session turns green."
   },
   {
     screen: engagementScreen, nav: 'staff',
     title: "Step 2 — log pieces, drinks & glazes",
     body: "Once seated, log everything from the Square catalogue. The full 82-colour Mayco palette is browsable with search and category tabs. Specialist glazes are pinned below — one tap adds £2 to the bill.",
     arrows: [{vx:171,vy:163,label:"✨ Specialist Glazes — £2 each",dir:"down"}],
-    voice: "Log pieces, drinks, and glazes from the Square catalogue here."
+    voice: "Log pieces, drinks, and glazes here, straight from your Square catalogue."
   },
   {
     screen: completionScreen, nav: 'staff',
     title: "Step 3 — photograph & complete",
     body: "When a customer finishes, tap Take Photo & Submit Pieces. Photo is stamped with name and date. Tick any outstanding charges before submitting.",
     arrows: [{vx:171,vy:76,label:"Tap to photograph & complete",dir:"down"}],
-    voice: "Take a photo, tick any charges, and submit to finish."
+    voice: "Take a photo, tick any outstanding charges, then submit to finish the session."
   },
   {
     screen: handoffAlertScreen, nav: 'dashboard',
     title: "🚨 Flashing alerts — handoffs between roles",
     body: "When something finishes and affects the next person's job, a big flashing alert appears on their tablet — with sound, voice, and vibration. It keeps repeating every few minutes until someone taps Complete.",
     arrows: [{vx:140,vy:120,label:"✓ Complete — stops the repeat",dir:"up"}],
-    voice: "Finished tasks alert the next person — it repeats until they tap Complete."
+    voice: "Finished tasks alert the next person automatically. It keeps repeating until they tap Complete."
   },
   {
     screen: dashboardScreen, nav: 'dashboard',
     title: "Completing a task",
     body: "Tap any task in your queue to see the full details. Tap Complete when it's done — the next step in the chain is created automatically for whoever's next.",
     arrows: [{vx:215,vy:65,label:"Tap a task to open its details",dir:"left"}],
-    voice: "Tap a task, do the job, then tap Complete."
+    voice: "Tap any task to see the details. Do the job, then tap Complete to close it out."
   },
   {
     screen: printQueueScreen, nav: 'printqueue',
@@ -575,56 +575,56 @@ const STEPS = [
       {vx:184,vy:70,label:"Approve — £1 charged",dir:"up"},
       {vx:246,vy:70,label:"Reject — no charge",dir:"up"}
     ],
-    voice: "Check the design, then Approve to print or Reject."
+    voice: "Check the design carefully, then Approve to send it to print, or Reject."
   },
   {
     screen: stockScreen, nav: 'stock',
     title: "Daily Menu — manage what customers see",
     body: "Add today's specials with name and price. Toggle Square catalogue items on or off for today. Customers see specials at the top of the Food & Drinks screen.",
     arrows: [{vx:120,vy:80,label:"Add a special → appears in customer app",dir:"down"}],
-    voice: "Add today's specials — they show straight away in the app."
+    voice: "Add today's specials here. They show up straight away in the customer app."
   },
   {
     screen: stockScreen, nav: 'stock',
     title: "Stock — catalogue & reservations",
     body: "Photograph bisque pieces and add them to the customer catalogue. Customers can browse and reserve pieces for their next visit from the app.",
     arrows: [{vx:118,vy:56,label:"📷 Take Photo to add to catalogue",dir:"up"}],
-    voice: "Photograph a piece to add it to the customer catalogue."
+    voice: "Photograph a bisque piece to add it to the customer catalogue for browsing."
   },
   {
     screen: communityScreen, nav: 'community',
     title: "Community — feature great work",
     body: "See everything customers have shared. Tap Feature on any post to push it to the worldwide kilnLINK feed.",
     arrows: [{vx:244,vy:29,label:"Feature — goes worldwide",dir:"down"}],
-    voice: "Tap Feature to push a post to the worldwide feed."
+    voice: "See what customers have shared. Tap Feature to push a post to the worldwide feed."
   },
   {
     screen: dashboardScreen, nav: 'dashboard',
     title: "For managers: Team & Duties",
     body: "Add team members, edit duty lists per role, and build your own handoff process in the Process Builder. This tab covers a lot — use the quick links at the top to jump straight to the section you need.",
     arrows: [{vx:171,vy:20,label:"Team, Duties, Process & more",dir:"down"}],
-    voice: "Managers: add your team and build your process chain here."
+    voice: "Managers: add your team, set duty lists, and build your process chain here."
   },
   {
     screen: dashboardScreen, nav: 'dashboard',
     title: "For managers: Timekeeping & Holidays",
     body: "Clock-in and clock-out happen automatically with PIN login. See everyone's hours, export a CSV for payroll, and approve or reject holiday requests — all in Team & Duties.",
     arrows: [{vx:171,vy:70,label:"Hours worked + holiday approvals",dir:"down"}],
-    voice: "Hours log automatically — export CSV and approve holidays here."
+    voice: "Hours log automatically as staff clock in and out. Export a CSV and approve holidays here."
   },
   {
     screen: dashboardScreen, nav: 'dashboard',
     title: "For managers: Daily Progress",
     body: "See every incomplete task across the whole team, grouped by role. Send one-off requests straight to a role or a specific person — appears as a flashing alert on their tablet.",
     arrows: [{vx:171,vy:100,label:"Every task, every role, live",dir:"down"}],
-    voice: "See every task across the team, and send one-off requests."
+    voice: "See every task across the whole team here. You can also send one-off requests."
   },
   {
     screen: dashboardScreen, nav: 'dashboard',
     title: "Daily flow — that's it!",
     body: "Tap your name → morning checklist → open booking → table & duties → setup checklist → Step 2 → Step 3 → handoff alerts → kiln → pickup. Tap 🎯 Staff Tour any time to replay.",
     arrows: [{vx:29,vy:165,label:"🎯 Staff Tour — always here",dir:"up"}],
-    voice: "That's the flow. Tap Staff Tour any time to replay this."
+    voice: "That's the full flow, start to finish. Tap Staff Tour any time to watch it again."
   }
 ];
 
@@ -836,7 +836,7 @@ function scheduleNext() {
         if (!playing) return;
         if (cur < STEPS.length - 1) { cur++; render(); scheduleNext(); }
         else { playing = false; document.getElementById('btn-play').textContent = '↺ Replay'; }
-      }, 800);
+      }, 1200);
     });
   } else {
     // No voice — use fixed 4 second timer
