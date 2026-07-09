@@ -3452,6 +3452,14 @@ app.post('/api/staff/clock-out', async (req, res) => {
   const { studioId, staffMemberId, shiftId } = req.body;
   if (!studioId || !staffMemberId) return res.status(400).json({ error: 'studioId and staffMemberId required' });
 
+  // If they're on a break and forget to end it, close the break out too
+  // so it doesn't count as break time forever.
+  let breakQuery = supabase.from('staff_breaks')
+    .update({ break_end: new Date().toISOString(), auto_closed: true })
+    .eq('studio_id', studioId).eq('staff_member_id', staffMemberId).is('break_end', null);
+  if (shiftId) breakQuery = breakQuery.eq('shift_id', shiftId);
+  await breakQuery;
+
   let query = supabase.from('staff_timesheet')
     .update({ clock_out: new Date().toISOString() })
     .eq('studio_id', studioId).eq('staff_member_id', staffMemberId).is('clock_out', null);
@@ -3461,6 +3469,40 @@ app.post('/api/staff/clock-out', async (req, res) => {
   const { data, error } = await query.select();
   if (error) return res.status(500).json({ error: error.message });
   res.json({ closed: data?.length || 0 });
+});
+
+// ── Breaks — pause the shift clock without ending it ──
+
+// POST /api/staff/break/start
+app.post('/api/staff/break/start', async (req, res) => {
+  const { studioId, staffMemberId, shiftId } = req.body;
+  if (!studioId || !staffMemberId || !shiftId) return res.status(400).json({ error: 'studioId, staffMemberId, shiftId required' });
+
+  // Only one open break at a time per shift
+  const { data: existing } = await supabase.from('staff_breaks')
+    .select('id').eq('shift_id', shiftId).is('break_end', null).single();
+  if (existing) return res.status(409).json({ error: 'Already on a break' });
+
+  const { data, error } = await supabase.from('staff_breaks').insert({
+    studio_id: studioId, staff_member_id: staffMemberId, shift_id: shiftId,
+    break_start: new Date().toISOString(),
+  }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ breakId: data.id });
+});
+
+// POST /api/staff/break/end
+app.post('/api/staff/break/end', async (req, res) => {
+  const { studioId, breakId } = req.body;
+  if (!studioId || !breakId) return res.status(400).json({ error: 'studioId, breakId required' });
+
+  const { data, error } = await supabase.from('staff_breaks')
+    .update({ break_end: new Date().toISOString() })
+    .eq('id', breakId).eq('studio_id', studioId).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+
+  const minutes = data ? Math.round((new Date(data.break_end) - new Date(data.break_start)) / 60000) : 0;
+  res.json({ ok: true, breakMinutes: minutes });
 });
 
 // ═══════════════════════════════════════════
@@ -3488,16 +3530,36 @@ app.get('/api/staff/timesheet', async (req, res) => {
   const nameMap = {};
   (team || []).forEach(m => { nameMap[m.id] = m; });
 
+  // Pull all breaks for these shifts so we can subtract them from hours worked
+  const shiftIds = (shifts || []).map(s => s.id);
+  let breaksByShift = {};
+  if (shiftIds.length) {
+    const { data: breaks } = await supabase.from('staff_breaks')
+      .select('shift_id, break_start, break_end').in('shift_id', shiftIds);
+    (breaks || []).forEach(b => {
+      if (!breaksByShift[b.shift_id]) breaksByShift[b.shift_id] = [];
+      breaksByShift[b.shift_id].push(b);
+    });
+  }
+
   const enriched = (shifts || []).map(s => {
     const clockIn = new Date(s.clock_in);
     const clockOut = s.clock_out ? new Date(s.clock_out) : null;
-    const hours = clockOut ? Math.round(((clockOut - clockIn) / 3600000) * 100) / 100 : null;
+    const shiftBreaks = breaksByShift[s.id] || [];
+    const breakMinutes = shiftBreaks.reduce((sum, b) => {
+      if (!b.break_end) return sum; // ignore still-open breaks in the total
+      return sum + (new Date(b.break_end) - new Date(b.break_start)) / 60000;
+    }, 0);
+    const grossHours = clockOut ? (clockOut - clockIn) / 3600000 : null;
+    const netHours = grossHours != null ? Math.round((grossHours - breakMinutes/60) * 100) / 100 : null;
     return {
       ...s,
       staffName: nameMap[s.staff_member_id]?.name || 'Unknown',
       role: nameMap[s.staff_member_id]?.role || '',
-      hoursWorked: hours,
+      hoursWorked: netHours,
+      breakMinutes: Math.round(breakMinutes),
       stillClockedIn: !s.clock_out,
+      onBreakNow: shiftBreaks.some(b => !b.break_end),
     };
   });
 
@@ -3528,17 +3590,35 @@ app.get('/api/staff/timesheet/export.csv', async (req, res) => {
   const nameMap = {};
   (team || []).forEach(m => { nameMap[m.id] = m; });
 
-  const rows = [['Name', 'Role', 'Clock In', 'Clock Out', 'Hours Worked', 'Date']];
+  const shiftIds = (shifts || []).map(s => s.id);
+  let breaksByShift = {};
+  if (shiftIds.length) {
+    const { data: breaks } = await supabase.from('staff_breaks')
+      .select('shift_id, break_start, break_end').in('shift_id', shiftIds);
+    (breaks || []).forEach(b => {
+      if (!breaksByShift[b.shift_id]) breaksByShift[b.shift_id] = [];
+      breaksByShift[b.shift_id].push(b);
+    });
+  }
+
+  const rows = [['Name', 'Role', 'Clock In', 'Clock Out', 'Break (mins)', 'Net Hours Worked', 'Date']];
   (shifts || []).forEach(s => {
     const clockIn = new Date(s.clock_in);
     const clockOut = s.clock_out ? new Date(s.clock_out) : null;
-    const hours = clockOut ? Math.round(((clockOut - clockIn) / 3600000) * 100) / 100 : '';
+    const shiftBreaks = breaksByShift[s.id] || [];
+    const breakMinutes = Math.round(shiftBreaks.reduce((sum, b) => {
+      if (!b.break_end) return sum;
+      return sum + (new Date(b.break_end) - new Date(b.break_start)) / 60000;
+    }, 0));
+    const grossHours = clockOut ? (clockOut - clockIn) / 3600000 : null;
+    const netHours = grossHours != null ? Math.round((grossHours - breakMinutes/60) * 100) / 100 : '';
     rows.push([
       nameMap[s.staff_member_id]?.name || 'Unknown',
       nameMap[s.staff_member_id]?.role || '',
       clockIn.toISOString(),
       clockOut ? clockOut.toISOString() : 'Still clocked in',
-      hours,
+      breakMinutes,
+      netHours,
       clockIn.toISOString().split('T')[0],
     ]);
   });

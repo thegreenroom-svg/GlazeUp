@@ -1391,6 +1391,7 @@
 <button id="shift-badge" onclick="toggleTaskQueue()" style="display:none;position:fixed;top:16px;right:222px;z-index:850;background:white;border:1.5px solid var(--gu-border);border-radius:24px;padding:8px 14px 8px 8px;font-size:12px;font-weight:700;color:var(--gu-text);cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.12);display:flex;align-items:center;gap:6px;">
   <span id="shift-badge-avatar" style="width:26px;height:26px;border-radius:50%;background:var(--gu-primary);color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">–</span>
   <span id="shift-badge-name">–</span>
+  <span id="shift-badge-break-indicator" style="display:none;background:#3949ab;color:white;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;">☕ BREAK</span>
   <span id="shift-task-count-badge" style="display:none;background:#e53935;color:white;font-size:10px;font-weight:800;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 4px;">0</span>
 </button>
 
@@ -1492,6 +1493,7 @@
   </div>
   <div id="task-queue-list" style="flex:1;overflow-y:auto;padding:14px;"></div>
   <div style="padding:12px 14px;border-top:1px solid #e8dfd3;display:flex;flex-direction:column;gap:8px;">
+    <button onclick="toggleBreak()" id="break-toggle-btn" style="width:100%;background:#f0f4ff;border:1px solid #c8d4f5;color:#3949ab;border-radius:8px;padding:9px;font-size:12px;font-weight:600;cursor:pointer;">☕ Take a break</button>
     <button onclick="openHolidayRequestForm()" style="width:100%;background:#fff9f0;border:1px solid #f0e0c0;color:var(--link-clay);border-radius:8px;padding:9px;font-size:12px;font-weight:600;cursor:pointer;">🏖️ Request holiday</button>
     <button onclick="logOutOfShift()" style="width:100%;background:none;border:1px solid var(--gu-border);color:var(--gu-dust);border-radius:8px;padding:9px;font-size:12px;font-weight:600;cursor:pointer;">🚪 End shift / switch person</button>
   </div>
@@ -4641,6 +4643,7 @@ const SHIFT_PIN_LOGIN_ENABLED = false;
 
 let currentShiftStaff = null; // { id, name, role }
 let currentShiftId = null; // timesheet row ID for automatic clock-out
+let currentBreakId = null; // set while on a break, null otherwise
 
 function checkShiftLogin() {
   if (!SHIFT_PIN_LOGIN_ENABLED) {
@@ -4657,7 +4660,9 @@ function checkShiftLogin() {
     try {
       currentShiftStaff = JSON.parse(saved);
       currentShiftId = localStorage.getItem('klnk_shift_id') || null;
+      currentBreakId = localStorage.getItem('klnk_break_id') || null;
       applyShiftUI();
+      updateBreakUI();
       return;
     } catch(e) {}
   }
@@ -4849,6 +4854,68 @@ function skipShiftLogin() {
   currentShiftStaff = null;
 }
 
+// ── Breaks — pause the clock without ending the shift ──
+async function toggleBreak() {
+  if (!currentShiftStaff || currentShiftStaff.id === 'testing') {
+    alert('Log in with your PIN to use break tracking.');
+    return;
+  }
+  if (!currentShiftId) {
+    alert('No active shift found — try logging out and back in.');
+    return;
+  }
+
+  const btn = document.getElementById('break-toggle-btn');
+
+  if (currentBreakId) {
+    // End the break
+    try {
+      const res = await fetch(`${API_URL}/api/staff/break/end`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ studioId, breakId: currentBreakId })
+      });
+      const data = await res.json();
+      currentBreakId = null;
+      localStorage.removeItem('klnk_break_id');
+      updateBreakUI();
+      const toast = document.createElement('div');
+      toast.textContent = `☕ Break ended — ${data.breakMinutes || 0} min`;
+      toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#2B2724;color:white;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;white-space:nowrap;';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 2500);
+    } catch(e) { alert('Could not end break: ' + e.message); }
+  } else {
+    // Start a break
+    try {
+      const res = await fetch(`${API_URL}/api/staff/break/start`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ studioId, staffMemberId: currentShiftStaff.id, shiftId: currentShiftId })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || 'Could not start break.');
+        return;
+      }
+      const data = await res.json();
+      currentBreakId = data.breakId;
+      localStorage.setItem('klnk_break_id', currentBreakId);
+      updateBreakUI();
+    } catch(e) { alert('Could not start break: ' + e.message); }
+  }
+}
+
+function updateBreakUI() {
+  const btn = document.getElementById('break-toggle-btn');
+  const indicator = document.getElementById('shift-badge-break-indicator');
+  if (currentBreakId) {
+    if (btn) { btn.textContent = '▶ End break — back to work'; btn.style.background = '#e8eaf6'; }
+    if (indicator) indicator.style.display = 'inline-block';
+  } else {
+    if (btn) { btn.textContent = '☕ Take a break'; btn.style.background = '#f0f4ff'; }
+    if (indicator) indicator.style.display = 'none';
+  }
+}
+
 async function logOutOfShift() {
   if (stepMotionActive) stopStepCounting();
   stepCount = 0;
@@ -4863,9 +4930,11 @@ async function logOutOfShift() {
     } catch(e) { /* silent */ }
   }
   currentShiftId = null;
+  currentBreakId = null;
 
   localStorage.removeItem('klnk_shift_staff');
   localStorage.removeItem('klnk_shift_id');
+  localStorage.removeItem('klnk_break_id');
   currentShiftStaff = null;
   document.getElementById('shift-badge').style.display = 'none';
   document.getElementById('step-counter-btn').style.display = 'none';
@@ -5310,13 +5379,16 @@ async function loadTimesheetView() {
     listEl.innerHTML = data.shifts.map(s => {
       const inTime = new Date(s.clock_in).toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
       const outTime = s.clock_out ? new Date(s.clock_out).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }) : null;
+      const status = s.onBreakNow
+        ? '<span style="color:#3949ab;font-weight:600;">☕ on break</span>'
+        : (outTime ? `→ ${outTime}` : '<span style="color:#F9A825;font-weight:600;">● still clocked in</span>');
       return `
         <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--gu-bg);border-radius:8px;margin-bottom:6px;border:1px solid var(--gu-border);">
           <div style="flex:1;min-width:0;">
             <span style="font-size:13px;font-weight:700;">${s.staffName}</span>
             <span style="font-size:11px;color:var(--gu-dust);"> · ${s.role}</span>
             <div style="font-size:11px;color:var(--gu-dust);margin-top:2px;">
-              ${inTime} ${outTime ? `→ ${outTime}` : '<span style="color:#F9A825;font-weight:600;">● still clocked in</span>'}
+              ${inTime} ${status}${s.breakMinutes ? ` · ${s.breakMinutes}min break` : ''}
             </div>
           </div>
           ${s.hoursWorked != null ? `<div style="font-size:15px;font-weight:800;color:var(--gu-primary);white-space:nowrap;">${s.hoursWorked}h</div>` : ''}
