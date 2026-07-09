@@ -911,7 +911,7 @@ function scheduleNext() {
         if (!playing) return;
         if (cur < STEPS.length - 1) { cur++; render(); scheduleNext(); }
         else { playing = false; document.getElementById('btn-play').textContent = '↺ Replay'; }
-      }, 1200);
+      }, 2200);
     });
   } else {
     // No voice — use fixed 4 second timer
