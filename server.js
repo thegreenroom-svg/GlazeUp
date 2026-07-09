@@ -3309,9 +3309,9 @@ app.post('/api/staff/session-duties', async (req, res) => {
 
 // PATCH /api/staff/session-duties/:id — tick/untick a specific duty
 app.patch('/api/staff/session-duties/:id', async (req, res) => {
-  const { completed } = req.body;
+  const { completed, status } = req.body;
   const { data, error } = await supabase.from('session_duties')
-    .update({ completed, completed_at: completed ? new Date().toISOString() : null })
+    .update({ completed, status: status || null, completed_at: completed ? new Date().toISOString() : null })
     .eq('id', req.params.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json({ duty: data });
