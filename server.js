@@ -3360,17 +3360,63 @@ app.get('/api/staff/daily-progress', async (req, res) => {
 
 function hashPin(pin) { return crypto.createHash('sha256').update(String(pin)).digest('hex'); }
 
-// POST /api/staff/set-pin — staff member sets/updates their PIN (done once, in Team & Duties)
+// GET /api/staff/team-for-login — names + roles only (no PINs), for the login
+// picker screen so staff can find themselves without typing their name
+app.get('/api/staff/team-for-login', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data: team } = await supabase.from('staff_team')
+    .select('id, name, role').eq('studio_id', studioId).eq('active', true).order('name');
+  const { data: pins } = await supabase.from('staff_pins').select('staff_member_id').eq('studio_id', studioId);
+  const hasPinSet = new Set((pins || []).map(p => p.staff_member_id));
+  res.json({
+    team: (team || []).map(m => ({ ...m, hasPinSet: hasPinSet.has(m.id) }))
+  });
+});
+
+// POST /api/staff/set-pin — self-service: staff member picks their own name,
+// then sets their own PIN the first time (no existing PIN required to do this —
+// but if a PIN already exists, this endpoint refuses; use reset-pin instead)
 app.post('/api/staff/set-pin', async (req, res) => {
   const { studioId, staffMemberId, pin } = req.body;
   if (!studioId || !staffMemberId || !pin) return res.status(400).json({ error: 'studioId, staffMemberId, pin required' });
   if (!/^\d{4,6}$/.test(String(pin))) return res.status(400).json({ error: 'PIN must be 4-6 digits' });
 
-  const { error } = await supabase.from('staff_pins').upsert({
+  const { data: existing } = await supabase.from('staff_pins')
+    .select('id').eq('studio_id', studioId).eq('staff_member_id', staffMemberId).single();
+  if (existing) {
+    return res.status(409).json({ error: 'A PIN is already set for this person. Ask your manager to reset it if you\'ve forgotten it.' });
+  }
+
+  const { error } = await supabase.from('staff_pins').insert({
     studio_id: studioId, staff_member_id: staffMemberId, pin_hash: hashPin(pin),
-  }, { onConflict: 'studio_id,staff_member_id' });
+  });
   if (error) return res.status(500).json({ error: error.message });
   res.json({ ok: true });
+});
+
+// POST /api/staff/reset-pin — manager-only: clears someone's PIN so they can set
+// a new one. Requires the manager's OWN PIN to authorise (proves they're really
+// a Studio Manager/Executive, not just anyone with dashboard access).
+app.post('/api/staff/reset-pin', async (req, res) => {
+  const { studioId, targetStaffMemberId, managerPin } = req.body;
+  if (!studioId || !targetStaffMemberId || !managerPin) {
+    return res.status(400).json({ error: 'studioId, targetStaffMemberId, managerPin required' });
+  }
+
+  // Verify the manager PIN belongs to someone with an authorised role
+  const { data: managerPinRow } = await supabase.from('staff_pins')
+    .select('staff_member_id').eq('studio_id', studioId).eq('pin_hash', hashPin(managerPin)).single();
+  if (!managerPinRow) return res.status(401).json({ error: 'Incorrect manager PIN' });
+
+  const { data: manager } = await supabase.from('staff_team')
+    .select('role').eq('id', managerPinRow.staff_member_id).single();
+  if (!manager || !['Studio Manager', 'Studio Executive'].includes(manager.role)) {
+    return res.status(403).json({ error: 'Only a Studio Manager or Studio Executive can reset PINs' });
+  }
+
+  await supabase.from('staff_pins').delete().eq('studio_id', studioId).eq('staff_member_id', targetStaffMemberId);
+  res.json({ ok: true, message: 'PIN cleared — that person can now set a new one from the login screen.' });
 });
 
 // POST /api/staff/shift-login — enter a PIN to start a shift on this device
