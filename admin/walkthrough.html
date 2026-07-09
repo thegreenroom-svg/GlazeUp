@@ -68,7 +68,7 @@
 </div>
 <div class="wt-progress-bar" role="progressbar" aria-valuemin="1" aria-valuemax="100" aria-valuenow="11" aria-label="Tour progress" id="progress-bar"><div class="wt-progress-fill" id="progress"></div></div>
 <div class="wt-info" id="wt-main-content">
-  <div class="wt-step-label" id="step-label" aria-live="polite" aria-atomic="true">Step 1 of 23</div>
+  <div class="wt-step-label" id="step-label" aria-live="polite" aria-atomic="true">Step 1 of 25</div>
   <h1 class="wt-title" id="step-title" aria-live="assertive" aria-atomic="true"></h1>
   <p class="wt-body" id="step-body" aria-live="polite" aria-atomic="true"></p>
   <p class="wt-narration" id="step-narration" aria-live="polite" aria-label="Narration text"></p>
@@ -344,10 +344,10 @@ function communityScreen() {
 const STEPS = [
   {
     screen: dashboardScreen, nav: 'dashboard',
-    title: "Start your shift — enter your PIN",
-    body: "Every tablet asks who's using it. Enter your personal PIN to start your shift — your name and role are now linked to this device.",
+    title: "Start your shift — tap your name",
+    body: "Every tablet asks who's using it. Tap your own name from the list. First time? You'll set your own PIN there and then. After that, just enter it each shift.",
     arrows: [],
-    voice: "Before anything else, each tablet will ask who's using it. Enter your personal PIN to start your shift. Your studio manager sets this up for you in Team and Duties. Once you're logged in, your name and role appear at the top of the screen, and your personal task list is ready."
+    voice: "Before anything else, each tablet will ask who's using it. Tap your own name from the list. If it's your first time, you'll be asked to choose your own PIN — four to six digits, kept private to you. After that, you just tap your name and enter your PIN each shift. If you ever forget it, tap Forgot your PIN and a Studio Manager can clear it for you using their own PIN, so you can set a fresh one."
   },
   {
     screen: dashboardScreen, nav: 'dashboard',
@@ -355,6 +355,13 @@ const STEPS = [
     body: "Your name badge sits at the top of every screen. Tap it any time to see your personal task queue — only tasks for your role, nothing else cluttering your view.",
     arrows: [],
     voice: "Once logged in, you'll see your name badge at the top of the screen with a red count showing how many tasks are waiting for you. Tap it any time to open your personal task queue — this only shows tasks for your role, so you're never wading through things that aren't yours."
+  },
+  {
+    screen: dashboardScreen, nav: 'dashboard',
+    title: "☕ Taking a break",
+    body: "In your task queue, tap Take a Break to pause your shift clock without ending it. Your badge shows a BREAK tag while you're away. Tap again when you're back.",
+    arrows: [],
+    voice: "When you need a break, open your task queue and tap Take a Break. This pauses your shift clock without ending it, so your hours worked stay accurate. Your badge shows a break tag while you're away. Tap the same button to end your break and carry on — if you forget, it closes automatically when you log out."
   },
   {
     screen: dashboardScreen, nav: 'dashboard',
@@ -488,9 +495,16 @@ const STEPS = [
   {
     screen: dashboardScreen, nav: 'dashboard',
     title: "For managers: Team & Duties",
-    body: "Add team members, set their PINs, edit duty lists per role, and build your own handoff process in the Process Builder — define exactly what alerts whom and when.",
+    body: "Add team members, edit duty lists per role, and build your own handoff process in the Process Builder. This tab covers a lot — use the quick links at the top to jump straight to the section you need.",
     arrows: [],
-    voice: "If you're a studio manager, the Team and Duties tab is where you run everything. Add team members and set their PIN, edit the default duty list for each role, and use the Process Builder to define your own handoff chain — exactly what happens when something finishes, who gets alerted, and what happens next. You can also set how often unactioned alerts repeat, and whether they escalate to a more senior role if nobody deals with them."
+    voice: "If you're a studio manager, the Team and Duties tab is where you run everything. Add team members, edit the default duty list for each role, and use the Process Builder to define your own handoff chain — exactly what happens when something finishes, who gets alerted, and what happens next. You can also set how often unactioned alerts repeat, and whether they escalate to a more senior role if nobody deals with them. It's a lot on one page, so there are quick jump links right at the top to take you straight to Team, Duties, Alerts, Process, Time, or Holiday."
+  },
+  {
+    screen: dashboardScreen, nav: 'dashboard',
+    title: "For managers: Timekeeping & Holidays",
+    body: "Clock-in and clock-out happen automatically with PIN login. See everyone's hours, export a CSV for payroll, and approve or reject holiday requests — all in Team & Duties.",
+    arrows: [],
+    voice: "Also in Team and Duties: Timekeeping shows every shift automatically, with clock-in and clock-out times, breaks subtracted, and a running total per person. Export it as a CSV to hand to your payroll provider or accountant — kilnLINK tracks hours only, it doesn't calculate pay or tax. Below that, Holiday Requests shows anything staff have asked for, ready to approve or reject, with each person's annual allowance tracked alongside it."
   },
   {
     screen: dashboardScreen, nav: 'dashboard',
@@ -502,9 +516,9 @@ const STEPS = [
   {
     screen: dashboardScreen, nav: 'dashboard',
     title: "Daily flow — that's it!",
-    body: "PIN login → morning checklist → open booking → table & duties → setup checklist → Step 2 → Step 3 → handoff alerts → kiln → pickup. Tap 🎯 Staff Tour any time to replay.",
+    body: "Tap your name → morning checklist → open booking → table & duties → setup checklist → Step 2 → Step 3 → handoff alerts → kiln → pickup. Tap 🎯 Staff Tour any time to replay.",
     arrows: [{vx:29,vy:165,label:"🎯 Staff Tour — always here",dir:"up"}],
-    voice: "That's the complete staff tour. The daily flow is: log in with your PIN, work through the morning opening checklist, look up the customer, assign a table and duties, complete the setup checklist, log everything in Step 2, photograph and complete in Step 3, then let the handoff alerts guide pieces through the kiln to pickup. The Staff Tour button is always in the sidebar for any new team member. Good luck!"
+    voice: "That's the complete staff tour. The daily flow is: tap your name and enter your PIN, work through the morning opening checklist, look up the customer, assign a table and duties, complete the setup checklist, log everything in Step 2, photograph and complete in Step 3, then let the handoff alerts guide pieces through the kiln to pickup. Don't forget to take a break when you need one, and log out properly at the end of your shift. The Staff Tour button is always in the sidebar for any new team member. Good luck!"
   }
 ];
 
