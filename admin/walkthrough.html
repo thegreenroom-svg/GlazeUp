@@ -68,7 +68,7 @@
 </div>
 <div class="wt-progress-bar" role="progressbar" aria-valuemin="1" aria-valuemax="100" aria-valuenow="11" aria-label="Tour progress" id="progress-bar"><div class="wt-progress-fill" id="progress"></div></div>
 <div class="wt-info" id="wt-main-content">
-  <div class="wt-step-label" id="step-label" aria-live="polite" aria-atomic="true">Step 1 of 26</div>
+  <div class="wt-step-label" id="step-label" aria-live="polite" aria-atomic="true">Step 1 of 29</div>
   <h1 class="wt-title" id="step-title" aria-live="assertive" aria-atomic="true"></h1>
   <p class="wt-body" id="step-body" aria-live="polite" aria-atomic="true"></p>
   <p class="wt-narration" id="step-narration" aria-live="polite" aria-label="Narration text"></p>
@@ -370,6 +370,60 @@ function handoffAlertScreen() {
   `;
 }
 
+function chainDiagramScreen() {
+  const stops = [
+    {icon:'🧹', label:'Table cleared', role:'Studio Assistant', col:'#00897B'},
+    {icon:'🏺', label:'Piece finished', role:'Ceramic Technician', col:'#8D6E63'},
+    {icon:'🔥', label:'Kiln loaded', role:'Ceramic Technician', col:'#8D6E63'},
+    {icon:'✨', label:'Kiln fired', role:'Studio Assistant', col:'#00897B'},
+    {icon:'🎉', label:'Booking complete', role:'Studio Manager', col:'#5E35B1'},
+  ];
+  return sidebar('dashboard') + `
+    <rect x="60" y="0" width="220" height="180" fill="${IVORY}"/>
+    <text x="65" y="13" fill="${CHARCOAL}" font-size="7" font-weight="700" font-family="sans-serif">How a task chains to the next person</text>
+    ${stops.map((s,i) => `
+      <rect x="65" y="${20+i*30}" width="205" height="24" rx="5" fill="white" stroke="${s.col}" stroke-width="1"/>
+      <circle cx="80" cy="${32+i*30}" r="8" fill="${s.col}"/>
+      <text x="80" y="${35+i*30}" fill="white" font-size="7" text-anchor="middle" font-family="sans-serif">${s.icon}</text>
+      <text x="94" y="${29+i*30}" fill="${CHARCOAL}" font-size="5" font-weight="700" font-family="sans-serif">${s.label}</text>
+      <text x="94" y="${36+i*30}" fill="${s.col}" font-size="4" font-weight="700" font-family="sans-serif">→ ${s.role}</text>
+      ${i < stops.length-1 ? `<text x="270" y="${38+i*30}" fill="${CLAY}" font-size="8" text-anchor="middle" font-family="sans-serif">↓</text>` : ''}
+    `).join('')}
+  `;
+}
+
+function taskCompleteChainScreen() {
+  return `
+    <rect width="280" height="180" fill="${IVORY}"/>
+    <text x="140" y="16" fill="${CHARCOAL}" font-size="7" font-weight="700" text-anchor="middle" font-family="sans-serif">What happens when you tap Complete</text>
+    <!-- Your task, completed -->
+    <rect x="20" y="28" width="110" height="60" rx="8" fill="white" stroke="#8D6E63" stroke-width="1.2"/>
+    <text x="75" y="42" fill="#8D6E63" font-size="10" text-anchor="middle" font-family="sans-serif">🏺</text>
+    <text x="75" y="56" fill="${CHARCOAL}" font-size="5" font-weight="700" text-anchor="middle" font-family="sans-serif">Piece finished</text>
+    <text x="75" y="63" fill="#8a8175" font-size="4" text-anchor="middle" font-family="sans-serif">Ceramic Technician</text>
+    <rect x="35" y="70" width="80" height="12" rx="4" fill="#2e7d32"/>
+    <text x="75" y="78.5" fill="white" font-size="4.5" font-weight="700" text-anchor="middle" font-family="sans-serif">✓ Complete</text>
+    <!-- Arrow across -->
+    <text x="145" y="60" fill="${CLAY}" font-size="14" text-anchor="middle" font-family="sans-serif">→</text>
+    <text x="145" y="68" fill="#8a8175" font-size="3.5" text-anchor="middle" font-family="sans-serif">creates next task</text>
+    <!-- New task, auto-created -->
+    <rect x="150" y="28" width="110" height="60" rx="8" fill="#fff9f0" stroke="${CLAY}" stroke-width="1.2" stroke-dasharray="3,2"/>
+    <text x="205" y="42" fill="${CLAY}" font-size="10" text-anchor="middle" font-family="sans-serif">🔥</text>
+    <text x="205" y="56" fill="${CHARCOAL}" font-size="5" font-weight="700" text-anchor="middle" font-family="sans-serif">Kiln loaded</text>
+    <text x="205" y="63" fill="${CLAY}" font-size="4" font-weight="700" text-anchor="middle" font-family="sans-serif">→ Ceramic Technician</text>
+    <rect x="163" y="70" width="84" height="12" rx="4" fill="${CLAY}"/>
+    <text x="205" y="78.5" fill="white" font-size="4.2" font-weight="700" text-anchor="middle" font-family="sans-serif">NEW — auto-created</text>
+    <!-- Explanation box -->
+    <rect x="20" y="100" width="240" height="66" rx="8" fill="white" stroke="${STONE}" stroke-width="1"/>
+    <text x="30" y="114" fill="${CHARCOAL}" font-size="5" font-weight="700" font-family="sans-serif">Where does it go?</text>
+    <text x="30" y="126" fill="#8a8175" font-size="4.3" font-family="sans-serif">• Someone else's role → it appears on their</text>
+    <text x="34" y="132" fill="#8a8175" font-size="4.3" font-family="sans-serif">tablet, flashing, straight away.</text>
+    <text x="30" y="144" fill="#8a8175" font-size="4.3" font-family="sans-serif">• Your own role → it lands right back in</text>
+    <text x="34" y="150" fill="#8a8175" font-size="4.3" font-family="sans-serif">your queue — e.g. you load the kiln, then</text>
+    <text x="34" y="156" fill="#8a8175" font-size="4.3" font-family="sans-serif">you're the one who fires it later too.</text>
+  `;
+}
+
 function stockScreen() {
   return sidebar('stock') + `
     <rect x="60" y="0" width="220" height="180" fill="${IVORY}"/>
@@ -554,18 +608,39 @@ const STEPS = [
     voice: "Take a photo, tick any outstanding charges, then submit to finish the session."
   },
   {
+    screen: chainDiagramScreen, nav: 'dashboard',
+    title: "🔗 The task chain — who gets what, and when",
+    body: "kilnLINK links tasks together. As the day runs, finishing one step automatically creates the next one for whoever's role needs to act — table cleared → piece finished → kiln loaded → kiln fired → booking complete.",
+    arrows: [{vx:270,vy:35,label:"Each step hands to the next role",dir:"down"}],
+    voice: "Tasks chain together automatically. Finishing one step creates the next, for whoever's role needs to act on it."
+  },
+  {
     screen: handoffAlertScreen, nav: 'dashboard',
-    title: "🚨 Flashing alerts — handoffs between roles",
-    body: "When something finishes and affects the next person's job, a big flashing alert appears on their tablet — with sound, voice, and vibration. It keeps repeating every few minutes until someone taps Complete.",
+    title: "🚨 The alert — big, flashing, hard to miss",
+    body: "When a task lands on your role, this appears on your tablet — flashing red, with sound and voice. If you dismiss it without completing, it comes back every few minutes until someone taps Complete.",
     arrows: [{vx:140,vy:120,label:"✓ Complete — stops the repeat",dir:"up"}],
-    voice: "Finished tasks alert the next person automatically. It keeps repeating until they tap Complete."
+    voice: "This is what a handoff looks like. It flashes and repeats until someone actually taps Complete."
+  },
+  {
+    screen: taskCompleteChainScreen, nav: 'dashboard',
+    title: "What happens when you tap Complete",
+    body: "Tapping Complete does two things: it closes your task, and it creates the next one in the chain. If the next step belongs to a different role, it appears on their tablet immediately, flashing.",
+    arrows: [{vx:145,vy:60,label:"Complete → creates the next task",dir:"down"}],
+    voice: "Tapping Complete closes your task and creates the next one — straight onto the right person's tablet."
+  },
+  {
+    screen: taskCompleteChainScreen, nav: 'dashboard',
+    title: "Sometimes the next task comes back to you",
+    body: "If the next step is also your role — like loading the kiln, then firing it later — it simply lands back in your own queue. You'll see it as a new task with its own alert, same as anyone else's.",
+    arrows: [{vx:205,vy:60,label:"Same role → back to your own queue",dir:"down"}],
+    voice: "If the next step is also your role, it just lands back in your own queue, same as anyone else's."
   },
   {
     screen: dashboardScreen, nav: 'dashboard',
-    title: "Completing a task",
-    body: "Tap any task in your queue to see the full details. Tap Complete when it's done — the next step in the chain is created automatically for whoever's next.",
+    title: "Completing a task, step by step",
+    body: "Tap any task in your queue to see the full details. Tap Complete when it's done, Can't Do This Now to release it, or Later if you'll get to it shortly.",
     arrows: [{vx:215,vy:65,label:"Tap a task to open its details",dir:"left"}],
-    voice: "Tap any task to see the details. Do the job, then tap Complete to close it out."
+    voice: "Tap a task to see the details. Do the job, then tap Complete — that's the whole loop."
   },
   {
     screen: printQueueScreen, nav: 'printqueue',
