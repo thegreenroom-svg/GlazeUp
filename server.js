@@ -3174,6 +3174,42 @@ app.post('/api/pieces/complete-unfinished', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════
+// STUDIO TABLE MANAGEMENT
+// ═══════════════════════════════════════════
+
+app.get('/api/studio/tables', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data } = await supabase.from('studio_tables')
+    .select('*').eq('studio_id', studioId).order('sort_order', { ascending: true });
+  res.json({ tables: data || [] });
+});
+
+app.post('/api/studio/tables', async (req, res) => {
+  const { studioId, tables } = req.body;
+  if (!studioId || !Array.isArray(tables)) return res.status(400).json({ error: 'studioId and tables required' });
+  await supabase.from('studio_tables').delete().eq('studio_id', studioId);
+  if (tables.length) {
+    await supabase.from('studio_tables').insert(
+      tables.map((t, i) => ({ studio_id: studioId, name: t.name, room: t.room || null, capacity: t.capacity || 2, sort_order: i }))
+    );
+  }
+  const { data } = await supabase.from('studio_tables').select('*').eq('studio_id', studioId).order('sort_order');
+  res.json({ tables: data || [] });
+});
+
+app.get('/api/studio/table-sessions/today', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const today = new Date(); today.setHours(0,0,0,0);
+  const { data } = await supabase.from('table_sessions')
+    .select('id, table_name, customer_name, num_places, status, created_at, booking_code')
+    .eq('studio_id', studioId).gte('created_at', today.toISOString())
+    .in('status', ['open', 'painting']).order('created_at', { ascending: true });
+  res.json({ sessions: data || [] });
+});
+
+// ═══════════════════════════════════════════
 // LOYALTY SYSTEM
 // Silver / Gold / Platinum tiers
 // Points earned on visits, spend, drinks orders
