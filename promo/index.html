@@ -100,6 +100,29 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
 .feat-title{font-size:16px;font-weight:700;margin-bottom:6px}
 .feat-body{font-size:13px;color:rgba(255,255,255,.5);line-height:1.55}
 
+/* LOYALTY */
+#scene-loyalty{background:#1a1408;text-align:center;gap:40px}
+.tier-strip{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:900px}
+.tier-pill{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:16px 14px;min-width:110px;text-align:center}
+.tier-pill .tier-emoji{font-size:26px;display:block;margin-bottom:6px}
+.tier-pill .tier-name{font-size:12px;font-weight:700;color:white}
+.loyalty-cards{display:flex;gap:16px;max-width:880px;width:100%;flex-wrap:wrap;justify-content:center}
+.loy-card{flex:1;min-width:220px;max-width:260px;background:rgba(249,168,37,.08);border:1px solid rgba(249,168,37,.2);border-radius:20px;padding:24px 20px;text-align:left}
+.loy-icon{font-size:28px;margin-bottom:12px;display:block}
+.loy-title{font-size:15px;font-weight:700;margin-bottom:6px}
+.loy-body{font-size:13px;color:rgba(255,255,255,.5);line-height:1.55}
+
+/* STAFF OPERATIONS */
+#scene-staffops{background:#120a1a;text-align:center;gap:40px}
+.staffops-cards{display:flex;gap:16px;max-width:900px;width:100%;flex-wrap:wrap;justify-content:center}
+.staffops-card{flex:1;min-width:220px;max-width:270px;background:rgba(94,53,177,.08);border:1px solid rgba(94,53,177,.22);border-radius:20px;padding:24px 20px;text-align:left}
+.staffops-icon{font-size:28px;margin-bottom:12px;display:block}
+.staffops-title{font-size:15px;font-weight:700;margin-bottom:6px}
+.staffops-body{font-size:13px;color:rgba(255,255,255,.5);line-height:1.55}
+.chain-strip{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center;max-width:900px}
+.chain-step{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:10px 14px;font-size:12px;font-weight:600;color:white;white-space:nowrap}
+.chain-arrow{color:#8D6E63;font-size:16px}
+
 /* COMMUNITY */
 #scene-community{background:#0d1a14;text-align:center;gap:44px}
 .globe-num{font-size:clamp(48px,9vw,100px);font-weight:700;color:var(--green);letter-spacing:-.04em}
@@ -160,6 +183,8 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
   <div class="nav-links">
     <a href="#scene-what">Features</a>
     <a href="#scene-money">Revenue</a>
+    <a href="#scene-loyalty">Loyalty</a>
+    <a href="#scene-staffops">Staff Ops</a>
     <a href="#scene-community">Community</a>
     <a href="#scene-pricing">Pricing</a>
   </div>
@@ -434,6 +459,97 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:cen
   </div>
 </section>
 
+<!-- ════ SCENE: LOYALTY ════ -->
+<section class="scene" id="scene-loyalty">
+  <div class="eyebrow reveal" style="color:#F9A825">Built-in loyalty</div>
+  <h2 class="headline reveal d1" style="text-align:center;max-width:600px">
+    Every visit earns something. Customers keep coming back.
+  </h2>
+  <p class="subhead reveal d2" style="text-align:center;margin-bottom:8px">
+    A full 7-tier rewards scheme, live from day one — no setup, no third-party app.
+  </p>
+  <div class="tier-strip reveal d2">
+    <div class="tier-pill"><span class="tier-emoji">🪴</span><span class="tier-name">Newcomer</span></div>
+    <div class="tier-pill"><span class="tier-emoji">🎨</span><span class="tier-name">Dabbler</span></div>
+    <div class="tier-pill"><span class="tier-emoji">⭐</span><span class="tier-name">Regular</span></div>
+    <div class="tier-pill"><span class="tier-emoji">🔥</span><span class="tier-name">Enthusiast</span></div>
+    <div class="tier-pill"><span class="tier-emoji">🥈</span><span class="tier-name">Silver</span></div>
+    <div class="tier-pill"><span class="tier-emoji">🥇</span><span class="tier-name">Gold</span></div>
+    <div class="tier-pill"><span class="tier-emoji">💎</span><span class="tier-name">Platinum</span></div>
+  </div>
+  <div class="loyalty-cards" style="margin-top:12px">
+    <div class="loy-card reveal d2">
+      <span class="loy-icon">🎁</span>
+      <div class="loy-title">Automatic Rewards</div>
+      <div class="loy-body">Free bisque pieces, glazing discounts, free drinks, and priority booking — unlocked automatically as customers move up the tiers.</div>
+    </div>
+    <div class="loy-card reveal d3">
+      <span class="loy-icon">📅</span>
+      <div class="loy-title">Book Next Visit — Instantly</div>
+      <div class="loy-body">Staff offer it in one tap. Customer books their next session before they leave, and gets a free drink on that visit as a thank you.</div>
+    </div>
+    <div class="loy-card reveal d3">
+      <span class="loy-icon">🏆</span>
+      <div class="loy-title">Team Leaderboard</div>
+      <div class="loy-body">Staff see the studio's most loyal customers at a glance — a nice bit of daily context, and a reason to make every visit count.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ SCENE: STAFF OPERATIONS ════ -->
+<section class="scene" id="scene-staffops">
+  <div class="eyebrow reveal" style="color:#9C7BDB">Runs the whole studio</div>
+  <h2 class="headline reveal d1" style="text-align:center;max-width:640px">
+    Tasks hand themselves between staff. Nothing gets missed.
+  </h2>
+  <p class="subhead reveal d2" style="text-align:center;margin-bottom:8px">
+    A live task chain connects every role — the moment one job finishes, the next person's tablet flashes.
+  </p>
+  <div class="chain-strip reveal d2">
+    <div class="chain-step">🧹 Table cleared</div>
+    <span class="chain-arrow">→</span>
+    <div class="chain-step">🏺 Piece finished</div>
+    <span class="chain-arrow">→</span>
+    <div class="chain-step">🔥 Kiln loaded</div>
+    <span class="chain-arrow">→</span>
+    <div class="chain-step">✨ Kiln fired</div>
+    <span class="chain-arrow">→</span>
+    <div class="chain-step">🎉 Booking complete</div>
+  </div>
+  <div class="staffops-cards" style="margin-top:12px">
+    <div class="staffops-card reveal d2">
+      <span class="staffops-icon">🚨</span>
+      <div class="staffops-title">Flashing Handoff Alerts</div>
+      <div class="staffops-body">Sound, voice, and vibration. Dismiss without completing and it comes back every few minutes until someone actually deals with it.</div>
+    </div>
+    <div class="staffops-card reveal d3">
+      <span class="staffops-icon">🔑</span>
+      <div class="staffops-title">Self-Service PIN Login</div>
+      <div class="staffops-body">Staff tap their name and set their own PIN first time. Managers can reset a forgotten PIN with their own — no shared passwords.</div>
+    </div>
+    <div class="staffops-card reveal d3">
+      <span class="staffops-icon">🕐</span>
+      <div class="staffops-title">Automatic Timekeeping</div>
+      <div class="staffops-body">Clock-in and clock-out happen with login. Breaks pause the clock properly. Export a clean CSV for payroll — hours only, no tax calculations.</div>
+    </div>
+    <div class="staffops-card reveal d4">
+      <span class="staffops-icon">🏖️</span>
+      <div class="staffops-title">Holiday Requests</div>
+      <div class="staffops-body">Staff request time off from their tablet. Managers approve or reject in one tap, with each person's annual allowance tracked automatically.</div>
+    </div>
+    <div class="staffops-card reveal d4">
+      <span class="staffops-icon">🔗</span>
+      <div class="staffops-title">Your Own Process Builder</div>
+      <div class="staffops-body">Define exactly what happens when something finishes, who gets alerted, and what happens next. Every studio's process is different — build yours.</div>
+    </div>
+    <div class="staffops-card reveal d5">
+      <span class="staffops-icon">📊</span>
+      <div class="staffops-title">Live Daily Progress</div>
+      <div class="staffops-body">Every booking, every task, every role — one running view for the studio manager. Send one-off requests straight to anyone's tablet.</div>
+    </div>
+  </div>
+</section>
+
 <!-- ════ SCENE 6: COMMUNITY ════ -->
 <section class="scene" id="scene-community">
   <div class="eyebrow reveal" style="color:var(--green)">Community</div>
@@ -619,6 +735,8 @@ const items = [
   'Design Marketplace','Bisque stock catalogue','Transfer print queue','Revenue dashboard',
   'Device licensing','Square POS integration','Stripe billing','Piece photography',
   'Jungle Gems glazes','Staff walkthroughs','Customer walkthroughs','Fully accessible',
+  '7-tier loyalty scheme','Flashing task alerts','Self-service PIN login','Automatic timekeeping',
+  'Holiday request workflow','Your own process builder','Live daily progress',
   'Built by a pottery studio','White-label ready','No per-customer fees','Instant QR setup',
 ];
 const ticker = document.getElementById('ticker');
