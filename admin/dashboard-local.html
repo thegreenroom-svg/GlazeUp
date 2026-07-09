@@ -1208,6 +1208,51 @@
 <!-- API Status Indicator -->
 <div class="api-status disconnected" id="api-status">📡 Connecting...</div>
 
+<!-- Handoff Alert Bell -->
+<button id="alert-bell-btn" onclick="toggleAlertFeed()" style="position:fixed;top:16px;right:170px;z-index:850;background:#2B2724;color:white;border:none;border-radius:50%;width:44px;height:44px;font-size:19px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;">
+  🔔
+  <span id="alert-bell-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#e53935;color:white;font-size:10px;font-weight:800;width:20px;height:20px;border-radius:50%;align-items:center;justify-content:center;border:2px solid white;">0</span>
+</button>
+
+<!-- Alert Feed Panel (slide-in) -->
+<div id="alert-feed-panel" style="display:none;position:fixed;top:0;right:0;bottom:0;width:340px;max-width:92vw;background:white;z-index:9200;box-shadow:-8px 0 32px rgba(0,0,0,0.2);flex-direction:column;">
+  <div style="background:#2B2724;color:white;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;">
+    <div style="font-size:15px;font-weight:700;">🔔 Handoff Alerts</div>
+    <button onclick="toggleAlertFeed()" style="background:none;border:none;color:rgba(255,255,255,0.7);font-size:18px;cursor:pointer;">✕</button>
+  </div>
+  <div style="padding:10px 14px;border-bottom:1px solid #f0ebe4;display:flex;gap:8px;">
+    <button onclick="goToTab('progress');toggleAlertFeed();" style="flex:1;background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;">📊 Daily Progress</button>
+  </div>
+  <div id="alert-feed-list" style="flex:1;overflow-y:auto;padding:12px;"></div>
+</div>
+<div id="alert-feed-backdrop" onclick="toggleAlertFeed()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:9150;"></div>
+
+<!-- Big Handoff Alert Popup -->
+<div id="handoff-alert-modal" style="display:none;position:fixed;inset:0;z-index:9500;background:rgba(43,39,36,0.75);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:white;border-radius:24px;max-width:440px;width:100%;box-shadow:0 24px 70px rgba(0,0,0,0.4);overflow:hidden;animation:handoffPop .35s cubic-bezier(.34,1.4,.4,1);">
+    <div id="handoff-alert-header" style="background:var(--gu-primary);padding:28px 24px 22px;text-align:center;">
+      <div id="handoff-alert-icon" style="font-size:52px;margin-bottom:10px;">🔔</div>
+      <div id="handoff-alert-label" style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,0.7);margin-bottom:6px;"></div>
+      <div id="handoff-alert-role" style="font-size:20px;font-weight:800;color:white;"></div>
+    </div>
+    <div style="padding:24px;">
+      <div id="handoff-alert-message" style="font-size:15px;color:var(--gu-text);line-height:1.6;text-align:center;margin-bottom:20px;"></div>
+      <button onclick="acknowledgeCurrentAlert()" style="width:100%;background:#2e7d32;color:white;border:none;border-radius:12px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;">
+        ✓ Got it — mark as actioned
+      </button>
+      <button onclick="dismissHandoffModal()" style="width:100%;background:none;border:none;color:var(--gu-dust);font-size:13px;cursor:pointer;padding:12px;margin-top:2px;">
+        Dismiss for now
+      </button>
+    </div>
+  </div>
+</div>
+<style>
+@keyframes handoffPop {
+  0% { transform: scale(0.85); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+</style>
+
 <div class="admin-wrapper">
   <!-- SIDEBAR -->
   <aside class="admin-sidebar">
@@ -1232,6 +1277,7 @@
       <a href="#" class="nav-link" onclick="goToTab('stock', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg></span><span class="nav-label">Stock</span></a>
       <a href="#" class="nav-link" onclick="goToTab('menu', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h12M4 10h12M4 14h7"/><circle cx="15" cy="14" r="2.5"/><path d="M15 11.5v-7"/></svg></span><span class="nav-label">Daily Menu</span></a>
       <a href="#" class="nav-link" onclick="goToTab('team', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="6" r="2.5"/><circle cx="14" cy="7" r="2"/><path d="M2.5 16c0-2.8 2-4.5 4.5-4.5s4.5 1.7 4.5 4.5"/><path d="M12 12c2 0 3.5 1.5 3.5 4"/></svg></span><span class="nav-label">Team &amp; Duties</span></a>
+      <a href="#" class="nav-link" onclick="goToTab('progress', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l4-4 3 3 6-7"/><path d="M13 9h4v4"/></svg></span><span class="nav-label">Daily Progress</span></a>
       <a href="#" class="nav-link" onclick="goToTab('branding', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.2 2.8l3 3-7.6 7.6c-.7.7-1.8.7-2.5 0l-.5-.5c-.7-.7-.7-1.8 0-2.5l7.6-7.6z"/><path d="M6.2 12.3L4 17.5l5.2-2.2"/></svg></span><span class="nav-label">Branding</span></a>
       <a href="#" class="nav-link" onclick="goToTab('palettes', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 3a7 7 0 100 14c1 0 1.6-.5 1.6-1.3 0-.4-.2-.7-.4-1-.2-.3-.4-.6-.4-1 0-.8.6-1.4 1.4-1.4h1.3A3.5 3.5 0 0017 8.5C17 5.5 13.9 3 10 3z"/><circle cx="7" cy="8.2" r="1" fill="currentColor" stroke="none"/><circle cx="10.3" cy="6.4" r="1" fill="currentColor" stroke="none"/><circle cx="13.2" cy="8.6" r="1" fill="currentColor" stroke="none"/></svg></span><span class="nav-label">Colours</span></a>
       <a href="#" class="nav-link" onclick="goToTab('shapes', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.5 5.5C6.5 4 8 3 10 3s3.5 1 3.5 2.5L13 13c-.1 2-1.4 3.5-3 3.5s-2.9-1.5-3-3.5L6.5 5.5z"/><ellipse cx="10" cy="5.3" rx="3.5" ry="1"/></svg></span><span class="nav-label">Bisque</span></a>
@@ -2056,6 +2102,43 @@
         </div>
       </div>
 
+      <!-- ── Daily Progress ── -->
+      <div id="progress-view" class="view" style="display: none;">
+        <h2 style="margin-top:0;">📊 Daily Progress</h2>
+        <p style="font-size:13px;color:var(--gu-dust);margin-bottom:20px;line-height:1.5;">
+          Live running log for the studio manager — every booking today, every stage, and today's takings. Updates automatically as staff work through the process.
+        </p>
+
+        <!-- Summary stats -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:20px;">
+          <div style="background:white;border:1px solid var(--gu-border);border-radius:12px;padding:14px;text-align:center;">
+            <div style="font-size:24px;font-weight:800;color:var(--gu-primary);" id="dp-total-bookings">–</div>
+            <div style="font-size:11px;color:var(--gu-dust);">Bookings today</div>
+          </div>
+          <div style="background:white;border:1px solid var(--gu-border);border-radius:12px;padding:14px;text-align:center;">
+            <div style="font-size:24px;font-weight:800;color:#2e7d32;" id="dp-completed-bookings">–</div>
+            <div style="font-size:11px;color:var(--gu-dust);">Completed</div>
+          </div>
+          <div style="background:white;border:1px solid var(--gu-border);border-radius:12px;padding:14px;text-align:center;">
+            <div style="font-size:24px;font-weight:800;color:#F9A825;" id="dp-tables-open">–</div>
+            <div style="font-size:11px;color:var(--gu-dust);">Tables open now</div>
+          </div>
+          <div style="background:white;border:1px solid var(--gu-border);border-radius:12px;padding:14px;text-align:center;">
+            <div style="font-size:24px;font-weight:800;color:var(--link-clay);" id="dp-extras-total">–</div>
+            <div style="font-size:11px;color:var(--gu-dust);">Extras to add</div>
+          </div>
+        </div>
+
+        <!-- Per-booking progress -->
+        <div class="chart-container">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <h3 style="margin:0;">Booking-by-booking progress</h3>
+            <button onclick="loadDailyProgress()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">🔄 Refresh</button>
+          </div>
+          <div id="dp-bookings-list"><div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading…</div></div>
+        </div>
+      </div>
+
       <div id="community-view" class="view" style="display: none;">
         <h2 style="margin-top: 0;">Community</h2>
         <p style="color: var(--gu-dust); margin-bottom: 20px;">
@@ -2666,6 +2749,8 @@ function goToTab(tab, event) {
     loadDailyMenu();
   } else if (tab === 'team') {
     loadTeamAndDuties();
+  } else if (tab === 'progress') {
+    loadDailyProgress();
   }
 }
 
@@ -3533,6 +3618,12 @@ function markTableReady() {
     return;
   }
   document.getElementById('s1-checklist-ready-btn').textContent = '🎉 Opening table…';
+
+  // Fire handoff alert — checklist complete
+  const bookingCode = document.getElementById('s1-result').dataset.bookingCode || '';
+  const customerName = document.getElementById('s1-customer-display')?.textContent || '';
+  fireHandoffAlert('checklist_done', bookingCode, { table: tableSelected, customerName });
+
   setTimeout(() => openTableSession(), 500);
 }
 
@@ -3774,6 +3865,17 @@ async function setSessionDutyStatus(id, status) {
   duty.completed = completed;
   duty.status = newStatus;
   renderAssignedDuties();
+
+  // Check if this staff member has now completed ALL their duties for this session
+  if (completed) {
+    const staffDuties = sessionDutiesAssigned.filter(d => d.staff_name === duty.staff_name);
+    const allStaffDutiesDone = staffDuties.every(d => d.completed);
+    if (allStaffDutiesDone && staffDuties.length > 0) {
+      const bookingCode = document.getElementById('s1-result').dataset.bookingCode || '';
+      const customerName = document.getElementById('s1-customer-display')?.textContent || '';
+      fireHandoffAlert('duties_completed', bookingCode, { staffName: duty.staff_name, customerName });
+    }
+  }
 }
 
 async function removeSessionDuty(id) {
@@ -3790,6 +3892,205 @@ const DEFAULT_ROLE_DUTIES_CLIENT = {
   'Studio Executive': ['Oversee daily studio operations','Review revenue and booking reports','Liaise with Head Office / franchise','Staff performance check-ins'],
   'Barista': ['Set up coffee machine and drinks station','Prepare and serve drinks orders','Keep drinks station stocked and clean','Manage cake/food display'],
 };
+
+// ═══════════════════════════════════════════
+// HANDOFF ALERTS SYSTEM
+// Broadcasts to all devices, highlighted for the
+// responsible role. Big popup + persistent feed.
+// ═══════════════════════════════════════════
+
+const ALERT_TRIGGERS_CLIENT = {
+  table_cleared:      { icon:'🧹', label:'Table cleared',            nextRole:'Studio Assistant' },
+  duties_completed:   { icon:'✅', label:'Duties completed',         nextRole:'Studio Manager' },
+  checklist_done:     { icon:'📋', label:'Setup checklist complete', nextRole:'Studio Manager' },
+  piece_finished:     { icon:'🏺', label:'Piece finished',           nextRole:'Ceramic Technician' },
+  kiln_loaded:        { icon:'🔥', label:'Kiln loaded',              nextRole:'Ceramic Technician' },
+  kiln_fired:         { icon:'✨', label:'Kiln fired — ready',       nextRole:'Studio Assistant' },
+  booking_completed:  { icon:'🎉', label:'Booking completed',        nextRole:'Studio Manager' },
+};
+
+let alertFeedItems = [];
+let alertLastSeenIds = new Set();
+let alertPollTimer = null;
+let currentPopupAlert = null;
+let alertPopupQueue = [];
+
+// Fire a new handoff alert (called from other parts of the app on completion events)
+async function fireHandoffAlert(triggerType, bookingCode, contextData) {
+  try {
+    await fetch(`${API_URL}/api/staff/alerts`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ studioId, triggerType, bookingCode, data: contextData || {} })
+    });
+    // Immediately poll so it shows on this device right away
+    pollHandoffAlerts();
+  } catch(e) { /* silent */ }
+}
+
+async function pollHandoffAlerts() {
+  if (!apiConnected || !studioId) return;
+  try {
+    const res = await fetch(`${API_URL}/api/staff/alerts?studioId=${studioId}`);
+    const data = await res.json();
+    alertFeedItems = data.alerts || [];
+
+    const newOnes = alertFeedItems.filter(a => !alertLastSeenIds.has(a.id) && !a.acknowledged);
+    alertFeedItems.forEach(a => alertLastSeenIds.add(a.id));
+
+    if (newOnes.length) {
+      alertPopupQueue.push(...newOnes);
+      if (!currentPopupAlert) showNextHandoffPopup();
+    }
+
+    updateAlertBellBadge();
+    renderAlertFeed();
+  } catch(e) { /* silent */ }
+}
+
+function updateAlertBellBadge() {
+  const unacked = alertFeedItems.filter(a => !a.acknowledged).length;
+  const badge = document.getElementById('alert-bell-badge');
+  if (badge) {
+    badge.style.display = unacked > 0 ? 'flex' : 'none';
+    badge.textContent = unacked > 9 ? '9+' : unacked;
+  }
+}
+
+function showNextHandoffPopup() {
+  if (!alertPopupQueue.length) { currentPopupAlert = null; return; }
+  currentPopupAlert = alertPopupQueue.shift();
+
+  const modal = document.getElementById('handoff-alert-modal');
+  const header = document.getElementById('handoff-alert-header');
+  document.getElementById('handoff-alert-icon').textContent = currentPopupAlert.icon || '🔔';
+  document.getElementById('handoff-alert-label').textContent = currentPopupAlert.label || 'Update';
+  document.getElementById('handoff-alert-role').textContent = `For: ${currentPopupAlert.next_role || 'Studio Team'}`;
+  document.getElementById('handoff-alert-message').textContent = currentPopupAlert.message || '';
+
+  // Colour-code header by role
+  const ROLE_COLORS = { 'Studio Manager':'#5E35B1', 'Studio Executive':'#1E88E5', 'Ceramic Technician':'#8D6E63', 'Studio Assistant':'#00897B', 'Barista':'#F4511E' };
+  header.style.background = ROLE_COLORS[currentPopupAlert.next_role] || 'var(--gu-primary)';
+
+  modal.style.display = 'flex';
+
+  // Play a gentle alert tone (reuse existing extras ping pattern if available)
+  try { playExtrasPing(); } catch(e) {}
+}
+
+async function acknowledgeCurrentAlert() {
+  if (!currentPopupAlert) return;
+  try {
+    await fetch(`${API_URL}/api/staff/alerts/${currentPopupAlert.id}`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ acknowledgedBy: null })
+    });
+    const item = alertFeedItems.find(a => a.id === currentPopupAlert.id);
+    if (item) item.acknowledged = true;
+  } catch(e) { /* silent */ }
+  document.getElementById('handoff-alert-modal').style.display = 'none';
+  updateAlertBellBadge();
+  renderAlertFeed();
+  showNextHandoffPopup();
+}
+
+function dismissHandoffModal() {
+  document.getElementById('handoff-alert-modal').style.display = 'none';
+  showNextHandoffPopup();
+}
+
+function toggleAlertFeed() {
+  const panel = document.getElementById('alert-feed-panel');
+  const backdrop = document.getElementById('alert-feed-backdrop');
+  const isOpen = panel.style.display === 'flex';
+  panel.style.display = isOpen ? 'none' : 'flex';
+  backdrop.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) renderAlertFeed();
+}
+
+function renderAlertFeed() {
+  const list = document.getElementById('alert-feed-list');
+  if (!list) return;
+  if (!alertFeedItems.length) {
+    list.innerHTML = '<p style="color:var(--gu-dust);font-size:13px;text-align:center;padding:24px 0;">No alerts today yet.</p>';
+    return;
+  }
+  const ROLE_COLORS = { 'Studio Manager':'#5E35B1', 'Studio Executive':'#1E88E5', 'Ceramic Technician':'#8D6E63', 'Studio Assistant':'#00897B', 'Barista':'#F4511E' };
+
+  list.innerHTML = alertFeedItems.map(a => {
+    const time = new Date(a.created_at).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+    const color = ROLE_COLORS[a.next_role] || '#999';
+    return `
+      <div style="border-left:4px solid ${color};background:${a.acknowledged?'#f7f5f2':'white'};border-radius:8px;padding:12px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <span style="font-size:16px;">${a.icon}</span>
+          <span style="font-size:12px;font-weight:700;color:${color};flex:1;">${a.next_role}</span>
+          <span style="font-size:10px;color:var(--gu-dust);">${time}</span>
+        </div>
+        <div style="font-size:12.5px;color:var(--gu-text);line-height:1.4;margin-bottom:6px;">${a.message}</div>
+        ${a.acknowledged
+          ? `<div style="font-size:10px;color:#2e7d32;font-weight:600;">✓ Actioned</div>`
+          : `<button onclick="acknowledgeAlertFromFeed('${a.id}')" style="background:${color};color:white;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">✓ Mark actioned</button>`
+        }
+      </div>`;
+  }).join('');
+}
+
+async function acknowledgeAlertFromFeed(id) {
+  await fetch(`${API_URL}/api/staff/alerts/${id}`, {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ acknowledgedBy: null })
+  });
+  const item = alertFeedItems.find(a => a.id === id);
+  if (item) item.acknowledged = true;
+  updateAlertBellBadge();
+  renderAlertFeed();
+}
+
+function startAlertPolling() {
+  if (alertPollTimer) return;
+  pollHandoffAlerts();
+  alertPollTimer = setInterval(pollHandoffAlerts, 20 * 1000);
+}
+
+// ── Daily Progress (running completion log) ──
+async function loadDailyProgress() {
+  const listEl = document.getElementById('dp-bookings-list');
+  try {
+    const res = await fetch(`${API_URL}/api/staff/daily-progress?studioId=${studioId}`);
+    const data = await res.json();
+
+    document.getElementById('dp-total-bookings').textContent = data.totalBookings ?? '0';
+    document.getElementById('dp-completed-bookings').textContent = data.completedBookings ?? '0';
+    document.getElementById('dp-tables-open').textContent = data.tablesOpen ?? '0';
+    document.getElementById('dp-extras-total').textContent = `£${((data.extrasTotalCents||0)/100).toFixed(0)}`;
+
+    if (!data.progress?.length) {
+      listEl.innerHTML = '<p style="color:var(--gu-dust);font-size:13px;text-align:center;padding:20px 0;">No bookings yet today.</p>';
+      return;
+    }
+
+    listEl.innerHTML = data.progress.map(p => {
+      const statusColor = p.bookingStatus === 'completed' ? '#2e7d32' : p.sessionStatus === 'open' || p.sessionStatus === 'painting' ? '#F9A825' : '#999';
+      const statusLabel = p.bookingStatus === 'completed' ? 'Completed' : p.sessionStatus === 'open' ? 'Table open' : p.sessionStatus === 'painting' ? 'Painting' : 'Not started';
+      return `
+        <div style="border:1px solid var(--gu-border);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+          <div style="display:flex;align-items:center;justify-content:between;gap:10px;margin-bottom:6px;">
+            <div style="flex:1;">
+              <span style="font-size:13px;font-weight:700;">${p.customerName}</span>
+              ${p.table ? `<span style="font-size:11px;color:var(--gu-dust);margin-left:8px;">${p.table}</span>` : ''}
+            </div>
+            <span style="font-size:10px;font-weight:700;color:white;background:${statusColor};padding:3px 10px;border-radius:20px;white-space:nowrap;">${statusLabel}</span>
+          </div>
+          <div style="display:flex;gap:14px;font-size:11px;color:var(--gu-dust);">
+            <span>👤 Duties: ${p.dutiesComplete}/${p.dutiesTotal}${p.allDutiesDone && p.dutiesTotal ? ' ✓' : ''}</span>
+            <span>🔔 Alerts: ${p.alertCount}</span>
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    listEl.innerHTML = '<p style="color:var(--gu-dust);font-size:13px;">Could not load daily progress.</p>';
+  }
+}
 
 // ── Team & Duties Management ──
 const STAFF_ROLES = ['Ceramic Technician', 'Studio Manager', 'Studio Assistant', 'Studio Executive', 'Barista'];
@@ -4241,6 +4542,7 @@ async function populateDashboard() {
   loadLoyaltyLeaderboard();
   swtShowTrigger();
   startExtrasPollingOnLoad();
+  startAlertPolling();
   // Show morning opening checklist if not done today
   setTimeout(showOpeningChecklist, 800);
   try {
@@ -4486,6 +4788,9 @@ async function startKilnBatch() {
 
     showBatchQR(data.batchCode, `${data.piecesIncluded} piece${data.piecesIncluded !== 1 ? 's' : ''} from ${data.bookingsIncluded} booking${data.bookingsIncluded !== 1 ? 's' : ''}`);
     loadKilnData();
+
+    // Fire handoff alert — kiln loaded and firing started
+    fireHandoffAlert('kiln_loaded', null, { sessionName: data.batchCode });
   } catch (err) {
     alert('Could not start firing: ' + err.message);
   }
@@ -4570,6 +4875,10 @@ async function fireKilnBatchByCode(batchCode, showAlert) {
 
     if (showAlert) alert(`✓ ${data.piecesFired} piece(s) across ${data.bookingsFired} booking(s) confirmed fired.`);
     loadKilnData();
+
+    // Fire handoff alert — kiln fired, pieces ready for pickup
+    fireHandoffAlert('kiln_fired', null, { sessionName: batchCode });
+
     return { ok: true, data };
   } catch (err) {
     if (showAlert) alert('Could not fire batch: ' + err.message);
@@ -6368,6 +6677,9 @@ async function savePiecesToDatabase(bookingCode, pieces, summaryText, customerNa
             (capturedPhotoBase64 ? `\n📷 Photo saved` : '') +
             (data.pointsEarned ? `\n⭐ Points earned: ${data.pointsEarned}` : ''));
 
+      // Fire handoff alert — piece(s) finished and photographed, ready for kiln
+      fireHandoffAlert('piece_finished', bookingCode, { customerName });
+
       // If this submission came from Section 3 (Completion), close out the table session too
       if (completingTableSessionId) {
         try {
@@ -6380,6 +6692,8 @@ async function savePiecesToDatabase(bookingCode, pieces, summaryText, customerNa
         }
         completingTableSessionId = null;
         loadOpenTablesForCompletion();
+        // Fire handoff alert — booking fully complete
+        fireHandoffAlert('booking_completed', bookingCode, { customerName });
       }
 
       closeQRModal();

@@ -3224,6 +3224,136 @@ const DEFAULT_ROLE_DUTIES = {
 };
 
 // GET /api/staff/team — list team members for a studio
+// Role hierarchy — lower number = more senior. Used to route
+// handoff alerts to the right level and build the studio manager's
+// end-of-day rollup.
+const ROLE_HIERARCHY = {
+  'Studio Manager':     1,
+  'Studio Executive':   2,
+  'Ceramic Technician': 3,
+  'Studio Assistant':   4,
+  'Barista':            4,
+};
+
+// Handoff alert trigger definitions — maps an event type to a
+// human-readable message template and which role should action it next.
+const ALERT_TRIGGERS = {
+  table_cleared:      { icon:'🧹', label:'Table cleared',            nextRole: 'Studio Assistant',   message: (d) => `Table ${d.table || ''} has been cleared and is ready for the next booking.` },
+  duties_completed:   { icon:'✅', label:'Duties completed',         nextRole: 'Studio Manager',      message: (d) => `${d.staffName || 'A team member'} has completed all duties for ${d.customerName || 'a session'}.` },
+  checklist_done:     { icon:'📋', label:'Setup checklist complete', nextRole: 'Studio Manager',      message: (d) => `Table setup checklist complete for ${d.customerName || 'a booking'} at ${d.table || 'a table'} — ready to open.` },
+  piece_finished:     { icon:'🏺', label:'Piece finished',           nextRole: 'Ceramic Technician',  message: (d) => `${d.customerName || 'A customer'}'s piece is finished and photographed — ready for the kiln.` },
+  kiln_loaded:        { icon:'🔥', label:'Kiln loaded',              nextRole: 'Ceramic Technician',  message: (d) => `Kiln session "${d.sessionName || ''}" has been loaded and is ready to fire.` },
+  kiln_fired:         { icon:'✨', label:'Kiln fired — ready',       nextRole: 'Studio Assistant',    message: (d) => `Kiln session "${d.sessionName || ''}" has finished firing — pieces ready for pickup.` },
+  booking_completed:  { icon:'🎉', label:'Booking completed',        nextRole: 'Studio Manager',      message: (d) => `${d.customerName || 'A booking'}'s session is fully complete — table, pieces, and payment all done.` },
+};
+
+// GET /api/staff/alerts — get today's alert feed for a studio
+app.get('/api/staff/alerts', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const today = new Date(); today.setHours(0,0,0,0);
+  const { data } = await supabase.from('staff_alerts')
+    .select('*').eq('studio_id', studioId)
+    .gte('created_at', today.toISOString())
+    .order('created_at', { ascending: false });
+  res.json({ alerts: data || [] });
+});
+
+// POST /api/staff/alerts — fire a new handoff alert
+app.post('/api/staff/alerts', async (req, res) => {
+  const { studioId, triggerType, bookingCode, data } = req.body;
+  if (!studioId || !triggerType) return res.status(400).json({ error: 'studioId and triggerType required' });
+  const trigger = ALERT_TRIGGERS[triggerType];
+  if (!trigger) return res.status(400).json({ error: `Unknown trigger type: ${triggerType}` });
+
+  const { data: alert, error } = await supabase.from('staff_alerts').insert({
+    studio_id: studioId,
+    trigger_type: triggerType,
+    booking_code: bookingCode || null,
+    next_role: trigger.nextRole,
+    icon: trigger.icon,
+    label: trigger.label,
+    message: trigger.message(data || {}),
+    context: data || {},
+    acknowledged: false,
+  }).select().single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ alert });
+});
+
+// PATCH /api/staff/alerts/:id — acknowledge/action an alert
+app.patch('/api/staff/alerts/:id', async (req, res) => {
+  const { acknowledgedBy } = req.body;
+  const { data, error } = await supabase.from('staff_alerts')
+    .update({ acknowledged: true, acknowledged_by: acknowledgedBy || null, acknowledged_at: new Date().toISOString() })
+    .eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ alert: data });
+});
+
+// GET /api/staff/daily-progress — running completion log for studio manager
+// Shows every booking today with each stage's status
+app.get('/api/staff/daily-progress', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  const [bookingsRes, sessionsRes, dutiesRes, alertsRes] = await Promise.all([
+    supabase.from('bookings').select('booking_code, customer_name, status, created_at')
+      .eq('studio_id', studioId).gte('created_at', today.toISOString()),
+    supabase.from('table_sessions').select('booking_code, table_name, status, created_at')
+      .eq('studio_id', studioId).gte('created_at', today.toISOString()),
+    supabase.from('session_duties').select('booking_code, staff_name, duty_text, completed, status')
+      .eq('studio_id', studioId).gte('created_at', today.toISOString()),
+    supabase.from('staff_alerts').select('*')
+      .eq('studio_id', studioId).gte('created_at', today.toISOString())
+      .order('created_at', { ascending: true }),
+  ]);
+
+  const bookings = bookingsRes.data || [];
+  const sessions = sessionsRes.data || [];
+  const duties = dutiesRes.data || [];
+  const alerts = alertsRes.data || [];
+
+  // Build per-booking progress rollup
+  const progress = bookings.map(b => {
+    const session = sessions.find(s => s.booking_code === b.booking_code);
+    const bookingDuties = duties.filter(d => d.booking_code === b.booking_code);
+    const bookingAlerts = alerts.filter(a => a.booking_code === b.booking_code);
+    const dutiesComplete = bookingDuties.length > 0 && bookingDuties.every(d => d.completed || d.status === 'na');
+
+    return {
+      bookingCode: b.booking_code,
+      customerName: b.customer_name,
+      table: session?.table_name || null,
+      sessionStatus: session?.status || 'not started',
+      bookingStatus: b.status,
+      dutiesTotal: bookingDuties.length,
+      dutiesComplete: bookingDuties.filter(d => d.completed || d.status === 'na').length,
+      allDutiesDone: dutiesComplete,
+      alertCount: bookingAlerts.length,
+      alerts: bookingAlerts,
+    };
+  });
+
+  // Today's takings summary
+  const { data: extras } = await supabase.from('app_extra_charges')
+    .select('amount_cents').eq('studio_id', studioId).gte('created_at', today.toISOString());
+  const extrasTotal = (extras || []).reduce((sum, e) => sum + (e.amount_cents || 0), 0);
+
+  res.json({
+    date: today.toISOString().split('T')[0],
+    totalBookings: bookings.length,
+    completedBookings: progress.filter(p => p.bookingStatus === 'completed').length,
+    tablesOpen: sessions.filter(s => s.status === 'open' || s.status === 'painting').length,
+    tablesFinished: sessions.filter(s => s.status === 'completed').length,
+    extrasTotalCents: extrasTotal,
+    progress,
+    allAlerts: alerts,
+  });
+});
+
 app.get('/api/staff/team', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
