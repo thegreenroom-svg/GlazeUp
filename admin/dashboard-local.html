@@ -1252,7 +1252,53 @@
   <span id="shift-task-count-badge" style="display:none;background:#e53935;color:white;font-size:10px;font-weight:800;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 4px;">0</span>
 </button>
 
-<!-- Personal Task Queue (slide-in) -->
+<!-- Headset / Bluetooth Setup button -->
+<button id="headset-setup-btn" onclick="openHeadsetHelp()" style="display:none;position:fixed;top:16px;right:280px;z-index:850;background:white;border:1.5px solid var(--gu-border);border-radius:50%;width:44px;height:44px;font-size:18px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.12);align-items:center;justify-content:center;">
+  🎧
+</button>
+
+<!-- Headset / Bluetooth Setup Modal -->
+<div id="headset-help-modal" style="display:none;position:fixed;inset:0;z-index:9700;background:rgba(43,39,36,0.8);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:white;border-radius:24px;max-width:440px;width:100%;max-height:88vh;overflow-y:auto;box-shadow:0 24px 70px rgba(0,0,0,0.4);">
+    <div style="background:var(--gu-primary);padding:26px 24px 22px;text-align:center;">
+      <div style="font-size:44px;margin-bottom:8px;">🎧</div>
+      <div style="font-size:18px;font-weight:800;color:white;">Use a Bluetooth Headset</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:4px;">Hear alerts and task voice through your earbuds</div>
+    </div>
+    <div style="padding:24px;">
+      <div style="background:#fff9f0;border:1px solid #f0e0c0;border-radius:12px;padding:14px;margin-bottom:20px;font-size:12.5px;color:var(--gu-text);line-height:1.6;">
+        <strong>How it works:</strong> Bluetooth audio is controlled by this device's own settings, not by kilnLINK directly. Pair your earbuds once below — after that, every alert, task, and voice reminder plays through them automatically. No further setup needed.
+      </div>
+
+      <div style="margin-bottom:18px;">
+        <div style="display:flex;gap:12px;margin-bottom:14px;">
+          <div style="width:28px;height:28px;border-radius:50%;background:var(--gu-primary);color:white;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;">1</div>
+          <div style="font-size:13px;color:var(--gu-text);line-height:1.5;">Put your Bluetooth earbuds/headset into pairing mode (usually hold the button until the light flashes).</div>
+        </div>
+        <div style="display:flex;gap:12px;margin-bottom:14px;">
+          <div style="width:28px;height:28px;border-radius:50%;background:var(--gu-primary);color:white;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;">2</div>
+          <div style="font-size:13px;color:var(--gu-text);line-height:1.5;">Open this device's <strong>Settings → Bluetooth</strong> and tap your headset to pair.</div>
+        </div>
+        <div style="display:flex;gap:12px;margin-bottom:14px;">
+          <div style="width:28px;height:28px;border-radius:50%;background:var(--gu-primary);color:white;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;">3</div>
+          <div style="font-size:13px;color:var(--gu-text);line-height:1.5;">Come back to kilnLINK — everything now plays through your headset automatically. Tap the button below to test it.</div>
+        </div>
+      </div>
+
+      <button onclick="testHeadsetAudio()" style="width:100%;background:#2e7d32;color:white;border:none;border-radius:12px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px;">
+        🔊 Test — play a sample alert
+      </button>
+      <button onclick="openDeviceBluetoothSettings()" style="width:100%;background:var(--gu-bg);border:1px solid var(--gu-border);color:var(--gu-text);border-radius:12px;padding:12px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px;">
+        📱 Open this device's Bluetooth settings
+      </button>
+      <button onclick="closeHeadsetHelp()" style="width:100%;background:none;border:none;color:var(--gu-dust);font-size:13px;cursor:pointer;padding:10px;">
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+
+
 <div id="task-queue-panel" style="display:none;position:fixed;top:0;right:0;bottom:0;width:360px;max-width:92vw;background:#f7f4ee;z-index:9300;box-shadow:-8px 0 32px rgba(0,0,0,0.2);flex-direction:column;">
   <div style="background:var(--gu-primary);color:white;padding:18px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
@@ -4404,7 +4450,28 @@ function applyShiftUI() {
   badge.style.display = 'flex';
   document.getElementById('shift-badge-avatar').textContent = currentShiftStaff.name.charAt(0).toUpperCase();
   document.getElementById('shift-badge-name').textContent = currentShiftStaff.name;
+  document.getElementById('headset-setup-btn').style.display = 'flex';
   startTaskPolling();
+}
+
+// ── Headset / Bluetooth help ──
+function openHeadsetHelp() {
+  document.getElementById('headset-help-modal').style.display = 'flex';
+}
+function closeHeadsetHelp() {
+  document.getElementById('headset-help-modal').style.display = 'none';
+}
+function testHeadsetAudio() {
+  try { playExtrasPing(); } catch(e) {}
+  speakTask('This is a test alert. If you can hear this through your headset, you are all set.');
+}
+function openDeviceBluetoothSettings() {
+  // No web API can open OS settings directly — give the platform-specific hint instead
+  const ua = navigator.userAgent;
+  let msg = 'Open your device Settings app, then go to Bluetooth.';
+  if (/iPad|iPhone|iPod/.test(ua)) msg = 'On this iPad/iPhone: open Settings → Bluetooth → tap your headset to connect.';
+  else if (/Android/.test(ua)) msg = 'On this Android tablet: open Settings → Connected devices → Bluetooth → tap your headset to connect.';
+  alert(msg);
 }
 
 // Allow Enter key on PIN input
