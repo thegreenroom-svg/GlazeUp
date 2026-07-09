@@ -1590,6 +1590,7 @@
         <div class="dp-tool-btn active" id="td-tool-draw" onclick="setTdMode('draw')"><span class="dp-tool-icon">✏️</span>Sketch</div>
         <div class="dp-tool-btn" id="td-tool-text" onclick="setTdMode('text')"><span class="dp-tool-icon">🔤</span>Add Text</div>
         <div class="dp-tool-btn" id="td-tool-motif" onclick="setTdMode('motif')"><span class="dp-tool-icon">✨</span>Add Motif</div>
+        <div class="dp-tool-btn" id="td-tool-ai" onclick="setTdMode('ai')" style="display:none;"><span class="dp-tool-icon">🤖</span>AI Design</div>
       </div>
 
       <div id="td-draw-controls">
@@ -1617,6 +1618,30 @@
       </div>
 
       <div id="td-motif-row" style="display:none;"></div>
+
+      <!-- AI Design Generation -->
+      <div id="td-ai-controls" style="display:none;">
+        <div style="font-size:12px; color:rgba(255,255,255,0.6); line-height:1.5; margin-bottom:10px;">
+          Describe what you'd like and AI will create it for you. <strong style="color:#fff;">20p per design</strong> — try a few until you find one you love.
+        </div>
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <input type="text" id="td-ai-prompt" maxlength="200" placeholder="e.g. a small watercolour daisy" style="flex:1; padding:11px; border-radius:10px; border:none; font-size:14px;">
+        </div>
+        <button id="td-ai-generate-btn" onclick="generateAiDesign()" style="width:100%; background:var(--glaze-oxblood-base); color:#fff; border:none; padding:12px; border-radius:10px; font-weight:700; font-size:13px; cursor:pointer; margin-bottom:10px;">
+          ✨ Generate — 20p
+        </button>
+        <div id="td-ai-status" style="text-align:center; font-size:12px; color:rgba(255,255,255,0.5); margin-bottom:10px; display:none;"></div>
+        <div id="td-ai-result" style="display:none; text-align:center; margin-bottom:10px;">
+          <img id="td-ai-result-img" style="max-width:100%; border-radius:12px; margin-bottom:10px;">
+          <div style="display:flex; gap:8px;">
+            <button onclick="useAiDesign()" style="flex:1; background:#2e7d32; color:#fff; border:none; padding:10px; border-radius:10px; font-weight:700; font-size:12px; cursor:pointer;">✓ Use This Design</button>
+            <button onclick="generateAiDesign()" style="flex:1; background:rgba(255,255,255,0.15); color:#fff; border:none; padding:10px; border-radius:10px; font-weight:700; font-size:12px; cursor:pointer;">🔄 Try Again — 20p</button>
+          </div>
+        </div>
+        <div style="font-size:10px; color:rgba(255,255,255,0.35); line-height:1.5;">
+          Please avoid copyrighted characters, brand logos, or named artists' styles — describe shapes, colours, and themes instead. All designs are reviewed by staff before printing.
+        </div>
+      </div>
 
       <div class="dp-palette" id="td-colour-row"></div>
 
@@ -3590,11 +3615,109 @@
       if (document.getElementById('td-font-row').children.length === 0) renderTdFonts();
       if (document.getElementById('td-motif-row').children.length === 0) renderTdMotifs();
       if (document.getElementById('td-colour-row').children.length === 0) renderTdColours();
+      checkAiDesignAvailability();
     }
     function closeTransferDesigner() {
       const screen = document.getElementById('transfer-designer-screen');
       screen.classList.remove('open');
       setTimeout(() => { screen.style.display = 'none'; }, 280);
+    }
+
+    // ── AI Design Generation ──
+    let aiConfigCache = null;
+    let aiLastImageUrl = null;
+
+    async function checkAiDesignAvailability() {
+      try {
+        const res = await fetch(`${API_URL}/api/ai-design/config?studioId=${STUDIO_ID}`);
+        const data = await res.json();
+        aiConfigCache = data.config;
+        const btn = document.getElementById('td-tool-ai');
+        if (btn) btn.style.display = aiConfigCache.enabled ? 'flex' : 'none';
+        const priceLabel = aiConfigCache.customer_generation_price_cents
+          ? `${aiConfigCache.customer_generation_price_cents}p` : '20p';
+        const genBtn = document.getElementById('td-ai-generate-btn');
+        if (genBtn) genBtn.textContent = `✨ Generate — ${priceLabel}`;
+      } catch (e) {
+        const btn = document.getElementById('td-tool-ai');
+        if (btn) btn.style.display = 'none';
+      }
+    }
+
+    async function generateAiDesign() {
+      const promptInput = document.getElementById('td-ai-prompt');
+      const prompt = promptInput.value.trim();
+      if (!prompt) { alert('Please describe what you\'d like first.'); return; }
+
+      const statusEl = document.getElementById('td-ai-status');
+      const resultEl = document.getElementById('td-ai-result');
+      const genBtn = document.getElementById('td-ai-generate-btn');
+
+      resultEl.style.display = 'none';
+      statusEl.style.display = 'block';
+      statusEl.textContent = '✨ Creating your design… this takes a few seconds';
+      genBtn.disabled = true;
+      genBtn.style.opacity = '0.6';
+
+      try {
+        const res = await fetch(`${API_URL}/api/ai-design/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studioId: STUDIO_ID,
+            bookingCode: window.currentBooking?.code || null,
+            prompt,
+          })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          statusEl.textContent = '❌ ' + (data.error || 'Could not generate a design.');
+          genBtn.disabled = false;
+          genBtn.style.opacity = '1';
+          return;
+        }
+
+        aiLastImageUrl = data.imageUrl;
+        document.getElementById('td-ai-result-img').src = data.imageUrl;
+        statusEl.style.display = 'none';
+        resultEl.style.display = 'block';
+
+        const bookingCode = window.currentBooking?.code;
+        if (bookingCode) {
+          const priceCents = aiConfigCache?.customer_generation_price_cents || 20;
+          fetch(`${API_URL}/api/extras/charge`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              studioId: STUDIO_ID, bookingCode,
+              itemName: `AI Design Generation: "${prompt.slice(0, 40)}${prompt.length > 40 ? '…' : ''}"`,
+              amountCents: priceCents,
+            })
+          }).catch(() => {});
+        }
+      } catch (e) {
+        statusEl.textContent = '❌ Could not generate a design — please try again.';
+      } finally {
+        genBtn.disabled = false;
+        genBtn.style.opacity = '1';
+      }
+    }
+
+    function useAiDesign() {
+      if (!aiLastImageUrl) return;
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        setupTdCanvases(img);
+        setTdMode('draw');
+        document.getElementById('td-ai-result').style.display = 'none';
+        document.getElementById('td-ai-prompt').value = '';
+      };
+      img.onerror = () => {
+        alert('Could not load the design onto your piece — please try generating again.');
+      };
+      img.src = aiLastImageUrl;
     }
 
     function handleTransferPhoto(event) {
@@ -3794,9 +3917,11 @@
       document.getElementById('td-tool-draw').classList.toggle('active', mode === 'draw');
       document.getElementById('td-tool-text').classList.toggle('active', mode === 'text');
       document.getElementById('td-tool-motif').classList.toggle('active', mode === 'motif');
+      document.getElementById('td-tool-ai').classList.toggle('active', mode === 'ai');
       document.getElementById('td-draw-controls').style.display = mode === 'draw' ? 'block' : 'none';
       document.getElementById('td-text-controls').style.display = mode === 'text' ? 'block' : 'none';
       document.getElementById('td-motif-row').style.display = mode === 'motif' ? 'flex' : 'none';
+      document.getElementById('td-ai-controls').style.display = mode === 'ai' ? 'block' : 'none';
     }
 
     function renderTdFonts() {

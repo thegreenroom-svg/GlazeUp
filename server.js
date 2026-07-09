@@ -3906,6 +3906,164 @@ app.get('/api/staff/tasks/all-incomplete', async (req, res) => {
   res.json({ tasks, grouped, totalCount: tasks.length });
 });
 
+// ═══════════════════════════════════════════
+// AI DESIGN GENERATION (Transfer Designer)
+// One central OpenAI account, shared across every
+// kilnLINK studio. Usage is logged per studio and
+// billed monthly as a line item on their existing
+// Stripe subscription via metered billing.
+// ═══════════════════════════════════════════
+
+const WHOLESALE_GENERATION_PRICE_CENTS = 10; // what we charge studios, per generation
+const DEFAULT_CUSTOMER_GENERATION_PRICE_CENTS = 20; // suggested default for studios to charge their customers
+const DEFAULT_CUSTOMER_PRINT_PRICE_CENTS = 150; // suggested default AI print price (vs £1 hand-drawn)
+
+// Blocks prompts that reference copyrighted characters, franchises, named
+// artists' styles, or anything obviously trying to reproduce existing IP.
+// This is a first line of defence, not a legal guarantee — staff review
+// and approve every submission before printing regardless.
+const BLOCKED_PROMPT_PATTERNS = [
+  /disney|pixar|marvel|dc comics|warner bros|nintendo|pokemon|pokémon/i,
+  /star wars|harry potter|hello kitty|sanrio|peppa pig|paw patrol/i,
+  /minecraft|fortnite|roblox|among us/i,
+  /in the style of\s+\w+/i, // "in the style of [named artist]"
+  /like\s+\w+\s+(the artist|painting|artwork)/i,
+  /copyrighted|trademark(ed)?/i,
+];
+
+function isPromptBlocked(prompt) {
+  return BLOCKED_PROMPT_PATTERNS.some(pattern => pattern.test(prompt));
+}
+
+// POST /api/ai-design/generate — generate AI artwork for a transfer design
+app.post('/api/ai-design/generate', async (req, res) => {
+  const { studioId, bookingCode, prompt } = req.body;
+  if (!studioId || !prompt) return res.status(400).json({ error: 'studioId and prompt required' });
+  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'AI design generation is not yet available for this studio.' });
+
+  const trimmedPrompt = String(prompt).trim().slice(0, 300);
+  if (!trimmedPrompt) return res.status(400).json({ error: 'Please describe what you would like.' });
+
+  if (isPromptBlocked(trimmedPrompt)) {
+    return res.status(400).json({
+      error: 'That description can\'t be used — please avoid copyrighted characters, brands, or named artists\' styles. Try describing shapes, colours, and themes instead.'
+    });
+  }
+
+  // Check the studio has AI generation enabled
+  const { data: aiConfig } = await supabase.from('ai_design_config').select('*').eq('studio_id', studioId).single();
+  if (aiConfig && aiConfig.enabled === false) {
+    return res.status(403).json({ error: 'AI design generation is turned off for this studio.' });
+  }
+
+  try {
+    const openaiRes = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'dall-e-3',
+        prompt: `A simple, clean, printable design suitable for a ceramic transfer: ${trimmedPrompt}. Flat colours, clear outlines, no photorealism, no text unless requested, white or transparent background.`,
+        n: 1,
+        size: '1024x1024',
+        quality: 'standard',
+      }),
+    });
+
+    if (!openaiRes.ok) {
+      const errBody = await openaiRes.text();
+      console.error('OpenAI generation error:', errBody);
+      return res.status(502).json({ error: 'Could not generate a design right now — please try again.' });
+    }
+
+    const openaiData = await openaiRes.json();
+    const imageUrl = openaiData.data?.[0]?.url;
+    if (!imageUrl) return res.status(502).json({ error: 'No image was returned — please try again.' });
+
+    // Log usage for wholesale billing to the studio
+    await supabase.from('ai_generation_usage').insert({
+      studio_id: studioId,
+      booking_code: bookingCode || null,
+      prompt: trimmedPrompt,
+      wholesale_cost_cents: WHOLESALE_GENERATION_PRICE_CENTS,
+      created_at: new Date().toISOString(),
+    });
+
+    // Report usage to Stripe for metered billing on the studio's subscription,
+    // if they have an active subscription with a metered AI usage item configured.
+    reportAiUsageToStripe(studioId).catch(err => console.error('Stripe usage report failed:', err));
+
+    res.json({ imageUrl, wholesaleCostCents: WHOLESALE_GENERATION_PRICE_CENTS });
+  } catch (err) {
+    console.error('AI generation error:', err);
+    res.status(500).json({ error: 'Could not generate a design right now — please try again.' });
+  }
+});
+
+// Reports today's running total of a studio's AI usage to Stripe as metered
+// usage, if they have a metered subscription item set up for it. Stripe
+// accumulates this and includes it as a line item on their next invoice —
+// no separate billing system needed.
+async function reportAiUsageToStripe(studioId) {
+  const { data: sub } = await supabase.from('stripe_subscriptions')
+    .select('stripe_subscription_id, ai_usage_item_id').eq('studio_id', studioId).single();
+  if (!sub || !sub.ai_usage_item_id) return; // studio has no metered AI item configured yet
+
+  await stripe.subscriptionItems.createUsageRecord(sub.ai_usage_item_id, {
+    quantity: 1,
+    timestamp: Math.floor(Date.now() / 1000),
+    action: 'increment',
+  });
+}
+
+// GET /api/ai-design/usage — a studio's own AI generation usage this month (for their dashboard)
+app.get('/api/ai-design/usage', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1); startOfMonth.setHours(0, 0, 0, 0);
+
+  const { data } = await supabase.from('ai_generation_usage')
+    .select('wholesale_cost_cents').eq('studio_id', studioId).gte('created_at', startOfMonth.toISOString());
+
+  const count = (data || []).length;
+  const totalCents = (data || []).reduce((sum, r) => sum + (r.wholesale_cost_cents || 0), 0);
+  res.json({ count, totalCents, monthLabel: startOfMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) });
+});
+
+// GET /api/ai-design/config — studio's AI generation settings (enabled + their customer pricing)
+app.get('/api/ai-design/config', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data } = await supabase.from('ai_design_config').select('*').eq('studio_id', studioId).single();
+  res.json({
+    config: data || {
+      enabled: true,
+      customer_generation_price_cents: DEFAULT_CUSTOMER_GENERATION_PRICE_CENTS,
+      customer_print_price_cents: DEFAULT_CUSTOMER_PRINT_PRICE_CENTS,
+    }
+  });
+});
+
+// POST /api/ai-design/config — studio toggles AI generation on/off, sets their own customer pricing
+app.post('/api/ai-design/config', async (req, res) => {
+  const { studioId, enabled, customerGenerationPriceCents, customerPrintPriceCents } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  const { data, error } = await supabase.from('ai_design_config').upsert({
+    studio_id: studioId,
+    enabled: enabled !== false,
+    customer_generation_price_cents: customerGenerationPriceCents ?? DEFAULT_CUSTOMER_GENERATION_PRICE_CENTS,
+    customer_print_price_cents: customerPrintPriceCents ?? DEFAULT_CUSTOMER_PRINT_PRICE_CENTS,
+  }, { onConflict: 'studio_id' }).select().single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ config: data });
+});
+
 // POST /api/staff/tasks/adhoc — manager pushes a one-off task to a role or specific staff member
 app.post('/api/staff/tasks/adhoc', async (req, res) => {
   const { studioId, assignedRole, assignedStaffId, taskDescription, tableName, bookingCode, urgent } = req.body;

@@ -2194,6 +2194,42 @@
           <button class="btn-connect" disabled style="opacity:0.5;cursor:not-allowed;">Billing setup not yet available — you're on the free trial</button>
         </div>
 
+        <!-- AI Design Generation -->
+        <div class="setup-card">
+          <h3>🤖 AI Design Generation</h3>
+          <p>Let customers describe a design and have AI create it for their Transfer Designer piece. Billed to your monthly invoice at <strong>10p per generation</strong> — you choose what to charge customers.</p>
+
+          <label style="display:flex; align-items:center; gap:10px; padding:12px; background:var(--gu-bg); border-radius:10px; border:1px solid var(--gu-border); cursor:pointer; margin:14px 0;">
+            <input type="checkbox" id="ai-design-enabled" checked style="width:18px; height:18px;">
+            <span style="font-size:13px; font-weight:600;">Enable AI design generation for customers</span>
+          </label>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;">
+            <div>
+              <label style="font-size:11px; font-weight:600; color:var(--gu-dust); display:block; margin-bottom:4px;">Charge per generation</label>
+              <div style="display:flex; align-items:center; gap:4px;">
+                <span style="font-size:14px; color:var(--gu-dust);">£</span>
+                <input type="number" id="ai-generation-price" value="0.20" step="0.05" min="0.10" style="width:100%; padding:9px 10px; border:1px solid var(--gu-border); border-radius:8px; font-size:13px;">
+              </div>
+            </div>
+            <div>
+              <label style="font-size:11px; font-weight:600; color:var(--gu-dust); display:block; margin-bottom:4px;">Charge to print AI design</label>
+              <div style="display:flex; align-items:center; gap:4px;">
+                <span style="font-size:14px; color:var(--gu-dust);">£</span>
+                <input type="number" id="ai-print-price" value="1.50" step="0.10" min="0.50" style="width:100%; padding:9px 10px; border:1px solid var(--gu-border); border-radius:8px; font-size:13px;">
+              </div>
+            </div>
+          </div>
+
+          <button class="btn-connect" onclick="saveAiDesignConfig()">Save AI Design Settings</button>
+          <span id="ai-design-save-status" style="font-size:12px; color:var(--gu-dust); margin-left:10px;"></span>
+
+          <div style="margin-top:16px; padding:14px; background:#f0f4ff; border-radius:10px; border:1px solid #c8d4f5;">
+            <div style="font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#3949ab; margin-bottom:6px;">This month's usage</div>
+            <div id="ai-usage-summary" style="font-size:13px; color:var(--gu-text);">Loading…</div>
+          </div>
+        </div>
+
         <!-- Customisation -->
         <div class="setup-card">
           <h3>3. Customize Your Studio Branding</h3>
@@ -5855,6 +5891,57 @@ async function saveProcessConfig() {
 // ── Studio Table Configuration (Setup tab) ──
 let tableConfigList = [];
 
+// ── AI Design Generation config ──
+async function loadAiDesignConfig() {
+  try {
+    const [configRes, usageRes] = await Promise.all([
+      fetch(`${API_URL}/api/ai-design/config?studioId=${studioId}`),
+      fetch(`${API_URL}/api/ai-design/usage?studioId=${studioId}`),
+    ]);
+    const configData = await configRes.json();
+    const usageData = await usageRes.json();
+
+    const cfg = configData.config;
+    const enabledEl = document.getElementById('ai-design-enabled');
+    const genPriceEl = document.getElementById('ai-generation-price');
+    const printPriceEl = document.getElementById('ai-print-price');
+    if (enabledEl) enabledEl.checked = cfg.enabled !== false;
+    if (genPriceEl) genPriceEl.value = ((cfg.customer_generation_price_cents || 20) / 100).toFixed(2);
+    if (printPriceEl) printPriceEl.value = ((cfg.customer_print_price_cents || 150) / 100).toFixed(2);
+
+    const usageEl = document.getElementById('ai-usage-summary');
+    if (usageEl) {
+      const wholesaleTotal = (usageData.totalCents / 100).toFixed(2);
+      usageEl.innerHTML = `<strong>${usageData.count}</strong> designs generated in ${usageData.monthLabel} · <strong>£${wholesaleTotal}</strong> added to your monthly invoice`;
+    }
+  } catch (e) {
+    const usageEl = document.getElementById('ai-usage-summary');
+    if (usageEl) usageEl.textContent = 'Could not load usage — try refreshing.';
+  }
+}
+
+async function saveAiDesignConfig() {
+  const enabled = document.getElementById('ai-design-enabled').checked;
+  const genPrice = parseFloat(document.getElementById('ai-generation-price').value) || 0.20;
+  const printPrice = parseFloat(document.getElementById('ai-print-price').value) || 1.50;
+  const status = document.getElementById('ai-design-save-status');
+  status.textContent = 'Saving…';
+  try {
+    await fetch(`${API_URL}/api/ai-design/config`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId, enabled,
+        customerGenerationPriceCents: Math.round(genPrice * 100),
+        customerPrintPriceCents: Math.round(printPrice * 100),
+      })
+    });
+    status.textContent = '✓ Saved';
+    setTimeout(() => status.textContent = '', 3000);
+  } catch (e) {
+    status.textContent = '✗ Failed';
+  }
+}
+
 async function loadTableConfig() {
   try {
     const res = await fetch(`${API_URL}/api/studio/tables?studioId=${studioId}`);
@@ -6542,6 +6629,8 @@ async function loadConnectionStatus() {
     loadKdsConfig();
     // And table config
     loadTableConfig();
+    // And AI design generation config
+    loadAiDesignConfig();
   } catch (err) {
     console.error('Error loading connection status:', err);
     squareBadge.innerHTML = `<span class="status-badge pending">Could not check status</span>`;
