@@ -514,6 +514,19 @@
     #browse-design-screen { background: #12082a; }
     #marketplace-screen { background: #12082a; }
 
+    /* kilnLINK wordmark — the small chain-link glyph gently turns, like
+       two links rotating into place, as a subtle branded flourish rather
+       than a static logo. Slow and understated — this sits on every
+       screen, so it shouldn't compete for attention. */
+    @keyframes klnk-link-turn {
+      0%, 85%, 100% { transform: rotate(0deg); }
+      92% { transform: rotate(180deg); }
+    }
+    .klnk-wordmark-spin {
+      animation: klnk-link-turn 6s ease-in-out infinite;
+      transform-origin: center;
+    }
+
     @keyframes browse-pulse {
       0%, 100% { box-shadow: 0 0 0 0 rgba(184,121,70,0); }
       50% { box-shadow: 0 0 0 6px rgba(184,121,70,0.25); }
@@ -1764,6 +1777,19 @@
       return new URLSearchParams(window.location.search).get(name);
     }
 
+    // Animated kilnLINK wordmark — "kiln" lowercase/lighter, "LINK" bold/
+    // uppercase, with a small chain-link glyph that gently rotates as a
+    // branded flourish. Shown consistently at the top of every screen.
+    const wordmarkHtml = `
+      <span class="klnk-wordmark" style="display:inline-flex; align-items:center; gap:5px; font-family:var(--gu-font-display); line-height:1;">
+        <svg class="klnk-wordmark-spin" width="18" height="18" viewBox="0 0 24 24" style="flex-shrink:0;">
+          <path d="M9 15 L15 9" stroke="#B87946" stroke-width="2.4" stroke-linecap="round"/>
+          <rect x="4" y="4" width="9" height="9" rx="4.5" fill="none" stroke="#B87946" stroke-width="2.2" transform="rotate(-45 8.5 8.5)"/>
+          <rect x="11" y="11" width="9" height="9" rx="4.5" fill="none" stroke="#F9A825" stroke-width="2.2" transform="rotate(-45 15.5 15.5)"/>
+        </svg>
+        <span style="font-weight:400; font-size:1em;">kiln</span><span style="font-weight:800; font-size:1em; letter-spacing:0.02em;">LINK</span>
+      </span>`;
+
     const logoSvg = `<svg viewBox="0 -30 241 128" style="height:0.85em; width:auto; display:block;" aria-hidden="true">
       <path d="M5.00,82.00 L5.00,10.00 L20.41,10.00 L20.41,82.00 L5.00,82.00 Z M12.20,82.00 L12.20,70.20 L55.00,70.20 L55.00,82.00 L12.20,82.00 Z" fill="#fff"/>
       <path d="M64.00,82.00 L64.00,10.00 L79.41,10.00 L79.41,82.00 L64.00,82.00 Z" fill="#fff"/>
@@ -1889,7 +1915,10 @@
       document.getElementById('app-root').innerHTML = `
         <div class="app-header">
           <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-            <div class="brand">${logoSvg} <span style="opacity:0.65; font-weight:400;">· The Kiln Cafe</span></div>
+            <div>
+              <div style="margin-bottom:3px;">${wordmarkHtml}</div>
+              <div class="brand" style="opacity:0.65; font-weight:400; font-size:0.8em;">The Kiln Cafe</div>
+            </div>
             <button id="my-qr-badge" onclick="showMyQR()" style="background:rgba(255,255,255,0.18); border:2px solid rgba(255,255,255,0.5); border-radius:12px; padding:4px; cursor:pointer;" aria-label="Show my QR code">
               <img src="${qrThumbUrl}" width="46" height="46" style="display:block; border-radius:6px;" alt="Your QR code">
             </button>
