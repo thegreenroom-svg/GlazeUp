@@ -1450,7 +1450,10 @@
       <div style="clear:both;"></div>
       <div id="login-pin-avatar" style="width:56px;height:56px;border-radius:50%;background:var(--gu-primary);color:white;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;margin:0 auto 12px;">–</div>
       <div style="font-size:16px;font-weight:800;color:var(--gu-text);margin-bottom:4px;" id="login-pin-name">–</div>
-      <div style="font-size:13px;color:var(--gu-dust);margin-bottom:20px;">Enter your PIN.</div>
+      <div style="font-size:13px;color:var(--gu-dust);margin-bottom:14px;">Enter your PIN.</div>
+      <div id="demo-pin-notice" style="background:#fff9f0;border:1px solid #f0e0c0;border-radius:10px;padding:9px 12px;margin-bottom:16px;font-size:11px;color:var(--link-clay);text-align:left;line-height:1.4;">
+        🎬 <strong>Demo mode:</strong> every account currently uses <strong>0000</strong> to log in for easy in-studio demoing. Real individual PINs can be set any time via Team &amp; Duties.
+      </div>
       <input type="password" id="shift-pin-input" inputmode="numeric" maxlength="6" placeholder="• • • •"
         style="width:100%;text-align:center;font-size:28px;letter-spacing:10px;padding:14px;border:2px solid var(--gu-border);border-radius:14px;margin-bottom:14px;">
       <div id="shift-pin-error" style="color:#e53935;font-size:12px;margin-bottom:10px;display:none;">Incorrect PIN — try again.</div>
@@ -5023,6 +5026,12 @@ function startAlertPolling() {
 // ═══════════════════════════════════════════
 const SHIFT_PIN_LOGIN_ENABLED = true;
 
+// Demo mode: shows the "everyone uses 0000" notice on the PIN screen.
+// Set to false once real individual PINs are in use and you don't want
+// this hint shown any more — the notice is purely cosmetic, it doesn't
+// affect which PINs actually work.
+const DEMO_MODE = true;
+
 let currentShiftStaff = null; // { id, name, role }
 let currentShiftId = null; // timesheet row ID for automatic clock-out
 let currentBreakId = null; // set while on a break, null otherwise
@@ -5119,6 +5128,8 @@ function selectLoginMember(member) {
     document.getElementById('login-pin-name').textContent = member.name;
     document.getElementById('shift-pin-input').value = '';
     document.getElementById('shift-pin-error').style.display = 'none';
+    const demoNotice = document.getElementById('demo-pin-notice');
+    if (demoNotice) demoNotice.style.display = DEMO_MODE ? 'block' : 'none';
     showLoginScreen('pin');
     setTimeout(() => document.getElementById('shift-pin-input')?.focus(), 200);
   } else {
