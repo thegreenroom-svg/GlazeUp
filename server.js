@@ -3809,11 +3809,29 @@ app.post('/api/staff/reset-pin', async (req, res) => {
 
 // POST /api/staff/shift-login — enter a PIN to start a shift on this device
 app.post('/api/staff/shift-login', async (req, res) => {
-  const { studioId, pin } = req.body;
+  const { studioId, pin, staffMemberId } = req.body;
   if (!studioId || !pin) return res.status(400).json({ error: 'studioId and pin required' });
 
-  const { data: pinRow } = await supabase.from('staff_pins')
-    .select('staff_member_id').eq('studio_id', studioId).eq('pin_hash', hashPin(pin)).single();
+  // The frontend sends staffMemberId because the user already tapped a
+  // specific name on the picker screen before entering their PIN — this
+  // validates the PIN belongs to THAT person specifically. Multiple staff
+  // can share the same PIN (e.g. demo mode, where everyone uses "0000"),
+  // so validating by hash alone would be ambiguous — this is what makes
+  // "tap your name, then enter your PIN" actually work correctly even
+  // when PINs collide.
+  let pinRow;
+  if (staffMemberId) {
+    const { data } = await supabase.from('staff_pins')
+      .select('staff_member_id').eq('studio_id', studioId).eq('staff_member_id', staffMemberId)
+      .eq('pin_hash', hashPin(pin)).single();
+    pinRow = data;
+  } else {
+    // Fallback for any older client that doesn't send staffMemberId yet —
+    // takes the first match rather than failing outright.
+    const { data } = await supabase.from('staff_pins')
+      .select('staff_member_id').eq('studio_id', studioId).eq('pin_hash', hashPin(pin));
+    pinRow = data?.[0];
+  }
 
   if (!pinRow) return res.status(401).json({ error: 'Incorrect PIN' });
 

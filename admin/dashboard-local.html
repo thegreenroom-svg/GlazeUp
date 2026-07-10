@@ -5166,7 +5166,7 @@ async function submitShiftPin() {
   try {
     const res = await fetch(`${API_URL}/api/staff/shift-login`, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ studioId, pin })
+      body: JSON.stringify({ studioId, pin, staffMemberId: selectedLoginMember?.id || null })
     });
     if (!res.ok) {
       errorEl.textContent = 'Incorrect PIN — try again.';
@@ -5219,7 +5219,7 @@ async function submitNewPin() {
     // PIN set — now log in properly through shift-login so a clock-in record is created
     const loginRes = await fetch(`${API_URL}/api/staff/shift-login`, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ studioId, pin })
+      body: JSON.stringify({ studioId, pin, staffMemberId: selectedLoginMember?.id || null })
     });
     const loginData = await loginRes.json();
     currentShiftStaff = { id: loginData.member.id, name: loginData.member.name, role: loginData.member.role };
