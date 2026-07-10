@@ -1612,7 +1612,7 @@
       <a href="#" class="nav-link" onclick="goToTab('menu', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h12M4 10h12M4 14h7"/><circle cx="15" cy="14" r="2.5"/><path d="M15 11.5v-7"/></svg></span><span class="nav-label">Daily Menu</span></a>
       <a href="#" class="nav-link" onclick="goToTab('team', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="6" r="2.5"/><circle cx="14" cy="7" r="2"/><path d="M2.5 16c0-2.8 2-4.5 4.5-4.5s4.5 1.7 4.5 4.5"/><path d="M12 12c2 0 3.5 1.5 3.5 4"/></svg></span><span class="nav-label">Team &amp; Duties</span></a>
       <a href="#" class="nav-link" onclick="goToTab('progress', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l4-4 3 3 6-7"/><path d="M13 9h4v4"/></svg></span><span class="nav-label">Daily Progress</span></a>
-      <a href="#" class="nav-link" onclick="goToTab('platformrev', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v14h14"/><path d="M6 13l3-4 3 2 4-6"/></svg></span><span class="nav-label">Platform Revenue</span></a>
+      <a href="#" class="nav-link" id="nav-platformrev" onclick="goToTab('platformrev', event)" style="display:none;"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v14h14"/><path d="M6 13l3-4 3 2 4-6"/></svg></span><span class="nav-label">Platform Revenue</span></a>
       <a href="#" class="nav-link" onclick="goToTab('branding', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.2 2.8l3 3-7.6 7.6c-.7.7-1.8.7-2.5 0l-.5-.5c-.7-.7-.7-1.8 0-2.5l7.6-7.6z"/><path d="M6.2 12.3L4 17.5l5.2-2.2"/></svg></span><span class="nav-label">Branding</span></a>
       <a href="#" class="nav-link" onclick="goToTab('shapes', event)"><span class="nav-icon-badge"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.5 5.5C6.5 4 8 3 10 3s3.5 1 3.5 2.5L13 13c-.1 2-1.4 3.5-3 3.5s-2.9-1.5-3-3.5L6.5 5.5z"/><ellipse cx="10" cy="5.3" rx="3.5" ry="1"/></svg></span><span class="nav-label">Bisque</span></a>
     </nav>
@@ -4931,6 +4931,22 @@ function applyShiftUI() {
   document.getElementById('headset-setup-btn').style.display = 'flex';
   document.getElementById('step-counter-btn').style.display = 'flex';
   startTaskPolling();
+  applyPlatformRevenueAccess();
+}
+
+// Platform Revenue is director-level data — only visible to named
+// directors, checked against the logged-in shift staff member's name.
+// This is a simple name check, not a full permissions system — good
+// enough while it's just the three of you, worth revisiting properly
+// before other studios are on the platform.
+const PLATFORM_REVENUE_ACCESS = ['David', 'Jenny', 'Daisy'];
+
+function applyPlatformRevenueAccess() {
+  const link = document.getElementById('nav-platformrev');
+  if (!link) return;
+  const firstName = (currentShiftStaff?.name || '').trim().split(' ')[0];
+  const hasAccess = PLATFORM_REVENUE_ACCESS.some(n => n.toLowerCase() === firstName.toLowerCase());
+  link.style.display = hasAccess ? 'flex' : 'none';
 }
 
 // ── Headset / Bluetooth help ──
@@ -5609,7 +5625,11 @@ async function sendAdhocRequest() {
 // ── Platform Revenue (kilnLINK owner view) ──
 async function loadPlatformRevenue() {
   try {
-    const res = await fetch(`${API_URL}/api/platform/revenue`);
+    const res = await fetch(`${API_URL}/api/platform/revenue?staffMemberId=${currentShiftStaff?.id || ''}`);
+    if (res.status === 403) {
+      document.getElementById('prev-studio-list').innerHTML = '<p style="color:var(--gu-dust);font-size:13px;text-align:center;padding:20px 0;">This section is restricted to directors.</p>';
+      return;
+    }
     const data = await res.json();
 
     document.getElementById('prev-total-studios').textContent = data.totalStudios ?? '0';

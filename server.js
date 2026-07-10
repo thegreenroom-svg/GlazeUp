@@ -4045,7 +4045,22 @@ app.get('/api/ai-design/usage', async (req, res) => {
 const PLAN_MONTHLY_PRICE_CENTS = { pilot: 0, solo: 2900, studio: 5900, multi: 9900 };
 
 // GET /api/platform/revenue — aggregate income across every studio on kilnLINK
+// Platform Revenue is director-level data (David, Jenny, Daisy only).
+// This checks the requesting staff member's name against that list —
+// a simple check, not a full auth system, but stops the endpoint being
+// hit directly by anyone who isn't logged in as one of the three.
+const PLATFORM_REVENUE_ACCESS_NAMES = ['david', 'jenny', 'daisy'];
+
 app.get('/api/platform/revenue', async (req, res) => {
+  const { staffMemberId } = req.query;
+  if (!staffMemberId) return res.status(401).json({ error: 'Not authorised' });
+
+  const { data: staffMember } = await supabase.from('staff_team').select('name').eq('id', staffMemberId).single();
+  const firstName = (staffMember?.name || '').trim().split(' ')[0].toLowerCase();
+  if (!PLATFORM_REVENUE_ACCESS_NAMES.includes(firstName)) {
+    return res.status(403).json({ error: 'Platform Revenue is restricted to directors.' });
+  }
+
   try {
     const startOfMonth = new Date();
     startOfMonth.setDate(1); startOfMonth.setHours(0, 0, 0, 0);
