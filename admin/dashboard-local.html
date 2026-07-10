@@ -16,21 +16,13 @@
       font-size: 11px;
       z-index: 950;
       border-radius: 0 0 0 4px;
-      transition: top 0.2s ease;
     }
-    /* When the director-only Platform Revenue strip is showing, it sits
-       at top:0 across the full width — push the API status badge down
-       below it instead of letting them overlap/fight for the same
-       corner (previously the badge had a higher z-index than the strip,
-       so it would flash into view during iOS over-scroll bounce, then
-       disappear again once the page settled — genuinely confusing). */
+    /* When the director-only Platform Revenue strip is showing, its own
+       built-in #strip-api-status badge takes over — hide this separate
+       floating one entirely so there's only ever one status indicator
+       on screen, not two competing for the same corner. */
     body.has-platform-strip .api-status {
-      top: 40px;
-    }
-    @media (max-width: 520px) {
-      body.has-platform-strip .api-status {
-        top: 56px;
-      }
+      display: none !important;
     }
     .api-status.connected {
       background: #c8e6c9;
@@ -1374,6 +1366,7 @@
       <span style="font-size:12px;color:white;">today <strong id="strip-plat-ai-today" style="color:#ba68c8;">–</strong></span>
       <span style="font-size:12px;color:white;">MRR <strong id="strip-plat-mrr" style="color:#B87946;">–</strong></span>
     </div>
+    <span id="strip-api-status" style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.75);white-space:nowrap;">📡 Connecting…</span>
     <span style="font-size:11px;color:rgba(255,255,255,0.6);white-space:nowrap;">tap for detail →</span>
   </div>
 </div>
@@ -1389,7 +1382,10 @@
   .ticker-count-up { transition: none; }
 </style>
 
-<!-- API Status Indicator -->
+<!-- API Status Indicator — for everyone NOT seeing the director strip
+     above (which has its own #strip-api-status badge built in). Static
+     positioned in the header row rather than a separate fixed overlay,
+     so it can never overlap or hide behind other fixed elements. -->
 <div class="api-status disconnected" id="api-status">📡 Connecting...</div>
 
 <!-- On phone widths, these three buttons flow into this horizontal bar instead
@@ -3431,12 +3427,23 @@ async function setupBilling() {
 
 function updateAPIStatus(connected) {
   const status = document.getElementById('api-status');
+  const stripStatus = document.getElementById('strip-api-status');
+  const label = connected ? '✓ API Connected' : '✗ Using Mock Data';
+
   if (connected) {
     status.className = 'api-status connected';
-    status.textContent = '✓ API Connected';
   } else {
     status.className = 'api-status disconnected';
-    status.textContent = '✗ Using Mock Data';
+  }
+  status.textContent = label;
+
+  // Keep the strip's own built-in status badge in sync too — this is
+  // what directors actually see, since the standalone badge is hidden
+  // whenever the Platform Revenue strip is showing (see .has-platform-strip)
+  if (stripStatus) {
+    stripStatus.textContent = label;
+    stripStatus.style.background = connected ? 'rgba(76,175,80,0.25)' : 'rgba(229,57,53,0.25)';
+    stripStatus.style.color = connected ? '#a5d6a7' : '#ef9a9a';
   }
 }
 
