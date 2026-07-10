@@ -3148,6 +3148,203 @@ app.get('/api/transfer-pieces/estimated-pickup', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════
+// AI ASSISTANT — customer, staff, and director chat
+// Three scoped contexts sharing one endpoint. Uses OpenAI
+// function calling so the assistant can look up REAL data
+// (booking status, stock, pricing) rather than guessing —
+// but strictly read-only. Anything it can't resolve becomes
+// a real task via the existing staff_alerts/task_queue
+// pipeline, exactly like every other handoff in the app —
+// no separate notification system.
+// ═══════════════════════════════════════════
+
+const ASSISTANT_SYSTEM_PROMPTS = {
+  customer: `You are the friendly help assistant for a pottery painting studio's booking app, built on kilnLINK.
+You can answer questions about: opening hours, pricing of app features (Design Preview £1, Take It Home £5, Transfer Designer £1, specialist glazes £2, AI design generation), how the app's tools work, and — using the check_booking_status function — the real status of a specific booking if the customer gives you a booking code.
+You do NOT have access to other customers' data, staff information, or financial figures. If asked about anything outside pottery painting, the app, or this studio, politely redirect.
+If a customer seems frustrated, upset, or you cannot resolve their question, use the escalate_to_staff function immediately rather than guessing — do not make up policy or promises the studio hasn't confirmed.
+Keep answers short and warm — this is a mobile chat window, not an essay. No more than 3-4 sentences unless genuinely necessary.`,
+
+  staff: `You are the in-app assistant for kilnLINK, a staff-facing pottery studio management dashboard.
+You help staff navigate the dashboard, understand features (task queue, handoff alerts, timekeeping, holiday requests, kiln process, transfer two-firing process), and — using the available functions — look up real data like today's bookings, stock levels, or pending tasks for their studio.
+You do NOT have access to Platform Revenue, other studios' data, or director-only figures — if asked, say this is director-only and suggest asking a Studio Manager/Director.
+If something requires a real decision or action you can't take (refunds, HR matters, correcting a mistake), use escalate_to_staff to flag it to the right role rather than guessing.
+Keep answers practical and concise — staff are mid-shift, not reading documentation.`,
+
+  director: `You are the in-app assistant for kilnLINK's director-level dashboard, covering both studio operations AND Platform Revenue (subscriptions, AI generation fees, commission on app purchases across every studio on the platform).
+You can look up real data across studios using the available functions. Be precise with figures — always use the lookup functions rather than estimating.
+Keep answers concise but can go into more financial/strategic depth than the staff or customer contexts, since this audience is a business owner.`
+};
+
+const ASSISTANT_FUNCTIONS = [
+  {
+    type: 'function',
+    function: {
+      name: 'check_booking_status',
+      description: 'Look up the real status of a specific booking by its booking code — whether pieces are painted, fired, or ready for pickup.',
+      parameters: {
+        type: 'object',
+        properties: { bookingCode: { type: 'string', description: 'The booking code, e.g. from a QR code' } },
+        required: ['bookingCode'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_todays_bookings',
+      description: "Get a summary of today's bookings for this studio — counts and statuses. Staff/director only.",
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_pending_tasks_count',
+      description: 'Get the number of incomplete tasks currently outstanding for this studio, grouped by role. Staff/director only.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_platform_revenue_summary',
+      description: 'Get the current platform-wide revenue summary (MRR, studio count, AI/licensing revenue). Director only.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'escalate_to_staff',
+      description: 'Escalate this conversation to a real member of staff because the assistant cannot resolve it, the person is frustrated, or it needs a human decision. Creates a real flashing alert for the right role.',
+      parameters: {
+        type: 'object',
+        properties: {
+          summary: { type: 'string', description: 'A short summary of what the person needs help with' },
+          urgent: { type: 'boolean', description: 'Whether this needs immediate attention' },
+        },
+        required: ['summary'],
+      },
+    },
+  },
+];
+
+async function executeAssistantFunction(name, args, studioId, context, bookingCode) {
+  switch (name) {
+    case 'check_booking_status': {
+      const code = args.bookingCode || bookingCode;
+      if (!code) return { error: 'No booking code provided.' };
+      const { data: booking } = await supabase.from('bookings').select('*').eq('studio_id', studioId).eq('booking_code', code).single();
+      if (!booking) return { error: 'Booking not found — please check the code.' };
+      const { data: pieces } = await supabase.from('pottery_pieces').select('piece_type, status').eq('booking_id', code);
+      return { booking: { status: booking.status, customerName: booking.customer_name }, pieces: pieces || [] };
+    }
+    case 'get_todays_bookings': {
+      if (context === 'customer') return { error: 'Not available in this context.' };
+      const today = new Date().toISOString().split('T')[0];
+      const { data } = await supabase.from('bookings').select('status').eq('studio_id', studioId).gte('session_start', today);
+      const counts = {};
+      (data || []).forEach(b => { counts[b.status] = (counts[b.status] || 0) + 1; });
+      return { totalBookings: (data || []).length, byStatus: counts };
+    }
+    case 'get_pending_tasks_count': {
+      if (context === 'customer') return { error: 'Not available in this context.' };
+      const { data } = await supabase.from('task_queue').select('assigned_role').eq('studio_id', studioId).eq('status', 'pending');
+      const byRole = {};
+      (data || []).forEach(t => { byRole[t.assigned_role] = (byRole[t.assigned_role] || 0) + 1; });
+      return { totalPending: (data || []).length, byRole };
+    }
+    case 'get_platform_revenue_summary': {
+      if (context !== 'director') return { error: 'Director access only.' };
+      const startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0,0,0,0);
+      const [studiosRes, subsRes] = await Promise.all([
+        supabase.from('studios').select('id'),
+        supabase.from('stripe_subscriptions').select('plan_id, status'),
+      ]);
+      const activeSubs = (subsRes.data || []).filter(s => s.status === 'active' || s.status === 'trialing');
+      const mrrCents = activeSubs.reduce((sum, s) => sum + (PLAN_MONTHLY_PRICE_CENTS[s.plan_id] || 0), 0);
+      return { totalStudios: (studiosRes.data || []).length, activeSubscriptions: activeSubs.length, mrrPounds: (mrrCents/100).toFixed(0) };
+    }
+    case 'escalate_to_staff': {
+      await supabase.from('staff_alerts').insert({
+        studio_id: studioId, trigger_type: 'assistant_escalation',
+        booking_code: bookingCode || null, next_role: 'Studio Manager',
+        icon: args.urgent ? '🚨' : '💬', label: args.urgent ? 'Urgent — needs a person' : 'Assistant escalation',
+        message: args.summary, context: { fromAssistant: true, chatContext: context }, acknowledged: false,
+      });
+      return { escalated: true };
+    }
+    default:
+      return { error: 'Unknown function' };
+  }
+}
+
+// POST /api/assistant/chat
+app.post('/api/assistant/chat', async (req, res) => {
+  const { studioId, context, messages, bookingCode, staffMemberId } = req.body;
+  if (!studioId || !context || !messages) return res.status(400).json({ error: 'studioId, context, messages required' });
+  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'The assistant is not yet available.' });
+  if (!ASSISTANT_SYSTEM_PROMPTS[context]) return res.status(400).json({ error: 'Invalid context' });
+
+  // Director context requires the same access check as Platform Revenue itself
+  if (context === 'director') {
+    if (!staffMemberId) return res.status(401).json({ error: 'Not authorised' });
+    const { data: staffMember } = await supabase.from('staff_team').select('name').eq('id', staffMemberId).single();
+    const firstName = (staffMember?.name || '').trim().split(' ')[0].toLowerCase();
+    if (!PLATFORM_REVENUE_ACCESS_NAMES.includes(firstName)) {
+      return res.status(403).json({ error: 'Director-level assistant is restricted.' });
+    }
+  }
+
+  try {
+    const chatMessages = [
+      { role: 'system', content: ASSISTANT_SYSTEM_PROMPTS[context] },
+      ...messages.slice(-10), // keep recent context only, bounded
+    ];
+
+    let openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'gpt-4o-mini', messages: chatMessages, tools: ASSISTANT_FUNCTIONS, tool_choice: 'auto', temperature: 0.4 }),
+    });
+
+    if (!openaiRes.ok) {
+      const errBody = await openaiRes.text();
+      console.error('Assistant chat error:', errBody);
+      return res.status(502).json({ error: 'Could not reach the assistant right now.' });
+    }
+
+    let data = await openaiRes.json();
+    let assistantMessage = data.choices?.[0]?.message;
+
+    // Handle one round of function calling (sufficient for this use case —
+    // avoids unbounded tool-call loops)
+    if (assistantMessage?.tool_calls?.length) {
+      chatMessages.push(assistantMessage);
+      for (const call of assistantMessage.tool_calls) {
+        const args = JSON.parse(call.function.arguments || '{}');
+        const result = await executeAssistantFunction(call.function.name, args, studioId, context, bookingCode);
+        chatMessages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result) });
+      }
+
+      openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'gpt-4o-mini', messages: chatMessages, temperature: 0.4 }),
+      });
+      data = await openaiRes.json();
+      assistantMessage = data.choices?.[0]?.message;
+    }
+
+    res.json({ reply: assistantMessage?.content || 'Sorry, I could not generate a reply.' });
+  } catch (err) {
+    console.error('Assistant chat error:', err);
+    res.status(500).json({ error: 'Something went wrong — please try again.' });
+  }
+});
+
 app.get('/api/pieces/ready-for-pickup', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
