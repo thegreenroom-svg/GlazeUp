@@ -1930,7 +1930,7 @@
           <div class="chart-container" style="border:1.5px solid rgba(184,121,70,0.3);background:linear-gradient(135deg,rgba(184,121,70,0.06),rgba(46,125,50,0.05));">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
               <h3 style="margin:0;">💷 The Kiln Cafe — Revenue <span style="font-size:11px;font-weight:500;color:var(--gu-dust);">(directors only)</span></h3>
-              <button onclick="populateDashboard()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
+              <button onclick="refreshKilnCafeRevenueData()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
             </div>
             <p style="font-size:11px;color:var(--gu-dust);margin-bottom:16px;">The studio's own real revenue and app usage — separate from Platform Revenue (worldwide SaaS income), and only visible to David, Jenny, and Daisy.</p>
 
@@ -7388,8 +7388,34 @@ async function populateDashboard() {
   const isDirector = PLATFORM_REVENUE_ACCESS.some(n => n.toLowerCase() === firstName.toLowerCase());
   const revenueSection = document.getElementById('kiln-cafe-revenue-section');
   if (revenueSection) revenueSection.style.display = isDirector ? 'block' : 'none';
-  if (!isDirector) return; // don't even fetch the data if it won't be shown
 
+  if (!isDirector) {
+    clearInterval(window._kilnCafeRevenueTimer);
+    return; // don't even fetch the data if it won't be shown
+  }
+
+  // Auto-refresh every 5 minutes while a director is on this tab, same
+  // pattern as the Platform Revenue strip — previously this only updated
+  // on login or a manual refresh tap, so it could sit stale for a long
+  // session even though the underlying Supabase data kept changing.
+  // Calls refreshKilnCafeRevenueData() specifically, NOT populateDashboard()
+  // itself — the latter also calls checkShiftLogin(), which would wrongly
+  // force a re-login/log the director out every 5 minutes.
+  clearInterval(window._kilnCafeRevenueTimer);
+  window._kilnCafeRevenueTimer = setInterval(() => {
+    if (document.getElementById('dashboard-view')?.style.display !== 'none') refreshKilnCafeRevenueData();
+    else clearInterval(window._kilnCafeRevenueTimer);
+  }, 5 * 60 * 1000);
+
+  await refreshKilnCafeRevenueData();
+}
+
+// Separated from populateDashboard() so the 5-minute auto-refresh timer
+// can update just the revenue figures without re-running the whole
+// dashboard bootstrap (which includes checkShiftLogin() — calling that
+// on a timer would wrongly force a re-login/kick the director back to
+// the name picker every 5 minutes).
+async function refreshKilnCafeRevenueData() {
   try {
     const data = await loadDashboardData();
     
