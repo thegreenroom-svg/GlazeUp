@@ -158,12 +158,19 @@
         flex: 1;
         min-width: 0;
         padding: 6px 10px 6px 6px !important;
+        border-radius: 24px !important;
       }
       #shift-badge-name {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
         max-width: 90px;
+      }
+      /* On phone widths the header is already tight — direct logout/break
+         stay reachable via the task queue drawer instead of adding two
+         more fixed buttons that would overcrowd a ~375px screen. */
+      #direct-logout-btn, #direct-break-btn {
+        display: none !important;
       }
       #phone-header-menu {
         display: flex !important;
@@ -1388,11 +1395,19 @@
 </div>
 
 <!-- Current shift badge (shows who's logged in) -->
-<button id="shift-badge" onclick="toggleTaskQueue()" style="display:none;position:fixed;top:16px;right:222px;z-index:850;background:white;border:1.5px solid var(--gu-border);border-radius:24px;padding:8px 14px 8px 8px;font-size:12px;font-weight:700;color:var(--gu-text);cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.12);display:flex;align-items:center;gap:6px;">
+<button id="shift-badge" onclick="toggleTaskQueue()" style="display:none;position:fixed;top:16px;right:222px;z-index:850;background:white;border:1.5px solid var(--gu-border);border-radius:24px 0 0 24px;padding:8px 10px 8px 8px;font-size:12px;font-weight:700;color:var(--gu-text);cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.12);display:flex;align-items:center;gap:6px;border-right:none;">
   <span id="shift-badge-avatar" style="width:26px;height:26px;border-radius:50%;background:var(--gu-primary);color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">–</span>
   <span id="shift-badge-name">–</span>
   <span id="shift-badge-break-indicator" style="display:none;background:#3949ab;color:white;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;">☕ BREAK</span>
   <span id="shift-task-count-badge" style="display:none;background:#e53935;color:white;font-size:10px;font-weight:800;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 4px;">0</span>
+</button>
+<!-- Direct log out — always visible next to the badge, no need to open the task queue first -->
+<button id="direct-logout-btn" onclick="confirmDirectLogout()" title="Log out" style="display:none;position:fixed;top:16px;right:198px;z-index:850;background:#fff5f5;border:1.5px solid #f0c0c0;border-left:none;border-radius:0 24px 24px 0;padding:8px 12px;font-size:14px;color:#c62828;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.12);">
+  ⏻
+</button>
+<!-- Direct break toggle — always visible, same one-tap access as logout -->
+<button id="direct-break-btn" onclick="toggleBreak()" title="Take a break" style="display:none;position:fixed;top:44px;right:198px;z-index:850;background:white;border:1.5px solid var(--gu-border);border-radius:16px;padding:5px 12px;font-size:11px;font-weight:700;color:#3949ab;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.12);white-space:nowrap;">
+  ☕ Break
 </button>
 
 <!-- Headset / Bluetooth Setup button -->
@@ -4976,12 +4991,15 @@ async function toggleBreak() {
 function updateBreakUI() {
   const btn = document.getElementById('break-toggle-btn');
   const indicator = document.getElementById('shift-badge-break-indicator');
+  const directBtn = document.getElementById('direct-break-btn');
   if (currentBreakId) {
     if (btn) { btn.textContent = '▶ End break — back to work'; btn.style.background = '#e8eaf6'; }
     if (indicator) indicator.style.display = 'inline-block';
+    if (directBtn) { directBtn.textContent = '▶ Back to work'; directBtn.style.background = '#e8eaf6'; directBtn.style.color = '#3949ab'; }
   } else {
     if (btn) { btn.textContent = '☕ Take a break'; btn.style.background = '#f0f4ff'; }
     if (indicator) indicator.style.display = 'none';
+    if (directBtn) { directBtn.textContent = '☕ Break'; directBtn.style.background = 'white'; directBtn.style.color = '#3949ab'; }
   }
 }
 
@@ -5008,7 +5026,12 @@ async function logOutOfShift() {
   document.getElementById('shift-badge').style.display = 'none';
   document.getElementById('step-counter-btn').style.display = 'none';
   document.getElementById('headset-setup-btn').style.display = 'none';
-  toggleTaskQueue();
+  document.getElementById('direct-logout-btn').style.display = 'none';
+  document.getElementById('direct-break-btn').style.display = 'none';
+  // Close the task queue drawer if it happens to be open — logging out
+  // via the direct header button won't have opened it in the first place.
+  const taskQueuePanel = document.getElementById('task-queue-panel');
+  if (taskQueuePanel && taskQueuePanel.style.display === 'flex') toggleTaskQueue();
   if (SHIFT_PIN_LOGIN_ENABLED) {
     setTimeout(() => document.getElementById('shift-login-modal').style.display = 'flex', 300);
   } else {
@@ -5025,11 +5048,24 @@ function applyShiftUI() {
   document.getElementById('shift-badge-name').textContent = currentShiftStaff.name;
   document.getElementById('headset-setup-btn').style.display = 'flex';
   document.getElementById('step-counter-btn').style.display = 'flex';
+  document.getElementById('direct-logout-btn').style.display = 'flex';
+  document.getElementById('direct-break-btn').style.display = 'flex';
   startTaskPolling();
   applyPlatformRevenueAccess();
   // Opening checklist only appears once we genuinely know who's logged in —
   // sequence is always: splash -> login -> checklist, never overlapping.
   checkOpeningChecklistStatus();
+}
+
+// Direct log out — reachable in one tap from the header, no need to open
+// the task queue drawer first. Confirms first since logging out mid-task
+// is disruptive and clocks the person out immediately.
+function confirmDirectLogout() {
+  if (!currentShiftStaff) return;
+  const name = currentShiftStaff.name;
+  if (confirm(`Log out ${name}? This clocks you out and ends any break in progress.`)) {
+    logOutOfShift();
+  }
 }
 
 // Platform Revenue is director-level data — only visible to named
