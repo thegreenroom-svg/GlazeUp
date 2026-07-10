@@ -2118,6 +2118,12 @@ app.get('/api/kiln-batches/active', async (req, res) => {
  * POST /api/kiln-batches/fire-by-code
  * Scan (or paste) a batch code to fire every piece in that batch at once —
  * whether it represents one booking or several days combined.
+ *
+ * Transfer pieces (requires_second_firing = true) do NOT go straight to
+ * 'fired'/ready like normal pieces — this is their FIRST of two firings,
+ * so they're marked 'glaze_fired' and routed into the second-firing
+ * pipeline instead (see /api/transfer-pieces/*). Normal pieces are
+ * unaffected and continue straight to ready-for-pickup as before.
  */
 app.post('/api/kiln-batches/fire-by-code', async (req, res) => {
   const { studioId, batchCode } = req.body;
@@ -2138,17 +2144,51 @@ app.post('/api/kiln-batches/fire-by-code', async (req, res) => {
       return res.status(404).json({ error: 'Batch not found for this code' });
     }
 
-    const { data: pieces, error: piecesError } = await supabase
+    // Normal pieces (no transfer): fire straight through as before
+    const { data: normalPieces, error: normalError } = await supabase
       .from('pottery_pieces')
       .update({ status: 'fired', updated_at: new Date().toISOString() })
       .eq('kiln_session_id', session.id)
+      .or('requires_second_firing.is.null,requires_second_firing.eq.false')
       .select('id, booking_id');
 
-    if (piecesError) throw piecesError;
+    if (normalError) throw normalError;
 
-    const bookingsFired = [...new Set((pieces || []).map(p => p.booking_id).filter(Boolean))];
+    // Transfer pieces: this is only their FIRST firing — mark glaze_fired
+    // and alert whoever applies transfers, rather than treating them as done.
+    const { data: transferPieces, error: transferError } = await supabase
+      .from('pottery_pieces')
+      .update({
+        status: 'glaze_fired', transfer_stage: 'glaze_fired',
+        glaze_fired_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+      })
+      .eq('kiln_session_id', session.id)
+      .eq('requires_second_firing', true)
+      .select('id, booking_id, piece_type');
 
-    res.json({ status: 'fired', piecesFired: pieces.length, bookingsFired: bookingsFired.length });
+    if (transferError) throw transferError;
+
+    // Alert staff for each transfer piece that it's ready for the decal to be applied
+    for (const piece of (transferPieces || [])) {
+      await supabase.from('staff_alerts').insert({
+        studio_id: studioId, trigger_type: 'transfer_ready_to_apply',
+        booking_code: piece.booking_id, next_role: 'Ceramic Technician',
+        icon: '🖼️', label: 'Transfer ready to apply',
+        message: `${piece.piece_type || 'Piece'} is glaze-fired and ready for the transfer to be applied.`,
+        context: { pieceId: piece.id }, acknowledged: false,
+      });
+    }
+
+    const pieces = [...(normalPieces || []), ...(transferPieces || [])];
+    const bookingsFired = [...new Set(pieces.map(p => p.booking_id).filter(Boolean))];
+
+    res.json({
+      status: 'fired',
+      piecesFired: pieces.length,
+      normalPiecesFired: (normalPieces || []).length,
+      transferPiecesAwaitingDecal: (transferPieces || []).length,
+      bookingsFired: bookingsFired.length,
+    });
   } catch (error) {
     console.error('Error firing kiln batch by code:', error);
     res.status(500).json({ error: error.message });
@@ -2902,7 +2942,11 @@ app.get('/api/print-requests', async (req, res) => {
   }
 });
 
-// POST /api/print-requests/:id/approve — staff approves, triggers the £1 charge
+// POST /api/print-requests/:id/approve — staff approves, triggers the £1
+// design charge PLUS the £4.50 second-firing charge (transfers require a
+// glaze fire, then the transfer applied, then a second decal fire — this
+// is a genuinely separate physical process from a normal piece, priced
+// to reflect the real extra kiln cycle, staff handling, and risk).
 app.post('/api/print-requests/:id/approve', async (req, res) => {
   const { id } = req.params;
   const { studioId } = req.body;
@@ -2924,13 +2968,30 @@ app.post('/api/print-requests/:id/approve', async (req, res) => {
 
     if (updateError) throw updateError;
 
-    // £1/transfer, flat, regardless of size — tallied like the other extras
+    // £1 flat design/print charge, as before
     await supabase.from('app_extra_charges').insert({
       studio_id: studioId,
       booking_code: request.booking_code,
       item_name: 'Ceramic Transfer Print',
       amount_cents: 100
     });
+
+    // £4.50 second-firing charge — the real cost of the extra kiln cycle
+    await supabase.from('app_extra_charges').insert({
+      studio_id: studioId,
+      booking_code: request.booking_code,
+      item_name: 'Transfer Second Firing (decal fire)',
+      amount_cents: 450
+    });
+
+    // If this transfer is linked to a specific piece, mark it as needing
+    // the two-firing path so the kiln process routes it correctly instead
+    // of going straight to ready-for-pickup after the first fire.
+    if (request.piece_id) {
+      await supabase.from('pottery_pieces')
+        .update({ requires_second_firing: true, transfer_stage: 'awaiting_glaze_fire' })
+        .eq('id', request.piece_id);
+    }
 
     res.json({ status: 'approved' });
   } catch (error) {
@@ -2954,6 +3015,136 @@ app.post('/api/print-requests/:id/reject', async (req, res) => {
   } catch (error) {
     console.error('Error rejecting print request:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════
+// TWO-FIRING TRANSFER PROCESS
+// A ceramic transfer cannot go on raw bisque — it needs a
+// glazed, fired surface. So transfer pieces genuinely go
+// through TWO kiln cycles: glaze fire, then transfer applied,
+// then a second (lower-temp, ~750-850C) decal fire. This is
+// a distinct physical process from a normal piece, tracked
+// via pottery_pieces.transfer_stage:
+//   awaiting_glaze_fire -> glaze_fired -> transfer_applied
+//   -> awaiting_decal_fire -> decal_fired (= ready for pickup)
+// ═══════════════════════════════════════════
+
+// GET /api/transfer-pieces/pending-stage — staff queue: pieces waiting
+// at each stage of the two-firing process, for the kiln screen
+app.get('/api/transfer-pieces/pending-stage', async (req, res) => {
+  const { studioId, stage } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    let query = supabase.from('pottery_pieces')
+      .select('*').eq('studio_id', studioId).eq('requires_second_firing', true);
+
+    if (stage) query = query.eq('transfer_stage', stage);
+    else query = query.not('transfer_stage', 'eq', 'decal_fired'); // anything not yet fully done
+
+    const { data, error } = await query.order('created_at', { ascending: true });
+    if (error) throw error;
+    res.json({ pieces: data || [] });
+  } catch (error) {
+    console.error('Error fetching transfer pipeline pieces:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/transfer-pieces/:id/mark-glaze-fired — first firing done for
+// this transfer piece. It does NOT go to ready-for-pickup like a normal
+// piece — it waits for the transfer to be applied instead.
+app.post('/api/transfer-pieces/:id/mark-glaze-fired', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { data, error } = await supabase.from('pottery_pieces')
+      .update({ transfer_stage: 'glaze_fired', status: 'glaze_fired', glaze_fired_at: new Date().toISOString() })
+      .eq('id', id).select().single();
+    if (error) throw error;
+
+    // Alert whoever applies transfers that this piece is ready for them
+    if (data) {
+      await supabase.from('staff_alerts').insert({
+        studio_id: data.studio_id, trigger_type: 'transfer_ready_to_apply',
+        booking_code: data.booking_id, next_role: 'Ceramic Technician',
+        icon: '🖼️', label: 'Transfer ready to apply',
+        message: `${data.piece_type || 'Piece'} is glaze-fired and ready for the transfer to be applied.`,
+        context: { pieceId: id }, acknowledged: false,
+      });
+    }
+    res.json({ piece: data });
+  } catch (error) {
+    console.error('Error marking piece glaze-fired:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/transfer-pieces/:id/mark-transfer-applied — staff have applied
+// the transfer onto the fired, glazed surface. Piece now needs its second
+// (decal) firing.
+app.post('/api/transfer-pieces/:id/mark-transfer-applied', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { data, error } = await supabase.from('pottery_pieces')
+      .update({ transfer_stage: 'awaiting_decal_fire', transfer_applied_at: new Date().toISOString() })
+      .eq('id', id).select().single();
+    if (error) throw error;
+
+    if (data) {
+      await supabase.from('staff_alerts').insert({
+        studio_id: data.studio_id, trigger_type: 'transfer_ready_for_second_firing',
+        booking_code: data.booking_id, next_role: 'Ceramic Technician',
+        icon: '🔥', label: 'Ready for second (decal) firing',
+        message: `${data.piece_type || 'Piece'} has its transfer applied — ready to load for the decal firing.`,
+        context: { pieceId: id }, acknowledged: false,
+      });
+    }
+    res.json({ piece: data });
+  } catch (error) {
+    console.error('Error marking transfer applied:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/transfer-pieces/:id/mark-decal-fired — second firing complete.
+// This IS the point the piece finally becomes ready for pickup.
+app.post('/api/transfer-pieces/:id/mark-decal-fired', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { data, error } = await supabase.from('pottery_pieces')
+      .update({
+        transfer_stage: 'decal_fired', status: 'ready_for_pickup',
+        decal_fired_at: new Date().toISOString(),
+      })
+      .eq('id', id).select().single();
+    if (error) throw error;
+
+    if (data) {
+      await supabase.from('staff_alerts').insert({
+        studio_id: data.studio_id, trigger_type: 'transfer_ready_for_pickup',
+        booking_code: data.booking_id, next_role: 'Studio Assistant',
+        icon: '✨', label: 'Transfer piece ready for pickup',
+        message: `${data.piece_type || 'Piece'} has completed both firings and is ready for the customer to collect.`,
+        context: { pieceId: id }, acknowledged: false,
+      });
+    }
+    res.json({ piece: data });
+  } catch (error) {
+    console.error('Error marking decal fired:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/transfer-pieces/estimated-pickup — a realistic pickup window
+// for a transfer piece vs a normal one, for the customer app to show.
+// Two firings genuinely take longer: normal ~5-7 days, transfer ~10-14.
+app.get('/api/transfer-pieces/estimated-pickup', async (req, res) => {
+  const { hasTransfer } = req.query;
+  if (hasTransfer === 'true') {
+    res.json({ minDays: 10, maxDays: 14, label: '10–14 days', reason: 'This piece has a transfer design, which needs two separate firings.' });
+  } else {
+    res.json({ minDays: 5, maxDays: 7, label: '5–7 days', reason: null });
   }
 });
 

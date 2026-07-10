@@ -1509,16 +1509,34 @@
   </div>
 
   <div id="print-request-modal" style="display:none; position:fixed; inset:0; background:rgba(43,39,36,0.7); backdrop-filter:blur(4px); z-index:3000; align-items:center; justify-content:center; padding:20px;">
-    <div style="background:#fff; border-radius:16px; padding:22px; max-width:340px; width:100%; text-align:center;">
+    <div style="background:#fff; border-radius:16px; padding:22px; max-width:340px; width:100%; text-align:center; max-height:88vh; overflow-y:auto;">
       <div style="font-size:32px; margin-bottom:8px;">🖨️</div>
       <div style="font-family:var(--gu-font-display); font-weight:700; font-size:17px; color:var(--gu-accent); margin-bottom:6px;">Print as a Transfer</div>
       <div id="prm-preview-wrap" style="margin-bottom:14px;">
         <img id="prm-preview-img" style="width:100%; border-radius:10px; border:1px solid var(--gu-border);">
       </div>
-      <div style="font-size:12px; color: var(--gu-dust); line-height:1.5; margin-bottom:14px; text-align:left; background:#fff9f0; border-radius:10px; padding:10px 12px;">
-        A member of staff will check your design and sizing before printing. <strong>£1 per transfer</strong> — added to your bill — <strong>regardless of size</strong>. Once printed, <strong>mistakes can't be corrected</strong>, so do check it looks right first!
+
+      <!-- Honest disclosure of the two-firing process — cost and timeline
+           must be clear BEFORE submission, not a surprise afterward. A
+           transfer needs a glazed, fired surface, then the transfer
+           applied, then a second firing — this genuinely takes longer
+           and costs more than a normal piece. -->
+      <div style="font-size:12px; color: var(--gu-dust); line-height:1.6; margin-bottom:14px; text-align:left; background:#fff9f0; border-radius:10px; padding:12px 14px;">
+        <div style="font-weight:700; color:var(--gu-accent); margin-bottom:6px;">This piece needs two firings</div>
+        <div style="margin-bottom:8px;">A transfer can only go onto a glazed, fired piece — so after your piece is glaze-fired as normal, staff apply the transfer and it goes through a <strong>second firing</strong> to set it in place.</div>
+        <div style="display:flex; justify-content:space-between; padding:6px 0; border-top:1px solid #f0e0c0;">
+          <span>Design &amp; print review</span><strong>£1</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:6px 0; border-top:1px solid #f0e0c0;">
+          <span>Second firing</span><strong>£4.50</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:6px 0 2px; border-top:1px solid #f0e0c0; font-weight:700; color:var(--gu-accent);">
+          <span>Total</span><span>£5.50</span>
+        </div>
+        <div style="margin-top:8px; padding-top:8px; border-top:1px solid #f0e0c0;">📅 Ready in <strong>10–14 days</strong> (rather than the usual 5–7) — the extra firing takes real kiln time.</div>
+        <div style="margin-top:6px;">Once printed, <strong>mistakes can't be corrected</strong>, so do check it looks right first!</div>
       </div>
-      <button onclick="confirmSubmitPrintRequest()" id="prm-confirm-btn" style="width:100%; background:var(--link-charcoal); color:#fff; border:none; padding:13px; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; margin-bottom:8px;">Submit for Review — £1</button>
+      <button onclick="confirmSubmitPrintRequest()" id="prm-confirm-btn" style="width:100%; background:var(--link-charcoal); color:#fff; border:none; padding:13px; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; margin-bottom:8px;">Submit for Review — £5.50 total</button>
       <button onclick="closePrintRequestModal()" style="width:100%; background:none; color:var(--gu-dust); border:none; padding:10px; font-size:13px; cursor:pointer;">Cancel</button>
     </div>
   </div>
@@ -4238,7 +4256,7 @@
 
         if (res.ok) {
           closePrintRequestModal();
-          alert('✅ Sent for review! A member of staff will check your design and let you know once it\'s printed.');
+          alert('✅ Sent for review! Staff will check your design, then it goes through its two firings — expect it ready in 10–14 days. We\'ll let you know once it\'s ready to collect.');
         } else {
           alert('Could not submit — please ask a member of staff.');
         }
