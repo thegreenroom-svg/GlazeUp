@@ -5608,13 +5608,24 @@ app.listen(port, () => {
   console.log(`  Supabase: ${process.env.SUPABASE_URL ? '✓' : '✗'}`);
 
   // Keep-alive: ping ourselves every 14 minutes so Render's free tier
-  // never spins down (it sleeps after 15 minutes of inactivity).
-  // This means the app is always instant to load — no cold-start delay.
-  const SELF_URL = process.env.API_URL || `http://localhost:${port}`;
-  setInterval(() => {
+  // never spins down (it sleeps after 15 minutes of inactivity, then
+  // takes 30-60s to wake on the next request — which can make login or
+  // any action look like it silently fails while the server wakes up).
+  // Uses API_URL if set, otherwise falls back to the known public URL
+  // directly rather than localhost — a purely internal ping doesn't
+  // reliably count as the external traffic Render's sleep detection
+  // looks for, so this needs to genuinely hit the public address.
+  const SELF_URL = process.env.API_URL || 'https://glazeup-api.onrender.com';
+  function pingSelf() {
     const http = SELF_URL.startsWith('https') ? require('https') : require('http');
-    http.get(`${SELF_URL}/health`, () => {}).on('error', () => {});
-  }, 14 * 60 * 1000); // every 14 minutes
+    http.get(`${SELF_URL}/health`, (res) => {
+      console.log(`Keep-alive ping: ${res.statusCode}`);
+    }).on('error', (err) => {
+      console.warn('Keep-alive ping failed:', err.message);
+    });
+  }
+  pingSelf(); // fire one immediately on boot, then every 14 minutes
+  setInterval(pingSelf, 14 * 60 * 1000);
 });
 
 module.exports = app;

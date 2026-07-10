@@ -1481,7 +1481,7 @@
       <input type="password" id="shift-pin-input" inputmode="numeric" maxlength="6" placeholder="• • • •"
         style="width:100%;text-align:center;font-size:28px;letter-spacing:10px;padding:14px;border:2px solid var(--gu-border);border-radius:14px;margin-bottom:14px;">
       <div id="shift-pin-error" style="color:#e53935;font-size:12px;margin-bottom:10px;display:none;">Incorrect PIN — try again.</div>
-      <button onclick="submitShiftPin()" style="width:100%;background:var(--gu-primary);color:white;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">
+      <button id="shift-pin-submit-btn" onclick="submitShiftPin()" style="width:100%;background:var(--gu-primary);color:white;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">
         Start Shift →
       </button>
       <button onclick="openForgotPin()" style="width:100%;background:none;border:none;color:var(--gu-dust);font-size:12px;cursor:pointer;padding:8px;">
@@ -5163,7 +5163,17 @@ function backToNamePicker() {
 async function submitShiftPin() {
   const pin = document.getElementById('shift-pin-input').value.trim();
   const errorEl = document.getElementById('shift-pin-error');
+  const submitBtn = document.getElementById('shift-pin-submit-btn');
   if (!pin) return;
+
+  // Visible loading state — if the server needs to wake up from sleep
+  // (Render free tier, up to ~30-60s), this makes that obvious instead
+  // of the button looking like it did nothing while a request is
+  // actually still in flight in the background.
+  const originalBtnText = submitBtn?.textContent;
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Checking…'; }
+  errorEl.style.display = 'none';
+
   try {
     const res = await fetch(`${API_URL}/api/staff/shift-login`, {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -5184,8 +5194,10 @@ async function submitShiftPin() {
     errorEl.style.display = 'none';
     applyShiftUI();
   } catch(e) {
-    errorEl.textContent = 'Could not check PIN — try again.';
+    errorEl.textContent = 'Could not reach the server — it may be waking up, please try again in a moment.';
     errorEl.style.display = 'block';
+  } finally {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = originalBtnText; }
   }
 }
 
