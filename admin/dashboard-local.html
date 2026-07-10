@@ -1403,6 +1403,14 @@
     0%, 100% { box-shadow: 0 6px 22px rgba(0,0,0,0.35), 0 0 0 0 rgba(184,121,70,0.5); }
     50% { box-shadow: 0 6px 22px rgba(0,0,0,0.35), 0 0 0 12px rgba(184,121,70,0); }
   }
+  /* Gentle paintbrush "dabbing" motion for the assistant icon — small
+     tilt back and forth around the bristle tip, like a light brush
+     stroke, rather than a static icon. */
+  @keyframes brushDab {
+    0%, 100% { transform: rotate(0deg); }
+    30% { transform: rotate(-8deg); }
+    60% { transform: rotate(4deg); }
+  }
 </style>
 
 <!-- API Status Indicator — for everyone NOT seeing the director strip
@@ -1540,8 +1548,17 @@
      staff_alerts entry, not a dead end. Context auto-switches to
      'director' for David/Jenny/Daisy (adds Platform Revenue lookups),
      'staff' for everyone else. -->
-<button id="staff-assistant-fab" onclick="toggleStaffAssistant()" style="display:none;position:fixed;bottom:20px;left:20px;z-index:9800;width:68px;height:68px;border-radius:50%;background:#2B2724;color:white;border:none;font-size:30px;box-shadow:0 6px 22px rgba(0,0,0,0.35);cursor:pointer;animation:assistantFabPulse 2.2s ease-in-out infinite;">
-  💬
+<button id="staff-assistant-fab" onclick="toggleStaffAssistant()" style="display:none;position:fixed;bottom:20px;left:20px;z-index:9800;width:68px;height:68px;border-radius:50%;background:#2B2724;color:white;border:none;box-shadow:0 6px 22px rgba(0,0,0,0.35);cursor:pointer;animation:assistantFabPulse 2.2s ease-in-out infinite;display:flex;align-items:center;justify-content:center;">
+  <svg id="assistant-brush-icon" width="34" height="34" viewBox="0 0 34 34" style="animation:brushDab 1.8s ease-in-out infinite;transform-origin:8px 26px;">
+    <!-- Handle -->
+    <rect x="16" y="4" width="4" height="16" rx="2" fill="#B87946" transform="rotate(-35 18 12)"/>
+    <!-- Ferrule (metal band) -->
+    <rect x="10.5" y="16" width="6" height="5" rx="1" fill="#C9C9C9" transform="rotate(-35 13.5 18.5)"/>
+    <!-- Bristles -->
+    <path d="M8 20 L13 17 L15 22 Q11 25 7 24 Z" fill="#8B5A2B"/>
+    <!-- Paint dab at the tip, pulses with the brush -->
+    <circle id="assistant-brush-dab" cx="7" cy="25" r="2.4" fill="#F9A825" opacity="0.9"/>
+  </svg>
 </button>
 
 <!-- Speech-bubble hint — makes it obvious the assistant is there to ask

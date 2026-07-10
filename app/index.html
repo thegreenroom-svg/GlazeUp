@@ -526,6 +526,11 @@
       0%, 100% { box-shadow: 0 6px 22px rgba(0,0,0,0.35), 0 0 0 0 rgba(184,121,70,0.5); }
       50% { box-shadow: 0 6px 22px rgba(0,0,0,0.35), 0 0 0 12px rgba(184,121,70,0); }
     }
+    @keyframes brushDab {
+      0%, 100% { transform: rotate(0deg); }
+      30% { transform: rotate(-8deg); }
+      60% { transform: rotate(4deg); }
+    }
 
     .bd-grid {
       display: grid;
@@ -1526,8 +1531,13 @@
        booking status, escalates to real staff (via the existing
        staff_alerts pipeline) if it can't help or the customer seems
        stuck/frustrated. -->
-  <button id="assistant-fab" onclick="toggleAssistant()" style="position:fixed; bottom:20px; left:16px; z-index:9500; width:68px; height:68px; border-radius:50%; background:var(--link-charcoal); color:white; border:none; font-size:30px; box-shadow:0 6px 22px rgba(0,0,0,0.35); cursor:pointer; animation:assistantFabPulseCustomer 2.2s ease-in-out infinite;">
-    💬
+  <button id="assistant-fab" onclick="toggleAssistant()" style="position:fixed; bottom:20px; left:16px; z-index:9500; width:68px; height:68px; border-radius:50%; background:var(--link-charcoal); color:white; border:none; box-shadow:0 6px 22px rgba(0,0,0,0.35); cursor:pointer; animation:assistantFabPulseCustomer 2.2s ease-in-out infinite; display:flex; align-items:center; justify-content:center;">
+    <svg width="34" height="34" viewBox="0 0 34 34" style="animation:brushDab 1.8s ease-in-out infinite; transform-origin:8px 26px;">
+      <rect x="16" y="4" width="4" height="16" rx="2" fill="#B87946" transform="rotate(-35 18 12)"/>
+      <rect x="10.5" y="16" width="6" height="5" rx="1" fill="#C9C9C9" transform="rotate(-35 13.5 18.5)"/>
+      <path d="M8 20 L13 17 L15 22 Q11 25 7 24 Z" fill="#8B5A2B"/>
+      <circle cx="7" cy="25" r="2.4" fill="#F9A825" opacity="0.9"/>
+    </svg>
   </button>
 
   <!-- Speech-bubble hint — makes it obvious the assistant is there to
