@@ -79,6 +79,15 @@
       background: var(--gu-secondary);
       color: var(--gu-text);
       -webkit-tap-highlight-color: transparent;
+      /* The page itself should never scroll — .admin-wrapper is already
+         100vh and .admin-content scrolls internally. Without this, an
+         auto-focused input (e.g. the PIN field on login) can trigger the
+         browser to scroll the whole BODY to bring it into view, landing
+         the page halfway down instead of at the top on load. */
+      overflow: hidden;
+      height: 100vh;
+      position: fixed;
+      width: 100%;
     }
 
     .admin-wrapper {
