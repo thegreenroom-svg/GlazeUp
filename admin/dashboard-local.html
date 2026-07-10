@@ -5056,33 +5056,15 @@ let currentShiftId = null; // timesheet row ID for automatic clock-out
 let currentBreakId = null; // set while on a break, null otherwise
 
 function checkShiftLogin() {
-  // TEMPORARY debug trace — shows exactly which login path actually ran,
-  // directly on screen, to diagnose why PIN entry may be appearing before
-  // the name picker despite the code only calling showLoginScreen('picker')
-  // on load. Remove once confirmed working correctly.
-  function debugTrace(msg) {
-    let el = document.getElementById('login-debug-trace');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'login-debug-trace';
-      el.style.cssText = 'position:fixed;top:60px;left:4px;z-index:999999;background:#000;color:#0f0;font-family:monospace;font-size:10px;padding:8px 10px;border-radius:6px;opacity:0.95;max-width:90vw;white-space:pre-wrap;';
-      document.body.appendChild(el);
-    }
-    el.textContent += msg + '\n';
-  }
-  debugTrace('checkShiftLogin() called');
-
   if (!SHIFT_PIN_LOGIN_ENABLED) {
     // PIN login disabled for now — auto-apply a placeholder "Testing" identity
     // so every role-gated feature (task queue, step counter, headset help)
     // is still visible without needing to log in. Switch SHIFT_PIN_LOGIN_ENABLED
     // to true above when ready to go live with real shift PINs.
-    debugTrace('SHIFT_PIN_LOGIN_ENABLED is FALSE — using testing identity');
     currentShiftStaff = currentShiftStaff || { id: 'testing', name: 'Testing Mode', role: 'Studio Manager' };
     applyShiftUI();
     return;
   }
-  debugTrace('SHIFT_PIN_LOGIN_ENABLED is true — proceeding to picker logic');
 
   // Login is required every time the app is opened or refreshed — it does
   // NOT persist across reloads. This is deliberate: a shared studio tablet
@@ -5115,7 +5097,6 @@ function checkShiftLogin() {
   // Always show the name picker on load
   document.getElementById('shift-login-modal').style.display = 'flex';
   showLoginScreen('picker');
-  debugTrace('showLoginScreen(picker) called — picker should now be visible');
   loadLoginNamePicker();
 }
 
@@ -5164,8 +5145,6 @@ async function loadLoginNamePicker() {
 }
 
 function selectLoginMember(member) {
-  const traceEl = document.getElementById('login-debug-trace');
-  if (traceEl) traceEl.textContent += `selectLoginMember() called for: ${member?.name}\n`;
   selectedLoginMember = member;
   const color = ROLE_COLORS_LOGIN[member.role] || '#999';
 
@@ -5509,11 +5488,17 @@ function applyPlatformRevenueAccess() {
   // The Kiln Cafe's own revenue section (on the Dashboard tab) uses this
   // exact same director check — re-populate it now login has resolved,
   // in case someone landed on Dashboard before logging in.
+  //
+  // IMPORTANT: this must call refreshKilnCafeRevenueData(), NOT
+  // populateDashboard(). populateDashboard() itself calls checkShiftLogin(),
+  // which resets the login flow and forces the name picker back over
+  // whatever screen was showing — this was the actual cause of "tap a
+  // name, enter PIN, get bounced straight back to the picker every time."
   const revenueSection = document.getElementById('kiln-cafe-revenue-section');
   if (revenueSection) {
     revenueSection.style.display = hasAccess ? 'block' : 'none';
     if (hasAccess && document.getElementById('dashboard-view')?.style.display !== 'none') {
-      populateDashboard();
+      refreshKilnCafeRevenueData();
     }
   }
 }
