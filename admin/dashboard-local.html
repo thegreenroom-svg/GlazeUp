@@ -1404,6 +1404,15 @@
      so it can never overlap or hide behind other fixed elements. -->
 <div class="api-status disconnected" id="api-status">📡 Connecting...</div>
 
+<!-- Update available banner — shown when the server has been redeployed
+     since this page loaded. Pages can't be pushed live automatically,
+     so this is the honest next-best thing: a clear, unmissable prompt
+     rather than someone unknowingly running a stale version. -->
+<div id="update-available-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:99999;background:#2e7d32;color:white;padding:10px 16px;text-align:center;font-size:13px;font-weight:700;box-shadow:0 2px 10px rgba(0,0,0,0.3);">
+  ✨ A new version is available —
+  <button onclick="window.location.reload()" style="background:white;color:#2e7d32;border:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:800;cursor:pointer;margin-left:8px;">Tap to update</button>
+</div>
+
 <!-- On phone widths, these three buttons flow into this horizontal bar instead
      of stacking as separate fixed-position circles (which overlap on narrow screens) -->
 <div id="phone-header-menu">
@@ -10020,6 +10029,27 @@ function startExtrasPollingOnLoad() {
     });
   }
 }
+// ── Update-available check ──
+// Pages can't push updates into an already-open tab automatically — this
+// polls the server's boot time and prompts a refresh if it's changed
+// since this page loaded, i.e. a new deploy has genuinely gone live.
+let _initialBootTime = null;
+async function checkForAppUpdate() {
+  try {
+    const res = await fetch(`${API_URL}/api/version`, { cache: 'no-store' });
+    const data = await res.json();
+    if (!_initialBootTime) {
+      _initialBootTime = data.bootTime; // first check just establishes the baseline
+      return;
+    }
+    if (data.bootTime && data.bootTime !== _initialBootTime) {
+      document.getElementById('update-available-banner').style.display = 'block';
+      clearInterval(window._versionCheckTimer); // stop polling once we know — no need to keep asking
+    }
+  } catch (e) { /* silent — network hiccup, try again next interval */ }
+}
+checkForAppUpdate();
+window._versionCheckTimer = setInterval(checkForAppUpdate, 2 * 60 * 1000); // check every 2 minutes
 
 </script>
 

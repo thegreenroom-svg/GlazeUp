@@ -5507,6 +5507,15 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// GET /api/version — reports when this server process started. A fresh
+// deploy = a fresh process = a new timestamp, so clients can poll this
+// and detect when a newer version has gone live, prompting a refresh
+// instead of silently running a stale version indefinitely.
+const SERVER_BOOT_TIME = new Date().toISOString();
+app.get('/api/version', (req, res) => {
+  res.json({ bootTime: SERVER_BOOT_TIME });
+});
+
 app.listen(port, () => {
   console.log(`✓ Link server running on port ${port}`);
   console.log(`  Square OAuth: ${process.env.SQUARE_CLIENT_ID ? '✓' : '✗'}`);

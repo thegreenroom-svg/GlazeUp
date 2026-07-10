@@ -1508,6 +1508,15 @@
     </div>
   </div>
 
+  <!-- Update available banner — same honest approach as the admin
+       dashboard: pages can't be pushed live automatically, so this is
+       a clear, unmissable prompt rather than someone unknowingly using
+       a stale version of the app. -->
+  <div id="update-available-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:99999;background:#2e7d32;color:white;padding:10px 16px;text-align:center;font-size:13px;font-weight:700;box-shadow:0 2px 10px rgba(0,0,0,0.3);">
+    ✨ A new version is available —
+    <button onclick="window.location.reload()" style="background:white;color:#2e7d32;border:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:800;cursor:pointer;margin-left:8px;">Tap to update</button>
+  </div>
+
   <!-- AI Assistant — floating button + chat panel. Customer context:
        answers pricing/hours/how-things-work questions, can check real
        booking status, escalates to real staff (via the existing
@@ -5357,6 +5366,25 @@
       document.addEventListener(evt, resetIdleTimer, { passive: true });
     });
     resetIdleTimer();
+
+    // ── Update-available check ──
+    // Same approach as the staff dashboard: polls the server's boot time
+    // and prompts a refresh once it changes, i.e. a new deploy has gone
+    // live — pages genuinely can't be pushed into an already-open tab.
+    let _initialBootTime = null;
+    async function checkForAppUpdate() {
+      try {
+        const res = await fetch(`${API_URL}/api/version`, { cache: 'no-store' });
+        const data = await res.json();
+        if (!_initialBootTime) { _initialBootTime = data.bootTime; return; }
+        if (data.bootTime && data.bootTime !== _initialBootTime) {
+          document.getElementById('update-available-banner').style.display = 'block';
+          clearInterval(window._versionCheckTimer);
+        }
+      } catch (e) { /* silent */ }
+    }
+    checkForAppUpdate();
+    window._versionCheckTimer = setInterval(checkForAppUpdate, 2 * 60 * 1000);
 
     init();
   </script>
