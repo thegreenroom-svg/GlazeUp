@@ -14,8 +14,23 @@
       right: 0;
       padding: 8px 12px;
       font-size: 11px;
-      z-index: 9999;
+      z-index: 950;
       border-radius: 0 0 0 4px;
+      transition: top 0.2s ease;
+    }
+    /* When the director-only Platform Revenue strip is showing, it sits
+       at top:0 across the full width — push the API status badge down
+       below it instead of letting them overlap/fight for the same
+       corner (previously the badge had a higher z-index than the strip,
+       so it would flash into view during iOS over-scroll bounce, then
+       disappear again once the page settled — genuinely confusing). */
+    body.has-platform-strip .api-status {
+      top: 40px;
+    }
+    @media (max-width: 520px) {
+      body.has-platform-strip .api-status {
+        top: 56px;
+      }
     }
     .api-status.connected {
       background: #c8e6c9;
