@@ -5422,6 +5422,18 @@ function applyPlatformRevenueAccess() {
   const firstName = (currentShiftStaff?.name || '').trim().split(' ')[0];
   const hasAccess = PLATFORM_REVENUE_ACCESS.some(n => n.toLowerCase() === firstName.toLowerCase());
 
+  // TEMPORARY debug badge — shows exactly what the app thinks is going on,
+  // so we can see the real state directly on screen instead of guessing.
+  // Safe to remove once Platform Revenue access is confirmed working again.
+  let debugBadge = document.getElementById('platform-access-debug');
+  if (!debugBadge) {
+    debugBadge = document.createElement('div');
+    debugBadge.id = 'platform-access-debug';
+    debugBadge.style.cssText = 'position:fixed;bottom:4px;left:4px;z-index:999999;background:#000;color:#0f0;font-family:monospace;font-size:10px;padding:6px 10px;border-radius:6px;opacity:0.9;max-width:90vw;';
+    document.body.appendChild(debugBadge);
+  }
+  debugBadge.textContent = `DEBUG: name="${currentShiftStaff?.name || 'none'}" firstName="${firstName}" hasAccess=${hasAccess} loggedIn=${!!currentShiftStaff}`;
+
   if (link) link.style.display = hasAccess ? 'flex' : 'none';
 
   if (strip) {
