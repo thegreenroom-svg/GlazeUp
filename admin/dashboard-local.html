@@ -1526,11 +1526,12 @@
   </div>
   <div id="staff-assistant-messages" style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;">
     <div style="background:var(--gu-bg);border-radius:14px 14px 14px 4px;padding:10px 14px;font-size:13px;align-self:flex-start;max-width:85%;">
-      Hi! I can help you find your way around, check today's bookings, see pending tasks, or answer questions about how features work. What do you need?
+      Hi! What can I help with today?
     </div>
+    <div id="staff-assistant-quick-options" style="display:flex;flex-wrap:wrap;gap:6px;align-self:flex-start;max-width:95%;"></div>
   </div>
   <div style="padding:12px;border-top:1px solid var(--gu-border);display:flex;gap:8px;">
-    <input type="text" id="staff-assistant-input" placeholder="Type your question…" style="flex:1;padding:11px 14px;border:1px solid var(--gu-border);border-radius:20px;font-size:13px;" onkeydown="if(event.key==='Enter') sendStaffAssistantMessage()">
+    <input type="text" id="staff-assistant-input" placeholder="Or type your own question…" style="flex:1;padding:11px 14px;border:1px solid var(--gu-border);border-radius:20px;font-size:13px;" onkeydown="if(event.key==='Enter') sendStaffAssistantMessage()">
     <button onclick="sendStaffAssistantMessage()" style="background:#2B2724;color:white;border:none;border-radius:50%;width:40px;height:40px;font-size:16px;cursor:pointer;flex-shrink:0;">→</button>
   </div>
 </div>
@@ -5424,7 +5425,39 @@ let staffAssistantOpen = false;
 function toggleStaffAssistant() {
   staffAssistantOpen = !staffAssistantOpen;
   document.getElementById('staff-assistant-panel').style.display = staffAssistantOpen ? 'flex' : 'none';
-  if (staffAssistantOpen) document.getElementById('staff-assistant-input')?.focus();
+  if (staffAssistantOpen) {
+    document.getElementById('staff-assistant-input')?.focus();
+    populateStaffAssistantQuickOptions();
+  }
+}
+
+// Different quick options depending on whether this is a director
+// (adds Platform Revenue) or regular staff — same context already
+// computed in applyPlatformRevenueAccess().
+function populateStaffAssistantQuickOptions() {
+  const el = document.getElementById('staff-assistant-quick-options');
+  if (!el || el.dataset.used === 'true') return; // one-shot per conversation
+
+  const staffOptions = [
+    { label: '📋 Today\'s bookings', text: 'How many bookings do we have today?' },
+    { label: '✅ Pending tasks', text: 'What tasks are still pending right now?' },
+    { label: '🔥 Kiln process', text: 'How does the two-firing transfer process work?' },
+    { label: '🔑 Reset a PIN', text: 'How do I reset a staff member\'s PIN?' },
+  ];
+  const directorOptions = [
+    { label: '💰 Platform revenue', text: 'What\'s our current platform revenue summary?' },
+  ];
+
+  const options = window.assistantContext === 'director' ? [...staffOptions, ...directorOptions] : staffOptions;
+  el.innerHTML = options.map(o =>
+    `<button onclick="sendStaffAssistantQuickOption('${o.text.replace(/'/g,"\\'")}')" style="background:white;border:1.5px solid #2B2724;color:#2B2724;border-radius:16px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;">${o.label}</button>`
+  ).join('');
+}
+
+function sendStaffAssistantQuickOption(text) {
+  const el = document.getElementById('staff-assistant-quick-options');
+  if (el) { el.style.display = 'none'; el.dataset.used = 'true'; }
+  sendStaffAssistantText(text);
 }
 
 function appendStaffAssistantBubble(text, fromUser) {
@@ -5444,7 +5477,12 @@ async function sendStaffAssistantMessage() {
   const text = input.value.trim();
   if (!text) return;
   input.value = '';
+  const el = document.getElementById('staff-assistant-quick-options');
+  if (el) { el.style.display = 'none'; el.dataset.used = 'true'; }
+  sendStaffAssistantText(text);
+}
 
+async function sendStaffAssistantText(text) {
   appendStaffAssistantBubble(text, true);
   staffAssistantMessages.push({ role: 'user', content: text });
 

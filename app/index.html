@@ -1527,11 +1527,18 @@
     </div>
     <div id="assistant-messages" style="flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:10px;">
       <div style="background:#f5f0ea; border-radius:14px 14px 14px 4px; padding:10px 14px; font-size:13px; align-self:flex-start; max-width:85%;">
-        Hi! I can help with pricing, opening hours, how the app works, or check on your piece if you give me your booking code. What can I help with?
+        Hi! What can I help with today?
+      </div>
+      <div id="assistant-quick-options" style="display:flex; flex-wrap:wrap; gap:6px; align-self:flex-start; max-width:95%;">
+        <button onclick="sendAssistantQuickOption('When is my piece ready?')" style="background:white; border:1.5px solid var(--link-charcoal); color:var(--link-charcoal); border-radius:16px; padding:7px 12px; font-size:12px; font-weight:600; cursor:pointer;">📦 When's my piece ready?</button>
+        <button onclick="sendAssistantQuickOption('What are your opening hours?')" style="background:white; border:1.5px solid var(--link-charcoal); color:var(--link-charcoal); border-radius:16px; padding:7px 12px; font-size:12px; font-weight:600; cursor:pointer;">🕐 Opening hours</button>
+        <button onclick="sendAssistantQuickOption('How much does Design Preview cost?')" style="background:white; border:1.5px solid var(--link-charcoal); color:var(--link-charcoal); border-radius:16px; padding:7px 12px; font-size:12px; font-weight:600; cursor:pointer;">💷 Pricing</button>
+        <button onclick="sendAssistantQuickOption('How does the Transfer Designer work?')" style="background:white; border:1.5px solid var(--link-charcoal); color:var(--link-charcoal); border-radius:16px; padding:7px 12px; font-size:12px; font-weight:600; cursor:pointer;">✨ How transfers work</button>
+        <button onclick="sendAssistantQuickOption('I need to speak to a member of staff')" style="background:white; border:1.5px solid var(--link-charcoal); color:var(--link-charcoal); border-radius:16px; padding:7px 12px; font-size:12px; font-weight:600; cursor:pointer;">🙋 Speak to staff</button>
       </div>
     </div>
     <div style="padding:12px; border-top:1px solid #f0ebe4; display:flex; gap:8px;">
-      <input type="text" id="assistant-input" placeholder="Type your question…" style="flex:1; padding:11px 14px; border:1px solid var(--gu-border); border-radius:20px; font-size:13px;" onkeydown="if(event.key==='Enter') sendAssistantMessage()">
+      <input type="text" id="assistant-input" placeholder="Or type your own question…" style="flex:1; padding:11px 14px; border:1px solid var(--gu-border); border-radius:20px; font-size:13px;" onkeydown="if(event.key==='Enter') sendAssistantMessage()">
       <button onclick="sendAssistantMessage()" style="background:var(--link-charcoal); color:white; border:none; border-radius:50%; width:40px; height:40px; font-size:16px; cursor:pointer; flex-shrink:0;">→</button>
     </div>
   </div>
@@ -4291,12 +4298,23 @@
       return bubble;
     }
 
+    function sendAssistantQuickOption(text) {
+      const optionsRow = document.getElementById('assistant-quick-options');
+      if (optionsRow) optionsRow.style.display = 'none'; // one-shot — don't clutter an ongoing chat
+      sendAssistantText(text);
+    }
+
     async function sendAssistantMessage() {
       const input = document.getElementById('assistant-input');
       const text = input.value.trim();
       if (!text) return;
       input.value = '';
+      const optionsRow = document.getElementById('assistant-quick-options');
+      if (optionsRow) optionsRow.style.display = 'none';
+      sendAssistantText(text);
+    }
 
+    async function sendAssistantText(text) {
       appendAssistantBubble(text, true);
       assistantMessages.push({ role: 'user', content: text });
 
