@@ -3692,6 +3692,40 @@ app.patch('/api/staff/holiday-requests/:id', async (req, res) => {
 });
 
 // GET /api/staff/holiday-allowance — running allowance per person (set manually by manager)
+// ═══════════════════════════════════════════
+// MORNING OPENING CHECKLIST — server-tracked so
+// it's genuinely "done for today, by this person"
+// rather than a per-device localStorage flag that
+// doesn't know who completed it or follow across
+// devices.
+// ═══════════════════════════════════════════
+
+// GET /api/staff/opening-checklist/today — has today's checklist been done, and by whom?
+app.get('/api/staff/opening-checklist/today', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const today = new Date().toISOString().split('T')[0];
+  const { data } = await supabase.from('opening_checklist_log')
+    .select('*').eq('studio_id', studioId).eq('checklist_date', today).single();
+  res.json({ completed: !!data, record: data || null });
+});
+
+// POST /api/staff/opening-checklist/complete — mark today's checklist done, recording who did it
+app.post('/api/staff/opening-checklist/complete', async (req, res) => {
+  const { studioId, staffMemberId, staffName } = req.body;
+  if (!studioId || !staffName) return res.status(400).json({ error: 'studioId and staffName required' });
+  const today = new Date().toISOString().split('T')[0];
+
+  const { data, error } = await supabase.from('opening_checklist_log').upsert({
+    studio_id: studioId, checklist_date: today,
+    completed_by_staff_id: staffMemberId || null, completed_by_name: staffName,
+    completed_at: new Date().toISOString(),
+  }, { onConflict: 'studio_id,checklist_date' }).select().single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ record: data });
+});
+
 app.get('/api/staff/holiday-allowance', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });

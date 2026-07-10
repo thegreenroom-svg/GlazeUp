@@ -3897,11 +3897,26 @@ const OPENING_CHECKLIST = [
 
 let openingCheckState = {};
 
-function showOpeningChecklist() {
-  const today = new Date().toDateString();
-  const doneKey = `klnk_opening_${today}`;
-  if (localStorage.getItem(doneKey)) return; // already done today
+async function checkOpeningChecklistStatus() {
+  try {
+    const res = await fetch(`${API_URL}/api/staff/opening-checklist/today?studioId=${studioId}`);
+    const data = await res.json();
+    if (data.completed) {
+      // Already done today — by whoever completed it, possibly on another
+      // device. Don't show the checklist again, but keep a record of who
+      // did it in case it's useful elsewhere.
+      window._openingChecklistDoneBy = data.record?.completed_by_name || null;
+      return;
+    }
+    showOpeningChecklist();
+  } catch (e) {
+    // If we can't reach the server, err on the side of showing it —
+    // better to double-check than silently skip studio opening steps.
+    showOpeningChecklist();
+  }
+}
 
+function showOpeningChecklist() {
   openingCheckState = {};
   OPENING_CHECKLIST.forEach(i => { openingCheckState[i.id] = false; });
 
@@ -3967,9 +3982,21 @@ function updateOpeningProgress() {
   if (header) header.style.background = allDone ? '#2e7d32' : 'var(--gu-primary)';
 }
 
-function completeOpeningChecklist() {
-  const today = new Date().toDateString();
-  localStorage.setItem(`klnk_opening_${today}`, '1');
+async function completeOpeningChecklist() {
+  // Record who completed it, server-side — this is what makes "already
+  // done today" actually mean something, rather than a flag stuck on
+  // one device that doesn't know or care who did it.
+  try {
+    await fetch(`${API_URL}/api/staff/opening-checklist/complete`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId,
+        staffMemberId: currentShiftStaff?.id !== 'testing' ? currentShiftStaff?.id : null,
+        staffName: currentShiftStaff?.name || 'Unknown',
+      })
+    });
+  } catch (e) { /* still close the modal even if the save fails */ }
+
   const modal = document.getElementById('opening-checklist-modal');
   modal.style.opacity = '0';
   modal.style.transition = 'opacity .4s';
@@ -5000,6 +5027,9 @@ function applyShiftUI() {
   document.getElementById('step-counter-btn').style.display = 'flex';
   startTaskPolling();
   applyPlatformRevenueAccess();
+  // Opening checklist only appears once we genuinely know who's logged in —
+  // sequence is always: splash -> login -> checklist, never overlapping.
+  checkOpeningChecklistStatus();
 }
 
 // Platform Revenue is director-level data — only visible to named
@@ -6508,8 +6538,11 @@ async function populateDashboard() {
   startAlertPolling();
   checkShiftLogin();
   loadAlertSettings();
-  // Show morning opening checklist if not done today
-  setTimeout(showOpeningChecklist, 800);
+  // Opening checklist is shown once login has actually resolved (see
+  // applyShiftUI / submitShiftPin / submitNewPin), not on a fixed timer —
+  // previously this fired 800ms after load regardless of whether the
+  // login screen was still showing, so it could appear behind/alongside
+  // the PIN prompt instead of strictly after it.
   try {
     const data = await loadDashboardData();
     
