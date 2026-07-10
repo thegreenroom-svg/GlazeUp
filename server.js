@@ -4228,6 +4228,77 @@ app.get('/api/platform/revenue', async (req, res) => {
   }
 });
 
+// GET /api/platform/revenue/monthly-trend — long-range monthly totals for
+// the historical trend chart. Aggregated server-side by month so a 2-3
+// year seed doesn't mean shipping thousands of daily rows to the browser.
+app.get('/api/platform/revenue/monthly-trend', async (req, res) => {
+  const { staffMemberId, months } = req.query;
+  if (!staffMemberId) return res.status(401).json({ error: 'Not authorised' });
+
+  const { data: staffMember } = await supabase.from('staff_team').select('name').eq('id', staffMemberId).single();
+  const firstName = (staffMember?.name || '').trim().split(' ')[0].toLowerCase();
+  if (!PLATFORM_REVENUE_ACCESS_NAMES.includes(firstName)) {
+    return res.status(403).json({ error: 'Platform Revenue is restricted to directors.' });
+  }
+
+  try {
+    const monthsBack = Math.min(60, parseInt(months) || 36); // default 3 years
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - monthsBack);
+    startDate.setDate(1); startDate.setHours(0, 0, 0, 0);
+
+    const [aiRes, extrasRes, studiosRes] = await Promise.all([
+      supabase.from('ai_generation_usage').select('wholesale_cost_cents, created_at').gte('created_at', startDate.toISOString()),
+      supabase.from('app_extra_charges').select('amount_cents, created_at').gte('created_at', startDate.toISOString()),
+      supabase.from('studios').select('id, created_at'),
+    ]);
+
+    const aiRows = aiRes.data || [];
+    const extrasRows = extrasRes.data || [];
+    const studios = studiosRes.data || [];
+
+    const monthMap = {};
+    const monthKey = (d) => { const dt = new Date(d); return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`; };
+
+    for (let m = 0; m <= monthsBack; m++) {
+      const d = new Date(startDate); d.setMonth(d.getMonth() + m);
+      monthMap[monthKey(d)] = { aiCents: 0, licensingCents: 0, newStudios: 0 };
+    }
+
+    aiRows.forEach(r => {
+      const key = monthKey(r.created_at);
+      if (monthMap[key]) monthMap[key].aiCents += (r.wholesale_cost_cents || 0);
+    });
+    extrasRows.forEach(r => {
+      const key = monthKey(r.created_at);
+      if (monthMap[key]) monthMap[key].licensingCents += Math.round((r.amount_cents || 0) * FEATURE_LICENSING_FEE_RATE);
+    });
+    studios.forEach(s => {
+      const key = monthKey(s.created_at);
+      if (monthMap[key]) monthMap[key].newStudios += 1;
+    });
+
+    let runningStudioCount = 0;
+    const monthly = Object.keys(monthMap).sort().map(key => {
+      runningStudioCount += monthMap[key].newStudios;
+      const totalCents = monthMap[key].aiCents + monthMap[key].licensingCents;
+      return {
+        month: key,
+        aiCents: monthMap[key].aiCents,
+        licensingCents: monthMap[key].licensingCents,
+        totalCents,
+        newStudios: monthMap[key].newStudios,
+        cumulativeStudios: runningStudioCount,
+      };
+    });
+
+    res.json({ monthly, monthsCovered: monthsBack + 1 });
+  } catch (err) {
+    console.error('Monthly trend error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/ai-design/config — studio's AI generation settings (enabled + their customer pricing)
 app.get('/api/ai-design/config', async (req, res) => {
   const { studioId } = req.query;

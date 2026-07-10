@@ -2855,6 +2855,22 @@
           </div>
         </div>
 
+        <!-- Multi-year growth trend -->
+        <div class="chart-container" style="margin-bottom:20px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <h3 style="margin:0;">Growth trend — revenue &amp; studios over time</h3>
+            <select id="trend-range-select" onchange="loadMonthlyTrend()" style="padding:6px 10px;border:1px solid var(--gu-border);border-radius:8px;font-size:12px;background:white;">
+              <option value="12">Last 12 months</option>
+              <option value="24">Last 2 years</option>
+              <option value="36" selected>Last 3 years</option>
+            </select>
+          </div>
+          <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Monthly AI + licensing revenue (bars) against the running total of studios on the platform (line).</p>
+          <div id="trend-chart-wrap" style="width:100%;overflow-x:auto;">
+            <div style="padding:24px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading…</div>
+          </div>
+        </div>
+
         <!-- Flowing daily table -->
         <div class="chart-container" style="margin-bottom:20px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
@@ -5892,6 +5908,103 @@ async function sendAdhocRequest() {
 
 // ── Platform Revenue (kilnLINK owner view) ──
 // ── Speedometer dial for today's platform revenue vs 7-day average ──
+// ── Multi-year growth trend chart (bars = revenue, line = studio count) ──
+async function loadMonthlyTrend() {
+  const wrap = document.getElementById('trend-chart-wrap');
+  if (!wrap) return;
+  const months = document.getElementById('trend-range-select')?.value || 36;
+  wrap.innerHTML = '<div style="padding:24px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading…</div>';
+  try {
+    const res = await fetch(`${API_URL}/api/platform/revenue/monthly-trend?staffMemberId=${currentShiftStaff?.id || ''}&months=${months}`);
+    if (!res.ok) { wrap.innerHTML = '<p style="color:var(--gu-dust);font-size:13px;text-align:center;">Restricted to directors.</p>'; return; }
+    const data = await res.json();
+    drawMonthlyTrendChart(data.monthly || []);
+  } catch (e) {
+    wrap.innerHTML = '<p style="color:var(--gu-dust);font-size:13px;text-align:center;">Could not load trend data.</p>';
+  }
+}
+
+function drawMonthlyTrendChart(monthly) {
+  const wrap = document.getElementById('trend-chart-wrap');
+  if (!wrap) return;
+  if (!monthly.length) {
+    wrap.innerHTML = '<p style="color:var(--gu-dust);font-size:13px;text-align:center;padding:24px;">No historical data yet.</p>';
+    return;
+  }
+
+  const W = Math.max(700, monthly.length * 46); // wider chart for longer ranges, scrolls horizontally
+  const H = 260;
+  const padL = 50, padR = 20, padT = 20, padB = 44;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+
+  const maxRevenue = Math.max(...monthly.map(m => m.totalCents), 100);
+  const maxStudios = Math.max(...monthly.map(m => m.cumulativeStudios), 1);
+
+  const barW = Math.max(6, (chartW / monthly.length) * 0.55);
+  const step = chartW / monthly.length;
+
+  // Bars — monthly revenue
+  const bars = monthly.map((m, i) => {
+    const x = padL + i * step + (step - barW) / 2;
+    const barH = (m.totalCents / maxRevenue) * chartH;
+    const y = padT + chartH - barH;
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" fill="url(#trendBarGrad)" rx="2">
+      <title>${m.month}: £${(m.totalCents/100).toFixed(2)} (${m.cumulativeStudios} studios)</title>
+    </rect>`;
+  }).join('');
+
+  // Line — cumulative studio count, scaled to its own axis
+  const linePoints = monthly.map((m, i) => {
+    const x = padL + i * step + step / 2;
+    const y = padT + chartH - (m.cumulativeStudios / maxStudios) * chartH;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+
+  // X-axis labels — show roughly every Nth month so labels don't overlap
+  const labelEvery = monthly.length > 24 ? 3 : monthly.length > 12 ? 2 : 1;
+  const xLabels = monthly.map((m, i) => {
+    if (i % labelEvery !== 0) return '';
+    const x = padL + i * step + step / 2;
+    const [y, mo] = m.month.split('-');
+    const label = new Date(`${y}-${mo}-01`).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+    return `<text x="${x.toFixed(1)}" y="${H - 14}" font-size="10" fill="#8a8175" text-anchor="middle" font-family="sans-serif">${label}</text>`;
+  }).join('');
+
+  // Y-axis (revenue) gridlines
+  const gridLines = [0, 0.25, 0.5, 0.75, 1].map(f => {
+    const y = padT + chartH - f * chartH;
+    const val = (maxRevenue * f / 100).toFixed(0);
+    return `
+      <line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="#eee" stroke-width="1"/>
+      <text x="${padL - 8}" y="${(y+3).toFixed(1)}" font-size="9" fill="#999" text-anchor="end" font-family="sans-serif">£${val}</text>
+    `;
+  }).join('');
+
+  wrap.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" style="width:${W}px; max-width:none; display:block;">
+      <defs>
+        <linearGradient id="trendBarGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#B87946"/>
+          <stop offset="100%" stop-color="#9C27B0" stop-opacity="0.6"/>
+        </linearGradient>
+      </defs>
+      ${gridLines}
+      ${bars}
+      <polyline points="${linePoints}" fill="none" stroke="#2B2724" stroke-width="2.5"/>
+      ${monthly.map((m,i) => {
+        const x = padL + i * step + step/2;
+        const y = padT + chartH - (m.cumulativeStudios / maxStudios) * chartH;
+        return i % labelEvery === 0 ? `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="#2B2724"/>` : '';
+      }).join('')}
+      ${xLabels}
+    </svg>
+    <div style="display:flex;gap:20px;margin-top:10px;font-size:11px;color:var(--gu-dust);">
+      <span><span style="display:inline-block;width:10px;height:10px;background:linear-gradient(180deg,#B87946,#9C27B0);border-radius:2px;margin-right:4px;"></span>Monthly revenue (bars)</span>
+      <span><span style="display:inline-block;width:14px;height:2px;background:#2B2724;margin-right:4px;vertical-align:middle;"></span>Studios on platform (line)</span>
+    </div>
+  `;
+}
+
 function drawRevenueSpeedometer(todayCents, avgCents) {
   const wrap = document.getElementById('speedometer-wrap');
   if (!wrap) return;
@@ -5955,6 +6068,7 @@ function renderDailyRevenueTable(dailyTrend) {
 }
 
 async function loadPlatformRevenue() {
+  loadMonthlyTrend();
   try {
     const res = await fetch(`${API_URL}/api/platform/revenue?staffMemberId=${currentShiftStaff?.id || ''}`);
     if (res.status === 403) {
