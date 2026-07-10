@@ -2764,13 +2764,13 @@
       <div id="platformrev-view" class="view" style="display: none;">
         <h2 style="margin-top:0;">📈 Platform Revenue</h2>
         <p style="font-size:13px;color:var(--gu-dust);margin-bottom:20px;line-height:1.5;">
-          Income into kilnLINK/Green Room from every studio on the platform — subscriptions, AI generation wholesale fees, and feature licensing. Separate from The Kiln Cafe's own customer revenue shown elsewhere.
+          Income into kilnLINK/Green Room from every studio on the platform — subscriptions, AI generation fees, and commission on in-app purchases. Separate from The Kiln Cafe's own customer revenue shown elsewhere.
         </p>
 
         <!-- Speedometer -->
         <div class="chart-container" style="margin-bottom:20px; text-align:center;">
           <h3 style="margin:0 0 4px;">Today's Platform Revenue</h3>
-          <p style="font-size:12px;color:var(--gu-dust);margin-bottom:10px;">AI generation + feature licensing fees earned today, against your recent daily average.</p>
+          <p style="font-size:12px;color:var(--gu-dust);margin-bottom:10px;">AI generation + commission fees earned today, against your recent daily average.</p>
           <div id="speedometer-wrap" style="max-width:340px;margin:0 auto;"></div>
           <div style="display:flex;justify-content:center;gap:28px;margin-top:8px;">
             <div>
@@ -2784,92 +2784,107 @@
           </div>
         </div>
 
-        <div class="platform-stat-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px;">
-          <div style="background:white;border:1px solid var(--gu-border);border-radius:14px;padding:18px;text-align:center;">
-            <div style="font-size:26px;font-weight:800;color:var(--gu-primary);" id="prev-total-studios">–</div>
-            <div style="font-size:12px;color:var(--gu-dust);margin-top:4px;">Studios on kilnLINK</div>
+        <div class="platform-stat-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:22px;">
+          <div class="platform-big-btn" style="background:white;border:2px solid var(--gu-border);border-radius:18px;padding:24px 18px;text-align:center;">
+            <div style="font-size:32px;font-weight:800;color:var(--gu-primary);" id="prev-total-studios">–</div>
+            <div style="font-size:13px;font-weight:600;color:var(--gu-dust);margin-top:6px;">Studios on kilnLINK</div>
           </div>
-          <div style="background:white;border:1px solid var(--gu-border);border-radius:14px;padding:18px;text-align:center;">
-            <div style="font-size:26px;font-weight:800;color:#2e7d32;" id="prev-active-subs">–</div>
-            <div style="font-size:12px;color:var(--gu-dust);margin-top:4px;">Active subscriptions</div>
+          <div class="platform-big-btn" style="background:white;border:2px solid var(--gu-border);border-radius:18px;padding:24px 18px;text-align:center;">
+            <div style="font-size:32px;font-weight:800;color:#2e7d32;" id="prev-active-subs">–</div>
+            <div style="font-size:13px;font-weight:600;color:var(--gu-dust);margin-top:6px;">Active subscriptions</div>
           </div>
-          <div style="background:white;border:1px solid var(--gu-border);border-radius:14px;padding:18px;text-align:center;">
-            <div style="font-size:26px;font-weight:800;color:var(--link-clay);" id="prev-mrr">–</div>
-            <div style="font-size:12px;color:var(--gu-dust);margin-top:4px;">Monthly recurring revenue</div>
+          <div class="platform-big-btn" style="background:white;border:2px solid var(--gu-border);border-radius:18px;padding:24px 18px;text-align:center;">
+            <div style="font-size:32px;font-weight:800;color:var(--link-clay);" id="prev-mrr">–</div>
+            <div style="font-size:13px;font-weight:600;color:var(--gu-dust);margin-top:6px;">Monthly recurring revenue</div>
           </div>
-          <div style="background:white;border:1px solid var(--gu-border);border-radius:14px;padding:18px;text-align:center;">
-            <div style="font-size:26px;font-weight:800;color:var(--gu-text);" id="prev-total-this-month">–</div>
-            <div style="font-size:12px;color:var(--gu-dust);margin-top:4px;">Total this month</div>
+          <div class="platform-big-btn" style="background:white;border:2px solid var(--gu-border);border-radius:18px;padding:24px 18px;text-align:center;">
+            <div style="font-size:32px;font-weight:800;color:var(--gu-text);" id="prev-total-this-month">–</div>
+            <div style="font-size:13px;font-weight:600;color:var(--gu-dust);margin-top:6px;">Total this month</div>
           </div>
         </div>
         <style>
+          .platform-big-btn {
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+          }
+          .platform-big-btn:hover, .platform-big-btn:active {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+          }
           /* On phone widths, stack these as clean full-width square-ish
              tabs — one per row — instead of squeezing 2-3 into a row
-             at the same minmax(140px) that works fine on tablet/desktop. */
+             at the same minmax(160px) that works fine on tablet/desktop. */
           @media (max-width: 520px) {
             .platform-stat-grid {
               grid-template-columns: 1fr 1fr !important;
-              gap: 10px !important;
+              gap: 12px !important;
             }
-            .platform-stat-grid > div {
-              padding: 20px 12px !important;
-              border-radius: 16px !important;
+            .platform-big-btn {
+              padding: 22px 12px !important;
+              border-radius: 18px !important;
             }
-            .platform-stat-grid > div > div:first-child {
-              font-size: 24px !important;
+            .platform-big-btn > div:first-child {
+              font-size: 26px !important;
             }
-            .platform-stat-grid > div > div:last-child {
-              font-size: 11px !important;
+            .platform-big-btn > div:last-child {
+              font-size: 12px !important;
               line-height: 1.3;
             }
-            /* AI Generation / Feature Licensing cards: full stack, one
-               per row, instead of squeezing two dense cards side by side. */
+            /* AI Generation / Commission cards: full stack, one per row,
+               instead of squeezing two dense cards side by side. */
             .platform-revenue-streams {
               grid-template-columns: 1fr !important;
             }
           }
         </style>
 
-        <div class="platform-revenue-streams" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">
-          <div class="chart-container" style="background:linear-gradient(135deg,rgba(184,121,70,0.08),rgba(156,39,176,0.06));">
-            <h3 style="margin:0 0 4px;">🤖 AI Generation — wholesale fee</h3>
-            <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">10p per AI design generated, billed on each studio's monthly invoice.</p>
-            <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px;">
-              <div>
-                <div style="font-size:11px;color:var(--gu-dust);">This month</div>
-                <div style="font-size:18px;font-weight:800;color:#9C27B0;" id="prev-ai-revenue">–</div>
+        <h3 style="margin:0 0 12px;font-size:15px;">Revenue streams</h3>
+        <div class="platform-revenue-streams" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px;">
+          <button onclick="scrollToStudioBreakdown()" class="platform-stream-btn" style="text-align:left;cursor:pointer;border:2px solid rgba(156,39,176,0.25);border-radius:20px;background:linear-gradient(135deg,rgba(184,121,70,0.10),rgba(156,39,176,0.08));padding:22px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+              <span style="font-size:26px;">🤖</span>
+              <span style="font-size:16px;font-weight:800;color:var(--gu-text);">AI Generation</span>
+            </div>
+            <p style="font-size:12.5px;color:var(--gu-dust);margin:0 0 16px;line-height:1.5;">10p per AI design generated, billed on each studio's monthly invoice.</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+              <div style="background:white;border-radius:12px;padding:10px 6px;text-align:center;">
+                <div style="font-size:10px;color:var(--gu-dust);margin-bottom:2px;">This month</div>
+                <div style="font-size:17px;font-weight:800;color:#9C27B0;" id="prev-ai-revenue">–</div>
               </div>
-              <div>
-                <div style="font-size:11px;color:var(--gu-dust);">All-time</div>
-                <div style="font-size:18px;font-weight:800;color:var(--gu-text);" id="prev-ai-revenue-total">–</div>
+              <div style="background:white;border-radius:12px;padding:10px 6px;text-align:center;">
+                <div style="font-size:10px;color:var(--gu-dust);margin-bottom:2px;">All-time</div>
+                <div style="font-size:17px;font-weight:800;color:var(--gu-text);" id="prev-ai-revenue-total">–</div>
               </div>
-              <div>
-                <div style="font-size:11px;color:var(--gu-dust);">Generations</div>
-                <div style="font-size:18px;font-weight:800;color:var(--gu-text);" id="prev-ai-generations-total">–</div>
+              <div style="background:white;border-radius:12px;padding:10px 6px;text-align:center;">
+                <div style="font-size:10px;color:var(--gu-dust);margin-bottom:2px;">Generations</div>
+                <div style="font-size:17px;font-weight:800;color:var(--gu-text);" id="prev-ai-generations-total">–</div>
               </div>
             </div>
-            <a href="#" onclick="scrollToStudioBreakdown(event)" style="font-size:11px;color:var(--gu-primary);font-weight:700;text-decoration:none;">↓ See per-studio breakdown</a>
-          </div>
+            <div style="margin-top:14px;font-size:12px;color:var(--gu-primary);font-weight:800;">↓ Tap to see per-studio breakdown</div>
+          </button>
 
-          <div class="chart-container" style="background:linear-gradient(135deg,rgba(46,125,50,0.08),rgba(33,150,243,0.06));">
-            <h3 style="margin:0 0 4px;">🔑 Feature Licensing — <span id="prev-licensing-rate">15%</span> fee</h3>
-            <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Our cut of every in-app extra customers buy — Design Preview, Take It Home, Transfer Designer, glazes and more.</p>
-            <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px;">
-              <div>
-                <div style="font-size:11px;color:var(--gu-dust);">This month</div>
-                <div style="font-size:18px;font-weight:800;color:#2e7d32;" id="prev-licensing-revenue">–</div>
+          <button onclick="scrollToStudioBreakdown()" class="platform-stream-btn" style="text-align:left;cursor:pointer;border:2px solid rgba(46,125,50,0.25);border-radius:20px;background:linear-gradient(135deg,rgba(46,125,50,0.10),rgba(33,150,243,0.08));padding:22px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+              <span style="font-size:26px;">💰</span>
+              <span style="font-size:16px;font-weight:800;color:var(--gu-text);">Commission — App Purchases</span>
+            </div>
+            <p style="font-size:12.5px;color:var(--gu-dust);margin:0 0 16px;line-height:1.5;">Our <strong id="prev-licensing-rate">15%</strong> cut of every in-app purchase customers make — Design Preview, Take It Home, Transfer Designer, tablet hire, glazes and more.</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+              <div style="background:white;border-radius:12px;padding:10px 6px;text-align:center;">
+                <div style="font-size:10px;color:var(--gu-dust);margin-bottom:2px;">This month</div>
+                <div style="font-size:17px;font-weight:800;color:#2e7d32;" id="prev-licensing-revenue">–</div>
               </div>
-              <div>
-                <div style="font-size:11px;color:var(--gu-dust);">All-time</div>
-                <div style="font-size:18px;font-weight:800;color:var(--gu-text);" id="prev-licensing-revenue-total">–</div>
+              <div style="background:white;border-radius:12px;padding:10px 6px;text-align:center;">
+                <div style="font-size:10px;color:var(--gu-dust);margin-bottom:2px;">All-time</div>
+                <div style="font-size:17px;font-weight:800;color:var(--gu-text);" id="prev-licensing-revenue-total">–</div>
               </div>
-              <div>
-                <div style="font-size:11px;color:var(--gu-dust);">Extras volume</div>
-                <div style="font-size:18px;font-weight:800;color:var(--gu-text);" id="prev-extras-volume">–</div>
+              <div style="background:white;border-radius:12px;padding:10px 6px;text-align:center;">
+                <div style="font-size:10px;color:var(--gu-dust);margin-bottom:2px;">Purchase volume</div>
+                <div style="font-size:17px;font-weight:800;color:var(--gu-text);" id="prev-extras-volume">–</div>
               </div>
             </div>
-            <a href="#" onclick="scrollToStudioBreakdown(event)" style="font-size:11px;color:#2e7d32;font-weight:700;text-decoration:none;">↓ See per-studio breakdown</a>
-          </div>
+            <div style="margin-top:14px;font-size:12px;color:#2e7d32;font-weight:800;">↓ Tap to see per-studio breakdown</div>
+          </button>
         </div>
 
         <!-- Multi-year growth trend -->
@@ -6269,17 +6284,17 @@ async function loadPlatformRevenue() {
     const PLAN_COLORS = { pilot:'#999', solo:'#42A5F5', studio:'#B87946', multi:'#9C27B0', none:'#ccc' };
 
     listEl.innerHTML = data.studioBreakdown.map(s => `
-      <div onclick="openStudioDetail('${s.studioId}')" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--gu-bg);border-radius:10px;margin-bottom:8px;border-left:4px solid ${PLAN_COLORS[s.plan]||'#999'};cursor:pointer;">
+      <button onclick="openStudioDetail('${s.studioId}')" style="width:100%;text-align:left;display:flex;align-items:center;gap:14px;padding:16px 18px;background:var(--gu-bg);border:2px solid transparent;border-left:5px solid ${PLAN_COLORS[s.plan]||'#999'};border-radius:14px;margin-bottom:10px;cursor:pointer;transition:transform 0.15s ease, box-shadow 0.15s ease;" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 12px rgba(0,0,0,0.08)';" onmouseout="this.style.transform='none';this.style.boxShadow='none';">
         <div style="flex:1;min-width:0;">
-          <div style="font-size:13px;font-weight:700;">${s.name}</div>
-          <div style="font-size:11px;color:var(--gu-dust);">${s.aiGenerationsAllTime} AI generations · £${(s.licensingRevenueAllTimeCents/100).toFixed(2)} licensing fees</div>
+          <div style="font-size:15px;font-weight:800;color:var(--gu-text);">${s.name}</div>
+          <div style="font-size:12px;color:var(--gu-dust);margin-top:2px;">${s.aiGenerationsAllTime} AI generations · £${(s.licensingRevenueAllTimeCents/100).toFixed(2)} commission earned</div>
         </div>
         <div style="text-align:right;flex-shrink:0;">
-          <div style="font-size:11px;font-weight:700;color:${PLAN_COLORS[s.plan]||'#999'};">${PLAN_LABELS[s.plan]||s.plan}</div>
-          <div style="font-size:12px;color:var(--gu-dust);">£${(s.monthlySubCents/100).toFixed(0)}/mo + £${((s.aiRevenueAllTimeCents+s.licensingRevenueAllTimeCents)/100).toFixed(2)}</div>
+          <div style="font-size:12px;font-weight:800;color:${PLAN_COLORS[s.plan]||'#999'};">${PLAN_LABELS[s.plan]||s.plan}</div>
+          <div style="font-size:14px;font-weight:700;color:var(--gu-text);">£${(s.monthlySubCents/100).toFixed(0)}/mo + £${((s.aiRevenueAllTimeCents+s.licensingRevenueAllTimeCents)/100).toFixed(2)}</div>
         </div>
-        <div style="color:var(--gu-dust);font-size:16px;flex-shrink:0;">›</div>
-      </div>
+        <div style="color:var(--gu-dust);font-size:20px;flex-shrink:0;">›</div>
+      </button>
     `).join('');
   } catch (e) {
     document.getElementById('prev-studio-list').innerHTML = '<p style="color:var(--gu-dust);font-size:13px;">Could not load platform revenue.</p>';
