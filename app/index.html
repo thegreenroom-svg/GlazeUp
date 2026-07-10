@@ -514,46 +514,45 @@
     #browse-design-screen { background: #12082a; }
     #marketplace-screen { background: #12082a; }
 
-    /* kilnLINK wordmark — bigger, bolder, genuinely present on every
-       screen. "kiln" is static; the second word continuously flips on
-       its horizontal axis like a card turning over, morphing between
-       "LINK" and "kiln" as it crosses the halfway point of each turn —
-       cycles forever, never settles, always visibly the brand at work. */
+    /* kilnLINK wordmark — single word, continuously flipping on its
+       VERTICAL axis (like a revolving door — left/right, not top/bottom)
+       morphing between "LINK" and "kiln". Both faces are the same bold
+       weight and same size — the flip itself carries the brand, no
+       supporting static text needed. Bigger and tighter-paced than the
+       first attempt. */
     .klnk-wordmark {
-      font-size: 28px;
-    }
-    .klnk-word-static {
-      font-weight: 400;
-      color: inherit;
+      font-size: 34px;
+      display: inline-block;
     }
     .klnk-flip-outer {
       display: inline-block;
-      perspective: 240px;
+      perspective: 260px;
       height: 1em;
-      width: 2.2em; /* fits "LINK" and "kiln" at this weight/size without jumping between the two */
+      width: 2.3em; /* fits "LINK" and "kiln" at this weight/size without jumping between the two */
       overflow: visible;
-      text-align: left;
     }
     .klnk-flip-inner {
       position: relative;
       display: inline-block;
+      width: 100%;
       height: 1em;
       transform-style: preserve-3d;
-      animation: klnk-flip-cycle 5s linear infinite;
+      animation: klnk-flip-cycle 2.8s linear infinite;
     }
     .klnk-face {
       position: absolute;
       left: 0; top: 0;
+      width: 100%;
       backface-visibility: hidden;
       font-weight: 800;
-      letter-spacing: 0.02em;
+      letter-spacing: 0.01em;
       white-space: nowrap;
     }
-    .klnk-face-link { transform: rotateX(0deg); color: #F9A825; }
-    .klnk-face-kiln { transform: rotateX(180deg); font-weight: 400; color: inherit; }
+    .klnk-face-link { transform: rotateY(0deg); color: #F9A825; }
+    .klnk-face-kiln { transform: rotateY(180deg); color: inherit; }
     @keyframes klnk-flip-cycle {
-      0%   { transform: rotateX(0deg); }
-      100% { transform: rotateX(360deg); }
+      0%   { transform: rotateY(0deg); }
+      100% { transform: rotateY(360deg); }
     }
 
     @keyframes browse-pulse {
@@ -1806,15 +1805,12 @@
       return new URLSearchParams(window.location.search).get(name);
     }
 
-    // Animated kilnLINK wordmark — "kiln" stays static, the second word
-    // continuously flips on its horizontal axis (like a card turning
-    // over) and morphs between "LINK" and "kiln" at the halfway point of
-    // each rotation, cycling forever. Genuinely present on every screen —
-    // sized to actually read as the brand, not a small afterthought.
+    // Animated kilnLINK wordmark — one word, continuously flipping on its
+    // VERTICAL axis (like a revolving door, left-right) morphing between
+    // "LINK" and "kiln" at the halfway point of each turn. Bold, bigger,
+    // no static "kiln" alongside it — the flip itself IS the brand mark.
     const wordmarkHtml = `
-      <span class="klnk-wordmark" style="display:inline-flex; align-items:baseline; gap:0.15em; font-family:var(--gu-font-display); line-height:1;">
-        <span class="klnk-word-static">kiln</span><span class="klnk-flip-outer"><span class="klnk-flip-inner"><span class="klnk-face klnk-face-link">LINK</span><span class="klnk-face klnk-face-kiln">kiln</span></span></span>
-      </span>`;
+      <span class="klnk-wordmark"><span class="klnk-flip-outer"><span class="klnk-flip-inner"><span class="klnk-face klnk-face-link">LINK</span><span class="klnk-face klnk-face-kiln">kiln</span></span></span></span>`;
 
     const logoSvg = `<svg viewBox="0 -30 241 128" style="height:0.85em; width:auto; display:block;" aria-hidden="true">
       <path d="M5.00,82.00 L5.00,10.00 L20.41,10.00 L20.41,82.00 L5.00,82.00 Z M12.20,82.00 L12.20,70.20 L55.00,70.20 L55.00,82.00 L12.20,82.00 Z" fill="#fff"/>

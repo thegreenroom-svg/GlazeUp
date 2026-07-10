@@ -241,7 +241,7 @@
         gap: 10px !important;
       }
       #phone-header-wordmark {
-        display: flex !important;
+        display: inline-block !important;
       }
       .api-status { font-size: 9px; padding: 5px 8px; }
     }
@@ -1396,45 +1396,43 @@
   </div>
 </div>
 <style>
-  /* kilnLINK wordmark — bigger, bolder, genuinely present on every
-     screen. "kiln" is static; the second word continuously flips on its
-     horizontal axis like a card turning over, morphing between "LINK"
-     and "kiln" as it crosses the halfway point of each turn — cycles
-     forever, never settles, always visibly the brand at work. */
-  .klnk-wordmark-sidebar { font-size: 24px; }
-  .klnk-wordmark-phone { font-size: 15px; }
-  .klnk-word-static {
-    font-weight: 400;
-    color: inherit;
-  }
+  /* kilnLINK wordmark — single word, continuously flipping on its
+     VERTICAL axis (like a revolving door — left/right, not top/bottom)
+     morphing between "LINK" and "kiln". Both faces are the same bold
+     weight and same size — the flip itself carries the brand, no
+     supporting static text needed. */
+  .klnk-wordmark { display: inline-block; }
+  .klnk-wordmark-sidebar { font-size: 30px; }
+  .klnk-wordmark-phone { font-size: 17px; }
   .klnk-flip-outer {
     display: inline-block;
-    perspective: 240px;
+    perspective: 260px;
     height: 1em;
-    width: 2.2em;
+    width: 2.3em;
     overflow: visible;
-    text-align: left;
   }
   .klnk-flip-inner {
     position: relative;
     display: inline-block;
+    width: 100%;
     height: 1em;
     transform-style: preserve-3d;
-    animation: klnk-flip-cycle 5s linear infinite;
+    animation: klnk-flip-cycle 2.8s linear infinite;
   }
   .klnk-face {
     position: absolute;
     left: 0; top: 0;
+    width: 100%;
     backface-visibility: hidden;
     font-weight: 800;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.01em;
     white-space: nowrap;
   }
-  .klnk-face-link { transform: rotateX(0deg); color: #F9A825; }
-  .klnk-face-kiln { transform: rotateX(180deg); font-weight: 400; color: inherit; }
+  .klnk-face-link { transform: rotateY(0deg); color: #F9A825; }
+  .klnk-face-kiln { transform: rotateY(180deg); color: inherit; }
   @keyframes klnk-flip-cycle {
-    0%   { transform: rotateX(0deg); }
-    100% { transform: rotateX(360deg); }
+    0%   { transform: rotateY(0deg); }
+    100% { transform: rotateY(360deg); }
   }
   @keyframes tickerShimmer {
     0%, 100% { background-position: 0% 50%; }
@@ -1520,8 +1518,8 @@
 <!-- Compact wordmark, phone only — the full sidebar logo is hidden at
      this width (horizontal tab bar leaves no room for it), so this is
      the one place it's still shown consistently. -->
-<span id="phone-header-wordmark" class="klnk-wordmark klnk-wordmark-phone" style="display:none;align-items:baseline;gap:0.12em;font-family:var(--gu-font-display);line-height:1;flex-shrink:0;margin-right:6px;color:var(--gu-text);">
-  <span class="klnk-word-static">kiln</span><span class="klnk-flip-outer"><span class="klnk-flip-inner"><span class="klnk-face klnk-face-link">LINK</span><span class="klnk-face klnk-face-kiln">kiln</span></span></span>
+<span id="phone-header-wordmark" class="klnk-wordmark klnk-wordmark-phone" style="display:none;flex-shrink:0;margin-right:6px;color:var(--gu-text);">
+  <span class="klnk-flip-outer"><span class="klnk-flip-inner"><span class="klnk-face klnk-face-link">LINK</span><span class="klnk-face klnk-face-kiln">kiln</span></span></span>
 </span>
 
 <!-- Handoff Alert Bell -->
@@ -1905,8 +1903,8 @@
   <!-- SIDEBAR -->
   <aside class="admin-sidebar">
     <div class="link-logo" onclick="goToTab('dashboard')" style="cursor:pointer;display:flex;align-items:center;justify-content:center;padding:10px 0;" title="Back to Dashboard">
-      <span class="klnk-wordmark klnk-wordmark-sidebar" style="display:inline-flex;align-items:baseline;gap:0.15em;font-family:var(--gu-font-display);line-height:1;color:white;">
-        <span class="klnk-word-static">kiln</span><span class="klnk-flip-outer"><span class="klnk-flip-inner"><span class="klnk-face klnk-face-link">LINK</span><span class="klnk-face klnk-face-kiln">kiln</span></span></span>
+      <span class="klnk-wordmark klnk-wordmark-sidebar" style="color:white;">
+        <span class="klnk-flip-outer"><span class="klnk-flip-inner"><span class="klnk-face klnk-face-link">LINK</span><span class="klnk-face klnk-face-kiln">kiln</span></span></span>
       </span>
     </div>
     <nav>
