@@ -4103,9 +4103,11 @@ app.get('/api/platform/revenue', async (req, res) => {
   try {
     const startOfMonth = new Date();
     startOfMonth.setDate(1); startOfMonth.setHours(0, 0, 0, 0);
+    const startOfYear = new Date();
+    startOfYear.setMonth(0, 1); startOfYear.setHours(0, 0, 0, 0);
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-    const [studiosRes, subsRes, aiUsageRes, aiUsageAllTimeRes, extrasRes, extrasAllTimeRes, extrasDailyRes] = await Promise.all([
+    const [studiosRes, subsRes, aiUsageRes, aiUsageAllTimeRes, extrasRes, extrasAllTimeRes, extrasDailyRes, aiYtdRes, extrasYtdRes] = await Promise.all([
       supabase.from('studios').select('id, name, created_at'),
       supabase.from('stripe_subscriptions').select('studio_id, plan_id, status'),
       supabase.from('ai_generation_usage').select('studio_id, wholesale_cost_cents, created_at').gte('created_at', startOfMonth.toISOString()),
@@ -4113,6 +4115,8 @@ app.get('/api/platform/revenue', async (req, res) => {
       supabase.from('app_extra_charges').select('studio_id, amount_cents, created_at').gte('created_at', startOfMonth.toISOString()),
       supabase.from('app_extra_charges').select('studio_id, amount_cents'),
       supabase.from('app_extra_charges').select('amount_cents, created_at').gte('created_at', thirtyDaysAgo.toISOString()),
+      supabase.from('ai_generation_usage').select('wholesale_cost_cents, created_at').gte('created_at', startOfYear.toISOString()),
+      supabase.from('app_extra_charges').select('amount_cents, created_at').gte('created_at', startOfYear.toISOString()),
     ]);
 
     const studios = studiosRes.data || [];
@@ -4203,6 +4207,15 @@ app.get('/api/platform/revenue', async (req, res) => {
     const last7 = dailyTrend.slice(-8, -1); // 7 days before today
     const avg7DayCents = last7.length ? Math.round(last7.reduce((s,d) => s + d.totalCents, 0) / last7.length) : 0;
 
+    // Year-to-date: AI + licensing revenue since 1 Jan this year
+    const aiYtdRows = aiYtdRes.data || [];
+    const extrasYtdRows = extrasYtdRes.data || [];
+    const aiRevenueYtdCents = aiYtdRows.reduce((sum, r) => sum + (r.wholesale_cost_cents || 0), 0);
+    const licensingRevenueYtdCents = Math.round(
+      extrasYtdRows.reduce((sum, r) => sum + (r.amount_cents || 0), 0) * FEATURE_LICENSING_FEE_RATE
+    );
+    const totalYtdRevenueCents = aiRevenueYtdCents + licensingRevenueYtdCents;
+
     res.json({
       totalStudios: studios.length,
       activeSubscriptions: activeSubs.length,
@@ -4216,6 +4229,7 @@ app.get('/api/platform/revenue', async (req, res) => {
       licensingFeeRate: FEATURE_LICENSING_FEE_RATE,
       extrasVolumeThisMonthCents,
       totalMonthlyRevenueCents: mrrCents + aiRevenueThisMonthCents + licensingRevenueThisMonthCents,
+      totalYtdRevenueCents,
       dailyTrend,
       todayCents,
       avg7DayCents,

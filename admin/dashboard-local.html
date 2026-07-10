@@ -1346,18 +1346,33 @@
      while logged in as a director (David/Jenny/Daisy).
      Not part of any scrolling tab content — this stays
      fixed no matter which screen is open. ═══════════ -->
-<div id="platform-revenue-strip" onclick="goToTab('platformrev')" style="display:none;position:fixed;top:0;left:0;right:0;z-index:1000;background:linear-gradient(90deg,#2B2724,#3d2e28);cursor:pointer;padding:10px 16px;box-shadow:0 2px 10px rgba(0,0,0,0.25);">
-  <div style="display:flex;align-items:center;gap:14px;max-width:1100px;margin:0 auto;flex-wrap:wrap;">
-    <span style="font-size:11px;font-weight:800;letter-spacing:.05em;color:#F9A825;white-space:nowrap;">📈 PLATFORM REVENUE</span>
-    <div style="display:flex;gap:18px;flex-wrap:wrap;flex:1;">
+<div id="platform-revenue-strip" onclick="goToTab('platformrev')" style="display:none;position:fixed;top:0;left:0;right:0;z-index:1000;background:linear-gradient(90deg,#2B2724,#3d2e28,#2B2724);background-size:200% 100%;cursor:pointer;padding:10px 16px;box-shadow:0 2px 10px rgba(0,0,0,0.25);animation:tickerShimmer 8s ease-in-out infinite;">
+  <div style="display:flex;align-items:center;gap:16px;max-width:1200px;margin:0 auto;flex-wrap:wrap;">
+    <span style="font-size:11px;font-weight:800;letter-spacing:.05em;color:#F9A825;white-space:nowrap;display:flex;align-items:center;gap:5px;">
+      <span id="strip-pulse-dot" style="width:7px;height:7px;border-radius:50%;background:#4caf50;display:inline-block;animation:tickerPulse 2s ease-in-out infinite;"></span>
+      PLATFORM REVENUE — LIVE
+    </span>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;flex:1;">
       <span style="font-size:12px;color:white;"><strong id="strip-plat-studios" style="color:#B87946;">–</strong> studios</span>
-      <span style="font-size:12px;color:white;">this month <strong id="strip-plat-total-month" style="color:#4caf50;">–</strong></span>
+      <span style="font-size:12px;color:white;">MTD <strong id="strip-plat-mtd" style="color:#4caf50;">–</strong></span>
+      <span style="font-size:12px;color:white;">YTD <strong id="strip-plat-ytd" style="color:#64b5f6;">–</strong></span>
       <span style="font-size:12px;color:white;">today <strong id="strip-plat-ai-today" style="color:#ba68c8;">–</strong></span>
       <span style="font-size:12px;color:white;">MRR <strong id="strip-plat-mrr" style="color:#B87946;">–</strong></span>
     </div>
     <span style="font-size:11px;color:rgba(255,255,255,0.6);white-space:nowrap;">tap for detail →</span>
   </div>
 </div>
+<style>
+  @keyframes tickerShimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  @keyframes tickerPulse {
+    0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(76,175,80,0.6); }
+    50% { opacity: 0.7; transform: scale(1.15); box-shadow: 0 0 0 4px rgba(76,175,80,0); }
+  }
+  .ticker-count-up { transition: none; }
+</style>
 
 <!-- API Status Indicator -->
 <div class="api-status disconnected" id="api-status">📡 Connecting...</div>
@@ -5226,11 +5241,34 @@ async function loadPlatformRevenueStrip() {
     const res = await fetch(`${API_URL}/api/platform/revenue?staffMemberId=${currentShiftStaff?.id || ''}`);
     if (!res.ok) return;
     const data = await res.json();
-    document.getElementById('strip-plat-studios').textContent = data.totalStudios ?? '0';
-    document.getElementById('strip-plat-total-month').textContent = `£${((data.totalMonthlyRevenueCents||0)/100).toFixed(0)}`;
-    document.getElementById('strip-plat-ai-today').textContent = `£${((data.todayCents||0)/100).toFixed(2)}`;
-    document.getElementById('strip-plat-mrr').textContent = `£${((data.mrrCents||0)/100).toFixed(0)}`;
+
+    animateCountUp('strip-plat-studios', data.totalStudios ?? 0, '', 0);
+    animateCountUp('strip-plat-mtd', (data.totalMonthlyRevenueCents||0)/100, '£', 0);
+    animateCountUp('strip-plat-ytd', (data.totalYtdRevenueCents||0)/100, '£', 0);
+    animateCountUp('strip-plat-ai-today', (data.todayCents||0)/100, '£', 2);
+    animateCountUp('strip-plat-mrr', (data.mrrCents||0)/100, '£', 0);
   } catch (e) { /* silent — strip just won't update this cycle */ }
+}
+
+// Animates a number counting up from its current displayed value to the
+// new target over ~900ms — this is what gives the ticker its "moving,
+// live" feel rather than numbers just jumping straight to the new value.
+function animateCountUp(elementId, targetValue, prefix, decimals) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  const currentText = el.textContent.replace(/[^0-9.]/g, '');
+  const startValue = parseFloat(currentText) || 0;
+  const duration = 900;
+  const startTime = performance.now();
+
+  function step(now) {
+    const progress = Math.min(1, (now - startTime) / duration);
+    const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic — settles smoothly, doesn't overshoot
+    const value = startValue + (targetValue - startValue) * eased;
+    el.textContent = prefix + value.toLocaleString('en-GB', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    if (progress < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
 }
 
 // ── Headset / Bluetooth help ──
