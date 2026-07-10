@@ -1700,6 +1700,36 @@
           <span style="font-size: 15px;">You're on the free trial. Billing starts next month. No credit card required.</span>
         </div>
 
+        <!-- Platform Revenue summary — director-only (David/Jenny/Daisy), shown
+             right on landing so it's never buried. Full detail in the Platform
+             Revenue tab; this is the at-a-glance box with a live link through. -->
+        <div id="dash-platform-summary" style="display:none;">
+          <div class="chart-container" onclick="goToTab('platformrev')" style="cursor:pointer; background:linear-gradient(135deg,rgba(184,121,70,0.10),rgba(156,39,176,0.08)); border:1.5px solid rgba(184,121,70,0.3);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+              <h3 style="margin:0;">📈 Platform Revenue <span style="font-size:11px;font-weight:500;color:var(--gu-dust);">— worldwide, all studios</span></h3>
+              <span style="font-size:12px;color:var(--gu-primary);font-weight:700;">View full detail →</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">
+              <div style="background:white;border-radius:14px;padding:18px;text-align:center;">
+                <div style="font-size:26px;font-weight:800;color:var(--gu-primary);" id="dash-plat-studios">–</div>
+                <div style="font-size:11px;color:var(--gu-dust);margin-top:4px;">Studios worldwide</div>
+              </div>
+              <div style="background:white;border-radius:14px;padding:18px;text-align:center;">
+                <div style="font-size:26px;font-weight:800;color:#2e7d32;" id="dash-plat-total-month">–</div>
+                <div style="font-size:11px;color:var(--gu-dust);margin-top:4px;">Revenue this month</div>
+              </div>
+              <div style="background:white;border-radius:14px;padding:18px;text-align:center;">
+                <div style="font-size:26px;font-weight:800;color:#9C27B0;" id="dash-plat-ai-today">–</div>
+                <div style="font-size:11px;color:var(--gu-dust);margin-top:4px;">AI + licensing today</div>
+              </div>
+              <div style="background:white;border-radius:14px;padding:18px;text-align:center;">
+                <div style="font-size:26px;font-weight:800;color:var(--link-clay);" id="dash-plat-mrr">–</div>
+                <div style="font-size:11px;color:var(--gu-dust);margin-top:4px;">Monthly recurring</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Extra Charges tally — PROTOTYPE, for appraisal. Not real payment
              processing yet: this is a running tally of paid-tool unlocks and
              studio equipment charges (tablet/stylus) to add to bills at
@@ -5147,10 +5177,29 @@ const PLATFORM_REVENUE_ACCESS = ['David', 'Jenny', 'Daisy'];
 
 function applyPlatformRevenueAccess() {
   const link = document.getElementById('nav-platformrev');
-  if (!link) return;
+  const dashBox = document.getElementById('dash-platform-summary');
   const firstName = (currentShiftStaff?.name || '').trim().split(' ')[0];
   const hasAccess = PLATFORM_REVENUE_ACCESS.some(n => n.toLowerCase() === firstName.toLowerCase());
-  link.style.display = hasAccess ? 'flex' : 'none';
+  if (link) link.style.display = hasAccess ? 'flex' : 'none';
+  if (dashBox) {
+    dashBox.style.display = hasAccess ? 'block' : 'none';
+    if (hasAccess) loadDashboardPlatformSummary();
+  }
+}
+
+// Lightweight version of the platform revenue data, just for the dashboard
+// landing page summary box. Same endpoint as the full Platform Revenue
+// tab — this just picks out four headline numbers for a quick glance.
+async function loadDashboardPlatformSummary() {
+  try {
+    const res = await fetch(`${API_URL}/api/platform/revenue?staffMemberId=${currentShiftStaff?.id || ''}`);
+    if (!res.ok) return; // silently skip if not authorised — box stays hidden
+    const data = await res.json();
+    document.getElementById('dash-plat-studios').textContent = data.totalStudios ?? '0';
+    document.getElementById('dash-plat-total-month').textContent = `£${((data.totalMonthlyRevenueCents||0)/100).toFixed(0)}`;
+    document.getElementById('dash-plat-ai-today').textContent = `£${((data.todayCents||0)/100).toFixed(2)}`;
+    document.getElementById('dash-plat-mrr').textContent = `£${((data.mrrCents||0)/100).toFixed(0)}`;
+  } catch (e) { /* silent — box just won't update this time */ }
 }
 
 // ── Headset / Bluetooth help ──
