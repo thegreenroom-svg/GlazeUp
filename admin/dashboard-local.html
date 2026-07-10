@@ -1899,17 +1899,17 @@
         <div class="dashboard-grid">
           <div class="metric-card">
             <div class="label">Revenue (30d)</div>
-            <div class="value">£1,240</div>
+            <div class="value" id="metric-revenue">£1,240</div>
             <div class="detail">23 transactions</div>
           </div>
           <div class="metric-card">
             <div class="label">App Sessions</div>
-            <div class="value">47</div>
+            <div class="value" id="metric-sessions">47</div>
             <div class="detail">customers used the app</div>
           </div>
           <div class="metric-card">
             <div class="label">Tool Used Most</div>
-            <div class="value">Transfers</div>
+            <div class="value" id="metric-tool">Transfers</div>
             <div class="detail">41% of sessions</div>
           </div>
           <div class="metric-card">
@@ -3360,7 +3360,7 @@
     <input type="hidden" id="modal-customer-id">
 
     <!-- Hidden QR input (listens for barcode scans) -->
-    <input type="text" class="qr-input" id="qr-input" placeholder="Scan QR code here">
+    <input type="text" class="qr-input" id="qr-input-submit-modal" placeholder="Scan QR code here">
 
     <div class="modal-buttons">
       <button class="btn-cancel" onclick="closeQRModal()">Cancel</button>
