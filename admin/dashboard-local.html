@@ -1367,9 +1367,9 @@
      fixed no matter which screen is open. ═══════════ -->
 <div id="platform-revenue-strip" style="display:none;position:fixed;top:0;left:0;right:0;z-index:1000;height:52px;background:linear-gradient(90deg,#2B2724,#3d2e28,#2B2724);background-size:200% 100%;box-shadow:0 3px 14px rgba(0,0,0,0.3);animation:tickerShimmer 8s ease-in-out infinite;overflow:hidden;">
   <div style="display:flex;align-items:center;gap:18px;height:100%;padding:0 16px;max-width:1300px;margin:0 auto;overflow-x:auto;white-space:nowrap;scrollbar-width:none;">
-    <span style="font-size:12px;font-weight:800;letter-spacing:.05em;color:#F9A825;display:flex;align-items:center;gap:6px;flex-shrink:0;">
+    <span style="font-size:16px;font-weight:800;letter-spacing:.02em;color:#F9A825;display:flex;align-items:center;gap:8px;flex-shrink:0;">
       <span id="strip-pulse-dot" style="width:8px;height:8px;border-radius:50%;background:#4caf50;display:inline-block;animation:tickerPulse 2s ease-in-out infinite;flex-shrink:0;"></span>
-      REVENUE
+      kilnLINK Sales
     </span>
     <span style="font-size:14px;color:white;flex-shrink:0;"><strong id="strip-plat-studios" style="color:#B87946;font-size:16px;">–</strong> studios</span>
     <span style="font-size:14px;color:white;flex-shrink:0;">MTD <strong id="strip-plat-mtd" style="color:#4caf50;font-size:16px;">–</strong></span>
@@ -5611,10 +5611,10 @@ async function loadPlatformRevenueStrip() {
     const data = await res.json();
 
     animateCountUp('strip-plat-studios', data.totalStudios ?? 0, '', 0);
-    animateCountUp('strip-plat-mtd', (data.totalMonthlyRevenueCents||0)/100, '£', 0);
-    animateCountUp('strip-plat-ytd', (data.totalYtdRevenueCents||0)/100, '£', 0);
+    animateCountUp('strip-plat-mtd', (data.totalMonthlyRevenueCents||0)/100, '£', 2);
+    animateCountUp('strip-plat-ytd', (data.totalYtdRevenueCents||0)/100, '£', 2);
     animateCountUp('strip-plat-ai-today', (data.todayCents||0)/100, '£', 2);
-    animateCountUp('strip-plat-mrr', (data.mrrCents||0)/100, '£', 0);
+    animateCountUp('strip-plat-mrr', (data.mrrCents||0)/100, '£', 2);
   } catch (e) { /* silent — strip just won't update this cycle */ }
 }
 
@@ -6564,8 +6564,8 @@ async function loadPlatformRevenue() {
 
     document.getElementById('prev-total-studios').textContent = data.totalStudios ?? '0';
     document.getElementById('prev-active-subs').textContent = data.activeSubscriptions ?? '0';
-    document.getElementById('prev-mrr').textContent = `£${((data.mrrCents||0)/100).toFixed(0)}`;
-    document.getElementById('prev-total-this-month').textContent = `£${((data.totalMonthlyRevenueCents||0)/100).toFixed(0)}`;
+    document.getElementById('prev-mrr').textContent = `£${((data.mrrCents||0)/100).toFixed(2)}`;
+    document.getElementById('prev-total-this-month').textContent = `£${((data.totalMonthlyRevenueCents||0)/100).toFixed(2)}`;
 
     document.getElementById('prev-ai-revenue').textContent = `£${((data.aiRevenueThisMonthCents||0)/100).toFixed(2)}`;
     document.getElementById('prev-ai-generations-total').textContent = data.aiGenerationsAllTime ?? '0';
@@ -6574,7 +6574,7 @@ async function loadPlatformRevenue() {
     document.getElementById('prev-licensing-rate').textContent = `${Math.round((data.licensingFeeRate||0.15)*100)}%`;
     document.getElementById('prev-licensing-revenue').textContent = `£${((data.licensingRevenueThisMonthCents||0)/100).toFixed(2)}`;
     document.getElementById('prev-licensing-revenue-total').textContent = `£${((data.licensingRevenueAllTimeCents||0)/100).toFixed(2)}`;
-    document.getElementById('prev-extras-volume').textContent = `£${((data.extrasVolumeThisMonthCents||0)/100).toFixed(0)}`;
+    document.getElementById('prev-extras-volume').textContent = `£${((data.extrasVolumeThisMonthCents||0)/100).toFixed(2)}`;
 
     document.getElementById('speedo-today-label').textContent = `£${((data.todayCents||0)/100).toFixed(2)}`;
     document.getElementById('speedo-avg-label').textContent = `£${((data.avg7DayCents||0)/100).toFixed(2)}`;
