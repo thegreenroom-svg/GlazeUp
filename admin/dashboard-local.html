@@ -4679,18 +4679,36 @@ function checkShiftLogin() {
     applyShiftUI();
     return;
   }
-  const saved = localStorage.getItem('klnk_shift_staff');
-  if (saved) {
+
+  // Login is required every time the app is opened or refreshed — it does
+  // NOT persist across reloads. This is deliberate: a shared studio tablet
+  // needs to always ask "who's using this right now" rather than silently
+  // carrying on as whoever last logged in, which risks tasks, timekeeping,
+  // and duties being attributed to the wrong person.
+  const previousSession = localStorage.getItem('klnk_shift_staff');
+  if (previousSession) {
+    // Properly clock out whoever was previously logged in before clearing
+    // the session, so their hours worked stay accurate.
     try {
-      currentShiftStaff = JSON.parse(saved);
-      currentShiftId = localStorage.getItem('klnk_shift_id') || null;
-      currentBreakId = localStorage.getItem('klnk_break_id') || null;
-      applyShiftUI();
-      updateBreakUI();
-      return;
-    } catch(e) {}
+      const prevStaff = JSON.parse(previousSession);
+      const prevShiftId = localStorage.getItem('klnk_shift_id');
+      if (prevStaff?.id && prevStaff.id !== 'testing') {
+        fetch(`${API_URL}/api/staff/clock-out`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studioId, staffMemberId: prevStaff.id, shiftId: prevShiftId })
+        }).catch(() => {});
+      }
+    } catch (e) {}
+    localStorage.removeItem('klnk_shift_staff');
+    localStorage.removeItem('klnk_shift_id');
+    localStorage.removeItem('klnk_break_id');
   }
-  // No one logged in — show the name picker
+
+  currentShiftStaff = null;
+  currentShiftId = null;
+  currentBreakId = null;
+
+  // Always show the name picker on load
   document.getElementById('shift-login-modal').style.display = 'flex';
   showLoginScreen('picker');
   loadLoginNamePicker();
