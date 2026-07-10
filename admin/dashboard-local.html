@@ -2733,26 +2733,53 @@
           </div>
         </div>
 
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px;">
-          <div style="background:white;border:1px solid var(--gu-border);border-radius:12px;padding:16px;text-align:center;">
-            <div style="font-size:24px;font-weight:800;color:var(--gu-primary);" id="prev-total-studios">–</div>
-            <div style="font-size:11px;color:var(--gu-dust);">Studios on kilnLINK</div>
+        <div class="platform-stat-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px;">
+          <div style="background:white;border:1px solid var(--gu-border);border-radius:14px;padding:18px;text-align:center;">
+            <div style="font-size:26px;font-weight:800;color:var(--gu-primary);" id="prev-total-studios">–</div>
+            <div style="font-size:12px;color:var(--gu-dust);margin-top:4px;">Studios on kilnLINK</div>
           </div>
-          <div style="background:white;border:1px solid var(--gu-border);border-radius:12px;padding:16px;text-align:center;">
-            <div style="font-size:24px;font-weight:800;color:#2e7d32;" id="prev-active-subs">–</div>
-            <div style="font-size:11px;color:var(--gu-dust);">Active subscriptions</div>
+          <div style="background:white;border:1px solid var(--gu-border);border-radius:14px;padding:18px;text-align:center;">
+            <div style="font-size:26px;font-weight:800;color:#2e7d32;" id="prev-active-subs">–</div>
+            <div style="font-size:12px;color:var(--gu-dust);margin-top:4px;">Active subscriptions</div>
           </div>
-          <div style="background:white;border:1px solid var(--gu-border);border-radius:12px;padding:16px;text-align:center;">
-            <div style="font-size:24px;font-weight:800;color:var(--link-clay);" id="prev-mrr">–</div>
-            <div style="font-size:11px;color:var(--gu-dust);">Monthly recurring revenue</div>
+          <div style="background:white;border:1px solid var(--gu-border);border-radius:14px;padding:18px;text-align:center;">
+            <div style="font-size:26px;font-weight:800;color:var(--link-clay);" id="prev-mrr">–</div>
+            <div style="font-size:12px;color:var(--gu-dust);margin-top:4px;">Monthly recurring revenue</div>
           </div>
-          <div style="background:white;border:1px solid var(--gu-border);border-radius:12px;padding:16px;text-align:center;">
-            <div style="font-size:24px;font-weight:800;color:var(--gu-text);" id="prev-total-this-month">–</div>
-            <div style="font-size:11px;color:var(--gu-dust);">Total this month</div>
+          <div style="background:white;border:1px solid var(--gu-border);border-radius:14px;padding:18px;text-align:center;">
+            <div style="font-size:26px;font-weight:800;color:var(--gu-text);" id="prev-total-this-month">–</div>
+            <div style="font-size:12px;color:var(--gu-dust);margin-top:4px;">Total this month</div>
           </div>
         </div>
+        <style>
+          /* On phone widths, stack these as clean full-width square-ish
+             tabs — one per row — instead of squeezing 2-3 into a row
+             at the same minmax(140px) that works fine on tablet/desktop. */
+          @media (max-width: 520px) {
+            .platform-stat-grid {
+              grid-template-columns: 1fr 1fr !important;
+              gap: 10px !important;
+            }
+            .platform-stat-grid > div {
+              padding: 20px 12px !important;
+              border-radius: 16px !important;
+            }
+            .platform-stat-grid > div > div:first-child {
+              font-size: 24px !important;
+            }
+            .platform-stat-grid > div > div:last-child {
+              font-size: 11px !important;
+              line-height: 1.3;
+            }
+            /* AI Generation / Feature Licensing cards: full stack, one
+               per row, instead of squeezing two dense cards side by side. */
+            .platform-revenue-streams {
+              grid-template-columns: 1fr !important;
+            }
+          }
+        </style>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">
+        <div class="platform-revenue-streams" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">
           <div class="chart-container" style="background:linear-gradient(135deg,rgba(184,121,70,0.08),rgba(156,39,176,0.06));">
             <h3 style="margin:0 0 4px;">🤖 AI Generation — wholesale fee</h3>
             <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">10p per AI design generated, billed on each studio's monthly invoice.</p>
