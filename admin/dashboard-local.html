@@ -5121,10 +5121,18 @@ async function loadLoginNamePicker() {
       return;
     }
 
-    grid.innerHTML = team.map(m => {
+    // Store the team list once, index by position, and reference by index
+    // in onclick — much more reliable than embedding a full JSON object
+    // inline in an HTML attribute (which is fragile: any character in a
+    // name/role that trips up HTML attribute parsing could silently break
+    // the click handler entirely, with no error shown — exactly the "taps
+    // do nothing" symptom this replaces).
+    window._loginTeamData = team;
+
+    grid.innerHTML = team.map((m, i) => {
       const color = ROLE_COLORS_LOGIN[m.role] || '#999';
       return `
-        <button onclick='selectLoginMember(${JSON.stringify(m).replace(/'/g,"&apos;")})' style="background:var(--gu-bg);border:1.5px solid var(--gu-border);border-radius:14px;padding:14px 8px;cursor:pointer;text-align:center;">
+        <button onclick="selectLoginMember(window._loginTeamData[${i}])" style="background:var(--gu-bg);border:1.5px solid var(--gu-border);border-radius:14px;padding:14px 8px;cursor:pointer;text-align:center;">
           <div style="width:42px;height:42px;border-radius:50%;background:${color};color:white;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;margin:0 auto 8px;">${m.name.charAt(0).toUpperCase()}</div>
           <div style="font-size:13px;font-weight:700;color:var(--gu-text);">${m.name}</div>
           <div style="font-size:10px;color:var(--gu-dust);margin-top:2px;">${m.role}</div>
@@ -5132,7 +5140,7 @@ async function loadLoginNamePicker() {
         </button>`;
     }).join('');
   } catch(e) {
-    grid.innerHTml = '<div style="grid-column:1/-1;color:var(--gu-dust);font-size:12px;padding:16px;">Could not load the team list.</div>';
+    grid.innerHTML = '<div style="grid-column:1/-1;color:var(--gu-dust);font-size:12px;padding:16px;">Could not load the team list.</div>';
   }
 }
 
