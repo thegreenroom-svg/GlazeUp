@@ -89,18 +89,21 @@
 
     /* Added by JS only for directors while the platform revenue strip is
        visible, so the fixed strip never overlaps the sidebar/content
-       below it. Regular staff never get this class, so their layout is
-       completely unaffected. */
+       below it. Strip is a fixed 34px tall (see #platform-revenue-strip)
+       and never wraps onto a second line, so this offset always matches
+       its real height exactly — no guessing, no overlap regardless of
+       screen width. Regular staff never get this class, so their layout
+       is completely unaffected. */
     body.has-platform-strip .admin-wrapper {
-      height: calc(100vh - 40px);
-      margin-top: 40px;
+      height: calc(100vh - 34px);
+      margin-top: 34px;
     }
     @media (max-width: 520px) {
       body.has-platform-strip .admin-wrapper {
-        margin-top: 56px;
+        margin-top: calc(34px + 44px); /* strip + phone header menu */
       }
       body.has-platform-strip #phone-header-menu {
-        top: 56px !important;
+        top: 34px !important;
       }
     }
 
@@ -1353,21 +1356,19 @@
      while logged in as a director (David/Jenny/Daisy).
      Not part of any scrolling tab content — this stays
      fixed no matter which screen is open. ═══════════ -->
-<div id="platform-revenue-strip" onclick="goToTab('platformrev')" style="display:none;position:fixed;top:0;left:0;right:0;z-index:1000;background:linear-gradient(90deg,#2B2724,#3d2e28,#2B2724);background-size:200% 100%;cursor:pointer;padding:10px 16px;box-shadow:0 2px 10px rgba(0,0,0,0.25);animation:tickerShimmer 8s ease-in-out infinite;">
-  <div style="display:flex;align-items:center;gap:16px;max-width:1200px;margin:0 auto;flex-wrap:wrap;">
-    <span style="font-size:11px;font-weight:800;letter-spacing:.05em;color:#F9A825;white-space:nowrap;display:flex;align-items:center;gap:5px;">
-      <span id="strip-pulse-dot" style="width:7px;height:7px;border-radius:50%;background:#4caf50;display:inline-block;animation:tickerPulse 2s ease-in-out infinite;"></span>
-      PLATFORM REVENUE — LIVE
+<div id="platform-revenue-strip" onclick="goToTab('platformrev')" style="display:none;position:fixed;top:0;left:0;right:0;z-index:1000;height:34px;background:linear-gradient(90deg,#2B2724,#3d2e28,#2B2724);background-size:200% 100%;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.25);animation:tickerShimmer 8s ease-in-out infinite;overflow:hidden;">
+  <div style="display:flex;align-items:center;gap:12px;height:100%;padding:0 12px;max-width:1200px;margin:0 auto;overflow-x:auto;white-space:nowrap;scrollbar-width:none;">
+    <span style="font-size:10px;font-weight:800;letter-spacing:.04em;color:#F9A825;display:flex;align-items:center;gap:4px;flex-shrink:0;">
+      <span id="strip-pulse-dot" style="width:6px;height:6px;border-radius:50%;background:#4caf50;display:inline-block;animation:tickerPulse 2s ease-in-out infinite;flex-shrink:0;"></span>
+      REVENUE
     </span>
-    <div style="display:flex;gap:20px;flex-wrap:wrap;flex:1;">
-      <span style="font-size:12px;color:white;"><strong id="strip-plat-studios" style="color:#B87946;">–</strong> studios</span>
-      <span style="font-size:12px;color:white;">MTD <strong id="strip-plat-mtd" style="color:#4caf50;">–</strong></span>
-      <span style="font-size:12px;color:white;">YTD <strong id="strip-plat-ytd" style="color:#64b5f6;">–</strong></span>
-      <span style="font-size:12px;color:white;">today <strong id="strip-plat-ai-today" style="color:#ba68c8;">–</strong></span>
-      <span style="font-size:12px;color:white;">MRR <strong id="strip-plat-mrr" style="color:#B87946;">–</strong></span>
-    </div>
-    <span id="strip-api-status" style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.75);white-space:nowrap;">📡 Connecting…</span>
-    <span style="font-size:11px;color:rgba(255,255,255,0.6);white-space:nowrap;">tap for detail →</span>
+    <span style="font-size:11px;color:white;flex-shrink:0;"><strong id="strip-plat-studios" style="color:#B87946;">–</strong> studios</span>
+    <span style="font-size:11px;color:white;flex-shrink:0;">MTD <strong id="strip-plat-mtd" style="color:#4caf50;">–</strong></span>
+    <span style="font-size:11px;color:white;flex-shrink:0;">YTD <strong id="strip-plat-ytd" style="color:#64b5f6;">–</strong></span>
+    <span style="font-size:11px;color:white;flex-shrink:0;">today <strong id="strip-plat-ai-today" style="color:#ba68c8;">–</strong></span>
+    <span style="font-size:11px;color:white;flex-shrink:0;">MRR <strong id="strip-plat-mrr" style="color:#B87946;">–</strong></span>
+    <span id="strip-api-status" style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:8px;background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.75);flex-shrink:0;">📡</span>
+    <span style="font-size:10px;color:rgba(255,255,255,0.55);flex-shrink:0;">tap for detail →</span>
   </div>
 </div>
 <style>
@@ -1380,6 +1381,10 @@
     50% { opacity: 0.7; transform: scale(1.15); box-shadow: 0 0 0 4px rgba(76,175,80,0); }
   }
   .ticker-count-up { transition: none; }
+  /* Hide the horizontal scrollbar on the compact strip — it still
+     scrolls on narrow screens, just without a visible scrollbar
+     cluttering an already-small 34px bar. */
+  #platform-revenue-strip > div::-webkit-scrollbar { display: none; }
 </style>
 
 <!-- API Status Indicator — for everyone NOT seeing the director strip
