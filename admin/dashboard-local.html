@@ -1396,17 +1396,45 @@
   </div>
 </div>
 <style>
-  /* kilnLINK wordmark — the small chain-link glyph gently turns, like
-     two links rotating into place, as a subtle branded flourish rather
-     than a static logo. Slow and understated — this sits on every
-     screen, so it shouldn't compete for attention. */
-  @keyframes klnk-link-turn {
-    0%, 85%, 100% { transform: rotate(0deg); }
-    92% { transform: rotate(180deg); }
+  /* kilnLINK wordmark — bigger, bolder, genuinely present on every
+     screen. "kiln" is static; the second word continuously flips on its
+     horizontal axis like a card turning over, morphing between "LINK"
+     and "kiln" as it crosses the halfway point of each turn — cycles
+     forever, never settles, always visibly the brand at work. */
+  .klnk-wordmark-sidebar { font-size: 24px; }
+  .klnk-wordmark-phone { font-size: 15px; }
+  .klnk-word-static {
+    font-weight: 400;
+    color: inherit;
   }
-  .klnk-wordmark-spin {
-    animation: klnk-link-turn 6s ease-in-out infinite;
-    transform-origin: center;
+  .klnk-flip-outer {
+    display: inline-block;
+    perspective: 240px;
+    height: 1em;
+    width: 2.2em;
+    overflow: visible;
+    text-align: left;
+  }
+  .klnk-flip-inner {
+    position: relative;
+    display: inline-block;
+    height: 1em;
+    transform-style: preserve-3d;
+    animation: klnk-flip-cycle 5s linear infinite;
+  }
+  .klnk-face {
+    position: absolute;
+    left: 0; top: 0;
+    backface-visibility: hidden;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+  .klnk-face-link { transform: rotateX(0deg); color: #F9A825; }
+  .klnk-face-kiln { transform: rotateX(180deg); font-weight: 400; color: inherit; }
+  @keyframes klnk-flip-cycle {
+    0%   { transform: rotateX(0deg); }
+    100% { transform: rotateX(360deg); }
   }
   @keyframes tickerShimmer {
     0%, 100% { background-position: 0% 50%; }
@@ -1492,13 +1520,8 @@
 <!-- Compact wordmark, phone only — the full sidebar logo is hidden at
      this width (horizontal tab bar leaves no room for it), so this is
      the one place it's still shown consistently. -->
-<span id="phone-header-wordmark" style="display:none;align-items:center;gap:4px;font-family:var(--gu-font-display);line-height:1;flex-shrink:0;margin-right:4px;">
-  <svg class="klnk-wordmark-spin" width="15" height="15" viewBox="0 0 24 24" style="flex-shrink:0;">
-    <path d="M9 15 L15 9" stroke="#B87946" stroke-width="2.8" stroke-linecap="round"/>
-    <rect x="4" y="4" width="9" height="9" rx="4.5" fill="none" stroke="#B87946" stroke-width="2.6" transform="rotate(-45 8.5 8.5)"/>
-    <rect x="11" y="11" width="9" height="9" rx="4.5" fill="none" stroke="#F9A825" stroke-width="2.6" transform="rotate(-45 15.5 15.5)"/>
-  </svg>
-  <span style="font-weight:400;font-size:11px;color:var(--gu-text);">kiln</span><span style="font-weight:800;font-size:11px;color:var(--gu-text);">LINK</span>
+<span id="phone-header-wordmark" class="klnk-wordmark klnk-wordmark-phone" style="display:none;align-items:baseline;gap:0.12em;font-family:var(--gu-font-display);line-height:1;flex-shrink:0;margin-right:6px;color:var(--gu-text);">
+  <span class="klnk-word-static">kiln</span><span class="klnk-flip-outer"><span class="klnk-flip-inner"><span class="klnk-face klnk-face-link">LINK</span><span class="klnk-face klnk-face-kiln">kiln</span></span></span>
 </span>
 
 <!-- Handoff Alert Bell -->
@@ -1881,14 +1904,9 @@
 <div class="admin-wrapper">
   <!-- SIDEBAR -->
   <aside class="admin-sidebar">
-    <div class="link-logo" onclick="goToTab('dashboard')" style="cursor:pointer;display:flex;align-items:center;justify-content:center;padding:4px 0;" title="Back to Dashboard">
-      <span class="klnk-wordmark" style="display:inline-flex;align-items:center;gap:5px;font-family:var(--gu-font-display);line-height:1;color:white;">
-        <svg class="klnk-wordmark-spin" width="20" height="20" viewBox="0 0 24 24" style="flex-shrink:0;">
-          <path d="M9 15 L15 9" stroke="#B87946" stroke-width="2.4" stroke-linecap="round"/>
-          <rect x="4" y="4" width="9" height="9" rx="4.5" fill="none" stroke="#B87946" stroke-width="2.2" transform="rotate(-45 8.5 8.5)"/>
-          <rect x="11" y="11" width="9" height="9" rx="4.5" fill="none" stroke="#F9A825" stroke-width="2.2" transform="rotate(-45 15.5 15.5)"/>
-        </svg>
-        <span class="klnk-wordmark-text" style="font-weight:400;font-size:15px;">kiln</span><span class="klnk-wordmark-text" style="font-weight:800;font-size:15px;letter-spacing:0.02em;">LINK</span>
+    <div class="link-logo" onclick="goToTab('dashboard')" style="cursor:pointer;display:flex;align-items:center;justify-content:center;padding:10px 0;" title="Back to Dashboard">
+      <span class="klnk-wordmark klnk-wordmark-sidebar" style="display:inline-flex;align-items:baseline;gap:0.15em;font-family:var(--gu-font-display);line-height:1;color:white;">
+        <span class="klnk-word-static">kiln</span><span class="klnk-flip-outer"><span class="klnk-flip-inner"><span class="klnk-face klnk-face-link">LINK</span><span class="klnk-face klnk-face-kiln">kiln</span></span></span>
       </span>
     </div>
     <nav>
