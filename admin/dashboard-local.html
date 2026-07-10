@@ -1544,6 +1544,14 @@
   💬
 </button>
 
+<!-- Speech-bubble hint — makes it obvious the assistant is there to ask
+     something, without needing to tap the FAB first. Dismissible, and
+     hides itself the moment the assistant is actually opened. -->
+<div id="staff-assistant-hint" style="display:none;position:fixed;bottom:32px;left:96px;z-index:9799;background:white;border:1.5px solid var(--gu-border);border-radius:16px 16px 16px 4px;padding:10px 14px;font-size:13px;font-weight:600;color:var(--gu-text);box-shadow:0 4px 16px rgba(0,0,0,0.15);max-width:220px;cursor:pointer;" onclick="toggleStaffAssistant()">
+  What would you like to do? Ask me anything 👋
+  <button onclick="event.stopPropagation(); dismissStaffAssistantHint();" style="position:absolute;top:-8px;right:-8px;background:var(--gu-dust);color:white;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;line-height:1;">✕</button>
+</div>
+
 <div id="staff-assistant-panel" style="display:none;position:fixed;bottom:0;right:0;left:0;z-index:9900;max-width:420px;margin:0 auto 0 0;height:65vh;max-height:560px;background:white;border-radius:20px 20px 0 0;box-shadow:0 -8px 32px rgba(0,0,0,0.25);flex-direction:column;">
   <div style="background:#2B2724;color:white;padding:16px 18px;border-radius:20px 20px 0 0;display:flex;align-items:center;justify-content:space-between;">
     <div>
@@ -5398,6 +5406,15 @@ function applyShiftUI() {
   document.getElementById('direct-logout-btn').style.display = 'flex';
   document.getElementById('direct-break-btn').style.display = 'flex';
   document.getElementById('staff-assistant-fab').style.display = 'flex';
+  // Show the hint bubble shortly after login (not instantly — let the
+  // rest of the UI settle first) unless it's already been dismissed
+  // this session.
+  if (!sessionStorage.getItem('klnk_assistant_hint_dismissed')) {
+    setTimeout(() => {
+      const hint = document.getElementById('staff-assistant-hint');
+      if (hint && !staffAssistantOpen) hint.style.display = 'block';
+    }, 1500);
+  }
   startTaskPolling();
   applyPlatformRevenueAccess();
   // Opening checklist only appears once we genuinely know who's logged in —
@@ -5511,12 +5528,20 @@ let staffAssistantOpen = false;
 function toggleStaffAssistant() {
   staffAssistantOpen = !staffAssistantOpen;
   document.getElementById('staff-assistant-panel').style.display = staffAssistantOpen ? 'flex' : 'none';
+  const hint = document.getElementById('staff-assistant-hint');
+  if (hint) hint.style.display = 'none'; // opening the chat makes the hint redundant either way
   if (staffAssistantOpen) {
     document.getElementById('staff-assistant-input')?.focus();
     populateStaffAssistantQuickOptions();
   } else {
     clearAssistantArrow();
   }
+}
+
+function dismissStaffAssistantHint() {
+  const hint = document.getElementById('staff-assistant-hint');
+  if (hint) hint.style.display = 'none';
+  sessionStorage.setItem('klnk_assistant_hint_dismissed', '1');
 }
 
 // Different quick options depending on whether this is a director

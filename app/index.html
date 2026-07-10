@@ -1530,6 +1530,13 @@
     💬
   </button>
 
+  <!-- Speech-bubble hint — makes it obvious the assistant is there to
+       help, without needing to tap the FAB first. Dismissible. -->
+  <div id="assistant-hint" style="display:none; position:fixed; bottom:32px; left:96px; z-index:9499; background:white; border:1.5px solid var(--gu-border); border-radius:16px 16px 16px 4px; padding:10px 14px; font-size:13px; font-weight:600; color:var(--gu-text); box-shadow:0 4px 16px rgba(0,0,0,0.15); max-width:220px; cursor:pointer;" onclick="toggleAssistant()">
+    Can I help you with anything? 👋
+    <button onclick="event.stopPropagation(); dismissAssistantHint();" style="position:absolute; top:-8px; right:-8px; background:var(--gu-dust); color:white; border:none; border-radius:50%; width:20px; height:20px; font-size:11px; cursor:pointer; line-height:1;">✕</button>
+  </div>
+
   <div id="assistant-panel" style="display:none; position:fixed; bottom:0; right:0; left:0; z-index:9600; max-width:400px; margin:0 auto; height:70vh; max-height:560px; background:white; border-radius:20px 20px 0 0; box-shadow:0 -8px 32px rgba(0,0,0,0.25); flex-direction:column;">
     <div style="background:var(--link-charcoal); color:white; padding:16px 18px; border-radius:20px 20px 0 0; display:flex; align-items:center; justify-content:space-between;">
       <div>
@@ -4296,8 +4303,16 @@
     function toggleAssistant() {
       assistantOpen = !assistantOpen;
       document.getElementById('assistant-panel').style.display = assistantOpen ? 'flex' : 'none';
+      const hint = document.getElementById('assistant-hint');
+      if (hint) hint.style.display = 'none';
       if (assistantOpen) document.getElementById('assistant-input')?.focus();
       else clearAssistantArrow();
+    }
+
+    function dismissAssistantHint() {
+      const hint = document.getElementById('assistant-hint');
+      if (hint) hint.style.display = 'none';
+      sessionStorage.setItem('klnk_assistant_hint_dismissed', '1');
     }
 
     // Same visual language as the staff walkthrough tour (clay-coloured
@@ -5438,6 +5453,16 @@
     }
     checkForAppUpdate();
     window._versionCheckTimer = setInterval(checkForAppUpdate, 2 * 60 * 1000);
+
+    // Show the assistant hint bubble shortly after load, unless already
+    // dismissed this session — makes it obvious the assistant is there
+    // to help without needing to tap the FAB first.
+    if (!sessionStorage.getItem('klnk_assistant_hint_dismissed')) {
+      setTimeout(() => {
+        const hint = document.getElementById('assistant-hint');
+        if (hint && !assistantOpen) hint.style.display = 'block';
+      }, 2500);
+    }
 
     init();
   </script>
