@@ -7520,11 +7520,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Check API connection
   await checkAPIConnection();
   
-  // Load dashboard data
-  await populateDashboard();
-  
-  // Show dashboard
+  // Show dashboard tab underneath (splash screen sits on top of everything
+  // until tapped, so this is safe to prep in the background)
   goToTab('dashboard');
+  
+  // NOTE: populateDashboard() / checkShiftLogin() is intentionally NOT
+  // called here. It used to fire immediately on page load, then fire
+  // AGAIN once the splash screen was dismissed (via deviceCheckIn() ->
+  // populateDashboard()) — two separate, uncoordinated triggers both
+  // showing the login picker. If someone had already tapped a name and
+  // was entering their PIN when the second trigger fired, the whole
+  // login flow would silently reset underneath them, landing back on
+  // the name picker with no error — exactly the reported bug. The splash
+  // dismissal (dismissSplash -> deviceCheckIn -> populateDashboard) is
+  // now the ONLY thing that triggers login, so it only ever runs once.
   
   // If studio ID in URL, update it
   if (new URLSearchParams(window.location.search).get('studio')) {
