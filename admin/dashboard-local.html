@@ -2655,8 +2655,25 @@
       <div id="platformrev-view" class="view" style="display: none;">
         <h2 style="margin-top:0;">📈 Platform Revenue</h2>
         <p style="font-size:13px;color:var(--gu-dust);margin-bottom:20px;line-height:1.5;">
-          Income into kilnLINK/Green Room from every studio on the platform — subscriptions plus wholesale AI design usage. This is separate from The Kiln Cafe's own customer revenue shown elsewhere.
+          Income into kilnLINK/Green Room from every studio on the platform — subscriptions, AI generation wholesale fees, and feature licensing. Separate from The Kiln Cafe's own customer revenue shown elsewhere.
         </p>
+
+        <!-- Speedometer -->
+        <div class="chart-container" style="margin-bottom:20px; text-align:center;">
+          <h3 style="margin:0 0 4px;">Today's Platform Revenue</h3>
+          <p style="font-size:12px;color:var(--gu-dust);margin-bottom:10px;">AI generation + feature licensing fees earned today, against your recent daily average.</p>
+          <div id="speedometer-wrap" style="max-width:340px;margin:0 auto;"></div>
+          <div style="display:flex;justify-content:center;gap:28px;margin-top:8px;">
+            <div>
+              <div style="font-size:20px;font-weight:800;color:var(--gu-primary);" id="speedo-today-label">£0.00</div>
+              <div style="font-size:11px;color:var(--gu-dust);">Today so far</div>
+            </div>
+            <div>
+              <div style="font-size:20px;font-weight:800;color:var(--gu-dust);" id="speedo-avg-label">£0.00</div>
+              <div style="font-size:11px;color:var(--gu-dust);">7-day average</div>
+            </div>
+          </div>
+        </div>
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px;">
           <div style="background:white;border:1px solid var(--gu-border);border-radius:12px;padding:16px;text-align:center;">
@@ -2672,30 +2689,58 @@
             <div style="font-size:11px;color:var(--gu-dust);">Monthly recurring revenue</div>
           </div>
           <div style="background:white;border:1px solid var(--gu-border);border-radius:12px;padding:16px;text-align:center;">
-            <div style="font-size:24px;font-weight:800;color:#9C27B0;" id="prev-ai-revenue">–</div>
-            <div style="font-size:11px;color:var(--gu-dust);">AI revenue this month</div>
+            <div style="font-size:24px;font-weight:800;color:var(--gu-text);" id="prev-total-this-month">–</div>
+            <div style="font-size:11px;color:var(--gu-dust);">Total this month</div>
           </div>
         </div>
 
-        <div class="chart-container" style="margin-bottom:20px;background:linear-gradient(135deg,rgba(184,121,70,0.08),rgba(156,39,176,0.06));">
-          <h3 style="margin:0 0 4px;">🤖 AI Design Generation — wholesale income</h3>
-          <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Every studio pays kilnLINK 10p per AI design their customers generate — billed automatically on their monthly invoice.</p>
-          <div style="display:flex;gap:24px;flex-wrap:wrap;">
-            <div>
-              <div style="font-size:11px;color:var(--gu-dust);">This month</div>
-              <div style="font-size:20px;font-weight:800;color:var(--gu-text);" id="prev-ai-generations-month">–</div>
-              <div style="font-size:11px;color:var(--gu-dust);">generations</div>
-            </div>
-            <div>
-              <div style="font-size:11px;color:var(--gu-dust);">All-time</div>
-              <div style="font-size:20px;font-weight:800;color:var(--gu-text);" id="prev-ai-generations-total">–</div>
-              <div style="font-size:11px;color:var(--gu-dust);">generations</div>
-            </div>
-            <div>
-              <div style="font-size:11px;color:var(--gu-dust);">All-time revenue</div>
-              <div style="font-size:20px;font-weight:800;color:#9C27B0;" id="prev-ai-revenue-total">–</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">
+          <div class="chart-container" style="background:linear-gradient(135deg,rgba(184,121,70,0.08),rgba(156,39,176,0.06));">
+            <h3 style="margin:0 0 4px;">🤖 AI Generation — wholesale fee</h3>
+            <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">10p per AI design generated, billed on each studio's monthly invoice.</p>
+            <div style="display:flex;gap:20px;flex-wrap:wrap;">
+              <div>
+                <div style="font-size:11px;color:var(--gu-dust);">This month</div>
+                <div style="font-size:18px;font-weight:800;color:#9C27B0;" id="prev-ai-revenue">–</div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--gu-dust);">All-time</div>
+                <div style="font-size:18px;font-weight:800;color:var(--gu-text);" id="prev-ai-revenue-total">–</div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--gu-dust);">Generations</div>
+                <div style="font-size:18px;font-weight:800;color:var(--gu-text);" id="prev-ai-generations-total">–</div>
+              </div>
             </div>
           </div>
+
+          <div class="chart-container" style="background:linear-gradient(135deg,rgba(46,125,50,0.08),rgba(33,150,243,0.06));">
+            <h3 style="margin:0 0 4px;">🔑 Feature Licensing — <span id="prev-licensing-rate">15%</span> fee</h3>
+            <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Our cut of every in-app extra customers buy — Design Preview, Take It Home, Transfer Designer, glazes and more.</p>
+            <div style="display:flex;gap:20px;flex-wrap:wrap;">
+              <div>
+                <div style="font-size:11px;color:var(--gu-dust);">This month</div>
+                <div style="font-size:18px;font-weight:800;color:#2e7d32;" id="prev-licensing-revenue">–</div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--gu-dust);">All-time</div>
+                <div style="font-size:18px;font-weight:800;color:var(--gu-text);" id="prev-licensing-revenue-total">–</div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--gu-dust);">Extras volume</div>
+                <div style="font-size:18px;font-weight:800;color:var(--gu-text);" id="prev-extras-volume">–</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Flowing daily table -->
+        <div class="chart-container" style="margin-bottom:20px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <h3 style="margin:0;">Daily revenue — last 30 days</h3>
+            <span style="font-size:11px;color:var(--gu-dust);">Updates automatically each day</span>
+          </div>
+          <div id="daily-revenue-table" style="max-height:340px;overflow-y:auto;"></div>
         </div>
 
         <div class="chart-container">
@@ -3211,6 +3256,11 @@ function goToTab(tab, event) {
     loadTeamMembers().then(() => populateAdhocSelects());
   } else if (tab === 'platformrev') {
     loadPlatformRevenue();
+    clearInterval(window._platformRevRefreshTimer);
+    window._platformRevRefreshTimer = setInterval(() => {
+      if (document.getElementById('platformrev-view')?.style.display !== 'none') loadPlatformRevenue();
+      else clearInterval(window._platformRevRefreshTimer);
+    }, 5 * 60 * 1000); // refresh every 5 minutes while the tab stays open
   }
 }
 
@@ -5623,11 +5673,75 @@ async function sendAdhocRequest() {
 }
 
 // ── Platform Revenue (kilnLINK owner view) ──
+// ── Speedometer dial for today's platform revenue vs 7-day average ──
+function drawRevenueSpeedometer(todayCents, avgCents) {
+  const wrap = document.getElementById('speedometer-wrap');
+  if (!wrap) return;
+
+  const maxCents = Math.max(todayCents, avgCents * 1.5, 100);
+  const pct = Math.min(1, todayCents / maxCents);
+  const angle = -90 + (pct * 180);
+
+  const cx = 150, cy = 150;
+  const needleLen = 90;
+  const rad = (angle - 90) * Math.PI / 180;
+  const needleX = cx + needleLen * Math.cos(rad);
+  const needleY = cy + needleLen * Math.sin(rad);
+
+  const avgPct = Math.min(1, avgCents / maxCents);
+  const avgAngleDeg = -90 + (avgPct * 180);
+  const avgRad = (avgAngleDeg - 90) * Math.PI / 180;
+
+  wrap.innerHTML = `
+    <svg viewBox="0 0 300 180" style="width:100%;">
+      <path d="M 40 150 A 110 110 0 0 1 260 150" fill="none" stroke="#eee" stroke-width="22" stroke-linecap="round"/>
+      <path d="M 40 150 A 110 110 0 0 1 150 40" fill="none" stroke="#ffcdd2" stroke-width="22" stroke-linecap="round" opacity="0.6"/>
+      <path d="M 150 40 A 110 110 0 0 1 260 150" fill="none" stroke="#c8e6c9" stroke-width="22" stroke-linecap="round" opacity="0.6"/>
+      <line x1="${cx + 95*Math.cos(avgRad)}" y1="${cy + 95*Math.sin(avgRad)}"
+            x2="${cx + 122*Math.cos(avgRad)}" y2="${cy + 122*Math.sin(avgRad)}"
+            stroke="#666" stroke-width="3" stroke-dasharray="2,2"/>
+      <line x1="${cx}" y1="${cy}" x2="${needleX}" y2="${needleY}" stroke="#B87946" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="${cy}" r="10" fill="#2B2724"/>
+      <text x="40" y="172" font-size="11" fill="#999" text-anchor="middle" font-family="sans-serif">£0</text>
+      <text x="260" y="172" font-size="11" fill="#999" text-anchor="middle" font-family="sans-serif">£${(maxCents/100).toFixed(0)}</text>
+    </svg>
+  `;
+}
+
+// ── Flowing daily revenue table ──
+function renderDailyRevenueTable(dailyTrend) {
+  const el = document.getElementById('daily-revenue-table');
+  if (!el) return;
+  if (!dailyTrend.length) {
+    el.innerHTML = '<p style="color:var(--gu-dust);font-size:13px;text-align:center;padding:16px;">No revenue data yet.</p>';
+    return;
+  }
+  const maxCents = Math.max(...dailyTrend.map(d => d.totalCents), 1);
+  const reversed = [...dailyTrend].reverse();
+
+  el.innerHTML = reversed.map((d, i) => {
+    const dateObj = new Date(d.date);
+    const isToday = i === 0;
+    const label = isToday ? 'Today' : dateObj.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
+    const barPct = Math.max(2, Math.round((d.totalCents / maxCents) * 100));
+    return `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--gu-border);">
+        <div style="width:90px;flex-shrink:0;font-size:12px;font-weight:${isToday?'700':'500'};color:${isToday?'var(--gu-primary)':'var(--gu-text)'};">${label}</div>
+        <div style="flex:1;background:var(--gu-bg);border-radius:6px;overflow:hidden;height:18px;position:relative;">
+          <div style="height:100%;width:${barPct}%;background:linear-gradient(90deg,#B87946,#9C27B0);border-radius:6px;transition:width 0.6s ease;"></div>
+        </div>
+        <div style="width:64px;flex-shrink:0;text-align:right;font-size:12px;font-weight:700;color:var(--gu-text);">£${(d.totalCents/100).toFixed(2)}</div>
+      </div>
+    `;
+  }).join('');
+}
+
 async function loadPlatformRevenue() {
   try {
     const res = await fetch(`${API_URL}/api/platform/revenue?staffMemberId=${currentShiftStaff?.id || ''}`);
     if (res.status === 403) {
       document.getElementById('prev-studio-list').innerHTML = '<p style="color:var(--gu-dust);font-size:13px;text-align:center;padding:20px 0;">This section is restricted to directors.</p>';
+      document.getElementById('speedometer-wrap').innerHTML = '';
       return;
     }
     const data = await res.json();
@@ -5635,10 +5749,22 @@ async function loadPlatformRevenue() {
     document.getElementById('prev-total-studios').textContent = data.totalStudios ?? '0';
     document.getElementById('prev-active-subs').textContent = data.activeSubscriptions ?? '0';
     document.getElementById('prev-mrr').textContent = `£${((data.mrrCents||0)/100).toFixed(0)}`;
+    document.getElementById('prev-total-this-month').textContent = `£${((data.totalMonthlyRevenueCents||0)/100).toFixed(0)}`;
+
     document.getElementById('prev-ai-revenue').textContent = `£${((data.aiRevenueThisMonthCents||0)/100).toFixed(2)}`;
-    document.getElementById('prev-ai-generations-month').textContent = data.aiGenerationsThisMonth ?? '0';
     document.getElementById('prev-ai-generations-total').textContent = data.aiGenerationsAllTime ?? '0';
     document.getElementById('prev-ai-revenue-total').textContent = `£${((data.aiRevenueAllTimeCents||0)/100).toFixed(2)}`;
+
+    document.getElementById('prev-licensing-rate').textContent = `${Math.round((data.licensingFeeRate||0.15)*100)}%`;
+    document.getElementById('prev-licensing-revenue').textContent = `£${((data.licensingRevenueThisMonthCents||0)/100).toFixed(2)}`;
+    document.getElementById('prev-licensing-revenue-total').textContent = `£${((data.licensingRevenueAllTimeCents||0)/100).toFixed(2)}`;
+    document.getElementById('prev-extras-volume').textContent = `£${((data.extrasVolumeThisMonthCents||0)/100).toFixed(0)}`;
+
+    document.getElementById('speedo-today-label').textContent = `£${((data.todayCents||0)/100).toFixed(2)}`;
+    document.getElementById('speedo-avg-label').textContent = `£${((data.avg7DayCents||0)/100).toFixed(2)}`;
+    drawRevenueSpeedometer(data.todayCents || 0, data.avg7DayCents || 0);
+
+    renderDailyRevenueTable(data.dailyTrend || []);
 
     const listEl = document.getElementById('prev-studio-list');
     if (!data.studioBreakdown?.length) {
@@ -5653,11 +5779,11 @@ async function loadPlatformRevenue() {
       <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--gu-bg);border-radius:10px;margin-bottom:8px;border-left:4px solid ${PLAN_COLORS[s.plan]||'#999'};">
         <div style="flex:1;min-width:0;">
           <div style="font-size:13px;font-weight:700;">${s.name}</div>
-          <div style="font-size:11px;color:var(--gu-dust);">${s.aiGenerationsAllTime} AI generations all-time</div>
+          <div style="font-size:11px;color:var(--gu-dust);">${s.aiGenerationsAllTime} AI generations · £${(s.licensingRevenueAllTimeCents/100).toFixed(2)} licensing fees</div>
         </div>
         <div style="text-align:right;flex-shrink:0;">
           <div style="font-size:11px;font-weight:700;color:${PLAN_COLORS[s.plan]||'#999'};">${PLAN_LABELS[s.plan]||s.plan}</div>
-          <div style="font-size:12px;color:var(--gu-dust);">£${(s.monthlySubCents/100).toFixed(0)}/mo + £${(s.aiRevenueAllTimeCents/100).toFixed(2)} AI</div>
+          <div style="font-size:12px;color:var(--gu-dust);">£${(s.monthlySubCents/100).toFixed(0)}/mo + £${((s.aiRevenueAllTimeCents+s.licensingRevenueAllTimeCents)/100).toFixed(2)}</div>
         </div>
       </div>
     `).join('');

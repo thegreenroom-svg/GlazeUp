@@ -4038,17 +4038,22 @@ app.get('/api/ai-design/usage', async (req, res) => {
 // PLATFORM REVENUE (kilnLINK/Green Room owner view)
 // Not scoped to a single studio — this is revenue
 // coming IN to the platform from every studio's
-// subscription + wholesale AI usage. Separate from
-// any individual studio's own customer revenue.
+// subscription, wholesale AI usage, and feature
+// licensing fee. Separate from any individual
+// studio's own customer revenue.
 // ═══════════════════════════════════════════
 
 const PLAN_MONTHLY_PRICE_CENTS = { pilot: 0, solo: 2900, studio: 5900, multi: 9900 };
 
-// GET /api/platform/revenue — aggregate income across every studio on kilnLINK
+// Feature licensing fee: kilnLINK takes a cut of every in-app extra a
+// customer buys at any studio (Design Preview, Take It Home, Transfer
+// Designer, tablet hire, specialist glazes etc). These features cost
+// the studio nothing extra to run — it's kilnLINK's own software — so
+// a flat percentage is simple and fair. 15% is in line with typical
+// app marketplace platform fees (15-30%), studios keep 85%.
+const FEATURE_LICENSING_FEE_RATE = 0.15;
+
 // Platform Revenue is director-level data (David, Jenny, Daisy only).
-// This checks the requesting staff member's name against that list —
-// a simple check, not a full auth system, but stops the endpoint being
-// hit directly by anyone who isn't logged in as one of the three.
 const PLATFORM_REVENUE_ACCESS_NAMES = ['david', 'jenny', 'daisy'];
 
 app.get('/api/platform/revenue', async (req, res) => {
@@ -4064,18 +4069,26 @@ app.get('/api/platform/revenue', async (req, res) => {
   try {
     const startOfMonth = new Date();
     startOfMonth.setDate(1); startOfMonth.setHours(0, 0, 0, 0);
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-    const [studiosRes, subsRes, aiUsageRes, aiUsageAllTimeRes] = await Promise.all([
+    const [studiosRes, subsRes, aiUsageRes, aiUsageAllTimeRes, extrasRes, extrasAllTimeRes, extrasDailyRes] = await Promise.all([
       supabase.from('studios').select('id, name, created_at'),
       supabase.from('stripe_subscriptions').select('studio_id, plan_id, status'),
       supabase.from('ai_generation_usage').select('studio_id, wholesale_cost_cents, created_at').gte('created_at', startOfMonth.toISOString()),
-      supabase.from('ai_generation_usage').select('studio_id, wholesale_cost_cents'),
+      supabase.from('ai_generation_usage').select('studio_id, wholesale_cost_cents, created_at'),
+      supabase.from('app_extra_charges').select('studio_id, amount_cents, created_at').gte('created_at', startOfMonth.toISOString()),
+      supabase.from('app_extra_charges').select('studio_id, amount_cents'),
+      supabase.from('app_extra_charges').select('amount_cents, created_at').gte('created_at', thirtyDaysAgo.toISOString()),
     ]);
 
     const studios = studiosRes.data || [];
     const subs = subsRes.data || [];
     const aiUsageThisMonth = aiUsageRes.data || [];
     const aiUsageAllTime = aiUsageAllTimeRes.data || [];
+    const extrasThisMonth = extrasRes.data || [];
+    const extrasAllTime = extrasAllTimeRes.data || [];
+    const extrasDaily30 = extrasDailyRes.data || [];
+    const aiDaily30 = aiUsageAllTime.filter(r => new Date(r.created_at) >= thirtyDaysAgo);
 
     const subByStudio = {};
     subs.forEach(s => { subByStudio[s.studio_id] = s; });
@@ -4090,6 +4103,15 @@ app.get('/api/platform/revenue', async (req, res) => {
     const aiGenerationsThisMonth = aiUsageThisMonth.length;
     const aiGenerationsAllTime = aiUsageAllTime.length;
 
+    // Feature licensing fee — 15% of every extras charge, this month and all-time
+    const licensingRevenueThisMonthCents = Math.round(
+      extrasThisMonth.reduce((sum, r) => sum + (r.amount_cents || 0), 0) * FEATURE_LICENSING_FEE_RATE
+    );
+    const licensingRevenueAllTimeCents = Math.round(
+      extrasAllTime.reduce((sum, r) => sum + (r.amount_cents || 0), 0) * FEATURE_LICENSING_FEE_RATE
+    );
+    const extrasVolumeThisMonthCents = extrasThisMonth.reduce((sum, r) => sum + (r.amount_cents || 0), 0);
+
     // Per-studio breakdown
     const aiByStudio = {};
     aiUsageAllTime.forEach(r => {
@@ -4097,10 +4119,17 @@ app.get('/api/platform/revenue', async (req, res) => {
       aiByStudio[r.studio_id].count++;
       aiByStudio[r.studio_id].cents += (r.wholesale_cost_cents || 0);
     });
+    const extrasByStudio = {};
+    extrasAllTime.forEach(r => {
+      if (!extrasByStudio[r.studio_id]) extrasByStudio[r.studio_id] = { volumeCents: 0 };
+      extrasByStudio[r.studio_id].volumeCents += (r.amount_cents || 0);
+    });
 
     const studioBreakdown = studios.map(st => {
       const sub = subByStudio[st.id];
       const ai = aiByStudio[st.id] || { count: 0, cents: 0 };
+      const extras = extrasByStudio[st.id] || { volumeCents: 0 };
+      const licensingCents = Math.round(extras.volumeCents * FEATURE_LICENSING_FEE_RATE);
       return {
         studioId: st.id,
         name: st.name || 'Unnamed studio',
@@ -4109,8 +4138,36 @@ app.get('/api/platform/revenue', async (req, res) => {
         monthlySubCents: PLAN_MONTHLY_PRICE_CENTS[sub?.plan_id] || 0,
         aiGenerationsAllTime: ai.count,
         aiRevenueAllTimeCents: ai.cents,
+        licensingRevenueAllTimeCents: licensingCents,
       };
-    }).sort((a, b) => (b.monthlySubCents + b.aiRevenueAllTimeCents) - (a.monthlySubCents + a.aiRevenueAllTimeCents));
+    }).sort((a, b) =>
+      (b.monthlySubCents + b.aiRevenueAllTimeCents + b.licensingRevenueAllTimeCents) -
+      (a.monthlySubCents + a.aiRevenueAllTimeCents + a.licensingRevenueAllTimeCents)
+    );
+
+    // 30-day daily trend — combines AI + licensing fee revenue per day,
+    // used to draw the daily-updating chart and feed the speedometer's
+    // "today vs recent average" comparison.
+    const dailyMap = {};
+    for (let d = 0; d < 30; d++) {
+      const day = new Date(); day.setDate(day.getDate() - d); day.setHours(0,0,0,0);
+      dailyMap[day.toISOString().split('T')[0]] = { aiCents: 0, licensingCents: 0 };
+    }
+    aiDaily30.forEach(r => {
+      const day = new Date(r.created_at).toISOString().split('T')[0];
+      if (dailyMap[day]) dailyMap[day].aiCents += (r.wholesale_cost_cents || 0);
+    });
+    extrasDaily30.forEach(r => {
+      const day = new Date(r.created_at).toISOString().split('T')[0];
+      if (dailyMap[day]) dailyMap[day].licensingCents += Math.round((r.amount_cents || 0) * FEATURE_LICENSING_FEE_RATE);
+    });
+    const dailyTrend = Object.entries(dailyMap)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, v]) => ({ date, totalCents: v.aiCents + v.licensingCents, aiCents: v.aiCents, licensingCents: v.licensingCents }));
+
+    const todayCents = dailyTrend[dailyTrend.length - 1]?.totalCents || 0;
+    const last7 = dailyTrend.slice(-8, -1); // 7 days before today
+    const avg7DayCents = last7.length ? Math.round(last7.reduce((s,d) => s + d.totalCents, 0) / last7.length) : 0;
 
     res.json({
       totalStudios: studios.length,
@@ -4120,7 +4177,14 @@ app.get('/api/platform/revenue', async (req, res) => {
       aiRevenueAllTimeCents,
       aiGenerationsThisMonth,
       aiGenerationsAllTime,
-      totalMonthlyRevenueCents: mrrCents + aiRevenueThisMonthCents,
+      licensingRevenueThisMonthCents,
+      licensingRevenueAllTimeCents,
+      licensingFeeRate: FEATURE_LICENSING_FEE_RATE,
+      extrasVolumeThisMonthCents,
+      totalMonthlyRevenueCents: mrrCents + aiRevenueThisMonthCents + licensingRevenueThisMonthCents,
+      dailyTrend,
+      todayCents,
+      avg7DayCents,
       studioBreakdown,
       monthLabel: startOfMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
     });
