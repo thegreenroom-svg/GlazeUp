@@ -109,10 +109,10 @@
     }
     @media (max-width: 520px) {
       body.has-platform-strip .admin-wrapper {
-        margin-top: calc(52px + 44px); /* strip + phone header menu */
+        margin-top: calc(118px + 44px); /* strip (now 2 rows on phone) + phone header menu */
       }
       body.has-platform-strip #phone-header-menu {
-        top: 52px !important;
+        top: 118px !important;
       }
     }
 
@@ -153,9 +153,10 @@
         align-items: stretch;
         justify-content: flex-start;
         padding: 0 !important;
-        overflow-x: auto;
+        overflow-x: scroll;
         overflow-y: hidden;
         -webkit-overflow-scrolling: touch;
+        touch-action: pan-x;
         scroll-snap-type: x proximity;
         box-shadow: 0 4px 16px -4px rgba(0,0,0,0.2);
       }
@@ -1405,6 +1406,38 @@
      scrolls on narrow screens, just without a visible scrollbar
      cluttering an already-small 34px bar. */
   #platform-revenue-strip > div::-webkit-scrollbar { display: none; }
+
+  /* Phone-only: the strip becomes a genuine 2-row wrapped layout instead
+     of relying on horizontal scroll, which was reported as not scrolling
+     reliably on iPhone (touch-scroll on a non-body flex container can be
+     inconsistent on iOS Safari). Wrapping means everything is visible at
+     once with no swipe needed — much more reliable than a scroll gesture
+     that may or may not register. iPad/desktop are completely untouched;
+     this only applies below 520px. */
+  @media (max-width: 520px) {
+    #platform-revenue-strip {
+      height: 118px !important;
+      padding: 6px 0;
+    }
+    #platform-revenue-strip > div {
+      flex-wrap: wrap !important;
+      overflow-x: visible !important;
+      gap: 8px 14px !important;
+      padding: 0 12px !important;
+      height: auto !important;
+      row-gap: 4px;
+      align-content: flex-start;
+    }
+    #platform-revenue-strip span { font-size: 12px !important; }
+    #platform-revenue-strip strong { font-size: 13px !important; }
+    #platform-revenue-strip button {
+      padding: 6px 14px !important;
+      font-size: 12px !important;
+      margin-left: 0 !important;
+      width: 100%;
+      margin-top: 2px;
+    }
+  }
   /* Assistant floating buttons — bigger and gently pulsing so they're
      genuinely hard to miss, without being so aggressive it's annoying
      during a whole shift. */
