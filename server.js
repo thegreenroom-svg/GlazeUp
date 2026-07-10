@@ -4680,14 +4680,27 @@ app.get('/api/platform/revenue', async (req, res) => {
     const last7 = dailyTrend.slice(-8, -1); // 7 days before today
     const avg7DayCents = last7.length ? Math.round(last7.reduce((s,d) => s + d.totalCents, 0) / last7.length) : 0;
 
-    // Year-to-date: AI + licensing revenue since 1 Jan this year
+    // Year-to-date: AI + licensing revenue since 1 Jan this year, PLUS
+    // subscription revenue accumulated so far this year. This was a real
+    // bug — the original version only summed AI+licensing and completely
+    // omitted subscriptions, which is the platform's single largest
+    // revenue source. That made YTD read lower than MTD, which is
+    // obviously wrong since YTD should always be >= MTD once you're past
+    // January. We don't keep a full historical billing ledger (no record
+    // of exactly what MRR was in past months, only what it is right now),
+    // so this approximates subscription revenue for the year using
+    // current MRR × months elapsed — reasonable given active subscriber
+    // count doesn't swing wildly month to month, and consistent with the
+    // same approximation already used for the studio growth-curve chart.
     const aiYtdRows = aiYtdRes.data || [];
     const extrasYtdRows = extrasYtdRes.data || [];
     const aiRevenueYtdCents = aiYtdRows.reduce((sum, r) => sum + (r.wholesale_cost_cents || 0), 0);
     const licensingRevenueYtdCents = Math.round(
       extrasYtdRows.reduce((sum, r) => sum + (r.amount_cents || 0), 0) * FEATURE_LICENSING_FEE_RATE
     );
-    const totalYtdRevenueCents = aiRevenueYtdCents + licensingRevenueYtdCents;
+    const monthsElapsedThisYear = new Date().getMonth() + 1; // Jan = 1, so this includes the current partial month
+    const subscriptionRevenueYtdCents = mrrCents * monthsElapsedThisYear;
+    const totalYtdRevenueCents = aiRevenueYtdCents + licensingRevenueYtdCents + subscriptionRevenueYtdCents;
 
     res.json({
       totalStudios: studios.length,
