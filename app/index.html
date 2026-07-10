@@ -1857,7 +1857,7 @@
         <div class="app-header">
           <div style="display:flex; justify-content:space-between; align-items:flex-start;">
             <div class="brand">${logoSvg} <span style="opacity:0.65; font-weight:400;">· The Kiln Cafe</span></div>
-            <button onclick="showMyQR()" style="background:rgba(255,255,255,0.18); border:2px solid rgba(255,255,255,0.5); border-radius:12px; padding:4px; cursor:pointer;" aria-label="Show my QR code">
+            <button id="my-qr-badge" onclick="showMyQR()" style="background:rgba(255,255,255,0.18); border:2px solid rgba(255,255,255,0.5); border-radius:12px; padding:4px; cursor:pointer;" aria-label="Show my QR code">
               <img src="${qrThumbUrl}" width="46" height="46" style="display:block; border-radius:6px;" alt="Your QR code">
             </button>
           </div>
@@ -1944,20 +1944,20 @@
             <div style="position:absolute; inset:0; background:linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%); animation: browse-shimmer 2.5s ease-in-out infinite;" id="home-access-shimmer"></div>
           </button>
 
-          <button class="tile tile-ocean" onclick="openColourPicker()">
+          <button class="tile tile-ocean" id="tile-colour-picker" onclick="openColourPicker()">
             <span class="tile-icon">🎨</span>
             <div class="tile-title">Colour Picker</div>
             <div class="tile-desc">Browse the studio's glaze colours and plan your palette.</div>
           </button>
 
-          <button class="tile tile-honey" onclick="openDesignPreviewGated()" style="position: relative;">
+          <button class="tile tile-honey" id="tile-design-preview" onclick="openDesignPreviewGated()" style="position: relative;">
             <span class="tile-icon">🖼️</span>
             <div class="tile-title">Design Preview</div>
             <div class="tile-desc">Photograph your real piece, then preview colours right on it.</div>
             <span style="position:absolute; top:14px; right:16px; background:rgba(255,255,255,0.25); font-size:10px; font-weight:700; padding:3px 9px; border-radius:20px;">£1</span>
           </button>
 
-          <button class="tile tile-oxblood" onclick="openTransferDesignerGated()" style="position: relative;">
+          <button class="tile tile-oxblood" id="tile-transfer-designer" onclick="openTransferDesignerGated()" style="position: relative;">
             <span class="tile-icon">✨</span>
             <div class="tile-title">Transfer Designer</div>
             <div class="tile-desc">Create and position transfers for your piece.</div>
@@ -4297,6 +4297,54 @@
       assistantOpen = !assistantOpen;
       document.getElementById('assistant-panel').style.display = assistantOpen ? 'flex' : 'none';
       if (assistantOpen) document.getElementById('assistant-input')?.focus();
+      else clearAssistantArrow();
+    }
+
+    // Same visual language as the staff walkthrough tour (clay-coloured
+    // bouncing triangle + label), positioned against a REAL live DOM
+    // element rather than a fixed illustration, since the assistant is
+    // answering about the actual running app.
+    let _assistantArrowEl = null;
+    let _assistantArrowRAF = null;
+    let _assistantArrowBounce = 0;
+
+    function pointAssistantArrowAt(elementId, label) {
+      clearAssistantArrow();
+      const target = document.getElementById(elementId);
+      if (!target) return;
+
+      const arrow = document.createElement('div');
+      arrow.id = 'assistant-point-arrow';
+      arrow.style.cssText = 'position:fixed;z-index:9990;pointer-events:none;display:flex;flex-direction:column;align-items:center;';
+      arrow.innerHTML = `
+        <div style="background:var(--link-charcoal); color:white; font-size:11px; font-weight:700; padding:5px 10px; border-radius:8px; white-space:nowrap; box-shadow:0 3px 10px rgba(0,0,0,0.25); margin-bottom:2px;">${label || 'here'}</div>
+        <svg width="20" height="16" viewBox="0 0 20 16"><polygon points="10,16 0,0 20,0" fill="var(--link-clay)"/></svg>
+      `;
+      document.body.appendChild(arrow);
+      _assistantArrowEl = arrow;
+
+      function position() {
+        if (!_assistantArrowEl) return;
+        const rect = target.getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) { clearAssistantArrow(); return; }
+        const bounce = Math.sin(_assistantArrowBounce) * 4;
+        _assistantArrowEl.style.left = `${rect.left + rect.width / 2}px`;
+        _assistantArrowEl.style.top = `${rect.top - 44 + bounce}px`;
+        _assistantArrowEl.style.transform = 'translateX(-50%)';
+        _assistantArrowBounce += 0.08;
+        _assistantArrowRAF = requestAnimationFrame(position);
+      }
+      position();
+
+      clearTimeout(window._assistantArrowTimeout);
+      window._assistantArrowTimeout = setTimeout(clearAssistantArrow, 8000);
+    }
+
+    function clearAssistantArrow() {
+      if (_assistantArrowRAF) cancelAnimationFrame(_assistantArrowRAF);
+      _assistantArrowRAF = null;
+      if (_assistantArrowEl) { _assistantArrowEl.remove(); _assistantArrowEl = null; }
+      clearTimeout(window._assistantArrowTimeout);
     }
 
     function appendAssistantBubble(text, fromUser) {
@@ -4346,6 +4394,7 @@
         const reply = data.reply || 'Sorry, I could not answer that — try asking a member of staff.';
         appendAssistantBubble(reply, false);
         assistantMessages.push({ role: 'assistant', content: reply });
+        if (data.pointTo) pointAssistantArrowAt(data.pointTo, data.pointToLabel);
       } catch (e) {
         thinkingBubble.remove();
         appendAssistantBubble('Sorry, something went wrong — please ask a member of staff.', false);

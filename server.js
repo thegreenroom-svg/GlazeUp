@@ -3159,22 +3159,55 @@ app.get('/api/transfer-pieces/estimated-pickup', async (req, res) => {
 // no separate notification system.
 // ═══════════════════════════════════════════
 
+// Registry of real on-screen element IDs the assistant can point an arrow
+// at. Kept small and specific — only things genuinely worth pointing to,
+// not every element in the app. IDs must match actual DOM ids in the
+// customer app (app/index.html) or staff dashboard (admin/dashboard-local.html).
+const ASSISTANT_UI_TARGETS = {
+  customer: {
+    'design preview': 'tile-design-preview',
+    'transfer designer': 'tile-transfer-designer',
+    'take it home': 'home-access-tile',
+    'colour picker': 'tile-colour-picker',
+    'my qr code': 'my-qr-badge',
+  },
+  staff: {
+    'daily bookings': 'nav-staff-tab',
+    'team and duties': 'nav-team-tab',
+    'daily progress': 'nav-progress-tab',
+    'kiln': 'nav-staff-tab',
+    'print queue': 'nav-printqueue-tab',
+    'stock': 'nav-stock-tab',
+    'daily menu': 'nav-menu-tab',
+    'setup': 'nav-setup-tab',
+  },
+  director: {
+    'platform revenue': 'nav-platformrev',
+    'daily bookings': 'nav-staff-tab',
+    'team and duties': 'nav-team-tab',
+    'daily progress': 'nav-progress-tab',
+  },
+};
+
 const ASSISTANT_SYSTEM_PROMPTS = {
   customer: `You are the friendly help assistant for a pottery painting studio's booking app, built on kilnLINK.
 You can answer questions about: opening hours, pricing of app features (Design Preview £1, Take It Home £5, Transfer Designer £1, specialist glazes £2, AI design generation), how the app's tools work, and — using the check_booking_status function — the real status of a specific booking if the customer gives you a booking code.
 You do NOT have access to other customers' data, staff information, or financial figures. If asked about anything outside pottery painting, the app, or this studio, politely redirect.
 If a customer seems frustrated, upset, or you cannot resolve their question, use the escalate_to_staff function immediately rather than guessing — do not make up policy or promises the studio hasn't confirmed.
-Keep answers short and warm — this is a mobile chat window, not an essay. No more than 3-4 sentences unless genuinely necessary.`,
+Keep answers short and warm — this is a mobile chat window, not an essay. No more than 3-4 sentences unless genuinely necessary.
+If your answer is clearly about one specific on-screen feature — Design Preview, Transfer Designer, Take It Home, Colour Picker, or their own QR code — mention its exact name naturally in your reply so the app can point an arrow at it. Only do this when genuinely relevant, not for every reply.`,
 
   staff: `You are the in-app assistant for kilnLINK, a staff-facing pottery studio management dashboard.
 You help staff navigate the dashboard, understand features (task queue, handoff alerts, timekeeping, holiday requests, kiln process, transfer two-firing process), and — using the available functions — look up real data like today's bookings, stock levels, or pending tasks for their studio.
 You do NOT have access to Platform Revenue, other studios' data, or director-only figures — if asked, say this is director-only and suggest asking a Studio Manager/Director.
 If something requires a real decision or action you can't take (refunds, HR matters, correcting a mistake), use escalate_to_staff to flag it to the right role rather than guessing.
-Keep answers practical and concise — staff are mid-shift, not reading documentation.`,
+Keep answers practical and concise — staff are mid-shift, not reading documentation.
+If your answer points to a specific tab — Daily Bookings, Team and Duties, Daily Progress, Kiln, Print Queue, Stock, Daily Menu, or Setup — mention its exact name naturally so the app can point an arrow at that tab in the sidebar. Only when genuinely relevant.`,
 
   director: `You are the in-app assistant for kilnLINK's director-level dashboard, covering both studio operations AND Platform Revenue (subscriptions, AI generation fees, commission on app purchases across every studio on the platform).
 You can look up real data across studios using the available functions. Be precise with figures — always use the lookup functions rather than estimating.
-Keep answers concise but can go into more financial/strategic depth than the staff or customer contexts, since this audience is a business owner.`
+Keep answers concise but can go into more financial/strategic depth than the staff or customer contexts, since this audience is a business owner.
+If your answer points to a specific tab — Platform Revenue, Daily Bookings, Team and Duties, or Daily Progress — mention its exact name naturally so the app can point an arrow at it. Only when genuinely relevant.`
 };
 
 const ASSISTANT_FUNCTIONS = [
@@ -3338,7 +3371,21 @@ app.post('/api/assistant/chat', async (req, res) => {
       assistantMessage = data.choices?.[0]?.message;
     }
 
-    res.json({ reply: assistantMessage?.content || 'Sorry, I could not generate a reply.' });
+    const replyText = assistantMessage?.content || 'Sorry, I could not generate a reply.';
+
+    // Scan the reply for a mention of any registered UI target (case-
+    // insensitive) so the frontend can point a real arrow at it. Longest
+    // match wins if multiple phrases appear, so "transfer designer"
+    // doesn't get shadowed by a shorter unrelated match.
+    const targets = ASSISTANT_UI_TARGETS[context] || {};
+    let pointTo = null, pointToLabel = null, longestMatch = 0;
+    for (const [phrase, elementId] of Object.entries(targets)) {
+      if (replyText.toLowerCase().includes(phrase) && phrase.length > longestMatch) {
+        pointTo = elementId; pointToLabel = phrase; longestMatch = phrase.length;
+      }
+    }
+
+    res.json({ reply: replyText, pointTo, pointToLabel });
   } catch (err) {
     console.error('Assistant chat error:', err);
     res.status(500).json({ error: 'Something went wrong — please try again.' });
