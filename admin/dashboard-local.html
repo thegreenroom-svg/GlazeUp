@@ -1396,6 +1396,13 @@
      scrolls on narrow screens, just without a visible scrollbar
      cluttering an already-small 34px bar. */
   #platform-revenue-strip > div::-webkit-scrollbar { display: none; }
+  /* Assistant floating buttons — bigger and gently pulsing so they're
+     genuinely hard to miss, without being so aggressive it's annoying
+     during a whole shift. */
+  @keyframes assistantFabPulse {
+    0%, 100% { box-shadow: 0 6px 22px rgba(0,0,0,0.35), 0 0 0 0 rgba(184,121,70,0.5); }
+    50% { box-shadow: 0 6px 22px rgba(0,0,0,0.35), 0 0 0 12px rgba(184,121,70,0); }
+  }
 </style>
 
 <!-- API Status Indicator — for everyone NOT seeing the director strip
@@ -1533,7 +1540,7 @@
      staff_alerts entry, not a dead end. Context auto-switches to
      'director' for David/Jenny/Daisy (adds Platform Revenue lookups),
      'staff' for everyone else. -->
-<button id="staff-assistant-fab" onclick="toggleStaffAssistant()" style="display:none;position:fixed;bottom:20px;left:20px;z-index:9800;width:52px;height:52px;border-radius:50%;background:#2B2724;color:white;border:none;font-size:22px;box-shadow:0 4px 16px rgba(0,0,0,0.25);cursor:pointer;">
+<button id="staff-assistant-fab" onclick="toggleStaffAssistant()" style="display:none;position:fixed;bottom:20px;left:20px;z-index:9800;width:68px;height:68px;border-radius:50%;background:#2B2724;color:white;border:none;font-size:30px;box-shadow:0 6px 22px rgba(0,0,0,0.35);cursor:pointer;animation:assistantFabPulse 2.2s ease-in-out infinite;">
   💬
 </button>
 
@@ -1547,7 +1554,7 @@
   </div>
   <div id="staff-assistant-messages" style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;">
     <div style="background:var(--gu-bg);border-radius:14px 14px 14px 4px;padding:10px 14px;font-size:13px;align-self:flex-start;max-width:85%;">
-      Hi! What can I help with today?
+      👋 Hi! I'm ready to help — what would you like to know?
     </div>
     <div id="staff-assistant-quick-options" style="display:flex;flex-wrap:wrap;gap:6px;align-self:flex-start;max-width:95%;"></div>
   </div>
@@ -5421,18 +5428,6 @@ function applyPlatformRevenueAccess() {
   const strip = document.getElementById('platform-revenue-strip');
   const firstName = (currentShiftStaff?.name || '').trim().split(' ')[0];
   const hasAccess = PLATFORM_REVENUE_ACCESS.some(n => n.toLowerCase() === firstName.toLowerCase());
-
-  // TEMPORARY debug badge — shows exactly what the app thinks is going on,
-  // so we can see the real state directly on screen instead of guessing.
-  // Safe to remove once Platform Revenue access is confirmed working again.
-  let debugBadge = document.getElementById('platform-access-debug');
-  if (!debugBadge) {
-    debugBadge = document.createElement('div');
-    debugBadge.id = 'platform-access-debug';
-    debugBadge.style.cssText = 'position:fixed;bottom:4px;left:4px;z-index:999999;background:#000;color:#0f0;font-family:monospace;font-size:10px;padding:6px 10px;border-radius:6px;opacity:0.9;max-width:90vw;';
-    document.body.appendChild(debugBadge);
-  }
-  debugBadge.textContent = `DEBUG: name="${currentShiftStaff?.name || 'none'}" firstName="${firstName}" hasAccess=${hasAccess} loggedIn=${!!currentShiftStaff}`;
 
   if (link) link.style.display = hasAccess ? 'flex' : 'none';
 
