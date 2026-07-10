@@ -26,6 +26,12 @@ const { Client, Environment } = require('square');
 
 const app = express();
 
+// Director-level access (David, Jenny, Daisy only) — used to gate genuinely
+// sensitive financial data: Platform Revenue (worldwide SaaS income) and
+// The Kiln Cafe's own real revenue/analytics. Declared once, early, so
+// every endpoint that needs it references the same single source of truth.
+const PLATFORM_REVENUE_ACCESS_NAMES = ['david', 'jenny', 'daisy'];
+
 // Square's SDK returns some numbers as BigInt, which JSON.stringify cannot
 // serialize by default. Teach BigInt to serialize as a string, globally,
 // so no response anywhere can crash on it.
@@ -895,9 +901,22 @@ app.delete('/api/devices/:deviceId', async (req, res) => {
  * GET /api/analytics/dashboard
  * Get dashboard data for a studio
  */
+// GET /api/analytics/dashboard — The Kiln Cafe's own real revenue and app
+// usage figures. Director-only (David/Jenny/Daisy), same access check as
+// Platform Revenue — this is genuinely sensitive financial data and the
+// frontend hides it from regular staff, but that's a UI convenience, not
+// security. This check is what actually stops the data being fetched by
+// anyone who isn't a director, regardless of what the UI shows.
 app.get('/api/analytics/dashboard', async (req, res) => {
-  const { studioId } = req.query;
+  const { studioId, staffMemberId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studio_id required' });
+  if (!staffMemberId) return res.status(401).json({ error: 'Not authorised' });
+
+  const { data: staffMember } = await supabase.from('staff_team').select('name').eq('id', staffMemberId).single();
+  const firstName = (staffMember?.name || '').trim().split(' ')[0].toLowerCase();
+  if (!PLATFORM_REVENUE_ACCESS_NAMES.includes(firstName)) {
+    return res.status(403).json({ error: 'This data is restricted to directors.' });
+  }
 
   try {
     // Last 30 days revenue
@@ -4539,9 +4558,6 @@ const PLAN_MONTHLY_PRICE_CENTS = { pilot: 0, solo: 2900, studio: 5900, multi: 99
 // a flat percentage is simple and fair. 15% is in line with typical
 // app marketplace platform fees (15-30%), studios keep 85%.
 const FEATURE_LICENSING_FEE_RATE = 0.15;
-
-// Platform Revenue is director-level data (David, Jenny, Daisy only).
-const PLATFORM_REVENUE_ACCESS_NAMES = ['david', 'jenny', 'daisy'];
 
 app.get('/api/platform/revenue', async (req, res) => {
   const { staffMemberId } = req.query;

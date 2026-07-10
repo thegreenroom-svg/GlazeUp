@@ -1895,110 +1895,62 @@
           </div>
         </div>
 
-        <!-- Key metrics -->
-        <div class="dashboard-grid">
-          <div class="metric-card">
-            <div class="label">Revenue (30d)</div>
-            <div class="value" id="metric-revenue">£1,240</div>
-            <div class="detail">23 transactions</div>
-          </div>
-          <div class="metric-card">
-            <div class="label">App Sessions</div>
-            <div class="value" id="metric-sessions">47</div>
-            <div class="detail">customers used the app</div>
-          </div>
-          <div class="metric-card">
-            <div class="label">Tool Used Most</div>
-            <div class="value" id="metric-tool">Transfers</div>
-            <div class="detail">41% of sessions</div>
-          </div>
-          <div class="metric-card">
-            <div class="label">Popular Design</div>
-            <div class="value" id="metric-design">Daisy</div>
-            <div class="detail">this month</div>
-          </div>
-        </div>
+        <!-- Kiln Cafe Revenue — director-only (David/Jenny/Daisy), same
+             access pattern as Platform Revenue. Shows this studio's own
+             REAL revenue and app usage figures from Supabase — genuinely
+             sensitive financial data that regular staff should not see
+             on the general dashboard they all land on. -->
+        <div id="kiln-cafe-revenue-section" style="display:none;">
+          <div class="chart-container" style="border:1.5px solid rgba(184,121,70,0.3);background:linear-gradient(135deg,rgba(184,121,70,0.06),rgba(46,125,50,0.05));">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <h3 style="margin:0;">💷 The Kiln Cafe — Revenue <span style="font-size:11px;font-weight:500;color:var(--gu-dust);">(directors only)</span></h3>
+              <button onclick="populateDashboard()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
+            </div>
+            <p style="font-size:11px;color:var(--gu-dust);margin-bottom:16px;">The studio's own real revenue and app usage — separate from Platform Revenue (worldwide SaaS income), and only visible to David, Jenny, and Daisy.</p>
 
-        <!-- Revenue Chart -->
-        <div class="chart-container">
-          <h3>Revenue (Last 30 Days)</h3>
-          <div class="chart-bars">
-            <div class="chart-bar" style="height: 45%;">
-              <div class="chart-bar-value">£75</div>
-              <div class="chart-bar-label">Jul 05</div>
+            <div class="dashboard-grid">
+              <div class="metric-card">
+                <div class="label">Revenue (30d)</div>
+                <div class="value" id="metric-revenue">£0</div>
+                <div class="detail" id="metric-revenue-detail">–</div>
+              </div>
+              <div class="metric-card">
+                <div class="label">App Sessions</div>
+                <div class="value" id="metric-sessions">0</div>
+                <div class="detail">customers used the app</div>
+              </div>
+              <div class="metric-card">
+                <div class="label">Tool Used Most</div>
+                <div class="value" id="metric-tool">–</div>
+                <div class="detail">of sessions this month</div>
+              </div>
+              <div class="metric-card">
+                <div class="label">Popular Design</div>
+                <div class="value" id="metric-design">–</div>
+                <div class="detail">this month</div>
+              </div>
             </div>
-            <div class="chart-bar" style="height: 65%;">
-              <div class="chart-bar-value">£110</div>
-              <div class="chart-bar-label">Jul 06</div>
-            </div>
-            <div class="chart-bar" style="height: 72%;">
-              <div class="chart-bar-value">£120</div>
-              <div class="chart-bar-label">Jul 07</div>
-            </div>
-            <div class="chart-bar" style="height: 55%;">
-              <div class="chart-bar-value">£95</div>
-              <div class="chart-bar-label">Jul 08</div>
-            </div>
-            <div class="chart-bar" style="height: 80%;">
-              <div class="chart-bar-value">£140</div>
-              <div class="chart-bar-label">Jul 09</div>
-            </div>
-            <div class="chart-bar" style="height: 60%;">
-              <div class="chart-bar-value">£105</div>
-              <div class="chart-bar-label">Jul 10</div>
-            </div>
-            <div class="chart-bar" style="height: 40%;">
-              <div class="chart-bar-value">£60</div>
-              <div class="chart-bar-label">Today</div>
+
+            <h3 style="margin:20px 0 10px;">Revenue (Last 30 Days)</h3>
+            <div class="chart-bars">
             </div>
           </div>
-        </div>
 
-        <!-- Most Popular Designs -->
-        <div class="chart-container">
-          <h3>Most Popular Designs</h3>
-          <ul class="design-list" id="top-designs-list">
-            <li>
-              <span>🌼 Daisy</span>
-              <strong>12 uses</strong>
-            </li>
-            <li>
-              <span>🌹 Rose</span>
-              <strong>9 uses</strong>
-            </li>
-            <li>
-              <span>🦋 Butterfly</span>
-              <strong>8 uses</strong>
-            </li>
-            <li>
-              <span>💚 Love Heart</span>
-              <strong>7 uses</strong>
-            </li>
-            <li>
-              <span>❄️ Snowflake</span>
-              <strong>5 uses</strong>
-            </li>
-          </ul>
-        </div>
+          <!-- Most Popular Designs -->
+          <div class="chart-container">
+            <h3>Most Popular Designs</h3>
+            <ul class="design-list" id="top-designs-list">
+            </ul>
+          </div>
 
-        <!-- App Usage -->
-        <div class="chart-container">
-          <h3>Which Tools Do Customers Use?</h3>
-          <ul class="design-list tool-usage-list">
-            <li>
-              <span>Transfer Preview</span>
-              <strong>19 sessions (41%)</strong>
-            </li>
-            <li>
-              <span>Colour Matcher</span>
-              <strong>18 sessions (38%)</strong>
-            </li>
-            <li>
-              <span>Print Tool</span>
-              <strong>10 sessions (21%)</strong>
-            </li>
-          </ul>
+          <!-- App Usage -->
+          <div class="chart-container">
+            <h3>Which Tools Do Customers Use?</h3>
+            <ul class="design-list tool-usage-list" id="tool-usage-list">
+            </ul>
+          </div>
         </div>
+        <!-- /kiln-cafe-revenue-section -->
       </div>
 
       <!-- ═════════════════════════════════════════════ -->
@@ -3463,7 +3415,7 @@ async function loadDashboardData() {
       throw new Error('API not connected');
     }
     
-    const res = await fetch(`${API_URL}/api/analytics/dashboard?studioId=${studioId}`);
+    const res = await fetch(`${API_URL}/api/analytics/dashboard?studioId=${studioId}&staffMemberId=${currentShiftStaff?.id || ''}`);
     if (!res.ok) throw new Error('Dashboard fetch failed');
     
     const data = await res.json();
@@ -5486,6 +5438,17 @@ function applyPlatformRevenueAccess() {
       ? 'Ask about the dashboard, bookings, tasks, or platform revenue'
       : 'Ask about the dashboard, bookings, or tasks';
   }
+
+  // The Kiln Cafe's own revenue section (on the Dashboard tab) uses this
+  // exact same director check — re-populate it now login has resolved,
+  // in case someone landed on Dashboard before logging in.
+  const revenueSection = document.getElementById('kiln-cafe-revenue-section');
+  if (revenueSection) {
+    revenueSection.style.display = hasAccess ? 'block' : 'none';
+    if (hasAccess && document.getElementById('dashboard-view')?.style.display !== 'none') {
+      populateDashboard();
+    }
+  }
 }
 
 // ── Assistant "point at real element" arrow ──
@@ -7349,6 +7312,17 @@ async function populateDashboard() {
   // previously this fired 800ms after load regardless of whether the
   // login screen was still showing, so it could appear behind/alongside
   // the PIN prompt instead of strictly after it.
+
+  // The Kiln Cafe's own revenue figures are genuinely sensitive financial
+  // data — director-only (David/Jenny/Daisy), same access check used for
+  // Platform Revenue. Regular staff landing on this Dashboard tab should
+  // never see the studio's real revenue numbers.
+  const firstName = (currentShiftStaff?.name || '').trim().split(' ')[0];
+  const isDirector = PLATFORM_REVENUE_ACCESS.some(n => n.toLowerCase() === firstName.toLowerCase());
+  const revenueSection = document.getElementById('kiln-cafe-revenue-section');
+  if (revenueSection) revenueSection.style.display = isDirector ? 'block' : 'none';
+  if (!isDirector) return; // don't even fetch the data if it won't be shown
+
   try {
     const data = await loadDashboardData();
     
@@ -7378,13 +7352,17 @@ async function populateDashboard() {
 
 function updateRevenueChart(data) {
   const container = document.querySelector('.chart-bars');
-  if (!container || !data.length) return;
+  if (!container) return;
+  if (!data.length) {
+    container.innerHTML = '<p style="color:var(--gu-dust);font-size:12px;padding:12px 0;">No revenue data recorded yet for the last 30 days.</p>';
+    return;
+  }
   
   const maxRevenue = Math.max(...data.map(d => d.metric_value?.revenue_cents || d.revenue || 0)) / 100;
   
   container.innerHTML = data.slice(-7).map(day => {
     const revenue = (day.metric_value?.revenue_cents || day.revenue || 0) / 100;
-    const height = (revenue / maxRevenue) * 100;
+    const height = maxRevenue > 0 ? (revenue / maxRevenue) * 100 : 0;
     const dateStr = day.metric_date || day.date;
     const date = new Date(dateStr);
     const label = date.getDate();
@@ -7401,6 +7379,10 @@ function updateRevenueChart(data) {
 function updateDesignList(designs) {
   const container = document.getElementById('top-designs-list') || document.querySelector('.design-list');
   if (!container) return;
+  if (!designs.length) {
+    container.innerHTML = '<li style="color:var(--gu-dust);font-size:12px;">No design data yet this month.</li>';
+    return;
+  }
   
   const emojis = {
     daisy: '🌼',
@@ -7421,8 +7403,11 @@ function updateDesignList(designs) {
 function updateToolUsage(usage) {
   const container = document.querySelector('.tool-usage-list');
   if (!container) return;
-  
   const total = Object.values(usage).reduce((a, b) => a + b, 0);
+  if (!total) {
+    container.innerHTML = '<li style="color:var(--gu-dust);font-size:12px;">No app usage recorded yet this month.</li>';
+    return;
+  }
   
   container.innerHTML = Object.entries(usage).map(([tool, count]) => `
     <li>
