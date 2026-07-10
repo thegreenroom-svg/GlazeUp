@@ -106,7 +106,7 @@
     @media (max-width: 520px) {
       .admin-wrapper {
         grid-template-columns: 1fr;
-        grid-template-rows: 52px 1fr;
+        grid-template-rows: 68px 1fr;
         padding-top: 44px; /* space for #phone-header-menu, which is fixed */
       }
       .admin-sidebar {
@@ -114,33 +114,44 @@
         order: 1;
         display: flex;
         flex-direction: row;
-        align-items: center;
-        justify-content: space-around;
-        padding: 6px 4px !important;
+        align-items: stretch;
+        justify-content: flex-start;
+        padding: 0 !important;
         overflow-x: auto;
         overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x proximity;
         box-shadow: 0 4px 16px -4px rgba(0,0,0,0.2);
       }
       .link-logo { display: none; }
       .admin-sidebar nav {
         display: flex;
         flex-direction: row;
-        width: 100%;
-        justify-content: space-around;
+        width: max-content; /* let it be as wide as it needs — scrolls, never squashes */
+        justify-content: flex-start;
       }
       .admin-sidebar nav a {
         flex-direction: column;
-        gap: 2px;
-        padding: 6px 4px;
+        justify-content: center;
+        gap: 3px;
+        padding: 8px 6px;
         font-size: 9px;
         margin-bottom: 0;
-        min-width: 44px;
+        min-width: 64px; /* real touch target, not squeezed to fit */
+        scroll-snap-align: start;
       }
       .admin-sidebar nav a .nav-label {
         display: block !important;
-        font-size: 8.5px;
+        font-size: 9.5px;
+        line-height: 1.15;
+        text-align: center;
+        white-space: normal; /* let two-word labels wrap rather than truncate */
       }
-      .admin-sidebar nav a svg { width: 18px; height: 18px; }
+      .admin-sidebar nav a svg { width: 22px; height: 22px; }
+      .admin-sidebar nav a.active {
+        background: rgba(184,121,70,0.1);
+        border-radius: 12px;
+      }
 
       /* Collapse header buttons into the phone header menu */
       #alert-bell-btn, #shift-badge, #headset-setup-btn, #step-counter-btn {
