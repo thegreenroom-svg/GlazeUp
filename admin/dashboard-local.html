@@ -80,6 +80,23 @@
       height: 100vh;
     }
 
+    /* Added by JS only for directors while the platform revenue strip is
+       visible, so the fixed strip never overlaps the sidebar/content
+       below it. Regular staff never get this class, so their layout is
+       completely unaffected. */
+    body.has-platform-strip .admin-wrapper {
+      height: calc(100vh - 40px);
+      margin-top: 40px;
+    }
+    @media (max-width: 520px) {
+      body.has-platform-strip .admin-wrapper {
+        margin-top: 56px;
+      }
+      body.has-platform-strip #phone-header-menu {
+        top: 56px !important;
+      }
+    }
+
     /* iPad portrait & narrower: slim the sidebar so content breathes */
     @media (max-width: 900px) {
       .admin-wrapper {
@@ -1323,6 +1340,25 @@
   <div class="splash-hint">Tap anywhere to continue</div>
 </div>
 
+<!-- ═══════════════════════════════════════════
+     PLATFORM REVENUE STRIP — pinned to the very top
+     of the entire app, above every tab, always visible
+     while logged in as a director (David/Jenny/Daisy).
+     Not part of any scrolling tab content — this stays
+     fixed no matter which screen is open. ═══════════ -->
+<div id="platform-revenue-strip" onclick="goToTab('platformrev')" style="display:none;position:fixed;top:0;left:0;right:0;z-index:1000;background:linear-gradient(90deg,#2B2724,#3d2e28);cursor:pointer;padding:10px 16px;box-shadow:0 2px 10px rgba(0,0,0,0.25);">
+  <div style="display:flex;align-items:center;gap:14px;max-width:1100px;margin:0 auto;flex-wrap:wrap;">
+    <span style="font-size:11px;font-weight:800;letter-spacing:.05em;color:#F9A825;white-space:nowrap;">📈 PLATFORM REVENUE</span>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;flex:1;">
+      <span style="font-size:12px;color:white;"><strong id="strip-plat-studios" style="color:#B87946;">–</strong> studios</span>
+      <span style="font-size:12px;color:white;">this month <strong id="strip-plat-total-month" style="color:#4caf50;">–</strong></span>
+      <span style="font-size:12px;color:white;">today <strong id="strip-plat-ai-today" style="color:#ba68c8;">–</strong></span>
+      <span style="font-size:12px;color:white;">MRR <strong id="strip-plat-mrr" style="color:#B87946;">–</strong></span>
+    </div>
+    <span style="font-size:11px;color:rgba(255,255,255,0.6);white-space:nowrap;">tap for detail →</span>
+  </div>
+</div>
+
 <!-- API Status Indicator -->
 <div class="api-status disconnected" id="api-status">📡 Connecting...</div>
 
@@ -1698,36 +1734,6 @@
         <div class="info-banner" style="padding: 20px 22px;">
           <strong style="font-size: 22px; font-family: var(--gu-font-display); margin-bottom: 8px;">Welcome to Link! 🎨</strong>
           <span style="font-size: 15px;">You're on the free trial. Billing starts next month. No credit card required.</span>
-        </div>
-
-        <!-- Platform Revenue summary — director-only (David/Jenny/Daisy), shown
-             right on landing so it's never buried. Full detail in the Platform
-             Revenue tab; this is the at-a-glance box with a live link through. -->
-        <div id="dash-platform-summary" style="display:none;">
-          <div class="chart-container" onclick="goToTab('platformrev')" style="cursor:pointer; background:linear-gradient(135deg,rgba(184,121,70,0.10),rgba(156,39,176,0.08)); border:1.5px solid rgba(184,121,70,0.3);">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-              <h3 style="margin:0;">📈 Platform Revenue <span style="font-size:11px;font-weight:500;color:var(--gu-dust);">— worldwide, all studios</span></h3>
-              <span style="font-size:12px;color:var(--gu-primary);font-weight:700;">View full detail →</span>
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">
-              <div style="background:white;border-radius:14px;padding:18px;text-align:center;">
-                <div style="font-size:26px;font-weight:800;color:var(--gu-primary);" id="dash-plat-studios">–</div>
-                <div style="font-size:11px;color:var(--gu-dust);margin-top:4px;">Studios worldwide</div>
-              </div>
-              <div style="background:white;border-radius:14px;padding:18px;text-align:center;">
-                <div style="font-size:26px;font-weight:800;color:#2e7d32;" id="dash-plat-total-month">–</div>
-                <div style="font-size:11px;color:var(--gu-dust);margin-top:4px;">Revenue this month</div>
-              </div>
-              <div style="background:white;border-radius:14px;padding:18px;text-align:center;">
-                <div style="font-size:26px;font-weight:800;color:#9C27B0;" id="dash-plat-ai-today">–</div>
-                <div style="font-size:11px;color:var(--gu-dust);margin-top:4px;">AI + licensing today</div>
-              </div>
-              <div style="background:white;border-radius:14px;padding:18px;text-align:center;">
-                <div style="font-size:26px;font-weight:800;color:var(--link-clay);" id="dash-plat-mrr">–</div>
-                <div style="font-size:11px;color:var(--gu-dust);margin-top:4px;">Monthly recurring</div>
-              </div>
-            </div>
-          </div>
         </div>
 
         <!-- Extra Charges tally — PROTOTYPE, for appraisal. Not real payment
@@ -5177,29 +5183,38 @@ const PLATFORM_REVENUE_ACCESS = ['David', 'Jenny', 'Daisy'];
 
 function applyPlatformRevenueAccess() {
   const link = document.getElementById('nav-platformrev');
-  const dashBox = document.getElementById('dash-platform-summary');
+  const strip = document.getElementById('platform-revenue-strip');
   const firstName = (currentShiftStaff?.name || '').trim().split(' ')[0];
   const hasAccess = PLATFORM_REVENUE_ACCESS.some(n => n.toLowerCase() === firstName.toLowerCase());
+
   if (link) link.style.display = hasAccess ? 'flex' : 'none';
-  if (dashBox) {
-    dashBox.style.display = hasAccess ? 'block' : 'none';
-    if (hasAccess) loadDashboardPlatformSummary();
+
+  if (strip) {
+    strip.style.display = hasAccess ? 'block' : 'none';
+    document.body.classList.toggle('has-platform-strip', hasAccess);
+    if (hasAccess) {
+      loadPlatformRevenueStrip();
+      clearInterval(window._platformStripTimer);
+      window._platformStripTimer = setInterval(loadPlatformRevenueStrip, 5 * 60 * 1000);
+    } else {
+      clearInterval(window._platformStripTimer);
+    }
   }
 }
 
-// Lightweight version of the platform revenue data, just for the dashboard
-// landing page summary box. Same endpoint as the full Platform Revenue
-// tab — this just picks out four headline numbers for a quick glance.
-async function loadDashboardPlatformSummary() {
+// Feeds the always-visible top strip — same endpoint as the full Platform
+// Revenue tab, just the headline numbers. Refreshes every 5 minutes so
+// it stays current throughout the day without needing a manual refresh.
+async function loadPlatformRevenueStrip() {
   try {
     const res = await fetch(`${API_URL}/api/platform/revenue?staffMemberId=${currentShiftStaff?.id || ''}`);
-    if (!res.ok) return; // silently skip if not authorised — box stays hidden
+    if (!res.ok) return;
     const data = await res.json();
-    document.getElementById('dash-plat-studios').textContent = data.totalStudios ?? '0';
-    document.getElementById('dash-plat-total-month').textContent = `£${((data.totalMonthlyRevenueCents||0)/100).toFixed(0)}`;
-    document.getElementById('dash-plat-ai-today').textContent = `£${((data.todayCents||0)/100).toFixed(2)}`;
-    document.getElementById('dash-plat-mrr').textContent = `£${((data.mrrCents||0)/100).toFixed(0)}`;
-  } catch (e) { /* silent — box just won't update this time */ }
+    document.getElementById('strip-plat-studios').textContent = data.totalStudios ?? '0';
+    document.getElementById('strip-plat-total-month').textContent = `£${((data.totalMonthlyRevenueCents||0)/100).toFixed(0)}`;
+    document.getElementById('strip-plat-ai-today').textContent = `£${((data.todayCents||0)/100).toFixed(2)}`;
+    document.getElementById('strip-plat-mrr').textContent = `£${((data.mrrCents||0)/100).toFixed(0)}`;
+  } catch (e) { /* silent — strip just won't update this cycle */ }
 }
 
 // ── Headset / Bluetooth help ──
