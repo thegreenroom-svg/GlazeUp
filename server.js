@@ -767,7 +767,11 @@ app.get('/api/stripe/subscription', async (req, res) => {
 // Plans: solo=1 slot, studio=3 slots, multi=6 slots
 // ═══════════════════════════════════════════
 
-const PLAN_SLOTS = { solo: 1, studio: 3, multi: 6, pilot: 3 };
+// Device slot limits per plan. 'pilot' is bumped to 10 for demo/testing
+// purposes — lots of devices getting used while showing this around the
+// studio and testing shouldn't lock anyone out. Real paid tiers (solo/
+// studio/multi) are untouched and reflect actual subscription limits.
+const PLAN_SLOTS = { solo: 1, studio: 3, multi: 6, pilot: 10 };
 const SESSION_TTL_HOURS = 8;
 
 // GET /api/devices/check-in
