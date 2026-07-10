@@ -4313,6 +4313,74 @@ app.get('/api/platform/revenue/monthly-trend', async (req, res) => {
   }
 });
 
+// GET /api/platform/revenue/studio-detail — drill-down for a single studio:
+// its full monthly history, current plan, and generation prompts sample.
+app.get('/api/platform/revenue/studio-detail', async (req, res) => {
+  const { staffMemberId, studioId } = req.query;
+  if (!staffMemberId) return res.status(401).json({ error: 'Not authorised' });
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  const { data: staffMember } = await supabase.from('staff_team').select('name').eq('id', staffMemberId).single();
+  const firstName = (staffMember?.name || '').trim().split(' ')[0].toLowerCase();
+  if (!PLATFORM_REVENUE_ACCESS_NAMES.includes(firstName)) {
+    return res.status(403).json({ error: 'Platform Revenue is restricted to directors.' });
+  }
+
+  try {
+    const [studioRes, subRes, aiRes, extrasRes] = await Promise.all([
+      supabase.from('studios').select('id, name, created_at').eq('id', studioId).single(),
+      supabase.from('stripe_subscriptions').select('plan_id, status, current_period_start').eq('studio_id', studioId).single(),
+      supabase.from('ai_generation_usage').select('wholesale_cost_cents, prompt, created_at').eq('studio_id', studioId).order('created_at', { ascending: true }),
+      supabase.from('app_extra_charges').select('amount_cents, item_name, created_at').eq('studio_id', studioId).order('created_at', { ascending: true }),
+    ]);
+
+    const studio = studioRes.data;
+    const sub = subRes.data;
+    const aiRows = aiRes.data || [];
+    const extrasRows = extrasRes.data || [];
+
+    // Group by month for this one studio's trend
+    const monthMap = {};
+    const monthKey = (d) => { const dt = new Date(d); return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`; };
+    aiRows.forEach(r => {
+      const key = monthKey(r.created_at);
+      if (!monthMap[key]) monthMap[key] = { aiCents: 0, licensingCents: 0, aiCount: 0 };
+      monthMap[key].aiCents += (r.wholesale_cost_cents || 0);
+      monthMap[key].aiCount += 1;
+    });
+    extrasRows.forEach(r => {
+      const key = monthKey(r.created_at);
+      if (!monthMap[key]) monthMap[key] = { aiCents: 0, licensingCents: 0, aiCount: 0 };
+      monthMap[key].licensingCents += Math.round((r.amount_cents || 0) * FEATURE_LICENSING_FEE_RATE);
+    });
+    const monthly = Object.keys(monthMap).sort().map(key => ({
+      month: key, ...monthMap[key], totalCents: monthMap[key].aiCents + monthMap[key].licensingCents,
+    }));
+
+    const totalAiCents = aiRows.reduce((s, r) => s + (r.wholesale_cost_cents || 0), 0);
+    const totalLicensingCents = Math.round(extrasRows.reduce((s, r) => s + (r.amount_cents || 0), 0) * FEATURE_LICENSING_FEE_RATE);
+
+    // A few recent example prompts, for a bit of texture in the detail view
+    const recentPrompts = aiRows.slice(-5).reverse().map(r => r.prompt);
+
+    res.json({
+      studio,
+      plan: sub?.plan_id || 'none',
+      status: sub?.status || 'no subscription',
+      joinedAt: studio?.created_at,
+      totalAiCents,
+      totalLicensingCents,
+      totalAiGenerations: aiRows.length,
+      totalExtrasPurchases: extrasRows.length,
+      monthly,
+      recentPrompts,
+    });
+  } catch (err) {
+    console.error('Studio detail error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/ai-design/config — studio's AI generation settings (enabled + their customer pricing)
 app.get('/api/ai-design/config', async (req, res) => {
   const { studioId } = req.query;

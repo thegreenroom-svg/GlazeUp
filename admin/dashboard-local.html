@@ -2834,7 +2834,7 @@
           <div class="chart-container" style="background:linear-gradient(135deg,rgba(184,121,70,0.08),rgba(156,39,176,0.06));">
             <h3 style="margin:0 0 4px;">🤖 AI Generation — wholesale fee</h3>
             <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">10p per AI design generated, billed on each studio's monthly invoice.</p>
-            <div style="display:flex;gap:20px;flex-wrap:wrap;">
+            <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px;">
               <div>
                 <div style="font-size:11px;color:var(--gu-dust);">This month</div>
                 <div style="font-size:18px;font-weight:800;color:#9C27B0;" id="prev-ai-revenue">–</div>
@@ -2848,12 +2848,13 @@
                 <div style="font-size:18px;font-weight:800;color:var(--gu-text);" id="prev-ai-generations-total">–</div>
               </div>
             </div>
+            <a href="#" onclick="scrollToStudioBreakdown(event)" style="font-size:11px;color:var(--gu-primary);font-weight:700;text-decoration:none;">↓ See per-studio breakdown</a>
           </div>
 
           <div class="chart-container" style="background:linear-gradient(135deg,rgba(46,125,50,0.08),rgba(33,150,243,0.06));">
             <h3 style="margin:0 0 4px;">🔑 Feature Licensing — <span id="prev-licensing-rate">15%</span> fee</h3>
             <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Our cut of every in-app extra customers buy — Design Preview, Take It Home, Transfer Designer, glazes and more.</p>
-            <div style="display:flex;gap:20px;flex-wrap:wrap;">
+            <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px;">
               <div>
                 <div style="font-size:11px;color:var(--gu-dust);">This month</div>
                 <div style="font-size:18px;font-weight:800;color:#2e7d32;" id="prev-licensing-revenue">–</div>
@@ -2867,6 +2868,7 @@
                 <div style="font-size:18px;font-weight:800;color:var(--gu-text);" id="prev-extras-volume">–</div>
               </div>
             </div>
+            <a href="#" onclick="scrollToStudioBreakdown(event)" style="font-size:11px;color:#2e7d32;font-weight:700;text-decoration:none;">↓ See per-studio breakdown</a>
           </div>
         </div>
 
@@ -2900,7 +2902,50 @@
             <h3 style="margin:0;">Studio-by-studio breakdown</h3>
             <button onclick="loadPlatformRevenue()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">🔄 Refresh</button>
           </div>
+          <p style="font-size:11px;color:var(--gu-dust);margin-bottom:12px;">Tap any studio for its full history and trend.</p>
           <div id="prev-studio-list"><div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading…</div></div>
+        </div>
+      </div>
+
+      <!-- Studio Detail Modal — drill-down for a single studio's revenue history -->
+      <div id="studio-detail-modal" style="display:none;position:fixed;inset:0;z-index:9800;background:rgba(43,39,36,0.8);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
+        <div style="background:white;border-radius:24px;max-width:560px;width:100%;max-height:88vh;overflow-y:auto;box-shadow:0 24px 70px rgba(0,0,0,0.4);">
+          <div style="background:linear-gradient(135deg,#2B2724,#3d2e28);padding:24px;position:relative;">
+            <button onclick="closeStudioDetail()" style="position:absolute;top:16px;right:16px;background:rgba(255,255,255,0.15);border:none;color:white;width:28px;height:28px;border-radius:50%;font-size:14px;cursor:pointer;">✕</button>
+            <div id="sd-studio-name" style="font-size:19px;font-weight:800;color:white;margin-bottom:4px;">–</div>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <span id="sd-studio-plan" style="background:#B87946;color:white;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;">–</span>
+              <span id="sd-studio-joined" style="font-size:12px;color:rgba(255,255,255,0.6);">–</span>
+            </div>
+          </div>
+          <div style="padding:24px;">
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:20px;">
+              <div style="background:var(--gu-bg);border-radius:12px;padding:14px;text-align:center;">
+                <div id="sd-total-ai" style="font-size:20px;font-weight:800;color:#9C27B0;">–</div>
+                <div style="font-size:11px;color:var(--gu-dust);margin-top:2px;">AI revenue all-time</div>
+              </div>
+              <div style="background:var(--gu-bg);border-radius:12px;padding:14px;text-align:center;">
+                <div id="sd-total-licensing" style="font-size:20px;font-weight:800;color:#2e7d32;">–</div>
+                <div style="font-size:11px;color:var(--gu-dust);margin-top:2px;">Licensing revenue all-time</div>
+              </div>
+              <div style="background:var(--gu-bg);border-radius:12px;padding:14px;text-align:center;">
+                <div id="sd-total-gens" style="font-size:20px;font-weight:800;color:var(--gu-text);">–</div>
+                <div style="font-size:11px;color:var(--gu-dust);margin-top:2px;">AI designs generated</div>
+              </div>
+              <div style="background:var(--gu-bg);border-radius:12px;padding:14px;text-align:center;">
+                <div id="sd-total-extras" style="font-size:20px;font-weight:800;color:var(--gu-text);">–</div>
+                <div style="font-size:11px;color:var(--gu-dust);margin-top:2px;">Feature purchases</div>
+              </div>
+            </div>
+
+            <h3 style="margin:0 0 10px;font-size:14px;">Monthly trend</h3>
+            <div id="sd-chart-wrap" style="width:100%;overflow-x:auto;margin-bottom:20px;">
+              <div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:12px;">Loading…</div>
+            </div>
+
+            <h3 style="margin:0 0 10px;font-size:14px;">Recent AI designs generated</h3>
+            <div id="sd-recent-prompts" style="font-size:12px;color:var(--gu-dust);line-height:1.8;"></div>
+          </div>
         </div>
       </div>
 
@@ -6105,6 +6150,84 @@ function renderDailyRevenueTable(dailyTrend) {
   }).join('');
 }
 
+// Smooth-scrolls down to the studio breakdown list from the summary cards
+function scrollToStudioBreakdown(event) {
+  if (event) event.preventDefault();
+  document.getElementById('prev-studio-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Studio Detail Modal — drill-down for one studio ──
+async function openStudioDetail(studioId) {
+  document.getElementById('studio-detail-modal').style.display = 'flex';
+  document.getElementById('sd-studio-name').textContent = 'Loading…';
+  document.getElementById('sd-chart-wrap').innerHTML = '<div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:12px;">Loading…</div>';
+  document.getElementById('sd-recent-prompts').innerHTML = '';
+
+  try {
+    const res = await fetch(`${API_URL}/api/platform/revenue/studio-detail?staffMemberId=${currentShiftStaff?.id || ''}&studioId=${studioId}`);
+    if (!res.ok) { document.getElementById('sd-studio-name').textContent = 'Could not load — restricted or not found.'; return; }
+    const data = await res.json();
+
+    const PLAN_LABELS = { pilot:'Pilot', solo:'Solo £29/mo', studio:'Studio £59/mo', multi:'Multi £99/mo', none:'No plan' };
+    document.getElementById('sd-studio-name').textContent = data.studio?.name || 'Unknown studio';
+    document.getElementById('sd-studio-plan').textContent = PLAN_LABELS[data.plan] || data.plan;
+    const joined = data.joinedAt ? new Date(data.joinedAt).toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' }) : '–';
+    document.getElementById('sd-studio-joined').textContent = `Joined ${joined}`;
+
+    document.getElementById('sd-total-ai').textContent = `£${((data.totalAiCents||0)/100).toFixed(2)}`;
+    document.getElementById('sd-total-licensing').textContent = `£${((data.totalLicensingCents||0)/100).toFixed(2)}`;
+    document.getElementById('sd-total-gens').textContent = data.totalAiGenerations ?? '0';
+    document.getElementById('sd-total-extras').textContent = data.totalExtrasPurchases ?? '0';
+
+    drawStudioDetailChart(data.monthly || []);
+
+    const promptsEl = document.getElementById('sd-recent-prompts');
+    if (data.recentPrompts?.length) {
+      promptsEl.innerHTML = data.recentPrompts.map(p => `• "${p}"`).join('<br>');
+    } else {
+      promptsEl.innerHTML = '<em>No AI designs generated yet.</em>';
+    }
+  } catch (e) {
+    document.getElementById('sd-studio-name').textContent = 'Could not load studio detail.';
+  }
+}
+
+function closeStudioDetail() {
+  document.getElementById('studio-detail-modal').style.display = 'none';
+}
+
+function drawStudioDetailChart(monthly) {
+  const wrap = document.getElementById('sd-chart-wrap');
+  if (!monthly.length) {
+    wrap.innerHTML = '<p style="color:var(--gu-dust);font-size:12px;text-align:center;padding:16px;">No revenue history yet.</p>';
+    return;
+  }
+  const W = Math.max(460, monthly.length * 36), H = 160;
+  const padL = 40, padR = 10, padT = 10, padB = 30;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+  const maxCents = Math.max(...monthly.map(m => m.totalCents), 10);
+  const barW = Math.max(5, (chartW / monthly.length) * 0.6);
+  const step = chartW / monthly.length;
+
+  const bars = monthly.map((m, i) => {
+    const x = padL + i * step + (step - barW) / 2;
+    const barH = (m.totalCents / maxCents) * chartH;
+    const y = padT + chartH - barH;
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" fill="#B87946" rx="2"><title>${m.month}: £${(m.totalCents/100).toFixed(2)}</title></rect>`;
+  }).join('');
+
+  const labelEvery = monthly.length > 18 ? 3 : monthly.length > 8 ? 2 : 1;
+  const xLabels = monthly.map((m, i) => {
+    if (i % labelEvery !== 0) return '';
+    const x = padL + i * step + step/2;
+    const [y, mo] = m.month.split('-');
+    const label = new Date(`${y}-${mo}-01`).toLocaleDateString('en-GB', { month:'short', year:'2-digit' });
+    return `<text x="${x.toFixed(1)}" y="${H-10}" font-size="9" fill="#8a8175" text-anchor="middle" font-family="sans-serif">${label}</text>`;
+  }).join('');
+
+  wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:${W}px;max-width:none;display:block;">${bars}${xLabels}</svg>`;
+}
+
 async function loadPlatformRevenue() {
   loadMonthlyTrend();
   try {
@@ -6146,7 +6269,7 @@ async function loadPlatformRevenue() {
     const PLAN_COLORS = { pilot:'#999', solo:'#42A5F5', studio:'#B87946', multi:'#9C27B0', none:'#ccc' };
 
     listEl.innerHTML = data.studioBreakdown.map(s => `
-      <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--gu-bg);border-radius:10px;margin-bottom:8px;border-left:4px solid ${PLAN_COLORS[s.plan]||'#999'};">
+      <div onclick="openStudioDetail('${s.studioId}')" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--gu-bg);border-radius:10px;margin-bottom:8px;border-left:4px solid ${PLAN_COLORS[s.plan]||'#999'};cursor:pointer;">
         <div style="flex:1;min-width:0;">
           <div style="font-size:13px;font-weight:700;">${s.name}</div>
           <div style="font-size:11px;color:var(--gu-dust);">${s.aiGenerationsAllTime} AI generations · £${(s.licensingRevenueAllTimeCents/100).toFixed(2)} licensing fees</div>
@@ -6155,6 +6278,7 @@ async function loadPlatformRevenue() {
           <div style="font-size:11px;font-weight:700;color:${PLAN_COLORS[s.plan]||'#999'};">${PLAN_LABELS[s.plan]||s.plan}</div>
           <div style="font-size:12px;color:var(--gu-dust);">£${(s.monthlySubCents/100).toFixed(0)}/mo + £${((s.aiRevenueAllTimeCents+s.licensingRevenueAllTimeCents)/100).toFixed(2)}</div>
         </div>
+        <div style="color:var(--gu-dust);font-size:16px;flex-shrink:0;">›</div>
       </div>
     `).join('');
   } catch (e) {
