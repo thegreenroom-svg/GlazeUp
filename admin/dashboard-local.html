@@ -1699,6 +1699,18 @@
     50% { transform: rotate(0deg) translateY(-2px); }
     75% { transform: rotate(6deg) translateY(-1px); }
   }
+  /* Cleo's Club mascot — gentle bounce, like a happy toddler, not a
+     static illustration. Genuinely illustrated cartoon character, not
+     a depiction of any real person. */
+  @keyframes cleoBounce {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    30% { transform: translateY(-3px) rotate(-3deg); }
+    60% { transform: translateY(0) rotate(3deg); }
+  }
+  @keyframes cleoCurlWiggle {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(4deg); }
+  }
 </style>
 
 <!-- API Status Indicator — for everyone NOT seeing the director strip
@@ -2830,6 +2842,30 @@
             <button class="btn-connect" onclick="testRoyalMailLabelGeneration()" style="flex:1;background:var(--gu-primary);">Test label generation</button>
           </div>
           <div id="rm-setup-status" style="font-size:11px;color:var(--gu-dust);margin-top:10px;"></div>
+        </div>
+
+        <!-- Cleo's Club — kids' sticker loyalty add-on, a real paid
+             upgrade to the monthly subscription. Studios trial it,
+             enable it for their customer app, and pay extra for it. -->
+        <div class="setup-card" style="background:linear-gradient(135deg,rgba(249,168,37,0.08),rgba(245,124,0,0.05));border:1.5px solid rgba(249,168,37,0.3);">
+          <h3>🧸 Cleo's Club <span style="font-size:11px;font-weight:500;color:var(--gu-dust);">— premium add-on</span></h3>
+          <p>A friendly kids' sticker collection — Cleo appears in the customer app, kids collect a sticker every visit, and unlock a real reward every 5th visit. Shown as its own tile alongside your loyalty scheme.</p>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;font-weight:700;color:var(--gu-text);cursor:pointer;margin-bottom:14px;">
+            <input type="checkbox" id="cleo-club-enabled-checkbox" style="width:20px;height:20px;">
+            Enable Cleo's Club for this studio
+          </label>
+          <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <div style="flex:1;">
+              <div style="font-size:10px;color:var(--gu-dust);margin-bottom:3px;">Reward every</div>
+              <input type="number" id="cleo-club-reward-every" value="5" min="2" max="20" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;box-sizing:border-box;">
+            </div>
+            <div style="flex:2;">
+              <div style="font-size:10px;color:var(--gu-dust);margin-bottom:3px;">Reward</div>
+              <input type="text" id="cleo-club-reward-desc" value="Free small piece + a drink" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;box-sizing:border-box;">
+            </div>
+          </div>
+          <button class="btn-connect" onclick="saveCleosClubConfig()" style="width:100%;background:#F9A825;">Save Cleo's Club settings</button>
+          <div id="cleo-club-setup-status" style="font-size:11px;color:var(--gu-dust);margin-top:10px;"></div>
         </div>
 
         <!-- Square Connection -->
@@ -4313,6 +4349,7 @@ function goToTab(tab, event) {
     populateDashboard();
   } else if (tab === 'setup') {
     loadConnectionStatus();
+    loadCleosClubSetup();
   } else if (tab === 'branding') {
     loadBranding();
   } else if (tab === 'catalogue') {
@@ -9346,6 +9383,37 @@ async function testRoyalMailLabelGeneration() {
     }
   } catch (e) {
     statusEl.textContent = 'Could not run the test — check your API key and try again.';
+  }
+}
+
+// ── Cleo's Club setup ──
+async function loadCleosClubSetup() {
+  try {
+    const res = await fetch(`${API_URL}/api/cleos-club/config?studioId=${studioId}`);
+    const data = await res.json();
+    const config = data.config || {};
+    document.getElementById('cleo-club-enabled-checkbox').checked = !!config.enabled;
+    document.getElementById('cleo-club-reward-every').value = config.reward_every_n_visits || 5;
+    document.getElementById('cleo-club-reward-desc').value = config.reward_description || 'Free small piece + a drink';
+  } catch (e) { /* silent */ }
+}
+
+async function saveCleosClubConfig() {
+  const statusEl = document.getElementById('cleo-club-setup-status');
+  statusEl.textContent = 'Saving…';
+  try {
+    await fetch(`${API_URL}/api/cleos-club/config`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId,
+        enabled: document.getElementById('cleo-club-enabled-checkbox').checked,
+        rewardEveryNVisits: parseInt(document.getElementById('cleo-club-reward-every').value) || 5,
+        rewardDescription: document.getElementById('cleo-club-reward-desc').value.trim(),
+      })
+    });
+    statusEl.textContent = '✓ Saved.';
+  } catch (e) {
+    statusEl.textContent = 'Could not save — try again.';
   }
 }
 

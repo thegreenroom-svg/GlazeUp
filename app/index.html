@@ -272,7 +272,7 @@
       #design-preview-screen { transition: none; }
     }
 
-    #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen, #new-booking-screen, #transfer-designer-screen, #browse-design-screen, #marketplace-screen, #order-screen, #loyalty-screen {
+    #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen, #new-booking-screen, #transfer-designer-screen, #browse-design-screen, #marketplace-screen, #order-screen, #loyalty-screen, #cleos-club-screen {
       position: fixed;
       inset: 0;
       background: var(--link-charcoal);
@@ -282,11 +282,11 @@
       transform: translateY(100%);
       transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
     }
-    #community-share-screen.open, #community-feed-screen.open, #colour-picker-screen.open, #my-bookings-screen.open, #new-booking-screen.open, #transfer-designer-screen.open, #browse-design-screen.open, #order-screen.open {
+    #community-share-screen.open, #community-feed-screen.open, #colour-picker-screen.open, #my-bookings-screen.open, #new-booking-screen.open, #transfer-designer-screen.open, #browse-design-screen.open, #order-screen.open, #cleos-club-screen.open {
       transform: translateY(0);
     }
     @media (prefers-reduced-motion: reduce) {
-      #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen, #new-booking-screen, #transfer-designer-screen, #browse-design-screen, #marketplace-screen, #order-screen, #loyalty-screen { transition: none; }
+      #community-share-screen, #community-feed-screen, #colour-picker-screen, #my-bookings-screen, #new-booking-screen, #transfer-designer-screen, #browse-design-screen, #marketplace-screen, #order-screen, #loyalty-screen, #cleos-club-screen { transition: none; }
     }
 
     .cp-tab {
@@ -1436,6 +1436,17 @@
     </div>
   </div>
 
+  <!-- Cleo's Club — kids' sticker collection board -->
+  <div id="cleos-club-screen">
+    <div class="dp-header" style="background:linear-gradient(135deg,#F9A825,#f57c00);">
+      <span class="dp-title" style="color:#fff;">Cleo's Club</span>
+      <button onclick="closeCleosClub()" style="color:rgba(255,255,255,0.85);">✕ Close</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;" id="cleos-club-screen-body">
+      <div style="padding:24px;text-align:center;color:rgba(255,255,255,0.4);font-size:13px;">Loading…</div>
+    </div>
+  </div>
+
   <!-- Design Marketplace: browse, use, and list designs -->
   <div id="marketplace-screen">
     <div class="dp-header" style="background: linear-gradient(135deg, #1a0a3d 0%, #2d1065 100%);">
@@ -2064,6 +2075,40 @@
             </div>
           </div>
 
+          <!-- Cleo's Club — kids' sticker collection, only shown if this
+               studio has the add-on enabled. Genuinely separate from
+               the adult loyalty tiers, its own friendly kids' brand. -->
+          <div id="cleos-club-tile" style="display:none; border-radius:16px; overflow:hidden; margin-bottom:2px; cursor:pointer; background:linear-gradient(135deg,#F9A825,#f57c00);" onclick="openCleosClub()">
+            <div style="padding:16px; position:relative; display:flex; align-items:center; gap:12px;">
+              <svg width="52" height="52" viewBox="0 0 52 52" style="flex-shrink:0; animation:cleoBounce 2.8s ease-in-out infinite; transform-origin:26px 48px;">
+                <!-- Cleo mascot — illustrated cartoon character, curly brown hair -->
+                <ellipse cx="26" cy="44" rx="14" ry="7" fill="#2B2724" opacity="0.12"/>
+                <path d="M14 40 Q14 30 26 30 Q38 30 38 40 L38 48 Q38 50 36 50 L16 50 Q14 50 14 48 Z" fill="#F4A896"/>
+                <circle cx="26" cy="20" r="14" fill="#FBCBA4"/>
+                <g style="animation:cleoCurlWiggle 3.2s ease-in-out infinite; transform-origin:26px 10px;">
+                  <circle cx="14" cy="12" r="5" fill="#6B4226"/>
+                  <circle cx="10" cy="18" r="4.5" fill="#6B4226"/>
+                  <circle cx="19" cy="7" r="5" fill="#6B4226"/>
+                  <circle cx="27" cy="5" r="5.5" fill="#6B4226"/>
+                  <circle cx="35" cy="7" r="5" fill="#6B4226"/>
+                  <circle cx="41" cy="13" r="4.5" fill="#6B4226"/>
+                  <circle cx="42" cy="19" r="4" fill="#6B4226"/>
+                </g>
+                <circle cx="20" cy="21" r="2.3" fill="#2B2724"/>
+                <circle cx="32" cy="21" r="2.3" fill="#2B2724"/>
+                <circle cx="20.7" cy="20.2" r="0.7" fill="white"/>
+                <circle cx="32.7" cy="20.2" r="0.7" fill="white"/>
+                <ellipse cx="15" cy="25" rx="2.6" ry="1.8" fill="#F0876A" opacity="0.5"/>
+                <ellipse cx="37" cy="25" rx="2.6" ry="1.8" fill="#F0876A" opacity="0.5"/>
+                <path d="M20 27 Q26 32 32 27" stroke="#2B2724" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+              </svg>
+              <div style="flex:1;">
+                <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,0.85);margin-bottom:2px;">Cleo's Club</div>
+                <div style="font-size:15px;font-weight:800;color:white;" id="cleos-club-tile-status">Loading…</div>
+              </div>
+            </div>
+          </div>
+
           <button class="tile tile-sage" onclick="window.open('https://www.thekilncafe.com/how-to-video', '_blank')">
             <span class="tile-icon">🎥</span>
             <div class="tile-title">Painting Guide</div>
@@ -2158,6 +2203,7 @@
       updateHomeAccessTile();
       wtShowTrigger();
       loadLoyaltyTile();
+      checkCleosClubEnabled();
     }
 
     function showMyQR() {
@@ -3311,6 +3357,140 @@
 
       } catch(e) {
         body.innerHTML = '<div style="padding:32px;text-align:center;color:rgba(255,255,255,0.4);font-size:13px;">Could not load loyalty status — please ask a member of staff.</div>';
+      }
+    }
+
+    // ── Cleo's Club — kids' sticker collection, real add-on feature ──
+    const CLEO_MASCOT_SVG = `<svg width="72" height="72" viewBox="0 0 52 52" style="animation:cleoBounce 2.8s ease-in-out infinite; transform-origin:26px 48px;">
+      <ellipse cx="26" cy="44" rx="14" ry="7" fill="#2B2724" opacity="0.12"/>
+      <path d="M14 40 Q14 30 26 30 Q38 30 38 40 L38 48 Q38 50 36 50 L16 50 Q14 50 14 48 Z" fill="#F4A896"/>
+      <circle cx="26" cy="20" r="14" fill="#FBCBA4"/>
+      <g style="animation:cleoCurlWiggle 3.2s ease-in-out infinite; transform-origin:26px 10px;">
+        <circle cx="14" cy="12" r="5" fill="#6B4226"/><circle cx="10" cy="18" r="4.5" fill="#6B4226"/>
+        <circle cx="19" cy="7" r="5" fill="#6B4226"/><circle cx="27" cy="5" r="5.5" fill="#6B4226"/>
+        <circle cx="35" cy="7" r="5" fill="#6B4226"/><circle cx="41" cy="13" r="4.5" fill="#6B4226"/>
+        <circle cx="42" cy="19" r="4" fill="#6B4226"/>
+      </g>
+      <circle cx="20" cy="21" r="2.3" fill="#2B2724"/><circle cx="32" cy="21" r="2.3" fill="#2B2724"/>
+      <circle cx="20.7" cy="20.2" r="0.7" fill="white"/><circle cx="32.7" cy="20.2" r="0.7" fill="white"/>
+      <ellipse cx="15" cy="25" rx="2.6" ry="1.8" fill="#F0876A" opacity="0.5"/>
+      <ellipse cx="37" cy="25" rx="2.6" ry="1.8" fill="#F0876A" opacity="0.5"/>
+      <path d="M20 27 Q26 32 32 27" stroke="#2B2724" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+    </svg>`;
+
+    async function checkCleosClubEnabled() {
+      try {
+        const res = await fetch(`${API_URL}/api/cleos-club/config?studioId=${STUDIO_ID}`);
+        const data = await res.json();
+        const tile = document.getElementById('cleos-club-tile');
+        if (!tile) return;
+        if (data.config?.enabled) {
+          tile.style.display = 'block';
+          loadCleosClubTilePreview();
+        } else {
+          tile.style.display = 'none';
+        }
+      } catch (e) { /* silent — feature just stays hidden if this fails */ }
+    }
+
+    // Resolves the real customer ID by name — matches how the loyalty
+    // tile itself does it (there's no customerId stored on
+    // window.currentBooking, only the name). Cached after first lookup
+    // so repeated calls in this session don't refetch it.
+    let _cleosClubCustomerId = null;
+    async function resolveCleosClubCustomerId() {
+      if (_cleosClubCustomerId) return _cleosClubCustomerId;
+      const customerName = window.currentBooking?.name;
+      if (!customerName) return null;
+      try {
+        const res = await fetch(`${API_URL}/api/loyalty/customer?studioId=${STUDIO_ID}&customerName=${encodeURIComponent(customerName)}`);
+        const data = await res.json();
+        if (data.found) { _cleosClubCustomerId = data.customer.id; return _cleosClubCustomerId; }
+      } catch (e) { /* silent */ }
+      return null;
+    }
+
+    async function loadCleosClubTilePreview() {
+      const customerId = await resolveCleosClubCustomerId();
+      if (!customerId) return;
+      try {
+        const res = await fetch(`${API_URL}/api/cleos-club/board/${customerId}?studioId=${STUDIO_ID}`);
+        const data = await res.json();
+        const statusEl = document.getElementById('cleos-club-tile-status');
+        if (statusEl) {
+          statusEl.textContent = data.visitsUntilNextReward > 0
+            ? `${data.stickers.length} stickers — ${data.visitsUntilNextReward} to go!`
+            : `${data.stickers.length} stickers collected!`;
+        }
+      } catch (e) { /* silent */ }
+    }
+
+    function openCleosClub() {
+      const screen = document.getElementById('cleos-club-screen');
+      screen.style.display = 'flex';
+      void screen.offsetWidth;
+      screen.classList.add('open');
+      renderCleosClubScreen();
+    }
+    function closeCleosClub() {
+      const screen = document.getElementById('cleos-club-screen');
+      screen.classList.remove('open');
+      setTimeout(() => { screen.style.display = 'none'; }, 280);
+    }
+
+    async function renderCleosClubScreen() {
+      const body = document.getElementById('cleos-club-screen-body');
+      const customerId = await resolveCleosClubCustomerId();
+      if (!customerId) {
+        body.innerHTML = '<div style="padding:32px;text-align:center;color:rgba(255,255,255,0.5);font-size:13px;">Please scan your booking QR code first.</div>';
+        return;
+      }
+
+      body.innerHTML = '<div style="padding:32px;text-align:center;color:rgba(255,255,255,0.4);font-size:13px;">Loading your sticker board…</div>';
+
+      try {
+        const res = await fetch(`${API_URL}/api/cleos-club/board/${customerId}?studioId=${STUDIO_ID}`);
+        const data = await res.json();
+
+        const stickersHtml = (data.stickers || []).map(s => `
+          <div style="background:white;border-radius:16px;padding:16px 8px;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.15);">
+            <div style="font-size:32px;margin-bottom:4px;">${s.cleos_club_sticker_types?.emoji || '⭐'}</div>
+            <div style="font-size:10px;font-weight:700;color:#2B2724;">${s.cleos_club_sticker_types?.name || 'Sticker'}</div>
+          </div>
+        `).join('');
+
+        // Empty slots for visual "board" feel — shows what's still to collect
+        const emptySlots = Math.max(0, 5 - ((data.stickers || []).length % 5 || 5));
+        const emptyHtml = (data.visitsUntilNextReward > 0 ? Array(data.visitsUntilNextReward) : []).map(() => `
+          <div style="background:rgba(255,255,255,0.08);border:2px dashed rgba(255,255,255,0.2);border-radius:16px;padding:16px 8px;text-align:center;">
+            <div style="font-size:32px;margin-bottom:4px;opacity:0.3;">❓</div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.3);">Next visit</div>
+          </div>
+        `).join('');
+
+        body.innerHTML = `
+          <div style="padding:24px 20px;text-align:center;">
+            ${CLEO_MASCOT_SVG}
+            <div style="font-size:19px;font-weight:800;color:white;margin-top:10px;">Hi, I'm Cleo! 👋</div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.7);margin-top:4px;">Collect a sticker every visit — fill the board for a treat!</div>
+          </div>
+          ${data.unclaimedRewards?.length ? `
+            <div style="margin:0 20px 20px;background:linear-gradient(135deg,#F9A825,#f57c00);border-radius:16px;padding:16px;text-align:center;">
+              <div style="font-size:15px;font-weight:800;color:white;">🎉 You've earned a reward!</div>
+              <div style="font-size:12px;color:rgba(255,255,255,0.9);margin-top:4px;">${data.unclaimedRewards[0].reward_description}</div>
+              <div style="font-size:11px;color:rgba(255,255,255,0.75);margin-top:6px;">Show this to a member of staff to claim it</div>
+            </div>
+          ` : ''}
+          <div style="padding:0 20px 32px;">
+            <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Your sticker board</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+              ${stickersHtml}${emptyHtml}
+            </div>
+            ${data.visitsUntilNextReward > 0 ? `<div style="text-align:center;margin-top:16px;font-size:13px;color:rgba(255,255,255,0.7);">${data.visitsUntilNextReward} more visit${data.visitsUntilNextReward === 1 ? '' : 's'} until your next reward!</div>` : ''}
+          </div>
+        `;
+      } catch (e) {
+        body.innerHTML = '<div style="padding:32px;text-align:center;color:rgba(255,255,255,0.4);font-size:13px;">Could not load your sticker board — please ask a member of staff.</div>';
       }
     }
 

@@ -5781,6 +5781,40 @@ app.post('/api/loyalty/visit', async (req, res) => {
       description: `Visit #${newVisits} — ${visitPoints} visit points + ${spendPoints} spend points${spendCents ? ` (£${(spendCents/100).toFixed(2)} spent)` : ''}`,
     });
 
+    // Cleo's Club — genuinely conditional on the studio having enabled
+    // this as a paid add-on. Awards one sticker per visit, and a real
+    // reward every Nth visit (default 5th). This is the actual
+    // upsell/upgrade unit: studios pay extra monthly for this feature.
+    let cleosClubResult = null;
+    const { data: clubConfig } = await supabase.from('cleos_club_config').select('*').eq('studio_id', studioId).eq('enabled', true).single();
+    if (clubConfig) {
+      const { data: stickerTypes } = await supabase.from('cleos_club_sticker_types').select('*');
+      if (stickerTypes && stickerTypes.length) {
+        // Weighted-ish pick: mostly common, occasionally rare/special —
+        // genuinely varied, not the same sticker every time.
+        const commons = stickerTypes.filter(s => s.rarity === 'common');
+        const rares = stickerTypes.filter(s => s.rarity !== 'common');
+        const roll = Math.random();
+        const pickFrom = (roll < 0.75 || !rares.length) ? commons : rares;
+        const sticker = pickFrom[Math.floor(Math.random() * pickFrom.length)] || stickerTypes[0];
+
+        await supabase.from('cleos_club_stickers_earned').insert({
+          studio_id: studioId, customer_id: customerId, sticker_type_id: sticker.id, visit_number: newVisits,
+        });
+
+        cleosClubResult = { stickerEarned: sticker, rewardUnlocked: null };
+
+        const rewardEvery = clubConfig.reward_every_n_visits || 5;
+        if (newVisits % rewardEvery === 0) {
+          const { data: reward } = await supabase.from('cleos_club_rewards_earned').insert({
+            studio_id: studioId, customer_id: customerId, visit_number: newVisits,
+            reward_description: clubConfig.reward_description || 'A free treat!',
+          }).select().single();
+          cleosClubResult.rewardUnlocked = reward;
+        }
+      }
+    }
+
     res.json({
       visitCount: newVisits,
       pointsEarned: totalNewPoints,
@@ -5790,6 +5824,7 @@ app.post('/api/loyalty/visit', async (req, res) => {
       progress: loyaltyProgress(newVisits, newSpend, pieces),
       rewards: newTier ? LOYALTY_REWARDS[newTier] : null,
       instantRewards,
+      cleosClub: cleosClubResult,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -5797,6 +5832,75 @@ app.post('/api/loyalty/visit', async (req, res) => {
 });
 
 // POST /api/loyalty/drinks-points — award bonus points for a drinks order
+// ═══════════════════════════════════════════
+// CLEO'S CLUB — kids' sticker loyalty sub-brand, real paid add-on
+// ═══════════════════════════════════════════
+
+// GET /api/cleos-club/config — is this enabled for this studio, and its settings
+app.get('/api/cleos-club/config', async (req, res) => {
+  const { studioId } = req.query;
+  const { data } = await supabase.from('cleos_club_config').select('*').eq('studio_id', studioId).single();
+  res.json({ config: data || { enabled: false } });
+});
+
+// POST /api/cleos-club/config — studio enables/configures the add-on
+// (in a real billed version this would also touch Stripe subscription
+// items — kept simple here as the on/off + settings switch itself)
+app.post('/api/cleos-club/config', async (req, res) => {
+  const { studioId, enabled, rewardEveryNVisits, rewardDescription } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data, error } = await supabase.from('cleos_club_config').upsert({
+    studio_id: studioId, enabled: !!enabled,
+    reward_every_n_visits: rewardEveryNVisits || 5,
+    reward_description: rewardDescription || 'Free small piece + a drink',
+    enabled_at: enabled ? new Date().toISOString() : null,
+  }, { onConflict: 'studio_id' }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ config: data });
+});
+
+// GET /api/cleos-club/board/:customerId — a customer's real sticker
+// board, plus progress toward the next reward
+app.get('/api/cleos-club/board/:customerId', async (req, res) => {
+  const { customerId } = req.params;
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    const [stickersRes, rewardsRes, configRes] = await Promise.all([
+      supabase.from('cleos_club_stickers_earned').select('*, cleos_club_sticker_types(*)').eq('studio_id', studioId).eq('customer_id', customerId).order('earned_at', { ascending: true }),
+      supabase.from('cleos_club_rewards_earned').select('*').eq('studio_id', studioId).eq('customer_id', customerId).order('earned_at', { ascending: false }),
+      supabase.from('cleos_club_config').select('*').eq('studio_id', studioId).single(),
+    ]);
+
+    const stickers = stickersRes.data || [];
+    const rewards = rewardsRes.data || [];
+    const config = configRes.data || { reward_every_n_visits: 5 };
+    const rewardEvery = config.reward_every_n_visits || 5;
+    const visitsSoFar = stickers.length;
+    const visitsUntilNextReward = rewardEvery - (visitsSoFar % rewardEvery || rewardEvery);
+
+    res.json({
+      stickers, rewards,
+      visitsSoFar,
+      visitsUntilNextReward: visitsUntilNextReward === rewardEvery ? 0 : visitsUntilNextReward,
+      unclaimedRewards: rewards.filter(r => !r.claimed),
+    });
+  } catch (error) {
+    console.error('Cleo\'s Club board error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PATCH /api/cleos-club/rewards/:id/claim — staff mark a reward as given
+app.patch('/api/cleos-club/rewards/:id/claim', async (req, res) => {
+  const { id } = req.params;
+  const { data, error } = await supabase.from('cleos_club_rewards_earned')
+    .update({ claimed: true, claimed_at: new Date().toISOString() }).eq('id', id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ reward: data });
+});
+
 app.post('/api/loyalty/drinks-points', async (req, res) => {
   const { studioId, customerId, bookingCode, itemCount } = req.body;
   if (!studioId || !customerId) return res.status(400).json({ error: 'missing fields' });
