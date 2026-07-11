@@ -1724,7 +1724,25 @@
   <div id="cleo-floating-bubble" style="position:fixed; bottom:86px; right:16px; z-index:9499; background:white; border:1.5px solid var(--gu-border); border-radius:16px 16px 4px 16px; padding:10px 14px; font-size:12px; font-weight:600; color:var(--gu-text); box-shadow:0 4px 16px rgba(0,0,0,0.15); max-width:190px; cursor:pointer; text-align:right;" onclick="handleCleoFloatingTap()">
   </div>
 
-  <div id="assistant-panel" style="display:none; position:fixed; bottom:0; right:0; left:0; z-index:9600; max-width:400px; margin:0 auto; max-height:min(560px, 90vh); height:520px; background:white; border-radius:20px 20px 0 0; box-shadow:0 -8px 32px rgba(0,0,0,0.25); flex-direction:column;">
+  <div id="assistant-panel" style="display:none; position:fixed; inset:0; z-index:9600; background:white; flex-direction:column;">
+    <style>
+      /* Genuine real responsive behavior: full-screen takeover on
+         phone widths (where a small centered card genuinely doesn't
+         make sense — was reported as "too wide" and not filling the
+         screen), but a sensible docked bottom-sheet card on tablet/
+         desktop widths, where full-screen would feel oversized. */
+      @media (min-width: 521px) {
+        #assistant-panel {
+          inset: auto 0 0 0;
+          max-width: 400px;
+          margin: 0 auto;
+          max-height: min(560px, 90vh);
+          height: 520px;
+          border-radius: 20px 20px 0 0;
+          box-shadow: 0 -8px 32px rgba(0,0,0,0.25);
+        }
+      }
+    </style>
     <div style="background:linear-gradient(135deg,#F9A825,#f57c00); color:white; padding:16px 18px; border-radius:20px 20px 0 0; display:flex; align-items:center; justify-content:space-between;">
       <div style="display:flex; align-items:center; gap:10px;">
         <div id="assistant-panel-cleo-mascot" style="width:36px;height:36px;flex-shrink:0;"></div>
