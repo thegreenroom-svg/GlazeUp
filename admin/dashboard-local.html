@@ -2060,6 +2060,25 @@
       <div id="staff-view" class="view" style="display: none;">
         <h2 style="margin-top: 0;">Daily Bookings &amp; Customer Engagement</h2>
 
+        <!-- All Bookings Overview — real Square bookings for today, plus
+             a small visual table schematic so anyone can see occupancy
+             at a glance without reading a list. Sits right at the top,
+             visible the moment this tab opens. -->
+        <div class="chart-container" style="margin-bottom: 20px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <h3 style="margin:0;">📋 Today's Bookings</h3>
+            <button onclick="loadBookingsOverview()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">🔄 Refresh</button>
+          </div>
+          <div id="bookings-overview-stats" style="display:flex;gap:16px;margin-bottom:14px;font-size:12px;color:var(--gu-dust);">
+            <span>Loading…</span>
+          </div>
+          <div id="bookings-table-schematic" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;margin-bottom:14px;">
+            <div style="grid-column:1/-1;color:var(--gu-dust);font-size:12px;padding:10px 0;">Loading table layout…</div>
+          </div>
+          <div id="bookings-overview-list" style="max-height:220px;overflow-y:auto;">
+          </div>
+        </div>
+
         <!-- Process flow: each stage as a connected step, arrows showing how work moves through -->
         <div class="flow-nav">
           <div class="flow-step active" id="staff-subtab-booking" onclick="showStaffSection('booking')">
@@ -3773,6 +3792,7 @@ function goToTab(tab, event) {
   // Load data for specific tabs
   if (tab === 'staff') {
     showStaffSection('booking');
+    loadBookingsOverview();
   } else if (tab === 'dashboard') {
     populateDashboard();
   } else if (tab === 'setup') {
@@ -8237,6 +8257,63 @@ async function saveTableTrackingMode() {
 let s1LookedUpBooking = null; // holds the booking currently looked up in Section 1
 let s2SelectedTableSessionId = null;
 let completingTableSessionId = null; // set when Section 3 opens the submit modal, so we close the table session after
+
+// ── All Bookings Overview — today's real Square bookings + a small
+// visual table schematic, sitting at the top of Daily Bookings so
+// everyone can see occupancy and what's coming up without digging in. ──
+async function loadBookingsOverview() {
+  const statsEl = document.getElementById('bookings-overview-stats');
+  const schematicEl = document.getElementById('bookings-table-schematic');
+  const listEl = document.getElementById('bookings-overview-list');
+  if (!statsEl) return;
+
+  try {
+    const res = await fetch(`${API_URL}/api/bookings/table-occupancy?studioId=${studioId}`);
+    const data = await res.json();
+    const tables = data.tables || [];
+
+    statsEl.innerHTML = `
+      <span><strong style="color:var(--gu-text);">${data.totalBookingsToday}</strong> bookings today</span>
+      <span><strong style="color:#2e7d32;">${data.occupiedNow}</strong> tables occupied now</span>
+      <span><strong style="color:var(--gu-text);">${data.totalTables - data.occupiedNow}</strong> free</span>
+    `;
+
+    if (!tables.length) {
+      schematicEl.innerHTML = '<div style="grid-column:1/-1;color:var(--gu-dust);font-size:12px;padding:10px 0;">No table layout set up yet — add tables in Setup.</div>';
+    } else {
+      const STATUS_COLORS = { occupied: '#2e7d32', upcoming: '#F9A825', free: '#e0e0e0' };
+      const STATUS_TEXT_COLORS = { occupied: 'white', upcoming: '#2B2724', free: '#8a8175' };
+      schematicEl.innerHTML = tables.map((t, i) => `
+        <div style="background:${STATUS_COLORS[t.status]};color:${STATUS_TEXT_COLORS[t.status]};border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;" onclick="showTableDetail(${JSON.stringify(t).replace(/"/g, '&quot;')})">
+          <div style="font-size:16px;font-weight:800;">${i + 1}</div>
+          <div style="font-size:9px;font-weight:600;line-height:1.2;">${t.status === 'occupied' ? (t.current?.customerName || 'Occupied').split(' ')[0] : t.status === 'upcoming' ? 'Next: ' + (t.next?.customerName || '').split(' ')[0] : 'Free'}</div>
+        </div>
+      `).join('');
+    }
+
+    // Compact upcoming bookings list underneath the schematic
+    const bookingsRes = await fetch(`${API_URL}/api/bookings/today?studioId=${studioId}`);
+    const bookingsData = await bookingsRes.json();
+    const bookings = bookingsData.bookings || [];
+    listEl.innerHTML = bookings.length ? bookings.map(b => `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--gu-border);font-size:12px;">
+        <div style="width:44px;flex-shrink:0;color:var(--gu-dust);">${new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</div>
+        <div style="flex:1;font-weight:600;">${b.customer_name || 'Guest'}</div>
+        <div style="color:var(--gu-dust);">Table ${b.table_number || '–'}</div>
+      </div>
+    `).join('') : '<div style="color:var(--gu-dust);font-size:12px;padding:8px 0;">No bookings today.</div>';
+  } catch (e) {
+    statsEl.innerHTML = '<span style="color:var(--gu-dust);">Could not load bookings overview.</span>';
+    schematicEl.innerHTML = '';
+  }
+}
+
+function showTableDetail(table) {
+  if (table.status === 'free') { alert(`${table.tableName} is free right now.`); return; }
+  const info = table.status === 'occupied' ? table.current : table.next;
+  const label = table.status === 'occupied' ? 'Currently seated' : 'Next booking';
+  alert(`${table.tableName}\n${label}: ${info?.customerName || 'Unknown'}\n${info?.sessionStart ? new Date(info.sessionStart).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''}`);
+}
 
 function showStaffSection(section) {
   ['booking', 'engagement', 'completion', 'kiln'].forEach(s => {

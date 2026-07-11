@@ -5882,6 +5882,58 @@ app.patch('/api/pre-glaze/:id/status', async (req, res) => {
   res.json({ reservation: data });
 });
 
+// GET /api/bookings/table-occupancy — combines the studio's real table
+// layout with today's live bookings, so the frontend can render a
+// small visual table schematic showing who's where right now without
+// needing two separate calls stitched together client-side.
+app.get('/api/bookings/table-occupancy', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    const now = new Date();
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const [tablesRes, bookingsRes] = await Promise.all([
+      supabase.from('studio_tables').select('*').eq('studio_id', studioId).order('sort_order', { ascending: true }),
+      supabase.from('bookings').select('*').eq('studio_id', studioId)
+        .gte('session_start', today.toISOString()).lt('session_start', tomorrow.toISOString())
+        .order('session_start', { ascending: true }),
+    ]);
+
+    const tables = tablesRes.data || [];
+    const bookings = bookingsRes.data || [];
+
+    // For each table, find whether a booking is currently occupying it
+    // right now (session_start <= now <= session_end), and what's next.
+    const occupancy = tables.map(table => {
+      const tableBookings = bookings.filter(b => b.table_number === table.name || b.table_number === String(table.sort_order + 1));
+      const current = tableBookings.find(b => {
+        const start = new Date(b.session_start);
+        const end = b.session_end ? new Date(b.session_end) : new Date(start.getTime() + 90 * 60000); // default 90min session if no end set
+        return now >= start && now <= end;
+      });
+      const next = tableBookings.find(b => new Date(b.session_start) > now);
+
+      return {
+        tableId: table.id, tableName: table.name, room: table.room, capacity: table.capacity,
+        status: current ? 'occupied' : (next ? 'upcoming' : 'free'),
+        current: current ? { customerName: current.customer_name, sessionStart: current.session_start, sessionEnd: current.session_end, partySize: current.party_size || null } : null,
+        next: next ? { customerName: next.customer_name, sessionStart: next.session_start } : null,
+      };
+    });
+
+    const totalToday = bookings.length;
+    const occupiedNow = occupancy.filter(t => t.status === 'occupied').length;
+
+    res.json({ tables: occupancy, totalBookingsToday: totalToday, occupiedNow, totalTables: tables.length });
+  } catch (error) {
+    console.error('Error building table occupancy snapshot:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
