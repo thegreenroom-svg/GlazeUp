@@ -1910,6 +1910,7 @@
     <nav>
       <a href="#" class="nav-link active" onclick="goToTab('dashboard', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.6"/><rect x="13" y="3.5" width="7.5" height="4.8" rx="1.6"/><rect x="13" y="10.5" width="7.5" height="10" rx="1.6"/><rect x="3.5" y="13" width="7.5" height="7.5" rx="1.6"/></svg></span><span class="nav-label">Dashboard</span></a>
       <a href="#" class="nav-link" id="nav-setup-tab" onclick="goToTab('setup', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.2v2.3M12 18.5v2.3M20.8 12h-2.3M5.5 12H3.2M17.9 6.1l-1.6 1.6M7.7 16.3l-1.6 1.6M17.9 17.9l-1.6-1.6M7.7 7.7L6.1 6.1"/></svg></span><span class="nav-label">Setup</span></a>
+      <a href="#" class="nav-link" id="nav-catalogue-tab" onclick="goToTab('catalogue', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="7.5" height="7.5" rx="1.5"/><rect x="13" y="4" width="7.5" height="7.5" rx="1.5"/><rect x="3.5" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg></span><span class="nav-label">Piece Catalogue</span></a>
       <a href="#" class="nav-link" id="nav-staff-tab" onclick="goToTab('staff', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="16" rx="2.2"/><path d="M3.5 9.5h17M8 3v3M16 3v3"/><path d="M8 14l2.4 2.4L16.5 10.5"/></svg></span><span class="nav-label">Daily Bookings</span></a>
       <a href="#" class="nav-link" onclick="goToTab('community', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 15.5H6.2a2.7 2.7 0 01-2.7-2.7V7.7A2.7 2.7 0 016.2 5h9.6a2.7 2.7 0 012.7 2.7v1.4"/><path d="M6.5 15.5v3.3l3.7-3.3"/><path d="M11 19h6.8a2.7 2.7 0 002.7-2.7v-3.6a2.7 2.7 0 00-2.7-2.7H11a2.7 2.7 0 00-2.7 2.7v3.6A2.7 2.7 0 0011 19z"/></svg></span><span class="nav-label">Community</span></a>
       <a href="#" class="nav-link" id="nav-printqueue-tab" onclick="goToTab('printqueue', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5V4h11v5.5"/><rect x="3.5" y="9.5" width="17" height="7.5" rx="1.8"/><rect x="6.5" y="13.5" width="11" height="6.5" rx="1"/><circle cx="17" cy="12.3" r=".9" fill="currentColor" stroke="none"/></svg></span><span class="nav-label">Print Queue</span></a>
@@ -2627,6 +2628,81 @@
             </div>
             <button onclick="saveKdsConfig()" style="background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;">Save KDS Settings</button>
             <span id="kds-save-status" style="font-size:12px;color:var(--gu-dust);margin-left:10px;"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═════════════════════════════════════════════ -->
+      <!-- PIECE CATALOGUE TAB -->
+      <!-- Real photographed stock — customers browse this from home,
+           pick a specific piece, design their transfer against it, and
+           staff pre-glaze that exact piece ahead of the visit. -->
+      <!-- ═════════════════════════════════════════════ -->
+      <div id="catalogue-view" class="view" style="display: none;">
+        <h2 style="margin-top: 0;">🏺 Piece Catalogue</h2>
+        <p style="color: var(--gu-dust); font-size: 13px; margin-bottom: 20px; line-height: 1.5;">
+          Real pieces from your own stock — photograph and upload them here. Customers browse this from home, choose one before their visit, and can design a transfer against it. If they book far enough ahead (at least 7 days), you can pre-glaze their exact chosen piece so it's ready and waiting.
+        </p>
+
+        <div class="chart-container" style="margin-bottom: 20px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <h3 style="margin:0;">Add a piece</h3>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+            <input type="text" id="cat-new-name" placeholder="Name (e.g. Classic Mug)" style="padding:10px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;">
+            <select id="cat-new-category" style="padding:10px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;">
+              <option value="mug">Mug</option>
+              <option value="bowl">Bowl</option>
+              <option value="vase">Vase</option>
+              <option value="plate">Plate</option>
+              <option value="figurine">Figurine</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <textarea id="cat-new-description" placeholder="Description…" style="width:100%;padding:10px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;margin-bottom:10px;box-sizing:border-box;height:60px;resize:vertical;"></textarea>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+            <div>
+              <div style="font-size:10px;color:var(--gu-dust);margin-bottom:3px;">Height (cm)</div>
+              <input type="number" id="cat-new-height" step="0.1" style="width:100%;padding:8px;border:1px solid var(--gu-border);border-radius:8px;font-size:12px;box-sizing:border-box;">
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--gu-dust);margin-bottom:3px;">Width (cm)</div>
+              <input type="number" id="cat-new-width" step="0.1" style="width:100%;padding:8px;border:1px solid var(--gu-border);border-radius:8px;font-size:12px;box-sizing:border-box;">
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--gu-dust);margin-bottom:3px;">Depth (cm)</div>
+              <input type="number" id="cat-new-depth" step="0.1" style="width:100%;padding:8px;border:1px solid var(--gu-border);border-radius:8px;font-size:12px;box-sizing:border-box;">
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--gu-dust);margin-bottom:3px;">Price (£)</div>
+              <input type="number" id="cat-new-price" step="0.01" style="width:100%;padding:8px;border:1px solid var(--gu-border);border-radius:8px;font-size:12px;box-sizing:border-box;">
+            </div>
+          </div>
+          <div style="margin-bottom:10px;">
+            <div style="font-size:10px;color:var(--gu-dust);margin-bottom:3px;">Photo</div>
+            <input type="file" id="cat-new-image" accept="image/*" style="font-size:12px;">
+          </div>
+          <button onclick="addCataloguePiece()" style="width:100%;background:var(--gu-primary);color:white;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;">Add to catalogue</button>
+        </div>
+
+        <div class="chart-container">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <h3 style="margin:0;">Current catalogue</h3>
+            <button onclick="loadAdminCatalogue()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">🔄 Refresh</button>
+          </div>
+          <div id="admin-catalogue-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;">
+            <div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;grid-column:1/-1;">Loading…</div>
+          </div>
+        </div>
+
+        <div class="chart-container" style="margin-top: 20px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <h3 style="margin:0;">🏺 Pre-Glaze Queue</h3>
+            <button onclick="loadPreGlazeQueue()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">🔄 Refresh</button>
+          </div>
+          <p style="font-size:11px;color:var(--gu-dust);margin-bottom:12px;">Customers who've chosen a piece from home ahead of their visit — ordered by how soon they're due in.</p>
+          <div id="pre-glaze-queue-list">
+            <div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading…</div>
           </div>
         </div>
       </div>
@@ -3701,6 +3777,9 @@ function goToTab(tab, event) {
     populateDashboard();
   } else if (tab === 'setup') {
     loadConnectionStatus();
+  } else if (tab === 'catalogue') {
+    loadAdminCatalogue();
+    loadPreGlazeQueue();
   } else if (tab === 'shapes') {
     loadBisqueCatalog();
   } else if (tab === 'community') {
@@ -7927,6 +8006,135 @@ async function fireKilnBatchByCode(batchCode, showAlert) {
 // ══════════════════════════════════════════════════════════
 // STUDIO CONNECTION SETUP (Square, Stripe, table tracking)
 // ══════════════════════════════════════════════════════════
+
+// ── Piece Catalogue admin ──
+const CATALOGUE_CATEGORY_ICONS = { mug: '☕', bowl: '🥣', vase: '🏺', plate: '🍽️', figurine: '🗿', other: '🎨' };
+
+async function loadAdminCatalogue() {
+  const grid = document.getElementById('admin-catalogue-grid');
+  if (!grid) return;
+  try {
+    const res = await fetch(`${API_URL}/api/admin/catalogue?studioId=${studioId}`);
+    const data = await res.json();
+    const pieces = data.pieces || [];
+    if (!pieces.length) {
+      grid.innerHTML = '<div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;grid-column:1/-1;">No pieces uploaded yet — add your first one above.</div>';
+      return;
+    }
+    grid.innerHTML = pieces.map(p => `
+      <div style="background:white;border:1px solid var(--gu-border);border-radius:14px;overflow:hidden;${!p.active ? 'opacity:0.5;' : ''}">
+        <div style="height:110px;background:${p.image_url ? `url('${p.image_url}') center/cover` : 'var(--gu-bg)'};display:flex;align-items:center;justify-content:center;font-size:36px;">
+          ${!p.image_url ? (CATALOGUE_CATEGORY_ICONS[p.category] || '🎨') : ''}
+        </div>
+        <div style="padding:10px;">
+          <div style="font-size:13px;font-weight:700;">${p.name}</div>
+          <div style="font-size:10px;color:var(--gu-dust);margin-bottom:6px;">${[p.height_cm && `H${p.height_cm}`, p.width_cm && `W${p.width_cm}`].filter(Boolean).join(' × ')}cm · £${((p.price_cents||0)/100).toFixed(2)}</div>
+          <button onclick="toggleCataloguePiece('${p.id}', ${!p.active})" style="width:100%;background:${p.active ? 'none' : 'var(--gu-primary)'};color:${p.active ? '#d9534f' : 'white'};border:1px solid ${p.active ? '#d9534f' : 'var(--gu-primary)'};border-radius:8px;padding:6px;font-size:11px;font-weight:700;cursor:pointer;">${p.active ? 'Remove' : 'Restore'}</button>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    grid.innerHTML = '<div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;grid-column:1/-1;">Could not load the catalogue.</div>';
+  }
+}
+
+async function addCataloguePiece() {
+  const name = document.getElementById('cat-new-name').value.trim();
+  const category = document.getElementById('cat-new-category').value;
+  const description = document.getElementById('cat-new-description').value.trim();
+  const heightCm = parseFloat(document.getElementById('cat-new-height').value) || null;
+  const widthCm = parseFloat(document.getElementById('cat-new-width').value) || null;
+  const depthCm = parseFloat(document.getElementById('cat-new-depth').value) || null;
+  const priceCents = Math.round((parseFloat(document.getElementById('cat-new-price').value) || 0) * 100);
+  const imageFile = document.getElementById('cat-new-image').files[0];
+
+  if (!name) { alert('Give the piece a name first.'); return; }
+
+  try {
+    const res = await fetch(`${API_URL}/api/admin/catalogue`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, name, category, description, heightCm, widthCm, depthCm, priceCents })
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Could not add the piece.'); return; }
+
+    // If a photo was selected, upload it now against the newly-created piece
+    if (imageFile) {
+      const base64 = await fileToBase64(imageFile);
+      const ext = imageFile.name.split('.').pop();
+      await fetch(`${API_URL}/api/admin/catalogue/${data.piece.id}/image`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: base64, fileExt: ext })
+      });
+    }
+
+    // Clear the form
+    ['cat-new-name','cat-new-description','cat-new-height','cat-new-width','cat-new-depth','cat-new-price'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('cat-new-image').value = '';
+    loadAdminCatalogue();
+  } catch (e) {
+    alert('Could not add the piece — try again.');
+  }
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function toggleCataloguePiece(id, activate) {
+  if (activate) {
+    await fetch(`${API_URL}/api/admin/catalogue/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ active: true })
+    });
+  } else {
+    await fetch(`${API_URL}/api/admin/catalogue/${id}`, { method: 'DELETE' });
+  }
+  loadAdminCatalogue();
+}
+
+// ── Pre-glaze queue ──
+async function loadPreGlazeQueue() {
+  const list = document.getElementById('pre-glaze-queue-list');
+  if (!list) return;
+  try {
+    const res = await fetch(`${API_URL}/api/pre-glaze/queue?studioId=${studioId}`);
+    const data = await res.json();
+    const reservations = (data.reservations || []).filter(r => r.status !== 'collected');
+    if (!reservations.length) {
+      list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">No pre-glaze reservations right now.</div>';
+      return;
+    }
+    const STATUS_LABELS = { pending_glaze: '⏳ Needs glazing', glazed: '🎨 Glazed', fired: '🔥 Fired', ready: '✅ Ready', collected: 'Collected' };
+    const STATUS_NEXT = { pending_glaze: 'glazed', glazed: 'fired', fired: 'ready', ready: 'collected' };
+    list.innerHTML = reservations.map(r => {
+      const daysUntil = Math.round((new Date(r.visit_date) - new Date()) / (1000*60*60*24));
+      return `
+        <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--gu-bg);border-radius:10px;margin-bottom:8px;border-left:4px solid ${daysUntil <= 2 ? '#e53935' : '#B87946'};">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:700;">${r.piece_catalogue?.name || 'Piece'} — ${r.customer_name || r.booking_code}</div>
+            <div style="font-size:11px;color:var(--gu-dust);">Visit: ${new Date(r.visit_date).toLocaleDateString('en-GB',{day:'numeric',month:'short'})} (${daysUntil} day${daysUntil===1?'':'s'}) · ${STATUS_LABELS[r.status]}</div>
+          </div>
+          ${STATUS_NEXT[r.status] ? `<button onclick="advancePreGlazeStatus('${r.id}', '${STATUS_NEXT[r.status]}')" style="background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:8px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">Mark ${STATUS_LABELS[STATUS_NEXT[r.status]]}</button>` : ''}
+        </div>`;
+    }).join('');
+  } catch (e) {
+    list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Could not load the pre-glaze queue.</div>';
+  }
+}
+
+async function advancePreGlazeStatus(id, newStatus) {
+  await fetch(`${API_URL}/api/pre-glaze/${id}/status`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: newStatus })
+  });
+  loadPreGlazeQueue();
+}
 
 async function loadConnectionStatus() {
   const squareBadge = document.getElementById('square-status-badge');

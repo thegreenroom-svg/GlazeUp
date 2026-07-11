@@ -5717,6 +5717,171 @@ app.get('/api/square/bookings-debug', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════
+// PIECE CATALOGUE — real photographed stock, with dimensions and
+// descriptions, so customers can choose a specific piece from home
+// before their visit and have it pre-glazed white, ready and waiting.
+// This is genuinely new infrastructure — the earlier canvas-drawn
+// silhouette tool was a separate standalone thing, not a real product
+// catalogue with photos and admin upload.
+// ═══════════════════════════════════════════
+
+// GET /api/catalogue — customer-facing browse (only shows active items)
+app.get('/api/catalogue', async (req, res) => {
+  const { studioId, category } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  let query = supabase.from('piece_catalogue').select('*').eq('studio_id', studioId).eq('active', true);
+  if (category) query = query.eq('category', category);
+  const { data, error } = await query.order('name');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ pieces: data || [] });
+});
+
+// GET /api/catalogue/:id — single piece detail
+app.get('/api/catalogue/:id', async (req, res) => {
+  const { id } = req.params;
+  const { data, error } = await supabase.from('piece_catalogue').select('*').eq('id', id).single();
+  if (error || !data) return res.status(404).json({ error: 'Piece not found' });
+  res.json({ piece: data });
+});
+
+// ── Admin catalogue management ──
+// GET /api/admin/catalogue — includes inactive items too, for admin editing
+app.get('/api/admin/catalogue', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data, error } = await supabase.from('piece_catalogue').select('*').eq('studio_id', studioId).order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ pieces: data || [] });
+});
+
+app.post('/api/admin/catalogue', async (req, res) => {
+  const { studioId, name, category, description, heightCm, widthCm, depthCm, priceCents, imageUrl, stockCount } = req.body;
+  if (!studioId || !name) return res.status(400).json({ error: 'studioId and name required' });
+  const { data, error } = await supabase.from('piece_catalogue').insert({
+    studio_id: studioId, name, category: category || 'mug', description,
+    height_cm: heightCm || null, width_cm: widthCm || null, depth_cm: depthCm || null,
+    price_cents: priceCents || 0, image_url: imageUrl || null, stock_count: stockCount ?? null,
+    active: true,
+  }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ piece: data });
+});
+
+app.patch('/api/admin/catalogue/:id', async (req, res) => {
+  const { id } = req.params;
+  const updates = {};
+  const allowed = ['name', 'category', 'description', 'height_cm', 'width_cm', 'depth_cm', 'price_cents', 'image_url', 'stock_count', 'active'];
+  for (const key of allowed) {
+    const bodyKey = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+    if (req.body[bodyKey] !== undefined) updates[key] = req.body[bodyKey];
+  }
+  const { data, error } = await supabase.from('piece_catalogue').update(updates).eq('id', id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ piece: data });
+});
+
+app.delete('/api/admin/catalogue/:id', async (req, res) => {
+  const { id } = req.params;
+  await supabase.from('piece_catalogue').update({ active: false }).eq('id', id);
+  res.json({ status: 'deactivated' });
+});
+
+// POST /api/admin/catalogue/:id/image — accepts a base64 image upload
+// and stores it in Supabase Storage, returning a public URL. Studios
+// photograph their own real stock and upload it here.
+app.post('/api/admin/catalogue/:id/image', async (req, res) => {
+  const { id } = req.params;
+  const { imageBase64, fileExt } = req.body;
+  if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' });
+
+  try {
+    const buffer = Buffer.from(imageBase64.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    const fileName = `catalogue/${id}-${Date.now()}.${fileExt || 'jpg'}`;
+    const { error: uploadError } = await supabase.storage.from('piece-images').upload(fileName, buffer, {
+      contentType: `image/${fileExt || 'jpeg'}`, upsert: true,
+    });
+    if (uploadError) throw uploadError;
+
+    const { data: urlData } = supabase.storage.from('piece-images').getPublicUrl(fileName);
+    await supabase.from('piece_catalogue').update({ image_url: urlData.publicUrl }).eq('id', id);
+    res.json({ imageUrl: urlData.publicUrl });
+  } catch (error) {
+    console.error('Catalogue image upload error:', error);
+    res.status(500).json({ error: 'Could not upload image. Make sure a "piece-images" storage bucket exists in Supabase.' });
+  }
+});
+
+// ═══════════════════════════════════════════
+// PRE-GLAZE RESERVATIONS — a customer picks a specific catalogue
+// piece from home, designs their transfer against it, and staff
+// pre-glaze that exact piece white ahead of the customer's booked
+// visit. Needs a minimum lead time (default 7 days) so staff
+// genuinely have time to glaze and fire it before the visit.
+// ═══════════════════════════════════════════
+
+const PRE_GLAZE_MIN_LEAD_DAYS = 7;
+
+// POST /api/pre-glaze/reserve — customer chooses a piece ahead of their visit
+app.post('/api/pre-glaze/reserve', async (req, res) => {
+  const { studioId, bookingCode, catalogueItemId, customerName, visitDate } = req.body;
+  if (!studioId || !bookingCode || !catalogueItemId || !visitDate) {
+    return res.status(400).json({ error: 'studioId, bookingCode, catalogueItemId, visitDate required' });
+  }
+
+  // Enforce the real lead time — staff need genuine time to glaze and
+  // fire before the visit, this isn't just advisory.
+  const visit = new Date(visitDate);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const daysUntilVisit = Math.round((visit - today) / (1000 * 60 * 60 * 24));
+  if (daysUntilVisit < PRE_GLAZE_MIN_LEAD_DAYS) {
+    return res.status(400).json({
+      error: `Pre-glazing needs at least ${PRE_GLAZE_MIN_LEAD_DAYS} days' notice before your visit — this visit is only ${daysUntilVisit} day(s) away. Please choose a piece in the studio instead, or move your booking further out.`,
+    });
+  }
+
+  const { data: catalogueItem } = await supabase.from('piece_catalogue').select('*').eq('id', catalogueItemId).single();
+  if (!catalogueItem) return res.status(404).json({ error: 'Catalogue piece not found' });
+
+  const { data, error } = await supabase.from('pre_glaze_reservations').insert({
+    studio_id: studioId, booking_code: bookingCode, catalogue_item_id: catalogueItemId,
+    customer_name: customerName || null, visit_date: visitDate, status: 'pending_glaze',
+  }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+
+  // Alert staff — this needs to happen well before the visit, not
+  // discovered on the day.
+  await supabase.from('staff_alerts').insert({
+    studio_id: studioId, trigger_type: 'pre_glaze_needed', next_role: 'Ceramic Technician',
+    booking_code: bookingCode, icon: '🏺', label: 'Pre-glaze reservation',
+    message: `${customerName || 'A customer'} has reserved "${catalogueItem.name}" for pre-glazing, ready for their visit on ${visitDate}.`,
+    context: { reservationId: data.id, catalogueItemId, visitDate }, acknowledged: false,
+  });
+
+  res.json({ reservation: data, piece: catalogueItem });
+});
+
+// GET /api/pre-glaze/queue — staff view: what needs pre-glazing, ordered
+// by how soon the visit is
+app.get('/api/pre-glaze/queue', async (req, res) => {
+  const { studioId, status } = req.query;
+  let query = supabase.from('pre_glaze_reservations').select('*, piece_catalogue(name, image_url, category)').eq('studio_id', studioId);
+  if (status) query = query.eq('status', status);
+  const { data, error } = await query.order('visit_date', { ascending: true });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ reservations: data || [] });
+});
+
+app.patch('/api/pre-glaze/:id/status', async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body; // 'pending_glaze' | 'glazed' | 'fired' | 'ready' | 'collected'
+  const validStatuses = ['pending_glaze', 'glazed', 'fired', 'ready', 'collected'];
+  if (!validStatuses.includes(status)) return res.status(400).json({ error: 'Invalid status' });
+  const { data, error } = await supabase.from('pre_glaze_reservations').update({ status, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ reservation: data });
+});
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });

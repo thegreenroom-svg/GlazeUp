@@ -1631,6 +1631,31 @@
   </div>
 
 
+  <!-- Piece Catalogue — real photographed stock, browse from home before
+       a visit. Choosing a piece with enough lead time (7+ days) before a
+       booked visit lets staff pre-glaze that exact piece ready and
+       waiting. -->
+  <div id="catalogue-modal" style="display:none; position:fixed; inset:0; background:var(--gu-secondary); z-index:2900; overflow-y:auto;">
+    <div style="background:var(--link-charcoal); color:white; padding:20px; position:sticky; top:0; z-index:10; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div style="font-size:17px; font-weight:800;">🏺 Choose a Piece</div>
+        <div style="font-size:12px; opacity:0.7;">Real pieces from our own stock</div>
+      </div>
+      <button onclick="closePieceCatalogue()" style="background:rgba(255,255,255,0.15); border:none; color:white; width:32px; height:32px; border-radius:50%; font-size:16px; cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:16px;">
+      <div id="catalogue-browse-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div style="grid-column:1/-1; text-align:center; padding:30px; color:var(--gu-dust); font-size:13px;">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="piece-detail-modal" style="display:none; position:fixed; inset:0; background:rgba(43,39,36,0.75); backdrop-filter:blur(6px); z-index:2950; align-items:flex-end; justify-content:center;">
+    <div style="background:white; border-radius:24px 24px 0 0; max-width:420px; width:100%; max-height:88vh; overflow-y:auto; padding:22px;">
+      <div id="piece-detail-content"></div>
+    </div>
+  </div>
+
   <div id="print-request-modal" style="display:none; position:fixed; inset:0; background:rgba(43,39,36,0.7); backdrop-filter:blur(4px); z-index:3000; align-items:center; justify-content:center; padding:20px;">
     <div style="background:#fff; border-radius:16px; padding:22px; max-width:340px; width:100%; text-align:center; max-height:88vh; overflow-y:auto;">
       <div style="font-size:32px; margin-bottom:8px;">🖨️</div>
@@ -2032,6 +2057,12 @@
             <span class="tile-icon">🎨</span>
             <div class="tile-title">Colour Picker</div>
             <div class="tile-desc">Browse the studio's glaze colours and plan your palette.</div>
+          </button>
+
+          <button class="tile" id="tile-browse-catalogue" onclick="openPieceCatalogue()" style="background:linear-gradient(135deg,#2E7D32,#1B5E20);position:relative;">
+            <span class="tile-icon">🏺</span>
+            <div class="tile-title" style="color:#fff;">Choose a Piece</div>
+            <div class="tile-desc" style="color:rgba(255,255,255,0.75);">Browse our real pieces from home, pick one, and have it glazed ready for your visit.</div>
           </button>
 
           <button class="tile tile-honey" id="tile-design-preview" onclick="openDesignPreviewGated()" style="position: relative;">
@@ -2864,6 +2895,92 @@
     function setMyPalette(arr) {
       localStorage.setItem('link_my_palette', JSON.stringify(arr));
       document.getElementById('cp-palette-count').textContent = arr.length;
+    }
+
+    // ── Piece Catalogue — browse real stock from home, reserve one
+    // ahead of a visit with enough lead time for pre-glazing ──
+    const CATALOGUE_CATEGORY_ICONS = { mug: '☕', bowl: '🥣', vase: '🏺', plate: '🍽️', figurine: '🗿', other: '🎨' };
+    const PRE_GLAZE_MIN_LEAD_DAYS = 7;
+
+    async function openPieceCatalogue() {
+      document.getElementById('catalogue-modal').style.display = 'block';
+      const grid = document.getElementById('catalogue-browse-grid');
+      grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:30px; color:var(--gu-dust); font-size:13px;">Loading…</div>';
+      try {
+        const res = await fetch(`${API_URL}/api/catalogue?studioId=${STUDIO_ID}`);
+        const data = await res.json();
+        const pieces = data.pieces || [];
+        if (!pieces.length) {
+          grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:30px; color:var(--gu-dust); font-size:13px;">No pieces uploaded yet — check back soon, or ask a member of staff.</div>';
+          return;
+        }
+        window._catalogueData = pieces;
+        grid.innerHTML = pieces.map((p, i) => `
+          <button onclick="showPieceDetail(window._catalogueData[${i}])" style="background:white; border:none; border-radius:16px; overflow:hidden; text-align:left; cursor:pointer; box-shadow:0 2px 10px rgba(43,39,36,0.08);">
+            <div style="height:110px; background:${p.image_url ? `url('${p.image_url}') center/cover` : 'var(--gu-bg)'}; display:flex; align-items:center; justify-content:center; font-size:36px;">
+              ${!p.image_url ? (CATALOGUE_CATEGORY_ICONS[p.category] || '🎨') : ''}
+            </div>
+            <div style="padding:10px;">
+              <div style="font-size:13px; font-weight:700; color:var(--gu-text);">${p.name}</div>
+              <div style="font-size:11px; color:var(--gu-dust);">£${((p.price_cents||0)/100).toFixed(2)}</div>
+            </div>
+          </button>
+        `).join('');
+      } catch (e) {
+        grid.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:30px; color:var(--gu-dust); font-size:13px;">Could not load the catalogue right now.</div>';
+      }
+    }
+
+    function closePieceCatalogue() {
+      document.getElementById('catalogue-modal').style.display = 'none';
+    }
+
+    function showPieceDetail(piece) {
+      const content = document.getElementById('piece-detail-content');
+      const dims = [piece.height_cm && `Height ${piece.height_cm}cm`, piece.width_cm && `Width ${piece.width_cm}cm`, piece.depth_cm && `Depth ${piece.depth_cm}cm`].filter(Boolean).join(' · ');
+      content.innerHTML = `
+        <div style="height:180px; border-radius:16px; background:${piece.image_url ? `url('${piece.image_url}') center/cover` : 'var(--gu-bg)'}; display:flex; align-items:center; justify-content:center; font-size:50px; margin-bottom:14px;">
+          ${!piece.image_url ? (CATALOGUE_CATEGORY_ICONS[piece.category] || '🎨') : ''}
+        </div>
+        <div style="font-size:19px; font-weight:800; margin-bottom:4px;">${piece.name}</div>
+        <div style="font-size:13px; color:var(--gu-dust); margin-bottom:10px;">${dims}</div>
+        <div style="font-size:13px; color:var(--gu-text); line-height:1.5; margin-bottom:16px;">${piece.description || ''}</div>
+        <div style="font-size:16px; font-weight:800; color:var(--link-clay); margin-bottom:16px;">£${((piece.price_cents||0)/100).toFixed(2)}</div>
+
+        <div style="background:#fff9f0; border-radius:12px; padding:14px; margin-bottom:16px;">
+          <div style="font-size:12px; font-weight:700; color:var(--gu-accent); margin-bottom:6px;">📅 Reserve for pre-glazing</div>
+          <div style="font-size:11px; color:var(--gu-dust); line-height:1.5; margin-bottom:10px;">Choose your visit date below — we need at least ${PRE_GLAZE_MIN_LEAD_DAYS} days' notice to glaze and fire this exact piece so it's ready when you arrive. Shorter notice? You can still choose a piece in person on the day.</div>
+          <input type="date" id="reserve-visit-date" style="width:100%; padding:10px; border:1px solid var(--gu-border); border-radius:10px; font-size:13px; margin-bottom:10px; box-sizing:border-box;">
+          <button onclick="reservePieceForVisit('${piece.id}')" style="width:100%; background:var(--link-charcoal); color:white; border:none; border-radius:12px; padding:13px; font-size:14px; font-weight:700; cursor:pointer;">Reserve this piece</button>
+        </div>
+        <button onclick="document.getElementById('piece-detail-modal').style.display='none';" style="width:100%; background:none; border:none; color:var(--gu-dust); padding:8px; font-size:13px; cursor:pointer;">Back to browsing</button>
+      `;
+      document.getElementById('piece-detail-modal').style.display = 'flex';
+    }
+
+    async function reservePieceForVisit(catalogueItemId) {
+      const visitDate = document.getElementById('reserve-visit-date').value;
+      if (!visitDate) { alert('Please choose your visit date first.'); return; }
+
+      const bookingCode = window.currentBooking ? window.currentBooking.code : null;
+      if (!bookingCode) {
+        alert('This needs to be linked to a booking — please scan your booking QR code first, or ask a member of staff to help.');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_URL}/api/pre-glaze/reserve`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studioId: STUDIO_ID, bookingCode, catalogueItemId, visitDate })
+        });
+        const data = await res.json();
+        if (!res.ok) { alert(data.error || 'Could not reserve this piece.'); return; }
+        alert(`✅ Reserved! We'll have "${data.piece.name}" glazed and ready for your visit on ${new Date(visitDate).toLocaleDateString('en-GB',{day:'numeric',month:'long'})}.`);
+        document.getElementById('piece-detail-modal').style.display = 'none';
+        closePieceCatalogue();
+      } catch (e) {
+        alert('Something went wrong — please try again or ask a member of staff.');
+      }
     }
 
     function openColourPicker() {
