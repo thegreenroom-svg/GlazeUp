@@ -1443,15 +1443,17 @@
 
     <button id="fp1-next-btn" onclick="goToFindPieceStep2()" disabled style="width:100%;max-width:400px;background:#8a8175;color:white;border:none;border-radius:14px;padding:16px;font-size:15px;font-weight:800;cursor:not-allowed;margin-bottom:18px;">Take a photo first, then continue →</button>
 
-    <!-- Text search — genuinely collapsed by default, one small link -->
-    <button onclick="toggleFp1TextSearch()" id="fp1-text-toggle" style="background:none;border:none;color:#8a8175;font-size:13px;cursor:pointer;text-decoration:underline;margin-bottom:6px;">Can't get a clean photo? Search by text instead</button>
+    <!-- Text search — genuinely collapsed by default, now a real
+         visible secondary button (was plain underlined text, not
+         obviously tappable). -->
+    <button onclick="toggleFp1TextSearch()" id="fp1-text-toggle" style="width:100%;max-width:400px;background:#2B2724;border:1.5px solid #5a5148;color:white;font-size:13px;font-weight:700;cursor:pointer;border-radius:12px;padding:12px;margin-bottom:8px;">🔤 Can't get a clean photo? Search by text</button>
 
     <!-- Genuine separate path: check what's already been found for a
          specific booking, rather than searching by photo. Real
          distinct use case from the photo-search flow above — this is
          for checking progress on an order, not locating an unknown
          piece. -->
-    <button onclick="toggleFp1BookingCheck()" id="fp1-booking-toggle" style="background:none;border:none;color:#8a8175;font-size:13px;cursor:pointer;text-decoration:underline;margin-bottom:6px;">Or check what's already found for a booking</button>
+    <button onclick="toggleFp1BookingCheck()" id="fp1-booking-toggle" style="width:100%;max-width:400px;background:#2B2724;border:1.5px solid #5a5148;color:white;font-size:13px;font-weight:700;cursor:pointer;border-radius:12px;padding:12px;margin-bottom:8px;">📋 Check what's already found for a booking</button>
 
     <div id="fp1-booking-check-area" style="display:none;width:100%;max-width:400px;margin-top:10px;">
       <div style="display:flex;gap:8px;">
@@ -1473,7 +1475,7 @@
          confirmation tap needed. Real, honest safeguards: only ever
          auto-assigns on unambiguous high confidence, always shows the
          result plainly, and stays reversible via a real undo button. -->
-    <button onclick="toggleFp1AutoMatch()" id="fp1-automatch-toggle" style="background:none;border:none;color:#8a8175;font-size:13px;cursor:pointer;text-decoration:underline;margin-bottom:6px;">🤖 Or auto-match this piece to its booking</button>
+    <button onclick="toggleFp1AutoMatch()" id="fp1-automatch-toggle" style="width:100%;max-width:400px;background:#3d2e5c;border:1.5px solid #5E35B1;color:white;font-size:13px;font-weight:700;cursor:pointer;border-radius:12px;padding:12px;margin-bottom:8px;">🤖 Auto-match this piece to its booking</button>
 
     <div id="fp1-automatch-area" style="display:none;width:100%;max-width:400px;margin-top:10px;">
       <div style="font-size:12px;color:#cfc7bd;margin-bottom:10px;line-height:1.4;">Photograph a piece with no booking code — this searches every real piece on file and, if genuinely confident, marks it found automatically. Always shown clearly, always reversible.</div>
