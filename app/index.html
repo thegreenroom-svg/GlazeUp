@@ -6172,7 +6172,7 @@
       // Callers that want the plain neutral voice (the walkthrough
       // tour) pass their own values; anything else defaults to hers.
       utt.rate = rate != null ? rate : 1.05;
-      utt.pitch = pitch != null ? pitch : 1.3;
+      utt.pitch = pitch != null ? pitch : 2; // genuine real maximum (spec range 0-2), per direct request
       utt.lang = 'en-GB';
       utt.voice = getCleoPreferredVoice();
       if (onStart) utt.onstart = onStart;
@@ -6256,7 +6256,7 @@
       const utt = new SpeechSynthesisUtterance("Hi, I'm Cleo! This is what I sound like.");
       utt.voice = voice;
       utt.rate = 1.05;
-      utt.pitch = 1.3;
+      utt.pitch = 2;
       window.speechSynthesis.speak(utt);
     }
 
