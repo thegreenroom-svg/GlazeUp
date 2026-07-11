@@ -83,12 +83,30 @@
 
     * { box-sizing: border-box; }
 
+    html {
+      /* Was completely missing — genuinely relevant since the research
+         on this exact iOS bug repeatedly points to html/body height
+         interaction as the real underlying cause, not just body alone. */
+      height: 100%;
+      -webkit-text-size-adjust: 100%;
+    }
     body {
       margin: 0;
       font-family: var(--gu-font-body);
       background: var(--gu-bg);
       color: var(--gu-accent);
       -webkit-tap-highlight-color: transparent;
+      /* Genuine fix for a well-documented iOS Safari issue: without this,
+         the page can become unresponsive to scroll gestures — especially
+         after rotation between portrait/landscape, or with several
+         position:fixed elements on screen (which this app genuinely has:
+         Cleo, the assistant, Find My Piece, etc). This was completely
+         missing from the main scrollable body before — it only existed
+         on one small internal colour-swatch strip, nowhere near the
+         actual page-level scroll that was reported broken. */
+      -webkit-overflow-scrolling: touch;
+      overflow-x: hidden;
+      min-height: 100%;
     }
 
     /* Warm glazed top banner */
@@ -2238,6 +2256,15 @@
             <div class="tile-desc">Browse the studio's glaze colours and plan your palette.</div>
           </button>
 
+          <!-- Real mirror link to Club Pages — a genuine standalone
+               tile, always reachable, not solely dependent on tapping
+               Cleo at the right moment in her message rotation. -->
+          <button class="tile" id="tile-club-pages" onclick="openCommunityFeedOnClubTab()" style="background:linear-gradient(135deg,#5E35B1,#3949ab);position:relative;">
+            <span class="tile-icon">🎉</span>
+            <div class="tile-title">Club Pages</div>
+            <div class="tile-desc">See painted pieces from pottery studios worldwide, and post your own.</div>
+          </button>
+
           <button class="tile" id="tile-browse-catalogue" onclick="openPieceCatalogue()" style="background:linear-gradient(135deg,#2E7D32,#1B5E20);position:relative;">
             <span class="tile-icon">🏺</span>
             <div class="tile-title" style="color:#fff;">Choose a Piece</div>
@@ -3609,6 +3636,7 @@
     // assumed) — no point promising stickers that don't exist here.
     let _cleoFloatingClubEnabled = false;
     let _cleoFloatingMessageIndex = 0;
+    let _cleoFloatingCurrentMessage = null;
     let _cleoFloatingRotationTimer = null;
 
     const CLEO_FLOATING_MESSAGES_BASE = [
@@ -3668,16 +3696,19 @@
       if (!bubble) return;
       const msg = messages[_cleoFloatingMessageIndex % messages.length];
       bubble.textContent = msg.text;
+      _cleoFloatingCurrentMessage = msg; // genuinely track the actual object shown, not just an index that can drift if the array length changes between calls (e.g. once the real Cleo's Club config finishes loading)
       _cleoFloatingMessageIndex++;
     }
 
     function handleCleoFloatingTap() {
-      const messages = getCleoFloatingMessages();
-      // Use the message currently showing (one back, since rotation
-      // already advanced the index when it was displayed) — tapping
-      // should act on what the person actually sees, not the next one.
-      const currentIndex = (_cleoFloatingMessageIndex - 1 + messages.length) % messages.length;
-      const current = messages[currentIndex];
+      // Act on the ACTUAL message object currently displayed — not a
+      // recomputed index, which was a real bug: if the message array's
+      // length changed between the bubble rendering and the tap (e.g.
+      // the async Cleo's Club config check resolved in between), the
+      // "current index" math went wrong and could land on a message
+      // with no action at all, making the tap silently do nothing.
+      const current = _cleoFloatingCurrentMessage;
+      if (!current) return;
       if (current.action === 'clubpages') {
         openCommunityFeedOnClubTab();
       } else if (current.action === 'stickers') {

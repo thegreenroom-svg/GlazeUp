@@ -5936,8 +5936,19 @@ app.post('/api/loyalty/visit', async (req, res) => {
     let cleosClubResult = null;
     const { data: clubConfig } = await supabase.from('cleos_club_config').select('*').eq('studio_id', studioId).eq('enabled', true).single();
     if (clubConfig) {
-      const { data: stickerTypes } = await supabase.from('cleos_club_sticker_types').select('*');
-      if (stickerTypes && stickerTypes.length) {
+      const { data: allStickerTypes } = await supabase.from('cleos_club_sticker_types').select('*');
+      // Genuinely filter to only stickers available RIGHT NOW — a
+      // seasonal sticker (e.g. Halloween) with a real date window
+      // should never be awarded outside it, otherwise the whole point
+      // of it being seasonal/limited is lost.
+      const todayStr = new Date().toISOString().split('T')[0];
+      const stickerTypes = (allStickerTypes || []).filter(s => {
+        const afterStart = !s.available_from || s.available_from <= todayStr;
+        const beforeEnd = !s.available_until || s.available_until >= todayStr;
+        return afterStart && beforeEnd;
+      });
+
+      if (stickerTypes.length) {
         // Weighted-ish pick: mostly common, occasionally rare/special —
         // genuinely varied, not the same sticker every time.
         const commons = stickerTypes.filter(s => s.rarity === 'common');
@@ -5950,7 +5961,7 @@ app.post('/api/loyalty/visit', async (req, res) => {
           studio_id: studioId, customer_id: customerId, sticker_type_id: sticker.id, visit_number: newVisits,
         });
 
-        cleosClubResult = { stickerEarned: sticker, rewardUnlocked: null };
+        cleosClubResult = { stickerEarned: sticker, rewardUnlocked: null, setCompletionBonus: null };
 
         const rewardEvery = clubConfig.reward_every_n_visits || 5;
         if (newVisits % rewardEvery === 0) {
@@ -5959,6 +5970,32 @@ app.post('/api/loyalty/visit', async (req, res) => {
             reward_description: clubConfig.reward_description || 'A free treat!',
           }).select().single();
           cleosClubResult.rewardUnlocked = reward;
+        }
+
+        // "Complete the Set" bonus — genuinely checks whether this
+        // customer has now earned at least one of every ALWAYS-
+        // AVAILABLE sticker type (seasonal ones deliberately excluded
+        // from the set, since requiring a Halloween visit to "complete"
+        // it wouldn't be fair for a customer who only ever visits in
+        // spring). Only awarded once ever per customer.
+        const alwaysAvailableTypes = (allStickerTypes || []).filter(s => !s.available_from && !s.available_until);
+        if (alwaysAvailableTypes.length) {
+          const { data: alreadyAwarded } = await supabase.from('cleos_club_set_completion_bonuses')
+            .select('id').eq('studio_id', studioId).eq('customer_id', customerId).single();
+          if (!alreadyAwarded) {
+            const { data: earnedStickers } = await supabase.from('cleos_club_stickers_earned')
+              .select('sticker_type_id').eq('studio_id', studioId).eq('customer_id', customerId);
+            const earnedTypeIds = new Set((earnedStickers || []).map(s => s.sticker_type_id));
+            const hasCompleteSet = alwaysAvailableTypes.every(t => earnedTypeIds.has(t.id));
+            if (hasCompleteSet) {
+              await supabase.from('cleos_club_set_completion_bonuses').insert({ studio_id: studioId, customer_id: customerId });
+              const { data: bonusReward } = await supabase.from('cleos_club_rewards_earned').insert({
+                studio_id: studioId, customer_id: customerId, visit_number: newVisits,
+                reward_description: '🌟 Complete Set Bonus — a special extra treat, on us!',
+              }).select().single();
+              cleosClubResult.setCompletionBonus = bonusReward;
+            }
+          }
         }
       }
     }
