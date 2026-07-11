@@ -6834,6 +6834,14 @@ function applyShiftUI() {
   document.getElementById('direct-break-btn').style.display = 'flex';
   document.getElementById('staff-assistant-fab').style.display = 'flex';
   document.getElementById('find-piece-fab').style.display = 'flex';
+  // Genuine real bug fix: the break button's visual state (Start vs
+  // End) was never refreshed when a session resumed after the device
+  // went idle/was put down — currentBreakId correctly restored in
+  // memory, but the button kept showing whatever it displayed before,
+  // out of sync with reality. If someone was genuinely on break,
+  // tapping it would incorrectly try to START a new break instead of
+  // ending the real one already in progress — precisely backwards.
+  updateBreakUI();
   initCleoAdminFloatingWidget();
   // Show the hint bubble shortly after login (not instantly — let the
   // rest of the UI settle first) unless it's already been dismissed
