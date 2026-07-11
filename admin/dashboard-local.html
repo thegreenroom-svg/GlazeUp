@@ -11462,16 +11462,30 @@ async function handleFindPieceStep2Capture(event) {
       // the honest result and reasoning — not just a yes/no with
       // nothing to actually look at.
       const confidenceColor = data.confidence === 'high' ? '#4caf50' : data.confidence === 'medium' ? '#F9A825' : '#8a8175';
+      // Real arrow overlay pointing at the AI's estimated centre point
+      // — genuinely more precise than the old 9-cell zone ("middle
+      // centre" was honestly too ambiguous to be useful). Still an
+      // estimate, not pixel-perfect, so the label says so honestly
+      // rather than implying false precision.
+      const hasCoords = data.found && data.centreX != null && data.centreY != null;
+      const arrowMarker = hasCoords ? `
+        <div style="position:absolute;left:${data.centreX}%;top:${data.centreY}%;transform:translate(-50%,-100%);pointer-events:none;">
+          <div style="font-size:32px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.6));">📍</div>
+        </div>
+        <div style="position:absolute;left:${data.centreX}%;top:${data.centreY}%;transform:translate(-50%,-50%);width:14px;height:14px;border-radius:50%;background:${confidenceColor};border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.5);pointer-events:none;"></div>
+      ` : '';
+
       resultEl.innerHTML = `
         <div style="border-radius:14px;overflow:hidden;margin-bottom:16px;position:relative;">
           <img src="${scenePhotoDataUrl}" style="width:100%;display:block;">
+          ${arrowMarker}
         </div>
         <div style="background:${data.found ? 'rgba(76,175,80,0.15)' : 'rgba(138,129,117,0.15)'};border:1.5px solid ${data.found ? '#4caf50' : '#5a5148'};border-radius:14px;padding:16px;margin-bottom:12px;">
           <div style="font-size:18px;font-weight:800;color:${data.found ? '#4caf50' : 'white'};margin-bottom:6px;">
             ${data.found ? '✓ Found it' : '✗ Not found in this photo'}
             ${data.found ? `<span style="font-size:11px;font-weight:700;color:${confidenceColor};text-transform:uppercase;margin-left:8px;">${data.confidence} confidence</span>` : ''}
           </div>
-          ${data.found && data.approxPosition ? `<div style="font-size:13px;color:#cfc7bd;margin-bottom:8px;">Roughly: ${data.approxPosition.replace('-', ' ')}</div>` : ''}
+          ${hasCoords ? `<div style="font-size:12px;color:#cfc7bd;margin-bottom:8px;">📍 marks the estimated spot${data.coordinateConfidence === 'approximate' ? ' — roughly, not pixel-precise' : ''}</div>` : ''}
           <div style="font-size:13px;color:white;line-height:1.5;">${data.reasoning || ''}</div>
         </div>
         ${data.otherObjectsNoted ? `<div style="font-size:12px;color:#8a8175;margin-bottom:16px;">Also visible in scene: ${data.otherObjectsNoted}</div>` : ''}

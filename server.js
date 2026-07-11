@@ -7046,7 +7046,9 @@ Look carefully at the scene photo and determine: is the object from the first ph
 
 Be honest — if you're not confident it's there, say so clearly rather than guessing. If pieces in the scene are overlapping or too small/blurry to tell confidently, mention that specifically. If multiple objects in the scene are plausible candidates, note the strongest one but mention the ambiguity in your reasoning.
 
-Respond ONLY as JSON: {"found": true or false, "confidence": "high" | "medium" | "low", "approxPosition": "top-left" | "top-centre" | "top-right" | "middle-left" | "middle-centre" | "middle-right" | "bottom-left" | "bottom-centre" | "bottom-right" | null, "reasoning": "honest explanation of what you compared and why you reached this conclusion", "otherObjectsNoted": "brief note on what else is visible in the scene, for context"}`,
+If found, also estimate the CENTRE POINT of the object as x/y percentages of the scene image (0,0 = top-left corner, 100,100 = bottom-right corner) — as precise as you can genuinely manage, for pointing an arrow directly at it. This is an estimate, not pixel-perfect — say so honestly in coordinateConfidence if you're only roughly sure of the position even though you're confident it's the right object.
+
+Respond ONLY as JSON: {"found": true or false, "confidence": "high" | "medium" | "low", "centreX": 0-100 or null, "centreY": 0-100 or null, "coordinateConfidence": "precise" | "approximate" | null, "reasoning": "honest explanation of what you compared and why you reached this conclusion", "otherObjectsNoted": "brief note on what else is visible in the scene, for context"}`,
       },
       { type: 'text', text: 'Target object (what we\'re looking for):' },
       { type: 'image_url', image_url: { url: targetPhotoBase64.startsWith('data:') ? targetPhotoBase64 : `data:image/jpeg;base64,${targetPhotoBase64}` } },
