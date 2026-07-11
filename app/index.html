@@ -6226,14 +6226,23 @@
         if (saved) return saved;
       }
       // Genuine real default, per direct request: "Junior" if this
-      // device actually has it (confirmed present in the picker).
+      // device actually has it — a real iOS-only voice name, so this
+      // genuinely never matches on Android; the fallback below is
+      // what Android actually uses.
       const junior = voices.find(v => v.name === 'Junior');
       if (junior) return junior;
-      const ukFemale = voices.find(v => v.lang === 'en-GB' && CLEO_FEMALE_VOICE_HINTS.some(hint => v.name.toLowerCase().includes(hint)));
+      // Real fix: startsWith, not strict equality — Android/Chrome
+      // sometimes reports locale variants (e.g. 'en-GB-x-...') that a
+      // strict === 'en-GB' check would genuinely miss even for a
+      // correct UK voice. Also explicitly checks for Google's own
+      // real Android naming convention ("Google UK English Female"),
+      // which is honestly a more reliable real signal there than the
+      // iOS-style name list.
+      const ukFemale = voices.find(v => v.lang.startsWith('en-GB') && CLEO_FEMALE_VOICE_HINTS.some(hint => v.name.toLowerCase().includes(hint)));
       if (ukFemale) return ukFemale;
       const anyFemale = voices.find(v => CLEO_FEMALE_VOICE_HINTS.some(hint => v.name.toLowerCase().includes(hint)));
       if (anyFemale) return anyFemale;
-      return voices.find(v => v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en')) || voices[0];
+      return voices.find(v => v.lang.startsWith('en-GB')) || voices.find(v => v.lang.startsWith('en')) || voices[0];
     }
 
     function openCleoVoicePicker() {

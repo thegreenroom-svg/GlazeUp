@@ -5180,14 +5180,16 @@ function getCleoAdminPreferredVoice() {
     if (saved) return saved;
   }
   // Genuine real default, per direct request: "Junior" if this
-  // device actually has it.
+  // device actually has it — a real iOS-only voice name, genuinely
+  // never matches on Android; the fallback below is what Android
+  // actually uses, fixed to reliably find the closest real match.
   const junior = voices.find(v => v.name === 'Junior');
   if (junior) return junior;
-  const ukFemale = voices.find(v => v.lang === 'en-GB' && CLEO_ADMIN_FEMALE_VOICE_HINTS.some(hint => v.name.toLowerCase().includes(hint)));
+  const ukFemale = voices.find(v => v.lang.startsWith('en-GB') && CLEO_ADMIN_FEMALE_VOICE_HINTS.some(hint => v.name.toLowerCase().includes(hint)));
   if (ukFemale) return ukFemale;
   const anyFemale = voices.find(v => CLEO_ADMIN_FEMALE_VOICE_HINTS.some(hint => v.name.toLowerCase().includes(hint)));
   if (anyFemale) return anyFemale;
-  return voices.find(v => v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en')) || voices[0];
+  return voices.find(v => v.lang.startsWith('en-GB')) || voices.find(v => v.lang.startsWith('en')) || voices[0];
 }
 
 // Genuine, honest voice picker for the staff side too — no browser
