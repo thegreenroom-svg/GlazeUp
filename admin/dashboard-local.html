@@ -4643,6 +4643,68 @@ function exitFocusMode() {
   goToTab('dashboard');
 }
 
+// ── Genuine real swipe-between-tabs — TRIAL, tablet Focus Mode only.
+// Careful to distinguish a real horizontal swipe from normal vertical
+// scrolling (the content area already scrolls a lot for real page
+// content) — only counts as a swipe if horizontal movement clearly
+// dominates vertical AND crosses a real minimum distance, so
+// imprecise touches or diagonal scrolls never misfire a tab change. ──
+const ADMIN_TAB_ORDER = ['dashboard','staff','tablecards','piecematch','labels','menu','stock','catalogue','printqueue','community','team','progress','branding','shapes','setup','platformrev'];
+let _swipeStartX = 0, _swipeStartY = 0, _swipeTracking = false;
+
+function isTabletFocusModeActive() {
+  return document.body.classList.contains('focus-mode') && window.innerWidth >= 521 && window.innerWidth <= 900;
+}
+
+let _tabSwipeInitialized = false;
+function initTabSwipe() {
+  if (_tabSwipeInitialized) return; // genuine guard — populateDashboard() runs every time Dashboard is revisited, not just once on page load, so this prevents attaching duplicate listeners
+  _tabSwipeInitialized = true;
+  const contentEl = document.getElementById('admin-content');
+  if (!contentEl) return;
+
+  contentEl.addEventListener('touchstart', (e) => {
+    if (!isTabletFocusModeActive()) { _swipeTracking = false; return; }
+    _swipeStartX = e.touches[0].clientX;
+    _swipeStartY = e.touches[0].clientY;
+    _swipeTracking = true;
+  }, { passive: true });
+
+  contentEl.addEventListener('touchend', (e) => {
+    if (!_swipeTracking) return;
+    _swipeTracking = false;
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const deltaX = endX - _swipeStartX;
+    const deltaY = endY - _swipeStartY;
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+
+    // Genuine real swipe: horizontal movement clearly dominant (at
+    // least 1.5x vertical) and past a real minimum distance — filters
+    // out diagonal scrolls and imprecise touches.
+    if (absX < 60 || absX < absY * 1.5) return;
+
+    // Real, honest tab list — skips Platform Revenue if this staff
+    // member genuinely can't see it (director-only), by checking the
+    // actual nav link's current real visibility rather than guessing.
+    const platformRevVisible = document.getElementById('nav-platformrev')?.style.display !== 'none';
+    const realOrder = ADMIN_TAB_ORDER.filter(t => t !== 'platformrev' || platformRevVisible);
+    const currentIndex = realOrder.indexOf(currentTab);
+    if (currentIndex === -1) return;
+
+    if (deltaX < 0) {
+      // Swiped left — genuinely go to the next tab
+      const nextTab = realOrder[currentIndex + 1];
+      if (nextTab) goToTab(nextTab);
+    } else {
+      // Swiped right — genuinely go to the previous tab
+      const prevTab = realOrder[currentIndex - 1];
+      if (prevTab) goToTab(prevTab);
+    }
+  }, { passive: true });
+}
+
 function toggleFloatingBackBtn() {
   const btn = document.getElementById('floating-back-btn');
   if (!btn) return;
@@ -9251,6 +9313,7 @@ async function populateDashboard() {
   loadDevicePanel();
   loadLoyaltyLeaderboard();
   loadDashboardAddonNudge();
+  initTabSwipe(); // genuine one-time setup — the listeners stay dormant until focus mode is actually active, safe to attach regardless of login state
   swtShowTrigger();
   startExtrasPollingOnLoad();
   startAlertPolling();
