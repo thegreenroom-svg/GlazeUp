@@ -1410,6 +1410,12 @@
       <div id="fmp-results" style="margin-top:16px;"></div>
 
       <div style="border-top:1px solid var(--gu-border);margin-top:20px;padding-top:16px;">
+        <!-- Genuinely for testing at home (or training a new starter):
+             photograph any object now as a "reference", put it in a
+             pile with other things, then use Photo Search above to see
+             if it finds it back. Just a fast path into the same lost
+             pieces registry the photo search already checks against. -->
+        <button onclick="addTestReferencePhoto()" style="width:100%;background:#c0392b;color:white;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">🧪 Add a test reference photo</button>
         <button onclick="openReportLostPiece()" style="width:100%;background:none;border:1.5px dashed var(--gu-dust);color:var(--gu-text);border-radius:10px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;">➕ Report a found/lost piece</button>
       </div>
     </div>
@@ -10686,6 +10692,59 @@ function captureLostPiecePhoto() {
   };
   input.click();
 }
+// One-tap test reference — genuinely for testing at home (or training):
+// photograph any object, it's saved instantly to the same lost pieces
+// registry the photo search already checks, auto-labelled with a
+// timestamp so multiple test shots don't collide. No form-filling — the
+// point is to make "photograph it, then go find it" as fast as possible.
+function addTestReferencePhoto() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.onchange = handleTestReferenceCapture;
+  input.click();
+}
+
+async function handleTestReferenceCapture(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const resultsEl = document.getElementById('fmp-results');
+  resultsEl.innerHTML = '<div style="padding:14px;text-align:center;color:var(--gu-dust);font-size:13px;">Saving reference photo…</div>';
+
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const uploadRes = await fetch(`${API_URL}/api/lost-pieces/upload-photo`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId, photoBase64: reader.result })
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadData.photoUrl) { resultsEl.innerHTML = '<div style="padding:14px;color:#d9534f;font-size:13px;">Could not save the photo — try again.</div>'; return; }
+
+      const timeLabel = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      await fetch(`${API_URL}/api/lost-pieces`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studioId, category: 'unidentified',
+          description: `Test reference — added ${timeLabel}`,
+          foundLocation: 'Test reference (home trial)',
+          photoUrl: uploadData.photoUrl, reportedBy: currentShiftStaff?.id || null,
+        })
+      });
+
+      resultsEl.innerHTML = `
+        <div style="padding:14px;background:#f0f8f0;border-radius:10px;text-align:center;">
+          <img src="${uploadData.photoUrl}" style="width:100px;height:100px;border-radius:10px;object-fit:cover;margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:700;color:#2e7d32;">✓ Saved as a test reference</div>
+          <div style="font-size:11px;color:var(--gu-dust);margin-top:4px;">Now put it in a pile with other objects, switch to Photo Search above, and photograph it again (or the whole pile) to test if it finds it.</div>
+        </div>
+      `;
+    } catch (e) {
+      resultsEl.innerHTML = '<div style="padding:14px;color:#d9534f;font-size:13px;">Could not save — try again.</div>';
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
 async function submitLostPiece() {
   const description = document.getElementById('rlp-description').value.trim();
   const location = document.getElementById('rlp-location').value.trim();
