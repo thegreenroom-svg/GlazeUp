@@ -1791,6 +1791,15 @@
       <div id="demo-pin-notice" style="background:#fff9f0;border:1px solid #f0e0c0;border-radius:10px;padding:9px 12px;margin-bottom:16px;font-size:11px;color:var(--link-clay);text-align:left;line-height:1.4;">
         🎬 <strong>Demo mode:</strong> every account currently uses <strong>0000</strong> to log in for easy in-studio demoing. Real individual PINs can be set any time via Team &amp; Duties.
       </div>
+      <!-- Genuinely temporary trial-only bypass — skips the PIN entirely.
+           Clearly labelled so it's obvious this isn't the real security
+           model; clock-in/out and timesheets stop being accurate
+           per-person while this is used, since anyone can click through
+           as anyone. Remove this button once the studio trial period
+           for open access ends and PINs go back to being required. -->
+      <button id="trial-bypass-btn" onclick="trialBypassLogin()" style="width:100%;background:none;border:1.5px dashed var(--gu-dust);color:var(--gu-dust);border-radius:12px;padding:11px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:14px;">
+        ⚡ Click here for now (trial — skips PIN)
+      </button>
       <input type="password" id="shift-pin-input" inputmode="numeric" maxlength="6" placeholder="• • • •"
         style="width:100%;text-align:center;font-size:28px;letter-spacing:10px;padding:14px;border:2px solid var(--gu-border);border-radius:14px;margin-bottom:14px;">
       <div id="shift-pin-error" style="color:#e53935;font-size:12px;margin-bottom:10px;display:none;">Incorrect PIN — try again.</div>
@@ -6074,7 +6083,7 @@ function checkShiftLogin() {
   loadLoginNamePicker();
 }
 
-const ROLE_COLORS_LOGIN = { 'Studio Manager':'#5E35B1', 'Studio Executive':'#1E88E5', 'Ceramic Technician':'#8D6E63', 'Studio Assistant':'#00897B', 'Barista':'#F4511E' };
+const ROLE_COLORS_LOGIN = { 'Studio Manager':'#5E35B1', 'Studio Executive':'#1E88E5', 'Ceramic Technician':'#8D6E63', 'Studio Assistant':'#00897B', 'Barista':'#F4511E', 'CEO':'#F9A825' };
 let selectedLoginMember = null;
 
 function showLoginScreen(screen) {
@@ -6149,6 +6158,19 @@ function selectLoginMember(member) {
 function backToNamePicker() {
   selectedLoginMember = null;
   showLoginScreen('picker');
+}
+
+// Genuinely temporary trial-only bypass — since every account is
+// currently on the shared demo PIN 0000 (DEMO_MODE), this just submits
+// that PIN automatically on the person's behalf, reusing the exact
+// same real shift-login endpoint as normal PIN entry. Still creates a
+// genuine clock-in record for whoever's selected — this isn't a
+// separate insecure path, it's a shortcut through the existing one.
+// REMOVE this once the trial period for open access ends.
+function trialBypassLogin() {
+  const input = document.getElementById('shift-pin-input');
+  if (input) input.value = '0000';
+  submitShiftPin();
 }
 
 async function submitShiftPin() {
