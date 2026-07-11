@@ -3164,6 +3164,23 @@
           </p>
         </div>
 
+        <!-- Genuine, real, growing knowledge base — staff teach Cleo
+             facts directly, used naturally by BOTH the customer chat
+             and the staff chat (same real facts, both real
+             audiences). Separate from the AI's built-in real
+             knowledge of pricing/hours/features — this is specifically
+             for anything staff want her to know that isn't already
+             covered. -->
+        <div class="setup-card" style="background:linear-gradient(135deg,rgba(249,168,37,0.06),rgba(94,53,177,0.04));border:1.5px solid rgba(249,168,37,0.25);">
+          <h3>🧠 Cleo's Knowledge Base</h3>
+          <p>Teach Cleo real facts about your studio — anything staff want her to know that isn't already covered. She'll use these naturally in both the customer and staff chat.</p>
+          <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <input type="text" id="knowledge-new-fact" placeholder="e.g. We're closed the last week of August" style="flex:1;padding:10px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;box-sizing:border-box;" onkeydown="if(event.key==='Enter') addStudioKnowledge()">
+            <button onclick="addStudioKnowledge()" style="background:#F9A825;color:white;border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">Teach her</button>
+          </div>
+          <div id="knowledge-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+        </div>
+
         <!-- Table Configuration -->
         <div class="chart-container" style="margin-top:20px;">
           <h3 style="margin:0 0 6px;">🪑 Studio Tables</h3>
@@ -4618,6 +4635,7 @@ function goToTab(tab, event) {
     loadAddonMarketplace();
     loadStickerTypes();
     loadOfferOfWeek();
+    loadStudioKnowledge();
   } else if (tab === 'branding') {
     loadBranding();
   } else if (tab === 'catalogue') {
@@ -10004,6 +10022,54 @@ function openKidPreview() {
 // ── Real sticker/offers management — genuine admin visibility and
 // control, was previously only ever configurable via SQL directly. ──
 // ── Genuine Offer of the Week — real admin control ──
+// ── Genuine Cleo's Knowledge Base — real, staff-managed facts ──
+async function loadStudioKnowledge() {
+  const listEl = document.getElementById('knowledge-list');
+  if (!listEl) return;
+  try {
+    const res = await fetch(`${API_URL}/api/studio-knowledge?studioId=${studioId}`);
+    const data = await res.json();
+    const knowledge = data.knowledge || [];
+    if (!knowledge.length) {
+      listEl.innerHTML = '<div style="padding:10px;text-align:center;color:var(--gu-dust);font-size:12px;">Nothing taught yet — add the first fact above.</div>';
+      return;
+    }
+    listEl.innerHTML = knowledge.map(k => `
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--gu-bg);border-radius:8px;">
+        <div style="flex:1;font-size:12.5px;color:var(--gu-text);">${k.fact}</div>
+        <button onclick="deleteStudioKnowledge('${k.id}')" style="background:none;border:none;color:#d9534f;font-size:11px;cursor:pointer;padding:4px;white-space:nowrap;">Remove</button>
+      </div>
+    `).join('');
+  } catch (e) {
+    listEl.innerHTML = '<div style="padding:10px;text-align:center;color:var(--gu-dust);font-size:12px;">Could not load — try again.</div>';
+  }
+}
+
+async function addStudioKnowledge() {
+  const input = document.getElementById('knowledge-new-fact');
+  const fact = input.value.trim();
+  if (!fact) return;
+  try {
+    await fetch(`${API_URL}/api/studio-knowledge`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, fact, addedBy: currentShiftStaff?.name || null })
+    });
+    input.value = '';
+    loadStudioKnowledge();
+  } catch (e) {
+    alert('Could not save — try again.');
+  }
+}
+
+async function deleteStudioKnowledge(id) {
+  try {
+    await fetch(`${API_URL}/api/studio-knowledge/${id}`, { method: 'DELETE' });
+    loadStudioKnowledge();
+  } catch (e) {
+    alert('Could not remove — try again.');
+  }
+}
+
 async function loadOfferOfWeek() {
   try {
     const res = await fetch(`${API_URL}/api/cleos-club/offer-of-week?studioId=${studioId}`);

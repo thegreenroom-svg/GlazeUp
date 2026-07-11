@@ -5503,11 +5503,17 @@
       const thinkingBubble = appendAssistantBubble('…', false);
 
       try {
+        // Genuine real customer identity — same resolution already
+        // proven for Cleo's Club stickers, reused here rather than
+        // building a second lookup. Only resolves if a real booking
+        // exists; no booking, no identity, no memory — never guessed.
+        const customerId = await resolveCleosClubCustomerId();
         const res = await fetch(`${API_URL}/api/assistant/chat`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             studioId: STUDIO_ID, context: 'customer', messages: assistantMessages,
             bookingCode: window.currentBooking ? window.currentBooking.code : null,
+            customerId: customerId || null,
           })
         });
         const data = await res.json();

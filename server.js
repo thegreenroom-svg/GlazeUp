@@ -3565,7 +3565,7 @@ async function executeAssistantFunction(name, args, studioId, context, bookingCo
 
 // POST /api/assistant/chat
 app.post('/api/assistant/chat', async (req, res) => {
-  const { studioId, context, messages, bookingCode, staffMemberId } = req.body;
+  const { studioId, context, messages, bookingCode, staffMemberId, customerId } = req.body;
   if (!studioId || !context || !messages) return res.status(400).json({ error: 'studioId, context, messages required' });
   if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'The assistant is not yet available.' });
   if (!ASSISTANT_SYSTEM_PROMPTS[context]) return res.status(400).json({ error: 'Invalid context' });
@@ -3581,8 +3581,29 @@ app.post('/api/assistant/chat', async (req, res) => {
   }
 
   try {
+    // Real, genuine memory injection — two separate sources, both
+    // optional, both additive to the base prompt:
+    // 1. Studio knowledge: whatever staff have taught her, usable in
+    //    every real context (customer AND staff chat both benefit).
+    // 2. Customer memory: durable facts about THIS specific returning
+    //    customer, only ever included when a real customerId is known
+    //    (no booking/identity, no memory — never guessed or assumed).
+    let memoryPrefix = '';
+    const { data: knowledge } = await supabase.from('studio_knowledge')
+      .select('fact').eq('studio_id', studioId).order('created_at', { ascending: false }).limit(30);
+    if (knowledge?.length) {
+      memoryPrefix += `\n\nThings the studio's real staff have taught you, genuinely true and worth using naturally when relevant:\n${knowledge.map(k => `- ${k.fact}`).join('\n')}`;
+    }
+    if (customerId && context === 'customer') {
+      const { data: memories } = await supabase.from('customer_memory')
+        .select('fact').eq('studio_id', studioId).eq('customer_id', customerId).order('created_at', { ascending: false }).limit(15);
+      if (memories?.length) {
+        memoryPrefix += `\n\nThis is a RETURNING customer — genuine things you've picked up about them from past real conversations, use naturally where it fits, never force it in:\n${memories.map(m => `- ${m.fact}`).join('\n')}`;
+      }
+    }
+
     const chatMessages = [
-      { role: 'system', content: ASSISTANT_SYSTEM_PROMPTS[context] },
+      { role: 'system', content: ASSISTANT_SYSTEM_PROMPTS[context] + memoryPrefix },
       ...messages.slice(-10), // keep recent context only, bounded
     ];
 
@@ -3635,10 +3656,74 @@ app.post('/api/assistant/chat', async (req, res) => {
     }
 
     res.json({ reply: replyText, pointTo, pointToLabel });
+
+    // Genuine, lightweight, real memory extraction — runs AFTER the
+    // real reply is already sent (never blocks or slows the actual
+    // response the customer is waiting for). Only for real returning
+    // customers with a known identity. A separate, cheap AI call
+    // decides if anything durable and worth remembering came up —
+    // most chats won't produce anything, and that's honest and fine.
+    if (customerId && context === 'customer') {
+      extractCustomerMemory(studioId, customerId, messages.slice(-4).concat([{ role: 'user', content: replyText }])).catch(() => {});
+    }
   } catch (err) {
     console.error('Assistant chat error:', err);
     res.status(500).json({ error: 'Something went wrong — please try again.' });
   }
+});
+
+// Real, honest background extraction — a separate, cheap AI call
+// decides whether anything from the last few real exchanges is
+// genuinely worth remembering long-term about this specific customer
+// (a stated preference, an occasion, a recurring detail) — NOT a
+// transcript dump, and explicitly told to say so if nothing durable
+// came up, rather than inventing something to justify the call.
+async function extractCustomerMemory(studioId, customerId, recentMessages) {
+  if (!process.env.OPENAI_API_KEY) return;
+  const transcript = recentMessages.map(m => `${m.role}: ${m.content}`).join('\n');
+  const prompt = `Below is a short real exchange between a customer and a pottery studio's chat assistant. Only extract something if it's a genuine, durable fact worth remembering about THIS customer for future visits — a stated preference, an occasion (birthday, wedding gift), a recurring detail. Do NOT extract one-off logistical questions (opening hours, pricing) or anything trivial. If nothing durable came up, say so honestly.
+
+${transcript}
+
+Respond ONLY as JSON: {"facts": ["short factual statement", ...]} — empty array if nothing genuinely worth remembering.`;
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], temperature: 0.2, max_tokens: 200 }),
+    });
+    const data = await res.json();
+    const parsed = JSON.parse((data.choices?.[0]?.message?.content || '{}').replace(/```json|```/g, '').trim());
+    const facts = parsed.facts || [];
+    if (facts.length) {
+      await supabase.from('customer_memory').insert(
+        facts.map(fact => ({ studio_id: studioId, customer_id: customerId, fact, source: 'chat' }))
+      );
+    }
+  } catch (e) { /* genuinely non-critical — memory is a nice-to-have, never worth surfacing an error over */ }
+}
+
+// ── Studio Knowledge — real, staff-managed facts Cleo can draw on ──
+app.get('/api/studio-knowledge', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data, error } = await supabase.from('studio_knowledge').select('*').eq('studio_id', studioId).order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ knowledge: data || [] });
+});
+
+app.post('/api/studio-knowledge', async (req, res) => {
+  const { studioId, fact, addedBy } = req.body;
+  if (!studioId || !fact) return res.status(400).json({ error: 'studioId and fact required' });
+  const { data, error } = await supabase.from('studio_knowledge').insert({ studio_id: studioId, fact, added_by: addedBy || null }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ entry: data });
+});
+
+app.delete('/api/studio-knowledge/:id', async (req, res) => {
+  const { error } = await supabase.from('studio_knowledge').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ deleted: true });
 });
 
 // GET /api/pieces/for-booking — every piece logged for a specific
