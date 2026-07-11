@@ -3881,19 +3881,24 @@
       // "current index" math went wrong and could land on a message
       // with no action at all, making the tap silently do nothing.
       const current = _cleoFloatingCurrentMessage;
-      if (!current) return;
-      if (current.action === 'chat') {
+      // Genuine real fix: tapping Cleo must ALWAYS do something —
+      // previously, if her rotating bubble happened to be showing the
+      // plain greeting or "I collect stickers" message (action: null),
+      // tapping did nothing at all. Her core real function (answering
+      // questions) shouldn't depend on rotation timing luck. Kid mode,
+      // Club Pages, and stickers stay reachable via their own specific
+      // messages, but "chat" is now the genuine default for anything
+      // without its own explicit action.
+      const action = current?.action || 'chat';
+      if (action === 'chat') {
         toggleAssistant();
-      } else if (current.action === 'clubpages') {
+      } else if (action === 'clubpages') {
         openCommunityFeedOnClubTab();
-      } else if (current.action === 'stickers') {
+      } else if (action === 'stickers') {
         openCleosClub();
-      } else if (current.action === 'kidmode') {
+      } else if (action === 'kidmode') {
         toggleKidMode();
       }
-      // No action for the plain greeting/growing-up messages — just a
-      // friendly presence, tapping those genuinely does nothing, which
-      // is fine, not every tap needs to go somewhere.
     }
 
     function getCleoCurrentAge() {
@@ -6077,12 +6082,17 @@
     // Genuine, generic speech function — real UK voice preference,
     // shared by the walkthrough tour AND Cleo's actual chat/tooltip
     // voice, rather than duplicating this logic in three places.
-    function cleoSpeak(text, onStart, onEnd) {
+    function cleoSpeak(text, onStart, onEnd, pitch, rate) {
       if (!window.speechSynthesis || !text) return;
       window.speechSynthesis.cancel();
       const utt = new SpeechSynthesisUtterance(text);
-      utt.rate = 0.95;
-      utt.pitch = 1;
+      // Genuine "cute" character voice for Cleo herself — brighter,
+      // slightly quicker, matching her actual written personality
+      // (clever and a little cheeky, not a flat neutral narrator).
+      // Callers that want the plain neutral voice (the walkthrough
+      // tour) pass their own values; anything else defaults to hers.
+      utt.rate = rate != null ? rate : 1.05;
+      utt.pitch = pitch != null ? pitch : 1.3;
       utt.lang = 'en-GB';
       const voices = window.speechSynthesis.getVoices();
       const ukVoice = voices.find(v => v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en'));
@@ -6095,7 +6105,8 @@
     function wtSpeak(text) {
       cleoSpeak(text,
         () => { const btn = document.getElementById('wt-voice-btn'); if (btn) { btn.textContent = '🔊 Speaking…'; btn.classList.add('speaking'); } wtSpeaking = true; },
-        () => { const btn = document.getElementById('wt-voice-btn'); if (btn) { btn.textContent = '🔊 Read aloud'; btn.classList.remove('speaking'); } wtSpeaking = false; }
+        () => { const btn = document.getElementById('wt-voice-btn'); if (btn) { btn.textContent = '🔊 Read aloud'; btn.classList.remove('speaking'); } wtSpeaking = false; },
+        1, 0.95 // genuine plain, neutral narrator voice for the walkthrough tour — not Cleo's cute character voice
       );
     }
 
