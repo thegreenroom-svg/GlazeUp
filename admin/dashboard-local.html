@@ -1970,6 +1970,7 @@
       </div>
     </div>
     <div style="display:flex; align-items:center; gap:6px;">
+      <button onclick="openCleoAdminVoicePicker()" title="Choose Cleo's voice" style="background:rgba(255,255,255,0.2); border:none; color:white; width:30px; height:30px; border-radius:50%; font-size:13px; cursor:pointer;">🎙️</button>
       <button id="staff-assistant-voice-toggle-btn" onclick="toggleStaffAssistantVoice()" title="Turn Cleo's voice on/off" style="background:rgba(255,255,255,0.2); border:none; color:white; width:30px; height:30px; border-radius:50%; font-size:14px; cursor:pointer;">🔊</button>
       <button onclick="toggleStaffAssistant()" style="background:none;border:none;color:rgba(255,255,255,0.8);font-size:20px;cursor:pointer;">✕</button>
     </div>
@@ -5157,12 +5158,91 @@ function cleoAdminSpeak(text, onStart, onEnd, pitch, rate) {
   utt.rate = rate != null ? rate : 1.05;
   utt.pitch = pitch != null ? pitch : 1.3;
   utt.lang = 'en-GB';
-  const voices = window.speechSynthesis.getVoices();
-  const v = voices.find(v => v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en'));
-  if (v) utt.voice = v;
+  utt.voice = getCleoAdminPreferredVoice();
   if (onStart) utt.onstart = onStart;
   if (onEnd) utt.onend = onEnd;
   window.speechSynthesis.speak(utt);
+}
+
+// Same real, honest voice-selection logic as the customer app: no
+// browser exposes a genuine "child" voice, so this prefers an actual
+// female-sounding voice by name instead of blindly picking whichever
+// voice the device happens to list first (often a male default like
+// "Daniel" on iOS).
+const CLEO_ADMIN_FEMALE_VOICE_HINTS = ['female', 'kate', 'serena', 'samantha', 'victoria', 'karen', 'moira', 'tessa', 'fiona', 'zira', 'susan', 'hazel'];
+function getCleoAdminPreferredVoice() {
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  const savedName = localStorage.getItem('klnk_cleo_admin_voice_name');
+  if (savedName) {
+    const saved = voices.find(v => v.name === savedName);
+    if (saved) return saved;
+  }
+  const ukFemale = voices.find(v => v.lang === 'en-GB' && CLEO_ADMIN_FEMALE_VOICE_HINTS.some(hint => v.name.toLowerCase().includes(hint)));
+  if (ukFemale) return ukFemale;
+  const anyFemale = voices.find(v => CLEO_ADMIN_FEMALE_VOICE_HINTS.some(hint => v.name.toLowerCase().includes(hint)));
+  if (anyFemale) return anyFemale;
+  return voices.find(v => v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en')) || voices[0];
+}
+
+// Genuine, honest voice picker for the staff side too — no browser
+// exposes a real "child" voice, so this shows every actual voice
+// available on the device rather than faking a fix. Temporarily
+// swaps the message area for a real picker list, restores it after.
+let _adminVoicePickerOpen = false;
+function openCleoAdminVoicePicker() {
+  const messagesEl = document.getElementById('staff-assistant-messages');
+  if (!messagesEl) return;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) {
+    window.speechSynthesis.onvoiceschanged = () => openCleoAdminVoicePicker();
+    return;
+  }
+  _adminVoicePickerOpen = true;
+  const englishVoices = voices.filter(v => v.lang.startsWith('en'));
+  const otherVoices = voices.filter(v => !v.lang.startsWith('en'));
+  const ordered = [...englishVoices, ...otherVoices];
+  const currentVoice = getCleoAdminPreferredVoice();
+
+  messagesEl.innerHTML = `
+    <div style="font-size:12px;color:var(--gu-dust);margin-bottom:8px;line-height:1.4;">🎙️ These are the real voices on this device — no app can add a genuine "child" voice, browsers don't offer one, so pick whichever sounds best.</div>
+    ${ordered.map(v => {
+      const isSelected = currentVoice && v.name === currentVoice.name;
+      return `
+      <div style="display:flex;align-items:center;gap:8px;padding:9px 10px;background:${isSelected ? '#fff3e0' : 'var(--gu-bg)'};border:1.5px solid ${isSelected ? '#F9A825' : 'transparent'};border-radius:10px;margin-bottom:6px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12.5px;font-weight:700;color:var(--gu-text);">${v.name}${isSelected ? ' ✓' : ''}</div>
+          <div style="font-size:10px;color:var(--gu-dust);">${v.lang}</div>
+        </div>
+        <button onclick="testCleoAdminVoice('${v.name.replace(/'/g, "\\'")}')" style="background:none;border:1px solid var(--gu-border);color:var(--gu-text);border-radius:8px;padding:5px 9px;font-size:10px;cursor:pointer;">▶ Test</button>
+        <button onclick="selectCleoAdminVoice('${v.name.replace(/'/g, "\\'")}')" style="background:#F9A825;color:white;border:none;border-radius:8px;padding:5px 9px;font-size:10px;font-weight:700;cursor:pointer;">Use</button>
+      </div>`;
+    }).join('')}
+    <button onclick="closeCleoAdminVoicePicker()" style="width:100%;background:none;border:1px solid var(--gu-border);color:var(--gu-dust);border-radius:10px;padding:10px;font-size:12px;cursor:pointer;margin-top:6px;">Done</button>
+  `;
+}
+
+function closeCleoAdminVoicePicker() {
+  _adminVoicePickerOpen = false;
+  const messagesEl = document.getElementById('staff-assistant-messages');
+  if (messagesEl) messagesEl.innerHTML = '<div style="background:var(--gu-bg);border-radius:14px 14px 14px 4px;padding:10px 14px;font-size:13px;align-self:flex-start;max-width:85%;">👋 Hi, I\'m Cleo! What would you like to know?</div><div id="staff-assistant-quick-options" style="display:flex;flex-wrap:wrap;gap:6px;align-self:flex-start;max-width:95%;"></div>';
+  populateStaffAssistantQuickOptions();
+}
+
+function testCleoAdminVoice(voiceName) {
+  const voices = window.speechSynthesis.getVoices();
+  const voice = voices.find(v => v.name === voiceName);
+  if (!voice) return;
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance("Hi, I'm Cleo! This is what I sound like.");
+  utt.voice = voice; utt.rate = 1.05; utt.pitch = 1.3;
+  window.speechSynthesis.speak(utt);
+}
+
+function selectCleoAdminVoice(voiceName) {
+  localStorage.setItem('klnk_cleo_admin_voice_name', voiceName);
+  testCleoAdminVoice(voiceName);
+  openCleoAdminVoicePicker(); // genuinely refresh so the new ✓ shows immediately
 }
 
 function swtSpeak(text) {

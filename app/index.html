@@ -1734,6 +1734,7 @@
         </div>
       </div>
       <div style="display:flex; align-items:center; gap:6px;">
+        <button id="assistant-voice-picker-btn" onclick="openCleoVoicePicker()" title="Choose Cleo's voice" style="background:rgba(255,255,255,0.2); border:none; color:white; width:30px; height:30px; border-radius:50%; font-size:13px; cursor:pointer;">🎙️</button>
         <button id="assistant-voice-toggle-btn" onclick="toggleAssistantVoice()" title="Turn Cleo's voice on/off" style="background:rgba(255,255,255,0.2); border:none; color:white; width:30px; height:30px; border-radius:50%; font-size:14px; cursor:pointer;">🔊</button>
         <button onclick="toggleAssistant()" style="background:none; border:none; color:rgba(255,255,255,0.8); font-size:20px; cursor:pointer;">✕</button>
       </div>
@@ -1754,6 +1755,24 @@
       <input type="text" id="assistant-input" placeholder="Or type your own question…" style="flex:1; padding:11px 14px; border:1px solid var(--gu-border); border-radius:20px; font-size:13px;" onkeydown="if(event.key==='Enter') sendAssistantMessage()">
       <button id="assistant-mic-btn" style="background:white; border:1.5px solid var(--gu-border); color:var(--gu-text); border-radius:50%; width:40px; height:40px; font-size:15px; cursor:pointer; flex-shrink:0;">🎤</button>
       <button onclick="sendAssistantMessage()" style="background:#F9A825; color:white; border:none; border-radius:50%; width:40px; height:40px; font-size:16px; cursor:pointer; flex-shrink:0;">→</button>
+    </div>
+  </div>
+
+  <!-- Genuine, honest voice picker — no browser exposes a real
+       "child" voice through the Web Speech API, so rather than fake a
+       fix, this shows every ACTUAL voice available on this specific
+       device and lets the person pick whichever genuinely sounds
+       best, with a real "Test" button to hear it before choosing. -->
+  <div id="cleo-voice-picker-modal" style="display:none; position:fixed; inset:0; z-index:9700; background:rgba(43,39,36,0.75); backdrop-filter:blur(6px); align-items:center; justify-content:center; padding:20px;">
+    <div style="background:white; border-radius:20px; max-width:380px; width:100%; max-height:80vh; display:flex; flex-direction:column;">
+      <div style="padding:20px 20px 12px;">
+        <div style="font-size:16px; font-weight:800; color:var(--gu-text); margin-bottom:4px;">🎙️ Choose Cleo's voice</div>
+        <div style="font-size:12px; color:var(--gu-dust); line-height:1.4;">These are the actual voices available on this device — no app can add a real "child" voice, browsers don't offer one, so pick whichever sounds best to you.</div>
+      </div>
+      <div id="cleo-voice-picker-list" style="flex:1; overflow-y:auto; padding:0 20px 12px;"></div>
+      <div style="padding:12px 20px; border-top:1px solid #f0ebe4;">
+        <button onclick="closeCleoVoicePicker()" style="width:100%; background:none; border:1px solid var(--gu-border); color:var(--gu-dust); border-radius:12px; padding:12px; font-size:13px; cursor:pointer;">Close</button>
+      </div>
     </div>
   </div>
 
@@ -6155,12 +6174,96 @@
       utt.rate = rate != null ? rate : 1.05;
       utt.pitch = pitch != null ? pitch : 1.3;
       utt.lang = 'en-GB';
-      const voices = window.speechSynthesis.getVoices();
-      const ukVoice = voices.find(v => v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en'));
-      if (ukVoice) utt.voice = ukVoice;
+      utt.voice = getCleoPreferredVoice();
       if (onStart) utt.onstart = onStart;
       if (onEnd) utt.onend = onEnd;
       window.speechSynthesis.speak(utt);
+    }
+
+    // Genuine, honest real voice selection. No standard browser
+    // exposes an actual "child" voice through the Web Speech API —
+    // that's a real platform limit, not something fixable in code.
+    // What's genuinely fixable: the old logic picked whichever UK
+    // voice happened to be listed first, which on iOS is very often
+    // a real male voice ("Daniel") — not a deliberate choice. This
+    // now: (1) uses the person's own saved pick if they've chosen one
+    // from the real picker, (2) otherwise prefers an actual
+    // female-sounding voice by name (closer to a youthful character,
+    // combined with the pitch bump above), (3) falls back to any
+    // English voice if neither is available.
+    const CLEO_FEMALE_VOICE_HINTS = ['female', 'kate', 'serena', 'samantha', 'victoria', 'karen', 'moira', 'tessa', 'fiona', 'zira', 'susan', 'hazel'];
+    function getCleoPreferredVoice() {
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices.length) return null;
+      const savedName = localStorage.getItem('klnk_cleo_voice_name');
+      if (savedName) {
+        const saved = voices.find(v => v.name === savedName);
+        if (saved) return saved;
+      }
+      const ukFemale = voices.find(v => v.lang === 'en-GB' && CLEO_FEMALE_VOICE_HINTS.some(hint => v.name.toLowerCase().includes(hint)));
+      if (ukFemale) return ukFemale;
+      const anyFemale = voices.find(v => CLEO_FEMALE_VOICE_HINTS.some(hint => v.name.toLowerCase().includes(hint)));
+      if (anyFemale) return anyFemale;
+      return voices.find(v => v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en')) || voices[0];
+    }
+
+    function openCleoVoicePicker() {
+      const modal = document.getElementById('cleo-voice-picker-modal');
+      const listEl = document.getElementById('cleo-voice-picker-list');
+      // Voices sometimes load asynchronously on first page visit — a
+      // real, honest browser quirk, not a bug here — so re-fetch fresh
+      // each time the picker opens rather than trusting an early
+      // empty result.
+      let voices = window.speechSynthesis.getVoices();
+      if (!voices.length) {
+        window.speechSynthesis.onvoiceschanged = () => openCleoVoicePicker();
+        listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading voices…</div>';
+        modal.style.display = 'flex';
+        return;
+      }
+      // English voices genuinely first (most relevant for this app),
+      // everything else after — real, not filtered out entirely, in
+      // case someone's device only has non-English voices installed.
+      const englishVoices = voices.filter(v => v.lang.startsWith('en'));
+      const otherVoices = voices.filter(v => !v.lang.startsWith('en'));
+      const ordered = [...englishVoices, ...otherVoices];
+      const currentVoice = getCleoPreferredVoice();
+
+      listEl.innerHTML = ordered.map(v => {
+        const isSelected = currentVoice && v.name === currentVoice.name;
+        return `
+        <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; background:${isSelected ? '#fff3e0' : 'var(--gu-bg)'}; border:1.5px solid ${isSelected ? '#F9A825' : 'transparent'}; border-radius:10px; margin-bottom:6px;">
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:13px; font-weight:700; color:var(--gu-text);">${v.name}${isSelected ? ' ✓' : ''}</div>
+            <div style="font-size:10px; color:var(--gu-dust);">${v.lang}</div>
+          </div>
+          <button onclick="testCleoVoice('${v.name.replace(/'/g, "\\'")}')" style="background:none; border:1px solid var(--gu-border); color:var(--gu-text); border-radius:8px; padding:6px 10px; font-size:11px; cursor:pointer;">▶ Test</button>
+          <button onclick="selectCleoVoice('${v.name.replace(/'/g, "\\'")}')" style="background:#F9A825; color:white; border:none; border-radius:8px; padding:6px 10px; font-size:11px; font-weight:700; cursor:pointer;">Use this</button>
+        </div>`;
+      }).join('');
+      modal.style.display = 'flex';
+    }
+
+    function closeCleoVoicePicker() {
+      document.getElementById('cleo-voice-picker-modal').style.display = 'none';
+    }
+
+    function testCleoVoice(voiceName) {
+      const voices = window.speechSynthesis.getVoices();
+      const voice = voices.find(v => v.name === voiceName);
+      if (!voice) return;
+      window.speechSynthesis.cancel();
+      const utt = new SpeechSynthesisUtterance("Hi, I'm Cleo! This is what I sound like.");
+      utt.voice = voice;
+      utt.rate = 1.05;
+      utt.pitch = 1.3;
+      window.speechSynthesis.speak(utt);
+    }
+
+    function selectCleoVoice(voiceName) {
+      localStorage.setItem('klnk_cleo_voice_name', voiceName);
+      testCleoVoice(voiceName);
+      openCleoVoicePicker(); // genuinely refresh the list so the new ✓ shows immediately
     }
 
     function wtSpeak(text) {
