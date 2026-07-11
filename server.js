@@ -6462,6 +6462,84 @@ app.post('/api/pieces/suggest-type', async (req, res) => {
   }
 });
 
+// POST /api/pieces/match-whole-tray — the multi-piece upgrade. Relies
+// entirely on pieces being laid out with real gaps between them (see
+// the mandatory spacing instruction in the Packing UI) — clear
+// separation is what makes distinguishing pieces in one photo
+// realistic at all. Detects every piece it can tell apart, matches
+// each against the booking's reference photos, and reports an
+// approximate on-screen position (grid-based — top-left/centre/etc —
+// not precise pixel coordinates, which vision models are genuinely
+// unreliable at) so the frontend can highlight roughly where to look.
+// Packer confirms each one; this narrows down, never silently decides.
+app.post('/api/pieces/match-whole-tray', async (req, res) => {
+  const { studioId, bookingCode, trayPhotoBase64, packerId } = req.body;
+  if (!studioId || !bookingCode || !trayPhotoBase64) {
+    return res.status(400).json({ error: 'studioId, bookingCode, trayPhotoBase64 required' });
+  }
+  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'Whole-tray scanning is not yet available.' });
+
+  try {
+    const { data: candidates } = await supabase.from('pottery_pieces')
+      .select('id, piece_type, reference_photo_url')
+      .eq('studio_id', studioId).eq('booking_id', bookingCode)
+      .not('reference_photo_url', 'is', null);
+
+    if (!candidates || !candidates.length) {
+      return res.status(404).json({ error: 'No reference photos found for this booking.' });
+    }
+
+    const content = [
+      {
+        type: 'text',
+        text: `A pottery studio packer has photographed a whole tray/box of FIRED, GLAZED pieces laid out with gaps between them (spaced out deliberately so each piece is distinguishable). Below are UNFIRED reference photos of the pieces expected in this specific group, each labelled with an ID.
+
+Your task: look at the tray photo and identify each distinguishable piece you can see, then match it against the reference photos. Colour is NOT reliable evidence — it changes completely during firing/glazing. Focus on shape, proportions, and the pattern/linework of the design, which stays recognisable through firing.
+
+For each piece you can distinguish in the tray photo, report: which reference ID it most likely matches (or null if no confident match), a confidence level (high/medium/low), a short honest reason, and its APPROXIMATE position in the tray photo using a simple 3x3 grid description (e.g. "top-left", "middle-centre", "bottom-right") — not precise coordinates, just roughly where in the frame it sits.
+
+If pieces are touching or overlapping and you genuinely can't tell them apart, say so rather than guessing. Respond ONLY as JSON: {"detectedPieces":[{"approxPosition":"top-left","matchedReferenceId":"...","confidence":"high","reason":"..."}], "unclearRegions": "description of any area where pieces were too close together to distinguish, or empty string if none"}`,
+      },
+    ];
+    candidates.forEach(c => {
+      content.push({ type: 'text', text: `Reference ID: ${c.id} (${c.piece_type || 'piece'})` });
+      content.push({ type: 'image_url', image_url: { url: c.reference_photo_url } });
+    });
+    content.push({ type: 'text', text: 'This is the whole tray photo:' });
+    content.push({ type: 'image_url', image_url: { url: trayPhotoBase64.startsWith('data:') ? trayPhotoBase64 : `data:image/jpeg;base64,${trayPhotoBase64}` } });
+
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content }], temperature: 0.2, max_tokens: 900 }),
+    });
+    const aiData = await openaiRes.json();
+    let parsed;
+    try {
+      parsed = JSON.parse((aiData.choices?.[0]?.message?.content || '{}').replace(/```json|```/g, '').trim());
+    } catch (e) {
+      return res.status(502).json({ error: 'Could not interpret the scan result — please try individual piece scanning instead.' });
+    }
+
+    const enrichedPieces = (parsed.detectedPieces || []).map(p => {
+      const candidate = candidates.find(c => c.id === p.matchedReferenceId);
+      return { ...p, piece_type: candidate?.piece_type, reference_photo_url: candidate?.reference_photo_url };
+    });
+
+    const { data: logEntry } = await supabase.from('piece_match_attempts').insert({
+      studio_id: studioId, booking_code: bookingCode,
+      query_photo_url: '(whole-tray photo, not separately stored)',
+      ai_reasoning: `Whole-tray scan: ${enrichedPieces.length} piece(s) detected`,
+      ai_confidence: null, all_candidates: enrichedPieces, packer_id: packerId || null,
+    }).select().single();
+
+    res.json({ detectedPieces: enrichedPieces, unclearRegions: parsed.unclearRegions || '', matchAttemptId: logEntry?.id });
+  } catch (error) {
+    console.error('Whole-tray matching error:', error);
+    res.status(500).json({ error: 'Could not run the scan right now — try individual piece scanning instead.' });
+  }
+});
+
 app.post('/api/pieces/match', async (req, res) => {
   const { studioId, bookingCode, queryPhotoBase64, packerId } = req.body;
   if (!studioId || !bookingCode || !queryPhotoBase64) {

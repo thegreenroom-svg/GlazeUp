@@ -2559,6 +2559,24 @@
                boxed/set aside — and this stage makes that a real,
                tracked step rather than pieces silently becoming "ready"
                the instant they're fired. -->
+
+          <!-- Layout instruction — a genuine, unmissable step whoever's
+               unloading the kiln (or handing off to the packer) sees
+               and must acknowledge before scanning. Clear spacing
+               between pieces is what makes the AI multi-piece scan
+               below genuinely reliable — no blurred edges, no
+               ambiguity between touching pieces. -->
+          <div class="chart-container" style="background:linear-gradient(135deg,rgba(249,168,37,0.1),rgba(184,121,70,0.06));border:1.5px solid rgba(249,168,37,0.35);">
+            <h3 style="margin:0 0 8px;">📐 Before scanning — lay pieces out</h3>
+            <p style="font-size:13px;color:var(--gu-text);line-height:1.6;margin-bottom:10px;">
+              Place every piece from the kiln onto the packing table or box, spaced out with <strong>at least 1 inch between each piece</strong> — nothing touching if at all possible. This is what lets the scan below reliably tell pieces apart. We know it's not always perfectly possible with awkward shapes — just spread them out as best you can.
+            </p>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--gu-text);cursor:pointer;">
+              <input type="checkbox" id="layout-confirmed-checkbox" onchange="toggleLayoutScanUnlock()" style="width:18px;height:18px;">
+              Pieces are laid out and spaced — ready to scan
+            </label>
+          </div>
+
           <div class="chart-container" style="background:linear-gradient(135deg,rgba(46,125,50,0.06),rgba(33,150,243,0.05));border:1.5px solid rgba(46,125,50,0.25);">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
               <h3 style="margin:0;">📦 Packing <span style="font-size:11px;font-weight:500;color:var(--gu-dust);">— currently Jenny</span></h3>
@@ -2588,6 +2606,28 @@
                 <button onclick="cancelPackingForm()" style="background:none;border:1px solid var(--gu-border);color:var(--gu-dust);border-radius:8px;padding:10px 14px;font-size:13px;cursor:pointer;">Cancel</button>
               </div>
             </div>
+          </div>
+
+          <!-- Whole-Tray Scan — the genuine multi-piece upgrade. Relies
+               entirely on the spacing instruction above being followed:
+               with clear gaps between pieces, the AI can distinguish
+               them far more reliably than in a jumbled pile. Detects
+               every piece it can separate out, ranks each against the
+               booking's reference photos, and highlights its best guess
+               with a bounding box — packer confirms each one. -->
+          <div class="chart-container" style="border:1.5px solid rgba(33,150,243,0.3);background:linear-gradient(135deg,rgba(33,150,243,0.05),rgba(46,125,50,0.04));">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <h3 style="margin:0;">📸 Whole-Tray Scan <span style="font-size:11px;font-weight:500;color:var(--gu-dust);">(pieces laid out with gaps)</span></h3>
+            </div>
+            <p style="font-size:11px;color:var(--gu-dust);margin-bottom:12px;line-height:1.5;">
+              Scan the booking's QR code, then photograph the whole tray at once. The AI outlines every piece it can distinguish and suggests which is which — confirm each one.
+            </p>
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+              <input type="text" id="wts-booking-scan-input" placeholder="Scan QR or paste booking code" style="flex:1;padding:10px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;" onkeydown="if(event.key==='Enter') loadWholeTrayGroup()">
+              <button onclick="loadWholeTrayGroup()" style="background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;">Load</button>
+            </div>
+            <button id="wts-scan-btn" onclick="captureWholeTrayPhoto()" disabled style="width:100%;background:#8a8175;color:white;border:none;border-radius:12px;padding:16px;font-size:15px;font-weight:800;cursor:not-allowed;margin-bottom:14px;">📷 Confirm layout is spaced first ☝️</button>
+            <div id="wts-result"></div>
           </div>
 
           <!-- Ready for Pickup -->
@@ -10419,6 +10459,116 @@ function loadKilnData() {
 
 // ── Packing — between firing and pickup, currently Jenny's job ──
 let _packingSelectedPieceIds = [];
+
+// Unlocks the whole-tray scan button only once the packer has genuinely
+// confirmed pieces are laid out spaced apart — this isn't just a nag,
+// clear spacing is what makes the AI detection actually reliable, so
+// this gate matters functionally, not just as a reminder.
+function toggleLayoutScanUnlock() {
+  const checked = document.getElementById('layout-confirmed-checkbox').checked;
+  const btn = document.getElementById('wts-scan-btn');
+  if (checked) {
+    btn.disabled = false;
+    btn.style.background = '#2e7d32';
+    btn.style.cursor = 'pointer';
+    btn.textContent = '📷 Photograph the whole tray';
+  } else {
+    btn.disabled = true;
+    btn.style.background = '#8a8175';
+    btn.style.cursor = 'not-allowed';
+    btn.textContent = '📷 Confirm layout is spaced first ☝️';
+  }
+}
+
+// ── Whole-Tray Scan — multi-piece detection, relies on the spacing
+// instruction above for reliability. Grid-based approximate positions,
+// not precise pixel coordinates — honestly labelled as such. ──
+let _wtsCurrentBookingCode = null;
+
+async function loadWholeTrayGroup() {
+  const raw = document.getElementById('wts-booking-scan-input').value.trim();
+  if (!raw) return;
+  let bookingCode = raw;
+  try {
+    const url = new URL(raw);
+    const paramCode = url.searchParams.get('booking');
+    if (paramCode) bookingCode = paramCode;
+  } catch { /* not a URL, use as-is */ }
+  _wtsCurrentBookingCode = bookingCode;
+  document.getElementById('wts-result').innerHTML = '<div style="padding:10px;color:#2e7d32;font-size:12px;font-weight:700;">✓ Booking loaded — lay pieces out, confirm spacing above, then scan.</div>';
+}
+
+function captureWholeTrayPhoto() {
+  if (!_wtsCurrentBookingCode) { alert('Scan a booking QR code first.'); return; }
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.onchange = handleWholeTrayCapture;
+  input.click();
+}
+
+const GRID_POSITION_STYLES = {
+  'top-left': { top: '8%', left: '8%' }, 'top-centre': { top: '8%', left: '42%' }, 'top-right': { top: '8%', left: '76%' },
+  'middle-left': { top: '42%', left: '8%' }, 'middle-centre': { top: '42%', left: '42%' }, 'middle-right': { top: '42%', left: '76%' },
+  'bottom-left': { top: '76%', left: '8%' }, 'bottom-centre': { top: '76%', left: '42%' }, 'bottom-right': { top: '76%', left: '76%' },
+};
+
+async function handleWholeTrayCapture(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const resultEl = document.getElementById('wts-result');
+  resultEl.innerHTML = '<div style="padding:14px;text-align:center;color:var(--gu-dust);font-size:13px;">🔍 Scanning the tray — this takes a few seconds…</div>';
+
+  const reader = new FileReader();
+  reader.onload = async () => {
+    const photoDataUrl = reader.result;
+    try {
+      const res = await fetch(`${API_URL}/api/pieces/match-whole-tray`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId, bookingCode: _wtsCurrentBookingCode, trayPhotoBase64: photoDataUrl, packerId: currentShiftStaff?.id || null })
+      });
+      const data = await res.json();
+      if (!res.ok) { resultEl.innerHTML = `<div style="padding:14px;color:#d9534f;font-size:13px;">${data.error}</div>`; return; }
+
+      if (!data.detectedPieces?.length) {
+        resultEl.innerHTML = '<div style="padding:14px;background:#fff3e0;border-radius:10px;font-size:13px;">🤷 Could not distinguish any pieces confidently — try spacing them out further, or scan pieces individually via Piece Matching.</div>';
+        return;
+      }
+
+      const CONFIDENCE_COLORS = { high: '#2e7d32', medium: '#F9A825', low: '#8a8175' };
+      // Show the photo with rough grid-position markers overlaid — this
+      // is deliberately approximate (a general area, not a precise
+      // pointer), stated honestly in the label itself.
+      const overlayMarkers = data.detectedPieces.map((p, i) => {
+        const pos = GRID_POSITION_STYLES[p.approxPosition] || GRID_POSITION_STYLES['middle-centre'];
+        const color = CONFIDENCE_COLORS[p.confidence] || '#8a8175';
+        return `<div style="position:absolute;top:${pos.top};left:${pos.left};width:36px;height:36px;border:3px solid ${color};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:${color};background:rgba(255,255,255,0.85);">${i + 1}</div>`;
+      }).join('');
+
+      resultEl.innerHTML = `
+        <div style="position:relative;border-radius:12px;overflow:hidden;margin-bottom:14px;">
+          <img src="${photoDataUrl}" style="width:100%;display:block;">
+          ${overlayMarkers}
+        </div>
+        <div style="font-size:11px;color:var(--gu-dust);margin-bottom:10px;">Markers show the approximate area of each detected piece — not a precise pointer, a rough guide. Confirm against the reference photo before picking it up.</div>
+        ${data.unclearRegions ? `<div style="padding:10px;background:#fff3e0;border-radius:8px;font-size:12px;margin-bottom:10px;">⚠️ ${data.unclearRegions}</div>` : ''}
+        ${data.detectedPieces.map((p, i) => `
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;background:${p.matchedReferenceId ? '#f0f8f0' : 'var(--gu-bg)'};border-radius:10px;margin-bottom:8px;border-left:4px solid ${CONFIDENCE_COLORS[p.confidence] || '#8a8175'};">
+            <div style="width:28px;height:28px;border-radius:50%;background:${CONFIDENCE_COLORS[p.confidence] || '#8a8175'};color:white;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;">${i + 1}</div>
+            ${p.reference_photo_url ? `<div style="width:44px;height:44px;border-radius:8px;background:url('${p.reference_photo_url}') center/cover;flex-shrink:0;"></div>` : ''}
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:700;">${p.piece_type || 'Unidentified'} <span style="font-size:10px;font-weight:700;color:${CONFIDENCE_COLORS[p.confidence] || '#8a8175'};text-transform:uppercase;">${p.confidence || 'no match'}</span></div>
+              <div style="font-size:11px;color:var(--gu-dust);line-height:1.4;">${p.reason || 'No confident match for this piece.'}</div>
+            </div>
+          </div>
+        `).join('')}
+        <button onclick="confirmPieceMatch('${data.matchAttemptId}', true)" style="width:100%;background:#2e7d32;color:white;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;">✓ Confirmed, all matched correctly</button>
+      `;
+    } catch (e) {
+      resultEl.innerHTML = '<div style="padding:14px;color:#d9534f;font-size:13px;">Could not run the scan — try again or scan pieces individually.</div>';
+    }
+  };
+  reader.readAsDataURL(file);
+}
 
 async function loadPackingQueue() {
   const listEl = document.getElementById('packing-queue-list');
