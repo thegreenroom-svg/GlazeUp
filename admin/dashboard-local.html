@@ -2013,6 +2013,7 @@
       <a href="#" class="nav-link active" onclick="goToTab('dashboard', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.6"/><rect x="13" y="3.5" width="7.5" height="4.8" rx="1.6"/><rect x="13" y="10.5" width="7.5" height="10" rx="1.6"/><rect x="3.5" y="13" width="7.5" height="7.5" rx="1.6"/></svg></span><span class="nav-label">Dashboard</span></a>
       <a href="#" class="nav-link" id="nav-setup-tab" onclick="goToTab('setup', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.2v2.3M12 18.5v2.3M20.8 12h-2.3M5.5 12H3.2M17.9 6.1l-1.6 1.6M7.7 16.3l-1.6 1.6M17.9 17.9l-1.6-1.6M7.7 7.7L6.1 6.1"/></svg></span><span class="nav-label">Setup</span></a>
       <a href="#" class="nav-link" id="nav-catalogue-tab" onclick="goToTab('catalogue', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="7.5" height="7.5" rx="1.5"/><rect x="13" y="4" width="7.5" height="7.5" rx="1.5"/><rect x="3.5" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg></span><span class="nav-label">Piece Catalogue</span></a>
+      <a href="#" class="nav-link" id="nav-tablecards-tab" onclick="goToTab('tablecards', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="6" width="17" height="13" rx="1.8"/><rect x="7" y="9" width="6" height="6" rx="0.8"/><path d="M15 10h3M15 13h3M15 16h2"/></svg></span><span class="nav-label">Table Cards</span></a>
       <a href="#" class="nav-link" id="nav-staff-tab" onclick="goToTab('staff', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="16" rx="2.2"/><path d="M3.5 9.5h17M8 3v3M16 3v3"/><path d="M8 14l2.4 2.4L16.5 10.5"/></svg></span><span class="nav-label">Daily Bookings</span></a>
       <a href="#" class="nav-link" onclick="goToTab('community', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 15.5H6.2a2.7 2.7 0 01-2.7-2.7V7.7A2.7 2.7 0 016.2 5h9.6a2.7 2.7 0 012.7 2.7v1.4"/><path d="M6.5 15.5v3.3l3.7-3.3"/><path d="M11 19h6.8a2.7 2.7 0 002.7-2.7v-3.6a2.7 2.7 0 00-2.7-2.7H11a2.7 2.7 0 00-2.7 2.7v3.6A2.7 2.7 0 0011 19z"/></svg></span><span class="nav-label">Community</span></a>
       <a href="#" class="nav-link" id="nav-printqueue-tab" onclick="goToTab('printqueue', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5V4h11v5.5"/><rect x="3.5" y="9.5" width="17" height="7.5" rx="1.8"/><rect x="6.5" y="13.5" width="11" height="6.5" rx="1"/><circle cx="17" cy="12.3" r=".9" fill="currentColor" stroke="none"/></svg></span><span class="nav-label">Print Queue</span></a>
@@ -2825,6 +2826,54 @@
           <div id="pre-glaze-queue-list">
             <div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading…</div>
           </div>
+        </div>
+      </div>
+
+      <!-- ═════════════════════════════════════════════ -->
+      <!-- TABLE CARDS TAB -->
+      <!-- Replaces the old handwritten table nameplates. Each card
+           carries the booking's REAL QR code (same one the customer
+           scans) plus their name, date, and time — printed and placed
+           on the table during morning setup. When pieces are cleared
+           and grouped for firing, the completion photo captures each
+           piece alongside this same card, so the QR in that photo is
+           the same one tracked through the whole firing/packing
+           pipeline — no separate/duplicate code, one QR from setup to
+           collection. -->
+      <!-- ═════════════════════════════════════════════ -->
+      <div id="tablecards-view" class="view" style="display: none;">
+        <h2 style="margin-top: 0;">🪧 Table Cards</h2>
+        <p style="color: var(--gu-dust); font-size: 13px; margin-bottom: 20px; line-height: 1.5;">
+          Print a QR table card for any booking — replaces handwritten nameplates. Place it on the table during morning setup. When pieces are cleared, group them next to this same card for the completion photo — the QR carries through to firing, packing, and collection.
+        </p>
+
+        <div class="chart-container" style="margin-bottom: 20px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <h3 style="margin:0;">Today's bookings</h3>
+            <button onclick="loadTableCardBookings()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">🔄 Refresh</button>
+          </div>
+          <div id="tablecard-bookings-list">
+            <div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading…</div>
+          </div>
+        </div>
+
+        <div class="chart-container">
+          <h3 style="margin:0 0 10px;">Or print a blank card</h3>
+          <p style="font-size:11px;color:var(--gu-dust);margin-bottom:12px;">For a walk-in without a booking yet — the QR opens a fresh self-check-in, same as the walk-in QR elsewhere in Setup.</p>
+          <button onclick="printBlankTableCard()" style="background:var(--gu-primary);color:white;border:none;border-radius:10px;padding:12px 18px;font-size:13px;font-weight:700;cursor:pointer;">🖨️ Print blank walk-in card</button>
+        </div>
+      </div>
+
+      <!-- Printable table card — a real print layout, separate from the
+           on-screen modal QR, sized and formatted to be cut out and
+           placed on a table. Uses the browser's own print dialog. -->
+      <div id="table-card-print-area" style="display:none;">
+        <div style="width:340px;padding:24px;border:2px solid #2B2724;border-radius:16px;text-align:center;font-family:sans-serif;margin:0 auto;">
+          <div id="tc-print-name" style="font-size:22px;font-weight:800;color:#2B2724;margin-bottom:4px;"></div>
+          <div id="tc-print-datetime" style="font-size:13px;color:#8a8175;margin-bottom:16px;"></div>
+          <div id="tc-print-qr" style="margin-bottom:12px;"></div>
+          <div id="tc-print-table" style="font-size:13px;font-weight:600;color:#2B2724;"></div>
+          <div style="font-size:9px;color:#b0a89e;margin-top:14px;">Scan to view your pottery session — kilnLINK</div>
         </div>
       </div>
 
@@ -3937,6 +3986,8 @@ function goToTab(tab, event) {
   } else if (tab === 'catalogue') {
     loadAdminCatalogue();
     loadPreGlazeQueue();
+  } else if (tab === 'tablecards') {
+    loadTableCardBookings();
   } else if (tab === 'shapes') {
     loadBisqueCatalog();
   } else if (tab === 'community') {
@@ -8392,6 +8443,84 @@ async function fireKilnBatchByCode(batchCode, showAlert) {
 
 // ── Piece Catalogue admin ──
 const CATALOGUE_CATEGORY_ICONS = { mug: '☕', bowl: '🥣', vase: '🏺', plate: '🍽️', figurine: '🗿', other: '🎨' };
+
+// ── Table Cards — replaces handwritten table nameplates. Each card
+// carries the booking's REAL QR (same one the customer scans, same one
+// tracked through firing/packing) plus name, date, time. ──
+async function loadTableCardBookings() {
+  const listEl = document.getElementById('tablecard-bookings-list');
+  if (!listEl) return;
+  try {
+    const res = await fetch(`${API_URL}/api/bookings/today?studioId=${studioId}`);
+    const data = await res.json();
+    const bookings = data.bookings || [];
+    if (!bookings.length) {
+      listEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">No bookings today.</div>';
+      return;
+    }
+    listEl.innerHTML = bookings.map(b => {
+      const time = b.session_start ? new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
+      return `
+        <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--gu-bg);border-radius:10px;margin-bottom:8px;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:14px;font-weight:700;">${b.customer_name || 'Guest'}</div>
+            <div style="font-size:11px;color:var(--gu-dust);">${time}${b.table_number ? ' · Table ' + b.table_number : ''}${b.space_name ? ' · ' + b.space_name : ''}</div>
+          </div>
+          <button onclick='printTableCard(${JSON.stringify(b).replace(/'/g, "&apos;")})' style="background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">🖨️ Print card</button>
+        </div>`;
+    }).join('');
+  } catch (e) {
+    listEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Could not load today\'s bookings.</div>';
+  }
+}
+
+function printTableCard(booking) {
+  const customerUrl = `${API_URL}/app?booking=${encodeURIComponent(booking.booking_code)}`;
+  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=6&data=${encodeURIComponent(customerUrl)}`;
+  const dateStr = booking.session_start ? new Date(booking.session_start).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
+  const timeStr = booking.session_start ? new Date(booking.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
+
+  document.getElementById('tc-print-name').textContent = booking.customer_name || 'Guest';
+  document.getElementById('tc-print-datetime').textContent = `${dateStr}${timeStr ? ' · ' + timeStr : ''}`;
+  document.getElementById('tc-print-qr').innerHTML = `<img src="${qrImageUrl}" width="200" height="200" style="display:block;margin:0 auto;border-radius:6px;">`;
+  document.getElementById('tc-print-table').textContent = booking.table_number ? `Table ${booking.table_number}` : '';
+
+  triggerTableCardPrint();
+}
+
+function printBlankTableCard() {
+  const customerUrl = `${API_URL}/app`;
+  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=6&data=${encodeURIComponent(customerUrl)}`;
+
+  document.getElementById('tc-print-name').textContent = 'Walk-in';
+  document.getElementById('tc-print-datetime').textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  document.getElementById('tc-print-qr').innerHTML = `<img src="${qrImageUrl}" width="200" height="200" style="display:block;margin:0 auto;border-radius:6px;">`;
+  document.getElementById('tc-print-table').textContent = 'Scan to start your visit';
+
+  triggerTableCardPrint();
+}
+
+function triggerTableCardPrint() {
+  const printArea = document.getElementById('table-card-print-area');
+  printArea.style.display = 'block';
+  // Print just this card, not the whole dashboard behind it — a
+  // dedicated print stylesheet hides everything else for the print pass.
+  const style = document.createElement('style');
+  style.id = 'table-card-print-style';
+  style.textContent = `
+    @media print {
+      body * { visibility: hidden; }
+      #table-card-print-area, #table-card-print-area * { visibility: visible; }
+      #table-card-print-area { position: fixed; top: 20px; left: 0; right: 0; display: block !important; }
+    }
+  `;
+  document.head.appendChild(style);
+  setTimeout(() => {
+    window.print();
+    printArea.style.display = 'none';
+    document.getElementById('table-card-print-style')?.remove();
+  }, 150);
+}
 
 async function loadAdminCatalogue() {
   const grid = document.getElementById('admin-catalogue-grid');
