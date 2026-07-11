@@ -6194,22 +6194,24 @@ function checkShiftLogin() {
     return;
   }
 
-  // Login now genuinely survives the tablet's screen sleeping/waking, or a
-  // normal page refresh, for up to SESSION_TIMEOUT_HOURS of real inactivity
-  // — this is the "still on shift" case, same person picking the tablet
-  // back up a few minutes later shouldn't have to re-enter their PIN.
-  // Beyond that window (screen off overnight, shift genuinely ended,
-  // different person picks up the tablet after a long gap), it correctly
-  // clocks the previous person out and asks who's using it now — same
-  // protection against wrong-person-attribution as before, just not
-  // triggered by every single screen lock during an active shift.
+  // Login survives the tablet's screen sleeping/waking, or a normal
+  // page refresh, for up to SESSION_TIMEOUT_HOURS — BUT genuinely
+  // never silently resumes if the device was deliberately put down and
+  // went idle (see the idle timer below, which sets
+  // klnk_force_relogin). That's a real, deliberate distinction: a
+  // momentary screen lock (phone call, brief interruption) shouldn't
+  // force a re-login, but the device genuinely being put down and
+  // picked up by someone else always should — no silent resume, ever,
+  // regardless of how little time has passed.
   const SESSION_TIMEOUT_HOURS = 4;
+  const forceRelogin = localStorage.getItem('klnk_force_relogin') === '1';
   const previousSession = localStorage.getItem('klnk_shift_staff');
   const lastActiveAt = parseInt(localStorage.getItem('klnk_last_active') || '0', 10);
   const hoursSinceActive = (Date.now() - lastActiveAt) / (1000 * 60 * 60);
 
-  if (previousSession && lastActiveAt && hoursSinceActive < SESSION_TIMEOUT_HOURS) {
-    // Still within the same shift window — resume without asking again
+  if (!forceRelogin && previousSession && lastActiveAt && hoursSinceActive < SESSION_TIMEOUT_HOURS) {
+    // Still within the same shift window AND wasn't idle-flagged —
+    // resume without asking again
     try {
       currentShiftStaff = JSON.parse(previousSession);
       currentShiftId = localStorage.getItem('klnk_shift_id') || null;
@@ -6219,11 +6221,13 @@ function checkShiftLogin() {
       return;
     } catch (e) { /* fall through to fresh login if the saved session is corrupt */ }
   }
+  localStorage.removeItem('klnk_force_relogin');
 
   if (previousSession) {
-    // Genuinely stale session (past the timeout, or a fresh app open after
-    // a long gap) — clock the previous person out properly before asking
-    // who's using the tablet now, so their hours worked stay accurate.
+    // Genuinely stale session (past the timeout, idle-flagged, or a
+    // fresh app open after a long gap) — clock the previous person out
+    // properly before asking who's using the tablet now, so their
+    // hours worked stay accurate.
     try {
       const prevStaff = JSON.parse(previousSession);
       const prevShiftId = localStorage.getItem('klnk_shift_id');
@@ -12600,6 +12604,7 @@ function drawSplashArrows() {
 function dismissSplash() {
   if (splashDismissed) return;
   splashDismissed = true;
+  resetIdleTimer(); // genuine activity — restart the idle clock for whoever's using it now
   const splash = document.getElementById('splash-screen');
   splash.classList.add('fading-out');
   setTimeout(async () => {
@@ -12808,12 +12813,27 @@ async function loadDevicePanel() {
   }
 }
 
-// Idle detection: after a few minutes with no interaction, rest back on the splash
+// Idle detection: after a few minutes with no interaction, rest back on
+// the splash. This existed before, but was genuinely disconnected from
+// the login logic — it showed the splash on a timer, but the
+// underlying session would still silently resume once dismissed, since
+// checkShiftLogin() had no way to know the splash appeared because of
+// real idle time rather than a normal page load. Fixed to set a real
+// force-relogin flag, so tapping back in always asks who's using it —
+// no silent resume, no matter how little time has actually passed.
 const IDLE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes — shared studio iPad
 let idleTimer = null;
 function resetIdleTimer() {
   clearTimeout(idleTimer);
-  idleTimer = setTimeout(showSplash, IDLE_TIMEOUT_MS);
+  idleTimer = setTimeout(triggerIdleSplash, IDLE_TIMEOUT_MS);
+}
+function triggerIdleSplash() {
+  // Only genuinely meaningful if someone's actually logged in — no
+  // point flagging "put down" state before anyone's started a shift.
+  if (currentShiftStaff && currentShiftStaff.id !== 'testing') {
+    localStorage.setItem('klnk_force_relogin', '1');
+  }
+  showSplash();
 }
 ['touchstart', 'mousedown', 'keydown', 'scroll'].forEach(evt => {
   document.addEventListener(evt, resetIdleTimer, { passive: true });
