@@ -5492,11 +5492,30 @@ function showAdminA2HSBanner() {
     return; // Neither iOS nor a real install prompt available — nothing genuinely useful to show
   }
   banner.style.display = 'flex';
+
+  // This banner is a large card sitting at the exact same bottom-left
+  // corner as the assistant button/hint and the floating back button —
+  // even though z-index technically keeps them "on top", visually it's
+  // genuinely cluttered (buttons crammed against/behind a big dark
+  // card). Hide those while this is showing, restore them once dismissed.
+  document.getElementById('staff-assistant-fab')?.style.setProperty('display', 'none', 'important');
+  document.getElementById('staff-assistant-hint')?.style.setProperty('display', 'none', 'important');
+  document.getElementById('floating-back-btn')?.style.setProperty('display', 'none', 'important');
 }
 
 function dismissAdminA2HS() {
   document.getElementById('a2hs-banner-admin').style.display = 'none';
   localStorage.setItem('klnk_admin_a2hs_dismissed', '1');
+
+  // Restore whichever bottom-left elements should genuinely be visible
+  // again now the banner's gone — re-run the same logic that decides
+  // this normally, rather than blindly showing everything back.
+  const fab = document.getElementById('staff-assistant-fab');
+  if (fab) fab.style.removeProperty('display');
+  if (currentShiftStaff && fab) fab.style.display = 'flex'; // only show if genuinely logged in
+  // Hint and back-button re-appear naturally on their own next trigger
+  // (hint on next relevant moment, back-button on next scroll) — no
+  // need to force them back immediately.
 }
 
 async function triggerAdminInstall() {
