@@ -419,16 +419,8 @@
       padding: 28px 32px 40px;
     }
 
-    /* Extra bottom clearance so real content never sits behind the big
-       fixed Clock Out bar — only applied while genuinely logged in
-       (body.has-clockout-bar), toggled alongside the button itself. */
-    body.has-clockout-bar .admin-content {
-      padding-bottom: 76px;
-    }
-
     @media (max-width: 900px) {
       .admin-content { padding: 20px 18px 40px; }
-      body.has-clockout-bar .admin-content { padding-bottom: 76px; }
     }
 
     .view {
@@ -1900,12 +1892,15 @@
   <span id="shift-badge-break-indicator" style="display:none;background:#3949ab;color:white;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;">☕ BREAK</span>
   <span id="shift-task-count-badge" style="display:none;background:#e53935;color:white;font-size:10px;font-weight:800;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 4px;">0</span>
 </button>
-<!-- Clock Out — rebuilt as a genuinely big, unmissable button (was a
-     tiny power icon easy to miss/forget). Fixed to the bottom of the
-     screen so it's always in the same predictable place when putting
-     the device down at the end of a shift. -->
-<button id="direct-logout-btn" onclick="confirmDirectLogout()" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:8600;background:#c0392b;color:white;border:none;padding:16px;font-size:17px;font-weight:800;cursor:pointer;box-shadow:0 -4px 16px rgba(0,0,0,0.25);align-items:center;justify-content:center;gap:10px;">
-  <span style="font-size:20px;">⏻</span> CLOCK OUT
+<!-- Clock Out — was a full-width bar across the entire bottom of the
+     screen; genuinely too prominent/obtrusive per feedback. Kept the
+     same real function (still unmissable, still one tap, still logs a
+     genuine clock-out) but rebuilt as a small corner button, matching
+     the same stacking pattern already used for the assistant/Cleo/Find
+     My Piece — bottom-left, stacked above the assistant. -->
+<button id="direct-logout-btn" onclick="confirmDirectLogout()" style="display:none;position:fixed;bottom:158px;left:20px;z-index:8600;width:58px;height:58px;border-radius:50%;background:#c0392b;color:white;border:none;cursor:pointer;box-shadow:0 6px 22px rgba(192,57,43,0.4);align-items:center;justify-content:center;flex-direction:column;gap:0;">
+  <span style="font-size:18px;line-height:1;">⏻</span>
+  <span style="font-size:7px;font-weight:800;line-height:1;margin-top:2px;">CLOCK OUT</span>
 </button>
 <!-- Direct break toggle — always visible, same one-tap access as logout -->
 <button id="direct-break-btn" onclick="toggleBreak()" title="Take a break" style="display:none;position:fixed;top:44px;right:198px;z-index:850;background:white;border:1.5px solid var(--gu-border);border-radius:16px;padding:5px 12px;font-size:11px;font-weight:700;color:#3949ab;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.12);white-space:nowrap;">
@@ -2956,6 +2951,33 @@
             <div style="display:flex;gap:8px;">
               <input type="text" id="kid-preview-name" placeholder="e.g. Dave" style="flex:1;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;box-sizing:border-box;">
               <button onclick="openKidPreview()" style="background:#5E35B1;color:white;border:none;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">👀 Preview as a kid</button>
+            </div>
+          </div>
+
+          <!-- Real sticker/offers management — was previously invisible
+               here entirely, only ever seeded directly via SQL with no
+               admin visibility or control at all. Shows every genuine
+               sticker type on file, including seasonal ones, with a
+               real way to add more without needing SQL going forward. -->
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(249,168,37,0.25);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <div style="font-size:12px;font-weight:700;color:var(--gu-text);">🎨 Stickers &amp; Offers</div>
+              <button onclick="toggleAddStickerForm()" style="background:none;border:1px solid #F9A825;color:#F9A825;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;">+ Add</button>
+            </div>
+            <div id="cleo-sticker-list" style="display:flex;flex-direction:column;gap:6px;">
+              <div style="padding:10px;text-align:center;color:var(--gu-dust);font-size:12px;">Loading…</div>
+            </div>
+            <div id="add-sticker-form" style="display:none;background:var(--gu-bg);border-radius:10px;padding:12px;margin-top:10px;">
+              <div style="display:flex;gap:8px;margin-bottom:8px;">
+                <input type="text" id="new-sticker-emoji" placeholder="🎃" maxlength="4" style="width:50px;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:16px;text-align:center;box-sizing:border-box;">
+                <input type="text" id="new-sticker-name" placeholder="Sticker name" style="flex:1;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;box-sizing:border-box;">
+              </div>
+              <div style="font-size:10px;color:var(--gu-dust);margin-bottom:3px;">Only available between these dates (leave blank for always-available)</div>
+              <div style="display:flex;gap:8px;margin-bottom:10px;">
+                <input type="date" id="new-sticker-from" style="flex:1;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:12px;box-sizing:border-box;">
+                <input type="date" id="new-sticker-until" style="flex:1;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:12px;box-sizing:border-box;">
+              </div>
+              <button onclick="saveNewSticker()" style="width:100%;background:#F9A825;color:white;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;">Save sticker</button>
             </div>
           </div>
         </div>
@@ -4530,6 +4552,7 @@ function goToTab(tab, event) {
     loadConnectionStatus();
     loadCleosClubSetup();
     loadAddonMarketplace();
+    loadStickerTypes();
   } else if (tab === 'branding') {
     loadBranding();
   } else if (tab === 'catalogue') {
@@ -6680,7 +6703,6 @@ async function logOutOfShift() {
   document.getElementById('headset-setup-btn').style.display = 'none';
   document.getElementById('direct-logout-btn').style.display = 'none';
   document.getElementById('direct-break-btn').style.display = 'none';
-  document.body.classList.remove('has-clockout-bar');
   document.getElementById('staff-assistant-fab').style.display = 'none';
   document.getElementById('staff-assistant-panel').style.display = 'none';
   document.getElementById('cleo-admin-floating-fab').style.display = 'none';
@@ -6710,7 +6732,6 @@ function applyShiftUI() {
   document.getElementById('step-counter-btn').style.display = 'flex';
   document.getElementById('direct-logout-btn').style.display = 'flex';
   document.getElementById('direct-break-btn').style.display = 'flex';
-  document.body.classList.add('has-clockout-bar');
   document.getElementById('staff-assistant-fab').style.display = 'flex';
   document.getElementById('find-piece-fab').style.display = 'flex';
   initCleoAdminFloatingWidget();
@@ -9726,6 +9747,77 @@ function openKidPreview() {
   const rawName = document.getElementById('kid-preview-name').value.trim();
   const name = rawName || 'Everyone';
   window.open(`${API_URL}/app?preview=kid&name=${encodeURIComponent(name)}`, '_blank');
+}
+
+// ── Real sticker/offers management — genuine admin visibility and
+// control, was previously only ever configurable via SQL directly. ──
+async function loadStickerTypes() {
+  const listEl = document.getElementById('cleo-sticker-list');
+  try {
+    const res = await fetch(`${API_URL}/api/cleos-club/sticker-types`);
+    const data = await res.json();
+    const stickers = data.stickerTypes || [];
+    if (!stickers.length) {
+      listEl.innerHTML = '<div style="padding:10px;text-align:center;color:var(--gu-dust);font-size:12px;">No stickers on file yet.</div>';
+      return;
+    }
+    const todayStr = new Date().toISOString().split('T')[0];
+    listEl.innerHTML = stickers.map(s => {
+      const isSeasonal = s.available_from || s.available_until;
+      const isCurrentlyActive = !isSeasonal || ((!s.available_from || s.available_from <= todayStr) && (!s.available_until || s.available_until >= todayStr));
+      const dateLabel = isSeasonal ? `${s.available_from || '…'} → ${s.available_until || '…'}` : 'Always available';
+      return `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:${isCurrentlyActive ? 'var(--gu-bg)' : 'rgba(138,129,117,0.1)'};border-radius:8px;">
+          <div style="font-size:20px;">${s.emoji}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12px;font-weight:700;color:var(--gu-text);">${s.name} ${isSeasonal && isCurrentlyActive ? '<span style="font-size:9px;font-weight:800;color:#2e7d32;">● LIVE NOW</span>' : ''}${isSeasonal && !isCurrentlyActive ? '<span style="font-size:9px;font-weight:700;color:var(--gu-dust);">⏳ ' + dateLabel + '</span>' : ''}</div>
+            ${!isSeasonal ? `<div style="font-size:10px;color:var(--gu-dust);">${dateLabel}</div>` : ''}
+          </div>
+          <button onclick="deleteSticker('${s.code}')" style="background:none;border:none;color:#d9534f;font-size:11px;cursor:pointer;padding:4px;">Remove</button>
+        </div>`;
+    }).join('');
+  } catch (e) {
+    listEl.innerHTML = '<div style="padding:10px;text-align:center;color:var(--gu-dust);font-size:12px;">Could not load stickers.</div>';
+  }
+}
+
+function toggleAddStickerForm() {
+  const form = document.getElementById('add-sticker-form');
+  form.style.display = form.style.display === 'block' ? 'none' : 'block';
+}
+
+async function saveNewSticker() {
+  const emoji = document.getElementById('new-sticker-emoji').value.trim();
+  const name = document.getElementById('new-sticker-name').value.trim();
+  const from = document.getElementById('new-sticker-from').value;
+  const until = document.getElementById('new-sticker-until').value;
+  if (!emoji || !name) { alert('Add an emoji and a name first.'); return; }
+
+  const code = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40);
+  try {
+    await fetch(`${API_URL}/api/cleos-club/sticker-types`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: `cleo-${code}`, name, emoji, rarity: (from || until) ? 'special' : 'common', availableFrom: from || null, availableUntil: until || null })
+    });
+    document.getElementById('new-sticker-emoji').value = '';
+    document.getElementById('new-sticker-name').value = '';
+    document.getElementById('new-sticker-from').value = '';
+    document.getElementById('new-sticker-until').value = '';
+    document.getElementById('add-sticker-form').style.display = 'none';
+    loadStickerTypes();
+  } catch (e) {
+    alert('Could not save — try again.');
+  }
+}
+
+async function deleteSticker(code) {
+  if (!confirm('Remove this sticker? Kids who already earned it keep it on their board — this only stops it being awarded going forward.')) return;
+  try {
+    await fetch(`${API_URL}/api/cleos-club/sticker-types/${code}`, { method: 'DELETE' });
+    loadStickerTypes();
+  } catch (e) {
+    alert('Could not remove — try again.');
+  }
 }
 
 async function loadCleosClubSetup() {

@@ -6093,6 +6093,37 @@ app.get('/api/cleos-club/config', async (req, res) => {
   res.json({ config: data || { enabled: false } });
 });
 
+// GET /api/cleos-club/sticker-types — every real sticker type on file,
+// genuine admin visibility into what actually exists (was previously
+// invisible in the admin UI — only ever seeded via SQL, never shown or
+// editable in Setup).
+app.get('/api/cleos-club/sticker-types', async (req, res) => {
+  const { data, error } = await supabase.from('cleos_club_sticker_types').select('*').order('available_from', { ascending: true, nullsFirst: true });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ stickerTypes: data || [] });
+});
+
+// POST /api/cleos-club/sticker-types — genuinely add a new sticker
+// type (e.g. a new seasonal one) directly from the admin UI, no SQL
+// needed going forward.
+app.post('/api/cleos-club/sticker-types', async (req, res) => {
+  const { code, name, emoji, rarity, availableFrom, availableUntil } = req.body;
+  if (!code || !name || !emoji) return res.status(400).json({ error: 'code, name, emoji required' });
+  const { data, error } = await supabase.from('cleos_club_sticker_types').upsert({
+    code, name, emoji, rarity: rarity || 'common',
+    available_from: availableFrom || null, available_until: availableUntil || null,
+  }, { onConflict: 'code' }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ stickerType: data });
+});
+
+// DELETE /api/cleos-club/sticker-types/:code — genuinely remove one
+app.delete('/api/cleos-club/sticker-types/:code', async (req, res) => {
+  const { error } = await supabase.from('cleos_club_sticker_types').delete().eq('code', req.params.code);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ deleted: true });
+});
+
 // POST /api/cleos-club/config — studio enables/configures the add-on
 // (in a real billed version this would also touch Stripe subscription
 // items — kept simple here as the on/off + settings switch itself)
