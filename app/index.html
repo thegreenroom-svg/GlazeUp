@@ -1687,6 +1687,18 @@
     <button onclick="event.stopPropagation(); dismissAssistantHint();" style="position:absolute; top:-8px; right:-8px; background:var(--gu-dust); color:white; border:none; border-radius:50%; width:20px; height:20px; font-size:11px; cursor:pointer; line-height:1;">✕</button>
   </div>
 
+  <!-- Cleo — genuinely always present on every page, bottom-right (not
+       gated by whether a studio has enabled the paid Cleo's Club
+       feature — this is just her friendly presence, distinct from the
+       fuller tile). Rotating call-out bubble cycles through messages,
+       tapping her does something sensible for whichever message is
+       currently showing. -->
+  <button id="cleo-floating-fab" onclick="handleCleoFloatingTap()" style="position:fixed; bottom:20px; right:16px; z-index:9500; width:60px; height:60px; border-radius:50%; background:linear-gradient(135deg,#F9A825,#f57c00); border:none; box-shadow:0 6px 22px rgba(249,168,37,0.4); cursor:pointer; display:flex; align-items:center; justify-content:center; padding:4px;">
+    <div id="cleo-floating-mascot" style="width:100%;height:100%;"></div>
+  </button>
+  <div id="cleo-floating-bubble" style="position:fixed; bottom:86px; right:16px; z-index:9499; background:white; border:1.5px solid var(--gu-border); border-radius:16px 16px 4px 16px; padding:10px 14px; font-size:12px; font-weight:600; color:var(--gu-text); box-shadow:0 4px 16px rgba(0,0,0,0.15); max-width:190px; cursor:pointer; text-align:right;" onclick="handleCleoFloatingTap()">
+  </div>
+
   <div id="assistant-panel" style="display:none; position:fixed; bottom:0; right:0; left:0; z-index:9600; max-width:400px; margin:0 auto; height:70vh; max-height:560px; background:white; border-radius:20px 20px 0 0; box-shadow:0 -8px 32px rgba(0,0,0,0.25); flex-direction:column;">
     <div style="background:var(--link-charcoal); color:white; padding:16px 18px; border-radius:20px 20px 0 0; display:flex; align-items:center; justify-content:space-between;">
       <div>
@@ -1992,6 +2004,7 @@
             </div>
           </div>`;
         showA2HSBanner();
+        initCleoFloatingWidget();
         return;
       }
 
@@ -2229,6 +2242,7 @@
       wtShowTrigger();
       loadLoyaltyTile();
       checkCleosClubEnabled();
+      initCleoFloatingWidget();
 
       // TEMPORARY diagnostic — genuine measured page state on the real
       // device, to find out why scrolling and Cleo's Club aren't
@@ -2566,6 +2580,13 @@
       void screen.offsetWidth;
       screen.classList.add('open');
       loadCommunityFeed();
+    }
+    // Genuinely jumps straight to the Club Pages tab, not just the
+    // community feed generally — this is what Cleo's rotating "press
+    // to see Club Pages" call-out actually links to.
+    function openCommunityFeedOnClubTab() {
+      openCommunityFeed();
+      switchCommunityTab('club');
     }
     function closeCommunityFeed() {
       const screen = document.getElementById('community-feed-screen');
@@ -3522,6 +3543,73 @@
     // back to 6 forever. Epoch anchored to her real birthday (26 June
     // 2025) as the sentimental start point for the cycle — the AGE
     // ITSELF isn't her real age, just when the cycle began counting.
+    // ── Cleo floating widget — genuinely always present on every page,
+    // regardless of whether the studio has enabled the paid Cleo's
+    // Club tile. Rotating call-out messages; the sticker-related
+    // message only ever appears if Cleo's Club is genuinely enabled
+    // for this studio (checked honestly via the real config, not
+    // assumed) — no point promising stickers that don't exist here.
+    let _cleoFloatingClubEnabled = false;
+    let _cleoFloatingMessageIndex = 0;
+    let _cleoFloatingRotationTimer = null;
+
+    const CLEO_FLOATING_MESSAGES_BASE = [
+      { text: "Hi, I'm Cleo! 👋", action: null },
+      { text: "I'm growing up every week! 🌱", action: null },
+    ];
+    const CLEO_FLOATING_MESSAGE_CLUB_PAGES = { text: "Press to see Club Pages 🌍", action: 'clubpages' };
+    const CLEO_FLOATING_MESSAGE_STICKERS = { text: "Collecting stickers? ⭐", action: 'stickers' };
+
+    function initCleoFloatingWidget() {
+      const mascotContainer = document.getElementById('cleo-floating-mascot');
+      if (mascotContainer) mascotContainer.innerHTML = renderCleoMascotSVG();
+
+      // Genuinely check the real config, not assume — the stickers
+      // message only makes sense if this studio actually has Cleo's
+      // Club turned on.
+      fetch(`${API_URL}/api/cleos-club/config?studioId=${STUDIO_ID}`)
+        .then(r => r.json())
+        .then(data => { _cleoFloatingClubEnabled = !!data.config?.enabled; })
+        .catch(() => { _cleoFloatingClubEnabled = false; })
+        .finally(() => {
+          rotateCleoFloatingMessage(); // show the first message once we genuinely know
+          clearInterval(_cleoFloatingRotationTimer);
+          _cleoFloatingRotationTimer = setInterval(rotateCleoFloatingMessage, 6000);
+        });
+    }
+
+    function getCleoFloatingMessages() {
+      const messages = [...CLEO_FLOATING_MESSAGES_BASE, CLEO_FLOATING_MESSAGE_CLUB_PAGES];
+      if (_cleoFloatingClubEnabled) messages.push(CLEO_FLOATING_MESSAGE_STICKERS);
+      return messages;
+    }
+
+    function rotateCleoFloatingMessage() {
+      const messages = getCleoFloatingMessages();
+      const bubble = document.getElementById('cleo-floating-bubble');
+      if (!bubble) return;
+      const msg = messages[_cleoFloatingMessageIndex % messages.length];
+      bubble.textContent = msg.text;
+      _cleoFloatingMessageIndex++;
+    }
+
+    function handleCleoFloatingTap() {
+      const messages = getCleoFloatingMessages();
+      // Use the message currently showing (one back, since rotation
+      // already advanced the index when it was displayed) — tapping
+      // should act on what the person actually sees, not the next one.
+      const currentIndex = (_cleoFloatingMessageIndex - 1 + messages.length) % messages.length;
+      const current = messages[currentIndex];
+      if (current.action === 'clubpages') {
+        openCommunityFeedOnClubTab();
+      } else if (current.action === 'stickers') {
+        openCleosClub();
+      }
+      // No action for the plain greeting/growing-up messages — just a
+      // friendly presence, tapping those genuinely does nothing, which
+      // is fine, not every tap needs to go somewhere.
+    }
+
     function getCleoCurrentAge() {
       const epoch = new Date('2025-06-26T00:00:00Z');
       const now = new Date();

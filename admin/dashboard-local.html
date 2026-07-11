@@ -1405,6 +1405,15 @@
   🔍
 </button>
 
+<!-- Cleo — genuinely always present on every admin page, not gated
+     behind whether Cleo's Club is enabled for this studio. Rotating
+     call-out bubble, stacked above Find My Piece. -->
+<button id="cleo-admin-floating-fab" onclick="handleCleoAdminFloatingTap()" style="display:none;position:fixed;bottom:154px;right:16px;z-index:9700;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#F9A825,#f57c00);border:none;box-shadow:0 6px 22px rgba(249,168,37,0.4);cursor:pointer;align-items:center;justify-content:center;padding:4px;">
+  <div id="cleo-admin-floating-mascot" style="width:100%;height:100%;"></div>
+</button>
+<div id="cleo-admin-floating-bubble" style="display:none;position:fixed;bottom:212px;right:16px;z-index:9699;background:white;border:1.5px solid var(--gu-border);border-radius:16px 16px 4px 16px;padding:9px 13px;font-size:11px;font-weight:600;color:var(--gu-text);box-shadow:0 4px 16px rgba(0,0,0,0.15);max-width:180px;cursor:pointer;text-align:right;" onclick="handleCleoAdminFloatingTap()">
+</div>
+
 <!-- ═══════════════════════════════════════════
      FIND MY PIECE — rebuilt as two genuine full screens, not a small
      popup panel. Step 1: confirm/capture the piece you're looking for.
@@ -6475,6 +6484,9 @@ async function logOutOfShift() {
   document.body.classList.remove('has-clockout-bar');
   document.getElementById('staff-assistant-fab').style.display = 'none';
   document.getElementById('staff-assistant-panel').style.display = 'none';
+  document.getElementById('cleo-admin-floating-fab').style.display = 'none';
+  document.getElementById('cleo-admin-floating-bubble').style.display = 'none';
+  clearInterval(_cleoAdminFloatingRotationTimer);
   staffAssistantOpen = false;
   staffAssistantMessages = []; // fresh conversation for whoever logs in next
   // Close the task queue drawer if it happens to be open — logging out
@@ -6502,6 +6514,7 @@ function applyShiftUI() {
   document.body.classList.add('has-clockout-bar');
   document.getElementById('staff-assistant-fab').style.display = 'flex';
   document.getElementById('find-piece-fab').style.display = 'flex';
+  initCleoAdminFloatingWidget();
   // Show the hint bubble shortly after login (not instantly — let the
   // rest of the UI settle first) unless it's already been dismissed
   // this session.
@@ -11231,6 +11244,89 @@ async function handleWholeTrayCapture(event) {
     }
   };
   reader.readAsDataURL(file);
+}
+
+// ── Cleo mascot — genuinely parametrized by age, same generator logic
+// as the customer app, so she looks identical and ages identically
+// wherever she appears. Deterministic weekly cycle: starts at 6, ticks
+// up to 11, loops back to 6 — calculated purely from today's date. ──
+function getCleoCurrentAge() {
+  const epoch = new Date('2025-06-26T00:00:00Z');
+  const now = new Date();
+  const daysSinceEpoch = Math.floor((now - epoch) / (1000 * 60 * 60 * 24));
+  const weeksSinceEpoch = Math.floor(daysSinceEpoch / 7);
+  const cyclePosition = ((weeksSinceEpoch % 6) + 6) % 6;
+  return 6 + cyclePosition;
+}
+
+function renderCleoMascotSVG(age) {
+  age = age || getCleoCurrentAge();
+  const t = (age - 6) / 5;
+  const headR = 14 - t * 1.5;
+  const bodyScale = 1 + t * 0.15;
+  const hairLen = 1 + t * 0.4;
+  const smileCurve = 32 - t * 2;
+  const showClip = age >= 9;
+
+  return `<svg width="72" height="72" viewBox="0 0 52 52" style="animation:cleoBounce 2.8s ease-in-out infinite; transform-origin:26px 48px;">
+    <ellipse cx="26" cy="44" rx="${14 * bodyScale}" ry="7" fill="#2B2724" opacity="0.12"/>
+    <path d="M${14 - (bodyScale-1)*14} 40 Q${14 - (bodyScale-1)*14} 30 26 30 Q${38 + (bodyScale-1)*14} 30 ${38 + (bodyScale-1)*14} 40 L${38 + (bodyScale-1)*14} 48 Q${38 + (bodyScale-1)*14} 50 36 50 L16 50 Q${14 - (bodyScale-1)*14} 50 ${14 - (bodyScale-1)*14} 48 Z" fill="#F4A896"/>
+    <circle cx="26" cy="20" r="${headR}" fill="#FBCBA4"/>
+    <g style="animation:cleoCurlWiggle 3.2s ease-in-out infinite; transform-origin:26px 10px;">
+      <circle cx="14" cy="12" r="${5*hairLen}" fill="#6B4226"/><circle cx="10" cy="18" r="${4.5*hairLen}" fill="#6B4226"/>
+      <circle cx="19" cy="7" r="${5*hairLen}" fill="#6B4226"/><circle cx="27" cy="5" r="${5.5*hairLen}" fill="#6B4226"/>
+      <circle cx="35" cy="7" r="${5*hairLen}" fill="#6B4226"/><circle cx="41" cy="13" r="${4.5*hairLen}" fill="#6B4226"/>
+      <circle cx="42" cy="19" r="${4*hairLen}" fill="#6B4226"/>
+      ${showClip ? '<rect x="30" y="4" width="7" height="2.5" rx="1.2" fill="#F9A825" transform="rotate(-15 33 5)"/>' : ''}
+    </g>
+    <circle cx="20" cy="21" r="2.3" fill="#2B2724"/><circle cx="32" cy="21" r="2.3" fill="#2B2724"/>
+    <circle cx="20.7" cy="20.2" r="0.7" fill="white"/><circle cx="32.7" cy="20.2" r="0.7" fill="white"/>
+    <ellipse cx="15" cy="25" rx="2.6" ry="1.8" fill="#F0876A" opacity="0.5"/>
+    <ellipse cx="37" cy="25" rx="2.6" ry="1.8" fill="#F0876A" opacity="0.5"/>
+    <path d="M20 27 Q26 ${smileCurve} 32 27" stroke="#2B2724" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+  </svg>`;
+}
+
+// Admin-side floating widget — genuinely always present once logged
+// in, regardless of whether Cleo's Club is enabled for this studio.
+// Rotating messages; tapping does something sensible per message.
+let _cleoAdminFloatingMessageIndex = 0;
+let _cleoAdminFloatingRotationTimer = null;
+
+const CLEO_ADMIN_FLOATING_MESSAGES_BASE = [
+  { text: "Hi, I'm Cleo! 👋", action: null },
+  { text: "I'm growing up every week! 🌱", action: null },
+  { text: "Kids love collecting my stickers ⭐", action: 'setup' },
+];
+
+function initCleoAdminFloatingWidget() {
+  const fab = document.getElementById('cleo-admin-floating-fab');
+  const bubble = document.getElementById('cleo-admin-floating-bubble');
+  if (!fab) return;
+  fab.style.display = 'flex';
+  bubble.style.display = 'block';
+  const mascotContainer = document.getElementById('cleo-admin-floating-mascot');
+  if (mascotContainer) mascotContainer.innerHTML = renderCleoMascotSVG();
+
+  rotateCleoAdminFloatingMessage();
+  clearInterval(_cleoAdminFloatingRotationTimer);
+  _cleoAdminFloatingRotationTimer = setInterval(rotateCleoAdminFloatingMessage, 6000);
+}
+
+function rotateCleoAdminFloatingMessage() {
+  const bubble = document.getElementById('cleo-admin-floating-bubble');
+  if (!bubble) return;
+  const msg = CLEO_ADMIN_FLOATING_MESSAGES_BASE[_cleoAdminFloatingMessageIndex % CLEO_ADMIN_FLOATING_MESSAGES_BASE.length];
+  bubble.textContent = msg.text;
+  _cleoAdminFloatingMessageIndex++;
+}
+
+function handleCleoAdminFloatingTap() {
+  const currentIndex = (_cleoAdminFloatingMessageIndex - 1 + CLEO_ADMIN_FLOATING_MESSAGES_BASE.length) % CLEO_ADMIN_FLOATING_MESSAGES_BASE.length;
+  const current = CLEO_ADMIN_FLOATING_MESSAGES_BASE[currentIndex];
+  // "setup" points staff toward the real Cleo's Club config in Setup,
+  // where the studio can actually turn the feature on if it isn't yet.
+  if (current.action === 'setup') goToTab('setup');
 }
 
 async function loadPackingQueue() {
