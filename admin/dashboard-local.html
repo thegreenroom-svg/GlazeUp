@@ -114,7 +114,7 @@
     }
     @media (max-width: 520px) {
       body.has-platform-strip .admin-wrapper {
-        margin-top: calc(118px + 44px); /* strip (now 2 rows on phone) + phone header menu */
+        margin-top: 162px; /* fallback estimate only — actual value set precisely by JS below, since the real phone-header-menu height drifts as its content changes (e.g. adding the wordmark made it taller than the old 44px assumption) */
       }
       body.has-platform-strip #phone-header-menu {
         top: 118px !important;
@@ -149,6 +149,17 @@
         grid-template-columns: 1fr;
         grid-template-rows: 68px 1fr;
         padding-top: 44px; /* space for #phone-header-menu, which is fixed */
+      }
+      /* For directors (David/Jenny/Daisy), the platform revenue strip
+         adds its own real height on top of the phone header — the
+         body.has-platform-strip rule below already accounts for BOTH
+         (strip + header) in its margin-top. Without zeroing THIS rule's
+         padding-top for that case, both were stacking: 44px padding
+         PLUS a separate 162px margin, creating a genuine ~44-120px+
+         white gap between the header and the real content underneath —
+         exactly what was reported. */
+      body.has-platform-strip .admin-wrapper {
+        padding-top: 0;
       }
       .admin-sidebar {
         grid-row: 1;
@@ -5961,28 +5972,6 @@ function applyShiftUI() {
   // actually logged in and the rest of the UI has settled. Checks if
   // there's an overnight firing still waiting on confirmation.
   setTimeout(checkMorningKilnStatus, 800);
-
-  // TEMPORARY diagnostic — shows the real measured positions of the
-  // strip, phone header, and content area directly on screen, to
-  // pinpoint exactly where the reported white gap is coming from on a
-  // real device rather than continuing to guess from code alone.
-  // Remove once resolved.
-  setTimeout(() => {
-    const strip = document.getElementById('platform-revenue-strip');
-    const header = document.getElementById('phone-header-menu');
-    const wrapper = document.querySelector('.admin-wrapper');
-    const content = document.querySelector('.admin-content');
-    const box = document.createElement('div');
-    box.style.cssText = 'position:fixed;top:4px;left:4px;z-index:999999;background:#000;color:#0f0;font-family:monospace;font-size:9px;padding:8px 10px;border-radius:6px;opacity:0.95;max-width:94vw;white-space:pre-wrap;';
-    const rectOf = el => el ? `top:${Math.round(el.getBoundingClientRect().top)} h:${Math.round(el.getBoundingClientRect().height)} disp:${getComputedStyle(el).display}` : 'not found';
-    box.textContent =
-      `body class: ${document.body.className}\n` +
-      `strip: ${rectOf(strip)}\n` +
-      `phone-header: ${rectOf(header)}\n` +
-      `wrapper: ${rectOf(wrapper)} marginTop:${wrapper ? getComputedStyle(wrapper).marginTop : '?'}\n` +
-      `content: ${rectOf(content)} scrollH:${content ? content.scrollHeight : '?'}`;
-    document.body.appendChild(box);
-  }, 1500);
 }
 
 // Direct log out — reachable in one tap from the header, no need to open
@@ -6003,6 +5992,26 @@ function confirmDirectLogout() {
 // before other studios are on the platform.
 const PLATFORM_REVENUE_ACCESS = ['David', 'Jenny', 'Daisy'];
 
+// Measures the ACTUAL rendered heights of the platform revenue strip and
+// phone header, and sets .admin-wrapper's margin-top to match exactly —
+// only meaningful on phone widths where both are stacked at the top.
+// This replaces a hardcoded CSS assumption that had drifted out of sync
+// with reality (assumed the phone header was 44px, it had genuinely
+// grown to ~61px), which was the real cause of a white gap between the
+// header and the actual dashboard content underneath it.
+function updatePhoneStripOffset() {
+  if (window.innerWidth > 520) return; // only relevant on phone; desktop uses a separate, already-correct fixed offset
+  if (!document.body.classList.contains('has-platform-strip')) return;
+
+  const strip = document.getElementById('platform-revenue-strip');
+  const header = document.getElementById('phone-header-menu');
+  const wrapper = document.querySelector('.admin-wrapper');
+  if (!strip || !header || !wrapper) return;
+
+  const realOffset = strip.getBoundingClientRect().height + header.getBoundingClientRect().height;
+  wrapper.style.marginTop = `${Math.round(realOffset)}px`;
+}
+
 function applyPlatformRevenueAccess() {
   const link = document.getElementById('nav-platformrev');
   const strip = document.getElementById('platform-revenue-strip');
@@ -6018,8 +6027,21 @@ function applyPlatformRevenueAccess() {
       loadPlatformRevenueStrip();
       clearInterval(window._platformStripTimer);
       window._platformStripTimer = setInterval(loadPlatformRevenueStrip, 5 * 60 * 1000);
+      // Set the real content offset by MEASURING the strip and phone
+      // header's actual rendered heights, rather than assuming fixed
+      // numbers in CSS that silently drift out of sync whenever their
+      // content changes (this was the real cause of a reported white
+      // gap under the header — the CSS assumed the phone header was
+      // 44px tall, but it had genuinely grown to ~61px after the
+      // wordmark was added, and the two numbers were never reconciled).
+      // Runs after a short delay so both elements have actually
+      // rendered their real content first.
+      setTimeout(updatePhoneStripOffset, 100);
+      window.addEventListener('resize', updatePhoneStripOffset);
     } else {
       clearInterval(window._platformStripTimer);
+      window.removeEventListener('resize', updatePhoneStripOffset);
+      document.querySelector('.admin-wrapper').style.marginTop = '';
     }
   }
 
