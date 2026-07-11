@@ -3840,6 +3840,7 @@ function goToTab(tab, event) {
   if (tab === 'staff') {
     showStaffSection('booking');
     loadBookingsOverview();
+    loadTodaysBookings(); // was manual-tap-only before — for real studio use, staff should see real bookings the instant they open this tab, not a "tap to load" placeholder
   } else if (tab === 'dashboard') {
     populateDashboard();
   } else if (tab === 'setup') {
@@ -8494,10 +8495,11 @@ function renderBookingButton(b) {
     ? new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
     : '';
   const table = b.table_number ? ` · ${b.table_number}` : '';
+  const space = b.space_name ? ` <span style="background:#f0ebe4;color:var(--gu-dust);font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:6px;">${b.space_name}</span>` : '';
   return `
     <button class="tap-row" onclick='selectTodaysBooking(${JSON.stringify(b).replace(/'/g, "&apos;")})' style="width: 100%; text-align: left; padding: 16px; background: #fff9f0; border: 1.5px solid var(--gu-border); border-left: 5px solid var(--link-clay); border-radius: 14px; margin-bottom: 10px; cursor: pointer;">
       <div style="display: flex; justify-content: space-between; align-items: center;">
-        <strong style="font-size: 16px; font-weight: 700;">${b.customer_name}</strong>
+        <strong style="font-size: 16px; font-weight: 700;">${b.customer_name}${space}</strong>
         <span style="font-size: 12px; color: var(--gu-dust); font-weight: 600;">${time}${table}</span>
       </div>
     </button>
