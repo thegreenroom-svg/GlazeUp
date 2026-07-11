@@ -7219,7 +7219,34 @@ Colour is NOT reliable evidence if this is comparing an unfired to a fired piece
       results_count: enriched.length, top_result_piece_id: enriched[0]?.id || null,
     });
 
-    res.json({ matches: enriched, noConfidentMatch: !!parsed.noConfidentMatch });
+    // Genuine, opt-in auto-assignment — only runs when the caller
+    // explicitly asks for it (autoAssign: true), since this endpoint
+    // is also used for plain searching where auto-assigning would be
+    // an unwanted surprise. Same real, conservative safeguards as
+    // Piece Matching: only on genuine high confidence AND a clear
+    // single best match, never on an ambiguous or uncertain result.
+    let autoAssigned = null;
+    if (req.body.autoAssign) {
+      const topMatch = enriched[0];
+      const secondMatch = enriched[1];
+      const genuinelyUnambiguous = !secondMatch || secondMatch.confidence !== 'high';
+      if (topMatch && topMatch.confidence === 'high' && topMatch.source === 'piece' && genuinelyUnambiguous && !parsed.noConfidentMatch) {
+        const { data: updatedPiece, error: assignError } = await supabase.from('pottery_pieces')
+          .update({ status: 'packed', packed_at: new Date().toISOString(), auto_matched: true })
+          .eq('id', topMatch.id).eq('studio_id', studioId).select().single();
+        if (!assignError && updatedPiece) {
+          autoAssigned = { pieceId: topMatch.id, pieceType: topMatch.label, bookingId: topMatch.booking_id, reason: topMatch.reason };
+          await supabase.from('piece_match_attempts').insert({
+            studio_id: studioId, booking_code: topMatch.booking_id,
+            query_photo_url: '(auto-match via Find My Piece)',
+            ai_reasoning: `Auto-assigned: ${topMatch.reason}`, ai_confidence: 'high',
+            all_candidates: enriched, packer_id: searchedBy || null, packer_confirmed: true,
+          });
+        }
+      }
+    }
+
+    res.json({ matches: enriched, noConfidentMatch: !!parsed.noConfidentMatch, autoAssigned });
   } catch (error) {
     console.error('Find by photo error:', error);
     res.status(500).json({ error: 'Could not run the photo search — try a text description instead.' });

@@ -1463,6 +1463,21 @@
       <button onclick="runTextPieceSearchFullScreen()" style="width:100%;background:#3d3833;color:white;border:none;border-radius:14px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;">🔤 Search system-wide by text</button>
     </div>
 
+    <!-- Genuine separate real option: holding an unknown piece with NO
+         booking code at all — searches every real candidate piece on
+         file and, on genuinely high confidence with a clear single
+         best match, automatically assigns it to that booking, no
+         confirmation tap needed. Real, honest safeguards: only ever
+         auto-assigns on unambiguous high confidence, always shows the
+         result plainly, and stays reversible via a real undo button. -->
+    <button onclick="toggleFp1AutoMatch()" id="fp1-automatch-toggle" style="background:none;border:none;color:#8a8175;font-size:13px;cursor:pointer;text-decoration:underline;margin-bottom:6px;">🤖 Or auto-match this piece to its booking</button>
+
+    <div id="fp1-automatch-area" style="display:none;width:100%;max-width:400px;margin-top:10px;">
+      <div style="font-size:12px;color:#cfc7bd;margin-bottom:10px;line-height:1.4;">Photograph a piece with no booking code — this searches every real piece on file and, if genuinely confident, marks it found automatically. Always shown clearly, always reversible.</div>
+      <button onclick="captureFp1AutoMatchPhoto()" style="width:100%;background:#5E35B1;color:white;border:none;border-radius:14px;padding:16px;font-size:15px;font-weight:800;cursor:pointer;">📷 Photograph &amp; auto-match</button>
+      <div id="fp1-automatch-result" style="margin-top:14px;"></div>
+    </div>
+
     <div id="fp1-text-results" style="width:100%;max-width:400px;margin-top:16px;"></div>
   </div>
 
@@ -9650,8 +9665,16 @@ async function undoAutoMatch(pieceId) {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ studioId })
     });
-    document.getElementById('pm-match-result').innerHTML = '<div style="padding:14px;background:#fff3e0;border-radius:10px;font-size:13px;">Undone — this piece is back to needing a real match.</div>';
-    loadPieceMatchGroup(); // genuinely refresh the found-count progress
+    // Genuinely update whichever real result box is actually showing —
+    // this function is now called from two different real contexts
+    // (Piece Matching, and the new Auto-Match option in Find My
+    // Piece), so it writes to whichever one exists rather than
+    // assuming Piece Matching's.
+    const pmResult = document.getElementById('pm-match-result');
+    const fp1Result = document.getElementById('fp1-automatch-result');
+    const undoneHtml = '<div style="padding:14px;background:#fff3e0;border-radius:10px;font-size:13px;">Undone — this piece is back to needing a real match.</div>';
+    if (pmResult && pmResult.innerHTML.includes('Auto-matched')) { pmResult.innerHTML = undoneHtml; loadPieceMatchGroup(); }
+    else if (fp1Result) { fp1Result.innerHTML = undoneHtml; }
   } catch (e) {
     alert('Could not undo — try again.');
   }
@@ -11632,6 +11655,8 @@ function openFindMyPiece() {
   document.getElementById('fp1-booking-check-area').style.display = 'none';
   document.getElementById('fp1-booking-check-input').value = '';
   document.getElementById('fp1-booking-check-result').innerHTML = '';
+  document.getElementById('fp1-automatch-area').style.display = 'none';
+  document.getElementById('fp1-automatch-result').innerHTML = '';
   const nextBtn = document.getElementById('fp1-next-btn');
   nextBtn.disabled = true;
   nextBtn.style.background = '#8a8175';
@@ -11705,6 +11730,78 @@ async function checkBookingFoundStatus() {
     resultEl.innerHTML = summaryHtml + gridHtml;
   } catch (e) {
     resultEl.innerHTML = '<div style="color:#ff8a80;font-size:12px;">Could not check this booking — try again.</div>';
+  }
+}
+
+// ── Auto-Match — genuinely separate option in Find My Piece: hold an
+// unknown piece with no booking code, search every real piece on file,
+// auto-assign on genuine high confidence, honest and reversible. ──
+function toggleFp1AutoMatch() {
+  const area = document.getElementById('fp1-automatch-area');
+  const isShowing = area.style.display === 'block';
+  area.style.display = isShowing ? 'none' : 'block';
+}
+
+function captureFp1AutoMatchPhoto() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.onchange = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => runFp1AutoMatch(reader.result);
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+async function runFp1AutoMatch(photoDataUrl) {
+  const resultEl = document.getElementById('fp1-automatch-result');
+  resultEl.innerHTML = '<div style="padding:14px;text-align:center;color:#8a8175;font-size:13px;">🔍 Searching every real piece on file — this takes a few seconds…</div>';
+
+  try {
+    const res = await fetch(`${API_URL}/api/pieces/find-by-photo`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, photoBase64: photoDataUrl, searchedBy: currentShiftStaff?.id || null, autoAssign: true })
+    });
+    const data = await res.json();
+    if (!res.ok) { resultEl.innerHTML = `<div style="padding:14px;color:#ff8a80;font-size:13px;">${data.error || 'Could not run the search.'}</div>`; return; }
+
+    // Genuine auto-assignment happened — shown clearly, real undo option
+    if (data.autoAssigned) {
+      resultEl.innerHTML = `
+        <div style="padding:16px;background:rgba(76,175,80,0.15);border:1.5px solid #4caf50;border-radius:12px;">
+          <div style="font-size:15px;font-weight:800;color:#4caf50;margin-bottom:6px;">✓ Auto-matched — high confidence</div>
+          <div style="font-size:13px;color:white;margin-bottom:4px;">${data.autoAssigned.pieceType || 'Piece'} genuinely recognised and marked found automatically — no confirmation needed.</div>
+          <div style="font-size:11px;color:#cfc7bd;line-height:1.4;margin-bottom:10px;">${data.autoAssigned.reason || ''}</div>
+          <button onclick="undoAutoMatch('${data.autoAssigned.pieceId}')" style="background:none;border:1px solid #ff8a80;color:#ff8a80;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;">↩ Undo — this isn't right</button>
+        </div>`;
+      return;
+    }
+
+    if (data.noConfidentMatch || !data.matches?.length) {
+      resultEl.innerHTML = '<div style="padding:14px;background:rgba(249,168,37,0.15);border-radius:10px;font-size:13px;color:white;">🤷 No confident match — not auto-assigned. Try Piece Matching with a known booking code instead.</div>';
+      return;
+    }
+
+    // Genuine matches found, but not confident/unambiguous enough to
+    // auto-assign — shown honestly as suggestions, same as the normal
+    // Piece Matching flow, not silently discarded.
+    const CONFIDENCE_COLORS = { high: '#4caf50', medium: '#F9A825', low: '#8a8175' };
+    resultEl.innerHTML = `
+      <div style="font-size:12px;color:#cfc7bd;margin-bottom:8px;">Not confident enough to auto-assign — here's what it found:</div>
+      ${data.matches.map(m => `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#2B2724;border-radius:10px;margin-bottom:6px;border-left:3px solid ${CONFIDENCE_COLORS[m.confidence] || '#8a8175'};">
+          <div style="width:44px;height:44px;border-radius:6px;background:url('${m.photo_url}') center/cover;flex-shrink:0;"></div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12px;font-weight:700;color:white;">${m.label || 'Piece'} <span style="font-size:9px;color:${CONFIDENCE_COLORS[m.confidence] || '#8a8175'};text-transform:uppercase;">${m.confidence || ''}</span></div>
+            <div style="font-size:10px;color:#8a8175;">${m.reason || ''}</div>
+          </div>
+        </div>
+      `).join('')}
+    `;
+  } catch (e) {
+    resultEl.innerHTML = '<div style="padding:14px;color:#ff8a80;font-size:13px;">Could not run the search — try again.</div>';
   }
 }
 
