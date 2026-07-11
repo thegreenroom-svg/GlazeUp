@@ -3664,6 +3664,7 @@
     let _cleoFloatingMessageIndex = 0;
     let _cleoFloatingCurrentMessage = null;
     let _cleoFloatingRotationTimer = null;
+    let _cleoFloatingActiveOffer = null; // genuine real offer, fetched from the actual backend, null if none set
 
     const CLEO_FLOATING_MESSAGES_BASE = [
       { text: "Ask me anything about the studio! 💬", action: 'chat' },
@@ -3808,21 +3809,34 @@
 
       // Genuinely check the real config, not assume — the stickers
       // message only makes sense if this studio actually has Cleo's
-      // Club turned on.
-      fetch(`${API_URL}/api/cleos-club/config?studioId=${STUDIO_ID}`)
-        .then(r => r.json())
-        .then(data => { _cleoFloatingClubEnabled = !!data.config?.enabled; })
-        .catch(() => { _cleoFloatingClubEnabled = false; })
-        .finally(() => {
-          rotateCleoFloatingMessage(); // show the first message once we genuinely know
-          clearInterval(_cleoFloatingRotationTimer);
-          _cleoFloatingRotationTimer = setInterval(rotateCleoFloatingMessage, 6000);
-        });
+      // Club turned on. Also genuinely fetch the real active Offer of
+      // the Week, if the studio has set one, so Cleo can call it out
+      // regularly in her rotation — real data, not a placeholder.
+      Promise.all([
+        fetch(`${API_URL}/api/cleos-club/config?studioId=${STUDIO_ID}`).then(r => r.json()).catch(() => ({})),
+        fetch(`${API_URL}/api/cleos-club/offer-of-week?studioId=${STUDIO_ID}`).then(r => r.json()).catch(() => ({})),
+      ]).then(([configData, offerData]) => {
+        _cleoFloatingClubEnabled = !!configData.config?.enabled;
+        _cleoFloatingActiveOffer = (offerData.offer && offerData.offer.title) ? offerData.offer : null;
+      }).finally(() => {
+        rotateCleoFloatingMessage(); // show the first message once we genuinely know
+        clearInterval(_cleoFloatingRotationTimer);
+        _cleoFloatingRotationTimer = setInterval(rotateCleoFloatingMessage, 6000);
+      });
     }
 
     function getCleoFloatingMessages() {
       const messages = [...CLEO_FLOATING_MESSAGES_BASE, CLEO_FLOATING_MESSAGE_CLUB_PAGES];
       if (_cleoFloatingClubEnabled) messages.push(CLEO_FLOATING_MESSAGE_STICKERS);
+      // Real offer callout — only included if the studio has genuinely
+      // set and activated one. Placed so it appears regularly in the
+      // rotation (roughly 1-in-5 messages currently), not buried.
+      if (_cleoFloatingActiveOffer) {
+        messages.push({
+          text: `${_cleoFloatingActiveOffer.emoji || '🎁'} ${_cleoFloatingActiveOffer.title}`,
+          action: 'stickers', // opens the same real Cleo's Club space where the offer is elaborated on
+        });
+      }
       return messages;
     }
 
@@ -3834,6 +3848,13 @@
       bubble.textContent = msg.text;
       _cleoFloatingCurrentMessage = msg; // genuinely track the actual object shown, not just an index that can drift if the array length changes between calls (e.g. once the real Cleo's Club config finishes loading)
       _cleoFloatingMessageIndex++;
+      // TEMPORARY trial logging — genuine console log each time the
+      // real Offer of the Week callout is actually shown, so timing/
+      // regularity can be observed during the trial (open browser dev
+      // tools > Console to see this). Remove once the trial's done.
+      if (_cleoFloatingActiveOffer && msg.text.includes(_cleoFloatingActiveOffer.title)) {
+        console.log(`[Cleo trial] Offer callout shown at ${new Date().toLocaleTimeString()}`);
+      }
     }
 
     function handleCleoFloatingTap() {
