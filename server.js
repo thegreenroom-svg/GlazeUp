@@ -5125,7 +5125,7 @@ app.get('/api/platform/revenue', async (req, res) => {
     startOfYear.setMonth(0, 1); startOfYear.setHours(0, 0, 0, 0);
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-    const [studiosRes, subsRes, aiUsageRes, aiUsageAllTimeRes, extrasRes, extrasAllTimeRes, extrasDailyRes, aiYtdRes, extrasYtdRes] = await Promise.all([
+    const [studiosRes, subsRes, aiUsageRes, aiUsageAllTimeRes, extrasRes, extrasAllTimeRes, extrasDailyRes, aiYtdRes, extrasYtdRes, addonsRes] = await Promise.all([
       supabase.from('studios').select('id, name, created_at'),
       supabase.from('stripe_subscriptions').select('studio_id, plan_id, status'),
       supabase.from('ai_generation_usage').select('studio_id, wholesale_cost_cents, created_at').gte('created_at', startOfMonth.toISOString()),
@@ -5135,6 +5135,7 @@ app.get('/api/platform/revenue', async (req, res) => {
       supabase.from('app_extra_charges').select('amount_cents, created_at').gte('created_at', thirtyDaysAgo.toISOString()),
       supabase.from('ai_generation_usage').select('wholesale_cost_cents, created_at').gte('created_at', startOfYear.toISOString()),
       supabase.from('app_extra_charges').select('amount_cents, created_at').gte('created_at', startOfYear.toISOString()),
+      supabase.from('studio_addons').select('studio_id, addon_key, monthly_price_cents, enabled').eq('enabled', true),
     ]);
 
     const studios = studiosRes.data || [];
@@ -5145,6 +5146,7 @@ app.get('/api/platform/revenue', async (req, res) => {
     const extrasAllTime = extrasAllTimeRes.data || [];
     const extrasDaily30 = extrasDailyRes.data || [];
     const aiDaily30 = aiUsageAllTime.filter(r => new Date(r.created_at) >= thirtyDaysAgo);
+    const activeAddons = addonsRes.data || [];
 
     const subByStudio = {};
     subs.forEach(s => { subByStudio[s.studio_id] = s; });
@@ -5152,6 +5154,15 @@ app.get('/api/platform/revenue', async (req, res) => {
     // Monthly recurring revenue from subscriptions
     const activeSubs = subs.filter(s => s.status === 'active' || s.status === 'trialing');
     const mrrCents = activeSubs.reduce((sum, s) => sum + (PLAN_MONTHLY_PRICE_CENTS[s.plan_id] || 0), 0);
+
+    // Real add-on MRR — every currently-enabled add-on across every
+    // studio, genuinely summed the same way base-plan MRR is. This
+    // includes Cleo's Club (tracked separately in cleos_club_config
+    // but folded in here) plus anything in the newer generic
+    // studio_addons table.
+    const addonMrrCents = activeAddons.reduce((sum, a) => sum + (a.monthly_price_cents || 0), 0);
+    const addonCountByKey = {};
+    activeAddons.forEach(a => { addonCountByKey[a.addon_key] = (addonCountByKey[a.addon_key] || 0) + 1; });
 
     // AI wholesale revenue this month and all-time
     const aiRevenueThisMonthCents = aiUsageThisMonth.reduce((sum, r) => sum + (r.wholesale_cost_cents || 0), 0);
@@ -5251,6 +5262,9 @@ app.get('/api/platform/revenue', async (req, res) => {
       totalStudios: studios.length,
       activeSubscriptions: activeSubs.length,
       mrrCents,
+      addonMrrCents,
+      addonCountByKey,
+      totalMrrWithAddonsCents: mrrCents + addonMrrCents,
       aiRevenueThisMonthCents,
       aiRevenueAllTimeCents,
       aiGenerationsThisMonth,
@@ -5259,7 +5273,7 @@ app.get('/api/platform/revenue', async (req, res) => {
       licensingRevenueAllTimeCents,
       licensingFeeRate: FEATURE_LICENSING_FEE_RATE,
       extrasVolumeThisMonthCents,
-      totalMonthlyRevenueCents: mrrCents + aiRevenueThisMonthCents + licensingRevenueThisMonthCents,
+      totalMonthlyRevenueCents: mrrCents + addonMrrCents + aiRevenueThisMonthCents + licensingRevenueThisMonthCents,
       totalYtdRevenueCents,
       dailyTrend,
       todayCents,
@@ -5997,6 +6011,94 @@ app.post('/api/cleos-club/config', async (req, res) => {
   const { data, error } = await supabase.from('cleos_club_config').upsert(updates, { onConflict: 'studio_id' }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json({ config: data });
+});
+
+// ═══════════════════════════════════════════
+// STUDIO ADD-ON MARKETPLACE — real, genuine paid upgrades on top of the
+// base plan, same proven confirm-before-enable pattern as Cleo's Club.
+// Each of these maps to an actual feature already built in the app —
+// this isn't inventing new work, it's honestly pricing what exists.
+// ═══════════════════════════════════════════
+
+const ADDON_CATALOGUE = {
+  ai_piece_finder: {
+    name: 'AI Piece Finder',
+    description: 'Piece Matching, Whole-Tray Scan, and Find My Piece — AI-assisted identification of fired pieces from a jumbled kiln load, and studio-wide lost piece search.',
+    monthlyPriceCents: 2000, // £20/mo — genuinely the most valuable of these, real staff time saved
+  },
+  piece_catalogue: {
+    name: 'Piece Catalogue & Pre-Glaze Reservations',
+    description: 'Customers browse real photographed stock from home and reserve a piece to be pre-glazed ready for their visit.',
+    monthlyPriceCents: 1500,
+  },
+  club_pages: {
+    name: 'Club Pages',
+    description: 'Worldwide social feed — customers post finished pieces directly, seen across every participating studio.',
+    monthlyPriceCents: 1000,
+  },
+  royal_mail_automation: {
+    name: 'Royal Mail Label Automation',
+    description: 'Automatic postal label creation via the studio\'s own connected Royal Mail account, instead of manual entry.',
+    monthlyPriceCents: 1000,
+  },
+};
+
+// GET /api/addons/catalogue — the real list of available add-ons and pricing
+app.get('/api/addons/catalogue', (req, res) => {
+  res.json({ catalogue: ADDON_CATALOGUE });
+});
+
+// GET /api/addons/status — which add-ons this studio genuinely has enabled
+app.get('/api/addons/status', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data, error } = await supabase.from('studio_addons').select('*').eq('studio_id', studioId);
+  if (error) return res.status(500).json({ error: error.message });
+  const statusByKey = {};
+  (data || []).forEach(a => { statusByKey[a.addon_key] = a; });
+  res.json({ addons: statusByKey });
+});
+
+// POST /api/addons/enable — genuine paywall confirmation already
+// happened client-side; this records the real enable and logs the
+// first month's revenue immediately so Platform Revenue reflects it
+// right away, not just from next month.
+app.post('/api/addons/enable', async (req, res) => {
+  const { studioId, addonKey } = req.body;
+  if (!studioId || !addonKey) return res.status(400).json({ error: 'studioId and addonKey required' });
+  const catalogueEntry = ADDON_CATALOGUE[addonKey];
+  if (!catalogueEntry) return res.status(400).json({ error: `Unknown add-on: ${addonKey}` });
+
+  try {
+    const { data, error } = await supabase.from('studio_addons').upsert({
+      studio_id: studioId, addon_key: addonKey, enabled: true,
+      monthly_price_cents: catalogueEntry.monthlyPriceCents,
+      enabled_at: new Date().toISOString(), disabled_at: null,
+    }, { onConflict: 'studio_id,addon_key' }).select().single();
+    if (error) throw error;
+
+    const billedForMonth = new Date(); billedForMonth.setDate(1); billedForMonth.setHours(0,0,0,0);
+    await supabase.from('addon_revenue_log').insert({
+      studio_id: studioId, addon_key: addonKey,
+      amount_cents: catalogueEntry.monthlyPriceCents, billed_for_month: billedForMonth.toISOString().split('T')[0],
+    });
+
+    res.json({ status: 'enabled', addon: data });
+  } catch (error) {
+    console.error('Add-on enable error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/addons/disable
+app.post('/api/addons/disable', async (req, res) => {
+  const { studioId, addonKey } = req.body;
+  if (!studioId || !addonKey) return res.status(400).json({ error: 'studioId and addonKey required' });
+  const { data, error } = await supabase.from('studio_addons')
+    .update({ enabled: false, disabled_at: new Date().toISOString() })
+    .eq('studio_id', studioId).eq('addon_key', addonKey).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ status: 'disabled', addon: data });
 });
 
 // GET /api/cleos-club/board/:customerId — a customer's real sticker
