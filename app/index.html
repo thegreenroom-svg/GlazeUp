@@ -3770,12 +3770,17 @@
       clearInterval(_cleoFloatingRotationTimer); // pause the normal rotation while explaining something specific
       bubble.textContent = `💡 ${text}`;
       _cleoContextShowing = true;
-      // Genuine voice on hover/tap too, per explicit request — respects
-      // the same mute toggle as the chat. cleoSpeak() genuinely cancels
-      // any in-progress speech before starting new, so rapid hovering
-      // across several tiles interrupts and replaces rather than
-      // queueing up overlapping audio.
-      if (!isAssistantVoiceMuted()) cleoSpeak(text);
+      // Genuine one-time voice demo — NOT on every hover (corrected
+      // after initial build spoke every single tooltip, which was
+      // wrong). Plays the very first time someone hovers/taps any
+      // button, as a one-off demonstration that the feature exists,
+      // then stays silent on every tooltip after that — tracked in
+      // localStorage so it genuinely never repeats, even on a return
+      // visit days later. Still respects the mute toggle too.
+      if (!isAssistantVoiceMuted() && !localStorage.getItem('klnk_cleo_tooltip_voice_demo_played')) {
+        localStorage.setItem('klnk_cleo_tooltip_voice_demo_played', '1');
+        cleoSpeak(text);
+      }
     }
 
     function hideCleoContextTip() {
