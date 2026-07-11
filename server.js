@@ -6472,6 +6472,200 @@ app.post('/api/pieces/suggest-type', async (req, res) => {
 // not precise pixel coordinates, which vision models are genuinely
 // unreliable at) so the frontend can highlight roughly where to look.
 // Packer confirms each one; this narrows down, never silently decides.
+// ═══════════════════════════════════════════
+// FIND MY PIECE — a single search across every real place a piece's
+// identity or location is recorded: individual reference photos, group
+// completion photos, the stock catalogue, the piece_catalogue, and the
+// lost-pieces registry (replacing the handwritten "waiting to be
+// found" notes). Genuinely searches real data, not a simulated result.
+// ═══════════════════════════════════════════
+
+// GET /api/pieces/find?studioId=&query= — TEXT search. Fast, no AI
+// cost, searches piece type, booking customer name, notes, and the
+// lost-pieces registry's descriptions.
+app.get('/api/pieces/find', async (req, res) => {
+  const { studioId, query } = req.query;
+  if (!studioId || !query) return res.status(400).json({ error: 'studioId and query required' });
+  const q = `%${query}%`;
+
+  try {
+    const [piecesRes, bookingsRes, lostRes, catalogueRes] = await Promise.all([
+      supabase.from('pottery_pieces').select('id, booking_id, piece_type, status, notes, reference_photo_url, packed_at')
+        .eq('studio_id', studioId).or(`piece_type.ilike.${q},notes.ilike.${q}`),
+      supabase.from('bookings').select('booking_code, customer_name, customer_email, table_number')
+        .eq('studio_id', studioId).ilike('customer_name', q),
+      supabase.from('lost_pieces_registry').select('*').eq('studio_id', studioId).eq('status', 'open')
+        .or(`description.ilike.${q},found_location.ilike.${q}`),
+      supabase.from('piece_catalogue').select('id, name, category, description, image_url')
+        .eq('studio_id', studioId).or(`name.ilike.${q},description.ilike.${q}`),
+    ]);
+
+    // Cross-reference: if a customer name matched, pull their real pieces too
+    const matchedBookingCodes = (bookingsRes.data || []).map(b => b.booking_code);
+    let piecesFromBookings = [];
+    if (matchedBookingCodes.length) {
+      const { data } = await supabase.from('pottery_pieces')
+        .select('id, booking_id, piece_type, status, notes, reference_photo_url, packed_at')
+        .eq('studio_id', studioId).in('booking_id', matchedBookingCodes);
+      piecesFromBookings = data || [];
+    }
+
+    const allPieces = [...(piecesRes.data || []), ...piecesFromBookings];
+    const uniquePieces = Array.from(new Map(allPieces.map(p => [p.id, p])).values());
+
+    // Enrich pieces with their booking's customer name for context
+    const bookingCodes = [...new Set(uniquePieces.map(p => p.booking_id).filter(Boolean))];
+    let bookingLookup = {};
+    if (bookingCodes.length) {
+      const { data: bks } = await supabase.from('bookings').select('booking_code, customer_name, table_number').eq('studio_id', studioId).in('booking_code', bookingCodes);
+      (bks || []).forEach(b => { bookingLookup[b.booking_code] = b; });
+    }
+    const enrichedPieces = uniquePieces.map(p => ({ ...p, customer_name: bookingLookup[p.booking_id]?.customer_name, table_number: bookingLookup[p.booking_id]?.table_number }));
+
+    res.json({
+      pieces: enrichedPieces,
+      lostRegistryMatches: lostRes.data || [],
+      catalogueMatches: catalogueRes.data || [],
+      totalResults: enrichedPieces.length + (lostRes.data || []).length + (catalogueRes.data || []).length,
+    });
+  } catch (error) {
+    console.error('Find my piece text search error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/pieces/find-by-photo — PHOTO search. Genuinely AI-powered,
+// compares the given photo against EVERY real reference/completion
+// photo on file for this studio (not scoped to one booking, unlike
+// Piece Matching) — this is the "lost somewhere in the whole studio"
+// case, so it has to search everything, honestly reported with
+// confidence, never a forced single answer.
+app.post('/api/pieces/find-by-photo', async (req, res) => {
+  const { studioId, photoBase64, searchedBy } = req.body;
+  if (!studioId || !photoBase64) return res.status(400).json({ error: 'studioId and photoBase64 required' });
+  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'Photo search is not yet available.' });
+
+  try {
+    // Pull every real photo source — capped at a sensible number so
+    // this doesn't become an enormous, slow, expensive single AI call.
+    // Prioritises pieces still open/unresolved (fired, packed, not yet
+    // picked up) since a genuinely lost piece is most likely among
+    // those, not ones already collected.
+    const { data: candidates } = await supabase.from('pottery_pieces')
+      .select('id, booking_id, piece_type, status, reference_photo_url')
+      .eq('studio_id', studioId).not('reference_photo_url', 'is', null)
+      .not('status', 'eq', 'picked_up')
+      .order('reference_photo_taken_at', { ascending: false })
+      .limit(40);
+
+    const { data: lostItems } = await supabase.from('lost_pieces_registry')
+      .select('id, description, photo_url, found_location').eq('studio_id', studioId).eq('status', 'open').not('photo_url', 'is', null).limit(20);
+
+    const allCandidates = [
+      ...(candidates || []).map(c => ({ id: c.id, source: 'piece', label: `${c.piece_type || 'Piece'} (${c.status})`, photo_url: c.reference_photo_url })),
+      ...(lostItems || []).map(l => ({ id: l.id, source: 'lost_registry', label: `Lost item: ${l.description || 'unidentified'} — ${l.found_location || 'location unknown'}`, photo_url: l.photo_url })),
+    ];
+
+    if (!allCandidates.length) {
+      return res.json({ matches: [], noConfidentMatch: true, note: 'No reference photos on file yet to search against.' });
+    }
+
+    const content = [
+      {
+        type: 'text',
+        text: `Someone is trying to find a specific pottery piece that may be lost somewhere in the studio. Below are photos of pieces currently on file (fired/packed/awaiting collection) and items in the lost-and-found registry, each labelled with an ID and source. The LAST image is a photo of (or describing) the piece being searched for.
+
+Colour is NOT reliable evidence if this is comparing an unfired to a fired piece — focus on shape, proportions, and the pattern/linework of any design. Return up to 5 ranked possible matches as JSON only: {"matches":[{"id":"...","source":"piece|lost_registry","confidence":"high|medium|low","reason":"..."}], "noConfidentMatch": false}. If nothing looks plausible, say so honestly rather than forcing a guess.`,
+      },
+    ];
+    allCandidates.forEach(c => {
+      content.push({ type: 'text', text: `ID: ${c.id} | Source: ${c.source} | ${c.label}` });
+      content.push({ type: 'image_url', image_url: { url: c.photo_url } });
+    });
+    content.push({ type: 'text', text: 'This is the piece being searched for:' });
+    content.push({ type: 'image_url', image_url: { url: photoBase64.startsWith('data:') ? photoBase64 : `data:image/jpeg;base64,${photoBase64}` } });
+
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content }], temperature: 0.2, max_tokens: 700 }),
+    });
+    const aiData = await openaiRes.json();
+    let parsed;
+    try {
+      parsed = JSON.parse((aiData.choices?.[0]?.message?.content || '{}').replace(/```json|```/g, '').trim());
+    } catch (e) {
+      return res.status(502).json({ error: 'Could not interpret the search result — please try a text description search instead.' });
+    }
+
+    const enriched = (parsed.matches || []).map(m => {
+      const candidate = allCandidates.find(c => c.id === m.id);
+      return { ...m, label: candidate?.label, photo_url: candidate?.photo_url };
+    });
+
+    await supabase.from('piece_search_log').insert({
+      studio_id: studioId, searched_by: searchedBy || null,
+      results_count: enriched.length, top_result_piece_id: enriched[0]?.id || null,
+    });
+
+    res.json({ matches: enriched, noConfidentMatch: !!parsed.noConfidentMatch });
+  } catch (error) {
+    console.error('Find by photo error:', error);
+    res.status(500).json({ error: 'Could not run the photo search — try a text description instead.' });
+  }
+});
+
+// ── Lost Pieces Registry — replaces the handwritten notes ──
+app.get('/api/lost-pieces', async (req, res) => {
+  const { studioId, status } = req.query;
+  let query = supabase.from('lost_pieces_registry').select('*').eq('studio_id', studioId);
+  if (status) query = query.eq('status', status);
+  const { data, error } = await query.order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ items: data || [] });
+});
+
+// POST /api/lost-pieces/upload-photo — separate from the piece
+// reference-photo upload since a lost item isn't necessarily linked to
+// a known pottery_pieces row. Same storage pattern, own path.
+app.post('/api/lost-pieces/upload-photo', async (req, res) => {
+  const { studioId, photoBase64 } = req.body;
+  if (!studioId || !photoBase64) return res.status(400).json({ error: 'studioId and photoBase64 required' });
+  try {
+    const base64Data = photoBase64.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    const fileName = `${studioId}/lost-pieces/${Date.now()}.jpg`;
+    const { error: uploadError } = await supabase.storage.from('booking-photos').upload(fileName, buffer, { contentType: 'image/jpeg' });
+    if (uploadError) throw uploadError;
+    const { data: urlData } = supabase.storage.from('booking-photos').getPublicUrl(fileName);
+    res.json({ photoUrl: urlData.publicUrl });
+  } catch (error) {
+    console.error('Lost piece photo upload error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/lost-pieces', async (req, res) => {
+  const { studioId, category, photoUrl, description, foundLocation, reportedBy, pieceId } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data, error } = await supabase.from('lost_pieces_registry').insert({
+    studio_id: studioId, category: category || 'unidentified', photo_url: photoUrl || null,
+    description, found_location: foundLocation, reported_by: reportedBy || null, piece_id: pieceId || null,
+  }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ item: data });
+});
+
+app.patch('/api/lost-pieces/:id/resolve', async (req, res) => {
+  const { id } = req.params;
+  const { resolvedNotes } = req.body;
+  const { data, error } = await supabase.from('lost_pieces_registry')
+    .update({ status: 'resolved', resolved_at: new Date().toISOString(), resolved_notes: resolvedNotes || null })
+    .eq('id', id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ item: data });
+});
+
 app.post('/api/pieces/match-whole-tray', async (req, res) => {
   const { studioId, bookingCode, trayPhotoBase64, packerId } = req.body;
   if (!studioId || !bookingCode || !trayPhotoBase64) {

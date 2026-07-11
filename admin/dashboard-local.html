@@ -1373,6 +1373,67 @@
 
 <div id="a2hs-banner-admin"></div>
 
+<!-- Find My Piece — a genuine panic button, reachable from every screen,
+     for the "customer/staff wants to know where a piece is, right now"
+     moment. Distinct from the assistant (bottom-left) and A2HS banner —
+     this is deliberately its own always-visible action, bottom-right. -->
+<button id="find-piece-fab" onclick="openFindMyPiece()" style="display:none;position:fixed;bottom:20px;right:16px;z-index:9700;background:#c0392b;color:white;border:none;border-radius:50%;width:64px;height:64px;font-size:26px;box-shadow:0 6px 22px rgba(192,57,43,0.4);cursor:pointer;">
+  🔍
+</button>
+
+<div id="find-piece-modal" style="display:none;position:fixed;inset:0;z-index:9950;background:rgba(43,39,36,0.75);backdrop-filter:blur(6px);align-items:flex-end;justify-content:center;">
+  <div style="background:white;border-radius:24px 24px 0 0;max-width:460px;width:100%;max-height:92vh;overflow-y:auto;padding:0;">
+    <div style="background:#c0392b;color:white;padding:18px 20px;position:sticky;top:0;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:17px;font-weight:800;">🔍 Find My Piece</div>
+        <div style="font-size:12px;opacity:0.85;">Search every photo and record we have</div>
+      </div>
+      <button onclick="closeFindMyPiece()" style="background:rgba(255,255,255,0.2);border:none;color:white;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;">✕</button>
+    </div>
+
+    <div style="padding:18px;">
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <button id="fmp-tab-text" onclick="switchFindPieceTab('text')" style="flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--gu-border);background:#c0392b;color:white;font-size:13px;font-weight:700;cursor:pointer;">🔤 Describe it</button>
+        <button id="fmp-tab-photo" onclick="switchFindPieceTab('photo')" style="flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--gu-border);background:white;color:var(--gu-text);font-size:13px;font-weight:700;cursor:pointer;">📷 Photo search</button>
+      </div>
+
+      <div id="fmp-text-panel">
+        <input type="text" id="fmp-search-input" placeholder="Customer name, piece type, colour, anything…" style="width:100%;padding:12px;border:1px solid var(--gu-border);border-radius:10px;font-size:14px;margin-bottom:10px;box-sizing:border-box;" onkeydown="if(event.key==='Enter') runTextPieceSearch()">
+        <button onclick="runTextPieceSearch()" style="width:100%;background:#c0392b;color:white;border:none;border-radius:12px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;">Search</button>
+      </div>
+
+      <div id="fmp-photo-panel" style="display:none;">
+        <p style="font-size:12px;color:var(--gu-dust);margin-bottom:12px;line-height:1.5;">Photograph the piece (or a customer's own photo of it) — this searches every reference photo, completion photo, and lost-item photo we have on file.</p>
+        <button onclick="capturePieceSearchPhoto()" style="width:100%;background:#c0392b;color:white;border:none;border-radius:12px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;">📷 Photograph or upload</button>
+      </div>
+
+      <div id="fmp-results" style="margin-top:16px;"></div>
+
+      <div style="border-top:1px solid var(--gu-border);margin-top:20px;padding-top:16px;">
+        <button onclick="openReportLostPiece()" style="width:100%;background:none;border:1.5px dashed var(--gu-dust);color:var(--gu-text);border-radius:10px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;">➕ Report a found/lost piece</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Report a lost/unidentified piece — the genuine replacement for the
+     handwritten "waiting to finish" / "waiting to be found" notes -->
+<div id="report-lost-modal" style="display:none;position:fixed;inset:0;z-index:9960;background:rgba(43,39,36,0.75);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:16px;">
+  <div style="background:white;border-radius:20px;max-width:400px;width:100%;padding:22px;">
+    <div style="font-size:16px;font-weight:800;margin-bottom:12px;">Report a piece</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <button id="rlp-cat-awaiting" onclick="setLostCategory('awaiting_collection')" style="flex:1;padding:9px;border-radius:8px;border:1.5px solid var(--gu-border);background:white;font-size:12px;font-weight:700;cursor:pointer;">⏳ Awaiting collection</button>
+      <button id="rlp-cat-unidentified" onclick="setLostCategory('unidentified')" style="flex:1;padding:9px;border-radius:8px;border:1.5px solid var(--gu-border);background:white;font-size:12px;font-weight:700;cursor:pointer;">❓ Unidentified</button>
+    </div>
+    <textarea id="rlp-description" placeholder="Description — e.g. blue mug, floral pattern" style="width:100%;padding:10px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;margin-bottom:10px;box-sizing:border-box;height:60px;"></textarea>
+    <input type="text" id="rlp-location" placeholder="Where found (e.g. waiting-to-finish shelf)" style="width:100%;padding:10px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;margin-bottom:10px;box-sizing:border-box;">
+    <button onclick="captureLostPiecePhoto()" style="width:100%;background:var(--gu-bg);border:1px solid var(--gu-border);color:var(--gu-text);border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:10px;">📷 Add a photo (optional)</button>
+    <div id="rlp-photo-preview"></div>
+    <button onclick="submitLostPiece()" style="width:100%;background:#c0392b;color:white;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">Save</button>
+    <button onclick="closeReportLostPiece()" style="width:100%;background:none;border:none;color:var(--gu-dust);padding:8px;font-size:12px;cursor:pointer;">Cancel</button>
+  </div>
+</div>
+
 <div id="opening-checklist-modal" style="display:none;position:fixed;inset:0;z-index:9100;background:rgba(43,39,36,0.7);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:16px;">
   <div style="background:#fff;border-radius:20px;max-width:480px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(43,39,36,0.4);">
     <!-- Header -->
@@ -5769,9 +5830,12 @@ function showAdminA2HSBanner() {
   // even though z-index technically keeps them "on top", visually it's
   // genuinely cluttered (buttons crammed against/behind a big dark
   // card). Hide those while this is showing, restore them once dismissed.
+  // Full-width banner also reaches the bottom-right corner, so the Find
+  // My Piece button needs the same treatment.
   document.getElementById('staff-assistant-fab')?.style.setProperty('display', 'none', 'important');
   document.getElementById('staff-assistant-hint')?.style.setProperty('display', 'none', 'important');
   document.getElementById('floating-back-btn')?.style.setProperty('display', 'none', 'important');
+  document.getElementById('find-piece-fab')?.style.setProperty('display', 'none', 'important');
 }
 
 function dismissAdminA2HS() {
@@ -5784,6 +5848,9 @@ function dismissAdminA2HS() {
   const fab = document.getElementById('staff-assistant-fab');
   if (fab) fab.style.removeProperty('display');
   if (currentShiftStaff && fab) fab.style.display = 'flex'; // only show if genuinely logged in
+  const findFab = document.getElementById('find-piece-fab');
+  if (findFab) findFab.style.removeProperty('display');
+  if (currentShiftStaff && findFab) findFab.style.display = 'flex';
   // Hint and back-button re-appear naturally on their own next trigger
   // (hint on next relevant moment, back-button on next scroll) — no
   // need to force them back immediately.
@@ -6214,6 +6281,7 @@ function applyShiftUI() {
   document.getElementById('direct-logout-btn').style.display = 'flex';
   document.getElementById('direct-break-btn').style.display = 'flex';
   document.getElementById('staff-assistant-fab').style.display = 'flex';
+  document.getElementById('find-piece-fab').style.display = 'flex';
   // Show the hint bubble shortly after login (not instantly — let the
   // rest of the UI settle first) unless it's already been dismissed
   // this session.
@@ -10464,6 +10532,194 @@ let _packingSelectedPieceIds = [];
 // confirmed pieces are laid out spaced apart — this isn't just a nag,
 // clear spacing is what makes the AI detection actually reliable, so
 // this gate matters functionally, not just as a reminder.
+// ── Find My Piece — the panic button, reachable from anywhere ──
+function openFindMyPiece() {
+  document.getElementById('find-piece-modal').style.display = 'flex';
+  document.getElementById('fmp-search-input').value = '';
+  document.getElementById('fmp-results').innerHTML = '';
+  switchFindPieceTab('text');
+}
+function closeFindMyPiece() {
+  document.getElementById('find-piece-modal').style.display = 'none';
+}
+
+function switchFindPieceTab(tab) {
+  document.getElementById('fmp-tab-text').style.background = tab === 'text' ? '#c0392b' : 'white';
+  document.getElementById('fmp-tab-text').style.color = tab === 'text' ? 'white' : 'var(--gu-text)';
+  document.getElementById('fmp-tab-photo').style.background = tab === 'photo' ? '#c0392b' : 'white';
+  document.getElementById('fmp-tab-photo').style.color = tab === 'photo' ? 'white' : 'var(--gu-text)';
+  document.getElementById('fmp-text-panel').style.display = tab === 'text' ? 'block' : 'none';
+  document.getElementById('fmp-photo-panel').style.display = tab === 'photo' ? 'block' : 'none';
+}
+
+async function runTextPieceSearch() {
+  const query = document.getElementById('fmp-search-input').value.trim();
+  if (!query) return;
+  const resultsEl = document.getElementById('fmp-results');
+  resultsEl.innerHTML = '<div style="padding:14px;text-align:center;color:var(--gu-dust);font-size:13px;">Searching…</div>';
+
+  try {
+    const res = await fetch(`${API_URL}/api/pieces/find?studioId=${studioId}&query=${encodeURIComponent(query)}`);
+    const data = await res.json();
+    if (!data.totalResults) {
+      resultsEl.innerHTML = '<div style="padding:14px;background:#fff3e0;border-radius:10px;font-size:13px;">Nothing found for that search. Try a photo search instead, or check the lost pieces list.</div>';
+      return;
+    }
+
+    let html = '';
+    if (data.pieces?.length) {
+      html += `<div style="font-size:11px;font-weight:700;color:var(--gu-dust);margin-bottom:8px;">PIECES (${data.pieces.length})</div>`;
+      html += data.pieces.map(p => `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--gu-bg);border-radius:10px;margin-bottom:6px;">
+          <div style="width:40px;height:40px;border-radius:8px;background:${p.reference_photo_url ? `url('${p.reference_photo_url}') center/cover` : 'var(--gu-border)'};flex-shrink:0;"></div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:700;">${p.piece_type || 'Piece'} <span style="font-size:10px;font-weight:600;color:var(--gu-dust);">${p.status}</span></div>
+            <div style="font-size:11px;color:var(--gu-dust);">${p.customer_name || 'Unknown customer'}${p.table_number ? ' · Table ' + p.table_number : ''}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+    if (data.lostRegistryMatches?.length) {
+      html += `<div style="font-size:11px;font-weight:700;color:var(--gu-dust);margin:12px 0 8px;">LOST &amp; FOUND (${data.lostRegistryMatches.length})</div>`;
+      html += data.lostRegistryMatches.map(l => `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#fff3e0;border-radius:10px;margin-bottom:6px;">
+          <div style="width:40px;height:40px;border-radius:8px;background:${l.photo_url ? `url('${l.photo_url}') center/cover` : 'var(--gu-border)'};flex-shrink:0;"></div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:700;">${l.description || 'Unidentified item'}</div>
+            <div style="font-size:11px;color:var(--gu-dust);">${l.found_location || 'Location unknown'}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+    if (data.catalogueMatches?.length) {
+      html += `<div style="font-size:11px;font-weight:700;color:var(--gu-dust);margin:12px 0 8px;">STOCK CATALOGUE (${data.catalogueMatches.length})</div>`;
+      html += data.catalogueMatches.map(c => `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--gu-bg);border-radius:10px;margin-bottom:6px;">
+          <div style="width:40px;height:40px;border-radius:8px;background:${c.image_url ? `url('${c.image_url}') center/cover` : 'var(--gu-border)'};flex-shrink:0;"></div>
+          <div style="flex:1;"><div style="font-size:13px;font-weight:700;">${c.name}</div></div>
+        </div>
+      `).join('');
+    }
+    resultsEl.innerHTML = html;
+  } catch (e) {
+    resultsEl.innerHTML = '<div style="padding:14px;color:#d9534f;font-size:13px;">Could not search — try again.</div>';
+  }
+}
+
+function capturePieceSearchPhoto() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.onchange = handlePieceSearchPhotoCapture;
+  input.click();
+}
+
+async function handlePieceSearchPhotoCapture(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const resultsEl = document.getElementById('fmp-results');
+  resultsEl.innerHTML = '<div style="padding:14px;text-align:center;color:var(--gu-dust);font-size:13px;">🔍 Searching every photo we have on file — this takes a few seconds…</div>';
+
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/pieces/find-by-photo`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId, photoBase64: reader.result, searchedBy: currentShiftStaff?.id || null })
+      });
+      const data = await res.json();
+      if (!res.ok) { resultsEl.innerHTML = `<div style="padding:14px;color:#d9534f;font-size:13px;">${data.error}</div>`; return; }
+      if (data.noConfidentMatch || !data.matches?.length) {
+        resultsEl.innerHTML = `<div style="padding:14px;background:#fff3e0;border-radius:10px;font-size:13px;">🤷 No confident match found. ${data.note || 'Try a text description, or report it as unidentified below.'}</div>`;
+        return;
+      }
+      const CONFIDENCE_COLORS = { high: '#2e7d32', medium: '#F9A825', low: '#8a8175' };
+      resultsEl.innerHTML = data.matches.map(m => `
+        <div style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--gu-bg);border-radius:10px;margin-bottom:8px;border-left:4px solid ${CONFIDENCE_COLORS[m.confidence] || '#8a8175'};">
+          <div style="width:44px;height:44px;border-radius:8px;background:url('${m.photo_url}') center/cover;flex-shrink:0;"></div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:700;">${m.label} <span style="font-size:10px;font-weight:700;color:${CONFIDENCE_COLORS[m.confidence] || '#8a8175'};text-transform:uppercase;">${m.confidence}</span></div>
+            <div style="font-size:11px;color:var(--gu-dust);">${m.reason || ''}</div>
+          </div>
+        </div>
+      `).join('');
+    } catch (e) {
+      resultsEl.innerHTML = '<div style="padding:14px;color:#d9534f;font-size:13px;">Could not search — try again.</div>';
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Report a lost/found piece ──
+let _lostPieceCategory = 'unidentified';
+let _lostPiecePhotoBase64 = null;
+
+function openReportLostPiece() {
+  document.getElementById('report-lost-modal').style.display = 'flex';
+  document.getElementById('rlp-description').value = '';
+  document.getElementById('rlp-location').value = '';
+  document.getElementById('rlp-photo-preview').innerHTML = '';
+  _lostPiecePhotoBase64 = null;
+  setLostCategory('unidentified');
+}
+function closeReportLostPiece() {
+  document.getElementById('report-lost-modal').style.display = 'none';
+}
+function setLostCategory(cat) {
+  _lostPieceCategory = cat;
+  document.getElementById('rlp-cat-awaiting').style.background = cat === 'awaiting_collection' ? '#c0392b' : 'white';
+  document.getElementById('rlp-cat-awaiting').style.color = cat === 'awaiting_collection' ? 'white' : 'var(--gu-text)';
+  document.getElementById('rlp-cat-unidentified').style.background = cat === 'unidentified' ? '#c0392b' : 'white';
+  document.getElementById('rlp-cat-unidentified').style.color = cat === 'unidentified' ? 'white' : 'var(--gu-text)';
+}
+function captureLostPiecePhoto() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.onchange = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      _lostPiecePhotoBase64 = reader.result;
+      document.getElementById('rlp-photo-preview').innerHTML = `<img src="${reader.result}" style="width:80px;height:80px;border-radius:8px;object-fit:cover;margin-bottom:10px;">`;
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+async function submitLostPiece() {
+  const description = document.getElementById('rlp-description').value.trim();
+  const location = document.getElementById('rlp-location').value.trim();
+  if (!description) { alert('Add a short description first.'); return; }
+
+  let photoUrl = null;
+  if (_lostPiecePhotoBase64) {
+    // Reuse the piece reference-photo upload pattern for storage — genuinely
+    // uploads to the same bucket, just not linked to a specific piece row.
+    try {
+      const uploadRes = await fetch(`${API_URL}/api/lost-pieces/upload-photo`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId, photoBase64: _lostPiecePhotoBase64 })
+      });
+      const uploadData = await uploadRes.json();
+      photoUrl = uploadData.photoUrl || null;
+    } catch (e) { /* proceed without photo if upload fails */ }
+  }
+
+  try {
+    await fetch(`${API_URL}/api/lost-pieces`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId, category: _lostPieceCategory, description, foundLocation: location,
+        photoUrl, reportedBy: currentShiftStaff?.id || null,
+      })
+    });
+    alert('Saved to the lost pieces list.');
+    closeReportLostPiece();
+  } catch (e) {
+    alert('Could not save — try again.');
+  }
+}
+
 function toggleLayoutScanUnlock() {
   const checked = document.getElementById('layout-confirmed-checkbox').checked;
   const btn = document.getElementById('wts-scan-btn');
