@@ -43,6 +43,44 @@
       --glaze-sage-deep: #454d3d;
     }
 
+    /* ── Cleo's Club KID MODE — a genuine, complete theme override.
+       Customer chooses this once (real toggle screen), and every
+       colour variable in the whole app flips to a warmer, brighter,
+       more playful palette built around Cleo's own orange/gold —
+       every element that already uses these variables re-themes
+       automatically, no need to hand-edit hundreds of components. ── */
+    body.kid-mode {
+      --link-charcoal: #3D2E5C;
+      --link-clay: #F9A825;
+      --link-sand: #FFF3D6;
+      --link-ivory: #FFFBF2;
+      --link-stone: #E0D4F5;
+
+      --gu-bg: var(--link-ivory);
+      --gu-primary: var(--link-clay);
+      --gu-accent: var(--link-charcoal);
+      --gu-dust: #9B8FB0;
+      --gu-border: var(--link-stone);
+
+      --glaze-oxblood-base: #F9A825;
+      --glaze-oxblood-high: #FFC862;
+      --glaze-oxblood-deep: #C77800;
+      --glaze-ocean-base: #4FC3E8;
+      --glaze-ocean-high: #8DE0FF;
+      --glaze-ocean-deep: #1E8FB5;
+      --glaze-honey-base: #FF8A65;
+      --glaze-honey-high: #FFB199;
+      --glaze-honey-deep: #D45A38;
+      --glaze-sage-base: #7ED957;
+      --glaze-sage-high: #A8EA85;
+      --glaze-sage-deep: #4CAF32;
+    }
+    /* Bigger, rounder, more playful shapes throughout kid mode — genuinely
+       easier for smaller hands to tap accurately, not just decorative. */
+    body.kid-mode .tile { border-radius: 22px !important; }
+    body.kid-mode .app-header { border-radius: 0 0 28px 28px !important; }
+    body.kid-mode button { border-radius: 16px; }
+
     * { box-sizing: border-box; }
 
     body {
@@ -2005,6 +2043,7 @@
           </div>`;
         showA2HSBanner();
         initCleoFloatingWidget();
+        applyKidModeFromStorage(); // theme still applies here even without the header toggle button (this screen has no header)
         return;
       }
 
@@ -2073,9 +2112,12 @@
               <div style="margin-bottom:3px;">${wordmarkHtml}</div>
               <div class="brand" style="opacity:0.65; font-weight:400; font-size:0.8em;">The Kiln Cafe</div>
             </div>
-            <button id="my-qr-badge" onclick="showMyQR()" style="background:rgba(255,255,255,0.18); border:2px solid rgba(255,255,255,0.5); border-radius:12px; padding:4px; cursor:pointer;" aria-label="Show my QR code">
-              <img src="${qrThumbUrl}" width="46" height="46" style="display:block; border-radius:6px;" alt="Your QR code">
-            </button>
+            <div style="display:flex; gap:8px;">
+              <button id="kid-mode-toggle-btn" onclick="toggleKidMode()" style="background:rgba(255,255,255,0.18); border:2px solid rgba(255,255,255,0.5); border-radius:12px; padding:4px 10px; cursor:pointer; font-size:22px; line-height:1;" aria-label="Switch to kid-friendly styling"></button>
+              <button id="my-qr-badge" onclick="showMyQR()" style="background:rgba(255,255,255,0.18); border:2px solid rgba(255,255,255,0.5); border-radius:12px; padding:4px; cursor:pointer;" aria-label="Show my QR code">
+                <img src="${qrThumbUrl}" width="46" height="46" style="display:block; border-radius:6px;" alt="Your QR code">
+              </button>
+            </div>
           </div>
           <div class="greeting">Hi ${firstName}! 👋</div>
           <div class="sub">Your painting session is ready. Have fun creating!</div>
@@ -2243,18 +2285,33 @@
       loadLoyaltyTile();
       checkCleosClubEnabled();
       initCleoFloatingWidget();
+      applyKidModeFromStorage();
 
       // TEMPORARY diagnostic — genuine measured page state on the real
       // device, to find out why scrolling and Cleo's Club aren't
       // showing rather than continuing to guess blind. Remove once resolved.
+      //
+      // IMPORTANT FIX: the original version of this box spanned nearly
+      // the full screen width with max-height:60vh and no dismiss
+      // button — genuinely plausible that THIS diagnostic itself was
+      // the actual cause of "not scrolling in either direction",
+      // sitting on top of everything at z-index:999999 and capturing
+      // all touch/scroll gestures within its own bounds. Fixed to be
+      // small, sized to its real content, and dismissible.
       setTimeout(() => {
         const cleoTile = document.getElementById('cleos-club-tile');
         const wtOverlay = document.getElementById('wt-overlay');
         const bodyStyle = getComputedStyle(document.body);
         const htmlStyle = getComputedStyle(document.documentElement);
         const box = document.createElement('div');
-        box.style.cssText = 'position:fixed;top:4px;left:4px;right:4px;z-index:999999;background:#000;color:#0f0;font-family:monospace;font-size:9px;padding:8px 10px;border-radius:6px;opacity:0.97;white-space:pre-wrap;max-height:60vh;overflow-y:auto;';
-        box.textContent =
+        box.style.cssText = 'position:fixed;top:4px;left:4px;max-width:280px;z-index:999999;background:#000;color:#0f0;font-family:monospace;font-size:9px;padding:8px 30px 8px 10px;border-radius:6px;opacity:0.97;white-space:pre-wrap;';
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '✕';
+        closeBtn.style.cssText = 'position:absolute;top:4px;right:4px;background:#333;color:#0f0;border:none;border-radius:4px;width:20px;height:20px;font-size:11px;cursor:pointer;';
+        closeBtn.onclick = () => box.remove();
+        box.appendChild(closeBtn);
+        const textNode = document.createElement('div');
+        textNode.textContent =
           `viewport: ${window.innerWidth}x${window.innerHeight}\n` +
           `body overflow: ${bodyStyle.overflow} / overflowY: ${bodyStyle.overflowY}\n` +
           `html overflow: ${htmlStyle.overflow} / overflowY: ${htmlStyle.overflowY}\n` +
@@ -2262,14 +2319,15 @@
           `cleo tile found: ${!!cleoTile} | display: ${cleoTile ? getComputedStyle(cleoTile).display : 'n/a'}\n` +
           `wt-overlay display: ${wtOverlay ? getComputedStyle(wtOverlay).display : 'n/a'} | pointerEvents: ${wtOverlay ? getComputedStyle(wtOverlay).pointerEvents : 'n/a'}\n` +
           `STUDIO_ID: ${typeof STUDIO_ID !== 'undefined' ? STUDIO_ID : 'undefined'}`;
+        box.appendChild(textNode);
         document.body.appendChild(box);
 
         // Also genuinely fetch the real Cleo's Club config live, so we
         // can see honestly whether the backend even reports it enabled.
         fetch(`${API_URL}/api/cleos-club/config?studioId=${STUDIO_ID}`)
           .then(r => r.json())
-          .then(data => { box.textContent += `\ncleos-club config: ${JSON.stringify(data)}`; })
-          .catch(e => { box.textContent += `\ncleos-club config fetch FAILED: ${e.message}`; });
+          .then(data => { textNode.textContent += `\ncleos-club config: ${JSON.stringify(data)}`; })
+          .catch(e => { textNode.textContent += `\ncleos-club config fetch FAILED: ${e.message}`; });
       }, 1200);
     }
 
@@ -3559,6 +3617,26 @@
     ];
     const CLEO_FLOATING_MESSAGE_CLUB_PAGES = { text: "Press to see Club Pages 🌍", action: 'clubpages' };
     const CLEO_FLOATING_MESSAGE_STICKERS = { text: "Collecting stickers? ⭐", action: 'stickers' };
+
+    // ── Kid Mode — genuine, complete theme toggle. Persisted in
+    // localStorage so it's remembered across visits on the same
+    // device, not just for one session. Applied by toggling a real
+    // class on <body>, which flips every CSS variable app-wide. ──
+    function applyKidModeFromStorage() {
+      const isKidMode = localStorage.getItem('klnk_kid_mode') === '1';
+      document.body.classList.toggle('kid-mode', isKidMode);
+      const btn = document.getElementById('kid-mode-toggle-btn');
+      if (btn) {
+        btn.textContent = isKidMode ? '🧸' : '🎨';
+        btn.title = isKidMode ? 'Switch back to normal styling' : "Switch to Cleo's Club kid styling";
+      }
+    }
+
+    function toggleKidMode() {
+      const isCurrentlyKidMode = document.body.classList.contains('kid-mode');
+      localStorage.setItem('klnk_kid_mode', isCurrentlyKidMode ? '0' : '1');
+      applyKidModeFromStorage();
+    }
 
     function initCleoFloatingWidget() {
       const mascotContainer = document.getElementById('cleo-floating-mascot');
