@@ -139,6 +139,35 @@
       }
     }
 
+    /* Genuine real "Focus Mode" for tablets — iPad/Android in the real
+       521-900px range (below that is already the dedicated phone
+       layout, which is inherently full-screen; above that there's
+       genuine room for the sidebar to coexist comfortably). When a
+       real tab is open, the sidebar/icon-rail and top header chrome
+       disappear entirely, content fills the whole real screen, and
+       one big always-visible back button (not the small scroll-
+       triggered pill) is the only way back — a genuine dedicated
+       screen, not a popup competing with surrounding navigation. Only
+       ever active on Dashboard? No — Dashboard is the real "home", so
+       focus mode never applies there; it's for every OTHER tab. */
+    @media (min-width: 521px) and (max-width: 900px) {
+      body.focus-mode .admin-sidebar {
+        display: none;
+      }
+      body.focus-mode .admin-wrapper {
+        grid-template-columns: 1fr;
+      }
+      body.focus-mode .admin-content {
+        padding-top: 68px; /* real clearance for the focus-mode back bar */
+      }
+      #focus-mode-back-bar {
+        display: none;
+      }
+      body.focus-mode #focus-mode-back-bar {
+        display: flex;
+      }
+    }
+
     /* Real phone widths (staff assistants/baristas on their own iPhone/Android) —
        the sidebar becomes a horizontal tab bar pinned at the top (below the
        header menu), and the top-right header buttons (alert bell, shift badge,
@@ -1994,6 +2023,17 @@
 <button id="floating-back-btn" onclick="goToTab('dashboard')" style="display:none;position:fixed;bottom:82px;left:20px;z-index:900;background:#2B2724;color:white;border:none;border-radius:24px;padding:11px 18px 11px 14px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.25);align-items:center;gap:6px;">
   ← Dashboard
 </button>
+
+<!-- Genuine real Focus Mode back bar — tablet-only (CSS above scopes
+     this to 521-900px), always visible at the top the whole time
+     focus mode is active, not scroll-triggered like the small pill
+     above. Real, big, obvious tap target — this is the ONE way back
+     while in focus mode, since the sidebar is genuinely hidden. -->
+<div id="focus-mode-back-bar" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9500;height:56px;background:#2B2724;align-items:center;padding:0 16px;box-shadow:0 2px 10px rgba(0,0,0,0.2);">
+  <button onclick="exitFocusMode()" style="background:rgba(255,255,255,0.15);border:none;color:white;border-radius:12px;padding:10px 16px;font-size:15px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:6px;">
+    ← <span id="focus-mode-back-label">Back</span>
+  </button>
+</div>
 
 <!-- Headset / Bluetooth Setup button -->
 <button id="headset-setup-btn" onclick="openHeadsetHelp()" style="display:none;position:fixed;top:16px;right:280px;z-index:850;background:white;border:1.5px solid var(--gu-border);border-radius:50%;width:44px;height:44px;font-size:18px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.12);align-items:center;justify-content:center;">
@@ -4595,6 +4635,14 @@ let currentTab = 'dashboard';
 // Shows the floating "← Dashboard" button once scrolled down on any
 // tab other than Dashboard itself — a quick, always-reachable way back
 // without needing to scroll up to find the sidebar first.
+// Genuine exit from Focus Mode — returns to Dashboard, the real home
+// screen. Removing the class is enough on its own (the tab switch
+// inside goToTab already does this for 'dashboard'), but this gives a
+// single, real, explicit function the back bar's button can call.
+function exitFocusMode() {
+  goToTab('dashboard');
+}
+
 function toggleFloatingBackBtn() {
   const btn = document.getElementById('floating-back-btn');
   if (!btn) return;
@@ -4635,6 +4683,19 @@ function goToTab(tab, event) {
   const contentEl = document.getElementById('admin-content');
   if (contentEl) contentEl.scrollTop = 0;
   toggleFloatingBackBtn();
+
+  // Genuine real Focus Mode — tablet widths only (CSS scopes the
+  // actual visual effect to 521-900px). Dashboard itself is the real
+  // "home" screen, so focus mode never applies there; every other
+  // real tab gets it. Label on the back bar shows the actual tab name
+  // being left, so it's genuinely clear where "back" goes.
+  if (tab === 'dashboard') {
+    document.body.classList.remove('focus-mode');
+  } else {
+    document.body.classList.add('focus-mode');
+    const label = document.getElementById('focus-mode-back-label');
+    if (label) label.textContent = 'Back';
+  }
 
   // Load data for specific tabs
   if (tab === 'staff') {
@@ -6868,6 +6929,7 @@ function updateBreakUI() {
 async function logOutOfShift() {
   if (stepMotionActive) stopStepCounting();
   stepCount = 0;
+  document.body.classList.remove('focus-mode'); // genuine safety reset — never leave this stuck across a login/logout cycle
 
   // Automatic clock-out
   if (currentShiftStaff && currentShiftStaff.id !== 'testing') {
