@@ -3471,6 +3471,18 @@ app.post('/api/assistant/chat', async (req, res) => {
   }
 });
 
+// GET /api/pieces/for-booking — every piece logged for a specific
+// booking, used by the reference-photo capture screen at table-clearing
+app.get('/api/pieces/for-booking', async (req, res) => {
+  const { studioId, bookingCode } = req.query;
+  if (!studioId || !bookingCode) return res.status(400).json({ error: 'studioId and bookingCode required' });
+  const { data: pieces, error } = await supabase.from('pottery_pieces')
+    .select('id, piece_type, status, reference_photo_url')
+    .eq('studio_id', studioId).eq('booking_id', bookingCode);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ pieces: pieces || [] });
+});
+
 app.get('/api/pieces/ready-for-pickup', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
@@ -6108,6 +6120,163 @@ app.post('/api/kiln/morning-check/report-misfire', async (req, res) => {
     console.error('Error reporting kiln misfire:', error);
     res.status(500).json({ error: error.message });
   }
+});
+
+// ═══════════════════════════════════════════
+// PIECE REFERENCE PHOTOS & AI-ASSISTED MATCHING
+// At table-clearing time, each piece in a group gets its own photo
+// taken next to the booking's QR card (not just the one group shot).
+// Later, when pieces come out of the kiln jumbled together, the packer
+// photographs a piece and the app suggests which reference photo it
+// most likely matches — genuinely AI-ASSISTED, not a silent guaranteed
+// match. Colour changes completely during firing/glazing and is
+// deliberately NOT trusted as a signal; shape, proportions, and the
+// pattern/linework of the design (which stays visually recognisable
+// even though its colour shifts) are what the AI is told to focus on.
+// The packer always makes the final call — this narrows down a
+// jumbled pile, it doesn't replace a human's judgement.
+// ═══════════════════════════════════════════
+
+// POST /api/pieces/:pieceId/reference-photo — capture the individual
+// piece photo at table-clearing time, next to the booking's QR card
+app.post('/api/pieces/:pieceId/reference-photo', async (req, res) => {
+  const { pieceId } = req.params;
+  const { studioId, photoBase64 } = req.body;
+  if (!studioId || !photoBase64) return res.status(400).json({ error: 'studioId and photoBase64 required' });
+
+  try {
+    const base64Data = photoBase64.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    const fileName = `${studioId}/piece-refs/${pieceId}-${Date.now()}.jpg`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('booking-photos')
+      .upload(fileName, buffer, { contentType: 'image/jpeg' });
+    if (uploadError) throw uploadError;
+
+    const { data: urlData } = supabase.storage.from('booking-photos').getPublicUrl(fileName);
+
+    const { data: piece, error } = await supabase.from('pottery_pieces')
+      .update({ reference_photo_url: urlData.publicUrl, reference_photo_taken_at: new Date().toISOString() })
+      .eq('id', pieceId).select().single();
+    if (error) throw error;
+
+    res.json({ status: 'saved', piece });
+  } catch (error) {
+    console.error('Reference photo upload error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/bookings/:bookingCode/reference-photos — all reference
+// photos for a booking's pieces, for the packer to compare against
+app.get('/api/bookings/:bookingCode/reference-photos', async (req, res) => {
+  const { bookingCode } = req.params;
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  const { data: pieces, error } = await supabase.from('pottery_pieces')
+    .select('id, piece_type, reference_photo_url, status')
+    .eq('studio_id', studioId).eq('booking_id', bookingCode)
+    .not('reference_photo_url', 'is', null);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ pieces: pieces || [] });
+});
+
+// POST /api/pieces/match — the actual AI-assisted matching. Packer
+// photographs a fired, jumbled piece; this compares it against every
+// reference photo for the given booking and returns a RANKED list with
+// honest reasoning and confidence — never a silent single answer.
+app.post('/api/pieces/match', async (req, res) => {
+  const { studioId, bookingCode, queryPhotoBase64, packerId } = req.body;
+  if (!studioId || !bookingCode || !queryPhotoBase64) {
+    return res.status(400).json({ error: 'studioId, bookingCode, queryPhotoBase64 required' });
+  }
+  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'Piece matching is not yet available.' });
+
+  try {
+    const { data: candidates } = await supabase.from('pottery_pieces')
+      .select('id, piece_type, reference_photo_url')
+      .eq('studio_id', studioId).eq('booking_id', bookingCode)
+      .not('reference_photo_url', 'is', null);
+
+    if (!candidates || !candidates.length) {
+      return res.status(404).json({ error: 'No reference photos found for this booking — pieces may not have been individually photographed at table-clearing.' });
+    }
+
+    // Build a genuinely explicit prompt: focus on shape/proportions and
+    // the pattern/linework of the design, NOT colour — colour shifts
+    // completely during firing and glazing and is not a reliable signal.
+    const content = [
+      {
+        type: 'text',
+        text: `You are helping a pottery studio packer identify which UNFIRED reference photo matches a FIRED, GLAZED piece they're holding right now. The fired piece's colours will look quite different from the reference photos — colour is NOT reliable evidence and should be ignored. Instead, focus on: the overall shape and proportions of the piece, the handle/rim/base style, and the PATTERN and LINEWORK of the painted design (its shape, position on the piece, and how much of the surface it covers) — these genuinely stay recognisable even though colour changes.
+
+The piece being identified is the LAST image below. The reference photos (each labelled with an ID) come before it.
+
+Return a ranked list of the most likely matches (up to 3), each with: the reference ID, a confidence level (high/medium/low), and a short, honest reason based on shape/pattern — not colour. If nothing genuinely looks like a plausible match, say so clearly rather than guessing. Respond ONLY as JSON: {"matches":[{"id":"...","confidence":"high","reason":"..."}], "noConfidentMatch": false}`,
+      },
+    ];
+    candidates.forEach(c => {
+      content.push({ type: 'text', text: `Reference ID: ${c.id} (${c.piece_type || 'piece'})` });
+      content.push({ type: 'image_url', image_url: { url: c.reference_photo_url } });
+    });
+    content.push({ type: 'text', text: 'This is the fired piece to identify:' });
+    content.push({ type: 'image_url', image_url: { url: queryPhotoBase64.startsWith('data:') ? queryPhotoBase64 : `data:image/jpeg;base64,${queryPhotoBase64}` } });
+
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content }],
+        temperature: 0.2,
+        max_tokens: 500,
+      }),
+    });
+    const aiData = await openaiRes.json();
+    let parsed;
+    try {
+      parsed = JSON.parse((aiData.choices?.[0]?.message?.content || '{}').replace(/```json|```/g, '').trim());
+    } catch (e) {
+      return res.status(502).json({ error: 'Could not interpret the match result — please try again or compare manually.' });
+    }
+
+    // Enrich the AI's response with the actual candidate data (photo
+    // URL, piece type) so the frontend can show a genuine side-by-side.
+    const enrichedMatches = (parsed.matches || []).map(m => {
+      const candidate = candidates.find(c => c.id === m.id);
+      return { ...m, piece_type: candidate?.piece_type, reference_photo_url: candidate?.reference_photo_url };
+    });
+
+    // Log the attempt for a genuine audit trail and honest accuracy
+    // tracking over time — not just fire-and-forget.
+    const { data: logEntry } = await supabase.from('piece_match_attempts').insert({
+      studio_id: studioId, booking_code: bookingCode,
+      query_photo_url: '(uploaded at match time, not separately stored)',
+      suggested_piece_id: enrichedMatches[0]?.id || null,
+      ai_reasoning: enrichedMatches[0]?.reason || null,
+      ai_confidence: parsed.noConfidentMatch ? 'no_match' : (enrichedMatches[0]?.confidence || null),
+      all_candidates: enrichedMatches,
+      packer_id: packerId || null,
+    }).select().single();
+
+    res.json({ matches: enrichedMatches, noConfidentMatch: !!parsed.noConfidentMatch, matchAttemptId: logEntry?.id });
+  } catch (error) {
+    console.error('Piece matching error:', error);
+    res.status(500).json({ error: 'Could not run the match right now — please compare manually.' });
+  }
+});
+
+// PATCH /api/pieces/match/:attemptId/confirm — packer confirms or
+// rejects the AI's suggestion, feeding honest accuracy tracking
+app.patch('/api/pieces/match/:attemptId/confirm', async (req, res) => {
+  const { attemptId } = req.params;
+  const { confirmed } = req.body;
+  const { data, error } = await supabase.from('piece_match_attempts')
+    .update({ packer_confirmed: !!confirmed }).eq('id', attemptId).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ attempt: data });
 });
 
 app.get('/health', (req, res) => {

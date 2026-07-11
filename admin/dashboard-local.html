@@ -2014,6 +2014,7 @@
       <a href="#" class="nav-link" id="nav-setup-tab" onclick="goToTab('setup', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.2v2.3M12 18.5v2.3M20.8 12h-2.3M5.5 12H3.2M17.9 6.1l-1.6 1.6M7.7 16.3l-1.6 1.6M17.9 17.9l-1.6-1.6M7.7 7.7L6.1 6.1"/></svg></span><span class="nav-label">Setup</span></a>
       <a href="#" class="nav-link" id="nav-catalogue-tab" onclick="goToTab('catalogue', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="7.5" height="7.5" rx="1.5"/><rect x="13" y="4" width="7.5" height="7.5" rx="1.5"/><rect x="3.5" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg></span><span class="nav-label">Piece Catalogue</span></a>
       <a href="#" class="nav-link" id="nav-tablecards-tab" onclick="goToTab('tablecards', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="6" width="17" height="13" rx="1.8"/><rect x="7" y="9" width="6" height="6" rx="0.8"/><path d="M15 10h3M15 13h3M15 16h2"/></svg></span><span class="nav-label">Table Cards</span></a>
+      <a href="#" class="nav-link" id="nav-piecematch-tab" onclick="goToTab('piecematch', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5l-4-4"/><path d="M8 11h6M11 8v6"/></svg></span><span class="nav-label">Piece Matching</span></a>
       <a href="#" class="nav-link" id="nav-staff-tab" onclick="goToTab('staff', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="16" rx="2.2"/><path d="M3.5 9.5h17M8 3v3M16 3v3"/><path d="M8 14l2.4 2.4L16.5 10.5"/></svg></span><span class="nav-label">Daily Bookings</span></a>
       <a href="#" class="nav-link" onclick="goToTab('community', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 15.5H6.2a2.7 2.7 0 01-2.7-2.7V7.7A2.7 2.7 0 016.2 5h9.6a2.7 2.7 0 012.7 2.7v1.4"/><path d="M6.5 15.5v3.3l3.7-3.3"/><path d="M11 19h6.8a2.7 2.7 0 002.7-2.7v-3.6a2.7 2.7 0 00-2.7-2.7H11a2.7 2.7 0 00-2.7 2.7v3.6A2.7 2.7 0 0011 19z"/></svg></span><span class="nav-label">Community</span></a>
       <a href="#" class="nav-link" id="nav-printqueue-tab" onclick="goToTab('printqueue', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5V4h11v5.5"/><rect x="3.5" y="9.5" width="17" height="7.5" rx="1.8"/><rect x="6.5" y="13.5" width="11" height="6.5" rx="1"/><circle cx="17" cy="12.3" r=".9" fill="currentColor" stroke="none"/></svg></span><span class="nav-label">Print Queue</span></a>
@@ -2467,6 +2468,23 @@
               <div style="padding: 4px 0;"><div class="skeleton-line" style="width: 70%;"></div><div class="skeleton-line" style="width: 45%;"></div></div>
             </div>
           </div>
+
+          <!-- Individual piece reference photos — separate from the
+               group completion photo above. Each piece in the group
+               gets photographed on its own, next to the booking's QR
+               table card, while pieces are still unfired. These are
+               what the Piece Matching tool later compares a fired,
+               jumbled piece against. -->
+          <div class="chart-container" style="border:1.5px solid rgba(184,121,70,0.3);background:linear-gradient(135deg,rgba(184,121,70,0.06),rgba(46,125,50,0.05));">
+            <h3 style="margin:0 0 6px;">📸 Individual Piece Photos</h3>
+            <p style="font-size:11px;color:var(--gu-dust);margin-bottom:12px;line-height:1.5;">
+              Photograph each piece in the group ON ITS OWN, next to the table's QR card, as clearly as possible. These feed the Piece Matching tool later, so the packer can identify each piece even when it's jumbled with others after firing.
+            </p>
+            <select id="ref-photo-booking-select" style="width:100%;padding:10px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;margin-bottom:10px;">
+              <option value="">Select a booking…</option>
+            </select>
+            <div id="ref-photo-pieces-list"></div>
+          </div>
         </div>
 
         <!-- ═══════════════════════════ -->
@@ -2874,6 +2892,44 @@
           <div id="tc-print-qr" style="margin-bottom:12px;"></div>
           <div id="tc-print-table" style="font-size:13px;font-weight:600;color:#2B2724;"></div>
           <div style="font-size:9px;color:#b0a89e;margin-top:14px;">Scan to view your pottery session — kilnLINK</div>
+        </div>
+      </div>
+
+      <!-- ═════════════════════════════════════════════ -->
+      <!-- PIECE MATCHING TAB -->
+      <!-- Helps the packer identify a fired, jumbled piece against the
+           individual reference photos taken at table-clearing time.
+           GENUINELY AI-ASSISTED, not a guaranteed silent match — colour
+           changes completely during firing/glazing and isn't trusted;
+           the AI is told to focus on shape and the pattern/linework of
+           the design instead. Always returns a ranked list with honest
+           reasoning, and the packer makes the final call. -->
+      <!-- ═════════════════════════════════════════════ -->
+      <div id="piecematch-view" class="view" style="display: none;">
+        <h2 style="margin-top: 0;">🔍 Piece Matching</h2>
+        <p style="color: var(--gu-dust); font-size: 13px; margin-bottom: 20px; line-height: 1.5;">
+          Pick up a fired piece from the jumbled pile, scan the group's QR code, then photograph the piece — this suggests which reference photo it most likely matches, based on shape and design pattern (not colour, which changes too much during firing to trust). Always double-check against the suggested photo before confirming.
+        </p>
+
+        <div class="chart-container" style="margin-bottom: 20px;">
+          <h3 style="margin:0 0 10px;">1. Scan the group's QR code</h3>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="pm-booking-scan-input" placeholder="Scan QR or paste booking code" style="flex:1;padding:10px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;" onkeydown="if(event.key==='Enter') loadPieceMatchGroup()">
+            <button onclick="loadPieceMatchGroup()" style="background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;">Load</button>
+          </div>
+        </div>
+
+        <div id="pm-group-info" style="display:none;">
+          <div class="chart-container" style="margin-bottom: 20px;">
+            <h3 style="margin:0 0 10px;">2. Reference photos for this group</h3>
+            <div id="pm-reference-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;"></div>
+          </div>
+
+          <div class="chart-container">
+            <h3 style="margin:0 0 10px;">3. Photograph the piece you're holding</h3>
+            <button onclick="capturePieceMatchPhoto()" style="width:100%;background:#2e7d32;color:white;border:none;border-radius:12px;padding:16px;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:14px;">📷 Photograph piece to identify</button>
+            <div id="pm-match-result"></div>
+          </div>
         </div>
       </div>
 
@@ -8522,6 +8578,115 @@ function triggerTableCardPrint() {
   }, 150);
 }
 
+// ── Piece Matching — AI-assisted, honest ranked suggestions, packer
+// confirms. Colour is deliberately ignored; shape + design pattern
+// (which stays recognisable through firing) is what the AI focuses on. ──
+let _pmCurrentBookingCode = null;
+
+async function loadPieceMatchGroup() {
+  const raw = document.getElementById('pm-booking-scan-input').value.trim();
+  if (!raw) return;
+
+  // Same flexible parsing as the kiln-unload scan — accepts a full URL,
+  // a raw booking code, or pasted text containing one.
+  let bookingCode = raw;
+  try {
+    const url = new URL(raw);
+    const paramCode = url.searchParams.get('booking');
+    if (paramCode) bookingCode = paramCode;
+  } catch { /* not a URL, use as-is */ }
+
+  _pmCurrentBookingCode = bookingCode;
+  const grid = document.getElementById('pm-reference-grid');
+  grid.innerHTML = '<div style="grid-column:1/-1;padding:10px;color:var(--gu-dust);font-size:12px;">Loading…</div>';
+  document.getElementById('pm-group-info').style.display = 'block';
+  document.getElementById('pm-match-result').innerHTML = '';
+
+  try {
+    const res = await fetch(`${API_URL}/api/bookings/${encodeURIComponent(bookingCode)}/reference-photos?studioId=${studioId}`);
+    const data = await res.json();
+    const pieces = data.pieces || [];
+    if (!pieces.length) {
+      grid.innerHTML = '<div style="grid-column:1/-1;padding:10px;color:var(--gu-dust);font-size:12px;">No individual piece photos found for this booking — they may not have been taken at table-clearing.</div>';
+      return;
+    }
+    grid.innerHTML = pieces.map(p => `
+      <div style="border-radius:10px;overflow:hidden;border:1px solid var(--gu-border);">
+        <div style="height:80px;background:url('${p.reference_photo_url}') center/cover;"></div>
+        <div style="font-size:10px;text-align:center;padding:4px;color:var(--gu-dust);">${p.piece_type || 'Piece'}</div>
+      </div>
+    `).join('');
+  } catch (e) {
+    grid.innerHTML = '<div style="grid-column:1/-1;padding:10px;color:var(--gu-dust);font-size:12px;">Could not load reference photos.</div>';
+  }
+}
+
+function capturePieceMatchPhoto() {
+  if (!_pmCurrentBookingCode) { alert('Scan a booking QR code first.'); return; }
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.onchange = handlePieceMatchCapture;
+  input.click();
+}
+
+async function handlePieceMatchCapture(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const resultEl = document.getElementById('pm-match-result');
+  resultEl.innerHTML = '<div style="padding:14px;text-align:center;color:var(--gu-dust);font-size:13px;">🔍 Comparing against reference photos — this takes a few seconds…</div>';
+
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/pieces/match`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studioId, bookingCode: _pmCurrentBookingCode,
+          queryPhotoBase64: reader.result, packerId: currentShiftStaff?.id || null,
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) { resultEl.innerHTML = `<div style="padding:14px;color:#d9534f;font-size:13px;">${data.error || 'Could not run the match.'}</div>`; return; }
+
+      if (data.noConfidentMatch || !data.matches?.length) {
+        resultEl.innerHTML = `<div style="padding:14px;background:#fff3e0;border-radius:10px;font-size:13px;color:var(--gu-text);">🤷 No confident match found — please compare manually against the reference photos above.</div>`;
+        return;
+      }
+
+      const CONFIDENCE_COLORS = { high: '#2e7d32', medium: '#F9A825', low: '#8a8175' };
+      resultEl.innerHTML = `
+        <div style="font-size:12px;font-weight:700;color:var(--gu-dust);margin-bottom:8px;">Suggested matches — always double-check before confirming:</div>
+        ${data.matches.map((m, i) => `
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;background:${i === 0 ? '#f0f8f0' : 'var(--gu-bg)'};border-radius:10px;margin-bottom:8px;border-left:4px solid ${CONFIDENCE_COLORS[m.confidence] || '#8a8175'};">
+            <div style="width:56px;height:56px;border-radius:8px;background:url('${m.reference_photo_url}') center/cover;flex-shrink:0;"></div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:700;">${m.piece_type || 'Piece'} <span style="font-size:10px;font-weight:700;color:${CONFIDENCE_COLORS[m.confidence] || '#8a8175'};text-transform:uppercase;">${m.confidence || ''}</span></div>
+              <div style="font-size:11px;color:var(--gu-dust);line-height:1.4;">${m.reason || ''}</div>
+            </div>
+            ${i === 0 ? `<button onclick="confirmPieceMatch('${data.matchAttemptId}', true)" style="background:#2e7d32;color:white;border:none;border-radius:8px;padding:8px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">✓ This one</button>` : ''}
+          </div>
+        `).join('')}
+        <button onclick="confirmPieceMatch('${data.matchAttemptId}', false)" style="width:100%;background:none;border:1px solid var(--gu-border);color:var(--gu-dust);border-radius:8px;padding:10px;font-size:12px;cursor:pointer;">None of these — I'll compare manually</button>
+      `;
+    } catch (e) {
+      resultEl.innerHTML = '<div style="padding:14px;color:#d9534f;font-size:13px;">Could not run the match — please compare manually.</div>';
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function confirmPieceMatch(attemptId, confirmed) {
+  if (!attemptId || attemptId === 'undefined') return;
+  await fetch(`${API_URL}/api/pieces/match/${attemptId}/confirm`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ confirmed })
+  });
+  const resultEl = document.getElementById('pm-match-result');
+  resultEl.innerHTML = confirmed
+    ? '<div style="padding:14px;background:#f0f8f0;border-radius:10px;font-size:13px;color:#2e7d32;font-weight:700;">✓ Confirmed — ready for the next piece.</div>'
+    : '<div style="padding:14px;background:var(--gu-bg);border-radius:10px;font-size:13px;color:var(--gu-dust);">Noted — please compare manually against the reference photos above.</div>';
+}
+
 async function loadAdminCatalogue() {
   const grid = document.getElementById('admin-catalogue-grid');
   if (!grid) return;
@@ -8823,6 +8988,7 @@ function showStaffSection(section) {
     loadOpenTablesIntoSelect();
   } else if (section === 'completion') {
     loadOpenTablesForCompletion();
+    loadRefPhotoBookingOptions();
   } else if (section === 'kiln') {
     loadKilnData();
   }
@@ -9796,6 +9962,82 @@ async function deleteTableOrder(orderId, sessionId, prefix) {
 }
 
 // ── Section 3: Completion ──
+
+// ── Individual piece reference photos — captured per-piece at
+// table-clearing time, next to the booking's QR card. Feeds the
+// Piece Matching tool later. ──
+async function loadRefPhotoBookingOptions() {
+  const select = document.getElementById('ref-photo-booking-select');
+  if (!select) return;
+  try {
+    const res = await fetch(`${API_URL}/api/bookings/today?studioId=${studioId}`);
+    const data = await res.json();
+    select.innerHTML = '<option value="">Select a booking…</option>' +
+      (data.bookings || []).map(b => `<option value="${b.booking_code}">${b.customer_name || 'Guest'} — ${b.table_number ? 'Table ' + b.table_number : ''}</option>`).join('');
+  } catch (e) { /* silent */ }
+}
+
+document.addEventListener('change', (e) => {
+  if (e.target?.id === 'ref-photo-booking-select') loadRefPhotoPieces(e.target.value);
+});
+
+async function loadRefPhotoPieces(bookingCode) {
+  const listEl = document.getElementById('ref-photo-pieces-list');
+  if (!bookingCode) { listEl.innerHTML = ''; return; }
+  listEl.innerHTML = '<div style="padding:10px;color:var(--gu-dust);font-size:12px;">Loading pieces…</div>';
+  try {
+    const res = await fetch(`${API_URL}/api/pieces/for-booking?studioId=${studioId}&bookingCode=${encodeURIComponent(bookingCode)}`);
+    const data = await res.json();
+    const pieces = data.pieces || [];
+    if (!pieces.length) {
+      listEl.innerHTML = '<div style="padding:10px;color:var(--gu-dust);font-size:12px;">No pieces logged for this booking yet.</div>';
+      return;
+    }
+    listEl.innerHTML = pieces.map(p => `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px;background:white;border-radius:10px;margin-bottom:6px;">
+        <div style="width:44px;height:44px;border-radius:8px;background:${p.reference_photo_url ? `url('${p.reference_photo_url}') center/cover` : 'var(--gu-bg)'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">
+          ${!p.reference_photo_url ? '📷' : ''}
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:700;">${p.piece_type || 'Piece'}</div>
+          <div style="font-size:10px;color:${p.reference_photo_url ? '#2e7d32' : 'var(--gu-dust)'};">${p.reference_photo_url ? '✓ Photographed' : 'Not photographed yet'}</div>
+        </div>
+        <button onclick="captureRefPhoto('${p.id}')" style="background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:8px 12px;font-size:11px;font-weight:700;cursor:pointer;">${p.reference_photo_url ? '🔄 Retake' : '📷 Photograph'}</button>
+      </div>
+    `).join('');
+  } catch (e) {
+    listEl.innerHTML = '<div style="padding:10px;color:var(--gu-dust);font-size:12px;">Could not load pieces.</div>';
+  }
+}
+
+let _capturingPieceId = null;
+function captureRefPhoto(pieceId) {
+  _capturingPieceId = pieceId;
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.onchange = handleRefPhotoCapture;
+  input.click();
+}
+
+async function handleRefPhotoCapture(event) {
+  const file = event.target.files[0];
+  if (!file || !_capturingPieceId) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/pieces/${_capturingPieceId}/reference-photo`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId, photoBase64: reader.result })
+      });
+      if (!res.ok) { alert('Could not save the photo — try again.'); return; }
+      const bookingCode = document.getElementById('ref-photo-booking-select').value;
+      loadRefPhotoPieces(bookingCode);
+    } catch (e) {
+      alert('Could not save the photo — try again.');
+    }
+  };
+  reader.readAsDataURL(file);
+}
 
 async function loadOpenTablesForCompletion() {
   const listEl = document.getElementById('s3-open-tables-list');
