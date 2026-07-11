@@ -6818,7 +6818,27 @@
     function resetIdleTimer() {
       clearTimeout(idleTimer);
       idleTimer = setTimeout(showSplash, IDLE_TIMEOUT_MS);
+      localStorage.setItem('klnk_customer_last_active', Date.now().toString());
     }
+
+    // Genuine real fix: the setTimeout above only counts down while
+    // the tab is genuinely running in the foreground — iOS Safari
+    // suspends JS execution the moment someone backgrounds the app
+    // (home button, app switcher), so the timer never actually fires
+    // for a real backgrounded session, however long it's away. This
+    // uses real wall-clock time instead, checked via the standard
+    // visibilitychange event, which correctly fires the instant the
+    // app becomes visible again — accurate regardless of how long it
+    // was genuinely away, not dependent on a timer that was frozen.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      const lastActive = parseInt(localStorage.getItem('klnk_customer_last_active') || '0', 10);
+      const genuinelyIdleFor = Date.now() - lastActive;
+      if (lastActive && genuinelyIdleFor >= IDLE_TIMEOUT_MS) {
+        showSplash();
+      }
+      resetIdleTimer();
+    });
     ['touchstart', 'mousedown', 'keydown', 'scroll'].forEach(evt => {
       document.addEventListener(evt, resetIdleTimer, { passive: true });
     });
