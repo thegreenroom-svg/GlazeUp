@@ -3764,38 +3764,23 @@
       return descEl ? descEl.textContent.trim() : null;
     }
 
-    // Real "which screen is this on" detection — this is a single-page
-    // app with overlay screens (Colour Picker, Community Feed, Cleo's
-    // Club, etc.), not real separate page loads, so "once per page"
-    // genuinely means "once per distinct screen/overlay currently
-    // showing". Walks up to the nearest identifiable screen container.
-    function getCurrentScreenId(el) {
-      const screen = el.closest('[id$="-screen"], [id$="-modal"], #app-root');
-      return screen ? screen.id : 'home';
-    }
+    // Real, simple cooldown — genuinely replaces the earlier per-screen
+    // tracking per direct correction. She can speak one tooltip line,
+    // then must wait a real 2 seconds before speaking the next one —
+    // rapid hovering across several tiles just shows the text
+    // silently until the cooldown clears, rather than cutting her off
+    // mid-sentence or queueing up overlapping audio.
+    let _cleoTooltipVoiceLastPlayedAt = 0;
 
-    // Real per-screen tracking — a plain in-memory Set, not
-    // localStorage, since this should genuinely reset each fresh visit
-    // (opening the app again starts fresh) and reset per distinct
-    // screen within a visit, not be remembered forever across days.
-    let _cleoVoiceDemoPlayedScreens = new Set();
-
-    function showCleoContextTip(text, sourceEl) {
+    function showCleoContextTip(text) {
       const bubble = document.getElementById('cleo-floating-bubble');
       if (!bubble || !text) return;
       clearInterval(_cleoFloatingRotationTimer); // pause the normal rotation while explaining something specific
       bubble.textContent = `💡 ${text}`;
       _cleoContextShowing = true;
-      // Genuine one-time-per-screen voice demo — plays once the first
-      // time someone hovers/taps any button on a given screen, then
-      // stays silent for the rest of that screen. Moving to a
-      // genuinely different screen (Colour Picker, Community Feed,
-      // etc.) resets it, so the demo plays again there — but it won't
-      // repeat on every hover within the SAME screen. Still respects
-      // the mute toggle.
-      const screenId = sourceEl ? getCurrentScreenId(sourceEl) : 'home';
-      if (!isAssistantVoiceMuted() && !_cleoVoiceDemoPlayedScreens.has(screenId)) {
-        _cleoVoiceDemoPlayedScreens.add(screenId);
+      const now = Date.now();
+      if (!isAssistantVoiceMuted() && (now - _cleoTooltipVoiceLastPlayedAt) >= 2000) {
+        _cleoTooltipVoiceLastPlayedAt = now;
         cleoSpeak(text);
       }
     }
@@ -3812,7 +3797,7 @@
     // meaningful hover, this listener is simply inert there).
     document.addEventListener('mouseover', (e) => {
       const desc = findTileDescFor(e.target);
-      if (desc) showCleoContextTip(desc, e.target);
+      if (desc) showCleoContextTip(desc);
     });
     document.addEventListener('mouseout', (e) => {
       if (e.target.closest('.tile, button[class*="tile"]')) hideCleoContextTip();
@@ -3824,7 +3809,7 @@
     document.addEventListener('touchstart', (e) => {
       const desc = findTileDescFor(e.target);
       if (!desc) return;
-      _cleoContextHoldTimer = setTimeout(() => showCleoContextTip(desc, e.target), 500);
+      _cleoContextHoldTimer = setTimeout(() => showCleoContextTip(desc), 500);
     }, { passive: true });
     document.addEventListener('touchend', () => {
       clearTimeout(_cleoContextHoldTimer);
