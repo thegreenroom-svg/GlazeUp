@@ -1381,44 +1381,74 @@
   🔍
 </button>
 
-<div id="find-piece-modal" style="display:none;position:fixed;inset:0;z-index:9950;background:rgba(43,39,36,0.75);backdrop-filter:blur(6px);align-items:flex-end;justify-content:center;">
-  <div style="background:white;border-radius:24px 24px 0 0;max-width:460px;width:100%;max-height:92vh;overflow-y:auto;padding:0;">
-    <div style="background:#c0392b;color:white;padding:18px 20px;position:sticky;top:0;display:flex;justify-content:space-between;align-items:center;">
-      <div>
-        <div style="font-size:17px;font-weight:800;">🔍 Find My Piece</div>
-        <div style="font-size:12px;opacity:0.85;">Search every photo and record we have</div>
+<!-- ═══════════════════════════════════════════
+     FIND MY PIECE — rebuilt as two genuine full screens, not a small
+     popup panel. Step 1: confirm/capture the piece you're looking for.
+     Step 2: photograph the table/pile of pieces — the AI searches
+     specifically WITHIN that photo for the piece from Step 1, and the
+     honest reasoning/what-the-AI-actually-saw is shown directly on
+     screen, not hidden behind a small result panel. ═══════════════ -->
+<div id="find-piece-step1" style="display:none;position:fixed;inset:0;z-index:9950;background:#1a1714;flex-direction:column;">
+  <div style="background:#c0392b;color:white;padding:20px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+    <div>
+      <div style="font-size:18px;font-weight:800;">🔍 Find My Piece</div>
+      <div style="font-size:13px;opacity:0.9;">Step 1 of 2 — the piece you're looking for</div>
+    </div>
+    <button onclick="closeFindMyPiece()" style="background:rgba(255,255,255,0.2);border:none;color:white;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;">✕</button>
+  </div>
+
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;overflow-y:auto;">
+    <div id="fp1-preview-wrap" style="width:100%;max-width:400px;aspect-ratio:1;background:#2B2724;border-radius:20px;display:flex;align-items:center;justify-content:center;margin-bottom:20px;overflow:hidden;">
+      <div id="fp1-placeholder" style="color:#8a8175;text-align:center;padding:20px;">
+        <div style="font-size:48px;margin-bottom:10px;">📷</div>
+        <div style="font-size:14px;">Take a photo of the piece,<br>or search by text below</div>
       </div>
-      <button onclick="closeFindMyPiece()" style="background:rgba(255,255,255,0.2);border:none;color:white;width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;">✕</button>
+      <img id="fp1-preview-img" style="display:none;width:100%;height:100%;object-fit:cover;">
     </div>
 
-    <div style="padding:18px;">
-      <div style="display:flex;gap:8px;margin-bottom:16px;">
-        <button id="fmp-tab-text" onclick="switchFindPieceTab('text')" style="flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--gu-border);background:#c0392b;color:white;font-size:13px;font-weight:700;cursor:pointer;">🔤 Describe it</button>
-        <button id="fmp-tab-photo" onclick="switchFindPieceTab('photo')" style="flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--gu-border);background:white;color:var(--gu-text);font-size:13px;font-weight:700;cursor:pointer;">📷 Photo search</button>
-      </div>
+    <button onclick="captureFindPieceStep1Photo()" style="width:100%;max-width:400px;background:#c0392b;color:white;border:none;border-radius:14px;padding:18px;font-size:16px;font-weight:800;cursor:pointer;margin-bottom:12px;">📷 Photograph the piece</button>
 
-      <div id="fmp-text-panel">
-        <input type="text" id="fmp-search-input" placeholder="Customer name, piece type, colour, anything…" style="width:100%;padding:12px;border:1px solid var(--gu-border);border-radius:10px;font-size:14px;margin-bottom:10px;box-sizing:border-box;" onkeydown="if(event.key==='Enter') runTextPieceSearch()">
-        <button onclick="runTextPieceSearch()" style="width:100%;background:#c0392b;color:white;border:none;border-radius:12px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;">Search</button>
-      </div>
-
-      <div id="fmp-photo-panel" style="display:none;">
-        <p style="font-size:12px;color:var(--gu-dust);margin-bottom:12px;line-height:1.5;">Photograph the piece (or a customer's own photo of it) — this searches every reference photo, completion photo, and lost-item photo we have on file.</p>
-        <button onclick="capturePieceSearchPhoto()" style="width:100%;background:#c0392b;color:white;border:none;border-radius:12px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;">📷 Photograph or upload</button>
-      </div>
-
-      <div id="fmp-results" style="margin-top:16px;"></div>
-
-      <div style="border-top:1px solid var(--gu-border);margin-top:20px;padding-top:16px;">
-        <!-- Genuinely for testing at home (or training a new starter):
-             photograph any object now as a "reference", put it in a
-             pile with other things, then use Photo Search above to see
-             if it finds it back. Just a fast path into the same lost
-             pieces registry the photo search already checks against. -->
-        <button onclick="addTestReferencePhoto()" style="width:100%;background:#c0392b;color:white;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">🧪 Add a test reference photo</button>
-        <button onclick="openReportLostPiece()" style="width:100%;background:none;border:1.5px dashed var(--gu-dust);color:var(--gu-text);border-radius:10px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;">➕ Report a found/lost piece</button>
-      </div>
+    <div style="width:100%;max-width:400px;display:flex;align-items:center;gap:10px;margin:6px 0;">
+      <div style="flex:1;height:1px;background:#3d3833;"></div>
+      <span style="color:#8a8175;font-size:12px;">or</span>
+      <div style="flex:1;height:1px;background:#3d3833;"></div>
     </div>
+
+    <input type="text" id="fp1-text-input" placeholder="Describe it — customer name, colour, type…" style="width:100%;max-width:400px;padding:14px;border:1px solid #3d3833;border-radius:12px;font-size:14px;margin-bottom:12px;box-sizing:border-box;background:#2B2724;color:white;">
+    <button onclick="runTextPieceSearchFullScreen()" style="width:100%;max-width:400px;background:#3d3833;color:white;border:none;border-radius:14px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:16px;">🔤 Search system-wide by text</button>
+
+    <button id="fp1-next-btn" onclick="goToFindPieceStep2()" disabled style="width:100%;max-width:400px;background:#8a8175;color:white;border:none;border-radius:14px;padding:16px;font-size:15px;font-weight:800;cursor:not-allowed;">Take a photo first, then continue →</button>
+
+    <div id="fp1-text-results" style="width:100%;max-width:400px;margin-top:16px;"></div>
+  </div>
+
+  <div style="padding:14px 20px;flex-shrink:0;">
+    <button onclick="addTestReferencePhoto()" style="width:100%;background:none;border:1px dashed #5a5148;color:#8a8175;border-radius:10px;padding:10px;font-size:12px;cursor:pointer;">🧪 Just save this as a test reference (skip search)</button>
+  </div>
+</div>
+
+<div id="find-piece-step2" style="display:none;position:fixed;inset:0;z-index:9960;background:#1a1714;flex-direction:column;">
+  <div style="background:#c0392b;color:white;padding:20px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+    <div>
+      <div style="font-size:18px;font-weight:800;">🔍 Find My Piece</div>
+      <div style="font-size:13px;opacity:0.9;">Step 2 of 2 — photograph the table/pile</div>
+    </div>
+    <button onclick="backToFindPieceStep1()" style="background:rgba(255,255,255,0.2);border:none;color:white;padding:8px 14px;border-radius:20px;font-size:13px;cursor:pointer;">← Back</button>
+  </div>
+
+  <div style="flex:1;display:flex;flex-direction:column;padding:20px;overflow-y:auto;">
+    <div style="display:flex;align-items:center;gap:10px;background:#2B2724;border-radius:12px;padding:10px;margin-bottom:16px;">
+      <div style="font-size:11px;color:#8a8175;">Looking for:</div>
+      <img id="fp2-target-thumb" style="width:36px;height:36px;border-radius:8px;object-fit:cover;">
+    </div>
+
+    <div id="fp2-scan-prompt" style="text-align:center;padding:30px 20px;">
+      <div style="font-size:48px;margin-bottom:14px;">📸</div>
+      <p style="color:white;font-size:15px;margin-bottom:20px;">Photograph the table, box, or pile of pieces you want to search — the AI looks specifically within this photo for the piece from Step 1.</p>
+      <button onclick="captureFindPieceStep2Photo()" style="width:100%;max-width:380px;background:#c0392b;color:white;border:none;border-radius:14px;padding:18px;font-size:16px;font-weight:800;cursor:pointer;">📷 Photograph the pile/table</button>
+    </div>
+
+    <div id="fp2-result-area" style="display:none;"></div>
   </div>
 </div>
 
@@ -10539,120 +10569,179 @@ let _packingSelectedPieceIds = [];
 // clear spacing is what makes the AI detection actually reliable, so
 // this gate matters functionally, not just as a reminder.
 // ── Find My Piece — the panic button, reachable from anywhere ──
+// ── Find My Piece — genuine two-screen flow ──
+let _fp1TargetPhotoBase64 = null;
+
 function openFindMyPiece() {
-  document.getElementById('find-piece-modal').style.display = 'flex';
-  document.getElementById('fmp-search-input').value = '';
-  document.getElementById('fmp-results').innerHTML = '';
-  switchFindPieceTab('text');
+  // Reset everything to a clean state each time it's opened
+  _fp1TargetPhotoBase64 = null;
+  document.getElementById('fp1-preview-img').style.display = 'none';
+  document.getElementById('fp1-placeholder').style.display = 'block';
+  document.getElementById('fp1-text-input').value = '';
+  document.getElementById('fp1-text-results').innerHTML = '';
+  const nextBtn = document.getElementById('fp1-next-btn');
+  nextBtn.disabled = true;
+  nextBtn.style.background = '#8a8175';
+  nextBtn.style.cursor = 'not-allowed';
+  nextBtn.textContent = 'Take a photo first, then continue →';
+
+  document.getElementById('find-piece-step1').style.display = 'flex';
+  document.getElementById('find-piece-step2').style.display = 'none';
 }
+
 function closeFindMyPiece() {
-  document.getElementById('find-piece-modal').style.display = 'none';
+  document.getElementById('find-piece-step1').style.display = 'none';
+  document.getElementById('find-piece-step2').style.display = 'none';
 }
 
-function switchFindPieceTab(tab) {
-  document.getElementById('fmp-tab-text').style.background = tab === 'text' ? '#c0392b' : 'white';
-  document.getElementById('fmp-tab-text').style.color = tab === 'text' ? 'white' : 'var(--gu-text)';
-  document.getElementById('fmp-tab-photo').style.background = tab === 'photo' ? '#c0392b' : 'white';
-  document.getElementById('fmp-tab-photo').style.color = tab === 'photo' ? 'white' : 'var(--gu-text)';
-  document.getElementById('fmp-text-panel').style.display = tab === 'text' ? 'block' : 'none';
-  document.getElementById('fmp-photo-panel').style.display = tab === 'photo' ? 'block' : 'none';
+function captureFindPieceStep1Photo() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.onchange = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      _fp1TargetPhotoBase64 = reader.result;
+      // The photo appears directly on screen immediately, as asked —
+      // this IS the confirmation it was actually taken, not a small
+      // thumbnail buried in a results list.
+      const img = document.getElementById('fp1-preview-img');
+      img.src = reader.result;
+      img.style.display = 'block';
+      document.getElementById('fp1-placeholder').style.display = 'none';
+
+      const nextBtn = document.getElementById('fp1-next-btn');
+      nextBtn.disabled = false;
+      nextBtn.style.background = '#c0392b';
+      nextBtn.style.cursor = 'pointer';
+      nextBtn.textContent = 'Continue to search a table/pile →';
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
 }
 
-async function runTextPieceSearch() {
-  const query = document.getElementById('fmp-search-input').value.trim();
+function goToFindPieceStep2() {
+  if (!_fp1TargetPhotoBase64) return;
+  document.getElementById('fp2-target-thumb').src = _fp1TargetPhotoBase64;
+  document.getElementById('fp2-scan-prompt').style.display = 'block';
+  document.getElementById('fp2-result-area').style.display = 'none';
+  document.getElementById('find-piece-step1').style.display = 'none';
+  document.getElementById('find-piece-step2').style.display = 'flex';
+}
+
+function backToFindPieceStep1() {
+  document.getElementById('find-piece-step2').style.display = 'none';
+  document.getElementById('find-piece-step1').style.display = 'flex';
+}
+
+function captureFindPieceStep2Photo() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.onchange = handleFindPieceStep2Capture;
+  input.click();
+}
+
+async function handleFindPieceStep2Capture(event) {
+  const file = event.target.files[0];
+  if (!file || !_fp1TargetPhotoBase64) return;
+
+  const promptEl = document.getElementById('fp2-scan-prompt');
+  const resultEl = document.getElementById('fp2-result-area');
+  promptEl.style.display = 'none';
+  resultEl.style.display = 'block';
+  resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:#8a8175;font-size:14px;">🔍 Comparing photos — this takes a few seconds…</div>';
+
+  const reader = new FileReader();
+  reader.onload = async () => {
+    const scenePhotoDataUrl = reader.result;
+    try {
+      const res = await fetch(`${API_URL}/api/pieces/find-in-photo`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studioId, targetPhotoBase64: _fp1TargetPhotoBase64,
+          scenePhotoBase64: scenePhotoDataUrl, searchedBy: currentShiftStaff?.id || null,
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        resultEl.innerHTML = `<div style="padding:20px;background:#3d2820;border-radius:14px;color:#ff8a80;font-size:14px;">${data.error}${data.rawResponse ? `<div style="margin-top:10px;font-size:11px;color:#8a8175;font-family:monospace;white-space:pre-wrap;">${data.rawResponse}</div>` : ''}</div>`;
+        return;
+      }
+
+      // The photo taken appears on screen, exactly as asked, alongside
+      // the honest result and reasoning — not just a yes/no with
+      // nothing to actually look at.
+      const confidenceColor = data.confidence === 'high' ? '#4caf50' : data.confidence === 'medium' ? '#F9A825' : '#8a8175';
+      resultEl.innerHTML = `
+        <div style="border-radius:14px;overflow:hidden;margin-bottom:16px;position:relative;">
+          <img src="${scenePhotoDataUrl}" style="width:100%;display:block;">
+        </div>
+        <div style="background:${data.found ? 'rgba(76,175,80,0.15)' : 'rgba(138,129,117,0.15)'};border:1.5px solid ${data.found ? '#4caf50' : '#5a5148'};border-radius:14px;padding:16px;margin-bottom:12px;">
+          <div style="font-size:18px;font-weight:800;color:${data.found ? '#4caf50' : 'white'};margin-bottom:6px;">
+            ${data.found ? '✓ Found it' : '✗ Not found in this photo'}
+            ${data.found ? `<span style="font-size:11px;font-weight:700;color:${confidenceColor};text-transform:uppercase;margin-left:8px;">${data.confidence} confidence</span>` : ''}
+          </div>
+          ${data.found && data.approxPosition ? `<div style="font-size:13px;color:#cfc7bd;margin-bottom:8px;">Roughly: ${data.approxPosition.replace('-', ' ')}</div>` : ''}
+          <div style="font-size:13px;color:white;line-height:1.5;">${data.reasoning || ''}</div>
+        </div>
+        ${data.otherObjectsNoted ? `<div style="font-size:12px;color:#8a8175;margin-bottom:16px;">Also visible in scene: ${data.otherObjectsNoted}</div>` : ''}
+        <div style="display:flex;gap:10px;">
+          <button onclick="captureFindPieceStep2Photo()" style="flex:1;background:#3d3833;color:white;border:none;border-radius:12px;padding:14px;font-size:13px;font-weight:700;cursor:pointer;">📷 Try another photo</button>
+          <button onclick="closeFindMyPiece()" style="flex:1;background:#c0392b;color:white;border:none;border-radius:12px;padding:14px;font-size:13px;font-weight:700;cursor:pointer;">Done</button>
+        </div>
+      `;
+    } catch (e) {
+      resultEl.innerHTML = '<div style="padding:20px;color:#ff8a80;font-size:14px;">Could not run the comparison — try again.</div>';
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+// System-wide text search, shown directly on Step 1 — genuinely
+// "search the whole system" as asked, no separate screen needed since
+// it's fast and doesn't need photo comparison.
+async function runTextPieceSearchFullScreen() {
+  const query = document.getElementById('fp1-text-input').value.trim();
   if (!query) return;
-  const resultsEl = document.getElementById('fmp-results');
-  resultsEl.innerHTML = '<div style="padding:14px;text-align:center;color:var(--gu-dust);font-size:13px;">Searching…</div>';
+  const resultsEl = document.getElementById('fp1-text-results');
+  resultsEl.innerHTML = '<div style="padding:14px;text-align:center;color:#8a8175;font-size:13px;">Searching…</div>';
 
   try {
     const res = await fetch(`${API_URL}/api/pieces/find?studioId=${studioId}&query=${encodeURIComponent(query)}`);
     const data = await res.json();
     if (!data.totalResults) {
-      resultsEl.innerHTML = '<div style="padding:14px;background:#fff3e0;border-radius:10px;font-size:13px;">Nothing found for that search. Try a photo search instead, or check the lost pieces list.</div>';
+      resultsEl.innerHTML = '<div style="padding:14px;background:#3d2820;border-radius:10px;color:#ffcc80;font-size:13px;">Nothing found for that search. Try a photo instead, or check spelling.</div>';
       return;
     }
-
     let html = '';
     if (data.pieces?.length) {
-      html += `<div style="font-size:11px;font-weight:700;color:var(--gu-dust);margin-bottom:8px;">PIECES (${data.pieces.length})</div>`;
       html += data.pieces.map(p => `
-        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--gu-bg);border-radius:10px;margin-bottom:6px;">
-          <div style="width:40px;height:40px;border-radius:8px;background:${p.reference_photo_url ? `url('${p.reference_photo_url}') center/cover` : 'var(--gu-border)'};flex-shrink:0;"></div>
+        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#2B2724;border-radius:10px;margin-bottom:6px;">
+          <div style="width:36px;height:36px;border-radius:8px;background:${p.reference_photo_url ? `url('${p.reference_photo_url}') center/cover` : '#3d3833'};flex-shrink:0;"></div>
           <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:700;">${p.piece_type || 'Piece'} <span style="font-size:10px;font-weight:600;color:var(--gu-dust);">${p.status}</span></div>
-            <div style="font-size:11px;color:var(--gu-dust);">${p.customer_name || 'Unknown customer'}${p.table_number ? ' · Table ' + p.table_number : ''}</div>
+            <div style="font-size:13px;font-weight:700;color:white;">${p.piece_type || 'Piece'} <span style="font-size:10px;font-weight:600;color:#8a8175;">${p.status}</span></div>
+            <div style="font-size:11px;color:#8a8175;">${p.customer_name || 'Unknown customer'}${p.table_number ? ' · Table ' + p.table_number : ''}</div>
           </div>
         </div>
       `).join('');
     }
     if (data.lostRegistryMatches?.length) {
-      html += `<div style="font-size:11px;font-weight:700;color:var(--gu-dust);margin:12px 0 8px;">LOST &amp; FOUND (${data.lostRegistryMatches.length})</div>`;
       html += data.lostRegistryMatches.map(l => `
-        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#fff3e0;border-radius:10px;margin-bottom:6px;">
-          <div style="width:40px;height:40px;border-radius:8px;background:${l.photo_url ? `url('${l.photo_url}') center/cover` : 'var(--gu-border)'};flex-shrink:0;"></div>
+        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#3d2820;border-radius:10px;margin-bottom:6px;">
+          <div style="width:36px;height:36px;border-radius:8px;background:${l.photo_url ? `url('${l.photo_url}') center/cover` : '#3d3833'};flex-shrink:0;"></div>
           <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:700;">${l.description || 'Unidentified item'}</div>
-            <div style="font-size:11px;color:var(--gu-dust);">${l.found_location || 'Location unknown'}</div>
+            <div style="font-size:13px;font-weight:700;color:white;">${l.description || 'Unidentified item'}</div>
+            <div style="font-size:11px;color:#8a8175;">${l.found_location || 'Location unknown'}</div>
           </div>
-        </div>
-      `).join('');
-    }
-    if (data.catalogueMatches?.length) {
-      html += `<div style="font-size:11px;font-weight:700;color:var(--gu-dust);margin:12px 0 8px;">STOCK CATALOGUE (${data.catalogueMatches.length})</div>`;
-      html += data.catalogueMatches.map(c => `
-        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--gu-bg);border-radius:10px;margin-bottom:6px;">
-          <div style="width:40px;height:40px;border-radius:8px;background:${c.image_url ? `url('${c.image_url}') center/cover` : 'var(--gu-border)'};flex-shrink:0;"></div>
-          <div style="flex:1;"><div style="font-size:13px;font-weight:700;">${c.name}</div></div>
         </div>
       `).join('');
     }
     resultsEl.innerHTML = html;
   } catch (e) {
-    resultsEl.innerHTML = '<div style="padding:14px;color:#d9534f;font-size:13px;">Could not search — try again.</div>';
+    resultsEl.innerHTML = '<div style="padding:14px;color:#ff8a80;font-size:13px;">Could not search — try again.</div>';
   }
-}
-
-function capturePieceSearchPhoto() {
-  const input = document.createElement('input');
-  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
-  input.onchange = handlePieceSearchPhotoCapture;
-  input.click();
-}
-
-async function handlePieceSearchPhotoCapture(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const resultsEl = document.getElementById('fmp-results');
-  resultsEl.innerHTML = '<div style="padding:14px;text-align:center;color:var(--gu-dust);font-size:13px;">🔍 Searching every photo we have on file — this takes a few seconds…</div>';
-
-  const reader = new FileReader();
-  reader.onload = async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/pieces/find-by-photo`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studioId, photoBase64: reader.result, searchedBy: currentShiftStaff?.id || null })
-      });
-      const data = await res.json();
-      if (!res.ok) { resultsEl.innerHTML = `<div style="padding:14px;color:#d9534f;font-size:13px;">${data.error}</div>`; return; }
-      if (data.noConfidentMatch || !data.matches?.length) {
-        resultsEl.innerHTML = `<div style="padding:14px;background:#fff3e0;border-radius:10px;font-size:13px;">🤷 No confident match found. ${data.note || 'Try a text description, or report it as unidentified below.'}</div>`;
-        return;
-      }
-      const CONFIDENCE_COLORS = { high: '#2e7d32', medium: '#F9A825', low: '#8a8175' };
-      resultsEl.innerHTML = data.matches.map(m => `
-        <div style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--gu-bg);border-radius:10px;margin-bottom:8px;border-left:4px solid ${CONFIDENCE_COLORS[m.confidence] || '#8a8175'};">
-          <div style="width:44px;height:44px;border-radius:8px;background:url('${m.photo_url}') center/cover;flex-shrink:0;"></div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:700;">${m.label} <span style="font-size:10px;font-weight:700;color:${CONFIDENCE_COLORS[m.confidence] || '#8a8175'};text-transform:uppercase;">${m.confidence}</span></div>
-            <div style="font-size:11px;color:var(--gu-dust);">${m.reason || ''}</div>
-          </div>
-        </div>
-      `).join('');
-    } catch (e) {
-      resultsEl.innerHTML = '<div style="padding:14px;color:#d9534f;font-size:13px;">Could not search — try again.</div>';
-    }
-  };
-  reader.readAsDataURL(file);
 }
 
 // ── Report a lost/found piece ──

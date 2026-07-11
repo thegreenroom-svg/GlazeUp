@@ -6540,6 +6540,75 @@ app.get('/api/pieces/find', async (req, res) => {
 // Piece Matching) — this is the "lost somewhere in the whole studio"
 // case, so it has to search everything, honestly reported with
 // confidence, never a forced single answer.
+// POST /api/pieces/find-in-photo — the direct two-photo comparison.
+// Takes ONE target photo (the piece someone's looking for, from Step 1)
+// and ONE scene photo (the table/pile, from Step 2), and asks the AI
+// specifically: is the target piece visible anywhere in this scene?
+// Genuinely different from find-by-photo, which searches a whole
+// library of pre-existing reference photos — this compares exactly the
+// two photos given, nothing else, which is both simpler and more
+// direct for "I'm holding this, is it in that pile."
+// Returns full, honest diagnostic detail (not just a yes/no) so a
+// failed search is debuggable rather than a silent black box.
+app.post('/api/pieces/find-in-photo', async (req, res) => {
+  const { studioId, targetPhotoBase64, scenePhotoBase64, searchedBy } = req.body;
+  if (!studioId || !targetPhotoBase64 || !scenePhotoBase64) {
+    return res.status(400).json({ error: 'studioId, targetPhotoBase64, scenePhotoBase64 required' });
+  }
+  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'Photo search is not yet available.' });
+
+  try {
+    const content = [
+      {
+        type: 'text',
+        text: `The FIRST image below is a specific object someone is trying to find. The SECOND image is a scene — a table, box, or pile — that may or may not contain that exact object among other things.
+
+Look carefully at the scene photo and determine: is the object from the first photo genuinely visible somewhere in the scene? Focus on shape, proportions, and any distinctive markings or pattern — not colour alone, since lighting and angle can shift how colour appears between two photos of the same real object.
+
+Be honest — if you're not confident it's there, say so clearly rather than guessing. If pieces in the scene are overlapping or too small/blurry to tell confidently, mention that specifically.
+
+Respond ONLY as JSON: {"found": true or false, "confidence": "high" | "medium" | "low", "approxPosition": "top-left" | "top-centre" | "top-right" | "middle-left" | "middle-centre" | "middle-right" | "bottom-left" | "bottom-centre" | "bottom-right" | null, "reasoning": "honest explanation of what you compared and why you reached this conclusion", "otherObjectsNoted": "brief note on what else is visible in the scene, for context"}`,
+      },
+      { type: 'text', text: 'Target object (what we\'re looking for):' },
+      { type: 'image_url', image_url: { url: targetPhotoBase64.startsWith('data:') ? targetPhotoBase64 : `data:image/jpeg;base64,${targetPhotoBase64}` } },
+      { type: 'text', text: 'Scene to search (table/pile/box):' },
+      { type: 'image_url', image_url: { url: scenePhotoBase64.startsWith('data:') ? scenePhotoBase64 : `data:image/jpeg;base64,${scenePhotoBase64}` } },
+    ];
+
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content }], temperature: 0.2, max_tokens: 500 }),
+    });
+
+    if (!openaiRes.ok) {
+      const errBody = await openaiRes.text();
+      console.error('OpenAI find-in-photo error:', errBody);
+      return res.status(502).json({ error: 'Could not run the comparison — please try again.' });
+    }
+
+    const aiData = await openaiRes.json();
+    const rawContent = aiData.choices?.[0]?.message?.content || '{}';
+    let parsed;
+    try {
+      parsed = JSON.parse(rawContent.replace(/```json|```/g, '').trim());
+    } catch (e) {
+      console.error('Could not parse AI response:', rawContent);
+      return res.status(502).json({ error: 'Could not interpret the result — please try again.', rawResponse: rawContent });
+    }
+
+    await supabase.from('piece_search_log').insert({
+      studio_id: studioId, searched_by: searchedBy || null,
+      results_count: parsed.found ? 1 : 0,
+    });
+
+    res.json(parsed);
+  } catch (error) {
+    console.error('Find in photo error:', error);
+    res.status(500).json({ error: 'Could not run the comparison — try again.' });
+  }
+});
+
 app.post('/api/pieces/find-by-photo', async (req, res) => {
   const { studioId, photoBase64, searchedBy } = req.body;
   if (!studioId || !photoBase64) return res.status(400).json({ error: 'studioId and photoBase64 required' });
