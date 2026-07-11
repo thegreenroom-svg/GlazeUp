@@ -1392,9 +1392,12 @@
 <!-- Find My Piece — a genuine panic button, reachable from every screen,
      for the "customer/staff wants to know where a piece is, right now"
      moment. Distinct from the assistant (bottom-left) and A2HS banner —
-     this is deliberately its own always-visible action, bottom-right. -->
-<button id="find-piece-fab" onclick="openFindMyPiece()" style="display:none;position:fixed;bottom:78px;right:16px;z-index:9700;background:#c0392b;color:white;border:none;border-radius:50%;width:64px;height:64px;font-size:26px;box-shadow:0 6px 22px rgba(192,57,43,0.4);cursor:pointer;">
-  🔍
+     this is deliberately its own always-visible action, bottom-right.
+     Added a real text label — was previously just a bare icon circle,
+     genuinely not self-identifiable on its own, per direct feedback. -->
+<button id="find-piece-fab" onclick="openFindMyPiece()" style="display:none;position:fixed;bottom:78px;right:16px;z-index:9700;background:#c0392b;color:white;border:none;border-radius:50%;width:64px;height:64px;box-shadow:0 6px 22px rgba(192,57,43,0.4);cursor:pointer;flex-direction:column;align-items:center;justify-content:center;gap:0;">
+  <span style="font-size:22px;line-height:1;">🔍</span>
+  <span style="font-size:7px;font-weight:800;line-height:1.1;margin-top:2px;text-align:center;">FIND<br>PIECE</span>
 </button>
 
 <!-- Cleo — genuinely always present on every admin page, not gated
