@@ -1733,7 +1733,10 @@
           <div style="font-size:11px; color:rgba(255,255,255,0.75);">Ask about pricing, hours, or your piece</div>
         </div>
       </div>
-      <button onclick="toggleAssistant()" style="background:none; border:none; color:rgba(255,255,255,0.8); font-size:20px; cursor:pointer;">✕</button>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <button id="assistant-voice-toggle-btn" onclick="toggleAssistantVoice()" title="Turn Cleo's voice on/off" style="background:rgba(255,255,255,0.2); border:none; color:white; width:30px; height:30px; border-radius:50%; font-size:14px; cursor:pointer;">🔊</button>
+        <button onclick="toggleAssistant()" style="background:none; border:none; color:rgba(255,255,255,0.8); font-size:20px; cursor:pointer;">✕</button>
+      </div>
     </div>
     <div id="assistant-messages" style="flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:10px;">
       <div style="background:#f5f0ea; border-radius:14px 14px 14px 4px; padding:10px 14px; font-size:13px; align-self:flex-start; max-width:85%;">
@@ -3767,6 +3770,12 @@
       clearInterval(_cleoFloatingRotationTimer); // pause the normal rotation while explaining something specific
       bubble.textContent = `💡 ${text}`;
       _cleoContextShowing = true;
+      // Genuine voice on hover/tap too, per explicit request — respects
+      // the same mute toggle as the chat. cleoSpeak() genuinely cancels
+      // any in-progress speech before starting new, so rapid hovering
+      // across several tiles interrupts and replaces rather than
+      // queueing up overlapping audio.
+      if (!isAssistantVoiceMuted()) cleoSpeak(text);
     }
 
     function hideCleoContextTip() {
@@ -5388,6 +5397,8 @@
         document.getElementById('assistant-input')?.focus();
         const mascotContainer = document.getElementById('assistant-panel-cleo-mascot');
         if (mascotContainer && !mascotContainer.innerHTML) mascotContainer.innerHTML = renderCleoMascotSVG();
+        const voiceBtn = document.getElementById('assistant-voice-toggle-btn');
+        if (voiceBtn) voiceBtn.textContent = isAssistantVoiceMuted() ? '🔇' : '🔊';
       }
       else clearAssistantArrow();
     }
@@ -5493,6 +5504,11 @@
         appendAssistantBubble(reply, false);
         assistantMessages.push({ role: 'assistant', content: reply });
         if (data.pointTo) pointAssistantArrowAt(data.pointTo, data.pointToLabel);
+        // Genuine real voice reply too, not just text — same shared
+        // speech function already proven in the walkthrough tour.
+        // Respects the customer's own mute preference, since
+        // automatic audio every reply could genuinely be unwanted.
+        if (!isAssistantVoiceMuted()) cleoSpeak(reply);
       } catch (e) {
         thinkingBubble.remove();
         appendAssistantBubble('Sorry, something went wrong — please ask a member of staff.', false);
@@ -6037,28 +6053,43 @@
       }
     }
 
-    function wtSpeak(text) {
+    // Genuine, persisted voice preference — customers who don't want
+    // audio (quiet space, or just prefer text) can turn it off, and
+    // it's remembered across visits on the same device.
+    function isAssistantVoiceMuted() {
+      return localStorage.getItem('klnk_assistant_voice_muted') === '1';
+    }
+    function toggleAssistantVoice() {
+      const isMuted = !isAssistantVoiceMuted();
+      localStorage.setItem('klnk_assistant_voice_muted', isMuted ? '1' : '0');
+      if (isMuted && window.speechSynthesis) window.speechSynthesis.cancel();
+      const btn = document.getElementById('assistant-voice-toggle-btn');
+      if (btn) btn.textContent = isMuted ? '🔇' : '🔊';
+    }
+
+    // Genuine, generic speech function — real UK voice preference,
+    // shared by the walkthrough tour AND Cleo's actual chat/tooltip
+    // voice, rather than duplicating this logic in three places.
+    function cleoSpeak(text, onStart, onEnd) {
       if (!window.speechSynthesis || !text) return;
-      wtStopVoice();
+      window.speechSynthesis.cancel();
       const utt = new SpeechSynthesisUtterance(text);
       utt.rate = 0.95;
       utt.pitch = 1;
       utt.lang = 'en-GB';
-      // Prefer a UK English voice if available
       const voices = window.speechSynthesis.getVoices();
       const ukVoice = voices.find(v => v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en'));
       if (ukVoice) utt.voice = ukVoice;
-      utt.onstart = () => {
-        const btn = document.getElementById('wt-voice-btn');
-        if (btn) { btn.textContent = '🔊 Speaking…'; btn.classList.add('speaking'); }
-      };
-      utt.onend = () => {
-        const btn = document.getElementById('wt-voice-btn');
-        if (btn) { btn.textContent = '🔊 Read aloud'; btn.classList.remove('speaking'); }
-        wtSpeaking = false;
-      };
-      wtSpeaking = true;
+      if (onStart) utt.onstart = onStart;
+      if (onEnd) utt.onend = onEnd;
       window.speechSynthesis.speak(utt);
+    }
+
+    function wtSpeak(text) {
+      cleoSpeak(text,
+        () => { const btn = document.getElementById('wt-voice-btn'); if (btn) { btn.textContent = '🔊 Speaking…'; btn.classList.add('speaking'); } wtSpeaking = true; },
+        () => { const btn = document.getElementById('wt-voice-btn'); if (btn) { btn.textContent = '🔊 Read aloud'; btn.classList.remove('speaking'); } wtSpeaking = false; }
+      );
     }
 
     function wtStopVoice() {
