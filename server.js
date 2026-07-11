@@ -4624,6 +4624,27 @@ app.post('/api/ai-design/generate', async (req, res) => {
     return res.status(403).json({ error: 'AI design generation is turned off for this studio.' });
   }
 
+  // Enforce a real per-booking generation cap — without this, a customer
+  // could generate unlimited images in one visit, each one a genuine cost
+  // to the studio (wholesale from OpenAI, billed onward to the customer
+  // at checkout) with nothing stopping runaway usage or non-payment risk.
+  // Checked BEFORE calling OpenAI, so a blocked request costs nothing —
+  // not just recorded after the fact.
+  const MAX_GENERATIONS_PER_BOOKING = 5;
+  if (bookingCode) {
+    const { count } = await supabase.from('ai_generation_usage')
+      .select('id', { count: 'exact', head: true })
+      .eq('studio_id', studioId).eq('booking_code', bookingCode);
+    if ((count || 0) >= MAX_GENERATIONS_PER_BOOKING) {
+      return res.status(429).json({
+        error: `You've reached the limit of ${MAX_GENERATIONS_PER_BOOKING} AI designs for this visit. Please ask a member of staff if you'd like more.`,
+        limitReached: true,
+        used: count,
+        max: MAX_GENERATIONS_PER_BOOKING,
+      });
+    }
+  }
+
   try {
     const openaiRes = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',

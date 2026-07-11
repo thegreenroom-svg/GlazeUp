@@ -4000,8 +4000,18 @@
 
         if (!res.ok) {
           statusEl.textContent = '❌ ' + (data.error || 'Could not generate a design.');
-          genBtn.disabled = false;
-          genBtn.style.opacity = '1';
+          if (data.limitReached) {
+            // Genuinely stop further attempts rather than just showing an
+            // error and letting them tap again — the limit is real and
+            // enforced server-side either way, but this makes it clear
+            // in the UI too rather than looking like a retry-able glitch.
+            genBtn.disabled = true;
+            genBtn.style.opacity = '0.4';
+            genBtn.textContent = `Limit reached (${data.used}/${data.max} used this visit)`;
+          } else {
+            genBtn.disabled = false;
+            genBtn.style.opacity = '1';
+          }
           return;
         }
 
