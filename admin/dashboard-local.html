@@ -2946,6 +2946,18 @@
           <button id="cleo-club-enable-btn" class="btn-connect" onclick="openCleosClubPaywall()" style="width:100%;background:#F9A825;">🧸 Enable Cleo's Club — £10/mo</button>
           <button id="cleo-club-disable-btn" class="btn-connect" onclick="disableCleosClub()" style="width:100%;background:none;border:1px solid #d9534f;color:#d9534f;display:none;">Turn off Cleo's Club</button>
           <div id="cleo-club-setup-status" style="font-size:11px;color:var(--gu-dust);margin-top:10px;"></div>
+
+          <!-- Genuine kid preview — opens the REAL customer app, real
+               offers, real Kid Mode styling, under a fake "Little
+               [Name]" persona. Not a mockup or description — the
+               actual thing a real family would see. -->
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(249,168,37,0.25);">
+            <div style="font-size:11px;color:var(--gu-dust);margin-bottom:8px;">See exactly what a child sees, under a fake name — the real app, real current offers, no booking needed.</div>
+            <div style="display:flex;gap:8px;">
+              <input type="text" id="kid-preview-name" placeholder="e.g. Dave" style="flex:1;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;box-sizing:border-box;">
+              <button onclick="openKidPreview()" style="background:#5E35B1;color:white;border:none;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">👀 Preview as a kid</button>
+            </div>
+          </div>
         </div>
 
         <!-- Cleo's Club paywall confirmation modal — genuine confirm
@@ -9706,6 +9718,16 @@ async function testRoyalMailLabelGeneration() {
 }
 
 // ── Cleo's Club setup ──
+// Opens the REAL customer app in a new tab, under a fake "Little
+// [Name]" persona, with Kid Mode genuinely forced on — not a
+// description or mockup, the actual live app a real family would see,
+// including whatever offers/rewards are genuinely configured right now.
+function openKidPreview() {
+  const rawName = document.getElementById('kid-preview-name').value.trim();
+  const name = rawName || 'Everyone';
+  window.open(`${API_URL}/app?preview=kid&name=${encodeURIComponent(name)}`, '_blank');
+}
+
 async function loadCleosClubSetup() {
   try {
     const res = await fetch(`${API_URL}/api/cleos-club/config?studioId=${studioId}`);

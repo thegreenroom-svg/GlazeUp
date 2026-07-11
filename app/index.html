@@ -2055,6 +2055,22 @@
         return;
       }
 
+      // Kid preview mode — genuinely renders the REAL home screen (not
+      // a separate mockup) under a fake "Little [Name]" persona, with
+      // Kid Mode forced on. Lets staff see exactly what a real family
+      // sees, real offers included, without needing an actual booking.
+      // URL: /app?preview=kid&name=Dave -> "Little Dave"
+      const previewKidName = getParam('preview') === 'kid' ? (getParam('name') || 'Everyone') : null;
+      if (previewKidName) {
+        localStorage.setItem('klnk_kid_mode', '1'); // force kid mode on for this preview, regardless of what's saved on this device normally
+        renderSession({
+          booking: { customerName: `Little ${previewKidName}` },
+          customerHistory: {},
+        });
+        showA2HSBanner();
+        return;
+      }
+
       if (!bookingCode) {
         root.innerHTML = `
           <div style="padding: 60px 24px 24px; text-align: center;">
