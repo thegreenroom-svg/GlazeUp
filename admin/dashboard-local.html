@@ -5961,6 +5961,28 @@ function applyShiftUI() {
   // actually logged in and the rest of the UI has settled. Checks if
   // there's an overnight firing still waiting on confirmation.
   setTimeout(checkMorningKilnStatus, 800);
+
+  // TEMPORARY diagnostic — shows the real measured positions of the
+  // strip, phone header, and content area directly on screen, to
+  // pinpoint exactly where the reported white gap is coming from on a
+  // real device rather than continuing to guess from code alone.
+  // Remove once resolved.
+  setTimeout(() => {
+    const strip = document.getElementById('platform-revenue-strip');
+    const header = document.getElementById('phone-header-menu');
+    const wrapper = document.querySelector('.admin-wrapper');
+    const content = document.querySelector('.admin-content');
+    const box = document.createElement('div');
+    box.style.cssText = 'position:fixed;top:4px;left:4px;z-index:999999;background:#000;color:#0f0;font-family:monospace;font-size:9px;padding:8px 10px;border-radius:6px;opacity:0.95;max-width:94vw;white-space:pre-wrap;';
+    const rectOf = el => el ? `top:${Math.round(el.getBoundingClientRect().top)} h:${Math.round(el.getBoundingClientRect().height)} disp:${getComputedStyle(el).display}` : 'not found';
+    box.textContent =
+      `body class: ${document.body.className}\n` +
+      `strip: ${rectOf(strip)}\n` +
+      `phone-header: ${rectOf(header)}\n` +
+      `wrapper: ${rectOf(wrapper)} marginTop:${wrapper ? getComputedStyle(wrapper).marginTop : '?'}\n` +
+      `content: ${rectOf(content)} scrollH:${content ? content.scrollHeight : '?'}`;
+    document.body.appendChild(box);
+  }, 1500);
 }
 
 // Direct log out — reachable in one tap from the header, no need to open
