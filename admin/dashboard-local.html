@@ -3683,6 +3683,28 @@ async function loadDashboardData() {
   }
 }
 
+// Was missing — the branding tab previously had no way to load real
+// saved settings, so it always displayed hardcoded HTML defaults
+// ("The Kiln Cafe", #b03a2e etc) even if you'd genuinely customized
+// and saved different branding earlier. Now fetches the actual saved
+// row and only falls back to those defaults if nothing's been saved yet.
+async function loadBranding() {
+  try {
+    const res = await fetch(`${API_URL}/api/studio/branding?studioId=${studioId}`);
+    const data = await res.json();
+    if (data.branding) {
+      document.getElementById('branding-name').value = data.branding.name || 'The Kiln Cafe';
+      document.getElementById('branding-tagline').value = data.branding.tagline || 'Paint · Glaze · Create';
+      document.getElementById('branding-primary').value = data.branding.primary_colour || '#b03a2e';
+      document.getElementById('branding-secondary').value = data.branding.secondary_colour || '#faf4ef';
+    }
+    // If data.branding is null, nothing's been saved yet — the HTML's
+    // hardcoded defaults are genuinely correct in that specific case.
+  } catch (e) {
+    console.error('Could not load branding:', e);
+  }
+}
+
 async function submitBranding(formData) {
   try {
     if (!apiConnected) {
@@ -3822,6 +3844,8 @@ function goToTab(tab, event) {
     populateDashboard();
   } else if (tab === 'setup') {
     loadConnectionStatus();
+  } else if (tab === 'branding') {
+    loadBranding();
   } else if (tab === 'catalogue') {
     loadAdminCatalogue();
     loadPreGlazeQueue();

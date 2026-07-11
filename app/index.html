@@ -2967,6 +2967,14 @@
         <button onclick="document.getElementById('piece-detail-modal').style.display='none';" style="width:100%; background:none; border:none; color:var(--gu-dust); padding:8px; font-size:13px; cursor:pointer;">Back to browsing</button>
       `;
       document.getElementById('piece-detail-modal').style.display = 'flex';
+
+      // Genuinely stop the customer picking a date that's too soon,
+      // rather than only rejecting it after they've filled everything
+      // in and tapped Reserve — the backend still enforces this too,
+      // but this avoids the needless friction of a late rejection.
+      const minDate = new Date();
+      minDate.setDate(minDate.getDate() + PRE_GLAZE_MIN_LEAD_DAYS);
+      document.getElementById('reserve-visit-date').min = minDate.toISOString().split('T')[0];
     }
 
     async function reservePieceForVisit(catalogueItemId) {

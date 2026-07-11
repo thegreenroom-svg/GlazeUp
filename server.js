@@ -1072,6 +1072,17 @@ app.get('/api/studio/connection-status', async (req, res) => {
  * POST /api/studio/branding
  * Save studio branding settings
  */
+// GET /api/studio/branding — was missing entirely; the branding tab had
+// no way to load a studio's actual saved settings, so it always showed
+// hardcoded HTML defaults regardless of what had actually been saved.
+app.get('/api/studio/branding', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studio_id required' });
+  const { data, error } = await supabase.from('studio_branding').select('*').eq('studio_id', studioId).single();
+  if (error && error.code !== 'PGRST116') return res.status(500).json({ error: error.message }); // PGRST116 = no row yet, fine
+  res.json({ branding: data || null });
+});
+
 app.post('/api/studio/branding', async (req, res) => {
   const { studioId, name, tagline, primaryColour, secondaryColour, footer } = req.body;
   if (!studioId) return res.status(400).json({ error: 'studio_id required' });
