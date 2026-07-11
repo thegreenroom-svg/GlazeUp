@@ -7878,9 +7878,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Check API connection
   await checkAPIConnection();
   
-  // Show dashboard tab underneath (splash screen sits on top of everything
-  // until tapped, so this is safe to prep in the background)
-  goToTab('dashboard');
+  // Show the dashboard tab visually underneath the splash screen (splash
+  // sits on top of everything until tapped, so this is safe to prep in
+  // the background) — but WITHOUT running its full data bootstrap yet.
+  // Calling goToTab('dashboard') here used to also fire populateDashboard()
+  // (via the dispatcher), which itself calls checkShiftLogin() — and then
+  // deviceCheckIn() correctly fires populateDashboard() AGAIN once the
+  // splash is actually dismissed. That's two independent, uncoordinated
+  // checkShiftLogin() runs on every single page load, which is exactly
+  // what caused the opening checklist (and PIN login picker) to
+  // sometimes appear twice. Fixed by only switching the visible tab here,
+  // and letting deviceCheckIn() -> populateDashboard() be the ONE place
+  // the real bootstrap (including checkShiftLogin) actually runs.
+  document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+  document.getElementById('dashboard-view').style.display = 'block';
+  // Dashboard's nav link is already class="active" by default in the raw
+  // HTML, so nothing more needed here — just making sure every OTHER
+  // view is hidden until a real tab switch happens.
   
   // NOTE: populateDashboard() / checkShiftLogin() is intentionally NOT
   // called here. It used to fire immediately on page load, then fire
