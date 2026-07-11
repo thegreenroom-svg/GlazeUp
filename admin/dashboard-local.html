@@ -2015,6 +2015,7 @@
       <a href="#" class="nav-link" id="nav-catalogue-tab" onclick="goToTab('catalogue', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="7.5" height="7.5" rx="1.5"/><rect x="13" y="4" width="7.5" height="7.5" rx="1.5"/><rect x="3.5" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg></span><span class="nav-label">Piece Catalogue</span></a>
       <a href="#" class="nav-link" id="nav-tablecards-tab" onclick="goToTab('tablecards', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="6" width="17" height="13" rx="1.8"/><rect x="7" y="9" width="6" height="6" rx="0.8"/><path d="M15 10h3M15 13h3M15 16h2"/></svg></span><span class="nav-label">Table Cards</span></a>
       <a href="#" class="nav-link" id="nav-piecematch-tab" onclick="goToTab('piecematch', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5l-4-4"/><path d="M8 11h6M11 8v6"/></svg></span><span class="nav-label">Piece Matching</span></a>
+      <a href="#" class="nav-link" id="nav-labels-tab" onclick="goToTab('labels', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h11l5 5v11H4z"/><path d="M15 4v5h5"/><path d="M8 13h8M8 16h5"/></svg></span><span class="nav-label">Labels</span></a>
       <a href="#" class="nav-link" id="nav-staff-tab" onclick="goToTab('staff', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="16" rx="2.2"/><path d="M3.5 9.5h17M8 3v3M16 3v3"/><path d="M8 14l2.4 2.4L16.5 10.5"/></svg></span><span class="nav-label">Daily Bookings</span></a>
       <a href="#" class="nav-link" onclick="goToTab('community', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 15.5H6.2a2.7 2.7 0 01-2.7-2.7V7.7A2.7 2.7 0 016.2 5h9.6a2.7 2.7 0 012.7 2.7v1.4"/><path d="M6.5 15.5v3.3l3.7-3.3"/><path d="M11 19h6.8a2.7 2.7 0 002.7-2.7v-3.6a2.7 2.7 0 00-2.7-2.7H11a2.7 2.7 0 00-2.7 2.7v3.6A2.7 2.7 0 0011 19z"/></svg></span><span class="nav-label">Community</span></a>
       <a href="#" class="nav-link" id="nav-printqueue-tab" onclick="goToTab('printqueue', event)"><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5V4h11v5.5"/><rect x="3.5" y="9.5" width="17" height="7.5" rx="1.8"/><rect x="6.5" y="13.5" width="11" height="6.5" rx="1"/><circle cx="17" cy="12.3" r=".9" fill="currentColor" stroke="none"/></svg></span><span class="nav-label">Print Queue</span></a>
@@ -2930,6 +2931,82 @@
             <button onclick="capturePieceMatchPhoto()" style="width:100%;background:#2e7d32;color:white;border:none;border-radius:12px;padding:16px;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:14px;">📷 Photograph piece to identify</button>
             <div id="pm-match-result"></div>
           </div>
+        </div>
+      </div>
+
+      <!-- ═════════════════════════════════════════════ -->
+      <!-- LABELS TAB -->
+      <!-- Collection labels (customer picks up) and postal labels
+           (posted via Royal Mail). Both print big, bold customer name,
+           booking ref, ready date, piece count, and any damage notes
+           with the standard kiln-risk explanation. Postal additionally
+           needs a real shipping address, and can optionally create a
+           REAL Royal Mail Click & Drop label once the studio has
+           connected their own Online Business Account — until then,
+           the printable label works on its own. -->
+      <!-- ═════════════════════════════════════════════ -->
+      <div id="labels-view" class="view" style="display: none;">
+        <h2 style="margin-top: 0;">🏷️ Labels</h2>
+        <p style="color: var(--gu-dust); font-size: 13px; margin-bottom: 20px; line-height: 1.5;">
+          Print a collection or postal label for any booking — customer name, booking reference, ready date, piece count, and any damage notes.
+        </p>
+
+        <div class="chart-container" style="margin-bottom: 20px;">
+          <h3 style="margin:0 0 10px;">Find a booking</h3>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="label-booking-scan-input" placeholder="Scan QR or paste booking code" style="flex:1;padding:10px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;" onkeydown="if(event.key==='Enter') loadLabelBooking()">
+            <button onclick="loadLabelBooking()" style="background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;">Load</button>
+          </div>
+        </div>
+
+        <div id="label-editor" style="display:none;">
+          <div class="chart-container" style="margin-bottom: 20px;">
+            <h3 style="margin:0 0 10px;">Fulfilment</h3>
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+              <button id="label-method-collection" onclick="setLabelMethod('collection')" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid var(--gu-border);background:white;font-size:13px;font-weight:700;cursor:pointer;">🏪 Collection</button>
+              <button id="label-method-postal" onclick="setLabelMethod('postal')" style="flex:1;padding:10px;border-radius:8px;border:1.5px solid var(--gu-border);background:white;font-size:13px;font-weight:700;cursor:pointer;">📮 Postal</button>
+            </div>
+
+            <div id="label-postal-fields" style="display:none;">
+              <input type="text" id="label-addr1" placeholder="Address line 1" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">
+              <input type="text" id="label-addr2" placeholder="Address line 2 (optional)" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">
+              <div style="display:flex;gap:8px;margin-bottom:8px;">
+                <input type="text" id="label-city" placeholder="Town/City" style="flex:1;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;box-sizing:border-box;">
+                <input type="text" id="label-postcode" placeholder="Postcode" style="width:110px;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;box-sizing:border-box;">
+              </div>
+            </div>
+
+            <div style="font-size:11px;color:var(--gu-dust);margin-bottom:4px;">Damage/firing notes (optional — leave blank if none)</div>
+            <textarea id="label-damage-notes" placeholder="e.g. One mug handle cracked slightly during firing" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;margin-bottom:12px;box-sizing:border-box;height:50px;"></textarea>
+
+            <button onclick="saveLabelInfo()" style="width:100%;background:var(--gu-primary);color:white;border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;">Save</button>
+          </div>
+
+          <div class="chart-container">
+            <h3 style="margin:0 0 10px;">Print</h3>
+            <button onclick="printCollectionLabel()" style="width:100%;background:#2B2724;color:white;border:none;border-radius:12px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px;">🖨️ Print label</button>
+            <button id="label-rm-btn" onclick="createRoyalMailLabel()" style="width:100%;background:#e30513;color:white;border:none;border-radius:12px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;display:none;">📮 Create real Royal Mail label</button>
+            <div id="label-rm-status" style="font-size:11px;color:var(--gu-dust);margin-top:8px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Printable label layout -->
+      <div id="collection-label-print-area" style="display:none;">
+        <div style="width:380px;padding:26px;border:2px solid #2B2724;border-radius:16px;font-family:sans-serif;margin:0 auto;">
+          <div id="cl-print-name" style="font-size:28px;font-weight:900;color:#2B2724;line-height:1.1;margin-bottom:10px;"></div>
+          <div style="border-top:2px solid #2B2724;border-bottom:2px solid #2B2724;padding:10px 0;margin-bottom:12px;">
+            <div style="font-size:13px;color:#2B2724;"><strong>Booking ref:</strong> <span id="cl-print-ref"></span></div>
+            <div style="font-size:13px;color:#2B2724;"><strong>Ready date:</strong> <span id="cl-print-date"></span></div>
+            <div style="font-size:13px;color:#2B2724;"><strong>Pieces:</strong> <span id="cl-print-pieces"></span></div>
+          </div>
+          <div id="cl-print-address" style="font-size:14px;color:#2B2724;margin-bottom:12px;display:none;"></div>
+          <div id="cl-print-damage-section" style="display:none;background:#fff3e0;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+            <div style="font-size:12px;font-weight:700;color:#8a5520;margin-bottom:3px;">⚠️ Please note</div>
+            <div id="cl-print-damage-notes" style="font-size:11px;color:#2B2724;margin-bottom:6px;"></div>
+            <div id="cl-print-kiln-explanation" style="font-size:10px;color:#8a8175;line-height:1.4;"></div>
+          </div>
+          <div style="font-size:9px;color:#b0a89e;text-align:center;margin-top:10px;">kilnLINK</div>
         </div>
       </div>
 
@@ -8687,6 +8764,143 @@ async function confirmPieceMatch(attemptId, confirmed) {
     : '<div style="padding:14px;background:var(--gu-bg);border-radius:10px;font-size:13px;color:var(--gu-dust);">Noted — please compare manually against the reference photos above.</div>';
 }
 
+// ── Labels — collection and postal, big bold name, booking ref, ready
+// date, piece count, damage notes with the kiln-risk explanation ──
+let _labelBookingCode = null;
+let _labelData = null;
+
+async function loadLabelBooking() {
+  const raw = document.getElementById('label-booking-scan-input').value.trim();
+  if (!raw) return;
+  let bookingCode = raw;
+  try {
+    const url = new URL(raw);
+    const paramCode = url.searchParams.get('booking');
+    if (paramCode) bookingCode = paramCode;
+  } catch { /* not a URL, use as-is */ }
+
+  try {
+    const res = await fetch(`${API_URL}/api/bookings/${encodeURIComponent(bookingCode)}/label-data?studioId=${studioId}`);
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Could not find this booking.'); return; }
+
+    _labelBookingCode = bookingCode;
+    _labelData = data;
+    document.getElementById('label-editor').style.display = 'block';
+    setLabelMethod(data.fulfilmentMethod || 'collection');
+    document.getElementById('label-addr1').value = data.shippingAddress?.line1 || '';
+    document.getElementById('label-addr2').value = data.shippingAddress?.line2 || '';
+    document.getElementById('label-city').value = data.shippingAddress?.city || '';
+    document.getElementById('label-postcode').value = data.shippingAddress?.postcode || '';
+    document.getElementById('label-damage-notes').value = data.damageNotes || '';
+
+    // Only show the real Royal Mail button if the studio has genuinely
+    // connected their own account — never fake this.
+    const rmRes = await fetch(`${API_URL}/api/studio/return-address?studioId=${studioId}`);
+    const rmData = await rmRes.json();
+    document.getElementById('label-rm-btn').style.display = rmData.address?.royal_mail_oba_api_key ? 'block' : 'none';
+  } catch (e) {
+    alert('Could not load this booking.');
+  }
+}
+
+function setLabelMethod(method) {
+  document.getElementById('label-method-collection').style.background = method === 'collection' ? 'var(--gu-primary)' : 'white';
+  document.getElementById('label-method-collection').style.color = method === 'collection' ? 'white' : 'var(--gu-text)';
+  document.getElementById('label-method-postal').style.background = method === 'postal' ? 'var(--gu-primary)' : 'white';
+  document.getElementById('label-method-postal').style.color = method === 'postal' ? 'white' : 'var(--gu-text)';
+  document.getElementById('label-postal-fields').style.display = method === 'postal' ? 'block' : 'none';
+  if (_labelData) _labelData.fulfilmentMethod = method;
+}
+
+async function saveLabelInfo() {
+  if (!_labelBookingCode) return;
+  const method = _labelData?.fulfilmentMethod || 'collection';
+  try {
+    await fetch(`${API_URL}/api/bookings/${encodeURIComponent(_labelBookingCode)}/shipping-info`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId, fulfilmentMethod: method,
+        addressLine1: document.getElementById('label-addr1').value.trim(),
+        addressLine2: document.getElementById('label-addr2').value.trim(),
+        city: document.getElementById('label-city').value.trim(),
+        postcode: document.getElementById('label-postcode').value.trim(),
+        damageNotes: document.getElementById('label-damage-notes').value.trim(),
+      })
+    });
+    alert('Saved.');
+  } catch (e) {
+    alert('Could not save — try again.');
+  }
+}
+
+function printCollectionLabel() {
+  if (!_labelData) return;
+  const method = _labelData.fulfilmentMethod || 'collection';
+  const damageNotes = document.getElementById('label-damage-notes').value.trim();
+
+  document.getElementById('cl-print-name').textContent = _labelData.customerName || 'Guest';
+  document.getElementById('cl-print-ref').textContent = _labelData.bookingCode;
+  document.getElementById('cl-print-date').textContent = new Date(_labelData.readyDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  document.getElementById('cl-print-pieces').textContent = `${_labelData.pieceCount} piece${_labelData.pieceCount === 1 ? '' : 's'}${_labelData.pieceTypes?.length ? ' — ' + _labelData.pieceTypes.join(', ') : ''}`;
+
+  const addrEl = document.getElementById('cl-print-address');
+  if (method === 'postal') {
+    const a1 = document.getElementById('label-addr1').value;
+    const a2 = document.getElementById('label-addr2').value;
+    const city = document.getElementById('label-city').value;
+    const postcode = document.getElementById('label-postcode').value;
+    addrEl.innerHTML = `${a1}<br>${a2 ? a2 + '<br>' : ''}${city}<br><strong>${postcode}</strong>`;
+    addrEl.style.display = 'block';
+  } else {
+    addrEl.style.display = 'none';
+  }
+
+  const damageSection = document.getElementById('cl-print-damage-section');
+  if (damageNotes) {
+    document.getElementById('cl-print-damage-notes').textContent = damageNotes;
+    document.getElementById('cl-print-kiln-explanation').textContent = "Kilns are temperamental by nature — occasional cracking, glaze imperfections, or colour variation can happen during firing, even with careful handling. We inspect every piece and only send out what meets our quality standard, but wanted to flag this in case anything looks different to what you expected.";
+    damageSection.style.display = 'block';
+  } else {
+    damageSection.style.display = 'none';
+  }
+
+  const printArea = document.getElementById('collection-label-print-area');
+  printArea.style.display = 'block';
+  const style = document.createElement('style');
+  style.id = 'collection-label-print-style';
+  style.textContent = `
+    @media print {
+      body * { visibility: hidden; }
+      #collection-label-print-area, #collection-label-print-area * { visibility: visible; }
+      #collection-label-print-area { position: fixed; top: 20px; left: 0; right: 0; display: block !important; }
+    }
+  `;
+  document.head.appendChild(style);
+  setTimeout(() => {
+    window.print();
+    printArea.style.display = 'none';
+    document.getElementById('collection-label-print-style')?.remove();
+  }, 150);
+}
+
+async function createRoyalMailLabel() {
+  if (!_labelBookingCode) return;
+  const statusEl = document.getElementById('label-rm-status');
+  statusEl.textContent = 'Creating label…';
+  try {
+    const res = await fetch(`${API_URL}/api/bookings/${encodeURIComponent(_labelBookingCode)}/create-royal-mail-label`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId })
+    });
+    const data = await res.json();
+    if (!res.ok) { statusEl.textContent = data.error || 'Could not create the label.'; return; }
+    statusEl.textContent = '✓ Real Royal Mail label created — check your Click & Drop account.';
+  } catch (e) {
+    statusEl.textContent = 'Could not reach Royal Mail — try the printable label instead.';
+  }
+}
+
 async function loadAdminCatalogue() {
   const grid = document.getElementById('admin-catalogue-grid');
   if (!grid) return;
@@ -10032,11 +10246,35 @@ async function handleRefPhotoCapture(event) {
       if (!res.ok) { alert('Could not save the photo — try again.'); return; }
       const bookingCode = document.getElementById('ref-photo-booking-select').value;
       loadRefPhotoPieces(bookingCode);
+
+      // Suggest a piece type from the studio's own stock list, based on
+      // the photo just taken — genuinely AI-assisted, staff confirms.
+      // Runs quietly in the background; doesn't block the main flow if
+      // it's slow or comes back empty.
+      suggestStockTypeForPiece(_capturingPieceId, reader.result);
     } catch (e) {
       alert('Could not save the photo — try again.');
     }
   };
   reader.readAsDataURL(file);
+}
+
+async function suggestStockTypeForPiece(pieceId, photoBase64) {
+  try {
+    const res = await fetch(`${API_URL}/api/pieces/suggest-type`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, photoBase64 })
+    });
+    const data = await res.json();
+    if (!data.suggestions?.length) return; // quietly do nothing if there's no confident suggestion
+
+    const top = data.suggestions[0];
+    const banner = document.createElement('div');
+    banner.style.cssText = 'background:#fff9f0;border:1px solid var(--link-clay);border-radius:10px;padding:10px 12px;margin-top:8px;font-size:12px;';
+    banner.innerHTML = `💡 Looks like it might be: <strong>${top.name}</strong> <span style="color:var(--gu-dust);">(${top.confidence} confidence)</span> — from your stock list.`;
+    document.getElementById('ref-photo-pieces-list')?.prepend(banner);
+    setTimeout(() => banner.remove(), 8000);
+  } catch (e) { /* silent — this is a nice-to-have, never block the workflow over it */ }
 }
 
 async function loadOpenTablesForCompletion() {

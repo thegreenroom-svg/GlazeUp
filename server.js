@@ -3483,6 +3483,158 @@ app.get('/api/pieces/for-booking', async (req, res) => {
   res.json({ pieces: pieces || [] });
 });
 
+// ═══════════════════════════════════════════
+// COLLECTION / POSTAL LABELS
+// Two label types: 'collection' (customer picks up in studio) and
+// 'postal' (posted back, needs a real shipping address). Both carry
+// the same core info — bold name, booking ref, collection/ready date,
+// piece count, and any damage notes with the standard kiln-risk
+// explanation. Postal labels additionally carry the shipping address
+// and are ready to feed into Royal Mail's Click & Drop API once a
+// studio has a real Online Business Account key — until then, this
+// produces a genuinely usable printable label on its own.
+// ═══════════════════════════════════════════
+
+const KILN_DAMAGE_EXPLANATION = "Kilns are temperamental by nature — occasional cracking, glaze imperfections, or colour variation can happen during firing, even with careful handling. We inspect every piece and only send out what meets our quality standard, but we wanted to flag this here in case anything looks different to what you expected.";
+
+// GET /api/bookings/:bookingCode/label-data — everything needed to
+// render a collection or postal label for this booking
+app.get('/api/bookings/:bookingCode/label-data', async (req, res) => {
+  const { bookingCode } = req.params;
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    const { data: booking } = await supabase.from('bookings')
+      .select('*').eq('studio_id', studioId).eq('booking_code', bookingCode).single();
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    const { data: pieces } = await supabase.from('pottery_pieces')
+      .select('id, piece_type, status').eq('studio_id', studioId).eq('booking_id', bookingCode);
+
+    const { data: returnAddress } = await supabase.from('studio_return_address')
+      .select('*').eq('studio_id', studioId).single();
+
+    res.json({
+      customerName: booking.customer_name,
+      bookingCode: booking.booking_code,
+      readyDate: new Date().toISOString(), // date the label is generated / pieces confirmed ready
+      pieceCount: (pieces || []).length,
+      pieceTypes: (pieces || []).map(p => p.piece_type).filter(Boolean),
+      fulfilmentMethod: booking.fulfilment_method || 'collection',
+      shippingAddress: booking.fulfilment_method === 'postal' ? {
+        line1: booking.shipping_address_line1, line2: booking.shipping_address_line2,
+        city: booking.shipping_city, postcode: booking.shipping_postcode, country: booking.shipping_country,
+      } : null,
+      damageNotes: booking.damage_notes || null,
+      kilnExplanation: booking.damage_notes ? KILN_DAMAGE_EXPLANATION : null,
+      returnAddress: returnAddress || null,
+    });
+  } catch (error) {
+    console.error('Label data error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/bookings/:bookingCode/shipping-info — save/update the
+// postal shipping address and fulfilment method for a booking
+app.post('/api/bookings/:bookingCode/shipping-info', async (req, res) => {
+  const { bookingCode } = req.params;
+  const { studioId, fulfilmentMethod, addressLine1, addressLine2, city, postcode, country, damageNotes } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  const updates = {};
+  if (fulfilmentMethod) updates.fulfilment_method = fulfilmentMethod;
+  if (addressLine1 !== undefined) updates.shipping_address_line1 = addressLine1;
+  if (addressLine2 !== undefined) updates.shipping_address_line2 = addressLine2;
+  if (city !== undefined) updates.shipping_city = city;
+  if (postcode !== undefined) updates.shipping_postcode = postcode;
+  if (country !== undefined) updates.shipping_country = country;
+  if (damageNotes !== undefined) updates.damage_notes = damageNotes;
+
+  const { data, error } = await supabase.from('bookings')
+    .update(updates).eq('studio_id', studioId).eq('booking_code', bookingCode).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ booking: data });
+});
+
+// GET/POST /api/studio/return-address — the studio's own postal return
+// address, set once in Setup, used as the "from" address on labels
+app.get('/api/studio/return-address', async (req, res) => {
+  const { studioId } = req.query;
+  const { data } = await supabase.from('studio_return_address').select('*').eq('studio_id', studioId).single();
+  res.json({ address: data || null });
+});
+
+app.post('/api/studio/return-address', async (req, res) => {
+  const { studioId, businessName, addressLine1, addressLine2, city, postcode, country, royalMailApiKey } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data, error } = await supabase.from('studio_return_address').upsert({
+    studio_id: studioId, business_name: businessName, address_line1: addressLine1,
+    address_line2: addressLine2, city, postcode, country: country || 'United Kingdom',
+    royal_mail_oba_api_key: royalMailApiKey || null,
+  }, { onConflict: 'studio_id' }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ address: data });
+});
+
+// POST /api/bookings/:bookingCode/create-royal-mail-label — REAL Royal
+// Mail Click & Drop integration. Only works once the studio has entered
+// a genuine Online Business Account API key in Setup — this cannot be
+// faked or bypassed, since real postage costs real money and needs a
+// real account. Returns a clear, honest error if no key is set, rather
+// than pretending to create a label.
+app.post('/api/bookings/:bookingCode/create-royal-mail-label', async (req, res) => {
+  const { bookingCode } = req.params;
+  const { studioId } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  const { data: returnAddress } = await supabase.from('studio_return_address').select('*').eq('studio_id', studioId).single();
+  if (!returnAddress?.royal_mail_oba_api_key) {
+    return res.status(400).json({
+      error: 'No Royal Mail Online Business Account is connected yet. Add your Click & Drop API key in Setup to enable real automatic labels — until then, use the printable label instead.',
+      needsSetup: true,
+    });
+  }
+
+  const { data: booking } = await supabase.from('bookings').select('*').eq('studio_id', studioId).eq('booking_code', bookingCode).single();
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+  if (!booking.shipping_postcode) return res.status(400).json({ error: 'No shipping address saved for this booking yet.' });
+
+  try {
+    const rmRes = await fetch('https://api.parcel.royalmail.com/api/v1/Orders', {
+      method: 'POST',
+      headers: { 'Authorization': returnAddress.royal_mail_oba_api_key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: [{
+          orderReference: booking.booking_code,
+          recipient: {
+            address: {
+              fullName: booking.customer_name,
+              addressLine1: booking.shipping_address_line1,
+              addressLine2: booking.shipping_address_line2 || undefined,
+              city: booking.shipping_city,
+              postcode: booking.shipping_postcode,
+              countryCode: 'GB',
+            },
+          },
+          billing: { address: { fullName: booking.customer_name, addressLine1: booking.shipping_address_line1, city: booking.shipping_city, postcode: booking.shipping_postcode, countryCode: 'GB' } },
+          packages: [{ weightInGrams: 500, packageFormatIdentifier: 'parcel' }],
+        }],
+      }),
+    });
+    const rmData = await rmRes.json();
+    if (!rmRes.ok) {
+      console.error('Royal Mail API error:', rmData);
+      return res.status(502).json({ error: 'Royal Mail rejected the label request — check the address and try again, or use the printable label.' });
+    }
+    res.json({ status: 'created', royalMailResponse: rmData });
+  } catch (error) {
+    console.error('Royal Mail integration error:', error);
+    res.status(500).json({ error: 'Could not reach Royal Mail — use the printable label instead.' });
+  }
+});
+
 app.get('/api/pieces/ready-for-pickup', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
@@ -6187,6 +6339,61 @@ app.get('/api/bookings/:bookingCode/reference-photos', async (req, res) => {
 // photographs a fired, jumbled piece; this compares it against every
 // reference photo for the given booking and returns a RANKED list with
 // honest reasoning and confidence — never a silent single answer.
+// POST /api/pieces/suggest-type — when a piece is photographed, suggest
+// which item from the studio's own stock list it most likely is, by
+// comparing against stock photos. Genuinely AI-assisted, same honesty
+// as piece matching — a suggestion to speed up selecting the right
+// type, not a forced/silent answer. Staff always picks the final type.
+app.post('/api/pieces/suggest-type', async (req, res) => {
+  const { studioId, photoBase64 } = req.body;
+  if (!studioId || !photoBase64) return res.status(400).json({ error: 'studioId and photoBase64 required' });
+  if (!process.env.OPENAI_API_KEY) return res.json({ suggestions: [] }); // fail quietly — this is a nice-to-have, not core
+
+  try {
+    const { data: stock } = await supabase.from('studio_stock')
+      .select('id, name, category, photo_data').eq('studio_id', studioId).eq('available', true).limit(30);
+    if (!stock || !stock.length) return res.json({ suggestions: [] });
+
+    const content = [
+      {
+        type: 'text',
+        text: `A pottery studio piece has just been photographed. Suggest which item from the stock catalogue below it most likely is, based on shape and form. Return up to 3 ranked suggestions as JSON only: {"suggestions":[{"id":"...","confidence":"high|medium|low"}]}. If nothing looks like a plausible match, return an empty array — don't force a guess.`,
+      },
+    ];
+    stock.forEach(s => {
+      if (s.photo_data) {
+        content.push({ type: 'text', text: `Stock item ID: ${s.id} — ${s.name} (${s.category || ''})` });
+        content.push({ type: 'image_url', image_url: { url: s.photo_data } });
+      }
+    });
+    content.push({ type: 'text', text: 'This is the piece just photographed:' });
+    content.push({ type: 'image_url', image_url: { url: photoBase64.startsWith('data:') ? photoBase64 : `data:image/jpeg;base64,${photoBase64}` } });
+
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content }], temperature: 0.2, max_tokens: 300 }),
+    });
+    const aiData = await openaiRes.json();
+    let parsed;
+    try {
+      parsed = JSON.parse((aiData.choices?.[0]?.message?.content || '{}').replace(/```json|```/g, '').trim());
+    } catch (e) {
+      return res.json({ suggestions: [] }); // fail quietly, don't block the workflow over a suggestion feature
+    }
+
+    const enriched = (parsed.suggestions || []).map(s => {
+      const item = stock.find(st => st.id === s.id);
+      return item ? { ...s, name: item.name, category: item.category } : null;
+    }).filter(Boolean);
+
+    res.json({ suggestions: enriched });
+  } catch (error) {
+    console.error('Stock type suggestion error (non-fatal):', error);
+    res.json({ suggestions: [] });
+  }
+});
+
 app.post('/api/pieces/match', async (req, res) => {
   const { studioId, bookingCode, queryPhotoBase64, packerId } = req.body;
   if (!studioId || !bookingCode || !queryPhotoBase64) {
