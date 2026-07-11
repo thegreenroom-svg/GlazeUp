@@ -4171,7 +4171,7 @@
           <div style="padding:0 20px 32px;">
             <div style="background:rgba(255,255,255,0.06);border-radius:16px;padding:16px;">
               <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.8);margin-bottom:4px;">🎂 Birthday (optional)</div>
-              <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:10px;line-height:1.4;">If you'd like, add a birthday and Cleo might have something special that week. Just the day and month — never asked for a year, never used to guess anyone's age.</div>
+              <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:10px;line-height:1.4;">If you'd like, add a birthday and Cleo might have something special that week. Just the day and month — never asked for a year, never used to guess anyone's age. <strong style="color:rgba(255,255,255,0.7);">If you're not a grown-up, check with a parent or guardian first!</strong></div>
               <div style="display:flex;gap:8px;">
                 <select id="birthday-day-select" style="flex:1;padding:9px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.1);color:white;font-size:13px;">
                   <option value="">Day</option>
@@ -4181,7 +4181,7 @@
                   <option value="">Month</option>
                   ${['January','February','March','April','May','June','July','August','September','October','November','December'].map((m,i)=>`<option value="${i+1}">${m}</option>`).join('')}
                 </select>
-                <button onclick="saveClubBirthday('${customerId}')" style="background:#F9A825;color:white;border:none;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+                <button onclick="confirmClubBirthdaySave('${customerId}')" style="background:#F9A825;color:white;border:none;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
               </div>
               <div id="birthday-save-status" style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:8px;"></div>
             </div>
@@ -4190,6 +4190,21 @@
       } catch (e) {
         body.innerHTML = '<div style="padding:32px;text-align:center;color:rgba(255,255,255,0.4);font-size:13px;">Could not load your sticker board — please ask a member of staff.</div>';
       }
+    }
+
+    // Genuine, gentle real consent checkpoint before actually saving —
+    // a real, soft pause asking the child to confirm a grown-up knows,
+    // rather than saving the instant Save is tapped. Not a hard gate
+    // (there's no real way to verify age in a web app), but a genuine,
+    // deliberate extra moment rather than a silent, instant save.
+    async function confirmClubBirthdaySave(customerId) {
+      const day = document.getElementById('birthday-day-select').value;
+      const month = document.getElementById('birthday-month-select').value;
+      const statusEl = document.getElementById('birthday-save-status');
+      if (!day || !month) { statusEl.textContent = 'Pick both a day and a month first.'; return; }
+      const confirmed = confirm("Quick check — does a parent or guardian know you're adding this? Tap OK if a grown-up is happy for you to save it.");
+      if (!confirmed) { statusEl.textContent = 'No problem — ask a grown-up first, then come back!'; return; }
+      await saveClubBirthday(customerId);
     }
 
     // Genuine, real save for the optional birthday field above
