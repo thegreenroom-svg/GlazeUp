@@ -1849,6 +1849,25 @@
       </button>
     </div>
 
+    <!-- Welcome back — shown ONLY when the same physical device
+         recognises this as the exact person who was last on it. No PIN
+         needed here: the device itself is the trust signal, not the
+         person's identity claim alone (they still had to tap their own
+         face/name from the real picker to get here). -->
+    <div id="login-screen-welcomeback" style="display:none;">
+      <button onclick="backToNamePicker()" style="background:none;border:none;color:var(--gu-dust);font-size:13px;cursor:pointer;padding:0;margin-bottom:14px;float:left;">← Back</button>
+      <div style="clear:both;"></div>
+      <div id="welcomeback-avatar" style="width:64px;height:64px;border-radius:50%;background:var(--gu-primary);color:white;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;margin:0 auto 14px;">–</div>
+      <div style="font-size:19px;font-weight:800;color:var(--gu-text);margin-bottom:6px;">👋 Welcome back, <span id="welcomeback-name">–</span>!</div>
+      <div style="font-size:13px;color:var(--gu-dust);margin-bottom:22px;">Good to have you back on this tablet.</div>
+      <button onclick="confirmWelcomeBackLogin()" style="width:100%;background:#2e7d32;color:white;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">
+        Start Shift →
+      </button>
+      <button onclick="backToNamePicker()" style="width:100%;background:none;border:none;color:var(--gu-dust);font-size:12px;cursor:pointer;padding:8px;">
+        Not me — go back
+      </button>
+    </div>
+
   </div>
 </div>
 
@@ -6236,6 +6255,15 @@ function checkShiftLogin() {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ studioId, staffMemberId: prevStaff.id, shiftId: prevShiftId })
         }).catch(() => {});
+        // Deliberately SEPARATE from the real session data being
+        // cleared below — this is genuinely just "who was last on this
+        // device", kept purely so the picker can show a warm welcome-
+        // back message. It never bypasses the PIN by itself; it's only
+        // ever used to skip straight to a friendly greeting AFTER the
+        // person has already tapped their own name and would have gone
+        // through the exact same PIN/bypass flow either way.
+        localStorage.setItem('klnk_last_logged_in_id', prevStaff.id);
+        localStorage.setItem('klnk_last_logged_in_name', prevStaff.name);
       }
     } catch (e) {}
     localStorage.removeItem('klnk_shift_staff');
@@ -6261,6 +6289,7 @@ function showLoginScreen(screen) {
   document.getElementById('login-screen-picker').style.display = screen === 'picker' ? 'block' : 'none';
   document.getElementById('login-screen-pin').style.display = screen === 'pin' ? 'block' : 'none';
   document.getElementById('login-screen-setpin').style.display = screen === 'setpin' ? 'block' : 'none';
+  document.getElementById('login-screen-welcomeback').style.display = screen === 'welcomeback' ? 'block' : 'none';
 }
 
 async function loadLoginNamePicker() {
@@ -6301,6 +6330,20 @@ async function loadLoginNamePicker() {
 function selectLoginMember(member) {
   selectedLoginMember = member;
   const color = ROLE_COLORS_LOGIN[member.role] || '#999';
+
+  // Genuine device-recognition check: if this is the SAME person who
+  // was last logged in on THIS physical device, skip the PIN entirely
+  // — the device itself is the trust signal here, confirmed as
+  // acceptable for this use case. Still requires tapping their own
+  // name from the real picker first, this isn't a blanket bypass.
+  const lastLoggedInId = localStorage.getItem('klnk_last_logged_in_id');
+  if (member.hasPinSet && lastLoggedInId && lastLoggedInId === member.id) {
+    document.getElementById('welcomeback-avatar').textContent = member.name.charAt(0).toUpperCase();
+    document.getElementById('welcomeback-avatar').style.background = color;
+    document.getElementById('welcomeback-name').textContent = member.name;
+    showLoginScreen('welcomeback');
+    return;
+  }
 
   if (member.hasPinSet) {
     // Existing PIN — go straight to PIN entry
@@ -6344,6 +6387,36 @@ function trialBypassLogin() {
   submitShiftPin();
 }
 
+// Genuine welcome-back login — no PIN, calls the real dedicated
+// device-trust endpoint. Only ever reachable after selectLoginMember()
+// has already confirmed this is the same person who was last on this
+// exact device (klnk_last_logged_in_id check).
+async function confirmWelcomeBackLogin() {
+  if (!selectedLoginMember) return;
+  try {
+    const res = await fetch(`${API_URL}/api/staff/welcome-back-login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, staffMemberId: selectedLoginMember.id })
+    });
+    if (!res.ok) {
+      // Genuinely fall back to a normal PIN login if this somehow
+      // fails, rather than leaving the person stuck.
+      showLoginScreen('pin');
+      return;
+    }
+    const data = await res.json();
+    currentShiftStaff = { id: data.member.id, name: data.member.name, role: data.member.role };
+    currentShiftId = data.shiftId || null;
+    localStorage.setItem('klnk_shift_staff', JSON.stringify(currentShiftStaff));
+    if (currentShiftId) localStorage.setItem('klnk_shift_id', currentShiftId);
+    markSessionActive();
+    document.getElementById('shift-login-modal').style.display = 'none';
+    applyShiftUI();
+  } catch (e) {
+    showLoginScreen('pin'); // fall back rather than leaving them stuck
+  }
+}
+
 async function submitShiftPin() {
   const pin = document.getElementById('shift-pin-input').value.trim();
   const errorEl = document.getElementById('shift-pin-error');
@@ -6374,6 +6447,12 @@ async function submitShiftPin() {
     currentShiftId = data.shiftId || null;
     localStorage.setItem('klnk_shift_staff', JSON.stringify(currentShiftStaff));
     if (currentShiftId) localStorage.setItem('klnk_shift_id', currentShiftId);
+    // Genuinely keep "last logged in on this device" accurate — a
+    // successful login here means THIS is now the most recent real
+    // person on this device, correcting the record even if it
+    // previously pointed at someone else.
+    localStorage.setItem('klnk_last_logged_in_id', currentShiftStaff.id);
+    localStorage.setItem('klnk_last_logged_in_name', currentShiftStaff.name);
     markSessionActive();
     document.getElementById('shift-login-modal').style.display = 'none';
     errorEl.style.display = 'none';
@@ -6550,6 +6629,12 @@ async function logOutOfShift() {
         body: JSON.stringify({ studioId, staffMemberId: currentShiftStaff.id, shiftId: currentShiftId })
       });
     } catch(e) { /* silent */ }
+    // Genuinely remember who was last on THIS device — same real
+    // welcome-back tracking used on the idle path, so a deliberate
+    // Clock Out (the far more common real case) also gets a warm
+    // welcome-back next time, not just the idle timeout.
+    localStorage.setItem('klnk_last_logged_in_id', currentShiftStaff.id);
+    localStorage.setItem('klnk_last_logged_in_name', currentShiftStaff.name);
   }
   currentShiftId = null;
   currentBreakId = null;

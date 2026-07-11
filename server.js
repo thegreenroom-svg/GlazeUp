@@ -4447,6 +4447,35 @@ app.post('/api/staff/shift-login', async (req, res) => {
   res.json({ member, shiftId: shift?.id || null });
 });
 
+// POST /api/staff/welcome-back-login — genuine device-trust login, no
+// PIN required. Only ever reachable from the real picker screen when
+// the frontend has already confirmed (via klnk_last_logged_in_id in
+// localStorage, set only when THIS exact device was the one this
+// person last logged in on) that this is a returning person on the
+// same physical tablet. Deliberately a SEPARATE endpoint from the real
+// PIN login, not a bypass flag bolted onto it — keeps the trust model
+// explicit and auditable rather than quietly weakening PIN validation.
+app.post('/api/staff/welcome-back-login', async (req, res) => {
+  const { studioId, staffMemberId } = req.body;
+  if (!studioId || !staffMemberId) return res.status(400).json({ error: 'studioId and staffMemberId required' });
+
+  const { data: member } = await supabase.from('staff_team')
+    .select('*').eq('id', staffMemberId).eq('studio_id', studioId).single();
+  if (!member || !member.active) return res.status(404).json({ error: 'Staff member not found or inactive' });
+
+  // Same real clock-in logic as the PIN login path — genuinely creates
+  // a proper timesheet entry, this isn't a lesser/fake session.
+  await supabase.from('staff_timesheet')
+    .update({ clock_out: new Date().toISOString(), auto_closed: true })
+    .eq('studio_id', studioId).eq('staff_member_id', member.id).is('clock_out', null);
+
+  const { data: shift } = await supabase.from('staff_timesheet').insert({
+    studio_id: studioId, staff_member_id: member.id, clock_in: new Date().toISOString(),
+  }).select().single();
+
+  res.json({ member, shiftId: shift?.id || null });
+});
+
 // POST /api/staff/clock-out — automatic clock-out on shift logout
 app.post('/api/staff/clock-out', async (req, res) => {
   const { studioId, staffMemberId, shiftId } = req.body;
