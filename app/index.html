@@ -2126,28 +2126,7 @@
                the adult loyalty tiers, its own friendly kids' brand. -->
           <div id="cleos-club-tile" style="display:none; border-radius:16px; overflow:hidden; margin-bottom:2px; cursor:pointer; background:linear-gradient(135deg,#F9A825,#f57c00);" onclick="openCleosClub()">
             <div style="padding:16px; position:relative; display:flex; align-items:center; gap:12px;">
-              <svg width="52" height="52" viewBox="0 0 52 52" style="flex-shrink:0; animation:cleoBounce 2.8s ease-in-out infinite; transform-origin:26px 48px;">
-                <!-- Cleo mascot — illustrated cartoon character, curly brown hair -->
-                <ellipse cx="26" cy="44" rx="14" ry="7" fill="#2B2724" opacity="0.12"/>
-                <path d="M14 40 Q14 30 26 30 Q38 30 38 40 L38 48 Q38 50 36 50 L16 50 Q14 50 14 48 Z" fill="#F4A896"/>
-                <circle cx="26" cy="20" r="14" fill="#FBCBA4"/>
-                <g style="animation:cleoCurlWiggle 3.2s ease-in-out infinite; transform-origin:26px 10px;">
-                  <circle cx="14" cy="12" r="5" fill="#6B4226"/>
-                  <circle cx="10" cy="18" r="4.5" fill="#6B4226"/>
-                  <circle cx="19" cy="7" r="5" fill="#6B4226"/>
-                  <circle cx="27" cy="5" r="5.5" fill="#6B4226"/>
-                  <circle cx="35" cy="7" r="5" fill="#6B4226"/>
-                  <circle cx="41" cy="13" r="4.5" fill="#6B4226"/>
-                  <circle cx="42" cy="19" r="4" fill="#6B4226"/>
-                </g>
-                <circle cx="20" cy="21" r="2.3" fill="#2B2724"/>
-                <circle cx="32" cy="21" r="2.3" fill="#2B2724"/>
-                <circle cx="20.7" cy="20.2" r="0.7" fill="white"/>
-                <circle cx="32.7" cy="20.2" r="0.7" fill="white"/>
-                <ellipse cx="15" cy="25" rx="2.6" ry="1.8" fill="#F0876A" opacity="0.5"/>
-                <ellipse cx="37" cy="25" rx="2.6" ry="1.8" fill="#F0876A" opacity="0.5"/>
-                <path d="M20 27 Q26 32 32 27" stroke="#2B2724" stroke-width="1.6" fill="none" stroke-linecap="round"/>
-              </svg>
+              <div id="cleos-club-tile-mascot" style="width:52px;height:52px;flex-shrink:0;"></div>
               <div style="flex:1;">
                 <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,0.85);margin-bottom:2px;">Cleo's Club</div>
                 <div style="font-size:15px;font-weight:800;color:white;" id="cleos-club-tile-status">Loading…</div>
@@ -3508,22 +3487,59 @@
     }
 
     // ── Cleo's Club — kids' sticker collection, real add-on feature ──
-    const CLEO_MASCOT_SVG = `<svg width="72" height="72" viewBox="0 0 52 52" style="animation:cleoBounce 2.8s ease-in-out infinite; transform-origin:26px 48px;">
-      <ellipse cx="26" cy="44" rx="14" ry="7" fill="#2B2724" opacity="0.12"/>
-      <path d="M14 40 Q14 30 26 30 Q38 30 38 40 L38 48 Q38 50 36 50 L16 50 Q14 50 14 48 Z" fill="#F4A896"/>
-      <circle cx="26" cy="20" r="14" fill="#FBCBA4"/>
-      <g style="animation:cleoCurlWiggle 3.2s ease-in-out infinite; transform-origin:26px 10px;">
-        <circle cx="14" cy="12" r="5" fill="#6B4226"/><circle cx="10" cy="18" r="4.5" fill="#6B4226"/>
-        <circle cx="19" cy="7" r="5" fill="#6B4226"/><circle cx="27" cy="5" r="5.5" fill="#6B4226"/>
-        <circle cx="35" cy="7" r="5" fill="#6B4226"/><circle cx="41" cy="13" r="4.5" fill="#6B4226"/>
-        <circle cx="42" cy="19" r="4" fill="#6B4226"/>
-      </g>
-      <circle cx="20" cy="21" r="2.3" fill="#2B2724"/><circle cx="32" cy="21" r="2.3" fill="#2B2724"/>
-      <circle cx="20.7" cy="20.2" r="0.7" fill="white"/><circle cx="32.7" cy="20.2" r="0.7" fill="white"/>
-      <ellipse cx="15" cy="25" rx="2.6" ry="1.8" fill="#F0876A" opacity="0.5"/>
-      <ellipse cx="37" cy="25" rx="2.6" ry="1.8" fill="#F0876A" opacity="0.5"/>
-      <path d="M20 27 Q26 32 32 27" stroke="#2B2724" stroke-width="1.6" fill="none" stroke-linecap="round"/>
-    </svg>`;
+    // ── Cleo's "growing up" cycle — genuinely deterministic, calculated
+    // purely from today's date, so it's automatically consistent
+    // everywhere she appears without needing any server state. Starts
+    // at age 6, ticks up by 1 every real week, cycles 6→11 then loops
+    // back to 6 forever. Epoch anchored to her real birthday (26 June
+    // 2025) as the sentimental start point for the cycle — the AGE
+    // ITSELF isn't her real age, just when the cycle began counting.
+    function getCleoCurrentAge() {
+      const epoch = new Date('2025-06-26T00:00:00Z');
+      const now = new Date();
+      const daysSinceEpoch = Math.floor((now - epoch) / (1000 * 60 * 60 * 24));
+      const weeksSinceEpoch = Math.floor(daysSinceEpoch / 7);
+      const cyclePosition = ((weeksSinceEpoch % 6) + 6) % 6; // 0..5, guards against any negative edge case
+      return 6 + cyclePosition;
+    }
+
+    // Genuinely parametrized by age, not six separately hand-drawn
+    // characters — guarantees the progression looks like the same
+    // character growing up, not different characters each time. Head
+    // shrinks slightly relative to body as she ages, hair gets a touch
+    // longer/more styled, smile becomes more defined, and a small hair
+    // clip appears from age 9 onward as a subtle "getting older" detail.
+    function renderCleoMascotSVG(age) {
+      age = age || getCleoCurrentAge();
+      // Interpolate proportions across the 6→11 range (t = 0 at age 6, 1 at age 11)
+      const t = (age - 6) / 5;
+      const headR = 14 - t * 1.5;           // head shrinks slightly: 14 -> 12.5
+      const bodyScale = 1 + t * 0.15;       // body grows slightly relative to head
+      const hairLen = 1 + t * 0.4;          // hair curls get a touch bigger/longer
+      const smileCurve = 32 - t * 2;        // smile becomes slightly more defined/less babyish
+      const showClip = age >= 9;
+
+      return `<svg width="72" height="72" viewBox="0 0 52 52" style="animation:cleoBounce 2.8s ease-in-out infinite; transform-origin:26px 48px;">
+        <ellipse cx="26" cy="44" rx="${14 * bodyScale}" ry="7" fill="#2B2724" opacity="0.12"/>
+        <path d="M${14 - (bodyScale-1)*14} 40 Q${14 - (bodyScale-1)*14} 30 26 30 Q${38 + (bodyScale-1)*14} 30 ${38 + (bodyScale-1)*14} 40 L${38 + (bodyScale-1)*14} 48 Q${38 + (bodyScale-1)*14} 50 36 50 L16 50 Q${14 - (bodyScale-1)*14} 50 ${14 - (bodyScale-1)*14} 48 Z" fill="#F4A896"/>
+        <circle cx="26" cy="20" r="${headR}" fill="#FBCBA4"/>
+        <g style="animation:cleoCurlWiggle 3.2s ease-in-out infinite; transform-origin:26px 10px;">
+          <circle cx="14" cy="12" r="${5*hairLen}" fill="#6B4226"/><circle cx="10" cy="18" r="${4.5*hairLen}" fill="#6B4226"/>
+          <circle cx="19" cy="7" r="${5*hairLen}" fill="#6B4226"/><circle cx="27" cy="5" r="${5.5*hairLen}" fill="#6B4226"/>
+          <circle cx="35" cy="7" r="${5*hairLen}" fill="#6B4226"/><circle cx="41" cy="13" r="${4.5*hairLen}" fill="#6B4226"/>
+          <circle cx="42" cy="19" r="${4*hairLen}" fill="#6B4226"/>
+          ${showClip ? '<rect x="30" y="4" width="7" height="2.5" rx="1.2" fill="#F9A825" transform="rotate(-15 33 5)"/>' : ''}
+        </g>
+        <circle cx="20" cy="21" r="2.3" fill="#2B2724"/><circle cx="32" cy="21" r="2.3" fill="#2B2724"/>
+        <circle cx="20.7" cy="20.2" r="0.7" fill="white"/><circle cx="32.7" cy="20.2" r="0.7" fill="white"/>
+        <ellipse cx="15" cy="25" rx="2.6" ry="1.8" fill="#F0876A" opacity="0.5"/>
+        <ellipse cx="37" cy="25" rx="2.6" ry="1.8" fill="#F0876A" opacity="0.5"/>
+        <path d="M20 27 Q26 ${smileCurve} 32 27" stroke="#2B2724" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+      </svg>`;
+    }
+    // Kept for any code still referencing the old constant directly —
+    // genuinely resolves to today's real current age.
+    const CLEO_MASCOT_SVG = renderCleoMascotSVG();
 
     async function checkCleosClubEnabled() {
       try {
@@ -3533,6 +3549,8 @@
         if (!tile) return;
         if (data.config?.enabled) {
           tile.style.display = 'block';
+          const mascotContainer = document.getElementById('cleos-club-tile-mascot');
+          if (mascotContainer) mascotContainer.innerHTML = renderCleoMascotSVG();
           loadCleosClubTilePreview();
         } else {
           tile.style.display = 'none';
@@ -3617,8 +3635,8 @@
 
         body.innerHTML = `
           <div style="padding:24px 20px;text-align:center;">
-            ${CLEO_MASCOT_SVG}
-            <div style="font-size:19px;font-weight:800;color:white;margin-top:10px;">Hi, I'm Cleo! 👋</div>
+            ${renderCleoMascotSVG()}
+            <div style="font-size:19px;font-weight:800;color:white;margin-top:10px;">Hi, I'm Cleo! 👋 <span style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.6);">(I'm ${getCleoCurrentAge()} this week!)</span></div>
             <div style="font-size:13px;color:rgba(255,255,255,0.7);margin-top:4px;">Collect a sticker every visit — fill the board for a treat!</div>
           </div>
           ${data.unclaimedRewards?.length ? `
