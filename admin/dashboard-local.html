@@ -5942,10 +5942,6 @@ function applyShiftUI() {
   // actually logged in and the rest of the UI has settled. Checks if
   // there's an overnight firing still waiting on confirmation.
   setTimeout(checkMorningKilnStatus, 800);
-  // Install banner — deliberately after the checklist/kiln-check, and
-  // delayed, so it doesn't visually compete with anything more
-  // operationally important that might also be showing right after login.
-  setTimeout(showAdminA2HSBanner, 2000);
 }
 
 // Direct log out — reachable in one tap from the header, no need to open
@@ -8033,6 +8029,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Dashboard's nav link is already class="active" by default in the raw
   // HTML, so nothing more needed here — just making sure every OTHER
   // view is hidden until a real tab switch happens.
+
+  // Add to Home Screen — shown on the actual landing/splash screen now,
+  // not gated behind login. Previously this only fired after a
+  // successful login, which meant it never appeared on the first
+  // screen someone actually sees — the most logical place for it.
+  setTimeout(showAdminA2HSBanner, 1500);
   
   // NOTE: populateDashboard() / checkShiftLogin() is intentionally NOT
   // called here. It used to fire immediately on page load, then fire

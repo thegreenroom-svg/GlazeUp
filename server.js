@@ -6108,6 +6108,11 @@ app.get('/api/version', (req, res) => {
 // changelog — newest first, kept short and non-technical. Add a new
 // entry here (top of the array) with every meaningful change shipped.
 const CHANGELOG = [
+  { date: '2026-07-12', items: [
+    'Fixed "Add to Home Screen" not showing on the login/splash screen — it now appears right away, before logging in, instead of only after.',
+    'Fixed the "What\'s new" update popup sometimes showing nothing.',
+    'Staff PINs reset back to 0000 for everyone during the studio trial.',
+  ]},
   { date: '2026-07-11', items: [
     'New "Choose a Piece" section — customers can now browse real photos of your stock from home and reserve one to be pre-glazed ready for their visit (needs at least 7 days notice).',
     'New Packing step between firing and pickup — pieces now need to be packed (currently Jenny) before customers see them as ready for collection.',
