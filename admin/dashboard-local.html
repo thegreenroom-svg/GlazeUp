@@ -1443,6 +1443,21 @@
     <!-- Text search — genuinely collapsed by default, one small link -->
     <button onclick="toggleFp1TextSearch()" id="fp1-text-toggle" style="background:none;border:none;color:#8a8175;font-size:13px;cursor:pointer;text-decoration:underline;margin-bottom:6px;">Can't get a clean photo? Search by text instead</button>
 
+    <!-- Genuine separate path: check what's already been found for a
+         specific booking, rather than searching by photo. Real
+         distinct use case from the photo-search flow above — this is
+         for checking progress on an order, not locating an unknown
+         piece. -->
+    <button onclick="toggleFp1BookingCheck()" id="fp1-booking-toggle" style="background:none;border:none;color:#8a8175;font-size:13px;cursor:pointer;text-decoration:underline;margin-bottom:6px;">Or check what's already found for a booking</button>
+
+    <div id="fp1-booking-check-area" style="display:none;width:100%;max-width:400px;margin-top:10px;">
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="fp1-booking-check-input" placeholder="Scan QR or paste booking code" style="flex:1;padding:14px;border:1px solid #3d3833;border-radius:12px;font-size:14px;box-sizing:border-box;background:#2B2724;color:white;" onkeydown="if(event.key==='Enter') checkBookingFoundStatus()">
+        <button onclick="checkBookingFoundStatus()" style="background:#3d3833;color:white;border:none;border-radius:12px;padding:0 18px;font-size:14px;font-weight:700;cursor:pointer;">Check</button>
+      </div>
+      <div id="fp1-booking-check-result" style="margin-top:12px;"></div>
+    </div>
+
     <div id="fp1-text-search-area" style="display:none;width:100%;max-width:400px;margin-top:10px;">
       <input type="text" id="fp1-text-input" placeholder="Describe it — customer name, colour, type…" style="width:100%;padding:14px;border:1px solid #3d3833;border-radius:12px;font-size:14px;margin-bottom:10px;box-sizing:border-box;background:#2B2724;color:white;">
       <button onclick="runTextPieceSearchFullScreen()" style="width:100%;background:#3d3833;color:white;border:none;border-radius:14px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;">🔤 Search system-wide by text</button>
@@ -3372,6 +3387,7 @@
         <div id="pm-group-info" style="display:none;">
           <div class="chart-container" style="margin-bottom: 20px;">
             <h3 style="margin:0 0 10px;">2. Reference photos for this group</h3>
+            <div id="pm-found-progress"></div>
             <div id="pm-reference-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;"></div>
           </div>
 
@@ -9532,12 +9548,23 @@ async function loadPieceMatchGroup() {
       grid.innerHTML = '<div style="grid-column:1/-1;padding:10px;color:var(--gu-dust);font-size:12px;">No individual piece photos found for this booking — they may not have been taken at table-clearing.</div>';
       return;
     }
-    grid.innerHTML = pieces.map(p => `
-      <div style="border-radius:10px;overflow:hidden;border:1px solid var(--gu-border);">
-        <div style="height:80px;background:url('${p.reference_photo_url}') center/cover;"></div>
+    // Genuine live progress — real counts from the actual piece
+    // statuses, not a guess. A piece already marked packed/ready has
+    // genuinely already been found and handled correctly.
+    const progressEl = document.getElementById('pm-found-progress');
+    if (progressEl) {
+      const allFound = data.foundCount === data.totalCount;
+      progressEl.innerHTML = `<div style="font-size:12px;font-weight:700;color:${allFound ? '#2e7d32' : 'var(--gu-text)'};margin-bottom:10px;">${allFound ? '✓ All' : data.foundCount + ' of'} ${data.totalCount} pieces found${allFound ? ' — this booking is complete!' : ' so far'}</div>`;
+    }
+    grid.innerHTML = pieces.map(p => {
+      const isFound = p.status === 'packed' || p.status === 'ready_for_pickup';
+      return `
+      <div style="border-radius:10px;overflow:hidden;border:1px solid ${isFound ? '#2e7d32' : 'var(--gu-border)'};position:relative;">
+        <div style="height:80px;background:url('${p.reference_photo_url}') center/cover;${isFound ? 'opacity:0.55;' : ''}"></div>
+        ${isFound ? '<div style="position:absolute;top:4px;right:4px;background:#2e7d32;color:white;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">✓</div>' : ''}
         <div style="font-size:10px;text-align:center;padding:4px;color:var(--gu-dust);">${p.piece_type || 'Piece'}</div>
       </div>
-    `).join('');
+    `;}).join('');
   } catch (e) {
     grid.innerHTML = '<div style="grid-column:1/-1;padding:10px;color:var(--gu-dust);font-size:12px;">Could not load reference photos.</div>';
   }
@@ -11569,6 +11596,9 @@ function openFindMyPiece() {
   document.getElementById('fp1-text-input').value = '';
   document.getElementById('fp1-text-results').innerHTML = '';
   document.getElementById('fp1-text-search-area').style.display = 'none'; // collapsed by default, photo is the primary path
+  document.getElementById('fp1-booking-check-area').style.display = 'none';
+  document.getElementById('fp1-booking-check-input').value = '';
+  document.getElementById('fp1-booking-check-result').innerHTML = '';
   const nextBtn = document.getElementById('fp1-next-btn');
   nextBtn.disabled = true;
   nextBtn.style.background = '#8a8175';
@@ -11593,6 +11623,55 @@ function toggleFp1TextSearch() {
   area.style.display = isShowing ? 'none' : 'block';
   if (!isShowing) {
     setTimeout(() => document.getElementById('fp1-text-input')?.focus(), 100);
+  }
+}
+
+// Genuinely separate real path from the photo-search flow above —
+// checking progress on a known booking, not locating an unknown
+// piece. Reuses the exact same real endpoint already built for the
+// Piece Matching tab's progress indicator, since it's the same real
+// data (piece status: fired -> packed -> ready_for_pickup).
+function toggleFp1BookingCheck() {
+  const area = document.getElementById('fp1-booking-check-area');
+  const isShowing = area.style.display === 'block';
+  area.style.display = isShowing ? 'none' : 'block';
+  if (!isShowing) {
+    setTimeout(() => document.getElementById('fp1-booking-check-input')?.focus(), 100);
+  }
+}
+
+async function checkBookingFoundStatus() {
+  const raw = document.getElementById('fp1-booking-check-input').value.trim();
+  if (!raw) return;
+  let bookingCode = raw;
+  try {
+    const url = new URL(raw);
+    const paramCode = url.searchParams.get('booking');
+    if (paramCode) bookingCode = paramCode;
+  } catch { /* not a URL, use as-is */ }
+
+  const resultEl = document.getElementById('fp1-booking-check-result');
+  resultEl.innerHTML = '<div style="color:#8a8175;font-size:12px;">Checking…</div>';
+  try {
+    const res = await fetch(`${API_URL}/api/bookings/${encodeURIComponent(bookingCode)}/reference-photos?studioId=${studioId}`);
+    const data = await res.json();
+    const pieces = data.pieces || [];
+    if (!pieces.length) {
+      resultEl.innerHTML = '<div style="color:#8a8175;font-size:12px;">No pieces on file for this booking.</div>';
+      return;
+    }
+    const allFound = data.foundCount === data.totalCount;
+    const summaryHtml = `<div style="font-size:13px;font-weight:700;color:${allFound ? '#4caf50' : 'white'};margin-bottom:10px;">${allFound ? '✓ All' : data.foundCount + ' of'} ${data.totalCount} pieces found${allFound ? ' — complete!' : ''}</div>`;
+    const gridHtml = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;">${pieces.map(p => {
+      const isFound = p.status === 'packed' || p.status === 'ready_for_pickup';
+      return `<div style="border-radius:8px;overflow:hidden;border:1px solid ${isFound ? '#4caf50' : '#3d3833'};position:relative;">
+        <div style="height:60px;background:url('${p.reference_photo_url}') center/cover;${isFound ? 'opacity:0.55;' : ''}"></div>
+        ${isFound ? '<div style="position:absolute;top:3px;right:3px;background:#4caf50;color:white;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;">✓</div>' : ''}
+      </div>`;
+    }).join('')}</div>`;
+    resultEl.innerHTML = summaryHtml + gridHtml;
+  } catch (e) {
+    resultEl.innerHTML = '<div style="color:#ff8a80;font-size:12px;">Could not check this booking — try again.</div>';
   }
 }
 

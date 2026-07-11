@@ -6930,7 +6930,17 @@ app.get('/api/bookings/:bookingCode/reference-photos', async (req, res) => {
     .eq('studio_id', studioId).eq('booking_id', bookingCode)
     .not('reference_photo_url', 'is', null);
   if (error) return res.status(500).json({ error: error.message });
-  res.json({ pieces: pieces || [] });
+
+  // Genuine "found so far" count — uses the real, already-trustworthy
+  // status field (fired -> packed -> ready_for_pickup) rather than
+  // reconstructing from piece_match_attempts logs, since a piece
+  // marked 'packed' has, by definition, already been correctly
+  // identified and physically handled — a more reliable real signal
+  // than an AI suggestion log alone.
+  const allPieces = pieces || [];
+  const foundCount = allPieces.filter(p => p.status === 'packed' || p.status === 'ready_for_pickup').length;
+
+  res.json({ pieces: allPieces, foundCount, totalCount: allPieces.length });
 });
 
 // POST /api/pieces/match — the actual AI-assisted matching. Packer
