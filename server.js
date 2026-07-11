@@ -7011,9 +7011,9 @@ app.post('/api/pieces/find-in-photo', async (req, res) => {
         type: 'text',
         text: `The FIRST image below is a specific object someone is trying to find. The SECOND image is a scene — a table, box, or pile — that may or may not contain that exact object among other things.
 
-Look carefully at the scene photo and determine: is the object from the first photo genuinely visible somewhere in the scene? Focus on shape, proportions, and any distinctive markings or pattern — not colour alone, since lighting and angle can shift how colour appears between two photos of the same real object.
+Look carefully at the scene photo and determine: is the object from the first photo genuinely visible somewhere in the scene? Work through this systematically: (1) note the target's overall silhouette and proportions, (2) note any handle, rim, base, or spout details, (3) note the exact shape and placement of any painted pattern or linework — this is often the single most reliable signal since colour can shift between photos due to lighting, angle, or firing. Compare each distinct object in the scene against these points individually rather than making one overall impression.
 
-Be honest — if you're not confident it's there, say so clearly rather than guessing. If pieces in the scene are overlapping or too small/blurry to tell confidently, mention that specifically.
+Be honest — if you're not confident it's there, say so clearly rather than guessing. If pieces in the scene are overlapping or too small/blurry to tell confidently, mention that specifically. If multiple objects in the scene are plausible candidates, note the strongest one but mention the ambiguity in your reasoning.
 
 Respond ONLY as JSON: {"found": true or false, "confidence": "high" | "medium" | "low", "approxPosition": "top-left" | "top-centre" | "top-right" | "middle-left" | "middle-centre" | "middle-right" | "bottom-left" | "bottom-centre" | "bottom-right" | null, "reasoning": "honest explanation of what you compared and why you reached this conclusion", "otherObjectsNoted": "brief note on what else is visible in the scene, for context"}`,
       },
@@ -7026,7 +7026,7 @@ Respond ONLY as JSON: {"found": true or false, "confidence": "high" | "medium" |
     const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content }], temperature: 0.2, max_tokens: 500 }),
+      body: JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'user', content }], temperature: 0.2, max_tokens: 600 }),
     });
 
     if (!openaiRes.ok) {
@@ -7105,7 +7105,7 @@ Colour is NOT reliable evidence if this is comparing an unfired to a fired piece
     const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content }], temperature: 0.2, max_tokens: 700 }),
+      body: JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'user', content }], temperature: 0.2, max_tokens: 800 }),
     });
     const aiData = await openaiRes.json();
     let parsed;
@@ -7278,7 +7278,7 @@ app.post('/api/pieces/match', async (req, res) => {
 
 The piece being identified is the LAST image below. The reference photos (each labelled with an ID) come before it.
 
-Return a ranked list of the most likely matches (up to 3), each with: the reference ID, a confidence level (high/medium/low), and a short, honest reason based on shape/pattern — not colour. If nothing genuinely looks like a plausible match, say so clearly rather than guessing. Respond ONLY as JSON: {"matches":[{"id":"...","confidence":"high","reason":"..."}], "noConfidentMatch": false}`,
+Return a ranked list of the most likely matches (up to 4), each with: the reference ID, a confidence level (high/medium/low), and a short, honest reason based on shape/pattern — not colour. If nothing genuinely looks like a plausible match, say so clearly rather than guessing. Respond ONLY as JSON: {"matches":[{"id":"...","confidence":"high","reason":"..."}], "noConfidentMatch": false}`,
       },
     ];
     candidates.forEach(c => {
@@ -7292,10 +7292,16 @@ Return a ranked list of the most likely matches (up to 3), each with: the refere
       method: 'POST',
       headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        // Upgraded from gpt-4o-mini to the full gpt-4o — genuinely
+        // stronger at fine visual discrimination (matching hand-painted
+        // glaze patterns across the colour shift from unfired to fired
+        // is exactly the kind of nuanced comparison the larger model
+        // handles noticeably better). Same API, same JSON contract,
+        // just a stronger real model doing the actual comparison.
+        model: 'gpt-4o',
         messages: [{ role: 'user', content }],
         temperature: 0.2,
-        max_tokens: 500,
+        max_tokens: 600,
       }),
     });
     const aiData = await openaiRes.json();
