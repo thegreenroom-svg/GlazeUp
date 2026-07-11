@@ -2596,6 +2596,100 @@ app.get('/api/community/global', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════
+// CLUB PAGES — worldwide feed, customer posts directly, no staff
+// approval. Genuinely different from the existing global tier (which
+// only ever gets there via a staff Feature action). Given this is
+// unmoderated and worldwide, every post passes through a basic
+// automated screening check first — confirms it's genuinely a pottery
+// photo, flags anything inappropriate — before going live. This isn't
+// full moderation, just a real, honest baseline safety net.
+// ═══════════════════════════════════════════
+
+// POST /api/club-pages/post — customer posts directly to the worldwide
+// Club Pages feed. Screens the photo first; only genuinely passes
+// through to 'club' visibility if screening passes.
+app.post('/api/club-pages/post', async (req, res) => {
+  const { studioId, bookingId, pieceType, photoUrl, caption, customerName } = req.body;
+  if (!studioId || !photoUrl) return res.status(400).json({ error: 'studioId and photoUrl required' });
+
+  try {
+    let screeningStatus = 'pending';
+    let screeningReason = null;
+
+    if (process.env.OPENAI_API_KEY) {
+      try {
+        const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [{
+              role: 'user',
+              content: [
+                { type: 'text', text: `This photo is being submitted to a worldwide, unmoderated public feed of hand-painted pottery pieces from pottery painting studios. Confirm it genuinely shows painted pottery (people can be in the photo too, that's fine — it just needs to genuinely be about the pottery). Flag it if it shows anything inappropriate, unsafe, or unrelated to pottery. Respond ONLY as JSON: {"passed": true or false, "reason": "brief honest explanation"}` },
+                { type: 'image_url', image_url: { url: photoUrl } },
+              ],
+            }],
+            temperature: 0.1, max_tokens: 200,
+          }),
+        });
+        const aiData = await openaiRes.json();
+        const parsed = JSON.parse((aiData.choices?.[0]?.message?.content || '{}').replace(/```json|```/g, '').trim());
+        screeningStatus = parsed.passed ? 'passed' : 'flagged';
+        screeningReason = parsed.reason || null;
+      } catch (screenErr) {
+        console.error('Club Pages screening error (failing safe, not posting):', screenErr);
+        screeningStatus = 'flagged';
+        screeningReason = 'Automated screening could not run — held back rather than posted unchecked.';
+      }
+    } else {
+      // No AI available at all — fail safe rather than post unscreened
+      screeningStatus = 'flagged';
+      screeningReason = 'Screening unavailable — held back rather than posted unchecked.';
+    }
+
+    const displayName = customerName ? customerName.trim().split(' ')[0] : 'A customer';
+    const { data: post, error } = await supabase.from('community_posts').insert({
+      studio_id: studioId, booking_id: bookingId || null, piece_type: pieceType || null,
+      photo_url: photoUrl, caption: caption || null, customer_display_name: displayName,
+      visibility: screeningStatus === 'passed' ? 'club' : 'studio', // flagged posts stay studio-only, genuinely never reach worldwide
+      screening_status: screeningStatus, screening_reason: screeningReason, screened_at: new Date().toISOString(),
+    }).select().single();
+    if (error) throw error;
+
+    await supabase.from('club_pages_screening_log').insert({
+      post_id: post.id, studio_id: studioId, result: screeningStatus, reasoning: screeningReason,
+    });
+
+    res.json({
+      status: screeningStatus === 'passed' ? 'posted_worldwide' : 'held_back',
+      post, screeningStatus, screeningReason,
+    });
+  } catch (error) {
+    console.error('Club Pages post error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/club-pages/feed — the worldwide feed itself, genuinely only
+// posts that passed screening
+app.get('/api/club-pages/feed', async (req, res) => {
+  try {
+    const { data: posts, error } = await supabase
+      .from('community_posts')
+      .select('*, studios(city, country, public_bio, instagram_handle)')
+      .eq('visibility', 'club').eq('screening_status', 'passed')
+      .order('created_at', { ascending: false })
+      .limit(80);
+    if (error) throw error;
+    res.json({ posts: posts || [] });
+  } catch (err) {
+    console.error('Error fetching Club Pages feed:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/community/posts/:postId/feature — staff feature a post (boosts to global)
 app.post('/api/community/posts/:postId/feature', async (req, res) => {
   const { id } = req.params;
