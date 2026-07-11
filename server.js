@@ -1217,6 +1217,46 @@ app.post('/api/bookings/manual', async (req, res) => {
  * before a customer can start their own session. Same underlying record
  * shape as a staff-created walk-in, just a different front door.
  */
+// POST /api/bookings/party — staff-created non-hosted party booking.
+// "Non-hosted" means the customer runs their own party (no dedicated
+// staff host on-site) in either The Vault (premium, private room) or
+// the Main Studio. Created manually by staff, same as any phone/email
+// enquiry — this app has no customer-facing booking flow of its own,
+// everything real comes through the website, phone, or email, so this
+// is genuinely a staff tool for logging what's already been arranged.
+app.post('/api/bookings/party', async (req, res) => {
+  const { studioId, customerName, customerEmail, customerPhone, space, sessionStart, sessionEnd, partySize, notes, createdBy } = req.body;
+  if (!studioId || !customerName || !space || !sessionStart) {
+    return res.status(400).json({ error: 'studioId, customerName, space, sessionStart required' });
+  }
+  if (!['The Vault', 'Main Studio'].includes(space)) {
+    return res.status(400).json({ error: 'space must be "The Vault" or "Main Studio"' });
+  }
+
+  try {
+    const bookingCode = `party-${Date.now()}`;
+    const { data: booking, error } = await supabase.from('bookings').insert({
+      studio_id: studioId,
+      square_booking_id: null,
+      booking_code: bookingCode,
+      customer_name: customerName,
+      customer_email: customerEmail || null,
+      customer_phone: customerPhone || null,
+      space_name: space,
+      session_start: sessionStart,
+      session_end: sessionEnd || null,
+      party_size: partySize || null,
+      notes: notes ? `[Non-hosted party — no staff host] ${notes}` : '[Non-hosted party — no staff host]',
+    }).select().single();
+
+    if (error) throw error;
+    res.json({ status: 'created', booking, isPremium: space === 'The Vault' });
+  } catch (error) {
+    console.error('Error creating party booking:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/bookings/self-checkin', async (req, res) => {
   const { studioId, customerName, partySize, tableNumber } = req.body;
   if (!studioId || !customerName) {

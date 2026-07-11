@@ -2379,6 +2379,48 @@
                 <span class="till-tile-name">Existing Booking</span>
               </button>
             </div>
+            <button class="till-tile" style="min-height: 70px; width: 100%; margin-top: 12px; background: linear-gradient(135deg,#5E35B1,#3949ab);" onclick="s1ChooseParty()">
+              <span style="font-size: 22px;">🎉</span>
+              <span class="till-tile-name">Log a Non-Hosted Party</span>
+            </button>
+          </div>
+
+          <!-- STEP D: log a non-hosted party (customer runs their own
+               session, no dedicated staff host). Genuinely a staff
+               tool, not a customer-facing booking flow — real bookings
+               all come through the website, phone, or email; this
+               logs what's already been arranged. -->
+          <div id="s1-step-party" class="chart-container" style="display:none;">
+            <button onclick="s1BackToStart()" style="background:none;border:none;color:var(--gu-dust);font-size:13px;cursor:pointer;padding:0;margin-bottom:14px;">← Back</button>
+            <h3 style="margin-top:0;">🎉 Log a Non-Hosted Party</h3>
+            <p style="font-size:12px;color:var(--gu-dust);margin-bottom:16px;line-height:1.5;">Customer runs their own party — no dedicated staff host on-site. For a booking already arranged by phone, email, or the website.</p>
+
+            <input type="text" id="party-customer-name" placeholder="Customer/party name" style="width:100%;padding:12px;border:1px solid var(--gu-border);border-radius:10px;font-size:14px;margin-bottom:10px;box-sizing:border-box;">
+            <div style="display:flex;gap:8px;margin-bottom:10px;">
+              <input type="email" id="party-customer-email" placeholder="Email (optional)" style="flex:1;padding:10px;border:1px solid var(--gu-border);border-radius:10px;font-size:13px;box-sizing:border-box;">
+              <input type="tel" id="party-customer-phone" placeholder="Phone (optional)" style="flex:1;padding:10px;border:1px solid var(--gu-border);border-radius:10px;font-size:13px;box-sizing:border-box;">
+            </div>
+
+            <div style="font-size:11px;color:var(--gu-dust);margin-bottom:6px;font-weight:700;">Which space?</div>
+            <div style="display:flex;gap:8px;margin-bottom:14px;">
+              <button id="party-space-main" class="staff-subtab-btn active" style="flex:1;padding:12px;font-size:13px;" onclick="setPartySpace('Main Studio')">Main Studio</button>
+              <button id="party-space-vault" class="staff-subtab-btn" style="flex:1;padding:12px;font-size:13px;position:relative;" onclick="setPartySpace('The Vault')">The Vault <span style="font-size:9px;background:#F9A825;color:white;padding:2px 6px;border-radius:8px;margin-left:4px;">PREMIUM</span></button>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-bottom:10px;">
+              <div style="flex:1;">
+                <div style="font-size:10px;color:var(--gu-dust);margin-bottom:3px;">Date &amp; start time</div>
+                <input type="datetime-local" id="party-session-start" style="width:100%;padding:10px;border:1px solid var(--gu-border);border-radius:10px;font-size:13px;box-sizing:border-box;">
+              </div>
+              <div style="width:90px;">
+                <div style="font-size:10px;color:var(--gu-dust);margin-bottom:3px;">Party size</div>
+                <input type="number" id="party-size" min="1" max="40" placeholder="e.g. 12" style="width:100%;padding:10px;border:1px solid var(--gu-border);border-radius:10px;font-size:13px;box-sizing:border-box;">
+              </div>
+            </div>
+            <textarea id="party-notes" placeholder="Any notes (optional)" style="width:100%;padding:10px;border:1px solid var(--gu-border);border-radius:10px;font-size:13px;margin-bottom:14px;box-sizing:border-box;height:50px;"></textarea>
+
+            <button onclick="submitPartyBooking()" style="width:100%;background:#3949ab;color:white;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;">Log this party booking</button>
+            <div id="party-booking-status" style="font-size:12px;color:var(--gu-dust);margin-top:10px;"></div>
           </div>
 
           <!-- STEP B: find an existing booking (only shown after choosing "Existing Booking") -->
@@ -9768,15 +9810,59 @@ function s1ChooseExisting() {
   document.getElementById('s1-step-existing').style.display = 'block';
 }
 
+function s1ChooseParty() {
+  document.getElementById('s1-step-start').style.display = 'none';
+  document.getElementById('s1-step-party').style.display = 'block';
+}
+
 function s1BackToStart() {
   document.getElementById('s1-step-start').style.display = 'block';
   document.getElementById('s1-step-existing').style.display = 'none';
+  document.getElementById('s1-step-party').style.display = 'none';
   document.getElementById('s1-result').style.display = 'none';
   document.getElementById('s1-customer-name').value = '';
   document.getElementById('s1-booking-code').value = '';
   document.getElementById('s1-tablet-charge').checked = false;
   document.getElementById('s1-home-access').checked = false;
   s1LookedUpBooking = null;
+}
+
+let _selectedPartySpace = 'Main Studio';
+function setPartySpace(space) {
+  _selectedPartySpace = space;
+  document.getElementById('party-space-main').classList.toggle('active', space === 'Main Studio');
+  document.getElementById('party-space-vault').classList.toggle('active', space === 'The Vault');
+}
+
+async function submitPartyBooking() {
+  const name = document.getElementById('party-customer-name').value.trim();
+  const email = document.getElementById('party-customer-email').value.trim();
+  const phone = document.getElementById('party-customer-phone').value.trim();
+  const sessionStartRaw = document.getElementById('party-session-start').value;
+  const partySize = parseInt(document.getElementById('party-size').value) || null;
+  const notes = document.getElementById('party-notes').value.trim();
+  const statusEl = document.getElementById('party-booking-status');
+
+  if (!name) { alert('Add a customer/party name first.'); return; }
+  if (!sessionStartRaw) { alert('Add the date and start time first.'); return; }
+
+  statusEl.textContent = 'Saving…';
+  try {
+    const res = await fetch(`${API_URL}/api/bookings/party`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId, customerName: name, customerEmail: email || null, customerPhone: phone || null,
+        space: _selectedPartySpace, sessionStart: new Date(sessionStartRaw).toISOString(),
+        partySize, notes, createdBy: currentShiftStaff?.id || null,
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) { statusEl.textContent = data.error || 'Could not save this booking.'; return; }
+    statusEl.innerHTML = `✓ Logged — ${data.booking.booking_code} (${_selectedPartySpace}${data.isPremium ? ', premium' : ''})`;
+    setTimeout(() => s1BackToStart(), 1800);
+  } catch (e) {
+    statusEl.textContent = 'Could not save — try again.';
+  }
 }
 
 // Scroll smoothly back up to a given numbered step within the flow

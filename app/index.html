@@ -2043,6 +2043,22 @@
           ${loyalty}
           ${unfinished}
 
+          <!-- Real booking banner — links out to the studio's actual
+               booking page. This app has no in-app booking flow of its
+               own; all real bookings go through the website, phone, or
+               email, so this is honestly just a clear, easy way back
+               to the real thing. -->
+          <a href="https://www.thekilncafe.com/bookonline" target="_blank" rel="noopener" style="display:block; text-decoration:none; margin-bottom:14px;">
+            <div style="background:linear-gradient(135deg,var(--link-clay),#8a5520); border-radius:16px; padding:16px 18px; display:flex; align-items:center; gap:14px; box-shadow:0 4px 14px rgba(184,121,70,0.3);">
+              <span style="font-size:26px;">📅</span>
+              <div style="flex:1;">
+                <div style="font-size:15px; font-weight:800; color:white;">Book Your Next Visit</div>
+                <div style="font-size:12px; color:rgba(255,255,255,0.85);">Opens our booking page</div>
+              </div>
+              <span style="font-size:18px; color:rgba(255,255,255,0.8);">→</span>
+            </div>
+          </a>
+
           <div class="section-label">Getting started</div>
 
           <button class="tile tile-honey" onclick="requestTabletGated()" style="position: relative;">
