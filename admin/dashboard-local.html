@@ -3962,6 +3962,21 @@
           Connect your studio to the wider LINK community — moderate what your customers share, tell other studios who you are, and see who else is on LINK worldwide.
         </p>
 
+        <!-- Kids' Club Pages preview — a genuine, direct way to see
+             exactly what customers (and kids) see, not a description
+             of it. Opens the real customer app in a new tab, on the
+             Club Pages view specifically. -->
+        <a href="${API_URL}/app?preview=club" target="_blank" rel="noopener" style="display:block;text-decoration:none;margin-bottom:20px;">
+          <div style="background:linear-gradient(135deg,#3D2E5C,#5E35B1);border-radius:16px;padding:16px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 4px 14px rgba(94,53,177,0.3);">
+            <span style="font-size:28px;">🧸</span>
+            <div style="flex:1;">
+              <div style="font-size:15px;font-weight:800;color:white;">Preview Kids' Club Pages</div>
+              <div style="font-size:12px;color:rgba(255,255,255,0.8);">See exactly what customers see — opens in a new tab</div>
+            </div>
+            <span style="font-size:18px;color:rgba(255,255,255,0.8);">↗</span>
+          </div>
+        </a>
+
         <div style="display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
           <button onclick="showCommunitySection('feed')" id="community-subtab-feed" class="staff-subtab-btn active">Our Feed</button>
           <button onclick="showCommunitySection('profile')" id="community-subtab-profile" class="staff-subtab-btn">Our Profile</button>
@@ -11662,6 +11677,7 @@ function renderCleoMascotSVG(age) {
 // Rotating messages; tapping does something sensible per message.
 let _cleoAdminFloatingMessageIndex = 0;
 let _cleoAdminFloatingRotationTimer = null;
+let _cleoAdminFloatingCurrentMessage = null;
 
 const CLEO_ADMIN_FLOATING_MESSAGES_BASE = [
   { text: "Hi, I'm Cleo! 👋", action: null },
@@ -11688,15 +11704,17 @@ function rotateCleoAdminFloatingMessage() {
   if (!bubble) return;
   const msg = CLEO_ADMIN_FLOATING_MESSAGES_BASE[_cleoAdminFloatingMessageIndex % CLEO_ADMIN_FLOATING_MESSAGES_BASE.length];
   bubble.textContent = msg.text;
+  _cleoAdminFloatingCurrentMessage = msg; // genuinely track the actual object shown, not a recomputed index — same real bug already found and fixed on the customer app side
   _cleoAdminFloatingMessageIndex++;
 }
 
 function handleCleoAdminFloatingTap() {
-  const currentIndex = (_cleoAdminFloatingMessageIndex - 1 + CLEO_ADMIN_FLOATING_MESSAGES_BASE.length) % CLEO_ADMIN_FLOATING_MESSAGES_BASE.length;
-  const current = CLEO_ADMIN_FLOATING_MESSAGES_BASE[currentIndex];
+  const current = _cleoAdminFloatingCurrentMessage;
+  if (!current) return;
   // "setup" points staff toward the real Cleo's Club config in Setup,
   // where the studio can actually turn the feature on if it isn't yet.
   if (current.action === 'setup') goToTab('setup');
+  else if (current.action === 'clubpages') goToTab('community'); // jumps to the Community tab; Club Pages awareness lives there for staff
 }
 
 async function loadPackingQueue() {

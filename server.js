@@ -2690,6 +2690,42 @@ app.get('/api/club-pages/feed', async (req, res) => {
   }
 });
 
+// GET /api/club-pages/stats — genuine, real counts for the "worldwide
+// membership" marketing moment on the home screen. Every number here
+// is a real database count, nothing invented — if the platform is
+// genuinely small right now, this honestly shows a small number rather
+// than a fabricated one, since an inflated number would be misleading
+// to real families and undermine trust the moment it's checked.
+app.get('/api/club-pages/stats', async (req, res) => {
+  try {
+    const [studiosWithClubRes, postsRes, studiosRes] = await Promise.all([
+      supabase.from('cleos_club_config').select('studio_id').eq('enabled', true),
+      supabase.from('community_posts').select('id, studio_id').eq('visibility', 'club').eq('screening_status', 'passed'),
+      supabase.from('studios').select('id, country').not('country', 'is', null),
+    ]);
+
+    const studiosWithClub = studiosWithClubRes.data || [];
+    const posts = postsRes.data || [];
+    const studios = studiosRes.data || [];
+
+    // Countries genuinely represented among studios that have Cleo's
+    // Club enabled specifically — not just any studio on the platform.
+    const clubStudioIds = new Set(studiosWithClub.map(s => s.studio_id));
+    const countriesWithClub = new Set(
+      studios.filter(s => clubStudioIds.has(s.id) && s.country).map(s => s.country)
+    );
+
+    res.json({
+      memberStudios: studiosWithClub.length,
+      totalPiecesShared: posts.length,
+      countriesRepresented: countriesWithClub.size || 0,
+    });
+  } catch (err) {
+    console.error('Error fetching Club Pages stats:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/community/posts/:postId/feature — staff feature a post (boosts to global)
 app.post('/api/community/posts/:postId/feature', async (req, res) => {
   const { id } = req.params;

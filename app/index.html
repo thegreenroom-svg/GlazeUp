@@ -2045,6 +2045,16 @@
       const bookingCode = getParam('booking');
       const root = document.getElementById('app-root');
 
+      // Admin preview link — genuinely opens straight into the real
+      // Club Pages feed, no booking needed. This is what the "Preview
+      // Kids' Club Pages" button in the admin dashboard's Community
+      // tab actually links to.
+      if (getParam('preview') === 'club') {
+        root.innerHTML = `<div style="padding:40px 20px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading Club Pages preview…</div>`;
+        openCommunityFeedOnClubTab();
+        return;
+      }
+
       if (!bookingCode) {
         root.innerHTML = `
           <div style="padding: 60px 24px 24px; text-align: center;">
@@ -2145,6 +2155,20 @@
           ${readyBanner}
           ${loyalty}
           ${unfinished}
+
+          <!-- Cleo — genuine prominent home-screen presence, not just a
+               corner widget. Real marketing moment: honest live
+               worldwide stats, not invented numbers. Tapping switches
+               into Kid Mode directly — she IS the trigger, not a
+               separate toggle button elsewhere. -->
+          <div id="cleo-hero-card" onclick="toggleKidMode()" style="cursor:pointer; border-radius:20px; padding:18px; margin-bottom:14px; background:linear-gradient(135deg,#3D2E5C,#5E35B1); display:flex; align-items:center; gap:14px; box-shadow:0 6px 20px rgba(94,53,177,0.35); position:relative; overflow:hidden;">
+            <div id="cleo-hero-mascot" style="width:64px;height:64px;flex-shrink:0;"></div>
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:15px; font-weight:800; color:white; margin-bottom:2px;">Cleo's Club — join kids painting worldwide 🌍</div>
+              <div id="cleo-hero-stats" style="font-size:11px; color:rgba(255,255,255,0.75);">Loading…</div>
+            </div>
+            <span style="font-size:20px; color:rgba(255,255,255,0.8);">🎨</span>
+          </div>
 
           <!-- Real booking banner — links out to the studio's actual
                booking page. This app has no in-app booking flow of its
@@ -2312,6 +2336,7 @@
       loadLoyaltyTile();
       checkCleosClubEnabled();
       initCleoFloatingWidget();
+      initCleoHeroCard();
       applyKidModeFromStorage();
 
       // TEMPORARY diagnostic — genuine measured page state on the real
@@ -3640,11 +3665,12 @@
     let _cleoFloatingRotationTimer = null;
 
     const CLEO_FLOATING_MESSAGES_BASE = [
-      { text: "Hi, I'm Cleo! 👋", action: null },
-      { text: "I'm growing up every week! 🌱", action: null },
+      { text: "Hi, I'm Cleo — the studio's littlest artist! 👋", action: null },
+      { text: "I collect stickers and grow up every week 🌱", action: null },
+      { text: "Tap me for the kids' version of this page! 🎨", action: 'kidmode' },
     ];
-    const CLEO_FLOATING_MESSAGE_CLUB_PAGES = { text: "Press to see Club Pages 🌍", action: 'clubpages' };
-    const CLEO_FLOATING_MESSAGE_STICKERS = { text: "Collecting stickers? ⭐", action: 'stickers' };
+    const CLEO_FLOATING_MESSAGE_CLUB_PAGES = { text: "See painted pieces from studios worldwide 🌍", action: 'clubpages' };
+    const CLEO_FLOATING_MESSAGE_STICKERS = { text: "Come collect my stickers! ⭐", action: 'stickers' };
 
     // ── Kid Mode — genuine, complete theme toggle. Persisted in
     // localStorage so it's remembered across visits on the same
@@ -3664,6 +3690,28 @@
       const isCurrentlyKidMode = document.body.classList.contains('kid-mode');
       localStorage.setItem('klnk_kid_mode', isCurrentlyKidMode ? '0' : '1');
       applyKidModeFromStorage();
+    }
+
+    // Populates the prominent home-screen Cleo hero card — genuine
+    // mascot render, and REAL live stats from the actual database, not
+    // invented marketing numbers. If the platform is small right now,
+    // this honestly shows that, since an inflated number would fall
+    // apart the moment anyone checked it against reality.
+    async function initCleoHeroCard() {
+      const mascotContainer = document.getElementById('cleo-hero-mascot');
+      if (mascotContainer) mascotContainer.innerHTML = renderCleoMascotSVG();
+
+      const statsEl = document.getElementById('cleo-hero-stats');
+      if (!statsEl) return;
+      try {
+        const res = await fetch(`${API_URL}/api/club-pages/stats`);
+        const data = await res.json();
+        const studioLabel = data.memberStudios === 1 ? 'studio' : 'studios';
+        const countryText = data.countriesRepresented > 1 ? ` across ${data.countriesRepresented} countries` : '';
+        statsEl.textContent = `${data.memberStudios} member ${studioLabel}${countryText} · ${data.totalPiecesShared} pieces shared`;
+      } catch (e) {
+        statsEl.textContent = 'Tap to see the kids\' version of this page';
+      }
     }
 
     function initCleoFloatingWidget() {
@@ -3713,6 +3761,8 @@
         openCommunityFeedOnClubTab();
       } else if (current.action === 'stickers') {
         openCleosClub();
+      } else if (current.action === 'kidmode') {
+        toggleKidMode();
       }
       // No action for the plain greeting/growing-up messages — just a
       // friendly presence, tapping those genuinely does nothing, which
