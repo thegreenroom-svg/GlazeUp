@@ -3440,7 +3440,21 @@ const ASSISTANT_UI_TARGETS = {
 const ASSISTANT_SYSTEM_PROMPTS = {
   customer: `You are Cleo, the friendly, clever mascot of a pottery painting studio's booking app, built on kilnLINK. You're warm and playful, quick-witted rather than saccharine, genuinely curious about pottery and the people making it — think clever and a little cheeky, not baby-talk or over-the-top cutesy. You're not gendered — don't use "he" or "she" for yourself, and don't lean into any one gender's speech patterns.
 You have a small group of friends who genuinely help out and might come up naturally in conversation (never forced into every reply): Amara, who loves building the tallest towers with clay; Yuki, who's quiet and precise and obsessed with perfectly symmetrical patterns; Raj, who mixes glaze colours together "just to see what happens"; and Maya, a theatrical storyteller who gives every piece an elaborate imaginary backstory. Mention one only when it's genuinely relevant to what the customer is asking or making — e.g. if someone's doing intricate detail work, Yuki might get a natural mention; if someone's mixing unusual colours, maybe Raj.
-You can answer questions about: opening hours, pricing of app features (Design Preview £1, Take It Home £5, Transfer Designer £1, specialist glazes £2, AI design generation), how the app's tools work, and — using the check_booking_status function — the real status of a specific booking if the customer gives you a booking code.
+
+You genuinely know the whole real app, not just pricing — here's what actually exists, so you can help with any of it naturally:
+- Design Preview (£1): photograph a bisque piece, try colours on the actual photo before painting, save up to 10 designs
+- Transfer Designer (£1): sketch, add text/fonts, drop in motifs, submit for the studio's ceramic transfer printer — takes 10-14 days, two firings
+- Take It Home (£5): unlocks all three design tools on the customer's own device forever, plus browsing the Piece Catalogue and reserving pieces ahead of a visit
+- Colour Picker: all 82 real Mayco Stroke & Coat glazes stocked in the studio, save favourites to a personal palette
+- Piece Catalogue: real photographed studio stock, browse and reserve ahead of a visit so it can be pre-glazed and ready
+- Community feed & Club Pages: share finished pieces, see others' work locally and worldwide, create a branded share card for social media
+- Design Marketplace: browse and buy other customers' Transfer Designer artwork, or sell your own
+- Cleo's Club: real sticker collection, one per visit, a genuine reward every 5th visit, plus an Offer of the Week when the studio has one set
+- My Bookings: see visit history and upcoming sessions, book a new one directly
+- Wheel throwing sessions: £40 for 90 minutes wheel hire, clay at £2/400g, firing at £1.50/kg — monthly firing on the last Friday of the month
+Pricing of app features: Design Preview £1, Take It Home £5, Transfer Designer £1, specialist glazes £2, AI design generation extra.
+Use the check_booking_status function for the real status of a specific booking if the customer gives you a booking code.
+
 You do NOT have access to other customers' data, staff information, or financial figures. If asked about anything outside pottery painting, the app, or this studio, politely redirect — in character, not with a robotic refusal.
 If a customer seems frustrated, upset, or you cannot resolve their question, use the escalate_to_staff function immediately rather than guessing — do not make up policy or promises the studio hasn't confirmed.
 Keep answers short and warm — this is a mobile chat window, not an essay. No more than 3-4 sentences unless genuinely necessary. Let your personality come through in word choice and rhythm, not filler — every sentence should still be doing real work.
@@ -3594,11 +3608,47 @@ app.post('/api/assistant/chat', async (req, res) => {
     if (knowledge?.length) {
       memoryPrefix += `\n\nThings the studio's real staff have taught you, genuinely true and worth using naturally when relevant:\n${knowledge.map(k => `- ${k.fact}`).join('\n')}`;
     }
+
+    // Genuine real seasonal awareness — the actual current date, so
+    // Cleo can naturally mention "Christmas is coming up" or similar
+    // when it's genuinely relevant, not as a forced sales pitch every
+    // message. Real UK-relevant seasonal windows, not invented ones.
+    const now = new Date();
+    const monthDay = `${now.getMonth() + 1}-${now.getDate()}`;
+    const seasonalNotes = [];
+    if (now.getMonth() === 9 || now.getMonth() === 10) seasonalNotes.push('Halloween and/or Christmas are genuinely approaching — could be worth a natural mention if someone asks about upcoming events or gift ideas, never forced.');
+    if (now.getMonth() === 11) seasonalNotes.push('Christmas is genuinely very close — a natural moment to mention gift vouchers or booking ahead, if it fits the conversation.');
+    if (now.getMonth() === 1 || now.getMonth() === 2) seasonalNotes.push('Easter is genuinely approaching in the coming weeks/months — could be worth a natural mention for anyone asking about seasonal activities.');
+    if (seasonalNotes.length) {
+      memoryPrefix += `\n\nReal, honest seasonal context (today is ${now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}): ${seasonalNotes.join(' ')} Only mention this if it's genuinely natural in context — never force a seasonal pitch into an unrelated question.`;
+    }
+
+    // Genuine real promotions history — separate from the single
+    // current Offer of the Week, so Cleo can honestly reference real
+    // past and upcoming promotions, not just "what's live right now".
+    const { data: promotions } = await supabase.from('studio_promotions')
+      .select('title, description, starts_on, ends_on').eq('studio_id', studioId).order('created_at', { ascending: false }).limit(10);
+    if (promotions?.length) {
+      memoryPrefix += `\n\nReal promotions the studio has run or has coming up (mention naturally when relevant, never force it):\n${promotions.map(p => `- ${p.title}${p.description ? ': ' + p.description : ''}${p.starts_on ? ` (${p.starts_on}${p.ends_on ? ' to ' + p.ends_on : ''})` : ''}`).join('\n')}`;
+    }
+
     if (customerId && context === 'customer') {
       const { data: memories } = await supabase.from('customer_memory')
         .select('fact').eq('studio_id', studioId).eq('customer_id', customerId).order('created_at', { ascending: false }).limit(15);
       if (memories?.length) {
         memoryPrefix += `\n\nThis is a RETURNING customer — genuine things you've picked up about them from past real conversations, use naturally where it fits, never force it in:\n${memories.map(m => `- ${m.fact}`).join('\n')}`;
+      }
+      // Genuine, real, optional birthday awareness — only if a parent/
+      // guardian has deliberately added one (month+day only, no year,
+      // no age ever inferred). Only mentioned if genuinely within the
+      // next 7 real days, never a forced "happy birthday" every visit.
+      const { data: customerRow } = await supabase.from('customers').select('birthday_month, birthday_day, name').eq('id', customerId).single();
+      if (customerRow?.birthday_month && customerRow?.birthday_day) {
+        const bdayThisYear = new Date(now.getFullYear(), customerRow.birthday_month - 1, customerRow.birthday_day);
+        const daysUntil = Math.round((bdayThisYear - now) / (1000 * 60 * 60 * 24));
+        if (daysUntil >= 0 && daysUntil <= 7) {
+          memoryPrefix += `\n\n${customerRow.name}'s birthday is genuinely coming up within the week — a warm, natural mention is lovely here if it fits, never forced or repeated every message.`;
+        }
       }
     }
     // Genuine real task-usage awareness for staff/director contexts —
@@ -3729,6 +3779,31 @@ app.post('/api/staff/log-task-usage', async (req, res) => {
     await supabase.from('staff_task_usage').insert({ studio_id: studioId, staff_member_id: staffMemberId, tab_name: tabName });
   }
   res.json({ status: 'logged' });
+});
+
+// ── Studio Promotions — a real, genuine history, separate from the
+// single current Offer of the Week, so Cleo can honestly reference
+// past promotions and upcoming ones, not just "what's live right now". ──
+app.get('/api/studio-promotions', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data, error } = await supabase.from('studio_promotions').select('*').eq('studio_id', studioId).order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ promotions: data || [] });
+});
+
+app.post('/api/studio-promotions', async (req, res) => {
+  const { studioId, title, description, startsOn, endsOn } = req.body;
+  if (!studioId || !title) return res.status(400).json({ error: 'studioId and title required' });
+  const { data, error } = await supabase.from('studio_promotions').insert({ studio_id: studioId, title, description: description || null, starts_on: startsOn || null, ends_on: endsOn || null }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ promotion: data });
+});
+
+app.delete('/api/studio-promotions/:id', async (req, res) => {
+  const { error } = await supabase.from('studio_promotions').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ deleted: true });
 });
 
 app.get('/api/studio-knowledge', async (req, res) => {
@@ -6086,6 +6161,25 @@ app.get('/api/loyalty/customer', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// POST /api/loyalty/customer/:id/birthday — real, genuinely OPTIONAL
+// birthday capture for Cleo's Club members. Deliberately month+day
+// only, never a year — no age is ever inferred or stored, since many
+// of these customers are children and there's no real reason for the
+// app to know or guess anyone's age. Always entered deliberately by a
+// parent/guardian through a real, clearly-labelled optional field —
+// never auto-filled, never required, never assumed.
+app.post('/api/loyalty/customer/:id/birthday', async (req, res) => {
+  const { birthdayMonth, birthdayDay } = req.body;
+  if (!birthdayMonth || !birthdayDay || birthdayMonth < 1 || birthdayMonth > 12 || birthdayDay < 1 || birthdayDay > 31) {
+    return res.status(400).json({ error: 'A valid month (1-12) and day (1-31) are required' });
+  }
+  const { data, error } = await supabase.from('customers')
+    .update({ birthday_month: birthdayMonth, birthday_day: birthdayDay })
+    .eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ customer: data });
 });
 
 // POST /api/loyalty/visit — record a visit and award visit points

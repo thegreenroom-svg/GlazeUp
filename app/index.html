@@ -4163,9 +4163,50 @@
             </div>
             ${data.visitsUntilNextReward > 0 ? `<div style="text-align:center;margin-top:16px;font-size:13px;color:rgba(255,255,255,0.7);">${data.visitsUntilNextReward} more visit${data.visitsUntilNextReward === 1 ? '' : 's'} until your next reward!</div>` : ''}
           </div>
+          <!-- Genuine, real, optional birthday field — deliberately
+               month + day only, no year (no age ever inferred or
+               stored). Clearly explained why it's asked, never
+               required, never pre-filled or assumed. Parent/guardian
+               enters this deliberately if they choose to. -->
+          <div style="padding:0 20px 32px;">
+            <div style="background:rgba(255,255,255,0.06);border-radius:16px;padding:16px;">
+              <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.8);margin-bottom:4px;">🎂 Birthday (optional)</div>
+              <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:10px;line-height:1.4;">If you'd like, add a birthday and Cleo might have something special that week. Just the day and month — never asked for a year, never used to guess anyone's age.</div>
+              <div style="display:flex;gap:8px;">
+                <select id="birthday-day-select" style="flex:1;padding:9px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.1);color:white;font-size:13px;">
+                  <option value="">Day</option>
+                  ${Array.from({length:31},(_,i)=>i+1).map(d=>`<option value="${d}">${d}</option>`).join('')}
+                </select>
+                <select id="birthday-month-select" style="flex:1;padding:9px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.1);color:white;font-size:13px;">
+                  <option value="">Month</option>
+                  ${['January','February','March','April','May','June','July','August','September','October','November','December'].map((m,i)=>`<option value="${i+1}">${m}</option>`).join('')}
+                </select>
+                <button onclick="saveClubBirthday('${customerId}')" style="background:#F9A825;color:white;border:none;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Save</button>
+              </div>
+              <div id="birthday-save-status" style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:8px;"></div>
+            </div>
+          </div>
         `;
       } catch (e) {
         body.innerHTML = '<div style="padding:32px;text-align:center;color:rgba(255,255,255,0.4);font-size:13px;">Could not load your sticker board — please ask a member of staff.</div>';
+      }
+    }
+
+    // Genuine, real save for the optional birthday field above
+    async function saveClubBirthday(customerId) {
+      const day = document.getElementById('birthday-day-select').value;
+      const month = document.getElementById('birthday-month-select').value;
+      const statusEl = document.getElementById('birthday-save-status');
+      if (!day || !month) { statusEl.textContent = 'Pick both a day and a month first.'; return; }
+      statusEl.textContent = 'Saving…';
+      try {
+        await fetch(`${API_URL}/api/loyalty/customer/${customerId}/birthday`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ birthdayMonth: parseInt(month), birthdayDay: parseInt(day) })
+        });
+        statusEl.textContent = '✓ Saved — thank you!';
+      } catch (e) {
+        statusEl.textContent = 'Could not save — please try again.';
       }
     }
 

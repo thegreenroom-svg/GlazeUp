@@ -3061,6 +3061,22 @@
             <div id="offer-week-status" style="font-size:11px;color:var(--gu-dust);margin-top:6px;"></div>
           </div>
 
+          <!-- Genuine real Promotions History — separate from the
+               single current Offer of the Week above. A real log so
+               Cleo can honestly reference what the studio has done
+               and has coming up, not just the one active thing. -->
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(249,168,37,0.25);">
+            <div style="font-size:12px;font-weight:700;color:var(--gu-text);margin-bottom:8px;">📣 Promotions History</div>
+            <input type="text" id="promo-title" placeholder="e.g. Christmas gift voucher offer" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">
+            <textarea id="promo-description" placeholder="Details (optional)" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:12px;margin-bottom:8px;box-sizing:border-box;height:44px;"></textarea>
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+              <input type="date" id="promo-starts" style="flex:1;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:12px;box-sizing:border-box;">
+              <input type="date" id="promo-ends" style="flex:1;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:12px;box-sizing:border-box;">
+            </div>
+            <button onclick="addStudioPromotion()" style="width:100%;background:#F9A825;color:white;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:10px;">Add to history</button>
+            <div id="promo-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+          </div>
+
           <!-- Real sticker/offers management — was previously invisible
                here entirely, only ever seeded directly via SQL with no
                admin visibility or control at all. Shows every genuine
@@ -4794,6 +4810,7 @@ function goToTab(tab, event) {
     loadStickerTypes();
     loadOfferOfWeek();
     loadStudioKnowledge();
+    loadStudioPromotions();
   } else if (tab === 'branding') {
     loadBranding();
   } else if (tab === 'catalogue') {
@@ -10376,6 +10393,65 @@ async function deleteStudioKnowledge(id) {
   try {
     await fetch(`${API_URL}/api/studio-knowledge/${id}`, { method: 'DELETE' });
     loadStudioKnowledge();
+  } catch (e) {
+    alert('Could not remove — try again.');
+  }
+}
+
+// ── Genuine real Promotions History ──
+async function loadStudioPromotions() {
+  const listEl = document.getElementById('promo-list');
+  if (!listEl) return;
+  try {
+    const res = await fetch(`${API_URL}/api/studio-promotions?studioId=${studioId}`);
+    const data = await res.json();
+    const promotions = data.promotions || [];
+    if (!promotions.length) {
+      listEl.innerHTML = '<div style="padding:10px;text-align:center;color:var(--gu-dust);font-size:12px;">No promotions logged yet.</div>';
+      return;
+    }
+    listEl.innerHTML = promotions.map(p => `
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--gu-bg);border-radius:8px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12.5px;font-weight:700;color:var(--gu-text);">${p.title}</div>
+          ${p.description ? `<div style="font-size:11px;color:var(--gu-dust);">${p.description}</div>` : ''}
+          ${p.starts_on ? `<div style="font-size:10px;color:var(--gu-dust);">${p.starts_on}${p.ends_on ? ' → ' + p.ends_on : ''}</div>` : ''}
+        </div>
+        <button onclick="deleteStudioPromotion('${p.id}')" style="background:none;border:none;color:#d9534f;font-size:11px;cursor:pointer;padding:4px;white-space:nowrap;">Remove</button>
+      </div>
+    `).join('');
+  } catch (e) {
+    listEl.innerHTML = '<div style="padding:10px;text-align:center;color:var(--gu-dust);font-size:12px;">Could not load — try again.</div>';
+  }
+}
+
+async function addStudioPromotion() {
+  const title = document.getElementById('promo-title').value.trim();
+  if (!title) return;
+  try {
+    await fetch(`${API_URL}/api/studio-promotions`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId, title,
+        description: document.getElementById('promo-description').value.trim(),
+        startsOn: document.getElementById('promo-starts').value || null,
+        endsOn: document.getElementById('promo-ends').value || null,
+      })
+    });
+    document.getElementById('promo-title').value = '';
+    document.getElementById('promo-description').value = '';
+    document.getElementById('promo-starts').value = '';
+    document.getElementById('promo-ends').value = '';
+    loadStudioPromotions();
+  } catch (e) {
+    alert('Could not save — try again.');
+  }
+}
+
+async function deleteStudioPromotion(id) {
+  try {
+    await fetch(`${API_URL}/api/studio-promotions/${id}`, { method: 'DELETE' });
+    loadStudioPromotions();
   } catch (e) {
     alert('Could not remove — try again.');
   }
