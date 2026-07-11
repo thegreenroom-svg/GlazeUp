@@ -2229,6 +2229,34 @@
       wtShowTrigger();
       loadLoyaltyTile();
       checkCleosClubEnabled();
+
+      // TEMPORARY diagnostic — genuine measured page state on the real
+      // device, to find out why scrolling and Cleo's Club aren't
+      // showing rather than continuing to guess blind. Remove once resolved.
+      setTimeout(() => {
+        const cleoTile = document.getElementById('cleos-club-tile');
+        const wtOverlay = document.getElementById('wt-overlay');
+        const bodyStyle = getComputedStyle(document.body);
+        const htmlStyle = getComputedStyle(document.documentElement);
+        const box = document.createElement('div');
+        box.style.cssText = 'position:fixed;top:4px;left:4px;right:4px;z-index:999999;background:#000;color:#0f0;font-family:monospace;font-size:9px;padding:8px 10px;border-radius:6px;opacity:0.97;white-space:pre-wrap;max-height:60vh;overflow-y:auto;';
+        box.textContent =
+          `viewport: ${window.innerWidth}x${window.innerHeight}\n` +
+          `body overflow: ${bodyStyle.overflow} / overflowY: ${bodyStyle.overflowY}\n` +
+          `html overflow: ${htmlStyle.overflow} / overflowY: ${htmlStyle.overflowY}\n` +
+          `body scrollHeight: ${document.body.scrollHeight} (viewport: ${window.innerHeight})\n` +
+          `cleo tile found: ${!!cleoTile} | display: ${cleoTile ? getComputedStyle(cleoTile).display : 'n/a'}\n` +
+          `wt-overlay display: ${wtOverlay ? getComputedStyle(wtOverlay).display : 'n/a'} | pointerEvents: ${wtOverlay ? getComputedStyle(wtOverlay).pointerEvents : 'n/a'}\n` +
+          `STUDIO_ID: ${typeof STUDIO_ID !== 'undefined' ? STUDIO_ID : 'undefined'}`;
+        document.body.appendChild(box);
+
+        // Also genuinely fetch the real Cleo's Club config live, so we
+        // can see honestly whether the backend even reports it enabled.
+        fetch(`${API_URL}/api/cleos-club/config?studioId=${STUDIO_ID}`)
+          .then(r => r.json())
+          .then(data => { box.textContent += `\ncleos-club config: ${JSON.stringify(data)}`; })
+          .catch(e => { box.textContent += `\ncleos-club config fetch FAILED: ${e.message}`; });
+      }, 1200);
     }
 
     function showMyQR() {
