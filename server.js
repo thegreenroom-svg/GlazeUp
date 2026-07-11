@@ -3584,6 +3584,74 @@ app.post('/api/studio/return-address', async (req, res) => {
 // faked or bypassed, since real postage costs real money and needs a
 // real account. Returns a clear, honest error if no key is set, rather
 // than pretending to create a label.
+// POST /api/studio/test-royal-mail-connection — genuinely tests whether
+// this account can create AND generate a real label, not just whether
+// the API key is accepted. Creates one real test order (harmless, no
+// postage is bought — orders can be deleted afterward in Click & Drop)
+// and attempts to fetch its label. Reports the true outcome either way,
+// since some accounts can create orders but the label file itself is
+// restricted to certain account tiers — a real, documented limitation
+// worth catching honestly rather than assuming success.
+app.post('/api/studio/test-royal-mail-connection', async (req, res) => {
+  const { studioId } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  const { data: returnAddress } = await supabase.from('studio_return_address').select('*').eq('studio_id', studioId).single();
+  if (!returnAddress?.royal_mail_oba_api_key) {
+    return res.status(400).json({ error: 'No Royal Mail API key saved yet — add it above first.' });
+  }
+
+  try {
+    const testRef = `KLNK-TEST-${Date.now()}`;
+    const orderRes = await fetch('https://api.parcel.royalmail.com/api/v1/Orders', {
+      method: 'POST',
+      headers: { 'Authorization': returnAddress.royal_mail_oba_api_key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: [{
+          orderReference: testRef,
+          recipient: {
+            address: {
+              fullName: 'Test Recipient', addressLine1: '1 Test Street',
+              city: 'London', postcode: 'SW1A 1AA', countryCode: 'GB',
+            },
+          },
+          billing: { address: { fullName: 'Test Recipient', addressLine1: '1 Test Street', city: 'London', postcode: 'SW1A 1AA', countryCode: 'GB' } },
+          packages: [{ weightInGrams: 500, packageFormatIdentifier: 'parcel' }],
+        }],
+      }),
+    });
+    const orderData = await orderRes.json();
+    if (!orderRes.ok) {
+      return res.status(502).json({ error: `Connection test failed — Royal Mail rejected the request: ${orderData.errors?.[0]?.errorMessage || 'unknown error'}. Check your API key and return address.` });
+    }
+
+    const orderIdentifier = orderData.createdOrders?.[0]?.orderIdentifier;
+    if (!orderIdentifier) {
+      return res.json({ connectionWorks: true, labelGenerated: false, note: 'Order created but no order identifier returned — cannot test label fetch.' });
+    }
+
+    // Now genuinely attempt to fetch the label — this is the real test,
+    // the part that's documented to fail on some account tiers.
+    const labelRes = await fetch(`https://api.parcel.royalmail.com/api/v1/orders/label?orderIdentifiers=${orderIdentifier}&documentType=postageLabel`, {
+      headers: { 'Authorization': returnAddress.royal_mail_oba_api_key },
+    });
+
+    if (labelRes.ok) {
+      const contentType = labelRes.headers.get('content-type') || '';
+      // A genuine label response is a PDF or similar binary file, not JSON
+      const labelGenerated = !contentType.includes('application/json');
+      res.json({ connectionWorks: true, labelGenerated, testOrderReference: testRef });
+    } else {
+      const labelErrorBody = await labelRes.text();
+      console.log('Royal Mail label fetch failed (this is the known limitation):', labelErrorBody);
+      res.json({ connectionWorks: true, labelGenerated: false, testOrderReference: testRef });
+    }
+  } catch (error) {
+    console.error('Royal Mail connection test error:', error);
+    res.status(500).json({ error: 'Could not reach Royal Mail to run the test.' });
+  }
+});
+
 app.post('/api/bookings/:bookingCode/create-royal-mail-label', async (req, res) => {
   const { bookingCode } = req.params;
   const { studioId } = req.body;

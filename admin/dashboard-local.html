@@ -2633,6 +2633,32 @@
           <button class="btn-connect" onclick="showStaticWalkinQR()">Show Walk-in QR</button>
         </div>
 
+        <!-- Royal Mail Click & Drop — for real postal labels on the
+             Labels tab. Genuinely tests the connection AND whether
+             this specific account can actually generate a printable
+             label via the API — some free-tier Click & Drop accounts
+             can create the order but not return a label file (a real,
+             documented limitation, reserved for certain account
+             types) — so this is checked honestly rather than assumed. -->
+        <div class="setup-card">
+          <h3>📮 Royal Mail Click &amp; Drop</h3>
+          <p>Connect your existing Click &amp; Drop account to create real postal labels directly from the Labels tab. Find your API key in Click &amp; Drop → Settings → Integrations → Click &amp; Drop API.</p>
+          <div style="margin-bottom:10px;">
+            <input type="text" id="rm-business-name" placeholder="Business/trading name" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">
+            <input type="text" id="rm-address1" placeholder="Return address line 1" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+              <input type="text" id="rm-city" placeholder="Town/City" style="flex:1;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;box-sizing:border-box;">
+              <input type="text" id="rm-postcode" placeholder="Postcode" style="width:110px;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;box-sizing:border-box;">
+            </div>
+            <input type="password" id="rm-api-key" placeholder="Click & Drop API key" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;box-sizing:border-box;">
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-connect" onclick="saveRoyalMailSetup()" style="flex:1;">Save</button>
+            <button class="btn-connect" onclick="testRoyalMailLabelGeneration()" style="flex:1;background:var(--gu-primary);">Test label generation</button>
+          </div>
+          <div id="rm-setup-status" style="font-size:11px;color:var(--gu-dust);margin-top:10px;"></div>
+        </div>
+
         <!-- Square Connection -->
         <div class="setup-card">
           <h3>1. Connect Your Square Account</h3>
@@ -9025,6 +9051,53 @@ async function advancePreGlazeStatus(id, newStatus) {
     body: JSON.stringify({ status: newStatus })
   });
   loadPreGlazeQueue();
+}
+
+// ── Royal Mail Click & Drop setup ──
+async function saveRoyalMailSetup() {
+  const statusEl = document.getElementById('rm-setup-status');
+  try {
+    await fetch(`${API_URL}/api/studio/return-address`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId,
+        businessName: document.getElementById('rm-business-name').value.trim(),
+        addressLine1: document.getElementById('rm-address1').value.trim(),
+        city: document.getElementById('rm-city').value.trim(),
+        postcode: document.getElementById('rm-postcode').value.trim(),
+        royalMailApiKey: document.getElementById('rm-api-key').value.trim() || undefined,
+      })
+    });
+    statusEl.textContent = '✓ Saved.';
+  } catch (e) {
+    statusEl.textContent = 'Could not save — try again.';
+  }
+}
+
+// Genuinely tests whether THIS account can actually generate a
+// printable label via the API, not just whether the key is accepted —
+// some Click & Drop accounts can create the order but the label file
+// itself is restricted to certain account tiers, a real documented
+// limitation. This is checked honestly rather than assumed to work.
+async function testRoyalMailLabelGeneration() {
+  const statusEl = document.getElementById('rm-setup-status');
+  statusEl.textContent = 'Testing — creating a real test order to check label generation…';
+  try {
+    const res = await fetch(`${API_URL}/api/studio/test-royal-mail-connection`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId })
+    });
+    const data = await res.json();
+    if (!res.ok) { statusEl.innerHTML = `❌ ${data.error}`; return; }
+
+    if (data.labelGenerated) {
+      statusEl.innerHTML = `✅ Connection works AND label generation works — you're ready to use real Royal Mail labels.`;
+    } else {
+      statusEl.innerHTML = `⚠️ Connection works, order created — but this account can't generate a label file via the API directly (a known Royal Mail limitation on some account tiers). You'll likely still need to print that specific label from inside Click & Drop itself. The printable kilnLINK label works regardless either way.`;
+    }
+  } catch (e) {
+    statusEl.textContent = 'Could not run the test — check your API key and try again.';
+  }
 }
 
 async function loadConnectionStatus() {
