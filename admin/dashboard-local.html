@@ -7210,6 +7210,16 @@ function initAdminPushToTalk() {
 function toggleStaffAssistant() {
   staffAssistantOpen = !staffAssistantOpen;
   document.getElementById('staff-assistant-panel').style.display = staffAssistantOpen ? 'flex' : 'none';
+  // Genuine real fix, matching the same fix on the customer app:
+  // Cleo's floating avatar/bubble was staying visible while her own
+  // chat panel was open, overlapping the quick-option buttons. Only
+  // restore on close if genuinely still logged in — this widget's
+  // real base state is hidden until login, so blindly forcing it back
+  // to visible regardless of that would be wrong here.
+  const cleoFab = document.getElementById('cleo-admin-floating-fab');
+  const cleoBubble = document.getElementById('cleo-admin-floating-bubble');
+  if (cleoFab) cleoFab.style.display = staffAssistantOpen ? 'none' : (currentShiftStaff ? 'flex' : 'none');
+  if (cleoBubble) cleoBubble.style.display = staffAssistantOpen ? 'none' : (currentShiftStaff ? 'block' : 'none');
   if (staffAssistantOpen) {
     document.getElementById('staff-assistant-input')?.focus();
     populateStaffAssistantQuickOptions();

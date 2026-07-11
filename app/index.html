@@ -5498,6 +5498,16 @@
       document.getElementById('assistant-panel').style.display = assistantOpen ? 'flex' : 'none';
       const hint = document.getElementById('assistant-hint');
       if (hint) hint.style.display = 'none';
+      // Genuine real fix: Cleo's floating avatar/bubble was staying
+      // visible while her own chat panel was open, visually
+      // overlapping and blocking the quick-option buttons. No real
+      // reason for her floating presence to show while her own chat
+      // is already open — hide both while the panel's open, restore
+      // when it closes.
+      const cleoFab = document.getElementById('cleo-floating-fab');
+      const cleoBubble = document.getElementById('cleo-floating-bubble');
+      if (cleoFab) cleoFab.style.display = assistantOpen ? 'none' : 'flex';
+      if (cleoBubble) cleoBubble.style.display = assistantOpen ? 'none' : 'block';
       if (assistantOpen) {
         document.getElementById('assistant-input')?.focus();
         const mascotContainer = document.getElementById('assistant-panel-cleo-mascot');
