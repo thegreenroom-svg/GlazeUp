@@ -1430,33 +1430,37 @@
     <button onclick="closeFindMyPiece()" style="background:rgba(255,255,255,0.2);border:none;color:white;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;">✕</button>
   </div>
 
+  <!-- Simplified: photo is the single obvious default path, since
+       that's the whole point of the feature. Text search is a genuine
+       fallback for when a clean photo isn't possible — collapsed
+       behind a small link rather than competing for equal visual
+       weight on first launch. -->
   <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;overflow-y:auto;">
     <div id="fp1-preview-wrap" style="width:100%;max-width:400px;aspect-ratio:1;background:#2B2724;border-radius:20px;display:flex;align-items:center;justify-content:center;margin-bottom:20px;overflow:hidden;">
       <div id="fp1-placeholder" style="color:#8a8175;text-align:center;padding:20px;">
         <div style="font-size:48px;margin-bottom:10px;">📷</div>
-        <div style="font-size:14px;">Take a photo of the piece,<br>or search by text below</div>
+        <div style="font-size:14px;">Photograph the piece you're looking for</div>
       </div>
       <img id="fp1-preview-img" style="display:none;width:100%;height:100%;object-fit:cover;">
     </div>
 
-    <button onclick="captureFindPieceStep1Photo()" style="width:100%;max-width:400px;background:#c0392b;color:white;border:none;border-radius:14px;padding:18px;font-size:16px;font-weight:800;cursor:pointer;margin-bottom:12px;">📷 Photograph the piece</button>
+    <button onclick="captureFindPieceStep1Photo()" style="width:100%;max-width:400px;background:#c0392b;color:white;border:none;border-radius:14px;padding:20px;font-size:17px;font-weight:800;cursor:pointer;margin-bottom:14px;">📷 Photograph the piece</button>
 
-    <div style="width:100%;max-width:400px;display:flex;align-items:center;gap:10px;margin:6px 0;">
-      <div style="flex:1;height:1px;background:#3d3833;"></div>
-      <span style="color:#8a8175;font-size:12px;">or</span>
-      <div style="flex:1;height:1px;background:#3d3833;"></div>
+    <button id="fp1-next-btn" onclick="goToFindPieceStep2()" disabled style="width:100%;max-width:400px;background:#8a8175;color:white;border:none;border-radius:14px;padding:16px;font-size:15px;font-weight:800;cursor:not-allowed;margin-bottom:18px;">Take a photo first, then continue →</button>
+
+    <!-- Text search — genuinely collapsed by default, one small link -->
+    <button onclick="toggleFp1TextSearch()" id="fp1-text-toggle" style="background:none;border:none;color:#8a8175;font-size:13px;cursor:pointer;text-decoration:underline;margin-bottom:6px;">Can't get a clean photo? Search by text instead</button>
+
+    <div id="fp1-text-search-area" style="display:none;width:100%;max-width:400px;margin-top:10px;">
+      <input type="text" id="fp1-text-input" placeholder="Describe it — customer name, colour, type…" style="width:100%;padding:14px;border:1px solid #3d3833;border-radius:12px;font-size:14px;margin-bottom:10px;box-sizing:border-box;background:#2B2724;color:white;">
+      <button onclick="runTextPieceSearchFullScreen()" style="width:100%;background:#3d3833;color:white;border:none;border-radius:14px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;">🔤 Search system-wide by text</button>
     </div>
-
-    <input type="text" id="fp1-text-input" placeholder="Describe it — customer name, colour, type…" style="width:100%;max-width:400px;padding:14px;border:1px solid #3d3833;border-radius:12px;font-size:14px;margin-bottom:12px;box-sizing:border-box;background:#2B2724;color:white;">
-    <button onclick="runTextPieceSearchFullScreen()" style="width:100%;max-width:400px;background:#3d3833;color:white;border:none;border-radius:14px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:16px;">🔤 Search system-wide by text</button>
-
-    <button id="fp1-next-btn" onclick="goToFindPieceStep2()" disabled style="width:100%;max-width:400px;background:#8a8175;color:white;border:none;border-radius:14px;padding:16px;font-size:15px;font-weight:800;cursor:not-allowed;">Take a photo first, then continue →</button>
 
     <div id="fp1-text-results" style="width:100%;max-width:400px;margin-top:16px;"></div>
   </div>
 
   <div style="padding:14px 20px;flex-shrink:0;">
-    <button onclick="addTestReferencePhoto()" style="width:100%;background:none;border:1px dashed #5a5148;color:#8a8175;border-radius:10px;padding:10px;font-size:12px;cursor:pointer;">🧪 Just save this as a test reference (skip search)</button>
+    <button onclick="addTestReferencePhoto()" style="width:100%;background:none;border:none;color:#5a5148;font-size:11px;cursor:pointer;">Save as test reference (skip search)</button>
   </div>
 </div>
 
@@ -11236,6 +11240,7 @@ function openFindMyPiece() {
   document.getElementById('fp1-placeholder').style.display = 'block';
   document.getElementById('fp1-text-input').value = '';
   document.getElementById('fp1-text-results').innerHTML = '';
+  document.getElementById('fp1-text-search-area').style.display = 'none'; // collapsed by default, photo is the primary path
   const nextBtn = document.getElementById('fp1-next-btn');
   nextBtn.disabled = true;
   nextBtn.style.background = '#8a8175';
@@ -11249,6 +11254,18 @@ function openFindMyPiece() {
 function closeFindMyPiece() {
   document.getElementById('find-piece-step1').style.display = 'none';
   document.getElementById('find-piece-step2').style.display = 'none';
+}
+
+// Text search is genuinely collapsed by default (photo is the primary,
+// obvious path) — this reveals it only when someone deliberately can't
+// get a clean photo.
+function toggleFp1TextSearch() {
+  const area = document.getElementById('fp1-text-search-area');
+  const isShowing = area.style.display === 'block';
+  area.style.display = isShowing ? 'none' : 'block';
+  if (!isShowing) {
+    setTimeout(() => document.getElementById('fp1-text-input')?.focus(), 100);
+  }
 }
 
 function captureFindPieceStep1Photo() {

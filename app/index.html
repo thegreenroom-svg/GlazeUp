@@ -3714,6 +3714,71 @@
       }
     }
 
+    // ── Cleo as the app-wide contextual guide — genuinely reads each
+    // button's OWN existing .tile-desc text (already there for sighted
+    // users to read directly), rather than maintaining a second,
+    // separate set of descriptions that could drift out of sync. One
+    // delegated listener covers every current and future button with a
+    // .tile-desc, no per-button wiring needed. Hover on desktop/laptop
+    // (genuine mouse event), long-press on touch devices (mobile has no
+    // real hover — a long-press is the honest equivalent, distinct from
+    // a normal tap which should still trigger the button's real action).
+    let _cleoContextHoldTimer = null;
+    let _cleoContextShowing = false;
+
+    function findTileDescFor(el) {
+      // Walk up from whatever was actually touched/hovered to find the
+      // real containing tile/button, then read ITS description —
+      // covers taps landing on an icon or title inside the button, not
+      // just the button element itself.
+      const tile = el.closest('.tile, button[class*="tile"]');
+      if (!tile) return null;
+      const descEl = tile.querySelector('.tile-desc');
+      return descEl ? descEl.textContent.trim() : null;
+    }
+
+    function showCleoContextTip(text) {
+      const bubble = document.getElementById('cleo-floating-bubble');
+      if (!bubble || !text) return;
+      clearInterval(_cleoFloatingRotationTimer); // pause the normal rotation while explaining something specific
+      bubble.textContent = `💡 ${text}`;
+      _cleoContextShowing = true;
+    }
+
+    function hideCleoContextTip() {
+      if (!_cleoContextShowing) return;
+      _cleoContextShowing = false;
+      rotateCleoFloatingMessage(); // hand back to the normal rotation
+      clearInterval(_cleoFloatingRotationTimer);
+      _cleoFloatingRotationTimer = setInterval(rotateCleoFloatingMessage, 6000);
+    }
+
+    // Genuine hover — desktop/laptop only (touch devices don't fire a
+    // meaningful hover, this listener is simply inert there).
+    document.addEventListener('mouseover', (e) => {
+      const desc = findTileDescFor(e.target);
+      if (desc) showCleoContextTip(desc);
+    });
+    document.addEventListener('mouseout', (e) => {
+      if (e.target.closest('.tile, button[class*="tile"]')) hideCleoContextTip();
+    });
+
+    // Genuine long-press for touch devices — a real 500ms hold, so a
+    // normal quick tap still opens the button as usual and doesn't get
+    // hijacked into showing a tip instead of doing its real job.
+    document.addEventListener('touchstart', (e) => {
+      const desc = findTileDescFor(e.target);
+      if (!desc) return;
+      _cleoContextHoldTimer = setTimeout(() => showCleoContextTip(desc), 500);
+    }, { passive: true });
+    document.addEventListener('touchend', () => {
+      clearTimeout(_cleoContextHoldTimer);
+      if (_cleoContextShowing) hideCleoContextTip();
+    }, { passive: true });
+    document.addEventListener('touchmove', () => {
+      clearTimeout(_cleoContextHoldTimer); // genuine scroll, not a deliberate hold — cancel
+    }, { passive: true });
+
     function initCleoFloatingWidget() {
       const mascotContainer = document.getElementById('cleo-floating-mascot');
       if (mascotContainer) mascotContainer.innerHTML = renderCleoMascotSVG();
