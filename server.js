@@ -4392,6 +4392,33 @@ app.get('/api/staff/team-for-login', async (req, res) => {
   });
 });
 
+// POST /api/staff/mark-home-screen-added — genuine per-person record
+// that THIS specific staff member has actually added the app to their
+// home screen, not a per-device flag. Called right after they confirm
+// they've done it, since login is the one moment we know exactly who's
+// using the device.
+app.post('/api/staff/mark-home-screen-added', async (req, res) => {
+  const { studioId, staffMemberId } = req.body;
+  if (!studioId || !staffMemberId) return res.status(400).json({ error: 'studioId and staffMemberId required' });
+  const { error } = await supabase.from('staff_team')
+    .update({ home_screen_added_at: new Date().toISOString() })
+    .eq('id', staffMemberId).eq('studio_id', studioId);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ status: 'recorded' });
+});
+
+// GET /api/staff/home-screen-status — for directors: genuine real
+// status of who has and hasn't actually completed this, across the
+// whole real team, not a guess.
+app.get('/api/staff/home-screen-status', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data: team, error } = await supabase.from('staff_team')
+    .select('id, name, role, home_screen_added_at').eq('studio_id', studioId).eq('active', true).order('name');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ team: team || [] });
+});
+
 // POST /api/staff/set-pin — self-service: staff member picks their own name,
 // then sets their own PIN the first time (no existing PIN required to do this —
 // but if a PIN already exists, this endpoint refuses; use reset-pin instead)

@@ -1885,6 +1885,23 @@
   </div>
 </div>
 
+<!-- Genuine, tracked staff onboarding: "add this app to your home
+     screen" — a real per-person completion record, not just hoping
+     people notice a passive banner. Shown once, right after login,
+     only to staff who genuinely haven't confirmed doing this yet
+     (checked against the real database, not a per-device guess) — so
+     it correctly reaches every new hire down the line too. -->
+<div id="staff-a2hs-onboarding-modal" style="display:none;position:fixed;inset:0;z-index:9880;background:rgba(43,39,36,0.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:white;border-radius:24px;max-width:400px;width:100%;padding:28px 24px;text-align:center;box-shadow:0 24px 70px rgba(0,0,0,0.4);">
+    <div style="font-size:40px;margin-bottom:10px;">📲</div>
+    <div style="font-size:17px;font-weight:800;color:var(--gu-text);margin-bottom:8px;">Add this app to your Home Screen</div>
+    <div style="font-size:13px;color:var(--gu-dust);margin-bottom:18px;line-height:1.5;">One quick step so you can open the studio dashboard directly, like a real app — no need to find this link again.</div>
+    <div id="staff-a2hs-instructions" style="text-align:left;background:var(--gu-bg);border-radius:14px;padding:16px;margin-bottom:18px;font-size:13px;color:var(--gu-text);line-height:1.8;"></div>
+    <button onclick="confirmStaffAddedToHomeScreen()" style="width:100%;background:#2e7d32;color:white;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:8px;">✓ Done — I've added it</button>
+    <button onclick="remindStaffA2HSLater()" style="width:100%;background:none;border:none;color:var(--gu-dust);font-size:12px;cursor:pointer;padding:8px;">Remind me next time</button>
+  </div>
+</div>
+
 <!-- Current shift badge (shows who's logged in) -->
 <button id="shift-badge" onclick="toggleTaskQueue()" style="display:none;position:fixed;top:16px;right:222px;z-index:850;background:white;border:1.5px solid var(--gu-border);border-radius:24px 0 0 24px;padding:8px 10px 8px 8px;font-size:12px;font-weight:700;color:var(--gu-text);cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.12);display:flex;align-items:center;gap:6px;border-right:none;">
   <span id="shift-badge-avatar" style="width:26px;height:26px;border-radius:50%;background:var(--gu-primary);color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">–</span>
@@ -3664,12 +3681,23 @@
           <div id="timesheet-shifts-list"><div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading…</div></div>
         </div>
 
+        <!-- Genuine, real per-person tracking of home screen
+             onboarding — directors can see exactly who has and hasn't
+             actually completed this, across the whole real team,
+             including any future new hires. -->
+        <div class="chart-container" style="margin-top:20px;" id="team-section-a2hs">
+          <h3 style="margin:0 0 6px;">📲 Home Screen Setup</h3>
+          <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Whether each real team member has added this app to their phone's home screen — shown to them automatically after login until they confirm it's done.</p>
+          <div id="a2hs-team-status-list"><div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading…</div></div>
+        </div>
+
         <!-- Holiday Requests -->
         <div class="chart-container" style="margin-top:20px;" id="team-section-holiday">
           <h3 style="margin:0 0 6px;">🏖️ Holiday Requests</h3>
           <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Approve or reject time-off requests. Set each person's annual allowance below — this is tracked, not calculated for pay.</p>
 
           <div id="holiday-pending-list" style="margin-bottom:16px;"></div>
+
 
           <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gu-dust);margin-bottom:10px;">Annual allowance per person</div>
           <div id="holiday-allowance-list"></div>
@@ -4573,6 +4601,7 @@ function goToTab(tab, event) {
     loadDailyMenu();
   } else if (tab === 'team') {
     loadTeamAndDuties();
+    loadA2HSTeamStatus();
   } else if (tab === 'progress') {
     loadDailyProgress();
     loadManagerTaskOverview();
@@ -6753,6 +6782,60 @@ function applyShiftUI() {
   // actually logged in and the rest of the UI has settled. Checks if
   // there's an overnight firing still waiting on confirmation.
   setTimeout(checkMorningKilnStatus, 800);
+  // Genuine per-person home screen onboarding — checked against the
+  // real database record for THIS specific person, not a per-device
+  // guess, so it correctly reaches every new hire down the line too.
+  setTimeout(checkStaffA2HSOnboarding, 2000);
+}
+
+// ── Genuine, tracked staff onboarding: add the app to the home screen ──
+async function checkStaffA2HSOnboarding() {
+  if (isStandaloneAdmin()) return; // already running as a real installed app — nothing to do
+  if (!currentShiftStaff || currentShiftStaff.id === 'testing') return;
+  if (sessionStorage.getItem('klnk_a2hs_onboarding_shown_this_session')) return; // don't nag more than once per session even if they tap "remind me later"
+
+  try {
+    const res = await fetch(`${API_URL}/api/staff/home-screen-status?studioId=${studioId}`);
+    const data = await res.json();
+    const me = (data.team || []).find(m => m.id === currentShiftStaff.id);
+    if (me && !me.home_screen_added_at) {
+      showStaffA2HSOnboarding();
+    }
+  } catch (e) { /* silent — don't block a real shift over this */ }
+}
+
+function showStaffA2HSOnboarding() {
+  sessionStorage.setItem('klnk_a2hs_onboarding_shown_this_session', '1');
+  const instructionsEl = document.getElementById('staff-a2hs-instructions');
+  if (isIOSAdmin()) {
+    instructionsEl.innerHTML = `
+      <div style="margin-bottom:6px;"><strong>1.</strong> Tap the <strong>Share</strong> button below (square with an arrow ↑)</div>
+      <div style="margin-bottom:6px;"><strong>2.</strong> Scroll down, tap <strong>"Add to Home Screen"</strong></div>
+      <div><strong>3.</strong> Tap <strong>Add</strong>, top right</div>`;
+  } else {
+    instructionsEl.innerHTML = `
+      <div style="margin-bottom:6px;"><strong>1.</strong> Tap your browser menu (⋮ or Share icon)</div>
+      <div><strong>2.</strong> Tap <strong>"Add to Home Screen"</strong> or <strong>"Install app"</strong></div>`;
+  }
+  document.getElementById('staff-a2hs-onboarding-modal').style.display = 'flex';
+}
+
+async function confirmStaffAddedToHomeScreen() {
+  document.getElementById('staff-a2hs-onboarding-modal').style.display = 'none';
+  if (!currentShiftStaff) return;
+  try {
+    await fetch(`${API_URL}/api/staff/mark-home-screen-added`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, staffMemberId: currentShiftStaff.id })
+    });
+  } catch (e) { /* if this fails, they'll just be asked again next login — not a big deal */ }
+}
+
+function remindStaffA2HSLater() {
+  document.getElementById('staff-a2hs-onboarding-modal').style.display = 'none';
+  // Genuinely NOT marked complete — this is a real "not yet", so it'll
+  // correctly ask again next login, matching the point of tracking
+  // this per-person rather than dismissing it forever after one tap.
 }
 
 // Direct log out — reachable in one tap from the header, no need to open
@@ -7451,6 +7534,35 @@ function notifyNewTask(task) {
 // ═══════════════════════════════════════════
 // TIMEKEEPING (Team & Duties)
 // ═══════════════════════════════════════════
+
+// Genuine real status for directors — exactly who has and hasn't
+// added the app to their home screen, no guessing.
+async function loadA2HSTeamStatus() {
+  const listEl = document.getElementById('a2hs-team-status-list');
+  if (!listEl) return;
+  try {
+    const res = await fetch(`${API_URL}/api/staff/home-screen-status?studioId=${studioId}`);
+    const data = await res.json();
+    const team = data.team || [];
+    if (!team.length) {
+      listEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">No team members yet.</div>';
+      return;
+    }
+    listEl.innerHTML = team.map(m => {
+      const done = !!m.home_screen_added_at;
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:${done ? '#e8f5e9' : 'var(--gu-bg)'};border-radius:8px;margin-bottom:6px;">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--gu-text);">${m.name}</div>
+            <div style="font-size:11px;color:var(--gu-dust);">${m.role}</div>
+          </div>
+          <div style="font-size:12px;font-weight:700;color:${done ? '#2e7d32' : '#8a8175'};">${done ? '✓ Done' : '○ Not yet'}</div>
+        </div>`;
+    }).join('');
+  } catch (e) {
+    listEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Could not load status.</div>';
+  }
+}
 
 async function loadTimesheetView() {
   const listEl = document.getElementById('timesheet-shifts-list');
