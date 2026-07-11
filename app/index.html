@@ -3868,6 +3868,64 @@
         <path d="M20 27 Q26 ${smileCurve} 32 27" stroke="#2B2724" stroke-width="1.6" fill="none" stroke-linecap="round"/>
       </svg>`;
     }
+
+    // ── Cleo's friends — a genuine small cast of illustrated cartoon
+    // characters, same abstract drawing style as Cleo (round shapes,
+    // simple dot eyes, no attempt at photorealism or depicting any
+    // real person) — each with a distinct look and a real, consistent
+    // personality carried through her chat dialogue and stickers. ──
+    const CLEO_FRIENDS = {
+      amara: {
+        name: 'Amara', personality: 'bold and giggly, loves building the tallest towers with clay',
+        skin: '#8B5A3C', hair: '#2B1810', clothes: '#F9A825', clothesLight: '#FFC862',
+      },
+      yuki: {
+        name: 'Yuki', personality: 'quiet and precise, obsessed with perfectly symmetrical patterns, dry sense of humour',
+        skin: '#F5D5B8', hair: '#1A1A1A', clothes: '#4FC3E8', clothesLight: '#8DE0FF',
+      },
+      raj: {
+        name: 'Raj', personality: 'endlessly curious, mixes glaze colours together "just to see what happens"',
+        skin: '#C68958', hair: '#2B1810', clothes: '#7ED957', clothesLight: '#A8EA85',
+      },
+      maya: {
+        name: 'Maya', personality: 'theatrical storyteller, gives every piece an elaborate imaginary backstory',
+        skin: '#A9673F', hair: '#2B1810', clothes: '#D667C7', clothesLight: '#EFA0E5',
+      },
+    };
+
+    function renderFriendMascotSVG(friendKey) {
+      const f = CLEO_FRIENDS[friendKey];
+      if (!f) return '';
+      // Genuinely distinct hairstyle per friend, everything else built
+      // on the identical real body/face structure Cleo uses — a real
+      // design family, not four unrelated drawings.
+      let hairSVG = '';
+      if (friendKey === 'amara') {
+        // Two round afro puffs
+        hairSVG = `<circle cx="12" cy="14" r="8" fill="${f.hair}"/><circle cx="40" cy="14" r="8" fill="${f.hair}"/><path d="M15 10 Q26 2 37 10 L37 16 Q26 9 15 16 Z" fill="${f.hair}"/>`;
+      } else if (friendKey === 'yuki') {
+        // Sleek high ponytail
+        hairSVG = `<path d="M13 14 Q26 2 39 14 L39 20 Q26 10 13 20 Z" fill="${f.hair}"/><path d="M36 10 Q46 14 43 30 Q41 32 39 29 Q41 18 33 12 Z" fill="${f.hair}"/>`;
+      } else if (friendKey === 'raj') {
+        // Short curly crop
+        hairSVG = `<circle cx="15" cy="11" r="5" fill="${f.hair}"/><circle cx="22" cy="6" r="5.5" fill="${f.hair}"/><circle cx="30" cy="6" r="5.5" fill="${f.hair}"/><circle cx="37" cy="11" r="5" fill="${f.hair}"/>`;
+      } else if (friendKey === 'maya') {
+        // Two space buns
+        hairSVG = `<path d="M14 15 Q26 3 38 15 L38 18 Q26 8 14 18 Z" fill="${f.hair}"/><circle cx="11" cy="9" r="6" fill="${f.hair}"/><circle cx="41" cy="9" r="6" fill="${f.hair}"/>`;
+      }
+
+      return `<svg width="72" height="72" viewBox="0 0 52 52" style="animation:cleoBounce 2.8s ease-in-out infinite; transform-origin:26px 48px;">
+        <ellipse cx="26" cy="44" rx="14" ry="7" fill="#2B2724" opacity="0.12"/>
+        <path d="M14 40 Q14 30 26 30 Q38 30 38 40 L38 48 Q38 50 36 50 L16 50 Q14 50 14 48 Z" fill="${f.clothes}"/>
+        <circle cx="26" cy="20" r="14" fill="${f.skin}"/>
+        <g style="animation:cleoCurlWiggle 3.2s ease-in-out infinite; transform-origin:26px 10px;">${hairSVG}</g>
+        <circle cx="20" cy="21" r="2.3" fill="#2B2724"/><circle cx="32" cy="21" r="2.3" fill="#2B2724"/>
+        <circle cx="20.7" cy="20.2" r="0.7" fill="white"/><circle cx="32.7" cy="20.2" r="0.7" fill="white"/>
+        <ellipse cx="15" cy="25" rx="2.6" ry="1.8" fill="#F0876A" opacity="0.4"/>
+        <ellipse cx="37" cy="25" rx="2.6" ry="1.8" fill="#F0876A" opacity="0.4"/>
+        <path d="M20 27 Q26 32 32 27" stroke="#2B2724" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+      </svg>`;
+    }
     // Kept for any code still referencing the old constant directly —
     // genuinely resolves to today's real current age.
     const CLEO_MASCOT_SVG = renderCleoMascotSVG();
@@ -3948,12 +4006,18 @@
         const res = await fetch(`${API_URL}/api/cleos-club/board/${customerId}?studioId=${STUDIO_ID}`);
         const data = await res.json();
 
-        const stickersHtml = (data.stickers || []).map(s => `
+        const stickersHtml = (data.stickers || []).map(s => {
+          const stickerCode = s.cleos_club_sticker_types?.code || '';
+          const friendKey = stickerCode.startsWith('friend-') ? stickerCode.replace('friend-', '') : null;
+          const artHtml = friendKey && CLEO_FRIENDS[friendKey]
+            ? `<div style="width:40px;height:40px;margin:0 auto 4px;">${renderFriendMascotSVG(friendKey)}</div>`
+            : `<div style="font-size:32px;margin-bottom:4px;">${s.cleos_club_sticker_types?.emoji || '⭐'}</div>`;
+          return `
           <div style="background:white;border-radius:16px;padding:16px 8px;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.15);">
-            <div style="font-size:32px;margin-bottom:4px;">${s.cleos_club_sticker_types?.emoji || '⭐'}</div>
+            ${artHtml}
             <div style="font-size:10px;font-weight:700;color:#2B2724;">${s.cleos_club_sticker_types?.name || 'Sticker'}</div>
           </div>
-        `).join('');
+        `;}).join('');
 
         // Empty slots for visual "board" feel — shows what's still to collect
         const emptySlots = Math.max(0, 5 - ((data.stickers || []).length % 5 || 5));
