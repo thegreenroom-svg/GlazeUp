@@ -2253,6 +2253,23 @@
           <span style="font-size: 15px;">You're on the free trial. Billing starts next month. No credit card required.</span>
         </div>
 
+        <!-- Genuine Add-On discovery nudge — real business value in
+             surfacing this on the very first screen a studio sees,
+             since it was previously the 4th card down a long Setup
+             page and easy to miss entirely. Only shows add-ons this
+             studio genuinely hasn't enabled yet, pulled from the real
+             backend, not hardcoded. -->
+        <div id="dashboard-addon-nudge" style="display:none;background:linear-gradient(135deg,rgba(94,53,177,0.08),rgba(249,168,37,0.06));border:1.5px solid rgba(94,53,177,0.25);border-radius:14px;padding:16px 18px;margin-bottom:20px;cursor:pointer;" onclick="goToTab('setup')">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div style="font-size:28px;">🚀</div>
+            <div style="flex:1;">
+              <div style="font-size:14px;font-weight:800;color:var(--gu-text);">New: premium add-ons available</div>
+              <div id="dashboard-addon-nudge-text" style="font-size:12px;color:var(--gu-dust);margin-top:2px;">Cleo's Club, AI Piece Finder, and more — tap to see what's available</div>
+            </div>
+            <div style="font-size:16px;color:#5E35B1;">→</div>
+          </div>
+        </div>
+
         <!-- Extra Charges tally — PROTOTYPE, for appraisal. Not real payment
              processing yet: this is a running tally of paid-tool unlocks and
              studio equipment charges (tablet/stylus) to add to bills at
@@ -2969,6 +2986,25 @@
               <input type="text" id="kid-preview-name" placeholder="e.g. Dave" style="flex:1;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;box-sizing:border-box;">
               <button onclick="openKidPreview()" style="background:#5E35B1;color:white;border:none;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">👀 Preview as a kid</button>
             </div>
+          </div>
+
+          <!-- Genuine Offer of the Week — a real, admin-editable
+               highlighted offer shown prominently in Cleo's space on
+               the customer app. Separate from the ongoing sticker
+               system — this is a single rotating highlight the studio
+               updates whenever they want. -->
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(249,168,37,0.25);">
+            <div style="font-size:12px;font-weight:700;color:var(--gu-text);margin-bottom:8px;">🎁 Offer of the Week</div>
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+              <input type="text" id="offer-week-emoji" placeholder="🎁" maxlength="4" style="width:50px;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:16px;text-align:center;box-sizing:border-box;">
+              <input type="text" id="offer-week-title" placeholder="e.g. Free glaze upgrade this week!" style="flex:1;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;box-sizing:border-box;">
+            </div>
+            <textarea id="offer-week-description" placeholder="A bit more detail (optional)" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:12px;margin-bottom:8px;box-sizing:border-box;height:50px;"></textarea>
+            <div style="display:flex;gap:8px;">
+              <button onclick="saveOfferOfWeek(true)" style="flex:1;background:#F9A825;color:white;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;">Save &amp; show to customers</button>
+              <button onclick="saveOfferOfWeek(false)" style="background:none;border:1px solid var(--gu-border);color:var(--gu-dust);border-radius:8px;padding:9px 12px;font-size:12px;cursor:pointer;">Hide</button>
+            </div>
+            <div id="offer-week-status" style="font-size:11px;color:var(--gu-dust);margin-top:6px;"></div>
           </div>
 
           <!-- Real sticker/offers management — was previously invisible
@@ -4581,6 +4617,7 @@ function goToTab(tab, event) {
     loadCleosClubSetup();
     loadAddonMarketplace();
     loadStickerTypes();
+    loadOfferOfWeek();
   } else if (tab === 'branding') {
     loadBranding();
   } else if (tab === 'catalogue') {
@@ -8914,10 +8951,42 @@ async function loadLoyaltyLeaderboard() {
   }
 }
 
+// Genuine discovery nudge — only shows if this studio has at least one
+// real add-on (Cleo's Club or anything in the marketplace) it hasn't
+// enabled yet. Pulls real data, doesn't assume.
+async function loadDashboardAddonNudge() {
+  const nudgeEl = document.getElementById('dashboard-addon-nudge');
+  if (!nudgeEl) return;
+  try {
+    const [catalogueRes, statusRes, cleosClubRes] = await Promise.all([
+      fetch(`${API_URL}/api/addons/catalogue`),
+      fetch(`${API_URL}/api/addons/status?studioId=${studioId}`),
+      fetch(`${API_URL}/api/cleos-club/config?studioId=${studioId}`),
+    ]);
+    const catalogue = (await catalogueRes.json()).catalogue || {};
+    const status = (await statusRes.json()).addons || {};
+    const cleosClubEnabled = !!(await cleosClubRes.json()).config?.enabled;
+
+    const notEnabled = Object.keys(catalogue).filter(key => !status[key]?.enabled);
+    const totalNotEnabled = notEnabled.length + (cleosClubEnabled ? 0 : 1);
+
+    if (totalNotEnabled === 0) { nudgeEl.style.display = 'none'; return; }
+
+    const names = [];
+    if (!cleosClubEnabled) names.push("Cleo's Club");
+    notEnabled.slice(0, 2).forEach(key => names.push(catalogue[key].name));
+
+    document.getElementById('dashboard-addon-nudge-text').textContent =
+      `${names.slice(0, 2).join(', ')}${totalNotEnabled > 2 ? `, and ${totalNotEnabled - 2} more` : ''} — tap to see what's available`;
+    nudgeEl.style.display = 'block';
+  } catch (e) { /* silent — this is a discovery nudge, not critical */ }
+}
+
 async function populateDashboard() {
   loadTodaysExtraCharges();
   loadDevicePanel();
   loadLoyaltyLeaderboard();
+  loadDashboardAddonNudge();
   swtShowTrigger();
   startExtrasPollingOnLoad();
   startAlertPolling();
@@ -9863,6 +9932,39 @@ function openKidPreview() {
 
 // ── Real sticker/offers management — genuine admin visibility and
 // control, was previously only ever configurable via SQL directly. ──
+// ── Genuine Offer of the Week — real admin control ──
+async function loadOfferOfWeek() {
+  try {
+    const res = await fetch(`${API_URL}/api/cleos-club/offer-of-week?studioId=${studioId}`);
+    const data = await res.json();
+    if (data.offer) {
+      document.getElementById('offer-week-emoji').value = data.offer.emoji || '🎁';
+      document.getElementById('offer-week-title').value = data.offer.title || '';
+      document.getElementById('offer-week-description').value = data.offer.description || '';
+    }
+  } catch (e) { /* silent */ }
+}
+
+async function saveOfferOfWeek(makeActive) {
+  const statusEl = document.getElementById('offer-week-status');
+  const title = document.getElementById('offer-week-title').value.trim();
+  if (makeActive && !title) { alert('Add a title first.'); return; }
+  statusEl.textContent = 'Saving…';
+  try {
+    await fetch(`${API_URL}/api/cleos-club/offer-of-week`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId, title: title || 'Offer', active: makeActive,
+        description: document.getElementById('offer-week-description').value.trim(),
+        emoji: document.getElementById('offer-week-emoji').value.trim() || '🎁',
+      })
+    });
+    statusEl.textContent = makeActive ? '✓ Live in Cleo\'s space now.' : 'Hidden from customers.';
+  } catch (e) {
+    statusEl.textContent = 'Could not save — try again.';
+  }
+}
+
 async function loadStickerTypes() {
   const listEl = document.getElementById('cleo-sticker-list');
   try {

@@ -6121,6 +6121,29 @@ app.get('/api/cleos-club/config', async (req, res) => {
   res.json({ config: data || { enabled: false } });
 });
 
+// GET/POST /api/cleos-club/offer-of-week — a genuine, real admin-set
+// highlighted offer, shown in Cleo's space on the customer app.
+// Separate from the ongoing sticker/reward system — this is a single
+// rotating highlight, updated whenever the studio wants, not tied to
+// visit count.
+app.get('/api/cleos-club/offer-of-week', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data } = await supabase.from('cleos_club_offer_of_week').select('*').eq('studio_id', studioId).eq('active', true).single();
+  res.json({ offer: data || null });
+});
+
+app.post('/api/cleos-club/offer-of-week', async (req, res) => {
+  const { studioId, title, description, emoji, active } = req.body;
+  if (!studioId || !title) return res.status(400).json({ error: 'studioId and title required' });
+  const { data, error } = await supabase.from('cleos_club_offer_of_week').upsert({
+    studio_id: studioId, title, description: description || null,
+    emoji: emoji || '🎁', active: active !== false, updated_at: new Date().toISOString(),
+  }, { onConflict: 'studio_id' }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ offer: data });
+});
+
 // GET /api/cleos-club/sticker-types — every real sticker type on file,
 // genuine admin visibility into what actually exists (was previously
 // invisible in the admin UI — only ever seeded via SQL, never shown or

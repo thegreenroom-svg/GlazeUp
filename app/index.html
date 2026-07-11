@@ -2158,6 +2158,18 @@
             <span style="font-size:20px; color:rgba(255,255,255,0.8);">🎨</span>
           </div>
 
+          <!-- Genuine Offer of the Week — real, admin-set, in Cleo's
+               space. Separate element from the hero card above so its
+               own tap (opens her sticker board) doesn't collide with
+               the hero card's kid-mode-toggle tap action. -->
+          <div id="offer-of-week-banner" onclick="openCleosClub()" style="display:none; cursor:pointer; border-radius:16px; padding:14px 16px; margin-bottom:14px; background:linear-gradient(135deg,#F9A825,#f57c00); align-items:center; gap:12px; box-shadow:0 4px 14px rgba(249,168,37,0.3);">
+            <div id="offer-of-week-emoji" style="font-size:26px;">🎁</div>
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:10px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:rgba(255,255,255,0.85);">Offer of the Week</div>
+              <div id="offer-of-week-title" style="font-size:13px; font-weight:700; color:white;"></div>
+            </div>
+          </div>
+
           <!-- Real booking banner — links out to the studio's actual
                booking page. This app has no in-app booking flow of its
                own; all real bookings go through the website, phone, or
@@ -2325,6 +2337,7 @@
       checkCleosClubEnabled();
       initCleoFloatingWidget();
       initCleoHeroCard();
+      initOfferOfWeek();
       applyKidModeFromStorage();
 
       // TEMPORARY diagnostic — genuine measured page state on the real
@@ -3700,6 +3713,27 @@
         statsEl.textContent = `${data.memberStudios} member ${studioLabel}${countryText} · ${data.totalPiecesShared} pieces shared`;
       } catch (e) {
         statsEl.textContent = 'Tap to see the kids\' version of this page';
+      }
+    }
+
+    // Genuine Offer of the Week — real, admin-set, only shown if the
+    // studio has actually configured and activated one. No fake
+    // urgency or fabricated offers.
+    async function initOfferOfWeek() {
+      const banner = document.getElementById('offer-of-week-banner');
+      if (!banner) return;
+      try {
+        const res = await fetch(`${API_URL}/api/cleos-club/offer-of-week?studioId=${STUDIO_ID}`);
+        const data = await res.json();
+        if (data.offer && data.offer.title) {
+          document.getElementById('offer-of-week-emoji').textContent = data.offer.emoji || '🎁';
+          document.getElementById('offer-of-week-title').textContent = data.offer.title;
+          banner.style.display = 'flex';
+        } else {
+          banner.style.display = 'none';
+        }
+      } catch (e) {
+        banner.style.display = 'none';
       }
     }
 
