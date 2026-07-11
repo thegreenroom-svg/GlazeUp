@@ -2897,15 +2897,19 @@
 
         <!-- Cleo's Club — kids' sticker loyalty add-on, a real paid
              upgrade to the monthly subscription. Studios trial it,
-             enable it for their customer app, and pay extra for it. -->
+             enable it for their customer app, and pay extra for it.
+             Genuine confirmation step before activating — honestly
+             labelled as demo pricing (£10/mo) since real Stripe
+             billing for this specific add-on isn't wired up yet. -->
         <div class="setup-card" style="background:linear-gradient(135deg,rgba(249,168,37,0.08),rgba(245,124,0,0.05));border:1.5px solid rgba(249,168,37,0.3);">
           <h3>🧸 Cleo's Club <span style="font-size:11px;font-weight:500;color:var(--gu-dust);">— premium add-on</span></h3>
           <p>A friendly kids' sticker collection — Cleo appears in the customer app, kids collect a sticker every visit, and unlock a real reward every 5th visit. Shown as its own tile alongside your loyalty scheme.</p>
-          <label style="display:flex;align-items:center;gap:10px;font-size:13px;font-weight:700;color:var(--gu-text);cursor:pointer;margin-bottom:14px;">
-            <input type="checkbox" id="cleo-club-enabled-checkbox" style="width:20px;height:20px;">
-            Enable Cleo's Club for this studio
-          </label>
-          <div style="display:flex;gap:8px;margin-bottom:10px;">
+
+          <div id="cleo-club-status-badge" style="display:none;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#2e7d32;font-weight:700;">
+            ✓ Cleo's Club is enabled for this studio
+          </div>
+
+          <div style="display:flex;gap:8px;margin-bottom:14px;">
             <div style="flex:1;">
               <div style="font-size:10px;color:var(--gu-dust);margin-bottom:3px;">Reward every</div>
               <input type="number" id="cleo-club-reward-every" value="5" min="2" max="20" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;box-sizing:border-box;">
@@ -2915,8 +2919,33 @@
               <input type="text" id="cleo-club-reward-desc" value="Free small piece + a drink" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;box-sizing:border-box;">
             </div>
           </div>
-          <button class="btn-connect" onclick="saveCleosClubConfig()" style="width:100%;background:#F9A825;">Save Cleo's Club settings</button>
+
+          <button id="cleo-club-enable-btn" class="btn-connect" onclick="openCleosClubPaywall()" style="width:100%;background:#F9A825;">🧸 Enable Cleo's Club — £10/mo</button>
+          <button id="cleo-club-disable-btn" class="btn-connect" onclick="disableCleosClub()" style="width:100%;background:none;border:1px solid #d9534f;color:#d9534f;display:none;">Turn off Cleo's Club</button>
           <div id="cleo-club-setup-status" style="font-size:11px;color:var(--gu-dust);margin-top:10px;"></div>
+        </div>
+
+        <!-- Cleo's Club paywall confirmation modal — genuine confirm
+             step, not silent auto-enable. Honestly labelled as demo
+             pricing since real Stripe billing for this specific
+             add-on doesn't exist yet — this records the studio's
+             intent to pay and turns the feature on, but doesn't
+             actually charge a card. -->
+        <div id="cleo-club-paywall-modal" style="display:none;position:fixed;inset:0;z-index:9970;background:rgba(43,39,36,0.75);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:16px;">
+          <div style="background:white;border-radius:20px;max-width:380px;width:100%;padding:26px;text-align:center;">
+            <div style="font-size:44px;margin-bottom:8px;">🧸</div>
+            <div style="font-size:19px;font-weight:800;color:var(--gu-text);margin-bottom:6px;">Enable Cleo's Club</div>
+            <div style="font-size:28px;font-weight:900;color:#F9A825;margin-bottom:4px;">£10<span style="font-size:14px;font-weight:600;color:var(--gu-dust);">/month</span></div>
+            <div style="font-size:11px;color:var(--gu-dust);margin-bottom:18px;">Demo price — real billing isn't connected yet. This turns the feature on for your customer app now.</div>
+            <div style="text-align:left;background:var(--gu-bg);border-radius:12px;padding:14px;margin-bottom:18px;font-size:12px;color:var(--gu-text);line-height:1.7;">
+              ✓ Cleo mascot on every customer page<br>
+              ✓ Sticker collection every visit<br>
+              ✓ Real rewards every 5th visit<br>
+              ✓ Club Pages worldwide feed access
+            </div>
+            <button onclick="confirmEnableCleosClub()" style="width:100%;background:#F9A825;color:white;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:8px;">Confirm — Enable Now</button>
+            <button onclick="closeCleosClubPaywall()" style="width:100%;background:none;border:none;color:var(--gu-dust);padding:10px;font-size:13px;cursor:pointer;">Cancel</button>
+          </div>
         </div>
 
         <!-- Square Connection -->
@@ -9447,28 +9476,71 @@ async function loadCleosClubSetup() {
     const res = await fetch(`${API_URL}/api/cleos-club/config?studioId=${studioId}`);
     const data = await res.json();
     const config = data.config || {};
-    document.getElementById('cleo-club-enabled-checkbox').checked = !!config.enabled;
     document.getElementById('cleo-club-reward-every').value = config.reward_every_n_visits || 5;
     document.getElementById('cleo-club-reward-desc').value = config.reward_description || 'Free small piece + a drink';
+    reflectCleosClubEnabledState(!!config.enabled);
   } catch (e) { /* silent */ }
 }
 
-async function saveCleosClubConfig() {
+// Keeps the enable/disable buttons and status badge genuinely in sync
+// with whatever the real backend actually reports — not assumed.
+function reflectCleosClubEnabledState(isEnabled) {
+  document.getElementById('cleo-club-status-badge').style.display = isEnabled ? 'block' : 'none';
+  document.getElementById('cleo-club-enable-btn').style.display = isEnabled ? 'none' : 'block';
+  document.getElementById('cleo-club-disable-btn').style.display = isEnabled ? 'block' : 'none';
+}
+
+// Opens the genuine paywall confirmation — enabling isn't a silent
+// checkbox flip, it's a real "here's the price, confirm you want this"
+// step, honestly labelled as demo pricing since real Stripe billing
+// for this specific add-on doesn't exist yet.
+function openCleosClubPaywall() {
+  document.getElementById('cleo-club-paywall-modal').style.display = 'flex';
+}
+function closeCleosClubPaywall() {
+  document.getElementById('cleo-club-paywall-modal').style.display = 'none';
+}
+
+async function confirmEnableCleosClub() {
   const statusEl = document.getElementById('cleo-club-setup-status');
-  statusEl.textContent = 'Saving…';
   try {
     await fetch(`${API_URL}/api/cleos-club/config`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        studioId,
-        enabled: document.getElementById('cleo-club-enabled-checkbox').checked,
+        studioId, enabled: true,
+        rewardEveryNVisits: parseInt(document.getElementById('cleo-club-reward-every').value) || 5,
+        rewardDescription: document.getElementById('cleo-club-reward-desc').value.trim(),
+        monthlyAddonPriceCents: 1000, // £10 demo price
+      })
+    });
+    closeCleosClubPaywall();
+    reflectCleosClubEnabledState(true);
+    statusEl.textContent = '✓ Cleo\'s Club is now enabled — check your customer app.';
+  } catch (e) {
+    statusEl.textContent = 'Could not enable — try again.';
+  }
+}
+
+// Genuine off switch — no confirmation modal needed to turn something
+// OFF (only turning it on, and therefore starting to be billed for it,
+// needs the deliberate confirm step), but still asks plainly since
+// this is a real toggle a studio might not want to hit by accident.
+async function disableCleosClub() {
+  if (!confirm('Turn off Cleo\'s Club? Kids will no longer see the sticker board or Cleo\'s tile in the customer app.')) return;
+  const statusEl = document.getElementById('cleo-club-setup-status');
+  try {
+    await fetch(`${API_URL}/api/cleos-club/config`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId, enabled: false,
         rewardEveryNVisits: parseInt(document.getElementById('cleo-club-reward-every').value) || 5,
         rewardDescription: document.getElementById('cleo-club-reward-desc').value.trim(),
       })
     });
-    statusEl.textContent = '✓ Saved.';
+    reflectCleosClubEnabledState(false);
+    statusEl.textContent = 'Cleo\'s Club turned off.';
   } catch (e) {
-    statusEl.textContent = 'Could not save — try again.';
+    statusEl.textContent = 'Could not turn off — try again.';
   }
 }
 

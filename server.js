@@ -5981,14 +5981,20 @@ app.get('/api/cleos-club/config', async (req, res) => {
 // (in a real billed version this would also touch Stripe subscription
 // items — kept simple here as the on/off + settings switch itself)
 app.post('/api/cleos-club/config', async (req, res) => {
-  const { studioId, enabled, rewardEveryNVisits, rewardDescription } = req.body;
+  const { studioId, enabled, rewardEveryNVisits, rewardDescription, monthlyAddonPriceCents } = req.body;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
-  const { data, error } = await supabase.from('cleos_club_config').upsert({
+  const updates = {
     studio_id: studioId, enabled: !!enabled,
     reward_every_n_visits: rewardEveryNVisits || 5,
     reward_description: rewardDescription || 'Free small piece + a drink',
     enabled_at: enabled ? new Date().toISOString() : null,
-  }, { onConflict: 'studio_id' }).select().single();
+  };
+  // Only touch the price if genuinely provided — don't silently reset
+  // it to the schema default every time someone just edits the reward
+  // description or toggles off.
+  if (monthlyAddonPriceCents !== undefined) updates.monthly_addon_price_cents = monthlyAddonPriceCents;
+
+  const { data, error } = await supabase.from('cleos_club_config').upsert(updates, { onConflict: 'studio_id' }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json({ config: data });
 });
