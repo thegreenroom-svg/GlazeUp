@@ -25,7 +25,9 @@ SELECT check_name, result FROM (
     EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'cleos_club_set_completion_bonuses')::text
   UNION ALL
   SELECT 8, 'Cleo friend stickers present (amara/yuki/raj/maya)',
-    (SELECT COUNT(*) FROM cleos_club_sticker_types WHERE code LIKE 'friend-%') >= 4
+    (CASE WHEN EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'cleos_club_sticker_types')
+      THEN ((SELECT COUNT(*) FROM cleos_club_sticker_types WHERE code LIKE 'friend-%') >= 4)::text
+      ELSE 'false (table missing)' END)
 ) x ORDER BY ord;
 
 -- If ANY row above says "false", the real fix:
