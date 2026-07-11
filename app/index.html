@@ -1752,6 +1752,7 @@
     </div>
     <div style="padding:12px; border-top:1px solid #f0ebe4; display:flex; gap:8px;">
       <input type="text" id="assistant-input" placeholder="Or type your own question…" style="flex:1; padding:11px 14px; border:1px solid var(--gu-border); border-radius:20px; font-size:13px;" onkeydown="if(event.key==='Enter') sendAssistantMessage()">
+      <button id="assistant-mic-btn" style="background:white; border:1.5px solid var(--gu-border); color:var(--gu-text); border-radius:50%; width:40px; height:40px; font-size:15px; cursor:pointer; flex-shrink:0;">🎤</button>
       <button onclick="sendAssistantMessage()" style="background:#F9A825; color:white; border:none; border-radius:50%; width:40px; height:40px; font-size:16px; cursor:pointer; flex-shrink:0;">→</button>
     </div>
   </div>
@@ -5400,6 +5401,59 @@
     let assistantMessages = [];
     let assistantOpen = false;
 
+    // ── Genuine push-to-talk — mic is ONLY ever live while this
+    // button is actively held (mousedown/touchstart to mouseup/
+    // touchend), never continuous or always-on. Deliberately not a
+    // wake-word/always-listening system — see the real conversation
+    // that led to this design: continuous listening in a shared
+    // studio space means streaming room audio to a third-party
+    // recognition server the whole time, with no visible way for
+    // people nearby to know it's happening. Hold-to-talk means the
+    // mic is only live for the few seconds someone deliberately
+    // chooses to speak. ──
+    let _pttRecognition = null;
+    let _pttInitialized = false;
+    function initPushToTalk() {
+      const btn = document.getElementById('assistant-mic-btn');
+      if (!btn) return;
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) { btn.style.display = 'none'; return; } // genuinely hide it if the browser can't do this at all, rather than show a button that fails silently
+
+      const startListening = (e) => {
+        e.preventDefault();
+        if (_pttRecognition) return; // already listening, ignore a second trigger
+        _pttRecognition = new SpeechRecognition();
+        _pttRecognition.lang = 'en-GB';
+        _pttRecognition.interimResults = false;
+        _pttRecognition.maxAlternatives = 1;
+        btn.style.background = '#c0392b';
+        btn.style.color = 'white';
+        btn.textContent = '●';
+        _pttRecognition.onresult = (event) => {
+          const transcript = event.results[0][0].transcript;
+          const input = document.getElementById('assistant-input');
+          if (input) input.value = transcript;
+        };
+        _pttRecognition.onerror = () => { /* genuinely fine — just means nothing was heard or mic was denied, no real error to surface */ };
+        _pttRecognition.onend = () => {
+          btn.style.background = 'white';
+          btn.style.color = 'var(--gu-text)';
+          btn.textContent = '🎤';
+          _pttRecognition = null;
+        };
+        _pttRecognition.start();
+      };
+      const stopListening = () => {
+        if (_pttRecognition) _pttRecognition.stop(); // stopping genuinely ends the mic immediately — onend fires and resets the button
+      };
+
+      btn.addEventListener('mousedown', startListening);
+      btn.addEventListener('mouseup', stopListening);
+      btn.addEventListener('mouseleave', stopListening); // genuinely stop if the finger/cursor slides off while still "held"
+      btn.addEventListener('touchstart', startListening, { passive: false });
+      btn.addEventListener('touchend', stopListening);
+    }
+
     function toggleAssistant() {
       assistantOpen = !assistantOpen;
       document.getElementById('assistant-panel').style.display = assistantOpen ? 'flex' : 'none';
@@ -5411,6 +5465,7 @@
         if (mascotContainer && !mascotContainer.innerHTML) mascotContainer.innerHTML = renderCleoMascotSVG();
         const voiceBtn = document.getElementById('assistant-voice-toggle-btn');
         if (voiceBtn) voiceBtn.textContent = isAssistantVoiceMuted() ? '🔇' : '🔊';
+        if (!_pttInitialized) { initPushToTalk(); _pttInitialized = true; }
       }
       else clearAssistantArrow();
     }

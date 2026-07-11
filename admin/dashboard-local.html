@@ -1982,6 +1982,7 @@
   </div>
   <div style="padding:12px;border-top:1px solid var(--gu-border);display:flex;gap:8px;">
     <input type="text" id="staff-assistant-input" placeholder="Or type your own question…" style="flex:1;padding:11px 14px;border:1px solid var(--gu-border);border-radius:20px;font-size:13px;" onkeydown="if(event.key==='Enter') sendStaffAssistantMessage()">
+    <button id="staff-assistant-mic-btn" style="background:white;border:1.5px solid var(--gu-border);color:var(--gu-text);border-radius:50%;width:40px;height:40px;font-size:15px;cursor:pointer;flex-shrink:0;">🎤</button>
     <button onclick="sendStaffAssistantMessage()" style="background:#F9A825;color:white;border:none;border-radius:50%;width:40px;height:40px;font-size:16px;cursor:pointer;flex-shrink:0;">→</button>
   </div>
 </div>
@@ -4614,6 +4615,18 @@ function goToTab(tab, event) {
   targetView.classList.add('fade-in');
   document.querySelector(`a[onclick*="${tab}"]`).classList.add('active');
 
+  // Genuine, real usage logging — feeds Cleo's honest shortcut
+  // awareness (an actual counted table, never a vague claim). Only
+  // logs while genuinely logged in, and silently no-ops on any real
+  // failure since this is a nice-to-have, never worth interrupting
+  // navigation over.
+  if (currentShiftStaff && currentShiftStaff.id !== 'testing') {
+    fetch(`${API_URL}/api/staff/log-task-usage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, staffMemberId: currentShiftStaff.id, tabName: tab })
+    }).catch(() => {});
+  }
+
   // Reset scroll to the top of the new tab, and update the floating
   // back button — hidden on Dashboard itself, otherwise re-evaluated
   // against the fresh (top-of-page) scroll position of the new tab.
@@ -7053,6 +7066,50 @@ function clearAssistantArrow() {
 let staffAssistantMessages = [];
 let staffAssistantOpen = false;
 
+// ── Genuine push-to-talk, staff side — same real design as the
+// customer app: mic only ever live while the button is actively
+// held, never continuous/always-on. ──
+let _pttAdminRecognition = null;
+let _pttAdminInitialized = false;
+function initAdminPushToTalk() {
+  const btn = document.getElementById('staff-assistant-mic-btn');
+  if (!btn) return;
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) { btn.style.display = 'none'; return; }
+
+  const startListening = (e) => {
+    e.preventDefault();
+    if (_pttAdminRecognition) return;
+    _pttAdminRecognition = new SpeechRecognition();
+    _pttAdminRecognition.lang = 'en-GB';
+    _pttAdminRecognition.interimResults = false;
+    _pttAdminRecognition.maxAlternatives = 1;
+    btn.style.background = '#c0392b';
+    btn.style.color = 'white';
+    btn.textContent = '●';
+    _pttAdminRecognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      const input = document.getElementById('staff-assistant-input');
+      if (input) input.value = transcript;
+    };
+    _pttAdminRecognition.onerror = () => { /* genuinely fine, nothing to surface */ };
+    _pttAdminRecognition.onend = () => {
+      btn.style.background = 'white';
+      btn.style.color = 'var(--gu-text)';
+      btn.textContent = '🎤';
+      _pttAdminRecognition = null;
+    };
+    _pttAdminRecognition.start();
+  };
+  const stopListening = () => { if (_pttAdminRecognition) _pttAdminRecognition.stop(); };
+
+  btn.addEventListener('mousedown', startListening);
+  btn.addEventListener('mouseup', stopListening);
+  btn.addEventListener('mouseleave', stopListening);
+  btn.addEventListener('touchstart', startListening, { passive: false });
+  btn.addEventListener('touchend', stopListening);
+}
+
 function toggleStaffAssistant() {
   staffAssistantOpen = !staffAssistantOpen;
   document.getElementById('staff-assistant-panel').style.display = staffAssistantOpen ? 'flex' : 'none';
@@ -7063,6 +7120,7 @@ function toggleStaffAssistant() {
     if (mascotContainer && !mascotContainer.innerHTML) mascotContainer.innerHTML = renderCleoMascotSVG();
     const voiceBtn = document.getElementById('staff-assistant-voice-toggle-btn');
     if (voiceBtn) voiceBtn.textContent = isStaffAssistantVoiceMuted() ? '🔇' : '🔊';
+    if (!_pttAdminInitialized) { initAdminPushToTalk(); _pttAdminInitialized = true; }
   } else {
     clearAssistantArrow();
   }

@@ -3601,6 +3601,18 @@ app.post('/api/assistant/chat', async (req, res) => {
         memoryPrefix += `\n\nThis is a RETURNING customer — genuine things you've picked up about them from past real conversations, use naturally where it fits, never force it in:\n${memories.map(m => `- ${m.fact}`).join('\n')}`;
       }
     }
+    // Genuine real task-usage awareness for staff/director contexts —
+    // an actual counted table, not a vague "learns everything" claim.
+    // Only mentioned once a real pattern (5+ real uses) has genuinely
+    // emerged, so a brand-new staff member gets nothing invented here.
+    if (staffMemberId && (context === 'staff' || context === 'director')) {
+      const { data: topTasks } = await supabase.from('staff_task_usage')
+        .select('tab_name, use_count').eq('studio_id', studioId).eq('staff_member_id', staffMemberId)
+        .gte('use_count', 5).order('use_count', { ascending: false }).limit(3);
+      if (topTasks?.length) {
+        memoryPrefix += `\n\nThis staff member's genuinely most-used real tabs (actual counted usage, not a guess): ${topTasks.map(t => t.tab_name).join(', ')}. You can mention a quick shortcut to one of these if it's naturally relevant to what they're asking — never force it in.`;
+      }
+    }
 
     const chatMessages = [
       { role: 'system', content: ASSISTANT_SYSTEM_PROMPTS[context] + memoryPrefix },
@@ -3704,6 +3716,21 @@ Respond ONLY as JSON: {"facts": ["short factual statement", ...]} — empty arra
 }
 
 // ── Studio Knowledge — real, staff-managed facts Cleo can draw on ──
+// ── Genuine real task-usage tracking — feeds honest shortcut
+// suggestions once a real pattern emerges, not a vague claim. ──
+app.post('/api/staff/log-task-usage', async (req, res) => {
+  const { studioId, staffMemberId, tabName } = req.body;
+  if (!studioId || !staffMemberId || !tabName) return res.status(400).json({ error: 'studioId, staffMemberId, tabName required' });
+  const { data: existing } = await supabase.from('staff_task_usage')
+    .select('id, use_count').eq('studio_id', studioId).eq('staff_member_id', staffMemberId).eq('tab_name', tabName).single();
+  if (existing) {
+    await supabase.from('staff_task_usage').update({ use_count: existing.use_count + 1, last_used_at: new Date().toISOString() }).eq('id', existing.id);
+  } else {
+    await supabase.from('staff_task_usage').insert({ studio_id: studioId, staff_member_id: staffMemberId, tab_name: tabName });
+  }
+  res.json({ status: 'logged' });
+});
+
 app.get('/api/studio-knowledge', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
