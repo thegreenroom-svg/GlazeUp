@@ -1948,6 +1948,16 @@
              <button onclick="openCommunityShare()" style="width:100%; background: var(--glaze-sage-base); color:#fff; border:none; padding:11px; border-radius:12px; font-weight:600; font-size:13px; cursor:pointer;">📸 Share to Community</button>
            </div>` : '';
 
+      // Delay flag — set if the kiln misfired overnight and this
+      // customer's pieces were affected. Shown honestly and prominently
+      // rather than the customer only finding out on arrival.
+      const delayBanner = b.delayFlag
+        ? `<div class="info-card" style="background: linear-gradient(180deg, #fdeceb, #fbe2e0); border-color: #d9534f;">
+             <div style="font-family: var(--gu-font-display); font-weight: 700; color: #a13a30; font-size: 16px; margin-bottom: 4px;">⚠️ Delay to your collection</div>
+             <div style="font-size: 13px; color: #7a2c24; margin-bottom: 4px;">${b.delayReason || 'There has been a delay with your pieces.'}</div>
+             <div style="font-size: 12px; color: #7a2c24;">Please contact the studio to arrange a new collection date.</div>
+           </div>` : '';
+
       const unfinished = (hist.unfinishedPieces && hist.unfinishedPieces.length)
         ? `<div class="section-label">Your unfinished pieces</div>
            <div class="info-card">
@@ -1974,6 +1984,7 @@
           <div class="sub">Your painting session is ready. Have fun creating!</div>
         </div>
         <div class="content">
+          ${delayBanner}
           ${readyBanner}
           ${loyalty}
           ${unfinished}

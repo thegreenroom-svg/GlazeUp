@@ -1334,7 +1334,9 @@ app.get('/api/booking/:bookingCode', async (req, res) => {
         sessionStart: booking.session_start,
         sessionEnd: booking.session_end,
         notes: booking.notes,
-        homeAccessUnlocked: booking.home_access_unlocked || false
+        homeAccessUnlocked: booking.home_access_unlocked || false,
+        delayFlag: booking.delay_flag || false,
+        delayReason: booking.delay_reason || null
       },
       piecesReadyForPickup: readyPieces || [],
       customerHistory: existingCustomer ? {
@@ -1689,6 +1691,28 @@ app.post('/api/bookings/sync', async (req, res) => {
       }
     }
 
+    // Fetch the studio's real Square services (Main Studio / Lounge / The
+    // Vault / party bookings etc are each their own bookable service in
+    // Square) so each booking can be correctly labelled with which space
+    // it's actually for — this was a real gap: appointment_segments carries
+    // a service_variation_id, but it was never being read or resolved to
+    // a name, so Lounge/Vault/party bookings synced in indistinguishable
+    // from ordinary Main Studio bookings.
+    let serviceNameByVariationId = {};
+    try {
+      const catalogRes = await squareClient.catalogApi.searchCatalogObjects({
+        objectTypes: ['ITEM'],
+      });
+      (catalogRes.result.objects || []).forEach(item => {
+        const variations = item.itemData?.variations || [];
+        variations.forEach(v => {
+          serviceNameByVariationId[v.id] = item.itemData?.name || v.itemVariationData?.name || 'Session';
+        });
+      });
+    } catch (catalogErr) {
+      console.error('Could not fetch Square catalog services for space labelling:', catalogErr);
+    }
+
     // Fetch bookings from now through the next 28 days (Square caps the window at 31 days)
     const startMin = new Date().toISOString();
     const startMax = new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString();
@@ -1744,6 +1768,12 @@ app.post('/api/bookings/sync', async (req, res) => {
         ? new Date(new Date(booking.startAt).getTime() + durationMinutes * 60000).toISOString()
         : null;
 
+      // Resolve which actual space/service this booking is for — Main
+      // Studio, Lounge, The Vault, a party booking etc — from the real
+      // Square catalog service name, so these are genuinely distinguished
+      // rather than all looking like generic bookings.
+      const spaceName = serviceNameByVariationId[segment?.serviceVariationId] || null;
+
       return {
         studio_id: studioId,
         square_booking_id: booking.id,
@@ -1752,6 +1782,7 @@ app.post('/api/bookings/sync', async (req, res) => {
         customer_email: cust.email || null,
         customer_phone: cust.phone || null,
         table_number: tableNumber,
+        space_name: spaceName,
         session_start: booking.startAt,
         session_end: sessionEnd,
         party_size: null,
@@ -5930,6 +5961,119 @@ app.get('/api/bookings/table-occupancy', async (req, res) => {
     res.json({ tables: occupancy, totalBookingsToday: totalToday, occupiedNow, totalTables: tables.length });
   } catch (error) {
     console.error('Error building table occupancy snapshot:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════
+// MORNING KILN CHECK — a genuine "did the kiln fire overnight?"
+// prompt for whoever's first in on Kiln Room duty. Any kiln session
+// that was still loading/not-yet-fired the evening before, and is
+// STILL not fired by morning, is a real overnight firing that needs
+// confirming. If it didn't fire, alerts go to all staff and every
+// affected booking gets flagged so customers can be told about a
+// delay before they arrive expecting finished pieces.
+// ═══════════════════════════════════════════
+
+// GET /api/kiln/morning-check — what overnight firing(s), if any, need
+// confirming this morning
+app.get('/api/kiln/morning-check', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    // A session created yesterday or earlier, still not fired and not
+    // yet confirmed this morning, is what needs checking. Genuinely
+    // scoped to sessions from BEFORE today, not ones just loaded this
+    // morning (which obviously haven't fired yet and aren't a misfire).
+    const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+
+    const { data: sessions, error } = await supabase
+      .from('kiln_sessions')
+      .select('*, pottery_pieces(count)')
+      .eq('studio_id', studioId)
+      .neq('status', 'fired')
+      .is('morning_check_confirmed_at', null)
+      .lt('created_at', startOfToday.toISOString())
+      .not('batch_code', 'is', null)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json({ needsCheck: (sessions || []).length > 0, sessions: sessions || [] });
+  } catch (error) {
+    console.error('Error running morning kiln check:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/kiln/morning-check/confirm-fired-ok — "yes, it fired fine
+// overnight" — just logs the confirmation, no alerts needed
+app.post('/api/kiln/morning-check/confirm-fired-ok', async (req, res) => {
+  const { studioId, sessionId, confirmedBy } = req.body;
+  if (!studioId || !sessionId) return res.status(400).json({ error: 'studioId and sessionId required' });
+
+  const { data, error } = await supabase.from('kiln_sessions').update({
+    status: 'fired', fired_at: new Date().toISOString(),
+    morning_check_confirmed_at: new Date().toISOString(), morning_check_confirmed_by: confirmedBy || null,
+    morning_check_result: 'fired_ok',
+  }).eq('id', sessionId).eq('studio_id', studioId).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+
+  // Mark the pieces in this session as fired too, same as a normal fire
+  await supabase.from('pottery_pieces').update({ status: 'fired', updated_at: new Date().toISOString() })
+    .eq('kiln_session_id', sessionId).or('requires_second_firing.is.null,requires_second_firing.eq.false');
+
+  res.json({ status: 'confirmed_fired_ok', session: data });
+});
+
+// POST /api/kiln/morning-check/report-misfire — "no, it didn't fire" —
+// this is the real, genuinely important path. Alerts ALL staff, and
+// flags every booking whose pieces were in this session so customers
+// can be proactively told about a delay before they arrive.
+app.post('/api/kiln/morning-check/report-misfire', async (req, res) => {
+  const { studioId, sessionId, reportedBy, notes } = req.body;
+  if (!studioId || !sessionId) return res.status(400).json({ error: 'studioId and sessionId required' });
+
+  try {
+    const { data: session } = await supabase.from('kiln_sessions').update({
+      status: 'misfired', morning_check_confirmed_at: new Date().toISOString(),
+      morning_check_confirmed_by: reportedBy || null, morning_check_result: 'misfired',
+      misfire_notes: notes || null,
+    }).eq('id', sessionId).eq('studio_id', studioId).select().single();
+    if (!session) return res.status(404).json({ error: 'Kiln session not found' });
+
+    // Find every booking with pieces in this session, so each one can
+    // genuinely be flagged and contacted, not just a generic alert with
+    // no way to know who's actually affected.
+    const { data: affectedPieces } = await supabase.from('pottery_pieces')
+      .select('booking_id, piece_type').eq('kiln_session_id', sessionId);
+    const affectedBookingCodes = [...new Set((affectedPieces || []).map(p => p.booking_id).filter(Boolean))];
+
+    // Alert ALL staff — this is urgent and studio-wide, not routed to
+    // one role like most alerts here.
+    await supabase.from('staff_alerts').insert({
+      studio_id: studioId, trigger_type: 'kiln_misfire', next_role: null, // null = visible to everyone, not role-scoped
+      icon: '🚨', label: 'Kiln misfire overnight',
+      message: `The kiln did not fire correctly overnight (batch ${session.batch_code}). ${affectedBookingCodes.length} booking(s) affected — customers may need contacting about a delay.${notes ? ' Notes: ' + notes : ''}`,
+      context: { sessionId, batchCode: session.batch_code, affectedBookingCodes }, acknowledged: false,
+    });
+
+    // Flag each affected booking with a delay note, so it's visible
+    // wherever that booking is looked up, and staff have a clear list
+    // of who genuinely needs contacting.
+    if (affectedBookingCodes.length) {
+      await supabase.from('bookings').update({
+        delay_flag: true, delay_reason: `Kiln misfire — pieces need refiring. Please contact us about your collection date.`,
+      }).eq('studio_id', studioId).in('booking_code', affectedBookingCodes);
+    }
+
+    res.json({
+      status: 'misfire_reported', session,
+      affectedBookings: affectedBookingCodes.length,
+      affectedBookingCodes,
+    });
+  } catch (error) {
+    console.error('Error reporting kiln misfire:', error);
     res.status(500).json({ error: error.message });
   }
 });

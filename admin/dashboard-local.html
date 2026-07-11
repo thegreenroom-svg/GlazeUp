@@ -1330,6 +1330,31 @@
 <button id="swt-trigger" onclick="window.location.href='/admin/walkthrough.html'">🎯 Staff Tour</button>
 
 <!-- Morning Opening Checklist Modal -->
+<!-- Morning Kiln Check — a genuine "did it fire overnight?" prompt for
+     whoever's first on Kiln Room. Big and unmissable, same visual weight
+     as the opening checklist, since a misfire genuinely needs catching
+     first thing, not discovered mid-morning. -->
+<div id="kiln-morning-check-modal" style="display:none;position:fixed;inset:0;z-index:9150;background:rgba(43,39,36,0.75);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:20px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(43,39,36,0.4);overflow:hidden;">
+    <div style="background:#c0392b;padding:20px;text-align:center;">
+      <div style="font-size:36px;margin-bottom:6px;">🔥</div>
+      <div style="font-size:17px;font-weight:800;color:white;">Overnight kiln check</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.85);margin-top:2px;" id="kiln-check-batch-info"></div>
+    </div>
+    <div style="padding:22px;">
+      <p style="font-size:13px;color:var(--gu-text);line-height:1.6;margin:0 0 18px;">Did the kiln fire correctly overnight? Check it now before starting anything else.</p>
+      <button onclick="confirmKilnFiredOk()" style="width:100%;background:#2e7d32;color:white;border:none;border-radius:12px;padding:14px;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:10px;">✓ Yes — fired OK</button>
+      <button onclick="showMisfireForm()" style="width:100%;background:#c0392b;color:white;border:none;border-radius:12px;padding:14px;font-size:14px;font-weight:800;cursor:pointer;">✕ No — didn't fire</button>
+
+      <div id="kiln-misfire-form" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--gu-border);">
+        <p style="font-size:12px;color:var(--gu-dust);line-height:1.5;margin:0 0 10px;">This will alert every member of staff and flag every affected booking for a delay — customers can then be contacted about their collection date.</p>
+        <textarea id="misfire-notes" placeholder="What happened? (optional, e.g. power cut, element fault)" style="width:100%;padding:10px;border:1px solid var(--gu-border);border-radius:10px;font-size:13px;margin-bottom:12px;box-sizing:border-box;height:60px;resize:vertical;"></textarea>
+        <button onclick="confirmMisfire()" style="width:100%;background:#c0392b;color:white;border:none;border-radius:12px;padding:14px;font-size:14px;font-weight:800;cursor:pointer;">🚨 Send alert to all staff</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="opening-checklist-modal" style="display:none;position:fixed;inset:0;z-index:9100;background:rgba(43,39,36,0.7);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:16px;">
   <div style="background:#fff;border-radius:20px;max-width:480px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(43,39,36,0.4);">
     <!-- Header -->
@@ -4460,6 +4485,64 @@ const OPENING_CHECKLIST = [
 
 let openingCheckState = {};
 
+// ── Morning Kiln Check ──
+let _kilnCheckSessionId = null;
+
+async function checkMorningKilnStatus() {
+  try {
+    const res = await fetch(`${API_URL}/api/kiln/morning-check?studioId=${studioId}`);
+    const data = await res.json();
+    if (!data.needsCheck || !data.sessions?.length) return;
+
+    // Show the most recent unconfirmed overnight session
+    const session = data.sessions[0];
+    _kilnCheckSessionId = session.id;
+    const pieceCount = session.pottery_pieces?.[0]?.count || 0;
+    document.getElementById('kiln-check-batch-info').textContent = `Batch ${session.batch_code} · ${pieceCount} piece(s)`;
+    document.getElementById('kiln-misfire-form').style.display = 'none';
+    document.getElementById('misfire-notes').value = '';
+    document.getElementById('kiln-morning-check-modal').style.display = 'flex';
+  } catch (e) { /* silent — not worth blocking login over a failed check */ }
+}
+
+async function confirmKilnFiredOk() {
+  if (!_kilnCheckSessionId) return;
+  try {
+    await fetch(`${API_URL}/api/kiln/morning-check/confirm-fired-ok`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, sessionId: _kilnCheckSessionId, confirmedBy: currentShiftStaff?.id || null })
+    });
+    document.getElementById('kiln-morning-check-modal').style.display = 'none';
+    _kilnCheckSessionId = null;
+    // Re-check in case there's more than one overnight session waiting
+    setTimeout(checkMorningKilnStatus, 300);
+  } catch (e) {
+    alert('Could not confirm — try again.');
+  }
+}
+
+function showMisfireForm() {
+  document.getElementById('kiln-misfire-form').style.display = 'block';
+}
+
+async function confirmMisfire() {
+  if (!_kilnCheckSessionId) return;
+  const notes = document.getElementById('misfire-notes').value.trim();
+  try {
+    const res = await fetch(`${API_URL}/api/kiln/morning-check/report-misfire`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, sessionId: _kilnCheckSessionId, reportedBy: currentShiftStaff?.id || null, notes })
+    });
+    const data = await res.json();
+    document.getElementById('kiln-morning-check-modal').style.display = 'none';
+    _kilnCheckSessionId = null;
+    alert(`Alert sent to all staff. ${data.affectedBookings} booking(s) have been flagged for a delay — you can find them in Daily Bookings to contact each customer.`);
+    setTimeout(checkMorningKilnStatus, 300);
+  } catch (e) {
+    alert('Could not send the alert — try again.');
+  }
+}
+
 async function checkOpeningChecklistStatus() {
   try {
     const res = await fetch(`${API_URL}/api/staff/opening-checklist/today?studioId=${studioId}`);
@@ -5696,6 +5779,10 @@ function applyShiftUI() {
   // Opening checklist only appears once we genuinely know who's logged in —
   // sequence is always: splash -> login -> checklist, never overlapping.
   checkOpeningChecklistStatus();
+  // Morning kiln check — same idea: only makes sense once someone's
+  // actually logged in and the rest of the UI has settled. Checks if
+  // there's an overnight firing still waiting on confirmation.
+  setTimeout(checkMorningKilnStatus, 800);
 }
 
 // Direct log out — reachable in one tap from the header, no need to open
@@ -8298,7 +8385,7 @@ async function loadBookingsOverview() {
     listEl.innerHTML = bookings.length ? bookings.map(b => `
       <div style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--gu-border);font-size:12px;">
         <div style="width:44px;flex-shrink:0;color:var(--gu-dust);">${new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</div>
-        <div style="flex:1;font-weight:600;">${b.customer_name || 'Guest'}</div>
+        <div style="flex:1;font-weight:600;">${b.customer_name || 'Guest'}${b.space_name ? ` <span style="font-weight:500;color:var(--gu-dust);">· ${b.space_name}</span>` : ''}</div>
         <div style="color:var(--gu-dust);">Table ${b.table_number || '–'}</div>
       </div>
     `).join('') : '<div style="color:var(--gu-dust);font-size:12px;padding:8px 0;">No bookings today.</div>';
