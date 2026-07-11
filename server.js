@@ -6158,6 +6158,116 @@ app.get('/api/changelog', (req, res) => {
   res.json({ changelog: CHANGELOG });
 });
 
+// ═══════════════════════════════════════════════════════════
+// DEMO STUDIO ACTIVITY SIMULATION
+// The 160+ seeded studios' historical data was a one-time snapshot —
+// genuinely realistic-looking history, but static once inserted, with
+// nothing making it feel like real customers are still using those
+// studios today. This adds a real, ongoing simulation: once a day,
+// generates plausible new AI-generation and extras-charge activity
+// for demo studios only, scaled by their real plan tier so a 'multi'
+// studio genuinely looks busier than a 'solo' one, with real day-to-
+// day variation (not every studio active every day) rather than a
+// suspiciously uniform drip of identical numbers.
+//
+// STRICTLY scoped to studios.is_demo = true — The Kiln Cafe (and any
+// other genuinely real, connected studio) is never touched by this,
+// enforced by the same query filter every single run.
+// ═══════════════════════════════════════════════════════════
+
+// Roughly how many customers a studio on each plan tier might
+// realistically see using the app on an active day — a 'multi' studio
+// (multiple locations) naturally sees more traffic than a 'solo' one.
+const DEMO_ACTIVITY_RATE = {
+  solo:   { minCustomers: 0, maxCustomers: 4,  activeChance: 0.55 },
+  studio: { minCustomers: 1, maxCustomers: 9,  activeChance: 0.72 },
+  multi:  { minCustomers: 2, maxCustomers: 16, activeChance: 0.85 },
+  pilot:  { minCustomers: 0, maxCustomers: 2,  activeChance: 0.30 },
+};
+
+// Not every "customer" generates an AI design or buys an extra — most
+// just paint. This keeps the numbers plausible rather than every
+// visit magically converting into a paid extra.
+const AI_GENERATION_CHANCE_PER_CUSTOMER = 0.22;
+const EXTRA_CHARGE_CHANCE_PER_CUSTOMER = 0.35;
+const EXTRA_CHARGE_OPTIONS = [
+  { name: 'Design Preview', priceCents: 100 },
+  { name: 'Transfer Designer', priceCents: 100 },
+  { name: 'Tablet hire', priceCents: 300 },
+  { name: 'Specialist glaze', priceCents: 200 },
+];
+
+function randomInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+async function simulateDemoStudioActivity() {
+  try {
+    const { data: demoStudios } = await supabase.from('studios').select('id').eq('is_demo', true);
+    if (!demoStudios || !demoStudios.length) {
+      console.log('Demo activity simulation: no demo studios found (is_demo flag may not be set yet) — skipping.');
+      return { studiosActive: 0, totalDemoStudios: 0, generationsAdded: 0, extrasAdded: 0 };
+    }
+
+    const { data: subs } = await supabase.from('stripe_subscriptions')
+      .select('studio_id, plan_id').in('studio_id', demoStudios.map(s => s.id));
+    const planByStudio = {};
+    (subs || []).forEach(s => { planByStudio[s.studio_id] = s.plan_id; });
+
+    let studiosActiveToday = 0, generationsAdded = 0, extrasAdded = 0;
+
+    for (const studio of demoStudios) {
+      const plan = planByStudio[studio.id] || 'solo';
+      const rate = DEMO_ACTIVITY_RATE[plan] || DEMO_ACTIVITY_RATE.solo;
+
+      // Real day-to-day variation — this studio might simply not be
+      // active today at all, same as a real business has quiet days.
+      if (Math.random() > rate.activeChance) continue;
+      studiosActiveToday++;
+
+      const customers = randomInt(rate.minCustomers, rate.maxCustomers);
+      const aiRows = [], extraRows = [];
+
+      for (let i = 0; i < customers; i++) {
+        // Spread activity across the day rather than everything at
+        // once, so it looks like real visits, not a single batch dump.
+        const ts = new Date(Date.now() - randomInt(0, 20 * 60 * 60 * 1000)).toISOString();
+
+        if (Math.random() < AI_GENERATION_CHANCE_PER_CUSTOMER) {
+          aiRows.push({ studio_id: studio.id, wholesale_cost_cents: WHOLESALE_GENERATION_PRICE_CENTS, prompt: '(simulated demo activity)', created_at: ts });
+        }
+        if (Math.random() < EXTRA_CHARGE_CHANCE_PER_CUSTOMER) {
+          const extra = pick(EXTRA_CHARGE_OPTIONS);
+          extraRows.push({ studio_id: studio.id, booking_code: `demo-sim-${Date.now()}-${i}`, item_name: extra.name, amount_cents: extra.priceCents, created_at: ts });
+        }
+      }
+
+      if (aiRows.length) { await supabase.from('ai_generation_usage').insert(aiRows); generationsAdded += aiRows.length; }
+      if (extraRows.length) { await supabase.from('app_extra_charges').insert(extraRows); extrasAdded += extraRows.length; }
+    }
+
+    console.log(`Demo activity simulation: ${studiosActiveToday}/${demoStudios.length} studios active, +${generationsAdded} AI generations, +${extrasAdded} extras charges.`);
+    return { studiosActive: studiosActiveToday, totalDemoStudios: demoStudios.length, generationsAdded, extrasAdded };
+  } catch (err) {
+    console.error('Demo activity simulation failed:', err.message);
+    return { error: err.message };
+  }
+}
+
+// POST /api/admin/simulate-demo-activity — manual trigger, e.g. right
+// before a demo/pitch, rather than only waiting for the daily schedule.
+// Director-only, same access check as Platform Revenue.
+app.post('/api/admin/simulate-demo-activity', async (req, res) => {
+  const { staffMemberId } = req.body;
+  if (!staffMemberId) return res.status(401).json({ error: 'Not authorised' });
+  const { data: staffMember } = await supabase.from('staff_team').select('name').eq('id', staffMemberId).single();
+  const firstName = (staffMember?.name || '').trim().split(' ')[0].toLowerCase();
+  if (!PLATFORM_REVENUE_ACCESS_NAMES.includes(firstName)) {
+    return res.status(403).json({ error: 'Restricted to directors.' });
+  }
+  const result = await simulateDemoStudioActivity();
+  res.json(result);
+});
+
 app.listen(port, () => {
   console.log(`✓ Link server running on port ${port}`);
   console.log(`  Square OAuth: ${process.env.SQUARE_CLIENT_ID ? '✓' : '✗'}`);
@@ -6183,6 +6293,12 @@ app.listen(port, () => {
   }
   pingSelf(); // fire one immediately on boot, then every 14 minutes
   setInterval(pingSelf, 14 * 60 * 1000);
+
+  // Demo studio activity simulation (function defined above, top-level) —
+  // run once shortly after boot (in case the server restarts mid-day and
+  // misses that day's run), then once every 24 hours.
+  setTimeout(simulateDemoStudioActivity, 30 * 1000);
+  setInterval(simulateDemoStudioActivity, 24 * 60 * 60 * 1000);
 });
 
 module.exports = app;
