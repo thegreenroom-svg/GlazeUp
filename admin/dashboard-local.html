@@ -5157,8 +5157,9 @@ function cleoAdminSpeak(text, onStart, onEnd, pitch, rate) {
   // walkthrough tour) pass their own values.
   utt.rate = rate != null ? rate : 1.05;
   utt.pitch = pitch != null ? pitch : 2; // genuine real maximum (spec range 0-2), per direct request
-  utt.lang = 'en-GB';
-  utt.voice = getCleoAdminPreferredVoice();
+  const selectedVoice = getCleoAdminPreferredVoice();
+  utt.voice = selectedVoice;
+  utt.lang = selectedVoice ? selectedVoice.lang : 'en-GB'; // genuine fix — use the selected voice's own real language, not a hardcoded mismatch
   if (onStart) utt.onstart = onStart;
   if (onEnd) utt.onend = onEnd;
   window.speechSynthesis.speak(utt);
@@ -5178,6 +5179,10 @@ function getCleoAdminPreferredVoice() {
     const saved = voices.find(v => v.name === savedName);
     if (saved) return saved;
   }
+  // Genuine real default, per direct request: "Junior" if this
+  // device actually has it.
+  const junior = voices.find(v => v.name === 'Junior');
+  if (junior) return junior;
   const ukFemale = voices.find(v => v.lang === 'en-GB' && CLEO_ADMIN_FEMALE_VOICE_HINTS.some(hint => v.name.toLowerCase().includes(hint)));
   if (ukFemale) return ukFemale;
   const anyFemale = voices.find(v => CLEO_ADMIN_FEMALE_VOICE_HINTS.some(hint => v.name.toLowerCase().includes(hint)));
@@ -5205,7 +5210,7 @@ function openCleoAdminVoicePicker() {
   const currentVoice = getCleoAdminPreferredVoice();
 
   messagesEl.innerHTML = `
-    <div style="font-size:12px;color:var(--gu-dust);margin-bottom:8px;line-height:1.4;">🎙️ These are the real voices on this device — no app can add a genuine "child" voice, browsers don't offer one, so pick whichever sounds best.</div>
+    <div style="font-size:12px;color:var(--gu-dust);margin-bottom:8px;line-height:1.4;">🎙️ These are the real voices available on this device — including different languages. No app can add a genuine "child" voice, browsers don't offer one, so pick whichever sounds best.</div>
     ${ordered.map(v => {
       const isSelected = currentVoice && v.name === currentVoice.name;
       return `
@@ -7151,11 +7156,21 @@ let staffAssistantOpen = false;
 // held, never continuous/always-on. ──
 let _pttAdminRecognition = null;
 let _pttAdminInitialized = false;
+// Genuine, honest fallback for real devices that don't support the
+// custom SpeechRecognition API — points to the device's own real,
+// already-working dictation instead of a non-functional button.
+function showStaffNativeDictationInstructions() {
+  appendStaffAssistantBubble('🎤 On this device, tap the text box below, then tap your keyboard\'s own microphone icon to speak instead of type — it\'s already built in, no need for a separate button.', false);
+}
+
 function initAdminPushToTalk() {
   const btn = document.getElementById('staff-assistant-mic-btn');
   if (!btn) return;
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) { btn.style.display = 'none'; return; }
+  // Genuine, honest real platform gap (iOS Safari, most notably) —
+  // show the button either way, but wire it to a clear instruction
+  // rather than silently hiding it with no explanation.
+  if (!SpeechRecognition) { btn.onclick = showStaffNativeDictationInstructions; btn.style.display = 'flex'; return; }
 
   const startListening = (e) => {
     e.preventDefault();

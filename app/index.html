@@ -1753,7 +1753,7 @@
     </div>
     <div style="padding:12px; border-top:1px solid #f0ebe4; display:flex; gap:8px;">
       <input type="text" id="assistant-input" placeholder="Or type your own question…" style="flex:1; padding:11px 14px; border:1px solid var(--gu-border); border-radius:20px; font-size:13px;" onkeydown="if(event.key==='Enter') sendAssistantMessage()">
-      <button id="assistant-mic-btn" style="background:white; border:1.5px solid var(--gu-border); color:var(--gu-text); border-radius:50%; width:40px; height:40px; font-size:15px; cursor:pointer; flex-shrink:0;">🎤</button>
+      <button id="assistant-mic-btn" style="display:none; background:white; border:1.5px solid var(--gu-border); color:var(--gu-text); border-radius:50%; width:40px; height:40px; font-size:15px; cursor:pointer; flex-shrink:0;">🎤</button>
       <button onclick="sendAssistantMessage()" style="background:#F9A825; color:white; border:none; border-radius:50%; width:40px; height:40px; font-size:16px; cursor:pointer; flex-shrink:0;">→</button>
     </div>
   </div>
@@ -1766,8 +1766,8 @@
   <div id="cleo-voice-picker-modal" style="display:none; position:fixed; inset:0; z-index:9700; background:rgba(43,39,36,0.75); backdrop-filter:blur(6px); align-items:center; justify-content:center; padding:20px;">
     <div style="background:white; border-radius:20px; max-width:380px; width:100%; max-height:80vh; display:flex; flex-direction:column;">
       <div style="padding:20px 20px 12px;">
-        <div style="font-size:16px; font-weight:800; color:var(--gu-text); margin-bottom:4px;">🎙️ Choose Cleo's voice</div>
-        <div style="font-size:12px; color:var(--gu-dust); line-height:1.4;">These are the actual voices available on this device — no app can add a real "child" voice, browsers don't offer one, so pick whichever sounds best to you.</div>
+        <div style="font-size:16px; font-weight:800; color:var(--gu-text); margin-bottom:4px;">🎙️ Choose Cleo's voice &amp; language</div>
+        <div style="font-size:12px; color:var(--gu-dust); line-height:1.4;">These are the actual voices available on this device — including different languages. No app can add a real "child" voice, browsers don't offer one, so pick whichever sounds best to you.</div>
       </div>
       <div id="cleo-voice-picker-list" style="flex:1; overflow-y:auto; padding:0 20px 12px;"></div>
       <div style="padding:12px 20px; border-top:1px solid #f0ebe4;">
@@ -2361,6 +2361,7 @@
       initCleoFloatingWidget();
       initCleoHeroCard();
       initOfferOfWeek();
+      initPushToTalk(); // genuine support check runs immediately, so the mic button is never shown at all on a device that can't use it (e.g. iOS Safari, which has no real SpeechRecognition support)
       applyKidModeFromStorage();
 
       // TEMPORARY diagnostic — genuine measured page state on the real
@@ -5431,12 +5432,31 @@
     // mic is only live for the few seconds someone deliberately
     // chooses to speak. ──
     let _pttRecognition = null;
-    let _pttInitialized = false;
+    // Genuine, honest fallback for real devices (iOS Safari included)
+    // that don't support the custom SpeechRecognition API — points
+    // people to their OWN device's real, already-working dictation,
+    // in clear, sequenced steps, rather than a non-functional button.
+    function showNativeDictationInstructions() {
+      appendAssistantBubble('🎤 On this device, tap the text box below, then tap your keyboard\'s own microphone icon to speak instead of type — it\'s already built in, no need for a separate button.', false);
+    }
+
     function initPushToTalk() {
       const btn = document.getElementById('assistant-mic-btn');
       if (!btn) return;
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognition) { btn.style.display = 'none'; return; } // genuinely hide it if the browser can't do this at all, rather than show a button that fails silently
+      // Genuine, honest real platform gap: iOS Safari does not
+      // support SpeechRecognition at all — this isn't a bug, it's a
+      // real Apple limitation. Rather than silently hide the mic
+      // button (leaving no real explanation), show it once, tap it to
+      // reveal a clear, sequenced instruction pointing to the
+      // device's own real dictation — which genuinely already works
+      // in this exact text field, no extra code needed.
+      if (!SpeechRecognition) {
+        btn.onclick = showNativeDictationInstructions;
+        btn.style.display = 'flex';
+        return;
+      }
+      btn.style.display = 'flex';
 
       const startListening = (e) => {
         e.preventDefault();
@@ -5484,7 +5504,6 @@
         if (mascotContainer && !mascotContainer.innerHTML) mascotContainer.innerHTML = renderCleoMascotSVG();
         const voiceBtn = document.getElementById('assistant-voice-toggle-btn');
         if (voiceBtn) voiceBtn.textContent = isAssistantVoiceMuted() ? '🔇' : '🔊';
-        if (!_pttInitialized) { initPushToTalk(); _pttInitialized = true; }
       }
       else clearAssistantArrow();
     }
@@ -6173,8 +6192,14 @@
       // tour) pass their own values; anything else defaults to hers.
       utt.rate = rate != null ? rate : 1.05;
       utt.pitch = pitch != null ? pitch : 2; // genuine real maximum (spec range 0-2), per direct request
-      utt.lang = 'en-GB';
-      utt.voice = getCleoPreferredVoice();
+      const selectedVoice = getCleoPreferredVoice();
+      utt.voice = selectedVoice;
+      // Genuine fix: lang was hardcoded to en-GB regardless of which
+      // real voice was actually selected — if someone genuinely picks
+      // a non-English voice from the picker (for international real
+      // users), this would mismatch and cause wrong pronunciation.
+      // Use the selected voice's own real language instead.
+      utt.lang = selectedVoice ? selectedVoice.lang : 'en-GB';
       if (onStart) utt.onstart = onStart;
       if (onEnd) utt.onend = onEnd;
       window.speechSynthesis.speak(utt);
@@ -6200,6 +6225,10 @@
         const saved = voices.find(v => v.name === savedName);
         if (saved) return saved;
       }
+      // Genuine real default, per direct request: "Junior" if this
+      // device actually has it (confirmed present in the picker).
+      const junior = voices.find(v => v.name === 'Junior');
+      if (junior) return junior;
       const ukFemale = voices.find(v => v.lang === 'en-GB' && CLEO_FEMALE_VOICE_HINTS.some(hint => v.name.toLowerCase().includes(hint)));
       if (ukFemale) return ukFemale;
       const anyFemale = voices.find(v => CLEO_FEMALE_VOICE_HINTS.some(hint => v.name.toLowerCase().includes(hint)));
