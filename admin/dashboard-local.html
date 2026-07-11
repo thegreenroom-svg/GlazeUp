@@ -247,8 +247,12 @@
         font-size: 14px !important;
       }
       /* These move into the task queue drawer on phone instead of
-         living in the header — see the drawer's own button row. */
-      #headset-setup-btn, #step-counter-btn, #direct-logout-btn, #direct-break-btn {
+         living in the header — see the drawer's own button row.
+         Clock Out is the exception: it now stays visible everywhere,
+         including phone, as the big bottom bar — hiding it inside a
+         drawer defeated the point of it being easy to see and
+         remember when putting the device down. */
+      #headset-setup-btn, #step-counter-btn, #direct-break-btn {
         display: none !important;
       }
       #phone-header-menu {
@@ -415,8 +419,16 @@
       padding: 28px 32px 40px;
     }
 
+    /* Extra bottom clearance so real content never sits behind the big
+       fixed Clock Out bar — only applied while genuinely logged in
+       (body.has-clockout-bar), toggled alongside the button itself. */
+    body.has-clockout-bar .admin-content {
+      padding-bottom: 76px;
+    }
+
     @media (max-width: 900px) {
       .admin-content { padding: 20px 18px 40px; }
+      body.has-clockout-bar .admin-content { padding-bottom: 76px; }
     }
 
     .view {
@@ -1313,8 +1325,15 @@
     #swt-step-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: #B87946; text-transform: uppercase; margin-bottom: 5px; }
     #swt-title { font-size: 16px; font-weight: 700; color: #2B2724; margin-bottom: 5px; line-height: 1.25; }
     #swt-body { font-size: 12px; color: #8a8175; line-height: 1.55; margin-bottom: 14px; }
-    #swt-actions { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
-    #swt-next-btn { flex: 1; background: #2B2724; color: #fff; border: none; padding: 11px; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; }
+    #swt-actions { display: flex; flex-direction: column; gap: 8px; }
+    #swt-nav-row { display: flex; gap: 8px; }
+    /* Big, unmissable GO/BACK buttons — replaces a small "Next →" text
+       link with a genuinely large, obvious action, matching the same
+       "easy to see and remember" principle as the Clock Out button. */
+    #swt-next-btn { flex: 1; background: #2e7d32; color: #fff; border: none; padding: 15px; border-radius: 12px; font-weight: 800; font-size: 15px; cursor: pointer; letter-spacing: 0.02em; }
+    #swt-back-btn { background: #3d3833; color: #fff; border: none; padding: 15px 18px; border-radius: 12px; font-weight: 800; font-size: 15px; cursor: pointer; }
+    #swt-back-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    #swt-bottom-row { display: flex; justify-content: space-between; align-items: center; }
     #swt-skip-btn { background: none; border: none; color: #8a8175; font-size: 11px; cursor: pointer; padding: 6px; }
     #swt-dots { display: flex; gap: 4px; align-items: center; }
     .swt-dot { width: 5px; height: 5px; border-radius: 50%; background: #C8BFB2; transition: all 0.2s; }
@@ -1336,9 +1355,14 @@
     <div id="swt-title">Welcome to kilnLINK Staff</div>
     <div id="swt-body">Your studio management app. Let's walk through the whole thing — takes about 2 minutes.</div>
     <div id="swt-actions">
-      <div id="swt-dots"></div>
-      <button id="swt-voice-btn" onclick="swtToggleVoice()">🔊 Read aloud</button>
-      <button id="swt-next-btn" onclick="swtNext()">Next →</button>
+      <div id="swt-nav-row">
+        <button id="swt-back-btn" onclick="swtBack()" disabled>← BACK</button>
+        <button id="swt-next-btn" onclick="swtNext()">GO →</button>
+      </div>
+      <div id="swt-bottom-row">
+        <div id="swt-dots"></div>
+        <button id="swt-voice-btn" onclick="swtToggleVoice()">🔊 Read aloud</button>
+      </div>
     </div>
     <button id="swt-skip-btn" onclick="swtEnd()">Skip tour</button>
   </div>
@@ -1377,7 +1401,7 @@
      for the "customer/staff wants to know where a piece is, right now"
      moment. Distinct from the assistant (bottom-left) and A2HS banner —
      this is deliberately its own always-visible action, bottom-right. -->
-<button id="find-piece-fab" onclick="openFindMyPiece()" style="display:none;position:fixed;bottom:20px;right:16px;z-index:9700;background:#c0392b;color:white;border:none;border-radius:50%;width:64px;height:64px;font-size:26px;box-shadow:0 6px 22px rgba(192,57,43,0.4);cursor:pointer;">
+<button id="find-piece-fab" onclick="openFindMyPiece()" style="display:none;position:fixed;bottom:78px;right:16px;z-index:9700;background:#c0392b;color:white;border:none;border-radius:50%;width:64px;height:64px;font-size:26px;box-shadow:0 6px 22px rgba(192,57,43,0.4);cursor:pointer;">
   🔍
 </button>
 
@@ -1624,7 +1648,7 @@
      automatic (that's a deliberate platform security boundary), so this
      is the closest thing to it — one big, unmissable first step. */
   .a2hs-banner {
-    position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 9200;
+    position: fixed; left: 12px; right: 12px; bottom: 76px; z-index: 9200;
     background: linear-gradient(135deg, #2B2724 0%, #3d2e28 100%);
     border: 1.5px solid rgba(184,121,70,0.4);
     border-radius: 24px; padding: 20px;
@@ -1823,9 +1847,12 @@
   <span id="shift-badge-break-indicator" style="display:none;background:#3949ab;color:white;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;">☕ BREAK</span>
   <span id="shift-task-count-badge" style="display:none;background:#e53935;color:white;font-size:10px;font-weight:800;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 4px;">0</span>
 </button>
-<!-- Direct log out — always visible next to the badge, no need to open the task queue first -->
-<button id="direct-logout-btn" onclick="confirmDirectLogout()" title="Log out" style="display:none;position:fixed;top:16px;right:198px;z-index:850;background:#fff5f5;border:1.5px solid #f0c0c0;border-left:none;border-radius:0 24px 24px 0;padding:8px 12px;font-size:14px;color:#c62828;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.12);">
-  ⏻
+<!-- Clock Out — rebuilt as a genuinely big, unmissable button (was a
+     tiny power icon easy to miss/forget). Fixed to the bottom of the
+     screen so it's always in the same predictable place when putting
+     the device down at the end of a shift. -->
+<button id="direct-logout-btn" onclick="confirmDirectLogout()" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:8600;background:#c0392b;color:white;border:none;padding:16px;font-size:17px;font-weight:800;cursor:pointer;box-shadow:0 -4px 16px rgba(0,0,0,0.25);align-items:center;justify-content:center;gap:10px;">
+  <span style="font-size:20px;">⏻</span> CLOCK OUT
 </button>
 <!-- Direct break toggle — always visible, same one-tap access as logout -->
 <button id="direct-break-btn" onclick="toggleBreak()" title="Take a break" style="display:none;position:fixed;top:44px;right:198px;z-index:850;background:white;border:1.5px solid var(--gu-border);border-radius:16px;padding:5px 12px;font-size:11px;font-weight:700;color:#3949ab;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.12);white-space:nowrap;">
@@ -1837,7 +1864,7 @@
      staff_alerts entry, not a dead end. Context auto-switches to
      'director' for David/Jenny/Daisy (adds Platform Revenue lookups),
      'staff' for everyone else. -->
-<button id="staff-assistant-fab" onclick="toggleStaffAssistant()" style="display:none;position:fixed;bottom:20px;left:20px;z-index:9800;width:72px;height:72px;border-radius:50%;background:#2B2724;color:white;border:none;box-shadow:0 6px 22px rgba(0,0,0,0.35);cursor:pointer;animation:assistantFabPulse 2.2s ease-in-out infinite;display:flex;align-items:center;justify-content:center;">
+<button id="staff-assistant-fab" onclick="toggleStaffAssistant()" style="display:none;position:fixed;bottom:78px;left:20px;z-index:9800;width:72px;height:72px;border-radius:50%;background:#2B2724;color:white;border:none;box-shadow:0 6px 22px rgba(0,0,0,0.35);cursor:pointer;animation:assistantFabPulse 2.2s ease-in-out infinite;display:flex;align-items:center;justify-content:center;">
   <svg id="assistant-brush-icon" width="44" height="44" viewBox="0 0 44 44" style="animation:brushWiggle 2.4s ease-in-out infinite;transform-origin:22px 42px;">
     <!-- Long slender handle, tapering slightly toward the ferrule -->
     <path d="M19.5 2 L24.5 2 L23.5 24 L20.5 24 Z" fill="#C98A4B"/>
@@ -1870,7 +1897,7 @@
 <!-- Speech-bubble hint — makes it obvious the assistant is there to ask
      something, without needing to tap the FAB first. Dismissible, and
      hides itself the moment the assistant is actually opened. -->
-<div id="staff-assistant-hint" style="display:none;position:fixed;bottom:32px;left:96px;z-index:9799;background:white;border:1.5px solid var(--gu-border);border-radius:16px 16px 16px 4px;padding:10px 14px;font-size:13px;font-weight:600;color:var(--gu-text);box-shadow:0 4px 16px rgba(0,0,0,0.15);max-width:220px;cursor:pointer;" onclick="toggleStaffAssistant()">
+<div id="staff-assistant-hint" style="display:none;position:fixed;bottom:90px;left:96px;z-index:9799;background:white;border:1.5px solid var(--gu-border);border-radius:16px 16px 16px 4px;padding:10px 14px;font-size:13px;font-weight:600;color:var(--gu-text);box-shadow:0 4px 16px rgba(0,0,0,0.15);max-width:220px;cursor:pointer;" onclick="toggleStaffAssistant()">
   What would you like to do? Ask me anything 👋
   <button onclick="event.stopPropagation(); dismissStaffAssistantHint();" style="position:absolute;top:-8px;right:-8px;background:var(--gu-dust);color:white;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;line-height:1;">✕</button>
 </div>
@@ -4634,6 +4661,16 @@ function swtNext() {
   swtRender();
 }
 
+// Genuine backward navigation — the tour never had this before, only
+// forward + skip. Disabled on the first step since there's nowhere to
+// go back to.
+function swtBack() {
+  if (swtStep <= 0) return;
+  swtStopVoice();
+  swtStep--;
+  swtRender();
+}
+
 function swtRender() {
   const step = SWT_STEPS[swtStep];
 
@@ -4648,7 +4685,9 @@ function swtRender() {
   document.getElementById('swt-step-label').textContent = `Step ${swtStep + 1} of ${SWT_STEPS.length}`;
   document.getElementById('swt-title').textContent = step.title;
   document.getElementById('swt-body').textContent = step.body;
-  document.getElementById('swt-next-btn').textContent = swtStep === SWT_STEPS.length - 1 ? 'Done ✓' : 'Next →';
+  document.getElementById('swt-next-btn').textContent = swtStep === SWT_STEPS.length - 1 ? 'DONE ✓' : 'GO →';
+  const backBtn = document.getElementById('swt-back-btn');
+  backBtn.disabled = swtStep === 0;
 
   const dots = document.getElementById('swt-dots');
   dots.innerHTML = SWT_STEPS.map((_,i) =>
@@ -6290,6 +6329,7 @@ async function logOutOfShift() {
   document.getElementById('headset-setup-btn').style.display = 'none';
   document.getElementById('direct-logout-btn').style.display = 'none';
   document.getElementById('direct-break-btn').style.display = 'none';
+  document.body.classList.remove('has-clockout-bar');
   document.getElementById('staff-assistant-fab').style.display = 'none';
   document.getElementById('staff-assistant-panel').style.display = 'none';
   staffAssistantOpen = false;
@@ -6316,6 +6356,7 @@ function applyShiftUI() {
   document.getElementById('step-counter-btn').style.display = 'flex';
   document.getElementById('direct-logout-btn').style.display = 'flex';
   document.getElementById('direct-break-btn').style.display = 'flex';
+  document.body.classList.add('has-clockout-bar');
   document.getElementById('staff-assistant-fab').style.display = 'flex';
   document.getElementById('find-piece-fab').style.display = 'flex';
   // Show the hint bubble shortly after login (not instantly — let the

@@ -425,19 +425,45 @@
     }
     #wt-actions {
       display: flex;
+      flex-direction: column;
       gap: 8px;
-      align-items: center;
     }
+    #wt-nav-row {
+      display: flex;
+      gap: 8px;
+    }
+    /* Big, unmissable GO/BACK buttons — matches the same "easy to see"
+       principle used for other primary actions throughout the app. */
     #wt-next-btn {
       flex: 1;
+      background: #2e7d32;
+      color: #fff;
+      border: none;
+      padding: 15px;
+      border-radius: 12px;
+      font-weight: 800;
+      font-size: 15px;
+      cursor: pointer;
+      letter-spacing: 0.02em;
+    }
+    #wt-back-btn {
       background: var(--link-charcoal);
       color: #fff;
       border: none;
-      padding: 12px;
+      padding: 15px 18px;
       border-radius: 12px;
-      font-weight: 700;
-      font-size: 14px;
+      font-weight: 800;
+      font-size: 15px;
       cursor: pointer;
+    }
+    #wt-back-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+    #wt-bottom-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
     #wt-skip-btn {
       background: none;
@@ -1154,9 +1180,14 @@
       <div id="wt-title">Welcome to kilnLINK</div>
       <div id="wt-body">Your personal pottery studio companion. Let's take a quick tour!</div>
       <div id="wt-actions">
-        <div id="wt-dots"></div>
-        <button id="wt-voice-btn" onclick="wtToggleVoice()">🔊 Read aloud</button>
-        <button id="wt-next-btn" onclick="wtNext()">Next →</button>
+        <div id="wt-nav-row">
+          <button id="wt-back-btn" onclick="wtBack()" disabled>← BACK</button>
+          <button id="wt-next-btn" onclick="wtNext()">GO →</button>
+        </div>
+        <div id="wt-bottom-row">
+          <div id="wt-dots"></div>
+          <button id="wt-voice-btn" onclick="wtToggleVoice()">🔊 Read aloud</button>
+        </div>
       </div>
       <button id="wt-skip-btn" onclick="wtEnd()">Skip tour</button>
     </div>
@@ -5064,6 +5095,15 @@
       wtRender();
     }
 
+    // Genuine backward navigation — matches the same fix applied to
+    // the staff app's tour. Disabled on the first step.
+    function wtBack() {
+      if (wtStep <= 0) return;
+      wtStopVoice();
+      wtStep--;
+      wtRender();
+    }
+
     function wtRender() {
       const step = WT_STEPS[wtStep];
       const overlay = document.getElementById('wt-overlay');
@@ -5076,7 +5116,8 @@
       document.getElementById('wt-title').textContent = step.title;
       document.getElementById('wt-body').textContent = step.body;
       document.getElementById('wt-next-btn').textContent =
-        wtStep === WT_STEPS.length - 1 ? 'Done ✓' : 'Next →';
+        wtStep === WT_STEPS.length - 1 ? 'DONE ✓' : 'GO →';
+      document.getElementById('wt-back-btn').disabled = wtStep === 0;
 
       // Progress dots
       const dots = document.getElementById('wt-dots');
