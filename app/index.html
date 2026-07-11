@@ -193,15 +193,16 @@
 
     .a2hs-banner {
       position: fixed;
-      left: 14px; right: 14px; bottom: 14px;
+      left: 12px; right: 12px; bottom: 12px;
       background: linear-gradient(135deg, var(--link-charcoal) 0%, #3d2e28 100%);
-      border: 1px solid rgba(184,121,70,0.35);
-      border-radius: 20px;
-      padding: 16px 18px;
-      box-shadow: 0 12px 32px -6px rgba(43,39,36,0.55), 0 0 0 1px rgba(184,121,70,0.15);
+      border: 1.5px solid rgba(184,121,70,0.4);
+      border-radius: 24px;
+      padding: 20px;
+      box-shadow: 0 16px 40px -8px rgba(43,39,36,0.6), 0 0 0 1px rgba(184,121,70,0.15);
       z-index: 900;
       display: flex;
-      align-items: center;
+      flex-direction: column;
+      align-items: stretch;
       gap: 14px;
       animation: a2hsSlideUp 0.4s cubic-bezier(0.34,1.2,0.4,1) both;
     }
@@ -209,38 +210,48 @@
       from { transform: translateY(120%); opacity: 0; }
       to   { transform: translateY(0);    opacity: 1; }
     }
+    .a2hs-banner-header {
+      display: flex; align-items: center; gap: 14px;
+    }
     .a2hs-icon-wrap {
-      width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+      width: 56px; height: 56px; border-radius: 16px; flex-shrink: 0;
       background: linear-gradient(135deg, var(--link-clay) 0%, #8a5520 100%);
       display: flex; align-items: center; justify-content: center;
-      font-size: 22px; box-shadow: 0 3px 10px rgba(184,121,70,0.4);
+      font-size: 28px; box-shadow: 0 4px 14px rgba(184,121,70,0.45);
     }
     .a2hs-banner .a2hs-text {
       flex: 1; line-height: 1.4;
     }
     .a2hs-banner .a2hs-text b {
-      display: block; font-size: 13px; font-weight: 700; color: white; margin-bottom: 2px;
+      display: block; font-size: 16px; font-weight: 800; color: white; margin-bottom: 3px;
     }
     .a2hs-banner .a2hs-text span {
-      font-size: 11px; color: rgba(255,255,255,0.55);
+      font-size: 12.5px; color: rgba(255,255,255,0.65);
     }
-    .a2hs-banner .a2hs-buttons {
-      display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;
-    }
+    /* The install action is now a genuinely big, full-width, unmissable
+       button — this is deliberately the "first step" the customer sees,
+       not a small compact banner action easy to overlook or dismiss
+       without noticing. */
     .a2hs-banner .a2hs-install {
+      width: 100%;
       background: var(--link-clay);
       color: white;
-      border: none; border-radius: 10px;
-      padding: 9px 16px; font-size: 12px; font-weight: 700;
-      cursor: pointer; white-space: nowrap;
-      box-shadow: 0 2px 8px rgba(184,121,70,0.4);
+      border: none; border-radius: 16px;
+      padding: 18px; font-size: 16px; font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(184,121,70,0.45);
       transition: background 0.2s, transform 0.15s;
+      animation: a2hsPulse 2.4s ease-in-out infinite;
     }
-    .a2hs-banner .a2hs-install:active { transform: scale(0.96); }
+    @keyframes a2hsPulse {
+      0%, 100% { box-shadow: 0 4px 14px rgba(184,121,70,0.45), 0 0 0 0 rgba(184,121,70,0.4); }
+      50% { box-shadow: 0 4px 14px rgba(184,121,70,0.45), 0 0 0 10px rgba(184,121,70,0); }
+    }
+    .a2hs-banner .a2hs-install:active { transform: scale(0.97); }
     .a2hs-banner .a2hs-dismiss {
       background: none; border: none;
-      color: rgba(255,255,255,0.35); font-size: 11px;
-      cursor: pointer; text-align: center; padding: 2px;
+      color: rgba(255,255,255,0.4); font-size: 12px;
+      cursor: pointer; text-align: center; padding: 6px;
     }
 
     /* ── Design Preview tool ── */
@@ -1908,6 +1919,7 @@
               <div id="sc-error" style="color: #c0392b; font-size: 12px; margin-top: 10px; text-align: center;"></div>
             </div>
           </div>`;
+        showA2HSBanner();
         return;
       }
 
@@ -2124,12 +2136,21 @@
       document.getElementById('my-qr-modal').style.display = 'none';
     }
 
-    // ── Add to Home Screen: so the customer can get back to THEIR exact booking
-    // page anytime, even after fully closing the tab — no email/SMS needed. ──
+    // ── Add to Home Screen: the "big button, first step" install prompt.
+    // Genuinely can't be made fully automatic — no browser lets a website
+    // silently place an icon on someone's home screen without a real tap,
+    // that's a deliberate security boundary on every platform, not a gap
+    // in this build. This is the honest version: as prominent and simple
+    // as a single real tap can be. Shows for ANY visit now, not just
+    // booking-linked ones — previously this only ever appeared if a
+    // ?booking= code was in the URL, so a customer opening the app
+    // generically would never see any install prompt at all. ──
 
     let deferredInstallPrompt = null;
     const bookingCodeForA2HS = getParam('booking');
-    const dismissKey = bookingCodeForA2HS ? `a2hs_dismissed_${bookingCodeForA2HS}` : null;
+    // Dismissal is remembered per-booking if there is one, otherwise
+    // generally for this device — either way, don't nag repeatedly.
+    const dismissKey = bookingCodeForA2HS ? `a2hs_dismissed_${bookingCodeForA2HS}` : 'a2hs_dismissed_general';
 
     function isStandalone() {
       return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -2139,43 +2160,52 @@
     }
 
     function showA2HSBanner() {
-      if (!bookingCodeForA2HS) return;
       if (isStandalone()) return;
-      if (dismissKey && localStorage.getItem(dismissKey)) return;
+      if (localStorage.getItem(dismissKey)) return;
 
       const banner = document.getElementById('a2hs-banner');
+      const subtitle = bookingCodeForA2HS
+        ? 'One tap gets you straight back to your session, anytime — no email or text needed.'
+        : 'One tap for instant access next time — no need to find this link again.';
 
       if (isIOS()) {
+        // iOS Safari has no programmatic install trigger at all — the
+        // ONLY way to add a home screen icon is the Share sheet, and no
+        // website can open that automatically. This is the honest
+        // maximum: one big, clear instruction, not a fake one-tap button.
         banner.innerHTML = `
-          <div class="a2hs-icon-wrap">📲</div>
-          <div class="a2hs-text">
-            <b>Save to your home screen</b>
-            <span>Tap Share → <strong style="color:rgba(255,255,255,0.8)">Add to Home Screen</strong> to get back to your session anytime.</span>
+          <div class="a2hs-banner-header">
+            <div class="a2hs-icon-wrap">📲</div>
+            <div class="a2hs-text">
+              <b>Add kilnLINK to your Home Screen</b>
+              <span>${subtitle}</span>
+            </div>
           </div>
-          <div class="a2hs-buttons">
-            <button class="a2hs-dismiss" onclick="dismissA2HS()">✕ Dismiss</button>
-          </div>`;
+          <button class="a2hs-install" onclick="alert('Tap the Share button below (square with an arrow), then scroll down and tap \\'Add to Home Screen\\'.')">👆 Tap Share, then "Add to Home Screen"</button>
+          <button class="a2hs-dismiss" onclick="dismissA2HS()">Not now</button>`;
       } else if (deferredInstallPrompt) {
+        // Android/Chrome genuinely supports one real tap doing the whole
+        // thing — this is the closest to "automatic" that's possible.
         banner.innerHTML = `
-          <div class="a2hs-icon-wrap">🏺</div>
-          <div class="a2hs-text">
-            <b>Save kilnLINK to your home screen</b>
-            <span>One tap to get back to your session anytime.</span>
+          <div class="a2hs-banner-header">
+            <div class="a2hs-icon-wrap">🏺</div>
+            <div class="a2hs-text">
+              <b>Add kilnLINK to your Home Screen</b>
+              <span>${subtitle}</span>
+            </div>
           </div>
-          <div class="a2hs-buttons">
-            <button class="a2hs-install" onclick="triggerInstall()">📲 Add to home screen</button>
-            <button class="a2hs-dismiss" onclick="dismissA2HS()">Not now</button>
-          </div>`;
+          <button class="a2hs-install" onclick="triggerInstall()">📲 Add to Home Screen</button>
+          <button class="a2hs-dismiss" onclick="dismissA2HS()">Not now</button>`;
       } else {
         banner.innerHTML = `
-          <div class="a2hs-icon-wrap">📲</div>
-          <div class="a2hs-text">
-            <b>Save kilnLINK to your home screen</b>
-            <span>Bookmark this page to check back on your session anytime.</span>
+          <div class="a2hs-banner-header">
+            <div class="a2hs-icon-wrap">📲</div>
+            <div class="a2hs-text">
+              <b>Save kilnLINK for next time</b>
+              <span>Bookmark this page, or check your browser menu for "Add to Home Screen".</span>
+            </div>
           </div>
-          <div class="a2hs-buttons">
-            <button class="a2hs-dismiss" onclick="dismissA2HS()">✕ Dismiss</button>
-          </div>`;
+          <button class="a2hs-dismiss" onclick="dismissA2HS()">Got it</button>`;
       }
 
       banner.style.display = 'flex';
@@ -2183,7 +2213,7 @@
 
     function dismissA2HS() {
       document.getElementById('a2hs-banner').style.display = 'none';
-      if (dismissKey) localStorage.setItem(dismissKey, '1');
+      localStorage.setItem(dismissKey, '1');
     }
 
     async function triggerInstall() {

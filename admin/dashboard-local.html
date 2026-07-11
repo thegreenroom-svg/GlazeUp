@@ -4,6 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Studio Admin · Link</title>
+  <link rel="manifest" href="/admin/manifest.json">
+  <link rel="apple-touch-icon" href="/brand-assets/app-icon/LINK-app-icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#2B2724">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -1355,6 +1360,8 @@
   </div>
 </div>
 
+<div id="a2hs-banner-admin"></div>
+
 <div id="opening-checklist-modal" style="display:none;position:fixed;inset:0;z-index:9100;background:rgba(43,39,36,0.7);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:16px;">
   <div style="background:#fff;border-radius:20px;max-width:480px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(43,39,36,0.4);">
     <!-- Header -->
@@ -1504,6 +1511,47 @@
       margin-top: 2px;
     }
   }
+  /* Add to Home Screen — big button install prompt for staff, same
+     honest approach as the customer app: no browser lets this be fully
+     automatic (that's a deliberate platform security boundary), so this
+     is the closest thing to it — one big, unmissable first step. */
+  .a2hs-banner {
+    position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 9200;
+    background: linear-gradient(135deg, #2B2724 0%, #3d2e28 100%);
+    border: 1.5px solid rgba(184,121,70,0.4);
+    border-radius: 24px; padding: 20px;
+    box-shadow: 0 16px 40px -8px rgba(43,39,36,0.6);
+    display: none; flex-direction: column; gap: 14px;
+    animation: a2hsSlideUp 0.4s cubic-bezier(0.34,1.2,0.4,1) both;
+    max-width: 420px; margin: 0 auto;
+  }
+  @keyframes a2hsSlideUp {
+    from { transform: translateY(120%); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+  .a2hs-banner-header { display: flex; align-items: center; gap: 14px; }
+  .a2hs-icon-wrap {
+    width: 56px; height: 56px; border-radius: 16px; flex-shrink: 0;
+    background: linear-gradient(135deg, #B87946 0%, #8a5520 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; box-shadow: 0 4px 14px rgba(184,121,70,0.45);
+  }
+  .a2hs-banner .a2hs-text { flex: 1; line-height: 1.4; }
+  .a2hs-banner .a2hs-text b { display: block; font-size: 16px; font-weight: 800; color: white; margin-bottom: 3px; }
+  .a2hs-banner .a2hs-text span { font-size: 12.5px; color: rgba(255,255,255,0.65); }
+  .a2hs-banner .a2hs-install {
+    width: 100%; background: #B87946; color: white; border: none; border-radius: 16px;
+    padding: 18px; font-size: 16px; font-weight: 800; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(184,121,70,0.45);
+    animation: a2hsPulse 2.4s ease-in-out infinite;
+  }
+  @keyframes a2hsPulse {
+    0%, 100% { box-shadow: 0 4px 14px rgba(184,121,70,0.45), 0 0 0 0 rgba(184,121,70,0.4); }
+    50% { box-shadow: 0 4px 14px rgba(184,121,70,0.45), 0 0 0 10px rgba(184,121,70,0); }
+  }
+  .a2hs-banner .a2hs-install:active { transform: scale(0.97); }
+  .a2hs-banner .a2hs-dismiss { background: none; border: none; color: rgba(255,255,255,0.4); font-size: 12px; cursor: pointer; text-align: center; padding: 6px; }
+
   /* Assistant floating buttons — bigger and gently pulsing so they're
      genuinely hard to miss, without being so aggressive it's annoying
      during a whole shift. */
@@ -5378,6 +5426,74 @@ let currentBreakId = null; // set while on a break, null otherwise
 // the screen sleep/wake or a normal refresh resume the same session
 // instead of forcing a fresh PIN entry every single time, while a truly
 // idle tablet (nobody's touched it in hours) still correctly times out.
+// ── Add to Home Screen for staff — same honest approach as the customer
+// app: no browser lets a website silently place a home screen icon, so
+// this is a genuinely big, unmissable first-step button instead. Shown
+// once someone's actually logged in (this is a work tool, showing it on
+// the anonymous splash screen wouldn't make sense), and only once per
+// device rather than nagging every shift. ──
+let _deferredInstallPromptAdmin = null;
+
+function isStandaloneAdmin() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+function isIOSAdmin() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent);
+}
+
+function showAdminA2HSBanner() {
+  if (isStandaloneAdmin()) return; // already installed, running as a real app
+  if (localStorage.getItem('klnk_admin_a2hs_dismissed')) return;
+
+  const banner = document.getElementById('a2hs-banner-admin');
+  if (!banner) return;
+
+  if (isIOSAdmin()) {
+    banner.innerHTML = `
+      <div class="a2hs-banner-header">
+        <div class="a2hs-icon-wrap">📲</div>
+        <div class="a2hs-text">
+          <b>Add kilnLINK to your Home Screen</b>
+          <span>Quick access every shift — no need to find this link again.</span>
+        </div>
+      </div>
+      <button class="a2hs-install" onclick="alert('Tap the Share button below (square with an arrow), then scroll down and tap \\'Add to Home Screen\\'.')">👆 Tap Share, then "Add to Home Screen"</button>
+      <button class="a2hs-dismiss" onclick="dismissAdminA2HS()">Not now</button>`;
+  } else if (_deferredInstallPromptAdmin) {
+    banner.innerHTML = `
+      <div class="a2hs-banner-header">
+        <div class="a2hs-icon-wrap">🏺</div>
+        <div class="a2hs-text">
+          <b>Add kilnLINK to your Home Screen</b>
+          <span>Quick access every shift — one tap sets it up.</span>
+        </div>
+      </div>
+      <button class="a2hs-install" onclick="triggerAdminInstall()">📲 Add to Home Screen</button>
+      <button class="a2hs-dismiss" onclick="dismissAdminA2HS()">Not now</button>`;
+  } else {
+    return; // Neither iOS nor a real install prompt available — nothing genuinely useful to show
+  }
+  banner.style.display = 'flex';
+}
+
+function dismissAdminA2HS() {
+  document.getElementById('a2hs-banner-admin').style.display = 'none';
+  localStorage.setItem('klnk_admin_a2hs_dismissed', '1');
+}
+
+async function triggerAdminInstall() {
+  if (!_deferredInstallPromptAdmin) return;
+  _deferredInstallPromptAdmin.prompt();
+  await _deferredInstallPromptAdmin.userChoice;
+  _deferredInstallPromptAdmin = null;
+  dismissAdminA2HS();
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _deferredInstallPromptAdmin = e;
+});
+
 function markSessionActive() {
   if (currentShiftStaff && currentShiftStaff.id !== 'testing') {
     localStorage.setItem('klnk_last_active', Date.now().toString());
@@ -5808,6 +5924,10 @@ function applyShiftUI() {
   // actually logged in and the rest of the UI has settled. Checks if
   // there's an overnight firing still waiting on confirmation.
   setTimeout(checkMorningKilnStatus, 800);
+  // Install banner — deliberately after the checklist/kiln-check, and
+  // delayed, so it doesn't visually compete with anything more
+  // operationally important that might also be showing right after login.
+  setTimeout(showAdminA2HSBanner, 2000);
 }
 
 // Direct log out — reachable in one tap from the header, no need to open
