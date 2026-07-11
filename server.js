@@ -6102,6 +6102,36 @@ app.get('/api/version', (req, res) => {
   res.json({ bootTime: SERVER_BOOT_TIME });
 });
 
+// GET /api/changelog — plain-English "what's new" entries, shown when
+// someone taps the green "update available" banner. Daisy doesn't have
+// a developer to explain each change to her, so this is genuinely her
+// changelog — newest first, kept short and non-technical. Add a new
+// entry here (top of the array) with every meaningful change shipped.
+const CHANGELOG = [
+  { date: '2026-07-11', items: [
+    'New "Choose a Piece" section — customers can now browse real photos of your stock from home and reserve one to be pre-glazed ready for their visit (needs at least 7 days notice).',
+    'New Packing step between firing and pickup — pieces now need to be packed (currently Jenny) before customers see them as ready for collection.',
+    'Login now stays open through the day if the tablet screen sleeps — no need to log back in every time it wakes up, only after a genuine long gap.',
+    'Fixed the opening checklist sometimes popping up twice.',
+    'Fixed Lounge, Vault, and party bookings not being labelled correctly when synced from Square.',
+    'Today\'s Bookings now shows real bookings straight away, with a small table map so you can see who\'s where at a glance.',
+    'Added a big "Add to Home Screen" button so the app can sit on your phone/tablet like a normal app.',
+  ]},
+  { date: '2026-07-10', items: [
+    'Fixed the Branding page not showing your actual saved studio name and colours.',
+    'kilnLINK Sales header made bigger and clearer, with more accurate figures.',
+    'New paintbrush character for the AI assistant, with a friendly wiggle animation.',
+  ]},
+  { date: '2026-07-09', items: [
+    'Fixed a bug where staff PIN login could get stuck in a loop back to the name picker.',
+    'Fixed device slot limits blocking login when too many devices had been used for testing.',
+  ]},
+];
+
+app.get('/api/changelog', (req, res) => {
+  res.json({ changelog: CHANGELOG });
+});
+
 app.listen(port, () => {
   console.log(`✓ Link server running on port ${port}`);
   console.log(`  Square OAuth: ${process.env.SQUARE_CLIENT_ID ? '✓' : '✗'}`);

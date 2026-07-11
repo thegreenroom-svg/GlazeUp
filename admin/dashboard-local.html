@@ -1578,10 +1578,28 @@
 <!-- Update available banner — shown when the server has been redeployed
      since this page loaded. Pages can't be pushed live automatically,
      so this is the honest next-best thing: a clear, unmissable prompt
-     rather than someone unknowingly running a stale version. -->
+     rather than someone unknowingly running a stale version. Tapping it
+     shows what's actually changed first (in plain English), THEN reloads
+     — since there's no developer on hand to explain updates individually,
+     this is genuinely the changelog. -->
 <div id="update-available-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:99999;background:#2e7d32;color:white;padding:10px 16px;text-align:center;font-size:13px;font-weight:700;box-shadow:0 2px 10px rgba(0,0,0,0.3);">
   ✨ A new version is available —
-  <button onclick="window.location.reload()" style="background:white;color:#2e7d32;border:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:800;cursor:pointer;margin-left:8px;">Tap to update</button>
+  <button onclick="showChangelogBeforeUpdate()" style="background:white;color:#2e7d32;border:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:800;cursor:pointer;margin-left:8px;">What's new?</button>
+</div>
+
+<div id="changelog-modal" style="display:none;position:fixed;inset:0;z-index:99998;background:rgba(43,39,36,0.7);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:16px;">
+  <div style="background:white;border-radius:20px;max-width:420px;width:100%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;">
+    <div style="background:#2e7d32;color:white;padding:18px 20px;">
+      <div style="font-size:17px;font-weight:800;">✨ What's new</div>
+      <div style="font-size:12px;opacity:0.85;">Recent updates to kilnLINK</div>
+    </div>
+    <div id="changelog-list" style="overflow-y:auto;padding:16px 20px;flex:1;">
+      <div style="text-align:center;color:var(--gu-dust);font-size:13px;padding:20px 0;">Loading…</div>
+    </div>
+    <div style="padding:14px 20px;border-top:1px solid var(--gu-border);">
+      <button onclick="window.location.reload()" style="width:100%;background:#2e7d32;color:white;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:800;cursor:pointer;">✓ Update now</button>
+    </div>
+  </div>
 </div>
 
 <!-- On phone widths, these three buttons flow into this horizontal bar instead
@@ -10997,6 +11015,35 @@ function startExtrasPollingOnLoad() {
 // polls the server's boot time and prompts a refresh if it's changed
 // since this page loaded, i.e. a new deploy has genuinely gone live.
 let _initialBootTime = null;
+// Shows what's actually changed, in plain English, before reloading —
+// genuinely the changelog since there's no developer on hand to explain
+// updates one by one. Fetched fresh from the server each time so it's
+// always current, not baked into this file (which would itself be stale
+// the moment a new version ships).
+async function showChangelogBeforeUpdate() {
+  document.getElementById('changelog-modal').style.display = 'flex';
+  const listEl = document.getElementById('changelog-list');
+  try {
+    const res = await fetch(`${API_URL}/api/changelog`);
+    const data = await res.json();
+    const entries = data.changelog || [];
+    if (!entries.length) {
+      listEl.innerHTML = '<div style="text-align:center;color:var(--gu-dust);font-size:13px;padding:20px 0;">Nothing to show yet — just tap Update now.</div>';
+      return;
+    }
+    listEl.innerHTML = entries.map(entry => `
+      <div style="margin-bottom:18px;">
+        <div style="font-size:11px;font-weight:800;color:#2e7d32;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">${new Date(entry.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+        <ul style="margin:0;padding-left:18px;">
+          ${entry.items.map(item => `<li style="font-size:13px;color:var(--gu-text);line-height:1.6;margin-bottom:4px;">${item}</li>`).join('')}
+        </ul>
+      </div>
+    `).join('');
+  } catch (e) {
+    listEl.innerHTML = '<div style="text-align:center;color:var(--gu-dust);font-size:13px;padding:20px 0;">Could not load what\'s new — you can still update below.</div>';
+  }
+}
+
 async function checkForAppUpdate() {
   try {
     const res = await fetch(`${API_URL}/api/version`, { cache: 'no-store' });
