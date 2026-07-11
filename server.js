@@ -7211,7 +7211,7 @@ Colour is NOT reliable evidence if this is comparing an unfired to a fired piece
 
     const enriched = (parsed.matches || []).map(m => {
       const candidate = allCandidates.find(c => c.id === m.id);
-      return { ...m, label: candidate?.label, photo_url: candidate?.photo_url };
+      return { ...m, label: candidate?.label, photo_url: candidate?.photo_url, booking_id: candidate?.booking_id || null, source: candidate?.source };
     });
 
     await supabase.from('piece_search_log').insert({
@@ -7425,7 +7425,30 @@ Return a ranked list of the most likely matches (up to 4), each with: the refere
       packer_id: packerId || null,
     }).select().single();
 
-    res.json({ matches: enrichedMatches, noConfidentMatch: !!parsed.noConfidentMatch, matchAttemptId: logEntry?.id });
+    // Genuine auto-assignment — only when the AI is genuinely
+    // confident AND there's a clear single best match, not merely top
+    // of a close/ambiguous ranking. A second candidate also at "high"
+    // confidence means it's genuinely ambiguous, so it stays a
+    // human-confirmed suggestion instead. Wrongly auto-marking a piece
+    // as packed/found is a real mistake (a customer could be told the
+    // wrong piece is theirs), so this is deliberately conservative —
+    // logged for a real audit trail, and genuinely reversible via the
+    // undo endpoint below, never silent or permanent-only.
+    let autoAssigned = null;
+    const topMatch = enrichedMatches[0];
+    const secondMatch = enrichedMatches[1];
+    const genuinelyUnambiguous = !secondMatch || secondMatch.confidence !== 'high';
+    if (topMatch && topMatch.confidence === 'high' && genuinelyUnambiguous && !parsed.noConfidentMatch) {
+      const { data: updatedPiece, error: assignError } = await supabase.from('pottery_pieces')
+        .update({ status: 'packed', packed_at: new Date().toISOString(), auto_matched: true })
+        .eq('id', topMatch.id).eq('studio_id', studioId).select().single();
+      if (!assignError && updatedPiece) {
+        autoAssigned = { pieceId: topMatch.id, pieceType: topMatch.piece_type, reason: topMatch.reason };
+        if (logEntry) await supabase.from('piece_match_attempts').update({ packer_confirmed: true }).eq('id', logEntry.id);
+      }
+    }
+
+    res.json({ matches: enrichedMatches, noConfidentMatch: !!parsed.noConfidentMatch, matchAttemptId: logEntry?.id, autoAssigned });
   } catch (error) {
     console.error('Piece matching error:', error);
     res.status(500).json({ error: 'Could not run the match right now — please compare manually.' });
@@ -7441,6 +7464,21 @@ app.patch('/api/pieces/match/:attemptId/confirm', async (req, res) => {
     .update({ packer_confirmed: !!confirmed }).eq('id', attemptId).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json({ attempt: data });
+});
+
+// POST /api/pieces/:pieceId/undo-auto-match — genuine, real undo for a
+// wrongly auto-assigned piece. Auto-assignment is deliberately
+// conservative, but still needs a real, easy way to correct a mistake
+// if the AI got it wrong — this isn't a silent, permanent action.
+app.post('/api/pieces/:pieceId/undo-auto-match', async (req, res) => {
+  const { pieceId } = req.params;
+  const { studioId } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data, error } = await supabase.from('pottery_pieces')
+    .update({ status: 'fired', packed_at: null, auto_matched: false })
+    .eq('id', pieceId).eq('studio_id', studioId).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ piece: data });
 });
 
 app.get('/health', (req, res) => {

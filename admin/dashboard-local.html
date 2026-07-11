@@ -9597,6 +9597,21 @@ async function handlePieceMatchCapture(event) {
       const data = await res.json();
       if (!res.ok) { resultEl.innerHTML = `<div style="padding:14px;color:#d9534f;font-size:13px;">${data.error || 'Could not run the match.'}</div>`; return; }
 
+      // Genuine auto-assignment happened — shown honestly and clearly,
+      // never silent. Real undo option right there, since this is a
+      // real automatic action that could genuinely be wrong.
+      if (data.autoAssigned) {
+        resultEl.innerHTML = `
+          <div style="padding:16px;background:#e8f5e9;border:1.5px solid #2e7d32;border-radius:12px;">
+            <div style="font-size:15px;font-weight:800;color:#2e7d32;margin-bottom:6px;">✓ Auto-matched — high confidence</div>
+            <div style="font-size:13px;color:var(--gu-text);margin-bottom:4px;">${data.autoAssigned.pieceType || 'Piece'} genuinely recognised and marked found automatically — no confirmation needed.</div>
+            <div style="font-size:11px;color:var(--gu-dust);line-height:1.4;margin-bottom:10px;">${data.autoAssigned.reason || ''}</div>
+            <button onclick="undoAutoMatch('${data.autoAssigned.pieceId}')" style="background:none;border:1px solid #d9534f;color:#d9534f;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;">↩ Undo — this isn't right</button>
+          </div>`;
+        loadPieceMatchGroup(); // refresh the real found-count progress, since a piece just genuinely changed status
+        return;
+      }
+
       if (data.noConfidentMatch || !data.matches?.length) {
         resultEl.innerHTML = `<div style="padding:14px;background:#fff3e0;border-radius:10px;font-size:13px;color:var(--gu-text);">🤷 No confident match found — please compare manually against the reference photos above.</div>`;
         return;
@@ -9622,6 +9637,24 @@ async function handlePieceMatchCapture(event) {
     }
   };
   reader.readAsDataURL(file);
+}
+
+// Genuine, real undo for an auto-matched piece — since auto-assignment
+// skips the normal human confirmation step, this is the real safety
+// net if the AI got it wrong. Reverts the piece back to 'fired' status
+// so it shows up as still needing to be found/matched normally.
+async function undoAutoMatch(pieceId) {
+  if (!confirm('Undo this auto-match? The piece goes back to needing to be found normally.')) return;
+  try {
+    await fetch(`${API_URL}/api/pieces/${pieceId}/undo-auto-match`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId })
+    });
+    document.getElementById('pm-match-result').innerHTML = '<div style="padding:14px;background:#fff3e0;border-radius:10px;font-size:13px;">Undone — this piece is back to needing a real match.</div>';
+    loadPieceMatchGroup(); // genuinely refresh the found-count progress
+  } catch (e) {
+    alert('Could not undo — try again.');
+  }
 }
 
 async function confirmPieceMatch(attemptId, confirmed) {
