@@ -2411,6 +2411,43 @@
             </div>
           </div>
 
+          <!-- Packing — sits between firing and pickup. Currently
+               allocated to Jenny. A piece coming out of the kiln isn't
+               genuinely ready for the customer until it's been packed —
+               boxed/set aside — and this stage makes that a real,
+               tracked step rather than pieces silently becoming "ready"
+               the instant they're fired. -->
+          <div class="chart-container" style="background:linear-gradient(135deg,rgba(46,125,50,0.06),rgba(33,150,243,0.05));border:1.5px solid rgba(46,125,50,0.25);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <h3 style="margin:0;">📦 Packing <span style="font-size:11px;font-weight:500;color:var(--gu-dust);">— currently Jenny</span></h3>
+              <button onclick="loadPackingQueue()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:14px;padding:4px 8px;font-weight:bold;">🔄 Refresh</button>
+            </div>
+            <p style="font-size:11px;color:var(--gu-dust);margin-bottom:14px;line-height:1.5;">
+              Pieces are fired but not yet ready for the customer — they need packing first. Pack a batch, then confirm with at least one QR/booking code from that batch so there's a clear record of what came out and when.
+            </p>
+            <div id="packing-queue-list" style="margin-bottom:14px;">
+              <div style="padding:10px;color:var(--gu-dust);font-size:12px;">Loading…</div>
+            </div>
+            <div id="packing-complete-form" style="display:none;background:white;border-radius:10px;padding:14px;border:1px solid var(--gu-border);">
+              <div style="font-size:12px;font-weight:700;margin-bottom:8px;" id="packing-form-title">Complete packing</div>
+              <input type="text" id="packing-reference-code" placeholder="Scan or paste a QR/booking code from this batch" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">
+              <div style="display:flex;gap:8px;margin-bottom:8px;">
+                <div style="flex:1;">
+                  <div style="font-size:10px;color:var(--gu-dust);margin-bottom:3px;">Fired date</div>
+                  <input type="date" id="packing-fired-date" style="width:100%;padding:8px;border:1px solid var(--gu-border);border-radius:8px;font-size:12px;box-sizing:border-box;">
+                </div>
+                <div style="flex:1;">
+                  <div style="font-size:10px;color:var(--gu-dust);margin-bottom:3px;">Due to be pulled</div>
+                  <input type="date" id="packing-pull-date" style="width:100%;padding:8px;border:1px solid var(--gu-border);border-radius:8px;font-size:12px;box-sizing:border-box;">
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;">
+                <button onclick="completePacking()" style="flex:1;background:#2e7d32;color:white;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;">✓ Confirm packed</button>
+                <button onclick="cancelPackingForm()" style="background:none;border:1px solid var(--gu-border);color:var(--gu-dust);border-radius:8px;padding:10px 14px;font-size:13px;cursor:pointer;">Cancel</button>
+              </div>
+            </div>
+          </div>
+
           <!-- Ready for Pickup -->
           <div class="chart-container">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
@@ -5129,6 +5166,32 @@ let currentShiftStaff = null; // { id, name, role }
 let currentShiftId = null; // timesheet row ID for automatic clock-out
 let currentBreakId = null; // set while on a break, null otherwise
 
+// Records "still genuinely in use" — called on login, and periodically
+// while someone's actually interacting with the tablet. This is what lets
+// the screen sleep/wake or a normal refresh resume the same session
+// instead of forcing a fresh PIN entry every single time, while a truly
+// idle tablet (nobody's touched it in hours) still correctly times out.
+function markSessionActive() {
+  if (currentShiftStaff && currentShiftStaff.id !== 'testing') {
+    localStorage.setItem('klnk_last_active', Date.now().toString());
+  }
+}
+
+// Update the activity timestamp on real interaction (throttled — no need
+// to write to localStorage on every single touch) and when the tablet's
+// screen wakes back up.
+let _lastActivityWrite = 0;
+document.addEventListener('touchstart', () => {
+  const now = Date.now();
+  if (now - _lastActivityWrite > 60000) { // at most once a minute
+    markSessionActive();
+    _lastActivityWrite = now;
+  }
+}, { passive: true });
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) markSessionActive(); // screen just woke up — this shift is still active
+});
+
 function checkShiftLogin() {
   if (!SHIFT_PIN_LOGIN_ENABLED) {
     // PIN login disabled for now — auto-apply a placeholder "Testing" identity
@@ -5140,15 +5203,36 @@ function checkShiftLogin() {
     return;
   }
 
-  // Login is required every time the app is opened or refreshed — it does
-  // NOT persist across reloads. This is deliberate: a shared studio tablet
-  // needs to always ask "who's using this right now" rather than silently
-  // carrying on as whoever last logged in, which risks tasks, timekeeping,
-  // and duties being attributed to the wrong person.
+  // Login now genuinely survives the tablet's screen sleeping/waking, or a
+  // normal page refresh, for up to SESSION_TIMEOUT_HOURS of real inactivity
+  // — this is the "still on shift" case, same person picking the tablet
+  // back up a few minutes later shouldn't have to re-enter their PIN.
+  // Beyond that window (screen off overnight, shift genuinely ended,
+  // different person picks up the tablet after a long gap), it correctly
+  // clocks the previous person out and asks who's using it now — same
+  // protection against wrong-person-attribution as before, just not
+  // triggered by every single screen lock during an active shift.
+  const SESSION_TIMEOUT_HOURS = 4;
   const previousSession = localStorage.getItem('klnk_shift_staff');
+  const lastActiveAt = parseInt(localStorage.getItem('klnk_last_active') || '0', 10);
+  const hoursSinceActive = (Date.now() - lastActiveAt) / (1000 * 60 * 60);
+
+  if (previousSession && lastActiveAt && hoursSinceActive < SESSION_TIMEOUT_HOURS) {
+    // Still within the same shift window — resume without asking again
+    try {
+      currentShiftStaff = JSON.parse(previousSession);
+      currentShiftId = localStorage.getItem('klnk_shift_id') || null;
+      currentBreakId = localStorage.getItem('klnk_break_id') || null;
+      markSessionActive();
+      applyShiftUI();
+      return;
+    } catch (e) { /* fall through to fresh login if the saved session is corrupt */ }
+  }
+
   if (previousSession) {
-    // Properly clock out whoever was previously logged in before clearing
-    // the session, so their hours worked stay accurate.
+    // Genuinely stale session (past the timeout, or a fresh app open after
+    // a long gap) — clock the previous person out properly before asking
+    // who's using the tablet now, so their hours worked stay accurate.
     try {
       const prevStaff = JSON.parse(previousSession);
       const prevShiftId = localStorage.getItem('klnk_shift_id');
@@ -5162,6 +5246,7 @@ function checkShiftLogin() {
     localStorage.removeItem('klnk_shift_staff');
     localStorage.removeItem('klnk_shift_id');
     localStorage.removeItem('klnk_break_id');
+    localStorage.removeItem('klnk_last_active');
   }
 
   currentShiftStaff = null;
@@ -5281,6 +5366,7 @@ async function submitShiftPin() {
     currentShiftId = data.shiftId || null;
     localStorage.setItem('klnk_shift_staff', JSON.stringify(currentShiftStaff));
     if (currentShiftId) localStorage.setItem('klnk_shift_id', currentShiftId);
+    markSessionActive();
     document.getElementById('shift-login-modal').style.display = 'none';
     errorEl.style.display = 'none';
     applyShiftUI();
@@ -5330,6 +5416,7 @@ async function submitNewPin() {
     currentShiftId = loginData.shiftId || null;
     localStorage.setItem('klnk_shift_staff', JSON.stringify(currentShiftStaff));
     if (currentShiftId) localStorage.setItem('klnk_shift_id', currentShiftId);
+    markSessionActive();
     document.getElementById('shift-login-modal').style.display = 'none';
     applyShiftUI();
   } catch(e) {
@@ -5462,6 +5549,7 @@ async function logOutOfShift() {
   localStorage.removeItem('klnk_shift_staff');
   localStorage.removeItem('klnk_shift_id');
   localStorage.removeItem('klnk_break_id');
+  localStorage.removeItem('klnk_last_active');
   currentShiftStaff = null;
   document.getElementById('shift-badge').style.display = 'none';
   document.getElementById('step-counter-btn').style.display = 'none';
@@ -8995,6 +9083,101 @@ function loadKilnData() {
   loadReadyForPickup();
   loadActiveKilnBatches();
   loadTransferPipeline();
+  loadPackingQueue();
+}
+
+// ── Packing — between firing and pickup, currently Jenny's job ──
+let _packingSelectedPieceIds = [];
+
+async function loadPackingQueue() {
+  const listEl = document.getElementById('packing-queue-list');
+  if (!listEl) return;
+  try {
+    const res = await fetch(`${API_URL}/api/packing/queue?studioId=${studioId}`);
+    const data = await res.json();
+    const pieces = data.pieces || [];
+
+    if (!pieces.length) {
+      listEl.innerHTML = '<div style="padding:10px;color:var(--gu-dust);font-size:12px;">Nothing waiting to be packed right now.</div>';
+      document.getElementById('packing-complete-form').style.display = 'none';
+      return;
+    }
+
+    // Reset selection to everything in the queue by default — packing is
+    // usually done as a whole batch, but individual pieces can be
+    // deselected if only some of a batch is actually ready to box up.
+    _packingSelectedPieceIds = pieces.map(p => p.id);
+
+    listEl.innerHTML = `
+      <div style="font-size:11px;color:var(--gu-dust);margin-bottom:8px;">${pieces.length} piece(s) waiting — tap to deselect any not going in this pack</div>
+      ${pieces.map(p => `
+        <div onclick="togglePackingPieceSelection('${p.id}')" id="pack-piece-${p.id}" style="display:flex;align-items:center;gap:10px;padding:9px 10px;background:white;border-radius:8px;margin-bottom:6px;border-left:3px solid #2e7d32;cursor:pointer;">
+          <div style="width:20px;height:20px;border-radius:5px;background:#2e7d32;color:white;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;" id="pack-check-${p.id}">✓</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:700;">${p.piece_type || 'Piece'}</div>
+            <div style="font-size:11px;color:var(--gu-dust);">${p.customer_name || p.booking_id || ''}</div>
+          </div>
+        </div>
+      `).join('')}
+      <button onclick="showPackingCompleteForm()" style="width:100%;background:#2e7d32;color:white;border:none;border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;margin-top:6px;">📦 Pack selected (${pieces.length})</button>
+    `;
+    document.getElementById('packing-complete-form').style.display = 'none';
+  } catch (e) {
+    listEl.innerHTML = '<div style="padding:10px;color:var(--gu-dust);font-size:12px;">Could not load the packing queue.</div>';
+  }
+}
+
+function togglePackingPieceSelection(pieceId) {
+  const idx = _packingSelectedPieceIds.indexOf(pieceId);
+  const checkEl = document.getElementById(`pack-check-${pieceId}`);
+  const rowEl = document.getElementById(`pack-piece-${pieceId}`);
+  if (idx > -1) {
+    _packingSelectedPieceIds.splice(idx, 1);
+    checkEl.style.background = 'white'; checkEl.style.border = '1.5px solid var(--gu-border)'; checkEl.textContent = '';
+    rowEl.style.opacity = '0.5';
+  } else {
+    _packingSelectedPieceIds.push(pieceId);
+    checkEl.style.background = '#2e7d32'; checkEl.style.border = 'none'; checkEl.textContent = '✓';
+    rowEl.style.opacity = '1';
+  }
+  const btn = document.querySelector('#packing-queue-list button');
+  if (btn) btn.textContent = `📦 Pack selected (${_packingSelectedPieceIds.length})`;
+}
+
+function showPackingCompleteForm() {
+  if (!_packingSelectedPieceIds.length) { alert('Select at least one piece to pack.'); return; }
+  document.getElementById('packing-form-title').textContent = `Complete packing — ${_packingSelectedPieceIds.length} piece(s)`;
+  document.getElementById('packing-fired-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('packing-complete-form').style.display = 'block';
+}
+
+function cancelPackingForm() {
+  document.getElementById('packing-complete-form').style.display = 'none';
+}
+
+async function completePacking() {
+  const referenceCode = document.getElementById('packing-reference-code').value.trim();
+  const firedDate = document.getElementById('packing-fired-date').value;
+  const pullDate = document.getElementById('packing-pull-date').value;
+
+  if (!referenceCode) { alert('Scan or enter at least one QR/booking code from this batch before confirming.'); return; }
+  if (!_packingSelectedPieceIds.length) { alert('No pieces selected.'); return; }
+
+  try {
+    const res = await fetch(`${API_URL}/api/packing/complete`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId, pieceIds: _packingSelectedPieceIds, referenceBookingCode: referenceCode,
+        packedBy: currentShiftStaff?.id || null, firedDate: firedDate || null, pullDate: pullDate || null,
+      })
+    });
+    if (!res.ok) { const err = await res.json(); alert(err.error || 'Could not complete packing.'); return; }
+    document.getElementById('packing-reference-code').value = '';
+    loadPackingQueue();
+    loadReadyForPickup();
+  } catch (e) {
+    alert('Could not complete packing — try again.');
+  }
 }
 
 // ── Transfer Second Firing pipeline ──

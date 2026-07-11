@@ -2177,6 +2177,20 @@ app.post('/api/kiln-batches/fire-by-code', async (req, res) => {
 
     if (normalError) throw normalError;
 
+    // Normal pieces just came out of the kiln and need packing before
+    // they're genuinely ready for the customer — alert whoever's on
+    // packing duty (currently Jenny) rather than leaving fired pieces
+    // sitting unnoticed.
+    if ((normalPieces || []).length) {
+      await supabase.from('staff_alerts').insert({
+        studio_id: studioId, trigger_type: 'packing_needed',
+        booking_code: batchCode, next_role: 'Packing',
+        icon: '📦', label: 'Pieces ready to pack',
+        message: `${normalPieces.length} piece(s) from batch ${batchCode} are fired and need packing.`,
+        context: { batchCode, pieceCount: normalPieces.length }, acknowledged: false,
+      });
+    }
+
     // Transfer pieces: this is only their FIRST firing — mark glaze_fired
     // and alert whoever applies transfers, rather than treating them as done.
     const { data: transferPieces, error: transferError } = await supabase
@@ -3420,11 +3434,17 @@ app.get('/api/pieces/ready-for-pickup', async (req, res) => {
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
 
   try {
+    // Customers only see a piece as ready once it's genuinely been packed
+    // — 'fired' alone isn't enough, since the piece still needs boxing up
+    // and setting aside for collection first. This was a real gap: before
+    // the packing stage existed, the customer app showed pieces as ready
+    // the moment they came out of the kiln, before anyone had actually
+    // packed them.
     const { data: pieces, error } = await supabase
       .from('pottery_pieces')
       .select('*')
       .eq('studio_id', studioId)
-      .eq('status', 'fired')
+      .eq('status', 'packed')
       .order('updated_at', { ascending: true });
 
     if (error) throw error;
@@ -3480,6 +3500,18 @@ app.post('/api/pieces/confirm-ready-by-scan', async (req, res) => {
 
     if (error) throw error;
 
+    // Same packing alert as the bulk-batch path — these pieces just
+    // became fired via an individual scan confirm, and need packing too.
+    if ((updatedPieces || []).length) {
+      await supabase.from('staff_alerts').insert({
+        studio_id: studioId, trigger_type: 'packing_needed',
+        booking_code: bookingCode, next_role: 'Packing',
+        icon: '📦', label: 'Pieces ready to pack',
+        message: `${updatedPieces.length} piece(s) for ${booking.customer_name} are fired and need packing.`,
+        context: { bookingCode, pieceCount: updatedPieces.length }, acknowledged: false,
+      });
+    }
+
     res.json({
       status: 'confirmed',
       customerName: booking.customer_name,
@@ -3489,6 +3521,90 @@ app.post('/api/pieces/confirm-ready-by-scan', async (req, res) => {
     console.error('Error confirming pieces ready by scan:', error);
     res.status(500).json({ error: error.message });
   }
+});
+
+// ═══════════════════════════════════════════
+// PACKING STAGE — sits between firing and pickup. A piece coming
+// out of the kiln isn't actually ready for the customer until it's
+// been packed (boxed/bagged, set aside, ideally matched to its
+// batch/QR reference so there's a clear record of what came out
+// when, and who packed it). Currently allocated to Jenny.
+// ═══════════════════════════════════════════
+
+// GET /api/packing/queue — pieces that are fired but not yet packed,
+// for whoever's doing the packing (currently Jenny)
+app.get('/api/packing/queue', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    const { data: pieces, error } = await supabase
+      .from('pottery_pieces')
+      .select('*')
+      .eq('studio_id', studioId)
+      .eq('status', 'fired')
+      .order('updated_at', { ascending: true });
+    if (error) throw error;
+
+    const enriched = await enrichPiecesWithCustomerName(studioId, pieces || []);
+    res.json({ pieces: enriched, count: enriched.length });
+  } catch (error) {
+    console.error('Error fetching packing queue:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/packing/complete — mark one or more fired pieces as packed,
+// referencing at least one QR/booking code from the batch as proof of
+// what was packed and when. This is the "complete" action for the
+// person doing the packing.
+app.post('/api/packing/complete', async (req, res) => {
+  const { studioId, pieceIds, referenceBookingCode, packedBy, batchCode, firedDate, pullDate } = req.body;
+  if (!studioId || !pieceIds || !Array.isArray(pieceIds) || !pieceIds.length) {
+    return res.status(400).json({ error: 'studioId and a non-empty pieceIds array required' });
+  }
+  if (!referenceBookingCode) {
+    return res.status(400).json({ error: 'referenceBookingCode required — at least one QR/booking code from this batch, so there\'s a clear record of what was packed' });
+  }
+
+  try {
+    const { data: updated, error } = await supabase
+      .from('pottery_pieces')
+      .update({
+        status: 'packed', packed_at: new Date().toISOString(),
+        packed_by: packedBy || null, updated_at: new Date().toISOString(),
+      })
+      .eq('studio_id', studioId)
+      .in('id', pieceIds)
+      .select('id, booking_id, piece_type');
+    if (error) throw error;
+
+    // Log the pack event itself — reference code, batch, dates — as a
+    // genuine record separate from the pieces themselves, so there's an
+    // audit trail of "this batch, fired on this date, packed on this date,
+    // referencing this QR code, by this person."
+    const { data: packLog, error: logError } = await supabase.from('packing_log').insert({
+      studio_id: studioId, reference_booking_code: referenceBookingCode,
+      batch_code: batchCode || null, fired_date: firedDate || null, pull_date: pullDate || null,
+      packed_by: packedBy || null, piece_count: (updated || []).length,
+      piece_ids: (updated || []).map(p => p.id),
+    }).select().single();
+    if (logError) console.error('Packing log insert failed (non-fatal):', logError);
+
+    res.json({ status: 'packed', piecesPacked: (updated || []).length, packLog });
+  } catch (error) {
+    console.error('Error completing packing:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/packing/log — recent packing history, for reference/audit
+app.get('/api/packing/log', async (req, res) => {
+  const { studioId, limit } = req.query;
+  const { data } = await supabase.from('packing_log')
+    .select('*').eq('studio_id', studioId)
+    .order('created_at', { ascending: false }).limit(parseInt(limit) || 30);
+  res.json({ log: data || [] });
 });
 
 app.post('/api/pieces/mark-picked-up', async (req, res) => {
