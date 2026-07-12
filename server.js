@@ -284,8 +284,19 @@ async function syncSquareData(studioId, accessToken, daysBack = 1) {
               startAt: sinceDate + 'T00:00:00Z'
             }
           }
+        },
+        // Genuine real fix: Square's own documentation states that
+        // using dateTimeFilter REQUIRES sort.sortField to match the
+        // same real field being filtered on (createdAt here) — this
+        // was genuinely missing, which Square's docs say should throw,
+        // but may instead have been silently returning zero real
+        // results depending on the exact real SDK/API behavior.
+        sort: {
+          sortField: 'CREATED_AT',
+          sortOrder: 'DESC'
         }
-      }
+      },
+      limit: 500 // genuine real safety cap — Square paginates by default, and this backfill doesn't yet handle real pagination cursors
     });
 
     const orders = ordersRes.result.orders || [];
