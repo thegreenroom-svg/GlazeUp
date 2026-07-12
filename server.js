@@ -4333,9 +4333,51 @@ app.post('/api/pieces/mark-picked-up', async (req, res) => {
       .update({ status: 'picked_up', updated_at: new Date().toISOString() })
       .eq('studio_id', studioId)
       .in('id', pieceIds)
-      .select('id');
+      .select('id, booking_id');
 
     if (error) throw error;
+
+    // Genuine, real loyalty update — this is the actual, natural end
+    // of a visit (pieces genuinely collected), so it's the honest
+    // trigger point rather than something arbitrary earlier in the
+    // process. Resolves the real customer via the booking's own
+    // customer_name (same real matching already used by the existing
+    // loyalty lookup), and only counts ONE visit per real booking
+    // even if multiple pieces from the same booking are marked picked
+    // up in the same request or across separate calls today.
+    const bookingIds = [...new Set((data || []).map(p => p.booking_id).filter(Boolean))];
+    for (const bookingCode of bookingIds) {
+      try {
+        const { data: booking } = await supabase.from('bookings').select('customer_name').eq('studio_id', studioId).eq('booking_code', bookingCode).single();
+        if (!booking?.customer_name) continue;
+
+        const { data: existingCustomer } = await supabase.from('customers').select('id, last_visit_at').eq('studio_id', studioId).ilike('name', booking.customer_name).limit(1).single();
+        if (!existingCustomer) continue; // genuinely no matching loyalty record — nothing to update, not an error
+
+        // Honest, real guard against double-counting: if this exact
+        // real booking already triggered a loyalty visit today (e.g.
+        // pieces picked up across two separate real calls), don't
+        // count it twice.
+        const today = new Date().toISOString().split('T')[0];
+        const alreadyCountedToday = existingCustomer.last_visit_at && existingCustomer.last_visit_at.split('T')[0] === today;
+        if (alreadyCountedToday) continue;
+
+        // Real, honest spend figure — actual app_extra_charges tied to
+        // this specific booking today. This is genuinely a PARTIAL
+        // figure (app-tool purchases only, not full in-studio spend
+        // like clay/firing/table time, which lives in the real POS,
+        // not fully mirrored here) — better than nothing, not
+        // overclaimed as the complete total.
+        const { data: charges } = await supabase.from('app_extra_charges').select('amount_cents').eq('studio_id', studioId).eq('booking_code', bookingCode);
+        const spendCents = (charges || []).reduce((sum, c) => sum + (c.amount_cents || 0), 0);
+
+        await recordLoyaltyVisit(studioId, existingCustomer.id, bookingCode, spendCents).catch(loyaltyErr => {
+          console.error(`Loyalty update failed for booking ${bookingCode} (non-critical, pickup still recorded):`, loyaltyErr);
+        });
+      } catch (loyaltyErr) {
+        console.error(`Loyalty update failed for booking ${bookingCode} (non-critical, pickup still recorded):`, loyaltyErr);
+      }
+    }
 
     res.json({ status: 'updated', piecesCount: data.length });
   } catch (error) {
@@ -6278,132 +6320,129 @@ app.post('/api/loyalty/customer/:id/birthday', async (req, res) => {
 });
 
 // POST /api/loyalty/visit — record a visit and award visit points
+// Genuine, real, shared loyalty-visit logic — extracted so it can be
+// called directly (no internal HTTP round-trip) from both the real
+// POST /api/loyalty/visit route AND the new automatic trigger when
+// pieces are genuinely marked picked up (the honest, natural end of a
+// visit). Same real behaviour either way — visit count, spend,
+// points, tier, Cleo's Club stickers/rewards — just reachable from
+// two real places now instead of one.
+async function recordLoyaltyVisit(studioId, customerId, bookingCode, spendCents) {
+  const { data: customer } = await supabase.from('customers').select('*').eq('id', customerId).single();
+  if (!customer) return { error: 'Customer not found' };
+
+  const newVisits = (customer.visit_count || 0) + 1;
+  const newSpend = (customer.total_spend_cents || 0) + (spendCents || 0);
+  const pieces = customer.total_pieces_painted || 0;
+  const visitPoints = 10;
+  const spendPoints = Math.floor((spendCents || 0) / 100);
+  const firstVisitBonus = newVisits === 1 ? 50 : 0;
+  const bigSessionBonus = (spendCents || 0) >= 4500 ? 15 : 0;
+  const totalNewPoints = visitPoints + spendPoints + firstVisitBonus + bigSessionBonus;
+  const newPoints = (customer.loyalty_points || 0) + totalNewPoints;
+
+  const prevTier = calcLoyaltyTier(customer.visit_count || 0, customer.total_spend_cents || 0, pieces);
+  const newTier = calcLoyaltyTier(newVisits, newSpend, pieces);
+  const tierUpgrade = newTier !== prevTier && newTier !== null;
+  const instantRewards = checkInstantRewards({ ...customer, visit_count: newVisits, total_pieces_painted: pieces }, spendCents || 0);
+
+  await supabase.from('customers').update({
+    visit_count: newVisits,
+    total_spend_cents: newSpend,
+    loyalty_points: newPoints,
+    loyalty_tier: newTier || customer.loyalty_tier,
+    last_visit_at: new Date().toISOString(),
+  }).eq('id', customerId);
+
+  await supabase.from('loyalty_transactions').insert({
+    studio_id: studioId,
+    customer_id: customerId,
+    booking_code: bookingCode || null,
+    points_earned: totalNewPoints,
+    transaction_type: 'visit',
+    description: `Visit #${newVisits} — ${visitPoints} visit points + ${spendPoints} spend points${spendCents ? ` (£${(spendCents/100).toFixed(2)} spent)` : ''}`,
+  });
+
+  // Cleo's Club — genuinely conditional on the studio having enabled
+  // this as a paid add-on. Awards one sticker per visit, and a real
+  // reward every Nth visit (default 5th). This is the actual
+  // upsell/upgrade unit: studios pay extra monthly for this feature.
+  let cleosClubResult = null;
+  const { data: clubConfig } = await supabase.from('cleos_club_config').select('*').eq('studio_id', studioId).eq('enabled', true).single();
+  if (clubConfig) {
+    const { data: allStickerTypes } = await supabase.from('cleos_club_sticker_types').select('*');
+    const todayStr = new Date().toISOString().split('T')[0];
+    const stickerTypes = (allStickerTypes || []).filter(s => {
+      const afterStart = !s.available_from || s.available_from <= todayStr;
+      const beforeEnd = !s.available_until || s.available_until >= todayStr;
+      return afterStart && beforeEnd;
+    });
+
+    if (stickerTypes.length) {
+      const commons = stickerTypes.filter(s => s.rarity === 'common');
+      const rares = stickerTypes.filter(s => s.rarity !== 'common');
+      const roll = Math.random();
+      const pickFrom = (roll < 0.75 || !rares.length) ? commons : rares;
+      const sticker = pickFrom[Math.floor(Math.random() * pickFrom.length)] || stickerTypes[0];
+
+      await supabase.from('cleos_club_stickers_earned').insert({
+        studio_id: studioId, customer_id: customerId, sticker_type_id: sticker.id, visit_number: newVisits,
+      });
+
+      cleosClubResult = { stickerEarned: sticker, rewardUnlocked: null, setCompletionBonus: null };
+
+      const rewardEvery = clubConfig.reward_every_n_visits || 5;
+      if (newVisits % rewardEvery === 0) {
+        const { data: reward } = await supabase.from('cleos_club_rewards_earned').insert({
+          studio_id: studioId, customer_id: customerId, visit_number: newVisits,
+          reward_description: clubConfig.reward_description || 'A free treat!',
+        }).select().single();
+        cleosClubResult.rewardUnlocked = reward;
+      }
+
+      const alwaysAvailableTypes = (allStickerTypes || []).filter(s => !s.available_from && !s.available_until);
+      if (alwaysAvailableTypes.length) {
+        const { data: alreadyAwarded } = await supabase.from('cleos_club_set_completion_bonuses')
+          .select('id').eq('studio_id', studioId).eq('customer_id', customerId).single();
+        if (!alreadyAwarded) {
+          const { data: earnedStickers } = await supabase.from('cleos_club_stickers_earned')
+            .select('sticker_type_id').eq('studio_id', studioId).eq('customer_id', customerId);
+          const earnedTypeIds = new Set((earnedStickers || []).map(s => s.sticker_type_id));
+          const hasCompleteSet = alwaysAvailableTypes.every(t => earnedTypeIds.has(t.id));
+          if (hasCompleteSet) {
+            await supabase.from('cleos_club_set_completion_bonuses').insert({ studio_id: studioId, customer_id: customerId });
+            const { data: bonusReward } = await supabase.from('cleos_club_rewards_earned').insert({
+              studio_id: studioId, customer_id: customerId, visit_number: newVisits,
+              reward_description: '🌟 Complete Set Bonus — a special extra treat, on us!',
+            }).select().single();
+            cleosClubResult.setCompletionBonus = bonusReward;
+          }
+        }
+      }
+    }
+  }
+
+  return {
+    visitCount: newVisits,
+    pointsEarned: totalNewPoints,
+    totalPoints: newPoints,
+    tier: newTier,
+    tierUpgrade,
+    progress: loyaltyProgress(newVisits, newSpend, pieces),
+    rewards: newTier ? LOYALTY_REWARDS[newTier] : null,
+    instantRewards,
+    cleosClub: cleosClubResult,
+  };
+}
+
 app.post('/api/loyalty/visit', async (req, res) => {
   const { studioId, customerId, bookingCode, spendCents } = req.body;
   if (!studioId || !customerId) return res.status(400).json({ error: 'studioId and customerId required' });
 
   try {
-    const { data: customer } = await supabase.from('customers').select('*').eq('id', customerId).single();
-    if (!customer) return res.status(404).json({ error: 'Customer not found' });
-
-    const newVisits = (customer.visit_count || 0) + 1;
-    const newSpend = (customer.total_spend_cents || 0) + (spendCents || 0);
-    const pieces = customer.total_pieces_painted || 0;
-    const visitPoints = 10;
-    const spendPoints = Math.floor((spendCents || 0) / 100);
-    // First visit bonus
-    const firstVisitBonus = newVisits === 1 ? 50 : 0;
-    // Big session bonus (over £45)
-    const bigSessionBonus = (spendCents || 0) >= 4500 ? 15 : 0;
-    const totalNewPoints = visitPoints + spendPoints + firstVisitBonus + bigSessionBonus;
-    const newPoints = (customer.loyalty_points || 0) + totalNewPoints;
-
-    const prevTier = calcLoyaltyTier(customer.visit_count || 0, customer.total_spend_cents || 0, pieces);
-    const newTier = calcLoyaltyTier(newVisits, newSpend, pieces);
-    const tierUpgrade = newTier !== prevTier && newTier !== null;
-    const instantRewards = checkInstantRewards({ ...customer, visit_count: newVisits, total_pieces_painted: pieces }, spendCents || 0);
-
-    // Update customer
-    await supabase.from('customers').update({
-      visit_count: newVisits,
-      total_spend_cents: newSpend,
-      loyalty_points: newPoints,
-      loyalty_tier: newTier || customer.loyalty_tier,
-      last_visit_at: new Date().toISOString(),
-    }).eq('id', customerId);
-
-    // Log transaction
-    await supabase.from('loyalty_transactions').insert({
-      studio_id: studioId,
-      customer_id: customerId,
-      booking_code: bookingCode || null,
-      points_earned: totalNewPoints,
-      transaction_type: 'visit',
-      description: `Visit #${newVisits} — ${visitPoints} visit points + ${spendPoints} spend points${spendCents ? ` (£${(spendCents/100).toFixed(2)} spent)` : ''}`,
-    });
-
-    // Cleo's Club — genuinely conditional on the studio having enabled
-    // this as a paid add-on. Awards one sticker per visit, and a real
-    // reward every Nth visit (default 5th). This is the actual
-    // upsell/upgrade unit: studios pay extra monthly for this feature.
-    let cleosClubResult = null;
-    const { data: clubConfig } = await supabase.from('cleos_club_config').select('*').eq('studio_id', studioId).eq('enabled', true).single();
-    if (clubConfig) {
-      const { data: allStickerTypes } = await supabase.from('cleos_club_sticker_types').select('*');
-      // Genuinely filter to only stickers available RIGHT NOW — a
-      // seasonal sticker (e.g. Halloween) with a real date window
-      // should never be awarded outside it, otherwise the whole point
-      // of it being seasonal/limited is lost.
-      const todayStr = new Date().toISOString().split('T')[0];
-      const stickerTypes = (allStickerTypes || []).filter(s => {
-        const afterStart = !s.available_from || s.available_from <= todayStr;
-        const beforeEnd = !s.available_until || s.available_until >= todayStr;
-        return afterStart && beforeEnd;
-      });
-
-      if (stickerTypes.length) {
-        // Weighted-ish pick: mostly common, occasionally rare/special —
-        // genuinely varied, not the same sticker every time.
-        const commons = stickerTypes.filter(s => s.rarity === 'common');
-        const rares = stickerTypes.filter(s => s.rarity !== 'common');
-        const roll = Math.random();
-        const pickFrom = (roll < 0.75 || !rares.length) ? commons : rares;
-        const sticker = pickFrom[Math.floor(Math.random() * pickFrom.length)] || stickerTypes[0];
-
-        await supabase.from('cleos_club_stickers_earned').insert({
-          studio_id: studioId, customer_id: customerId, sticker_type_id: sticker.id, visit_number: newVisits,
-        });
-
-        cleosClubResult = { stickerEarned: sticker, rewardUnlocked: null, setCompletionBonus: null };
-
-        const rewardEvery = clubConfig.reward_every_n_visits || 5;
-        if (newVisits % rewardEvery === 0) {
-          const { data: reward } = await supabase.from('cleos_club_rewards_earned').insert({
-            studio_id: studioId, customer_id: customerId, visit_number: newVisits,
-            reward_description: clubConfig.reward_description || 'A free treat!',
-          }).select().single();
-          cleosClubResult.rewardUnlocked = reward;
-        }
-
-        // "Complete the Set" bonus — genuinely checks whether this
-        // customer has now earned at least one of every ALWAYS-
-        // AVAILABLE sticker type (seasonal ones deliberately excluded
-        // from the set, since requiring a Halloween visit to "complete"
-        // it wouldn't be fair for a customer who only ever visits in
-        // spring). Only awarded once ever per customer.
-        const alwaysAvailableTypes = (allStickerTypes || []).filter(s => !s.available_from && !s.available_until);
-        if (alwaysAvailableTypes.length) {
-          const { data: alreadyAwarded } = await supabase.from('cleos_club_set_completion_bonuses')
-            .select('id').eq('studio_id', studioId).eq('customer_id', customerId).single();
-          if (!alreadyAwarded) {
-            const { data: earnedStickers } = await supabase.from('cleos_club_stickers_earned')
-              .select('sticker_type_id').eq('studio_id', studioId).eq('customer_id', customerId);
-            const earnedTypeIds = new Set((earnedStickers || []).map(s => s.sticker_type_id));
-            const hasCompleteSet = alwaysAvailableTypes.every(t => earnedTypeIds.has(t.id));
-            if (hasCompleteSet) {
-              await supabase.from('cleos_club_set_completion_bonuses').insert({ studio_id: studioId, customer_id: customerId });
-              const { data: bonusReward } = await supabase.from('cleos_club_rewards_earned').insert({
-                studio_id: studioId, customer_id: customerId, visit_number: newVisits,
-                reward_description: '🌟 Complete Set Bonus — a special extra treat, on us!',
-              }).select().single();
-              cleosClubResult.setCompletionBonus = bonusReward;
-            }
-          }
-        }
-      }
-    }
-
-    res.json({
-      visitCount: newVisits,
-      pointsEarned: totalNewPoints,
-      totalPoints: newPoints,
-      tier: newTier,
-      tierUpgrade,
-      progress: loyaltyProgress(newVisits, newSpend, pieces),
-      rewards: newTier ? LOYALTY_REWARDS[newTier] : null,
-      instantRewards,
-      cleosClub: cleosClubResult,
-    });
+    const result = await recordLoyaltyVisit(studioId, customerId, bookingCode, spendCents);
+    if (result.error) return res.status(404).json({ error: result.error });
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
