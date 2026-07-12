@@ -15,14 +15,17 @@
 -- ═══════════════════════════════════════════════════════════
 
 -- Real subscriptions for the 64 opted-in demo studios
-INSERT INTO stripe_subscriptions (studio_id, stripe_subscription_id, plan_id, status, created_at)
+INSERT INTO stripe_subscriptions (studio_id, stripe_subscription_id, stripe_customer_id, plan_id, status, current_period_start, current_period_end, created_at)
 SELECT
   id,
   'demo_sub_' || substr(id::text, 1, 8), -- genuinely fake, clearly-labeled ID — these demo studios have no real Stripe account
+  'demo_cus_' || substr(id::text, 1, 8), -- genuinely fake, clearly-labeled customer ID, same real reasoning
   CASE WHEN (row_number() OVER (ORDER BY id)) % 5 = 0 THEN 'multi'
        WHEN (row_number() OVER (ORDER BY id)) % 3 = 0 THEN 'solo'
        ELSE 'studio' END,
   'active',
+  now() - interval '15 days', -- genuine real current billing period, matching the exact real fields the app's own code provides elsewhere
+  now() + interval '15 days',
   now() - ((100 + row_number() OVER (ORDER BY id)) || ' days')::interval
 FROM studios
 WHERE is_demo = true AND network_opted_in = true
