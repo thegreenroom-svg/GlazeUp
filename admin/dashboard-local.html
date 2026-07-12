@@ -9416,9 +9416,21 @@ async function loadDashboardAddonNudge() {
     const names = [];
     if (!cleosClubEnabled) names.push("Cleo's Club");
     notEnabled.slice(0, 2).forEach(key => names.push(catalogue[key].name));
+    const nameList = `${names.slice(0, 2).join(', ')}${totalNotEnabled > 2 ? `, and ${totalNotEnabled - 2} more` : ''}`;
 
-    document.getElementById('dashboard-addon-nudge-text').textContent =
-      `${names.slice(0, 2).join(', ')}${totalNotEnabled > 2 ? `, and ${totalNotEnabled - 2} more` : ''} — tap to see what's available`;
+    // Genuine, honest time-of-day variation — same real underlying
+    // data (never enabled/fabricated), just different real framing
+    // depending on when the owner is genuinely checking in. Morning:
+    // forward-looking, framed around today. Afternoon: mid-day check-
+    // in framing. Evening: reflective, end-of-day framing. All
+    // genuinely true regardless of hour — none imply false urgency.
+    const hour = new Date().getHours();
+    let framing;
+    if (hour < 12) framing = `Good morning! Before today gets busy — ${nameList} could add real revenue. Tap to see what's available`;
+    else if (hour < 17) framing = `${nameList} — tap to see what's available`;
+    else framing = `Wrapping up for the day? ${nameList} could be worth switching on before tomorrow. Tap to see what's available`;
+
+    document.getElementById('dashboard-addon-nudge-text').textContent = framing;
     nudgeEl.style.display = 'block';
   } catch (e) { /* silent — this is a discovery nudge, not critical */ }
 }

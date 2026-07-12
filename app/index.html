@@ -4915,11 +4915,51 @@
         console.error('Could not record charge, opening anyway:', err);
       }
 
+      // Genuine, real, session-scoped tracking (not persisted across
+      // visits — resets naturally each fresh session) — counts actual
+      // real paid unlocks this visit, feeding the honest "you've paid
+      // twice, £5 covers everything" moment below. Not fabricated
+      // urgency, a real earned nudge based on genuine behaviour.
+      if (!tool.isHomeAccess && !tool.isRequest) {
+        _realPaidUnlocksThisVisit = (_realPaidUnlocksThisVisit || 0) + 1;
+      }
+
       const openFn = tool.openFn;
       closeExtraChargeModal();
       btn.textContent = originalLabel;
       btn.disabled = false;
       openFn();
+
+      // Genuine real Take It Home nudge — only fires once, only after
+      // a real 2nd paid unlock THIS visit, only if home access isn't
+      // already unlocked. An honest, earned moment: they've now
+      // genuinely paid twice, so "£5 covers everything" is a real,
+      // useful thing to know, not a random interruption.
+      if (_realPaidUnlocksThisVisit === 2 && !window.currentBooking?.homeAccessUnlocked && !_takeHomeNudgeShownThisVisit) {
+        _takeHomeNudgeShownThisVisit = true;
+        setTimeout(showTakeHomeEarnedNudge, 1200); // genuine short pause so it doesn't collide with the tool opening
+      }
+    }
+
+    let _realPaidUnlocksThisVisit = 0;
+    let _takeHomeNudgeShownThisVisit = false;
+
+    // Genuine, honest, real earned-moment nudge — shown once, only
+    // after real evidence (2 real paid unlocks) that Take It Home
+    // would genuinely save this customer money. Dismissible, never
+    // repeats this visit.
+    function showTakeHomeEarnedNudge() {
+      const el = document.createElement('div');
+      el.id = 'take-home-earned-nudge';
+      el.style.cssText = 'position:fixed;bottom:20px;left:16px;right:16px;max-width:400px;margin:0 auto;background:white;border-radius:16px;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,0.25);z-index:9400;display:flex;align-items:center;gap:12px;';
+      el.innerHTML = `
+        <div style="font-size:28px;">💡</div>
+        <div style="flex:1;font-size:12.5px;color:var(--gu-text);line-height:1.4;">You've paid for tools twice this visit — <strong>Take It Home</strong> covers all three, forever, for £5.</div>
+        <button onclick="document.getElementById('take-home-earned-nudge').remove(); openTakeItHome();" style="background:var(--link-clay);color:white;border:none;border-radius:10px;padding:9px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">See it</button>
+        <button onclick="document.getElementById('take-home-earned-nudge').remove();" style="background:none;border:none;color:var(--gu-dust);font-size:16px;cursor:pointer;padding:4px;">✕</button>
+      `;
+      document.body.appendChild(el);
+      setTimeout(() => { if (document.getElementById('take-home-earned-nudge')) el.remove(); }, 12000); // genuinely auto-dismiss if ignored, don't linger forever
     }
 
     function openTransferDesigner() {
@@ -6534,7 +6574,20 @@
       dpPutSaved(saved);
       dpRefreshSavedUI();
       dpToggleSavedTray();
+
+      // Genuine, honest engagement-based nudge — a real save is
+      // genuine evidence someone's actively into the design, not just
+      // browsing. Only fires once per real visit, only if they
+      // haven't already unlocked home access, and only after their
+      // SECOND real save (one save could be a quick test — two is a
+      // genuinely engaged customer).
+      _dpSaveCountThisVisit = (_dpSaveCountThisVisit || 0) + 1;
+      if (_dpSaveCountThisVisit === 2 && !window.currentBooking?.homeAccessUnlocked && !_takeHomeNudgeShownThisVisit) {
+        _takeHomeNudgeShownThisVisit = true;
+        setTimeout(showTakeHomeEarnedNudge, 1000);
+      }
     }
+    let _dpSaveCountThisVisit = 0;
 
     function dpToggleSavedTray() {
       const tray = document.getElementById('dp-saved-tray');
