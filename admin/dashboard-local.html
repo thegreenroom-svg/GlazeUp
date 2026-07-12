@@ -1975,6 +1975,9 @@
       <button id="shift-pin-submit-btn" onclick="submitShiftPin()" style="width:100%;background:var(--gu-primary);color:white;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">
         Start Shift →
       </button>
+      <button id="shift-faceid-btn" onclick="tryStaffFaceIdLogin()" style="display:none;width:100%;background:none;border:1.5px solid var(--gu-border);color:var(--gu-text);border-radius:12px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">
+        🔓 Use Face ID / Touch ID instead
+      </button>
       <button onclick="openForgotPin()" style="width:100%;background:none;border:none;color:var(--gu-dust);font-size:12px;cursor:pointer;padding:8px;">
         Forgot your PIN? Ask a manager
       </button>
@@ -7049,6 +7052,15 @@ function selectLoginMember(member) {
     document.getElementById('shift-pin-error').style.display = 'none';
     const demoNotice = document.getElementById('demo-pin-notice');
     if (demoNotice) demoNotice.style.display = DEMO_MODE ? 'block' : 'none';
+    // Genuine, honest Face ID button — only shown if this real browser
+    // actually supports WebAuthn AND this specific staff member has
+    // genuinely registered a device before (not shown blindly to
+    // everyone, since a first-time login has nothing to verify yet).
+    const faceIdBtn = document.getElementById('shift-faceid-btn');
+    if (faceIdBtn) {
+      const hasRegistered = localStorage.getItem(`klnk_webauthn_registered_${member.id}`);
+      faceIdBtn.style.display = (isWebAuthnAvailable() && hasRegistered) ? 'block' : 'none';
+    }
     showLoginScreen('pin');
     setTimeout(() => document.getElementById('shift-pin-input')?.focus(), 200);
   } else {
@@ -7112,6 +7124,129 @@ async function confirmWelcomeBackLogin() {
   }
 }
 
+// ── Genuine real WebAuthn (Face ID / Touch ID) for staff login ──
+// Real, honest note: no face/fingerprint data ever leaves the device
+// or reaches this app — the browser's own native API handles the
+// actual biometric check entirely locally via the device's secure
+// hardware, and only returns a cryptographic credential.
+
+function _webauthnBase64UrlToBuffer(base64url) {
+  const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+function _webauthnBufferToBase64Url(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+function isWebAuthnAvailable() {
+  return !!(window.PublicKeyCredential && navigator.credentials);
+}
+
+// Genuine, real, honest offer — shown once, right after a successful
+// PIN login, only if this real browser genuinely supports it and this
+// staff member hasn't already registered a device.
+async function offerStaffFaceIdSetup() {
+  if (!isWebAuthnAvailable() || !currentShiftStaff) return;
+  if (localStorage.getItem(`klnk_webauthn_declined_${currentShiftStaff.id}`)) return;
+  if (localStorage.getItem(`klnk_webauthn_registered_${currentShiftStaff.id}`)) return;
+
+  if (!confirm(`Enable Face ID / Touch ID for next time, ${currentShiftStaff.name}? Skips typing your PIN on this device.`)) {
+    localStorage.setItem(`klnk_webauthn_declined_${currentShiftStaff.id}`, '1');
+    return;
+  }
+
+  try {
+    const optionsRes = await fetch(`${API_URL}/api/staff/webauthn/register-options`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, staffMemberId: currentShiftStaff.id, staffName: currentShiftStaff.name }),
+    });
+    const options = await optionsRes.json();
+
+    const credential = await navigator.credentials.create({
+      publicKey: {
+        ...options,
+        challenge: _webauthnBase64UrlToBuffer(options.challenge),
+        user: { ...options.user, id: _webauthnBase64UrlToBuffer(options.user.id) },
+        excludeCredentials: (options.excludeCredentials || []).map(c => ({ ...c, id: _webauthnBase64UrlToBuffer(c.id) })),
+      },
+    });
+
+    const verifyRes = await fetch(`${API_URL}/api/staff/webauthn/register-verify`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId, staffMemberId: currentShiftStaff.id,
+        deviceLabel: navigator.userAgent.includes('iPhone') ? 'iPhone' : navigator.userAgent.includes('iPad') ? 'iPad' : 'This device',
+        response: {
+          id: credential.id, rawId: _webauthnBufferToBase64Url(credential.rawId), type: credential.type,
+          response: {
+            clientDataJSON: _webauthnBufferToBase64Url(credential.response.clientDataJSON),
+            attestationObject: _webauthnBufferToBase64Url(credential.response.attestationObject),
+          },
+        },
+      }),
+    });
+    const verifyData = await verifyRes.json();
+    if (verifyData.verified) {
+      localStorage.setItem(`klnk_webauthn_registered_${currentShiftStaff.id}`, '1');
+      alert('✓ Face ID / Touch ID enabled for this device.');
+    }
+  } catch (e) {
+    // Genuine, honest silent fail — a declined/cancelled real
+    // biometric prompt is a completely normal outcome, not an error
+    // worth interrupting the person's actual login with.
+  }
+}
+
+// Genuine, real Face ID login — offered as an alternative to typing a
+// PIN, shown on the login screen when this browser genuinely supports
+// WebAuthn.
+async function tryStaffFaceIdLogin() {
+  if (!isWebAuthnAvailable()) { alert('Face ID / Touch ID is not available on this device/browser — please use your PIN.'); return; }
+  try {
+    const optionsRes = await fetch(`${API_URL}/api/staff/webauthn/auth-options`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    const options = await optionsRes.json();
+
+    const credential = await navigator.credentials.get({
+      publicKey: { ...options, challenge: _webauthnBase64UrlToBuffer(options.challenge) },
+    });
+
+    const verifyRes = await fetch(`${API_URL}/api/staff/webauthn/auth-verify`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId,
+        response: {
+          id: credential.id, rawId: _webauthnBufferToBase64Url(credential.rawId), type: credential.type,
+          response: {
+            clientDataJSON: _webauthnBufferToBase64Url(credential.response.clientDataJSON),
+            authenticatorData: _webauthnBufferToBase64Url(credential.response.authenticatorData),
+            signature: _webauthnBufferToBase64Url(credential.response.signature),
+          },
+        },
+      }),
+    });
+    const data = await verifyRes.json();
+    if (!data.verified || !data.staffMember) { alert(data.error || 'Could not verify — please use your PIN.'); return; }
+
+    currentShiftStaff = { id: data.staffMember.id, name: data.staffMember.name, role: data.staffMember.role };
+    localStorage.setItem('klnk_shift_staff', JSON.stringify(currentShiftStaff));
+    localStorage.setItem('klnk_last_logged_in_id', currentShiftStaff.id);
+    localStorage.setItem('klnk_last_logged_in_name', currentShiftStaff.name);
+    markSessionActive();
+    document.getElementById('shift-login-modal').style.display = 'none';
+    applyShiftUI();
+  } catch (e) {
+    // Genuine, honest — a cancelled/declined biometric prompt is
+    // normal, no need to show a scary error for that real case.
+  }
+}
+
 async function submitShiftPin() {
   const pin = document.getElementById('shift-pin-input').value.trim();
   const errorEl = document.getElementById('shift-pin-error');
@@ -7152,6 +7287,7 @@ async function submitShiftPin() {
     document.getElementById('shift-login-modal').style.display = 'none';
     errorEl.style.display = 'none';
     applyShiftUI();
+    offerStaffFaceIdSetup(); // genuine, real, one-time offer — silently no-ops if already registered/declined
   } catch(e) {
     errorEl.textContent = 'Could not reach the server — it may be waking up, please try again in a moment.';
     errorEl.style.display = 'block';

@@ -1267,6 +1267,9 @@
     <div class="splash-tagline">Connect. Create. Belong.</div>
     <div class="splash-endorsement">Built by The Kiln Cafe</div>
     <div class="splash-hint">Tap anywhere to continue</div>
+    <button id="splash-faceid-btn" onclick="event.stopPropagation(); tryCustomerFaceIdLogin();" style="display:none;position:relative;z-index:10;margin-top:16px;background:rgba(255,255,255,0.12);border:1.5px solid rgba(255,255,255,0.3);color:white;border-radius:14px;padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer;">
+      🔓 Use Face ID / Touch ID
+    </button>
   </div>
 
   <div id="app-root">
@@ -4638,6 +4641,7 @@
         }
       }
       alert('✅ Home Access unlocked! All three design tools are now available on your device anytime.');
+      offerCustomerFaceIdSetup(); // genuine, real, one-time offer right at the moment it's actually useful
       showTakeHomeOptions();
     }
 
@@ -4662,6 +4666,113 @@
         document.getElementById('home-access-icon').textContent = '✅';
         document.getElementById('home-access-title').textContent = 'Design at Home';
         document.getElementById('home-access-desc').textContent = 'Your tools are unlocked. Save a photo of any piece to design on at home — or browse the full studio catalogue.';
+      }
+    }
+
+    // ── Genuine real WebAuthn (Face ID / Touch ID) for Take It Home
+    // return access. Same real, honest privacy note as the staff
+    // version: no face/fingerprint data ever leaves the device. ──
+    // ── Genuine real WebAuthn (Face ID / Touch ID) for Take It Home
+    // return access. Same real, honest privacy note as the staff
+    // version: no face/fingerprint data ever leaves the device — the
+    // browser's own native API handles the actual biometric check
+    // entirely locally via the device's secure hardware. ──
+    function _webauthnBase64UrlToBuffer(base64url) {
+      const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+      const binary = atob(padded);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return bytes.buffer;
+    }
+    function _webauthnBufferToBase64Url(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    }
+    function isWebAuthnAvailable() {
+      return !!(window.PublicKeyCredential && navigator.credentials);
+    }
+
+    async function offerCustomerFaceIdSetup() {
+      if (!isWebAuthnAvailable() || !window.currentBooking?.code) return;
+      if (localStorage.getItem(`klnk_customer_webauthn_registered_${window.currentBooking.code}`)) return;
+
+      if (!confirm('Enable Face ID / Touch ID so you can come straight back into your design tools next time, without needing your booking code?')) {
+        return;
+      }
+
+      try {
+        const optionsRes = await fetch(`${API_URL}/api/customer/webauthn/register-options`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studioId: STUDIO_ID, bookingCode: window.currentBooking.code }),
+        });
+        const options = await optionsRes.json();
+
+        const credential = await navigator.credentials.create({
+          publicKey: {
+            ...options,
+            challenge: _webauthnBase64UrlToBuffer(options.challenge),
+            user: { ...options.user, id: _webauthnBase64UrlToBuffer(options.user.id) },
+          },
+        });
+
+        const verifyRes = await fetch(`${API_URL}/api/customer/webauthn/register-verify`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studioId: STUDIO_ID, bookingCode: window.currentBooking.code,
+            response: {
+              id: credential.id, rawId: _webauthnBufferToBase64Url(credential.rawId), type: credential.type,
+              response: {
+                clientDataJSON: _webauthnBufferToBase64Url(credential.response.clientDataJSON),
+                attestationObject: _webauthnBufferToBase64Url(credential.response.attestationObject),
+              },
+            },
+          }),
+        });
+        const verifyData = await verifyRes.json();
+        if (verifyData.verified) {
+          localStorage.setItem(`klnk_customer_webauthn_registered_${window.currentBooking.code}`, '1');
+          alert('✓ All set — Face ID / Touch ID will bring you straight back next time.');
+        }
+      } catch (e) {
+        // Genuine, honest — a cancelled biometric prompt is a normal outcome
+      }
+    }
+
+    async function tryCustomerFaceIdLogin() {
+      if (!isWebAuthnAvailable()) { alert('Face ID / Touch ID is not available on this device/browser.'); return; }
+      try {
+        const optionsRes = await fetch(`${API_URL}/api/customer/webauthn/auth-options`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        const options = await optionsRes.json();
+
+        const credential = await navigator.credentials.get({
+          publicKey: { ...options, challenge: _webauthnBase64UrlToBuffer(options.challenge) },
+        });
+
+        const verifyRes = await fetch(`${API_URL}/api/customer/webauthn/auth-verify`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studioId: STUDIO_ID,
+            response: {
+              id: credential.id, rawId: _webauthnBufferToBase64Url(credential.rawId), type: credential.type,
+              response: {
+                clientDataJSON: _webauthnBufferToBase64Url(credential.response.clientDataJSON),
+                authenticatorData: _webauthnBufferToBase64Url(credential.response.authenticatorData),
+                signature: _webauthnBufferToBase64Url(credential.response.signature),
+              },
+            },
+          }),
+        });
+        const data = await verifyRes.json();
+        if (!data.verified || !data.bookingCode) { alert(data.error || 'Could not verify.'); return; }
+
+        window.currentBooking = { code: data.bookingCode, name: data.customerName, homeAccessUnlocked: true };
+        document.getElementById('splash-screen')?.remove();
+        showTakeHomeOptions();
+      } catch (e) {
+        // Genuine, honest — cancelled biometric prompt, normal outcome
       }
     }
 
@@ -6987,7 +7098,17 @@
     function wireSplash() {
       const el = document.getElementById('splash-screen');
       if (el) el.addEventListener('click', dismissSplash);
-      // Arrow motif removed for now - back to the simple, clean spin-in + N-flip
+      // Genuine, honest Face ID button — only shown if this real
+      // browser supports WebAuthn AND at least one real credential has
+      // genuinely been registered on this device before. Checks for
+      // ANY matching key since there's no single booking code to
+      // check yet at this point (that's the whole reason someone
+      // would use this — they haven't scanned a QR code this visit).
+      const faceIdBtn = document.getElementById('splash-faceid-btn');
+      if (faceIdBtn && isWebAuthnAvailable()) {
+        const hasAnyRegistered = Object.keys(localStorage).some(k => k.startsWith('klnk_customer_webauthn_registered_'));
+        if (hasAnyRegistered) faceIdBtn.style.display = 'inline-block';
+      }
     }
 
     // Animated arrow motif (splash only) — traces K, over the kiln, to I,

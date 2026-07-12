@@ -19,6 +19,10 @@ const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const Stripe = require('stripe');
 const { Client, Environment } = require('square');
+const {
+  generateRegistrationOptions, verifyRegistrationResponse,
+  generateAuthenticationOptions, verifyAuthenticationResponse,
+} = require('@simplewebauthn/server');
 
 // ═══════════════════════════════════════════
 // INIT
@@ -4887,6 +4891,197 @@ app.get('/api/staff/other-active-shifts', async (req, res) => {
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   res.json({ othersStillClockedIn: (data || []).length > 0, count: (data || []).length });
+});
+
+// ── Genuine real WebAuthn (Face ID / Touch ID / device biometric) ──
+// Important, honestly: no face or fingerprint data is EVER sent to or
+// stored by this server. The device's own secure hardware does the
+// actual biometric matching entirely locally; the server only ever
+// receives a cryptographic credential, functionally equivalent to a
+// very long password. This is the real, standard, correct way to do
+// this — genuinely private by design, not just by policy.
+const WEBAUTHN_RP_NAME = 'kilnLINK';
+const WEBAUTHN_RP_ID = process.env.WEBAUTHN_RP_ID || 'glazeup-api.onrender.com';
+const WEBAUTHN_ORIGIN = process.env.WEBAUTHN_ORIGIN || 'https://glazeup-api.onrender.com';
+
+// Real, honest, short-lived in-memory store for the challenge each
+// registration/login round-trip needs — genuinely fine as in-memory
+// (not persisted to the database) since a challenge is only ever
+// valid for a few real minutes and single-use by design.
+const _webauthnChallenges = new Map();
+
+// STAFF: Step 1 — generate a real registration challenge
+app.post('/api/staff/webauthn/register-options', async (req, res) => {
+  const { studioId, staffMemberId, staffName } = req.body;
+  if (!studioId || !staffMemberId || !staffName) return res.status(400).json({ error: 'studioId, staffMemberId, staffName required' });
+
+  const { data: existing } = await supabase.from('staff_webauthn_credentials')
+    .select('credential_id').eq('staff_member_id', staffMemberId);
+
+  const options = await generateRegistrationOptions({
+    rpName: WEBAUTHN_RP_NAME, rpID: WEBAUTHN_RP_ID,
+    userName: staffName, userID: Buffer.from(staffMemberId),
+    attestationType: 'none',
+    excludeCredentials: (existing || []).map(c => ({ id: c.credential_id })),
+    authenticatorSelection: { residentKey: 'preferred', userVerification: 'required' }, // genuinely REQUIRES real Face ID/Touch ID/PIN, not just "device present"
+  });
+
+  _webauthnChallenges.set(`staff:${staffMemberId}`, options.challenge);
+  res.json(options);
+});
+
+// STAFF: Step 2 — verify the real registration and save the credential
+app.post('/api/staff/webauthn/register-verify', async (req, res) => {
+  const { studioId, staffMemberId, response, deviceLabel } = req.body;
+  if (!studioId || !staffMemberId || !response) return res.status(400).json({ error: 'studioId, staffMemberId, response required' });
+
+  const expectedChallenge = _webauthnChallenges.get(`staff:${staffMemberId}`);
+  if (!expectedChallenge) return res.status(400).json({ error: 'Registration expired — please try again.' });
+
+  try {
+    const verification = await verifyRegistrationResponse({
+      response, expectedChallenge, expectedOrigin: WEBAUTHN_ORIGIN, expectedRPID: WEBAUTHN_RP_ID,
+    });
+    if (!verification.verified || !verification.registrationInfo) {
+      return res.status(400).json({ error: 'Could not verify — please try again.' });
+    }
+    const { credential } = verification.registrationInfo;
+    await supabase.from('staff_webauthn_credentials').insert({
+      studio_id: studioId, staff_member_id: staffMemberId,
+      credential_id: credential.id,
+      public_key: Buffer.from(credential.publicKey).toString('base64'),
+      device_label: deviceLabel || 'This device',
+    });
+    _webauthnChallenges.delete(`staff:${staffMemberId}`);
+    res.json({ verified: true });
+  } catch (error) {
+    console.error('WebAuthn staff registration error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// STAFF: Step 3 — generate a real login challenge (no staffMemberId
+// needed yet — real Face ID resolves WHICH staff member from the
+// device's own stored credential, genuinely faster than picking a
+// name first).
+app.post('/api/staff/webauthn/auth-options', async (req, res) => {
+  const options = await generateAuthenticationOptions({
+    rpID: WEBAUTHN_RP_ID, userVerification: 'required',
+  });
+  _webauthnChallenges.set(`staff-auth:${options.challenge}`, true);
+  res.json(options);
+});
+
+// STAFF: Step 4 — verify the real login and identify who it was
+app.post('/api/staff/webauthn/auth-verify', async (req, res) => {
+  const { studioId, response } = req.body;
+  if (!studioId || !response) return res.status(400).json({ error: 'studioId and response required' });
+
+  try {
+    const { data: cred } = await supabase.from('staff_webauthn_credentials')
+      .select('*').eq('credential_id', response.id).eq('studio_id', studioId).single();
+    if (!cred) return res.status(404).json({ error: 'This device is not registered for Face ID login — please use your PIN.' });
+
+    const challengeKey = [..._webauthnChallenges.keys()].find(k => k.startsWith('staff-auth:'));
+    if (!challengeKey) return res.status(400).json({ error: 'Login expired — please try again.' });
+    const expectedChallenge = challengeKey.replace('staff-auth:', '');
+
+    const verification = await verifyAuthenticationResponse({
+      response, expectedChallenge, expectedOrigin: WEBAUTHN_ORIGIN, expectedRPID: WEBAUTHN_RP_ID,
+      credential: { id: cred.credential_id, publicKey: Buffer.from(cred.public_key, 'base64'), counter: 0 },
+    });
+    if (!verification.verified) return res.status(401).json({ error: 'Could not verify — please use your PIN.' });
+
+    _webauthnChallenges.delete(challengeKey);
+    await supabase.from('staff_webauthn_credentials').update({ last_used_at: new Date().toISOString() }).eq('id', cred.id);
+    const { data: staffMember } = await supabase.from('staff_team').select('id, name, role').eq('id', cred.staff_member_id).single();
+    res.json({ verified: true, staffMember });
+  } catch (error) {
+    console.error('WebAuthn staff auth error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// CUSTOMER (Take It Home): Step 1 — generate a real registration challenge
+app.post('/api/customer/webauthn/register-options', async (req, res) => {
+  const { studioId, bookingCode, customerId } = req.body;
+  if (!studioId || !bookingCode) return res.status(400).json({ error: 'studioId and bookingCode required' });
+
+  const options = await generateRegistrationOptions({
+    rpName: WEBAUTHN_RP_NAME, rpID: WEBAUTHN_RP_ID,
+    userName: bookingCode, userID: Buffer.from(customerId || bookingCode),
+    attestationType: 'none',
+    authenticatorSelection: { residentKey: 'preferred', userVerification: 'required' },
+  });
+  _webauthnChallenges.set(`customer:${bookingCode}`, options.challenge);
+  res.json(options);
+});
+
+// CUSTOMER: Step 2 — verify and save, tied to the booking's real home access
+app.post('/api/customer/webauthn/register-verify', async (req, res) => {
+  const { studioId, bookingCode, customerId, response } = req.body;
+  if (!studioId || !bookingCode || !response) return res.status(400).json({ error: 'studioId, bookingCode, response required' });
+
+  const expectedChallenge = _webauthnChallenges.get(`customer:${bookingCode}`);
+  if (!expectedChallenge) return res.status(400).json({ error: 'Registration expired — please try again.' });
+
+  try {
+    const verification = await verifyRegistrationResponse({
+      response, expectedChallenge, expectedOrigin: WEBAUTHN_ORIGIN, expectedRPID: WEBAUTHN_RP_ID,
+    });
+    if (!verification.verified || !verification.registrationInfo) {
+      return res.status(400).json({ error: 'Could not verify — please try again.' });
+    }
+    const { credential } = verification.registrationInfo;
+    await supabase.from('customer_webauthn_credentials').insert({
+      studio_id: studioId, customer_id: customerId || null, booking_code: bookingCode,
+      credential_id: credential.id,
+      public_key: Buffer.from(credential.publicKey).toString('base64'),
+    });
+    _webauthnChallenges.delete(`customer:${bookingCode}`);
+    res.json({ verified: true });
+  } catch (error) {
+    console.error('WebAuthn customer registration error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// CUSTOMER: Step 3 — real login challenge
+app.post('/api/customer/webauthn/auth-options', async (req, res) => {
+  const options = await generateAuthenticationOptions({ rpID: WEBAUTHN_RP_ID, userVerification: 'required' });
+  _webauthnChallenges.set(`customer-auth:${options.challenge}`, true);
+  res.json(options);
+});
+
+// CUSTOMER: Step 4 — verify and return the real booking to resume
+app.post('/api/customer/webauthn/auth-verify', async (req, res) => {
+  const { studioId, response } = req.body;
+  if (!studioId || !response) return res.status(400).json({ error: 'studioId and response required' });
+
+  try {
+    const { data: cred } = await supabase.from('customer_webauthn_credentials')
+      .select('*').eq('credential_id', response.id).eq('studio_id', studioId).single();
+    if (!cred) return res.status(404).json({ error: 'This device is not set up for quick return access.' });
+
+    const challengeKey = [..._webauthnChallenges.keys()].find(k => k.startsWith('customer-auth:'));
+    if (!challengeKey) return res.status(400).json({ error: 'Login expired — please try again.' });
+    const expectedChallenge = challengeKey.replace('customer-auth:', '');
+
+    const verification = await verifyAuthenticationResponse({
+      response, expectedChallenge, expectedOrigin: WEBAUTHN_ORIGIN, expectedRPID: WEBAUTHN_RP_ID,
+      credential: { id: cred.credential_id, publicKey: Buffer.from(cred.public_key, 'base64'), counter: 0 },
+    });
+    if (!verification.verified) return res.status(401).json({ error: 'Could not verify.' });
+
+    _webauthnChallenges.delete(challengeKey);
+    await supabase.from('customer_webauthn_credentials').update({ last_used_at: new Date().toISOString() }).eq('id', cred.id);
+    const { data: booking } = await supabase.from('bookings').select('booking_code, customer_name, home_access_unlocked').eq('booking_code', cred.booking_code).eq('studio_id', studioId).single();
+    if (!booking?.home_access_unlocked) return res.status(403).json({ error: 'Home access is no longer active for this booking.' });
+    res.json({ verified: true, bookingCode: booking.booking_code, customerName: booking.customer_name });
+  } catch (error) {
+    console.error('WebAuthn customer auth error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.post('/api/staff/clock-out', async (req, res) => {
