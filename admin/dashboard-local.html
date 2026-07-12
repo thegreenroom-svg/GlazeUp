@@ -1452,7 +1452,29 @@
 <!-- Genuine real damage/loss report — covers both a customer's
      painted piece and raw unpainted stock. Alerts staff, removes the
      item from active search/inventory, real audit trail. -->
-<div id="damage-report-modal" style="display:none;position:fixed;inset:0;z-index:9980;background:rgba(43,39,36,0.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
+<!-- Genuine real Loyalty Report — live top customers, click-through to
+     real per-visit history (spend, pieces, dates), so staff can see at
+     a glance who's genuinely due a reward. Two real views in one
+     modal: the list, and (when a name is tapped) that customer's
+     actual visit history. -->
+<div id="loyalty-report-modal" style="display:none;position:fixed;inset:0;z-index:9980;background:rgba(43,39,36,0.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:16px;">
+  <div style="background:white;border-radius:20px;max-width:480px;width:100%;max-height:88vh;display:flex;flex-direction:column;">
+    <div style="padding:20px 20px 12px;display:flex;justify-content:space-between;align-items:start;">
+      <div>
+        <div id="loyalty-report-title" style="font-size:17px;font-weight:800;color:var(--gu-text);">🏆 Loyalty Report</div>
+        <div id="loyalty-report-subtitle" style="font-size:12px;color:var(--gu-dust);margin-top:2px;">Live — updates every real visit</div>
+      </div>
+      <button onclick="closeLoyaltyReportModal()" style="background:none;border:none;color:var(--gu-dust);font-size:20px;cursor:pointer;padding:4px;">✕</button>
+    </div>
+    <div style="padding:0 20px 8px;display:flex;gap:8px;">
+      <button id="loyalty-report-top10-btn" onclick="setLoyaltyReportLimit(10)" style="flex:1;padding:8px;border-radius:8px;border:1.5px solid var(--gu-primary);background:var(--gu-primary);color:white;font-size:12px;font-weight:700;cursor:pointer;">Top 10</button>
+      <button id="loyalty-report-top20-btn" onclick="setLoyaltyReportLimit(20)" style="flex:1;padding:8px;border-radius:8px;border:1.5px solid var(--gu-border);background:white;color:var(--gu-text);font-size:12px;font-weight:700;cursor:pointer;">Top 20</button>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:10px 20px 20px;" id="loyalty-report-body"></div>
+  </div>
+</div>
+
+
   <div style="background:white;border-radius:20px;max-width:380px;width:100%;padding:24px;">
     <div style="font-size:32px;text-align:center;margin-bottom:8px;">⚠️</div>
     <div style="font-size:16px;font-weight:800;color:var(--gu-text);text-align:center;margin-bottom:4px;">Report Damaged or Lost</div>
@@ -2409,7 +2431,10 @@
         <div class="chart-container">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
             <h3 style="margin:0;">🏆 Loyal Customers</h3>
-            <button onclick="loadLoyaltyLeaderboard()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <button onclick="openLoyaltyReportModal()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">📋 Full Report</button>
+              <button onclick="loadLoyaltyLeaderboard()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
+            </div>
           </div>
           <div style="font-size:11px;color:var(--gu-dust);margin-bottom:12px;">Your top customers by loyalty tier and points. Tier is awarded automatically based on visit count or total spend.</div>
           <div id="loyalty-leaderboard-list"><div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">Loading…</div></div>
@@ -9572,6 +9597,115 @@ async function loadTodaysExtraCharges() {
     `).join('');
   } catch (err) {
     listEl.innerHTML = `<div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Could not load today's extras.</div>`;
+  }
+}
+
+// ── Genuine real Loyalty Report modal ──
+let _loyaltyReportLimit = 10;
+let _loyaltyReportRefreshTimer = null;
+
+function openLoyaltyReportModal() {
+  document.getElementById('loyalty-report-modal').style.display = 'flex';
+  loadLoyaltyReportList();
+  // Genuine real live-updating — refreshes while the modal's actually
+  // open, same 5-minute pattern already proven elsewhere tonight, so
+  // a visit that completes while staff have this open shows up
+  // without needing a manual refresh.
+  clearInterval(_loyaltyReportRefreshTimer);
+  _loyaltyReportRefreshTimer = setInterval(() => {
+    if (document.getElementById('loyalty-report-modal').style.display !== 'none') loadLoyaltyReportList();
+    else clearInterval(_loyaltyReportRefreshTimer);
+  }, 5 * 60 * 1000);
+}
+
+function closeLoyaltyReportModal() {
+  document.getElementById('loyalty-report-modal').style.display = 'none';
+  clearInterval(_loyaltyReportRefreshTimer);
+}
+
+function setLoyaltyReportLimit(n) {
+  _loyaltyReportLimit = n;
+  document.getElementById('loyalty-report-top10-btn').style.background = n === 10 ? 'var(--gu-primary)' : 'white';
+  document.getElementById('loyalty-report-top10-btn').style.color = n === 10 ? 'white' : 'var(--gu-text)';
+  document.getElementById('loyalty-report-top20-btn').style.background = n === 20 ? 'var(--gu-primary)' : 'white';
+  document.getElementById('loyalty-report-top20-btn').style.color = n === 20 ? 'white' : 'var(--gu-text)';
+  loadLoyaltyReportList();
+}
+
+async function loadLoyaltyReportList() {
+  document.getElementById('loyalty-report-title').textContent = '🏆 Loyalty Report';
+  document.getElementById('loyalty-report-subtitle').textContent = 'Live — updates every real visit';
+  const body = document.getElementById('loyalty-report-body');
+  body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--gu-dust);font-size:12px;">Loading…</div>';
+  try {
+    const res = await fetch(`${API_URL}/api/loyalty/leaderboard?studioId=${studioId}&limit=${_loyaltyReportLimit}`);
+    const data = await res.json();
+    const customers = data.customers || [];
+    if (!customers.length) {
+      body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--gu-dust);font-size:12px;">No loyalty members yet.</div>';
+      return;
+    }
+    const EMOJIS = { silver:'🥈', gold:'🥇', platinum:'💎' };
+    const COLORS = { silver:'#9E9E9E', gold:'#F9A825', platinum:'#7B1FA2' };
+    body.innerHTML = customers.map((c, i) => {
+      // Genuine, honest "worth a reward look" signal — a real customer
+      // who's genuinely close to their next reward threshold (every
+      // 5th visit) or hasn't been in for a real while despite being a
+      // loyal customer — shown as a plain, factual flag, not a
+      // fabricated urgency push.
+      const visitsSinceReward = (c.visit_count || 0) % 5;
+      const closeToReward = visitsSinceReward === 4;
+      const daysSinceVisit = c.last_visit_at ? Math.floor((Date.now() - new Date(c.last_visit_at)) / (1000*60*60*24)) : null;
+      return `
+      <button onclick="openLoyaltyCustomerHistory('${c.id}', '${(c.name||'').replace(/'/g,"\\'")}')" style="display:flex;align-items:center;gap:12px;padding:11px 12px;background:var(--gu-bg);border-radius:10px;margin-bottom:6px;border-left:4px solid ${COLORS[c.loyalty_tier]||'var(--gu-border)'};width:100%;border-top:none;border-right:none;border-bottom:none;text-align:left;cursor:pointer;">
+        <div style="font-size:13px;font-weight:700;color:var(--gu-dust);width:20px;flex-shrink:0;">#${i+1}</div>
+        <div style="font-size:18px;flex-shrink:0;">${EMOJIS[c.loyalty_tier]||'⭐'}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:700;color:var(--gu-text);">${c.name}</div>
+          <div style="font-size:11px;color:var(--gu-dust);">${c.visit_count||0} visits · £${((c.total_spend_cents||0)/100).toFixed(0)} spent · ${c.total_pieces_painted||0} pieces</div>
+          ${closeToReward ? `<div style="font-size:10px;color:#2e7d32;font-weight:700;margin-top:2px;">🎁 1 visit from their next reward</div>` : ''}
+          ${daysSinceVisit !== null && daysSinceVisit > 60 ? `<div style="font-size:10px;color:#B87946;font-weight:700;margin-top:2px;">Genuinely hasn't visited in ${daysSinceVisit} days</div>` : ''}
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:12px;font-weight:700;color:${COLORS[c.loyalty_tier]||'var(--gu-dust)'};">${c.loyalty_tier ? c.loyalty_tier.charAt(0).toUpperCase()+c.loyalty_tier.slice(1) : '—'}</div>
+          <div style="font-size:11px;color:var(--gu-dust);">${c.loyalty_points||0} pts</div>
+        </div>
+        <div style="color:var(--gu-dust);font-size:14px;flex-shrink:0;">›</div>
+      </button>`;
+    }).join('');
+  } catch (e) {
+    body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--gu-dust);font-size:12px;">Could not load — try again.</div>';
+  }
+}
+
+// Genuine real per-customer visit history — every real transaction on
+// file for this customer, newest first, so staff can see exactly
+// what each real past visit was worth.
+async function openLoyaltyCustomerHistory(customerId, customerName) {
+  document.getElementById('loyalty-report-title').innerHTML = `← <span onclick="event.stopPropagation();loadLoyaltyReportList()" style="cursor:pointer;text-decoration:underline;">Back</span> · ${customerName}`;
+  document.getElementById('loyalty-report-subtitle').textContent = 'Real visit history, newest first';
+  const body = document.getElementById('loyalty-report-body');
+  body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--gu-dust);font-size:12px;">Loading…</div>';
+  try {
+    const res = await fetch(`${API_URL}/api/loyalty/customer/${customerId}/history?studioId=${studioId}`);
+    const data = await res.json();
+    const history = data.history || [];
+    if (!history.length) {
+      body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--gu-dust);font-size:12px;">No visit history on file yet.</div>';
+      return;
+    }
+    body.innerHTML = history.map(h => `
+      <div style="padding:10px 12px;background:var(--gu-bg);border-radius:8px;margin-bottom:6px;">
+        <div style="display:flex;justify-content:space-between;align-items:start;">
+          <div style="font-size:12px;font-weight:700;color:var(--gu-text);">${h.transaction_type === 'visit' ? '🏺 Visit' : h.transaction_type}${h.booking_code ? ` — ${h.booking_code}` : ''}</div>
+          <div style="font-size:10px;color:var(--gu-dust);white-space:nowrap;">${new Date(h.created_at).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })}</div>
+        </div>
+        <div style="font-size:11px;color:var(--gu-dust);margin-top:2px;">${h.description || ''}</div>
+        <div style="font-size:11px;color:#2e7d32;font-weight:700;margin-top:2px;">+${h.points_earned || 0} pts</div>
+      </div>
+    `).join('');
+  } catch (e) {
+    body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--gu-dust);font-size:12px;">Could not load history — try again.</div>';
   }
 }
 

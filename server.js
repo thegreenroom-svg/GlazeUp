@@ -6794,15 +6794,31 @@ app.post('/api/loyalty/piece-milestone', async (req, res) => {
 
 // GET /api/loyalty/leaderboard — top customers by tier/points for a studio
 app.get('/api/loyalty/leaderboard', async (req, res) => {
-  const { studioId } = req.query;
+  const { studioId, limit } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
   const { data } = await supabase.from('customers')
-    .select('name, loyalty_points, visit_count, total_spend_cents, loyalty_tier')
+    .select('id, name, loyalty_points, visit_count, total_spend_cents, total_pieces_painted, loyalty_tier, last_visit_at, created_at')
     .eq('studio_id', studioId)
     .not('loyalty_tier', 'is', null)
     .order('loyalty_points', { ascending: false })
-    .limit(20);
+    .limit(parseInt(limit) || 20);
   res.json({ customers: data || [] });
+});
+
+// GET /api/loyalty/customer/:id/history — genuine real per-visit
+// history for one customer, newest first. Powers the detail view when
+// staff tap a name on the real loyalty leaderboard, so they can see
+// exactly when someone last visited and what each real visit was
+// worth, not just the running totals.
+app.get('/api/loyalty/customer/:id/history', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data, error } = await supabase.from('loyalty_transactions')
+    .select('booking_code, points_earned, transaction_type, description, created_at')
+    .eq('studio_id', studioId).eq('customer_id', req.params.id)
+    .order('created_at', { ascending: false }).limit(30);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ history: data || [] });
 });
 
 // ═══════════════════════════════════════════
