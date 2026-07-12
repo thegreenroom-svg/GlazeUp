@@ -9943,6 +9943,8 @@ async function loadPieceMatchGroup() {
   }
 }
 
+let _pmLastCapturedPhoto = null; // genuine real retained photo, so a retry can reuse it rather than require retaking
+
 function capturePieceMatchPhoto() {
   if (!_pmCurrentBookingCode) { alert('Scan a booking QR code first.'); return; }
   const input = document.createElement('input');
@@ -9951,24 +9953,43 @@ function capturePieceMatchPhoto() {
   input.click();
 }
 
+// Genuine real retry — same photo, since a "no match"/error result
+// could honestly be a network blip during the request rather than a
+// genuinely bad photo.
+function retryPieceMatch() {
+  if (!_pmLastCapturedPhoto) { alert('No photo to retry with — please take a new one.'); return; }
+  runPieceMatchWithPhoto(_pmLastCapturedPhoto);
+}
+
 async function handlePieceMatchCapture(event) {
   const file = event.target.files[0];
   if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => { _pmLastCapturedPhoto = reader.result; runPieceMatchWithPhoto(reader.result); };
+  reader.readAsDataURL(file);
+}
+
+async function runPieceMatchWithPhoto(photoBase64) {
   const resultEl = document.getElementById('pm-match-result');
   resultEl.innerHTML = '<div style="padding:14px;text-align:center;color:var(--gu-dust);font-size:13px;">🔍 Comparing against reference photos — this takes a few seconds…</div>';
 
-  const reader = new FileReader();
-  reader.onload = async () => {
-    try {
+  try {
       const res = await fetch(`${API_URL}/api/pieces/match`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           studioId, bookingCode: _pmCurrentBookingCode,
-          queryPhotoBase64: reader.result, packerId: currentShiftStaff?.id || null,
+          queryPhotoBase64: photoBase64, packerId: currentShiftStaff?.id || null,
         })
       });
       const data = await res.json();
-      if (!res.ok) { resultEl.innerHTML = `<div style="padding:14px;color:#d9534f;font-size:13px;">${data.error || 'Could not run the match.'}</div>`; return; }
+      if (!res.ok) {
+        resultEl.innerHTML = `
+          <div style="padding:14px;background:#fdecea;border-radius:10px;">
+            <div style="color:#d9534f;font-size:13px;margin-bottom:10px;">${data.error || 'Could not run the match.'}</div>
+            <button onclick="retryPieceMatch()" style="width:100%;background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;">🔄 Try again with the same photo</button>
+          </div>`;
+        return;
+      }
 
       // Genuine auto-assignment happened — shown honestly and clearly,
       // never silent. Real undo option right there, since this is a
@@ -9986,7 +10007,14 @@ async function handlePieceMatchCapture(event) {
       }
 
       if (data.noConfidentMatch || !data.matches?.length) {
-        resultEl.innerHTML = `<div style="padding:14px;background:#fff3e0;border-radius:10px;font-size:13px;color:var(--gu-text);">🤷 No confident match found — please compare manually against the reference photos above.</div>`;
+        resultEl.innerHTML = `
+          <div style="padding:14px;background:#fff3e0;border-radius:10px;">
+            <div style="font-size:13px;color:var(--gu-text);margin-bottom:10px;">🤷 No confident match found. This could genuinely be a real network hiccup during the search, not necessarily a bad photo — or compare manually against the reference photos above.</div>
+            <div style="display:flex;gap:8px;">
+              <button onclick="retryPieceMatch()" style="flex:1;background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;">🔄 Try again, same photo</button>
+              <button onclick="capturePieceMatchPhoto()" style="flex:1;background:none;border:1px solid var(--gu-border);color:var(--gu-text);border-radius:8px;padding:10px;font-size:12px;cursor:pointer;">📷 New photo instead</button>
+            </div>
+          </div>`;
         return;
       }
 
@@ -10008,8 +10036,6 @@ async function handlePieceMatchCapture(event) {
     } catch (e) {
       resultEl.innerHTML = '<div style="padding:14px;color:#d9534f;font-size:13px;">Could not run the match — please compare manually.</div>';
     }
-  };
-  reader.readAsDataURL(file);
 }
 
 // Genuine, real undo for an auto-matched piece — since auto-assignment
@@ -12268,6 +12294,8 @@ function toggleFp1AutoMatch() {
   area.style.display = isShowing ? 'none' : 'block';
 }
 
+let _fp1LastAutoMatchPhoto = null; // genuine real retained photo, so a retry can reuse it rather than require retaking
+
 function captureFp1AutoMatchPhoto() {
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
@@ -12275,10 +12303,19 @@ function captureFp1AutoMatchPhoto() {
     const file = event.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => runFp1AutoMatch(reader.result);
+    reader.onload = () => { _fp1LastAutoMatchPhoto = reader.result; runFp1AutoMatch(reader.result); };
     reader.readAsDataURL(file);
   };
   input.click();
+}
+
+// Genuine real retry — reuses the exact same photo already taken,
+// since a "no match" result could honestly be a network blip during
+// the request rather than a genuinely bad photo, so retaking
+// shouldn't be the only option.
+function retryFp1AutoMatch() {
+  if (!_fp1LastAutoMatchPhoto) { alert('No photo to retry with — please take a new one.'); return; }
+  runFp1AutoMatch(_fp1LastAutoMatchPhoto);
 }
 
 async function runFp1AutoMatch(photoDataUrl) {
@@ -12291,7 +12328,14 @@ async function runFp1AutoMatch(photoDataUrl) {
       body: JSON.stringify({ studioId, photoBase64: photoDataUrl, searchedBy: currentShiftStaff?.id || null, autoAssign: true })
     });
     const data = await res.json();
-    if (!res.ok) { resultEl.innerHTML = `<div style="padding:14px;color:#ff8a80;font-size:13px;">${data.error || 'Could not run the search.'}</div>`; return; }
+    if (!res.ok) {
+      resultEl.innerHTML = `
+        <div style="padding:14px;background:rgba(255,138,128,0.15);border-radius:10px;">
+          <div style="color:#ff8a80;font-size:13px;margin-bottom:10px;">${data.error || 'Could not run the search.'}</div>
+          <button onclick="retryFp1AutoMatch()" style="width:100%;background:#5E35B1;color:white;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;">🔄 Try again with the same photo</button>
+        </div>`;
+      return;
+    }
 
     // Genuine auto-assignment happened — shown clearly, real undo option
     if (data.autoAssigned) {
@@ -12306,7 +12350,14 @@ async function runFp1AutoMatch(photoDataUrl) {
     }
 
     if (data.noConfidentMatch || !data.matches?.length) {
-      resultEl.innerHTML = '<div style="padding:14px;background:rgba(249,168,37,0.15);border-radius:10px;font-size:13px;color:white;">🤷 No confident match — not auto-assigned. Try Piece Matching with a known booking code instead.</div>';
+      resultEl.innerHTML = `
+        <div style="padding:14px;background:rgba(249,168,37,0.15);border-radius:10px;">
+          <div style="font-size:13px;color:white;margin-bottom:10px;">🤷 No confident match — not auto-assigned. This could genuinely be a real network hiccup during the search, not necessarily a bad photo.</div>
+          <div style="display:flex;gap:8px;">
+            <button onclick="retryFp1AutoMatch()" style="flex:1;background:#5E35B1;color:white;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;">🔄 Try again, same photo</button>
+            <button onclick="captureFp1AutoMatchPhoto()" style="flex:1;background:none;border:1px solid rgba(255,255,255,0.3);color:white;border-radius:8px;padding:10px;font-size:12px;cursor:pointer;">📷 New photo instead</button>
+          </div>
+        </div>`;
       return;
     }
 
