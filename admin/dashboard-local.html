@@ -4189,17 +4189,8 @@
           Live running log for the studio manager — every booking today, every stage, and today's takings. Updates automatically as staff work through the process.
         </p>
 
-        <!-- Genuine real damage/loss report history — every real
-             report ever submitted, newest first, so a manager can see
-             the honest ongoing pattern, not just react to one-off
-             alerts as they come in. -->
-        <div class="chart-container" style="margin-bottom:20px;border-left:4px solid #d9534f;">
-          <h3 style="margin:0 0 6px;">⚠️ Damaged / Lost Reports</h3>
-          <p style="font-size:12px;color:var(--gu-dust);margin-bottom:12px;">Real reports from staff — each one already removed the item from active search and alerted the team.</p>
-          <div id="damage-reports-list"><div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">Loading…</div></div>
-        </div>
-
-        <!-- Summary stats -->
+        <!-- Summary stats — stays visible above the tiles, a genuine
+             real quick-glance element regardless of which section is open -->
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:20px;">
           <div style="background:white;border:1px solid var(--gu-border);border-radius:12px;padding:14px;text-align:center;">
             <div style="font-size:24px;font-weight:800;color:var(--gu-primary);" id="dp-total-bookings">–</div>
@@ -4219,7 +4210,44 @@
           </div>
         </div>
 
+        <!-- Genuine real tile entry point, per direct request -->
+        <div id="progress-tile-menu" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+          <button onclick="showProgressSection('damage')" style="background:#d9534f;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">⚠️</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Damaged / Lost</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Real report history</span>
+          </button>
+          <button onclick="showProgressSection('tasks')" style="background:#d9534f;filter:brightness(0.88);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">📋</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Incomplete Tasks</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Everyone, every role, live</span>
+          </button>
+          <button onclick="showProgressSection('adhoc')" style="background:#d9534f;filter:brightness(0.76);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">📌</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">One-Off Request</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Send an ad-hoc task</span>
+          </button>
+          <button onclick="showProgressSection('bookings')" style="background:#d9534f;filter:brightness(0.64);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">📖</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Booking Progress</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Every table, stage by stage</span>
+          </button>
+        </div>
+
+        <!-- Genuine real damage/loss report history — every real
+             report ever submitted, newest first, so a manager can see
+             the honest ongoing pattern, not just react to one-off
+             alerts as they come in. -->
+        <div id="progress-section-damage" class="progress-section" style="display:none;">
+        <div class="chart-container" style="margin-bottom:20px;border-left:4px solid #d9534f;">
+          <h3 style="margin:0 0 6px;">⚠️ Damaged / Lost Reports</h3>
+          <p style="font-size:12px;color:var(--gu-dust);margin-bottom:12px;">Real reports from staff — each one already removed the item from active search and alerted the team.</p>
+          <div id="damage-reports-list"><div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">Loading…</div></div>
+        </div>
+        </div>
+
         <!-- Incomplete Tasks by Role — Manager overview -->
+        <div id="progress-section-tasks" class="progress-section" style="display:none;">
         <div class="chart-container" style="margin-bottom:20px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
             <h3 style="margin:0;">📋 Incomplete Tasks — All Roles</h3>
@@ -4228,8 +4256,10 @@
           <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Everything still pending across the whole team right now, grouped by role. Cancel anything that's no longer needed.</p>
           <div id="manager-tasks-by-role"><div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading…</div></div>
         </div>
+        </div>
 
         <!-- Push a one-off / ad-hoc request -->
+        <div id="progress-section-adhoc" class="progress-section" style="display:none;">
         <div class="chart-container" style="margin-bottom:20px;">
           <h3 style="margin:0 0 6px;">📌 Send a One-Off Request</h3>
           <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Push an ad-hoc task straight to a role or a specific person. Appears on their tablet exactly like a handoff alert — flashing until actioned.</p>
@@ -4260,14 +4290,17 @@
           <button onclick="sendAdhocRequest()" style="background:var(--link-clay);color:white;border:none;border-radius:8px;padding:11px 22px;font-size:13px;font-weight:700;cursor:pointer;">📤 Send Request</button>
           <span id="adhoc-send-status" style="font-size:12px;color:var(--gu-dust);margin-left:10px;"></span>
         </div>
+        </div>
 
         <!-- Per-booking progress -->
+        <div id="progress-section-bookings" class="progress-section" style="display:none;">
         <div class="chart-container">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
             <h3 style="margin:0;">Booking-by-booking progress</h3>
             <button onclick="loadDailyProgress()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">🔄 Refresh</button>
           </div>
           <div id="dp-bookings-list"><div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading…</div></div>
+        </div>
         </div>
       </div>
 
@@ -12215,6 +12248,16 @@ function showTeamSection(section) {
   document.getElementById('team-tile-menu').style.display = 'none';
   document.querySelectorAll('.team-section').forEach(el => el.style.display = 'none');
   document.getElementById(`team-section-${section}`).style.display = 'block';
+}
+
+// Genuine real tile-section switcher for Daily Progress, per direct
+// request, same proven pattern. No individual real load call needed
+// per section — every real load already fires automatically on
+// tab-open, independent of which tile is tapped.
+function showProgressSection(section) {
+  document.getElementById('progress-tile-menu').style.display = 'none';
+  document.querySelectorAll('.progress-section').forEach(el => el.style.display = 'none');
+  document.getElementById(`progress-section-${section}`).style.display = 'block';
 }
 
 function showStaffSection(section) {
