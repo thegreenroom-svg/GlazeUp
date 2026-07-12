@@ -10453,7 +10453,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // and letting deviceCheckIn() -> populateDashboard() be the ONE place
   // the real bootstrap (including checkShiftLogin) actually runs.
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
-  document.getElementById('dashboard-view').style.display = 'block';
+  document.getElementById('grid-nav-view').style.display = 'block';
+  showGridNavTop();
   // Dashboard's nav link is already class="active" by default in the raw
   // HTML, so nothing more needed here — just making sure every OTHER
   // view is hidden until a real tab switch happens.
