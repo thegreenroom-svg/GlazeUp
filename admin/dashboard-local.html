@@ -7654,28 +7654,28 @@ async function logOutOfShift() {
 // used by the sidebar — nothing underneath was changed at all.
 // ═══════════════════════════════════════════════════════════
 const GRID_NAV_STRUCTURE = [
-  { id: 'dashboard', label: 'Dashboard', desc: 'Your daily overview', color: '#B87946', direct: 'dashboard' },
-  { id: 'bookings', label: 'Bookings & Tables', desc: 'Open a booking, print a table QR', color: '#2e7d32', items: [
+  { id: 'dashboard', label: 'Dashboard', color: '#B87946', direct: 'dashboard' },
+  { id: 'bookings', label: 'Bookings', color: '#2e7d32', items: [
     { tab: 'staff', label: 'Daily Bookings', desc: 'Start a booking, walk-in, or party' },
     { tab: 'tablecards', label: 'Table Cards', desc: "Print a table's QR card" },
   ]},
-  { id: 'pieces', label: 'Pieces & Labels', desc: 'Match, label, and print', color: '#c0392b', items: [
+  { id: 'pieces', label: 'Pieces', color: '#c0392b', items: [
     { tab: 'piecematch', label: 'Piece Matching', desc: 'AI-match fired pieces to photos' },
     { tab: 'labels', label: 'Labels', desc: 'Print collection or postal labels' },
     { tab: 'printqueue', label: 'Print Queue', desc: 'Approve customer transfer designs' },
   ]},
-  { id: 'stock', label: 'Stock & Catalogue', desc: 'Bisque, stock, and browsing', color: '#5E35B1', items: [
+  { id: 'stock', label: 'Stock', color: '#5E35B1', items: [
     { tab: 'stock', label: 'Stock', desc: 'Photograph bisque, manage reservations' },
     { tab: 'catalogue', label: 'Piece Catalogue', desc: 'What customers browse from home' },
     { tab: 'shapes', label: 'Bisque', desc: 'Your Square catalogue as silhouettes' },
   ]},
-  { id: 'menu', label: 'Daily Menu', desc: "Today's specials", color: '#F9A825', direct: 'menu' },
-  { id: 'team', label: 'Team & Progress', desc: 'Duties, timekeeping, live tasks', color: '#00838f', items: [
+  { id: 'menu', label: 'Menu', color: '#F9A825', direct: 'menu' },
+  { id: 'team', label: 'Team', color: '#00838f', items: [
     { tab: 'team', label: 'Team & Duties', desc: 'Duty lists, timekeeping, holidays' },
     { tab: 'progress', label: 'Daily Progress', desc: "Every team member's live tasks" },
   ]},
-  { id: 'community', label: 'Community', desc: 'Feature and moderate customer work', color: '#8e44ad', direct: 'community' },
-  { id: 'setup', label: 'Studio Setup', desc: 'Branding, connections, add-ons', color: '#2B2724', items: [
+  { id: 'community', label: 'Community', color: '#8e44ad', direct: 'community' },
+  { id: 'setup', label: 'Setup', color: '#2B2724', items: [
     { tab: 'branding', label: 'Branding', desc: 'Colours, logo, customer app look' },
     { tab: 'setup', label: 'Studio Setup', desc: 'Connections, Cleo, add-ons, offers' },
   ]},
@@ -7694,10 +7694,12 @@ function showGridNavTop() {
   document.getElementById('grid-nav-top').style.display = 'block';
   document.getElementById('grid-nav-sub').style.display = 'none';
   const wrap = document.getElementById('grid-nav-top-tiles');
+  // Genuine, real, deliberately simple — top-level tiles show ONLY a
+  // short name, nothing else, per direct clarification. Large, plain,
+  // one colour, one word or short phrase.
   wrap.innerHTML = GRID_NAV_STRUCTURE.map(group => `
-    <button onclick="${group.direct ? `goToTab('${group.direct}')` : `showGridNavSub('${group.id}')`}" style="background:${group.color};color:white;border:none;border-radius:16px;padding:22px 14px;text-align:left;cursor:pointer;min-height:110px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 4px 14px rgba(0,0,0,0.15);">
-      <div style="font-size:16px;font-weight:800;line-height:1.25;">${group.label}</div>
-      <div style="font-size:12px;opacity:0.85;margin-top:8px;">${group.desc}</div>
+    <button onclick="${group.direct ? `goToTab('${group.direct}')` : `showGridNavSub('${group.id}')`}" style="background:${group.color};color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;align-items:center;justify-content:center;text-align:center;">
+      <div style="font-size:19px;font-weight:800;line-height:1.2;padding:8px;">${group.label}</div>
     </button>
   `).join('');
 }
@@ -7712,11 +7714,13 @@ function showGridNavSub(groupId) {
   // Genuine, real per-tile colour variation within a group — same
   // base hue, stepped lighter/darker, so every real tile in the
   // whole app is visually distinct per direct request, not just one
-  // flat colour per group.
+  // flat colour per group. Second level gets a real short description
+  // under the name, per direct clarification — "slightly more detail"
+  // than the top level, since these name actual specific functions.
   wrap.innerHTML = group.items.map((item, i) => `
-    <button onclick="goToTab('${item.tab}')" style="background:${group.color};filter:brightness(${1 - i * 0.12});color:white;border:none;border-radius:16px;padding:22px 14px;text-align:left;cursor:pointer;min-height:110px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 4px 14px rgba(0,0,0,0.15);">
-      <div style="font-size:16px;font-weight:800;line-height:1.25;">${item.label}</div>
-      <div style="font-size:12px;opacity:0.85;margin-top:8px;">${item.desc}</div>
+    <button onclick="goToTab('${item.tab}')" style="background:${group.color};filter:brightness(${1 - i * 0.12});color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+      <div style="font-size:16px;font-weight:800;line-height:1.2;">${item.label}</div>
+      <div style="font-size:11px;opacity:0.85;margin-top:6px;line-height:1.3;">${item.desc}</div>
     </button>
   `).join('');
 }
