@@ -5549,7 +5549,7 @@ function cleoAdminSpeak(text, onStart, onEnd, pitch, rate) {
   // customer app. Callers wanting the plain neutral voice (the
   // walkthrough tour) pass their own values.
   utt.rate = rate != null ? rate : 0.95;
-  utt.pitch = pitch != null ? pitch : 1.15; // genuinely brought down from the real max (2) — too high/fast per direct feedback
+  utt.pitch = pitch != null ? pitch : 1.0; // genuine real natural pitch, per direct request tonight
   const selectedVoice = getCleoAdminPreferredVoice();
   utt.voice = selectedVoice;
   utt.lang = selectedVoice ? selectedVoice.lang : 'en-GB'; // genuine fix — use the selected voice's own real language, not a hardcoded mismatch
@@ -5635,7 +5635,7 @@ function testCleoAdminVoice(voiceName) {
   if (!voice) return;
   window.speechSynthesis.cancel();
   const utt = new SpeechSynthesisUtterance("Hi, I'm Cleo! This is what I sound like.");
-  utt.voice = voice; utt.rate = 0.95; utt.pitch = 1.15;
+  utt.voice = voice; utt.rate = 0.95; utt.pitch = 1.0;
   window.speechSynthesis.speak(utt);
 }
 
@@ -8444,6 +8444,10 @@ function toggleTaskVoice() {
 // ── Voice narration for tasks (British voice if available) ──
 function speakTask(text) {
   if (!window.speechSynthesis) return;
+  // Genuine real mute check, per direct request — task narration
+  // shares the same mute state as Cleo's own voice, since both are
+  // real spoken output that should stop together, text always stays.
+  if (isStaffAssistantVoiceMuted()) return;
   window.speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
   const voices = window.speechSynthesis.getVoices();
@@ -13945,7 +13949,7 @@ function showCleoAdminContextTip(text) {
   // rapid hovering across several nav items doesn't cut her off
   // mid-sentence or queue up overlapping audio.
   const now = Date.now();
-  if ((now - _cleoAdminTooltipVoiceLastPlayedAt) >= 2000) {
+  if ((now - _cleoAdminTooltipVoiceLastPlayedAt) >= 2000 && !isStaffAssistantVoiceMuted()) {
     _cleoAdminTooltipVoiceLastPlayedAt = now;
     cleoAdminSpeak(text);
   }
