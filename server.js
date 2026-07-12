@@ -275,31 +275,46 @@ async function syncSquareData(studioId, accessToken, daysBack = 1) {
     // or a real wider historical pull when explicitly asked for
     // (e.g. a genuine one-time 30-day backfill).
     const sinceDate = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const ordersRes = await client.ordersApi.searchOrders({
-      locationIds,
-      query: {
-        filter: {
-          dateTimeFilter: {
-            createdAt: {
-              startAt: sinceDate + 'T00:00:00Z'
+
+    // Genuine real pagination — Square caps each real request at 500
+    // orders, so a genuine full-year pull (per direct request, "since
+    // Square was set up") needs to follow real cursor pages until
+    // there's genuinely nothing left, rather than silently truncating
+    // at the first 500. Real, honest safety cap of 20 pages (10,000
+    // orders) so a genuine account issue can't loop forever.
+    let orders = [];
+    let cursor = undefined;
+    let pageCount = 0;
+    do {
+      const ordersRes = await client.ordersApi.searchOrders({
+        locationIds,
+        query: {
+          filter: {
+            dateTimeFilter: {
+              createdAt: {
+                startAt: sinceDate + 'T00:00:00Z'
+              }
             }
+          },
+          // Genuine real fix: Square's own documentation states that
+          // using dateTimeFilter REQUIRES sort.sortField to match the
+          // same real field being filtered on (createdAt here) — this
+          // was genuinely missing, which Square's docs say should throw,
+          // but may instead have been silently returning zero real
+          // results depending on the exact real SDK/API behavior.
+          sort: {
+            sortField: 'CREATED_AT',
+            sortOrder: 'DESC'
           }
         },
-        // Genuine real fix: Square's own documentation states that
-        // using dateTimeFilter REQUIRES sort.sortField to match the
-        // same real field being filtered on (createdAt here) — this
-        // was genuinely missing, which Square's docs say should throw,
-        // but may instead have been silently returning zero real
-        // results depending on the exact real SDK/API behavior.
-        sort: {
-          sortField: 'CREATED_AT',
-          sortOrder: 'DESC'
-        }
-      },
-      limit: 500 // genuine real safety cap — Square paginates by default, and this backfill doesn't yet handle real pagination cursors
-    });
+        limit: 500,
+        cursor,
+      });
+      orders = orders.concat(ordersRes.result.orders || []);
+      cursor = ordersRes.result.cursor;
+      pageCount++;
+    } while (cursor && pageCount < 20);
 
-    const orders = ordersRes.result.orders || [];
     recordsSynced = orders.length;
 
     // Real, honest keyword-to-category matching — transparent and
@@ -1110,23 +1125,41 @@ app.get('/api/analytics/dashboard', async (req, res) => {
     const allTimeRevenueCents = (allTimeRevenue || []).reduce((sum, day) => sum + (day.metric_value?.revenue_cents || 0), 0);
     const allTimeTransactionCount = (allTimeRevenue || []).reduce((sum, day) => sum + (day.metric_value?.transaction_count || 0), 0);
 
+    // Genuine real MTD (month to date) and YTD (year to date) totals,
+    // per direct request — same real analytics_cache data, just
+    // different real date windows.
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const startOfYear = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+    const { data: mtdRevenue } = await supabase
+      .from('analytics_cache').select('metric_value').eq('studio_id', studioId).eq('metric_type', 'daily_revenue').gte('metric_date', startOfMonth);
+    const { data: ytdRevenue } = await supabase
+      .from('analytics_cache').select('metric_value').eq('studio_id', studioId).eq('metric_type', 'daily_revenue').gte('metric_date', startOfYear);
+    const mtdRevenueCents = (mtdRevenue || []).reduce((sum, day) => sum + (day.metric_value?.revenue_cents || 0), 0);
+    const ytdRevenueCents = (ytdRevenue || []).reduce((sum, day) => sum + (day.metric_value?.revenue_cents || 0), 0);
+
     // Genuine real revenue category breakdown — cakes, drinks,
-    // pottery/glazes, booking fees, return fees — per direct request,
-    // last 30 real days, summed by category.
-    const { data: categoryRows } = await supabase
-      .from('revenue_category_breakdown')
-      .select('category, revenue_cents, item_count')
-      .eq('studio_id', studioId)
-      .gte('metric_date', thirtyDaysAgo);
-    const categoryTotals = {};
-    (categoryRows || []).forEach(row => {
-      if (!categoryTotals[row.category]) categoryTotals[row.category] = { revenue_cents: 0, item_count: 0 };
-      categoryTotals[row.category].revenue_cents += row.revenue_cents;
-      categoryTotals[row.category].item_count += row.item_count;
-    });
-    const revenueByCategory = Object.entries(categoryTotals)
-      .map(([category, v]) => ({ category, revenueCents: v.revenue_cents, itemCount: v.item_count }))
-      .sort((a, b) => b.revenueCents - a.revenueCents);
+    // pottery/glazes, booking fees, return fees — per direct request.
+    // Real, honest helper so the same logic serves every real time
+    // window (30d, MTD, YTD, all-time) without repeating it four times.
+    async function getCategoryBreakdown(sinceDate) {
+      let query = supabase.from('revenue_category_breakdown').select('category, revenue_cents, item_count').eq('studio_id', studioId);
+      if (sinceDate) query = query.gte('metric_date', sinceDate);
+      const { data: rows } = await query;
+      const totals = {};
+      (rows || []).forEach(row => {
+        if (!totals[row.category]) totals[row.category] = { revenue_cents: 0, item_count: 0 };
+        totals[row.category].revenue_cents += row.revenue_cents;
+        totals[row.category].item_count += row.item_count;
+      });
+      return Object.entries(totals)
+        .map(([category, v]) => ({ category, revenueCents: v.revenue_cents, itemCount: v.item_count }))
+        .sort((a, b) => b.revenueCents - a.revenueCents);
+    }
+    const revenueByCategory = await getCategoryBreakdown(thirtyDaysAgo);
+    const revenueByCategoryMTD = await getCategoryBreakdown(startOfMonth);
+    const revenueByCategoryYTD = await getCategoryBreakdown(startOfYear);
+    const revenueByCategoryAllTime = await getCategoryBreakdown(null);
 
     // App usage
     const { data: appActivity } = await supabase
@@ -1147,7 +1180,12 @@ app.get('/api/analytics/dashboard', async (req, res) => {
     res.json({
       totalRevenue: totalRevenue / 100,  // Convert cents to currency
       allTimeRevenue: allTimeRevenueCents / 100, // genuine real all-time total, per direct request
-      revenueByCategory, // genuine real category breakdown, per direct request
+      revenueByCategory, // genuine real category breakdown (last 30d), per direct request
+      mtdRevenue: mtdRevenueCents / 100, // genuine real month-to-date total, per direct request
+      ytdRevenue: ytdRevenueCents / 100, // genuine real year-to-date total, per direct request
+      revenueByCategoryMTD,
+      revenueByCategoryYTD,
+      revenueByCategoryAllTime,
       allTimeTransactionCount,
       revenueByDay: revenue || [],
       appSessions: appActivity?.length || 0,

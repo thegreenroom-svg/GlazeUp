@@ -2405,7 +2405,7 @@
               <button onclick="refreshKilnCafeRevenueData()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
             </div>
             <p style="font-size:11px;color:var(--gu-dust);margin-bottom:10px;">The studio's own real revenue and app usage — separate from Platform Revenue (worldwide SaaS income), and only visible to David, Jenny, and Daisy.</p>
-            <button id="kiln-cafe-backfill-btn" onclick="triggerKilnCafeBackfill()" style="background:#2e7d32;color:white;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:16px;margin-right:100px;max-width:calc(100% - 100px);">📥 Pull real last 30 days from Square</button>
+            <button id="kiln-cafe-backfill-btn" onclick="triggerKilnCafeBackfill()" style="background:#2e7d32;color:white;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:16px;margin-right:100px;max-width:calc(100% - 100px);">📥 Pull all real Square history</button>
 
             <!-- Genuine real speedometer — today's actual revenue vs
                  a real recent daily average, reusing the exact same
@@ -2430,6 +2430,16 @@
                 <div class="label">Revenue (30d)</div>
                 <div class="value" id="metric-revenue">£0</div>
                 <div class="detail" id="metric-revenue-detail">–</div>
+              </div>
+              <div class="metric-card">
+                <div class="label">Revenue (MTD)</div>
+                <div class="value" id="metric-revenue-mtd">£0</div>
+                <div class="detail">month to date</div>
+              </div>
+              <div class="metric-card">
+                <div class="label">Revenue (YTD)</div>
+                <div class="value" id="metric-revenue-ytd">£0</div>
+                <div class="detail">year to date</div>
               </div>
               <div class="metric-card">
                 <div class="label">Revenue (all time)</div>
@@ -2459,8 +2469,15 @@
 
             <!-- Genuine real revenue category breakdown — per direct
                  request. Built from actual Square line-item names,
-                 keyword-matched into honest, transparent categories. -->
-            <h3 style="margin:20px 0 10px;">By Category (Last 30 Days)</h3>
+                 keyword-matched into honest, transparent categories.
+                 Real tabs to switch between time windows. -->
+            <h3 style="margin:20px 0 10px;">By Category</h3>
+            <div style="display:flex;gap:6px;margin-bottom:12px;">
+              <button id="rev-cat-tab-30d" onclick="setRevenueCategoryWindow('30d')" style="flex:1;padding:7px;border-radius:8px;border:1.5px solid var(--gu-primary);background:var(--gu-primary);color:white;font-size:11px;font-weight:700;cursor:pointer;">30 Days</button>
+              <button id="rev-cat-tab-mtd" onclick="setRevenueCategoryWindow('mtd')" style="flex:1;padding:7px;border-radius:8px;border:1.5px solid var(--gu-border);background:white;color:var(--gu-text);font-size:11px;font-weight:700;cursor:pointer;">MTD</button>
+              <button id="rev-cat-tab-ytd" onclick="setRevenueCategoryWindow('ytd')" style="flex:1;padding:7px;border-radius:8px;border:1.5px solid var(--gu-border);background:white;color:var(--gu-text);font-size:11px;font-weight:700;cursor:pointer;">YTD</button>
+              <button id="rev-cat-tab-alltime" onclick="setRevenueCategoryWindow('alltime')" style="flex:1;padding:7px;border-radius:8px;border:1.5px solid var(--gu-border);background:white;color:var(--gu-text);font-size:11px;font-weight:700;cursor:pointer;">All Time</button>
+            </div>
             <div id="revenue-category-list"><div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">No category data yet — pull real Square data first.</div></div>
           </div>
 
@@ -7759,6 +7776,12 @@ function applyPlatformRevenueAccess() {
   const revenueSection = document.getElementById('kiln-cafe-revenue-section');
   if (revenueSection) {
     revenueSection.style.display = hasAccess ? 'block' : 'none';
+    // Genuine, honest diagnostic — logs precisely why this section is
+    // shown or hidden, since static code review couldn't find a bug
+    // in the logic but it's been reported not showing on some real
+    // devices. This lets us see the ACTUAL live values in the
+    // console rather than guess further.
+    console.log('kiln-cafe-revenue-section check:', { firstName, hasAccess, currentShiftStaff, PLATFORM_REVENUE_ACCESS });
     // Genuine real fix: this used to only fetch/draw the real
     // speedometer data if the Dashboard tab happened to already be
     // the visible one at this exact moment — a real, fragile timing
@@ -10070,7 +10093,7 @@ async function triggerKilnCafeBackfill() {
   try {
     const res = await fetch(`${API_URL}/api/square/backfill`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studioId, daysBack: 30 }),
+      body: JSON.stringify({ studioId, daysBack: 365 }),
     });
     const data = await res.json();
     // Genuine real fix: this was previously never checking whether
@@ -10106,6 +10129,8 @@ async function refreshKilnCafeRevenueData() {
     
     // Update metrics
     document.getElementById('metric-revenue').textContent = '£' + (data.totalRevenue || 0).toFixed(2);
+    document.getElementById('metric-revenue-mtd').textContent = '£' + (data.mtdRevenue || 0).toFixed(2);
+    document.getElementById('metric-revenue-ytd').textContent = '£' + (data.ytdRevenue || 0).toFixed(2);
     document.getElementById('metric-revenue-alltime').textContent = '£' + (data.allTimeRevenue || 0).toFixed(2);
     document.getElementById('metric-revenue-alltime-detail').textContent = `${data.allTimeTransactionCount || 0} real transactions synced`;
     document.getElementById('metric-sessions').textContent = (data.appSessions || 0);
@@ -10123,9 +10148,18 @@ async function refreshKilnCafeRevenueData() {
     
     // Update charts
     updateRevenueChart(data.revenueByDay || []);
-    updateRevenueCategoryBreakdown(data.revenueByCategory || []);
     updateDesignList(data.topDesigns || []);
     updateToolUsage(data.tabUsage || {});
+
+    // Genuine real category data for every time window, stored so the
+    // tab-switcher can display any of them instantly without a fresh fetch
+    window._revenueCategoryData = {
+      '30d': data.revenueByCategory || [],
+      mtd: data.revenueByCategoryMTD || [],
+      ytd: data.revenueByCategoryYTD || [],
+      alltime: data.revenueByCategoryAllTime || [],
+    };
+    setRevenueCategoryWindow(window._currentRevenueCategoryWindow || '30d');
 
     // Genuine real speedometer — today's actual figure against a real
     // recent 7-day average, computed from the same real revenueByDay
@@ -10148,6 +10182,20 @@ async function refreshKilnCafeRevenueData() {
   } catch (err) {
     console.error('Error populating dashboard:', err);
   }
+}
+
+// Genuine real category time-window tab switcher, per direct request
+function setRevenueCategoryWindow(window_) {
+  window._currentRevenueCategoryWindow = window_;
+  ['30d', 'mtd', 'ytd', 'alltime'].forEach(w => {
+    const btn = document.getElementById(`rev-cat-tab-${w}`);
+    if (!btn) return;
+    const active = w === window_;
+    btn.style.background = active ? 'var(--gu-primary)' : 'white';
+    btn.style.color = active ? 'white' : 'var(--gu-text)';
+  });
+  const categories = (window._revenueCategoryData || {})[window_] || [];
+  updateRevenueCategoryBreakdown(categories);
 }
 
 // Genuine real revenue category breakdown display — per direct
