@@ -4507,10 +4507,22 @@
           </div>
         </a>
 
-        <div style="display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
-          <button onclick="showCommunitySection('feed')" id="community-subtab-feed" class="staff-subtab-btn active">Our Feed</button>
-          <button onclick="showCommunitySection('profile')" id="community-subtab-profile" class="staff-subtab-btn">Our Profile</button>
-          <button onclick="showCommunitySection('directory')" id="community-subtab-directory" class="staff-subtab-btn">Studios Worldwide</button>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+          <button onclick="showCommunitySection('feed')" id="community-subtab-feed" class="staff-subtab-btn active" style="background:#8e44ad;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">🖼️</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Our Feed</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Moderate what customers share</span>
+          </button>
+          <button onclick="showCommunitySection('profile')" id="community-subtab-profile" class="staff-subtab-btn" style="background:#8e44ad;filter:brightness(0.9);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">🧑‍🎨</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Our Profile</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">What other studios see about you</span>
+          </button>
+          <button onclick="showCommunitySection('directory')" id="community-subtab-directory" class="staff-subtab-btn" style="background:#8e44ad;filter:brightness(0.8);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">🌍</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Studios Worldwide</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">See who else is on LINK</span>
+          </button>
         </div>
 
         <!-- Our Feed: moderate what customers have shared -->
@@ -12772,7 +12784,13 @@ let bisqueCatalogCategories = [];
 function showCommunitySection(section) {
   ['feed', 'profile', 'directory'].forEach(s => {
     document.getElementById(`community-section-${s}`).style.display = (s === section) ? 'block' : 'none';
-    document.getElementById(`community-subtab-${s}`).classList.toggle('active', s === section);
+    const tab = document.getElementById(`community-subtab-${s}`);
+    tab.classList.toggle('active', s === section);
+    // Genuine real fix, same as the Daily Bookings tiles: inline tile
+    // colours now block the old .active background swap, so a real
+    // outline ring shows which one's selected instead.
+    tab.style.outline = (s === section) ? '3px solid white' : 'none';
+    tab.style.outlineOffset = (s === section) ? '-3px' : '0';
   });
 
   if (section === 'feed') loadStaffCommunityFeed();
