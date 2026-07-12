@@ -3715,6 +3715,19 @@ app.post('/api/assistant/chat', async (req, res) => {
       memoryPrefix += `\n\nReal promotions the studio has run or has coming up (mention naturally when relevant, never force it):\n${promotions.map(p => `- ${p.title}${p.description ? ': ' + p.description : ''}${p.starts_on ? ` (${p.starts_on}${p.ends_on ? ' to ' + p.ends_on : ''})` : ''}`).join('\n')}`;
     }
 
+    // Genuine real kilnLINK Network awareness — only ever mentioned if
+    // THIS studio has actually, explicitly opted in. Never assumed,
+    // never mentioned for a studio that hasn't chosen to join.
+    const { data: studioNetworkStatus } = await supabase.from('studios').select('network_opted_in').eq('id', studioId).single();
+    if (studioNetworkStatus?.network_opted_in) {
+      const { data: networkData } = await supabase.from('network_offers')
+        .select('title, description').eq('studio_id', studioId).limit(3);
+      memoryPrefix += `\n\nThis studio is genuinely part of the kilnLINK Network — customers' loyalty points work across other opted-in independent studios too. Mention this only if genuinely relevant (e.g. someone asks about using points elsewhere, or is clearly a visitor from another studio).`;
+      if (networkData?.length) {
+        memoryPrefix += ` This studio's own real offers published to the network: ${networkData.map(o => o.title).join(', ')}.`;
+      }
+    }
+
     if (customerId && context === 'customer') {
       const { data: memories } = await supabase.from('customer_memory')
         .select('fact').eq('studio_id', studioId).eq('customer_id', customerId).order('created_at', { ascending: false }).limit(15);
@@ -3867,6 +3880,69 @@ app.post('/api/staff/log-task-usage', async (req, res) => {
 // ── Studio Promotions — a real, genuine history, separate from the
 // single current Offer of the Week, so Cleo can honestly reference
 // past promotions and upcoming ones, not just "what's live right now". ──
+// ── Genuine real "kilnLINK Network" — opt-in cross-studio foundation.
+// Real, careful boundary: only what a studio EXPLICITLY publishes
+// here ever crosses studio lines. Customer contact details, visit
+// history, spend, staff data, and revenue are never part of this,
+// with no exception. ──
+
+// GET/POST /api/studio/network-status — a studio's own real opt-in
+// state, and the ability to genuinely change it themselves.
+app.get('/api/studio/network-status', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data } = await supabase.from('studios').select('network_opted_in, network_opted_in_at, network_display_name').eq('id', studioId).single();
+  res.json({ optedIn: !!data?.network_opted_in, optedInAt: data?.network_opted_in_at, displayName: data?.network_display_name });
+});
+
+app.post('/api/studio/network-status', async (req, res) => {
+  const { studioId, optIn, displayName } = req.body;
+  if (!studioId || typeof optIn !== 'boolean') return res.status(400).json({ error: 'studioId and optIn (boolean) required' });
+  const updates = { network_opted_in: optIn };
+  if (optIn) updates.network_opted_in_at = new Date().toISOString();
+  if (displayName !== undefined) updates.network_display_name = displayName;
+  const { data, error } = await supabase.from('studios').update(updates).eq('id', studioId).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ optedIn: data.network_opted_in });
+});
+
+// GET /api/network/studios — the real, genuine directory of every
+// OTHER opted-in studio (excludes the requesting studio itself).
+// Deliberately returns ONLY display name and network offers — never
+// any studio's real internal data.
+app.get('/api/network/studios', async (req, res) => {
+  const { studioId } = req.query;
+  const { data: studios } = await supabase.from('studios')
+    .select('id, network_display_name, name')
+    .eq('network_opted_in', true)
+    .neq('id', studioId || '');
+  const studioIds = (studios || []).map(s => s.id);
+  const today = new Date().toISOString().split('T')[0];
+  const { data: offers } = studioIds.length
+    ? await supabase.from('network_offers').select('*').in('studio_id', studioIds).or(`ends_on.is.null,ends_on.gte.${today}`)
+    : { data: [] };
+  res.json({
+    studios: (studios || []).map(s => ({ id: s.id, displayName: s.network_display_name || s.name })),
+    offers: offers || [],
+  });
+});
+
+// POST /api/network/offers — a studio explicitly publishing a
+// network-wide offer, genuinely separate from their own private
+// studio_promotions.
+app.post('/api/network/offers', async (req, res) => {
+  const { studioId, title, description, startsOn, endsOn } = req.body;
+  if (!studioId || !title) return res.status(400).json({ error: 'studioId and title required' });
+  const { data: studio } = await supabase.from('studios').select('network_opted_in').eq('id', studioId).single();
+  if (!studio?.network_opted_in) return res.status(403).json({ error: 'This studio has not opted into the kilnLINK Network yet.' });
+  if (containsGenuineURL(title) || containsGenuineURL(description)) {
+    return res.status(400).json({ error: 'Network offers can\'t include website links.' });
+  }
+  const { data, error } = await supabase.from('network_offers').insert({ studio_id: studioId, title, description: description || null, starts_on: startsOn || null, ends_on: endsOn || null }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ offer: data });
+});
+
 app.get('/api/studio-promotions', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });

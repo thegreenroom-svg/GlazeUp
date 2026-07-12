@@ -3175,6 +3175,33 @@
             <div id="promo-list" style="display:flex;flex-direction:column;gap:6px;"></div>
           </div>
 
+          <!-- Genuine real kilnLINK Network opt-in — explicit, off by
+               default, entirely the studio owner's own choice. Real,
+               honest explanation of exactly what this does and
+               doesn't share, shown before anyone toggles it. -->
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(94,53,177,0.25);">
+            <div style="font-size:12px;font-weight:700;color:var(--gu-text);margin-bottom:8px;">🌐 kilnLINK Network</div>
+            <div style="font-size:11px;color:var(--gu-dust);line-height:1.5;margin-bottom:10px;">
+              Join a genuine real network of other independent studios on kilnLINK. Customers' loyalty points become usable across every opted-in studio, and you can publish your own offers to be seen network-wide.<br><br>
+              <strong>What's shared if you opt in:</strong> your studio's public name, and any offers you explicitly publish here.<br>
+              <strong>What's never shared, ever:</strong> your customers' contact details, visit history, spend, staff data, or revenue — those stay entirely private to your own studio, opted in or not.
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;background:var(--gu-bg);border-radius:10px;padding:12px 14px;">
+              <div>
+                <div id="network-status-label" style="font-size:13px;font-weight:700;color:var(--gu-text);">Not part of the network yet</div>
+                <div style="font-size:10px;color:var(--gu-dust);">Entirely your own choice — can be turned off anytime</div>
+              </div>
+              <label style="position:relative;display:inline-block;width:46px;height:26px;flex-shrink:0;">
+                <input type="checkbox" id="network-opt-in-toggle" onchange="toggleNetworkOptIn(this.checked)" style="opacity:0;width:0;height:0;">
+                <span id="network-toggle-slider" style="position:absolute;inset:0;background:#ccc;border-radius:26px;cursor:pointer;transition:.2s;"></span>
+              </label>
+            </div>
+            <div id="network-offers-panel" style="display:none;margin-top:12px;">
+              <input type="text" id="network-offer-title" placeholder="e.g. £5 off any visit this month" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">
+              <button onclick="addNetworkOffer()" style="width:100%;background:#5E35B1;color:white;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;">Publish to the network</button>
+            </div>
+          </div>
+
           <!-- Real sticker/offers management — was previously invisible
                here entirely, only ever seeded directly via SQL with no
                admin visibility or control at all. Shows every genuine
@@ -4919,6 +4946,7 @@ function goToTab(tab, event) {
     loadOfferOfWeek();
     loadStudioKnowledge();
     loadStudioPromotions();
+    loadNetworkStatus();
   } else if (tab === 'branding') {
     loadBranding();
   } else if (tab === 'catalogue') {
@@ -11014,6 +11042,67 @@ async function deleteStudioKnowledge(id) {
 }
 
 // ── Genuine real Promotions History ──
+// ── Genuine real kilnLINK Network opt-in ──
+async function loadNetworkStatus() {
+  try {
+    const res = await fetch(`${API_URL}/api/studio/network-status?studioId=${studioId}`);
+    const data = await res.json();
+    document.getElementById('network-opt-in-toggle').checked = data.optedIn;
+    updateNetworkToggleVisual(data.optedIn);
+    document.getElementById('network-status-label').textContent = data.optedIn
+      ? 'Part of the kilnLINK Network' : 'Not part of the network yet';
+    document.getElementById('network-offers-panel').style.display = data.optedIn ? 'block' : 'none';
+  } catch (e) { /* silent — non-critical on load */ }
+}
+
+function updateNetworkToggleVisual(optedIn) {
+  const slider = document.getElementById('network-toggle-slider');
+  if (!slider) return;
+  slider.style.background = optedIn ? '#5E35B1' : '#ccc';
+  slider.style.setProperty('--dot-pos', optedIn ? '22px' : '2px');
+  slider.innerHTML = `<span style="position:absolute;height:20px;width:20px;left:${optedIn ? '22px' : '2px'};top:3px;background:white;border-radius:50%;transition:.2s;"></span>`;
+}
+
+async function toggleNetworkOptIn(checked) {
+  // Genuine, real, honest confirmation before opting in — this is a
+  // real, meaningful choice, not a casual toggle to flip blindly.
+  if (checked && !confirm('Join the kilnLINK Network? Your studio\'s public name and any network offers you publish will be visible to other opted-in studios and their customers. Your customer data, revenue, and staff data always stay private. You can turn this off anytime.')) {
+    document.getElementById('network-opt-in-toggle').checked = false;
+    return;
+  }
+  try {
+    const res = await fetch(`${API_URL}/api/studio/network-status`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, optIn: checked }),
+    });
+    const data = await res.json();
+    updateNetworkToggleVisual(data.optedIn);
+    document.getElementById('network-status-label').textContent = data.optedIn
+      ? 'Part of the kilnLINK Network' : 'Not part of the network yet';
+    document.getElementById('network-offers-panel').style.display = data.optedIn ? 'block' : 'none';
+  } catch (e) {
+    alert('Could not update — try again.');
+    document.getElementById('network-opt-in-toggle').checked = !checked;
+  }
+}
+
+async function addNetworkOffer() {
+  const title = document.getElementById('network-offer-title').value.trim();
+  if (!title) return;
+  try {
+    const res = await fetch(`${API_URL}/api/network/offers`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, title }),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Could not publish — try again.'); return; }
+    document.getElementById('network-offer-title').value = '';
+    alert('✓ Published to the kilnLINK Network.');
+  } catch (e) {
+    alert('Could not publish — try again.');
+  }
+}
+
 async function loadStudioPromotions() {
   const listEl = document.getElementById('promo-list');
   if (!listEl) return;
