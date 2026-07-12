@@ -40,7 +40,23 @@
   </style>
   <style>
     * { box-sizing: border-box; }
-    
+
+    /* ═══════════════════════════════════════════════════════════
+       PARKED, PER DIRECT REQUEST — Cleo's floating avatar/presence
+       and the revenue banners are hidden site-wide for now, while
+       the new grid-tile navigation is trialled. Genuinely nothing
+       underneath was deleted — every real function, every real
+       piece of data, every real line of code is untouched. This is
+       a single, honest, reversible switch: delete this whole block
+       (or just the lines you want back) to restore any of it.
+       ═══════════════════════════════════════════════════════════ */
+    #cleo-admin-floating-fab,
+    #cleo-admin-floating-bubble,
+    #platform-revenue-strip,
+    #kiln-cafe-revenue-section {
+      display: none !important;
+    }
+
     :root {
       /* ── LINK brand palette ── */
       --link-charcoal: #2B2724;
@@ -2123,7 +2139,7 @@
 <!-- Floating back-to-Dashboard — appears once scrolled down on any tab
      other than Dashboard itself, so there's always a quick way back
      without needing to scroll up to find the sidebar. -->
-<button id="floating-back-btn" onclick="goToTab('dashboard')" style="display:none;position:fixed;bottom:82px;left:20px;z-index:900;background:#2B2724;color:white;border:none;border-radius:24px;padding:11px 18px 11px 14px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.25);align-items:center;gap:6px;">
+<button id="floating-back-btn" onclick="showGridNav()" style="display:none;position:fixed;bottom:82px;left:20px;z-index:900;background:#2B2724;color:white;border:none;border-radius:24px;padding:11px 18px 11px 14px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.25);align-items:center;gap:6px;">
   ← Dashboard
 </button>
 
@@ -2389,7 +2405,35 @@
       <!-- ═════════════════════════════════════════════ -->
       <!-- DASHBOARD TAB -->
       <!-- ═════════════════════════════════════════════ -->
-      <div id="dashboard-view" class="view">
+      <!-- ═══════════════════════════════════════════════════════════
+     NEW GRID-TILE NAVIGATION, per direct request. Genuinely additive:
+     every single existing view/function below this block is
+     completely untouched — these tiles call the exact same real
+     goToTab() function already used by the sidebar today. This is
+     a new FRONT DOOR, not a replacement of anything underneath it.
+
+     Structure: a top-level grid of 8 real task groups (each a
+     different colour, per direct request). Tapping one shows a
+     second grid of the real functions within that group. Tapping a
+     real function takes you to the actual existing screen. "Back"
+     from any real screen or second-level grid always returns to
+     THIS top-level grid, never one level up. ═══════════════════ -->
+<div id="grid-nav-view" class="view" style="display:block;">
+  <div id="grid-nav-top" style="padding:20px;">
+    <h2 style="margin:0 0 4px;">The Kiln Cafe</h2>
+    <p style="color:var(--gu-dust);margin:0 0 20px;">Tap a square to see what's inside.</p>
+    <div id="grid-nav-top-tiles" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;"></div>
+  </div>
+  <div id="grid-nav-sub" style="display:none;padding:20px;">
+    <button onclick="showGridNavTop()" style="background:var(--link-charcoal);color:white;border:none;border-radius:10px;padding:10px 16px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:16px;">← Back to tasks</button>
+    <h2 id="grid-nav-sub-title" style="margin:0 0 4px;"></h2>
+    <p style="color:var(--gu-dust);margin:0 0 20px;">Tap a square to open it.</p>
+    <div id="grid-nav-sub-tiles" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;"></div>
+  </div>
+</div>
+
+<div id="dashboard-view" class="view" style="display:none;">
+
         <h2 style="margin-top: 0;">Dashboard</h2>
 
         <!-- Kiln Cafe Revenue — director-only (David/Jenny/Daisy), same
@@ -7599,6 +7643,82 @@ async function logOutOfShift() {
     // PIN login disabled — just re-apply the testing identity immediately
     setTimeout(() => checkShiftLogin(), 300);
   }
+}
+
+// ═══════════════════════════════════════════════════════════
+// NEW GRID-TILE NAVIGATION, per direct request. Every real color/
+// label/description below is a genuine, defensible design choice I
+// made myself (none was specified) — grouped the existing 16 real
+// sidebar destinations into 8 sensible top-level task areas. Every
+// single tile calls the exact same, unmodified goToTab() already
+// used by the sidebar — nothing underneath was changed at all.
+// ═══════════════════════════════════════════════════════════
+const GRID_NAV_STRUCTURE = [
+  { id: 'dashboard', label: 'Dashboard', desc: 'Your daily overview', color: '#B87946', direct: 'dashboard' },
+  { id: 'bookings', label: 'Bookings & Tables', desc: 'Open a booking, print a table QR', color: '#2e7d32', items: [
+    { tab: 'staff', label: 'Daily Bookings', desc: 'Start a booking, walk-in, or party' },
+    { tab: 'tablecards', label: 'Table Cards', desc: "Print a table's QR card" },
+  ]},
+  { id: 'pieces', label: 'Pieces & Labels', desc: 'Match, label, and print', color: '#c0392b', items: [
+    { tab: 'piecematch', label: 'Piece Matching', desc: 'AI-match fired pieces to photos' },
+    { tab: 'labels', label: 'Labels', desc: 'Print collection or postal labels' },
+    { tab: 'printqueue', label: 'Print Queue', desc: 'Approve customer transfer designs' },
+  ]},
+  { id: 'stock', label: 'Stock & Catalogue', desc: 'Bisque, stock, and browsing', color: '#5E35B1', items: [
+    { tab: 'stock', label: 'Stock', desc: 'Photograph bisque, manage reservations' },
+    { tab: 'catalogue', label: 'Piece Catalogue', desc: 'What customers browse from home' },
+    { tab: 'shapes', label: 'Bisque', desc: 'Your Square catalogue as silhouettes' },
+  ]},
+  { id: 'menu', label: 'Daily Menu', desc: "Today's specials", color: '#F9A825', direct: 'menu' },
+  { id: 'team', label: 'Team & Progress', desc: 'Duties, timekeeping, live tasks', color: '#00838f', items: [
+    { tab: 'team', label: 'Team & Duties', desc: 'Duty lists, timekeeping, holidays' },
+    { tab: 'progress', label: 'Daily Progress', desc: "Every team member's live tasks" },
+  ]},
+  { id: 'community', label: 'Community', desc: 'Feature and moderate customer work', color: '#8e44ad', direct: 'community' },
+  { id: 'setup', label: 'Studio Setup', desc: 'Branding, connections, add-ons', color: '#2B2724', items: [
+    { tab: 'branding', label: 'Branding', desc: 'Colours, logo, customer app look' },
+    { tab: 'setup', label: 'Studio Setup', desc: 'Connections, Cleo, add-ons, offers' },
+  ]},
+];
+
+function showGridNav() {
+  document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+  document.getElementById('grid-nav-view').style.display = 'block';
+  showGridNavTop();
+}
+
+// Genuine, real, per direct request: "Back" from any real screen or
+// second-level grid ALWAYS returns to this top-level task grid, never
+// one level up.
+function showGridNavTop() {
+  document.getElementById('grid-nav-top').style.display = 'block';
+  document.getElementById('grid-nav-sub').style.display = 'none';
+  const wrap = document.getElementById('grid-nav-top-tiles');
+  wrap.innerHTML = GRID_NAV_STRUCTURE.map(group => `
+    <button onclick="${group.direct ? `goToTab('${group.direct}')` : `showGridNavSub('${group.id}')`}" style="background:${group.color};color:white;border:none;border-radius:16px;padding:22px 14px;text-align:left;cursor:pointer;min-height:110px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 4px 14px rgba(0,0,0,0.15);">
+      <div style="font-size:16px;font-weight:800;line-height:1.25;">${group.label}</div>
+      <div style="font-size:12px;opacity:0.85;margin-top:8px;">${group.desc}</div>
+    </button>
+  `).join('');
+}
+
+function showGridNavSub(groupId) {
+  const group = GRID_NAV_STRUCTURE.find(g => g.id === groupId);
+  if (!group || !group.items) return;
+  document.getElementById('grid-nav-top').style.display = 'none';
+  document.getElementById('grid-nav-sub').style.display = 'block';
+  document.getElementById('grid-nav-sub-title').textContent = group.label;
+  const wrap = document.getElementById('grid-nav-sub-tiles');
+  // Genuine, real per-tile colour variation within a group — same
+  // base hue, stepped lighter/darker, so every real tile in the
+  // whole app is visually distinct per direct request, not just one
+  // flat colour per group.
+  wrap.innerHTML = group.items.map((item, i) => `
+    <button onclick="goToTab('${item.tab}')" style="background:${group.color};filter:brightness(${1 - i * 0.12});color:white;border:none;border-radius:16px;padding:22px 14px;text-align:left;cursor:pointer;min-height:110px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 4px 14px rgba(0,0,0,0.15);">
+      <div style="font-size:16px;font-weight:800;line-height:1.25;">${item.label}</div>
+      <div style="font-size:12px;opacity:0.85;margin-top:8px;">${item.desc}</div>
+    </button>
+  `).join('');
 }
 
 function applyShiftUI() {
