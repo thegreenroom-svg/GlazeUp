@@ -4006,18 +4006,42 @@
           Manage your team, set default duties per role, and assign extra duties to any staff member. Duties get ticked off per session as staff work through their tables.
         </p>
 
-        <!-- Jump nav — this tab covers a lot, so give a quick way to skip to a section -->
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px;position:sticky;top:0;background:var(--gu-bg-page,#F7F4EE);padding:8px 0;z-index:5;">
-          <a href="#team-section-members" style="background:white;border:1px solid var(--gu-border);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--gu-text);text-decoration:none;">👥 Team</a>
-          <a href="#team-section-duties" style="background:white;border:1px solid var(--gu-border);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--gu-text);text-decoration:none;">✅ Duties</a>
-          <a href="#team-section-alerts" style="background:white;border:1px solid var(--gu-border);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--gu-text);text-decoration:none;">🚨 Alerts</a>
-          <a href="#team-section-process" style="background:white;border:1px solid var(--gu-border);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--gu-text);text-decoration:none;">🔗 Process</a>
-          <a href="#team-section-time" style="background:white;border:1px solid var(--gu-border);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--gu-text);text-decoration:none;">🕐 Time</a>
-          <a href="#team-section-holiday" style="background:white;border:1px solid var(--gu-border);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--gu-text);text-decoration:none;">🏖️ Holiday</a>
+        <!-- Genuine real tile entry point, per direct request, replacing
+             the previous scroll-jump nav — real content within each
+             section is completely untouched. -->
+        <div id="team-tile-menu" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:20px;">
+          <button onclick="showTeamSection('members')" style="background:#00838f;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">👥</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">Team Members</span>
+          </button>
+          <button onclick="showTeamSection('duties')" style="background:#00838f;filter:brightness(0.93);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">✅</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">Duty Lists</span>
+          </button>
+          <button onclick="showTeamSection('alerts')" style="background:#00838f;filter:brightness(0.86);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">🚨</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">Alerts</span>
+          </button>
+          <button onclick="showTeamSection('process')" style="background:#00838f;filter:brightness(0.79);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">🔗</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">Handoff Chain</span>
+          </button>
+          <button onclick="showTeamSection('time')" style="background:#00838f;filter:brightness(0.72);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">🕐</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">Timekeeping</span>
+          </button>
+          <button onclick="showTeamSection('a2hs')" style="background:#00838f;filter:brightness(0.65);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">📲</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">Home Screen Setup</span>
+          </button>
+          <button onclick="showTeamSection('holiday')" style="background:#00838f;filter:brightness(0.58);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">🏖️</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">Holiday Requests</span>
+          </button>
         </div>
 
         <!-- Team members -->
-        <div class="chart-container" style="margin-bottom:20px;" id="team-section-members">
+        <div class="chart-container team-section" style="margin-bottom:20px;" id="team-section-members">
           <h3 style="margin:0 0 6px;">Team Members</h3>
           <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Add each team member with their role. Roles determine their default duty list.</p>
           <div id="team-members-list" style="margin-bottom:14px;"></div>
@@ -4041,7 +4065,7 @@
         </div>
 
         <!-- Duty lists per role -->
-        <div class="chart-container" id="team-section-duties">
+        <div class="chart-container team-section" id="team-section-duties">
           <h3 style="margin:0 0 6px;">Duty Lists by Role</h3>
           <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Edit the default duties for each role. Update any time — great for a weekly review. Changes apply to all future sessions.</p>
           <div id="duty-role-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;"></div>
@@ -4049,7 +4073,7 @@
         </div>
 
         <!-- Alert Settings -->
-        <div class="chart-container" style="margin-top:20px;" id="team-section-alerts">
+        <div class="chart-container team-section" style="margin-top:20px;" id="team-section-alerts">
           <h3 style="margin:0 0 6px;">🚨 Alert &amp; Reminder Settings</h3>
           <p style="font-size:12px;color:var(--gu-dust);margin-bottom:16px;line-height:1.5;">
             Control how insistent handoff alerts and tasks are. An unactioned alert will keep flashing and re-alerting at this interval until someone taps Complete/Actioned.
@@ -4081,7 +4105,7 @@
         </div>
 
         <!-- Process Builder — the handoff chain -->
-        <div class="chart-container" style="margin-top:20px;" id="team-section-process">
+        <div class="chart-container team-section" style="margin-top:20px;" id="team-section-process">
           <h3 style="margin:0 0 6px;">🔗 Process Builder — Task Handoff Chain</h3>
           <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;line-height:1.5;">
             Define what happens when something finishes. Each step says: <strong>when this happens</strong> → <strong>notify this role</strong> → <strong>with this message</strong> → <strong>optionally trigger the next step</strong>. Staff logged in as that role get the task on their tablet automatically, with vibration and voice.
@@ -4118,7 +4142,7 @@
         </div>
 
         <!-- Timekeeping -->
-        <div class="chart-container" style="margin-top:20px;" id="team-section-time">
+        <div class="chart-container team-section" style="margin-top:20px;" id="team-section-time">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
             <h3 style="margin:0;">🕐 Timekeeping</h3>
             <a href="#" id="timesheet-export-link" onclick="downloadTimesheetCSV();return false;" style="font-size:12px;font-weight:700;color:var(--gu-primary);text-decoration:none;">⬇ Export CSV</a>
@@ -4139,14 +4163,14 @@
              onboarding — directors can see exactly who has and hasn't
              actually completed this, across the whole real team,
              including any future new hires. -->
-        <div class="chart-container" style="margin-top:20px;" id="team-section-a2hs">
+        <div class="chart-container team-section" style="margin-top:20px;" id="team-section-a2hs">
           <h3 style="margin:0 0 6px;">📲 Home Screen Setup</h3>
           <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Whether each real team member has added this app to their phone's home screen — shown to them automatically after login until they confirm it's done.</p>
           <div id="a2hs-team-status-list"><div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading…</div></div>
         </div>
 
         <!-- Holiday Requests -->
-        <div class="chart-container" style="margin-top:20px;" id="team-section-holiday">
+        <div class="chart-container team-section" style="margin-top:20px;" id="team-section-holiday">
           <h3 style="margin:0 0 6px;">🏖️ Holiday Requests</h3>
           <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Approve or reject time-off requests. Set each person's annual allowance below — this is tracked, not calculated for pay.</p>
 
@@ -12181,6 +12205,16 @@ function showMenuSection(section) {
   document.querySelectorAll('.menu-section').forEach(el => el.style.display = 'none');
   document.getElementById(`menu-section-${section}`).style.display = 'block';
   if (section === 'square') loadDailyMenu();
+}
+
+// Genuine real tile-section switcher for Team & Duties, per direct
+// request, same proven pattern. No individual real load call needed
+// per section — loadTeamAndDuties() already correctly loads
+// everything for this whole screen on tab-open.
+function showTeamSection(section) {
+  document.getElementById('team-tile-menu').style.display = 'none';
+  document.querySelectorAll('.team-section').forEach(el => el.style.display = 'none');
+  document.getElementById(`team-section-${section}`).style.display = 'block';
 }
 
 function showStaffSection(section) {
