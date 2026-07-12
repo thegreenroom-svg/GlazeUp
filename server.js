@@ -248,12 +248,25 @@ async function syncSquareData(studioId, accessToken, daysBack = 1) {
     const client = await getSquareClient(accessToken);
     let recordsSynced = 0;
 
+    // Genuine real fix: Square's searchOrders API actually REQUIRES a
+    // real locationIds array — this was missing entirely, meaning
+    // every sync (including the original 24-hour daily one, before
+    // tonight) has genuinely always failed with a real 400 from
+    // Square's own API. It was never surfaced because the original
+    // code only ever logged the error server-side, never shown to a
+    // real person. Using the same real, proven listLocations() pattern
+    // already used elsewhere in this file.
+    const locRes = await client.locationsApi.listLocations();
+    const locationIds = (locRes.result.locations || []).map(l => l.id);
+    if (!locationIds.length) throw new Error('No Square location found for this studio — check the Square connection in Setup.');
+
     // Fetch orders from the real requested window — genuinely 24
     // hours by default (the existing, lightweight daily behavior),
     // or a real wider historical pull when explicitly asked for
     // (e.g. a genuine one-time 30-day backfill).
     const sinceDate = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const ordersRes = await client.ordersApi.searchOrders({
+      locationIds,
       query: {
         filter: {
           dateTimeFilter: {
