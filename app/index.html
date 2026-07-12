@@ -6418,8 +6418,8 @@
       // (clever and a little cheeky, not a flat neutral narrator).
       // Callers that want the plain neutral voice (the walkthrough
       // tour) pass their own values; anything else defaults to hers.
-      utt.rate = rate != null ? rate : 1.05;
-      utt.pitch = pitch != null ? pitch : 2; // genuine real maximum (spec range 0-2), per direct request
+      utt.rate = rate != null ? rate : 0.95;
+      utt.pitch = pitch != null ? pitch : 1.15; // genuinely brought down from the real max (2) — too high/fast per direct feedback
       const selectedVoice = getCleoPreferredVoice();
       utt.voice = selectedVoice;
       // Genuine fix: lang was hardcoded to en-GB regardless of which
@@ -6521,8 +6521,8 @@
       window.speechSynthesis.cancel();
       const utt = new SpeechSynthesisUtterance("Hi, I'm Cleo! This is what I sound like.");
       utt.voice = voice;
-      utt.rate = 1.05;
-      utt.pitch = 2;
+      utt.rate = 0.95;
+      utt.pitch = 1.15;
       window.speechSynthesis.speak(utt);
     }
 

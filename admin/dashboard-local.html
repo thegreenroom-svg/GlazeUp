@@ -5367,8 +5367,8 @@ function cleoAdminSpeak(text, onStart, onEnd, pitch, rate) {
   // slightly quicker, matching the exact same real fix applied to the
   // customer app. Callers wanting the plain neutral voice (the
   // walkthrough tour) pass their own values.
-  utt.rate = rate != null ? rate : 1.05;
-  utt.pitch = pitch != null ? pitch : 2; // genuine real maximum (spec range 0-2), per direct request
+  utt.rate = rate != null ? rate : 0.95;
+  utt.pitch = pitch != null ? pitch : 1.15; // genuinely brought down from the real max (2) — too high/fast per direct feedback
   const selectedVoice = getCleoAdminPreferredVoice();
   utt.voice = selectedVoice;
   utt.lang = selectedVoice ? selectedVoice.lang : 'en-GB'; // genuine fix — use the selected voice's own real language, not a hardcoded mismatch
@@ -5454,7 +5454,7 @@ function testCleoAdminVoice(voiceName) {
   if (!voice) return;
   window.speechSynthesis.cancel();
   const utt = new SpeechSynthesisUtterance("Hi, I'm Cleo! This is what I sound like.");
-  utt.voice = voice; utt.rate = 1.05; utt.pitch = 2;
+  utt.voice = voice; utt.rate = 0.95; utt.pitch = 1.15;
   window.speechSynthesis.speak(utt);
 }
 
