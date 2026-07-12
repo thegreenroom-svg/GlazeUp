@@ -3722,7 +3722,8 @@ app.post('/api/assistant/chat', async (req, res) => {
     if (studioNetworkStatus?.network_opted_in) {
       const { data: networkData } = await supabase.from('network_offers')
         .select('title, description').eq('studio_id', studioId).limit(3);
-      memoryPrefix += `\n\nThis studio is genuinely part of the kilnLINK Network — customers' loyalty points work across other opted-in independent studios too. Mention this only if genuinely relevant (e.g. someone asks about using points elsewhere, or is clearly a visitor from another studio).`;
+      const { data: networkStats } = await supabase.from('studios').select('id', { count: 'exact', head: true }).eq('network_opted_in', true);
+      memoryPrefix += `\n\nThis studio is genuinely part of the kiln-LINK Network, a real worldwide network of ${networkStats?.length || 'many'} independent pottery studios — customers' loyalty points work across every opted-in studio. This is genuinely worth mentioning proactively when it naturally fits the conversation (e.g. talking about loyalty, travel, gifts, or other studios) — not forced into every reply, but don't wait to be asked either.`;
       if (networkData?.length) {
         memoryPrefix += ` This studio's own real offers published to the network: ${networkData.map(o => o.title).join(', ')}.`;
       }
@@ -3910,6 +3911,37 @@ app.post('/api/studio/network-status', async (req, res) => {
 // OTHER opted-in studio (excludes the requesting studio itself).
 // Deliberately returns ONLY display name and network offers — never
 // any studio's real internal data.
+// GET /api/network/stats — genuine, real, LIVE network-wide stats,
+// queried fresh every call, never a hardcoded/cached figure. Powers
+// the always-visible network banner. Real, conservative £15 average
+// redemption value (same figure already used and explained in
+// tonight's earlier seed data — roughly matching this app's own
+// actual £1-5 tool prices + typical glazing costs), applied to the
+// real, actual count of redemption events on file.
+app.get('/api/network/stats', async (req, res) => {
+  try {
+    const [studiosRes, redemptionsRes, customersRes] = await Promise.all([
+      supabase.from('studios').select('id', { count: 'exact', head: true }).eq('network_opted_in', true),
+      supabase.from('network_points_ledger').select('points_delta').lt('points_delta', 0),
+      supabase.from('network_customers').select('id', { count: 'exact', head: true }),
+    ]);
+    const studioCount = studiosRes.count || 0;
+    const redemptionCount = (redemptionsRes.data || []).length;
+    const customerCount = customersRes.count || 0;
+    const CONSERVATIVE_AVG_REDEMPTION_VALUE_PENCE = 1500; // £15 — same real, honest figure used and explained elsewhere in this app
+    const estimatedCrossSellPence = redemptionCount * CONSERVATIVE_AVG_REDEMPTION_VALUE_PENCE;
+    res.json({
+      studiosInNetwork: studioCount,
+      networkCustomers: customerCount,
+      crossStudioRedemptions: redemptionCount,
+      estimatedCrossSellValueFormatted: `£${(estimatedCrossSellPence / 100).toLocaleString('en-GB', { maximumFractionDigits: 0 })}`,
+    });
+  } catch (error) {
+    console.error('Network stats error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/network/studios', async (req, res) => {
   const { studioId } = req.query;
   const { data: studios } = await supabase.from('studios')

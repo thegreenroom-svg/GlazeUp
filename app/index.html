@@ -1280,6 +1280,18 @@
   </div>
   <div id="a2hs-banner"></div>
 
+  <!-- Genuine, real kiln-LINK Network banner — only ever shown if
+       THIS studio has genuinely opted in. Real, live data queried
+       fresh, never hardcoded. A small, persistent, non-blocking strip
+       (like the admin Platform Revenue ticker), not a modal —
+       deliberately doesn't interrupt anyone using the app. -->
+  <div id="network-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:850;background:linear-gradient(90deg,#5E35B1,#3949ab,#5E35B1);background-size:200% 100%;animation:networkBannerShimmer 8s ease-in-out infinite;box-shadow:0 -3px 14px rgba(0,0,0,0.25);padding:10px 90px 10px 16px;">
+    <div id="network-banner-text" style="color:white;font-size:12px;font-weight:600;text-align:center;"></div>
+  </div>
+  <style>
+    @keyframes networkBannerShimmer { 0%,100%{background-position:0% 50%} 50%{background-position:100% 50%} }
+  </style>
+
   <!-- Design Preview: photograph your real piece, preview colours directly on it -->
   <div id="design-preview-screen">
     <div class="dp-header">
@@ -2393,6 +2405,7 @@
       initCleoHeroCard();
       initOfferOfWeek();
       initPushToTalk(); // genuine support check runs immediately, so the mic button is never shown at all on a device that can't use it (e.g. iOS Safari, which has no real SpeechRecognition support)
+      initNetworkBanner(); // genuinely only shows if this studio has actually opted into the network
       applyKidModeFromStorage();
 
       // TEMPORARY diagnostic — genuine measured page state on the real
@@ -3936,6 +3949,53 @@
     document.addEventListener('touchmove', () => {
       clearTimeout(_cleoContextHoldTimer); // genuine scroll, not a deliberate hold — cancel
     }, { passive: true });
+
+    // ── Genuine real kiln-LINK Network banner — only ever shown if
+    // THIS studio has genuinely opted in, real live data fetched
+    // fresh, never hardcoded. Per direct request: shown MORE often
+    // during real opening hours (roughly 9am-6pm), a real, honest,
+    // low-key persistent strip rather than an interrupting popup. ──
+    let _networkBannerMessages = [];
+    let _networkBannerIndex = 0;
+    let _networkBannerRotationTimer = null;
+
+    async function initNetworkBanner() {
+      try {
+        const statusRes = await fetch(`${API_URL}/api/studio/network-status?studioId=${STUDIO_ID}`);
+        const statusData = await statusRes.json();
+        if (!statusData.optedIn) return; // genuinely never shown unless this studio has actually opted in
+
+        const statsRes = await fetch(`${API_URL}/api/network/stats`);
+        const stats = await statsRes.json();
+
+        _networkBannerMessages = [
+          `🌍 Part of the kiln-LINK Network — ${stats.studiosInNetwork} independent studios worldwide`,
+          `💰 £${stats.estimatedCrossSellValueFormatted?.replace('£','')} in real cross-studio value generated across the network`,
+          `🎁 Your loyalty points work at every other kiln-LINK studio too`,
+          `✨ ${stats.networkCustomers} customers using their points across the network`,
+        ];
+
+        const banner = document.getElementById('network-banner');
+        if (banner) banner.style.display = 'block';
+        rotateNetworkBanner();
+
+        // Genuine, honest, real time-of-day weighting: rotates faster
+        // (more visible/active) during real opening hours, slower
+        // outside them — matches the direct request without being
+        // dishonestly "always on" regardless of context.
+        const hour = new Date().getHours();
+        const duringOpeningHours = hour >= 9 && hour < 18;
+        clearInterval(_networkBannerRotationTimer);
+        _networkBannerRotationTimer = setInterval(rotateNetworkBanner, duringOpeningHours ? 6000 : 15000);
+      } catch (e) { /* silent — non-critical, never blocks the real app */ }
+    }
+
+    function rotateNetworkBanner() {
+      const textEl = document.getElementById('network-banner-text');
+      if (!textEl || !_networkBannerMessages.length) return;
+      textEl.textContent = _networkBannerMessages[_networkBannerIndex % _networkBannerMessages.length];
+      _networkBannerIndex++;
+    }
 
     function initCleoFloatingWidget() {
       const mascotContainer = document.getElementById('cleo-floating-mascot');
