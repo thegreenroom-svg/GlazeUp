@@ -7399,16 +7399,20 @@ app.post('/api/pieces/find-by-photo', async (req, res) => {
     // this doesn't become an enormous, slow, expensive single AI call.
     // Prioritises pieces still open/unresolved (fired, packed, not yet
     // picked up) since a genuinely lost piece is most likely among
-    // those, not ones already collected.
+    // those, not ones already collected. Caps reduced (was 40+20=60,
+    // genuinely slow with that many real images in one request) —
+    // most recent pieces first, since a piece someone's actively
+    // searching for right now is honestly far more likely to be a
+    // recent one than something fired weeks ago.
     const { data: candidates } = await supabase.from('pottery_pieces')
       .select('id, booking_id, piece_type, status, reference_photo_url')
       .eq('studio_id', studioId).not('reference_photo_url', 'is', null)
       .not('status', 'eq', 'picked_up')
       .order('reference_photo_taken_at', { ascending: false })
-      .limit(40);
+      .limit(20);
 
     const { data: lostItems } = await supabase.from('lost_pieces_registry')
-      .select('id, description, photo_url, found_location').eq('studio_id', studioId).eq('status', 'open').not('photo_url', 'is', null).limit(20);
+      .select('id, description, photo_url, found_location').eq('studio_id', studioId).eq('status', 'open').not('photo_url', 'is', null).limit(10);
 
     const allCandidates = [
       ...(candidates || []).map(c => ({ id: c.id, source: 'piece', label: `${c.piece_type || 'Piece'} (${c.status})`, photo_url: c.reference_photo_url })),
