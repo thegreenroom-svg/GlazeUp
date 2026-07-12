@@ -2635,31 +2635,32 @@
           </div>
         </div>
 
-        <!-- Process flow: each stage as a connected step, arrows showing how work moves through -->
-        <div class="flow-nav">
-          <div class="flow-step active" id="staff-subtab-booking" onclick="showStaffSection('booking')">
-            <span class="flow-step-num">1</span>
-            <span class="flow-step-icon">📋</span>
-            <span class="flow-step-label">Booking Details</span>
-          </div>
-          <div class="flow-arrow">→</div>
-          <div class="flow-step" id="staff-subtab-engagement" onclick="showStaffSection('engagement')">
-            <span class="flow-step-num">2</span>
-            <span class="flow-step-icon">🎨</span>
-            <span class="flow-step-label">Customer Engagement</span>
-          </div>
-          <div class="flow-arrow">→</div>
-          <div class="flow-step" id="staff-subtab-completion" onclick="showStaffSection('completion')">
-            <span class="flow-step-num">3</span>
-            <span class="flow-step-icon">📷</span>
-            <span class="flow-step-label">Completion</span>
-          </div>
-          <div class="flow-arrow">→</div>
-          <div class="flow-step" id="staff-subtab-kiln" onclick="showStaffSection('kiln')">
-            <span class="flow-step-num">4</span>
-            <span class="flow-step-icon">🔥</span>
-            <span class="flow-step-label">Kiln &amp; Inventory</span>
-          </div>
+        <!-- Genuine real tile entry point for this screen's 4 actual
+             steps, per direct request to unify the whole app with the
+             same tile visual language. Reuses the exact same, already-
+             working showStaffSection() function — real content and
+             logic underneath is completely untouched. -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+          <button class="flow-step active" id="staff-subtab-booking" onclick="showStaffSection('booking')" style="background:#2e7d32;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">📋</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Booking Details</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Look up, assign a table, open the session</span>
+          </button>
+          <button class="flow-step" id="staff-subtab-engagement" onclick="showStaffSection('engagement')" style="background:#2e7d32;filter:brightness(0.9);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">🎨</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Customer Engagement</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">While they're painting</span>
+          </button>
+          <button class="flow-step" id="staff-subtab-completion" onclick="showStaffSection('completion')" style="background:#2e7d32;filter:brightness(0.8);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">📷</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Completion</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Reference photos, finishing up</span>
+          </button>
+          <button class="flow-step" id="staff-subtab-kiln" onclick="showStaffSection('kiln')" style="background:#2e7d32;filter:brightness(0.7);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">🔥</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Kiln &amp; Inventory</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">What's firing, real stock</span>
+          </button>
         </div>
 
         <!-- ═══════════════════════════════════ -->
@@ -12057,7 +12058,16 @@ function showStaffSection(section) {
     const el = document.getElementById(`staff-section-${s}`);
     el.style.display = (s === section) ? 'block' : 'none';
     el.classList.remove('fade-in');
-    document.getElementById(`staff-subtab-${s}`).classList.toggle('active', s === section);
+    const tab = document.getElementById(`staff-subtab-${s}`);
+    tab.classList.toggle('active', s === section);
+    // Genuine real fix: the tile is now inline-coloured (per direct
+    // request to unify with the new grid tiles), so the old
+    // .flow-step.active CSS background swap can no longer take
+    // visual effect — inline styles always win. A real outline ring
+    // shows which one's active instead, working correctly regardless
+    // of the tile's own real colour.
+    tab.style.outline = (s === section) ? '3px solid white' : 'none';
+    tab.style.outlineOffset = (s === section) ? '-3px' : '0';
   });
 
   const activeEl = document.getElementById(`staff-section-${section}`);
