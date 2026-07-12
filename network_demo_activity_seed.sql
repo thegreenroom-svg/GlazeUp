@@ -15,9 +15,10 @@
 -- ═══════════════════════════════════════════════════════════
 
 -- Real subscriptions for the 64 opted-in demo studios
-INSERT INTO stripe_subscriptions (studio_id, plan_id, status, created_at)
+INSERT INTO stripe_subscriptions (studio_id, stripe_subscription_id, plan_id, status, created_at)
 SELECT
   id,
+  'demo_sub_' || substr(id::text, 1, 8), -- genuinely fake, clearly-labeled ID — these demo studios have no real Stripe account
   CASE WHEN (row_number() OVER (ORDER BY id)) % 5 = 0 THEN 'multi'
        WHEN (row_number() OVER (ORDER BY id)) % 3 = 0 THEN 'solo'
        ELSE 'studio' END,
