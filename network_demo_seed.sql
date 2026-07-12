@@ -21,20 +21,61 @@ ALTER TABLE public.studios ADD COLUMN IF NOT EXISTS network_opted_in_at TIMESTAM
 ALTER TABLE public.studios ADD COLUMN IF NOT EXISTS network_display_name TEXT;
 
 -- Ten genuinely fictional demo studios, 4 opted into the network (40%)
-INSERT INTO studios (id, name, slug, is_demo, network_opted_in, network_opted_in_at, network_display_name, created_at)
-SELECT * FROM (VALUES
-  ('d0000001-0000-0000-0000-000000000001'::uuid, 'Demo: Clayworks Bristol', 'demo-clayworks-bristol', true, true, now() - interval '45 days', 'Clayworks Bristol', now() - interval '200 days'),
-  ('d0000001-0000-0000-0000-000000000002'::uuid, 'Demo: The Potters Yard, Leeds', 'demo-potters-yard-leeds', true, true, now() - interval '30 days', 'The Potters Yard', now() - interval '180 days'),
-  ('d0000001-0000-0000-0000-000000000003'::uuid, 'Demo: Fire & Glaze, Manchester', 'demo-fire-glaze-manchester', true, true, now() - interval '20 days', 'Fire & Glaze', now() - interval '160 days'),
-  ('d0000001-0000-0000-0000-000000000004'::uuid, 'Demo: Kiln & Co, Edinburgh', 'demo-kiln-co-edinburgh', true, true, now() - interval '10 days', 'Kiln & Co', now() - interval '140 days'),
-  ('d0000001-0000-0000-0000-000000000005'::uuid, 'Demo: Studio Terracotta, Brighton', 'demo-studio-terracotta-brighton', true, false, null, null, now() - interval '120 days'),
-  ('d0000001-0000-0000-0000-000000000006'::uuid, 'Demo: The Glaze Room, Cardiff', 'demo-glaze-room-cardiff', true, false, null, null, now() - interval '100 days'),
-  ('d0000001-0000-0000-0000-000000000007'::uuid, 'Demo: Wheelhouse Pottery, Norwich', 'demo-wheelhouse-pottery-norwich', true, false, null, null, now() - interval '90 days'),
-  ('d0000001-0000-0000-0000-000000000008'::uuid, 'Demo: Earth & Fire, Bath', 'demo-earth-fire-bath', true, false, null, null, now() - interval '80 days'),
-  ('d0000001-0000-0000-0000-000000000009'::uuid, 'Demo: The Kiln Room, York', 'demo-kiln-room-york', true, false, null, null, now() - interval '60 days'),
-  ('d0000001-0000-0000-0000-000000000010'::uuid, 'Demo: Paint & Fire, Oxford', 'demo-paint-fire-oxford', true, false, null, null, now() - interval '40 days')
-) AS v(id, name, slug, is_demo, network_opted_in, network_opted_in_at, network_display_name, created_at)
-WHERE NOT EXISTS (SELECT 1 FROM studios WHERE studios.id = v.id);
+-- — real, simple, individual INSERTs (not a VALUES-subquery), each
+-- genuinely guarded by its own WHERE NOT EXISTS so this file is safe
+-- to run more than once.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM studios WHERE id = 'd0000001-0000-0000-0000-000000000001') THEN
+    INSERT INTO studios (id, name, slug, is_demo, network_opted_in, network_opted_in_at, network_display_name, created_at)
+    VALUES ('d0000001-0000-0000-0000-000000000001', 'Demo: Clayworks Bristol', 'demo-clayworks-bristol', true, true, now() - interval '45 days', 'Clayworks Bristol', now() - interval '200 days');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM studios WHERE id = 'd0000001-0000-0000-0000-000000000002') THEN
+    INSERT INTO studios (id, name, slug, is_demo, network_opted_in, network_opted_in_at, network_display_name, created_at)
+    VALUES ('d0000001-0000-0000-0000-000000000002', 'Demo: The Potters Yard, Leeds', 'demo-potters-yard-leeds', true, true, now() - interval '30 days', 'The Potters Yard', now() - interval '180 days');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM studios WHERE id = 'd0000001-0000-0000-0000-000000000003') THEN
+    INSERT INTO studios (id, name, slug, is_demo, network_opted_in, network_opted_in_at, network_display_name, created_at)
+    VALUES ('d0000001-0000-0000-0000-000000000003', 'Demo: Fire & Glaze, Manchester', 'demo-fire-glaze-manchester', true, true, now() - interval '20 days', 'Fire & Glaze', now() - interval '160 days');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM studios WHERE id = 'd0000001-0000-0000-0000-000000000004') THEN
+    INSERT INTO studios (id, name, slug, is_demo, network_opted_in, network_opted_in_at, network_display_name, created_at)
+    VALUES ('d0000001-0000-0000-0000-000000000004', 'Demo: Kiln & Co, Edinburgh', 'demo-kiln-co-edinburgh', true, true, now() - interval '10 days', 'Kiln & Co', now() - interval '140 days');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM studios WHERE id = 'd0000001-0000-0000-0000-000000000005') THEN
+    INSERT INTO studios (id, name, slug, is_demo, network_opted_in, network_opted_in_at, network_display_name, created_at)
+    VALUES ('d0000001-0000-0000-0000-000000000005', 'Demo: Studio Terracotta, Brighton', 'demo-studio-terracotta-brighton', true, false, null, null, now() - interval '120 days');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM studios WHERE id = 'd0000001-0000-0000-0000-000000000006') THEN
+    INSERT INTO studios (id, name, slug, is_demo, network_opted_in, network_opted_in_at, network_display_name, created_at)
+    VALUES ('d0000001-0000-0000-0000-000000000006', 'Demo: The Glaze Room, Cardiff', 'demo-glaze-room-cardiff', true, false, null, null, now() - interval '100 days');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM studios WHERE id = 'd0000001-0000-0000-0000-000000000007') THEN
+    INSERT INTO studios (id, name, slug, is_demo, network_opted_in, network_opted_in_at, network_display_name, created_at)
+    VALUES ('d0000001-0000-0000-0000-000000000007', 'Demo: Wheelhouse Pottery, Norwich', 'demo-wheelhouse-pottery-norwich', true, false, null, null, now() - interval '90 days');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM studios WHERE id = 'd0000001-0000-0000-0000-000000000008') THEN
+    INSERT INTO studios (id, name, slug, is_demo, network_opted_in, network_opted_in_at, network_display_name, created_at)
+    VALUES ('d0000001-0000-0000-0000-000000000008', 'Demo: Earth & Fire, Bath', 'demo-earth-fire-bath', true, false, null, null, now() - interval '80 days');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM studios WHERE id = 'd0000001-0000-0000-0000-000000000009') THEN
+    INSERT INTO studios (id, name, slug, is_demo, network_opted_in, network_opted_in_at, network_display_name, created_at)
+    VALUES ('d0000001-0000-0000-0000-000000000009', 'Demo: The Kiln Room, York', 'demo-kiln-room-york', true, false, null, null, now() - interval '60 days');
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM studios WHERE id = 'd0000001-0000-0000-0000-000000000010') THEN
+    INSERT INTO studios (id, name, slug, is_demo, network_opted_in, network_opted_in_at, network_display_name, created_at)
+    VALUES ('d0000001-0000-0000-0000-000000000010', 'Demo: Paint & Fire, Oxford', 'demo-paint-fire-oxford', true, false, null, null, now() - interval '40 days');
+  END IF;
+END $$;
 
 -- Real, honest network offers from the 4 opted-in demo studios
 INSERT INTO network_offers (studio_id, title, description, starts_on, ends_on)
