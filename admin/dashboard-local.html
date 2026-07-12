@@ -3105,13 +3105,14 @@
                and has coming up, not just the one active thing. -->
           <div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(249,168,37,0.25);">
             <div style="font-size:12px;font-weight:700;color:var(--gu-text);margin-bottom:8px;">📣 Promotions History</div>
+            <div id="promo-review-reminder" style="display:none;background:#fff3e0;border:1px solid #F9A825;border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:var(--gu-text);"></div>
             <input type="text" id="promo-title" placeholder="e.g. Christmas gift voucher offer" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">
             <textarea id="promo-description" placeholder="Details (optional)" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:12px;margin-bottom:8px;box-sizing:border-box;height:44px;"></textarea>
             <div style="display:flex;gap:8px;margin-bottom:8px;">
               <input type="date" id="promo-starts" style="flex:1;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:12px;box-sizing:border-box;">
               <input type="date" id="promo-ends" style="flex:1;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:12px;box-sizing:border-box;">
             </div>
-            <button onclick="addStudioPromotion()" style="width:100%;background:#F9A825;color:white;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:10px;">Add to history</button>
+            <button id="promo-submit-btn" onclick="addStudioPromotion()" style="width:100%;background:#F9A825;color:white;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:10px;">Add to history</button>
             <div id="promo-list" style="display:flex;flex-direction:column;gap:6px;"></div>
           </div>
 
@@ -10494,10 +10495,12 @@ async function addStudioKnowledge() {
   const fact = input.value.trim();
   if (!fact) return;
   try {
-    await fetch(`${API_URL}/api/studio-knowledge`, {
+    const res = await fetch(`${API_URL}/api/studio-knowledge`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ studioId, fact, addedBy: currentShiftStaff?.name || null })
     });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Could not save — try again.'); return; }
     input.value = '';
     loadStudioKnowledge();
   } catch (e) {
@@ -10524,40 +10527,89 @@ async function loadStudioPromotions() {
     const promotions = data.promotions || [];
     if (!promotions.length) {
       listEl.innerHTML = '<div style="padding:10px;text-align:center;color:var(--gu-dust);font-size:12px;">No promotions logged yet.</div>';
+      updatePromoReviewReminder(0);
       return;
     }
-    listEl.innerHTML = promotions.map(p => `
-      <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--gu-bg);border-radius:8px;">
+    // Genuine, honest staleness check — a real promotion whose
+    // ends_on date has genuinely already passed is worth a real
+    // review nudge (still cluttering the list, and if it's ever
+    // surfaced anywhere it'd honestly be misleading).
+    const todayStr = new Date().toISOString().split('T')[0];
+    const expiredCount = promotions.filter(p => p.ends_on && p.ends_on < todayStr).length;
+    updatePromoReviewReminder(expiredCount);
+
+    listEl.innerHTML = promotions.map(p => {
+      const isExpired = p.ends_on && p.ends_on < todayStr;
+      return `
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:${isExpired ? '#fdecea' : 'var(--gu-bg)'};border-radius:8px;">
         <div style="flex:1;min-width:0;">
-          <div style="font-size:12.5px;font-weight:700;color:var(--gu-text);">${p.title}</div>
+          <div style="font-size:12.5px;font-weight:700;color:var(--gu-text);">${p.title}${isExpired ? ' <span style="color:#d9534f;font-size:10px;font-weight:800;">ENDED</span>' : ''}</div>
           ${p.description ? `<div style="font-size:11px;color:var(--gu-dust);">${p.description}</div>` : ''}
           ${p.starts_on ? `<div style="font-size:10px;color:var(--gu-dust);">${p.starts_on}${p.ends_on ? ' → ' + p.ends_on : ''}</div>` : ''}
         </div>
+        <button onclick='editStudioPromotion(${JSON.stringify(p).replace(/'/g, "&#39;")})' style="background:none;border:none;color:var(--gu-primary);font-size:11px;cursor:pointer;padding:4px;white-space:nowrap;">Edit</button>
         <button onclick="deleteStudioPromotion('${p.id}')" style="background:none;border:none;color:#d9534f;font-size:11px;cursor:pointer;padding:4px;white-space:nowrap;">Remove</button>
       </div>
-    `).join('');
+    `;}).join('');
   } catch (e) {
     listEl.innerHTML = '<div style="padding:10px;text-align:center;color:var(--gu-dust);font-size:12px;">Could not load — try again.</div>';
   }
 }
 
+// Genuine, honest reminder — only shows when there's real, concrete
+// evidence something needs review (an actually-expired promotion
+// still in the list), never a vague nagging banner.
+function updatePromoReviewReminder(expiredCount) {
+  const el = document.getElementById('promo-review-reminder');
+  if (!el) return;
+  if (expiredCount > 0) {
+    el.style.display = 'block';
+    el.textContent = `⏰ ${expiredCount} promotion${expiredCount === 1 ? '' : 's'} genuinely ended but still listed below — worth a quick review.`;
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+let _editingPromoId = null; // null = adding new; set = genuinely editing an existing one
+
+function editStudioPromotion(p) {
+  _editingPromoId = p.id;
+  document.getElementById('promo-title').value = p.title || '';
+  document.getElementById('promo-description').value = p.description || '';
+  document.getElementById('promo-starts').value = p.starts_on || '';
+  document.getElementById('promo-ends').value = p.ends_on || '';
+  const btn = document.getElementById('promo-submit-btn');
+  btn.textContent = 'Save changes';
+  btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 async function addStudioPromotion() {
   const title = document.getElementById('promo-title').value.trim();
   if (!title) return;
+  const body = {
+    studioId, title,
+    description: document.getElementById('promo-description').value.trim(),
+    startsOn: document.getElementById('promo-starts').value || null,
+    endsOn: document.getElementById('promo-ends').value || null,
+  };
   try {
-    await fetch(`${API_URL}/api/studio-promotions`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        studioId, title,
-        description: document.getElementById('promo-description').value.trim(),
-        startsOn: document.getElementById('promo-starts').value || null,
-        endsOn: document.getElementById('promo-ends').value || null,
-      })
-    });
+    // Genuine real edit vs add — same endpoint pattern already proven
+    // elsewhere in the app (PATCH for existing, POST for new).
+    const res = _editingPromoId
+      ? await fetch(`${API_URL}/api/studio-promotions/${_editingPromoId}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        })
+      : await fetch(`${API_URL}/api/studio-promotions`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Could not save — try again.'); return; }
     document.getElementById('promo-title').value = '';
     document.getElementById('promo-description').value = '';
     document.getElementById('promo-starts').value = '';
     document.getElementById('promo-ends').value = '';
+    document.getElementById('promo-submit-btn').textContent = 'Add to history';
+    _editingPromoId = null;
     loadStudioPromotions();
   } catch (e) {
     alert('Could not save — try again.');
@@ -10591,7 +10643,7 @@ async function saveOfferOfWeek(makeActive) {
   if (makeActive && !title) { alert('Add a title first.'); return; }
   statusEl.textContent = 'Saving…';
   try {
-    await fetch(`${API_URL}/api/cleos-club/offer-of-week`, {
+    const res = await fetch(`${API_URL}/api/cleos-club/offer-of-week`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         studioId, title: title || 'Offer', active: makeActive,
@@ -10599,6 +10651,8 @@ async function saveOfferOfWeek(makeActive) {
         emoji: document.getElementById('offer-week-emoji').value.trim() || '🎁',
       })
     });
+    const data = await res.json();
+    if (!res.ok) { statusEl.textContent = data.error || 'Could not save — try again.'; return; }
     statusEl.textContent = makeActive ? '✓ Live in Cleo\'s space now.' : 'Hidden from customers.';
   } catch (e) {
     statusEl.textContent = 'Could not save — try again.';

@@ -3851,6 +3851,11 @@ app.get('/api/studio-promotions', async (req, res) => {
 app.post('/api/studio-promotions', async (req, res) => {
   const { studioId, title, description, startsOn, endsOn } = req.body;
   if (!studioId || !title) return res.status(400).json({ error: 'studioId and title required' });
+  // Genuine, real guardrail — no external links in what a customer
+  // sees, ever, regardless of studio.
+  if (containsGenuineURL(title) || containsGenuineURL(description)) {
+    return res.status(400).json({ error: 'Promotions can\'t include website links — describe the offer in your own words instead.' });
+  }
   const { data, error } = await supabase.from('studio_promotions').insert({ studio_id: studioId, title, description: description || null, starts_on: startsOn || null, ends_on: endsOn || null }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json({ promotion: data });
@@ -3860,6 +3865,25 @@ app.delete('/api/studio-promotions/:id', async (req, res) => {
   const { error } = await supabase.from('studio_promotions').delete().eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ deleted: true });
+});
+
+// PATCH /api/studio-promotions/:id — genuine, real edit of an existing
+// promotion (was previously add-or-delete only, no way to actually
+// correct a mistake or extend/shorten dates without deleting and
+// re-adding, losing the real original creation timestamp).
+app.patch('/api/studio-promotions/:id', async (req, res) => {
+  const { title, description, startsOn, endsOn } = req.body;
+  if (containsGenuineURL(title) || containsGenuineURL(description)) {
+    return res.status(400).json({ error: 'Promotions can\'t include website links — describe the offer in your own words instead.' });
+  }
+  const updates = {};
+  if (title !== undefined) updates.title = title;
+  if (description !== undefined) updates.description = description || null;
+  if (startsOn !== undefined) updates.starts_on = startsOn || null;
+  if (endsOn !== undefined) updates.ends_on = endsOn || null;
+  const { data, error } = await supabase.from('studio_promotions').update(updates).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ promotion: data });
 });
 
 app.get('/api/studio-knowledge', async (req, res) => {
@@ -3873,6 +3897,9 @@ app.get('/api/studio-knowledge', async (req, res) => {
 app.post('/api/studio-knowledge', async (req, res) => {
   const { studioId, fact, addedBy } = req.body;
   if (!studioId || !fact) return res.status(400).json({ error: 'studioId and fact required' });
+  if (containsGenuineURL(fact)) {
+    return res.status(400).json({ error: 'Cleo can\'t be taught website links — describe it in your own words instead.' });
+  }
   const { data, error } = await supabase.from('studio_knowledge').insert({ studio_id: studioId, fact, added_by: addedBy || null }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json({ entry: data });
@@ -5433,6 +5460,18 @@ app.get('/api/ai-design/usage', async (req, res) => {
 // studio's own customer revenue.
 // ═══════════════════════════════════════════
 
+// Genuine, real guardrail: studios can genuinely promote real
+// kilnLINK/GlazeUp features and their own studio through free-text
+// fields (Promotions History, Offer of the Week, Studio Knowledge),
+// but must never be able to insert an external URL — no payment
+// links, no unrelated external wares, no way to route a customer off
+// the platform through these fields. Applied consistently everywhere
+// a studio can enter promotional text a customer will see.
+const URL_PATTERN = /https?:\/\/|www\.|\.(com|co\.uk|net|org|shop|store|link|io|biz)\b/i;
+function containsGenuineURL(text) {
+  return !!text && URL_PATTERN.test(text);
+}
+
 const PLAN_MONTHLY_PRICE_CENTS = { pilot: 0, solo: 2900, studio: 5900, multi: 9900 };
 
 // Feature licensing fee: kilnLINK takes a cut of every in-app extra a
@@ -6397,6 +6436,9 @@ app.get('/api/cleos-club/offer-of-week', async (req, res) => {
 app.post('/api/cleos-club/offer-of-week', async (req, res) => {
   const { studioId, title, description, emoji, active } = req.body;
   if (!studioId || !title) return res.status(400).json({ error: 'studioId and title required' });
+  if (containsGenuineURL(title) || containsGenuineURL(description)) {
+    return res.status(400).json({ error: 'Offers can\'t include website links — describe it in your own words instead.' });
+  }
   const { data, error } = await supabase.from('cleos_club_offer_of_week').upsert({
     studio_id: studioId, title, description: description || null,
     emoji: emoji || '🎁', active: active !== false, updated_at: new Date().toISOString(),
