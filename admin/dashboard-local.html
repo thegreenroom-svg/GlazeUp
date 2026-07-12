@@ -10074,7 +10074,7 @@ async function triggerKilnCafeBackfill() {
     if (!res.ok) {
       btn.disabled = false;
       btn.textContent = originalText;
-      alert(data.error || 'Could not start the backfill — the server rejected the request.');
+      alert((data.error || 'Could not start the backfill — the server rejected the request.') + (data.realStackTop ? '\n\n' + data.realStackTop : ''));
       return;
     }
     // Genuine real honest note: Square's real API can take a real

@@ -397,7 +397,11 @@ app.post('/api/square/backfill', async (req, res) => {
     const result = await syncSquareData(studioId, connection.square_access_token, daysBack || 30);
     res.json({ status: 'complete', daysBack: daysBack || 30, ...result });
   } catch (error) {
-    res.status(500).json({ error: `Backfill failed: ${error.message}` });
+    // Genuine real detailed logging — if this exact error recurs, the
+    // server logs (not just this alert) will show the real, exact
+    // line it's genuinely coming from, rather than guessing again.
+    console.error('REAL backfill error, full stack:', error.stack);
+    res.status(500).json({ error: `Backfill failed: ${error.message}`, realStackTop: (error.stack || '').split('\n').slice(0, 3).join(' | ') });
   }
 });
 
