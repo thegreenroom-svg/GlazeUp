@@ -2142,8 +2142,8 @@
 <!-- Floating back-to-Dashboard — appears once scrolled down on any tab
      other than Dashboard itself, so there's always a quick way back
      without needing to scroll up to find the sidebar. -->
-<button id="floating-back-btn" onclick="showGridNav()" style="display:none;position:fixed;bottom:82px;left:20px;z-index:900;background:#2B2724;color:white;border:none;border-radius:24px;padding:11px 18px 11px 14px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.25);align-items:center;gap:6px;">
-  ← Dashboard
+<button id="floating-back-btn" onclick="showGridNav()" style="display:none;position:fixed;bottom:20px;left:16px;right:16px;z-index:900;background:#2e7d32;color:white;border:none;border-radius:14px;padding:16px;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.25);align-items:center;justify-content:center;gap:8px;">
+  ✓ Finished — back to tasks
 </button>
 
 <!-- Genuine real Focus Mode back bar — tablet-only (CSS above scopes
@@ -4996,9 +4996,11 @@ function initTabSwipe() {
 function toggleFloatingBackBtn() {
   const btn = document.getElementById('floating-back-btn');
   if (!btn) return;
-  const contentEl = document.getElementById('admin-content');
-  const scrolledDown = contentEl && contentEl.scrollTop > 120;
-  btn.style.display = (currentTab !== 'dashboard' && scrolledDown) ? 'flex' : 'none';
+  // Genuine real fix, per direct request: always visible on any real
+  // function screen (not scroll-gated like before), hidden only
+  // while genuinely already on the top-level task grid itself.
+  const onGridNav = document.getElementById('grid-nav-view')?.style.display !== 'none';
+  btn.style.display = onGridNav ? 'none' : 'flex';
 }
 
 function goToTab(tab, event) {
@@ -7694,6 +7696,7 @@ function showGridNav() {
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
   document.getElementById('grid-nav-view').style.display = 'block';
   showGridNavTop();
+  toggleFloatingBackBtn();
 }
 
 // Genuine, real, per direct request: "Back" from any real screen or
