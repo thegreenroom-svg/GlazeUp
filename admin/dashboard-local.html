@@ -3941,7 +3941,7 @@
           This is what customers see in the Food & Drinks screen. Items come from your Square catalogue — add daily specials here with custom prices. Customers can order from this and it goes straight to your KDS.
         </p>
 
-        <!-- KDS config banner -->
+        <!-- KDS config banner — stays visible above the tiles, genuinely relevant regardless of which section is open -->
         <div id="menu-kds-banner" style="background:#f0f7ff;border:1px solid #b3d4f0;border-radius:8px;padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
           <div>
             <div style="font-size:13px;font-weight:600;color:#1a4a6e;">KDS System</div>
@@ -3950,6 +3950,21 @@
           <button onclick="goToTab('setup')" style="background:none;border:1px solid #b3d4f0;border-radius:6px;padding:5px 12px;font-size:12px;color:#1a4a6e;cursor:pointer;white-space:nowrap;">Configure →</button>
         </div>
 
+        <!-- Genuine real tile entry point, per direct request -->
+        <div id="menu-tile-menu" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+          <button onclick="showMenuSection('specials')" style="background:#F9A825;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">📋</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Today's Specials</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Add a one-off item</span>
+          </button>
+          <button onclick="showMenuSection('square')" style="background:#F9A825;filter:brightness(0.85);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">🔗</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Square Menu</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Toggle items on/off today</span>
+          </button>
+        </div>
+
+        <div id="menu-section-specials" class="menu-section" style="display:none;">
         <!-- Daily specials — add on the fly -->
         <div class="chart-container" style="margin-bottom:20px;">
           <h3 style="margin:0 0 12px;">📋 Today's Specials</h3>
@@ -3967,7 +3982,9 @@
             <button onclick="addMenuSpecial()" style="background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">+ Add</button>
           </div>
         </div>
+        </div>
 
+        <div id="menu-section-square" class="menu-section" style="display:none;">
         <!-- Square catalogue items — toggle visibility -->
         <div class="chart-container">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
@@ -3978,6 +3995,7 @@
           <div id="menu-square-items">
             <div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading from Square…</div>
           </div>
+        </div>
         </div>
       </div>
 
@@ -12142,6 +12160,15 @@ function showStockSection(section) {
   document.getElementById(`stock-section-${section}`).style.display = 'block';
   if (section === 'reservations') loadStockReservations();
   if (section === 'catalogue') loadStockCatalogue();
+}
+
+// Genuine real tile-section switcher for Daily Menu, per direct
+// request, same proven pattern.
+function showMenuSection(section) {
+  document.getElementById('menu-tile-menu').style.display = 'none';
+  document.querySelectorAll('.menu-section').forEach(el => el.style.display = 'none');
+  document.getElementById(`menu-section-${section}`).style.display = 'block';
+  if (section === 'square') loadDailyMenu();
 }
 
 function showStaffSection(section) {
