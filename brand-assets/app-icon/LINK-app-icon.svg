@@ -1,7 +1,27 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <rect width="1024" height="1024" fill="#2B2724"/>
-  <g transform="translate(512,512) rotate(-45)">
-    <rect x="-260" y="-90" width="340" height="180" rx="90" fill="none" stroke="#F7F4EE" stroke-width="62"/>
-    <rect x="-80" y="-90" width="340" height="180" rx="90" fill="none" stroke="#B87946" stroke-width="62"/>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><rect width="1024" height="1024" fill="#2B2724"/><g transform="translate(512.0,512.0) scale(6.15) translate(-125.41,-34.0)">
+  <!-- pot inside the arch -->
+  <path d="M116.6,77
+           C111,71 110,64 112.5,58
+           C114,54 117.5,52 118.7,50
+           L118.7,48.5
+           C117.8,46.3 119.8,45 122,45
+           L128.8,45
+           C131,45 133,46.3 132.1,48.5
+           L132.1,50
+           C133.3,52 136.8,54 138.3,58
+           C140.8,64 139.8,71 134.2,77
+           C129,80.5 121.8,80.5 116.6,77 Z"
+        fill="#F7F4EE"/>
+  <!-- kiln arch (the N) -->
+  <path d="M 101.41,82.00 L 107.41,82.00 L 107.41,40.00
+           C 107.41,20.00 115.41,12.00 125.41,12.00
+           C 135.41,12.00 143.41,20.00 143.41,40.00
+           L 143.41,82.00 L 149.41,82.00"
+        fill="none" stroke="#B87946" stroke-width="13"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- chimney + drifting smoke -->
+  <rect x="120.41" y="-8" width="9" height="13" rx="1.5" fill="#B87946"/>
+  <circle cx="125.41" cy="-13" r="3.4" fill="#B87946" opacity="0.6"/>
+  <circle cx="128.41" cy="-19" r="2.6" fill="#B87946" opacity="0.45"/>
+  <circle cx="126.91" cy="-25" r="1.9" fill="#B87946" opacity="0.3"/>
+</g></svg>
