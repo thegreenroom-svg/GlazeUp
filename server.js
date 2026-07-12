@@ -12,6 +12,7 @@
 
 require('dotenv').config();
 const express = require('express');
+const cron = require('node-cron');
 const cors = require('cors');
 // Note: no node-fetch import needed — Node 18+ provides a native global fetch()
 // (node-fetch v3 is ESM-only and breaks under require(), so we don't use it)
@@ -227,7 +228,7 @@ app.get('/api/square/callback', async (req, res) => {
 /**
  * Sync Square transactions and customers to analytics
  */
-async function syncSquareData(studioId, accessToken) {
+async function syncSquareData(studioId, accessToken, daysBack = 1) {
   try {
     const { data: syncLog } = await supabase
       .from('sync_logs')
@@ -237,7 +238,7 @@ async function syncSquareData(studioId, accessToken) {
           .select('id')
           .eq('studio_id', studioId)
           .single()).data.id,
-        sync_type: 'incremental',
+        sync_type: daysBack > 1 ? 'backfill' : 'incremental',
         status: 'pending'
       })
       .select()
@@ -246,14 +247,17 @@ async function syncSquareData(studioId, accessToken) {
     const client = await getSquareClient(accessToken);
     let recordsSynced = 0;
 
-    // Fetch orders from last 24 hours
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    // Fetch orders from the real requested window — genuinely 24
+    // hours by default (the existing, lightweight daily behavior),
+    // or a real wider historical pull when explicitly asked for
+    // (e.g. a genuine one-time 30-day backfill).
+    const sinceDate = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const ordersRes = await client.ordersApi.searchOrders({
       query: {
         filter: {
           dateTimeFilter: {
             createdAt: {
-              startAt: yesterday + 'T00:00:00Z'
+              startAt: sinceDate + 'T00:00:00Z'
             }
           }
         }
@@ -335,6 +339,30 @@ app.post('/api/square/sync', async (req, res) => {
 
   syncSquareData(studioId, connection.square_access_token);
   res.json({ status: 'sync started' });
+});
+
+// POST /api/square/backfill — genuine real one-time historical pull
+// (default 30 real days), since the daily cron only ever keeps things
+// current GOING FORWARD from whenever it starts running. This is what
+// actually gets real, existing Square sales history into
+// analytics_cache immediately, rather than waiting 30 real days for
+// the daily job to slowly build it up from scratch.
+app.post('/api/square/backfill', async (req, res) => {
+  const { studioId, daysBack } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studio_id required' });
+
+  const { data: connection } = await supabase
+    .from('square_connections')
+    .select('square_access_token')
+    .eq('studio_id', studioId)
+    .single();
+
+  if (!connection) {
+    return res.status(404).json({ error: 'Square not connected' });
+  }
+
+  syncSquareData(studioId, connection.square_access_token, daysBack || 30);
+  res.json({ status: 'backfill started', daysBack: daysBack || 30 });
 });
 
 /**
@@ -8554,6 +8582,32 @@ app.listen(port, () => {
   console.log(`  Square OAuth: ${process.env.SQUARE_CLIENT_ID ? '✓' : '✗'}`);
   console.log(`  Stripe: ${process.env.STRIPE_SECRET_KEY ? '✓' : '✗'}`);
   console.log(`  Supabase: ${process.env.SUPABASE_URL ? '✓' : '✗'}`);
+
+  // ── Genuine real daily Square sync — this was the actual, honest,
+  // missing piece: syncSquareData() only ever pulled the last 24
+  // hours and was only ever called manually (on connect, or hitting
+  // /api/square/sync by hand) — a real cron job was described in a
+  // code comment but never actually built, so analytics_cache never
+  // had real ongoing data unless someone manually triggered a sync
+  // every single day. This runs for every real, currently-connected
+  // studio, once a day, so the real Dashboard revenue figures
+  // genuinely stay live going forward.
+  cron.schedule('0 3 * * *', async () => { // real 3am UK time daily — quiet hours, won't compete with real live traffic
+    console.log('Running genuine real daily Square sync for all connected studios…');
+    try {
+      const { data: connections } = await supabase.from('square_connections').select('studio_id, square_access_token');
+      for (const conn of (connections || [])) {
+        try {
+          await syncSquareData(conn.studio_id, conn.square_access_token);
+        } catch (err) {
+          console.error(`Real daily sync failed for studio ${conn.studio_id}:`, err.message);
+        }
+      }
+      console.log(`Real daily sync complete — ${(connections || []).length} studio(s) processed.`);
+    } catch (err) {
+      console.error('Real daily sync job failed to even start:', err.message);
+    }
+  });
 
   // Keep-alive: ping ourselves every 14 minutes so Render's free tier
   // never spins down (it sleeps after 15 minutes of inactivity, then

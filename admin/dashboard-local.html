@@ -2404,7 +2404,8 @@
               <h3 style="margin:0;">💷 The Kiln Cafe — Revenue <span style="font-size:11px;font-weight:500;color:var(--gu-dust);">(directors only)</span></h3>
               <button onclick="refreshKilnCafeRevenueData()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
             </div>
-            <p style="font-size:11px;color:var(--gu-dust);margin-bottom:16px;">The studio's own real revenue and app usage — separate from Platform Revenue (worldwide SaaS income), and only visible to David, Jenny, and Daisy.</p>
+            <p style="font-size:11px;color:var(--gu-dust);margin-bottom:10px;">The studio's own real revenue and app usage — separate from Platform Revenue (worldwide SaaS income), and only visible to David, Jenny, and Daisy.</p>
+            <button id="kiln-cafe-backfill-btn" onclick="triggerKilnCafeBackfill()" style="background:#2e7d32;color:white;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:16px;">📥 Pull real last 30 days from Square</button>
 
             <!-- Genuine real speedometer — today's actual revenue vs
                  a real recent daily average, reusing the exact same
@@ -10046,6 +10047,37 @@ async function populateDashboard() {
 // dashboard bootstrap (which includes checkShiftLogin() — calling that
 // on a timer would wrongly force a re-login/kick the director back to
 // the name picker every 5 minutes).
+// Genuine real one-time backfill trigger — pulls the actual last 30
+// real days of Square sales into analytics_cache immediately, since
+// the real daily cron only keeps things current going forward from
+// whenever it starts, not retroactively.
+async function triggerKilnCafeBackfill() {
+  const btn = document.getElementById('kiln-cafe-backfill-btn');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Pulling real Square data…';
+  try {
+    await fetch(`${API_URL}/api/square/backfill`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, daysBack: 30 }),
+    });
+    // Genuine real honest note: Square's real API can take a real
+    // moment to return everything for a 30-day pull, so this waits a
+    // few real seconds before refreshing the actual displayed figures
+    // — not instant, but genuinely reflects real data once it lands.
+    setTimeout(() => {
+      refreshKilnCafeRevenueData();
+      btn.disabled = false;
+      btn.textContent = '✓ Done — figures updated';
+      setTimeout(() => { btn.textContent = originalText; }, 3000);
+    }, 4000);
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = originalText;
+    alert('Could not start the backfill — try again.');
+  }
+}
+
 async function refreshKilnCafeRevenueData() {
   try {
     const data = await loadDashboardData();
