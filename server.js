@@ -3494,7 +3494,8 @@ Keep answers short and warm — this is a mobile chat window, not an essay. No m
 If your answer is clearly about one specific on-screen feature — Design Preview, Transfer Designer, Take It Home, Colour Picker, or their own QR code — mention its exact name naturally in your reply so the app can point an arrow at it. Only do this when genuinely relevant, not for every reply.`,
 
   staff: `You are the in-app assistant for kilnLINK, a staff-facing pottery studio management dashboard.
-You help staff navigate the dashboard, understand features (task queue, handoff alerts, timekeeping, holiday requests, kiln process, transfer two-firing process), and — using the available functions — look up real data like today's bookings, stock levels, or pending tasks for their studio.
+You help staff navigate the dashboard, understand features (task queue, handoff alerts, timekeeping, holiday requests, kiln process, transfer two-firing process), and — using the available functions — look up real data like today's bookings, stock levels, pending tasks, or open staff alerts for their studio.
+If asked about alerts, damage reports, kiln issues, or anything currently outstanding, use get_open_alerts to check the real, current list rather than guessing — never invent an alert that isn't actually there.
 You do NOT have access to Platform Revenue, other studios' data, or director-only figures — if asked, say this is director-only and suggest asking a Studio Manager/Director.
 If something requires a real decision or action you can't take (refunds, HR matters, correcting a mistake), use escalate_to_staff to flag it to the right role rather than guessing.
 Keep answers practical and concise — staff are mid-shift, not reading documentation.
@@ -3546,6 +3547,14 @@ const ASSISTANT_FUNCTIONS = [
   {
     type: 'function',
     function: {
+      name: 'get_open_alerts',
+      description: "Get today's real open/unacknowledged staff alerts for this studio — kiln issues, pieces ready for packing, damage reports, transfer designs ready, holiday requests, and similar. Staff/director only.",
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'escalate_to_staff',
       description: 'Escalate this conversation to a real member of staff because the assistant cannot resolve it, the person is frustrated, or it needs a human decision. Creates a real flashing alert for the right role.',
       parameters: {
@@ -3584,6 +3593,20 @@ async function executeAssistantFunction(name, args, studioId, context, bookingCo
       const byRole = {};
       (data || []).forEach(t => { byRole[t.assigned_role] = (byRole[t.assigned_role] || 0) + 1; });
       return { totalPending: (data || []).length, byRole };
+    }
+    case 'get_open_alerts': {
+      if (context === 'customer') return { error: 'Not available in this context.' };
+      const today = new Date(); today.setHours(0,0,0,0);
+      const { data } = await supabase.from('staff_alerts')
+        .select('trigger_type, label, message, next_role, created_at').eq('studio_id', studioId)
+        .eq('acknowledged', false).gte('created_at', today.toISOString())
+        .order('created_at', { ascending: false }).limit(15);
+      const alerts = data || [];
+      if (!alerts.length) return { openAlertCount: 0, alerts: [], summary: 'Genuinely nothing open right now — all clear.' };
+      return {
+        openAlertCount: alerts.length,
+        alerts: alerts.map(a => ({ label: a.label, message: a.message, forRole: a.next_role, raisedAt: a.created_at })),
+      };
     }
     case 'get_platform_revenue_summary': {
       if (context !== 'director') return { error: 'Director access only.' };
