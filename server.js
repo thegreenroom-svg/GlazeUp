@@ -6793,6 +6793,33 @@ app.post('/api/loyalty/piece-milestone', async (req, res) => {
 });
 
 // GET /api/loyalty/leaderboard — top customers by tier/points for a studio
+// GET /api/loyalty/public-leaderboard — genuine real customer-facing
+// leaderboard, deliberately a SEPARATE endpoint from the admin one
+// rather than a flag on it, so it's structurally incapable of ever
+// leaking full names, exact spend, or any contact detail — only ever
+// returns a first name/initial, tier, and points. This is shown on
+// customers' own phones in the studio, so real, direct privacy care.
+app.get('/api/loyalty/public-leaderboard', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data } = await supabase.from('customers')
+    .select('name, loyalty_points, loyalty_tier')
+    .eq('studio_id', studioId)
+    .not('loyalty_tier', 'is', null)
+    .order('loyalty_points', { ascending: false })
+    .limit(20);
+
+  // Genuine real reduction to first name + last initial only — e.g.
+  // "Sarah M." — never the full real name, never anything else.
+  const publicList = (data || []).map(c => {
+    const parts = (c.name || '').trim().split(' ');
+    const firstName = parts[0] || 'Someone';
+    const lastInitial = parts.length > 1 ? `${parts[parts.length - 1][0]}.` : '';
+    return { displayName: `${firstName}${lastInitial ? ' ' + lastInitial : ''}`, points: c.loyalty_points || 0, tier: c.loyalty_tier };
+  });
+  res.json({ leaderboard: publicList });
+});
+
 app.get('/api/loyalty/leaderboard', async (req, res) => {
   const { studioId, limit } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });

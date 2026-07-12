@@ -3705,12 +3705,62 @@
           <div style="padding:0 16px 32px;text-align:center;font-size:12px;color:rgba(255,255,255,0.3);line-height:1.6;">
             Ask a member of staff to redeem any rewards on your account.<br>Points and tier status update after each visit.
           </div>
+
+          <!-- Genuine real top-20 leaderboard — first name + last
+               initial only, never a full name or anything else, since
+               this is visible on any customer's own phone in the
+               studio. Loaded separately from the main real screen
+               data so a slow leaderboard fetch never blocks the
+               customer's own real loyalty status from showing first. -->
+          <div style="padding:0 16px 32px;">
+            <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,0.45);margin-bottom:10px;">🏆 Top Loyalty Members</div>
+            <div id="public-leaderboard-list" style="background:rgba(255,255,255,0.06);border-radius:14px;overflow:hidden;">
+              <div style="padding:16px;text-align:center;color:rgba(255,255,255,0.4);font-size:12px;">Loading…</div>
+            </div>
+          </div>
+
           ${renderCrossLinkFooter('loyalty')}
         `;
+        loadPublicLeaderboard();
 
       } catch(e) {
         body.innerHTML = '<div style="padding:32px;text-align:center;color:rgba(255,255,255,0.4);font-size:13px;">Could not load loyalty status — please ask a member of staff.</div>';
       }
+    }
+
+    // Genuine real live-updating top-20 — refreshes every 60 seconds
+    // while the Loyalty screen is genuinely open, so it reflects
+    // other real customers' visits happening elsewhere in the studio
+    // right now, not just a one-time snapshot.
+    let _publicLeaderboardTimer = null;
+    async function loadPublicLeaderboard() {
+      const listEl = document.getElementById('public-leaderboard-list');
+      if (!listEl) { clearInterval(_publicLeaderboardTimer); return; }
+      try {
+        const res = await fetch(`${API_URL}/api/loyalty/public-leaderboard?studioId=${STUDIO_ID}`);
+        const data = await res.json();
+        const board = data.leaderboard || [];
+        if (!board.length) {
+          listEl.innerHTML = '<div style="padding:16px;text-align:center;color:rgba(255,255,255,0.4);font-size:12px;">Be the first on the board — start your loyalty journey today!</div>';
+        } else {
+          const TIER_EMOJIS_LB = { newcomer:'🪴', dabbler:'🌱', regular:'🌿', enthusiast:'🌸', silver:'🥈', gold:'🥇', platinum:'💎' };
+          listEl.innerHTML = board.map((m, i) => `
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;${i>0?'border-top:1px solid rgba(255,255,255,0.08);':''}">
+              <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.4);width:20px;flex-shrink:0;">${i+1}</div>
+              <div style="font-size:16px;flex-shrink:0;">${TIER_EMOJIS_LB[m.tier] || '⭐'}</div>
+              <div style="flex:1;font-size:13px;color:white;font-weight:600;">${m.displayName}</div>
+              <div style="font-size:12px;color:#FFD54F;font-weight:700;">${m.points} pts</div>
+            </div>
+          `).join('');
+        }
+      } catch (e) {
+        listEl.innerHTML = '<div style="padding:16px;text-align:center;color:rgba(255,255,255,0.4);font-size:12px;">Could not load right now.</div>';
+      }
+      clearInterval(_publicLeaderboardTimer);
+      _publicLeaderboardTimer = setInterval(() => {
+        if (document.getElementById('loyalty-screen')?.classList.contains('open')) loadPublicLeaderboard();
+        else clearInterval(_publicLeaderboardTimer);
+      }, 60 * 1000);
     }
 
     // ── Cleo's Club — kids' sticker collection, real add-on feature ──
