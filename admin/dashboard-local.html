@@ -2472,6 +2472,24 @@
             </div>
             <p style="font-size:11px;color:var(--gu-dust);margin-bottom:16px;">The studio's own real revenue and app usage — separate from Platform Revenue (worldwide SaaS income), and only visible to David, Jenny, and Daisy.</p>
 
+            <!-- Genuine real speedometer — today's actual revenue vs
+                 a real recent daily average, reusing the exact same
+                 proven drawRevenueSpeedometer() already built for
+                 Platform Revenue rather than duplicating the logic. -->
+            <div style="text-align:center;margin-bottom:16px;">
+              <div id="kiln-cafe-speedometer-wrap" style="max-width:280px;margin:0 auto;"></div>
+              <div style="display:flex;justify-content:center;gap:24px;margin-top:6px;">
+                <div>
+                  <div style="font-size:17px;font-weight:800;color:var(--gu-primary);" id="kiln-cafe-speedo-today">£0.00</div>
+                  <div style="font-size:10px;color:var(--gu-dust);">Today so far</div>
+                </div>
+                <div>
+                  <div style="font-size:17px;font-weight:800;color:var(--gu-dust);" id="kiln-cafe-speedo-avg">£0.00</div>
+                  <div style="font-size:10px;color:var(--gu-dust);">Recent daily average</div>
+                </div>
+              </div>
+            </div>
+
             <div class="dashboard-grid">
               <div class="metric-card">
                 <div class="label">Revenue (30d)</div>
@@ -8817,8 +8835,8 @@ function drawMonthlyTrendChart(monthly) {
   `;
 }
 
-function drawRevenueSpeedometer(todayCents, avgCents) {
-  const wrap = document.getElementById('speedometer-wrap');
+function drawRevenueSpeedometer(todayCents, avgCents, targetId) {
+  const wrap = document.getElementById(targetId || 'speedometer-wrap');
   if (!wrap) return;
 
   const maxCents = Math.max(todayCents, avgCents * 1.5, 100);
@@ -10035,6 +10053,25 @@ async function refreshKilnCafeRevenueData() {
     updateRevenueChart(data.revenueByDay || []);
     updateDesignList(data.topDesigns || []);
     updateToolUsage(data.tabUsage || {});
+
+    // Genuine real speedometer — today's actual figure against a real
+    // recent 7-day average, computed from the same real revenueByDay
+    // data already being fetched (no extra request needed). Reuses
+    // the exact same proven drawRevenueSpeedometer() function already
+    // built for Platform Revenue.
+    const speedoWrap = document.getElementById('kiln-cafe-speedometer-wrap');
+    if (speedoWrap) {
+      const byDay = data.revenueByDay || [];
+      const todayStr = new Date().toISOString().split('T')[0];
+      const todayEntry = byDay.find(d => d.metric_date === todayStr);
+      const todayCents = todayEntry?.metric_value?.revenue_cents || 0;
+      const last7 = byDay.slice(0, 7);
+      const avgCents = last7.length ? Math.round(last7.reduce((s, d) => s + (d.metric_value?.revenue_cents || 0), 0) / last7.length) : 0;
+
+      document.getElementById('kiln-cafe-speedo-today').textContent = `£${(todayCents / 100).toFixed(2)}`;
+      document.getElementById('kiln-cafe-speedo-avg').textContent = `£${(avgCents / 100).toFixed(2)}`;
+      drawRevenueSpeedometer(todayCents, avgCents, 'kiln-cafe-speedometer-wrap');
+    }
   } catch (err) {
     console.error('Error populating dashboard:', err);
   }
