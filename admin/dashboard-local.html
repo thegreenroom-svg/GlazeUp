@@ -5243,6 +5243,16 @@ function swtStart() {
   swtStep = 0;
   document.getElementById('swt-trigger').style.display = 'none';
   document.getElementById('swt-overlay').style.display = 'block';
+  // Genuine real fix: the tour card's own real footprint (centered,
+  // near the bottom or top of the screen) was overlapping the
+  // floating Find My Piece / Cleo buttons on narrow real iPhone
+  // screens, making them genuinely untappable underneath the card —
+  // even where the card was just empty padding. Hiding them for the
+  // real duration of the tour is more reliable than chasing exact
+  // pixel positioning across every possible screen size.
+  document.getElementById('find-piece-fab')?.style.setProperty('display', 'none', 'important');
+  document.getElementById('cleo-admin-floating-fab')?.style.setProperty('display', 'none', 'important');
+  document.getElementById('cleo-admin-floating-bubble')?.style.setProperty('display', 'none', 'important');
   swtRender();
 }
 
@@ -5253,6 +5263,21 @@ function swtEnd() {
   document.getElementById('swt-trigger').style.display = 'flex';
   swtStopVoice();
   localStorage.setItem('swt_done', '1');
+  // Genuine real restore — only if actually still logged in (these
+  // buttons' real base state is hidden until login), removing the
+  // real forced override rather than blindly setting display:flex
+  // regardless of the genuine current login state.
+  const findFab = document.getElementById('find-piece-fab');
+  const cleoFab = document.getElementById('cleo-admin-floating-fab');
+  const cleoBubble = document.getElementById('cleo-admin-floating-bubble');
+  if (findFab) findFab.style.removeProperty('display');
+  if (cleoFab) cleoFab.style.removeProperty('display');
+  if (cleoBubble) cleoBubble.style.removeProperty('display');
+  if (currentShiftStaff) {
+    if (findFab) findFab.style.display = 'flex';
+    // Cleo's own real widget re-init call handles her correct visibility/rotation state properly, rather than guessing here
+    if (typeof initCleoAdminFloatingWidget === 'function') initCleoAdminFloatingWidget();
+  }
 }
 
 function swtNext() {
