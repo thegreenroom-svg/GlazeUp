@@ -575,7 +575,7 @@
     #wt-trigger {
       position: fixed;
       bottom: 24px;
-      right: 16px;
+      left: 16px;
       z-index: 8000;
       background: var(--link-charcoal);
       color: #fff;
@@ -1634,7 +1634,7 @@
     </div>
     <div style="padding:0 16px;">
       <div style="color:#fff; font-weight:700; font-size:14px; margin-bottom:10px;">Choose a date</div>
-      <div id="nb-date-strip" style="display:flex; gap:8px; overflow-x:auto; padding-bottom:14px;"></div>
+      <div id="nb-date-strip" style="display:flex; gap:8px; overflow-x:auto; padding-bottom:14px; -webkit-overflow-scrolling:touch;"></div>
     </div>
     <div style="padding:0 16px; flex:1; overflow-y:auto;">
       <div id="nb-slots-label" style="color:#fff; font-weight:700; font-size:14px; margin-bottom:10px;"></div>
@@ -1673,7 +1673,7 @@
       <div style="font-size:12px; color:rgba(255,255,255,0.55); line-height:1.5; margin-bottom:12px;">
         Tap any piece to design on it at home — or reserve it for your next visit.
       </div>
-      <div style="display:flex; gap:8px; margin-bottom:14px; overflow-x:auto; padding-bottom:4px;" id="bd-category-strip"></div>
+      <div style="display:flex; gap:8px; margin-bottom:14px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch;" id="bd-category-strip"></div>
     </div>
     <div style="flex:1; overflow-y:auto;">
       <div id="bd-grid" class="bd-grid"></div>
@@ -5070,7 +5070,12 @@
     function showTakeHomeEarnedNudge() {
       const el = document.createElement('div');
       el.id = 'take-home-earned-nudge';
-      el.style.cssText = 'position:fixed;bottom:20px;left:16px;right:16px;max-width:400px;margin:0 auto;background:white;border-radius:16px;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,0.25);z-index:9400;display:flex;align-items:center;gap:12px;';
+      // Genuine real fix: was at bottom:20px, the exact same real
+      // vertical position as Cleo's floating widget (also bottom:20px)
+      // — this nudge spans nearly the full width, so it genuinely
+      // overlapped Cleo regardless of z-index stacking order. Moved
+      // above her real position instead.
+      el.style.cssText = 'position:fixed;bottom:92px;left:16px;right:16px;max-width:400px;margin:0 auto;background:white;border-radius:16px;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,0.25);z-index:9400;display:flex;align-items:center;gap:12px;';
       el.innerHTML = `
         <div style="font-size:28px;">💡</div>
         <div style="flex:1;font-size:12.5px;color:var(--gu-text);line-height:1.4;">You've paid for tools twice this visit — <strong>Take It Home</strong> covers all three, forever, for £5.</div>

@@ -1700,7 +1700,7 @@
      Not part of any scrolling tab content — this stays
      fixed no matter which screen is open. ═══════════ -->
 <div id="platform-revenue-strip" style="display:none;position:fixed;top:0;left:0;right:0;z-index:1000;height:52px;background:linear-gradient(90deg,#2B2724,#3d2e28,#2B2724);background-size:200% 100%;box-shadow:0 3px 14px rgba(0,0,0,0.3);animation:tickerShimmer 8s ease-in-out infinite;overflow:hidden;">
-  <div style="display:flex;align-items:center;gap:18px;height:100%;padding:0 16px;max-width:1300px;margin:0 auto;overflow-x:auto;white-space:nowrap;scrollbar-width:none;">
+  <div style="display:flex;align-items:center;gap:18px;height:100%;padding:0 16px;max-width:1300px;margin:0 auto;overflow-x:auto;white-space:nowrap;scrollbar-width:none;-webkit-overflow-scrolling:touch;">
     <span style="font-size:16px;font-weight:800;letter-spacing:.02em;color:#F9A825;display:flex;align-items:center;gap:8px;flex-shrink:0;">
       <span id="strip-pulse-dot" style="width:8px;height:8px;border-radius:50%;background:#4caf50;display:inline-block;animation:tickerPulse 2s ease-in-out infinite;flex-shrink:0;"></span>
       kilnLINK Sales
@@ -4185,7 +4185,7 @@
             </select>
           </div>
           <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;">Monthly AI + licensing revenue (bars) against the running total of studios on the platform (line).</p>
-          <div id="trend-chart-wrap" style="width:100%;overflow-x:auto;">
+          <div id="trend-chart-wrap" style="width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;">
             <div style="padding:24px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading…</div>
           </div>
         </div>
@@ -4241,7 +4241,7 @@
             </div>
 
             <h3 style="margin:0 0 10px;font-size:14px;">Monthly trend</h3>
-            <div id="sd-chart-wrap" style="width:100%;overflow-x:auto;margin-bottom:20px;">
+            <div id="sd-chart-wrap" style="width:100%;overflow-x:auto;margin-bottom:20px;-webkit-overflow-scrolling:touch;">
               <div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:12px;">Loading…</div>
             </div>
 
@@ -4490,7 +4490,7 @@
       <!-- Collection photos for this booking (helps identify pieces at kiln-unload time) -->
       <div id="collection-photos-section" style="display: none; margin-bottom: 16px;">
         <div style="font-size: 12px; color: var(--gu-dust); font-weight: bold; margin-bottom: 8px;">📷 Photos taken at collection:</div>
-        <div id="collection-photos-gallery" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;">
+        <div id="collection-photos-gallery" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch;">
           <!-- Populated by JS -->
         </div>
       </div>
