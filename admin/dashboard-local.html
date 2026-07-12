@@ -7734,7 +7734,15 @@ function applyPlatformRevenueAccess() {
   const revenueSection = document.getElementById('kiln-cafe-revenue-section');
   if (revenueSection) {
     revenueSection.style.display = hasAccess ? 'block' : 'none';
-    if (hasAccess && document.getElementById('dashboard-view')?.style.display !== 'none') {
+    // Genuine real fix: this used to only fetch/draw the real
+    // speedometer data if the Dashboard tab happened to already be
+    // the visible one at this exact moment — a real, fragile timing
+    // dependency. Fetching is genuinely harmless even if the tab
+    // isn't visible yet (it just populates elements that exist,
+    // whether currently on-screen or not), so this now always runs
+    // when access is granted, rather than silently skipping and
+    // leaving a real, empty, data-less card behind.
+    if (hasAccess) {
       refreshKilnCafeRevenueData();
     }
   }
