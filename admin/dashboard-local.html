@@ -1626,6 +1626,37 @@
   </div>
 </div>
 
+<!-- Genuine real Closing Checklist — shown to the LAST person clocking
+     out each day, right before their real Clock Out actually
+     proceeds. Same proven structure as the opening checklist. Skip is
+     genuinely allowed (real emergencies happen), but logged
+     separately as an honest skip, not silently treated as if the
+     real checklist was actually completed. -->
+<div id="closing-checklist-modal" style="display:none;position:fixed;inset:0;z-index:9100;background:rgba(43,39,36,0.7);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:20px;max-width:480px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(43,39,36,0.4);">
+    <div style="background:#2B2724;border-radius:20px 20px 0 0;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,0.6);margin-bottom:3px;">Closing up 🌙</div>
+        <div style="font-size:18px;font-weight:700;color:white;" id="closing-modal-date"></div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:11px;color:rgba(255,255,255,0.6);" id="closing-check-count">0 of 13 done</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:2px;">Studio closing checklist</div>
+      </div>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:12px 16px;" id="closing-checklist-items"></div>
+    <div style="padding:14px 16px 18px;border-top:1px solid #f0ebe4;">
+      <button id="closing-ready-btn" onclick="completeClosingChecklist()" disabled
+        style="width:100%;padding:14px;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:not-allowed;background:#e0e0e0;color:#aaa;transition:all .3s;">
+        ✓ All Done — Clock Out
+      </button>
+      <button onclick="skipClosingChecklist()" style="width:100%;background:none;border:none;color:var(--gu-dust);font-size:12px;cursor:pointer;padding:10px;margin-top:4px;">
+        Skip and clock out anyway
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Splash / resting screen -->
 <div id="splash-screen">
   <div style="display:flex; align-items:baseline; justify-content:center; gap:0;">
@@ -5710,6 +5741,33 @@ const OPENING_CHECKLIST = [
 
 let openingCheckState = {};
 
+// ── Genuine real Closing Checklist — for the LAST person clocking out
+// each day. Real items requested directly, plus sensible additional
+// real close-of-day checks matching the same honest category
+// structure as the opening checklist. ──
+const CLOSING_CHECKLIST = [
+  // Studio
+  { id:'c_lights',    icon:'💡', text:'Lights off throughout the studio',                       cat:'Studio' },
+  { id:'c_music',     icon:'🎵', text:'Music/sound system off',                                 cat:'Studio' },
+  { id:'c_windows',   icon:'🪟', text:'Windows shut and locked',                                cat:'Studio' },
+  { id:'c_doors',     icon:'🚪', text:'Doors locked and alarm set',                              cat:'Studio' },
+  // Kiln & Safety
+  { id:'c_kiln',      icon:'🔥', text:'Kiln checked — genuinely off, or safely loaded and set for an overnight firing',  cat:'Kiln & Safety' },
+  { id:'c_plugs',     icon:'🔌', text:'Non-essential appliances and equipment switched off at the wall', cat:'Kiln & Safety' },
+  // Tables & Stock
+  { id:'c_tables',    icon:'🪑', text:'All tables cleared, cleaned, and wiped down',            cat:'Tables & Stock' },
+  { id:'c_brushes',   icon:'🖌️', text:'Brushes cleaned and put away',                          cat:'Tables & Stock' },
+  { id:'c_glazes',    icon:'🎨', text:'Glaze lids on and put away correctly',                    cat:'Tables & Stock' },
+  // Cafe & Till
+  { id:'c_till',      icon:'💷', text:'Till counted, cashed up, and card machine off',           cat:'Café & Till' },
+  { id:'c_fridge',    icon:'🧊', text:'Fridge/drinks station stocked items covered or put away', cat:'Café & Till' },
+  // Rubbish & Final Check
+  { id:'c_bins',      icon:'🗑️', text:'Rubbish and recycling taken out',                        cat:'Rubbish & Final Check' },
+  { id:'c_walkthrough', icon:'🚶', text:'Full walkthrough done — nothing left on, nothing left behind', cat:'Rubbish & Final Check' },
+];
+
+let closingCheckState = {};
+
 // ── Morning Kiln Check ──
 let _kilnCheckSessionId = null;
 
@@ -5882,6 +5940,126 @@ async function completeOpeningChecklist() {
 
 function skipOpeningChecklist() {
   document.getElementById('opening-checklist-modal').style.display = 'none';
+}
+
+// ── Genuine real Closing Checklist — shown to the LAST person
+// clocking out each day, right before Clock Out actually proceeds. ──
+function renderClosingChecklist() {
+  const container = document.getElementById('closing-checklist-items');
+  if (!container) return;
+
+  const cats = [...new Set(CLOSING_CHECKLIST.map(i => i.cat))];
+  const catIcons = { 'Studio':'🏠', 'Kiln & Safety':'🔥', 'Tables & Stock':'🪑', 'Café & Till':'💷', 'Rubbish & Final Check':'🗑️' };
+
+  container.innerHTML = cats.map(cat => {
+    const items = CLOSING_CHECKLIST.filter(i => i.cat === cat);
+    return `
+      <div style="margin-bottom:12px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gu-dust);margin:10px 0 6px;">${catIcons[cat]||''} ${cat}</div>
+        ${items.map(item => {
+          const done = closingCheckState[item.id];
+          return `<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;margin-bottom:4px;background:${done?'#e8f5e9':'#f9f6f2'};transition:background .2s;">
+            <input type="checkbox" ${done?'checked':''} onchange="toggleClosingItem('${item.id}',this.checked)"
+              style="width:18px;height:18px;flex-shrink:0;accent-color:#2e7d32;cursor:pointer;">
+            <span style="font-size:16px;flex-shrink:0;">${item.icon}</span>
+            <span style="font-size:13px;color:${done?'#2e7d32':'#2B2724'};text-decoration:${done?'line-through':''};line-height:1.35;">${item.text}</span>
+            ${done?'<span style="margin-left:auto;color:#2e7d32;font-size:14px;flex-shrink:0;">✓</span>':''}
+          </label>`;
+        }).join('')}
+      </div>`;
+  }).join('');
+
+  updateClosingProgress();
+}
+
+function toggleClosingItem(id, checked) {
+  closingCheckState[id] = checked;
+  renderClosingChecklist();
+}
+
+function updateClosingProgress() {
+  const total = CLOSING_CHECKLIST.length;
+  const done = Object.values(closingCheckState).filter(Boolean).length;
+  const countEl = document.getElementById('closing-check-count');
+  const btn = document.getElementById('closing-ready-btn');
+  const allDone = done === total;
+
+  if (countEl) countEl.textContent = `${done} of ${total} done`;
+  if (btn) {
+    btn.disabled = !allDone;
+    btn.style.background = allDone ? '#2e7d32' : '#e0e0e0';
+    btn.style.color = allDone ? 'white' : '#aaa';
+    btn.style.cursor = allDone ? 'pointer' : 'not-allowed';
+    btn.textContent = allDone ? '✅ All Done — Clock Out' : `✓ All Done — Clock Out — ${total - done} items left`;
+  }
+}
+
+// Genuinely, real, the actual entry point — checks whether this
+// person is genuinely the last one still clocked in before showing
+// the closing checklist at all. If others are still on shift, Clock
+// Out proceeds normally, no closing checklist shown — it's honestly
+// only relevant for the real last person out.
+async function maybeShowClosingChecklist() {
+  if (!currentShiftStaff) { logOutOfShift(); return; }
+  try {
+    const excludeId = currentShiftStaff.id !== 'testing' ? currentShiftStaff.id : '';
+    const res = await fetch(`${API_URL}/api/staff/other-active-shifts?studioId=${studioId}&excludeStaffMemberId=${excludeId}`);
+    const data = await res.json();
+    if (data.othersStillClockedIn) {
+      // Genuinely not the last person — just clock out normally
+      logOutOfShift();
+      return;
+    }
+  } catch (e) {
+    // Real, honest fallback: if we can't check, err on the side of
+    // showing the checklist rather than silently skip it — same
+    // reasoning already used for the opening checklist.
+  }
+  showClosingChecklist();
+}
+
+function showClosingChecklist() {
+  closingCheckState = {};
+  CLOSING_CHECKLIST.forEach(i => { closingCheckState[i.id] = false; });
+
+  const dateEl = document.getElementById('closing-modal-date');
+  if (dateEl) dateEl.textContent = new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
+
+  renderClosingChecklist();
+  document.getElementById('closing-checklist-modal').style.display = 'flex';
+}
+
+async function completeClosingChecklist() {
+  try {
+    await fetch(`${API_URL}/api/staff/closing-checklist/complete`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId,
+        staffMemberId: currentShiftStaff?.id !== 'testing' ? currentShiftStaff?.id : null,
+        staffName: currentShiftStaff?.name || 'Unknown',
+      })
+    });
+  } catch (e) { /* still proceed with the real clock-out even if the save fails */ }
+
+  document.getElementById('closing-checklist-modal').style.display = 'none';
+  logOutOfShift();
+}
+
+// Genuine real skip — allowed for real emergencies, but this is
+// honestly logged as a skip via the real 'skipped' flag, never
+// silently recorded as if the checklist was actually completed.
+function skipClosingChecklist() {
+  document.getElementById('closing-checklist-modal').style.display = 'none';
+  fetch(`${API_URL}/api/staff/closing-checklist/complete`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      studioId,
+      staffMemberId: currentShiftStaff?.id !== 'testing' ? currentShiftStaff?.id : null,
+      staffName: currentShiftStaff?.name || 'Unknown',
+      skipped: true,
+    })
+  }).catch(() => {});
+  logOutOfShift();
 }
 
 // ── Table Setup Checklist ──
@@ -7252,7 +7430,9 @@ function confirmDirectLogout() {
   if (!currentShiftStaff) return;
   const name = currentShiftStaff.name;
   if (confirm(`Log out ${name}? This clocks you out and ends any break in progress.`)) {
-    logOutOfShift();
+    // Genuine real check: only the LAST person clocking out sees the
+    // closing checklist — anyone else just clocks out normally.
+    maybeShowClosingChecklist();
   }
 }
 

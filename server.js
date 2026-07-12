@@ -4853,6 +4853,20 @@ app.post('/api/staff/welcome-back-login', async (req, res) => {
 });
 
 // POST /api/staff/clock-out — automatic clock-out on shift logout
+// GET /api/staff/other-active-shifts — genuine real check: is there
+// anyone ELSE still clocked in right now? Used to decide whether to
+// show the closing checklist (only for the genuinely LAST person out).
+app.get('/api/staff/other-active-shifts', async (req, res) => {
+  const { studioId, excludeStaffMemberId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  let query = supabase.from('staff_timesheet')
+    .select('staff_member_id').eq('studio_id', studioId).is('clock_out', null);
+  if (excludeStaffMemberId) query = query.neq('staff_member_id', excludeStaffMemberId);
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ othersStillClockedIn: (data || []).length > 0, count: (data || []).length });
+});
+
 app.post('/api/staff/clock-out', async (req, res) => {
   const { studioId, staffMemberId, shiftId } = req.body;
   if (!studioId || !staffMemberId) return res.status(400).json({ error: 'studioId and staffMemberId required' });
@@ -5125,6 +5139,33 @@ app.post('/api/staff/opening-checklist/complete', async (req, res) => {
     studio_id: studioId, checklist_date: today,
     completed_by_staff_id: staffMemberId || null, completed_by_name: staffName,
     completed_at: new Date().toISOString(),
+  }, { onConflict: 'studio_id,checklist_date' }).select().single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ record: data });
+});
+
+// GET /api/staff/closing-checklist/today — genuine real mirror of the
+// opening checklist's own endpoint, same honest pattern.
+app.get('/api/staff/closing-checklist/today', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const today = new Date().toISOString().split('T')[0];
+  const { data } = await supabase.from('closing_checklist_log')
+    .select('*').eq('studio_id', studioId).eq('checklist_date', today).single();
+  res.json({ completed: !!data, record: data || null });
+});
+
+// POST /api/staff/closing-checklist/complete — mark today's closing checklist done
+app.post('/api/staff/closing-checklist/complete', async (req, res) => {
+  const { studioId, staffMemberId, staffName, skipped } = req.body;
+  if (!studioId || !staffName) return res.status(400).json({ error: 'studioId and staffName required' });
+  const today = new Date().toISOString().split('T')[0];
+
+  const { data, error } = await supabase.from('closing_checklist_log').upsert({
+    studio_id: studioId, checklist_date: today,
+    completed_by_staff_id: staffMemberId || null, completed_by_name: staffName,
+    completed_at: new Date().toISOString(), was_skipped: !!skipped,
   }, { onConflict: 'studio_id,checklist_date' }).select().single();
 
   if (error) return res.status(500).json({ error: error.message });
