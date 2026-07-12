@@ -2471,6 +2471,13 @@
       if (localStorage.getItem(dismissKey)) return;
 
       const banner = document.getElementById('a2hs-banner');
+      // Genuine real fix, same class of bug found and fixed on the
+      // admin side tonight: this banner spans nearly the full real
+      // screen width at bottom:12px, genuinely overlapping Cleo's
+      // floating widget (bottom:20px) on a narrow real iPhone.
+      const cleoFab = document.getElementById('cleo-floating-fab');
+      if (cleoFab) cleoFab.style.setProperty('display', 'none', 'important');
+
       const subtitle = bookingCodeForA2HS
         ? 'One tap gets you straight back to your session, anytime — no email or text needed.'
         : 'One tap for instant access next time — no need to find this link again.';
@@ -2521,6 +2528,9 @@
     function dismissA2HS() {
       document.getElementById('a2hs-banner').style.display = 'none';
       localStorage.setItem(dismissKey, '1');
+      // Genuine real restore of Cleo's widget, now the banner's gone
+      const cleoFab = document.getElementById('cleo-floating-fab');
+      if (cleoFab) cleoFab.style.removeProperty('display');
     }
 
     async function triggerInstall() {

@@ -6600,6 +6600,13 @@ function showAdminA2HSBanner() {
   const banner = document.getElementById('a2hs-banner-admin');
   if (!banner) return;
 
+  // Genuine real fix, same class of bug already found and fixed twice
+  // tonight elsewhere: this banner sits at bottom:76px, nearly full
+  // width — genuinely the same real vertical position as Find My
+  // Piece (bottom:78px), which would visually overlap it on a narrow
+  // real iPhone despite the different z-index math on paper.
+  document.getElementById('find-piece-fab')?.style.setProperty('display', 'none', 'important');
+
   if (isIOSAdmin()) {
     banner.innerHTML = `
       <div class="a2hs-banner-header">
