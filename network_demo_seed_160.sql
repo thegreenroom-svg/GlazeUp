@@ -21,7 +21,7 @@ BEGIN
   FOR i IN 1..160 LOOP
     new_id := ('d1600000-0000-0000-0000-' || LPAD(i::text, 12, '0'))::uuid;
     studio_name := 'Demo: ' || studio_words[1 + (i % array_length(studio_words,1))] || ', ' || city_names[1 + (i % array_length(city_names,1))] || ' ' || i;
-    IF NOT EXISTS (SELECT 1 FROM studios WHERE id = new_id) THEN
+    IF NOT EXISTS (SELECT 1 FROM studios WHERE id = new_id OR slug = 'demo-studio-' || i) THEN
       INSERT INTO studios (id, name, slug, is_demo, network_opted_in, network_opted_in_at, network_display_name, created_at)
       VALUES (
         new_id, studio_name, 'demo-studio-' || i, true,
