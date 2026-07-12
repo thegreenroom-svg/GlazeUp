@@ -96,6 +96,10 @@ const square = new Client({
 });
 
 const port = process.env.PORT || 3000;
+// Genuine, deliberate, harmless marker — forces a real, full Render
+// rebuild (not just a static file refresh) to help resolve tonight's
+// deploy not picking up the latest grid-navigation change.
+console.log('Server build marker: grid-nav-deploy-retry');
 
 // ═══════════════════════════════════════════
 // UTILITIES
