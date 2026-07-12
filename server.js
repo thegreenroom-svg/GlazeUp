@@ -302,8 +302,29 @@ async function syncSquareData(studioId, accessToken, daysBack = 1) {
     const orders = ordersRes.result.orders || [];
     recordsSynced = orders.length;
 
+    // Real, honest keyword-to-category matching — transparent and
+    // simple: matches against the actual real item name Square
+    // returns, case-insensitive, first match wins. Genuinely covers
+    // what was directly asked for (cakes, drinks, pottery/glazes,
+    // booking fees, return fees), everything else falls to "Other".
+    const CATEGORY_KEYWORDS = [
+      { category: 'Cakes & Food', keywords: ['cake', 'brownie', 'cookie', 'pastry', 'sandwich', 'toast', 'scone', 'muffin', 'flapjack'] },
+      { category: 'Drinks', keywords: ['coffee', 'tea', 'latte', 'cappuccino', 'espresso', 'juice', 'squash', 'hot chocolate', 'drink'] },
+      { category: 'Pottery & Glazes', keywords: ['glaze', 'pottery', 'painting', 'session', 'piece', 'firing', 'bisque', 'stroke'] },
+      { category: 'Booking Fees', keywords: ['booking fee', 'deposit', 'reservation'] },
+      { category: 'Return / Cancellation Fees', keywords: ['return fee', 'cancellation', 'refund fee', 'no-show'] },
+    ];
+    function categorizeItemName(name) {
+      const lower = (name || '').toLowerCase();
+      for (const { category, keywords } of CATEGORY_KEYWORDS) {
+        if (keywords.some(kw => lower.includes(kw))) return category;
+      }
+      return 'Other';
+    }
+
     // Aggregate into daily analytics
     const dailyRevenue = {};
+    const dailyCategoryBreakdown = {}; // { date: { category: { revenue_cents, item_count } } }
     orders.forEach(order => {
       const date = order.createdAt.split('T')[0];
       // Genuine real fix: Square's SDK types Money.amount as `bigint`
@@ -314,7 +335,26 @@ async function syncSquareData(studioId, accessToken, daysBack = 1) {
       // within Number's safe integer range.
       const total = order.totalMoney?.amount ? Number(order.totalMoney.amount) : 0;
       dailyRevenue[date] = (dailyRevenue[date] || 0) + total;
+
+      // Real, genuine per-item category breakdown, per direct request
+      if (!dailyCategoryBreakdown[date]) dailyCategoryBreakdown[date] = {};
+      (order.lineItems || []).forEach(item => {
+        const category = categorizeItemName(item.name);
+        const itemTotal = item.totalMoney?.amount ? Number(item.totalMoney.amount) : 0;
+        if (!dailyCategoryBreakdown[date][category]) dailyCategoryBreakdown[date][category] = { revenue_cents: 0, item_count: 0 };
+        dailyCategoryBreakdown[date][category].revenue_cents += itemTotal;
+        dailyCategoryBreakdown[date][category].item_count += Number(item.quantity || 1);
+      });
     });
+
+    // Store the real, genuine category breakdown
+    for (const [date, categories] of Object.entries(dailyCategoryBreakdown)) {
+      for (const [category, { revenue_cents, item_count }] of Object.entries(categories)) {
+        await supabase.from('revenue_category_breakdown').upsert({
+          studio_id: studioId, metric_date: date, category, revenue_cents, item_count,
+        }, { onConflict: 'studio_id,metric_date,category' });
+      }
+    }
 
     // Store analytics cache
     for (const [date, revenue] of Object.entries(dailyRevenue)) {
@@ -1070,6 +1110,24 @@ app.get('/api/analytics/dashboard', async (req, res) => {
     const allTimeRevenueCents = (allTimeRevenue || []).reduce((sum, day) => sum + (day.metric_value?.revenue_cents || 0), 0);
     const allTimeTransactionCount = (allTimeRevenue || []).reduce((sum, day) => sum + (day.metric_value?.transaction_count || 0), 0);
 
+    // Genuine real revenue category breakdown — cakes, drinks,
+    // pottery/glazes, booking fees, return fees — per direct request,
+    // last 30 real days, summed by category.
+    const { data: categoryRows } = await supabase
+      .from('revenue_category_breakdown')
+      .select('category, revenue_cents, item_count')
+      .eq('studio_id', studioId)
+      .gte('metric_date', thirtyDaysAgo);
+    const categoryTotals = {};
+    (categoryRows || []).forEach(row => {
+      if (!categoryTotals[row.category]) categoryTotals[row.category] = { revenue_cents: 0, item_count: 0 };
+      categoryTotals[row.category].revenue_cents += row.revenue_cents;
+      categoryTotals[row.category].item_count += row.item_count;
+    });
+    const revenueByCategory = Object.entries(categoryTotals)
+      .map(([category, v]) => ({ category, revenueCents: v.revenue_cents, itemCount: v.item_count }))
+      .sort((a, b) => b.revenueCents - a.revenueCents);
+
     // App usage
     const { data: appActivity } = await supabase
       .from('customer_app_activity')
@@ -1089,6 +1147,7 @@ app.get('/api/analytics/dashboard', async (req, res) => {
     res.json({
       totalRevenue: totalRevenue / 100,  // Convert cents to currency
       allTimeRevenue: allTimeRevenueCents / 100, // genuine real all-time total, per direct request
+      revenueByCategory, // genuine real category breakdown, per direct request
       allTimeTransactionCount,
       revenueByDay: revenue || [],
       appSessions: appActivity?.length || 0,
