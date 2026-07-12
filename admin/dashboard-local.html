@@ -9960,6 +9960,19 @@ function triggerTableCardPrint() {
 // (which stays recognisable through firing) is what the AI focuses on. ──
 let _pmCurrentBookingCode = null;
 
+// Genuine, real admin-side "what's next" shortcut — a booking that's
+// just genuinely completed in Piece Matching naturally leads to
+// Labels next. Jumps tab, pre-fills the real booking code, and
+// auto-loads it, rather than making staff re-scan/retype what's
+// already known.
+function jumpToLabelsFor(bookingCode) {
+  goToTab('labels');
+  setTimeout(() => {
+    const input = document.getElementById('label-booking-scan-input');
+    if (input) { input.value = bookingCode; loadLabelBooking(); }
+  }, 150); // genuine short delay so the real tab content has actually rendered first
+}
+
 async function loadPieceMatchGroup() {
   const raw = document.getElementById('pm-booking-scan-input').value.trim();
   if (!raw) return;
@@ -9993,7 +10006,8 @@ async function loadPieceMatchGroup() {
     const progressEl = document.getElementById('pm-found-progress');
     if (progressEl) {
       const allFound = data.foundCount === data.totalCount;
-      progressEl.innerHTML = `<div style="font-size:12px;font-weight:700;color:${allFound ? '#2e7d32' : 'var(--gu-text)'};margin-bottom:10px;">${allFound ? '✓ All' : data.foundCount + ' of'} ${data.totalCount} pieces found${allFound ? ' — this booking is complete!' : ' so far'}</div>`;
+      progressEl.innerHTML = `<div style="font-size:12px;font-weight:700;color:${allFound ? '#2e7d32' : 'var(--gu-text)'};margin-bottom:10px;">${allFound ? '✓ All' : data.foundCount + ' of'} ${data.totalCount} pieces found${allFound ? ' — this booking is complete!' : ' so far'}</div>
+      ${allFound ? `<button onclick="jumpToLabelsFor('${bookingCode}')" style="width:100%;background:#2e7d32;color:white;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:10px;">🏷️ Print Labels for this booking →</button>` : ''}`;
     }
     grid.innerHTML = pieces.map(p => {
       const isFound = p.status === 'packed' || p.status === 'ready_for_pickup';

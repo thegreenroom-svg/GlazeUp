@@ -1547,6 +1547,7 @@
       <div id="mkt-browse-view" style="padding:16px;">
         <div style="font-size:12px; color:rgba(255,255,255,0.55); line-height:1.5; margin-bottom:14px;">Community designs you can use on your own pieces. Tap one to load it straight into Transfer Designer.</div>
         <div id="mkt-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;"></div>
+        <div id="mkt-cross-link-footer"></div>
       </div>
       <div id="mkt-sell-view" style="padding:16px; display:none;">
         <div style="font-size:12px; color:rgba(255,255,255,0.55); line-height:1.5; margin-bottom:16px;">Made something great in Transfer Designer? List it here so other customers can use your design on their pieces.</div>
@@ -1614,6 +1615,7 @@
         <div style="color:#fff; font-weight:700; font-size:14px; margin-bottom:10px;">Past visits</div>
         <div id="mb-past-list"></div>
       </div>
+      <div id="mb-cross-link-footer"></div>
     </div>
   </div>
 
@@ -3123,6 +3125,8 @@
       void screen.offsetWidth;
       screen.classList.add('open');
       loadMarketplace();
+      const footerEl = document.getElementById('mkt-cross-link-footer');
+      if (footerEl && !footerEl.innerHTML) footerEl.innerHTML = renderCrossLinkFooter('marketplace');
     }
     function closeMarketplace() {
       const screen = document.getElementById('marketplace-screen');
@@ -3691,6 +3695,7 @@
           <div style="padding:0 16px 32px;text-align:center;font-size:12px;color:rgba(255,255,255,0.3);line-height:1.6;">
             Ask a member of staff to redeem any rewards on your account.<br>Points and tier status update after each visit.
           </div>
+          ${renderCrossLinkFooter('loyalty')}
         `;
 
       } catch(e) {
@@ -4357,6 +4362,8 @@
       void screen.offsetWidth;
       screen.classList.add('open');
       loadMyBookings();
+      const footerEl = document.getElementById('mb-cross-link-footer');
+      if (footerEl && !footerEl.innerHTML) footerEl.innerHTML = renderCrossLinkFooter('myBookings');
     }
     function closeMyBookings() {
       const screen = document.getElementById('my-bookings-screen');
@@ -4976,7 +4983,6 @@
         { label: '📅 Book your next visit', fn: 'openNewBooking' },
       ],
       myBookings: [
-        { label: '📅 Book another visit', fn: 'openNewBooking' },
         { label: '💬 See the Community', fn: 'openCommunityFeed' },
       ],
       marketplace: [
@@ -4987,11 +4993,16 @@
     function renderCrossLinkFooter(key) {
       const links = CROSS_LINKS[key];
       if (!links || !links.length) return '';
+      // Genuine, real styling fix: every actual screen this footer has
+      // been added to (Colour Picker, Loyalty, My Bookings,
+      // Marketplace) uses a dark background — the original light-mode
+      // CSS variable fallbacks were honestly wrong everywhere, not
+      // just missed on one screen.
       return `
-        <div style="padding:14px 20px 20px;border-top:1px solid rgba(0,0,0,0.06);margin-top:10px;">
-          <div style="font-size:11px;font-weight:700;color:var(--gu-dust);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px;">You might also like</div>
+        <div style="padding:14px 16px 20px;border-top:1px solid rgba(255,255,255,0.1);margin-top:14px;">
+          <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px;">You might also like</div>
           <div style="display:flex;flex-direction:column;gap:8px;">
-            ${links.map(l => `<button onclick="${l.fn}()" style="text-align:left;background:var(--gu-bg,#f5f0ea);border:none;border-radius:10px;padding:11px 14px;font-size:13px;font-weight:600;color:var(--gu-text,#2B2724);cursor:pointer;">${l.label} →</button>`).join('')}
+            ${links.map(l => `<button onclick="${l.fn}()" style="text-align:left;background:rgba(255,255,255,0.08);border:none;border-radius:10px;padding:11px 14px;font-size:13px;font-weight:600;color:white;cursor:pointer;">${l.label} →</button>`).join('')}
           </div>
         </div>`;
     }
