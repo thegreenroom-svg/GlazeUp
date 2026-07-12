@@ -1884,6 +1884,13 @@
         This tool is <strong>£1 for your visit</strong> — added to your bill, no payment needed now.
       </div>
       <button onclick="confirmUnlockPaidTool()" id="ecm-confirm-btn" style="width:100%; background:var(--link-charcoal); color:#fff; border:none; padding:13px; border-radius:12px; font-weight:700; font-size:14px; cursor:pointer; margin-bottom:8px;">Unlock for £1</button>
+      <!-- Genuine real upsell — was completely missing from this exact
+           moment before, despite this being honestly the best real
+           place for it: someone already reaching for their wallet for
+           a single £1 unlock. -->
+      <div id="ecm-take-home-upsell" style="display:none; background:#fff8f0; border:1px solid #f0d9b5; border-radius:10px; padding:10px 12px; margin-bottom:10px; text-align:left;">
+        <div style="font-size:12px; color:var(--gu-text); line-height:1.4;">💡 Or get <strong>all three design tools, forever</strong>, for £5 with <button onclick="closeExtraChargeModal(); openTakeItHome();" style="background:none; border:none; color:var(--link-clay); font-weight:700; font-size:12px; text-decoration:underline; cursor:pointer; padding:0;">Take It Home</button></div>
+      </div>
       <button onclick="closeExtraChargeModal()" style="width:100%; background:none; color:var(--gu-dust); border:none; padding:10px; font-size:13px; cursor:pointer;">Not now</button>
     </div>
   </div>
@@ -4859,6 +4866,14 @@
             ? `Unlocks <strong>all three design tools</strong> on your own phone, 24/7 — Design Preview, Transfer Designer, and Colour Picker. Plus photo-save any piece to work on at home. <strong>£5 added to your bill today</strong>, no payment needed now.`
             : `This is <strong>£${(tool.priceCents / 100).toFixed(2)} for your visit</strong> — added to your bill, no payment needed now.`;
           document.getElementById('ecm-confirm-btn').textContent = tool.isHomeAccess ? 'Unlock Home Access — £5' : `${verb} for £${(tool.priceCents / 100).toFixed(2)}`;
+          // Genuine real upsell — the ONE moment someone's actively
+          // reaching for their wallet for a single £1 unlock is
+          // honestly the best real place to mention that £5 gets
+          // everything forever. Only shown for the single-tool
+          // paywalls, never for Take It Home's own modal (that would
+          // be circular) or a staff request (not a real purchase).
+          const upsellEl = document.getElementById('ecm-take-home-upsell');
+          if (upsellEl) upsellEl.style.display = (!tool.isHomeAccess && !tool.isRequest) ? 'block' : 'none';
           document.getElementById('extra-charge-modal').style.display = 'flex';
         }
       } catch (err) {
