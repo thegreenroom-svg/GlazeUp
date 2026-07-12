@@ -3160,6 +3160,45 @@
           Complete these three steps to unlock analytics and billing. You're already on the free trial!
         </p>
 
+        <!-- Genuine real top-level tile entry point for Setup, per
+             direct request — real content underneath every tile is
+             completely untouched, only the entry point changes. -->
+        <div id="setup-tile-menu" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:20px;">
+          <button onclick="showSetupSection('preview')" style="background:#2B2724;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">👀</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">Preview &amp; Testing</span>
+          </button>
+          <button onclick="showSetupSection('royalmail')" style="background:#2B2724;filter:brightness(0.92);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">📮</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">Royal Mail</span>
+          </button>
+          <button onclick="showSetupSection('cleosclub')" style="background:#2B2724;filter:brightness(0.84);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">🧸</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">Cleo's Club</span>
+          </button>
+          <button onclick="showSetupSection('addons')" style="background:#2B2724;filter:brightness(0.76);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">🚀</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">Add-Ons</span>
+          </button>
+          <button onclick="showSetupSection('squarebilling')" style="background:#2B2724;filter:brightness(0.68);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">🔌</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">Square &amp; Billing</span>
+          </button>
+          <button onclick="showSetupSection('aidesign')" style="background:#2B2724;filter:brightness(0.60);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">🤖</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">AI Design</span>
+          </button>
+          <button onclick="showSetupSection('brandingknowledge')" style="background:#2B2724;filter:brightness(0.52);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">🎨</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">Branding &amp; Knowledge</span>
+          </button>
+          <button onclick="showSetupSection('studio')" style="background:#2B2724;filter:brightness(0.44);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">🪑</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">Studio Config</span>
+          </button>
+        </div>
+
+        <div id="setup-section-preview" class="setup-section" style="display:none;">
         <!-- Genuine real dedicated test/preview page — the actual live
              customer app, opened fresh, no booking needed. Same real
              app real customers use, just for internal testing. -->
@@ -3178,7 +3217,9 @@
           <p>A permanent QR code that lets any customer start their own session on the spot — no booking needed. Print it once and leave it on tables, or by the door.</p>
           <button class="btn-connect" onclick="showStaticWalkinQR()">Show Walk-in QR</button>
         </div>
+        </div>
 
+        <div id="setup-section-royalmail" class="setup-section" style="display:none;">
         <!-- Royal Mail Click & Drop — for real postal labels on the
              Labels tab. Genuinely tests the connection AND whether
              this specific account can actually generate a printable
@@ -3204,7 +3245,9 @@
           </div>
           <div id="rm-setup-status" style="font-size:11px;color:var(--gu-dust);margin-top:10px;"></div>
         </div>
+        </div>
 
+        <div id="setup-section-cleosclub" class="setup-section" style="display:none;">
         <!-- Cleo's Club — kids' sticker loyalty add-on, a real paid
              upgrade to the monthly subscription. Studios trial it,
              enable it for their customer app, and pay extra for it.
@@ -3369,7 +3412,9 @@
             <button onclick="closeCleosClubPaywall()" style="width:100%;background:none;border:none;color:var(--gu-dust);padding:10px;font-size:13px;cursor:pointer;">Cancel</button>
           </div>
         </div>
+        </div>
 
+        <div id="setup-section-addons" class="setup-section" style="display:none;">
         <!-- Add-On Marketplace — real premium features, each genuinely
              already built in the app, honestly priced as paid
              upgrades. Same proven confirm-before-enable pattern as
@@ -3393,8 +3438,12 @@
             <button onclick="closeAddonPaywall()" style="width:100%;background:none;border:none;color:var(--gu-dust);padding:10px;font-size:13px;cursor:pointer;">Cancel</button>
           </div>
         </div>
+        </div>
 
-        <!-- Square Connection -->
+        <div id="setup-section-squarebilling" class="setup-section" style="display:none;">
+        <!-- Square Connection and Monthly Billing — genuinely
+             adjacent in the real document, grouped together under
+             one tile. -->
         <div class="setup-card">
           <h3>1. Connect Your Square Account</h3>
           <p>We read your bookings and transaction history to show you real-time analytics. Your Square account stays in your control — this is read-only.</p>
@@ -3426,7 +3475,9 @@
           </p>
           <button class="btn-connect" disabled style="opacity:0.5;cursor:not-allowed;">Billing setup not yet available — you're on the free trial</button>
         </div>
+        </div>
 
+        <div id="setup-section-aidesign" class="setup-section" style="display:none;">
         <!-- AI Design Generation -->
         <div class="setup-card">
           <h3>🤖 AI Design Generation</h3>
@@ -3462,7 +3513,9 @@
             <div id="ai-usage-summary" style="font-size:13px; color:var(--gu-text);">Loading…</div>
           </div>
         </div>
+        </div>
 
+        <div id="setup-section-brandingknowledge" class="setup-section" style="display:none;">
         <!-- Customisation -->
         <div class="setup-card">
           <h3>3. Customize Your Studio Branding</h3>
@@ -3493,7 +3546,9 @@
           </div>
           <div id="knowledge-list" style="display:flex;flex-direction:column;gap:6px;"></div>
         </div>
+        </div>
 
+        <div id="setup-section-studio" class="setup-section" style="display:none;">
         <!-- Table Configuration -->
         <div class="chart-container" style="margin-top:20px;">
           <h3 style="margin:0 0 6px;">🪑 Studio Tables</h3>
@@ -3548,6 +3603,7 @@
             <button onclick="saveKdsConfig()" style="background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;">Save KDS Settings</button>
             <span id="kds-save-status" style="font-size:12px;color:var(--gu-dust);margin-left:10px;"></span>
           </div>
+        </div>
         </div>
       </div>
 
@@ -12258,6 +12314,16 @@ function showProgressSection(section) {
   document.getElementById('progress-tile-menu').style.display = 'none';
   document.querySelectorAll('.progress-section').forEach(el => el.style.display = 'none');
   document.getElementById(`progress-section-${section}`).style.display = 'block';
+}
+
+// Genuine real tile-section switcher for Setup, per direct request,
+// same proven pattern. No individual real load call needed per
+// section — every real load already fires automatically on
+// tab-open, independent of which tile is tapped.
+function showSetupSection(section) {
+  document.getElementById('setup-tile-menu').style.display = 'none';
+  document.querySelectorAll('.setup-section').forEach(el => el.style.display = 'none');
+  document.getElementById(`setup-section-${section}`).style.display = 'block';
 }
 
 function showStaffSection(section) {
