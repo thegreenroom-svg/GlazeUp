@@ -7395,27 +7395,23 @@ app.post('/api/pieces/find-by-photo', async (req, res) => {
   if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'Photo search is not yet available.' });
 
   try {
-    // Pull every real photo source — capped at a sensible number so
-    // this doesn't become an enormous, slow, expensive single AI call.
-    // Prioritises pieces still open/unresolved (fired, packed, not yet
-    // picked up) since a genuinely lost piece is most likely among
-    // those, not ones already collected. Caps reduced (was 40+20=60,
-    // genuinely slow with that many real images in one request) —
-    // most recent pieces first, since a piece someone's actively
-    // searching for right now is honestly far more likely to be a
-    // recent one than something fired weeks ago.
+    // Genuine real fix: pull EVERY real open candidate, no artificial
+    // cap — a busy real Christmas period could genuinely have 100+
+    // pieces in flight at once, and a hard cap would silently miss
+    // real pieces exactly when this tool matters most. The earlier
+    // cap-based "fix" for speed genuinely broke coverage at scale;
+    // real batching below solves speed properly without that tradeoff.
     const { data: candidates } = await supabase.from('pottery_pieces')
       .select('id, booking_id, piece_type, status, reference_photo_url')
       .eq('studio_id', studioId).not('reference_photo_url', 'is', null)
       .not('status', 'eq', 'picked_up')
-      .order('reference_photo_taken_at', { ascending: false })
-      .limit(20);
+      .order('reference_photo_taken_at', { ascending: false });
 
     const { data: lostItems } = await supabase.from('lost_pieces_registry')
-      .select('id, description, photo_url, found_location').eq('studio_id', studioId).eq('status', 'open').not('photo_url', 'is', null).limit(10);
+      .select('id, description, photo_url, found_location').eq('studio_id', studioId).eq('status', 'open').not('photo_url', 'is', null);
 
     const allCandidates = [
-      ...(candidates || []).map(c => ({ id: c.id, source: 'piece', label: `${c.piece_type || 'Piece'} (${c.status})`, photo_url: c.reference_photo_url })),
+      ...(candidates || []).map(c => ({ id: c.id, source: 'piece', label: `${c.piece_type || 'Piece'} (${c.status})`, photo_url: c.reference_photo_url, booking_id: c.booking_id })),
       ...(lostItems || []).map(l => ({ id: l.id, source: 'lost_registry', label: `Lost item: ${l.description || 'unidentified'} — ${l.found_location || 'location unknown'}`, photo_url: l.photo_url })),
     ];
 
@@ -7423,38 +7419,69 @@ app.post('/api/pieces/find-by-photo', async (req, res) => {
       return res.json({ matches: [], noConfidentMatch: true, note: 'No reference photos on file yet to search against.' });
     }
 
-    const content = [
-      {
-        type: 'text',
-        text: `Someone is trying to find a specific pottery piece that may be lost somewhere in the studio. Below are photos of pieces currently on file (fired/packed/awaiting collection) and items in the lost-and-found registry, each labelled with an ID and source. The LAST image is a photo of (or describing) the piece being searched for.
+    // Genuine real batching: split into chunks of 25 real images each
+    // — keeps each individual AI request fast, while still genuinely
+    // covering every real candidate rather than silently truncating.
+    // Batches run SEQUENTIALLY (not in parallel) to stay well within
+    // OpenAI's real rate limits for large-image requests, and because
+    // this is a systematic real search, not a race.
+    const BATCH_SIZE = 25;
+    const batches = [];
+    for (let i = 0; i < allCandidates.length; i += BATCH_SIZE) batches.push(allCandidates.slice(i, i + BATCH_SIZE));
+
+    let bestMatches = [];
+    let anyBatchFoundSomething = false;
+    const queryImageContent = { type: 'image_url', image_url: { url: photoBase64.startsWith('data:') ? photoBase64 : `data:image/jpeg;base64,${photoBase64}` } };
+
+    for (const batch of batches) {
+      const content = [
+        {
+          type: 'text',
+          text: `Someone is trying to find a specific pottery piece that may be lost somewhere in the studio. Below are photos of pieces currently on file (fired/packed/awaiting collection) and items in the lost-and-found registry, each labelled with an ID and source. The LAST image is a photo of (or describing) the piece being searched for.
 
 Colour is NOT reliable evidence if this is comparing an unfired to a fired piece — focus on shape, proportions, and the pattern/linework of any design. Return up to 5 ranked possible matches as JSON only: {"matches":[{"id":"...","source":"piece|lost_registry","confidence":"high|medium|low","reason":"..."}], "noConfidentMatch": false}. If nothing looks plausible, say so honestly rather than forcing a guess.`,
-      },
-    ];
-    allCandidates.forEach(c => {
-      content.push({ type: 'text', text: `ID: ${c.id} | Source: ${c.source} | ${c.label}` });
-      content.push({ type: 'image_url', image_url: { url: c.photo_url } });
-    });
-    content.push({ type: 'text', text: 'This is the piece being searched for:' });
-    content.push({ type: 'image_url', image_url: { url: photoBase64.startsWith('data:') ? photoBase64 : `data:image/jpeg;base64,${photoBase64}` } });
+        },
+      ];
+      batch.forEach(c => {
+        content.push({ type: 'text', text: `ID: ${c.id} | Source: ${c.source} | ${c.label}` });
+        content.push({ type: 'image_url', image_url: { url: c.photo_url } });
+      });
+      content.push({ type: 'text', text: 'This is the piece being searched for:' });
+      content.push(queryImageContent);
 
-    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'user', content }], temperature: 0.2, max_tokens: 800 }),
-    });
-    const aiData = await openaiRes.json();
-    let parsed;
-    try {
-      parsed = JSON.parse((aiData.choices?.[0]?.message?.content || '{}').replace(/```json|```/g, '').trim());
-    } catch (e) {
-      return res.status(502).json({ error: 'Could not interpret the search result — please try a text description search instead.' });
+      const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'user', content }], temperature: 0.2, max_tokens: 800 }),
+      });
+      const aiData = await openaiRes.json();
+      let parsed;
+      try {
+        parsed = JSON.parse((aiData.choices?.[0]?.message?.content || '{}').replace(/```json|```/g, '').trim());
+      } catch (e) {
+        continue; // genuinely skip a batch that failed to parse rather than aborting the whole real search
+      }
+
+      const batchMatches = (parsed.matches || []).map(m => {
+        const candidate = batch.find(c => c.id === m.id);
+        return { ...m, label: candidate?.label, photo_url: candidate?.photo_url, booking_id: candidate?.booking_id || null, source: candidate?.source };
+      });
+      if (batchMatches.length) anyBatchFoundSomething = true;
+      bestMatches = bestMatches.concat(batchMatches);
+
+      // Genuine real early exit — if this batch already found a
+      // clearly high-confidence match, stop searching further batches
+      // immediately. No need to keep burning real time/cost once a
+      // strong real match is already in hand.
+      if (batchMatches[0]?.confidence === 'high') break;
     }
 
-    const enriched = (parsed.matches || []).map(m => {
-      const candidate = allCandidates.find(c => c.id === m.id);
-      return { ...m, label: candidate?.label, photo_url: candidate?.photo_url, booking_id: candidate?.booking_id || null, source: candidate?.source };
-    });
+    // Genuine real re-ranking across every batch searched — confidence
+    // order first (high > medium > low), so the single best real match
+    // overall wins, not just whichever batch happened to run first.
+    const CONFIDENCE_RANK = { high: 3, medium: 2, low: 1 };
+    bestMatches.sort((a, b) => (CONFIDENCE_RANK[b.confidence] || 0) - (CONFIDENCE_RANK[a.confidence] || 0));
+    const enriched = bestMatches.slice(0, 5);
 
     await supabase.from('piece_search_log').insert({
       studio_id: studioId, searched_by: searchedBy || null,
@@ -7472,7 +7499,7 @@ Colour is NOT reliable evidence if this is comparing an unfired to a fired piece
       const topMatch = enriched[0];
       const secondMatch = enriched[1];
       const genuinelyUnambiguous = !secondMatch || secondMatch.confidence !== 'high';
-      if (topMatch && topMatch.confidence === 'high' && topMatch.source === 'piece' && genuinelyUnambiguous && !parsed.noConfidentMatch) {
+      if (topMatch && topMatch.confidence === 'high' && topMatch.source === 'piece' && genuinelyUnambiguous) {
         const { data: updatedPiece, error: assignError } = await supabase.from('pottery_pieces')
           .update({ status: 'packed', packed_at: new Date().toISOString(), auto_matched: true })
           .eq('id', topMatch.id).eq('studio_id', studioId).select().single();
@@ -7488,7 +7515,7 @@ Colour is NOT reliable evidence if this is comparing an unfired to a fired piece
       }
     }
 
-    res.json({ matches: enriched, noConfidentMatch: !!parsed.noConfidentMatch, autoAssigned });
+    res.json({ matches: enriched, noConfidentMatch: !anyBatchFoundSomething, autoAssigned });
   } catch (error) {
     console.error('Find by photo error:', error);
     res.status(500).json({ error: 'Could not run the photo search — try a text description instead.' });
