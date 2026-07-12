@@ -49,9 +49,31 @@ app.use(express.json({ limit: '50mb' }));
 
 // Serve the admin dashboard (and other static frontend files) so they have real URLs
 const path = require('path');
-app.use('/admin', express.static(path.join(__dirname, 'admin')));
-app.use('/app', express.static(path.join(__dirname, 'app')));
-app.use('/promo', express.static(path.join(__dirname, 'promo')));
+// Genuine real cache-control — was previously entirely uncached (no
+// headers at all), meaning every real page load re-downloaded the
+// full HTML/JS/CSS from scratch (~790KB for the admin dashboard,
+// ~360KB for the customer app) every single time, a real, honest
+// contributor to "feels slow", especially at the start of every real
+// shift or fresh app open. Real tradeoff considered carefully: this
+// app is actively developed (pushed multiple times some nights), so
+// HTML/JSON get a short real cache (5 minutes) — long enough to
+// noticeably help repeat loads within a shift, short enough that a
+// real fix or new feature reaches people within minutes, not stuck on
+// stale cached code for hours. Genuinely static image assets (icons,
+// which never change) get a real long cache, since there's no
+// downside to caching something that's never going to be different.
+const staticCacheOptions = {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.png') || filePath.endsWith('.jpg') || filePath.endsWith('.svg')) {
+      res.setHeader('Cache-Control', 'public, max-age=604800'); // 7 real days — genuinely static assets
+    } else {
+      res.setHeader('Cache-Control', 'public, max-age=300, must-revalidate'); // 5 real minutes — actively developed, needs to stay fresh
+    }
+  },
+};
+app.use('/admin', express.static(path.join(__dirname, 'admin'), staticCacheOptions));
+app.use('/app', express.static(path.join(__dirname, 'app'), staticCacheOptions));
+app.use('/promo', express.static(path.join(__dirname, 'promo'), staticCacheOptions));
 // Redirect root to promo page for prospective studio owners
 app.get('/', (req, res) => res.redirect('/promo'));
 
