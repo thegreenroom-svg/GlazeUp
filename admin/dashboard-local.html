@@ -2392,74 +2392,13 @@
       <div id="dashboard-view" class="view">
         <h2 style="margin-top: 0;">Dashboard</h2>
 
-        <div class="info-banner" style="padding: 20px 22px;">
-          <strong style="font-size: 22px; font-family: var(--gu-font-display); margin-bottom: 8px;">Welcome to Link! 🎨</strong>
-          <span style="font-size: 15px;">You're on the free trial. Billing starts next month. No credit card required.</span>
-        </div>
-
-        <!-- Genuine Add-On discovery nudge — real business value in
-             surfacing this on the very first screen a studio sees,
-             since it was previously the 4th card down a long Setup
-             page and easy to miss entirely. Only shows add-ons this
-             studio genuinely hasn't enabled yet, pulled from the real
-             backend, not hardcoded. -->
-        <div id="dashboard-addon-nudge" style="display:none;background:linear-gradient(135deg,rgba(94,53,177,0.08),rgba(249,168,37,0.06));border:1.5px solid rgba(94,53,177,0.25);border-radius:14px;padding:16px 18px;margin-bottom:20px;cursor:pointer;" onclick="goToTab('setup')">
-          <div style="display:flex;align-items:center;gap:14px;">
-            <div style="font-size:28px;">🚀</div>
-            <div style="flex:1;">
-              <div style="font-size:14px;font-weight:800;color:var(--gu-text);">New: premium add-ons available</div>
-              <div id="dashboard-addon-nudge-text" style="font-size:12px;color:var(--gu-dust);margin-top:2px;">Cleo's Club, AI Piece Finder, and more — tap to see what's available</div>
-            </div>
-            <div style="font-size:16px;color:#5E35B1;">→</div>
-          </div>
-        </div>
-
-        <!-- Extra Charges tally — PROTOTYPE, for appraisal. Not real payment
-             processing yet: this is a running tally of paid-tool unlocks and
-             studio equipment charges (tablet/stylus) to add to bills at
-             checkout, until proper billing is wired up. -->
-        <div class="chart-container">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <h3 style="margin: 0;">💷 Extra Charges Today <span style="font-size: 11px; font-weight: 500; color: var(--gu-dust);">(prototype)</span></h3>
-            <button onclick="loadTodaysExtraCharges()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
-          </div>
-          <div style="font-size: 11px; color: var(--gu-dust); margin-bottom: 10px;">Paid app tools and studio equipment (tablet/stylus) used this visit — add these to the bill at checkout. Not charged automatically yet.</div>
-          <div id="extras-today-list">
-            <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
-          </div>
-        </div>
-
-        <!-- Loyalty Leaderboard -->
-        <div class="chart-container">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-            <h3 style="margin:0;">🏆 Loyal Customers</h3>
-            <div style="display:flex;gap:10px;align-items:center;">
-              <button onclick="openLoyaltyReportModal()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">📋 Full Report</button>
-              <button onclick="loadLoyaltyLeaderboard()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
-            </div>
-          </div>
-          <div style="font-size:11px;color:var(--gu-dust);margin-bottom:12px;">Your top customers by loyalty tier and points. Tier is awarded automatically based on visit count or total spend.</div>
-          <div id="loyalty-leaderboard-list"><div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">Loading…</div></div>
-        </div>
-
-        <!-- Device slots panel -->
-        <div class="chart-container">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-            <h3 style="margin:0;">📱 Active Devices</h3>
-            <button onclick="loadDevicePanel()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
-          </div>
-          <div style="font-size:11px;color:var(--gu-dust);margin-bottom:10px;">Devices currently using this dashboard. Your plan controls how many can be active at once. Release a device to free up a slot.</div>
-          <div id="device-panel-content">
-            <p style="color:var(--gu-dust);font-size:13px;padding:8px 0;">Loading…</p>
-          </div>
-        </div>
-
         <!-- Kiln Cafe Revenue — director-only (David/Jenny/Daisy), same
              access pattern as Platform Revenue. Shows this studio's own
              REAL revenue and app usage figures from Supabase — genuinely
              sensitive financial data that regular staff should not see
-             on the general dashboard they all land on. -->
-        <div id="kiln-cafe-revenue-section" style="display:none;">
+             on the general dashboard they all land on. Moved to the
+             genuine top of the page per direct request. -->
+        <div id="kiln-cafe-revenue-section" style="display:none;min-height:640px;">
           <div class="chart-container" style="border:1.5px solid rgba(184,121,70,0.3);background:linear-gradient(135deg,rgba(184,121,70,0.06),rgba(46,125,50,0.05));">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
               <h3 style="margin:0;">💷 The Kiln Cafe — Revenue <span style="font-size:11px;font-weight:500;color:var(--gu-dust);">(directors only)</span></h3>
@@ -2528,6 +2467,68 @@
           </div>
         </div>
         <!-- /kiln-cafe-revenue-section -->
+
+        <div class="info-banner" style="padding: 20px 22px;">
+          <strong style="font-size: 22px; font-family: var(--gu-font-display); margin-bottom: 8px;">Welcome to Link! 🎨</strong>
+          <span style="font-size: 15px;">You're on the free trial. Billing starts next month. No credit card required.</span>
+        </div>
+
+        <!-- Genuine Add-On discovery nudge — real business value in
+             surfacing this on the very first screen a studio sees,
+             since it was previously the 4th card down a long Setup
+             page and easy to miss entirely. Only shows add-ons this
+             studio genuinely hasn't enabled yet, pulled from the real
+             backend, not hardcoded. -->
+        <div id="dashboard-addon-nudge" style="display:none;background:linear-gradient(135deg,rgba(94,53,177,0.08),rgba(249,168,37,0.06));border:1.5px solid rgba(94,53,177,0.25);border-radius:14px;padding:16px 18px;margin-bottom:20px;cursor:pointer;" onclick="goToTab('setup')">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div style="font-size:28px;">🚀</div>
+            <div style="flex:1;">
+              <div style="font-size:14px;font-weight:800;color:var(--gu-text);">New: premium add-ons available</div>
+              <div id="dashboard-addon-nudge-text" style="font-size:12px;color:var(--gu-dust);margin-top:2px;">Cleo's Club, AI Piece Finder, and more — tap to see what's available</div>
+            </div>
+            <div style="font-size:16px;color:#5E35B1;">→</div>
+          </div>
+        </div>
+
+        <!-- Extra Charges tally — PROTOTYPE, for appraisal. Not real payment
+             processing yet: this is a running tally of paid-tool unlocks and
+             studio equipment charges (tablet/stylus) to add to bills at
+             checkout, until proper billing is wired up. -->
+        <div class="chart-container">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="margin: 0;">💷 Extra Charges Today <span style="font-size: 11px; font-weight: 500; color: var(--gu-dust);">(prototype)</span></h3>
+            <button onclick="loadTodaysExtraCharges()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
+          </div>
+          <div style="font-size: 11px; color: var(--gu-dust); margin-bottom: 10px;">Paid app tools and studio equipment (tablet/stylus) used this visit — add these to the bill at checkout. Not charged automatically yet.</div>
+          <div id="extras-today-list">
+            <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
+          </div>
+        </div>
+
+        <!-- Loyalty Leaderboard -->
+        <div class="chart-container">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <h3 style="margin:0;">🏆 Loyal Customers</h3>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <button onclick="openLoyaltyReportModal()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">📋 Full Report</button>
+              <button onclick="loadLoyaltyLeaderboard()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--gu-dust);margin-bottom:12px;">Your top customers by loyalty tier and points. Tier is awarded automatically based on visit count or total spend.</div>
+          <div id="loyalty-leaderboard-list"><div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">Loading…</div></div>
+        </div>
+
+        <!-- Device slots panel -->
+        <div class="chart-container">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <h3 style="margin:0;">📱 Active Devices</h3>
+            <button onclick="loadDevicePanel()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
+          </div>
+          <div style="font-size:11px;color:var(--gu-dust);margin-bottom:10px;">Devices currently using this dashboard. Your plan controls how many can be active at once. Release a device to free up a slot.</div>
+          <div id="device-panel-content">
+            <p style="color:var(--gu-dust);font-size:13px;padding:8px 0;">Loading…</p>
+          </div>
+        </div>
       </div>
 
       <!-- ═════════════════════════════════════════════ -->
