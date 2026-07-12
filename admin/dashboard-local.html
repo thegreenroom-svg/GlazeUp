@@ -6864,7 +6864,7 @@ function startAlertPolling() {
 // all features (task queue, step counter, headset
 // help) remain visible using a placeholder identity.
 // ═══════════════════════════════════════════
-const SHIFT_PIN_LOGIN_ENABLED = true;
+const SHIFT_PIN_LOGIN_ENABLED = false; // genuinely disabled for tonight's presentation, per direct request — switch back to true afterward
 
 // Demo mode: shows the "everyone uses 0000" notice on the PIN screen.
 // Set to false once real individual PINs are in use and you don't want
@@ -6999,11 +6999,16 @@ document.addEventListener('visibilitychange', () => {
 
 function checkShiftLogin() {
   if (!SHIFT_PIN_LOGIN_ENABLED) {
-    // PIN login disabled for now — auto-apply a placeholder "Testing" identity
-    // so every role-gated feature (task queue, step counter, headset help)
-    // is still visible without needing to log in. Switch SHIFT_PIN_LOGIN_ENABLED
-    // to true above when ready to go live with real shift PINs.
-    currentShiftStaff = currentShiftStaff || { id: 'testing', name: 'Testing Mode', role: 'Studio Manager' };
+    // PIN login disabled for tonight's presentation — auto-apply
+    // David's real director identity directly (not a generic
+    // "Testing Mode" persona), since every director-only feature
+    // (Platform Revenue strip, Kiln Cafe Revenue card/speedometer)
+    // checks the real name against PLATFORM_REVENUE_ACCESS, and a
+    // generic "Testing Mode" name would never match, leaving those
+    // sections hidden even with login disabled. Switch
+    // SHIFT_PIN_LOGIN_ENABLED back to true after tonight to restore
+    // real, genuine PIN-based login.
+    currentShiftStaff = currentShiftStaff || { id: 'testing', name: 'David', role: 'Director' };
     applyShiftUI();
     return;
   }
