@@ -29,8 +29,7 @@ SELECT
   now() - ((100 + row_number() OVER (ORDER BY id)) || ' days')::interval
 FROM studios
 WHERE is_demo = true AND network_opted_in = true
-  AND id NOT IN (SELECT studio_id FROM stripe_subscriptions WHERE studio_id IS NOT NULL)
-  AND ('demo_sub_' || substr(id::text, 1, 8)) NOT IN (SELECT stripe_subscription_id FROM stripe_subscriptions WHERE stripe_subscription_id IS NOT NULL);
+ON CONFLICT (stripe_subscription_id) DO NOTHING;
 
 -- Real, genuine AI generation usage — spread across the last 12 real
 -- months, ~2-6 generations per demo studio per month, honest
