@@ -3198,7 +3198,9 @@
             </div>
             <div id="network-offers-panel" style="display:none;margin-top:12px;">
               <input type="text" id="network-offer-title" placeholder="e.g. £5 off any visit this month" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">
-              <button onclick="addNetworkOffer()" style="width:100%;background:#5E35B1;color:white;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;">Publish to the network</button>
+              <button onclick="addNetworkOffer()" style="width:100%;background:#5E35B1;color:white;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:12px;">Publish to the network</button>
+              <div style="font-size:11px;font-weight:700;color:var(--gu-dust);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Other studios in the network</div>
+              <div id="network-directory-list"><div style="padding:10px;text-align:center;color:var(--gu-dust);font-size:12px;">Loading…</div></div>
             </div>
           </div>
 
@@ -11052,7 +11054,33 @@ async function loadNetworkStatus() {
     document.getElementById('network-status-label').textContent = data.optedIn
       ? 'Part of the kilnLINK Network' : 'Not part of the network yet';
     document.getElementById('network-offers-panel').style.display = data.optedIn ? 'block' : 'none';
+    if (data.optedIn) loadNetworkDirectory();
   } catch (e) { /* silent — non-critical on load */ }
+}
+
+async function loadNetworkDirectory() {
+  const listEl = document.getElementById('network-directory-list');
+  if (!listEl) return;
+  try {
+    const res = await fetch(`${API_URL}/api/network/studios?studioId=${studioId}`);
+    const data = await res.json();
+    const studios = data.studios || [];
+    const offers = data.offers || [];
+    if (!studios.length) {
+      listEl.innerHTML = '<div style="padding:10px;text-align:center;color:var(--gu-dust);font-size:12px;">No other studios have opted in yet.</div>';
+      return;
+    }
+    listEl.innerHTML = studios.map(s => {
+      const studioOffers = offers.filter(o => o.studio_id === s.id);
+      return `
+      <div style="padding:9px 12px;background:var(--gu-bg);border-radius:8px;margin-bottom:6px;">
+        <div style="font-size:12.5px;font-weight:700;color:var(--gu-text);">${s.displayName}</div>
+        ${studioOffers.map(o => `<div style="font-size:11px;color:#5E35B1;margin-top:2px;">🎁 ${o.title}</div>`).join('')}
+      </div>`;
+    }).join('');
+  } catch (e) {
+    listEl.innerHTML = '<div style="padding:10px;text-align:center;color:var(--gu-dust);font-size:12px;">Could not load — try again.</div>';
+  }
 }
 
 function updateNetworkToggleVisual(optedIn) {
