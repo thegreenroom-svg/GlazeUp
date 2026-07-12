@@ -1587,6 +1587,7 @@
     </div>
     <div id="cp-browse-view" style="flex:1; overflow-y:auto; padding:0 16px 20px;">
       <div id="cp-swatch-grid" style="display:grid; grid-template-columns:repeat(3,1fr); gap:12px;"></div>
+      <div id="cp-cross-link-footer"></div>
     </div>
     <div id="cp-palette-view" style="display:none; flex:1; overflow-y:auto; padding:0 16px 20px;">
       <div id="cp-palette-list"></div>
@@ -3451,6 +3452,8 @@
       screen.classList.add('open');
       renderColourSwatches();
       setMyPalette(getMyPalette());
+      const footerEl = document.getElementById('cp-cross-link-footer');
+      if (footerEl && !footerEl.innerHTML) footerEl.innerHTML = renderCrossLinkFooter('colourPicker');
     }
     function closeColourPicker() {
       const screen = document.getElementById('colour-picker-screen');
@@ -4948,6 +4951,51 @@
     // after real evidence (2 real paid unlocks) that Take It Home
     // would genuinely save this customer money. Dismissible, never
     // repeats this visit.
+    // ── Genuine, real cross-link footer — one shared, consistent
+    // pattern instead of hand-building a different one per screen.
+    // Each real screen defines its own genuinely related destinations
+    // (not random/generic), rendered the same honest way everywhere.
+    // Real design intent: someone in Colour Picker should see Design
+    // Preview and Transfer Designer suggested, not "here's everything
+    // else in the app" — genuine logical connection, not a sitemap dump.
+    const CROSS_LINKS = {
+      colourPicker: [
+        { label: '🎨 Try it in Design Preview', fn: 'openDesignPreviewGated' },
+        { label: '✨ Design a transfer', fn: 'openTransferDesignerGated' },
+      ],
+      designPreview: [
+        { label: '🎨 Browse colours', fn: 'openColourPicker' },
+        { label: '🏠 Take It Home — unlock everything', fn: 'openTakeItHome' },
+      ],
+      transferDesigner: [
+        { label: '🛍️ Browse the Marketplace', fn: 'openMarketplace' },
+        { label: '🏠 Take It Home — unlock everything', fn: 'openTakeItHome' },
+      ],
+      loyalty: [
+        { label: '🌍 See Club Pages', fn: 'openCommunityFeedOnClubTab' },
+        { label: '📅 Book your next visit', fn: 'openNewBooking' },
+      ],
+      myBookings: [
+        { label: '📅 Book another visit', fn: 'openNewBooking' },
+        { label: '💬 See the Community', fn: 'openCommunityFeed' },
+      ],
+      marketplace: [
+        { label: '✨ Make your own design', fn: 'openTransferDesignerGated' },
+      ],
+    };
+
+    function renderCrossLinkFooter(key) {
+      const links = CROSS_LINKS[key];
+      if (!links || !links.length) return '';
+      return `
+        <div style="padding:14px 20px 20px;border-top:1px solid rgba(0,0,0,0.06);margin-top:10px;">
+          <div style="font-size:11px;font-weight:700;color:var(--gu-dust);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px;">You might also like</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            ${links.map(l => `<button onclick="${l.fn}()" style="text-align:left;background:var(--gu-bg,#f5f0ea);border:none;border-radius:10px;padding:11px 14px;font-size:13px;font-weight:600;color:var(--gu-text,#2B2724);cursor:pointer;">${l.label} →</button>`).join('')}
+          </div>
+        </div>`;
+    }
+
     function showTakeHomeEarnedNudge() {
       const el = document.createElement('div');
       el.id = 'take-home-earned-nudge';
