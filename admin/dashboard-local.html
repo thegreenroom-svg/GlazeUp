@@ -1445,7 +1445,28 @@
      specifically WITHIN that photo for the piece from Step 1, and the
      honest reasoning/what-the-AI-actually-saw is shown directly on
      screen, not hidden behind a small result panel. ═══════════════ -->
-<div id="find-piece-step1" style="display:none;position:fixed;inset:0;z-index:9950;background:#1a1714;flex-direction:column;">
+<!-- Genuine real Find Booking search — searches by customer name,
+     booking code, or table number, across a real 90-day window (not
+     just today), so staff can look up a recent booking regardless of
+     which day it was on. -->
+<div id="booking-search-modal" style="display:none;position:fixed;inset:0;z-index:9950;background:#1a1714;flex-direction:column;">
+  <div style="background:var(--gu-primary);color:white;padding:20px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+    <div>
+      <div style="font-size:18px;font-weight:800;">🔍 Find Booking</div>
+      <div style="font-size:13px;opacity:0.9;">Search by name, booking code, or table</div>
+    </div>
+    <button onclick="closeBookingSearch()" style="background:rgba(255,255,255,0.2);border:none;color:white;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;">✕</button>
+  </div>
+  <div style="padding:20px;">
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <input type="text" id="booking-search-input" placeholder="e.g. Sarah, ABC123, Table 4" style="flex:1;padding:14px;border:1px solid #3d3833;border-radius:12px;font-size:14px;box-sizing:border-box;background:#2B2724;color:white;" onkeydown="if(event.key==='Enter') runBookingSearch()">
+      <button onclick="runBookingSearch()" style="background:var(--gu-primary);color:white;border:none;border-radius:12px;padding:0 20px;font-size:14px;font-weight:700;cursor:pointer;">Search</button>
+    </div>
+    <div id="booking-search-results"></div>
+  </div>
+</div>
+
+
   <div style="background:#c0392b;color:white;padding:20px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
     <div>
       <div style="font-size:18px;font-weight:800;">🔍 Find My Piece</div>
@@ -2432,7 +2453,10 @@
         <div class="chart-container" style="margin-bottom: 20px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
             <h3 style="margin:0;">📋 Today's Bookings</h3>
-            <button onclick="loadBookingsOverview()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">🔄 Refresh</button>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <button onclick="openBookingSearch()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">🔍 Find Booking</button>
+              <button onclick="loadBookingsOverview()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">🔄 Refresh</button>
+            </div>
           </div>
           <div id="bookings-overview-stats" style="display:flex;gap:16px;margin-bottom:14px;font-size:12px;color:var(--gu-dust);">
             <span>Loading…</span>
@@ -12084,6 +12108,67 @@ let _packingSelectedPieceIds = [];
 // ── Find My Piece — the panic button, reachable from anywhere ──
 // ── Find My Piece — genuine two-screen flow ──
 let _fp1TargetPhotoBase64 = null;
+
+// ── Genuine real Find Booking search ──
+function openBookingSearch() {
+  document.getElementById('booking-search-modal').style.display = 'flex';
+  document.getElementById('booking-search-input').value = '';
+  document.getElementById('booking-search-results').innerHTML = '';
+  setTimeout(() => document.getElementById('booking-search-input')?.focus(), 100);
+}
+
+function closeBookingSearch() {
+  document.getElementById('booking-search-modal').style.display = 'none';
+}
+
+async function runBookingSearch() {
+  const query = document.getElementById('booking-search-input').value.trim();
+  const resultsEl = document.getElementById('booking-search-results');
+  if (query.length < 2) { resultsEl.innerHTML = '<div style="color:#8a8175;font-size:12px;text-align:center;padding:20px;">Type at least 2 characters to search.</div>'; return; }
+
+  resultsEl.innerHTML = '<div style="color:#8a8175;font-size:13px;text-align:center;padding:20px;">Searching…</div>';
+  try {
+    const res = await fetch(`${API_URL}/api/bookings/search?studioId=${studioId}&q=${encodeURIComponent(query)}`);
+    const data = await res.json();
+    if (!res.ok) { resultsEl.innerHTML = `<div style="color:#ff8a80;font-size:13px;text-align:center;padding:20px;">${data.error || 'Could not search.'}</div>`; return; }
+
+    const bookings = data.bookings || [];
+    if (!bookings.length) {
+      resultsEl.innerHTML = '<div style="color:#8a8175;font-size:13px;text-align:center;padding:20px;">No real bookings found matching that — try a different name, code, or table.</div>';
+      return;
+    }
+
+    resultsEl.innerHTML = bookings.map(b => {
+      const sessionDate = b.session_start ? new Date(b.session_start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'No date';
+      const sessionTime = b.session_start ? new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
+      return `
+      <div style="background:#2B2724;border-radius:12px;padding:14px;margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px;">
+          <div style="font-size:14px;font-weight:700;color:white;">${b.customer_name || 'Unknown'}</div>
+          <div style="font-size:11px;font-weight:700;color:${b.status === 'ready_for_pickup' ? '#4caf50' : '#F9A825'};text-transform:uppercase;">${(b.status || 'active').replace(/_/g,' ')}</div>
+        </div>
+        <div style="font-size:12px;color:#cfc7bd;margin-bottom:2px;">📅 ${sessionDate}${sessionTime ? ' at ' + sessionTime : ''}${b.table_number ? ` · Table ${b.table_number}` : ''}</div>
+        ${b.customer_email ? `<div style="font-size:12px;color:#cfc7bd;margin-bottom:2px;">✉️ ${b.customer_email}</div>` : ''}
+        <div style="font-size:12px;color:#cfc7bd;margin-bottom:10px;">Booking code: <strong style="color:white;">${b.booking_code}</strong></div>
+        <button onclick="copyBookingCode('${b.booking_code}')" style="width:100%;background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;">Copy booking code</button>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    resultsEl.innerHTML = '<div style="color:#ff8a80;font-size:13px;text-align:center;padding:20px;">Could not search — try again.</div>';
+  }
+}
+
+// Genuine, simple real utility — copies the booking code so staff can
+// paste it straight into Piece Matching, Labels, or wherever they
+// actually need it next, since there's no single dedicated "booking
+// detail" screen in the app to deep-link into.
+function copyBookingCode(code) {
+  navigator.clipboard.writeText(code).then(() => {
+    alert(`Copied: ${code}`);
+  }).catch(() => {
+    alert(`Booking code: ${code}`);
+  });
+}
 
 function openFindMyPiece() {
   // Reset everything to a clean state each time it's opened

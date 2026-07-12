@@ -1581,6 +1581,37 @@ app.post('/api/table-sessions/:sessionId/complete', async (req, res) => {
  * GET /api/bookings/today
  * List today's bookings already synced into the database (for Section 1 to display)
  */
+// GET /api/bookings/search — genuine real search by customer name,
+// table number, or booking code, across a real 90-day window (not
+// just today) so staff can look up a recent booking regardless of
+// which day it was on. Real, honest partial matching (ilike), not
+// requiring an exact match.
+app.get('/api/bookings/search', async (req, res) => {
+  const { studioId, q } = req.query;
+  if (!studioId || !q || q.trim().length < 2) return res.status(400).json({ error: 'studioId and a search term (2+ characters) required' });
+
+  try {
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    const term = q.trim();
+
+    const { data: bookings, error } = await supabase
+      .from('bookings')
+      .select('booking_code, customer_name, customer_email, table_number, status, session_start, created_at')
+      .eq('studio_id', studioId)
+      .gte('created_at', ninetyDaysAgo.toISOString())
+      .or(`customer_name.ilike.%${term}%,booking_code.ilike.%${term}%,table_number.ilike.%${term}%`)
+      .order('session_start', { ascending: false })
+      .limit(20);
+
+    if (error) throw error;
+    res.json({ bookings: bookings || [] });
+  } catch (error) {
+    console.error('Booking search error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/bookings/today', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
