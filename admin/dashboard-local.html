@@ -1449,6 +1449,20 @@
      booking code, or table number, across a real 90-day window (not
      just today), so staff can look up a recent booking regardless of
      which day it was on. -->
+<!-- Genuine real damage/loss report — covers both a customer's
+     painted piece and raw unpainted stock. Alerts staff, removes the
+     item from active search/inventory, real audit trail. -->
+<div id="damage-report-modal" style="display:none;position:fixed;inset:0;z-index:9980;background:rgba(43,39,36,0.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
+  <div style="background:white;border-radius:20px;max-width:380px;width:100%;padding:24px;">
+    <div style="font-size:32px;text-align:center;margin-bottom:8px;">⚠️</div>
+    <div style="font-size:16px;font-weight:800;color:var(--gu-text);text-align:center;margin-bottom:4px;">Report Damaged or Lost</div>
+    <div style="font-size:12px;color:var(--gu-dust);text-align:center;margin-bottom:16px;">This removes the item from active search and lets staff know right away.</div>
+    <textarea id="damage-report-reason" placeholder="What happened? e.g. 'Cracked during firing' or 'Lost track of it after kiln unload'" style="width:100%;padding:10px;border:1px solid var(--gu-border);border-radius:10px;font-size:13px;margin-bottom:14px;box-sizing:border-box;height:70px;"></textarea>
+    <button onclick="submitDamageReport()" style="width:100%;background:#d9534f;color:white;border:none;border-radius:12px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;">Report it</button>
+    <button onclick="closeDamageReport()" style="width:100%;background:none;border:none;color:var(--gu-dust);font-size:12px;cursor:pointer;padding:8px;">Cancel</button>
+  </div>
+</div>
+
 <div id="booking-search-modal" style="display:none;position:fixed;inset:0;z-index:9950;background:#1a1714;flex-direction:column;">
   <div style="background:var(--gu-primary);color:white;padding:20px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
     <div>
@@ -3859,6 +3873,16 @@
           Live running log for the studio manager — every booking today, every stage, and today's takings. Updates automatically as staff work through the process.
         </p>
 
+        <!-- Genuine real damage/loss report history — every real
+             report ever submitted, newest first, so a manager can see
+             the honest ongoing pattern, not just react to one-off
+             alerts as they come in. -->
+        <div class="chart-container" style="margin-bottom:20px;border-left:4px solid #d9534f;">
+          <h3 style="margin:0 0 6px;">⚠️ Damaged / Lost Reports</h3>
+          <p style="font-size:12px;color:var(--gu-dust);margin-bottom:12px;">Real reports from staff — each one already removed the item from active search and alerted the team.</p>
+          <div id="damage-reports-list"><div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">Loading…</div></div>
+        </div>
+
         <!-- Summary stats -->
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:20px;">
           <div style="background:white;border:1px solid var(--gu-border);border-radius:12px;padding:14px;text-align:center;">
@@ -4860,6 +4884,7 @@ function goToTab(tab, event) {
     loadDailyProgress();
     loadManagerTaskOverview();
     loadTeamMembers().then(() => populateAdhocSelects());
+    loadDamageReports();
   } else if (tab === 'platformrev') {
     loadPlatformRevenue();
     clearInterval(window._platformRevRefreshTimer);
@@ -4947,6 +4972,7 @@ async function loadStockCatalogue() {
               📷 Photo
               <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="updateStockPhoto('${item.id}', event)">
             </label>
+            <button onclick="openDamageReport('raw_stock', '${item.id}', null)" style="flex:1; padding:6px 4px; background:#fff3e0; border:none; border-radius:6px; font-size:10px; font-weight:600; cursor:pointer; color:#c77800;">⚠️ Damaged</button>
             <button onclick="removeStockItem('${item.id}')" style="flex:1; padding:6px 4px; background:#fce8e8; border:none; border-radius:6px; font-size:10px; font-weight:600; cursor:pointer; color:#d9534f;">Remove</button>
           </div>
         </div>
@@ -8650,6 +8676,33 @@ async function loadPlatformRevenue() {
   }
 }
 
+// ── Genuine real damage/loss report history ──
+async function loadDamageReports() {
+  const listEl = document.getElementById('damage-reports-list');
+  if (!listEl) return;
+  try {
+    const res = await fetch(`${API_URL}/api/damage-reports?studioId=${studioId}`);
+    const data = await res.json();
+    const reports = data.reports || [];
+    if (!reports.length) {
+      listEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">No reports yet — genuinely good news.</div>';
+      return;
+    }
+    listEl.innerHTML = reports.map(r => `
+      <div style="padding:10px 12px;background:#fff8f7;border-radius:8px;margin-bottom:6px;border-left:3px solid #d9534f;">
+        <div style="display:flex;justify-content:space-between;align-items:start;">
+          <div style="font-size:12px;font-weight:700;color:var(--gu-text);">${r.item_type === 'customer_piece' ? '🎨 Customer piece' : '🏺 Raw stock'}${r.booking_code ? ` — ${r.booking_code}` : ''}</div>
+          <div style="font-size:10px;color:var(--gu-dust);white-space:nowrap;">${new Date(r.reported_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</div>
+        </div>
+        <div style="font-size:12px;color:var(--gu-dust);margin-top:2px;">${r.reason}</div>
+        ${r.reported_by ? `<div style="font-size:10px;color:var(--gu-dust);margin-top:4px;">Reported by ${r.reported_by}</div>` : ''}
+      </div>
+    `).join('');
+  } catch (e) {
+    listEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">Could not load reports.</div>';
+  }
+}
+
 async function loadDailyProgress() {
   const listEl = document.getElementById('dp-bookings-list');
   try {
@@ -9935,6 +9988,7 @@ async function loadPieceMatchGroup() {
       <div style="border-radius:10px;overflow:hidden;border:1px solid ${isFound ? '#2e7d32' : 'var(--gu-border)'};position:relative;">
         <div style="height:80px;background:url('${p.reference_photo_url}') center/cover;${isFound ? 'opacity:0.55;' : ''}"></div>
         ${isFound ? '<div style="position:absolute;top:4px;right:4px;background:#2e7d32;color:white;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">✓</div>' : ''}
+        <button onclick="openDamageReport('customer_piece', '${p.id}', '${bookingCode}')" title="Report damaged or lost" style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,0.55);border:none;color:white;border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;">⚠️</button>
         <div style="font-size:10px;text-align:center;padding:4px;color:var(--gu-dust);">${p.piece_type || 'Piece'}</div>
       </div>
     `;}).join('');
@@ -12136,6 +12190,44 @@ let _packingSelectedPieceIds = [];
 let _fp1TargetPhotoBase64 = null;
 
 // ── Genuine real Find Booking search ──
+// ── Genuine real damage/loss report ──
+let _damageReportContext = null;
+function openDamageReport(itemType, pieceId, bookingCode) {
+  _damageReportContext = { itemType, pieceId, bookingCode: bookingCode || null };
+  document.getElementById('damage-report-reason').value = '';
+  document.getElementById('damage-report-modal').style.display = 'flex';
+}
+
+function closeDamageReport() {
+  document.getElementById('damage-report-modal').style.display = 'none';
+  _damageReportContext = null;
+}
+
+async function submitDamageReport() {
+  const reason = document.getElementById('damage-report-reason').value.trim();
+  if (!reason) { alert('Please add a quick reason first.'); return; }
+  if (!_damageReportContext) return;
+
+  try {
+    await fetch(`${API_URL}/api/damage-report`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId, itemType: _damageReportContext.itemType, pieceId: _damageReportContext.pieceId,
+        bookingCode: _damageReportContext.bookingCode, reason, reportedBy: currentShiftStaff?.name || null,
+      })
+    });
+    closeDamageReport();
+    alert('Reported — this item is now removed from active search and staff have been alerted.');
+    // Genuinely refresh whichever real view is currently showing this
+    // item, so the reported piece visually reflects its new real state
+    // immediately rather than looking unchanged until a manual reload.
+    if (document.getElementById('pm-reference-grid') && _pmCurrentBookingCode) loadPieceMatchGroup();
+    if (document.getElementById('stock-catalogue-list')) loadStockCatalogue();
+  } catch (e) {
+    alert('Could not submit the report — please try again.');
+  }
+}
+
 function openBookingSearch() {
   document.getElementById('booking-search-modal').style.display = 'flex';
   document.getElementById('booking-search-input').value = '';

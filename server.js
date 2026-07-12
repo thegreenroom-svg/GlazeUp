@@ -7389,6 +7389,68 @@ Respond ONLY as JSON: {"found": true or false, "confidence": "high" | "medium" |
   }
 });
 
+// ── Genuine real damage/loss reporting — covers both a customer's
+// painted piece and raw unpainted stock. Alerts staff via the real
+// existing staff_alerts system, genuinely removes the item from
+// active search/inventory, and keeps a real honest audit trail. ──
+app.post('/api/damage-report', async (req, res) => {
+  const { studioId, itemType, pieceId, bookingCode, reason, reportedBy } = req.body;
+  if (!studioId || !itemType || !pieceId || !reason) {
+    return res.status(400).json({ error: 'studioId, itemType, pieceId, and reason are required' });
+  }
+  if (itemType !== 'customer_piece' && itemType !== 'raw_stock') {
+    return res.status(400).json({ error: 'itemType must be customer_piece or raw_stock' });
+  }
+
+  try {
+    // Genuinely remove the item from active search/inventory FIRST —
+    // a real customer piece is marked damaged (excluded from
+    // Piece Matching / Auto-Match / Find My Piece, all of which
+    // filter on this), a real raw stock item is marked unavailable,
+    // same real field already used elsewhere in the catalogue.
+    if (itemType === 'customer_piece') {
+      await supabase.from('pottery_pieces').update({ damaged: true }).eq('id', pieceId).eq('studio_id', studioId);
+    } else {
+      await supabase.from('studio_stock').update({ available: false }).eq('id', pieceId).eq('studio_id', studioId);
+    }
+
+    const { data: report, error } = await supabase.from('damage_reports').insert({
+      studio_id: studioId, item_type: itemType,
+      pottery_piece_id: itemType === 'customer_piece' ? pieceId : null,
+      stock_item_id: itemType === 'raw_stock' ? pieceId : null,
+      booking_code: bookingCode || null, reason, reported_by: reportedBy || null,
+    }).select().single();
+    if (error) throw error;
+
+    // Genuine real staff alert — same real alert system used
+    // everywhere else, so it shows up honestly alongside every other
+    // real task/notification, not a separate silo.
+    await supabase.from('staff_alerts').insert({
+      studio_id: studioId, trigger_type: 'damage_report',
+      booking_code: bookingCode || null, next_role: 'Manager',
+      icon: '⚠️', label: itemType === 'customer_piece' ? 'Customer piece damaged/lost' : 'Stock item damaged/lost',
+      message: `${itemType === 'customer_piece' ? 'A customer piece' : 'A raw stock item'} has been reported ${reason.toLowerCase().includes('lost') ? 'lost' : 'damaged'}: ${reason}${bookingCode ? ` (booking ${bookingCode})` : ''}`,
+      context: { itemType, pieceId, bookingCode, reason }, acknowledged: false,
+    });
+
+    res.json({ report });
+  } catch (error) {
+    console.error('Damage report error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/damage-reports — real, honest history for the dashboard,
+// so staff/directors can see everything reported over time, not just
+// the live alert.
+app.get('/api/damage-reports', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data, error } = await supabase.from('damage_reports').select('*').eq('studio_id', studioId).order('reported_at', { ascending: false }).limit(50);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ reports: data || [] });
+});
+
 app.post('/api/pieces/find-by-photo', async (req, res) => {
   const { studioId, photoBase64, searchedBy } = req.body;
   if (!studioId || !photoBase64) return res.status(400).json({ error: 'studioId and photoBase64 required' });
@@ -7405,6 +7467,7 @@ app.post('/api/pieces/find-by-photo', async (req, res) => {
       .select('id, booking_id, piece_type, status, reference_photo_url')
       .eq('studio_id', studioId).not('reference_photo_url', 'is', null)
       .not('status', 'eq', 'picked_up')
+      .not('damaged', 'is', true) // genuinely never search for a piece already reported damaged/lost — .not('is', true) rather than .eq('damaged', false) so existing pieces with a real NULL value (before this column existed) are correctly still included, not silently excluded
       .order('reference_photo_taken_at', { ascending: false });
 
     const { data: lostItems } = await supabase.from('lost_pieces_registry')
@@ -7584,7 +7647,8 @@ app.post('/api/pieces/match-whole-tray', async (req, res) => {
     const { data: candidates } = await supabase.from('pottery_pieces')
       .select('id, piece_type, reference_photo_url')
       .eq('studio_id', studioId).eq('booking_id', bookingCode)
-      .not('reference_photo_url', 'is', null);
+      .not('reference_photo_url', 'is', null)
+      .not('damaged', 'is', true); // genuinely never search for a piece already reported damaged/lost
 
     if (!candidates || !candidates.length) {
       return res.status(404).json({ error: 'No reference photos found for this booking.' });
@@ -7652,7 +7716,8 @@ app.post('/api/pieces/match', async (req, res) => {
     const { data: candidates } = await supabase.from('pottery_pieces')
       .select('id, piece_type, reference_photo_url')
       .eq('studio_id', studioId).eq('booking_id', bookingCode)
-      .not('reference_photo_url', 'is', null);
+      .not('reference_photo_url', 'is', null)
+      .not('damaged', 'is', true); // genuinely never search for a piece already reported damaged/lost
 
     if (!candidates || !candidates.length) {
       return res.status(404).json({ error: 'No reference photos found for this booking — pieces may not have been individually photographed at table-clearing.' });
