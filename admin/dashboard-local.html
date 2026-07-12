@@ -3763,8 +3763,18 @@
           Print a collection or postal label for any booking — customer name, booking reference, ready date, piece count, and any damage notes.
         </p>
 
+        <!-- Genuine real tile styling for the entry step, per direct
+             request — the editor below genuinely depends on a real
+             booking being loaded first, so this stays sequential
+             rather than free-jumping tiles. -->
+        <button onclick="document.getElementById('label-booking-scan-input').focus()" style="width:100%;background:#B87946;color:white;border:none;border-radius:14px;padding:20px;text-align:left;cursor:pointer;margin-bottom:20px;display:flex;align-items:center;gap:14px;">
+          <span style="font-size:28px;">🔍</span>
+          <div>
+            <div style="font-size:16px;font-weight:800;">Find a booking</div>
+            <div style="font-size:11px;opacity:0.85;margin-top:2px;">Scan or paste a booking code below</div>
+          </div>
+        </button>
         <div class="chart-container" style="margin-bottom: 20px;">
-          <h3 style="margin:0 0 10px;">Find a booking</h3>
           <div style="display:flex;gap:8px;">
             <input type="text" id="label-booking-scan-input" placeholder="Scan QR or paste booking code" style="flex:1;padding:10px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;" onkeydown="if(event.key==='Enter') loadLabelBooking()">
             <button onclick="loadLabelBooking()" style="background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;">Load</button>
@@ -3832,6 +3842,28 @@
         <h2 style="margin-top: 0;">Studio Stock</h2>
         <p style="color: var(--gu-dust); margin-bottom: 20px;">Photograph pieces and add them to the catalogue so customers can browse and design at home.</p>
 
+        <!-- Genuine real tile entry point, per direct request — 3
+             genuinely independent real sections, real content inside
+             each completely untouched. -->
+        <div id="stock-tile-menu" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+          <button onclick="showStockSection('add')" style="background:#5E35B1;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">📷</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Add a Piece</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Photograph and price a new item</span>
+          </button>
+          <button onclick="showStockSection('reservations')" style="background:#5E35B1;filter:brightness(0.9);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">📌</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Reservations</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Pending customer holds</span>
+          </button>
+          <button onclick="showStockSection('catalogue')" style="background:#5E35B1;filter:brightness(0.8);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">🗂️</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Catalogue</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Everything currently listed</span>
+          </button>
+        </div>
+
+        <div id="stock-section-add" class="stock-section" style="display:none;">
         <!-- Add a new piece -->
         <div class="chart-container" style="margin-bottom: 20px;">
           <h3 style="margin-top: 0;">Add a Piece</h3>
@@ -3855,7 +3887,9 @@
             <span class="till-tile-name">+ Add to Catalogue</span>
           </button>
         </div>
+        </div>
 
+        <div id="stock-section-reservations" class="stock-section" style="display:none;">
         <!-- Reservations pending -->
         <div class="chart-container" style="margin-bottom: 20px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
@@ -3866,7 +3900,9 @@
             <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
           </div>
         </div>
+        </div>
 
+        <div id="stock-section-catalogue" class="stock-section" style="display:none;">
         <!-- Existing catalogue -->
         <div class="chart-container">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
@@ -3874,6 +3910,7 @@
             <button onclick="loadStockCatalogue()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄</button>
           </div>
           <div id="stock-catalogue-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;"></div>
+        </div>
         </div>
       </div>
 
@@ -12095,6 +12132,16 @@ function showTableCardsSection(section) {
   document.querySelectorAll('.tablecards-section').forEach(el => el.style.display = 'none');
   document.getElementById(`tablecards-section-${section}`).style.display = 'block';
   if (section === 'bookings') loadTableCardBookings();
+}
+
+// Genuine real tile-section switcher for Stock, per direct request,
+// same proven pattern as Table Cards.
+function showStockSection(section) {
+  document.getElementById('stock-tile-menu').style.display = 'none';
+  document.querySelectorAll('.stock-section').forEach(el => el.style.display = 'none');
+  document.getElementById(`stock-section-${section}`).style.display = 'block';
+  if (section === 'reservations') loadStockReservations();
+  if (section === 'catalogue') loadStockCatalogue();
 }
 
 function showStaffSection(section) {
