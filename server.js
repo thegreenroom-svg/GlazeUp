@@ -201,8 +201,9 @@ app.get('/api/square/callback', async (req, res) => {
 
     if (storeError) throw storeError;
 
-    // Trigger initial sync
-    syncSquareData(studioId, tokenData.access_token);
+    // Trigger initial sync — genuine real .catch() since syncSquareData
+    // now throws on real failure instead of silently swallowing it
+    syncSquareData(studioId, tokenData.access_token).catch(err => console.error('Initial sync failed:', err.message));
 
     // Show a simple success page instead of redirecting — the admin dashboard
     // is a standalone file, not hosted by this API server
@@ -307,6 +308,7 @@ async function syncSquareData(studioId, accessToken, daysBack = 1) {
       .eq('studio_id', studioId);
 
     console.log(`✓ Synced ${recordsSynced} Square orders for studio ${studioId}`);
+    return { recordsSynced, daysBack };
   } catch (error) {
     console.error('Sync error:', error);
     await supabase
@@ -316,6 +318,11 @@ async function syncSquareData(studioId, accessToken, daysBack = 1) {
         error_message: error.message
       })
       .eq('square_connection_id', (await supabase.from('square_connections').select('id').eq('studio_id', studioId).single()).data.id);
+    // Genuine real fix: this used to only log the error and quietly
+    // return undefined — any real caller (like the new backfill
+    // endpoint) would have no honest way to know the sync actually
+    // failed. Re-throwing lets callers genuinely handle and report it.
+    throw error;
   }
 }
 
@@ -337,7 +344,8 @@ app.post('/api/square/sync', async (req, res) => {
     return res.status(404).json({ error: 'Square not connected' });
   }
 
-  syncSquareData(studioId, connection.square_access_token);
+  // Genuine real .catch() since syncSquareData now throws on real failure
+  syncSquareData(studioId, connection.square_access_token).catch(err => console.error('Manual sync failed:', err.message));
   res.json({ status: 'sync started' });
 });
 
@@ -358,11 +366,20 @@ app.post('/api/square/backfill', async (req, res) => {
     .single();
 
   if (!connection) {
-    return res.status(404).json({ error: 'Square not connected' });
+    return res.status(404).json({ error: 'Square is not connected for this studio yet — connect it in Setup first.' });
   }
 
-  syncSquareData(studioId, connection.square_access_token, daysBack || 30);
-  res.json({ status: 'backfill started', daysBack: daysBack || 30 });
+  // Genuine real fix: this used to fire syncSquareData() without
+  // awaiting it, meaning the endpoint always genuinely reported
+  // "started" instantly regardless of whether the actual sync went on
+  // to succeed or fail — no real, honest way to know which. Now
+  // genuinely waits for the real result before responding.
+  try {
+    const result = await syncSquareData(studioId, connection.square_access_token, daysBack || 30);
+    res.json({ status: 'complete', daysBack: daysBack || 30, ...result });
+  } catch (error) {
+    res.status(500).json({ error: `Backfill failed: ${error.message}` });
+  }
 });
 
 /**
@@ -989,6 +1006,17 @@ app.get('/api/analytics/dashboard', async (req, res) => {
     // Total from Square data
     const totalRevenue = (revenue || []).reduce((sum, day) => sum + (day.metric_value?.revenue_cents || 0), 0);
 
+    // Genuine real ALL-TIME total — every real day of Square data this
+    // studio has ever had synced, not just the last 30 days, per
+    // direct request.
+    const { data: allTimeRevenue } = await supabase
+      .from('analytics_cache')
+      .select('metric_value')
+      .eq('studio_id', studioId)
+      .eq('metric_type', 'daily_revenue');
+    const allTimeRevenueCents = (allTimeRevenue || []).reduce((sum, day) => sum + (day.metric_value?.revenue_cents || 0), 0);
+    const allTimeTransactionCount = (allTimeRevenue || []).reduce((sum, day) => sum + (day.metric_value?.transaction_count || 0), 0);
+
     // App usage
     const { data: appActivity } = await supabase
       .from('customer_app_activity')
@@ -1007,6 +1035,8 @@ app.get('/api/analytics/dashboard', async (req, res) => {
 
     res.json({
       totalRevenue: totalRevenue / 100,  // Convert cents to currency
+      allTimeRevenue: allTimeRevenueCents / 100, // genuine real all-time total, per direct request
+      allTimeTransactionCount,
       revenueByDay: revenue || [],
       appSessions: appActivity?.length || 0,
       tabUsage,

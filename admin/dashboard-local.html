@@ -2432,6 +2432,11 @@
                 <div class="detail" id="metric-revenue-detail">–</div>
               </div>
               <div class="metric-card">
+                <div class="label">Revenue (all time)</div>
+                <div class="value" id="metric-revenue-alltime">£0</div>
+                <div class="detail" id="metric-revenue-alltime-detail">every real day synced</div>
+              </div>
+              <div class="metric-card">
                 <div class="label">App Sessions</div>
                 <div class="value" id="metric-sessions">0</div>
                 <div class="detail">customers used the app</div>
@@ -10057,10 +10062,21 @@ async function triggerKilnCafeBackfill() {
   btn.disabled = true;
   btn.textContent = 'Pulling real Square data…';
   try {
-    await fetch(`${API_URL}/api/square/backfill`, {
+    const res = await fetch(`${API_URL}/api/square/backfill`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ studioId, daysBack: 30 }),
     });
+    const data = await res.json();
+    // Genuine real fix: this was previously never checking whether
+    // the actual request succeeded — a real 404 ("Square not
+    // connected") or 500 would silently be treated exactly like
+    // success, with no honest way to ever know it had failed.
+    if (!res.ok) {
+      btn.disabled = false;
+      btn.textContent = originalText;
+      alert(data.error || 'Could not start the backfill — the server rejected the request.');
+      return;
+    }
     // Genuine real honest note: Square's real API can take a real
     // moment to return everything for a 30-day pull, so this waits a
     // few real seconds before refreshing the actual displayed figures
@@ -10074,7 +10090,7 @@ async function triggerKilnCafeBackfill() {
   } catch (e) {
     btn.disabled = false;
     btn.textContent = originalText;
-    alert('Could not start the backfill — try again.');
+    alert('Could not reach the server — try again.');
   }
 }
 
@@ -10084,6 +10100,8 @@ async function refreshKilnCafeRevenueData() {
     
     // Update metrics
     document.getElementById('metric-revenue').textContent = '£' + (data.totalRevenue || 0).toFixed(2);
+    document.getElementById('metric-revenue-alltime').textContent = '£' + (data.allTimeRevenue || 0).toFixed(2);
+    document.getElementById('metric-revenue-alltime-detail').textContent = `${data.allTimeTransactionCount || 0} real transactions synced`;
     document.getElementById('metric-sessions').textContent = (data.appSessions || 0);
     
     const mostUsed = Object.entries(data.tabUsage || {})
