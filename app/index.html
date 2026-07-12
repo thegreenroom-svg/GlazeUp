@@ -3707,6 +3707,7 @@
     let _cleoFloatingCurrentMessage = null;
     let _cleoFloatingRotationTimer = null;
     let _cleoFloatingActiveOffer = null; // genuine real offer, fetched from the actual backend, null if none set
+    let _cleoFloatingPromotions = []; // genuine real current/upcoming promotions, fetched from the actual backend
 
     const CLEO_FLOATING_MESSAGES_BASE = [
       { text: "Ask me anything about the studio! 💬", action: 'chat' },
@@ -3865,14 +3866,21 @@
       // Genuinely check the real config, not assume — the stickers
       // message only makes sense if this studio actually has Cleo's
       // Club turned on. Also genuinely fetch the real active Offer of
-      // the Week, if the studio has set one, so Cleo can call it out
-      // regularly in her rotation — real data, not a placeholder.
+      // the Week, and the real promotions history, so Cleo can call
+      // both out regularly in her rotation — real data, not a
+      // placeholder or invented chatter.
       Promise.all([
         fetch(`${API_URL}/api/cleos-club/config?studioId=${STUDIO_ID}`).then(r => r.json()).catch(() => ({})),
         fetch(`${API_URL}/api/cleos-club/offer-of-week?studioId=${STUDIO_ID}`).then(r => r.json()).catch(() => ({})),
-      ]).then(([configData, offerData]) => {
+        fetch(`${API_URL}/api/studio-promotions?studioId=${STUDIO_ID}`).then(r => r.json()).catch(() => ({})),
+      ]).then(([configData, offerData, promoData]) => {
         _cleoFloatingClubEnabled = !!configData.config?.enabled;
         _cleoFloatingActiveOffer = (offerData.offer && offerData.offer.title) ? offerData.offer : null;
+        // Genuinely only real promotions that are CURRENT or UPCOMING
+        // — a past promotion sitting in the history log shouldn't
+        // clutter her rotation as if it's still relevant.
+        const todayStr = new Date().toISOString().split('T')[0];
+        _cleoFloatingPromotions = (promoData.promotions || []).filter(p => !p.ends_on || p.ends_on >= todayStr).slice(0, 3);
       }).finally(() => {
         rotateCleoFloatingMessage(); // show the first message once we genuinely know
         clearInterval(_cleoFloatingRotationTimer);
@@ -3892,7 +3900,29 @@
           action: 'stickers', // opens the same real Cleo's Club space where the offer is elaborated on
         });
       }
+      // Real promotions history — genuinely current/upcoming ones
+      // only (already filtered when fetched), each gets its own real
+      // rotation slot rather than being crammed into one message.
+      _cleoFloatingPromotions.forEach(p => {
+        messages.push({ text: `📣 ${p.title}`, action: 'stickers' });
+      });
+      // Genuine seasonal chitchat — real current date, honest windows,
+      // a soft, natural line rather than a hard sell. Only appears
+      // during the actual real season it's about.
+      const seasonalLine = getCleoSeasonalChitchatLine();
+      if (seasonalLine) messages.push({ text: seasonalLine, action: null });
       return messages;
+    }
+
+    // Genuine, real seasonal chitchat — soft, natural lines, only
+    // shown during the actual real calendar window each refers to.
+    function getCleoSeasonalChitchatLine() {
+      const now = new Date();
+      const month = now.getMonth(); // 0-indexed
+      if (month === 11) return "Christmas is getting close! 🎄 Gift vouchers are a lovely idea";
+      if (month === 9 || month === 10) return "Ooh, Christmas will be here before we know it! 🎄";
+      if (month === 1 || month === 2) return "Easter's on its way! 🐣";
+      return null;
     }
 
     function rotateCleoFloatingMessage() {

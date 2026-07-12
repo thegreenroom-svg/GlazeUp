@@ -12694,6 +12694,30 @@ const CLEO_ADMIN_FLOATING_MESSAGES_BASE = [
   { text: "I'm growing up every week! 🌱", action: null },
   { text: "Kids love collecting my stickers ⭐", action: 'setup' },
 ];
+let _cleoAdminFloatingPromotions = []; // genuine real current/upcoming promotions, fetched from the actual backend
+
+function getCleoAdminFloatingMessages() {
+  const messages = [...CLEO_ADMIN_FLOATING_MESSAGES_BASE];
+  // Real promotions history — same genuine real data as the customer
+  // side, so staff can see exactly what Cleo's telling customers.
+  _cleoAdminFloatingPromotions.forEach(p => {
+    messages.push({ text: `📣 ${p.title}`, action: 'clubpages' });
+  });
+  const seasonalLine = getCleoAdminSeasonalChitchatLine();
+  if (seasonalLine) messages.push({ text: seasonalLine, action: null });
+  return messages;
+}
+
+// Genuine, real seasonal chitchat — same real windows as the customer
+// side, so staff see the same honest seasonal awareness Cleo has.
+function getCleoAdminSeasonalChitchatLine() {
+  const now = new Date();
+  const month = now.getMonth();
+  if (month === 11) return "Christmas is getting close! 🎄 Gift vouchers are a lovely idea";
+  if (month === 9 || month === 10) return "Ooh, Christmas will be here before we know it! 🎄";
+  if (month === 1 || month === 2) return "Easter's on its way! 🐣";
+  return null;
+}
 
 function initCleoAdminFloatingWidget() {
   const fab = document.getElementById('cleo-admin-floating-fab');
@@ -12704,15 +12728,23 @@ function initCleoAdminFloatingWidget() {
   const mascotContainer = document.getElementById('cleo-admin-floating-mascot');
   if (mascotContainer) mascotContainer.innerHTML = renderCleoMascotSVG();
 
-  rotateCleoAdminFloatingMessage();
-  clearInterval(_cleoAdminFloatingRotationTimer);
-  _cleoAdminFloatingRotationTimer = setInterval(rotateCleoAdminFloatingMessage, 6000);
+  // Genuinely fetch the real promotions history, same real data as
+  // the customer side — filtered to current/upcoming only.
+  fetch(`${API_URL}/api/studio-promotions?studioId=${studioId}`).then(r => r.json()).then(data => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    _cleoAdminFloatingPromotions = (data.promotions || []).filter(p => !p.ends_on || p.ends_on >= todayStr).slice(0, 3);
+  }).catch(() => {}).finally(() => {
+    rotateCleoAdminFloatingMessage();
+    clearInterval(_cleoAdminFloatingRotationTimer);
+    _cleoAdminFloatingRotationTimer = setInterval(rotateCleoAdminFloatingMessage, 6000);
+  });
 }
 
 function rotateCleoAdminFloatingMessage() {
   const bubble = document.getElementById('cleo-admin-floating-bubble');
   if (!bubble) return;
-  const msg = CLEO_ADMIN_FLOATING_MESSAGES_BASE[_cleoAdminFloatingMessageIndex % CLEO_ADMIN_FLOATING_MESSAGES_BASE.length];
+  const messages = getCleoAdminFloatingMessages();
+  const msg = messages[_cleoAdminFloatingMessageIndex % messages.length];
   bubble.textContent = msg.text;
   _cleoAdminFloatingCurrentMessage = msg; // genuinely track the actual object shown, not a recomputed index — same real bug already found and fixed on the customer app side
   _cleoAdminFloatingMessageIndex++;
