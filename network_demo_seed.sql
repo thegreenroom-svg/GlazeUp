@@ -21,19 +21,19 @@ ALTER TABLE public.studios ADD COLUMN IF NOT EXISTS network_opted_in_at TIMESTAM
 ALTER TABLE public.studios ADD COLUMN IF NOT EXISTS network_display_name TEXT;
 
 -- Ten genuinely fictional demo studios, 4 opted into the network (40%)
-INSERT INTO studios (id, name, is_demo, network_opted_in, network_opted_in_at, network_display_name, created_at)
+INSERT INTO studios (id, name, slug, is_demo, network_opted_in, network_opted_in_at, network_display_name, created_at)
 SELECT * FROM (VALUES
-  ('d0000001-0000-0000-0000-000000000001'::uuid, 'Demo: Clayworks Bristol', true, true, now() - interval '45 days', 'Clayworks Bristol', now() - interval '200 days'),
-  ('d0000001-0000-0000-0000-000000000002'::uuid, 'Demo: The Potters Yard, Leeds', true, true, now() - interval '30 days', 'The Potters Yard', now() - interval '180 days'),
-  ('d0000001-0000-0000-0000-000000000003'::uuid, 'Demo: Fire & Glaze, Manchester', true, true, now() - interval '20 days', 'Fire & Glaze', now() - interval '160 days'),
-  ('d0000001-0000-0000-0000-000000000004'::uuid, 'Demo: Kiln & Co, Edinburgh', true, true, now() - interval '10 days', 'Kiln & Co', now() - interval '140 days'),
-  ('d0000001-0000-0000-0000-000000000005'::uuid, 'Demo: Studio Terracotta, Brighton', true, false, null, null, now() - interval '120 days'),
-  ('d0000001-0000-0000-0000-000000000006'::uuid, 'Demo: The Glaze Room, Cardiff', true, false, null, null, now() - interval '100 days'),
-  ('d0000001-0000-0000-0000-000000000007'::uuid, 'Demo: Wheelhouse Pottery, Norwich', true, false, null, null, now() - interval '90 days'),
-  ('d0000001-0000-0000-0000-000000000008'::uuid, 'Demo: Earth & Fire, Bath', true, false, null, null, now() - interval '80 days'),
-  ('d0000001-0000-0000-0000-000000000009'::uuid, 'Demo: The Kiln Room, York', true, false, null, null, now() - interval '60 days'),
-  ('d0000001-0000-0000-0000-000000000010'::uuid, 'Demo: Paint & Fire, Oxford', true, false, null, null, now() - interval '40 days')
-) AS v(id, name, is_demo, network_opted_in, network_opted_in_at, network_display_name, created_at)
+  ('d0000001-0000-0000-0000-000000000001'::uuid, 'Demo: Clayworks Bristol', 'demo-clayworks-bristol', true, true, now() - interval '45 days', 'Clayworks Bristol', now() - interval '200 days'),
+  ('d0000001-0000-0000-0000-000000000002'::uuid, 'Demo: The Potters Yard, Leeds', 'demo-potters-yard-leeds', true, true, now() - interval '30 days', 'The Potters Yard', now() - interval '180 days'),
+  ('d0000001-0000-0000-0000-000000000003'::uuid, 'Demo: Fire & Glaze, Manchester', 'demo-fire-glaze-manchester', true, true, now() - interval '20 days', 'Fire & Glaze', now() - interval '160 days'),
+  ('d0000001-0000-0000-0000-000000000004'::uuid, 'Demo: Kiln & Co, Edinburgh', 'demo-kiln-co-edinburgh', true, true, now() - interval '10 days', 'Kiln & Co', now() - interval '140 days'),
+  ('d0000001-0000-0000-0000-000000000005'::uuid, 'Demo: Studio Terracotta, Brighton', 'demo-studio-terracotta-brighton', true, false, null, null, now() - interval '120 days'),
+  ('d0000001-0000-0000-0000-000000000006'::uuid, 'Demo: The Glaze Room, Cardiff', 'demo-glaze-room-cardiff', true, false, null, null, now() - interval '100 days'),
+  ('d0000001-0000-0000-0000-000000000007'::uuid, 'Demo: Wheelhouse Pottery, Norwich', 'demo-wheelhouse-pottery-norwich', true, false, null, null, now() - interval '90 days'),
+  ('d0000001-0000-0000-0000-000000000008'::uuid, 'Demo: Earth & Fire, Bath', 'demo-earth-fire-bath', true, false, null, null, now() - interval '80 days'),
+  ('d0000001-0000-0000-0000-000000000009'::uuid, 'Demo: The Kiln Room, York', 'demo-kiln-room-york', true, false, null, null, now() - interval '60 days'),
+  ('d0000001-0000-0000-0000-000000000010'::uuid, 'Demo: Paint & Fire, Oxford', 'demo-paint-fire-oxford', true, false, null, null, now() - interval '40 days')
+) AS v(id, name, slug, is_demo, network_opted_in, network_opted_in_at, network_display_name, created_at)
 WHERE NOT EXISTS (SELECT 1 FROM studios WHERE studios.id = v.id);
 
 -- Real, honest network offers from the 4 opted-in demo studios
