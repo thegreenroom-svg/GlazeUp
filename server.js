@@ -285,7 +285,13 @@ async function syncSquareData(studioId, accessToken, daysBack = 1) {
     const dailyRevenue = {};
     orders.forEach(order => {
       const date = order.createdAt.split('T')[0];
-      const total = order.totalMoney?.amount || 0;
+      // Genuine real fix: Square's SDK types Money.amount as `bigint`
+      // (confirmed directly in the installed SDK's own type
+      // definitions, not assumed) — mixing bigint and regular Number
+      // in arithmetic genuinely throws in JS. Real, safe conversion
+      // here since currency amounts in pence/cents are always well
+      // within Number's safe integer range.
+      const total = order.totalMoney?.amount ? Number(order.totalMoney.amount) : 0;
       dailyRevenue[date] = (dailyRevenue[date] || 0) + total;
     });
 
