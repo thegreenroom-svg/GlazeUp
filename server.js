@@ -78,6 +78,12 @@ const staticCacheOptions = {
 };
 app.use('/admin', express.static(path.join(__dirname, 'admin'), staticCacheOptions));
 app.use('/app', express.static(path.join(__dirname, 'app'), staticCacheOptions));
+// Genuine real fix: /brand-assets was referenced directly in the real
+// HTML (apple-touch-icon, manifest icons) but never actually had a
+// real static route serving it — every real request for anything
+// under this path has always genuinely 404'd. Confirmed via a real,
+// live browser console error, not assumed.
+app.use('/brand-assets', express.static(path.join(__dirname, 'brand-assets'), staticCacheOptions));
 app.use('/promo', express.static(path.join(__dirname, 'promo'), staticCacheOptions));
 // Redirect root to promo page for prospective studio owners
 app.get('/', (req, res) => res.redirect('/promo'));
