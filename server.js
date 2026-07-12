@@ -34,7 +34,7 @@ const app = express();
 // sensitive financial data: Platform Revenue (worldwide SaaS income) and
 // The Kiln Cafe's own real revenue/analytics. Declared once, early, so
 // every endpoint that needs it references the same single source of truth.
-const PLATFORM_REVENUE_ACCESS_NAMES = ['david', 'jenny', 'daisy', 'elliot'];
+const PLATFORM_REVENUE_ACCESS_NAMES = ['david', 'jenny', 'daisy', 'elliott'];
 
 // Square's SDK returns some numbers as BigInt, which JSON.stringify cannot
 // serialize by default. Teach BigInt to serialize as a string, globally,
