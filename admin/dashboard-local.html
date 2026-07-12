@@ -3083,6 +3083,18 @@
           Complete these three steps to unlock analytics and billing. You're already on the free trial!
         </p>
 
+        <!-- Genuine real dedicated test/preview page — the actual live
+             customer app, opened fresh, no booking needed. Same real
+             app real customers use, just for internal testing. -->
+        <div class="setup-card" style="border:1.5px solid rgba(94,53,177,0.3);background:linear-gradient(135deg,rgba(94,53,177,0.05),rgba(249,168,37,0.04));">
+          <h3>👀 Preview &amp; Test the Customer App</h3>
+          <p>Opens the real, live customer app in a new tab — the exact same thing a customer sees, genuinely no booking or QR scan needed. Useful for testing before a real shift, or showing someone what the app looks like.</p>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-connect" onclick="window.open(`${API_URL}/app`, '_blank')" style="flex:1;">Open the real app</button>
+            <button class="btn-connect" onclick="openKidPreview()" style="flex:1;background:#5E35B1;">👶 Preview as a kid</button>
+          </div>
+        </div>
+
         <!-- Static Walk-in QR: print once, works forever, no booking needed -->
         <div class="setup-card">
           <h3>🚶 Walk-in QR (print &amp; leave on tables)</h3>
@@ -7658,7 +7670,7 @@ function confirmDirectLogout() {
 // This is a simple name check, not a full permissions system — good
 // enough while it's just the three of you, worth revisiting properly
 // before other studios are on the platform.
-const PLATFORM_REVENUE_ACCESS = ['David', 'Jenny', 'Daisy'];
+const PLATFORM_REVENUE_ACCESS = ['David', 'Jenny', 'Daisy', 'Elliot'];
 
 // Measures the ACTUAL rendered heights of the platform revenue strip and
 // phone header, and sets .admin-wrapper's margin-top to match exactly —
