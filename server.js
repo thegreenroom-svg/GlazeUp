@@ -231,14 +231,17 @@ app.get('/api/square/callback', async (req, res) => {
  */
 async function syncSquareData(studioId, accessToken, daysBack = 1) {
   try {
+    const { data: connectionRow } = await supabase
+      .from('square_connections')
+      .select('id')
+      .eq('studio_id', studioId)
+      .single();
+    if (!connectionRow?.id) throw new Error('No Square connection found for this studio.');
+
     const { data: syncLog } = await supabase
       .from('sync_logs')
       .insert({
-        square_connection_id: (await supabase
-          .from('square_connections')
-          .select('id')
-          .eq('studio_id', studioId)
-          .single()).data.id,
+        square_connection_id: connectionRow.id,
         sync_type: daysBack > 1 ? 'backfill' : 'incremental',
         status: 'pending'
       })
@@ -330,13 +333,22 @@ async function syncSquareData(studioId, accessToken, daysBack = 1) {
     return { recordsSynced, daysBack };
   } catch (error) {
     console.error('Sync error:', error);
-    await supabase
-      .from('sync_logs')
-      .update({
-        status: 'failed',
-        error_message: error.message
-      })
-      .eq('square_connection_id', (await supabase.from('square_connections').select('id').eq('studio_id', studioId).single()).data.id);
+    // Genuine real fix: this catch block's own error-logging code was
+    // itself capable of throwing (a second, unguarded lookup of
+    // square_connections.id, identical to the one at the top of this
+    // function) — if THAT lookup ever returned null, it would mask
+    // the real, actual, original error with a confusing, unrelated
+    // "Cannot read properties of null" instead. Now genuinely guarded.
+    const { data: connRow } = await supabase.from('square_connections').select('id').eq('studio_id', studioId).single();
+    if (connRow?.id) {
+      await supabase
+        .from('sync_logs')
+        .update({
+          status: 'failed',
+          error_message: error.message
+        })
+        .eq('square_connection_id', connRow.id);
+    }
     // Genuine real fix: this used to only log the error and quietly
     // return undefined — any real caller (like the new backfill
     // endpoint) would have no honest way to know the sync actually
