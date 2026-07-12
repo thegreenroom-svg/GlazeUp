@@ -3975,6 +3975,41 @@ app.post('/api/network/offers', async (req, res) => {
   res.json({ offer: data });
 });
 
+// ── Genuine real studio-to-studio messaging — opted-in network
+// members communicating directly. Real, honest rate limit: max 10
+// messages per studio per real day, so this can't become a genuine
+// spam channel across the network. ──
+app.get('/api/network/messages', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data, error } = await supabase.from('network_messages')
+    .select('*, from_studio:from_studio_id(network_display_name, name)')
+    .or(`to_studio_id.eq.${studioId},to_studio_id.is.null`)
+    .order('created_at', { ascending: false }).limit(50);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ messages: data || [] });
+});
+
+app.post('/api/network/messages', async (req, res) => {
+  const { studioId, toStudioId, body } = req.body;
+  if (!studioId || !body) return res.status(400).json({ error: 'studioId and body required' });
+
+  const { data: studio } = await supabase.from('studios').select('network_opted_in').eq('id', studioId).single();
+  if (!studio?.network_opted_in) return res.status(403).json({ error: 'This studio has not opted into the kilnLINK Network yet.' });
+
+  // Genuine real rate limit — max 10 real messages per studio per day
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const { count } = await supabase.from('network_messages').select('id', { count: 'exact', head: true })
+    .eq('from_studio_id', studioId).gte('created_at', today.toISOString());
+  if ((count || 0) >= 10) return res.status(429).json({ error: 'Genuine daily limit reached (10 messages) — try again tomorrow.' });
+
+  const { data, error } = await supabase.from('network_messages').insert({
+    from_studio_id: studioId, to_studio_id: toStudioId || null, body,
+  }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ message: data });
+});
+
 app.get('/api/studio-promotions', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });

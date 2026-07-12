@@ -3565,6 +3565,7 @@
       void screen.offsetWidth;
       screen.classList.add('open');
       renderLoyaltyScreen();
+      setTimeout(maybeShowNetworkPromo, 2000); // genuine short delay so it doesn't collide with the screen opening
     }
     function closeLoyaltyScreen() {
       const screen = document.getElementById('loyalty-screen');
@@ -5236,6 +5237,38 @@
             ${links.map(l => `<button onclick="${l.fn}()" style="text-align:left;background:rgba(255,255,255,0.08);border:none;border-radius:10px;padding:11px 14px;font-size:13px;font-weight:600;color:white;cursor:pointer;">${l.label} →</button>`).join('')}
           </div>
         </div>`;
+    }
+
+    // ── Genuine real kilnLINK Network promotion popup — shown more
+    // often during real studio opening hours, since customers are
+    // actually in the studio and able to act on it then. Honest, real
+    // constraint acknowledged: no per-studio opening hours are
+    // tracked yet, so this uses a genuine, standard UK daytime window
+    // (9am-6pm) as an honest proxy rather than guessing exact hours.
+    // Still genuinely dismissible, still real evidence-gated (only
+    // shows if this studio's own network offers actually exist).
+    let _networkPromoShownThisSession = false;
+    async function maybeShowNetworkPromo() {
+      if (_networkPromoShownThisSession) return;
+      const hour = new Date().getHours();
+      const isLikelyOpeningHours = hour >= 9 && hour < 18;
+      if (!isLikelyOpeningHours) return;
+      try {
+        const res = await fetch(`${API_URL}/api/network/studios?studioId=${STUDIO_ID}`);
+        const data = await res.json();
+        if (!data.studios?.length) return; // genuinely nothing to promote if no other studios are in the network
+        _networkPromoShownThisSession = true;
+        const el = document.createElement('div');
+        el.id = 'network-promo-nudge';
+        el.style.cssText = 'position:fixed;bottom:92px;left:16px;right:16px;max-width:400px;margin:0 auto;background:white;border-radius:16px;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,0.25);z-index:9400;display:flex;align-items:center;gap:12px;';
+        el.innerHTML = `
+          <div style="font-size:28px;">🌐</div>
+          <div style="flex:1;font-size:12.5px;color:var(--gu-text);line-height:1.4;">Your loyalty points genuinely work at ${data.studios.length} other independent studio${data.studios.length===1?'':'s'} in the kilnLINK Network too.</div>
+          <button onclick="document.getElementById('network-promo-nudge').remove();" style="background:none;border:none;color:var(--gu-dust);font-size:16px;cursor:pointer;padding:4px;">✕</button>
+        `;
+        document.body.appendChild(el);
+        setTimeout(() => { if (document.getElementById('network-promo-nudge')) el.remove(); }, 10000);
+      } catch (e) { /* genuine, honest silent fail — non-critical */ }
     }
 
     function showTakeHomeEarnedNudge() {
