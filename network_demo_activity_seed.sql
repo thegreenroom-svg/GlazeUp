@@ -44,8 +44,10 @@ WHERE s.is_demo = true AND s.network_opted_in = true
 
 -- Real, genuine app extra charges (Design Preview £1, Transfer
 -- Designer £1, Take It Home £5) — ~10 per demo studio per month.
-INSERT INTO app_extra_charges (studio_id, amount_cents, created_at)
+INSERT INTO app_extra_charges (studio_id, booking_code, item_name, amount_cents, created_at)
 SELECT s.id,
+  'DEMO-' || substr(s.id::text, 1, 8) || '-' || m || '-' || c, -- genuinely fake, clearly-labeled booking code — no real booking behind this demo data
+  CASE WHEN (c % 4 = 0) THEN 'Home Access — all design tools' WHEN (c % 3 = 0) THEN 'Transfer Designer' ELSE 'Design Preview' END,
   CASE WHEN (c % 4 = 0) THEN 500 ELSE 100 END,
   now() - (m || ' months')::interval - (c || ' days')::interval
 FROM studios s
