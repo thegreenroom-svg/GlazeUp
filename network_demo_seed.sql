@@ -12,6 +12,14 @@
 -- real ratio is what matters for a demo, not the raw count.
 -- ═══════════════════════════════════════════════════════════
 
+-- Genuine safety check — ensures every real column this seed depends
+-- on actually exists before using it, regardless of which earlier
+-- schema files have or haven't been run yet on this database.
+ALTER TABLE public.studios ADD COLUMN IF NOT EXISTS is_demo BOOLEAN DEFAULT false;
+ALTER TABLE public.studios ADD COLUMN IF NOT EXISTS network_opted_in BOOLEAN DEFAULT false;
+ALTER TABLE public.studios ADD COLUMN IF NOT EXISTS network_opted_in_at TIMESTAMPTZ;
+ALTER TABLE public.studios ADD COLUMN IF NOT EXISTS network_display_name TEXT;
+
 -- Ten genuinely fictional demo studios, 4 opted into the network (40%)
 INSERT INTO studios (id, name, is_demo, network_opted_in, network_opted_in_at, network_display_name, created_at)
 SELECT * FROM (VALUES
