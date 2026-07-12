@@ -238,7 +238,7 @@ async function syncSquareData(studioId, accessToken, daysBack = 1) {
       .single();
     if (!connectionRow?.id) throw new Error('No Square connection found for this studio.');
 
-    const { data: syncLog } = await supabase
+    const { data: syncLog, error: syncLogError } = await supabase
       .from('sync_logs')
       .insert({
         square_connection_id: connectionRow.id,
@@ -247,6 +247,13 @@ async function syncSquareData(studioId, accessToken, daysBack = 1) {
       })
       .select()
       .single();
+    // Genuine real fix: this never checked whether the insert itself
+    // actually succeeded — Supabase can return data: null (not throw)
+    // if something like a real RLS policy silently blocks the write,
+    // and every later use of syncLog.id would then throw a confusing,
+    // unrelated null-property error instead of the real, honest cause.
+    if (syncLogError) throw new Error(`Could not create sync log: ${syncLogError.message}`);
+    if (!syncLog?.id) throw new Error('Sync log was not created — check RLS policies on sync_logs.');
 
     const client = await getSquareClient(accessToken);
     let recordsSynced = 0;
