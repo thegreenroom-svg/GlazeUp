@@ -1494,6 +1494,71 @@
 </div>
 <button id="swt-trigger" onclick="swtStart()">🎯 Staff Tour</button>
 
+<!-- ── Returns Screen ───────────────────────────────────────────────
+     Customer brings back a piece. Photograph it → AI matches it to
+     the booking trail → shows who it belongs to, their contact
+     details, booking info, and next action.
+──────────────────────────────────────────────────────────────────── -->
+<div id="returns-screen" style="display:none;position:fixed;inset:0;z-index:9700;background:#1a1714;flex-direction:column;">
+
+  <!-- Header -->
+  <div style="background:#2B2724;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;">
+    <button onclick="closeReturns()" class="glaze-tile"
+      style="background:#B87946;color:white;border:none;border-radius:12px;padding:8px 14px;font-size:13px;font-weight:800;cursor:pointer;">
+      ← Back
+    </button>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:white;">📦 Returns</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.5);">Photograph a piece to identify it</div>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div style="flex:1;overflow-y:auto;padding:20px;">
+
+    <!-- Step 1: Photograph -->
+    <div id="returns-step-photo" style="text-align:center;">
+      <div style="font-size:60px;margin-bottom:16px;">📦</div>
+      <div style="font-size:18px;font-weight:800;color:white;margin-bottom:8px;">Photograph the piece</div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:24px;line-height:1.5;">
+        Take a clear photo of the piece — top view works best. The AI will match it against all piece photos in the booking system.
+      </div>
+      <button onclick="document.getElementById('returns-photo-input').click()"
+        style="background:#5E35B1;color:white;border:none;border-radius:16px;padding:20px 32px;font-size:16px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:10px;margin-bottom:16px;">
+        📷 Take Photo
+      </button>
+      <input type="file" id="returns-photo-input" accept="image/*" capture="environment"
+        style="display:none;" onchange="handleReturnPhoto(event)">
+      <div style="margin-top:12px;">
+        <button onclick="showManualReturnSearch()"
+          style="background:none;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);border-radius:10px;padding:10px 20px;font-size:12px;cursor:pointer;">
+          Can't photograph it? Search by name instead
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 2: Identifying -->
+    <div id="returns-step-identifying" style="display:none;text-align:center;">
+      <div style="font-size:50px;margin-bottom:16px;animation:spin 1s linear infinite;">🔍</div>
+      <div style="font-size:16px;font-weight:800;color:white;margin-bottom:8px;">Identifying piece…</div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.5);">Comparing against all piece photos in the system</div>
+    </div>
+
+    <!-- Step 3: Result -->
+    <div id="returns-step-result" style="display:none;"></div>
+
+    <!-- Manual search fallback -->
+    <div id="returns-manual-search" style="display:none;">
+      <div style="font-size:14px;font-weight:700;color:white;margin-bottom:12px;">Search by customer name</div>
+      <input type="text" id="returns-name-input" placeholder="Customer name or booking code…"
+        style="width:100%;padding:12px;border-radius:12px;border:none;font-size:14px;box-sizing:border-box;margin-bottom:10px;"
+        oninput="searchReturnsByName(this.value)">
+      <div id="returns-name-results" style="margin-top:8px;"></div>
+    </div>
+
+  </div>
+</div>
+
 <!-- Morning Opening Checklist Modal -->
 <!-- Morning Kiln Check — a genuine "did it fire overnight?" prompt for
      whoever's first on Kiln Room. Big and unmissable, same visual weight
@@ -2442,6 +2507,10 @@
           <span style="font-size:15px;line-height:1;">🔍</span>
           <span style="font-size:5.5px;font-weight:800;line-height:1;">Find Piece</span>
         </button>
+        <button onclick="openReturns()" class="glaze-tile" style="flex-shrink:0;width:44px;background:#5E35B1;color:white;border:none;border-radius:10px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:3px;gap:1px;">
+          <span style="font-size:15px;line-height:1;">📦</span>
+          <span style="font-size:5.5px;font-weight:800;line-height:1;">Returns</span>
+        </button>
         <div style="display:none;"><span class="status-badge free">Free tier (1st month)</span></div>
         <!-- Genuine real, tidy header icons, per direct request —
              consolidates the Break and Find Piece buttons (previously
@@ -2452,6 +2521,7 @@
              working correctly without any change needed there. -->
         <button id="direct-break-btn" onclick="toggleBreak()" title="Take a break" style="display:none;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:5px 10px;font-size:11px;font-weight:700;color:#3949ab;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px;">☕ <span>Break</span></button>
         <button id="find-piece-fab" onclick="openFindMyPiece()" title="Find a piece" style="display:none;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:5px 10px;font-size:11px;font-weight:700;color:var(--gu-text);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px;">🔍 <span>Find Piece</span></button>
+        <button id="returns-btn" onclick="openReturns()" title="Customer returns" style="display:none;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:5px 10px;font-size:11px;font-weight:700;color:#5E35B1;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px;">📦 <span>Returns</span></button>
         <button id="direct-logout-btn" onclick="confirmDirectLogout()" title="Log out" style="display:none;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:5px 10px;font-size:11px;font-weight:700;color:#c0392b;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px;">🚪 <span>Log Out</span></button>
       </div>
     </header>
@@ -8570,6 +8640,7 @@ async function logOutOfShift() {
   document.getElementById('headset-setup-btn').style.display = 'none';
   document.getElementById('direct-logout-btn').style.display = 'none';
   document.getElementById('direct-break-btn').style.display = 'none';
+  document.getElementById('returns-btn').style.display = 'none';
   document.getElementById('staff-assistant-panel').style.display = 'none';
   document.getElementById('cleo-admin-floating-fab').style.display = 'none';
   document.getElementById('cleo-admin-floating-bubble').style.display = 'none';
@@ -9681,6 +9752,7 @@ function demoteSubTile(tabId) {
 (function() {
   const style = document.createElement('style');
   style.textContent = `
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     @keyframes tile-wobble {
       0%,100% { transform: rotate(-1.5deg) scale(1.02); }
       50%      { transform: rotate(1.5deg)  scale(1.02); }
@@ -10025,6 +10097,7 @@ function applyShiftUI() {
   document.getElementById('direct-logout-btn').style.display = 'flex';
   document.getElementById('direct-break-btn').style.display = 'flex';
   document.getElementById('find-piece-fab').style.display = 'flex';
+  document.getElementById('returns-btn').style.display = 'flex';
   // Genuine real bug fix: the break button's visual state (Start vs
   // End) was never refreshed when a session resumed after the device
   // went idle/was put down — currentBreakId correctly restored in
@@ -16278,6 +16351,280 @@ function copyBookingCode(code) {
   }).catch(() => {
     alert(`Booking code: ${code}`);
   });
+}
+
+// ── Returns System ───────────────────────────────────────────────────
+// Staff photograph a returned piece → AI matches against all piece
+// photos in the booking system → shows customer info + next action.
+// ─────────────────────────────────────────────────────────────────────
+
+function openReturns() {
+  document.getElementById('returns-screen').style.display = 'flex';
+  // Reset to photo step
+  document.getElementById('returns-step-photo').style.display = 'block';
+  document.getElementById('returns-step-identifying').style.display = 'none';
+  document.getElementById('returns-step-result').style.display = 'none';
+  document.getElementById('returns-manual-search').style.display = 'none';
+  document.getElementById('returns-photo-input').value = '';
+}
+
+function closeReturns() {
+  document.getElementById('returns-screen').style.display = 'none';
+}
+
+function showManualReturnSearch() {
+  document.getElementById('returns-step-photo').style.display = 'none';
+  document.getElementById('returns-manual-search').style.display = 'block';
+  document.getElementById('returns-name-input').focus();
+}
+
+async function handleReturnPhoto(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async () => {
+    const photoBase64 = reader.result;
+
+    // Show identifying state
+    document.getElementById('returns-step-photo').style.display = 'none';
+    document.getElementById('returns-step-identifying').style.display = 'block';
+
+    try {
+      const res = await fetch(`${API_URL}/api/pieces/find-by-photo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studioId,
+          photoBase64,
+          searchedBy: currentShiftStaff?.id || null,
+          autoAssign: false // returns just identifies, doesn't change piece status
+        })
+      });
+      const data = await res.json();
+      document.getElementById('returns-step-identifying').style.display = 'none';
+      document.getElementById('returns-step-result').style.display = 'block';
+
+      if (data.noConfidentMatch || !data.matches?.length) {
+        _renderReturnNotFound(photoBase64);
+      } else {
+        _renderReturnMatches(data.matches, photoBase64);
+      }
+    } catch(e) {
+      document.getElementById('returns-step-identifying').style.display = 'none';
+      document.getElementById('returns-step-result').style.display = 'block';
+      document.getElementById('returns-step-result').innerHTML = `
+        <div style="background:rgba(229,57,53,0.15);border:1px solid rgba(229,57,53,0.3);border-radius:12px;padding:16px;text-align:center;">
+          <div style="font-size:32px;margin-bottom:8px;">⚠️</div>
+          <div style="color:#ff8a80;font-size:13px;margin-bottom:12px;">Couldn't run the search — check connection and try again.</div>
+          <button onclick="openReturns()" style="background:#5E35B1;color:white;border:none;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;">Try again</button>
+        </div>`;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function _renderReturnMatches(matches, photoBase64) {
+  const resultEl = document.getElementById('returns-step-result');
+  const CONF_COLOR = { high:'#4CAF50', medium:'#F9A825', low:'#8a8175' };
+
+  // Enrich top match with full booking info
+  const topMatch = matches[0];
+  let bookingInfo = null;
+  if (topMatch?.booking_id) {
+    try {
+      const res = await fetch(`${API_URL}/api/bookings/${topMatch.booking_id}?studioId=${studioId}`);
+      if (res.ok) bookingInfo = (await res.json()).booking;
+    } catch(e) {}
+  }
+
+  const confColor = CONF_COLOR[topMatch.confidence] || '#8a8175';
+
+  resultEl.innerHTML = `
+    <!-- Photo preview -->
+    <div style="text-align:center;margin-bottom:16px;">
+      <img src="${photoBase64}" style="width:120px;height:120px;object-fit:cover;border-radius:12px;border:2px solid #5E35B1;">
+    </div>
+
+    ${topMatch.confidence === 'high' ? `
+    <!-- High confidence match -->
+    <div style="background:rgba(76,175,80,0.15);border:2px solid #4CAF50;border-radius:16px;padding:16px;margin-bottom:12px;">
+      <div style="font-size:13px;font-weight:700;color:#4CAF50;margin-bottom:10px;">✓ Identified — high confidence</div>
+      ${bookingInfo ? `
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+          <div style="width:44px;height:44px;border-radius:50%;background:#5E35B1;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:white;flex-shrink:0;">
+            ${(bookingInfo.customer_name||'?').charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <div style="font-size:16px;font-weight:800;color:white;">${bookingInfo.customer_name || '—'}</div>
+            <div style="font-size:11px;color:rgba(255,255,255,0.5);">Booking ${bookingInfo.booking_code || ''}</div>
+            ${bookingInfo.customer_email ? `<div style="font-size:11px;color:rgba(255,255,255,0.5);">${bookingInfo.customer_email}</div>` : ''}
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,0.07);border-radius:10px;padding:10px;margin-bottom:12px;font-size:12px;color:rgba(255,255,255,0.7);line-height:1.6;">
+          <div>🏺 ${topMatch.label || 'Piece'}</div>
+          ${bookingInfo.session_start ? `<div>📅 Session: ${new Date(bookingInfo.session_start).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</div>` : ''}
+          <div>📍 Stage: ${bookingInfo.current_stage || 'unknown'}</div>
+          ${bookingInfo.table_number ? `<div>🪑 ${bookingInfo.table_number}</div>` : ''}
+        </div>
+        <!-- Reference photo if available -->
+        ${topMatch.reference_photo_url ? `
+        <div style="margin-bottom:12px;">
+          <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">Reference photo from system</div>
+          <img src="${topMatch.reference_photo_url}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid rgba(255,255,255,0.2);">
+        </div>` : ''}
+      ` : ''}
+      <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:12px;font-style:italic;">${topMatch.reason || ''}</div>
+
+      <!-- Actions -->
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button onclick="markPieceCollected('${topMatch.id}','${bookingInfo?.booking_code||''}')"
+          style="background:#4CAF50;color:white;border:none;border-radius:12px;padding:12px;font-size:13px;font-weight:800;cursor:pointer;">
+          ✓ Mark as collected
+        </button>
+        ${bookingInfo?.customer_email ? `
+        <button onclick="notifyCustomerReady('${bookingInfo.customer_email}','${bookingInfo.customer_name}')"
+          style="background:rgba(255,255,255,0.1);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;">
+          ✉️ Notify customer it's here
+        </button>` : ''}
+        <button onclick="printShelfTag('${topMatch.id}','${bookingInfo?.customer_name||''}','${bookingInfo?.booking_code||''}')"
+          style="background:rgba(255,255,255,0.1);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;">
+          🏷️ Print shelf tag
+        </button>
+        <button onclick="openReturns()" style="background:none;border:none;color:rgba(255,255,255,0.4);font-size:12px;cursor:pointer;padding:8px;">
+          ↩ Not right — search again
+        </button>
+      </div>
+    </div>` : `
+    <!-- Lower confidence — show options -->
+    <div style="background:rgba(249,168,37,0.1);border:1.5px solid rgba(249,168,37,0.3);border-radius:12px;padding:14px;margin-bottom:12px;">
+      <div style="font-size:13px;font-weight:700;color:#F9A825;margin-bottom:8px;">Not certain — here are the best guesses</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:12px;">Tap the right one if you recognise it, or search by name below.</div>
+      ${matches.slice(0,3).map((m,i) => `
+        <button onclick="confirmReturnMatch('${m.id}','${m.booking_id||''}')"
+          style="width:100%;text-align:left;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:10px;">
+          ${m.reference_photo_url ? `<img src="${m.reference_photo_url}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;flex-shrink:0;">` : `<div style="width:44px;height:44px;background:rgba(255,255,255,0.1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;">🏺</div>`}
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:700;color:white;">${m.customer_name || 'Unknown'}</div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.4);">${m.label||'Piece'}</div>
+          </div>
+          <span style="font-size:9px;font-weight:700;color:${CONF_COLOR[m.confidence]||'#8a8175'};text-transform:uppercase;">${m.confidence}</span>
+        </button>`).join('')}
+    </div>`}
+
+    <!-- Search by name always available at bottom -->
+    <div style="margin-top:12px;">
+      <button onclick="showManualReturnSearch()"
+        style="width:100%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.6);border-radius:12px;padding:10px;font-size:12px;cursor:pointer;">
+        Search by customer name instead
+      </button>
+    </div>
+  `;
+}
+
+function _renderReturnNotFound(photoBase64) {
+  document.getElementById('returns-step-result').innerHTML = `
+    <div style="text-align:center;margin-bottom:16px;">
+      <img src="${photoBase64}" style="width:100px;height:100px;object-fit:cover;border-radius:12px;border:2px solid rgba(255,255,255,0.2);">
+    </div>
+    <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:16px;text-align:center;margin-bottom:16px;">
+      <div style="font-size:28px;margin-bottom:8px;">🤷</div>
+      <div style="font-size:14px;font-weight:700;color:white;margin-bottom:6px;">Couldn't identify this piece</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.5);line-height:1.5;">The photo may not have matched anything in the system — it could be a walk-in piece, or the reference photo wasn't taken at table clearance.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button onclick="openReturns()" style="background:#5E35B1;color:white;border:none;border-radius:12px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;">📷 Try a different photo</button>
+      <button onclick="showManualReturnSearch()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:white;border-radius:12px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;">🔎 Search by name</button>
+    </div>`;
+}
+
+async function searchReturnsByName(query) {
+  if (!query || query.length < 2) {
+    document.getElementById('returns-name-results').innerHTML = '';
+    return;
+  }
+  try {
+    const res = await fetch(`${API_URL}/api/bookings/search?studioId=${studioId}&q=${encodeURIComponent(query)}`);
+    const data = await res.json();
+    const bookings = (data.bookings || []).slice(0, 6);
+    const resultsEl = document.getElementById('returns-name-results');
+    if (!bookings.length) {
+      resultsEl.innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:12px;padding:8px;">No bookings found.</div>';
+      return;
+    }
+    resultsEl.innerHTML = bookings.map(b => `
+      <button onclick="openBookingFromReturn('${b.booking_code}')"
+        style="width:100%;text-align:left;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:12px;margin-bottom:6px;cursor:pointer;">
+        <div style="font-size:13px;font-weight:700;color:white;">${b.customer_name}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,0.4);">
+          ${b.booking_code}
+          ${b.table_number ? ' · ' + b.table_number : ''}
+          ${b.session_start ? ' · ' + new Date(b.session_start).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : ''}
+        </div>
+      </button>`).join('');
+  } catch(e) {}
+}
+
+async function markPieceCollected(pieceId, bookingCode) {
+  try {
+    await fetch(`${API_URL}/api/pieces/${pieceId}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, status: 'collected', staffName: currentShiftStaff?.name })
+    });
+    const resultEl = document.getElementById('returns-step-result');
+    resultEl.innerHTML = `
+      <div style="text-align:center;padding:32px 16px;">
+        <div style="font-size:60px;margin-bottom:16px;">✅</div>
+        <div style="font-size:18px;font-weight:800;color:white;margin-bottom:8px;">Marked as collected</div>
+        <div style="font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:24px;">Booking updated. Customer's status will reflect this.</div>
+        <button onclick="openReturns()" style="background:#5E35B1;color:white;border:none;border-radius:12px;padding:12px 24px;font-size:13px;font-weight:700;cursor:pointer;">
+          Next return →
+        </button>
+      </div>`;
+  } catch(e) {
+    alert('Could not update — try again.');
+  }
+}
+
+async function notifyCustomerReady(email, name) {
+  try {
+    await fetch(`${API_URL}/api/notifications/piece-ready`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, email, name })
+    });
+    alert(`✓ Notification sent to ${email}`);
+  } catch(e) {
+    alert('Could not send notification — check email settings.');
+  }
+}
+
+function printShelfTag(pieceId, customerName, bookingCode) {
+  const win = window.open('', '_blank', 'width=300,height=200');
+  win.document.write(`
+    <html><body style="font-family:sans-serif;padding:16px;text-align:center;">
+      <div style="font-size:24px;">🏺</div>
+      <div style="font-size:18px;font-weight:800;">${customerName}</div>
+      <div style="font-size:12px;color:#666;">${bookingCode}</div>
+      <div style="font-size:11px;color:#999;margin-top:4px;">The Kiln Cafe</div>
+      <script>window.print();<\/script>
+    </body></html>`);
+}
+
+function openBookingFromReturn(bookingCode) {
+  closeReturns();
+  goToTab('piecematch');
+  // Pre-fill the booking code
+  setTimeout(() => {
+    const input = document.getElementById('pm-booking-scan-input');
+    if (input) { input.value = bookingCode; loadPieceMatchGroup(); }
+  }, 400);
+}
+
+async function confirmReturnMatch(pieceId, bookingId) {
+  // Staff confirmed one of the uncertain matches — load the booking
+  if (bookingId) openBookingFromReturn(bookingId);
 }
 
 function openFindMyPiece() {
