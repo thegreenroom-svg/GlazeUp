@@ -2588,13 +2588,73 @@
 
         <h2 style="margin-top: 0;">Dashboard</h2>
 
+        <div class="info-banner" style="padding: 20px 22px;">
+          <strong style="font-size: 22px; font-family: var(--gu-font-display); margin-bottom: 8px;">Welcome to The Kiln Cafe! 🎨</strong>
+          <span style="font-size: 15px;">You're on the free trial. Billing starts next month. No credit card required.</span>
+        </div>
+
+        <!-- Genuine Add-On discovery nudge — real business value in
+             surfacing this on the very first screen a studio sees,
+             since it was previously the 4th card down a long Setup
+             page and easy to miss entirely. Only shows add-ons this
+             studio genuinely hasn't enabled yet, pulled from the real
+             backend, not hardcoded. -->
+        <div id="dashboard-addon-nudge" style="display:none;background:linear-gradient(135deg,rgba(94,53,177,0.08),rgba(249,168,37,0.06));border:1.5px solid rgba(94,53,177,0.25);border-radius:14px;padding:16px 18px;margin-bottom:20px;cursor:pointer;" onclick="goToTab('setup')">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div style="font-size:28px;">🚀</div>
+            <div style="flex:1;">
+              <div style="font-size:14px;font-weight:800;color:var(--gu-text);">New: premium add-ons available</div>
+              <div id="dashboard-addon-nudge-text" style="font-size:12px;color:var(--gu-dust);margin-top:2px;">Cleo's Club, AI Piece Finder, and more — tap to see what's available</div>
+            </div>
+            <div style="font-size:16px;color:#5E35B1;">→</div>
+          </div>
+        </div>
+
+        <!-- Genuine real tile entry point, per direct request. First
+             3 tiles (Revenue, Popular Designs, Tool Usage) only show
+             for directors — same real, existing, unchanged access
+             check already proven elsewhere (PLATFORM_REVENUE_ACCESS)
+             — everyone else genuinely sees the other 3 straight away. -->
+        <div id="dashboard-tile-menu" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+          <button id="dashboard-tile-revenue" onclick="showDashboardSection('revenue')" class="glaze-tile" style="display:none;background:#B87946;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">💷</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Revenue</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Directors only</span>
+          </button>
+          <button id="dashboard-tile-designs" onclick="showDashboardSection('designs')" class="glaze-tile" style="display:none;background:#B87946;filter:brightness(0.9);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">🎨</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Popular Designs</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Directors only</span>
+          </button>
+          <button id="dashboard-tile-tools" onclick="showDashboardSection('tools')" class="glaze-tile" style="display:none;background:#B87946;filter:brightness(0.8);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">🔧</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Tool Usage</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Directors only</span>
+          </button>
+          <button onclick="showDashboardSection('extras')" class="glaze-tile" style="background:#2e7d32;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">💷</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Extra Charges</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Today's tally</span>
+          </button>
+          <button onclick="showDashboardSection('loyalty')" class="glaze-tile" style="background:#2e7d32;filter:brightness(0.9);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">🏆</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Loyal Customers</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Top by tier &amp; points</span>
+          </button>
+          <button onclick="showDashboardSection('devices')" class="glaze-tile" style="background:#2e7d32;filter:brightness(0.8);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">📱</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Active Devices</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Currently in use</span>
+          </button>
+        </div>
+
         <!-- Kiln Cafe Revenue — director-only (David/Jenny/Daisy), same
              access pattern as Platform Revenue. Shows this studio's own
              REAL revenue and app usage figures from Supabase — genuinely
              sensitive financial data that regular staff should not see
              on the general dashboard they all land on. Moved to the
              genuine top of the page per direct request. -->
-        <div id="kiln-cafe-revenue-section" style="display:none;">
+        <div id="kiln-cafe-revenue-section" class="dashboard-section" style="display:none;">
           <div class="chart-container" style="border:1.5px solid rgba(184,121,70,0.3);background:linear-gradient(135deg,rgba(184,121,70,0.06),rgba(46,125,50,0.05));">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
               <h3 style="margin:0;">💷 The Kiln Cafe — Revenue <span style="font-size:11px;font-weight:500;color:var(--gu-dust);">(directors only)</span></h3>
@@ -2676,42 +2736,27 @@
             </div>
             <div id="revenue-category-list"><div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">No category data yet — pull real Square data first.</div></div>
           </div>
+        </div>
+        <!-- /kiln-cafe-revenue-section -->
 
-          <!-- Most Popular Designs -->
+        <!-- Most Popular Designs — director-only, per direct request,
+             genuinely its own real switchable section now, was
+             previously bundled inside kiln-cafe-revenue-section. -->
+        <div id="dashboard-section-designs" class="dashboard-section" style="display:none;">
           <div class="chart-container">
             <h3>Most Popular Designs</h3>
             <ul class="design-list" id="top-designs-list">
             </ul>
           </div>
+        </div>
 
-          <!-- App Usage -->
+        <!-- App Usage — director-only, per direct request, same
+             genuine split as Designs above. -->
+        <div id="dashboard-section-tools" class="dashboard-section" style="display:none;">
           <div class="chart-container">
             <h3>Which Tools Do Customers Use?</h3>
             <ul class="design-list tool-usage-list" id="tool-usage-list">
             </ul>
-          </div>
-        </div>
-        <!-- /kiln-cafe-revenue-section -->
-
-        <div class="info-banner" style="padding: 20px 22px;">
-          <strong style="font-size: 22px; font-family: var(--gu-font-display); margin-bottom: 8px;">Welcome to Link! 🎨</strong>
-          <span style="font-size: 15px;">You're on the free trial. Billing starts next month. No credit card required.</span>
-        </div>
-
-        <!-- Genuine Add-On discovery nudge — real business value in
-             surfacing this on the very first screen a studio sees,
-             since it was previously the 4th card down a long Setup
-             page and easy to miss entirely. Only shows add-ons this
-             studio genuinely hasn't enabled yet, pulled from the real
-             backend, not hardcoded. -->
-        <div id="dashboard-addon-nudge" style="display:none;background:linear-gradient(135deg,rgba(94,53,177,0.08),rgba(249,168,37,0.06));border:1.5px solid rgba(94,53,177,0.25);border-radius:14px;padding:16px 18px;margin-bottom:20px;cursor:pointer;" onclick="goToTab('setup')">
-          <div style="display:flex;align-items:center;gap:14px;">
-            <div style="font-size:28px;">🚀</div>
-            <div style="flex:1;">
-              <div style="font-size:14px;font-weight:800;color:var(--gu-text);">New: premium add-ons available</div>
-              <div id="dashboard-addon-nudge-text" style="font-size:12px;color:var(--gu-dust);margin-top:2px;">Cleo's Club, AI Piece Finder, and more — tap to see what's available</div>
-            </div>
-            <div style="font-size:16px;color:#5E35B1;">→</div>
           </div>
         </div>
 
@@ -2719,39 +2764,45 @@
              processing yet: this is a running tally of paid-tool unlocks and
              studio equipment charges (tablet/stylus) to add to bills at
              checkout, until proper billing is wired up. -->
-        <div class="chart-container">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <h3 style="margin: 0;">💷 Extra Charges Today <span style="font-size: 11px; font-weight: 500; color: var(--gu-dust);">(prototype)</span></h3>
-            <button onclick="loadTodaysExtraCharges()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
-          </div>
-          <div style="font-size: 11px; color: var(--gu-dust); margin-bottom: 10px;">Paid app tools and studio equipment (tablet/stylus) used this visit — add these to the bill at checkout. Not charged automatically yet.</div>
-          <div id="extras-today-list">
-            <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
+        <div id="dashboard-section-extras" class="dashboard-section" style="display:none;">
+          <div class="chart-container">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="margin: 0;">💷 Extra Charges Today <span style="font-size: 11px; font-weight: 500; color: var(--gu-dust);">(prototype)</span></h3>
+              <button onclick="loadTodaysExtraCharges()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
+            </div>
+            <div style="font-size: 11px; color: var(--gu-dust); margin-bottom: 10px;">Paid app tools and studio equipment (tablet/stylus) used this visit — add these to the bill at checkout. Not charged automatically yet.</div>
+            <div id="extras-today-list">
+              <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Loading...</div>
+            </div>
           </div>
         </div>
 
         <!-- Loyalty Leaderboard -->
-        <div class="chart-container">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-            <h3 style="margin:0;">🏆 Loyal Customers</h3>
-            <div style="display:flex;gap:10px;align-items:center;">
-              <button onclick="openLoyaltyReportModal()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">📋 Full Report</button>
-              <button onclick="loadLoyaltyLeaderboard()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
+        <div id="dashboard-section-loyalty" class="dashboard-section" style="display:none;">
+          <div class="chart-container">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <h3 style="margin:0;">🏆 Loyal Customers</h3>
+              <div style="display:flex;gap:10px;align-items:center;">
+                <button onclick="openLoyaltyReportModal()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">📋 Full Report</button>
+                <button onclick="loadLoyaltyLeaderboard()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
+              </div>
             </div>
+            <div style="font-size:11px;color:var(--gu-dust);margin-bottom:12px;">Your top customers by loyalty tier and points. Tier is awarded automatically based on visit count or total spend.</div>
+            <div id="loyalty-leaderboard-list"><div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">Loading…</div></div>
           </div>
-          <div style="font-size:11px;color:var(--gu-dust);margin-bottom:12px;">Your top customers by loyalty tier and points. Tier is awarded automatically based on visit count or total spend.</div>
-          <div id="loyalty-leaderboard-list"><div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">Loading…</div></div>
         </div>
 
         <!-- Device slots panel -->
-        <div class="chart-container">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-            <h3 style="margin:0;">📱 Active Devices</h3>
-            <button onclick="loadDevicePanel()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
-          </div>
-          <div style="font-size:11px;color:var(--gu-dust);margin-bottom:10px;">Devices currently using this dashboard. Your plan controls how many can be active at once. Release a device to free up a slot.</div>
-          <div id="device-panel-content">
-            <p style="color:var(--gu-dust);font-size:13px;padding:8px 0;">Loading…</p>
+        <div id="dashboard-section-devices" class="dashboard-section" style="display:none;">
+          <div class="chart-container">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <h3 style="margin:0;">📱 Active Devices</h3>
+              <button onclick="loadDevicePanel()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
+            </div>
+            <div style="font-size:11px;color:var(--gu-dust);margin-bottom:10px;">Devices currently using this dashboard. Your plan controls how many can be active at once. Release a device to free up a slot.</div>
+            <div id="device-panel-content">
+              <p style="color:var(--gu-dust);font-size:13px;padding:8px 0;">Loading…</p>
+            </div>
           </div>
         </div>
       </div>
@@ -8507,6 +8558,14 @@ function applyPlatformRevenueAccess() {
   const revenueSection = document.getElementById('kiln-cafe-revenue-section');
   if (revenueSection) {
     revenueSection.style.display = hasAccess ? 'block' : 'none';
+    // Genuine real tile visibility, per direct request — the 3
+    // director-only Dashboard tiles (Revenue, Popular Designs, Tool
+    // Usage) correctly show/hide using this same, existing, unchanged
+    // access check, rather than a genuinely separate, parallel one.
+    ['dashboard-tile-revenue', 'dashboard-tile-designs', 'dashboard-tile-tools'].forEach(id => {
+      const tile = document.getElementById(id);
+      if (tile) tile.style.display = hasAccess ? 'flex' : 'none';
+    });
     // Genuine, honest diagnostic — logs precisely why this section is
     // shown or hidden, since static code review couldn't find a bug
     // in the logic but it's been reported not showing on some real
@@ -10869,6 +10928,13 @@ async function populateDashboard() {
   const isDirector = PLATFORM_REVENUE_ACCESS.some(n => n.toLowerCase() === firstName.toLowerCase());
   const revenueSection = document.getElementById('kiln-cafe-revenue-section');
   if (revenueSection) revenueSection.style.display = isDirector ? 'block' : 'none';
+  // Genuine real tile visibility, per direct request — same director
+  // check as above, correctly kept in sync across both real places
+  // this access logic runs.
+  ['dashboard-tile-revenue', 'dashboard-tile-designs', 'dashboard-tile-tools'].forEach(id => {
+    const tile = document.getElementById(id);
+    if (tile) tile.style.display = isDirector ? 'flex' : 'none';
+  });
 
   if (!isDirector) {
     clearInterval(window._kilnCafeRevenueTimer);
@@ -12780,6 +12846,17 @@ function showSetupSection(section) {
   document.getElementById('setup-tile-menu').style.display = 'none';
   document.querySelectorAll('.setup-section').forEach(el => el.style.display = 'none');
   document.getElementById(`setup-section-${section}`).style.display = 'block';
+}
+
+// Genuine real tile-section switcher for Dashboard, per direct
+// request, same proven pattern as every other multi-section screen.
+// No individual real load call needed per section — every real load
+// already fires automatically on tab-open via populateDashboard().
+function showDashboardSection(section) {
+  document.getElementById('dashboard-tile-menu').style.display = 'none';
+  document.querySelectorAll('.dashboard-section').forEach(el => el.style.display = 'none');
+  const target = section === 'revenue' ? 'kiln-cafe-revenue-section' : `dashboard-section-${section}`;
+  document.getElementById(target).style.display = 'block';
 }
 
 // ── Genuine real Barista landing page, per direct request ──
