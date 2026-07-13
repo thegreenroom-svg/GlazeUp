@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>The Kiln Cafe · Studio Admin</title>
+  <meta name="version" content="1.1.0">
   <link rel="manifest" href="/admin/manifest.json">
   <link rel="apple-touch-icon" href="/brand-assets/kiln-cafe-icon/kiln-cafe-icon-180.png">
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
@@ -3639,7 +3640,10 @@
       <!-- SETUP TAB -->
       <!-- ═════════════════════════════════════════════ -->
       <div id="setup-view" class="view" style="display: none;">
-        <h2 style="margin-top: 0;">Setup Checklist</h2>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+          <h2 style="margin-top:0;">Setup</h2>
+          <span style="font-size:10px;color:var(--gu-dust);font-weight:600;">v1.1.0</span>
+        </div>
         <p style="color: var(--gu-dust); line-height: 1.6;">
           Complete these three steps to unlock analytics and billing. You're already on the free trial!
         </p>
@@ -8054,6 +8058,7 @@ const SHIFT_PIN_LOGIN_ENABLED = true; // genuine real login restored after tonig
 // Set to false once real individual PINs are in use and you don't want
 // this hint shown any more — the notice is purely cosmetic, it doesn't
 // affect which PINs actually work.
+const APP_VERSION = '1.1.0';
 const DEMO_MODE = true;
 
 let currentShiftStaff = null; // { id, name, role }

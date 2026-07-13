@@ -1,7 +1,7 @@
 {
   "name": "glazeup",
-  "version": "0.1.0",
-  "description": "Pottery painting studio customer tools and management suite",
+  "version": "1.1.0",
+  "description": "The Kiln Cafe \u2014 studio management app (GlazeUp platform)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
