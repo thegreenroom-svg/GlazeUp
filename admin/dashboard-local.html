@@ -458,11 +458,12 @@
       position: relative;
       background: linear-gradient(180deg, #ffffff 0%, #fdf9f6 100%);
       border-bottom: 1px solid var(--gu-border);
-      padding: 10px 20px;
+      padding: 6px 10px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      overflow: hidden;
+      flex-wrap: wrap;
+      gap: 4px;
       box-shadow:
         inset 0 1px 0 rgba(255,255,255,0.7),
         0 4px 14px -4px rgba(61,28,18,0.1);
@@ -471,10 +472,11 @@
     .admin-header h1 {
       margin: 0;
       font-family: var(--gu-font-display);
-      font-size: 21px;
+      font-size: 15px;
       font-weight: 700;
       color: var(--gu-accent);
       letter-spacing: -0.01em;
+      white-space: nowrap;
     }
 
     .admin-header-right {
@@ -2442,7 +2444,7 @@
           <span style="font-size:15px;line-height:1;">🔍</span>
           <span style="font-size:5.5px;font-weight:800;line-height:1;">Find Piece</span>
         </button>
-        <div><span class="status-badge free">Free tier (1st month)</span></div>
+        <div style="display:none;"><span class="status-badge free">Free tier (1st month)</span></div>
         <!-- Genuine real, tidy header icons, per direct request —
              consolidates the Break and Find Piece buttons (previously
              large, floating circles competing with everything else
