@@ -1934,7 +1934,7 @@
 </div>
 
 <!-- Splash / resting screen -->
-<div id="splash-screen" style="position:fixed;inset:0;z-index:5000;background:#0E1A18;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:default;">
+<div id="splash-screen" style="position:fixed;inset:0;z-index:5000;background:#0E1A18;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;" onclick="dismissSplash()">
 
   <!-- Fullscreen animated logo -->
   <div style="position:relative;width:140px;height:140px;display:flex;align-items:center;justify-content:center;">
@@ -19595,10 +19595,8 @@ function wireSplash() {
   const el = document.getElementById('splash-screen');
   if (!el) return;
   
-  // Auto-dismiss splash after 3 seconds
-  setTimeout(() => {
-    dismissSplash();
-  }, 3000);
+  // Splash stays until user clicks it
+  el.addEventListener('click', dismissSplash);
 }
 
 // Animated arrow motif (splash only) — traces K, over the kiln, to I,
