@@ -4722,7 +4722,7 @@ app.post('/api/hbp/orders/:orderId/create-royal-mail-label', async (req, res) =>
       console.error('Royal Mail API error (Host By Post):', rmData);
       return res.status(502).json({ error: 'Royal Mail rejected the label request — check the address and try again.' });
     }
-    await supabase.from('hbp_orders').update({ status: 'labelled' }).eq('id', orderId);
+    await supabase.from('hbp_orders').update({ status: 'labelled', journey_stage: 'kit_labelled' }).eq('id', orderId);
     res.json({
       status: 'created', royalMailResponse: rmData,
       weightWarning: weightIsHonestPlaceholder ? `Used an unconfirmed placeholder weight (${weightGrams}g) — worth actually weighing a real kit and updating this in the product catalogue.` : null,
@@ -4730,6 +4730,132 @@ app.post('/api/hbp/orders/:orderId/create-royal-mail-label', async (req, res) =>
   } catch (error) {
     console.error('Royal Mail integration error (Host By Post):', error);
     res.status(500).json({ error: 'Could not reach Royal Mail — try again.' });
+  }
+});
+
+// POST /api/hbp/orders/:orderId/advance — move an order to the next
+// stage in the postal journey. Each stage is recorded as a journey
+// event so there's a complete audit trail.
+// Stages: kit_labelled → kit_dispatched → piece_received →
+//         firing → fired_dispatched → (repeat from piece_received
+//         for additional firings) → complete
+app.post('/api/hbp/orders/:orderId/advance', async (req, res) => {
+  const { orderId } = req.params;
+  const { stage, notes, staffName, trackingNumber, needsAdditionalFiring } = req.body;
+
+  const validStages = [
+    'kit_labelled', 'kit_dispatched',
+    'piece_received', 'firing', 'fired_dispatched',
+    'complete'
+  ];
+  if (!validStages.includes(stage)) {
+    return res.status(400).json({ error: `Invalid stage: ${stage}` });
+  }
+
+  // Build the order update
+  const updates = { journey_stage: stage, status: stage };
+  if (stage === 'piece_received') updates.return_received_at = new Date().toISOString();
+  if (stage === 'firing') {/* no extra fields */}
+  if (stage === 'fired_dispatched') {
+    updates.fired_dispatched_at = new Date().toISOString();
+    if (trackingNumber) updates.royal_mail_tracking_number = trackingNumber;
+  }
+  if (stage === 'kit_dispatched' && trackingNumber) updates.royal_mail_tracking_number = trackingNumber;
+  if (typeof needsAdditionalFiring === 'boolean') updates.needs_additional_firing = needsAdditionalFiring;
+  if (notes) updates.notes = notes;
+
+  // Increment firing count when entering firing stage
+  if (stage === 'firing') {
+    const { data: order } = await supabase.from('hbp_orders').select('firing_count').eq('id', orderId).single();
+    updates.firing_count = (order?.firing_count || 0) + 1;
+  }
+
+  const { error: updateError } = await supabase.from('hbp_orders').update(updates).eq('id', orderId);
+  if (updateError) return res.status(500).json({ error: updateError.message });
+
+  // Log the journey event
+  await supabase.from('hbp_journey_events').insert({
+    order_id: orderId,
+    stage,
+    notes: notes || null,
+    staff_name: staffName || null,
+    tracking_number: trackingNumber || null
+  });
+
+  res.json({ advanced: true, stage });
+});
+
+// GET /api/hbp/orders/:orderId/journey — full journey history for one order
+app.get('/api/hbp/orders/:orderId/journey', async (req, res) => {
+  const { orderId } = req.params;
+  const { data, error } = await supabase
+    .from('hbp_journey_events')
+    .select('*')
+    .eq('order_id', orderId)
+    .order('created_at', { ascending: true });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ events: data || [] });
+});
+
+// POST /api/hbp/orders/:orderId/return-label — generate a return label
+// for the customer to send their painted piece back to us.
+// Uses the same Royal Mail Click & Drop integration but in reverse —
+// the sender is the customer, the recipient is Host By Post's return address.
+app.post('/api/hbp/orders/:orderId/return-label', async (req, res) => {
+  const { orderId } = req.params;
+  const { studioId } = req.body;
+
+  const { data: order } = await supabase.from('hbp_orders').select('*, hbp_products(weight_grams)').eq('id', orderId).single();
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+
+  // Get the HBP Royal Mail setup (same as kit dispatch but reversed addresses)
+  const { data: setup } = await supabase.from('studio_settings')
+    .select('value').eq('studio_id', studioId).eq('key', 'hbp_royal_mail').single();
+  if (!setup?.value) return res.status(400).json({ error: 'Royal Mail not configured for Host By Post' });
+
+  const rm = JSON.parse(setup.value);
+  if (!rm.apiKey) return res.status(400).json({ error: 'No API key configured' });
+
+  // For a return label, sender = customer, recipient = us
+  const returnLabelPayload = {
+    orders: [{
+      orderReference: `RETURN-${order.order_reference}`,
+      recipient: {
+        name: rm.businessName || 'Host By Post',
+        addressLine1: rm.addressLine1,
+        city: rm.city,
+        postcode: rm.postcode,
+        countryCode: 'GB'
+      },
+      sender: {
+        name: order.customer_name,
+        addressLine1: order.shipping_address_line1,
+        addressLine2: order.shipping_address_line2 || '',
+        city: order.shipping_city,
+        postcode: order.shipping_postcode,
+        countryCode: 'GB'
+      },
+      packages: [{ weightInGrams: order.hbp_products?.weight_grams || 400 }],
+      orderDate: new Date().toISOString(),
+      serviceCode: 'TPS48'
+    }]
+  };
+
+  try {
+    const rmRes = await fetch('https://api.parcel.royalmail.com/api/v1/orders', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${rm.apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(returnLabelPayload)
+    });
+    const rmData = await rmRes.json();
+    const tracking = rmData.orders?.[0]?.packages?.[0]?.trackingNumber;
+    if (tracking) {
+      await supabase.from('hbp_orders').update({ return_label_tracking: tracking }).eq('id', orderId);
+      await supabase.from('hbp_journey_events').insert({ order_id: orderId, stage: 'return_label_created', tracking_number: tracking });
+    }
+    res.json({ created: true, tracking, rmData });
+  } catch(e) {
+    res.status(500).json({ error: 'Royal Mail error: ' + e.message });
   }
 });
 

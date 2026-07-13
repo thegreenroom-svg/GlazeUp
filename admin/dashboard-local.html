@@ -3454,11 +3454,21 @@
           <div id="hbp-order-create-status" style="font-size:12px;color:var(--gu-dust);margin-top:10px;"></div>
         </div>
 
-        <!-- Real orders list -->
+        <!-- Real orders list with full journey stages -->
         <div class="setup-card">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
             <h3 style="margin:0;">Orders</h3>
             <button onclick="loadHostByPostOrders()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">🔄 Refresh</button>
+          </div>
+          <!-- Stage filter tabs -->
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;" id="hbp-stage-tabs">
+            <button onclick="filterHBPOrders('all')" class="hbp-stage-tab active" style="background:#2B2724;color:white;border:none;border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">All</button>
+            <button onclick="filterHBPOrders('pending')" class="hbp-stage-tab" style="background:var(--gu-bg);color:var(--gu-text);border:1px solid var(--gu-border);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">📦 Pending</button>
+            <button onclick="filterHBPOrders('kit_dispatched')" class="hbp-stage-tab" style="background:var(--gu-bg);color:var(--gu-text);border:1px solid var(--gu-border);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">🚚 Kit Sent</button>
+            <button onclick="filterHBPOrders('piece_received')" class="hbp-stage-tab" style="background:var(--gu-bg);color:var(--gu-text);border:1px solid var(--gu-border);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">📬 Piece Back</button>
+            <button onclick="filterHBPOrders('firing')" class="hbp-stage-tab" style="background:var(--gu-bg);color:var(--gu-text);border:1px solid var(--gu-border);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">🔥 Firing</button>
+            <button onclick="filterHBPOrders('fired_dispatched')" class="hbp-stage-tab" style="background:var(--gu-bg);color:var(--gu-text);border:1px solid var(--gu-border);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">🎁 Returned</button>
+            <button onclick="filterHBPOrders('complete')" class="hbp-stage-tab" style="background:var(--gu-bg);color:var(--gu-text);border:1px solid var(--gu-border);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;">✓ Complete</button>
           </div>
           <div id="hbp-orders-list"><div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">Loading…</div></div>
         </div>
@@ -13946,31 +13956,120 @@ async function createHostByPostOrder() {
   } catch (e) { statusEl.textContent = 'Could not add order — try again.'; }
 }
 
+// Stage metadata — labels, colours, next actions for each journey stage
+const HBP_STAGES = {
+  pending:          { label: 'Pending',       color: '#8a8175', emoji: '📦', next: 'kit_labelled',    nextLabel: '📮 Create kit label' },
+  kit_labelled:     { label: 'Label ready',   color: '#B87946', emoji: '🏷️', next: 'kit_dispatched', nextLabel: '🚚 Mark kit sent' },
+  kit_dispatched:   { label: 'Kit sent',      color: '#2196F3', emoji: '🚚', next: 'piece_received',  nextLabel: '📬 Mark piece received back' },
+  piece_received:   { label: 'Piece received',color: '#9C27B0', emoji: '📬', next: 'firing',          nextLabel: '🔥 Mark in kiln' },
+  firing:           { label: 'Firing',        color: '#FF5722', emoji: '🔥', next: 'fired_dispatched',nextLabel: '🎁 Mark fired & posted back' },
+  fired_dispatched: { label: 'Returned',      color: '#4CAF50', emoji: '🎁', next: 'complete',        nextLabel: '✓ Mark complete' },
+  complete:         { label: 'Complete',      color: '#2e7d32', emoji: '✓',  next: null,              nextLabel: null },
+};
+
+let _hbpAllOrders = [];
+let _hbpStageFilter = 'all';
+
 async function loadHostByPostOrders() {
   const listEl = document.getElementById('hbp-orders-list');
   try {
     const res = await fetch(`${API_URL}/api/hbp/orders`);
     const data = await res.json();
-    const orders = data.orders || [];
-    if (!orders.length) {
-      listEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">No real orders yet.</div>';
-      return;
-    }
-    listEl.innerHTML = orders.map(o => `
-      <div style="padding:12px;background:var(--gu-bg);border-radius:10px;margin-bottom:8px;">
-        <div style="display:flex;justify-content:space-between;align-items:start;">
-          <div>
-            <div style="font-weight:700;font-size:13px;">${o.customer_name} — ${o.order_reference}</div>
-            <div style="font-size:11px;color:var(--gu-dust);margin-top:2px;">${o.shipping_address_line1}, ${o.shipping_city} ${o.shipping_postcode}</div>
-            ${o.product ? `<div style="font-size:11px;color:var(--gu-dust);margin-top:2px;">${o.quantity}× ${o.product.name}</div>` : ''}
-          </div>
-          ${o.status === 'pending' ? `<button onclick="createHostByPostLabel('${o.id}')" style="background:#B87946;color:white;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">📮 Label</button>` : `<span style="font-size:11px;color:#2e7d32;font-weight:700;">✓ ${o.status}</span>`}
-        </div>
-      </div>
-    `).join('');
+    _hbpAllOrders = data.orders || [];
+    renderHBPOrders();
   } catch (e) {
     listEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">Could not load — try again.</div>';
   }
+}
+
+function filterHBPOrders(stage) {
+  _hbpStageFilter = stage;
+  document.querySelectorAll('.hbp-stage-tab').forEach(btn => {
+    btn.style.background = 'var(--gu-bg)';
+    btn.style.color = 'var(--gu-text)';
+    btn.style.border = '1px solid var(--gu-border)';
+  });
+  event.target.style.background = '#2B2724';
+  event.target.style.color = 'white';
+  event.target.style.border = 'none';
+  renderHBPOrders();
+}
+
+function renderHBPOrders() {
+  const listEl = document.getElementById('hbp-orders-list');
+  const orders = _hbpStageFilter === 'all'
+    ? _hbpAllOrders
+    : _hbpAllOrders.filter(o => (o.journey_stage || o.status) === _hbpStageFilter);
+
+  if (!orders.length) {
+    listEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">No orders at this stage.</div>';
+    return;
+  }
+
+  listEl.innerHTML = orders.map(o => {
+    const stage = o.journey_stage || o.status || 'pending';
+    const meta = HBP_STAGES[stage] || HBP_STAGES.pending;
+    const firingCount = o.firing_count || 0;
+
+    return `
+      <div style="padding:14px;background:var(--gu-bg);border-radius:12px;margin-bottom:10px;border-left:3px solid ${meta.color};">
+        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:800;font-size:13px;">${o.customer_name}</div>
+            <div style="font-size:10px;color:var(--gu-dust);margin-top:1px;">${o.order_reference}</div>
+            <div style="font-size:11px;color:var(--gu-dust);margin-top:2px;">${o.shipping_city} ${o.shipping_postcode}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;margin-left:10px;">
+            <span style="background:${meta.color};color:white;border-radius:20px;padding:3px 10px;font-size:10px;font-weight:700;">${meta.emoji} ${meta.label}</span>
+            ${firingCount > 0 ? `<div style="font-size:10px;color:var(--gu-dust);margin-top:3px;">Firing ${firingCount}</div>` : ''}
+          </div>
+        </div>
+
+        <!-- Journey progress bar -->
+        <div style="display:flex;gap:3px;margin-bottom:10px;">
+          ${['pending','kit_dispatched','piece_received','firing','fired_dispatched','complete'].map(s => `
+            <div style="flex:1;height:3px;border-radius:2px;background:${_hbpStageReached(stage,s) ? HBP_STAGES[s]?.color || '#2e7d32' : 'var(--gu-border)'};"></div>
+          `).join('')}
+        </div>
+
+        <!-- Action buttons -->
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          ${stage === 'pending' ? `
+            <button onclick="createHostByPostLabel('${o.id}')" style="background:#B87946;color:white;border:none;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer;">📮 Create Kit Label</button>
+          ` : ''}
+          ${meta.next ? `
+            <button onclick="advanceHBPOrder('${o.id}','${meta.next}')" style="background:${meta.color};color:white;border:none;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer;">${meta.nextLabel}</button>
+          ` : ''}
+          ${stage === 'kit_dispatched' ? `
+            <button onclick="createHBPReturnLabel('${o.id}')" style="background:#5E35B1;color:white;border:none;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer;">📬 Return Label</button>
+          ` : ''}
+          ${stage === 'fired_dispatched' ? `
+            <button onclick="advanceHBPOrder('${o.id}','piece_received',true)" style="background:#FF5722;color:white;border:none;border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer;">🔄 Another Firing</button>
+          ` : ''}
+          <button onclick="showHBPJourney('${o.id}')" style="background:none;border:1px solid var(--gu-border);color:var(--gu-dust);border-radius:8px;padding:7px 12px;font-size:11px;font-weight:700;cursor:pointer;">📋 History</button>
+        </div>
+        ${o.royal_mail_tracking_number ? `<div style="font-size:10px;color:var(--gu-dust);margin-top:6px;">Tracking: ${o.royal_mail_tracking_number}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function _hbpStageReached(current, check) {
+  const order = ['pending','kit_labelled','kit_dispatched','piece_received','firing','fired_dispatched','complete'];
+  return order.indexOf(current) >= order.indexOf(check);
+}
+
+async function advanceHBPOrder(orderId, stage, additionalFiring) {
+  try {
+    const staffName = currentShiftStaff?.name || null;
+    const res = await fetch(`${API_URL}/api/hbp/orders/${orderId}/advance`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stage, staffName, needsAdditionalFiring: additionalFiring || false })
+    });
+    if (!res.ok) { const d = await res.json(); alert(d.error || 'Could not update order.'); return; }
+    loadHostByPostOrders();
+  } catch(e) { alert('Could not update — try again.'); }
 }
 
 async function createHostByPostLabel(orderId) {
@@ -13981,6 +14080,47 @@ async function createHostByPostLabel(orderId) {
     if (data.weightWarning) alert(`✓ Label created.\n\n${data.weightWarning}`);
     loadHostByPostOrders();
   } catch (e) { alert('Could not create label — try again.'); }
+}
+
+async function createHBPReturnLabel(orderId) {
+  try {
+    const res = await fetch(`${API_URL}/api/hbp/orders/${orderId}/return-label`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId })
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Could not create return label.'); return; }
+    alert(`✓ Return label created. Tracking: ${data.tracking || 'see Royal Mail dashboard'}`);
+    loadHostByPostOrders();
+  } catch(e) { alert('Could not create return label — try again.'); }
+}
+
+async function showHBPJourney(orderId) {
+  const res = await fetch(`${API_URL}/api/hbp/orders/${orderId}/journey`);
+  const data = await res.json();
+  const events = data.events || [];
+  const sheet = document.createElement('div');
+  sheet.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(43,39,36,0.5);backdrop-filter:blur(4px);display:flex;align-items:flex-end;';
+  sheet.onclick = e => { if (e.target === sheet) sheet.remove(); };
+  const inner = document.createElement('div');
+  inner.style.cssText = 'background:white;border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:480px;margin:0 auto;max-height:70vh;overflow-y:auto;';
+  inner.innerHTML = `
+    <div style="font-size:16px;font-weight:800;color:#2B2724;margin-bottom:16px;">Order Journey</div>
+    ${events.length ? events.map(e => `
+      <div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--gu-border);">
+        <div style="font-size:18px;">${HBP_STAGES[e.stage]?.emoji || '•'}</div>
+        <div>
+          <div style="font-size:13px;font-weight:700;">${HBP_STAGES[e.stage]?.label || e.stage}</div>
+          <div style="font-size:11px;color:var(--gu-dust);">${new Date(e.created_at).toLocaleDateString('en-GB', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}${e.staff_name ? ' · ' + e.staff_name : ''}</div>
+          ${e.tracking_number ? `<div style="font-size:10px;color:#B87946;margin-top:2px;">Tracking: ${e.tracking_number}</div>` : ''}
+          ${e.notes ? `<div style="font-size:11px;color:var(--gu-dust);margin-top:2px;">${e.notes}</div>` : ''}
+        </div>
+      </div>`).join('') : '<div style="padding:16px;text-align:center;color:var(--gu-dust);">No history yet.</div>'}
+    <button onclick="this.closest('[style*=fixed]').remove()" style="width:100%;margin-top:16px;background:none;border:none;padding:12px;font-size:14px;color:#8a8175;cursor:pointer;">Close</button>
+  `;
+  sheet.appendChild(inner);
+  document.body.appendChild(sheet);
 }
 
 function showBaristaSection(section) {
