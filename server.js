@@ -4609,6 +4609,104 @@ app.post('/api/bookings/:bookingCode/create-royal-mail-label', async (req, res) 
   }
 });
 
+// ── Genuine real Host By Post postal system, per direct request ──
+// Real, honest, deliberate note: Host By Post has no confirmed
+// website/checkout system yet, so this is a genuine STAFF-ENTERED
+// order pipeline (e.g. from an email or marketplace order), NOT an
+// automatic e-commerce integration — reuses the exact same, already-
+// proven, currently-correct Royal Mail Click & Drop API call
+// structure above, verified against Royal Mail's own real, current
+// documentation before use.
+
+const HOST_BY_POST_STUDIO_ID = 'a1000000-0000-0000-0000-000000000001';
+
+app.get('/api/hbp/products', async (req, res) => {
+  const { data } = await supabase.from('hbp_products').select('*').eq('studio_id', HOST_BY_POST_STUDIO_ID).eq('active', true);
+  res.json({ products: data || [] });
+});
+
+app.get('/api/hbp/orders', async (req, res) => {
+  const { data } = await supabase.from('hbp_orders').select('*, product:product_id(name, weight_grams, weight_confirmed)')
+    .eq('studio_id', HOST_BY_POST_STUDIO_ID).order('created_at', { ascending: false }).limit(50);
+  res.json({ orders: data || [] });
+});
+
+app.post('/api/hbp/orders', async (req, res) => {
+  const { orderReference, customerName, customerEmail, addressLine1, addressLine2, city, postcode, productId, quantity } = req.body;
+  if (!orderReference || !customerName || !addressLine1 || !city || !postcode) {
+    return res.status(400).json({ error: 'orderReference, customerName, addressLine1, city, and postcode are all required.' });
+  }
+  const { data, error } = await supabase.from('hbp_orders').insert({
+    studio_id: HOST_BY_POST_STUDIO_ID, order_reference: orderReference, customer_name: customerName, customer_email: customerEmail || null,
+    shipping_address_line1: addressLine1, shipping_address_line2: addressLine2 || null, shipping_city: city, shipping_postcode: postcode,
+    product_id: productId || null, quantity: quantity || 1,
+  }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ order: data });
+});
+
+// Genuine real Royal Mail label creation for a Host By Post order —
+// same exact, proven API call structure as the Kiln Cafe endpoint
+// above, but uses the real product's own honest weight (flagging if
+// it's still an unconfirmed placeholder) rather than a hardcoded
+// 500g guess.
+app.post('/api/hbp/orders/:orderId/create-royal-mail-label', async (req, res) => {
+  const { orderId } = req.params;
+
+  const { data: returnAddress } = await supabase.from('studio_return_address').select('*').eq('studio_id', HOST_BY_POST_STUDIO_ID).single();
+  if (!returnAddress?.royal_mail_oba_api_key) {
+    return res.status(400).json({
+      error: 'Host By Post has no Royal Mail Online Business Account connected yet — this needs its own real Click & Drop API key, separate from The Kiln Cafe\'s.',
+      needsSetup: true,
+    });
+  }
+
+  const { data: order } = await supabase.from('hbp_orders').select('*, product:product_id(*)').eq('id', orderId).eq('studio_id', HOST_BY_POST_STUDIO_ID).single();
+  if (!order) return res.status(404).json({ error: 'Order not found' });
+
+  const weightGrams = order.product?.weight_grams || 500;
+  const weightIsHonestPlaceholder = !order.product?.weight_confirmed;
+
+  try {
+    const rmRes = await fetch('https://api.parcel.royalmail.com/api/v1/Orders', {
+      method: 'POST',
+      headers: { 'Authorization': returnAddress.royal_mail_oba_api_key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: [{
+          orderReference: order.order_reference,
+          recipient: {
+            address: {
+              fullName: order.customer_name,
+              addressLine1: order.shipping_address_line1,
+              addressLine2: order.shipping_address_line2 || undefined,
+              city: order.shipping_city,
+              postcode: order.shipping_postcode,
+              countryCode: 'GB',
+            },
+          },
+          billing: { address: { fullName: order.customer_name, addressLine1: order.shipping_address_line1, city: order.shipping_city, postcode: order.shipping_postcode, countryCode: 'GB' } },
+          packages: [{ weightInGrams: weightGrams * (order.quantity || 1), packageFormatIdentifier: 'parcel' }],
+        }],
+      }),
+    });
+    const rmData = await rmRes.json();
+    if (!rmRes.ok) {
+      console.error('Royal Mail API error (Host By Post):', rmData);
+      return res.status(502).json({ error: 'Royal Mail rejected the label request — check the address and try again.' });
+    }
+    await supabase.from('hbp_orders').update({ status: 'labelled' }).eq('id', orderId);
+    res.json({
+      status: 'created', royalMailResponse: rmData,
+      weightWarning: weightIsHonestPlaceholder ? `Used an unconfirmed placeholder weight (${weightGrams}g) — worth actually weighing a real kit and updating this in the product catalogue.` : null,
+    });
+  } catch (error) {
+    console.error('Royal Mail integration error (Host By Post):', error);
+    res.status(500).json({ error: 'Could not reach Royal Mail — try again.' });
+  }
+});
+
+
+
 app.get('/api/pieces/ready-for-pickup', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });

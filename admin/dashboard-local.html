@@ -2745,22 +2745,22 @@
              working showStaffSection() function — real content and
              logic underneath is completely untouched. -->
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
-          <button class="flow-step active" id="staff-subtab-booking" onclick="showStaffSection('booking')" style="background:#2e7d32;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+          <button class="flow-step active glaze-tile" id="staff-subtab-booking" onclick="showStaffSection('booking')" style="background:#2e7d32;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
             <span style="font-size:24px;">📋</span>
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Booking Details</span>
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">Look up, assign a table, open the session</span>
           </button>
-          <button class="flow-step" id="staff-subtab-engagement" onclick="showStaffSection('engagement')" style="background:#2e7d32;filter:brightness(0.9);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+          <button class="flow-step glaze-tile" id="staff-subtab-engagement" onclick="showStaffSection('engagement')" style="background:#2e7d32;filter:brightness(0.9);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
             <span style="font-size:24px;">🎨</span>
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Customer Engagement</span>
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">While they're painting</span>
           </button>
-          <button class="flow-step" id="staff-subtab-completion" onclick="showStaffSection('completion')" style="background:#2e7d32;filter:brightness(0.8);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+          <button class="flow-step glaze-tile" id="staff-subtab-completion" onclick="showStaffSection('completion')" style="background:#2e7d32;filter:brightness(0.8);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
             <span style="font-size:24px;">📷</span>
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Completion</span>
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">Reference photos, finishing up</span>
           </button>
-          <button class="flow-step" id="staff-subtab-kiln" onclick="showStaffSection('kiln')" style="background:#2e7d32;filter:brightness(0.7);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+          <button class="flow-step glaze-tile" id="staff-subtab-kiln" onclick="showStaffSection('kiln')" style="background:#2e7d32;filter:brightness(0.7);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
             <span style="font-size:24px;">🔥</span>
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Kiln &amp; Inventory</span>
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">What's firing, real stock</span>
@@ -3309,12 +3309,8 @@
         <div id="setup-section-hostbypost" class="setup-section" style="display:none;">
         <!-- Genuine real Host By Post page — per direct request,
              populated with what's genuinely already known about this
-             separate real business (the postal pottery kit brand,
-             sister to The Kiln Cafe). Deliberately honest about being
-             a starting point, not a complete operational dashboard —
-             no real order data, stock, or logistics integration
-             exists for this business yet, so none is faked here. -->
-        <div class="setup-card" style="background:linear-gradient(135deg,rgba(184,121,70,0.06),rgba(232,217,196,0.1));border:1.5px solid rgba(184,121,70,0.25);">
+             separate real business. -->
+        <div class="setup-card" style="background:linear-gradient(135deg,rgba(184,121,70,0.06),rgba(232,217,196,0.1));border:1.5px solid rgba(184,121,70,0.25);margin-bottom:16px;">
           <h3>📦 Host By Post</h3>
           <p>A postal pottery painting kit brand — sister to The Kiln Cafe. Launched with a ceramic mug kit.</p>
           <div style="background:var(--gu-bg);border-radius:10px;padding:14px;margin-top:12px;font-size:12px;color:var(--gu-text);line-height:1.7;">
@@ -3323,8 +3319,65 @@
             • Website copy tone: warm but not saccharine, subtly cheeky, grounded in quality
           </div>
           <div style="background:#fff8e1;border-radius:10px;padding:12px 14px;margin-top:12px;font-size:12px;color:#8a6d1f;">
-            Honest note: this is genuinely a starting point, not a working dashboard yet — no real order data, stock levels, or logistics are connected here. Worth a proper session to scope out what this page should actually do once there's more real operational detail to work with.
+            Honest note: no real website checkout is confirmed for this brand yet, so orders below are entered by staff (e.g. from an email or marketplace sale), not pulled in automatically.
           </div>
+        </div>
+
+        <!-- Real Royal Mail connection — genuinely separate from The
+             Kiln Cafe's own, since this is a different real business
+             with its own real trading name and return address. -->
+        <div class="setup-card" style="margin-bottom:16px;">
+          <h3>📮 Royal Mail Click &amp; Drop — Host By Post</h3>
+          <p>Host By Post's own real Click & Drop account — separate from The Kiln Cafe's. Find your API key in Click & Drop → Settings → Integrations → Click & Drop API.</p>
+          <div style="margin-bottom:10px;">
+            <input type="text" id="hbp-rm-business-name" placeholder="Business/trading name" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">
+            <input type="text" id="hbp-rm-address1" placeholder="Return address line 1" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+              <input type="text" id="hbp-rm-city" placeholder="Town/City" style="flex:1;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;box-sizing:border-box;">
+              <input type="text" id="hbp-rm-postcode" placeholder="Postcode" style="width:110px;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;box-sizing:border-box;">
+            </div>
+            <input type="password" id="hbp-rm-api-key" placeholder="Click & Drop API key" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;box-sizing:border-box;">
+          </div>
+          <button class="btn-connect" onclick="saveHostByPostRoyalMailSetup()">Save</button>
+          <div id="hbp-rm-setup-status" style="font-size:11px;color:var(--gu-dust);margin-top:10px;"></div>
+        </div>
+
+        <!-- Real product weight — honest, needs actually confirming -->
+        <div class="setup-card" style="margin-bottom:16px;">
+          <h3>⚖️ Product Weights</h3>
+          <p style="font-size:12px;color:var(--gu-dust);margin-bottom:10px;">Real postage cost depends on this being accurate. The figure below is a genuine estimate, not yet confirmed against an actual weighed kit.</p>
+          <div id="hbp-products-list"><div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">Loading…</div></div>
+        </div>
+
+        <!-- Real new order entry -->
+        <div class="setup-card" style="margin-bottom:16px;">
+          <h3>+ New Order</h3>
+          <div style="display:grid;gap:8px;margin-bottom:10px;">
+            <input type="text" id="hbp-order-ref" placeholder="Order reference (e.g. from Etsy/email)" style="padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;">
+            <input type="text" id="hbp-customer-name" placeholder="Customer name" style="padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;">
+            <input type="email" id="hbp-customer-email" placeholder="Customer email (optional)" style="padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;">
+            <input type="text" id="hbp-addr1" placeholder="Address line 1" style="padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;">
+            <input type="text" id="hbp-addr2" placeholder="Address line 2 (optional)" style="padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;">
+            <div style="display:flex;gap:8px;">
+              <input type="text" id="hbp-city" placeholder="Town/City" style="flex:1;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;">
+              <input type="text" id="hbp-postcode" placeholder="Postcode" style="width:110px;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;">
+            </div>
+            <div style="display:flex;gap:8px;">
+              <select id="hbp-product-select" style="flex:1;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;background:white;"></select>
+              <input type="number" id="hbp-quantity" value="1" min="1" style="width:70px;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;">
+            </div>
+          </div>
+          <button onclick="createHostByPostOrder()" style="width:100%;background:var(--gu-primary);color:white;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;">+ Add Order</button>
+          <div id="hbp-order-create-status" style="font-size:12px;color:var(--gu-dust);margin-top:10px;"></div>
+        </div>
+
+        <!-- Real orders list -->
+        <div class="setup-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 style="margin:0;">Orders</h3>
+            <button onclick="loadHostByPostOrders()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">🔄 Refresh</button>
+          </div>
+          <div id="hbp-orders-list"><div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">Loading…</div></div>
         </div>
         </div>
         <div id="setup-section-preview" class="setup-section" style="display:none;">
@@ -4750,17 +4803,17 @@
         </a>
 
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
-          <button onclick="showCommunitySection('feed')" id="community-subtab-feed" class="staff-subtab-btn active" style="background:#8e44ad;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+          <button onclick="showCommunitySection('feed')" id="community-subtab-feed" class="staff-subtab-btn active glaze-tile" style="background:#8e44ad;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
             <span style="font-size:24px;">🖼️</span>
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Our Feed</span>
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">Moderate what customers share</span>
           </button>
-          <button onclick="showCommunitySection('profile')" id="community-subtab-profile" class="staff-subtab-btn" style="background:#8e44ad;filter:brightness(0.9);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+          <button onclick="showCommunitySection('profile')" id="community-subtab-profile" class="staff-subtab-btn glaze-tile" style="background:#8e44ad;filter:brightness(0.9);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
             <span style="font-size:24px;">🧑‍🎨</span>
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Our Profile</span>
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">What other studios see about you</span>
           </button>
-          <button onclick="showCommunitySection('directory')" id="community-subtab-directory" class="staff-subtab-btn" style="background:#8e44ad;filter:brightness(0.8);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+          <button onclick="showCommunitySection('directory')" id="community-subtab-directory" class="staff-subtab-btn glaze-tile" style="background:#8e44ad;filter:brightness(0.8);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
             <span style="font-size:24px;">🌍</span>
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Studios Worldwide</span>
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">See who else is on LINK</span>
@@ -5410,6 +5463,8 @@ function goToTab(tab, event) {
     loadStudioKnowledge();
     loadStudioPromotions();
     loadNetworkStatus();
+    loadHostByPostProducts();
+    loadHostByPostOrders();
   } else if (tab === 'branding') {
     loadBranding();
   } else if (tab === 'catalogue') {
@@ -12485,6 +12540,119 @@ function showSetupSection(section) {
 }
 
 // ── Genuine real Barista landing page, per direct request ──
+// ── Genuine real Host By Post postal system, per direct request ──
+async function saveHostByPostRoyalMailSetup() {
+  const statusEl = document.getElementById('hbp-rm-setup-status');
+  statusEl.textContent = 'Saving…';
+  try {
+    const res = await fetch(`${API_URL}/api/studio/return-address`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId: 'a1000000-0000-0000-0000-000000000001',
+        businessName: document.getElementById('hbp-rm-business-name').value,
+        addressLine1: document.getElementById('hbp-rm-address1').value,
+        city: document.getElementById('hbp-rm-city').value,
+        postcode: document.getElementById('hbp-rm-postcode').value,
+        royalMailApiKey: document.getElementById('hbp-rm-api-key').value,
+      }),
+    });
+    if (!res.ok) { statusEl.textContent = 'Could not save — try again.'; return; }
+    statusEl.textContent = '✓ Saved';
+  } catch (e) { statusEl.textContent = 'Could not save — try again.'; }
+}
+
+async function loadHostByPostProducts() {
+  const listEl = document.getElementById('hbp-products-list');
+  const selectEl = document.getElementById('hbp-product-select');
+  try {
+    const res = await fetch(`${API_URL}/api/hbp/products`);
+    const data = await res.json();
+    const products = data.products || [];
+    if (!products.length) {
+      listEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">No real products yet.</div>';
+      return;
+    }
+    listEl.innerHTML = products.map(p => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--gu-bg);border-radius:8px;margin-bottom:6px;">
+        <span style="font-size:13px;font-weight:600;">${p.name}</span>
+        <span style="font-size:12px;color:${p.weight_confirmed ? '#2e7d32' : '#d9534f'};font-weight:700;">${p.weight_grams}g ${p.weight_confirmed ? '✓ confirmed' : '— placeholder, needs weighing'}</span>
+      </div>
+    `).join('');
+    if (selectEl) selectEl.innerHTML = products.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  } catch (e) {
+    listEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">Could not load — try again.</div>';
+  }
+}
+
+async function createHostByPostOrder() {
+  const statusEl = document.getElementById('hbp-order-create-status');
+  const orderRef = document.getElementById('hbp-order-ref').value.trim();
+  const customerName = document.getElementById('hbp-customer-name').value.trim();
+  const addr1 = document.getElementById('hbp-addr1').value.trim();
+  const city = document.getElementById('hbp-city').value.trim();
+  const postcode = document.getElementById('hbp-postcode').value.trim();
+  if (!orderRef || !customerName || !addr1 || !city || !postcode) {
+    statusEl.textContent = 'Please fill in order reference, customer name, and full address.';
+    return;
+  }
+  statusEl.textContent = 'Adding…';
+  try {
+    const res = await fetch(`${API_URL}/api/hbp/orders`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orderReference: orderRef, customerName,
+        customerEmail: document.getElementById('hbp-customer-email').value.trim() || null,
+        addressLine1: addr1, addressLine2: document.getElementById('hbp-addr2').value.trim() || null,
+        city, postcode,
+        productId: document.getElementById('hbp-product-select').value,
+        quantity: parseInt(document.getElementById('hbp-quantity').value) || 1,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) { statusEl.textContent = data.error || 'Could not add order.'; return; }
+    statusEl.textContent = '✓ Order added';
+    ['hbp-order-ref', 'hbp-customer-name', 'hbp-customer-email', 'hbp-addr1', 'hbp-addr2', 'hbp-city', 'hbp-postcode'].forEach(id => document.getElementById(id).value = '');
+    loadHostByPostOrders();
+  } catch (e) { statusEl.textContent = 'Could not add order — try again.'; }
+}
+
+async function loadHostByPostOrders() {
+  const listEl = document.getElementById('hbp-orders-list');
+  try {
+    const res = await fetch(`${API_URL}/api/hbp/orders`);
+    const data = await res.json();
+    const orders = data.orders || [];
+    if (!orders.length) {
+      listEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">No real orders yet.</div>';
+      return;
+    }
+    listEl.innerHTML = orders.map(o => `
+      <div style="padding:12px;background:var(--gu-bg);border-radius:10px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:start;">
+          <div>
+            <div style="font-weight:700;font-size:13px;">${o.customer_name} — ${o.order_reference}</div>
+            <div style="font-size:11px;color:var(--gu-dust);margin-top:2px;">${o.shipping_address_line1}, ${o.shipping_city} ${o.shipping_postcode}</div>
+            ${o.product ? `<div style="font-size:11px;color:var(--gu-dust);margin-top:2px;">${o.quantity}× ${o.product.name}</div>` : ''}
+          </div>
+          ${o.status === 'pending' ? `<button onclick="createHostByPostLabel('${o.id}')" style="background:#B87946;color:white;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">📮 Label</button>` : `<span style="font-size:11px;color:#2e7d32;font-weight:700;">✓ ${o.status}</span>`}
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    listEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">Could not load — try again.</div>';
+  }
+}
+
+async function createHostByPostLabel(orderId) {
+  try {
+    const res = await fetch(`${API_URL}/api/hbp/orders/${orderId}/create-royal-mail-label`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Could not create label.'); return; }
+    if (data.weightWarning) alert(`✓ Label created.\n\n${data.weightWarning}`);
+    loadHostByPostOrders();
+  } catch (e) { alert('Could not create label — try again.'); }
+}
+
 function showBaristaSection(section) {
   document.querySelectorAll('.barista-section').forEach(el => el.style.display = 'none');
   document.getElementById(`barista-section-${section}`).style.display = 'block';
