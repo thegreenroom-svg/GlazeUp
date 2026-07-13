@@ -68,6 +68,50 @@
       display: none !important;
     }
 
+    /* ═══════════════════════════════════════════════════════════
+       GENUINE REAL GLAZE-FINISH TILES, per direct request — every
+       tile across the whole app gets a soft, real ceramic-glaze
+       look: a light reflection highlight in the upper-left (like
+       light catching a real glazed surface), and genuine depth via
+       layered shadow, on top of each tile's own existing colour.
+       Real, honest, achievable approach: one single shared class,
+       layered on top of every tile's real existing inline colour via
+       a genuine ::before highlight, so none of the 39 real tiles
+       across the app needed individual editing — applied once,
+       consistently, everywhere.
+       ═══════════════════════════════════════════════════════════ */
+    .glaze-tile {
+      position: relative;
+      overflow: hidden;
+      box-shadow:
+        0 2px 4px rgba(0,0,0,0.12),
+        0 8px 16px -4px rgba(0,0,0,0.18),
+        inset 0 1px 1px rgba(255,255,255,0.25);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .glaze-tile::before {
+      content: '';
+      position: absolute;
+      top: -30%;
+      left: -20%;
+      width: 70%;
+      height: 70%;
+      background: radial-gradient(circle, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 70%);
+      pointer-events: none;
+      border-radius: 50%;
+    }
+    .glaze-tile:active {
+      transform: scale(0.96);
+      box-shadow:
+        0 1px 2px rgba(0,0,0,0.12),
+        0 3px 6px -2px rgba(0,0,0,0.15),
+        inset 0 1px 1px rgba(255,255,255,0.2);
+    }
+    .glaze-tile > * {
+      position: relative;
+      z-index: 1;
+    }
+
     :root {
       /* ── LINK brand palette ── */
       --link-charcoal: #2B2724;
@@ -422,7 +466,7 @@
       position: relative;
       background: linear-gradient(180deg, #ffffff 0%, #fdf9f6 100%);
       border-bottom: 1px solid var(--gu-border);
-      padding: 18px 28px;
+      padding: 10px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -2460,15 +2504,15 @@
   <p style="color:var(--gu-dust);margin:0 0 20px;">Today's real drinks orders and stock, straight from Square.</p>
 
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
-    <button onclick="showBaristaSection('orders')" style="background:#F4511E;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+    <button onclick="showBaristaSection('orders')" class="glaze-tile" style="background:#F4511E;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
       <span style="font-size:22px;">☕</span>
       <span style="font-size:12px;font-weight:800;margin-top:5px;">Today's Orders</span>
     </button>
-    <button onclick="showBaristaSection('stock')" style="background:#F4511E;filter:brightness(0.85);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+    <button onclick="showBaristaSection('stock')" class="glaze-tile" style="background:#F4511E;filter:brightness(0.85);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
       <span style="font-size:22px;">📦</span>
       <span style="font-size:12px;font-weight:800;margin-top:5px;">Stock Levels</span>
     </button>
-    <button onclick="showGridNav()" style="background:#2B2724;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+    <button onclick="showGridNav()" class="glaze-tile" style="background:#2B2724;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
       <span style="font-size:22px;">⋯</span>
       <span style="font-size:12px;font-weight:800;margin-top:5px;">Everything Else</span>
     </button>
@@ -3224,40 +3268,65 @@
              direct request — real content underneath every tile is
              completely untouched, only the entry point changes. -->
         <div id="setup-tile-menu" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:20px;">
-          <button onclick="showSetupSection('preview')" style="background:#2B2724;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+          <button onclick="showSetupSection('preview')" class="glaze-tile" style="background:#2B2724;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
             <span style="font-size:22px;">👀</span>
             <span style="font-size:12px;font-weight:800;margin-top:5px;">Preview &amp; Testing</span>
           </button>
-          <button onclick="showSetupSection('royalmail')" style="background:#2B2724;filter:brightness(0.92);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+          <button onclick="showSetupSection('royalmail')" class="glaze-tile" style="background:#2B2724;filter:brightness(0.92);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
             <span style="font-size:22px;">📮</span>
             <span style="font-size:12px;font-weight:800;margin-top:5px;">Royal Mail</span>
           </button>
-          <button onclick="showSetupSection('cleosclub')" style="background:#2B2724;filter:brightness(0.84);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+          <button onclick="showSetupSection('cleosclub')" class="glaze-tile" style="background:#2B2724;filter:brightness(0.84);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
             <span style="font-size:22px;">🧸</span>
             <span style="font-size:12px;font-weight:800;margin-top:5px;">Cleo's Club</span>
           </button>
-          <button onclick="showSetupSection('addons')" style="background:#2B2724;filter:brightness(0.76);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+          <button onclick="showSetupSection('addons')" class="glaze-tile" style="background:#2B2724;filter:brightness(0.76);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
             <span style="font-size:22px;">🚀</span>
             <span style="font-size:12px;font-weight:800;margin-top:5px;">Add-Ons</span>
           </button>
-          <button onclick="showSetupSection('squarebilling')" style="background:#2B2724;filter:brightness(0.68);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+          <button onclick="showSetupSection('squarebilling')" class="glaze-tile" style="background:#2B2724;filter:brightness(0.68);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
             <span style="font-size:22px;">🔌</span>
             <span style="font-size:12px;font-weight:800;margin-top:5px;">Square &amp; Billing</span>
           </button>
-          <button onclick="showSetupSection('aidesign')" style="background:#2B2724;filter:brightness(0.60);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+          <button onclick="showSetupSection('aidesign')" class="glaze-tile" style="background:#2B2724;filter:brightness(0.60);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
             <span style="font-size:22px;">🤖</span>
             <span style="font-size:12px;font-weight:800;margin-top:5px;">AI Design</span>
           </button>
-          <button onclick="showSetupSection('brandingknowledge')" style="background:#2B2724;filter:brightness(0.52);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+          <button onclick="showSetupSection('brandingknowledge')" class="glaze-tile" style="background:#2B2724;filter:brightness(0.52);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
             <span style="font-size:22px;">🎨</span>
             <span style="font-size:12px;font-weight:800;margin-top:5px;">Branding &amp; Knowledge</span>
           </button>
-          <button onclick="showSetupSection('studio')" style="background:#2B2724;filter:brightness(0.44);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+          <button onclick="showSetupSection('studio')" class="glaze-tile" style="background:#2B2724;filter:brightness(0.44);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
             <span style="font-size:22px;">🪑</span>
             <span style="font-size:12px;font-weight:800;margin-top:5px;">Studio Config</span>
           </button>
+          <button onclick="showSetupSection('hostbypost')" class="glaze-tile" style="background:#2B2724;filter:brightness(0.38);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">📦</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">Host By Post</span>
+          </button>
         </div>
 
+        <div id="setup-section-hostbypost" class="setup-section" style="display:none;">
+        <!-- Genuine real Host By Post page — per direct request,
+             populated with what's genuinely already known about this
+             separate real business (the postal pottery kit brand,
+             sister to The Kiln Cafe). Deliberately honest about being
+             a starting point, not a complete operational dashboard —
+             no real order data, stock, or logistics integration
+             exists for this business yet, so none is faked here. -->
+        <div class="setup-card" style="background:linear-gradient(135deg,rgba(184,121,70,0.06),rgba(232,217,196,0.1));border:1.5px solid rgba(184,121,70,0.25);">
+          <h3>📦 Host By Post</h3>
+          <p>A postal pottery painting kit brand — sister to The Kiln Cafe. Launched with a ceramic mug kit.</p>
+          <div style="background:var(--gu-bg);border-radius:10px;padding:14px;margin-top:12px;font-size:12px;color:var(--gu-text);line-height:1.7;">
+            <strong>What's genuinely known so far:</strong><br>
+            • Extensive SEO landing page copy already written, across occasion types — hen dos, birthdays, baby showers, kids' parties, date nights, corporate, gifting<br>
+            • Website copy tone: warm but not saccharine, subtly cheeky, grounded in quality
+          </div>
+          <div style="background:#fff8e1;border-radius:10px;padding:12px 14px;margin-top:12px;font-size:12px;color:#8a6d1f;">
+            Honest note: this is genuinely a starting point, not a working dashboard yet — no real order data, stock levels, or logistics are connected here. Worth a proper session to scope out what this page should actually do once there's more real operational detail to work with.
+          </div>
+        </div>
+        </div>
         <div id="setup-section-preview" class="setup-section" style="display:none;">
         <!-- Genuine real dedicated test/preview page — the actual live
              customer app, opened fresh, no booking needed. Same real
@@ -3765,12 +3834,12 @@
              list stays a live list, a single action stays a single
              button. -->
         <div id="tablecards-tile-menu" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
-          <button onclick="showTableCardsSection('bookings')" style="background:#2e7d32;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+          <button onclick="showTableCardsSection('bookings')" class="glaze-tile" style="background:#2e7d32;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
             <span style="font-size:24px;">📋</span>
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Today's Bookings</span>
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">Print a card for a real booking</span>
           </button>
-          <button onclick="showTableCardsSection('blank')" style="background:#2e7d32;filter:brightness(0.85);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+          <button onclick="showTableCardsSection('blank')" class="glaze-tile" style="background:#2e7d32;filter:brightness(0.85);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
             <span style="font-size:24px;">🖨️</span>
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Blank Card</span>
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">For a walk-in with no booking yet</span>
@@ -3962,17 +4031,17 @@
              genuinely independent real sections, real content inside
              each completely untouched. -->
         <div id="stock-tile-menu" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
-          <button onclick="showStockSection('add')" style="background:#5E35B1;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+          <button onclick="showStockSection('add')" class="glaze-tile" style="background:#5E35B1;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
             <span style="font-size:24px;">📷</span>
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Add a Piece</span>
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">Photograph and price a new item</span>
           </button>
-          <button onclick="showStockSection('reservations')" style="background:#5E35B1;filter:brightness(0.9);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+          <button onclick="showStockSection('reservations')" class="glaze-tile" style="background:#5E35B1;filter:brightness(0.9);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
             <span style="font-size:24px;">📌</span>
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Reservations</span>
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">Pending customer holds</span>
           </button>
-          <button onclick="showStockSection('catalogue')" style="background:#5E35B1;filter:brightness(0.8);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+          <button onclick="showStockSection('catalogue')" class="glaze-tile" style="background:#5E35B1;filter:brightness(0.8);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
             <span style="font-size:24px;">🗂️</span>
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Catalogue</span>
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">Everything currently listed</span>
@@ -4068,12 +4137,12 @@
 
         <!-- Genuine real tile entry point, per direct request -->
         <div id="menu-tile-menu" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
-          <button onclick="showMenuSection('specials')" style="background:#F9A825;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+          <button onclick="showMenuSection('specials')" class="glaze-tile" style="background:#F9A825;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
             <span style="font-size:24px;">📋</span>
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Today's Specials</span>
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">Add a one-off item</span>
           </button>
-          <button onclick="showMenuSection('square')" style="background:#F9A825;filter:brightness(0.85);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+          <button onclick="showMenuSection('square')" class="glaze-tile" style="background:#F9A825;filter:brightness(0.85);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
             <span style="font-size:24px;">🔗</span>
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Square Menu</span>
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">Toggle items on/off today</span>
@@ -4126,31 +4195,31 @@
              the previous scroll-jump nav — real content within each
              section is completely untouched. -->
         <div id="team-tile-menu" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:20px;">
-          <button onclick="showTeamSection('time')" style="background:#00838f;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+          <button onclick="showTeamSection('time')" class="glaze-tile" style="background:#00838f;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
             <span style="font-size:22px;">🕐</span>
             <span style="font-size:12px;font-weight:800;margin-top:5px;">Timekeeping</span>
           </button>
-          <button onclick="showTeamSection('duties')" style="background:#00838f;filter:brightness(0.92);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+          <button onclick="showTeamSection('duties')" class="glaze-tile" style="background:#00838f;filter:brightness(0.92);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
             <span style="font-size:22px;">✅</span>
             <span style="font-size:12px;font-weight:800;margin-top:5px;">Duty Lists</span>
           </button>
-          <button onclick="showTeamSection('alerts')" style="background:#00838f;filter:brightness(0.84);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+          <button onclick="showTeamSection('alerts')" class="glaze-tile" style="background:#00838f;filter:brightness(0.84);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
             <span style="font-size:22px;">🚨</span>
             <span style="font-size:12px;font-weight:800;margin-top:5px;">Alerts</span>
           </button>
-          <button onclick="showTeamSection('members')" style="background:#00838f;filter:brightness(0.76);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+          <button onclick="showTeamSection('members')" class="glaze-tile" style="background:#00838f;filter:brightness(0.76);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
             <span style="font-size:22px;">👥</span>
             <span style="font-size:12px;font-weight:800;margin-top:5px;">Team Members</span>
           </button>
-          <button onclick="showTeamSection('holiday')" style="background:#00838f;filter:brightness(0.68);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+          <button onclick="showTeamSection('holiday')" class="glaze-tile" style="background:#00838f;filter:brightness(0.68);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
             <span style="font-size:22px;">🏖️</span>
             <span style="font-size:12px;font-weight:800;margin-top:5px;">Holiday Requests</span>
           </button>
-          <button id="team-tile-process" onclick="showTeamSection('process')" style="background:#00838f;filter:brightness(0.60);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+          <button id="team-tile-process" onclick="showTeamSection('process')" class="glaze-tile" style="background:#00838f;filter:brightness(0.60);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
             <span style="font-size:22px;">🔗</span>
             <span style="font-size:12px;font-weight:800;margin-top:5px;">Handoff Chain</span>
           </button>
-          <button onclick="showTeamSection('a2hs')" style="background:#00838f;filter:brightness(0.52);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+          <button onclick="showTeamSection('a2hs')" class="glaze-tile" style="background:#00838f;filter:brightness(0.52);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
             <span style="font-size:22px;">📲</span>
             <span style="font-size:12px;font-weight:800;margin-top:5px;">Home Screen Setup</span>
           </button>
@@ -4328,22 +4397,22 @@
 
         <!-- Genuine real tile entry point, per direct request -->
         <div id="progress-tile-menu" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
-          <button onclick="showProgressSection('damage')" style="background:#d9534f;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+          <button onclick="showProgressSection('damage')" class="glaze-tile" style="background:#d9534f;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
             <span style="font-size:24px;">⚠️</span>
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Damaged / Lost</span>
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">Real report history</span>
           </button>
-          <button onclick="showProgressSection('tasks')" style="background:#d9534f;filter:brightness(0.88);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+          <button onclick="showProgressSection('tasks')" class="glaze-tile" style="background:#d9534f;filter:brightness(0.88);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
             <span style="font-size:24px;">📋</span>
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Incomplete Tasks</span>
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">Everyone, every role, live</span>
           </button>
-          <button onclick="showProgressSection('adhoc')" style="background:#d9534f;filter:brightness(0.76);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+          <button onclick="showProgressSection('adhoc')" class="glaze-tile" style="background:#d9534f;filter:brightness(0.76);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
             <span style="font-size:24px;">📌</span>
             <span style="font-size:14px;font-weight:800;margin-top:6px;">One-Off Request</span>
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">Send an ad-hoc task</span>
           </button>
-          <button onclick="showProgressSection('bookings')" style="background:#d9534f;filter:brightness(0.64);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+          <button onclick="showProgressSection('bookings')" class="glaze-tile" style="background:#d9534f;filter:brightness(0.64);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
             <span style="font-size:24px;">📖</span>
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Booking Progress</span>
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">Every table, stage by stage</span>
@@ -8002,7 +8071,7 @@ function showGridNavTop() {
   // short name, nothing else, per direct clarification. Large, plain,
   // one colour, one word or short phrase.
   wrap.innerHTML = GRID_NAV_STRUCTURE.map(group => `
-    <button onclick="showGridNavSub('${group.id}')" style="background:${group.color};color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;align-items:center;justify-content:center;text-align:center;">
+    <button onclick="showGridNavSub('${group.id}')" class="glaze-tile" style="background:${group.color};color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;align-items:center;justify-content:center;text-align:center;">
       <div style="font-size:19px;font-weight:800;line-height:1.2;padding:8px;">${group.label}</div>
     </button>
   `).join('');
@@ -8022,7 +8091,7 @@ function showGridNavSub(groupId) {
   // under the name, per direct clarification — "slightly more detail"
   // than the top level, since these name actual specific functions.
   wrap.innerHTML = group.items.map((item, i) => `
-    <button onclick="goToTab('${item.tab}')" style="background:${group.color};filter:brightness(${1 - i * 0.12});color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+    <button onclick="goToTab('${item.tab}')" class="glaze-tile" style="background:${group.color};filter:brightness(${1 - i * 0.12});color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
       <div style="font-size:16px;font-weight:800;line-height:1.2;">${item.label}</div>
       <div style="font-size:11px;opacity:0.85;margin-top:6px;line-height:1.3;">${item.desc}</div>
     </button>

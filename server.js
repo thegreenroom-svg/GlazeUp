@@ -99,7 +99,7 @@ const port = process.env.PORT || 3000;
 // Genuine, deliberate, harmless marker — forces a real, full Render
 // rebuild (not just a static file refresh) to help resolve tonight's
 // deploy not picking up the latest grid-navigation change.
-console.log('Server build marker: barista-page-and-operational-review');
+console.log('Server build marker: hostbypost-glaze-tiles-thin-header');
 
 // ═══════════════════════════════════════════
 // UTILITIES
