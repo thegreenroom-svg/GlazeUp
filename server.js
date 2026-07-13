@@ -1960,6 +1960,34 @@ app.get('/api/bookings/today', async (req, res) => {
   }
 });
 
+// POST /api/bookings/:bookingCode/stage — save which of the 4 real
+// flow stages (booking/engagement/completion/kiln) a booking is
+// genuinely at right now, per direct request. Called every time a
+// staff member switches stages within a booking's flow, so the
+// persistent booking list elsewhere in the app can correctly show
+// and deep-link to the real, current stage — confirmed directly that
+// no such tracking existed before this.
+app.post('/api/bookings/:bookingCode/stage', async (req, res) => {
+  const { bookingCode } = req.params;
+  const { studioId, stage } = req.body;
+  if (!studioId || !stage) return res.status(400).json({ error: 'studioId and stage required' });
+  const VALID_STAGES = ['booking', 'engagement', 'completion', 'kiln'];
+  if (!VALID_STAGES.includes(stage)) return res.status(400).json({ error: `stage must be one of: ${VALID_STAGES.join(', ')}` });
+
+  try {
+    const { data, error } = await supabase.from('bookings')
+      .update({ current_stage: stage })
+      .eq('studio_id', studioId).eq('booking_code', bookingCode)
+      .select().single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: 'Booking not found' });
+    res.json({ status: 'saved', booking: data });
+  } catch (error) {
+    console.error('Error saving booking stage:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 /**
  * GET /api/bookings/upcoming?studioId=&days=7
  * List bookings from today through the next N days (default 7), for the look-ahead view

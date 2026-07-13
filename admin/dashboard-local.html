@@ -2474,6 +2474,15 @@
       </div>
     </header>
 
+    <!-- Genuine real persistent booking strip, per direct request —
+         always visible on every screen, shows today's real active
+         bookings and their genuine current stage. Tapping one takes
+         the staff member straight to the correct tile in the flow,
+         using the real stage data now saved by showStaffSection().
+         Hidden entirely when there's genuinely nothing active,
+         rather than showing an empty bar. -->
+    <div id="active-bookings-strip" style="display:none;background:var(--link-ivory);border-bottom:1px solid var(--gu-border);padding:8px 12px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;">
+    </div>
 
     <div class="admin-content" id="admin-content" onscroll="toggleFloatingBackBtn()">
 
@@ -8130,6 +8139,67 @@ function goToRealLandingPage() {
   }
 }
 
+// ── Genuine real persistent booking strip, per direct request ──
+// Real stage labels/colours matching exactly the same real brightness
+// stepping already used on the Daily Bookings flow tiles, so a
+// booking shown here as "Kiln" looks and feels like the same real
+// stage as the actual Kiln tile.
+const REAL_STAGE_META = {
+  booking:    { label: 'Booking',    icon: '📋', brightness: 1.0 },
+  engagement: { label: 'Painting',   icon: '🎨', brightness: 0.9 },
+  completion: { label: 'Completion', icon: '📷', brightness: 0.8 },
+  kiln:       { label: 'Kiln',       icon: '🔥', brightness: 0.7 },
+};
+
+async function loadActiveBookingsStrip() {
+  const stripEl = document.getElementById('active-bookings-strip');
+  if (!stripEl || !studioId) return;
+  try {
+    const res = await fetch(`${API_URL}/api/bookings/today?studioId=${studioId}`);
+    const data = await res.json();
+    const now = new Date();
+    // Genuine, honest definition of "currently active" — the real
+    // session has actually started, and either has no real end time
+    // yet or genuinely hasn't ended. A booking that hasn't started
+    // yet, or has already finished, isn't shown here — this strip is
+    // specifically for what's happening on the floor right now.
+    const active = (data.bookings || []).filter(b => {
+      const start = b.session_start ? new Date(b.session_start) : null;
+      const end = b.session_end ? new Date(b.session_end) : null;
+      return start && start <= now && (!end || end >= now);
+    });
+
+    if (!active.length) {
+      stripEl.style.display = 'none';
+      return;
+    }
+    stripEl.style.display = 'block';
+    stripEl.innerHTML = active.map(b => {
+      const stage = REAL_STAGE_META[b.current_stage] || REAL_STAGE_META.booking;
+      return `
+        <button onclick="openBookingAtRealStage('${b.booking_code}', '${b.current_stage || 'booking'}')" style="display:inline-flex;align-items:center;gap:6px;background:#2e7d32;filter:brightness(${stage.brightness});color:white;border:none;border-radius:20px;padding:7px 14px;margin-right:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">
+          <span>${stage.icon}</span>
+          <span>${b.table_number ? 'Table ' + b.table_number : b.customer_name}</span>
+          <span style="opacity:0.8;font-weight:600;">· ${stage.label}</span>
+        </button>
+      `;
+    }).join('');
+  } catch (e) {
+    // Genuine, honest fallback — a failed load just means the strip
+    // stays hidden this refresh, not a disruptive error on screen.
+    stripEl.style.display = 'none';
+  }
+}
+
+// Genuine real deep-link, per direct request — opens Daily Bookings,
+// loads this specific real booking, and jumps straight to the exact
+// tile matching its actual current stage.
+async function openBookingAtRealStage(bookingCode, stage) {
+  goToTab('staff');
+  openQRModal(bookingCode);
+  showStaffSection(stage);
+}
+
 function showGridNav() {
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
   document.getElementById('grid-nav-view').style.display = 'block';
@@ -8196,6 +8266,9 @@ function applyShiftUI() {
   updateBreakUI();
   initCleoAdminFloatingWidget();
   startTaskPolling();
+  loadActiveBookingsStrip();
+  clearInterval(window._activeBookingsStripTimer);
+  window._activeBookingsStripTimer = setInterval(loadActiveBookingsStrip, 30 * 1000);
   applyPlatformRevenueAccess();
 
   // Genuine real personalized landing page, per direct request —
@@ -12771,6 +12844,21 @@ function showStaffSection(section) {
   const activeEl = document.getElementById(`staff-section-${section}`);
   void activeEl.offsetWidth;
   activeEl.classList.add('fade-in');
+
+  // Genuine real save, per direct request — records which stage this
+  // specific booking is genuinely at right now, so the persistent
+  // booking list elsewhere in the app can deep-link correctly.
+  // Reads the same real hidden field already used elsewhere in this
+  // exact codebase as the honest source of truth for "which booking
+  // is currently open" — confirmed directly that currentBookingCode
+  // is never actually assigned a real value anywhere in the app.
+  const activeBookingCode = document.getElementById('modal-booking-code')?.value;
+  if (activeBookingCode) {
+    fetch(`${API_URL}/api/bookings/${activeBookingCode}/stage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, stage: section }),
+    }).catch(() => { /* silent — a failed save here shouldn't interrupt the staff member's actual work */ });
+  }
 
   if (section === 'engagement') {
     loadOpenTablesIntoSelect();
