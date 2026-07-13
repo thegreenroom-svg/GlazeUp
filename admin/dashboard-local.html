@@ -1523,7 +1523,8 @@
     @keyframes swt-tap { 0%,100%{transform:scale(1) rotate(-10deg)} 40%{transform:scale(0.82) rotate(-10deg)} }
     @keyframes swt-drag { 0%{transform:translate(0,0) rotate(-10deg)} 50%{transform:translate(60px,-30px) rotate(-5deg)} 100%{transform:translate(0,0) rotate(-10deg)} }
     @keyframes swt-scroll { 0%,100%{transform:translateY(0) rotate(-10deg)} 50%{transform:translateY(40px) rotate(-10deg)} }
-    @keyframes swt-swipe { 0%{transform:translateX(0) rotate(-10deg)} 100%{transform:translateX(-80px) rotate(-10deg)} opacity:1 }
+    @keyframes swt-swipe { 0%{transform:translateX(0) rotate(-10deg)}
+    @keyframes fade-in-out { 0%{opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{opacity:0} } 100%{transform:translateX(-80px) rotate(-10deg)} opacity:1 }
     @keyframes swt-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
     @keyframes swt-pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
     @keyframes swt-appear { from{opacity:0;transform:scale(0.9) translateY(10px)} to{opacity:1;transform:scale(1) translateY(0)} }
@@ -19007,66 +19008,98 @@ document.addEventListener('DOMContentLoaded', function() {
 const splashTemplate = document.getElementById('splash-screen').outerHTML;
 let splashDismissed = false;
 let _splashLoopTimer = null;
-let _splashLoopStep = 0;
+let _splashTableDemo = 0;
 
-// Scenes for the splash loop — the REAL floor plan demo scenes
-const SPLASH_LOOP_SCENES = [
-  { room: 'main',      hand: 'tap',  hx: 35, hy: 45, label: 'Main Studio',     caption: 'Every table live — who\'s in, what stage, how long left' },
-  { room: 'main',      hand: 'drag', hx: 35, hy: 45, label: 'Your layout',     caption: 'Hold any tile to reorder — drag it wherever makes sense' },
-  { room: 'lounge',    hand: 'tap',  hx: 50, hy: 50, label: 'The Lounge',      caption: 'Women\'s Institute — party of 5, 30 minutes in' },
-  { room: 'vault',     hand: 'tap',  hx: 50, hy: 50, label: 'The Vault',       caption: 'Sophie\'s Hen Do — 12 guests, Prosecco on the table' },
-  { room: 'checklist', hand: 'tap',  hx: 50, hy: 60, label: 'Flow checklist',  caption: 'Tap each step as you go — saved instantly to the booking' },
-];
-
+// Splash — single large table hero animation
 function wireSplash() {
   const el = document.getElementById('splash-screen');
   if (!el) return;
-  _splashLoopStep = 0;
-  // Defer 300ms so _renderDemoMainStudio etc. are defined before we call them
+  _splashTableDemo = 0;
   setTimeout(() => {
-    _renderSplashScene();
+    _renderSplashTable();
     _splashLoopTimer = setInterval(() => {
-      _splashLoopStep = (_splashLoopStep + 1) % SPLASH_LOOP_SCENES.length;
-      _renderSplashScene();
-    }, 3500);
+      _splashTableDemo = (_splashTableDemo + 1) % 4;
+      _renderSplashTable();
+    }, 4500);
   }, 300);
 }
 
-function _renderSplashScene() {
-  const scene = SPLASH_LOOP_SCENES[_splashLoopStep];
+function _renderSplashTable() {
   const canvas  = document.getElementById('splash-loop-canvas');
   const label   = document.getElementById('splash-scene-label');
   const caption = document.getElementById('splash-scene-caption');
   const dots    = document.getElementById('splash-dots');
+
+  const steps = [
+    { title: 'See who\'s here',     sub: 'Every table shows who\'s painting, where they are in the session' },
+    { title: 'Tap for details',     sub: 'Name, party size, time elapsed, what they\'re painting, drinks ordered' },
+    { title: 'Drag to arrange',     sub: 'Hold any table to move it around the floor plan — your layout, your way' },
+    { title: 'Icons tell you what', sub: 'Painting, completion, kiln ready — see the whole session at a glance' },
+  ];
+  const step = steps[_splashTableDemo];
 
   if (canvas) {
     canvas.style.opacity = '0';
     setTimeout(() => {
       canvas.innerHTML = '';
       const sceneEl = document.createElement('div');
-      sceneEl.style.cssText = 'position:absolute;inset:0;';
+      sceneEl.style.cssText = 'position:absolute;inset:0;background:#F7F4EE;display:flex;align-items:center;justify-content:center;';
       canvas.appendChild(sceneEl);
-      // Render the real floor plan demo scene
-      if (typeof _renderDemoMainStudio === 'function') {
-        if      (scene.room === 'main')      _renderDemoMainStudio(sceneEl, scene.hand === 'drag');
-        else if (scene.room === 'lounge')    _renderDemoLounge(sceneEl);
-        else if (scene.room === 'vault')     _renderDemoVault(sceneEl);
-        else if (scene.room === 'checklist') _renderDemoChecklist(sceneEl);
-      }
-      // Animated hand
-      const hand = document.createElement('div');
-      hand.className = `demo-hand ${scene.hand === 'drag' ? 'dragging' : 'tapping'}`;
-      hand.textContent = '\u261e';
-      hand.style.cssText = `position:absolute;left:${scene.hx}%;top:${scene.hy}%;font-size:28px;pointer-events:none;z-index:20;`;
-      sceneEl.appendChild(hand);
+
+      // ONE BIG TABLE — bold, high-contrast, striking colors
+      const tableHTML = `
+        <div class="demo-table-tile" style="
+          position:relative;width:280px;height:240px;
+          background:#0F1419;border:5px solid #00D9FF;border-radius:24px;
+          padding:20px;box-sizing:border-box;overflow:hidden;
+          box-shadow:0 0 40px rgba(0,217,255,0.4), 0 12px 48px rgba(0,0,0,0.6);
+          animation: demo-pulse 2.5s ease-in-out infinite;">
+          <div style="position:absolute;top:0;left:0;right:0;height:6px;background:linear-gradient(90deg,#FF006E,#00D9FF);border-radius:24px 24px 0 0;"></div>
+          <div style="font-size:18px;font-weight:900;color:#00D9FF;letter-spacing:0.05em;margin-bottom:2px;">TABLE 1</div>
+          <div style="font-size:12px;color:#FF006E;font-weight:700;margin-bottom:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Sarah & Friends</div>
+          <div style="margin:14px 0;transform:scale(2);transform-origin:0 0;width:120px;height:60px;">
+            <svg viewBox="0 0 48 38" width="48" height="38" xmlns="http://www.w3.org/2000/svg">
+              <rect x="6" y="12" width="36" height="14" rx="3" fill="#1a2332" stroke="#00D9FF" stroke-width="1.5"/>
+              <rect x="10" y="4" width="6" height="6" rx="1.5" fill="#FF006E"/>
+              <rect x="20" y="4" width="6" height="6" rx="1.5" fill="#00D9FF"/>
+              <rect x="30" y="4" width="6" height="6" rx="1.5" fill="#FF006E"/>
+              <rect x="10" y="28" width="6" height="6" rx="1.5" fill="#FF006E"/>
+              <rect x="20" y="28" width="6" height="6" rx="1.5" fill="#00D9FF"/>
+              <rect x="30" y="28" width="6" height="6" rx="1.5" fill="#FF006E"/>
+            </svg>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:8px;">
+            <span style="background:#FF006E;color:#0F1419;border-radius:8px;padding:4px 12px;font-size:11px;font-weight:800;">🎨 PAINTING</span>
+            <span style="font-size:14px;font-weight:900;color:#00D9FF;letter-spacing:0.05em;">45m</span>
+          </div>
+        </div>
+      `;
+      sceneEl.innerHTML = tableHTML;
+
+      // Animated hands showing tap, tap, drag, tap sequence
+      const hands = [
+        { gesture: 'tap',  x: '60%', y: '55%', delay: '0s' },
+        { gesture: 'tap',  x: '75%', y: '40%', delay: '0.8s' },
+        { gesture: 'drag', x: '50%', y: '45%', delay: '1.6s' },
+        { gesture: 'tap',  x: '30%', y: '25%', delay: '2.4s' },
+      ];
+      hands.forEach(h => {
+        const hand = document.createElement('div');
+        hand.className = `demo-hand ${h.gesture === 'drag' ? 'dragging' : 'tapping'}`;
+        hand.textContent = '\u261e';
+        hand.style.cssText = `position:absolute;left:${h.x};top:${h.y};font-size:32px;pointer-events:none;z-index:20;animation:fade-in-out 1s ease-in-out ${h.delay} forwards;opacity:0;`;
+        sceneEl.appendChild(hand);
+      });
+
       canvas.style.opacity = '1';
     }, 250);
   }
-  if (label)   { label.style.opacity   = '0'; setTimeout(() => { label.textContent   = scene.label;   label.style.opacity   = '1'; }, 280); }
-  if (caption) { caption.style.opacity = '0'; setTimeout(() => { caption.textContent = scene.caption; caption.style.opacity = '1'; }, 320); }
+
+  if (label)   { label.style.opacity   = '0'; setTimeout(() => { label.textContent   = step.title;   label.style.opacity   = '1'; }, 280); }
+  if (caption) { caption.style.opacity = '0'; setTimeout(() => { caption.textContent = step.sub; caption.style.opacity = '1'; }, 320); }
   if (dots) {
-    dots.innerHTML = SPLASH_LOOP_SCENES.map((_,i) =>
-      `<div style="width:${i===_splashLoopStep?'20px':'5px'};height:5px;border-radius:3px;background:${i===_splashLoopStep?'#B87946':'rgba(255,255,255,0.2)'};transition:all 0.4s;"></div>`
+    dots.innerHTML = steps.map((_,i) =>
+      `<div style="width:${i===_splashTableDemo?'20px':'5px'};height:5px;border-radius:3px;background:${i===_splashTableDemo?'#B87946':'rgba(255,255,255,0.2)'};transition:all 0.4s;"></div>`
     ).join('');
   }
 }
