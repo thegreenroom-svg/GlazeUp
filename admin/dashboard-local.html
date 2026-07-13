@@ -5847,59 +5847,123 @@ async function rejectPrintRequest(id) {
 // ══════════════════════════════════════════════════════════
 
 const SWT_STEPS = [
+
+  // ── 1. WELCOME ───────────────────────────────────────────────────
   {
     title: 'Hello! 👋',
-    body: "Quick tour, about a minute. Everything in this app works the same simple way — tap a coloured square, then tap again, and you're there.",
+    body: "One minute and you'll know this whole app. Everything works the same simple way from start to finish — coloured squares, all the way down.",
     target: null, arrow: null,
-    voice: "Hello! Let's take a really quick tour — about a minute. Everything in this app works the same simple way: tap a coloured square, then tap again, and you're there."
+    navFn: 'showGridNav',
+    voice: "Hello! One minute and you'll know this whole app. Everything works the same simple way — coloured squares, all the way down."
   },
+
+  // ── 2. HOME GRID ─────────────────────────────────────────────────
   {
-    title: 'Tap a square to start',
-    body: "This is home. Every task — bookings, stock, the menu, setup — is one of these squares. Tap one to see what's inside.",
+    title: 'This is home',
+    body: "Every task lives in one of these coloured squares. Tap any square to see what's inside it.",
     target: '#grid-nav-top-tiles', arrow: 'down',
     navFn: 'showGridNav',
-    voice: "This is home. Every task lives in one of these squares. Tap one to see what's inside it."
+    voice: "This is home. Every task lives in one of these coloured squares. Tap any square to see what's inside."
   },
+
+  // ── 3. GLAZE NAMES ───────────────────────────────────────────────
   {
-    title: 'Tap again to open it',
-    body: 'Tapping a square shows you a smaller set of squares underneath — tap one of those to actually open the real screen.',
-    target: '#grid-nav-sub-tiles', arrow: 'down',
-    navFn: 'showGridNavSub', navArgs: ['bookings'],
-    voice: 'Tapping a square shows a smaller set of squares underneath. Tap one of those to open the real screen.'
+    title: 'Real Mayco glaze colours',
+    body: "Each tile is painted with a real Mayco Stroke & Coat colour — the name is just underneath. You'll learn them without trying.",
+    target: '#grid-glaze-labels', arrow: 'up',
+    navFn: 'showGridNav',
+    voice: "Each tile is painted with a real Mayco Stroke and Coat colour — the name is just underneath. You'll learn them naturally as you use the app."
   },
+
+  // ── 4. REARRANGE ─────────────────────────────────────────────────
   {
-    title: 'Daily Bookings',
-    body: "Where every session starts: Booking Details, then Painting, then Completion, then Kiln — four squares, in order, same idea every time.",
+    title: 'Make it yours',
+    body: "Hold any tile for a second and they start to wobble. Drag them into your own order. The app also spots which ones you use most and suggests bringing them to the front.",
+    target: '#grid-nav-top-tiles', arrow: 'down',
+    navFn: 'showGridNav',
+    voice: "Hold any tile for a second and they wobble. Drag them into your own order. The app also notices which ones you use most and suggests shortcuts."
+  },
+
+  // ── 5. DAILY BOOKINGS OVERVIEW ───────────────────────────────────
+  {
+    title: 'Every session: four steps',
+    body: "Bookings → Painting → Completion → Kiln. Same four squares, same order, every single time. You always know exactly where you are.",
     target: '#staff-section-booking',
     nav: 'staff', arrow: 'up',
-    voice: 'Daily Bookings is where every session starts — Booking Details, Painting, Completion, then Kiln. Four squares, in order.'
+    voice: "Every customer session goes through four steps in order — Booking, Painting, Completion, Kiln. Same every time. You always know where you are."
   },
+
+  // ── 6. STEP 1 — BOOKING ──────────────────────────────────────────
   {
-    title: "Today's bookings, always visible",
-    body: "A strip along the top shows every table in progress right now, whenever there's one. Tap it to jump straight back to where that booking's up to.",
+    title: 'Step 1 — Booking details',
+    body: "Type the customer's name, choose their table, pick New or Returning. The app finds any previous visits and pieces automatically.",
+    target: '#staff-section-booking',
+    nav: 'staff', arrow: 'up',
+    voice: "Step one — type the customer name, choose their table, pick new or returning. The app finds their history automatically."
+  },
+
+  // ── 7. STEP 2 — PAINTING ─────────────────────────────────────────
+  {
+    title: 'Step 2 — Painting',
+    body: "Add pottery pieces, drinks, cakes, and Mayco glazes to the running bill. Every time you add a glaze the app shows its real name — that's how new staff learn the colours.",
+    target: '#staff-section-engagement',
+    nav: 'staff', arrow: 'up',
+    voice: "Step two — add pottery pieces, drinks, and glazes to the bill. Every glaze you add shows its real Mayco name, so you learn the colours just by working."
+  },
+
+  // ── 8. STEP 3 — COMPLETION ───────────────────────────────────────
+  {
+    title: 'Step 3 — Completion',
+    body: "Photograph each piece when the customer finishes. The photo is date-stamped and saved to the booking. Add any tablet or home-access charges before submitting.",
+    target: '#staff-section-completion',
+    nav: 'staff', arrow: 'up',
+    voice: "Step three — photograph each piece. The photo is stamped and saved. Add any extras before you submit."
+  },
+
+  // ── 9. STEP 4 — KILN ─────────────────────────────────────────────
+  {
+    title: 'Step 4 — Kiln & pickup',
+    body: "Group pieces into firing batches. Mark them fired when they come out. Mark ready for collection when packed. The customer sees their status update automatically.",
+    target: '#staff-section-kiln',
+    nav: 'staff', arrow: 'up',
+    voice: "Step four — group pieces into firing batches, mark fired when done, then mark ready for collection. The customer sees their status update live."
+  },
+
+  // ── 10. BOOKING STRIP ────────────────────────────────────────────
+  {
+    title: "Every live table, always visible",
+    body: "The strip at the top of every screen shows every table currently in progress. Tap one to jump straight to where that session is up to — no searching.",
     target: null, arrow: null,
     nav: 'staff',
-    voice: "A strip along the top shows every table in progress right now. Tap it to jump straight back to where that booking's up to."
+    voice: "The strip at the top shows every live table. Tap one to jump straight back to exactly where that session is."
   },
+
+  // ── 11. PIECES, LABELS, HOST BY POST ─────────────────────────────
   {
-    title: 'Quick actions, top right',
-    body: 'Find a piece, take a break, or log out — three small icons, always in the same place, top right of every screen.',
-    target: '#find-piece-fab', arrow: 'down',
-    voice: 'Find a piece, take a break, or log out — three small icons, always in the same place, top right.'
-  },
-  {
-    title: 'One way back, always',
-    body: "This green button takes you home from anywhere. It's the same button on every screen — you genuinely can't get lost.",
-    target: '#floating-back-btn', arrow: 'up',
-    voice: "This green button takes you home from anywhere, on every screen. You genuinely can't get lost."
-  },
-  {
-    title: "That's it! 🎉",
-    body: "Tap a square, tap again, do the thing, tap the green button home. Tap 🎯 Staff Tour anytime to see this again.",
+    title: 'Pieces, Labels & Host By Post',
+    body: "Piece Matching: AI identifies a fired piece from a photo when pieces get jumbled. Labels: print collection or postal labels for any booking. Host By Post: manage postal pottery kit orders.",
     target: null, arrow: null,
     navFn: 'showGridNav',
-    voice: "That's genuinely it. Tap a square, tap again, do the thing, tap the green button home. Have a good shift!"
-  }
+    voice: "Three more things — Piece Matching uses AI to identify fired pieces from a photo. Labels prints collection or postal labels. Host By Post manages your postal kit orders."
+  },
+
+  // ── 12. HEADER CLUSTER ───────────────────────────────────────────
+  {
+    title: 'Top right — always there',
+    body: "Your name and today's tasks. The bell for handoff alerts. Host By Post shortcut. Find a piece anywhere. These four never move — whatever screen you're on.",
+    target: '#shift-badge', arrow: 'down',
+    voice: "Top right — your name and tasks, the alert bell, Host By Post, and Find a Piece. These four are always there, whatever screen you're on."
+  },
+
+  // ── 13. FINISHED ─────────────────────────────────────────────────
+  {
+    title: "One way home — always",
+    body: "The green button at the bottom takes you back to the tile grid from any screen. You genuinely cannot get lost. Tap 🎯 Staff Tour anytime to see this again.",
+    target: '#floating-back-btn', arrow: 'up',
+    navFn: 'showGridNav',
+    voice: "The green button at the bottom takes you home from anywhere. You cannot get lost. Tap the Staff Tour button anytime to see this again. Good luck!"
+  },
+
 ];
 
 let swtStep = 0;
