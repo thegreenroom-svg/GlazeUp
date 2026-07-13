@@ -1443,6 +1443,23 @@
       box-shadow: 0 12px 40px rgba(43,39,36,0.35);
       pointer-events: all; transition: all 0.3s cubic-bezier(0.34,1.2,0.4,1);
     }
+    /* Genuine real content reveal, per direct request for animations —
+       each new step's text visibly settles in rather than silently
+       swapping, matching the same tile-landing feel used elsewhere. */
+    @keyframes swt-content-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    #swt-step-label.swt-content-animate,
+    #swt-title.swt-content-animate,
+    #swt-body.swt-content-animate {
+      animation: swt-content-in 0.35s cubic-bezier(0.25,0.8,0.4,1) both;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #swt-step-label.swt-content-animate,
+      #swt-title.swt-content-animate,
+      #swt-body.swt-content-animate { animation: none; }
+    }
     #swt-step-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: #B87946; text-transform: uppercase; margin-bottom: 5px; }
     #swt-title { font-size: 16px; font-weight: 700; color: #2B2724; margin-bottom: 5px; line-height: 1.25; }
     #swt-body { font-size: 12px; color: #8a8175; line-height: 1.55; margin-bottom: 14px; }
@@ -1473,8 +1490,8 @@
   <div id="swt-arrow">👇</div>
   <div id="swt-card">
     <div id="swt-step-label">Step 1 of 12</div>
-    <div id="swt-title">Welcome to kilnLINK Staff</div>
-    <div id="swt-body">Your studio management app. Let's walk through the whole thing — takes about 2 minutes.</div>
+    <div id="swt-title">Welcome</div>
+    <div id="swt-body">Quick tour — tap GO to begin.</div>
     <div id="swt-actions">
       <div id="swt-nav-row">
         <button id="swt-back-btn" onclick="swtBack()" disabled>← BACK</button>
@@ -1488,7 +1505,7 @@
     <button id="swt-skip-btn" onclick="swtEnd()">Skip tour</button>
   </div>
 </div>
-<button id="swt-trigger" onclick="window.location.href='/admin/walkthrough.html'">🎯 Staff Tour</button>
+<button id="swt-trigger" onclick="swtStart()">🎯 Staff Tour</button>
 
 <!-- Morning Opening Checklist Modal -->
 <!-- Morning Kiln Check — a genuine "did it fire overnight?" prompt for
@@ -5862,128 +5879,57 @@ async function rejectPrintRequest(id) {
 
 const SWT_STEPS = [
   {
-    title: 'Welcome to the Staff App 👋',
-    body: 'This is your daily studio management dashboard. Everything you need — from opening a table to firing pieces — is here. Let\'s walk through it.',
+    title: 'Hello! 👋',
+    body: "Quick tour, about a minute. Everything in this app works the same simple way — tap a coloured square, then tap again, and you're there.",
     target: null, arrow: null,
-    voice: 'Welcome to the kilnLINK staff app. This is your complete studio management dashboard. Let\'s take a quick tour.'
+    voice: "Hello! Let's take a really quick tour — about a minute. Everything in this app works the same simple way: tap a coloured square, then tap again, and you're there."
   },
   {
-    title: 'Dashboard',
-    body: 'Your daily overview — revenue, app extras charged today (tablet, home access, tools), and the Extra Charges tally to add to customer bills at checkout.',
-    target: '.nav-link:nth-child(1)', arrow: 'right',
-    nav: 'dashboard',
-    voice: 'The Dashboard shows your daily overview — revenue, session stats, and a running tally of all app extras to add to bills at checkout.'
+    title: 'Tap a square to start',
+    body: "This is home. Every task — bookings, stock, the menu, setup — is one of these squares. Tap one to see what's inside.",
+    target: '#grid-nav-top-tiles', arrow: 'down',
+    navFn: 'showGridNav',
+    voice: "This is home. Every task lives in one of these squares. Tap one to see what's inside it."
   },
   {
-    title: 'Daily Bookings — Step 1',
-    body: 'Start here for every customer. Type their name, then choose New Walk-in or Existing Booking. The app finds their history and any returning pieces automatically.',
+    title: 'Tap again to open it',
+    body: 'Tapping a square shows you a smaller set of squares underneath — tap one of those to actually open the real screen.',
+    target: '#grid-nav-sub-tiles', arrow: 'down',
+    navFn: 'showGridNavSub', navArgs: ['bookings'],
+    voice: 'Tapping a square shows a smaller set of squares underneath. Tap one of those to open the real screen.'
+  },
+  {
+    title: 'Daily Bookings',
+    body: "Where every session starts: Booking Details, then Painting, then Completion, then Kiln — four squares, in order, same idea every time.",
     target: '#staff-section-booking',
     nav: 'staff', arrow: 'up',
-    voice: 'Daily Bookings is where every session starts. Type the customer name, choose walk-in or existing booking, and the app finds their history automatically.'
+    voice: 'Daily Bookings is where every session starts — Booking Details, Painting, Completion, then Kiln. Four squares, in order.'
   },
   {
-    title: 'Step 2 — Customer Engagement',
-    body: 'Add pottery pieces, drinks, and cakes to the running bill. The Mayco Specialist Glazes panel is here too — tap a glaze to add it instantly.',
-    target: '#staff-section-engagement',
-    nav: 'staff', arrow: 'up',
-    voice: 'Customer Engagement is where you log pottery pieces, drinks, and cakes to the running bill. The Mayco specialist glazes panel is here for quick add-ons.'
-  },
-  {
-    title: 'Step 3 — Completion',
-    body: 'When a customer finishes, photograph their pieces here. The photo gets stamped with their name and date. Tick Home Access or tablet charges before submitting.',
-    target: '#staff-section-completion',
-    nav: 'staff', arrow: 'up',
-    voice: 'At completion, photograph the customer\'s pieces. The photo is stamped with their name and date. Add any extra charges like home access before submitting.'
-  },
-  {
-    title: 'Step 4 — Kiln & Pickup',
-    body: 'Mark pieces as fired, group them into kiln batches with a scannable QR, and mark them ready for collection when done. All tracked by booking.',
-    target: '#staff-section-kiln',
-    nav: 'staff', arrow: 'up',
-    voice: 'The Kiln section lets you mark pieces as fired, group them into batches with a QR code, and mark them ready for collection.'
-  },
-  {
-    title: 'Table Cards',
-    body: 'Print a QR table card for any booking, replacing handwritten nameplates — same QR the customer scans, tracked all the way through firing and packing.',
-    target: '#nav-tablecards-tab', arrow: 'right',
-    nav: 'tablecards',
-    voice: 'Table Cards prints a real QR code for any booking, replacing handwritten nameplates. Place it on the table during setup.'
-  },
-  {
-    title: 'Piece Catalogue',
-    body: 'Photograph real studio pieces with dimensions and prices — customers can browse from home and reserve a piece to be pre-glazed ready for their visit.',
-    target: '#nav-catalogue-tab', arrow: 'right',
-    nav: 'catalogue',
-    voice: 'The Piece Catalogue lets customers browse real photographed stock from home and reserve a piece ahead of their visit.'
-  },
-  {
-    title: 'Piece Matching',
-    body: 'When pieces come out of the kiln jumbled together, scan the booking QR, photograph the piece you\'re holding, and the AI suggests which reference photo it matches — you confirm before packing.',
-    target: '#nav-piecematch-tab', arrow: 'right',
-    nav: 'piecematch',
-    voice: 'Piece Matching helps identify a fired piece from a jumbled pile — scan the booking, photograph the piece, and get AI-suggested matches to confirm.'
-  },
-  {
-    title: 'Labels',
-    body: 'Print a collection or postal label for any booking — customer name, booking reference, ready date, and any damage notes with our standard kiln-risk explanation.',
-    target: '#nav-labels-tab', arrow: 'right',
-    nav: 'labels',
-    voice: 'Labels prints a collection or postal label for any booking, with piece count and any damage notes included automatically.'
-  },
-  {
-    title: 'Find My Piece 🔍',
-    body: 'The red button, bottom-right, works from anywhere. Photograph a piece, then photograph the table or pile — it tells you if that piece is in there.',
-    target: '#find-piece-fab', arrow: 'up',
-    nav: 'dashboard',
-    voice: 'Find My Piece is the red button reachable from any screen. Photograph the piece you are looking for, then photograph a table or pile to search it.'
-  },
-  {
-    title: 'Clock Out',
-    body: 'The big red bar at the bottom of the screen. One tap clocks you out and logs your hours automatically — always in the same place, easy to remember at the end of a shift.',
-    target: '#direct-logout-btn', arrow: 'down',
-    nav: 'dashboard',
-    voice: 'Clock Out is the big red bar at the bottom of the screen. One tap logs you out and records your hours automatically.'
-  },
-  {
-    title: 'Community & Featuring',
-    body: 'See everything customers have shared from this studio. Tap ✨ Feature on any post to push it to the worldwide kilnLINK feed — great for showcasing brilliant work.',
-    target: '.nav-link[onclick*="community"]', arrow: 'right',
-    nav: 'community',
-    voice: 'The Community tab shows all customer-shared pieces. Tap Feature on any post to push it to the worldwide kilnLINK feed.'
-  },
-  {
-    title: 'Print Queue',
-    body: 'Customer-submitted transfer designs land here for your review. Check the design and sizing, then Approve to charge £1 and print — or Reject with no charge.',
-    target: '.nav-link[onclick*="printqueue"]', arrow: 'right',
-    nav: 'printqueue',
-    voice: 'The Print Queue shows customer designs submitted for ceramic transfer printing. Approve to charge one pound and print, or reject with no charge.'
-  },
-  {
-    title: 'Stock Catalogue',
-    body: 'Photograph bisque pieces from the studio and add them here. Customers can then browse, design on them at home, and reserve pieces for their next visit.',
-    target: '.nav-link[onclick*="stock"]', arrow: 'right',
-    nav: 'stock',
-    voice: 'The Stock tab lets you photograph and catalogue bisque pieces. Customers can browse, design on them at home, and reserve pieces for their next visit.'
-  },
-  {
-    title: 'Extra Charges Today',
-    body: 'Everything customers have been charged through the app — tablet hire, home access, design tools — appears here grouped by booking. Add these to the bill at checkout.',
-    target: '#extras-today-list',
-    nav: 'dashboard', arrow: 'up',
-    voice: 'The Extra Charges Today card shows everything charged through the app, grouped by booking. Add these to the till when customers pay.'
-  },
-  {
-    title: 'Studio Setup',
-    body: 'Connect your Square account, configure table tracking, and print the static walk-in QR code — one code for your door, works forever for drop-in customers.',
-    target: '.nav-link[onclick*="setup"]', arrow: 'right',
-    nav: 'setup',
-    voice: 'Setup is where you connect Square, configure table tracking, and print the permanent walk-in QR code for your door.'
-  },
-  {
-    title: 'You\'re ready! 🎉',
-    body: 'That\'s the full staff walkthrough. The flow every session: open a booking → engage → complete → kiln → pickup. Tap the 🎯 button anytime to replay.',
+    title: "Today's bookings, always visible",
+    body: "A strip along the top shows every table in progress right now, whenever there's one. Tap it to jump straight back to where that booking's up to.",
     target: null, arrow: null,
-    voice: 'That\'s the full staff tour! The daily flow is: open a booking, log items, complete with a photo, then manage firing and pickup. Good luck!'
+    nav: 'staff',
+    voice: "A strip along the top shows every table in progress right now. Tap it to jump straight back to where that booking's up to."
+  },
+  {
+    title: 'Quick actions, top right',
+    body: 'Find a piece, take a break, or log out — three small icons, always in the same place, top right of every screen.',
+    target: '#find-piece-fab', arrow: 'down',
+    voice: 'Find a piece, take a break, or log out — three small icons, always in the same place, top right.'
+  },
+  {
+    title: 'One way back, always',
+    body: "This green button takes you home from anywhere. It's the same button on every screen — you genuinely can't get lost.",
+    target: '#floating-back-btn', arrow: 'up',
+    voice: "This green button takes you home from anywhere, on every screen. You genuinely can't get lost."
+  },
+  {
+    title: "That's it! 🎉",
+    body: "Tap a square, tap again, do the thing, tap the green button home. Tap 🎯 Staff Tour anytime to see this again.",
+    target: null, arrow: null,
+    navFn: 'showGridNav',
+    voice: "That's genuinely it. Tap a square, tap again, do the thing, tap the green button home. Have a good shift!"
   }
 ];
 
@@ -6051,17 +5997,45 @@ function swtBack() {
 function swtRender() {
   const step = SWT_STEPS[swtStep];
 
-  // Navigate to the right tab if needed
-  if (step.nav) {
+  // Navigate to the right real screen if needed. Most steps use the
+  // simple `nav` shortcut (goToTab), but some genuinely need to
+  // demonstrate the grid itself — `navFn` runs any real function by
+  // name for those, e.g. showing the top grid or a specific sub-grid.
+  if (step.navFn) {
+    window[step.navFn](...(step.navArgs || []));
+    setTimeout(() => swtPositionCard(step), 350);
+  } else if (step.nav) {
     goToTab(step.nav);
     setTimeout(() => swtPositionCard(step), 350);
   } else {
     swtPositionCard(step);
   }
 
-  document.getElementById('swt-step-label').textContent = `Step ${swtStep + 1} of ${SWT_STEPS.length}`;
-  document.getElementById('swt-title').textContent = step.title;
-  document.getElementById('swt-body').textContent = step.body;
+  // Genuine real fix — find-piece-fab is deliberately force-hidden for
+  // the whole tour (see swtStart) to stop the tour card overlapping it
+  // on narrow screens, but the one step that specifically points it
+  // out genuinely needs it visible to actually show something. Every
+  // other step keeps it hidden as before.
+  const findFabDuringTour = document.getElementById('find-piece-fab');
+  if (findFabDuringTour) {
+    findFabDuringTour.style.setProperty('display', step.target === '#find-piece-fab' ? 'flex' : 'none', 'important');
+  }
+
+  const stepLabelEl = document.getElementById('swt-step-label');
+  const titleEl = document.getElementById('swt-title');
+  const bodyEl = document.getElementById('swt-body');
+  stepLabelEl.textContent = `Step ${swtStep + 1} of ${SWT_STEPS.length}`;
+  titleEl.textContent = step.title;
+  bodyEl.textContent = step.body;
+  // Genuine real animation replay, per direct request for animations
+  // — removes then re-adds the class so the CSS animation genuinely
+  // restarts on every step, not just the first time. Same proven
+  // technique already used for the tile-landing animation elsewhere.
+  [stepLabelEl, titleEl, bodyEl].forEach(el => {
+    el.classList.remove('swt-content-animate');
+    void el.offsetWidth;
+    el.classList.add('swt-content-animate');
+  });
   document.getElementById('swt-next-btn').textContent = swtStep === SWT_STEPS.length - 1 ? 'DONE ✓' : 'GO →';
   const backBtn = document.getElementById('swt-back-btn');
   backBtn.disabled = swtStep === 0;
@@ -6081,7 +6055,12 @@ function swtPositionCard(step) {
 
   if (step.target) {
     const el = document.querySelector(step.target);
-    if (el) {
+    // Genuine real safety check — an element can exist in the DOM but
+    // still be genuinely hidden (display:none) or zero-sized (e.g. a
+    // director-only or data-dependent element that hasn't shown yet).
+    // Falls through to the safe, centred card below rather than
+    // spotlighting an invisible point on screen.
+    if (el && el.offsetWidth > 0 && el.offsetHeight > 0) {
       const r = el.getBoundingClientRect();
       const pad = 6;
       spotlight.style.cssText = `
