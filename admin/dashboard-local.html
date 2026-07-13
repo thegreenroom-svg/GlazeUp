@@ -8275,6 +8275,14 @@ function checkShiftLogin() {
 const ROLE_COLORS_LOGIN = { 'Studio Manager':'#5E35B1', 'Studio Executive':'#1E88E5', 'Ceramic Technician':'#8D6E63', 'Studio Assistant':'#00897B', 'Barista':'#F4511E', 'CEO':'#F9A825' };
 let selectedLoginMember = null;
 
+function skipLoginUseSharedView() {
+  // Show the shared/manager view without login
+  currentShiftStaff = null;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('splash-screen').style.display = 'none';
+  _switchView('floor-plan-view');
+}
+
 function showLoginScreen(screen) {
   document.getElementById('login-screen-picker').style.display = screen === 'picker' ? 'block' : 'none';
   document.getElementById('login-screen-pin').style.display = screen === 'pin' ? 'block' : 'none';
@@ -8448,6 +8456,7 @@ async function loadLoginNamePicker() {
   const grid = document.getElementById('login-name-grid');
   try {
     const res = await fetch(`${API_URL}/api/staff/team-for-login?studioId=${studioId}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const team = data.team || [];
 
@@ -8487,7 +8496,13 @@ async function loadLoginNamePicker() {
         </button>`;
     }).join('');
   } catch(e) {
-    grid.innerHTML = '<div style="grid-column:1/-1;color:var(--gu-dust);font-size:12px;padding:16px;">Could not load the team list.</div>';
+    console.error('Team loading error:', e);
+    grid.innerHTML = `<div style="grid-column:1/-1;color:var(--gu-dust);font-size:12px;padding:16px;">
+      Could not load the team list.
+      <div style="font-size:10px;margin-top:8px;color:var(--link-clay);">
+        <a href="javascript:skipLoginUseSharedView()" style="color:inherit;text-decoration:underline;">Skip — use shared/manager view</a>
+      </div>
+    </div>`;
   }
 }
 
