@@ -537,8 +537,23 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
+    /* Genuine real tile-landing animation, per direct request — tiles
+       visibly settle into their new grid rather than a flat instant
+       swap, staggered slightly per tile so they land one after
+       another. Kept brief (0.32s) and restrained — a small scale-and-
+       settle, not a spin or bounce, matching the "chic" direction
+       every other real instruction tonight has leant toward. */
+    @keyframes tileLand {
+      from { opacity: 0; transform: scale(0.82) translateY(10px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .tile-landing {
+      animation: tileLand 0.32s cubic-bezier(0.25, 0.8, 0.4, 1) both;
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .view.fade-in { animation: none; }
+      .tile-landing { animation: none; }
     }
 
     .view > h2 {
@@ -8135,8 +8150,8 @@ function showGridNavTop() {
   // Genuine, real, deliberately simple — top-level tiles show ONLY a
   // short name, nothing else, per direct clarification. Large, plain,
   // one colour, one word or short phrase.
-  wrap.innerHTML = GRID_NAV_STRUCTURE.map(group => `
-    <button onclick="showGridNavSub('${group.id}')" class="glaze-tile" style="background:${group.color};color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;align-items:center;justify-content:center;text-align:center;">
+  wrap.innerHTML = GRID_NAV_STRUCTURE.map((group, i) => `
+    <button onclick="showGridNavSub('${group.id}')" class="glaze-tile tile-landing" style="background:${group.color};color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;align-items:center;justify-content:center;text-align:center;animation-delay:${i * 0.035}s;">
       <div style="font-size:19px;font-weight:800;line-height:1.2;padding:8px;">${group.label}</div>
     </button>
   `).join('');
@@ -8156,7 +8171,7 @@ function showGridNavSub(groupId) {
   // under the name, per direct clarification — "slightly more detail"
   // than the top level, since these name actual specific functions.
   wrap.innerHTML = group.items.map((item, i) => `
-    <button onclick="goToTab('${item.tab}')" class="glaze-tile" style="background:${group.color};filter:brightness(${1 - i * 0.12});color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+    <button onclick="goToTab('${item.tab}')" class="glaze-tile tile-landing" style="background:${group.color};filter:brightness(${1 - i * 0.12});color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;animation-delay:${i * 0.035}s;">
       <div style="font-size:16px;font-weight:800;line-height:1.2;">${item.label}</div>
       <div style="font-size:11px;opacity:0.85;margin-top:6px;line-height:1.3;">${item.desc}</div>
     </button>
