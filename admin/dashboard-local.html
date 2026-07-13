@@ -1397,99 +1397,176 @@
       .splash-arrow-path, .splash-flame { animation: none; opacity: 1; }
     }
 
-    /* ── Staff walkthrough ── */
-    #swt-overlay { position: fixed; inset: 0; z-index: 9000; pointer-events: none; display: none; }
-    #swt-backdrop { position: absolute; inset: 0; background: rgba(43,39,36,0.82); backdrop-filter: blur(3px); }
-    #swt-spotlight {
-      position: absolute; pointer-events: none;
-      transition: all 0.45s cubic-bezier(0.34,1.2,0.4,1);
-      box-shadow: 0 0 0 9999px rgba(43,39,36,0.82);
-      border: 2.5px solid #B87946; border-radius: 14px;
+    /* ── Staff Walkthrough Tour — full screen immersive ── */
+    #swt-overlay {
+      position: fixed; inset: 0; z-index: 9900;
+      display: none; flex-direction: column;
+      background: #0E1A18;
+      font-family: 'Inter', sans-serif;
     }
-    #swt-arrow {
-      position: absolute; font-size: 28px; pointer-events: none;
-      animation: swt-bounce 0.9s ease-in-out infinite;
+    /* Visual panel — top 58% of screen */
+    #swt-visual {
+      flex: 0 0 58%;
+      position: relative;
+      overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
     }
-    @keyframes swt-bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
-    #swt-card {
-      position: absolute; background: #fff; border-radius: 20px;
-      padding: 20px 18px 16px; max-width: 320px; width: calc(100vw - 32px);
-      box-shadow: 0 16px 48px rgba(43,39,36,0.4);
-      pointer-events: all; transition: all 0.35s cubic-bezier(0.34,1.2,0.4,1);
+    #swt-visual-inner {
+      position: absolute; inset: 0;
+      transition: opacity 0.4s ease;
     }
-    @keyframes swt-content-in {
-      from { opacity: 0; transform: translateY(8px); }
-      to   { opacity: 1; transform: translateY(0); }
+    /* Info panel — bottom 42% */
+    #swt-info {
+      flex: 1;
+      background: #1C1814;
+      border-top: 1px solid rgba(184,121,70,0.2);
+      display: flex; flex-direction: column;
+      padding: 18px 20px 14px;
+      overflow: hidden;
     }
-    #swt-step-label.swt-content-animate,
-    #swt-title.swt-content-animate,
-    #swt-body.swt-content-animate {
-      animation: swt-content-in 0.35s cubic-bezier(0.25,0.8,0.4,1) both;
+    #swt-step-label {
+      font-size: 10px; font-weight: 700;
+      letter-spacing: 0.12em; color: #B87946;
+      text-transform: uppercase; margin-bottom: 6px;
     }
-    @media (prefers-reduced-motion: reduce) {
-      #swt-step-label.swt-content-animate,
-      #swt-title.swt-content-animate,
-      #swt-body.swt-content-animate { animation: none; }
+    #swt-title {
+      font-size: 20px; font-weight: 800;
+      color: #F4ECE0; line-height: 1.15;
+      margin-bottom: 7px;
     }
-    #swt-step-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: #B87946; text-transform: uppercase; margin-bottom: 5px; }
-    #swt-title { font-size: 17px; font-weight: 800; color: #2B2724; margin-bottom: 6px; line-height: 1.2; }
-    #swt-body { font-size: 12px; color: #8a8175; line-height: 1.55; margin-bottom: 14px; }
-    #swt-actions { display: flex; flex-direction: column; gap: 8px; }
-    #swt-nav-row { display: flex; gap: 8px; }
-    #swt-next-btn { flex:1; background:#2e7d32; color:#fff; border:none; padding:15px; border-radius:12px; font-weight:800; font-size:15px; cursor:pointer; }
-    #swt-back-btn { background:#3d3833; color:#fff; border:none; padding:15px 18px; border-radius:12px; font-weight:800; font-size:15px; cursor:pointer; }
-    #swt-back-btn:disabled { opacity:0.3; cursor:not-allowed; }
-    #swt-bottom-row { display:flex; justify-content:space-between; align-items:center; gap:8px; }
-    #swt-skip-btn { background:none; border:none; color:#8a8175; font-size:11px; cursor:pointer; padding:6px; flex-shrink:0; }
-    #swt-dots { display:flex; gap:4px; align-items:center; flex:1; }
-    .swt-dot { width:5px; height:5px; border-radius:50%; background:#C8BFB2; transition:all 0.2s; }
-    .swt-dot.active { background:#B87946; width:16px; border-radius:3px; }
-    /* Autoplay controls */
-    #swt-audio-controls { display:flex; align-items:center; gap:6px; flex-shrink:0; }
-    #swt-autoplay-btn {
-      background:#2B2724; color:#fff; border:none; border-radius:20px;
-      padding:5px 11px; font-size:11px; font-weight:700; cursor:pointer;
-      display:flex; align-items:center; gap:4px; white-space:nowrap;
+    #swt-body {
+      font-size: 13px; color: rgba(244,236,224,0.6);
+      line-height: 1.6; flex: 1;
     }
-    #swt-autoplay-btn.playing { background:#B87946; }
+    /* Audio bar */
+    #swt-audio-bar-wrap {
+      height: 2px; background: rgba(255,255,255,0.08);
+      border-radius: 2px; margin: 12px 0 0; overflow: hidden;
+    }
+    #swt-audio-bar {
+      height: 100%; background: linear-gradient(90deg,#B87946,#E8A03C);
+      border-radius: 2px; width: 0%; transition: width 0.1s linear;
+    }
+    /* Navigation row */
+    #swt-nav-row {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      margin-top: 14px; gap: 12px;
+    }
+    #swt-back-btn {
+      width: 44px; height: 44px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px; color: rgba(255,255,255,0.5);
+      font-size: 18px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s;
+    }
+    #swt-back-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+    #swt-back-btn:not(:disabled):active { background: rgba(255,255,255,0.12); }
+    #swt-dots {
+      display: flex; gap: 5px; align-items: center; flex: 1; justify-content: center;
+    }
+    .swt-dot {
+      height: 4px; border-radius: 2px;
+      background: rgba(255,255,255,0.15);
+      transition: all 0.3s cubic-bezier(0.34,1.2,0.4,1);
+      width: 4px;
+    }
+    .swt-dot.active { background: #B87946; width: 20px; }
+    #swt-next-btn {
+      height: 44px; padding: 0 24px;
+      background: linear-gradient(135deg,#B87946,#9A6435);
+      color: white; border: none; border-radius: 12px;
+      font-weight: 800; font-size: 14px; cursor: pointer;
+      box-shadow: 0 4px 16px rgba(184,121,70,0.35);
+      display: flex; align-items: center; gap: 6px;
+      white-space: nowrap;
+    }
+    #swt-next-btn:active { transform: scale(0.97); }
+    /* Audio controls & skip row */
+    #swt-bottom-row {
+      display: flex; justify-content: space-between;
+      align-items: center; margin-top: 6px;
+    }
+    #swt-audio-controls { display: flex; gap: 6px; }
     #swt-mute-btn {
-      background:none; border:1.5px solid #C8BFB2; border-radius:50%;
-      width:28px; height:28px; font-size:13px; cursor:pointer;
-      display:flex; align-items:center; justify-content:center;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px; padding: 4px 10px;
+      font-size: 11px; color: rgba(255,255,255,0.5);
+      cursor: pointer; font-weight: 600;
     }
-    #swt-mute-btn.muted { border-color:#e53935; }
-    /* Narration progress bar — shows how far through the current step's audio we are */
-    #swt-audio-bar-wrap { height:3px; background:#f0ebe5; border-radius:2px; margin-bottom:12px; overflow:hidden; display:none; }
-    #swt-audio-bar { height:100%; background:#B87946; border-radius:2px; width:0%; transition:width 0.1s linear; }
-    #swt-trigger { position:fixed; bottom:20px; left:20px; z-index:8000; background:#2B2724; color:#fff; border:none; border-radius:22px; padding:9px 14px; font-size:12px; font-weight:600; cursor:pointer; box-shadow:0 4px 14px rgba(43,39,36,0.3); display:none; align-items:center; gap:5px; }
+    #swt-autoplay-btn {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px; padding: 4px 10px;
+      font-size: 11px; color: rgba(255,255,255,0.5);
+      cursor: pointer; font-weight: 600;
+    }
+    #swt-autoplay-btn.playing { background: rgba(184,121,70,0.2); color: #B87946; border-color: rgba(184,121,70,0.3); }
+    #swt-skip-btn {
+      background: none; border: none;
+      color: rgba(255,255,255,0.25);
+      font-size: 11px; cursor: pointer; padding: 4px;
+    }
+    /* Hand cursor animation */
+    .swt-hand {
+      position: absolute; font-size: 32px;
+      pointer-events: none; z-index: 20;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
+    }
+    @keyframes swt-tap { 0%,100%{transform:scale(1) rotate(-10deg)} 40%{transform:scale(0.82) rotate(-10deg)} }
+    @keyframes swt-drag { 0%{transform:translate(0,0) rotate(-10deg)} 50%{transform:translate(60px,-30px) rotate(-5deg)} 100%{transform:translate(0,0) rotate(-10deg)} }
+    @keyframes swt-scroll { 0%,100%{transform:translateY(0) rotate(-10deg)} 50%{transform:translateY(40px) rotate(-10deg)} }
+    @keyframes swt-swipe { 0%{transform:translateX(0) rotate(-10deg)} 100%{transform:translateX(-80px) rotate(-10deg)} opacity:1 }
+    @keyframes swt-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+    @keyframes swt-pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+    @keyframes swt-appear { from{opacity:0;transform:scale(0.9) translateY(10px)} to{opacity:1;transform:scale(1) translateY(0)} }
+    @keyframes swt-slide-up { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes swt-glow { 0%,100%{box-shadow:0 0 20px rgba(184,121,70,0.3)} 50%{box-shadow:0 0 40px rgba(184,121,70,0.6)} }
+    .swt-appear { animation: swt-appear 0.5s cubic-bezier(0.34,1.2,0.4,1) both; }
+    #swt-trigger {
+      position: fixed; bottom: 20px; left: 20px; z-index: 8000;
+      background: linear-gradient(135deg,#2B2724,#1C1814);
+      color: white; border: 1px solid rgba(184,121,70,0.3);
+      border-radius: 22px; padding: 9px 14px;
+      font-size: 12px; font-weight: 700; cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+      display: none; align-items: center; gap: 5px;
+    }
   </style>
 </head>
 <body>
 
-<!-- Staff app walkthrough -->
+<!-- ── Staff Walkthrough Tour — full screen immersive ────────────────
+     Each step fills the whole screen. Top 58%: rich illustrated panel.
+     Bottom 42%: title, description, navigation.
+──────────────────────────────────────────────────────────────────── -->
 <div id="swt-overlay">
-  <div id="swt-backdrop"></div>
-  <div id="swt-spotlight"></div>
-  <div id="swt-arrow">👇</div>
-  <div id="swt-card">
-    <div id="swt-step-label">Step 1 of 12</div>
+  <!-- Visual panel — illustrated per step -->
+  <div id="swt-visual">
+    <div id="swt-visual-inner"></div>
+  </div>
+
+  <!-- Info panel -->
+  <div id="swt-info">
+    <div id="swt-step-label">Step 1 of 10</div>
     <div id="swt-title">Welcome</div>
-    <div id="swt-body">Quick tour — tap GO to begin.</div>
+    <div id="swt-body">One minute to know everything.</div>
     <div id="swt-audio-bar-wrap"><div id="swt-audio-bar"></div></div>
-    <div id="swt-actions">
-      <div id="swt-nav-row">
-        <button id="swt-back-btn" onclick="swtBack()" disabled>← BACK</button>
-        <button id="swt-next-btn" onclick="swtNext()">GO →</button>
-      </div>
-      <div id="swt-bottom-row">
-        <div id="swt-dots"></div>
-        <div id="swt-audio-controls">
-          <button id="swt-mute-btn" onclick="swtToggleMute()" title="Mute narration">🔊</button>
-          <button id="swt-autoplay-btn" onclick="swtToggleAutoplay()">▶ Autoplay</button>
-        </div>
-      </div>
+    <div id="swt-nav-row">
+      <button id="swt-back-btn" onclick="swtBack()" disabled>←</button>
+      <div id="swt-dots"></div>
+      <button id="swt-next-btn" onclick="swtNext()">Next →</button>
     </div>
-    <button id="swt-skip-btn" onclick="swtEnd()">Skip tour</button>
+    <div id="swt-bottom-row">
+      <div id="swt-audio-controls">
+        <button id="swt-mute-btn" onclick="swtToggleMute()">🔊</button>
+        <button id="swt-autoplay-btn" onclick="swtToggleAutoplay()">▶ Auto</button>
+      </div>
+      <button id="swt-skip-btn" onclick="swtEnd()">Skip tour</button>
+    </div>
   </div>
 </div>
 <button id="swt-trigger" onclick="swtStart()">🎯 Staff Tour</button>
@@ -6057,129 +6134,471 @@ async function rejectPrintRequest(id) {
 // STAFF APP WALKTHROUGH
 // ══════════════════════════════════════════════════════════
 
+// ── Staff Walkthrough Tour — full-screen immersive ───────────────────
+// Ten steps. Each fills the whole screen: illustrated visual panel on
+// top, clean info card below. SVG scenes show real features in action.
+// Animated hand cursor demonstrates every interaction.
+// ─────────────────────────────────────────────────────────────────────
+
 const SWT_STEPS = [
 
-  // ── 1. WELCOME ───────────────────────────────────────────────────
+  // ── 1. WELCOME ────────────────────────────────────────────────────
   {
-    title: 'Hello! 👋',
-    body: "One minute and you'll know this whole app. Everything works the same simple way from start to finish — coloured squares, all the way down.",
-    target: null, arrow: null,
-    navFn: 'showGridNav',
-    voice: "Hello! One minute and you'll know this whole app. Everything works the same simple way — coloured squares, all the way down."
+    label: 'Welcome',
+    title: 'Hello from GlazeUp 👋',
+    body: "One minute and you'll know this whole app. Every task lives in a coloured tile. Tap it, do it, done. Let's walk through together.",
+    voice: "Hello and welcome to GlazeUp! In just one minute you'll know everything you need. Every task lives in a coloured tile. Let me show you how it all works.",
+    visual: 'welcome',
   },
 
-  // ── 2. HOME GRID ─────────────────────────────────────────────────
+  // ── 2. THE TILE GRID ──────────────────────────────────────────────
   {
-    title: 'This is home',
-    body: "Every task lives in one of these coloured squares. Tap any square to see what's inside it.",
-    target: '#grid-nav-top-tiles', arrow: 'down',
-    navFn: 'showGridNav',
-    voice: "This is home. Every task lives in one of these coloured squares. Tap any square to see what's inside."
+    label: 'Home',
+    title: 'Your home screen',
+    body: "Everything the studio needs, organised into coloured tiles. Tap any tile to open it. Hold and drag to reorder them into your own layout — the app remembers your arrangement.",
+    voice: "This is your home screen. Everything you need is in one of these coloured tiles. Tap one to open it, or hold and drag to rearrange them into the order that suits you best.",
+    visual: 'grid',
   },
 
-  // ── 3. REARRANGE ─────────────────────────────────────────────────
+  // ── 3. FLOOR PLAN ─────────────────────────────────────────────────
   {
-    title: 'Make it yours',
-    body: "Hold any tile for a second and they start to wobble. Drag them into your own order. The app also spots which ones you use most and suggests bringing them to the front.",
-    target: '#grid-nav-top-tiles', arrow: 'down',
-    navFn: 'showGridNav',
-    voice: "Hold any tile for a second and they wobble. Drag them into your own order. The app also notices which ones you use most and suggests shortcuts."
+    label: 'Floor Plan',
+    title: 'Your studio at a glance',
+    body: "Every table in real time — who's sitting where, how far through their session, what stage they're at. Tap any table to open its full detail with draggable chairs, place mats, drinks, and a live countdown.",
+    voice: "The floor plan shows you the whole studio in real time. Every table, every session, every stage. Tap a table and you get a full draggable layout — chairs, place mats, drinks — with a live countdown timer.",
+    visual: 'floorplan',
   },
 
-  // ── 5. DAILY BOOKINGS OVERVIEW ───────────────────────────────────
+  // ── 4. BOOKING FLOW ───────────────────────────────────────────────
   {
+    label: 'Booking Flow',
     title: 'Every session: four steps',
-    body: "Bookings → Painting → Completion → Kiln. Same four squares, same order, every single time. You always know exactly where you are.",
-    target: '#staff-section-booking',
-    nav: 'staff', arrow: 'up',
-    voice: "Every customer session goes through four steps in order — Booking, Painting, Completion, Kiln. Same every time. You always know where you are."
+    body: "Booking → Painting → Completion → Kiln. Same four stages, same order, every time. The app tracks exactly where each customer is and carries everything forward automatically.",
+    voice: "Every customer session goes through four steps in the same order: Booking, Painting, Completion, and Kiln. The app tracks where each customer is and carries their information forward at every stage.",
+    visual: 'flow',
   },
 
-  // ── 6. STEP 1 — BOOKING ──────────────────────────────────────────
+  // ── 5. STEP 1 — BOOKING ───────────────────────────────────────────
   {
-    title: 'Step 1 — Booking details',
-    body: "Type the customer's name, choose their table, pick New or Returning. The app finds any previous visits and pieces automatically.",
-    target: '#staff-section-booking',
-    nav: 'staff', arrow: 'up',
-    voice: "Step one — type the customer name, choose their table, pick new or returning. The app finds their history automatically."
+    label: 'Step 1 — Booking',
+    title: 'Greet and seat',
+    body: "Customer name, table, new or returning — that's it. The app pulls in any previous visits automatically. A walk-in takes under 20 seconds to set up.",
+    voice: "Step one is Booking. Type the customer name, choose their table, and say whether they're new or returning. The app finds their history automatically. A walk-in takes under twenty seconds.",
+    visual: 'booking',
   },
 
-  // ── 7. STEP 2 — PAINTING ─────────────────────────────────────────
+  // ── 6. STEP 2 — PAINTING ──────────────────────────────────────────
   {
-    title: 'Step 2 — Painting',
-    body: "Add pottery pieces, drinks, cakes, and Mayco glazes to the running bill. Every time you add a glaze the app shows its real name — that's how new staff learn the colours.",
-    target: '#staff-section-engagement',
-    nav: 'staff', arrow: 'up',
-    voice: "Step two — add pottery pieces, drinks, and glazes to the bill. Every glaze you add shows its real Mayco name, so you learn the colours just by working."
+    label: 'Step 2 — Painting',
+    title: 'Track everything on the table',
+    body: "Add pieces, drinks, cakes, and glazes as you go. The floor plan updates live. Every Mayco glaze shows its real name so staff learn the colours naturally while they work.",
+    voice: "Step two is Painting. Add pottery pieces, drinks, and Mayco glazes to the session as you go. The floor plan updates live. Every glaze shows its real Mayco name, so new staff learn the colours just by working.",
+    visual: 'painting',
   },
 
-  // ── 8. STEP 3 — COMPLETION ───────────────────────────────────────
+  // ── 7. STEP 3 — COMPLETION ────────────────────────────────────────
   {
-    title: 'Step 3 — Completion',
-    body: "Photograph each piece when the customer finishes. The photo is date-stamped and saved to the booking. Add any tablet or home-access charges before submitting.",
-    target: '#staff-section-completion',
-    nav: 'staff', arrow: 'up',
-    voice: "Step three — photograph each piece. The photo is stamped and saved. Add any extras before you submit."
+    label: 'Step 3 — Completion',
+    title: 'Photograph and finish',
+    body: "Photograph each piece when the customer's done. The AI matches the photo to the booking, date-stamps it, and saves it. This photo is how you identify the piece at every stage from here on.",
+    voice: "Step three is Completion. Photograph each piece. The AI matches the photo to the booking, stamps it with the date, and saves it to their record. That photo is how the system identifies the piece from here on — at the kiln, at collection, every time.",
+    visual: 'completion',
   },
 
-  // ── 9. STEP 4 — KILN ─────────────────────────────────────────────
+  // ── 8. STEP 4 — KILN & RETURNS ────────────────────────────────────
   {
-    title: 'Step 4 — Kiln & pickup',
-    body: "Group pieces into firing batches. Mark them fired when they come out. Mark ready for collection when packed. The customer sees their status update automatically.",
-    target: '#staff-section-kiln',
-    nav: 'staff', arrow: 'up',
-    voice: "Step four — group pieces into firing batches, mark fired when done, then mark ready for collection. The customer sees their status update live."
+    label: 'Step 4 — Kiln',
+    title: 'Fire, identify, collect',
+    body: "Pieces go into firing batches. When they come out the AI identifies them from the photo — even mixed-up pieces from different bookings. Mark fired, mark ready, and the customer is notified automatically.",
+    voice: "Step four is the Kiln. Group pieces into firing batches. When they come out, photograph the shelf — the AI identifies every piece from the photos taken at completion, even when pieces from different bookings get mixed together. Mark them fired, mark them ready, and the customer is notified automatically.",
+    visual: 'kiln',
   },
 
-  // ── 10. BOOKING STRIP ────────────────────────────────────────────
+  // ── 9. AI PIECE MATCHING ──────────────────────────────────────────
   {
-    title: "Every live table, always visible",
-    body: "The strip at the top of every screen shows every table currently in progress. Tap one to jump straight to where that session is up to — no searching.",
-    target: null, arrow: null,
-    nav: 'staff',
-    voice: "The strip at the top shows every live table. Tap one to jump straight back to exactly where that session is."
+    label: 'AI Returns',
+    title: 'Never lose a piece again',
+    body: "A customer brings back a piece with no tag. Photograph it — the AI searches every piece photo in the system and shows you whose it is in seconds, with their booking info and contact details. No more shelf-hunting.",
+    voice: "This is the Returns system. A customer walks in with a piece and no tag. Take a photo. The AI searches every piece photo in the system and identifies it in seconds — showing you the customer name, booking reference, and contact details. No more searching through the shelves.",
+    visual: 'returns',
   },
 
-  // ── 11. PIECES, LABELS, HOST BY POST ─────────────────────────────
+  // ── 10. DONE ──────────────────────────────────────────────────────
   {
-    title: 'Pieces, Labels & Host By Post',
-    body: "Piece Matching: AI identifies a fired piece from a photo when pieces get jumbled. Labels: print collection or postal labels for any booking. Host By Post: manage postal pottery kit orders.",
-    target: null, arrow: null,
-    navFn: 'showGridNav',
-    voice: "Three more things — Piece Matching uses AI to identify fired pieces from a photo. Labels prints collection or postal labels. Host By Post manages your postal kit orders."
-  },
-
-  // ── 12. HEADER CLUSTER ───────────────────────────────────────────
-  {
-    title: 'Top right — always there',
-    body: "Your name and today's tasks. The bell for handoff alerts. Host By Post shortcut. Find a piece anywhere. These four never move — whatever screen you're on.",
-    target: '#shift-badge', arrow: 'down',
-    voice: "Top right — your name and tasks, the alert bell, Host By Post, and Find a Piece. These four are always there, whatever screen you're on."
-  },
-
-  // ── 13. FINISHED ─────────────────────────────────────────────────
-  {
-    title: "One way home — always",
-    body: "The green button at the bottom takes you back to the tile grid from any screen. You genuinely cannot get lost. Tap 🎯 Staff Tour anytime to see this again.",
-    target: '#floating-back-btn', arrow: 'up',
-    navFn: 'showGridNav',
-    voice: "The green button at the bottom takes you home from anywhere. You cannot get lost. Tap the Staff Tour button anytime to see this again. Good luck!"
+    label: 'Ready',
+    title: "You're all set",
+    body: "Tap 🎯 Staff Tour any time to see this again. The home button always brings you back, no matter where you are. You cannot get lost.",
+    voice: "That's it — you know everything you need. Tap the Staff Tour button any time to see this again. The home button always brings you back from any screen. You cannot get lost. Good luck, and enjoy your shift.",
+    visual: 'done',
   },
 
 ];
 
-// ── Staff Walkthrough Tour ────────────────────────────────────────────
-// Autoplay: narration starts automatically on each step.
-// Auto-advance: when narration finishes the tour moves to the next
-//   step by itself — no button press needed.
-// Mute: persistent toggle, remembered in localStorage.
-// Progress bar: shows how far through the current step's narration.
-// Interactive: each step navigates the real app to show the thing
-//   being described, not just a static highlight.
+// ── Visual panel renderer ─────────────────────────────────────────────
+// Each step gets a full-panel illustrated SVG scene.
 // ─────────────────────────────────────────────────────────────────────
 
+function _swtVisual(key) {
+  const w = window.innerWidth; const h = Math.round(window.innerHeight * 0.58);
+  const cx = w/2; const cy = h/2;
+
+  const scenes = {
+
+    welcome: () => `
+      <div style="width:100%;height:100%;background:radial-gradient(ellipse at 50% 60%,#1C2E28 0%,#0E1A18 70%);display:flex;align-items:center;justify-content:center;overflow:hidden;">
+        <!-- Kiln Cafe mark, large and glowing -->
+        <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:20px;">
+          <div style="width:100px;height:100px;border-radius:50%;background:linear-gradient(135deg,#B87946,#E8A03C);display:flex;align-items:center;justify-content:center;box-shadow:0 0 60px rgba(184,121,70,0.5),0 0 120px rgba(184,121,70,0.2);animation:swt-float 2.5s ease-in-out infinite;">
+            <img src="/brand-assets/kiln-cafe-logo-demo/kiln-cafe-mark-demo.svg" style="width:60px;opacity:0.95;">
+          </div>
+          <!-- Orbiting feature pills -->
+          <div style="position:absolute;top:-10px;left:-140px;background:rgba(184,121,70,0.15);border:1px solid rgba(184,121,70,0.3);border-radius:20px;padding:6px 14px;font-size:11px;font-weight:700;color:#E8A03C;white-space:nowrap;animation:swt-float 3s ease-in-out infinite 0.3s;">🗺 Floor Plan</div>
+          <div style="position:absolute;top:20px;right:-130px;background:rgba(76,175,80,0.12);border:1px solid rgba(76,175,80,0.25);border-radius:20px;padding:6px 14px;font-size:11px;font-weight:700;color:#81C784;white-space:nowrap;animation:swt-float 3.5s ease-in-out infinite 0.6s;">📋 Bookings</div>
+          <div style="position:absolute;bottom:30px;left:-150px;background:rgba(149,117,205,0.12);border:1px solid rgba(149,117,205,0.25);border-radius:20px;padding:6px 14px;font-size:11px;font-weight:700;color:#CE93D8;white-space:nowrap;animation:swt-float 2.8s ease-in-out infinite 0.9s;">🤖 AI Matching</div>
+          <div style="position:absolute;bottom:10px;right:-120px;background:rgba(229,57,53,0.1);border:1px solid rgba(229,57,53,0.2);border-radius:20px;padding:6px 14px;font-size:11px;font-weight:700;color:#EF9A9A;white-space:nowrap;animation:swt-float 3.2s ease-in-out infinite 1.2s;">🔥 Kiln</div>
+          <div style="font-size:28px;font-weight:800;color:#F4ECE0;letter-spacing:-0.02em;text-align:center;">GlazeUp</div>
+          <div style="font-size:13px;color:rgba(184,121,70,0.8);font-weight:500;letter-spacing:0.04em;text-transform:uppercase;">by The Kiln Cafe</div>
+        </div>
+      </div>`,
+
+    grid: () => {
+      const tiles = [
+        {label:'Tables',icon:'🗺',color:'#00695c'},
+        {label:'Bookings',icon:'📋',color:'#2e7d32'},
+        {label:'Pieces',icon:'🏺',color:'#B87946'},
+        {label:'Kiln',icon:'🔥',color:'#c0392b'},
+        {label:'Labels',icon:'🏷',color:'#1565C0'},
+        {label:'Returns',icon:'📦',color:'#5E35B1'},
+      ];
+      const cols = 3; const tileW = Math.min(90, (w-60)/cols); const gap = 10;
+      const gridW = cols*tileW + (cols-1)*gap;
+      const rows = 2; const gridH = rows*tileW + (rows-1)*gap;
+      const gx = (w - gridW)/2; const gy = (h - gridH)/2;
+      return `<div style="width:100%;height:100%;background:radial-gradient(ellipse at 50% 40%,#1C2E28 0%,#0E1A18 70%);position:relative;overflow:hidden;">
+        ${tiles.map((t,i) => {
+          const col = i%cols; const row = Math.floor(i/cols);
+          const tx = gx + col*(tileW+gap); const ty = gy + row*(tileW+gap);
+          const delay = i*0.08;
+          return `<div style="position:absolute;left:${tx}px;top:${ty}px;width:${tileW}px;height:${tileW}px;background:linear-gradient(135deg,${t.color}dd,${t.color}99);border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;box-shadow:0 8px 24px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.1);animation:swt-appear 0.5s cubic-bezier(0.34,1.2,0.4,1) ${delay}s both;">
+            <span style="font-size:28px;">${t.icon}</span>
+            <span style="font-size:10px;font-weight:800;color:white;letter-spacing:0.04em;text-transform:uppercase;">${t.label}</span>
+          </div>`;
+        }).join('')}
+        <!-- Animated hand dragging a tile -->
+        <div class="swt-hand" style="left:${gx+tileW+gap+tileW*0.5-16}px;top:${gy+tileW*0.5-16}px;animation:swt-drag 2.5s ease-in-out infinite 1s;">👆</div>
+        <!-- Wobble rings on one tile -->
+        <div style="position:absolute;left:${gx}px;top:${gy}px;width:${tileW}px;height:${tileW}px;border:2px solid rgba(184,121,70,0.4);border-radius:18px;animation:swt-glow 2s ease-in-out infinite;pointer-events:none;"></div>
+      </div>`;
+    },
+
+    floorplan: () => {
+      // Mini floor plan showing occupied and empty tables
+      const tables = [
+        {n:'1',x:0.08,y:0.12,covers:3,stage:'engagement',color:'#B87946',name:'Sarah'},
+        {n:'2',x:0.36,y:0.12,covers:2,stage:'booking',color:'#4CAF50',name:'James & Emma'},
+        {n:'3',x:0.64,y:0.12,covers:0,stage:'',color:'rgba(255,255,255,0.08)',name:''},
+        {n:'4',x:0.08,y:0.52,covers:0,stage:'',color:'rgba(255,255,255,0.08)',name:''},
+        {n:'5A',x:0.36,y:0.52,covers:2,stage:'completion',color:'#e53935',name:'Hendersons'},
+        {n:'6',x:0.64,y:0.52,covers:4,stage:'engagement',color:'#B87946',name:'WI Group'},
+      ];
+      const tw = Math.min(90,w*0.24); const th = tw;
+      return `<div style="width:100%;height:100%;background:radial-gradient(ellipse at 50% 40%,#1C2E28 0%,#0E1A18 70%);position:relative;overflow:hidden;">
+        <!-- Room label -->
+        <div style="position:absolute;top:12px;left:0;right:0;text-align:center;font-size:9px;font-weight:700;color:rgba(184,121,70,0.5);text-transform:uppercase;letter-spacing:0.1em;">Main Studio · Tables 1–8</div>
+        ${tables.map((t,i) => {
+          const tx = t.x*w; const ty = t.y*h + 24;
+          const occupied = t.covers > 0;
+          return `<div style="position:absolute;left:${tx}px;top:${ty}px;width:${tw}px;height:${th}px;
+            background:${occupied?`linear-gradient(160deg,#2A1F18,#1E1710)`:'rgba(255,255,255,0.03)'};
+            border:${occupied?`1.5px solid ${t.color}50`:'1px solid rgba(255,255,255,0.06)'};
+            border-radius:14px;padding:8px;box-sizing:border-box;
+            ${occupied?`box-shadow:0 4px 20px rgba(0,0,0,0.4);`:''}
+            animation:swt-appear 0.4s ease ${i*0.07}s both;">
+            ${occupied?`<div style="position:absolute;top:0;left:0;right:0;height:2px;background:${t.color};border-radius:14px 14px 0 0;"></div>`:''}
+            <div style="font-size:10px;font-weight:800;color:${occupied?'#F4ECE0':'rgba(255,255,255,0.2)'};">${t.n}</div>
+            ${occupied?`<div style="font-size:8px;color:rgba(184,121,70,0.6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.name}</div>`:''}
+            ${occupied?`<div style="margin:4px 0;">${_swtMiniChairs(t.covers,tw-16)}</div>`:`<div style="text-align:center;margin-top:${tw*0.3}px;font-size:8px;color:rgba(255,255,255,0.1);">Empty</div>`}
+            ${occupied?`<span style="background:${t.color}22;color:${t.color};border:1px solid ${t.color}40;border-radius:20px;padding:1px 6px;font-size:7px;font-weight:700;">${t.stage}</span>`:''}
+          </div>`;
+        }).join('')}
+        <!-- Timer on a tile -->
+        <div style="position:absolute;right:12px;top:${0.12*h+24}px;background:linear-gradient(135deg,#1C1814,#2B2118);border:1px solid rgba(184,121,70,0.3);border-radius:12px;padding:8px 12px;text-align:center;animation:swt-appear 0.5s ease 0.5s both;">
+          <div style="font-size:20px;font-weight:800;color:#e53935;font-variant-numeric:tabular-nums;">15m</div>
+          <div style="font-size:8px;color:rgba(255,255,255,0.3);text-transform:uppercase;">left</div>
+          <div style="font-size:8px;color:#e53935;font-weight:700;margin-top:2px;">⚠ Soon</div>
+        </div>
+        <!-- Hand tapping a tile -->
+        <div class="swt-hand" style="left:${0.36*w+tw*0.4}px;top:${0.52*h+th*0.5+24}px;animation:swt-tap 1.4s ease-in-out infinite 0.8s;">👆</div>
+        <!-- Vault strip -->
+        <div style="position:absolute;right:0;top:0;bottom:0;width:40px;background:linear-gradient(180deg,#1A0050,#0D0030);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
+          <div style="writing-mode:vertical-rl;font-size:9px;font-weight:700;color:rgba(255,255,255,0.5);letter-spacing:0.08em;">VAULT</div>
+          <div style="background:#9575CD;color:#1A0050;border-radius:20px;padding:2px 6px;font-size:9px;font-weight:800;">1</div>
+        </div>
+      </div>`;
+    },
+
+    flow: () => {
+      const stages = [
+        {icon:'📋',label:'Booking',color:'#4CAF50',desc:'Name & table'},
+        {icon:'🎨',label:'Painting',color:'#B87946',desc:'Pieces & glazes'},
+        {icon:'📷',label:'Completion',color:'#e53935',desc:'Photo & bill'},
+        {icon:'🔥',label:'Kiln',color:'#FF5722',desc:'Fire & collect'},
+      ];
+      const stageW = Math.min(68, (w-48)/4);
+      return `<div style="width:100%;height:100%;background:radial-gradient(ellipse at 50% 50%,#1C2E28 0%,#0E1A18 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;position:relative;">
+        <!-- Flow row -->
+        <div style="display:flex;align-items:center;gap:0;margin-bottom:24px;">
+          ${stages.map((s,i) => `
+            <div style="display:flex;align-items:center;">
+              <div style="width:${stageW}px;display:flex;flex-direction:column;align-items:center;gap:6px;animation:swt-appear 0.5s ease ${i*0.12}s both;">
+                <div style="width:${stageW}px;height:${stageW}px;background:linear-gradient(135deg,${s.color}dd,${s.color}88);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 8px 24px ${s.color}40,inset 0 1px 0 rgba(255,255,255,0.15);">${s.icon}</div>
+                <div style="font-size:10px;font-weight:800;color:#F4ECE0;">${s.label}</div>
+                <div style="font-size:9px;color:rgba(255,255,255,0.35);">${s.desc}</div>
+              </div>
+              ${i<3?`<div style="width:24px;height:2px;background:linear-gradient(90deg,${s.color}60,${stages[i+1].color}60);margin:0 4px;flex-shrink:0;margin-bottom:24px;"></div>`:''}
+            </div>`).join('')}
+        </div>
+        <!-- Booking card example -->
+        <div style="background:linear-gradient(135deg,#2A1F18,#1E1710);border:1px solid rgba(184,121,70,0.25);border-radius:16px;padding:14px 18px;max-width:260px;width:90%;animation:swt-appear 0.5s ease 0.5s both;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+          <div style="font-size:11px;color:rgba(184,121,70,0.7);font-weight:600;margin-bottom:6px;">Current booking</div>
+          <div style="font-size:15px;font-weight:800;color:#F4ECE0;">Sarah & Friends</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px;">Table 1 · 3 people · 45 min in</div>
+          <div style="margin-top:8px;display:flex;gap:6px;">
+            <span style="background:rgba(184,121,70,0.2);color:#E8A03C;border-radius:20px;padding:3px 10px;font-size:10px;font-weight:700;">🎨 Painting</span>
+            <span style="background:rgba(76,175,80,0.15);color:#81C784;border-radius:20px;padding:3px 10px;font-size:10px;font-weight:700;">2/3 done</span>
+          </div>
+        </div>
+      </div>`;
+    },
+
+    booking: () => `
+      <div style="width:100%;height:100%;background:radial-gradient(ellipse at 50% 40%,#1C2E28 0%,#0E1A18 70%);display:flex;align-items:center;justify-content:center;position:relative;">
+        <!-- Booking form mockup -->
+        <div style="background:linear-gradient(135deg,#2A1F18,#1E1710);border:1px solid rgba(184,121,70,0.2);border-radius:20px;padding:20px;width:min(280px,88%);box-shadow:0 16px 48px rgba(0,0,0,0.5);animation:swt-appear 0.5s ease both;">
+          <div style="font-size:10px;font-weight:700;color:rgba(184,121,70,0.6);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;">📋 New Booking</div>
+          <!-- Name field filled in -->
+          <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(184,121,70,0.3);border-radius:10px;padding:10px 14px;margin-bottom:8px;">
+            <div style="font-size:10px;color:rgba(255,255,255,0.3);margin-bottom:2px;">Customer name</div>
+            <div style="font-size:15px;font-weight:700;color:#F4ECE0;">Sarah Taylor
+              <span style="animation:swt-pulse 1s ease-in-out infinite;color:#B87946;">|</span>
+            </div>
+          </div>
+          <!-- Table selector -->
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+            ${[1,2,3,4,5].map(n => `<div style="background:${n===1?'linear-gradient(135deg,#B87946,#9A6435)':'rgba(255,255,255,0.06)'};border:1px solid ${n===1?'transparent':'rgba(255,255,255,0.1)'};border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;color:${n===1?'white':'rgba(255,255,255,0.3)'};">T${n}</div>`).join('')}
+          </div>
+          <!-- Party size -->
+          <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-size:12px;color:rgba(255,255,255,0.4);">People</span>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="width:26px;height:26px;background:rgba(255,255,255,0.06);border-radius:50%;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.4);font-size:14px;">−</div>
+              <span style="font-size:18px;font-weight:800;color:#F4ECE0;">3</span>
+              <div style="width:26px;height:26px;background:rgba(184,121,70,0.3);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#E8A03C;font-size:14px;">+</div>
+            </div>
+          </div>
+          <!-- Start button -->
+          <div style="background:linear-gradient(135deg,#4CAF50,#2e7d32);border-radius:12px;padding:12px;text-align:center;font-size:14px;font-weight:800;color:white;box-shadow:0 4px 16px rgba(76,175,80,0.3);">
+            Start session →
+          </div>
+          <!-- 20 second claim -->
+          <div style="text-align:center;margin-top:10px;font-size:10px;color:rgba(255,255,255,0.2);">Walk-in set up in under 20 seconds</div>
+        </div>
+        <!-- Hand tapping Start -->
+        <div class="swt-hand" style="position:absolute;left:50%;top:78%;transform:translateX(-50%);animation:swt-tap 1.6s ease-in-out infinite 1s;">👆</div>
+      </div>`,
+
+    painting: () => `
+      <div style="width:100%;height:100%;background:radial-gradient(ellipse at 50% 40%,#1C2E28 0%,#0E1A18 70%);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+        <!-- Table view with items -->
+        <div style="display:flex;gap:12px;align-items:flex-start;padding:16px;max-width:320px;width:100%;">
+          <!-- Left: piece and glazes -->
+          <div style="flex:1;">
+            <div style="font-size:9px;color:rgba(184,121,70,0.5);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">On the table</div>
+            <!-- Mug piece -->
+            <div style="background:linear-gradient(135deg,#2A1F18,#1E1710);border:1px solid rgba(184,121,70,0.25);border-radius:12px;padding:10px;margin-bottom:6px;display:flex;align-items:center;gap:10px;animation:swt-appear 0.4s ease both;">
+              <div style="font-size:28px;">🏺</div>
+              <div>
+                <div style="font-size:12px;font-weight:700;color:#F4ECE0;">Classic Mug</div>
+                <div style="font-size:10px;color:rgba(255,255,255,0.3);">HC-102 · £8.50</div>
+              </div>
+            </div>
+            <!-- Glazes -->
+            ${[
+              {name:'Sour Apple',hex:'#7CB342'},
+              {name:'Blue Surf',hex:'#1976D2'},
+              {name:'Poppy Field',hex:'#E53935'},
+            ].map((g,i) => `<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:7px 10px;margin-bottom:4px;display:flex;align-items:center;gap:8px;animation:swt-appear 0.4s ease ${0.1+i*0.08}s both;">
+              <div style="width:14px;height:14px;border-radius:50%;background:${g.hex};flex-shrink:0;"></div>
+              <div style="font-size:10px;color:rgba(255,255,255,0.5);">${g.name}</div>
+            </div>`).join('')}
+          </div>
+          <!-- Right: bill running total -->
+          <div style="width:100px;flex-shrink:0;">
+            <div style="font-size:9px;color:rgba(184,121,70,0.5);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Running bill</div>
+            <div style="background:linear-gradient(135deg,#2A1F18,#1E1710);border:1px solid rgba(184,121,70,0.2);border-radius:12px;padding:10px;text-align:center;animation:swt-appear 0.4s ease 0.3s both;">
+              <div style="font-size:22px;font-weight:800;color:#F4ECE0;">£24</div>
+              <div style="font-size:9px;color:rgba(255,255,255,0.3);">so far</div>
+              <div style="height:1px;background:rgba(255,255,255,0.06);margin:8px 0;"></div>
+              <div style="font-size:9px;color:rgba(184,121,70,0.6);">🍰 Cake £4</div>
+              <div style="font-size:9px;color:rgba(184,121,70,0.6);">☕ Tea £2.50</div>
+            </div>
+          </div>
+        </div>
+        <!-- Floor plan live update badge -->
+        <div style="position:absolute;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(76,175,80,0.15);border:1px solid rgba(76,175,80,0.25);border-radius:20px;padding:5px 14px;font-size:10px;color:#81C784;font-weight:700;animation:swt-pulse 2s ease-in-out infinite;">
+          🗺 Floor plan updated live
+        </div>
+      </div>`,
+
+    completion: () => `
+      <div style="width:100%;height:100%;background:radial-gradient(ellipse at 50% 40%,#1C2E28 0%,#0E1A18 70%);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:16px;padding:16px;max-width:300px;width:100%;">
+          <!-- Camera viewfinder -->
+          <div style="position:relative;width:min(180px,70%);aspect-ratio:1;animation:swt-appear 0.5s ease both;">
+            <div style="width:100%;height:100%;background:linear-gradient(135deg,#2A1F18,#1E1710);border:2px solid rgba(184,121,70,0.4);border-radius:16px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+              <!-- Piece photo mockup -->
+              <div style="font-size:52px;animation:swt-float 3s ease-in-out infinite;">🏺</div>
+            </div>
+            <!-- Corner markers -->
+            <div style="position:absolute;top:6px;left:6px;width:18px;height:18px;border-top:2.5px solid #B87946;border-left:2.5px solid #B87946;border-radius:3px 0 0 0;"></div>
+            <div style="position:absolute;top:6px;right:6px;width:18px;height:18px;border-top:2.5px solid #B87946;border-right:2.5px solid #B87946;border-radius:0 3px 0 0;"></div>
+            <div style="position:absolute;bottom:6px;left:6px;width:18px;height:18px;border-bottom:2.5px solid #B87946;border-left:2.5px solid #B87946;border-radius:0 0 0 3px;"></div>
+            <div style="position:absolute;bottom:6px;right:6px;width:18px;height:18px;border-bottom:2.5px solid #B87946;border-right:2.5px solid #B87946;border-radius:0 0 3px 0;"></div>
+          </div>
+          <!-- AI match result -->
+          <div style="background:linear-gradient(135deg,rgba(76,175,80,0.12),rgba(76,175,80,0.06));border:1px solid rgba(76,175,80,0.3);border-radius:14px;padding:12px 16px;width:100%;box-sizing:border-box;animation:swt-appear 0.5s ease 0.3s both;">
+            <div style="font-size:10px;font-weight:700;color:#4CAF50;margin-bottom:6px;">✓ Photo saved to booking</div>
+            <div style="font-size:12px;font-weight:700;color:#F4ECE0;">Sarah Taylor · Classic Mug</div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:2px;">Saved ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</div>
+          </div>
+          <!-- Date stamp visual -->
+          <div style="display:flex;gap:8px;width:100%;">
+            <div style="flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:8px;text-align:center;">
+              <div style="font-size:9px;color:rgba(255,255,255,0.3);margin-bottom:3px;">Date stamped</div>
+              <div style="font-size:11px;font-weight:700;color:#F4ECE0;">${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</div>
+            </div>
+            <div style="flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:8px;text-align:center;">
+              <div style="font-size:9px;color:rgba(255,255,255,0.3);margin-bottom:3px;">Booking</div>
+              <div style="font-size:11px;font-weight:700;color:#F4ECE0;">DEMO-T1</div>
+            </div>
+          </div>
+        </div>
+        <!-- Camera hand -->
+        <div class="swt-hand" style="position:absolute;right:16%;top:38%;animation:swt-tap 2s ease-in-out infinite 0.5s;">📸</div>
+      </div>`,
+
+    kiln: () => `
+      <div style="width:100%;height:100%;background:radial-gradient(ellipse at 50% 50%,#1C1008 0%,#0E1A18 60%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;position:relative;overflow:hidden;">
+        <!-- Kiln glow effect -->
+        <div style="position:absolute;bottom:-60px;left:50%;transform:translateX(-50%);width:200px;height:120px;background:radial-gradient(ellipse at 50% 100%,rgba(255,87,34,0.3),transparent 70%);pointer-events:none;"></div>
+        <!-- Firing batch shelf -->
+        <div style="font-size:9px;color:rgba(255,87,34,0.6);text-transform:uppercase;letter-spacing:0.1em;font-weight:700;">Firing batch #3</div>
+        <div style="display:flex;gap:10px;align-items:flex-end;animation:swt-appear 0.5s ease both;">
+          ${[
+            {emoji:'🏺',name:'Sarah',match:'high'},
+            {emoji:'🥣',name:'James',match:'high'},
+            {emoji:'🍶',name:'Hendersons',match:'medium'},
+          ].map((p,i) => `<div style="text-align:center;animation:swt-appear 0.4s ease ${i*0.1}s both;">
+            <div style="width:64px;height:64px;background:linear-gradient(135deg,#2A1F18,#1E1710);border:1.5px solid ${p.match==='high'?'rgba(76,175,80,0.4)':'rgba(249,168,37,0.4)'};border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:32px;box-shadow:0 4px 16px rgba(0,0,0,0.4);margin-bottom:6px;">${p.emoji}</div>
+            <div style="font-size:9px;font-weight:700;color:${p.match==='high'?'#81C784':'#FFD54F'};">${p.match==='high'?'✓ Matched':'~ Likely'}</div>
+            <div style="font-size:8px;color:rgba(255,255,255,0.3);">${p.name}</div>
+          </div>`).join('')}
+        </div>
+        <!-- AI identification label -->
+        <div style="background:linear-gradient(135deg,rgba(255,87,34,0.12),rgba(255,87,34,0.06));border:1px solid rgba(255,87,34,0.25);border-radius:14px;padding:10px 16px;text-align:center;max-width:260px;animation:swt-appear 0.5s ease 0.4s both;">
+          <div style="font-size:10px;font-weight:700;color:#FF8A65;margin-bottom:4px;">🤖 AI identified all 3 pieces</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.4);">Matched from photos taken at completion</div>
+        </div>
+        <!-- Mark fired button -->
+        <div style="background:linear-gradient(135deg,#FF5722,#E64A19);border-radius:12px;padding:10px 24px;font-size:13px;font-weight:800;color:white;box-shadow:0 4px 20px rgba(255,87,34,0.4);animation:swt-glow 2s ease-in-out infinite;">
+          🔥 Mark all fired
+        </div>
+        <!-- Hand tapping -->
+        <div class="swt-hand" style="position:absolute;bottom:14%;left:54%;animation:swt-tap 1.8s ease-in-out infinite 1s;">👆</div>
+      </div>`,
+
+    returns: () => `
+      <div style="width:100%;height:100%;background:radial-gradient(ellipse at 50% 40%,#180A2E 0%,#0E1A18 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;position:relative;overflow:hidden;">
+        <!-- Phone camera mockup -->
+        <div style="position:relative;width:min(130px,42%);aspect-ratio:0.75;background:linear-gradient(135deg,#2A1F18,#1E1710);border:2px solid rgba(149,117,205,0.4);border-radius:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 16px 48px rgba(0,0,0,0.5);animation:swt-appear 0.5s ease both;">
+          <div style="font-size:44px;animation:swt-float 2.5s ease-in-out infinite;">🏺</div>
+          <div style="font-size:8px;color:rgba(255,255,255,0.2);margin-top:6px;">Tap to photograph</div>
+          <!-- Corner markers -->
+          <div style="position:absolute;top:10px;left:10px;width:14px;height:14px;border-top:2px solid #9575CD;border-left:2px solid #9575CD;border-radius:2px 0 0 0;"></div>
+          <div style="position:absolute;top:10px;right:10px;width:14px;height:14px;border-top:2px solid #9575CD;border-right:2px solid #9575CD;border-radius:0 2px 0 0;"></div>
+          <div style="position:absolute;bottom:30px;left:10px;width:14px;height:14px;border-bottom:2px solid #9575CD;border-left:2px solid #9575CD;border-radius:0 0 0 2px;"></div>
+          <div style="position:absolute;bottom:30px;right:10px;width:14px;height:14px;border-bottom:2px solid #9575CD;border-right:2px solid #9575CD;border-radius:0 0 2px 0;"></div>
+        </div>
+        <!-- Arrow -->
+        <div style="font-size:18px;color:rgba(149,117,205,0.5);animation:swt-float 2s ease-in-out infinite;">↓</div>
+        <!-- Match result card -->
+        <div style="background:linear-gradient(135deg,rgba(76,175,80,0.12),rgba(76,175,80,0.06));border:1.5px solid rgba(76,175,80,0.35);border-radius:16px;padding:12px 16px;width:min(260px,84%);box-sizing:border-box;animation:swt-appear 0.5s ease 0.4s both;">
+          <div style="font-size:10px;font-weight:700;color:#4CAF50;margin-bottom:8px;">✓ Identified — high confidence</div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <div style="width:36px;height:36px;background:#9575CD;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:white;flex-shrink:0;">S</div>
+            <div>
+              <div style="font-size:14px;font-weight:800;color:#F4ECE0;">Sarah Taylor</div>
+              <div style="font-size:10px;color:rgba(255,255,255,0.35);">Booking DEMO-T1</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <div style="flex:1;background:rgba(76,175,80,0.15);border-radius:8px;padding:7px;text-align:center;font-size:10px;font-weight:700;color:#81C784;">✓ Collected</div>
+            <div style="flex:1;background:rgba(255,255,255,0.06);border-radius:8px;padding:7px;text-align:center;font-size:10px;font-weight:700;color:rgba(255,255,255,0.4);">✉ Notify</div>
+          </div>
+        </div>
+      </div>`,
+
+    done: () => `
+      <div style="width:100%;height:100%;background:radial-gradient(ellipse at 50% 60%,#1C2E28 0%,#0E1A18 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;overflow:hidden;">
+        <!-- All feature icons in a celebratory layout -->
+        <div style="position:relative;width:160px;height:160px;">
+          <!-- Central mark -->
+          <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#B87946,#E8A03C);display:flex;align-items:center;justify-content:center;box-shadow:0 0 40px rgba(184,121,70,0.5);animation:swt-float 3s ease-in-out infinite;">
+            <img src="/brand-assets/kiln-cafe-logo-demo/kiln-cafe-mark-demo.svg" style="width:38px;">
+          </div>
+          <!-- Orbiting icons -->
+          ${[
+            {icon:'🗺',angle:0},{icon:'📋',angle:60},{icon:'🎨',angle:120},
+            {icon:'📷',angle:180},{icon:'🔥',angle:240},{icon:'📦',angle:300}
+          ].map((o,i) => {
+            const rad = (o.angle - 90) * Math.PI / 180;
+            const r = 62;
+            const ox = 80 + r * Math.cos(rad) - 16;
+            const oy = 80 + r * Math.sin(rad) - 16;
+            return `<div style="position:absolute;left:${ox}px;top:${oy}px;width:32px;height:32px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;animation:swt-appear 0.4s ease ${i*0.07}s both,swt-float ${2.5+i*0.2}s ease-in-out infinite ${i*0.3}s;">${o.icon}</div>`;
+          }).join('')}
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:24px;font-weight:800;color:#F4ECE0;margin-bottom:6px;">You're ready to go</div>
+          <div style="font-size:12px;color:rgba(184,121,70,0.7);max-width:240px;">Tap 🎯 Staff Tour any time to revisit. You cannot get lost.</div>
+        </div>
+        <!-- Kiln Cafe branding -->
+        <div style="display:flex;align-items:center;gap:8px;opacity:0.4;">
+          <img src="/brand-assets/kiln-cafe-logo-demo/kiln-cafe-mark-demo.svg" style="width:18px;">
+          <span style="font-size:11px;font-weight:700;color:#F4ECE0;letter-spacing:0.04em;">GlazeUp · The Kiln Cafe</span>
+        </div>
+      </div>`,
+
+  };
+  return (scenes[key] || scenes.welcome)();
+}
+
+function _swtMiniChairs(covers, availW) {
+  const c = Math.min(covers, 6);
+  const top = Math.ceil(c/2); const bot = Math.floor(c/2);
+  const cw = Math.min(10, (availW - 4) / Math.max(top,bot) - 3);
+  const gap = 2; const tw = Math.max(top,bot)*(cw+gap);
+  let s = `<svg viewBox="0 0 ${tw+8} 30" width="${tw+8}" height="30" xmlns="http://www.w3.org/2000/svg">`;
+  s += `<rect x="4" y="10" width="${tw}" height="10" rx="2" fill="#3D2B1F" stroke="#B87946" stroke-width="1"/>`;
+  for(let i=0;i<top;i++){const x=4+i*(cw+gap);s+=`<rect x="${x}" y="3" width="${cw}" height="6" rx="1.5" fill="#4A3020"/>`;}
+  for(let i=0;i<bot;i++){const x=4+i*(cw+gap);s+=`<rect x="${x}" y="21" width="${cw}" height="6" rx="1.5" fill="#4A3020"/>`;}
+  return s+'</svg>';
+}
+
+// ── Tour engine ───────────────────────────────────────────────────────
+
 let swtStep = 0;
-let swtAutoplay = true;  // on by default — real learning tool
+let swtAutoplay = true;
 let swtMuted = localStorage.getItem('swt_muted') === '1';
 let _swtUtterance = null;
 let _swtAutoAdvanceTimer = null;
@@ -6191,10 +6610,10 @@ function swtStart() {
   swtStep = 0;
   swtAutoplay = true;
   document.getElementById('swt-trigger').style.display = 'none';
-  document.getElementById('swt-overlay').style.display = 'block';
-  document.getElementById('find-piece-fab')?.style.setProperty('display', 'none', 'important');
-  document.getElementById('cleo-admin-floating-fab')?.style.setProperty('display', 'none', 'important');
-  document.getElementById('cleo-admin-floating-bubble')?.style.setProperty('display', 'none', 'important');
+  document.getElementById('swt-overlay').style.display = 'flex';
+  document.getElementById('find-piece-fab')?.style.setProperty('display','none','important');
+  document.getElementById('cleo-admin-floating-fab')?.style.setProperty('display','none','important');
+  document.getElementById('cleo-admin-floating-bubble')?.style.setProperty('display','none','important');
   _swtUpdateAudioControls();
   swtRender();
 }
@@ -6202,10 +6621,8 @@ function swtStart() {
 function swtEnd() {
   _swtCancelAudio();
   document.getElementById('swt-overlay').style.display = 'none';
-  document.getElementById('swt-spotlight').style.cssText = 'display:none';
-  document.getElementById('swt-arrow').style.display = 'none';
   document.getElementById('swt-trigger').style.display = 'flex';
-  localStorage.setItem('swt_done', '1');
+  localStorage.setItem('swt_done','1');
   const findFab = document.getElementById('find-piece-fab');
   const cleoFab = document.getElementById('cleo-admin-floating-fab');
   const cleoBubble = document.getElementById('cleo-admin-floating-bubble');
@@ -6235,41 +6652,23 @@ function swtBack() {
 function swtToggleAutoplay() {
   swtAutoplay = !swtAutoplay;
   _swtUpdateAudioControls();
-  if (swtAutoplay) {
-    // Start narration for current step immediately
-    const step = SWT_STEPS[swtStep];
-    if (step?.voice) _swtNarrate(step.voice);
-  } else {
-    _swtCancelAudio();
-  }
+  if (swtAutoplay) { const step = SWT_STEPS[swtStep]; if (step?.voice) _swtNarrate(step.voice); }
+  else _swtCancelAudio();
 }
 
 function swtToggleMute() {
   swtMuted = !swtMuted;
   localStorage.setItem('swt_muted', swtMuted ? '1' : '0');
   _swtUpdateAudioControls();
-  if (swtMuted) {
-    // Cancel current speech but keep autoplay state
-    if (window.speechSynthesis) window.speechSynthesis.cancel();
-  } else if (swtAutoplay) {
-    // Resume narration for current step
-    const step = SWT_STEPS[swtStep];
-    if (step?.voice) _swtNarrate(step.voice);
-  }
+  if (swtMuted) { if (window.speechSynthesis) window.speechSynthesis.cancel(); }
+  else if (swtAutoplay) { const step = SWT_STEPS[swtStep]; if (step?.voice) _swtNarrate(step.voice); }
 }
 
 function _swtUpdateAudioControls() {
   const autoBtn = document.getElementById('swt-autoplay-btn');
   const muteBtn = document.getElementById('swt-mute-btn');
-  if (autoBtn) {
-    autoBtn.textContent = swtAutoplay ? '⏸ Pause' : '▶ Autoplay';
-    autoBtn.classList.toggle('playing', swtAutoplay);
-  }
-  if (muteBtn) {
-    muteBtn.textContent = swtMuted ? '🔇' : '🔊';
-    muteBtn.classList.toggle('muted', swtMuted);
-    muteBtn.title = swtMuted ? 'Unmute narration' : 'Mute narration';
-  }
+  if (autoBtn) { autoBtn.textContent = swtAutoplay ? '⏸' : '▶ Auto'; autoBtn.classList.toggle('playing', swtAutoplay); }
+  if (muteBtn) { muteBtn.textContent = swtMuted ? '🔇' : '🔊'; }
 }
 
 function _swtCancelAudio() {
@@ -6277,67 +6676,64 @@ function _swtCancelAudio() {
   if (_swtAutoAdvanceTimer) { clearTimeout(_swtAutoAdvanceTimer); _swtAutoAdvanceTimer = null; }
   if (_swtAudioBarTimer) { cancelAnimationFrame(_swtAudioBarTimer); _swtAudioBarTimer = null; }
   const bar = document.getElementById('swt-audio-bar');
-  const wrap = document.getElementById('swt-audio-bar-wrap');
   if (bar) bar.style.width = '0%';
-  if (wrap) wrap.style.display = 'none';
+}
+
+function swtRender() {
+  const step = SWT_STEPS[swtStep];
+  const visual = document.getElementById('swt-visual-inner');
+  const stepLbl = document.getElementById('swt-step-label');
+  const title = document.getElementById('swt-title');
+  const body = document.getElementById('swt-body');
+  const nextBtn = document.getElementById('swt-next-btn');
+  const backBtn = document.getElementById('swt-back-btn');
+
+  // Fade out then in
+  if (visual) { visual.style.opacity = '0'; setTimeout(() => {
+    visual.innerHTML = _swtVisual(step.visual);
+    visual.style.opacity = '1';
+  }, 200); }
+
+  if (stepLbl) stepLbl.textContent = `${step.label} · ${swtStep+1} of ${SWT_STEPS.length}`;
+  if (title) title.textContent = step.title;
+  if (body) body.textContent = step.body;
+  if (nextBtn) nextBtn.textContent = swtStep === SWT_STEPS.length-1 ? 'Finish ✓' : 'Next →';
+  if (backBtn) backBtn.disabled = swtStep === 0;
+
+  // Progress dots
+  const dots = document.getElementById('swt-dots');
+  if (dots) dots.innerHTML = SWT_STEPS.map((_,i) =>
+    `<div class="swt-dot${i===swtStep?' active':''}"></div>`
+  ).join('');
+
+  if (swtAutoplay && step.voice) _swtNarrate(step.voice);
+  _swtUpdateAudioControls();
 }
 
 function _swtNarrate(text) {
   if (!window.speechSynthesis || !text) {
-    // No speech API — just auto-advance after a readable delay
-    if (swtAutoplay) {
-      const readTime = Math.max(3000, text.length * 60);
-      _swtAutoAdvanceTimer = setTimeout(() => swtNext(), readTime);
-    }
+    if (swtAutoplay) _swtAutoAdvanceTimer = setTimeout(() => swtNext(), Math.max(4000, text.length * 55));
     return;
   }
   window.speechSynthesis.cancel();
-
   const utt = new SpeechSynthesisUtterance(text);
-  utt.rate = 0.92;
-  utt.pitch = 1.0;
+  utt.rate = 0.92; utt.pitch = 1.0;
   const voice = getCleoAdminPreferredVoice();
-  if (voice) { utt.voice = voice; utt.lang = voice.lang; }
-  else utt.lang = 'en-GB';
-
-  // Estimate duration for the progress bar (words / 2.8 words per second)
+  if (voice) { utt.voice = voice; utt.lang = voice.lang; } else utt.lang = 'en-GB';
   const wordCount = text.split(/\s+/).length;
   _swtAudioBarDuration = (wordCount / 2.8) * 1000;
-
   utt.onstart = () => {
     if (swtMuted) { window.speechSynthesis.cancel(); return; }
-    const wrap = document.getElementById('swt-audio-bar-wrap');
-    const bar = document.getElementById('swt-audio-bar');
-    if (wrap) wrap.style.display = 'block';
-    if (bar) bar.style.width = '0%';
-    _swtAudioBarStart = performance.now();
-    _swtAnimateBar();
+    _swtAudioBarStart = performance.now(); _swtAnimateBar();
   };
-
   utt.onend = () => {
-    const bar = document.getElementById('swt-audio-bar');
-    const wrap = document.getElementById('swt-audio-bar-wrap');
-    if (bar) bar.style.width = '100%';
+    const bar = document.getElementById('swt-audio-bar'); if (bar) bar.style.width = '100%';
     if (_swtAudioBarTimer) { cancelAnimationFrame(_swtAudioBarTimer); _swtAudioBarTimer = null; }
-    // Auto-advance after a brief pause at the end of narration
-    if (swtAutoplay) {
-      _swtAutoAdvanceTimer = setTimeout(() => {
-        if (swtStep < SWT_STEPS.length - 1) swtNext();
-        else swtEnd();
-      }, 900);
-    }
+    if (swtAutoplay) _swtAutoAdvanceTimer = setTimeout(() => { if(swtStep<SWT_STEPS.length-1)swtNext(); else swtEnd(); }, 900);
   };
-
-  utt.onerror = () => {
-    // Narration failed silently — just advance if autoplay is on
-    if (swtAutoplay) _swtAutoAdvanceTimer = setTimeout(() => swtNext(), 2500);
-  };
-
+  utt.onerror = () => { if (swtAutoplay) _swtAutoAdvanceTimer = setTimeout(() => swtNext(), 2500); };
   if (!swtMuted) window.speechSynthesis.speak(utt);
-  else if (swtAutoplay) {
-    // Muted but autoplay on — advance after estimated read time
-    _swtAutoAdvanceTimer = setTimeout(() => swtNext(), _swtAudioBarDuration + 900);
-  }
+  else if (swtAutoplay) _swtAutoAdvanceTimer = setTimeout(() => swtNext(), _swtAudioBarDuration + 900);
 }
 
 function _swtAnimateBar() {
@@ -6349,224 +6745,6 @@ function _swtAnimateBar() {
   if (pct < 99) _swtAudioBarTimer = requestAnimationFrame(_swtAnimateBar);
 }
 
-function swtRender() {
-  const step = SWT_STEPS[swtStep];
-
-  // Navigate the real app to demonstrate the thing being described
-  if (step.navFn) {
-    window[step.navFn](...(step.navArgs || []));
-    setTimeout(() => { swtPositionCard(step); _swtStartStep(step); }, 400);
-  } else if (step.nav) {
-    goToTab(step.nav);
-    setTimeout(() => { swtPositionCard(step); _swtStartStep(step); }, 400);
-  } else {
-    swtPositionCard(step);
-    _swtStartStep(step);
-  }
-
-  // Find Piece button: hidden during tour except the step that spotlights it
-  const findFab = document.getElementById('find-piece-fab');
-  if (findFab) {
-    findFab.style.setProperty('display', step.target === '#find-piece-fab' || step.target === '#shift-badge' ? 'flex' : 'none', 'important');
-  }
-}
-
-function _swtStartStep(step) {
-  // Update card content
-  const stepLabelEl = document.getElementById('swt-step-label');
-  const titleEl     = document.getElementById('swt-title');
-  const bodyEl      = document.getElementById('swt-body');
-  stepLabelEl.textContent = `Step ${swtStep + 1} of ${SWT_STEPS.length}`;
-  titleEl.textContent = step.title;
-  bodyEl.textContent  = step.body;
-
-  // Animate content in
-  [stepLabelEl, titleEl, bodyEl].forEach(el => {
-    el.classList.remove('swt-content-animate');
-    void el.offsetWidth;
-    el.classList.add('swt-content-animate');
-  });
-
-  // Navigation buttons
-  document.getElementById('swt-next-btn').textContent = swtStep === SWT_STEPS.length - 1 ? 'DONE ✓' : 'NEXT →';
-  document.getElementById('swt-back-btn').disabled = swtStep === 0;
-
-  // Progress dots
-  document.getElementById('swt-dots').innerHTML = SWT_STEPS.map((_,i) =>
-    `<div class="swt-dot ${i===swtStep?'active':''}"></div>`
-  ).join('');
-
-  // Start narration if autoplay is on
-  if (swtAutoplay && step.voice) {
-    _swtNarrate(step.voice);
-  }
-
-  _swtUpdateAudioControls();
-}
-
-function swtPositionCard(step) {
-  const spotlight = document.getElementById('swt-spotlight');
-  const arrow = document.getElementById('swt-arrow');
-  const card = document.getElementById('swt-card');
-
-  if (step.target) {
-    const el = document.querySelector(step.target);
-    // Genuine real safety check — an element can exist in the DOM but
-    // still be genuinely hidden (display:none) or zero-sized (e.g. a
-    // director-only or data-dependent element that hasn't shown yet).
-    // Falls through to the safe, centred card below rather than
-    // spotlighting an invisible point on screen.
-    if (el && el.offsetWidth > 0 && el.offsetHeight > 0) {
-      const r = el.getBoundingClientRect();
-      const pad = 6;
-      spotlight.style.cssText = `
-        display:block; position:absolute;
-        left:${r.left-pad}px; top:${r.top-pad}px;
-        width:${r.width+pad*2}px; height:${r.height+pad*2}px;
-        border-radius:12px;
-        box-shadow:0 0 0 9999px rgba(43,39,36,0.82);
-        border:2px solid #B87946;
-      `;
-
-      arrow.style.display = 'block';
-      if (step.arrow === 'right') {
-        arrow.textContent = '👈';
-        arrow.style.cssText = `display:block;position:absolute;font-size:26px;left:${r.right+6}px;top:${r.top+r.height/2-16}px;animation:swt-bounce 1s ease-in-out infinite;`;
-      } else if (step.arrow === 'up') {
-        arrow.textContent = '👆';
-        arrow.style.cssText = `display:block;position:absolute;font-size:26px;left:${r.left+r.width/2-13}px;top:${r.top-48}px;animation:swt-bounce 1s ease-in-out infinite;`;
-      } else {
-        arrow.textContent = '👇';
-        arrow.style.cssText = `display:block;position:absolute;font-size:26px;left:${r.left+r.width/2-13}px;top:${r.bottom+8}px;animation:swt-bounce 1s ease-in-out infinite;`;
-      }
-
-      // Position card to not cover the spotlight
-      const vp = window.innerHeight;
-      const cardW = Math.min(310, window.innerWidth - 32);
-      if (r.top > vp * 0.55) {
-        card.style.cssText = `top:16px;left:50%;transform:translateX(-50%);max-width:${cardW}px;`;
-      } else {
-        card.style.cssText = `bottom:16px;left:50%;transform:translateX(-50%);max-width:${cardW}px;`;
-      }
-      return;
-    }
-  }
-
-  spotlight.style.cssText = 'display:none';
-  arrow.style.display = 'none';
-  card.style.cssText = 'top:50%;left:50%;transform:translate(-50%,-50%);max-width:310px;';
-}
-
-// Show trigger after the dashboard loads
-// by the walkthrough tour AND Cleo's actual staff-side chat, rather
-// than duplicating this logic (same real fix already applied on the
-// customer app earlier tonight).
-function cleoAdminSpeak(text, onStart, onEnd, pitch, rate) {
-  if (!window.speechSynthesis || !text) return;
-  window.speechSynthesis.cancel();
-  const utt = new SpeechSynthesisUtterance(text);
-  // Genuine "cute" character voice for Cleo herself — brighter,
-  // slightly quicker, matching the exact same real fix applied to the
-  // customer app. Callers wanting the plain neutral voice (the
-  // walkthrough tour) pass their own values.
-  utt.rate = rate != null ? rate : 0.95;
-  utt.pitch = pitch != null ? pitch : 1.0; // genuine real natural pitch, per direct request tonight
-  const selectedVoice = getCleoAdminPreferredVoice();
-  utt.voice = selectedVoice;
-  utt.lang = selectedVoice ? selectedVoice.lang : 'en-GB'; // genuine fix — use the selected voice's own real language, not a hardcoded mismatch
-  if (onStart) utt.onstart = onStart;
-  if (onEnd) utt.onend = onEnd;
-  window.speechSynthesis.speak(utt);
-}
-
-// Same real, honest voice-selection logic as the customer app: no
-// browser exposes a genuine "child" voice, so this prefers an actual
-// female-sounding voice by name instead of blindly picking whichever
-// voice the device happens to list first (often a male default like
-// "Daniel" on iOS).
-const CLEO_ADMIN_FEMALE_VOICE_HINTS = ['female', 'kate', 'serena', 'samantha', 'victoria', 'karen', 'moira', 'tessa', 'fiona', 'zira', 'susan', 'hazel'];
-function getCleoAdminPreferredVoice() {
-  const voices = window.speechSynthesis.getVoices();
-  if (!voices.length) return null;
-  const savedName = localStorage.getItem('klnk_cleo_admin_voice_name');
-  if (savedName) {
-    const saved = voices.find(v => v.name === savedName);
-    if (saved) return saved;
-  }
-  // Genuine real default, per direct request: "Junior" if this
-  // device actually has it — a real iOS-only voice name, genuinely
-  // never matches on Android; the fallback below is what Android
-  // actually uses, fixed to reliably find the closest real match.
-  const junior = voices.find(v => v.name === 'Junior');
-  if (junior) return junior;
-  const ukFemale = voices.find(v => v.lang.startsWith('en-GB') && CLEO_ADMIN_FEMALE_VOICE_HINTS.some(hint => v.name.toLowerCase().includes(hint)));
-  if (ukFemale) return ukFemale;
-  const anyFemale = voices.find(v => CLEO_ADMIN_FEMALE_VOICE_HINTS.some(hint => v.name.toLowerCase().includes(hint)));
-  if (anyFemale) return anyFemale;
-  return voices.find(v => v.lang.startsWith('en-GB')) || voices.find(v => v.lang.startsWith('en')) || voices[0];
-}
-
-// Genuine, honest voice picker for the staff side too — no browser
-// exposes a real "child" voice, so this shows every actual voice
-// available on the device rather than faking a fix. Temporarily
-// swaps the message area for a real picker list, restores it after.
-let _adminVoicePickerOpen = false;
-function openCleoAdminVoicePicker() {
-  const messagesEl = document.getElementById('staff-assistant-messages');
-  if (!messagesEl) return;
-  const voices = window.speechSynthesis.getVoices();
-  if (!voices.length) {
-    window.speechSynthesis.onvoiceschanged = () => openCleoAdminVoicePicker();
-    return;
-  }
-  _adminVoicePickerOpen = true;
-  const englishVoices = voices.filter(v => v.lang.startsWith('en'));
-  const otherVoices = voices.filter(v => !v.lang.startsWith('en'));
-  const ordered = [...englishVoices, ...otherVoices];
-  const currentVoice = getCleoAdminPreferredVoice();
-
-  messagesEl.innerHTML = `
-    <div style="font-size:12px;color:var(--gu-dust);margin-bottom:8px;line-height:1.4;">🎙️ These are the real voices available on this device — including different languages. No app can add a genuine "child" voice, browsers don't offer one, so pick whichever sounds best.</div>
-    ${ordered.map(v => {
-      const isSelected = currentVoice && v.name === currentVoice.name;
-      return `
-      <div style="display:flex;align-items:center;gap:8px;padding:9px 10px;background:${isSelected ? '#fff3e0' : 'var(--gu-bg)'};border:1.5px solid ${isSelected ? '#F9A825' : 'transparent'};border-radius:10px;margin-bottom:6px;">
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:12.5px;font-weight:700;color:var(--gu-text);">${v.name}${isSelected ? ' ✓' : ''}</div>
-          <div style="font-size:10px;color:var(--gu-dust);">${v.lang}</div>
-        </div>
-        <button onclick="testCleoAdminVoice('${v.name.replace(/'/g, "\\'")}')" style="background:none;border:1px solid var(--gu-border);color:var(--gu-text);border-radius:8px;padding:5px 9px;font-size:10px;cursor:pointer;">▶ Test</button>
-        <button onclick="selectCleoAdminVoice('${v.name.replace(/'/g, "\\'")}')" style="background:#F9A825;color:white;border:none;border-radius:8px;padding:5px 9px;font-size:10px;font-weight:700;cursor:pointer;">Use</button>
-      </div>`;
-    }).join('')}
-    <button onclick="closeCleoAdminVoicePicker()" style="width:100%;background:none;border:1px solid var(--gu-border);color:var(--gu-dust);border-radius:10px;padding:10px;font-size:12px;cursor:pointer;margin-top:6px;">Done</button>
-  `;
-}
-
-function closeCleoAdminVoicePicker() {
-  _adminVoicePickerOpen = false;
-  const messagesEl = document.getElementById('staff-assistant-messages');
-  if (messagesEl) messagesEl.innerHTML = '<div style="background:var(--gu-bg);border-radius:14px 14px 14px 4px;padding:10px 14px;font-size:13px;align-self:flex-start;max-width:85%;">👋 Hi, I\'m Cleo! What would you like to know?</div><div id="staff-assistant-quick-options" style="display:flex;flex-wrap:wrap;gap:6px;align-self:flex-start;max-width:95%;"></div>';
-  populateStaffAssistantQuickOptions();
-}
-
-function testCleoAdminVoice(voiceName) {
-  const voices = window.speechSynthesis.getVoices();
-  const voice = voices.find(v => v.name === voiceName);
-  if (!voice) return;
-  window.speechSynthesis.cancel();
-  const utt = new SpeechSynthesisUtterance("Hi, I'm Cleo! This is what I sound like.");
-  utt.voice = voice; utt.rate = 0.95; utt.pitch = 1.0;
-  window.speechSynthesis.speak(utt);
-}
-
-function selectCleoAdminVoice(voiceName) {
-  localStorage.setItem('klnk_cleo_admin_voice_name', voiceName);
-  testCleoAdminVoice(voiceName);
-  openCleoAdminVoicePicker(); // genuinely refresh so the new ✓ shows immediately
-}
-
-// Show trigger after the dashboard loads
 function swtShowTrigger() {
   setTimeout(() => {
     const t = document.getElementById('swt-trigger');
