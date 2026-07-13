@@ -6622,6 +6622,67 @@ function _swtMiniChairs(covers, availW) {
   return s+'</svg>';
 }
 
+// ── Voice selection — used by tour narration AND Cleo's chat voice ────
+// Picks the best available British English female voice on the device.
+// Free, built-in voices only — no external API needed.
+// Priority order based on quality across iOS, macOS, Android, Windows:
+//   iOS/macOS: Serena (enhanced) → Sonia (enhanced) → Libby → Kate
+//   Windows:   Hazel → Susan → Zira
+//   Android:   any en-GB female
+//   Fallback:  any en-GB → any en-US female → first available
+// Saves the selection to localStorage so it's stable across sessions.
+// Staff can override via the voice picker in Cleo's settings.
+const _SWT_VOICE_PRIORITY = [
+  'Serena', 'Sonia', 'Libby', 'Kate', 'Moira', 'Tessa', 'Fiona',
+  'Hazel', 'Susan', 'Zira', 'Samantha', 'Victoria', 'Karen',
+];
+
+function getCleoAdminPreferredVoice() {
+  const voices = window.speechSynthesis?.getVoices() || [];
+  if (!voices.length) return null;
+
+  // Use saved preference if valid
+  const saved = localStorage.getItem('klnk_cleo_admin_voice_name');
+  if (saved) {
+    const v = voices.find(v => v.name === saved);
+    if (v) return v;
+  }
+
+  // Priority: named high-quality British voices
+  for (const name of _SWT_VOICE_PRIORITY) {
+    const v = voices.find(v => v.name.includes(name));
+    if (v) return v;
+  }
+  // Any en-GB voice
+  const gb = voices.find(v => v.lang === 'en-GB');
+  if (gb) return gb;
+  // Any English female-sounding name
+  const enFemale = voices.find(v =>
+    v.lang.startsWith('en') &&
+    _SWT_VOICE_PRIORITY.some(n => v.name.includes(n))
+  );
+  if (enFemale) return enFemale;
+  // Any English
+  return voices.find(v => v.lang.startsWith('en')) || voices[0];
+}
+
+// Expose for voice picker compatibility
+function testCleoAdminVoice(voiceName) {
+  const voices = window.speechSynthesis.getVoices();
+  const voice = voices.find(v => v.name === voiceName);
+  if (!voice) return;
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance("Hello! This is what the narration sounds like on GlazeUp.");
+  utt.voice = voice; utt.rate = 0.92; utt.pitch = 1.0;
+  window.speechSynthesis.speak(utt);
+}
+
+function selectCleoAdminVoice(voiceName) {
+  localStorage.setItem('klnk_cleo_admin_voice_name', voiceName);
+  testCleoAdminVoice(voiceName);
+  openCleoAdminVoicePicker();
+}
+
 // ── Tour engine ───────────────────────────────────────────────────────
 
 let swtStep = 0;
@@ -11293,7 +11354,7 @@ function speakTask(text) {
   const voices = window.speechSynthesis.getVoices();
   const preferred = voices.find(v => /UK|British|Sonia|Libby|Karen/i.test(v.name)) || voices.find(v => v.lang === 'en-GB');
   if (preferred) utter.voice = preferred;
-  utter.rate = 0.98;
+  utter.rate = 0.92;
   utter.pitch = 1.0;
   window.speechSynthesis.speak(utter);
 }
