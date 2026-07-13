@@ -8717,12 +8717,13 @@ const SESSION_DURATION_MINS = 90; // default for standard sessions
 // the room. All-day sessions show elapsed time rather than countdown.
 function _sessionDuration(booking) {
   const type = booking.booking_type || 'standard';
-  if (type === 'all_day') return null; // null = all day, no countdown
-  if (type === 'group') return null;   // groups book the room, no fixed end
-  // Check if the session was booked on a Thursday (all-day painting day)
+  if (type === 'all_day') return null;
+  if (type === 'group') return null;
+  // Thursday = Paint All Day, but ONLY in the Main Studio
+  // Lounge and Vault keep normal 90-min timing on Thursdays
   const start = booking.session_start ? new Date(booking.session_start) : null;
-  if (start && start.getDay() === 4) return null; // Thursday = all day
-  // Standard = 90 minutes
+  const isMainStudio = !booking.table_number || /^Table [1-8]$|^Table 5A$/.test(booking.table_number);
+  if (start && start.getDay() === 4 && isMainStudio) return null; // Thursday Main Studio = Paint All Day
   return 90;
 }
 
@@ -8935,7 +8936,8 @@ function _renderOccupiedTile(table, b, now) {
   const stageChecks = FLOW_CHECKS[stage] || [];
   const completedChecks = stageChecks.filter(c => b.checks?.[`${stage}:${c.key}`]).length;
   const allDone = completedChecks === stageChecks.length && stageChecks.length > 0;
-  const isThursday = b.session_start && new Date(b.session_start).getDay() === 4;
+  const isMainStudio = !b.table_number || /^Table [1-8]$|^Table 5A$/.test(b.table_number);
+  const isThursday = b.session_start && new Date(b.session_start).getDay() === 4 && isMainStudio;
   const isGroup = b.booking_type === 'group';
   const typePill = isThursday
     ? `<span style="background:rgba(149,117,205,0.25);color:#CE93D8;border-radius:4px;padding:1px 5px;font-size:8px;font-weight:700;">PAINT ALL DAY</span>`
@@ -9007,7 +9009,8 @@ async function openTableDetail(bookingCode) {
 
   // Find real table name from tables data
   const tableData = _floorData.tables.find(t => t.name === b.table_number) || {};
-  const isThursday = b.session_start && new Date(b.session_start).getDay() === 4;
+  const isMainStudioTable = !b.table_number || /^Table [1-8]$|^Table 5A$/.test(b.table_number);
+  const isThursday = b.session_start && new Date(b.session_start).getDay() === 4 && isMainStudioTable;
   const typeLabel = isThursday ? ' · Paint All Day' : b.booking_type === 'group' ? ' · Group booking' : ' · 90 min session';
   document.getElementById('detail-table-name').textContent = b.table_number || 'Table';
   document.getElementById('detail-booking-info').textContent =
