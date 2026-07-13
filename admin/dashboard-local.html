@@ -2517,22 +2517,21 @@
      THIS top-level grid, never one level up. ═══════════════════ -->
 <div id="grid-nav-view" class="view" style="display:block;">
   <div id="grid-nav-top" style="padding:20px;">
-    <h2 style="margin:0 0 4px;">The Kiln Cafe</h2>
-    <p style="color:var(--gu-dust);margin:0 0 20px;">Tap a square to see what's inside.</p>
-    <div style="display:flex;gap:14px;align-items:start;">
-      <div id="grid-nav-top-tiles" style="flex:1;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:4px;">
+      <h2 style="margin:0;">The Kiln Cafe</h2>
       <!-- Genuine real, separate mini tile, per direct request —
            Host By Post is genuinely a different business, not a
-           Kiln Cafe operational task, so it sits to the side of the
-           main grid rather than competing for one of the 8 main
-           squares. Real, direct link straight into its actual
-           working section — same postal-stamp mark already built
-           for it. -->
-      <button onclick="goToTab('setup'); showSetupSection('hostbypost');" class="glaze-tile" style="flex-shrink:0;width:88px;background:#2B2724;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:6px;gap:4px;">
-        <img src="/brand-assets/kiln-cafe-logo-demo/hostbypost-mark-demo.svg" alt="" style="width:26px;height:auto;">
-        <span style="font-size:9px;font-weight:800;line-height:1.15;">Host By Post</span>
+           Kiln Cafe operational task, so it sits apart from the
+           main grid, next to the heading. Real, direct link straight
+           into its actual working section — same postal-stamp mark
+           already built for it. -->
+      <button onclick="goToTab('setup'); showSetupSection('hostbypost');" class="glaze-tile" style="flex-shrink:0;width:60px;background:#2B2724;color:white;border:none;border-radius:12px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:4px;gap:2px;">
+        <img src="/brand-assets/kiln-cafe-logo-demo/hostbypost-mark-demo.svg" alt="" style="width:20px;height:auto;">
+        <span style="font-size:7px;font-weight:800;line-height:1.1;">Host By Post</span>
       </button>
     </div>
+    <p style="color:var(--gu-dust);margin:0 0 20px;">Tap a square to see what's inside.</p>
+    <div id="grid-nav-top-tiles" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;"></div>
   </div>
   <div id="grid-nav-sub" style="display:none;padding:20px;">
     <button onclick="showGridNavTop()" style="background:var(--link-charcoal);color:white;border:none;border-radius:10px;padding:10px 16px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:16px;">← Back to tasks</button>
