@@ -8153,6 +8153,193 @@ async function logOutOfShift() {
 // single tile calls the exact same, unmodified goToTab() already
 // used by the sidebar — nothing underneath was changed at all.
 // ═══════════════════════════════════════════════════════════
+// ── Glaze colour training system ─────────────────────────────────────
+// Learns quietly through real use — no separate training module.
+// Every time a staff member adds a Mayco glaze to a bill, the app
+// shows a brief reinforcement toast: colour swatch + name + code.
+// The first 3 encounters show the full training card; after that just
+// a quick confirmation, since the name is genuinely learned by then.
+// Tracked per-staff-member per-glaze in localStorage.
+// ────────────────────────────────────────────────────────────────────
+
+// Full Mayco Stroke & Coat colour map — hex → {name, code} — so any
+// glaze added anywhere in the app can show its real name, not just
+// the specialist ones that go through addMaycoGlaze directly.
+const MAYCO_COLOUR_MAP = {
+  '#f5f0e6': { name: 'Cotton Tail', code: 'SC-16' },
+  '#f0e6d2': { name: 'Ivory Tower', code: 'SC-37' },
+  '#f5d020': { name: 'Yella Bout It', code: 'SC-55' },
+  '#f7c948': { name: 'Sunkissed', code: 'SC-6' },
+  '#f9e17a': { name: 'Butter Me Up', code: 'SC-42' },
+  '#f9d423': { name: 'Dandelion', code: 'SC-24' },
+  '#f4a13a': { name: "Cant-elope", code: 'SC-97' },
+  '#f6b98a': { name: 'Just Peachy', code: 'SC-102' },
+  '#e8721f': { name: "Jack O'Lantern", code: 'SC-23' },
+  '#eb7a1f': { name: 'Orange-A-Peel', code: 'SC-75' },
+  '#f0862a': { name: 'Orange Ya Happy', code: 'SC-50' },
+  '#f0836b': { name: 'Melon-choly', code: 'SC-2' },
+  '#f27a63': { name: 'Cutie Pie Coral', code: 'SC-89' },
+  '#e8437a': { name: 'Tu Tu Tango', code: 'SC-88' },
+  '#c81e2c': { name: 'Candy Apple Red', code: 'SC-73' },
+  '#d8331f': { name: 'Hot Tamale', code: 'SC-74' },
+  '#a3162a': { name: 'Ruby Slippers', code: 'SC-87' },
+  '#9c4a2e': { name: 'Cinnamon Stix', code: 'SC-81' },
+  '#f2a8c0': { name: 'Pink-A-Boo', code: 'SC-1' },
+  '#f0b8be': { name: 'Makin Me Blush', code: 'SC-100' },
+  '#eb9fb8': { name: 'Pink-A-Dot', code: 'SC-70' },
+  '#f3a9c4': { name: 'Pinkie Swear', code: 'SC-95' },
+  '#e8799f': { name: 'Cheeky Pinky', code: 'SC-17' },
+  '#d9738c': { name: 'Rosey Posey', code: 'SC-18' },
+  '#5e1a2e': { name: 'Wine About It', code: 'SC-3' },
+  '#2c4f9e': { name: 'Blueberry Hill', code: 'SC-40' },
+  '#5b3a7a': { name: 'Grapel', code: 'SC-13' },
+  '#9a5bb0': { name: 'Orkid', code: 'SC-85' },
+  '#b39ddb': { name: 'Lavendear', code: 'SC-103' },
+  '#6a3b96': { name: 'Purple Haze', code: 'SC-53' },
+  '#4a2560': { name: 'Grape Jelly', code: 'SC-72' },
+  '#7a3d99': { name: 'Purple-Licious', code: 'SC-71' },
+  '#42225c': { name: 'Fruit Of The Vine', code: 'SC-33' },
+  '#6e3f8f': { name: 'Grape Expectations', code: 'SC-104' },
+  '#5b9bd5': { name: 'My Blue Heaven', code: 'SC-45' },
+  '#7fc7c2': { name: 'Seabreeze', code: 'SC-91' },
+  '#7b8fd6': { name: 'Peri-Twinkle', code: 'SC-65' },
+  '#2f6fb0': { name: 'Blue Dawn', code: 'SC-30' },
+  '#274b8f': { name: 'The Blues', code: 'SC-31' },
+  '#3a6fb5': { name: 'Blue Yonder', code: 'SC-11' },
+  '#3c5a8c': { name: '501 Blues', code: 'SC-58' },
+  '#1c94a8': { name: 'Cara-bein Blue', code: 'SC-76' },
+  '#345a8a': { name: 'Moody Blue', code: 'SC-12' },
+  '#4fb8b0': { name: 'Aqu-ward', code: 'SC-96' },
+  '#3c6e4f': { name: 'Spruce It Up', code: 'SC-101' },
+  '#3c8f6e': { name: 'Jaded', code: 'SC-9' },
+  '#2e8f9e': { name: 'Blue Isle', code: 'SC-28' },
+  '#1f7d7a': { name: 'Teal Next Time', code: 'SC-10' },
+  '#4a8f7e': { name: 'Blue Grass', code: 'SC-29' },
+  '#1c3f6e': { name: 'Bluebeard', code: 'SC-32' },
+  '#c8dca0': { name: 'Honeydew List', code: 'SC-93' },
+  '#7bab4a': { name: 'Lettuce Alone', code: 'SC-43' },
+  '#8dc63f': { name: "Leapin' Lizard", code: 'SC-7' },
+  '#4f8f3a': { name: 'Green Thumb', code: 'SC-26' },
+  '#6fae3e': { name: 'Just Froggy', code: 'SC-8' },
+  '#2e7d3e': { name: 'Irish Luck', code: 'SC-36' },
+  '#9fd83a': { name: 'Glo-Worm', code: 'SC-77' },
+  '#c4e034': { name: 'Lime Light', code: 'SC-78' },
+  '#a8c93a': { name: 'Slime Time', code: 'SC-98' },
+  '#9ecb3f': { name: 'Sour Apple', code: 'SC-27' },
+  '#5e8f4a': { name: 'Toad-ily Green', code: 'SC-52' },
+  '#8fa878': { name: "It's Sage", code: 'SC-79' },
+  '#5e6b3e': { name: 'Army Surplus', code: 'SC-39' },
+  '#f2e8d5': { name: 'Old Lace', code: 'SC-86' },
+  '#f0dfc0': { name: 'Vanilla Dip', code: 'SC-54' },
+  '#c9a877': { name: 'Cashew Later', code: 'SC-20' },
+  '#b78a5e': { name: 'Rawhide', code: 'SC-46' },
+  '#7a5230': { name: 'Poo Bear', code: 'SC-51' },
+  '#c9752e': { name: 'Tiger Tail', code: 'SC-5' },
+  '#6e4423': { name: 'Crackerjack Brown', code: 'SC-25' },
+  '#a85a2e': { name: 'Basketball', code: 'SC-80' },
+  '#5c3b23': { name: 'Brown Cow', code: 'SC-41' },
+  '#c9a06a': { name: 'Camel Back', code: 'SC-48' },
+  '#3c2718': { name: 'Java Bean', code: 'SC-14' },
+  '#6e5233': { name: 'Down To Earth', code: 'SC-34' },
+  '#5e3d24': { name: 'Café Ole', code: 'SC-92' },
+  '#8a7d6e': { name: 'Elephant Ears', code: 'SC-90' },
+  '#a89684': { name: 'Tip Taupe', code: 'SC-83' },
+  '#a8adb0': { name: 'Silver Lining', code: 'SC-60' },
+  '#7e8286': { name: 'Gray Hare', code: 'SC-35' },
+  '#4a4a4a': { name: 'Char-ming', code: 'SC-99' },
+  '#1a1a1a': { name: 'Tuxedo', code: 'SC-15' },
+};
+
+function _glazeTrainingKey() {
+  const staffId = currentShiftStaff?.id || 'shared';
+  return `glaze_training_${staffId}`;
+}
+
+function _getGlazeEncounters() {
+  try { return JSON.parse(localStorage.getItem(_glazeTrainingKey())) || {}; }
+  catch(e) { return {}; }
+}
+
+function _recordGlazeEncounter(code) {
+  const enc = _getGlazeEncounters();
+  enc[code] = (enc[code] || 0) + 1;
+  localStorage.setItem(_glazeTrainingKey(), JSON.stringify(enc));
+  return enc[code];
+}
+
+// The main function — called whenever any glaze gets added anywhere.
+// Shows a rich training card for the first 3 encounters, then a
+// brief confirmation only. Both fade and remove themselves.
+function showGlazeTrainingToast(name, code, hexColour) {
+  const count = _recordGlazeEncounter(code);
+  const isNew = count <= 3;
+
+  // Remove any existing toast first
+  document.querySelectorAll('.glaze-training-toast').forEach(el => el.remove());
+
+  const toast = document.createElement('div');
+  toast.className = 'glaze-training-toast';
+
+  if (isNew) {
+    // Rich training card — swatch, name, code, encounter count
+    const timesText = count === 1 ? 'First time using this one!' :
+                      count === 2 ? 'Second time — almost there.' :
+                      'Third time — you\'ve got this one.';
+    toast.style.cssText = `
+      position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
+      background:white; border:1.5px solid var(--gu-border);
+      border-radius:16px; padding:12px 16px;
+      box-shadow:0 8px 24px rgba(0,0,0,0.18);
+      display:flex; align-items:center; gap:12px;
+      z-index:9999; max-width:calc(100vw - 40px);
+      animation:glaze-toast-in 0.25s cubic-bezier(0.34,1.4,0.4,1) both;
+    `;
+    toast.innerHTML = `
+      <div style="width:40px;height:40px;border-radius:10px;background:${hexColour || '#B87946'};flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,0.2);"></div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:800;color:#2B2724;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</div>
+        <div style="font-size:11px;color:#B87946;font-weight:700;margin-top:1px;">${code} · Mayco Stroke &amp; Coat®</div>
+        <div style="font-size:10px;color:#8a8175;margin-top:3px;">${timesText}</div>
+      </div>
+      <div style="font-size:18px;">✓</div>
+    `;
+  } else {
+    // Brief confirmation only — they know this one
+    toast.style.cssText = `
+      position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
+      background:#2B2724; color:white; padding:10px 20px;
+      border-radius:10px; font-size:13px; font-weight:600;
+      z-index:9999; white-space:nowrap;
+      animation:glaze-toast-in 0.2s cubic-bezier(0.34,1.4,0.4,1) both;
+    `;
+    toast.textContent = `✓ ${name} · ${code} added`;
+  }
+
+  // Inject the keyframe if not already there
+  if (!document.getElementById('glaze-toast-style')) {
+    const s = document.createElement('style');
+    s.id = 'glaze-toast-style';
+    s.textContent = `
+      @keyframes glaze-toast-in {
+        from { opacity:0; transform:translateX(-50%) translateY(12px); }
+        to   { opacity:1; transform:translateX(-50%) translateY(0); }
+      }
+      @keyframes glaze-toast-out {
+        from { opacity:1; transform:translateX(-50%) translateY(0); }
+        to   { opacity:0; transform:translateX(-50%) translateY(8px); }
+      }
+    `;
+    document.head.appendChild(s);
+  }
+
+  document.body.appendChild(toast);
+  const duration = isNew ? 3500 : 2000;
+  setTimeout(() => {
+    toast.style.animation = 'glaze-toast-out 0.3s ease forwards';
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
+
 // ── Genuine real per-device tile layout system ──────────────────────
 // Three things saved to localStorage, all keyed by studioId so
 // different studios on the same device don't bleed into each other:
@@ -14290,6 +14477,18 @@ async function addCatalogItemToOrder(item, itemType) {
 
     if (res.ok) {
       refreshOrdersList(s2SelectedTableSessionId, 's2');
+      // If this is a glaze item, show the training toast — look up
+      // the Mayco name from the item name or colour hex if available.
+      if (itemType === 'glaze' && item.name) {
+        const matched = Object.entries(MAYCO_COLOUR_MAP).find(
+          ([hex, v]) => item.name.includes(v.code) || item.name.includes(v.name)
+        );
+        if (matched) {
+          showGlazeTrainingToast(matched[1].name, matched[1].code, matched[0]);
+        } else {
+          showGlazeTrainingToast(item.name, '', item.hex || '#B87946');
+        }
+      }
     } else {
       alert('Error adding item: ' + res.statusText);
     }
@@ -14376,12 +14575,13 @@ async function addMaycoGlaze(code, name) {
     setTimeout(() => { panel.style.background = prev; }, 700);
   }
 
-  // Brief toast
-  const toast = document.createElement('div');
-  toast.textContent = `✓ ${name} (${code}) — £2.00 added`;
-  toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#2B2724;color:white;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;white-space:nowrap;';
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 2500);
+  // Glaze training toast — shows colour swatch, name, code, and
+  // tracks how many times this staff member has used this glaze.
+  // First 3 encounters show the full training card; after that brief.
+  // Hex looked up from MAYCO_COLOUR_MAP by code, since addMaycoGlaze
+  // receives name+code but not hex directly.
+  const hexEntry = Object.entries(MAYCO_COLOUR_MAP).find(([, v]) => v.code === code);
+  showGlazeTrainingToast(name, code, hexEntry ? hexEntry[0] : '#B87946');
 }
 
 async function addTableOrder() {
