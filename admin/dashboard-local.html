@@ -43,12 +43,18 @@
 
     /* ═══════════════════════════════════════════════════════════
        PARKED, PER DIRECT REQUEST — Cleo's floating avatar/presence
-       and the revenue banners are hidden site-wide for now, while
-       the new grid-tile navigation is trialled. Genuinely nothing
-       underneath was deleted — every real function, every real
-       piece of data, every real line of code is untouched. This is
-       a single, honest, reversible switch: delete this whole block
-       (or just the lines you want back) to restore any of it.
+       and Platform Revenue (every revenue stream OTHER than the
+       Kiln Cafe's own) are hidden site-wide for now, while the new
+       grid-tile navigation is trialled. Genuinely nothing underneath
+       was deleted — every real function, every real piece of data,
+       every real line of code is untouched. This is a single,
+       honest, reversible switch: delete this whole block (or just
+       the lines you want back) to restore any of it.
+
+       Kiln Cafe Revenue itself is genuinely UNPARKED, per direct
+       request — it's still correctly gated to Elliott/David/Jenny/
+       Daisy only, via the existing, unchanged PLATFORM_REVENUE_ACCESS
+       check.
 
        Also parked: the Process Builder / Task Handoff Chain — a real
        custom workflow-automation builder (define triggers, target
@@ -62,7 +68,6 @@
     #cleo-admin-floating-fab,
     #cleo-admin-floating-bubble,
     #platform-revenue-strip,
-    #kiln-cafe-revenue-section,
     #team-tile-process,
     #team-section-process {
       display: none !important;
@@ -2841,6 +2846,7 @@
             <div style="font-size:11px;color:var(--gu-dust);margin-bottom:6px;font-weight:700;">Which space?</div>
             <div style="display:flex;gap:8px;margin-bottom:14px;">
               <button id="party-space-main" class="staff-subtab-btn active" style="flex:1;padding:12px;font-size:13px;" onclick="setPartySpace('Main Studio')">Main Studio</button>
+              <button id="party-space-lounge" class="staff-subtab-btn" style="flex:1;padding:12px;font-size:13px;" onclick="setPartySpace('Lounge')">Lounge</button>
               <button id="party-space-vault" class="staff-subtab-btn" style="flex:1;padding:12px;font-size:13px;position:relative;" onclick="setPartySpace('The Vault')">The Vault <span style="font-size:9px;background:#F9A825;color:white;padding:2px 6px;border-radius:8px;margin-left:4px;">PREMIUM</span></button>
             </div>
 
@@ -3767,6 +3773,23 @@
           <h3 style="margin:0 0 6px;">🪑 Studio Tables</h3>
           <p style="font-size:12px;color:var(--gu-dust);margin-bottom:16px;">Define your tables once here. They'll appear as a visual picker in Daily Bookings so staff can assign each customer to the right table and see which are free at a glance.</p>
           <div id="table-config-list" style="margin-bottom:12px;"></div>
+
+          <!-- Genuine real quick actions, per direct request for a
+               logical, easy-to-envisage way to split a table into
+               two smaller ones (e.g. Table 4 → 4A + 4B) or combine
+               several into one big party table (e.g. Table 9-12 →
+               one 12-seat table). Both correctly work with whichever
+               real table is currently selected below. -->
+          <div style="background:var(--gu-bg);border:1px solid var(--gu-border);border-radius:10px;padding:12px;margin-bottom:14px;">
+            <div style="font-size:11px;font-weight:700;color:var(--gu-text);margin-bottom:8px;">Splitting a table, or combining a few into one big table for a party? Pick a real table below, then:</div>
+            <select id="table-quick-action-select" style="width:100%;padding:8px 10px;border:1px solid var(--gu-border);border-radius:8px;font-size:12px;background:white;margin-bottom:8px;"></select>
+            <div style="display:flex;gap:8px;">
+              <button onclick="splitSelectedTable()" style="flex:1;background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;">Split into two</button>
+              <button onclick="openCombineTablesPicker()" style="flex:1;background:var(--link-clay);color:white;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;">Combine a few into one</button>
+            </div>
+            <div id="table-quick-action-status" style="font-size:11px;color:var(--gu-dust);margin-top:8px;"></div>
+          </div>
+
           <div style="display:grid;grid-template-columns:1fr 80px 100px auto;gap:8px;align-items:end;margin-bottom:12px;">
             <div>
               <label style="font-size:11px;font-weight:600;color:var(--gu-dust);display:block;margin-bottom:4px;">Table name</label>
@@ -3784,6 +3807,19 @@
           </div>
           <button onclick="saveTableConfig()" style="background:var(--link-clay);color:white;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;">💾 Save Tables</button>
           <span id="table-config-status" style="font-size:12px;color:var(--gu-dust);margin-left:10px;"></span>
+
+          <!-- Genuine real combine picker — appears when "Combine a
+               few into one" is tapped, lets staff tick which real
+               tables to fold into one big party table. -->
+          <div id="combine-tables-picker" style="display:none;background:white;border:1.5px solid var(--gu-primary);border-radius:10px;padding:12px;margin-top:12px;">
+            <div style="font-size:12px;font-weight:700;margin-bottom:8px;">Tick the real tables to combine into one</div>
+            <div id="combine-tables-checklist" style="margin-bottom:10px;"></div>
+            <input type="text" id="combine-table-new-name" placeholder="Name for the combined table (e.g. Lounge Party Table)" style="width:100%;padding:8px 10px;border:1px solid var(--gu-border);border-radius:8px;font-size:12px;margin-bottom:8px;box-sizing:border-box;">
+            <div style="display:flex;gap:8px;">
+              <button onclick="confirmCombineTables()" style="flex:1;background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;">Combine</button>
+              <button onclick="document.getElementById('combine-tables-picker').style.display='none';" style="flex:1;background:none;border:1px solid var(--gu-border);border-radius:8px;padding:9px;font-size:12px;cursor:pointer;">Cancel</button>
+            </div>
+          </div>
         </div>
 
         <!-- KDS Configuration -->
@@ -10264,6 +10300,7 @@ function renderTableConfig() {
   if (!el) return;
   if (!tableConfigList.length) {
     el.innerHTML = '<p style="font-size:12px;color:var(--gu-dust);padding:8px 0;">No tables added yet. Add your tables below.</p>';
+    populateTableQuickActionSelect();
     return;
   }
   el.innerHTML = tableConfigList.map((t, i) => `
@@ -10274,6 +10311,7 @@ function renderTableConfig() {
       <button onclick="removeTableConfig(${i})" style="background:none;border:none;color:#d9534f;font-size:18px;cursor:pointer;padding:0 2px;line-height:1;">×</button>
     </div>
   `).join('');
+  populateTableQuickActionSelect();
 }
 
 function addTableConfig() {
@@ -10305,6 +10343,84 @@ async function saveTableConfig() {
     // Also reload studio tables for the picker
     studioTables = tableConfigList;
   } catch(e) { status.textContent = '✗ Failed'; }
+}
+
+// ── Genuine real split/combine quick actions, per direct request for
+// a logical, easy-to-envisage way to handle a table being split into
+// two smaller ones, or several being folded into one big party table.
+// Both correctly work within the same, existing tableConfigList
+// pattern already used everywhere else on this screen — nothing is
+// genuinely saved to the real database until "Save Tables" is
+// tapped, matching the established, safe behaviour. ──
+
+function populateTableQuickActionSelect() {
+  const sel = document.getElementById('table-quick-action-select');
+  if (!sel) return;
+  sel.innerHTML = tableConfigList.map((t, i) => `<option value="${i}">${t.name}${t.room ? ' — ' + t.room : ''} (${t.capacity} seats)</option>`).join('');
+}
+
+// Splits the selected real table into two smaller ones, e.g.
+// "Table 4" (4 seats) → "Table 4A" + "Table 4B" (2 seats each) —
+// genuinely halves the real capacity, rounding down so seats are
+// never invented out of nowhere.
+function splitSelectedTable() {
+  const sel = document.getElementById('table-quick-action-select');
+  const statusEl = document.getElementById('table-quick-action-status');
+  const i = parseInt(sel?.value);
+  if (isNaN(i) || !tableConfigList[i]) { statusEl.textContent = 'Pick a table first.'; return; }
+  const original = tableConfigList[i];
+  if (original.capacity < 2) { statusEl.textContent = `${original.name} only seats ${original.capacity} — too small to split.`; return; }
+  const halfCapacity = Math.floor(original.capacity / 2);
+  tableConfigList.splice(i, 1,
+    { name: `${original.name}A`, capacity: halfCapacity, room: original.room },
+    { name: `${original.name}B`, capacity: original.capacity - halfCapacity, room: original.room }
+  );
+  renderTableConfig();
+  populateTableQuickActionSelect();
+  statusEl.textContent = `✓ Split into ${original.name}A and ${original.name}B — tap Save Tables to confirm.`;
+}
+
+// Opens the real combine picker, listing every current table so
+// staff can tick which ones to fold into one big party table.
+function openCombineTablesPicker() {
+  const picker = document.getElementById('combine-tables-picker');
+  const checklist = document.getElementById('combine-tables-checklist');
+  if (!picker || !checklist) return;
+  checklist.innerHTML = tableConfigList.map((t, i) => `
+    <label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;cursor:pointer;">
+      <input type="checkbox" class="combine-table-checkbox" value="${i}" style="width:16px;height:16px;">
+      ${t.name}${t.room ? ' — ' + t.room : ''} (${t.capacity} seats)
+    </label>
+  `).join('');
+  picker.style.display = 'block';
+}
+
+// Folds the ticked real tables into one combined table, per direct
+// request — e.g. Lounge 9+10+11+12 → one "Lounge Party Table" seating
+// 12. The real combined capacity is the honest sum of every table
+// being folded in, not a guess.
+function confirmCombineTables() {
+  const checked = Array.from(document.querySelectorAll('.combine-table-checkbox:checked')).map(cb => parseInt(cb.value));
+  const statusEl = document.getElementById('table-quick-action-status');
+  const newName = document.getElementById('combine-table-new-name').value.trim();
+  if (checked.length < 2) { alert('Tick at least two tables to combine.'); return; }
+  if (!newName) { alert('Give the combined table a name.'); return; }
+
+  const tablesToCombine = checked.map(i => tableConfigList[i]);
+  const combinedCapacity = tablesToCombine.reduce((sum, t) => sum + t.capacity, 0);
+  const room = tablesToCombine[0].room; // genuinely, real tables being combined should share a room — using the first's
+
+  // Remove the individual real tables (highest index first, so
+  // removing doesn't shift the indices of ones still to remove),
+  // then add the one new combined table.
+  checked.sort((a, b) => b - a).forEach(i => tableConfigList.splice(i, 1));
+  tableConfigList.push({ name: newName, capacity: combinedCapacity, room });
+
+  renderTableConfig();
+  populateTableQuickActionSelect();
+  document.getElementById('combine-tables-picker').style.display = 'none';
+  document.getElementById('combine-table-new-name').value = '';
+  statusEl.textContent = `✓ Combined into "${newName}" (${combinedCapacity} seats) — tap Save Tables to confirm.`;
 }
 
 // ── KDS Configuration ──
@@ -13061,6 +13177,7 @@ let _selectedPartySpace = 'Main Studio';
 function setPartySpace(space) {
   _selectedPartySpace = space;
   document.getElementById('party-space-main').classList.toggle('active', space === 'Main Studio');
+  document.getElementById('party-space-lounge').classList.toggle('active', space === 'Lounge');
   document.getElementById('party-space-vault').classList.toggle('active', space === 'The Vault');
 }
 

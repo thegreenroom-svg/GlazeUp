@@ -1550,8 +1550,8 @@ app.post('/api/bookings/party', async (req, res) => {
   if (!studioId || !customerName || !space || !sessionStart) {
     return res.status(400).json({ error: 'studioId, customerName, space, sessionStart required' });
   }
-  if (!['The Vault', 'Main Studio'].includes(space)) {
-    return res.status(400).json({ error: 'space must be "The Vault" or "Main Studio"' });
+  if (!['The Vault', 'Main Studio', 'Lounge'].includes(space)) {
+    return res.status(400).json({ error: 'space must be "The Vault", "Main Studio", or "Lounge"' });
   }
 
   try {
