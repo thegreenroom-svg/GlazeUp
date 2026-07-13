@@ -1785,8 +1785,16 @@
 
 <!-- Splash / resting screen -->
 <div id="splash-screen">
-  <img src="/brand-assets/kiln-cafe-logo-demo/kiln-cafe-mark-demo-light.svg" alt="" style="width:88px;height:88px;margin-bottom:18px;">
-  <div style="font-family:var(--gu-font-display);font-size:32px;font-weight:700;color:#F7F4EE;letter-spacing:-0.01em;">The Kiln Cafe</div>
+  <!-- Genuine real large glaze-tile, per direct request — same
+       established .glaze-tile treatment (shadow, soft highlight
+       sweep) used on every tile across the app, so this launch
+       screen genuinely previews what the app looks like inside.
+       The real, actual uploaded logo sits centred within it at
+       roughly a third of the tile's own size, its own edges
+       visible around it. -->
+  <div class="glaze-tile" style="background:var(--link-clay);border-radius:28px;width:min(78vw,340px);aspect-ratio:1;display:flex;align-items:center;justify-content:center;">
+    <img src="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png" alt="The Kiln Cafe" style="width:33%;height:auto;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,0.25);">
+  </div>
   <div class="splash-hint">Tap anywhere to continue</div>
 </div>
 
