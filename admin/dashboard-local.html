@@ -15280,27 +15280,35 @@ async function handleFindPieceStep2Capture(event) {
       // Real arrow overlay pointing at the AI's estimated centre point
       // — genuinely more precise than the old 9-cell zone ("middle
       // centre" was honestly too ambiguous to be useful). Still an
-      // estimate, not pixel-perfect, so the label says so honestly
-      // rather than implying false precision.
+      // Red circle overlay — centered on the AI's estimated centre
+      // point, sized relative to the photo (18% of width as diameter)
+      // so it looks proportionate regardless of portrait/landscape.
+      // Per direct request: no pin emoji or pointer, just a clean red
+      // circle around the piece, sized to the piece.
       const hasCoords = data.found && data.centreX != null && data.centreY != null;
-      const arrowMarker = hasCoords ? `
-        <div style="position:absolute;left:${data.centreX}%;top:${data.centreY}%;transform:translate(-50%,-100%);pointer-events:none;">
-          <div style="font-size:32px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.6));">📍</div>
+      const circleMarker = hasCoords ? `
+        <div style="position:absolute;
+          left:${data.centreX}%;top:${data.centreY}%;
+          width:18%;padding-bottom:18%;height:0;
+          transform:translate(-50%,-50%);
+          border-radius:50%;
+          border:3px solid #e53935;
+          box-shadow:0 0 0 2px rgba(0,0,0,0.35),0 0 20px rgba(229,57,53,0.55);
+          pointer-events:none;">
         </div>
-        <div style="position:absolute;left:${data.centreX}%;top:${data.centreY}%;transform:translate(-50%,-50%);width:14px;height:14px;border-radius:50%;background:${confidenceColor};border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.5);pointer-events:none;"></div>
       ` : '';
 
       resultEl.innerHTML = `
         <div style="border-radius:14px;overflow:hidden;margin-bottom:16px;position:relative;">
           <img src="${scenePhotoDataUrl}" style="width:100%;display:block;">
-          ${arrowMarker}
+          ${circleMarker}
         </div>
         <div style="background:${data.found ? 'rgba(76,175,80,0.15)' : 'rgba(138,129,117,0.15)'};border:1.5px solid ${data.found ? '#4caf50' : '#5a5148'};border-radius:14px;padding:16px;margin-bottom:12px;">
           <div style="font-size:18px;font-weight:800;color:${data.found ? '#4caf50' : 'white'};margin-bottom:6px;">
             ${data.found ? '✓ Found it' : '✗ Not found in this photo'}
             ${data.found ? `<span style="font-size:11px;font-weight:700;color:${confidenceColor};text-transform:uppercase;margin-left:8px;">${data.confidence} confidence</span>` : ''}
           </div>
-          ${hasCoords ? `<div style="font-size:12px;color:#cfc7bd;margin-bottom:8px;">📍 marks the estimated spot${data.coordinateConfidence === 'approximate' ? ' — roughly, not pixel-precise' : ''}</div>` : ''}
+          ${hasCoords ? `<div style="font-size:12px;color:#cfc7bd;margin-bottom:8px;">Circle shows the estimated position${data.coordinateConfidence === 'approximate' ? ' — roughly, not pixel-precise' : ''}</div>` : ''}
           <div style="font-size:13px;color:white;line-height:1.5;">${data.reasoning || ''}</div>
         </div>
         ${data.otherObjectsNoted ? `<div style="font-size:12px;color:#8a8175;margin-bottom:16px;">Also visible in scene: ${data.otherObjectsNoted}</div>` : ''}
@@ -15559,10 +15567,27 @@ async function handleWholeTrayCapture(event) {
       // Show the photo with rough grid-position markers overlaid — this
       // is deliberately approximate (a general area, not a precise
       // pointer), stated honestly in the label itself.
+      // Red circle per detected piece — centered on its grid-zone
+      // midpoint, sized as a percentage of the image width so they
+      // look proportionate at any photo size. Numbered inside so
+      // staff can match each circle to the confirmation list below.
+      // Per direct request: red circles, sized to each piece, no
+      // pointer or pin emoji.
       const overlayMarkers = data.detectedPieces.map((p, i) => {
         const pos = GRID_POSITION_STYLES[p.approxPosition] || GRID_POSITION_STYLES['middle-centre'];
-        const color = CONFIDENCE_COLORS[p.confidence] || '#8a8175';
-        return `<div style="position:absolute;top:${pos.top};left:${pos.left};width:36px;height:36px;border:3px solid ${color};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:${color};background:rgba(255,255,255,0.85);">${i + 1}</div>`;
+        // Circle diameter: 22% of image width, which renders roughly
+        // the right visual weight for a single pottery piece in a
+        // typical tray shot. Transform centres it on the grid-zone
+        // midpoint rather than placing its top-left corner there.
+        return `<div style="position:absolute;top:${pos.top};left:${pos.left};
+          width:22%;padding-bottom:22%;height:0;
+          transform:translate(-50%,-50%);
+          border-radius:50%;
+          border:3px solid #e53935;
+          box-shadow:0 0 0 2px rgba(0,0,0,0.35),0 0 16px rgba(229,57,53,0.5);
+          pointer-events:none;overflow:hidden;">
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#e53935;text-shadow:0 1px 3px rgba(0,0,0,0.5);">${i + 1}</div>
+        </div>`;
       }).join('');
 
       resultEl.innerHTML = `
