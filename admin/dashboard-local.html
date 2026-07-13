@@ -2590,81 +2590,89 @@
 ──────────────────────────────────────────────────────────────────── -->
 <div id="floor-plan-view" class="view" style="display:none;flex-direction:column;height:100%;background:#F7F4EE;">
 
-  <!-- Header -->
-  <div style="background:#2B2724;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+  <!-- Header — rich dark with amber accent -->
+  <div style="background:linear-gradient(135deg,#1C1814 0%,#2B2118 100%);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid rgba(184,121,70,0.3);">
     <div>
-      <div style="font-size:15px;font-weight:800;color:white;" id="floor-greeting">Tables</div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.6);" id="floor-subtitle">Live floor plan</div>
+      <div style="font-size:16px;font-weight:800;color:#F4ECE0;letter-spacing:-0.01em;" id="floor-greeting">Floor Plan</div>
+      <div style="font-size:11px;color:rgba(184,121,70,0.8);font-weight:500;" id="floor-subtitle">Live studio view</div>
     </div>
     <button onclick="goToRealLandingPage()" class="glaze-tile"
-      style="background:#2e7d32;color:white;border:none;border-radius:14px;padding:10px 16px;font-size:13px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:8px;">
-      🏠 <span>My Home</span>
+      style="background:linear-gradient(135deg,#B87946,#9A6435);color:white;border:none;border-radius:12px;padding:9px 16px;font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:7px;box-shadow:0 4px 16px rgba(184,121,70,0.35);letter-spacing:0.01em;">
+      🏠 <span>Home</span>
     </button>
   </div>
 
-  <!-- Three-column layout:
-       Left strip = Lounge tile, Middle = Main Studio grid, Right strip = Vault tile -->
-  <div style="flex:1;display:flex;overflow:hidden;gap:0;">
+  <!-- Three-column layout -->
+  <div style="flex:1;display:flex;overflow:hidden;">
 
-    <!-- Lounge — glaze tile strip on the left, opens to full screen -->
-    <div style="width:52px;flex-shrink:0;background:#00695c;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:6px;"
+    <!-- Lounge strip — left, teal-to-dark gradient -->
+    <div style="width:48px;flex-shrink:0;background:linear-gradient(180deg,#004D40 0%,#00251A 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:10px;border-right:1px solid rgba(0,105,92,0.4);position:relative;"
       onclick="openRoomPanel('Lounge')">
-      <div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;font-weight:800;color:white;letter-spacing:0.06em;">LOUNGE</div>
-      <div id="lounge-active-count" style="background:rgba(255,255,255,0.2);color:white;border-radius:20px;padding:3px 6px;font-size:10px;font-weight:700;"></div>
-      <div style="font-size:18px;">→</div>
+      <!-- Active indicator line -->
+      <div id="lounge-indicator" style="position:absolute;left:0;top:0;bottom:0;width:3px;background:#00BFA5;display:none;border-radius:0 3px 3px 0;"></div>
+      <div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:10px;font-weight:800;color:rgba(255,255,255,0.9);letter-spacing:0.1em;text-transform:uppercase;">Lounge</div>
+      <div id="lounge-active-count" style="display:none;background:#00BFA5;color:#003D35;border-radius:20px;padding:3px 7px;font-size:10px;font-weight:800;"></div>
+      <div style="font-size:14px;color:rgba(255,255,255,0.4);">›</div>
     </div>
 
-    <!-- Main Studio — centre, always visible, scrollable -->
-    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
-      <div style="background:#2B2724;border-top:1px solid rgba(255,255,255,0.08);padding:5px 10px;flex-shrink:0;">
-        <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.06em;">Main Studio · Tables 1–8</div>
+    <!-- Main Studio — dark luxury background -->
+    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;background:#1A1714;">
+      <div style="padding:8px 10px 6px;flex-shrink:0;border-bottom:1px solid rgba(184,121,70,0.15);">
+        <div style="font-size:9px;font-weight:700;color:rgba(184,121,70,0.6);text-transform:uppercase;letter-spacing:0.1em;">Main Studio · Tables 1–8</div>
       </div>
-      <div id="floor-main-studio" style="flex:1;overflow-y:auto;padding:8px;display:grid;gap:8px;grid-template-columns:1fr 1fr;align-content:start;"></div>
+      <div id="floor-main-studio" style="flex:1;overflow-y:auto;padding:8px;display:grid;gap:7px;grid-template-columns:1fr 1fr;align-content:start;"></div>
     </div>
 
-    <!-- The Vault — glaze tile strip on the right, opens to full screen -->
-    <div style="width:52px;flex-shrink:0;background:#4527A0;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:6px;"
+    <!-- Vault strip — right, deep purple gradient -->
+    <div style="width:48px;flex-shrink:0;background:linear-gradient(180deg,#1A0050 0%,#0D0030 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:10px;border-left:1px solid rgba(94,53,177,0.4);position:relative;"
       onclick="openRoomPanel('The Vault')">
-      <div style="writing-mode:vertical-rl;font-size:11px;font-weight:800;color:white;letter-spacing:0.06em;">VAULT</div>
-      <div id="vault-active-count" style="background:rgba(255,255,255,0.2);color:white;border-radius:20px;padding:3px 6px;font-size:10px;font-weight:700;"></div>
-      <div style="font-size:18px;">←</div>
+      <div id="vault-indicator" style="position:absolute;right:0;top:0;bottom:0;width:3px;background:#9575CD;display:none;border-radius:3px 0 0 3px;"></div>
+      <div style="writing-mode:vertical-rl;font-size:10px;font-weight:800;color:rgba(255,255,255,0.9);letter-spacing:0.1em;text-transform:uppercase;">The Vault</div>
+      <div id="vault-active-count" style="display:none;background:#9575CD;color:#1A0050;border-radius:20px;padding:3px 7px;font-size:10px;font-weight:800;"></div>
+      <div style="font-size:14px;color:rgba(255,255,255,0.4);">‹</div>
     </div>
 
   </div>
 
-  <!-- Room panel — full screen overlay for Lounge or Vault -->
+  <!-- Room panel — full screen overlay, premium dark -->
   <div id="floor-room-panel" style="display:none;position:fixed;inset:0;z-index:9500;flex-direction:column;">
-    <div id="floor-room-panel-header" style="background:#2B2724;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;">
+    <div id="floor-room-panel-header" style="background:linear-gradient(135deg,#1C1814,#2B2118);padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;border-bottom:1px solid rgba(184,121,70,0.2);">
       <button onclick="closeRoomPanel()" class="glaze-tile"
-        style="background:#B87946;color:white;border:none;border-radius:12px;padding:8px 14px;font-size:13px;font-weight:800;cursor:pointer;">
+        style="background:linear-gradient(135deg,#B87946,#9A6435);color:white;border:none;border-radius:12px;padding:8px 14px;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(184,121,70,0.3);">
         ← Back
       </button>
-      <div style="font-size:15px;font-weight:800;color:white;" id="floor-room-panel-title">Lounge</div>
+      <div>
+        <div style="font-size:16px;font-weight:800;color:#F4ECE0;" id="floor-room-panel-title">Lounge</div>
+        <div style="font-size:11px;color:rgba(184,121,70,0.7);" id="floor-room-panel-sub"></div>
+      </div>
     </div>
-    <div id="floor-room-panel-grid" style="flex:1;overflow-y:auto;padding:12px;display:grid;gap:10px;grid-template-columns:1fr 1fr;align-content:start;background:#F7F4EE;"></div>
+    <div id="floor-room-panel-grid" style="flex:1;overflow-y:auto;padding:10px;display:grid;gap:8px;grid-template-columns:1fr 1fr;align-content:start;background:#1A1714;"></div>
   </div>
 
-  <!-- Table detail full-screen -->
-  <div id="floor-table-detail" style="display:none;position:fixed;inset:0;z-index:9600;background:#F7F4EE;flex-direction:column;">
-    <div style="background:#2B2724;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;">
+  <!-- Table detail full-screen — dark, rich -->
+  <div id="floor-table-detail" style="display:none;position:fixed;inset:0;z-index:9600;background:#1A1714;flex-direction:column;">
+    <div style="background:linear-gradient(135deg,#1C1814,#2B2118);padding:12px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;border-bottom:1px solid rgba(184,121,70,0.2);">
       <button onclick="closeTableDetail()" class="glaze-tile"
-        style="background:#B87946;color:white;border:none;border-radius:12px;padding:8px 14px;font-size:13px;font-weight:800;cursor:pointer;">
+        style="background:linear-gradient(135deg,#B87946,#9A6435);color:white;border:none;border-radius:12px;padding:8px 14px;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(184,121,70,0.3);">
         ← Back
       </button>
-      <div style="flex:1;">
-        <div style="font-size:15px;font-weight:800;color:white;" id="detail-table-name">Table 4</div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.6);" id="detail-booking-info">—</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:16px;font-weight:800;color:#F4ECE0;" id="detail-table-name">Table 4</div>
+        <div style="font-size:11px;color:rgba(184,121,70,0.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="detail-booking-info">—</div>
       </div>
-      <div style="text-align:right;">
-        <div style="font-size:20px;font-weight:800;color:#4CAF50;" id="detail-time-remaining">—</div>
-        <div style="font-size:9px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.05em;" id="detail-timer-label">remaining</div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:22px;font-weight:800;color:#4CAF50;font-variant-numeric:tabular-nums;" id="detail-time-remaining">—</div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.08em;" id="detail-timer-label">remaining</div>
       </div>
     </div>
-    <div style="height:5px;background:rgba(255,255,255,0.1);flex-shrink:0;">
-      <div id="detail-progress-bar" style="height:100%;background:#2e7d32;transition:width 1s linear;width:0%;"></div>
+    <!-- Session progress bar -->
+    <div style="height:3px;background:rgba(255,255,255,0.06);flex-shrink:0;">
+      <div id="detail-progress-bar" style="height:100%;background:linear-gradient(90deg,#B87946,#4CAF50);transition:width 1s linear;width:0%;"></div>
     </div>
-    <div id="detail-canvas-wrap" style="flex:1;position:relative;overflow:hidden;touch-action:none;"></div>
-    <div id="detail-checklist" style="background:white;border-top:2px solid var(--gu-border);padding:12px 16px;flex-shrink:0;max-height:45vh;overflow-y:auto;"></div>
+    <!-- Table canvas — dark -->
+    <div id="detail-canvas-wrap" style="flex:1;position:relative;overflow:hidden;touch-action:none;background:radial-gradient(ellipse at 50% 40%,#2B2118 0%,#1A1714 70%);"></div>
+    <!-- Checklist — warm dark card -->
+    <div id="detail-checklist" style="background:#1C1814;border-top:1px solid rgba(184,121,70,0.2);padding:14px 16px;flex-shrink:0;max-height:42vh;overflow-y:auto;"></div>
   </div>
 
 </div>
@@ -8856,13 +8864,17 @@ function renderFloorPlan() {
       : '<div style="grid-column:1/-1;padding:16px;text-align:center;color:var(--gu-dust);font-size:12px;">No tables set up yet.</div>';
   }
 
-  // Update side strip active counts
+  // Update side strip indicators
   const loungeActive = _floorData.tables.filter(t => t.room === 'Lounge' && bookingByTable[t.name]).length;
   const vaultActive = _floorData.tables.filter(t => t.room === 'The Vault' && bookingByTable[t.name]).length;
   const loungeCount = document.getElementById('lounge-active-count');
   const vaultCount = document.getElementById('vault-active-count');
-  if (loungeCount) loungeCount.textContent = loungeActive ? `${loungeActive} on` : '';
-  if (vaultCount) vaultCount.textContent = vaultActive ? `${vaultActive} on` : '';
+  const loungeInd = document.getElementById('lounge-indicator');
+  const vaultInd = document.getElementById('vault-indicator');
+  if (loungeCount) { loungeCount.textContent = loungeActive || ''; loungeCount.style.display = loungeActive ? 'block' : 'none'; }
+  if (vaultCount) { vaultCount.textContent = vaultActive || ''; vaultCount.style.display = vaultActive ? 'block' : 'none'; }
+  if (loungeInd) loungeInd.style.display = loungeActive ? 'block' : 'none';
+  if (vaultInd) vaultInd.style.display = vaultActive ? 'block' : 'none';
 }
 
 // Open Lounge or Vault as a full-screen panel
@@ -8872,9 +8884,11 @@ function openRoomPanel(room) {
   const grid = document.getElementById('floor-room-panel-grid');
   if (!panel || !grid) return;
 
-  const roomColor = room === 'Lounge' ? '#00695c' : '#4527A0';
+  const roomColor = room === 'Lounge' ? '#00BFA5' : '#9575CD';
+  const roomCapacity = room === 'Lounge' ? 'Modular seating · up to 12' : 'Private room · up to 14';
   title.textContent = room;
-  document.getElementById('floor-room-panel-header').style.background = '#2B2724';
+  const sub = document.getElementById('floor-room-panel-sub');
+  if (sub) sub.textContent = roomCapacity;
 
   const now = new Date();
   const bookingByTable = {};
@@ -8904,71 +8918,72 @@ function filterFloorByRoom() {}
 
 function _renderEmptyTile(table) {
   return `
-    <div style="background:white;border:1.5px solid var(--gu-border);border-radius:16px;padding:12px;text-align:center;opacity:0.5;">
-      <div style="font-size:12px;font-weight:800;color:var(--gu-text);margin-bottom:6px;">${table.name}</div>
-      <div style="margin:4px auto;">${_miniTableSvg(table.capacity || 4)}</div>
-      <div style="font-size:9px;color:var(--gu-dust);margin-top:4px;">${table.room}</div>
-      <div style="font-size:9px;color:var(--gu-dust);">Empty</div>
+    <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:11px;text-align:center;">
+      <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.25);margin-bottom:5px;">${table.name}</div>
+      <div style="margin:4px auto;opacity:0.2;">${_miniTableSvg(table.capacity || 4, true)}</div>
+      <div style="font-size:9px;color:rgba(255,255,255,0.12);margin-top:3px;text-transform:uppercase;letter-spacing:0.06em;">Empty</div>
     </div>`;
 }
 
 function _renderOccupiedTile(table, b, now) {
   const timer = _sessionTimerDisplay(b, now);
   const stage = b.current_stage || 'booking';
-  const stageColor = { booking:'#2e7d32', engagement:'#B87946', completion:'#c0392b', kiln:'#FF5722' }[stage] || '#2e7d32';
-  const stageIcon = { booking:'📋', engagement:'🎨', completion:'📷', kiln:'🔥' }[stage] || '📋';
+  const stageColor = { booking:'#4CAF50', engagement:'#B87946', completion:'#e53935', kiln:'#FF5722' }[stage] || '#B87946';
+  const stageBg    = { booking:'rgba(76,175,80,0.12)', engagement:'rgba(184,121,70,0.12)', completion:'rgba(229,57,53,0.12)', kiln:'rgba(255,87,34,0.12)' }[stage] || 'rgba(184,121,70,0.12)';
+  const stageIcon  = { booking:'📋', engagement:'🎨', completion:'📷', kiln:'🔥' }[stage] || '📋';
+  const stageLabel = { booking:'Booking', engagement:'Painting', completion:'Done', kiln:'Kiln' }[stage] || '';
   const stageChecks = FLOW_CHECKS[stage] || [];
   const completedChecks = stageChecks.filter(c => b.checks?.[`${stage}:${c.key}`]).length;
-
-  // Special badges for booking type
-  const isAllDay = timer.isAllDay;
+  const allDone = completedChecks === stageChecks.length && stageChecks.length > 0;
   const isThursday = b.session_start && new Date(b.session_start).getDay() === 4;
-  const typeBadge = isThursday ? '<span style="font-size:8px;background:#5E35B1;color:white;border-radius:4px;padding:1px 4px;margin-left:4px;">ALL DAY</span>'
-    : (b.booking_type === 'group' ? '<span style="font-size:8px;background:#F9A825;color:#2B2724;border-radius:4px;padding:1px 4px;margin-left:4px;">GROUP</span>' : '');
-
+  const isGroup = b.booking_type === 'group';
+  const typePill = isThursday
+    ? `<span style="background:rgba(149,117,205,0.25);color:#CE93D8;border-radius:4px;padding:1px 5px;font-size:8px;font-weight:700;">PAINT ALL DAY</span>`
+    : isGroup
+    ? `<span style="background:rgba(249,168,37,0.2);color:#FFD54F;border-radius:4px;padding:1px 5px;font-size:8px;font-weight:700;">GROUP</span>`
+    : '';
+  const warningSoon = !timer.isAllDay && parseInt(timer.label) <= 15 && timer.label !== '0m';
   return `
     <button onclick="openTableDetail('${b.booking_code}')"
-      style="background:white;border:2px solid ${stageColor};border-radius:16px;padding:12px;cursor:pointer;text-align:left;position:relative;overflow:hidden;">
-      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${stageColor};"></div>
-      ${!isAllDay ? `<div style="position:absolute;top:3px;left:0;height:2px;background:${stageColor};opacity:0.25;width:${timer.pct}%;"></div>` : ''}
-      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px;">
+      style="background:linear-gradient(160deg,#2A1F18 0%,#1E1710 100%);
+             border:1px solid ${stageColor}40;border-radius:14px;padding:11px;
+             cursor:pointer;text-align:left;position:relative;overflow:hidden;
+             box-shadow:0 4px 20px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.04);">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,${stageColor},${stageColor}50);"></div>
+      ${!timer.isAllDay ? `<div style="position:absolute;top:0;left:0;height:2px;background:${stageColor};width:${timer.pct}%;opacity:0.9;"></div>` : ''}
+      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:7px;gap:4px;">
         <div style="flex:1;min-width:0;">
-          <div style="font-size:12px;font-weight:800;color:var(--gu-text);">${table.name}${typeBadge}</div>
-          <div style="font-size:10px;color:var(--gu-dust);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${b.customer_name}</div>
+          <div style="font-size:12px;font-weight:800;color:#F4ECE0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${table.name}</div>
+          <div style="font-size:9px;color:rgba(184,121,70,0.65);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;">${b.customer_name}</div>
         </div>
-        <div style="text-align:right;flex-shrink:0;margin-left:6px;">
-          <div style="font-size:${isAllDay?'11px':'14px'};font-weight:800;color:${timer.color};">${timer.label}</div>
-          <div style="font-size:8px;color:var(--gu-dust);">${timer.sublabel||''}</div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:15px;font-weight:800;color:${timer.color};font-variant-numeric:tabular-nums;line-height:1;">${timer.label}</div>
+          <div style="font-size:8px;color:rgba(255,255,255,0.2);">${timer.sublabel||''}</div>
         </div>
       </div>
-      <div style="margin:4px auto;text-align:center;">${_miniTableSvg(b.num_people || table.capacity || 4)}</div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
-        <span style="background:${stageColor};color:white;border-radius:20px;padding:2px 7px;font-size:8px;font-weight:700;">${stageIcon}</span>
-        <span style="font-size:9px;color:var(--gu-dust);">${completedChecks}/${stageChecks.length}</span>
+      <div style="margin:0 auto 7px;text-align:center;">${_miniTableSvg(b.party_size || table.capacity || 4, true)}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="background:${stageBg};color:${stageColor};border:1px solid ${stageColor}35;border-radius:20px;padding:2px 7px;font-size:8px;font-weight:700;">${stageIcon} ${stageLabel}</span>
+        <div style="display:flex;align-items:center;gap:4px;">
+          ${typePill}
+          <span style="font-size:9px;color:${allDone ? '#4CAF50' : 'rgba(255,255,255,0.2)'};">${completedChecks}/${stageChecks.length}</span>
+        </div>
       </div>
-      ${!isAllDay && timer.label.replace('m','') <= 15 && timer.label !== '0m' ? '<div style="margin-top:4px;text-align:center;font-size:8px;font-weight:800;color:#e53935;">⚠️ FINISHING SOON</div>' : ''}
+      ${warningSoon ? `<div style="margin-top:5px;text-align:center;font-size:8px;font-weight:800;color:#FF5252;letter-spacing:0.04em;">⚠ FINISHING SOON</div>` : ''}
     </button>`;
 }
 
-function _miniTableSvg(covers) {
-  const chairs = Math.min(covers, 8);
-  const top = Math.ceil(chairs / 2);
-  const bottom = Math.floor(chairs / 2);
-  const chairW = 7; const gap = 3;
-  const tableW = Math.max(top, bottom) * (chairW + gap);
-  const totalW = tableW + 16; const totalH = 46;
-  let svg = `<svg viewBox="0 0 ${totalW} ${totalH}" width="${totalW}" height="${totalH}" xmlns="http://www.w3.org/2000/svg">`;
-  svg += `<rect x="8" y="14" width="${tableW}" height="18" rx="3" fill="#E8D8C0" stroke="#B87946" stroke-width="1.5"/>`;
-  for (let i=0;i<top;i++) {
-    const x = 8 + i*(chairW+gap) + gap/2;
-    svg += `<rect x="${x}" y="4" width="${chairW}" height="8" rx="2" fill="#B87946"/>`;
-  }
-  for (let i=0;i<bottom;i++) {
-    const x = 8 + i*(chairW+gap) + gap/2;
-    svg += `<rect x="${x}" y="34" width="${chairW}" height="8" rx="2" fill="#B87946"/>`;
-  }
-  svg += '</svg>';
-  return svg;
+function _miniTableSvg(covers, dark = false) {
+  const c = Math.min(covers, 8); const top = Math.ceil(c/2); const bot = Math.floor(c/2);
+  const cw = 7; const gap = 3; const tw = Math.max(top, bot) * (cw + gap);
+  const fill = dark ? '#3D2B1F' : '#E8D8C0';
+  const stroke = '#B87946';
+  const chairFill = dark ? '#4A3020' : '#B87946';
+  let svg = `<svg viewBox="0 0 ${tw+14} 44" width="${tw+14}" height="44" xmlns="http://www.w3.org/2000/svg">`;
+  svg += `<rect x="7" y="14" width="${tw}" height="16" rx="4" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`;
+  for (let i=0;i<top;i++){const x=7+i*(cw+gap)+gap/2; svg+=`<rect x="${x}" y="5" width="${cw}" height="8" rx="2" fill="${chairFill}"/>`;}
+  for (let i=0;i<bot;i++){const x=7+i*(cw+gap)+gap/2; svg+=`<rect x="${x}" y="31" width="${cw}" height="8" rx="2" fill="${chairFill}"/>`;}
+  return svg + '</svg>';
 }
 
 async function openTableDetail(bookingCode) {
@@ -8983,7 +8998,7 @@ async function openTableDetail(bookingCode) {
   } catch(e) { _detailItems = []; }
 
   if (_detailItems.length === 0) {
-    const covers = b.num_people || 2;
+    const covers = b.party_size || 2;
     _detailItems = Array.from({length: covers}, (_, i) => ({
       id: `pm_${i}`, item_type: 'placemat', item_label: `${i+1}`,
       pos_x: 20 + (i * (60 / Math.max(covers-1,1))), pos_y: 45
@@ -8993,10 +9008,10 @@ async function openTableDetail(bookingCode) {
   // Find real table name from tables data
   const tableData = _floorData.tables.find(t => t.name === b.table_number) || {};
   const isThursday = b.session_start && new Date(b.session_start).getDay() === 4;
-  const typeLabel = isThursday ? ' · All-day session' : b.booking_type === 'group' ? ' · Group booking' : ' · 90 min session';
+  const typeLabel = isThursday ? ' · Paint All Day' : b.booking_type === 'group' ? ' · Group booking' : ' · 90 min session';
   document.getElementById('detail-table-name').textContent = b.table_number || 'Table';
   document.getElementById('detail-booking-info').textContent =
-    `${b.customer_name} · ${b.num_people || tableData.capacity || '?'} covers · ${tableData.room || ''}${typeLabel}`;
+    `${b.customer_name} · ${b.party_size || tableData.capacity || '?'} covers · ${tableData.room || ''}${typeLabel}`;
 
   document.getElementById('floor-table-detail').style.display = 'flex';
   _startDetailTimer();
@@ -9061,7 +9076,7 @@ function renderDetailCanvas() {
   const wrap = document.getElementById('detail-canvas-wrap');
   if (!wrap || !_detailBooking) return;
   const b = _detailBooking;
-  const capacity = b.num_people || 2;
+  const capacity = b.party_size || 2;
 
   wrap.innerHTML = '';
   const canvas = document.createElement('div');
@@ -9069,7 +9084,7 @@ function renderDetailCanvas() {
   wrap.appendChild(canvas);
 
   const tableEl = document.createElement('div');
-  tableEl.style.cssText = `position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:65%;height:32%;background:#E8D8C0;border:2px solid #B87946;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#8a5520;`;
+  tableEl.style.cssText = `position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:65%;height:32%;background:linear-gradient(135deg,#3D2B1F,#2A1A0F);border:1.5px solid rgba(184,121,70,0.5);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:rgba(184,121,70,0.6);letter-spacing:0.04em;box-shadow:0 8px 32px rgba(0,0,0,0.5),inset 0 1px 0 rgba(184,121,70,0.1);`;
   tableEl.textContent = b.table_number || 'Table';
   canvas.appendChild(tableEl);
 
@@ -9106,7 +9121,7 @@ function renderDetailCanvas() {
 
 function _makeChair(x, y, index) {
   const el = document.createElement('div');
-  el.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:36px;height:36px;background:#B87946;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:grab;user-select:none;`;
+  el.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:36px;height:36px;background:linear-gradient(135deg,#5A3A22,#3D2510);border:1px solid rgba(184,121,70,0.4);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:grab;user-select:none;box-shadow:0 2px 8px rgba(0,0,0,0.4);`;
   el.textContent = '🪑';
   _makeDraggable(el, x, y, (nx, ny) => { el.style.left = nx+'px'; el.style.top = ny+'px'; });
   return el;
@@ -9115,7 +9130,7 @@ function _makeChair(x, y, index) {
 function _makeDraggableItem(item, idx, x, y, canvas) {
   const el = document.createElement('div');
   const typeInfo = TABLE_ITEM_TYPES[item.item_type] || { emoji: '●', label: '' };
-  el.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:40px;height:40px;border-radius:50%;background:white;border:1.5px solid var(--gu-border);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:grab;user-select:none;box-shadow:0 2px 8px rgba(0,0,0,0.1);z-index:10;`;
+  el.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.08);border:1px solid rgba(184,121,70,0.3);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:grab;user-select:none;box-shadow:0 4px 16px rgba(0,0,0,0.4);z-index:10;`;
   el.textContent = typeInfo.emoji;
   el.title = typeInfo.label;
 
@@ -9171,19 +9186,29 @@ function renderDetailChecklist() {
   const stageColor = { booking:'#2e7d32', engagement:'#B87946', completion:'#c0392b', kiln:'#FF5722' }[stage] || '#2e7d32';
 
   el.innerHTML = `
-    <div style="font-size:11px;font-weight:700;color:${stageColor};text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;">
+    <div style="font-size:10px;font-weight:700;color:${stageColor};text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">
       ${{ booking:'📋 Booking', engagement:'🎨 Painting', completion:'📷 Completion', kiln:'🔥 Kiln' }[stage]} checklist
     </div>
     ${checks.map(c => {
       const done = !!b.checks?.[`${stage}:${c.key}`];
       return `<button onclick="toggleFlowCheck('${b.booking_code}','${stage}','${c.key}',${!done})"
-        style="width:100%;text-align:left;background:${done?'#f0f8f0':'var(--gu-bg)'};border:1.5px solid ${done?'#2e7d32':'var(--gu-border)'};border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:10px;">
-        <span style="font-size:18px;">${done?'✅':'⬜'}</span>
-        <span style="font-size:13px;font-weight:600;color:${done?'#2e7d32':'var(--gu-text)'};text-decoration:${done?'line-through':'none'};opacity:${done?0.7:1};">${c.label}</span>
+        style="width:100%;text-align:left;
+          background:${done ? 'rgba(76,175,80,0.1)' : 'rgba(255,255,255,0.04)'};
+          border:1px solid ${done ? 'rgba(76,175,80,0.35)' : 'rgba(255,255,255,0.1)'};
+          border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer;
+          display:flex;align-items:center;gap:10px;">
+        <span style="font-size:18px;">${done ? '✅' : '⬜'}</span>
+        <span style="font-size:13px;font-weight:600;
+          color:${done ? '#4CAF50' : '#F4ECE0'};
+          text-decoration:${done ? 'line-through' : 'none'};
+          opacity:${done ? 0.6 : 1};">${c.label}</span>
       </button>`;
     }).join('')}
     <button onclick="openBookingAtRealStage('${b.booking_code}','${stage}')"
-      style="width:100%;background:${stageColor};color:white;border:none;border-radius:12px;padding:12px;font-size:13px;font-weight:800;cursor:pointer;margin-top:4px;">
+      style="width:100%;background:linear-gradient(135deg,${stageColor},${stageColor}cc);
+        color:white;border:none;border-radius:12px;padding:12px;
+        font-size:13px;font-weight:800;cursor:pointer;margin-top:4px;
+        box-shadow:0 4px 16px ${stageColor}40;">
       Open full booking →
     </button>`;
 }

@@ -4871,7 +4871,7 @@ app.get('/api/floor/active', async (req, res) => {
   const today = new Date(); today.setHours(0,0,0,0);
   const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
   const { data: bookings } = await supabase.from('bookings')
-    .select('booking_code,customer_name,table_number,current_stage,session_start,num_people,status')
+    .select('booking_code,customer_name,table_number,current_stage,session_start,party_size,status,booking_type')
     .eq('studio_id', studioId)
     .gte('session_start', today.toISOString())
     .lt('session_start', tomorrow.toISOString())
