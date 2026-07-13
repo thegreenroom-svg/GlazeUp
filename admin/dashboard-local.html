@@ -3801,6 +3801,17 @@
         </div>
 
         <div id="setup-section-studio" class="setup-section" style="display:none;">
+
+        <!-- Glaze colour training toggle -->
+        <div class="chart-container" style="margin-top:20px;">
+          <h3 style="margin:0 0 6px;">🎨 Glaze Colour Training</h3>
+          <p style="font-size:12px;color:var(--gu-dust);margin-bottom:12px;">When turned on, every time a Mayco glaze gets added to a bill the app shows its real name and code — so new staff learn the colours naturally through real work. Turns itself down automatically after a few uses of each colour. Each staff member has their own setting.</p>
+          <button onclick="toggleGlazeTraining(); this.textContent = _isGlazeTrainingOff() ? '▶ Turn glaze training on' : '⏸ Turn glaze training off';"
+            style="background:var(--gu-bg);border:1.5px solid var(--gu-border);border-radius:10px;padding:10px 16px;font-size:13px;font-weight:700;color:var(--gu-text);cursor:pointer;">
+            ⏸ Turn glaze training off
+          </button>
+        </div>
+
         <!-- Table Configuration -->
         <div class="chart-container" style="margin-top:20px;">
           <h3 style="margin:0 0 6px;">🪑 Studio Tables</h3>
@@ -8319,6 +8330,35 @@ function _glazeTrainingKey() {
   return `glaze_training_${staffId}`;
 }
 
+function _glazeTrainingOffKey() {
+  const staffId = currentShiftStaff?.id || 'shared';
+  return `glaze_training_off_${staffId}`;
+}
+
+function _isGlazeTrainingOff() {
+  return localStorage.getItem(_glazeTrainingOffKey()) === '1';
+}
+
+function toggleGlazeTraining() {
+  if (_isGlazeTrainingOff()) {
+    localStorage.removeItem(_glazeTrainingOffKey());
+    // Brief confirmation that it's back on
+    const t = document.createElement('div');
+    t.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#2e7d32;color:white;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;white-space:nowrap;';
+    t.textContent = '✓ Glaze training back on';
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2000);
+  } else {
+    localStorage.setItem(_glazeTrainingOffKey(), '1');
+    document.querySelectorAll('.glaze-training-toast').forEach(el => el.remove());
+    const t = document.createElement('div');
+    t.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#2B2724;color:white;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:9999;white-space:nowrap;';
+    t.textContent = 'Glaze training off — tap to turn back on in Setup';
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2500);
+  }
+}
+
 function _getGlazeEncounters() {
   try { return JSON.parse(localStorage.getItem(_glazeTrainingKey())) || {}; }
   catch(e) { return {}; }
@@ -8334,7 +8374,9 @@ function _recordGlazeEncounter(code) {
 // The main function — called whenever any glaze gets added anywhere.
 // Shows a rich training card for the first 3 encounters, then a
 // brief confirmation only. Both fade and remove themselves.
+// Silently does nothing if training has been turned off.
 function showGlazeTrainingToast(name, code, hexColour) {
+  if (_isGlazeTrainingOff()) return;
   const count = _recordGlazeEncounter(code);
   const isNew = count <= 3;
 
@@ -8363,7 +8405,7 @@ function showGlazeTrainingToast(name, code, hexColour) {
       <div style="flex:1;min-width:0;">
         <div style="font-size:14px;font-weight:800;color:#2B2724;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</div>
         <div style="font-size:11px;color:#B87946;font-weight:700;margin-top:1px;">${code} · Mayco Stroke &amp; Coat®</div>
-        <div style="font-size:10px;color:#8a8175;margin-top:3px;">${timesText}</div>
+        <div style="font-size:10px;color:#8a8175;margin-top:3px;">${timesText} <button onclick="toggleGlazeTraining()" style="background:none;border:none;color:#8a8175;font-size:10px;cursor:pointer;padding:0;text-decoration:underline;margin-left:6px;">Turn off</button></div>
       </div>
       <div style="font-size:18px;">✓</div>
     `;
