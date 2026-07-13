@@ -619,47 +619,6 @@
     #browse-design-screen { background: #12082a; }
     #marketplace-screen { background: #12082a; }
 
-    /* kilnLINK wordmark — single word, continuously flipping on its
-       VERTICAL axis (like a revolving door — left/right, not top/bottom)
-       morphing between "LINK" and "kiln". Both faces are the same bold
-       weight and same size — the flip itself carries the brand, no
-       supporting static text needed. Bigger and tighter-paced than the
-       first attempt. */
-    .klnk-wordmark {
-      font-size: 34px;
-      display: inline-block;
-    }
-    .klnk-flip-outer {
-      display: inline-block;
-      perspective: 260px;
-      height: 1em;
-      width: 2.3em; /* fits "LINK" and "kiln" at this weight/size without jumping between the two */
-      overflow: visible;
-    }
-    .klnk-flip-inner {
-      position: relative;
-      display: inline-block;
-      width: 100%;
-      height: 1em;
-      transform-style: preserve-3d;
-      animation: klnk-flip-cycle 2.8s linear infinite;
-    }
-    .klnk-face {
-      position: absolute;
-      left: 0; top: 0;
-      width: 100%;
-      backface-visibility: hidden;
-      font-weight: 800;
-      letter-spacing: 0.01em;
-      white-space: nowrap;
-    }
-    .klnk-face-link { transform: rotateY(0deg); color: #F9A825; }
-    .klnk-face-kiln { transform: rotateY(180deg); color: inherit; }
-    @keyframes klnk-flip-cycle {
-      0%   { transform: rotateY(0deg); }
-      100% { transform: rotateY(360deg); }
-    }
-
     @keyframes browse-pulse {
       0%, 100% { box-shadow: 0 0 0 0 rgba(184,121,70,0); }
       50% { box-shadow: 0 0 0 6px rgba(184,121,70,0.25); }
@@ -1245,7 +1204,7 @@
     <div id="wt-arrow">👇</div>
     <div id="wt-card">
       <div id="wt-step-label">Step 1 of 8</div>
-      <div id="wt-title">Welcome to kilnLINK</div>
+      <div id="wt-title">Welcome to The Kiln Cafe</div>
       <div id="wt-body">Your personal pottery studio companion. Let's take a quick tour!</div>
       <div id="wt-actions">
         <div id="wt-nav-row">
@@ -2031,13 +1990,9 @@
       return new URLSearchParams(window.location.search).get(name);
     }
 
-    // Animated kilnLINK wordmark — one word, continuously flipping on its
-    // VERTICAL axis (like a revolving door, left-right) morphing between
-    // "LINK" and "kiln" at the halfway point of each turn. Bold, bigger,
-    // no static "kiln" alongside it — the flip itself IS the brand mark.
-    const wordmarkHtml = `
-      <span class="klnk-wordmark"><span class="klnk-flip-outer"><span class="klnk-flip-inner"><span class="klnk-face klnk-face-link">LINK</span><span class="klnk-face klnk-face-kiln">kiln</span></span></span></span>`;
-
+    // Genuine real logo now lives directly in the app header markup
+    // below, per direct request — the old spinning kiln/LINK wordmark
+    // effect has been fully removed, not just hidden.
     const logoSvg = `<svg viewBox="0 -30 241 128" style="height:0.85em; width:auto; display:block;" aria-hidden="true">
       <path d="M5.00,82.00 L5.00,10.00 L20.41,10.00 L20.41,82.00 L5.00,82.00 Z M12.20,82.00 L12.20,70.20 L55.00,70.20 L55.00,82.00 L12.20,82.00 Z" fill="#fff"/>
       <path d="M64.00,82.00 L64.00,10.00 L79.41,10.00 L79.41,82.00 L64.00,82.00 Z" fill="#fff"/>
@@ -2202,9 +2157,12 @@
       document.getElementById('app-root').innerHTML = `
         <div class="app-header">
           <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-            <div>
-              <div style="margin-bottom:3px;">${wordmarkHtml}</div>
-              <div class="brand" style="opacity:0.65; font-weight:400; font-size:0.8em;">The Kiln Cafe</div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <!-- Genuine real logo, per direct request — this is
+                   now the permanent brand, small and discreet, on
+                   the app's own actual header. -->
+              <img src="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png" alt="The Kiln Cafe" style="width:30px;height:30px;border-radius:6px;flex-shrink:0;">
+              <div class="brand" style="font-weight:600; font-size:1em;">The Kiln Cafe</div>
             </div>
             <div style="display:flex; gap:8px;">
               <button id="kid-mode-toggle-btn" onclick="toggleKidMode()" style="background:rgba(255,255,255,0.18); border:2px solid rgba(255,255,255,0.5); border-radius:12px; padding:4px 10px; cursor:pointer; font-size:22px; line-height:1;" aria-label="Switch to kid-friendly styling"></button>
@@ -2519,11 +2477,7 @@
           <div class="a2hs-banner-header">
             <div class="a2hs-icon-wrap">📲</div>
             <div class="a2hs-text">
-              <b>Add kilnLINK to your Home Screen</b>
-              <span>${subtitle}</span>
-            </div>
-          </div>
-          <button class="a2hs-install" onclick="alert('Tap the Share button below (square with an arrow), then scroll down and tap \\'Add to Home Screen\\'.')">👆 Tap Share, then "Add to Home Screen"</button>
+              <b>Add The Kiln Cafe to your Home Screen</b>
           <button class="a2hs-dismiss" onclick="dismissA2HS()">Not now</button>`;
       } else if (deferredInstallPrompt) {
         // Android/Chrome genuinely supports one real tap doing the whole
@@ -2532,18 +2486,14 @@
           <div class="a2hs-banner-header">
             <div class="a2hs-icon-wrap">🏺</div>
             <div class="a2hs-text">
-              <b>Add kilnLINK to your Home Screen</b>
-              <span>${subtitle}</span>
-            </div>
-          </div>
-          <button class="a2hs-install" onclick="triggerInstall()">📲 Add to Home Screen</button>
+              <b>Add The Kiln Cafe to your Home Screen</b>
           <button class="a2hs-dismiss" onclick="dismissA2HS()">Not now</button>`;
       } else {
         banner.innerHTML = `
           <div class="a2hs-banner-header">
             <div class="a2hs-icon-wrap">📲</div>
             <div class="a2hs-text">
-              <b>Save kilnLINK for next time</b>
+              <b>Save The Kiln Cafe for next time</b>
               <span>Bookmark this page, or check your browser menu for "Add to Home Screen".</span>
             </div>
           </div>
@@ -2816,7 +2766,7 @@
     }
 
     // ── Shareable piece card generator: creates a branded 1080×1080
-    // image (Instagram square format) with the piece photo, kilnLINK
+    // image (Instagram square format) with the piece photo, studio
     // branding, studio name, and the customer's first name. ──
     let shareCardPhotoSrc = null;
 
@@ -2881,13 +2831,10 @@
         ctx.fillStyle = grad;
         ctx.fillRect(0, ph - 40, SIZE, SIZE - (ph - 40));
 
-        // kilnLINK wordmark
-        ctx.fillStyle = '#B87946';
-        ctx.font = '400 16px "Instrument Sans", Inter, sans-serif';
-        ctx.fillText('kiln', 20, SIZE - 34);
-        ctx.fillStyle = '#fff';
+        // Real, genuine studio wordmark, per direct request
+        ctx.fillStyle = '#F7F4EE';
         ctx.font = '700 20px "Instrument Sans", Inter, sans-serif';
-        ctx.fillText('LINK', 20 + ctx.measureText('kiln').width - 2, SIZE - 34);
+        ctx.fillText('The Kiln Cafe', 20, SIZE - 34);
 
         // Customer name + studio
         const name = (window.currentBooking?.name || '').split(' ')[0];
@@ -2905,7 +2852,7 @@
         // Small hashtag hint
         ctx.fillStyle = 'rgba(255,255,255,0.45)';
         ctx.font = '400 11px "Instrument Sans", Inter, sans-serif';
-        ctx.fillText('#kilnlink #thkilncafe #pottery', SIZE - ctx.measureText('#kilnlink #thkilncafe #pottery').width - 20, SIZE - 12);
+        ctx.fillText('#thekilncafe #pottery', SIZE - ctx.measureText('#thekilncafe #pottery').width - 20, SIZE - 12);
       };
       img.src = photoSrc;
     }
@@ -2913,7 +2860,7 @@
     function downloadShareCard() {
       const canvas = document.getElementById('share-card-canvas');
       const link = document.createElement('a');
-      link.download = 'my-kilnlink-piece.png';
+      link.download = 'my-kiln-cafe-piece.png';
       link.href = canvas.toDataURL('image/png');
       link.click();
     }
@@ -2953,7 +2900,7 @@
 
         listEl.innerHTML = data.posts.map(p => {
           const studioNote = (cfCurrentTab === 'global' || cfCurrentTab === 'club') && p.studios
-            ? `<div style="font-size:10px; color:rgba(255,255,255,0.4); margin-top:2px;">📍 ${[p.studios.city, p.studios.country].filter(Boolean).join(', ') || 'A studio on kilnLINK'}</div>`
+            ? `<div style="font-size:10px; color:rgba(255,255,255,0.4); margin-top:2px;">📍 ${[p.studios.city, p.studios.country].filter(Boolean).join(', ') || 'A studio near you'}</div>`
             : '';
           return `
             <div class="cf-post">
@@ -5251,7 +5198,7 @@
         </div>`;
     }
 
-    // ── Genuine real kilnLINK Network promotion popup — shown more
+    // ── Genuine real Network promotion popup — shown more
     // often during real studio opening hours, since customers are
     // actually in the studio and able to act on it then. Honest, real
     // constraint acknowledged: no per-studio opening hours are
@@ -5275,7 +5222,7 @@
         el.style.cssText = 'position:fixed;bottom:92px;left:16px;right:16px;max-width:400px;margin:0 auto;background:white;border-radius:16px;padding:16px;box-shadow:0 8px 32px rgba(0,0,0,0.25);z-index:9400;display:flex;align-items:center;gap:12px;';
         el.innerHTML = `
           <div style="font-size:28px;">🌐</div>
-          <div style="flex:1;font-size:12.5px;color:var(--gu-text);line-height:1.4;">Your loyalty points genuinely work at ${data.studios.length} other independent studio${data.studios.length===1?'':'s'} in the kilnLINK Network too.</div>
+          <div style="flex:1;font-size:12.5px;color:var(--gu-text);line-height:1.4;">Your loyalty points genuinely work at ${data.studios.length} other independent studio${data.studios.length===1?'':'s'} too.</div>
           <button onclick="document.getElementById('network-promo-nudge').remove();" style="background:none;border:none;color:var(--gu-dust);font-size:16px;cursor:pointer;padding:4px;">✕</button>
         `;
         document.body.appendChild(el);
@@ -6431,7 +6378,7 @@
 
     const WT_STEPS = [
       {
-        title: 'Welcome to kilnLINK! 🎨',
+        title: 'Welcome to The Kiln Cafe! 🎨',
         body: 'Your personal pottery studio companion. This quick tour shows you everything you can do. Tap Next to begin — or Skip if you\'re already a pro!',
         target: null,
         arrow: null,
