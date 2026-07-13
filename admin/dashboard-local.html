@@ -5568,6 +5568,20 @@ function goToTab(tab, event) {
     loadManagerTaskOverview();
     loadTeamMembers().then(() => populateAdhocSelects());
     loadDamageReports();
+    // Genuine real auto-refresh — this is a live operational view
+    // (every team member's current tasks), so it shouldn't rely on
+    // staff remembering to tap the manual Refresh button. Same
+    // proven clear-then-set pattern as Platform Revenue below, so
+    // repeatedly tabbing in and out never stacks duplicate timers.
+    clearInterval(window._dailyProgressRefreshTimer);
+    window._dailyProgressRefreshTimer = setInterval(() => {
+      if (document.getElementById('progress-view')?.style.display !== 'none') {
+        loadDailyProgress();
+        loadManagerTaskOverview();
+      } else {
+        clearInterval(window._dailyProgressRefreshTimer);
+      }
+    }, 30 * 1000);
   } else if (tab === 'platformrev') {
     loadPlatformRevenue();
     clearInterval(window._platformRevRefreshTimer);
