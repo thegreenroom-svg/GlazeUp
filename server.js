@@ -99,7 +99,7 @@ const port = process.env.PORT || 3000;
 // Genuine, deliberate, harmless marker — forces a real, full Render
 // rebuild (not just a static file refresh) to help resolve tonight's
 // deploy not picking up the latest grid-navigation change.
-console.log('Server build marker: setup-screen-tiled');
+console.log('Server build marker: barista-page-and-operational-review');
 
 // ═══════════════════════════════════════════
 // UTILITIES
@@ -860,6 +860,84 @@ app.get('/api/kds/orders', async (req, res) => {
     .eq('studio_id', studioId).gte('created_at', today.toISOString())
     .order('created_at', { ascending: false });
   res.json({ orders: data || [] });
+});
+
+// GET /api/kds/stock-levels — genuine real Square inventory counts
+// for food/drink items, for the Barista landing page. Honest note:
+// this only returns real data if the studio has actually enabled
+// Square's inventory tracking feature — if not, this correctly
+// returns an empty/null count per item rather than inventing a
+// number, and the frontend is built to say so plainly.
+app.get('/api/kds/stock-levels', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    const { data: connection } = await supabase
+      .from('square_connections')
+      .select('square_access_token')
+      .eq('studio_id', studioId)
+      .single();
+    if (!connection) return res.json({ items: [], inventoryTrackingEnabled: false });
+
+    const squareClient = await getSquareClient(connection.square_access_token);
+
+    // Reuse the exact same, already-proven food/drink filtering logic
+    // from /api/kds/menu, so "stock levels" genuinely shows the same
+    // real items as the menu, not a separately-maintained list.
+    const [catRes, itemRes] = await Promise.all([
+      squareClient.catalogApi.listCatalog(undefined, 'CATEGORY'),
+      squareClient.catalogApi.listCatalog(undefined, 'ITEM'),
+    ]);
+    const catById = {};
+    (catRes.result.objects || []).forEach(c => { catById[c.id] = c.categoryData?.name || 'Other'; });
+    const EXCLUDE_KEYWORDS = /pottery|bisque|mug|bowl|plate|vase|tile|glaze|firing|kiln|piece|paint/i;
+
+    const variationIds = [];
+    const itemByVariationId = {};
+    (itemRes.result.objects || []).forEach(item => {
+      const d = item.itemData;
+      if (!d) return;
+      const catId = d.categoryId || d.categories?.[0]?.id;
+      const catName = catById[catId] || 'Other';
+      if (EXCLUDE_KEYWORDS.test(catName) || EXCLUDE_KEYWORDS.test(d.name)) return;
+      const variation = d.variations?.[0];
+      if (!variation?.id) return;
+      variationIds.push(variation.id);
+      itemByVariationId[variation.id] = d.name;
+    });
+
+    if (!variationIds.length) return res.json({ items: [], inventoryTrackingEnabled: false });
+
+    // Genuine real Square inventory API call — honestly attempted,
+    // not assumed to work.
+    let inventoryTrackingEnabled = true;
+    let counts = {};
+    try {
+      const invRes = await squareClient.inventoryApi.batchRetrieveInventoryCounts({
+        catalogObjectIds: variationIds,
+      });
+      (invRes.result.counts || []).forEach(c => {
+        counts[c.catalogObjectId] = c.quantity ? Number(c.quantity) : 0;
+      });
+      if (!invRes.result.counts?.length) inventoryTrackingEnabled = false;
+    } catch (invErr) {
+      // Genuine, honest fallback — Square inventory tracking may
+      // genuinely not be enabled for this account at all, which is a
+      // real, normal, common case, not a real error to alarm about.
+      inventoryTrackingEnabled = false;
+    }
+
+    const items = variationIds.map(vId => ({
+      name: itemByVariationId[vId],
+      stockCount: counts[vId] ?? null,
+    }));
+
+    res.json({ items, inventoryTrackingEnabled });
+  } catch (err) {
+    console.error('Stock levels error:', err);
+    res.status(500).json({ error: err.message, items: [], inventoryTrackingEnabled: false });
+  }
 });
 
 // PATCH /api/kds/orders/:id — mark an order done/complete

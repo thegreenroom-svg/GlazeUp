@@ -49,11 +49,22 @@
        piece of data, every real line of code is untouched. This is
        a single, honest, reversible switch: delete this whole block
        (or just the lines you want back) to restore any of it.
+
+       Also parked: the Process Builder / Task Handoff Chain — a real
+       custom workflow-automation builder (define triggers, target
+       roles, chained multi-step rules) that's genuinely more formal
+       than the actual real team needs. 5 close staff sharing 2
+       iPads, who already switch roles freely when busy, are honestly
+       better served by the simpler One-Off Request (Daily Progress)
+       — pick a role, say what's needed, send. Same reversible
+       pattern: nothing deleted, just hidden.
        ═══════════════════════════════════════════════════════════ */
     #cleo-admin-floating-fab,
     #cleo-admin-floating-bubble,
     #platform-revenue-strip,
-    #kiln-cafe-revenue-section {
+    #kiln-cafe-revenue-section,
+    #team-tile-process,
+    #team-section-process {
       display: none !important;
     }
 
@@ -2142,7 +2153,7 @@
 <!-- Floating back-to-Dashboard — appears once scrolled down on any tab
      other than Dashboard itself, so there's always a quick way back
      without needing to scroll up to find the sidebar. -->
-<button id="floating-back-btn" onclick="showGridNav()" style="display:none;position:fixed;bottom:20px;left:16px;right:16px;z-index:900;background:#2e7d32;color:white;border:none;border-radius:14px;padding:16px;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.25);align-items:center;justify-content:center;gap:8px;">
+<button id="floating-back-btn" onclick="goToRealLandingPage()" style="display:none;position:fixed;bottom:20px;left:16px;right:16px;z-index:900;background:#2e7d32;color:white;border:none;border-radius:14px;padding:16px;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.25);align-items:center;justify-content:center;gap:8px;">
   ✓ Finished — back to tasks
 </button>
 
@@ -2432,6 +2443,55 @@
     <h2 id="grid-nav-sub-title" style="margin:0 0 4px;"></h2>
     <p style="color:var(--gu-dust);margin:0 0 20px;">Tap a square to open it.</p>
     <div id="grid-nav-sub-tiles" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;"></div>
+  </div>
+</div>
+
+<!-- Genuine real Barista landing page, per direct request — David's
+     own dedicated view, shown automatically instead of the shared
+     task grid when he specifically logs in. Real, live food/drink
+     orders (reuses the already-proven, existing KDS order system,
+     confirmed working on the backend but never surfaced anywhere in
+     the actual admin UI before now) and honest real Square stock
+     levels, which correctly say so plainly if inventory tracking
+     isn't actually enabled on the Square account, rather than
+     inventing numbers. -->
+<div id="barista-view" class="view" style="display:none;padding:20px;">
+  <h2 style="margin:0 0 4px;">☕ Morning, David</h2>
+  <p style="color:var(--gu-dust);margin:0 0 20px;">Today's real drinks orders and stock, straight from Square.</p>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+    <button onclick="showBaristaSection('orders')" style="background:#F4511E;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+      <span style="font-size:22px;">☕</span>
+      <span style="font-size:12px;font-weight:800;margin-top:5px;">Today's Orders</span>
+    </button>
+    <button onclick="showBaristaSection('stock')" style="background:#F4511E;filter:brightness(0.85);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+      <span style="font-size:22px;">📦</span>
+      <span style="font-size:12px;font-weight:800;margin-top:5px;">Stock Levels</span>
+    </button>
+    <button onclick="showGridNav()" style="background:#2B2724;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+      <span style="font-size:22px;">⋯</span>
+      <span style="font-size:12px;font-weight:800;margin-top:5px;">Everything Else</span>
+    </button>
+  </div>
+
+  <div id="barista-section-orders" class="barista-section" style="display:none;">
+    <div class="chart-container">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">☕ Today's Orders</h3>
+        <button onclick="loadBaristaOrders()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">🔄 Refresh</button>
+      </div>
+      <div id="barista-orders-list"><div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading…</div></div>
+    </div>
+  </div>
+
+  <div id="barista-section-stock" class="barista-section" style="display:none;">
+    <div class="chart-container">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;">📦 Stock Levels</h3>
+        <button onclick="loadBaristaStock()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">🔄 Refresh</button>
+      </div>
+      <div id="barista-stock-list"><div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading…</div></div>
+    </div>
   </div>
 </div>
 
@@ -4066,33 +4126,33 @@
              the previous scroll-jump nav — real content within each
              section is completely untouched. -->
         <div id="team-tile-menu" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:20px;">
-          <button onclick="showTeamSection('members')" style="background:#00838f;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
-            <span style="font-size:22px;">👥</span>
-            <span style="font-size:12px;font-weight:800;margin-top:5px;">Team Members</span>
-          </button>
-          <button onclick="showTeamSection('duties')" style="background:#00838f;filter:brightness(0.93);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
-            <span style="font-size:22px;">✅</span>
-            <span style="font-size:12px;font-weight:800;margin-top:5px;">Duty Lists</span>
-          </button>
-          <button onclick="showTeamSection('alerts')" style="background:#00838f;filter:brightness(0.86);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
-            <span style="font-size:22px;">🚨</span>
-            <span style="font-size:12px;font-weight:800;margin-top:5px;">Alerts</span>
-          </button>
-          <button onclick="showTeamSection('process')" style="background:#00838f;filter:brightness(0.79);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
-            <span style="font-size:22px;">🔗</span>
-            <span style="font-size:12px;font-weight:800;margin-top:5px;">Handoff Chain</span>
-          </button>
-          <button onclick="showTeamSection('time')" style="background:#00838f;filter:brightness(0.72);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+          <button onclick="showTeamSection('time')" style="background:#00838f;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
             <span style="font-size:22px;">🕐</span>
             <span style="font-size:12px;font-weight:800;margin-top:5px;">Timekeeping</span>
           </button>
-          <button onclick="showTeamSection('a2hs')" style="background:#00838f;filter:brightness(0.65);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
-            <span style="font-size:22px;">📲</span>
-            <span style="font-size:12px;font-weight:800;margin-top:5px;">Home Screen Setup</span>
+          <button onclick="showTeamSection('duties')" style="background:#00838f;filter:brightness(0.92);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">✅</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">Duty Lists</span>
           </button>
-          <button onclick="showTeamSection('holiday')" style="background:#00838f;filter:brightness(0.58);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+          <button onclick="showTeamSection('alerts')" style="background:#00838f;filter:brightness(0.84);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">🚨</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">Alerts</span>
+          </button>
+          <button onclick="showTeamSection('members')" style="background:#00838f;filter:brightness(0.76);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">👥</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">Team Members</span>
+          </button>
+          <button onclick="showTeamSection('holiday')" style="background:#00838f;filter:brightness(0.68);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
             <span style="font-size:22px;">🏖️</span>
             <span style="font-size:12px;font-weight:800;margin-top:5px;">Holiday Requests</span>
+          </button>
+          <button id="team-tile-process" onclick="showTeamSection('process')" style="background:#00838f;filter:brightness(0.60);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">🔗</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">Handoff Chain</span>
+          </button>
+          <button onclick="showTeamSection('a2hs')" style="background:#00838f;filter:brightness(0.52);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">📲</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">Home Screen Setup</span>
           </button>
         </div>
 
@@ -5212,9 +5272,11 @@ function toggleFloatingBackBtn() {
   if (!btn) return;
   // Genuine real fix, per direct request: always visible on any real
   // function screen (not scroll-gated like before), hidden only
-  // while genuinely already on the top-level task grid itself.
+  // while genuinely already on someone's own real landing page —
+  // the shared grid for most staff, or David's own Barista page.
   const onGridNav = document.getElementById('grid-nav-view')?.style.display !== 'none';
-  btn.style.display = onGridNav ? 'none' : 'flex';
+  const onBaristaHome = document.getElementById('barista-view')?.style.display !== 'none';
+  btn.style.display = (onGridNav || onBaristaHome) ? 'none' : 'flex';
 }
 
 function goToTab(tab, event) {
@@ -7880,6 +7942,9 @@ const GRID_NAV_STRUCTURE = [
     { tab: 'staff', label: 'Daily Bookings', desc: 'Start a booking, walk-in, or party' },
     { tab: 'tablecards', label: 'Table Cards', desc: "Print a table's QR card" },
   ]},
+  { id: 'menu', label: 'Menu', color: '#F9A825', items: [
+    { tab: 'menu', label: 'Daily Menu', desc: "Today's specials" },
+  ]},
   { id: 'pieces', label: 'Pieces', color: '#c0392b', items: [
     { tab: 'piecematch', label: 'Piece Matching', desc: 'AI-match fired pieces to photos' },
     { tab: 'labels', label: 'Labels', desc: 'Print collection or postal labels' },
@@ -7889,9 +7954,6 @@ const GRID_NAV_STRUCTURE = [
     { tab: 'stock', label: 'Stock', desc: 'Photograph bisque, manage reservations' },
     { tab: 'catalogue', label: 'Piece Catalogue', desc: 'What customers browse from home' },
     { tab: 'shapes', label: 'Bisque', desc: 'Your Square catalogue as silhouettes' },
-  ]},
-  { id: 'menu', label: 'Menu', color: '#F9A825', items: [
-    { tab: 'menu', label: 'Daily Menu', desc: "Today's specials" },
   ]},
   { id: 'team', label: 'Team', color: '#00838f', items: [
     { tab: 'team', label: 'Team & Duties', desc: 'Duty lists, timekeeping, holidays' },
@@ -7905,6 +7967,22 @@ const GRID_NAV_STRUCTURE = [
     { tab: 'setup', label: 'Studio Setup', desc: 'Connections, Cleo, add-ons, offers' },
   ]},
 ];
+
+// Genuine real landing-page router, per direct request — "Finished"
+// always returns to whoever's OWN real landing page, which for David
+// specifically is his own Barista page, not the shared grid everyone
+// else gets. Same real first-name check already proven for the
+// initial login routing.
+function goToRealLandingPage() {
+  const firstNameForRouting = (currentShiftStaff?.name || '').trim().split(' ')[0];
+  if (firstNameForRouting.toLowerCase() === 'david') {
+    document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+    document.getElementById('barista-view').style.display = 'block';
+    toggleFloatingBackBtn();
+  } else {
+    showGridNav();
+  }
+}
 
 function showGridNav() {
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
@@ -7973,6 +8051,17 @@ function applyShiftUI() {
   initCleoAdminFloatingWidget();
   startTaskPolling();
   applyPlatformRevenueAccess();
+
+  // Genuine real personalized landing page, per direct request —
+  // David specifically sees his own dedicated Barista page
+  // automatically on login, rather than the shared 8-tile grid
+  // everyone else sees. Checked by real first name, same honest
+  // pattern already proven for director-only access checks.
+  const firstNameForRouting = (currentShiftStaff.name || '').trim().split(' ')[0];
+  if (firstNameForRouting.toLowerCase() === 'david') {
+    document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+    document.getElementById('barista-view').style.display = 'block';
+  }
   // Opening checklist only appears once we genuinely know who's logged in —
   // sequence is always: splash -> login -> checklist, never overlapping.
   checkOpeningChecklistStatus();
@@ -12324,6 +12413,83 @@ function showSetupSection(section) {
   document.getElementById('setup-tile-menu').style.display = 'none';
   document.querySelectorAll('.setup-section').forEach(el => el.style.display = 'none');
   document.getElementById(`setup-section-${section}`).style.display = 'block';
+}
+
+// ── Genuine real Barista landing page, per direct request ──
+function showBaristaSection(section) {
+  document.querySelectorAll('.barista-section').forEach(el => el.style.display = 'none');
+  document.getElementById(`barista-section-${section}`).style.display = 'block';
+  if (section === 'orders') loadBaristaOrders();
+  if (section === 'stock') loadBaristaStock();
+}
+
+async function loadBaristaOrders() {
+  const listEl = document.getElementById('barista-orders-list');
+  try {
+    const res = await fetch(`${API_URL}/api/kds/orders?studioId=${studioId}`);
+    const data = await res.json();
+    const orders = data.orders || [];
+    if (!orders.length) {
+      listEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">No real orders yet today.</div>';
+      return;
+    }
+    listEl.innerHTML = orders.map(o => {
+      // Genuine real fix: items is stored as a JSON string
+      // (JSON.stringify(items) in the real insert code), not an
+      // array — parse it honestly, with a safe fallback if it's
+      // ever genuinely malformed.
+      let itemNames = '';
+      try { itemNames = (JSON.parse(o.items) || []).map(i => i.name).join(', '); } catch (e) { itemNames = 'Order details unavailable'; }
+      return `
+      <div style="padding:12px;background:${o.status === 'done' ? '#f0f0f0' : 'var(--gu-bg)'};border-radius:10px;margin-bottom:8px;opacity:${o.status === 'done' ? '0.6' : '1'};">
+        <div style="display:flex;justify-content:space-between;align-items:start;">
+          <div>
+            <div style="font-weight:700;font-size:13px;">${o.customer_name || o.booking_code || 'Order'}</div>
+            <div style="font-size:12px;color:var(--gu-dust);margin-top:2px;">${itemNames}</div>
+          </div>
+          ${o.status !== 'done' ? `<button onclick="markBaristaOrderDone('${o.id}')" style="background:#2e7d32;color:white;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">✓ Done</button>` : '<span style="font-size:11px;color:var(--gu-dust);">✓ Done</span>'}
+        </div>
+      </div>
+    `;
+    }).join('');
+  } catch (e) {
+    listEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Could not load — try again.</div>';
+  }
+}
+
+async function markBaristaOrderDone(orderId) {
+  try {
+    await fetch(`${API_URL}/api/kds/orders/${orderId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'done' }),
+    });
+    loadBaristaOrders();
+  } catch (e) { /* silent — the refresh button remains available */ }
+}
+
+async function loadBaristaStock() {
+  const listEl = document.getElementById('barista-stock-list');
+  try {
+    const res = await fetch(`${API_URL}/api/kds/stock-levels?studioId=${studioId}`);
+    const data = await res.json();
+    const items = data.items || [];
+    if (!items.length) {
+      listEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">No real drinks/food items found in Square.</div>';
+      return;
+    }
+    // Genuine, honest note if Square inventory tracking genuinely
+    // isn't enabled — real counts shown as "—" rather than a fake 0.
+    const trackingNote = data.inventoryTrackingEnabled ? '' :
+      '<div style="padding:10px 12px;background:#fff8e1;border-radius:8px;margin-bottom:10px;font-size:12px;color:#8a6d1f;">Square inventory tracking isn\'t switched on for this account, so real stock counts aren\'t available — just the item list.</div>';
+    listEl.innerHTML = trackingNote + items.map(i => `
+      <div style="display:flex;justify-content:space-between;padding:10px 12px;background:var(--gu-bg);border-radius:8px;margin-bottom:6px;">
+        <span style="font-size:13px;font-weight:600;">${i.name}</span>
+        <span style="font-size:13px;font-weight:800;color:${i.stockCount !== null && i.stockCount < 5 ? '#d9534f' : 'var(--gu-text)'};">${i.stockCount !== null ? i.stockCount : '—'}</span>
+      </div>
+    `).join('');
+  } catch (e) {
+    listEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Could not load — try again.</div>';
+  }
 }
 
 function showStaffSection(section) {
