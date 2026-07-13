@@ -1387,7 +1387,7 @@
   </div>
 
   <!-- Share to Community: opt-in, piece photo only, first name shown -->
-  <div id="community-share-screen">
+  <div id="community-share-screen" data-parked="true">
     <div class="dp-header">
       <span class="dp-title">Share to Community</span>
       <button onclick="closeCommunityShare()">✕ Close</button>
@@ -1414,7 +1414,7 @@
   </div>
 
   <!-- Community Feed: the studio's shared-pieces gallery -->
-  <div id="community-feed-screen">
+  <div id="community-feed-screen" data-parked="true">
     <div class="dp-header">
       <span class="dp-title">Kiln Cafe Community</span>
       <button onclick="closeCommunityFeed()">✕ Close</button>
@@ -1435,7 +1435,7 @@
   <!-- Club Pages posting screen — genuinely different from the studio
        Community share: this goes worldwide immediately, no staff
        approval, after passing a basic automated screening check. -->
-  <div id="club-pages-share-screen">
+  <div id="club-pages-share-screen" data-parked="true">
     <div class="dp-header" style="background:linear-gradient(135deg,#5E35B1,#3949ab);">
       <span class="dp-title" style="color:#fff;">Post to Club Pages</span>
       <button onclick="closeClubPagesShare()" style="color:rgba(255,255,255,0.85);">✕ Close</button>
@@ -1509,7 +1509,7 @@
   </div>
 
   <!-- Cleo's Club — kids' sticker collection board -->
-  <div id="cleos-club-screen">
+  <div id="cleos-club-screen" data-parked="true">
     <div class="dp-header" style="background:linear-gradient(135deg,#F9A825,#f57c00);">
       <span class="dp-title" style="color:#fff;">Cleo's Club</span>
       <button onclick="closeCleosClub()" style="color:rgba(255,255,255,0.85);">✕ Close</button>
@@ -1520,7 +1520,7 @@
   </div>
 
   <!-- Design Marketplace: browse, use, and list designs -->
-  <div id="marketplace-screen">
+  <div id="marketplace-screen" data-parked="true">
     <div class="dp-header" style="background: linear-gradient(135deg, #1a0a3d 0%, #2d1065 100%);">
       <span class="dp-title" style="color:#fff;">Design Marketplace</span>
       <button onclick="closeMarketplace()" style="color:rgba(255,255,255,0.8);">✕ Close</button>
@@ -1977,7 +1977,7 @@
         <button onclick="tdClearAll()">🧹 Clear All</button>
       </div>
       <button onclick="openPrintRequestFor('transferDesigner')" style="width:100%; margin-top:8px; background:var(--glaze-oxblood-base); color:#fff; border:none; padding:12px; border-radius:12px; font-weight:700; font-size:13px; cursor:pointer;">🖨️ Print as Transfer — £1</button>
-      <button onclick="openMarketplaceFromTd()" style="width:100%; margin-top:6px; background:var(--link-clay); color:#fff; border:none; padding:12px; border-radius:12px; font-weight:700; font-size:13px; cursor:pointer;">🏪 List in Design Marketplace</button>
+      <!-- List in Design Marketplace — parked for now -->
     </div>
   </div>
 
@@ -2130,7 +2130,7 @@
         ? `<div class="info-card" style="background: linear-gradient(180deg, #f2f8f0, #e9f3e4); border-color: var(--glaze-sage-base);">
              <div style="font-family: var(--gu-font-display); font-weight: 700; color: var(--glaze-sage-deep); font-size: 16px; margin-bottom: 4px;">🎉 Ready for collection!</div>
              <div style="font-size: 13px; color: var(--gu-accent); margin-bottom: 12px;">${readyPieces.length} piece${readyPieces.length > 1 ? 's are' : ' is'} fired and waiting for you at the studio.</div>
-             <button onclick="openCommunityShare()" style="width:100%; background: var(--glaze-sage-base); color:#fff; border:none; padding:11px; border-radius:12px; font-weight:600; font-size:13px; cursor:pointer;">📸 Share to Community</button>
+             <!-- Share to Community — parked for now -->
            </div>` : '';
 
       // Delay flag — set if the kiln misfired overnight and this
@@ -2185,7 +2185,7 @@
                worldwide stats, not invented numbers. Tapping switches
                into Kid Mode directly — she IS the trigger, not a
                separate toggle button elsewhere. -->
-          <div id="cleo-hero-card" onclick="toggleKidMode()" style="cursor:pointer; border-radius:20px; padding:18px; margin-bottom:14px; background:linear-gradient(135deg,#3D2E5C,#5E35B1); display:flex; align-items:center; gap:14px; box-shadow:0 6px 20px rgba(94,53,177,0.35); position:relative; overflow:hidden;">
+          <div id="cleo-hero-card" onclick="toggleKidMode()" style="display:none;cursor:pointer; border-radius:20px; padding:18px; margin-bottom:14px; background:linear-gradient(135deg,#3D2E5C,#5E35B1); display:flex; align-items:center; gap:14px; box-shadow:0 6px 20px rgba(94,53,177,0.35); position:relative; overflow:hidden;">
             <div id="cleo-hero-mascot" style="width:64px;height:64px;flex-shrink:0;"></div>
             <div style="flex:1; min-width:0;">
               <div style="font-size:15px; font-weight:800; color:white; margin-bottom:2px;">Cleo's Club — join kids painting worldwide 🌍</div>
@@ -2273,7 +2273,7 @@
             <div class="tile-desc">New to painting pottery? Watch our quick how-to before you start.</div>
           </button>
 
-          <button class="tile tile-ocean" onclick="openCommunityFeed()">
+          <button class="tile tile-ocean" onclick="openCommunityFeed()" style="display:none;">
             <span class="tile-icon">💬</span>
             <div class="tile-title">Community</div>
             <div class="tile-desc">See what other Kiln Cafe painters have been creating.</div>
@@ -2285,7 +2285,7 @@
             <div class="tile-desc" style="color:rgba(255,255,255,0.75);">Order drinks, cakes, and snacks — sent straight to the kitchen.</div>
           </button>
 
-          <button class="tile" onclick="openMarketplace()" style="position:relative; overflow:hidden; background:linear-gradient(135deg, #B87946 0%, #7a4a20 100%); border:1.5px solid rgba(255,255,255,0.2);">
+          <button class="tile" onclick="openMarketplace()" style="display:none;position:relative; overflow:hidden; background:linear-gradient(135deg, #B87946 0%, #7a4a20 100%); border:1.5px solid rgba(255,255,255,0.2);">
             <span class="tile-icon">🎨</span>
             <div class="tile-title" style="color:#fff;">Design Marketplace</div>
             <div class="tile-desc" style="color:rgba(255,255,255,0.8);">Buy and sell original designs. Use someone's artwork on your own piece, or earn from yours.</div>
@@ -2319,7 +2319,7 @@
           <!-- Real mirror link to Club Pages — a genuine standalone
                tile, always reachable, not solely dependent on tapping
                Cleo at the right moment in her message rotation. -->
-          <button class="tile" id="tile-club-pages" onclick="openCommunityFeedOnClubTab()" style="background:linear-gradient(135deg,#5E35B1,#3949ab);position:relative;">
+          <button class="tile" id="tile-club-pages" onclick="openCommunityFeedOnClubTab()" style="display:none;background:linear-gradient(135deg,#5E35B1,#3949ab);position:relative;">
             <span class="tile-icon">🎉</span>
             <div class="tile-title">Club Pages</div>
             <div class="tile-desc">See painted pieces from pottery studios worldwide, and post your own.</div>
@@ -2575,6 +2575,8 @@
     let communityPhotoBase64 = null;
 
     function openCommunityShare() {
+      // Parked for now — screen hidden, code intact for future use
+      if (document.getElementById('community-share-screen')?.dataset?.parked) return;
       const screen = document.getElementById('community-share-screen');
       screen.querySelector('.dp-title').textContent = 'Share to Community';
       screen.style.display = 'flex';
@@ -2646,6 +2648,8 @@
     let clubPagesPhotoBase64 = null;
 
     function openClubPagesShare() {
+      // Parked for now — screen hidden, code intact for future use
+      if (document.getElementById('club-pages-share-screen')?.dataset?.parked) return;
       closeCommunityFeed();
       const screen = document.getElementById('club-pages-share-screen');
       screen.style.display = 'flex';
@@ -2726,6 +2730,8 @@
     let cfCurrentTab = 'studio';
 
     function openCommunityFeed() {
+      // Parked for now — screen hidden, code intact for future use
+      if (document.getElementById('community-feed-screen')?.dataset?.parked) return;
       const screen = document.getElementById('community-feed-screen');
       screen.style.display = 'flex';
       void screen.offsetWidth;
@@ -3105,6 +3111,8 @@
     }
 
     function openMarketplace() {
+      // Parked for now — screen hidden, code intact for future use
+      if (document.getElementById('marketplace-screen')?.dataset?.parked) return;
       const screen = document.getElementById('marketplace-screen');
       screen.style.display = 'flex';
       void screen.offsetWidth;
@@ -4223,6 +4231,8 @@
     }
 
     function openCleosClub() {
+      // Parked for now — screen hidden, code intact for future use
+      if (document.getElementById('cleos-club-screen')?.dataset?.parked) return;
       const screen = document.getElementById('cleos-club-screen');
       screen.style.display = 'flex';
       void screen.offsetWidth;
@@ -6406,13 +6416,6 @@
         voice: 'Cleo\'s Club is a real kids\' sticker collection with genuine rewards. Tap here to switch into the kids\' version of the page.'
       },
       {
-        title: '🎉 Club Pages',
-        body: 'A real worldwide feed — see painted pieces shared by pottery lovers everywhere, and post your own finished piece straight to it.',
-        target: '#tile-club-pages',
-        arrow: 'up',
-        voice: 'Club Pages is a real worldwide feed of painted pieces. See what others have made, and share your own.'
-      },
-      {
         title: '🏺 Browse the Catalogue',
         body: 'See real photographed stock from this studio, and reserve a piece to be pre-glazed and ready for your next visit — no need to search for something to paint when you arrive.',
         target: '#tile-browse-catalogue',
@@ -6453,20 +6456,6 @@
         target: '#home-access-tile',
         arrow: 'up',
         voice: 'For just five pounds, Take It Home unlocks all three design tools on your own device forever. Design at home, browse the studio catalogue, and reserve pieces anytime.'
-      },
-      {
-        title: '💬 Community',
-        body: 'See what other painters have been creating — in this studio and worldwide. Share your own finished pieces and create a branded card to post on Instagram or TikTok.',
-        target: '[onclick="openCommunityFeed()"]',
-        arrow: 'up',
-        voice: 'The Community feed shows finished pieces from painters here and worldwide. Share your work, like others\', and create a branded share card for Instagram or TikTok.'
-      },
-      {
-        title: '🎨 Design Marketplace',
-        body: 'Browse designs created by other customers and use them on your own piece. Or list your own Transfer Designer artwork for others to buy — you set the price.',
-        target: '[onclick="openMarketplace()"]',
-        arrow: 'up',
-        voice: 'The Design Marketplace lets you browse and buy other customers\' designs, or sell your own. A great way to get a stunning piece even if you\'re not sure what to paint.'
       },
       {
         title: '📅 My Bookings',
