@@ -239,17 +239,9 @@
     @media (max-width: 520px) {
       .admin-wrapper {
         grid-template-columns: 1fr;
-        grid-template-rows: 68px 1fr;
-        padding-top: 44px; /* space for #phone-header-menu, which is fixed */
+        grid-template-rows: 1fr;
+        padding-top: 0;
       }
-      /* For directors (David/Jenny/Daisy), the platform revenue strip
-         adds its own real height on top of the phone header — the
-         body.has-platform-strip rule below already accounts for BOTH
-         (strip + header) in its margin-top. Without zeroing THIS rule's
-         padding-top for that case, both were stacking: 44px padding
-         PLUS a separate 162px margin, creating a genuine ~44-120px+
-         white gap between the header and the real content underneath —
-         exactly what was reported. */
       body.has-platform-strip .admin-wrapper {
         padding-top: 0;
       }
