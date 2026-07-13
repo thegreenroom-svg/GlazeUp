@@ -3182,12 +3182,20 @@
           <!-- Kiln Unload: scan the stamped photo's QR to confirm pieces are out and ready -->
           <div class="chart-container">
             <h3>Kiln Unload — Confirm Ready for Collection</h3>
-            <div style="font-size: 11px; color: var(--gu-dust); margin-bottom: 10px;">
-              After visually matching a fired piece to its stamped photo, scan (or paste) the QR from that photo here to confirm it's ready. The customer's own page updates automatically — nothing to send manually.
+            <div style="font-size:11px;color:var(--gu-dust);margin-bottom:12px;">
+              Photograph the fired piece — the app will identify which booking it belongs to and mark it ready. If recognition isn't confident, you'll be asked for the booking code.
             </div>
-            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-              <input type="text" id="kiln-unload-scan-input" placeholder="Scan QR or paste booking link/code" style="flex: 1; padding: 10px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px;" onkeydown="if(event.key==='Enter') confirmReadyByScan()">
-              <button class="btn-connect glaze-sage" style="padding: 10px 16px;" onclick="confirmReadyByScan()">✓ Confirm</button>
+            <button onclick="document.getElementById('kiln-unload-photo-input').click()" style="width:100%;background:#2e7d32;color:white;border:none;border-radius:12px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:10px;">
+              <span>📷</span> Photograph to confirm ready
+            </button>
+            <input type="file" id="kiln-unload-photo-input" accept="image/*" capture="environment" style="display:none;" onchange="handleKilnUnloadPhoto(event)">
+            <!-- QR fallback — shown only when photo recognition isn't confident -->
+            <div id="kiln-unload-qr-fallback" style="display:none;margin-top:8px;">
+              <div style="font-size:11px;color:var(--gu-dust);margin-bottom:8px;">Not recognised from the photo — enter the booking code:</div>
+              <div style="display:flex;gap:8px;">
+                <input type="text" id="kiln-unload-scan-input" placeholder="Paste booking code" style="flex:1;padding:10px;border:1px solid var(--gu-border);border-radius:6px;font-size:13px;" onkeydown="if(event.key==='Enter') confirmReadyByScan()">
+                <button class="btn-connect glaze-sage" style="padding:10px 16px;" onclick="confirmReadyByScan()">✓ Confirm</button>
+              </div>
             </div>
             <div id="kiln-unload-result"></div>
           </div>
@@ -3246,14 +3254,14 @@
               <button onclick="loadPackingQueue()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:14px;padding:4px 8px;font-weight:bold;">🔄 Refresh</button>
             </div>
             <p style="font-size:11px;color:var(--gu-dust);margin-bottom:14px;line-height:1.5;">
-              Pieces are fired but not yet ready for the customer — they need packing first. Pack a batch, then confirm with at least one QR/booking code from that batch so there's a clear record of what came out and when.
+              Pieces are fired but not yet ready for the customer — they need packing first. Photograph a piece from the batch to confirm it — if the photo isn't clear enough, you can enter a booking code instead.
             </p>
             <div id="packing-queue-list" style="margin-bottom:14px;">
               <div style="padding:10px;color:var(--gu-dust);font-size:12px;">Loading…</div>
             </div>
             <div id="packing-complete-form" style="display:none;background:white;border-radius:10px;padding:14px;border:1px solid var(--gu-border);">
               <div style="font-size:12px;font-weight:700;margin-bottom:8px;" id="packing-form-title">Complete packing</div>
-              <input type="text" id="packing-reference-code" placeholder="Scan or paste a QR/booking code from this batch" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">
+              <input type="text" id="packing-reference-code" placeholder="Booking code (fallback if photo unclear)" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">
               <div style="display:flex;gap:8px;margin-bottom:8px;">
                 <div style="flex:1;">
                   <div style="font-size:10px;color:var(--gu-dust);margin-bottom:3px;">Fired date</div>
@@ -3283,10 +3291,10 @@
               <h3 style="margin:0;">📸 Whole-Tray Scan <span style="font-size:11px;font-weight:500;color:var(--gu-dust);">(pieces laid out with gaps)</span></h3>
             </div>
             <p style="font-size:11px;color:var(--gu-dust);margin-bottom:12px;line-height:1.5;">
-              Scan the booking's QR code, then photograph the whole tray at once. The AI outlines every piece it can distinguish and suggests which is which — confirm each one.
+              Photograph the whole tray at once — the AI outlines every piece it can distinguish and suggests which booking each one belongs to. If any piece can't be identified from the photo, enter a booking code below as a fallback for just that one.
             </p>
             <div style="display:flex;gap:8px;margin-bottom:12px;">
-              <input type="text" id="wts-booking-scan-input" placeholder="Scan QR or paste booking code" style="flex:1;padding:10px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;" onkeydown="if(event.key==='Enter') loadWholeTrayGroup()">
+              <input type="text" id="wts-booking-scan-input" placeholder="Booking code (fallback for unrecognised pieces)" style="flex:1;padding:10px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;" onkeydown="if(event.key==='Enter') loadWholeTrayGroup()">
               <button onclick="loadWholeTrayGroup()" style="background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;">Load</button>
             </div>
             <button id="wts-scan-btn" onclick="captureWholeTrayPhoto()" disabled style="width:100%;background:#8a8175;color:white;border:none;border-radius:12px;padding:16px;font-size:15px;font-weight:800;cursor:not-allowed;margin-bottom:14px;">📷 Confirm layout is spaced first ☝️</button>
@@ -4057,26 +4065,30 @@
       <div id="piecematch-view" class="view" style="display: none;">
         <h2 style="margin-top: 0;">🔍 Piece Matching</h2>
         <p style="color: var(--gu-dust); font-size: 13px; margin-bottom: 20px; line-height: 1.5;">
-          Pick up a fired piece from the jumbled pile, scan the group's QR code, then photograph the piece — this suggests which reference photo it most likely matches, based on shape and design pattern (not colour, which changes too much during firing to trust). Always double-check against the suggested photo before confirming.
+          Pick up a fired piece from the jumbled pile and photograph it — the AI will suggest which booking it belongs to based on shape and design. If it can't identify it confidently, you'll be offered a booking code or QR as a fallback.
         </p>
 
-        <!-- Genuine real tile styling for step 1, per direct request
-             to unify the visual language. Steps 2-3 genuinely depend
-             on step 1's real data (can't photograph a piece before
-             scanning its group), so this stays a real sequential
-             flow rather than free-jumping tiles — the actual logic
-             and behaviour is completely untouched, only the look. -->
-        <button onclick="document.getElementById('pm-booking-scan-input').focus()" style="width:100%;background:#c0392b;color:white;border:none;border-radius:14px;padding:20px;text-align:left;cursor:pointer;margin-bottom:20px;display:flex;align-items:center;gap:14px;">
+        <button onclick="document.getElementById('pm-photo-input').click()" style="width:100%;background:#c0392b;color:white;border:none;border-radius:14px;padding:20px;text-align:left;cursor:pointer;margin-bottom:12px;display:flex;align-items:center;gap:14px;">
           <span style="font-size:28px;">📷</span>
           <div>
-            <div style="font-size:16px;font-weight:800;">1. Scan the group's QR code</div>
-            <div style="font-size:11px;opacity:0.85;margin-top:2px;">Tap here, then scan or paste the booking code below</div>
+            <div style="font-size:16px;font-weight:800;">1. Photograph the piece</div>
+            <div style="font-size:11px;opacity:0.85;margin-top:2px;">AI will identify which booking it belongs to</div>
           </div>
         </button>
-        <div class="chart-container" style="margin-bottom: 20px;">
-          <div style="display:flex;gap:8px;">
-            <input type="text" id="pm-booking-scan-input" placeholder="Scan QR or paste booking code" style="flex:1;padding:10px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;" onkeydown="if(event.key==='Enter') loadPieceMatchGroup()">
-            <button onclick="loadPieceMatchGroup()" style="background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;">Load</button>
+        <input type="file" id="pm-photo-input" accept="image/*" capture="environment" style="display:none;" onchange="handlePieceMatchPhotoFirst(event)">
+
+        <!-- QR / booking code fallback — shown only when photo
+             recognition genuinely can't identify the piece confidently.
+             Not shown by default. -->
+        <div id="pm-qr-fallback" style="display:none;">
+          <div style="text-align:center;font-size:12px;color:var(--gu-dust);margin-bottom:10px;">
+            📷 Not confident enough from the photo — enter the booking code instead
+          </div>
+          <div class="chart-container" style="margin-bottom:20px;">
+            <div style="display:flex;gap:8px;">
+              <input type="text" id="pm-booking-scan-input" placeholder="Paste or scan booking code" style="flex:1;padding:10px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;" onkeydown="if(event.key==='Enter') loadPieceMatchGroup()">
+              <button onclick="loadPieceMatchGroup()" style="background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;">Load</button>
+            </div>
           </div>
         </div>
 
@@ -12170,6 +12182,96 @@ function jumpToLabelsFor(bookingCode) {
     const input = document.getElementById('label-booking-scan-input');
     if (input) { input.value = bookingCode; loadLabelBooking(); }
   }, 150); // genuine short delay so the real tab content has actually rendered first
+}
+
+// ── Photo-first piece identification handlers ─────────────────────
+// Called from the new photo-first UI buttons. Tries recognition
+// first; only reveals the QR/booking-code fallback if confidence
+// genuinely isn't high enough to auto-assign. QR stays in the system
+// but is genuinely last resort, not the first thing staff see.
+// ─────────────────────────────────────────────────────────────────
+
+async function handlePieceMatchPhotoFirst(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    const photoBase64 = reader.result;
+    // Show spinner
+    const fallbackEl = document.getElementById('pm-qr-fallback');
+    const groupInfo = document.getElementById('pm-group-info');
+    const matchResult = document.getElementById('pm-match-result');
+    if (matchResult) matchResult.innerHTML = '<div style="padding:14px;text-align:center;color:var(--gu-dust);font-size:13px;">🔍 Identifying piece…</div>';
+    if (groupInfo) groupInfo.style.display = 'block';
+    try {
+      const res = await fetch(`${API_URL}/api/pieces/find-by-photo`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId, photoBase64, searchedBy: currentShiftStaff?.id || null, autoAssign: true })
+      });
+      const data = await res.json();
+      if (data.autoAssigned) {
+        // High confidence — show confirmation, hide fallback
+        if (fallbackEl) fallbackEl.style.display = 'none';
+        if (matchResult) matchResult.innerHTML = `
+          <div style="padding:16px;background:rgba(76,175,80,0.1);border:1.5px solid #4caf50;border-radius:12px;">
+            <div style="font-size:15px;font-weight:800;color:#2e7d32;margin-bottom:6px;">✓ Identified — ${data.autoAssigned.pieceType || 'Piece'}</div>
+            <div style="font-size:13px;color:var(--gu-text);margin-bottom:10px;">${data.autoAssigned.reason || 'Matched automatically.'}</div>
+            <button onclick="undoAutoMatch('${data.autoAssigned.pieceId}')" style="background:none;border:1px solid #c0392b;color:#c0392b;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;">↩ Not right — undo</button>
+          </div>`;
+      } else {
+        // Not confident — reveal the QR/booking-code fallback
+        if (fallbackEl) fallbackEl.style.display = 'block';
+        if (matchResult) matchResult.innerHTML = `
+          <div style="padding:12px;background:rgba(249,168,37,0.1);border-radius:10px;margin-bottom:10px;">
+            <div style="font-size:13px;font-weight:700;color:#B87946;margin-bottom:4px;">📷 Photo not clear enough to identify confidently</div>
+            <div style="font-size:11px;color:var(--gu-dust);">Enter the booking code below to load this piece's group manually.</div>
+          </div>`;
+      }
+    } catch(e) {
+      if (fallbackEl) fallbackEl.style.display = 'block';
+      if (matchResult) matchResult.innerHTML = '<div style="padding:10px;color:var(--gu-dust);font-size:12px;">Could not run recognition — enter the booking code below.</div>';
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function handleKilnUnloadPhoto(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    const photoBase64 = reader.result;
+    const resultEl = document.getElementById('kiln-unload-result');
+    const fallbackEl = document.getElementById('kiln-unload-qr-fallback');
+    if (resultEl) resultEl.innerHTML = '<div style="padding:10px;color:var(--gu-dust);font-size:12px;">🔍 Identifying piece…</div>';
+    try {
+      const res = await fetch(`${API_URL}/api/pieces/find-by-photo`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId, photoBase64, searchedBy: currentShiftStaff?.id || null, autoAssign: true })
+      });
+      const data = await res.json();
+      if (data.autoAssigned) {
+        // High confidence — mark it ready directly
+        if (fallbackEl) fallbackEl.style.display = 'none';
+        // Now trigger the ready-confirmation using the identified booking code
+        const pieceBookingCode = data.autoAssigned.bookingCode;
+        if (pieceBookingCode) {
+          document.getElementById('kiln-unload-scan-input').value = pieceBookingCode;
+          await confirmReadyByScan();
+        } else {
+          if (resultEl) resultEl.innerHTML = `<div style="padding:12px;background:rgba(76,175,80,0.1);border:1.5px solid #4caf50;border-radius:10px;font-size:13px;font-weight:700;color:#2e7d32;">✓ Identified — marking ready for collection</div>`;
+        }
+      } else {
+        // Not confident — reveal QR/code fallback
+        if (fallbackEl) fallbackEl.style.display = 'block';
+        if (resultEl) resultEl.innerHTML = '<div style="padding:10px;background:rgba(249,168,37,0.08);border-radius:8px;font-size:12px;color:#B87946;">Photo not clear enough — enter booking code below.</div>';
+      }
+    } catch(e) {
+      if (fallbackEl) fallbackEl.style.display = 'block';
+      if (resultEl) resultEl.innerHTML = '<div style="padding:10px;color:var(--gu-dust);font-size:12px;">Recognition failed — enter booking code below.</div>';
+    }
+  };
+  reader.readAsDataURL(file);
 }
 
 async function loadPieceMatchGroup() {
