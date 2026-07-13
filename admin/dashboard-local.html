@@ -176,7 +176,6 @@
     .admin-wrapper {
       display: grid;
       grid-template-columns: 1fr;
-      grid-template-rows: auto auto 1fr;
       height: 100vh;
     }
 
@@ -452,6 +451,8 @@
     .admin-main {
       display: flex;
       flex-direction: column;
+      height: 100%;
+      min-height: 0;
       background: var(--gu-secondary);
     }
 
@@ -500,6 +501,7 @@
     }
 
     .admin-content {
+      flex: 1;
       min-height: 0;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
