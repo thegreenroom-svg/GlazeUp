@@ -7810,6 +7810,168 @@ function showLoginScreen(screen) {
   document.getElementById('login-screen-welcomeback').style.display = screen === 'welcomeback' ? 'block' : 'none';
 }
 
+// ── Staff illustrated avatars ─────────────────────────────────────────
+// Small SVG portrait for each real staff member — warm, stylised,
+// consistent with the glaze tile aesthetic. Each is 60×60 viewBox.
+// Where we don't have confirmed physical descriptions, avatars reflect
+// personality and role rather than literal appearance.
+const STAFF_AVATARS = {
+  // David — Daisy's father, co-director, warm older man, barista background
+  'David': `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="30" cy="30" r="30" fill="#B87946"/>
+    <!-- Face -->
+    <ellipse cx="30" cy="27" rx="13" ry="15" fill="#F5D5B0"/>
+    <!-- Grey hair — close-cropped sides, fuller on top -->
+    <ellipse cx="30" cy="14" rx="13" ry="7" fill="#888"/>
+    <rect x="17" y="14" width="4" height="10" fill="#888"/>
+    <rect x="39" y="14" width="4" height="10" fill="#888"/>
+    <!-- Kind eyes -->
+    <ellipse cx="25" cy="25" rx="2.5" ry="2" fill="#5A3E28"/>
+    <ellipse cx="35" cy="25" rx="2.5" ry="2" fill="#5A3E28"/>
+    <!-- Warm smile with laughter lines -->
+    <path d="M23 33 Q30 38 37 33" fill="none" stroke="#8a5520" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M20 28 Q18 26 20 24" fill="none" stroke="#D4A870" stroke-width="1" stroke-linecap="round"/>
+    <path d="M40 28 Q42 26 40 24" fill="none" stroke="#D4A870" stroke-width="1" stroke-linecap="round"/>
+    <!-- Collar -->
+    <path d="M17 42 Q30 46 43 42 L43 60 L17 60Z" fill="#2B2724"/>
+  </svg>`,
+
+  // Jenny — co-director, professional, confident
+  'Jenny': `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="30" cy="30" r="30" fill="#2e7d32"/>
+    <!-- Face -->
+    <ellipse cx="30" cy="27" rx="12" ry="14" fill="#F0C8A0"/>
+    <!-- Hair — dark, neat, shoulder length suggested -->
+    <ellipse cx="30" cy="13" rx="13" ry="7" fill="#3D2B1F"/>
+    <path d="M17 13 Q14 28 16 40" fill="none" stroke="#3D2B1F" stroke-width="5" stroke-linecap="round"/>
+    <path d="M43 13 Q46 28 44 40" fill="none" stroke="#3D2B1F" stroke-width="5" stroke-linecap="round"/>
+    <!-- Confident eyes -->
+    <ellipse cx="25" cy="26" rx="2.5" ry="2.2" fill="#3D2B1F"/>
+    <ellipse cx="35" cy="26" rx="2.5" ry="2.2" fill="#3D2B1F"/>
+    <path d="M22 23 Q25 21.5 28 23" fill="none" stroke="#3D2B1F" stroke-width="1" stroke-linecap="round"/>
+    <path d="M32 23 Q35 21.5 38 23" fill="none" stroke="#3D2B1F" stroke-width="1" stroke-linecap="round"/>
+    <!-- Poised smile -->
+    <path d="M24 33 Q30 37 36 33" fill="none" stroke="#8a5520" stroke-width="1.5" stroke-linecap="round"/>
+    <!-- Smart collar -->
+    <path d="M18 42 Q30 47 42 42 L42 60 L18 60Z" fill="#1a4d1e"/>
+  </svg>`,
+
+  // Daisy — the owner, creative, warm, mid-late 30s
+  'Daisy': `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="30" cy="30" r="30" fill="#B87946"/>
+    <!-- Face -->
+    <ellipse cx="30" cy="27" rx="12" ry="14" fill="#F2C49A"/>
+    <!-- Hair — warm brown, loose wavy -->
+    <ellipse cx="30" cy="12" rx="14" ry="8" fill="#7B4A2D"/>
+    <path d="M16 12 Q11 30 13 44" fill="none" stroke="#7B4A2D" stroke-width="6" stroke-linecap="round"/>
+    <path d="M44 12 Q49 30 47 44" fill="none" stroke="#7B4A2D" stroke-width="6" stroke-linecap="round"/>
+    <path d="M14 20 Q10 32 12 40" fill="none" stroke="#9B6A4D" stroke-width="3" stroke-linecap="round"/>
+    <!-- Warm eyes with a spark -->
+    <ellipse cx="25" cy="25" rx="2.8" ry="2.5" fill="#5A3018"/>
+    <ellipse cx="35" cy="25" rx="2.8" ry="2.5" fill="#5A3018"/>
+    <circle cx="26" cy="24" r="0.8" fill="white"/>
+    <circle cx="36" cy="24" r="0.8" fill="white"/>
+    <!-- Genuine smile -->
+    <path d="M23 33 Q30 39 37 33" fill="none" stroke="#8a5520" stroke-width="1.8" stroke-linecap="round"/>
+    <!-- Creative top -->
+    <path d="M18 42 Q30 48 42 42 L42 60 L18 60Z" fill="#c0392b"/>
+  </svg>`,
+
+  // Lucy — ceramicist, artistic, Cancer warmth beneath a grounded exterior
+  'Lucy': `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="30" cy="30" r="30" fill="#c0392b"/>
+    <!-- Face -->
+    <ellipse cx="30" cy="27" rx="12" ry="14" fill="#F5D0A8"/>
+    <!-- Hair — light brown, often up/tied back for studio work -->
+    <ellipse cx="30" cy="12" rx="13" ry="7" fill="#A07040"/>
+    <circle cx="38" cy="11" r="5" fill="#A07040"/>
+    <!-- Bun suggestion -->
+    <circle cx="40" cy="9" r="4" fill="#C09060"/>
+    <!-- Warm eyes -->
+    <ellipse cx="25" cy="26" rx="2.5" ry="2.2" fill="#5A3A1A"/>
+    <ellipse cx="35" cy="26" rx="2.5" ry="2.2" fill="#5A3A1A"/>
+    <circle cx="25.8" cy="25.2" r="0.7" fill="white"/>
+    <circle cx="35.8" cy="25.2" r="0.7" fill="white"/>
+    <!-- Gentle smile -->
+    <path d="M24 33 Q30 37 36 33" fill="none" stroke="#8a5520" stroke-width="1.5" stroke-linecap="round"/>
+    <!-- Studio apron hint -->
+    <path d="M18 42 Q30 47 42 42 L42 60 L18 60Z" fill="#8e44ad"/>
+    <rect x="26" y="42" width="8" height="14" fill="#7a3d96" rx="2"/>
+  </svg>`,
+
+  // Ruby — studio assistant, young, bubbly energy
+  'Ruby': `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="30" cy="30" r="30" fill="#00838f"/>
+    <!-- Face -->
+    <ellipse cx="30" cy="28" rx="11" ry="13" fill="#F8D4B0"/>
+    <!-- Hair — longer, perhaps wavy, youthful -->
+    <ellipse cx="30" cy="14" rx="13" ry="8" fill="#4A2C10"/>
+    <path d="M17 14 Q12 32 15 46" fill="none" stroke="#4A2C10" stroke-width="7" stroke-linecap="round"/>
+    <path d="M43 14 Q48 32 45 46" fill="none" stroke="#4A2C10" stroke-width="7" stroke-linecap="round"/>
+    <!-- Big bright eyes -->
+    <ellipse cx="25" cy="27" rx="3" ry="2.8" fill="#3D2010"/>
+    <ellipse cx="35" cy="27" rx="3" ry="2.8" fill="#3D2010"/>
+    <circle cx="26" cy="26" r="1" fill="white"/>
+    <circle cx="36" cy="26" r="1" fill="white"/>
+    <!-- Big smile -->
+    <path d="M22 34 Q30 40 38 34" fill="none" stroke="#8a5520" stroke-width="2" stroke-linecap="round"/>
+    <!-- Colourful top -->
+    <path d="M18 42 Q30 48 42 42 L42 60 L18 60Z" fill="#00695c"/>
+  </svg>`,
+
+  // Elliott — Daisy's brother, early 30s, good-looking, creative, very funny
+  'Elliott': `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="30" cy="30" r="30" fill="#5E35B1"/>
+    <!-- Face — strong jaw, good bone structure -->
+    <ellipse cx="30" cy="27" rx="12" ry="15" fill="#F2C49A"/>
+    <!-- Hair — dark, styled, a bit of character -->
+    <ellipse cx="30" cy="12" rx="13" ry="7" fill="#2B1F14"/>
+    <path d="M17 12 Q16 20 17 24" fill="#2B1F14" stroke="#2B1F14" stroke-width="3"/>
+    <!-- Slight quiff/texture suggestion -->
+    <path d="M22 8 Q30 5 36 9" fill="none" stroke="#2B1F14" stroke-width="3" stroke-linecap="round"/>
+    <!-- Expressive eyes — there's a joke behind them -->
+    <ellipse cx="25" cy="25" rx="2.8" ry="2.5" fill="#2B1F14"/>
+    <ellipse cx="35" cy="25" rx="2.8" ry="2.5" fill="#2B1F14"/>
+    <circle cx="26" cy="24" r="0.9" fill="white"/>
+    <circle cx="36" cy="24" r="0.9" fill="white"/>
+    <!-- One eyebrow slightly raised — the comedian -->
+    <path d="M22 21 Q25 19.5 28 20.5" fill="none" stroke="#2B1F14" stroke-width="1.2" stroke-linecap="round"/>
+    <path d="M32 20 Q35 18.5 38 20" fill="none" stroke="#2B1F14" stroke-width="1.5" stroke-linecap="round"/>
+    <!-- A grin rather than a smile -->
+    <path d="M23 33 Q27 37 33 36 Q36 35 37 33" fill="none" stroke="#8a5520" stroke-width="1.8" stroke-linecap="round"/>
+    <!-- Creative, slightly interesting collar -->
+    <path d="M18 42 Q30 47 42 42 L42 60 L18 60Z" fill="#4527A0"/>
+    <path d="M27 42 L30 48 L33 42" fill="white" opacity="0.3"/>
+  </svg>`,
+
+  // Dave (barista) — separate from David — friendly, coffee-expert energy
+  'Dave': `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="30" cy="30" r="30" fill="#F4511E"/>
+    <!-- Face -->
+    <ellipse cx="30" cy="27" rx="12" ry="14" fill="#F5D5B0"/>
+    <!-- Hair — shorter, neat -->
+    <ellipse cx="30" cy="13" rx="12" ry="6" fill="#5A3A1A"/>
+    <rect x="18" y="13" width="3" height="8" fill="#5A3A1A"/>
+    <rect x="39" y="13" width="3" height="8" fill="#5A3A1A"/>
+    <!-- Friendly eyes -->
+    <ellipse cx="25" cy="26" rx="2.5" ry="2.2" fill="#3D2010"/>
+    <ellipse cx="35" cy="26" rx="2.5" ry="2.2" fill="#3D2010"/>
+    <!-- Big welcoming smile — barista energy -->
+    <path d="M22 33 Q30 39 38 33" fill="none" stroke="#8a5520" stroke-width="2" stroke-linecap="round"/>
+    <!-- Coffee-stained apron hint -->
+    <path d="M18 42 Q30 47 42 42 L42 60 L18 60Z" fill="#2B2724"/>
+    <ellipse cx="30" cy="46" rx="4" ry="3" fill="#3D2010" opacity="0.6"/>
+  </svg>`,
+};
+
+// Fallback SVG for any staff member without a defined portrait
+function _staffAvatarSvg(name, roleColor) {
+  return STAFF_AVATARS[name] || `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="30" cy="30" r="30" fill="${roleColor}"/>
+    <text x="30" y="37" text-anchor="middle" font-size="22" font-weight="800" fill="white" font-family="sans-serif">${name.charAt(0).toUpperCase()}</text>
+  </svg>`;
+}
+
 async function loadLoginNamePicker() {
   const grid = document.getElementById('login-name-grid');
   try {
@@ -7822,22 +7984,34 @@ async function loadLoginNamePicker() {
       return;
     }
 
-    // Store the team list once, index by position, and reference by index
-    // in onclick — much more reliable than embedding a full JSON object
-    // inline in an HTML attribute (which is fragile: any character in a
-    // name/role that trips up HTML attribute parsing could silently break
-    // the click handler entirely, with no error shown — exactly the "taps
-    // do nothing" symptom this replaces).
     window._loginTeamData = team;
 
     grid.innerHTML = team.map((m, i) => {
       const color = ROLE_COLORS_LOGIN[m.role] || '#999';
+      const avatarSvg = _staffAvatarSvg(m.name, color);
+
+      // Status badge
+      let statusBadge = '';
+      let cardOpacity = '1';
+      let cardBorder = '1.5px solid var(--gu-border)';
+      if (m.onHoliday) {
+        statusBadge = '<div style="position:absolute;top:6px;right:6px;background:#F9A825;color:white;border-radius:20px;padding:2px 7px;font-size:9px;font-weight:800;">🏖️ Holiday</div>';
+        cardOpacity = '0.7';
+      } else if (m.onShift) {
+        statusBadge = '<div style="position:absolute;top:6px;right:6px;background:#2e7d32;color:white;border-radius:20px;padding:2px 7px;font-size:9px;font-weight:800;">● On shift</div>';
+        cardBorder = '1.5px solid #2e7d32';
+      }
+
       return `
-        <button onclick="selectLoginMember(window._loginTeamData[${i}])" style="background:var(--gu-bg);border:1.5px solid var(--gu-border);border-radius:14px;padding:14px 8px;cursor:pointer;text-align:center;">
-          <div style="width:42px;height:42px;border-radius:50%;background:${color};color:white;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;margin:0 auto 8px;">${m.name.charAt(0).toUpperCase()}</div>
+        <button onclick="selectLoginMember(window._loginTeamData[${i}])"
+          style="background:var(--gu-bg);border:${cardBorder};border-radius:14px;padding:14px 8px 12px;cursor:pointer;text-align:center;position:relative;opacity:${cardOpacity};">
+          ${statusBadge}
+          <div style="width:56px;height:56px;margin:0 auto 8px;border-radius:50%;overflow:hidden;border:2px solid ${color};">
+            ${avatarSvg}
+          </div>
           <div style="font-size:13px;font-weight:700;color:var(--gu-text);">${m.name}</div>
           <div style="font-size:10px;color:var(--gu-dust);margin-top:2px;">${m.role}</div>
-          ${!m.hasPinSet ? '<div style="font-size:9px;color:var(--link-clay);margin-top:4px;font-weight:700;">● NEW — set PIN</div>' : ''}
+          ${!m.hasPinSet ? '<div style="font-size:9px;color:var(--link-clay);margin-top:4px;font-weight:700;">● Set PIN first</div>' : ''}
         </button>`;
     }).join('');
   } catch(e) {

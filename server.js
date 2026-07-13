@@ -5408,8 +5408,9 @@ app.get('/api/staff/daily-progress', async (req, res) => {
 
 function hashPin(pin) { return crypto.createHash('sha256').update(String(pin)).digest('hex'); }
 
-// GET /api/staff/team-for-login — names + roles only (no PINs), for the login
-// picker screen so staff can find themselves without typing their name
+// GET /api/staff/team-for-login — names + roles + shift/holiday status,
+// for the login picker so staff can see who's on shift, off shift, or
+// on holiday without logging in first.
 app.get('/api/staff/team-for-login', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
@@ -5417,8 +5418,33 @@ app.get('/api/staff/team-for-login', async (req, res) => {
     .select('id, name, role').eq('studio_id', studioId).eq('active', true).order('name');
   const { data: pins } = await supabase.from('staff_pins').select('staff_member_id').eq('studio_id', studioId);
   const hasPinSet = new Set((pins || []).map(p => p.staff_member_id));
+
+  // Check for active shifts today
+  const today = new Date().toISOString().split('T')[0];
+  const { data: activeShifts } = await supabase.from('staff_shifts')
+    .select('staff_member_id')
+    .eq('studio_id', studioId)
+    .gte('clock_in', today)
+    .is('clock_out', null);
+  const onShift = new Set((activeShifts || []).map(s => s.staff_member_id));
+
+  // Check for holidays today
+  const { data: holidays } = await supabase.from('staff_holidays')
+    .select('staff_member_id')
+    .eq('studio_id', studioId)
+    .lte('start_date', today)
+    .gte('end_date', today)
+    .eq('approved', true)
+    .catch(() => ({ data: [] }));
+  const onHoliday = new Set(((holidays || [])).map(h => h.staff_member_id));
+
   res.json({
-    team: (team || []).map(m => ({ ...m, hasPinSet: hasPinSet.has(m.id) }))
+    team: (team || []).map(m => ({
+      ...m,
+      hasPinSet: hasPinSet.has(m.id),
+      onShift: onShift.has(m.id),
+      onHoliday: onHoliday.has(m.id)
+    }))
   });
 });
 
