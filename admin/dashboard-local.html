@@ -2439,9 +2439,9 @@
              IDs kept throughout, so all existing JS that already
              updates their state (updateBreakUI, etc.) continues
              working correctly without any change needed there. -->
-        <button id="direct-break-btn" onclick="toggleBreak()" title="Take a break" style="display:none;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:5px 9px;font-size:11px;font-weight:700;color:#3949ab;cursor:pointer;white-space:nowrap;">☕</button>
-        <button id="find-piece-fab" onclick="openFindMyPiece()" title="Find a piece" style="display:none;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:5px 9px;font-size:14px;cursor:pointer;">🔍</button>
-        <button id="direct-logout-btn" onclick="confirmDirectLogout()" title="Log out" style="display:none;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:5px 9px;font-size:14px;cursor:pointer;">🚪</button>
+        <button id="direct-break-btn" onclick="toggleBreak()" title="Take a break" style="display:none;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:5px 10px;font-size:11px;font-weight:700;color:#3949ab;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px;">☕ <span>Break</span></button>
+        <button id="find-piece-fab" onclick="openFindMyPiece()" title="Find a piece" style="display:none;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:5px 10px;font-size:11px;font-weight:700;color:var(--gu-text);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px;">🔍 <span>Find Piece</span></button>
+        <button id="direct-logout-btn" onclick="confirmDirectLogout()" title="Log out" style="display:none;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:5px 10px;font-size:11px;font-weight:700;color:#c0392b;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px;">🚪 <span>Log Out</span></button>
       </div>
     </header>
 
@@ -8146,11 +8146,11 @@ function updateBreakUI() {
   if (currentBreakId) {
     if (btn) { btn.textContent = '▶ End break — back to work'; btn.style.background = '#e8eaf6'; }
     if (indicator) indicator.style.display = 'inline-block';
-    if (directBtn) { directBtn.textContent = '▶ Back to work'; directBtn.style.background = '#e8eaf6'; directBtn.style.color = '#3949ab'; }
+    if (directBtn) { directBtn.innerHTML = '▶ <span>Back to work</span>'; directBtn.style.background = '#e8eaf6'; directBtn.style.color = '#3949ab'; }
   } else {
     if (btn) { btn.textContent = '☕ Take a break'; btn.style.background = '#f0f4ff'; }
     if (indicator) indicator.style.display = 'none';
-    if (directBtn) { directBtn.textContent = '☕ Break'; directBtn.style.background = 'white'; directBtn.style.color = '#3949ab'; }
+    if (directBtn) { directBtn.innerHTML = '☕ <span>Break</span>'; directBtn.style.background = 'none'; directBtn.style.color = '#3949ab'; }
   }
 }
 
@@ -8316,22 +8316,37 @@ function _updateNavControls() {
   const canUndo = _personalScreen && _layoutHistory.length > 0;
   const canRedo = _personalScreen && _layoutFuture.length > 0;
 
+  // Work out contextual destination labels for back/forward
+  function _stateLabel(state) {
+    if (!state) return '';
+    if (state.type === 'personal') return 'Your home screen';
+    if (state.type === 'top') return 'All tasks';
+    if (state.type === 'sub') {
+      const g = GRID_NAV_STRUCTURE.find(g => g.id === state.groupId);
+      return g ? g.label : 'Back';
+    }
+    return 'Back';
+  }
+
+  const backLabel  = canBack    ? `← ${_stateLabel(_navHistory[_navHistoryIndex - 1])}` : '← Back';
+  const fwdLabel   = canForward ? `${_stateLabel(_navHistory[_navHistoryIndex + 1])} →`  : 'Forward →';
+
   bar.innerHTML = `
     <button onclick="_navBack()" ${canBack ? '' : 'disabled'}
-      style="flex:1;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:8px;font-size:13px;font-weight:700;cursor:${canBack ? 'pointer' : 'default'};color:${canBack ? 'var(--gu-text)' : 'var(--gu-dust)'};">
-      ← Back
+      style="flex:1;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:8px 10px;font-size:12px;font-weight:700;cursor:${canBack ? 'pointer' : 'default'};color:${canBack ? 'var(--gu-text)' : 'var(--gu-dust)'};">
+      ${backLabel}
     </button>
     <button onclick="_navForward()" ${canForward ? '' : 'disabled'}
-      style="flex:1;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:8px;font-size:13px;font-weight:700;cursor:${canForward ? 'pointer' : 'default'};color:${canForward ? 'var(--gu-text)' : 'var(--gu-dust)'};">
-      Forward →
+      style="flex:1;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:8px 10px;font-size:12px;font-weight:700;cursor:${canForward ? 'pointer' : 'default'};color:${canForward ? 'var(--gu-text)' : 'var(--gu-dust)'};">
+      ${fwdLabel}
     </button>
     ${canUndo || canRedo ? `
     <button onclick="_layoutUndo()" ${canUndo ? '' : 'disabled'}
-      style="flex:1;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:8px;font-size:13px;font-weight:700;cursor:${canUndo ? 'pointer' : 'default'};color:${canUndo ? '#c0392b' : 'var(--gu-dust)'};">
-      ↩ Undo
+      style="flex:1;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:8px 10px;font-size:12px;font-weight:700;cursor:${canUndo ? 'pointer' : 'default'};color:${canUndo ? '#c0392b' : 'var(--gu-dust)'};">
+      ↩ Undo change
     </button>
     ${canRedo ? `<button onclick="_layoutRedo()"
-      style="flex:1;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:8px;font-size:13px;font-weight:700;cursor:pointer;color:#2e7d32;">
+      style="flex:1;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:8px 10px;font-size:12px;font-weight:700;cursor:pointer;color:#2e7d32;">
       Redo ↪
     </button>` : ''}
     ` : ''}
