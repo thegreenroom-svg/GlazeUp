@@ -1934,45 +1934,24 @@
 </div>
 
 <!-- Splash / resting screen -->
-<div id="splash-screen" style="position:fixed;inset:0;z-index:5000;background:#0E1A18;display:flex;flex-direction:column;overflow:hidden;cursor:default;">
+<div id="splash-screen" style="position:fixed;inset:0;z-index:5000;background:#0E1A18;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:default;">
 
-  <!-- Full-screen animated floor plan loop — occupies full screen -->
-  <div id="splash-loop-canvas" style="position:absolute;inset:0;transition:opacity 0.5s ease;opacity:0.6;"></div>
-
-  <!-- Heavier overlay — scenes are context, not foreground -->
-  <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,20,18,0.75) 0%,rgba(10,20,18,0.35) 40%,rgba(10,20,18,0.75) 75%,rgba(10,20,18,0.97) 100%);pointer-events:none;"></div>
-
-  <!-- Branding — top of screen, clear of scene content -->
-  <div style="position:absolute;top:0;left:0;right:0;padding:52px 0 0;text-align:center;pointer-events:none;">
-    <div style="width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,#B87946,#9A6435);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;box-shadow:0 0 40px rgba(184,121,70,0.5),0 6px 20px rgba(0,0,0,0.5);animation:swt-float 3s ease-in-out infinite;">
-      <img src="/brand-assets/kiln-cafe-logo-demo/kiln-cafe-mark-demo.svg" style="width:36px;opacity:0.95;">
+  <!-- Fullscreen animated logo -->
+  <div style="position:relative;width:140px;height:140px;display:flex;align-items:center;justify-content:center;">
+    <!-- Animated glow ring -->
+    <div style="position:absolute;inset:-20px;border:2px solid #B87946;border-radius:50%;opacity:0.2;animation:splash-glow-rotate 8s linear infinite;"></div>
+    <div style="position:absolute;inset:-40px;border:1px solid #B87946;border-radius:50%;opacity:0.1;animation:splash-glow-rotate 12s linear infinite reverse;"></div>
+    
+    <!-- Logo container with float animation -->
+    <div style="width:120px;height:120px;background:linear-gradient(135deg,#B87946,#9A6435);border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 0 60px rgba(184,121,70,0.6),0 12px 40px rgba(0,0,0,0.8);animation:splash-float 4s ease-in-out infinite;">
+      <img src="/brand-assets/kiln-cafe-logo-demo/kiln-cafe-mark-demo.svg" style="width:64px;opacity:0.98;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.3));">
     </div>
-    <div style="font-size:22px;font-weight:800;color:#F4ECE0;letter-spacing:-0.01em;text-shadow:0 2px 16px rgba(0,0,0,0.8);">The Kiln Cafe</div>
-    <div style="font-size:11px;color:rgba(184,121,70,0.9);font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin-top:3px;">Studio Manager</div>
   </div>
 
-  <!-- Scene caption — above the button -->
-  <div style="position:absolute;bottom:130px;left:0;right:0;text-align:center;padding:0 28px;pointer-events:none;">
-    <div id="splash-scene-label" style="font-size:10px;font-weight:700;color:rgba(184,121,70,0.8);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:5px;transition:opacity 0.4s;"></div>
-    <div id="splash-scene-caption" style="font-size:15px;font-weight:700;color:rgba(244,236,224,0.9);line-height:1.4;transition:opacity 0.4s;text-shadow:0 1px 8px rgba(0,0,0,0.6);"></div>
+  <!-- Subtle loading indicator below -->
+  <div style="position:absolute;bottom:80px;left:0;right:0;text-align:center;">
+    <div style="width:40px;height:3px;background:linear-gradient(90deg,transparent,#B87946,transparent);margin:0 auto;border-radius:2px;animation:splash-pulse-bar 2s ease-in-out infinite;"></div>
   </div>
-
-  <!-- Progress dots -->
-  <div id="splash-dots" style="position:absolute;bottom:96px;left:0;right:0;display:flex;justify-content:center;gap:5px;pointer-events:none;"></div>
-
-  <!-- Enter button — full width, pinned to bottom -->
-  <button onclick="dismissSplash()" style="
-    position:absolute;bottom:0;left:0;right:0;
-    background:linear-gradient(135deg,#B87946,#8a5520);
-    color:white;border:none;border-radius:0;
-    padding:20px 24px 36px;
-    font-size:17px;font-weight:800;
-    cursor:pointer;text-align:center;
-    box-shadow:0 -8px 32px rgba(0,0,0,0.4);
-    letter-spacing:0.02em;
-    animation:swt-appear 0.6s cubic-bezier(0.34,1.2,0.4,1) 1.2s both;">
-    Enter the studio →
-  </button>
 
 </div>
 
@@ -10148,6 +10127,9 @@ function demoteSubTile(tabId) {
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     @keyframes demo-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
     @keyframes demo-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.7;transform:scale(0.96)} }
+    @keyframes splash-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+    @keyframes splash-glow-rotate { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+    @keyframes splash-pulse-bar { 0%{width:20px;opacity:0.4} 50%{width:80px;opacity:1} 100%{width:20px;opacity:0.4} }
     @keyframes demo-drag { 0%{transform:translate(0,0)} 40%{transform:translate(30px,20px)} 70%{transform:translate(50px,10px)} 100%{transform:translate(0,0)} }
     @keyframes demo-tap { 0%,100%{transform:scale(1)} 50%{transform:scale(0.88)} }
     @keyframes demo-slide-in { from{opacity:0;transform:translateX(40px)} to{opacity:1;transform:translateX(0)} }
@@ -19025,98 +19007,15 @@ let splashDismissed = false;
 let _splashLoopTimer = null;
 let _splashTableDemo = 0;
 
-// Splash — single large table hero animation
+// Splash — fullscreen logo with auto-dismiss
 function wireSplash() {
   const el = document.getElementById('splash-screen');
   if (!el) return;
-  _splashTableDemo = 0;
+  
+  // Auto-dismiss splash after 3 seconds
   setTimeout(() => {
-    _renderSplashTable();
-    _splashLoopTimer = setInterval(() => {
-      _splashTableDemo = (_splashTableDemo + 1) % 4;
-      _renderSplashTable();
-    }, 4500);
-  }, 300);
-}
-
-function _renderSplashTable() {
-  const canvas  = document.getElementById('splash-loop-canvas');
-  const label   = document.getElementById('splash-scene-label');
-  const caption = document.getElementById('splash-scene-caption');
-  const dots    = document.getElementById('splash-dots');
-
-  const steps = [
-    { title: 'See who\'s here',     sub: 'Every table shows who\'s painting, where they are in the session' },
-    { title: 'Tap for details',     sub: 'Name, party size, time elapsed, what they\'re painting, drinks ordered' },
-    { title: 'Drag to arrange',     sub: 'Hold any table to move it around the floor plan — your layout, your way' },
-    { title: 'Icons tell you what', sub: 'Painting, completion, kiln ready — see the whole session at a glance' },
-  ];
-  const step = steps[_splashTableDemo];
-
-  if (canvas) {
-    canvas.style.opacity = '0';
-    setTimeout(() => {
-      canvas.innerHTML = '';
-      const sceneEl = document.createElement('div');
-      sceneEl.style.cssText = 'position:absolute;inset:0;background:#F7F4EE;display:flex;align-items:center;justify-content:center;';
-      canvas.appendChild(sceneEl);
-
-      // ONE BIG TABLE — bold, high-contrast, striking colors
-      const tableHTML = `
-        <div class="demo-table-tile" style="
-          position:relative;width:280px;height:240px;
-          background:#0F1419;border:5px solid #00D9FF;border-radius:24px;
-          padding:20px;box-sizing:border-box;overflow:hidden;
-          box-shadow:0 0 40px rgba(0,217,255,0.4), 0 12px 48px rgba(0,0,0,0.6);
-          animation: demo-pulse 2.5s ease-in-out infinite;">
-          <div style="position:absolute;top:0;left:0;right:0;height:6px;background:linear-gradient(90deg,#FF006E,#00D9FF);border-radius:24px 24px 0 0;"></div>
-          <div style="font-size:18px;font-weight:900;color:#00D9FF;letter-spacing:0.05em;margin-bottom:2px;">TABLE 1</div>
-          <div style="font-size:12px;color:#FF006E;font-weight:700;margin-bottom:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Sarah & Friends</div>
-          <div style="margin:14px 0;transform:scale(2);transform-origin:0 0;width:120px;height:60px;">
-            <svg viewBox="0 0 48 38" width="48" height="38" xmlns="http://www.w3.org/2000/svg">
-              <rect x="6" y="12" width="36" height="14" rx="3" fill="#1a2332" stroke="#00D9FF" stroke-width="1.5"/>
-              <rect x="10" y="4" width="6" height="6" rx="1.5" fill="#FF006E"/>
-              <rect x="20" y="4" width="6" height="6" rx="1.5" fill="#00D9FF"/>
-              <rect x="30" y="4" width="6" height="6" rx="1.5" fill="#FF006E"/>
-              <rect x="10" y="28" width="6" height="6" rx="1.5" fill="#FF006E"/>
-              <rect x="20" y="28" width="6" height="6" rx="1.5" fill="#00D9FF"/>
-              <rect x="30" y="28" width="6" height="6" rx="1.5" fill="#FF006E"/>
-            </svg>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:8px;">
-            <span style="background:#FF006E;color:#0F1419;border-radius:8px;padding:4px 12px;font-size:11px;font-weight:800;">🎨 PAINTING</span>
-            <span style="font-size:14px;font-weight:900;color:#00D9FF;letter-spacing:0.05em;">45m</span>
-          </div>
-        </div>
-      `;
-      sceneEl.innerHTML = tableHTML;
-
-      // Animated hands showing tap, tap, drag, tap sequence
-      const hands = [
-        { gesture: 'tap',  x: '60%', y: '55%', delay: '0s' },
-        { gesture: 'tap',  x: '75%', y: '40%', delay: '0.8s' },
-        { gesture: 'drag', x: '50%', y: '45%', delay: '1.6s' },
-        { gesture: 'tap',  x: '30%', y: '25%', delay: '2.4s' },
-      ];
-      hands.forEach(h => {
-        const hand = document.createElement('div');
-        hand.className = `demo-hand ${h.gesture === 'drag' ? 'dragging' : 'tapping'}`;
-        hand.textContent = '\u261e';
-        hand.style.cssText = `position:absolute;left:${h.x};top:${h.y};font-size:32px;pointer-events:none;z-index:20;animation:fade-in-out 1s ease-in-out ${h.delay} forwards;opacity:0;`;
-        sceneEl.appendChild(hand);
-      });
-
-      canvas.style.opacity = '1';
-    }, 250);
-  }
-
-  if (label)   { label.style.opacity   = '0'; setTimeout(() => { label.textContent   = step.title;   label.style.opacity   = '1'; }, 280); }
-  if (caption) { caption.style.opacity = '0'; setTimeout(() => { caption.textContent = step.sub; caption.style.opacity = '1'; }, 320); }
-  if (dots) {
-    dots.innerHTML = steps.map((_,i) =>
-      `<div style="width:${i===_splashTableDemo?'20px':'5px'};height:5px;border-radius:3px;background:${i===_splashTableDemo?'#B87946':'rgba(255,255,255,0.2)'};transition:all 0.4s;"></div>`
-    ).join('');
-  }
+    dismissSplash();
+  }, 3000);
 }
 
 // Animated arrow motif (splash only) — traces K, over the kiln, to I,
