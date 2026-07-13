@@ -17192,16 +17192,20 @@ async function confirmReturnMatch(pieceId, bookingId) {
 function openFindMyPiece() {
   // Reset everything to a clean state each time it's opened
   _fp1TargetPhotoBase64 = null;
+  window._fp2LastScenePhoto = null;
   document.getElementById('fp1-preview-img').style.display = 'none';
   document.getElementById('fp1-placeholder').style.display = 'block';
   document.getElementById('fp1-text-input').value = '';
   document.getElementById('fp1-text-results').innerHTML = '';
-  document.getElementById('fp1-text-search-area').style.display = 'none'; // collapsed by default, photo is the primary path
+  document.getElementById('fp1-text-search-area').style.display = 'none';
   document.getElementById('fp1-booking-check-area').style.display = 'none';
   document.getElementById('fp1-booking-check-input').value = '';
   document.getElementById('fp1-booking-check-result').innerHTML = '';
   document.getElementById('fp1-automatch-area').style.display = 'none';
   document.getElementById('fp1-automatch-result').innerHTML = '';
+  document.getElementById('fp2-result-area').style.display = 'none';
+  document.getElementById('fp2-result-area').innerHTML = '';
+  document.getElementById('fp2-scan-prompt').style.display = 'block';
   const nextBtn = document.getElementById('fp1-next-btn');
   nextBtn.disabled = true;
   nextBtn.style.background = '#8a8175';
@@ -17213,6 +17217,7 @@ function openFindMyPiece() {
 }
 
 function closeFindMyPiece() {
+  window._fp2LastScenePhoto = null;
   document.getElementById('find-piece-step1').style.display = 'none';
   document.getElementById('find-piece-step2').style.display = 'none';
 }
@@ -17413,8 +17418,15 @@ function goToFindPieceStep2() {
 }
 
 function backToFindPieceStep1() {
+  // Reset step 2 so it's clean next time they come in
+  document.getElementById('fp2-scan-prompt').style.display = 'block';
+  document.getElementById('fp2-result-area').style.display = 'none';
+  document.getElementById('fp2-result-area').innerHTML = '';
   document.getElementById('find-piece-step2').style.display = 'none';
   document.getElementById('find-piece-step1').style.display = 'flex';
+  // The piece photo from step 1 is still in _fp1TargetPhotoBase64 —
+  // the Continue button stays enabled so they can go straight back
+  // to step 2 and try photographing a different pile.
 }
 
 function captureFindPieceStep2Photo() {
@@ -17437,6 +17449,8 @@ async function handleFindPieceStep2Capture(event) {
   const reader = new FileReader();
   reader.onload = async () => {
     const scenePhotoDataUrl = reader.result;
+    // Store so we can offer "use this photo again" after a failed search
+    window._fp2LastScenePhoto = scenePhotoDataUrl;
     try {
       const res = await fetch(`${API_URL}/api/pieces/find-in-photo`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -17451,18 +17465,7 @@ async function handleFindPieceStep2Capture(event) {
         return;
       }
 
-      // The photo taken appears on screen, exactly as asked, alongside
-      // the honest result and reasoning — not just a yes/no with
-      // nothing to actually look at.
       const confidenceColor = data.confidence === 'high' ? '#4caf50' : data.confidence === 'medium' ? '#F9A825' : '#8a8175';
-      // Real arrow overlay pointing at the AI's estimated centre point
-      // — genuinely more precise than the old 9-cell zone ("middle
-      // centre" was honestly too ambiguous to be useful). Still an
-      // Red circle overlay — centered on the AI's estimated centre
-      // point, sized relative to the photo (18% of width as diameter)
-      // so it looks proportionate regardless of portrait/landscape.
-      // Per direct request: no pin emoji or pointer, just a clean red
-      // circle around the piece, sized to the piece.
       const hasCoords = data.found && data.centreX != null && data.centreY != null;
       const circleMarker = hasCoords ? `
         <div style="position:absolute;
@@ -17489,17 +17492,48 @@ async function handleFindPieceStep2Capture(event) {
           ${hasCoords ? `<div style="font-size:12px;color:#cfc7bd;margin-bottom:8px;">Circle shows the estimated position${data.coordinateConfidence === 'approximate' ? ' — roughly, not pixel-precise' : ''}</div>` : ''}
           <div style="font-size:13px;color:white;line-height:1.5;">${data.reasoning || ''}</div>
         </div>
-        ${data.otherObjectsNoted ? `<div style="font-size:12px;color:#8a8175;margin-bottom:16px;">Also visible in scene: ${data.otherObjectsNoted}</div>` : ''}
+        ${data.otherObjectsNoted ? `<div style="font-size:12px;color:#8a8175;margin-bottom:12px;">Also visible: ${data.otherObjectsNoted}</div>` : ''}
+
+        ${!data.found ? `
+        <!-- Not found — offer to reuse this photo or try a different pile -->
+        <div style="background:#2B2724;border:1px solid #3d3833;border-radius:12px;padding:12px;margin-bottom:12px;">
+          <div style="font-size:11px;color:#8a8175;margin-bottom:8px;font-weight:600;">NOT IN THIS PHOTO — TRY:</div>
+          <div style="display:flex;flex-direction:column;gap:7px;">
+            <button onclick="captureFindPieceStep2Photo()" style="background:#3d3833;color:white;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;text-align:left;">
+              📷 Photograph a different pile or table
+            </button>
+            <button onclick="reuseLastScenePhoto()" style="background:#3d3833;color:white;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;text-align:left;">
+              🔄 Search this photo again with the same piece
+            </button>
+            <button onclick="backToFindPieceStep1()" style="background:rgba(184,121,70,0.15);border:1px solid rgba(184,121,70,0.3);color:#E8A03C;border-radius:10px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;text-align:left;">
+              ← My piece photo is still saved — go back and try a new pile
+            </button>
+          </div>
+        </div>` : ''}
+
         <div style="display:flex;gap:10px;">
-          <button onclick="captureFindPieceStep2Photo()" style="flex:1;background:#3d3833;color:white;border:none;border-radius:12px;padding:14px;font-size:13px;font-weight:700;cursor:pointer;">📷 Try another photo</button>
+          ${data.found ? `<button onclick="captureFindPieceStep2Photo()" style="flex:1;background:#3d3833;color:white;border:none;border-radius:12px;padding:14px;font-size:13px;font-weight:700;cursor:pointer;">📷 Try another photo</button>` : ''}
           <button onclick="closeFindMyPiece()" style="flex:1;background:#c0392b;color:white;border:none;border-radius:12px;padding:14px;font-size:13px;font-weight:700;cursor:pointer;">Done</button>
         </div>
       `;
     } catch (e) {
-      resultEl.innerHTML = '<div style="padding:20px;color:#ff8a80;font-size:14px;">Could not run the comparison — try again.</div>';
+      resultEl.innerHTML = `
+        <div style="padding:20px;color:#ff8a80;font-size:14px;margin-bottom:12px;">Could not run the comparison — try again.</div>
+        <button onclick="backToFindPieceStep1()" style="width:100%;background:rgba(184,121,70,0.15);border:1px solid rgba(184,121,70,0.3);color:#E8A03C;border-radius:10px;padding:12px;font-size:13px;font-weight:700;cursor:pointer;">
+          ← Your piece photo is still saved — go back and try again
+        </button>`;
     }
   };
   reader.readAsDataURL(file);
+}
+
+// Rerun the search using the last scene photo without retaking it
+async function reuseLastScenePhoto() {
+  if (!window._fp2LastScenePhoto || !_fp1TargetPhotoBase64) return;
+  const fakeEvent = { target: { files: [
+    new File([await (await fetch(window._fp2LastScenePhoto)).blob()], 'scene.jpg', { type: 'image/jpeg' })
+  ]}};
+  handleFindPieceStep2Capture(fakeEvent);
 }
 
 // System-wide text search, shown directly on Step 1 — genuinely
