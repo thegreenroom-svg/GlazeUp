@@ -500,15 +500,7 @@
     }
 
     .admin-content {
-      /* Was flex:1, which does nothing inside a CSS grid parent
-         (.admin-wrapper is display:grid, not display:flex) — that meant
-         this had no real height constraint, grew to its full content
-         height regardless of viewport, and its own overflow-y:auto never
-         actually kicked in. min-height:0 is essential here: without it,
-         a grid item defaults to its content's natural size and refuses
-         to shrink, which silently breaks internal scrolling. */
       min-height: 0;
-      height: 100%;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       padding: 28px 32px 40px;
