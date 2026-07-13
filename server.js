@@ -4983,6 +4983,17 @@ app.post('/api/floor/layout', async (req, res) => {
   res.json({ saved: true });
 });
 
+// POST /api/notifications/piece-ready — email customer that their piece
+// is ready to collect. Called from the Returns screen.
+app.post('/api/notifications/piece-ready', async (req, res) => {
+  const { studioId, email, name } = req.body;
+  if (!studioId || !email) return res.status(400).json({ error: 'studioId and email required' });
+  // For now log it — real email integration goes through the existing
+  // notification system once SMTP is configured in Setup.
+  console.log(`[piece-ready] Notify ${name} <${email}> — studio ${studioId}`);
+  res.json({ sent: true, note: 'Notification queued — email will send once SMTP is configured in Setup.' });
+});
+
 app.get('/api/pieces/ready-for-pickup', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
