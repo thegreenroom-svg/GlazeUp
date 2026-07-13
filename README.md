@@ -277,3 +277,4 @@ const SUPABASE_KEY = 'eyJhbGci...';
 ## Licence
 
 Proprietary — © GlazeUp. All rights reserved.
+  
