@@ -5548,6 +5548,58 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.0.3/qrcode.min.js"></script>
 <script>
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMPLETE APP RESET — clears all state, localStorage, and cached data
+// Called on page load to ensure clean startup
+// ═══════════════════════════════════════════════════════════════════════════
+
+function completeAppReset() {
+  // Clear all localStorage
+  localStorage.clear();
+  sessionStorage.clear();
+  
+  // Reset all global state
+  if (typeof currentShiftStaff !== 'undefined') currentShiftStaff = null;
+  if (typeof currentTab !== 'undefined') currentTab = 'dashboard';
+  if (typeof splashDismissed !== 'undefined') splashDismissed = false;
+  if (typeof selectedLoginMember !== 'undefined') selectedLoginMember = null;
+  if (typeof _currentBookingModal !== 'undefined') _currentBookingModal = null;
+  if (typeof _currentTableName !== 'undefined') _currentTableName = null;
+  
+  // Clear any timers
+  if (typeof _floorPlanTimer !== 'undefined' && _floorPlanTimer) { clearInterval(_floorPlanTimer); _floorPlanTimer = null; }
+  if (typeof _splashLoopTimer !== 'undefined' && _splashLoopTimer) { clearInterval(_splashLoopTimer); _splashLoopTimer = null; }
+  if (typeof _longPressTimer !== 'undefined' && _longPressTimer) { clearTimeout(_longPressTimer); _longPressTimer = null; }
+  
+  // Hide everything, show splash
+  setTimeout(() => {
+    document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+    const splash = document.getElementById('splash-screen');
+    const login = document.getElementById('login-screen');
+    const modal = document.getElementById('booking-modal');
+    if (splash) splash.style.display = 'block';
+    if (login) login.style.display = 'none';
+    if (modal) modal.style.display = 'none';
+    console.log('✓ App reset — splash showing, fresh start');
+  }, 100);
+}
+
+// Call reset on page load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', completeAppReset);
+} else {
+  completeAppReset();
+}
+
+// Also reset if page is revisited (browser back button, etc)
+window.addEventListener('pageshow', function(e) {
+  if (e.persisted) {
+    completeAppReset();
+  }
+});
+
+
 // ═══════════════════════════════════════════════════════════
 // Link Admin Dashboard · API Integration
 // ═══════════════════════════════════════════════════════════
