@@ -2180,12 +2180,8 @@
           ${loyalty}
           ${unfinished}
 
-          <!-- Cleo — genuine prominent home-screen presence, not just a
-               corner widget. Real marketing moment: honest live
-               worldwide stats, not invented numbers. Tapping switches
-               into Kid Mode directly — she IS the trigger, not a
-               separate toggle button elsewhere. -->
-          <div id="cleo-hero-card" onclick="toggleKidMode()" style="display:none;cursor:pointer; border-radius:20px; padding:18px; margin-bottom:14px; background:linear-gradient(135deg,#3D2E5C,#5E35B1); display:flex; align-items:center; gap:14px; box-shadow:0 6px 20px rgba(94,53,177,0.35); position:relative; overflow:hidden;">
+          <!-- Cleo hero — parked -->
+          <div id="cleo-hero-card" onclick="toggleKidMode()" style="display:none;cursor:pointer; border-radius:20px; padding:18px; margin-bottom:14px; background:linear-gradient(135deg,#3D2E5C,#5E35B1); align-items:center; gap:14px; box-shadow:0 6px 20px rgba(94,53,177,0.35); position:relative; overflow:hidden;">
             <div id="cleo-hero-mascot" style="width:64px;height:64px;flex-shrink:0;"></div>
             <div style="flex:1; min-width:0;">
               <div style="font-size:15px; font-weight:800; color:white; margin-bottom:2px;">Cleo's Club — join kids painting worldwide 🌍</div>
@@ -2194,10 +2190,7 @@
             <span style="font-size:20px; color:rgba(255,255,255,0.8);">🎨</span>
           </div>
 
-          <!-- Genuine Offer of the Week — real, admin-set, in Cleo's
-               space. Separate element from the hero card above so its
-               own tap (opens her sticker board) doesn't collide with
-               the hero card's kid-mode-toggle tap action. -->
+          <!-- Offer of the Week — parked -->
           <div id="offer-of-week-banner" onclick="openCleosClub()" style="display:none; cursor:pointer; border-radius:16px; padding:14px 16px; margin-bottom:14px; background:linear-gradient(135deg,#F9A825,#f57c00); align-items:center; gap:12px; box-shadow:0 4px 14px rgba(249,168,37,0.3);">
             <div id="offer-of-week-emoji" style="font-size:26px;">🎁</div>
             <div style="flex:1; min-width:0;">
@@ -2206,58 +2199,22 @@
             </div>
           </div>
 
-          <!-- Real booking banner — links out to the studio's actual
-               booking page. This app has no in-app booking flow of its
-               own; all real bookings go through the website, phone, or
-               email, so this is honestly just a clear, easy way back
-               to the real thing. -->
-          <a href="https://www.thekilncafe.com/bookonline" target="_blank" rel="noopener" style="display:block; text-decoration:none; margin-bottom:14px;">
-            <div style="background:linear-gradient(135deg,var(--link-clay),#8a5520); border-radius:16px; padding:16px 18px; display:flex; align-items:center; gap:14px; box-shadow:0 4px 14px rgba(184,121,70,0.3);">
-              <span style="font-size:26px;">📅</span>
-              <div style="flex:1;">
-                <div style="font-size:15px; font-weight:800; color:white;">Book Your Next Visit</div>
-                <div style="font-size:12px; color:rgba(255,255,255,0.85);">Opens our booking page</div>
-              </div>
-              <span style="font-size:18px; color:rgba(255,255,255,0.8);">→</span>
-            </div>
-          </a>
-
-          <div class="section-label">Getting started</div>
-
-          <button class="tile tile-honey" onclick="requestTabletGated()" style="position: relative;">
-            <span class="tile-icon">📱</span>
-            <div class="tile-title">Studio Tablet &amp; Stylus</div>
-            <div class="tile-desc">Want to use the design tools properly? Request a tablet and stylus for your table.</div>
-            <span style="position:absolute; top:14px; right:16px; background:rgba(255,255,255,0.25); font-size:10px; font-weight:700; padding:3px 9px; border-radius:20px;">£3</span>
-          </button>
-
-          <button class="tile tile-oxblood" onclick="openMyBookings()">
-            <span class="tile-icon">📅</span>
-            <div class="tile-title">My Bookings</div>
-            <div class="tile-desc">See your past visits and anything coming up.</div>
-          </button>
-
-          <!-- Loyalty card — populated dynamically once booking loads -->
-          <div id="loyalty-tile" style="display:none; border-radius:16px; overflow:hidden; margin-bottom:2px; cursor:pointer;" onclick="openLoyaltyScreen()">
+          <!-- Loyalty tile — shown dynamically when booking data loads -->
+          <div id="loyalty-tile" style="display:none; border-radius:16px; overflow:hidden; margin-bottom:14px; cursor:pointer;" onclick="openLoyaltyScreen()">
             <div id="loyalty-tile-inner" style="padding:16px; position:relative; min-height:90px;">
               <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,0.6);margin-bottom:4px;" id="loyalty-tile-label">Loyalty</div>
               <div style="font-size:20px;font-weight:700;color:white;margin-bottom:2px;" id="loyalty-tile-tier">Loading…</div>
               <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-bottom:10px;" id="loyalty-tile-progress"></div>
-              <!-- Progress bar -->
               <div style="height:4px;background:rgba(255,255,255,0.2);border-radius:2px;overflow:hidden;">
                 <div id="loyalty-tile-bar" style="height:100%;background:white;border-radius:2px;transition:width .6s ease;width:0%;"></div>
               </div>
-              <!-- Rewards summary -->
               <div id="loyalty-tile-rewards" style="margin-top:10px;font-size:11px;color:rgba(255,255,255,0.8);line-height:1.5;"></div>
-              <!-- Tier badge -->
               <div id="loyalty-tile-badge" style="position:absolute;top:14px;right:14px;font-size:28px;"></div>
             </div>
           </div>
 
-          <!-- Cleo's Club — kids' sticker collection, only shown if this
-               studio has the add-on enabled. Genuinely separate from
-               the adult loyalty tiers, its own friendly kids' brand. -->
-          <div id="cleos-club-tile" style="display:none; border-radius:16px; overflow:hidden; margin-bottom:2px; cursor:pointer; background:linear-gradient(135deg,#F9A825,#f57c00);" onclick="openCleosClub()">
+          <!-- Cleo's Club tile — parked, stays display:none -->
+          <div id="cleos-club-tile" style="display:none; border-radius:16px; overflow:hidden; margin-bottom:14px; cursor:pointer; background:linear-gradient(135deg,#F9A825,#f57c00);" onclick="openCleosClub()">
             <div style="padding:16px; position:relative; display:flex; align-items:center; gap:12px;">
               <div id="cleos-club-tile-mascot" style="width:52px;height:52px;flex-shrink:0;"></div>
               <div style="flex:1;">
@@ -2267,82 +2224,88 @@
             </div>
           </div>
 
+          <!-- ── Core tiles — consistent .tile structure throughout ── -->
+
+          <button class="tile tile-oxblood" onclick="openMyBookings()">
+            <span class="tile-icon">📅</span>
+            <div class="tile-title">My Bookings</div>
+            <div class="tile-desc">See your past visits and anything coming up.</div>
+          </button>
+
           <button class="tile tile-sage" onclick="window.open('https://www.thekilncafe.com/how-to-video', '_blank')">
             <span class="tile-icon">🎥</span>
             <div class="tile-title">Painting Guide</div>
             <div class="tile-desc">New to painting pottery? Watch our quick how-to before you start.</div>
           </button>
 
-          <button class="tile tile-ocean" onclick="openCommunityFeed()" style="display:none;">
-            <span class="tile-icon">💬</span>
-            <div class="tile-title">Community</div>
-            <div class="tile-desc">See what other Kiln Cafe painters have been creating.</div>
-          </button>
-
-          <button class="tile" onclick="openOrderScreen()" style="background:linear-gradient(135deg,#3d1f0a 0%,#1a0e05 100%);border:1.5px solid rgba(255,255,255,0.15);position:relative;">
-            <span class="tile-icon">☕</span>
-            <div class="tile-title" style="color:#fff;">Food & Drinks</div>
-            <div class="tile-desc" style="color:rgba(255,255,255,0.75);">Order drinks, cakes, and snacks — sent straight to the kitchen.</div>
-          </button>
-
-          <button class="tile" onclick="openMarketplace()" style="display:none;position:relative; overflow:hidden; background:linear-gradient(135deg, #B87946 0%, #7a4a20 100%); border:1.5px solid rgba(255,255,255,0.2);">
-            <span class="tile-icon">🎨</span>
-            <div class="tile-title" style="color:#fff;">Design Marketplace</div>
-            <div class="tile-desc" style="color:rgba(255,255,255,0.8);">Buy and sell original designs. Use someone's artwork on your own piece, or earn from yours.</div>
-            <span style="position:absolute;top:14px;right:16px;background:rgba(255,255,255,0.25);font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;color:#fff;">NEW</span>
-          </button>
-
-          <div class="section-label">Design tools</div>
-
-          <!-- Combined "Take It Home" tile — unlocks all three tools AND
-               offers to save a piece photo to design on at home. Animates
-               to stand out. Dynamically updated once booking loads. -->
-          <button class="tile" onclick="openTakeItHome()" id="home-access-tile" style="
-            position: relative; overflow: hidden;
-            background: linear-gradient(135deg, #1a0a3d 0%, #2d1065 50%, #1a0a3d 100%);
-            border: 1.5px solid rgba(184,121,70,0.5);
-            animation: browse-pulse 3s ease-in-out infinite;
-          ">
-            <span class="tile-icon" style="font-size:28px;" id="home-access-icon">🏠</span>
-            <div class="tile-title" style="color:#fff;" id="home-access-title">Take It Home</div>
-            <div class="tile-desc" style="color:rgba(255,255,255,0.75);" id="home-access-desc">Unlock all three design tools on your own device, 24/7. Photograph a piece to design on at home — then reserve it for your next visit.</div>
-            <span id="home-access-badge" style="position:absolute; top:14px; right:16px; background:var(--link-clay); font-size:10px; font-weight:700; padding:3px 9px; border-radius:20px; color:#fff; letter-spacing:0.03em;">£5</span>
-            <div style="position:absolute; inset:0; background:linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%); animation: browse-shimmer 2.5s ease-in-out infinite;" id="home-access-shimmer"></div>
+          <button class="tile tile-honey" onclick="requestTabletGated()" style="position:relative;">
+            <span class="tile-icon">📱</span>
+            <div class="tile-title">Studio Tablet &amp; Stylus</div>
+            <div class="tile-desc">Request a tablet and stylus for your table — makes the design tools much easier to use.</div>
+            <span style="position:absolute;top:14px;right:16px;background:rgba(255,255,255,0.25);font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;">£3</span>
           </button>
 
           <button class="tile tile-ocean" id="tile-colour-picker" onclick="openColourPicker()">
             <span class="tile-icon">🎨</span>
             <div class="tile-title">Colour Picker</div>
-            <div class="tile-desc">Browse the studio's glaze colours and plan your palette.</div>
+            <div class="tile-desc">Browse the studio's glaze colours and build your palette before you paint.</div>
           </button>
 
-          <!-- Real mirror link to Club Pages — a genuine standalone
-               tile, always reachable, not solely dependent on tapping
-               Cleo at the right moment in her message rotation. -->
-          <button class="tile" id="tile-club-pages" onclick="openCommunityFeedOnClubTab()" style="display:none;background:linear-gradient(135deg,#5E35B1,#3949ab);position:relative;">
+          <button class="tile tile-honey" id="tile-design-preview" onclick="openDesignPreviewGated()" style="position:relative;">
+            <span class="tile-icon">🖼️</span>
+            <div class="tile-title">Design Preview</div>
+            <div class="tile-desc">Photograph your piece and try colours on the actual photo before you commit.</div>
+            <span style="position:absolute;top:14px;right:16px;background:rgba(255,255,255,0.25);font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;">£1</span>
+          </button>
+
+          <button class="tile tile-oxblood" id="tile-transfer-designer" onclick="openTransferDesignerGated()" style="position:relative;">
+            <span class="tile-icon">✨</span>
+            <div class="tile-title">Transfer Designer</div>
+            <div class="tile-desc">Design your own ceramic transfer — sketch, add text, upload artwork — then send it to staff for printing.</div>
+            <span id="td-price-badge" style="position:absolute;top:14px;right:16px;background:rgba(255,255,255,0.25);font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;">£1</span>
+          </button>
+
+          <button class="tile" id="tile-browse-catalogue" onclick="openPieceCatalogue()" style="background:linear-gradient(135deg,#2E7D32,#1B5E20);">
+            <span class="tile-icon">🏺</span>
+            <div class="tile-title">Choose a Piece</div>
+            <div class="tile-desc">Browse our real pieces, pick one, and have it pre-glazed ready for your visit.</div>
+          </button>
+
+          <button class="tile" onclick="openOrderScreen()" style="background:linear-gradient(135deg,#3d1f0a,#1a0e05);border:1.5px solid rgba(255,255,255,0.12);">
+            <span class="tile-icon">☕</span>
+            <div class="tile-title">Food &amp; Drinks</div>
+            <div class="tile-desc">Order drinks, cakes, and snacks — sent straight to the kitchen.</div>
+          </button>
+
+          <button class="tile" onclick="openTakeItHome()" id="home-access-tile" style="position:relative;overflow:hidden;background:linear-gradient(135deg,#1a0a3d,#2d1065,#1a0a3d);border:1.5px solid rgba(184,121,70,0.5);animation:browse-pulse 3s ease-in-out infinite;">
+            <span class="tile-icon" style="font-size:28px;" id="home-access-icon">🏠</span>
+            <div class="tile-title" id="home-access-title">Take It Home</div>
+            <div class="tile-desc" id="home-access-desc">Unlock all three design tools on your own device, 24/7. Design at home, then reserve a piece for your next visit.</div>
+            <span id="home-access-badge" style="position:absolute;top:14px;right:16px;background:var(--link-clay);font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;color:#fff;">£5</span>
+            <div style="position:absolute;inset:0;background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.08) 50%,transparent 60%);animation:browse-shimmer 2.5s ease-in-out infinite;" id="home-access-shimmer"></div>
+          </button>
+
+          <a href="https://www.thekilncafe.com/bookonline" target="_blank" rel="noopener" class="tile" style="display:block;text-decoration:none;background:linear-gradient(135deg,var(--link-clay),#8a5520);margin-bottom:14px;">
+            <span class="tile-icon">📅</span>
+            <div class="tile-title">Book Your Next Visit</div>
+            <div class="tile-desc">Opens our booking page directly.</div>
+          </a>
+
+          <!-- Parked tiles — hidden, code intact -->
+          <button class="tile tile-ocean" onclick="openCommunityFeed()" style="display:none;">
+            <span class="tile-icon">💬</span>
+            <div class="tile-title">Community</div>
+            <div class="tile-desc">See what other Kiln Cafe painters have been creating.</div>
+          </button>
+          <button class="tile" onclick="openMarketplace()" style="display:none;background:linear-gradient(135deg,#B87946,#7a4a20);">
+            <span class="tile-icon">🎨</span>
+            <div class="tile-title">Design Marketplace</div>
+            <div class="tile-desc">Buy and sell original designs.</div>
+          </button>
+          <button class="tile" id="tile-club-pages" onclick="openCommunityFeedOnClubTab()" style="display:none;background:linear-gradient(135deg,#5E35B1,#3949ab);">
             <span class="tile-icon">🎉</span>
             <div class="tile-title">Club Pages</div>
             <div class="tile-desc">See painted pieces from pottery studios worldwide, and post your own.</div>
-          </button>
-
-          <button class="tile" id="tile-browse-catalogue" onclick="openPieceCatalogue()" style="background:linear-gradient(135deg,#2E7D32,#1B5E20);position:relative;">
-            <span class="tile-icon">🏺</span>
-            <div class="tile-title" style="color:#fff;">Choose a Piece</div>
-            <div class="tile-desc" style="color:rgba(255,255,255,0.75);">Browse our real pieces from home, pick one, and have it glazed ready for your visit.</div>
-          </button>
-
-          <button class="tile tile-honey" id="tile-design-preview" onclick="openDesignPreviewGated()" style="position: relative;">
-            <span class="tile-icon">🖼️</span>
-            <div class="tile-title">Design Preview</div>
-            <div class="tile-desc">Photograph your real piece, then preview colours right on it.</div>
-            <span style="position:absolute; top:14px; right:16px; background:rgba(255,255,255,0.25); font-size:10px; font-weight:700; padding:3px 9px; border-radius:20px;">£1</span>
-          </button>
-
-          <button class="tile tile-oxblood" id="tile-transfer-designer" onclick="openTransferDesignerGated()" style="position: relative;">
-            <span class="tile-icon">✨</span>
-            <div class="tile-title">Transfer Designer</div>
-            <div class="tile-desc">Create and position transfers for your piece.</div>
-            <span id="td-price-badge" style="position:absolute; top:14px; right:16px; background:rgba(255,255,255,0.25); font-size:10px; font-weight:700; padding:3px 9px; border-radius:20px;">£1</span>
           </button>
         </div>
 
