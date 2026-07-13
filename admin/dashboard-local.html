@@ -2484,6 +2484,63 @@
      real function takes you to the actual existing screen. "Back"
      from any real screen or second-level grid always returns to
      THIS top-level grid, never one level up. ═══════════════════ -->
+<!-- ── Live Table Floor Plan ─────────────────────────────────────────
+     Becomes a staff member's home screen when they have active
+     bookings. Shows all tables as draggable diagram tiles.
+     Tap a table to enter the full-screen detail view.
+──────────────────────────────────────────────────────────────────── -->
+<div id="floor-plan-view" class="view" style="display:none;flex-direction:column;height:100%;background:#F7F4EE;">
+
+  <!-- Floor plan header -->
+  <div style="background:white;border-bottom:1px solid var(--gu-border);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+    <div>
+      <div style="font-size:14px;font-weight:800;color:var(--gu-text);" id="floor-greeting">Tables</div>
+      <div style="font-size:11px;color:var(--gu-dust);" id="floor-subtitle">Your active bookings</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button onclick="showAllTablesView()" style="background:var(--gu-bg);border:1.5px solid var(--gu-border);border-radius:10px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;color:var(--gu-text);">🗺️ Full Studio</button>
+      <button onclick="goToRealLandingPage()" style="background:#2e7d32;color:white;border:none;border-radius:10px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">🏠 Home</button>
+    </div>
+  </div>
+
+  <!-- My tables — scales to fit however many are active -->
+  <div id="floor-my-tables" style="flex:1;overflow-y:auto;padding:12px;display:grid;gap:10px;grid-template-columns:1fr 1fr;align-content:start;"></div>
+
+  <!-- All tables modal -->
+  <div id="floor-all-tables-modal" style="display:none;position:fixed;inset:0;z-index:9500;background:#F7F4EE;flex-direction:column;">
+    <div style="background:white;border-bottom:1px solid var(--gu-border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <div style="font-size:15px;font-weight:800;">Full Studio</div>
+      <button onclick="document.getElementById('floor-all-tables-modal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--gu-dust);">✕</button>
+    </div>
+    <div id="floor-all-tables-content" style="flex:1;overflow-y:auto;padding:12px;"></div>
+  </div>
+
+  <!-- Table detail full-screen -->
+  <div id="floor-table-detail" style="display:none;position:fixed;inset:0;z-index:9600;background:#F7F4EE;flex-direction:column;">
+    <div style="background:white;border-bottom:1px solid var(--gu-border);padding:10px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;">
+      <button onclick="closeTableDetail()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--gu-dust);">←</button>
+      <div style="flex:1;">
+        <div style="font-size:15px;font-weight:800;color:var(--gu-text);" id="detail-table-name">Table 4</div>
+        <div style="font-size:11px;color:var(--gu-dust);" id="detail-booking-info">—</div>
+      </div>
+      <!-- Session timer -->
+      <div id="detail-timer" style="text-align:right;">
+        <div style="font-size:18px;font-weight:800;color:#2e7d32;" id="detail-time-remaining">—</div>
+        <div style="font-size:9px;color:var(--gu-dust);text-transform:uppercase;letter-spacing:0.05em;">remaining</div>
+      </div>
+    </div>
+    <!-- Session progress bar -->
+    <div style="height:4px;background:var(--gu-border);flex-shrink:0;">
+      <div id="detail-progress-bar" style="height:100%;background:#2e7d32;transition:width 1s linear;width:0%;"></div>
+    </div>
+    <!-- Table canvas -->
+    <div id="detail-canvas-wrap" style="flex:1;position:relative;overflow:hidden;touch-action:none;"></div>
+    <!-- Flow checklist bottom panel -->
+    <div id="detail-checklist" style="background:white;border-top:1px solid var(--gu-border);padding:12px 16px;flex-shrink:0;max-height:40vh;overflow-y:auto;"></div>
+  </div>
+
+</div>
+
 <div id="grid-nav-view" class="view" style="display:block;">
   <div id="grid-nav-top" style="padding:20px;">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:4px;">
@@ -8450,6 +8507,11 @@ async function logOutOfShift() {
   // gets their own, not the previous person's layout.
   _personalScreen = null;
   _personalEditMode = false;
+  // Reset floor plan
+  _floorData = { bookings: [], tables: [] };
+  clearInterval(window._floorPlanTimer);
+  if (_detailTimerInterval) { clearInterval(_detailTimerInterval); _detailTimerInterval = null; }
+  document.getElementById('floor-plan-view').style.display = 'none';
 
   // Automatic clock-out
   if (currentShiftStaff && currentShiftStaff.id !== 'testing') {
@@ -8505,6 +8567,549 @@ async function logOutOfShift() {
 // single tile calls the exact same, unmodified goToTab() already
 // used by the sidebar — nothing underneath was changed at all.
 // ═══════════════════════════════════════════════════════════
+// ── Live Table Floor Plan ─────────────────────────────────────────────
+// Becomes a staff member's home screen when they have active bookings.
+// Shows a draggable table schematic with session timing, flow checks,
+// and draggable items (placemats, drinks, cake, etc).
+// ─────────────────────────────────────────────────────────────────────
+
+const SESSION_DURATION_MINS = 90; // 1.5 hours
+
+// Flow checklist definitions per stage
+const FLOW_CHECKS = {
+  booking: [
+    { key: 'table_set_up',    label: '🪑 Table set up' },
+    { key: 'greeted',         label: '👋 Customers greeted & seated' },
+    { key: 'drinks_offered',  label: '☕ Drinks offered' },
+    { key: 'pieces_selected', label: '🏺 Pieces selected' },
+  ],
+  engagement: [
+    { key: 'paints_issued',   label: '🎨 Paints issued' },
+    { key: 'checked_in',      label: '✅ Checked on progress' },
+    { key: 'drinks_check',    label: '☕ Drinks check done' },
+  ],
+  completion: [
+    { key: 'photos_taken',    label: '📷 Piece photos taken' },
+    { key: 'extras_added',    label: '💰 Extras added to bill' },
+    { key: 'bill_ready',      label: '🧾 Bill prepared' },
+    { key: 'table_cleared',   label: '🧹 Table cleared' },
+  ],
+  kiln: [
+    { key: 'pieces_bagged',   label: '🔥 Pieces bagged for kiln' },
+    { key: 'label_printed',   label: '🏷️ Label printed' },
+  ],
+};
+
+// Draggable item types with emoji representations
+const TABLE_ITEM_TYPES = {
+  placemat:         { emoji: '🏺', label: 'Place mat' },
+  coffee_cup:       { emoji: '☕', label: 'Coffee' },
+  tea_cup:          { emoji: '🍵', label: 'Tea' },
+  cake_slice:       { emoji: '🍰', label: 'Cake' },
+  prosecco_bottle:  { emoji: '🍾', label: 'Prosecco' },
+  prosecco_glass:   { emoji: '🥂', label: 'Glass' },
+  water_jug:        { emoji: '💧', label: 'Water' },
+  paint_set:        { emoji: '🎨', label: 'Paints' },
+  firing_bag:       { emoji: '🔥', label: 'Kiln bag' },
+  piece_done:       { emoji: '✨', label: 'Piece done' },
+};
+
+let _floorData = { bookings: [], tables: [] };
+let _floorRefreshTimer = null;
+let _detailBooking = null;
+let _detailItems = [];
+let _detailDragging = null;
+let _detailTimerInterval = null;
+
+async function loadFloorPlan() {
+  try {
+    const [floorRes, tablesRes] = await Promise.all([
+      fetch(`${API_URL}/api/floor/active?studioId=${studioId}`),
+      fetch(`${API_URL}/api/floor/tables?studioId=${studioId}`)
+    ]);
+    const floorData = await floorRes.json();
+    const tablesData = await tablesRes.json();
+    _floorData = {
+      bookings: floorData.bookings || [],
+      tables: tablesData.tables || []
+    };
+    renderFloorPlan();
+  } catch(e) {
+    console.warn('Floor plan load failed:', e);
+  }
+}
+
+function renderFloorPlan() {
+  const now = new Date();
+  const myId = currentShiftStaff?.id;
+
+  // My active bookings = assigned to me, or unassigned and active
+  const myBookings = _floorData.bookings.filter(b => {
+    const start = b.session_start ? new Date(b.session_start) : null;
+    if (!start || start > now) return false;
+    const myAssignment = (b.assignments||[]).find(a => a.staff_member_id === myId);
+    return myAssignment || (b.assignments||[]).length === 0;
+  });
+
+  const grid = document.getElementById('floor-my-tables');
+  if (!grid) return;
+
+  // Update greeting
+  const name = currentShiftStaff?.name?.split(' ')[0] || 'Staff';
+  document.getElementById('floor-greeting').textContent = myBookings.length
+    ? `${name}'s tables` : `${name} — no active tables`;
+  document.getElementById('floor-subtitle').textContent = myBookings.length
+    ? `${myBookings.length} booking${myBookings.length > 1 ? 's' : ''} on the floor`
+    : 'All clear';
+
+  // Scale tiles — more bookings = smaller tiles
+  const cols = myBookings.length <= 2 ? '1fr' :
+               myBookings.length <= 4 ? '1fr 1fr' : '1fr 1fr 1fr';
+  grid.style.gridTemplateColumns = cols;
+
+  grid.innerHTML = myBookings.map(b => _renderTableTile(b, now, myId)).join('');
+
+  // Auto-assign current staff to unassigned bookings on first view
+  myBookings.forEach(b => {
+    if ((b.assignments||[]).length === 0 && myId) {
+      fetch(`${API_URL}/api/floor/assign`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          studioId, bookingCode: b.booking_code,
+          staffMemberId: myId, staffName: currentShiftStaff.name, isPrimary: true
+        })
+      }).catch(() => {});
+    }
+  });
+}
+
+function _renderTableTile(b, now, myId) {
+  const start = b.session_start ? new Date(b.session_start) : null;
+  const end = start ? new Date(start.getTime() + SESSION_DURATION_MINS * 60000) : null;
+  const elapsedMins = start ? Math.floor((now - start) / 60000) : 0;
+  const remainingMins = end ? Math.max(0, Math.floor((end - now) / 60000)) : 0;
+  const pct = Math.min(100, (elapsedMins / SESSION_DURATION_MINS) * 100);
+
+  const stage = b.current_stage || 'booking';
+  const stageColor = { booking:'#2e7d32', engagement:'#B87946', completion:'#c0392b', kiln:'#FF5722' }[stage] || '#2e7d32';
+  const stageIcon = { booking:'📋', engagement:'🎨', completion:'📷', kiln:'🔥' }[stage] || '📋';
+  const stageLabel = { booking:'Booking', engagement:'Painting', completion:'Complete', kiln:'Kiln' }[stage] || '';
+
+  // Check completion for current stage
+  const stageChecks = FLOW_CHECKS[stage] || [];
+  const completedChecks = stageChecks.filter(c => b.checks?.[`${stage}:${c.key}`]).length;
+  const checkProgress = stageChecks.length ? `${completedChecks}/${stageChecks.length}` : '';
+
+  // Time warning
+  const timeColor = remainingMins <= 15 ? '#e53935' : remainingMins <= 30 ? '#F9A825' : '#2e7d32';
+
+  // Chair diagram — small version
+  const capacity = b.num_people || 2;
+  const chairSvg = _miniTableSvg(capacity);
+
+  return `
+    <button onclick="openTableDetail('${b.booking_code}')"
+      style="background:white;border:2px solid ${stageColor};border-radius:16px;padding:12px;cursor:pointer;text-align:left;position:relative;overflow:hidden;">
+      <!-- Stage colour top bar -->
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${stageColor};"></div>
+      <!-- Session progress -->
+      <div style="position:absolute;top:3px;left:0;height:2px;background:${stageColor};opacity:0.3;width:${pct}%;"></div>
+
+      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px;">
+        <div>
+          <div style="font-size:14px;font-weight:800;color:var(--gu-text);">${b.table_number || '—'}</div>
+          <div style="font-size:11px;color:var(--gu-dust);">${b.customer_name}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:16px;font-weight:800;color:${timeColor};">${remainingMins}<span style="font-size:9px;">m</span></div>
+          <div style="font-size:9px;color:var(--gu-dust);">left</div>
+        </div>
+      </div>
+
+      <!-- Mini table diagram -->
+      <div style="margin:6px auto;text-align:center;">${chairSvg}</div>
+
+      <!-- Stage + checks -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+        <span style="background:${stageColor};color:white;border-radius:20px;padding:2px 8px;font-size:9px;font-weight:700;">${stageIcon} ${stageLabel}</span>
+        ${checkProgress ? `<span style="font-size:10px;color:var(--gu-dust);">${checkProgress} done</span>` : ''}
+      </div>
+
+      ${remainingMins <= 15 && remainingMins > 0 ? '<div style="margin-top:6px;text-align:center;font-size:9px;font-weight:800;color:#e53935;letter-spacing:0.05em;">⚠️ FINISHING SOON</div>' : ''}
+    </button>`;
+}
+
+function _miniTableSvg(covers) {
+  // Simple top-down table with chairs around it
+  const chairs = Math.min(covers, 8);
+  const top = Math.ceil(chairs / 2);
+  const bottom = Math.floor(chairs / 2);
+  const chairW = 8; const gap = 4;
+  const tableW = Math.max(top, bottom) * (chairW + gap);
+  const totalW = tableW + 20; const totalH = 52;
+  let svg = `<svg viewBox="0 0 ${totalW} ${totalH}" width="${totalW}" height="${totalH}" xmlns="http://www.w3.org/2000/svg">`;
+  // Table
+  svg += `<rect x="10" y="16" width="${tableW}" height="20" rx="4" fill="#E8D8C0" stroke="#B87946" stroke-width="1.5"/>`;
+  // Top chairs
+  for (let i=0;i<top;i++) {
+    const x = 10 + i*(chairW+gap) + gap/2;
+    svg += `<rect x="${x}" y="4" width="${chairW}" height="10" rx="2" fill="#B87946"/>`;
+  }
+  // Bottom chairs
+  for (let i=0;i<bottom;i++) {
+    const x = 10 + i*(chairW+gap) + gap/2;
+    svg += `<rect x="${x}" y="38" width="${chairW}" height="10" rx="2" fill="#B87946"/>`;
+  }
+  svg += '</svg>';
+  return svg;
+}
+
+async function openTableDetail(bookingCode) {
+  const b = _floorData.bookings.find(x => x.booking_code === bookingCode);
+  if (!b) return;
+  _detailBooking = b;
+
+  // Load items for this booking
+  try {
+    const res = await fetch(`${API_URL}/api/floor/items/${bookingCode}?studioId=${studioId}`);
+    const data = await res.json();
+    _detailItems = data.items || [];
+  } catch(e) { _detailItems = []; }
+
+  // If no items yet, auto-populate placemats based on cover count
+  if (_detailItems.length === 0) {
+    const covers = b.num_people || 2;
+    _detailItems = Array.from({length: covers}, (_, i) => ({
+      id: `pm_${i}`, item_type: 'placemat', item_label: `${i+1}`,
+      pos_x: 20 + (i * (60 / Math.max(covers-1,1))), pos_y: 45
+    }));
+  }
+
+  document.getElementById('detail-table-name').textContent = b.table_number || 'Table';
+  document.getElementById('detail-booking-info').textContent =
+    `${b.customer_name} · ${b.num_people || '?'} people`;
+
+  document.getElementById('floor-table-detail').style.display = 'flex';
+  _startDetailTimer();
+  renderDetailCanvas();
+  renderDetailChecklist();
+}
+
+function closeTableDetail() {
+  document.getElementById('floor-table-detail').style.display = 'none';
+  if (_detailTimerInterval) { clearInterval(_detailTimerInterval); _detailTimerInterval = null; }
+  _detailBooking = null;
+  _saveDetailItems();
+}
+
+function _startDetailTimer() {
+  if (_detailTimerInterval) clearInterval(_detailTimerInterval);
+  _updateDetailTimer();
+  _detailTimerInterval = setInterval(_updateDetailTimer, 10000);
+}
+
+function _updateDetailTimer() {
+  if (!_detailBooking?.session_start) return;
+  const now = new Date();
+  const start = new Date(_detailBooking.session_start);
+  const end = new Date(start.getTime() + SESSION_DURATION_MINS * 60000);
+  const remaining = Math.max(0, end - now);
+  const remainingMins = Math.floor(remaining / 60000);
+  const remainingSecs = Math.floor((remaining % 60000) / 1000);
+  const pct = Math.min(100, ((now - start) / (SESSION_DURATION_MINS * 60000)) * 100);
+
+  const timerEl = document.getElementById('detail-time-remaining');
+  const barEl = document.getElementById('detail-progress-bar');
+  if (timerEl) {
+    timerEl.textContent = `${remainingMins}m ${remainingSecs}s`;
+    timerEl.style.color = remainingMins <= 15 ? '#e53935' : remainingMins <= 30 ? '#F9A825' : '#2e7d32';
+  }
+  if (barEl) {
+    barEl.style.width = pct + '%';
+    barEl.style.background = remainingMins <= 15 ? '#e53935' : remainingMins <= 30 ? '#F9A825' : '#2e7d32';
+  }
+}
+
+function renderDetailCanvas() {
+  const wrap = document.getElementById('detail-canvas-wrap');
+  if (!wrap || !_detailBooking) return;
+  const b = _detailBooking;
+  const capacity = b.num_people || 2;
+  const isSplit = false; // TODO: use saved layout
+
+  wrap.innerHTML = '';
+
+  // Table canvas
+  const canvas = document.createElement('div');
+  canvas.style.cssText = 'position:absolute;inset:0;overflow:hidden;background:#F7F4EE;';
+  wrap.appendChild(canvas);
+
+  // Draw table
+  const tableEl = document.createElement('div');
+  tableEl.style.cssText = `
+    position:absolute; left:50%; top:50%;
+    transform:translate(-50%,-50%);
+    width:65%; height:35%;
+    background:#E8D8C0; border:2px solid #B87946;
+    border-radius:16px; display:flex;
+    align-items:center; justify-content:center;
+    font-size:13px; font-weight:700; color:#8a5520;
+  `;
+  tableEl.textContent = b.table_number || 'Table';
+  canvas.appendChild(tableEl);
+
+  // Chairs around the table — top and bottom
+  const top = Math.ceil(capacity / 2);
+  const bottom = Math.floor(capacity / 2);
+  const canvasW = wrap.offsetWidth || 360;
+  const canvasH = wrap.offsetHeight || 400;
+  const tableW = canvasW * 0.65;
+  const tableX = canvasW * 0.175;
+  const tableY = canvasH * 0.35;
+  const tableH = canvasH * 0.3;
+
+  for (let i=0; i<top; i++) {
+    const chairEl = _makeChair(tableX + (tableW/(top+1))*(i+1) - 18, tableY - 44, i);
+    canvas.appendChild(chairEl);
+  }
+  for (let i=0; i<bottom; i++) {
+    const chairEl = _makeChair(tableX + (tableW/(bottom+1))*(i+1) - 18, tableY + tableH + 8, i + top);
+    canvas.appendChild(chairEl);
+  }
+
+  // Draggable items
+  _detailItems.forEach((item, idx) => {
+    const x = (item.pos_x / 100) * canvasW - 20;
+    const y = (item.pos_y / 100) * canvasH - 20;
+    const el = _makeDraggableItem(item, idx, x, y, canvas);
+    canvas.appendChild(el);
+  });
+
+  // Add item bar at bottom of canvas
+  const addBar = document.createElement('div');
+  addBar.style.cssText = 'position:absolute;bottom:8px;left:0;right:0;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:0 8px;';
+  addBar.innerHTML = Object.entries(TABLE_ITEM_TYPES).map(([type, {emoji, label}]) =>
+    `<button onclick="addTableItem('${type}')"
+      style="background:white;border:1px solid var(--gu-border);border-radius:20px;padding:4px 10px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;">
+      ${emoji}<span style="font-size:10px;color:var(--gu-dust);">${label}</span>
+    </button>`
+  ).join('');
+  canvas.appendChild(addBar);
+}
+
+function _makeChair(x, y, index) {
+  const el = document.createElement('div');
+  el.style.cssText = `
+    position:absolute; left:${x}px; top:${y}px;
+    width:36px; height:36px;
+    background:#B87946; border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px; cursor:grab; user-select:none;
+  `;
+  el.textContent = '🪑';
+  _makeDraggable(el, x, y, (nx, ny) => {
+    el.style.left = nx + 'px';
+    el.style.top = ny + 'px';
+  });
+  return el;
+}
+
+function _makeDraggableItem(item, idx, x, y, canvas) {
+  const el = document.createElement('div');
+  const typeInfo = TABLE_ITEM_TYPES[item.item_type] || { emoji: '●', label: '' };
+  el.style.cssText = `
+    position:absolute; left:${x}px; top:${y}px;
+    width:40px; height:40px; border-radius:50%;
+    background:white; border:1.5px solid var(--gu-border);
+    display:flex; align-items:center; justify-content:center;
+    font-size:22px; cursor:grab; user-select:none;
+    box-shadow:0 2px 8px rgba(0,0,0,0.1);
+    z-index:10;
+  `;
+  el.textContent = typeInfo.emoji;
+  el.title = typeInfo.label;
+  el.dataset.itemIdx = idx;
+
+  // Long press to remove
+  let longPressTimer;
+  el.addEventListener('pointerdown', () => {
+    longPressTimer = setTimeout(() => {
+      if (confirm(`Remove ${typeInfo.label}?`)) {
+        _detailItems.splice(idx, 1);
+        renderDetailCanvas();
+        _saveDetailItems();
+      }
+    }, 800);
+  });
+  el.addEventListener('pointerup', () => clearTimeout(longPressTimer));
+
+  _makeDraggable(el, x, y, (nx, ny) => {
+    el.style.left = nx + 'px';
+    el.style.top = ny + 'px';
+    const wrap = document.getElementById('detail-canvas-wrap');
+    if (wrap) {
+      _detailItems[idx].pos_x = ((nx + 20) / wrap.offsetWidth) * 100;
+      _detailItems[idx].pos_y = ((ny + 20) / wrap.offsetHeight) * 100;
+    }
+  });
+  return el;
+}
+
+function _makeDraggable(el, startX, startY, onMove) {
+  let isDragging = false, startPX, startPY, origX, origY;
+  el.addEventListener('pointerdown', e => {
+    isDragging = true;
+    startPX = e.clientX; startPY = e.clientY;
+    origX = parseInt(el.style.left); origY = parseInt(el.style.top);
+    el.setPointerCapture(e.pointerId);
+    e.stopPropagation();
+  });
+  el.addEventListener('pointermove', e => {
+    if (!isDragging) return;
+    const dx = e.clientX - startPX; const dy = e.clientY - startPY;
+    onMove(origX + dx, origY + dy);
+  });
+  el.addEventListener('pointerup', () => {
+    isDragging = false;
+    _saveDetailItems();
+  });
+}
+
+function addTableItem(type) {
+  const wrap = document.getElementById('detail-canvas-wrap');
+  const newItem = {
+    id: `item_${Date.now()}`, item_type: type, item_label: TABLE_ITEM_TYPES[type]?.label || '',
+    pos_x: 45 + Math.random()*10, pos_y: 45 + Math.random()*10
+  };
+  _detailItems.push(newItem);
+  renderDetailCanvas();
+}
+
+function _saveDetailItems() {
+  if (!_detailBooking) return;
+  fetch(`${API_URL}/api/floor/items/${_detailBooking.booking_code}`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ studioId, items: _detailItems })
+  }).catch(() => {});
+}
+
+function renderDetailChecklist() {
+  if (!_detailBooking) return;
+  const b = _detailBooking;
+  const stage = b.current_stage || 'booking';
+  const checks = FLOW_CHECKS[stage] || [];
+  const el = document.getElementById('detail-checklist');
+  if (!el) return;
+
+  el.innerHTML = `
+    <div style="font-size:11px;font-weight:700;color:var(--gu-dust);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;">
+      ${stage === 'booking' ? '📋 Booking' : stage === 'engagement' ? '🎨 Painting' : stage === 'completion' ? '📷 Completion' : '🔥 Kiln'} checklist
+    </div>
+    ${checks.map(c => {
+      const done = !!b.checks?.[`${stage}:${c.key}`];
+      return `
+        <button onclick="toggleFlowCheck('${b.booking_code}','${stage}','${c.key}',${!done})"
+          style="width:100%;text-align:left;background:${done ? '#f0f8f0' : 'var(--gu-bg)'};
+          border:1.5px solid ${done ? '#2e7d32' : 'var(--gu-border)'};
+          border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer;
+          display:flex;align-items:center;gap:10px;">
+          <span style="font-size:18px;">${done ? '✅' : '⬜'}</span>
+          <span style="font-size:13px;font-weight:600;color:${done ? '#2e7d32' : 'var(--gu-text)'};
+          text-decoration:${done ? 'line-through' : 'none'};opacity:${done ? 0.7 : 1};">${c.label}</span>
+        </button>`;
+    }).join('')}
+    <div style="margin-top:10px;">
+      <button onclick="openBookingAtRealStage('${b.booking_code}','${stage}')"
+        style="width:100%;background:#2e7d32;color:white;border:none;border-radius:12px;
+        padding:12px;font-size:13px;font-weight:800;cursor:pointer;">
+        Open full booking →
+      </button>
+    </div>
+  `;
+}
+
+async function toggleFlowCheck(bookingCode, stage, checkKey, completed) {
+  const staffName = currentShiftStaff?.name || 'Staff';
+  await fetch(`${API_URL}/api/floor/check`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ studioId, bookingCode, stage, checkKey, completed, staffName })
+  });
+  // Update local state
+  if (_detailBooking?.booking_code === bookingCode) {
+    if (!_detailBooking.checks) _detailBooking.checks = {};
+    _detailBooking.checks[`${stage}:${checkKey}`] = completed;
+    renderDetailChecklist();
+  }
+  // Refresh floor
+  await loadFloorPlan();
+}
+
+function showAllTablesView() {
+  const modal = document.getElementById('floor-all-tables-modal');
+  const content = document.getElementById('floor-all-tables-content');
+  if (!modal || !content) return;
+
+  const rooms = {};
+  _floorData.tables.forEach(t => {
+    if (!rooms[t.room]) rooms[t.room] = [];
+    rooms[t.room].push(t);
+  });
+
+  const now = new Date();
+  const bookingByTable = {};
+  _floorData.bookings.forEach(b => {
+    const start = b.session_start ? new Date(b.session_start) : null;
+    if (start && start <= now) bookingByTable[b.table_number] = b;
+  });
+
+  content.innerHTML = Object.entries(rooms).map(([room, tables]) => `
+    <div style="margin-bottom:20px;">
+      <div style="font-size:11px;font-weight:700;color:var(--gu-dust);text-transform:uppercase;
+        letter-spacing:0.06em;margin-bottom:8px;">${room}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;">
+        ${tables.map(t => {
+          const b = bookingByTable[t.name];
+          const occupied = !!b;
+          const stage = b?.current_stage || 'booking';
+          const stageColor = {booking:'#2e7d32',engagement:'#B87946',completion:'#c0392b',kiln:'#FF5722'}[stage]||'#2e7d32';
+          return `
+            <button onclick="${occupied ? `openTableDetail('${b.booking_code}')` : ''}"
+              style="background:${occupied ? 'white' : '#F7F4EE'};
+              border:2px solid ${occupied ? stageColor : 'var(--gu-border)'};
+              border-radius:12px;padding:10px 8px;cursor:${occupied ? 'pointer' : 'default'};
+              text-align:center;opacity:${occupied ? 1 : 0.5};">
+              <div style="font-size:12px;font-weight:800;color:var(--gu-text);">${t.name}</div>
+              <div style="margin:6px auto;">${_miniTableSvg(b?.num_people || t.capacity)}</div>
+              ${occupied ? `<div style="font-size:9px;font-weight:700;color:${stageColor};">${b.customer_name}</div>` : '<div style="font-size:9px;color:var(--gu-dust);">Empty</div>'}
+            </button>`;
+        }).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  modal.style.display = 'flex';
+}
+
+// Check whether the floor plan should be the home screen right now.
+// Called after login and after every floor plan refresh.
+function _checkFloorPlanMode() {
+  if (!currentShiftStaff) return;
+  const now = new Date();
+  const hasActiveTables = _floorData.bookings.some(b => {
+    const start = b.session_start ? new Date(b.session_start) : null;
+    return start && start <= now;
+  });
+  // Switch to floor plan view only if we're currently on the grid home screen
+  const gridVisible = document.getElementById('grid-nav-view')?.style.display !== 'none';
+  const floorVisible = document.getElementById('floor-plan-view')?.style.display !== 'none';
+  if (hasActiveTables && (gridVisible || floorVisible)) {
+    document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+    document.getElementById('floor-plan-view').style.display = 'flex';
+  } else if (!hasActiveTables && floorVisible) {
+    showGridNav();
+  }
+}
+
 // ── Grid navigation history — back, forward, undo ────────────────────
 // A simple three-button bar present on every grid screen.
 // Back/Forward: navigate through the history of screens visited.
@@ -9468,6 +10073,12 @@ function applyShiftUI() {
   loadActiveBookingsStrip();
   clearInterval(window._activeBookingsStripTimer);
   window._activeBookingsStripTimer = setInterval(loadActiveBookingsStrip, 30 * 1000);
+  // Load floor plan and check if it should be the home screen
+  loadFloorPlan().then(() => _checkFloorPlanMode());
+  clearInterval(window._floorPlanTimer);
+  window._floorPlanTimer = setInterval(() => {
+    loadFloorPlan().then(() => _checkFloorPlanMode());
+  }, 30 * 1000);
   applyPlatformRevenueAccess();
 
   // Genuine real personalized landing page, per direct request —

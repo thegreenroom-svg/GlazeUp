@@ -4861,6 +4861,128 @@ app.post('/api/hbp/orders/:orderId/return-label', async (req, res) => {
 
 
 
+// ── Live Table Floor Plan endpoints ─────────────────────────────────
+
+// GET /api/floor/active — all active bookings today with assignment
+// and session timing info, for the floor plan screen.
+app.get('/api/floor/active', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const today = new Date(); today.setHours(0,0,0,0);
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+  const { data: bookings } = await supabase.from('bookings')
+    .select('booking_code,customer_name,table_number,current_stage,session_start,num_people,status')
+    .eq('studio_id', studioId)
+    .gte('session_start', today.toISOString())
+    .lt('session_start', tomorrow.toISOString())
+    .not('status', 'eq', 'cancelled');
+  const { data: assignments } = await supabase.from('booking_assignments')
+    .select('booking_code,staff_name,staff_member_id,is_primary')
+    .eq('studio_id', studioId).is('released_at', null);
+  const { data: checks } = await supabase.from('booking_flow_checks')
+    .select('booking_code,stage,check_key,completed')
+    .eq('studio_id', studioId);
+  const assignMap = {};
+  (assignments||[]).forEach(a => {
+    if (!assignMap[a.booking_code]) assignMap[a.booking_code] = [];
+    assignMap[a.booking_code].push(a);
+  });
+  const checkMap = {};
+  (checks||[]).forEach(c => {
+    if (!checkMap[c.booking_code]) checkMap[c.booking_code] = {};
+    checkMap[c.booking_code][`${c.stage}:${c.check_key}`] = c.completed;
+  });
+  res.json({
+    bookings: (bookings||[]).map(b => ({
+      ...b,
+      assignments: assignMap[b.booking_code] || [],
+      checks: checkMap[b.booking_code] || {}
+    }))
+  });
+});
+
+// GET /api/floor/tables — studio table config for the floor plan
+app.get('/api/floor/tables', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data: tables } = await supabase.from('studio_tables')
+    .select('id,name,room,capacity,sort_order')
+    .eq('studio_id', studioId).order('sort_order');
+  const { data: layouts } = await supabase.from('table_chair_layouts')
+    .select('table_name,chairs,split_position,is_split')
+    .eq('studio_id', studioId);
+  const layoutMap = {};
+  (layouts||[]).forEach(l => { layoutMap[l.table_name] = l; });
+  res.json({
+    tables: (tables||[]).map(t => ({ ...t, layout: layoutMap[t.name] || null }))
+  });
+});
+
+// POST /api/floor/assign — assign a staff member to a booking
+app.post('/api/floor/assign', async (req, res) => {
+  const { studioId, bookingCode, staffMemberId, staffName, isPrimary } = req.body;
+  if (!studioId||!bookingCode||!staffMemberId||!staffName) return res.status(400).json({ error: 'missing fields' });
+  const { error } = await supabase.from('booking_assignments').upsert({
+    studio_id: studioId, booking_code: bookingCode,
+    staff_member_id: staffMemberId, staff_name: staffName,
+    is_primary: isPrimary !== false, released_at: null
+  }, { onConflict: 'studio_id,booking_code,staff_member_id' });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ assigned: true });
+});
+
+// POST /api/floor/release — release a staff member from a booking
+app.post('/api/floor/release', async (req, res) => {
+  const { studioId, bookingCode, staffMemberId } = req.body;
+  const { error } = await supabase.from('booking_assignments')
+    .update({ released_at: new Date().toISOString() })
+    .eq('studio_id', studioId).eq('booking_code', bookingCode).eq('staff_member_id', staffMemberId);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ released: true });
+});
+
+// POST /api/floor/check — tick or untick a flow checklist item
+app.post('/api/floor/check', async (req, res) => {
+  const { studioId, bookingCode, stage, checkKey, completed, staffName } = req.body;
+  const { error } = await supabase.from('booking_flow_checks').upsert({
+    studio_id: studioId, booking_code: bookingCode, stage, check_key: checkKey,
+    completed: !!completed, completed_by: completed ? staffName : null,
+    completed_at: completed ? new Date().toISOString() : null
+  }, { onConflict: 'studio_id,booking_code,stage,check_key' });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ saved: true });
+});
+
+// GET/POST /api/floor/items/:bookingCode — draggable table items
+app.get('/api/floor/items/:bookingCode', async (req, res) => {
+  const { studioId } = req.query;
+  const { data } = await supabase.from('table_session_items')
+    .select('*').eq('studio_id', studioId).eq('booking_code', req.params.bookingCode);
+  res.json({ items: data || [] });
+});
+app.post('/api/floor/items/:bookingCode', async (req, res) => {
+  const { studioId, items } = req.body;
+  await supabase.from('table_session_items')
+    .delete().eq('studio_id', studioId).eq('booking_code', req.params.bookingCode);
+  if (items?.length) {
+    await supabase.from('table_session_items')
+      .insert(items.map(it => ({ ...it, studio_id: studioId, booking_code: req.params.bookingCode })));
+  }
+  res.json({ saved: true });
+});
+
+// POST /api/floor/layout — save chair layout for a table
+app.post('/api/floor/layout', async (req, res) => {
+  const { studioId, tableName, chairs, splitPosition, isSplit } = req.body;
+  const { error } = await supabase.from('table_chair_layouts').upsert({
+    studio_id: studioId, table_name: tableName,
+    chairs: chairs || [], split_position: splitPosition ?? 50,
+    is_split: !!isSplit, updated_at: new Date().toISOString()
+  }, { onConflict: 'studio_id,table_name' });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ saved: true });
+});
+
 app.get('/api/pieces/ready-for-pickup', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
