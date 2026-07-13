@@ -2172,7 +2172,7 @@
   <div style="background:white;border-radius:20px;max-width:420px;width:100%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;">
     <div style="background:#2e7d32;color:white;padding:18px 20px;">
       <div style="font-size:17px;font-weight:800;">✨ What's new</div>
-      <div style="font-size:12px;opacity:0.85;">Recent updates to kilnLINK</div>
+      <div style="font-size:12px;opacity:0.85;">Recent updates</div>
     </div>
     <div id="changelog-list" style="overflow-y:auto;padding:16px 20px;flex:1;">
       <div style="text-align:center;color:var(--gu-dust);font-size:13px;padding:20px 0;">Loading…</div>
@@ -2467,7 +2467,7 @@
     </div>
     <div style="padding:24px;">
       <div style="background:#fff9f0;border:1px solid #f0e0c0;border-radius:12px;padding:14px;margin-bottom:20px;font-size:12.5px;color:var(--gu-text);line-height:1.6;">
-        <strong>How it works:</strong> Bluetooth audio is controlled by this device's own settings, not by kilnLINK directly. Pair your earbuds once below — after that, every alert, task, and voice reminder plays through them automatically. No further setup needed.
+        <strong>How it works:</strong> Bluetooth audio is controlled by this device's own settings, not by this app directly. Pair your earbuds once below — after that, every alert, task, and voice reminder plays through them automatically. No further setup needed.
       </div>
 
       <div style="margin-bottom:18px;">
@@ -2481,7 +2481,7 @@
         </div>
         <div style="display:flex;gap:12px;margin-bottom:14px;">
           <div style="width:28px;height:28px;border-radius:50%;background:var(--gu-primary);color:white;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;">3</div>
-          <div style="font-size:13px;color:var(--gu-text);line-height:1.5;">Come back to kilnLINK — everything now plays through your headset automatically. Tap the button below to test it.</div>
+          <div style="font-size:13px;color:var(--gu-text);line-height:1.5;">Come back to the app — everything now plays through your headset automatically. Tap the button below to test it.</div>
         </div>
       </div>
 
@@ -4184,13 +4184,13 @@
                 <option value="square">Square KDS (recommended — uses your Square account)</option>
                 <option value="webhook">Webhook — send orders to a custom HTTP endpoint</option>
                 <option value="email">Email — orders sent to an email address</option>
-                <option value="manual">Manual — orders appear in your kilnLINK dashboard only</option>
+                <option value="manual">Manual — orders appear in your dashboard only</option>
               </select>
             </div>
             <div id="kds-webhook-field" style="display:none;margin-bottom:12px;">
               <label style="font-size:12px;font-weight:600;color:var(--gu-dust);display:block;margin-bottom:6px;">Webhook URL</label>
               <input type="url" id="kds-webhook-url" placeholder="https://your-kds-system.com/orders" style="width:100%;padding:9px 12px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;">
-              <div style="font-size:11px;color:var(--gu-dust);margin-top:4px;">kilnLINK will POST order data as JSON to this URL. Works with any system that accepts webhooks.</div>
+              <div style="font-size:11px;color:var(--gu-dust);margin-top:4px;">The app will POST order data as JSON to this URL. Works with any system that accepts webhooks.</div>
             </div>
             <div id="kds-email-field" style="display:none;margin-bottom:12px;">
               <label style="font-size:12px;font-weight:600;color:var(--gu-dust);display:block;margin-bottom:6px;">Kitchen Email Address</label>
@@ -4347,7 +4347,7 @@
           <div id="tc-print-datetime" style="font-size:13px;color:#8a8175;margin-bottom:16px;"></div>
           <div id="tc-print-qr" style="margin-bottom:12px;"></div>
           <div id="tc-print-table" style="font-size:13px;font-weight:600;color:#2B2724;"></div>
-          <div style="font-size:9px;color:#b0a89e;margin-top:14px;">Scan to view your pottery session — kilnLINK</div>
+          <div style="font-size:9px;color:#b0a89e;margin-top:14px;">Scan to view your pottery session · The Kiln Cafe</div>
         </div>
       </div>
 
@@ -4488,7 +4488,7 @@
             <div id="cl-print-damage-notes" style="font-size:11px;color:#2B2724;margin-bottom:6px;"></div>
             <div id="cl-print-kiln-explanation" style="font-size:10px;color:#8a8175;line-height:1.4;"></div>
           </div>
-          <div style="font-size:9px;color:#b0a89e;text-align:center;margin-top:10px;">kilnLINK</div>
+          <div style="font-size:9px;color:#b0a89e;text-align:center;margin-top:10px;">The Kiln Cafe</div>
         </div>
       </div>
 
@@ -4808,7 +4808,7 @@
             <a href="#" id="timesheet-export-link" onclick="downloadTimesheetCSV();return false;" style="font-size:12px;font-weight:700;color:var(--gu-primary);text-decoration:none;">⬇ Export CSV</a>
           </div>
           <p style="font-size:12px;color:var(--gu-dust);margin-bottom:14px;line-height:1.5;">
-            Clock-in and clock-out happen automatically when staff log in/out with their PIN. This is hours worked only — <strong>kilnLINK does not calculate pay or tax</strong>. Export the CSV and hand it to your payroll provider or accountant.
+            Clock-in and clock-out happen automatically when staff log in/out with their PIN. This is hours worked only — <strong>this app does not calculate pay or tax</strong>. Export the CSV and hand it to your payroll provider or accountant.
           </p>
           <div style="display:flex;gap:8px;margin-bottom:14px;">
             <input type="date" id="timesheet-from" style="flex:1;padding:8px 10px;border:1px solid var(--gu-border);border-radius:8px;font-size:12px;">
@@ -6179,9 +6179,9 @@ const SWT_STEPS = [
   // ── 1. WELCOME ────────────────────────────────────────────────────
   {
     label: 'Welcome',
-    title: 'Hello from GlazeUp 👋',
+    title: 'Welcome to The Kiln Cafe 👋',
     body: "One minute and you'll know this whole app. Every task lives in a coloured tile. Tap it, do it, done. Let's walk through together.",
-    voice: "Hello and welcome to GlazeUp! In just one minute you'll know everything you need. Every task lives in a coloured tile. Let me show you how it all works.",
+    voice: "Hello and welcome to The Kiln Cafe staff app! In just one minute you'll know everything you need. Every task lives in a coloured tile. Let me show you how it all works.",
     visual: 'welcome',
   },
 
@@ -6609,7 +6609,7 @@ function _swtVisual(key) {
         <!-- Kiln Cafe branding -->
         <div style="display:flex;align-items:center;gap:8px;opacity:0.4;">
           <img src="/brand-assets/kiln-cafe-logo-demo/kiln-cafe-mark-demo.svg" style="width:18px;">
-          <span style="font-size:11px;font-weight:700;color:#F4ECE0;letter-spacing:0.04em;">GlazeUp · The Kiln Cafe</span>
+          <span style="font-size:11px;font-weight:700;color:#F4ECE0;letter-spacing:0.04em;">The Kiln Cafe · Studio Manager</span>
         </div>
       </div>`,
 
@@ -6679,7 +6679,7 @@ function testCleoAdminVoice(voiceName) {
   const voice = voices.find(v => v.name === voiceName);
   if (!voice) return;
   window.speechSynthesis.cancel();
-  const utt = new SpeechSynthesisUtterance("Hello! This is what the narration sounds like on GlazeUp.");
+  const utt = new SpeechSynthesisUtterance("Hello! This is what the narration sounds like on The Kiln Cafe app.");
   utt.voice = voice; utt.rate = 0.92; utt.pitch = 1.0;
   window.speechSynthesis.speak(utt);
 }
@@ -8099,7 +8099,7 @@ function showAdminA2HSBanner() {
       <div class="a2hs-banner-header">
         <div class="a2hs-icon-wrap">📲</div>
         <div class="a2hs-text">
-          <b>Add kilnLINK to your Home Screen</b>
+          <b>Add The Kiln Cafe to your Home Screen</b>
           <span>Quick access every shift — no need to find this link again.</span>
         </div>
       </div>
@@ -8110,8 +8110,7 @@ function showAdminA2HSBanner() {
       <div class="a2hs-banner-header">
         <div class="a2hs-icon-wrap">🏺</div>
         <div class="a2hs-text">
-          <b>Add kilnLINK to your Home Screen</b>
-          <span>Quick access every shift — one tap sets it up.</span>
+          <b>Add The Kiln Cafe to your Home Screen</b>
         </div>
       </div>
       <button class="a2hs-install" onclick="triggerAdminInstall()">📲 Add to Home Screen</button>
