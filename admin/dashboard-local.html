@@ -2583,52 +2583,49 @@
   <!-- MAIN -->
   <div class="admin-main">
     <header class="admin-header">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <img src="/brand-assets/kiln-cafe-logo-demo/kiln-cafe-mark-demo.svg" alt="The Kiln Cafe" style="width:26px;height:26px;flex-shrink:0;">
-        <h1 id="studio-name" style="margin:0;">The Kiln Cafe</h1>
+      <!-- Left: logo + abbreviated studio name -->
+      <div style="display:flex;align-items:center;gap:7px;flex-shrink:0;min-width:0;">
+        <img src="/brand-assets/kiln-cafe-logo-demo/kiln-cafe-mark-demo.svg" alt="The Kiln Cafe" style="width:28px;height:28px;flex-shrink:0;">
+        <h1 id="studio-name" style="margin:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;">The Kiln Cafe</h1>
       </div>
-      <div class="admin-header-right" style="display:flex;align-items:center;gap:10px;">
-        <!-- Genuine real consolidated cluster, per direct request —
-             replaces the old sidebar and its spinning logo entirely.
-             The staff avatar and alerts bell (moved here from their
-             old fixed positions, exact same real IDs kept so all
-             existing JS continues updating them correctly) sit
-             alongside two quick-access mini tiles. Nothing else to
-             look at. -->
-        <button id="shift-badge" onclick="toggleTaskQueue()" style="display:none;background:linear-gradient(135deg,#2B2724,var(--link-clay));border:none;border-radius:20px;padding:6px 12px 6px 6px;font-size:12px;font-weight:700;color:white;cursor:pointer;align-items:center;gap:6px;position:relative;">
-          <span id="shift-badge-avatar" style="width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,0.25);color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">–</span>
-          <span id="shift-badge-name">–</span>
-          <span id="shift-badge-break-indicator" style="display:none;background:#3949ab;color:white;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;">☕ BREAK</span>
-          <span id="shift-task-count-badge" style="display:none;background:#e53935;color:white;font-size:10px;font-weight:800;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 4px;">0</span>
+
+      <!-- Right: shift badge + bell + mini tiles including logout -->
+      <div class="admin-header-right" style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+
+        <button id="shift-badge" onclick="toggleTaskQueue()" style="display:none;background:linear-gradient(135deg,#2B2724,var(--link-clay));border:none;border-radius:20px;padding:5px 10px 5px 5px;font-size:11px;font-weight:700;color:white;cursor:pointer;align-items:center;gap:5px;position:relative;max-width:100px;">
+          <span id="shift-badge-avatar" style="width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,0.25);color:white;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;">–</span>
+          <span id="shift-badge-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52px;">–</span>
+          <span id="shift-badge-break-indicator" style="display:none;background:#3949ab;color:white;font-size:8px;font-weight:800;padding:1px 5px;border-radius:8px;">☕</span>
+          <span id="shift-task-count-badge" style="display:none;background:#e53935;color:white;font-size:9px;font-weight:800;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 3px;">0</span>
         </button>
-        <button id="alert-bell-btn" onclick="toggleAlertFeed()" style="background:#2B2724;color:white;border:none;border-radius:50%;width:36px;height:36px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0;">
+
+        <button id="alert-bell-btn" onclick="toggleAlertFeed()" style="background:#2B2724;color:white;border:none;border-radius:50%;width:32px;height:32px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0;">
           🔔
-          <span id="alert-bell-badge" style="display:none;position:absolute;top:-3px;right:-3px;background:#e53935;color:white;font-size:9px;font-weight:800;width:16px;height:16px;border-radius:50%;align-items:center;justify-content:center;border:1.5px solid white;">0</span>
+          <span id="alert-bell-badge" style="display:none;position:absolute;top:-2px;right:-2px;background:#e53935;color:white;font-size:8px;font-weight:800;width:14px;height:14px;border-radius:50%;align-items:center;justify-content:center;border:1.5px solid white;">0</span>
         </button>
-        <button onclick="goToTab('setup'); showSetupSection('hostbypost');" class="glaze-tile" style="flex-shrink:0;width:44px;background:#2B2724;color:white;border:none;border-radius:10px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:3px;gap:1px;">
-          <img src="/brand-assets/kiln-cafe-logo-demo/hostbypost-mark-demo.svg" alt="" style="width:15px;height:auto;">
-          <span style="font-size:5.5px;font-weight:800;line-height:1;">Host By Post</span>
+
+        <button onclick="goToTab('setup'); showSetupSection('hostbypost');" class="glaze-tile" style="flex-shrink:0;width:36px;height:36px;background:#2B2724;color:white;border:none;border-radius:9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:3px;">
+          <img src="/brand-assets/kiln-cafe-logo-demo/hostbypost-mark-demo.svg" alt="" style="width:13px;height:auto;">
+          <span style="font-size:5px;font-weight:800;line-height:1;color:white;">HBP</span>
         </button>
-        <button onclick="openFindMyPiece()" class="glaze-tile" style="flex-shrink:0;width:44px;background:#c0392b;color:white;border:none;border-radius:10px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:3px;gap:1px;">
-          <span style="font-size:15px;line-height:1;">🔍</span>
-          <span style="font-size:5.5px;font-weight:800;line-height:1;">Find Piece</span>
+        <button onclick="openFindMyPiece()" class="glaze-tile" style="flex-shrink:0;width:36px;height:36px;background:#c0392b;color:white;border:none;border-radius:9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:3px;">
+          <span style="font-size:14px;line-height:1;">🔍</span>
+          <span style="font-size:5px;font-weight:800;line-height:1;">Find</span>
         </button>
-        <button onclick="openReturns()" class="glaze-tile" style="flex-shrink:0;width:44px;background:#5E35B1;color:white;border:none;border-radius:10px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:3px;gap:1px;">
-          <span style="font-size:15px;line-height:1;">📦</span>
-          <span style="font-size:5.5px;font-weight:800;line-height:1;">Returns</span>
+        <button onclick="openReturns()" class="glaze-tile" style="flex-shrink:0;width:36px;height:36px;background:#5E35B1;color:white;border:none;border-radius:9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:3px;">
+          <span style="font-size:14px;line-height:1;">📦</span>
+          <span style="font-size:5px;font-weight:800;line-height:1;">Returns</span>
         </button>
+        <button id="direct-logout-btn" onclick="confirmDirectLogout()" class="glaze-tile" style="display:none;flex-shrink:0;width:36px;height:36px;background:#8B1A1A;color:white;border:none;border-radius:9px;cursor:pointer;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:3px;">
+          <span style="font-size:14px;line-height:1;">🚪</span>
+          <span style="font-size:5px;font-weight:800;line-height:1;">Out</span>
+        </button>
+
         <div style="display:none;"><span class="status-badge free">Free tier (1st month)</span></div>
-        <!-- Genuine real, tidy header icons, per direct request —
-             consolidates the Break and Find Piece buttons (previously
-             large, floating circles competing with everything else
-             on screen) up here, small and consistent. Same exact real
-             IDs kept throughout, so all existing JS that already
-             updates their state (updateBreakUI, etc.) continues
-             working correctly without any change needed there. -->
-        <button id="direct-break-btn" onclick="toggleBreak()" title="Take a break" style="display:none;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:5px 10px;font-size:11px;font-weight:700;color:#3949ab;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px;">☕ <span>Break</span></button>
-        <button id="find-piece-fab" onclick="openFindMyPiece()" title="Find a piece" style="display:none;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:5px 10px;font-size:11px;font-weight:700;color:var(--gu-text);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px;">🔍 <span>Find Piece</span></button>
-        <button id="returns-btn" onclick="openReturns()" title="Customer returns" style="display:none;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:5px 10px;font-size:11px;font-weight:700;color:#5E35B1;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px;">📦 <span>Returns</span></button>
-        <button id="direct-logout-btn" onclick="confirmDirectLogout()" title="Log out" style="display:none;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:5px 10px;font-size:11px;font-weight:700;color:#c0392b;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px;">🚪 <span>Log Out</span></button>
+        <!-- Legacy hidden buttons kept for JS compatibility -->
+        <button id="direct-break-btn" onclick="toggleBreak()" style="display:none;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:5px 10px;font-size:11px;font-weight:700;color:#3949ab;cursor:pointer;white-space:nowrap;align-items:center;gap:4px;">☕ <span>Break</span></button>
+        <button id="find-piece-fab" onclick="openFindMyPiece()" style="display:none;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:5px 10px;font-size:11px;font-weight:700;color:var(--gu-text);cursor:pointer;white-space:nowrap;align-items:center;gap:4px;">🔍 <span>Find Piece</span></button>
+        <button id="returns-btn" onclick="openReturns()" style="display:none;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:5px 10px;font-size:11px;font-weight:700;color:#5E35B1;cursor:pointer;white-space:nowrap;align-items:center;gap:4px;">📦 <span>Returns</span></button>
       </div>
     </header>
 
