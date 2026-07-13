@@ -5686,10 +5686,24 @@ function previewStockPhoto(event) {
 async function addStockItem() {
   const name = document.getElementById('stock-new-name').value.trim();
   const cat = document.getElementById('stock-new-cat').value.trim();
-  const price = document.getElementById('stock-new-price').value;
+  const priceRaw = document.getElementById('stock-new-price').value.trim();
 
   if (!name) { alert('Please enter a piece name.'); return; }
   if (!apiConnected) { alert('Connect the API to add stock.'); return; }
+
+  // Genuine real validation, per direct request to make this idiot-
+  // proof — previously, typing anything non-numeric into the price
+  // field silently saved the item with NO price at all and no
+  // warning, since JSON.stringify quietly turns NaN into null.
+  let priceCents = null;
+  if (priceRaw) {
+    const parsed = parseInt(priceRaw);
+    if (isNaN(parsed) || parsed < 0) {
+      alert('Price needs to be a real number in pence (e.g. 850 for £8.50) — or leave it blank.');
+      return;
+    }
+    priceCents = parsed;
+  }
 
   try {
     await fetch(`${API_URL}/api/stock`, {
@@ -5699,7 +5713,7 @@ async function addStockItem() {
         studioId,
         name,
         category: cat || null,
-        priceCents: price ? parseInt(price) : null,
+        priceCents,
         photoData: stockNewPhotoData || null
       })
     });
@@ -7164,6 +7178,7 @@ async function setSessionDutyStatus(id, status) {
 }
 
 async function removeSessionDuty(id) {
+  if (!confirm('Remove this duty from the session?')) return;
   await fetch(`${API_URL}/api/staff/session-duties/${id}`, { method:'DELETE' });
   sessionDutiesAssigned = sessionDutiesAssigned.filter(d => d.id !== id);
   renderAssignedDuties();
@@ -10042,7 +10057,7 @@ function renderTeamMembers() {
       <span style="font-size:13px;font-weight:600;flex:1;">${m.name}</span>
       <span style="font-size:11px;color:white;background:${ROLE_COLORS[m.role]||'#999'};padding:3px 10px;border-radius:20px;">${m.role}</span>
       <button onclick="promptResetPin('${m.id}','${m.name.replace(/'/g,"\\'")}')" style="background:none;border:1px solid var(--gu-border);color:var(--gu-dust);border-radius:6px;padding:4px 9px;font-size:11px;font-weight:600;cursor:pointer;">🔑 Reset PIN</button>
-      <button onclick="removeTeamMember('${m.id}')" style="background:none;border:none;color:#d9534f;font-size:18px;cursor:pointer;padding:0 2px;line-height:1;">×</button>
+      <button onclick="removeTeamMember('${m.id}','${m.name.replace(/'/g,"\\'")}')" style="background:none;border:none;color:#d9534f;font-size:18px;cursor:pointer;padding:0 2px;line-height:1;">×</button>
     </div>
   `).join('');
 }
@@ -10081,7 +10096,8 @@ async function addTeamMember() {
   } catch(e) { alert('Could not add team member: ' + e.message); }
 }
 
-async function removeTeamMember(id) {
+async function removeTeamMember(id, name) {
+  if (!confirm(`Remove ${name || 'this team member'} from staff? This can't be undone from here — you'd need to add them again from scratch.`)) return;
   await fetch(`${API_URL}/api/staff/team/${id}?studioId=${studioId}`, { method:'DELETE' });
   teamMembers = teamMembers.filter(m => m.id !== id);
   renderTeamMembers();
@@ -10611,6 +10627,7 @@ async function addMenuSpecial() {
 }
 
 async function removeSpecial(id) {
+  if (!confirm('Remove this item from today\'s menu?')) return;
   await fetch(`${API_URL}/api/menu/specials/${id}?studioId=${studioId}`, { method: 'DELETE' });
   dailySpecials = dailySpecials.filter(s => s.id !== id);
   renderSpecialsList();
@@ -12098,6 +12115,7 @@ async function addStudioKnowledge() {
 }
 
 async function deleteStudioKnowledge(id) {
+  if (!confirm("Remove this from Cleo's knowledge? She won't know it anymore.")) return;
   try {
     await fetch(`${API_URL}/api/studio-knowledge/${id}`, { method: 'DELETE' });
     loadStudioKnowledge();
@@ -12342,6 +12360,7 @@ async function addStudioPromotion() {
 }
 
 async function deleteStudioPromotion(id) {
+  if (!confirm('Remove this promotion?')) return;
   try {
     await fetch(`${API_URL}/api/studio-promotions/${id}`, { method: 'DELETE' });
     loadStudioPromotions();
@@ -13992,7 +14011,7 @@ async function refreshOrdersList(sessionId, prefix) {
       return `
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: #f7f7f7; border-radius: 6px; margin-bottom: 4px; font-size: 13px;">
           <span>${typeEmojis[o.item_type] || '•'} ${o.item_name}${priceDisplay} <span style="color: var(--gu-dust); font-size: 11px;">(${o.item_type})</span></span>
-          <button onclick="deleteTableOrder('${o.id}', '${sessionId}', '${prefix}')" style="background: none; border: none; color: #d9534f; cursor: pointer; font-size: 12px;">✕</button>
+          <button onclick="deleteTableOrder('${o.id}', '${sessionId}', '${prefix}', '${(o.item_name||'this item').replace(/'/g,"\\'")}')" style="background: none; border: none; color: #d9534f; cursor: pointer; font-size: 12px;">✕</button>
         </div>
       `;
     }).join('');
@@ -14083,7 +14102,8 @@ async function addTableOrder() {
   }
 }
 
-async function deleteTableOrder(orderId, sessionId, prefix) {
+async function deleteTableOrder(orderId, sessionId, prefix, itemName) {
+  if (!confirm(`Remove ${itemName} from this table's bill?`)) return;
   try {
     await fetch(`${API_URL}/api/table-sessions/orders/${orderId}`, { method: 'DELETE' });
     refreshOrdersList(sessionId, prefix);
