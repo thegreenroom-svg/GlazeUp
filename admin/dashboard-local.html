@@ -8339,11 +8339,16 @@ const ROLE_COLORS_LOGIN = { 'Studio Manager':'#5E35B1', 'Studio Executive':'#1E8
 let selectedLoginMember = null;
 
 function skipLoginUseSharedView() {
-  // Show the shared/manager view without login
+  // Show the floor plan without login, skip any tours/onboarding
   currentShiftStaff = null;
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('splash-screen').style.display = 'none';
-  _switchView('floor-plan-view');
+  
+  // Hide any tours or onboarding
+  document.querySelectorAll('[id*="tour"], [id*="onboarding"]').forEach(el => el.style.display = 'none');
+  
+  // Go straight to floor plan
+  goToTab('floor-plan');
 }
 
 function showLoginScreen(screen) {
