@@ -88,6 +88,11 @@ app.use('/promo', express.static(path.join(__dirname, 'promo'), staticCacheOptio
 // Redirect root to promo page for prospective studio owners
 app.get('/', (req, res) => res.redirect('/promo'));
 
+// Favicon — served from root so browsers find it automatically
+// at glazeup-api.onrender.com/favicon.ico
+app.get('/favicon.ico', (req, res) => res.sendFile(path.join(__dirname, 'favicon.ico')));
+app.get('/favicon.png', (req, res) => res.sendFile(path.join(__dirname, 'favicon.png')));
+
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const square = new Client({
