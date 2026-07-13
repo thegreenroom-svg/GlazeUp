@@ -8149,6 +8149,219 @@ async function logOutOfShift() {
 // single tile calls the exact same, unmodified goToTab() already
 // used by the sidebar — nothing underneath was changed at all.
 // ═══════════════════════════════════════════════════════════
+// ── Genuine real per-device tile layout system ──────────────────────
+// Three things saved to localStorage, all keyed by studioId so
+// different studios on the same device don't bleed into each other:
+//
+//   grid_order_{studioId}     — array of group IDs in display order
+//   grid_promoted_{studioId}  — array of sub-tile tab IDs promoted to top level
+//   grid_usage_{studioId}     — object mapping tab IDs to tap counts
+//
+// Long press a top-level tile to enter edit mode (wobble).
+// In edit mode: drag to reorder, or tap a tile to see promote options.
+// Smart suggestion: after 5 taps of the same sub-tile, parent tile
+// gets a subtle pulse and long-press shows a promote suggestion.
+// ────────────────────────────────────────────────────────────────────
+
+function _gridKey(suffix) {
+  return `grid_${suffix}_${studioId || 'default'}`;
+}
+
+function _getGridOrder() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(_gridKey('order')));
+    if (Array.isArray(saved) && saved.length) return saved;
+  } catch(e) {}
+  return GRID_NAV_STRUCTURE.map(g => g.id);
+}
+
+function _getPromoted() {
+  try {
+    return JSON.parse(localStorage.getItem(_gridKey('promoted'))) || [];
+  } catch(e) { return []; }
+}
+
+function _getUsage() {
+  try {
+    return JSON.parse(localStorage.getItem(_gridKey('usage'))) || {};
+  } catch(e) { return {}; }
+}
+
+function _saveGridOrder(order) {
+  localStorage.setItem(_gridKey('order'), JSON.stringify(order));
+}
+
+function _savePromoted(promoted) {
+  localStorage.setItem(_gridKey('promoted'), JSON.stringify(promoted));
+}
+
+function _recordTabUsage(tabId) {
+  const usage = _getUsage();
+  usage[tabId] = (usage[tabId] || 0) + 1;
+  localStorage.setItem(_gridKey('usage'), JSON.stringify(usage));
+}
+
+function _getSuggestions() {
+  // Returns sub-tile tab IDs that have been tapped 5+ times
+  // and haven't been promoted yet
+  const usage = _getUsage();
+  const promoted = _getPromoted();
+  return Object.entries(usage)
+    .filter(([tabId, count]) => count >= 5 && !promoted.includes(tabId))
+    .map(([tabId]) => tabId);
+}
+
+// Build the real, ordered list of top-level items to render,
+// merging the base structure, custom order, and promoted sub-tiles.
+function _buildTopLevelItems() {
+  const order = _getGridOrder();
+  const promoted = _getPromoted();
+
+  // Start with groups in the saved order
+  const groups = order
+    .map(id => GRID_NAV_STRUCTURE.find(g => g.id === id))
+    .filter(Boolean);
+
+  // Add any groups not in the saved order (new groups added since last save)
+  GRID_NAV_STRUCTURE.forEach(g => {
+    if (!groups.find(x => x.id === g.id)) groups.push(g);
+  });
+
+  // Build the flat top-level list: groups + promoted sub-tiles
+  const items = [];
+  groups.forEach(group => {
+    items.push({ type: 'group', group });
+    // Add any promoted sub-tiles from this group immediately after it
+    group.items.forEach(item => {
+      if (promoted.includes(item.tab)) {
+        items.push({ type: 'promoted', item, group });
+      }
+    });
+  });
+
+  return items;
+}
+
+let _gridEditMode = false;
+let _dragSrcIndex = null;
+
+function _enterEditMode() {
+  _gridEditMode = true;
+  showGridNavTop();
+}
+
+function _exitEditMode() {
+  _gridEditMode = false;
+  showGridNavTop();
+}
+
+function _handleTileLongPress(index) {
+  if (!_gridEditMode) {
+    _enterEditMode();
+    return;
+  }
+  // Already in edit mode — tap shows promote options for this tile
+  const items = _buildTopLevelItems();
+  const item = items[index];
+  if (!item || item.type !== 'group') return;
+  const group = item.group;
+  const promoted = _getPromoted();
+  const suggestions = _getSuggestions();
+  const available = group.items.filter(i => !promoted.includes(i.tab));
+  if (!available.length) return;
+  _showPromoteSheet(group, available, suggestions);
+}
+
+function _showPromoteSheet(group, available, suggestions) {
+  // Simple, clean action sheet — no modal library needed
+  const existing = document.getElementById('promote-sheet');
+  if (existing) existing.remove();
+
+  const sheet = document.createElement('div');
+  sheet.id = 'promote-sheet';
+  sheet.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:flex-end;background:rgba(43,39,36,0.5);backdrop-filter:blur(4px);';
+  sheet.onclick = e => { if (e.target === sheet) sheet.remove(); };
+
+  const inner = document.createElement('div');
+  inner.style.cssText = 'background:white;border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:480px;margin:0 auto;';
+
+  const title = `<div style="font-size:16px;font-weight:800;color:#2B2724;margin-bottom:4px;">Bring to the front</div>
+    <div style="font-size:12px;color:#8a8175;margin-bottom:18px;">Choose which part of <strong>${group.label}</strong> you want as its own tile on the home screen.</div>`;
+
+  const buttons = available.map(item => {
+    const isSuggested = suggestions.includes(item.tab);
+    return `<button onclick="promoteSubTile('${group.id}','${item.tab}')" style="width:100%;text-align:left;background:${isSuggested ? 'rgba(46,125,50,0.08)' : '#F7F4EE'};border:${isSuggested ? '1.5px solid #2e7d32' : '1.5px solid transparent'};border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:#2B2724;">${item.label}</div>
+        <div style="font-size:11px;color:#8a8175;margin-top:2px;">${item.desc}</div>
+      </div>
+      ${isSuggested ? '<div style="font-size:10px;font-weight:800;color:#2e7d32;background:rgba(46,125,50,0.12);padding:3px 8px;border-radius:8px;">You use this a lot</div>' : ''}
+    </button>`;
+  }).join('');
+
+  const cancel = `<button onclick="document.getElementById('promote-sheet').remove()" style="width:100%;background:none;border:none;padding:12px;font-size:14px;color:#8a8175;cursor:pointer;margin-top:4px;">Cancel</button>`;
+
+  inner.innerHTML = title + buttons + cancel;
+  sheet.appendChild(inner);
+  document.body.appendChild(sheet);
+}
+
+function promoteSubTile(groupId, tabId) {
+  const promoted = _getPromoted();
+  if (!promoted.includes(tabId)) {
+    promoted.push(tabId);
+    _savePromoted(promoted);
+  }
+  const sheet = document.getElementById('promote-sheet');
+  if (sheet) sheet.remove();
+  _exitEditMode();
+}
+
+function demoteSubTile(tabId) {
+  const promoted = _getPromoted().filter(t => t !== tabId);
+  _savePromoted(promoted);
+  showGridNavTop();
+}
+
+// ── CSS for wobble animation ──────────────────────────────────────────
+(function() {
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes tile-wobble {
+      0%,100% { transform: rotate(-1.5deg) scale(1.02); }
+      50%      { transform: rotate(1.5deg)  scale(1.02); }
+    }
+    .tile-editing {
+      animation: tile-wobble 0.5s ease-in-out infinite !important;
+      cursor: grab !important;
+      position: relative;
+    }
+    .tile-editing::after {
+      content: '✕';
+      position: absolute;
+      top: -6px; right: -6px;
+      width: 20px; height: 20px;
+      background: #e53935;
+      color: white;
+      border-radius: 50%;
+      font-size: 11px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+    @keyframes tile-suggest-pulse {
+      0%,100% { box-shadow: 0 0 0 0 rgba(46,125,50,0.5); }
+      50%      { box-shadow: 0 0 0 8px rgba(46,125,50,0); }
+    }
+    .tile-has-suggestion { animation: tile-suggest-pulse 2s ease-in-out infinite; }
+    .tile-dragging { opacity: 0.4; }
+    .tile-drag-over { outline: 3px dashed rgba(255,255,255,0.6); outline-offset: -3px; }
+  `;
+  document.head.appendChild(style);
+})();
+
 const GRID_NAV_STRUCTURE = [
   { id: 'dashboard', label: 'Dashboard', color: '#B87946', items: [
     { tab: 'dashboard', label: 'Overview', desc: 'Your daily overview' },
@@ -8175,13 +8388,14 @@ const GRID_NAV_STRUCTURE = [
     { tab: 'progress', label: 'Daily Progress', desc: "Every team member's live tasks" },
   ]},
   { id: 'community', label: 'Community', color: '#8e44ad', items: [
-    { tab: 'community', label: 'Community', desc: 'Feature and moderate customer work' },
+    { tab: 'community', label: 'Feature and moderate customer work' , desc: '' },
   ]},
   { id: 'setup', label: 'Setup', color: '#2B2724', items: [
     { tab: 'branding', label: 'Branding', desc: 'Colours, logo, customer app look' },
     { tab: 'setup', label: 'Studio Setup', desc: 'Connections, Cleo, add-ons, offers' },
   ]},
 ];
+
 
 // Genuine real landing-page router, per direct request — "Finished"
 // always returns to whoever's OWN real landing page, which for David
@@ -8267,38 +8481,155 @@ function showGridNav() {
   toggleFloatingBackBtn();
 }
 
-// Genuine, real, per direct request: "Back" from any real screen or
-// second-level grid ALWAYS returns to this top-level task grid, never
-// one level up.
 function showGridNavTop() {
   document.getElementById('grid-nav-top').style.display = 'block';
   document.getElementById('grid-nav-sub').style.display = 'none';
   const wrap = document.getElementById('grid-nav-top-tiles');
-  // Genuine, real, deliberately simple — top-level tiles show ONLY a
-  // short name, nothing else, per direct clarification. Large, plain,
-  // one colour, one word or short phrase.
-  wrap.innerHTML = GRID_NAV_STRUCTURE.map((group, i) => `
-    <button onclick="showGridNavSub('${group.id}')" class="glaze-tile tile-landing" style="background:${group.color};color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;align-items:center;justify-content:center;text-align:center;animation-delay:${i * 0.035}s;">
-      <div style="font-size:19px;font-weight:800;line-height:1.2;padding:8px;">${group.label}</div>
-    </button>
-  `).join('');
+  const items = _buildTopLevelItems();
+  const suggestions = _getSuggestions();
+  const promoted = _getPromoted();
+
+  // Find which group IDs have suggestions pending
+  const groupsWithSuggestions = new Set();
+  suggestions.forEach(tabId => {
+    const group = GRID_NAV_STRUCTURE.find(g => g.items.some(i => i.tab === tabId));
+    if (group) groupsWithSuggestions.add(group.id);
+  });
+
+  wrap.innerHTML = items.map((item, i) => {
+    if (item.type === 'group') {
+      const group = item.group;
+      const hasSuggestion = groupsWithSuggestions.has(group.id);
+      const wobbleClass = _gridEditMode ? 'tile-editing' : '';
+      const pulseClass = hasSuggestion && !_gridEditMode ? 'tile-has-suggestion' : '';
+      const editAttr = _gridEditMode
+        ? `draggable="true" ondragstart="_onDragStart(event,${i})" ondragover="_onDragOver(event,${i})" ondrop="_onDrop(event,${i})" ondragend="_onDragEnd(event)"`
+        : '';
+      const clickFn = _gridEditMode
+        ? `_handleTileLongPress(${i})`
+        : `showGridNavSub('${group.id}')`;
+      const longPressFn = `_startLongPress(${i})`;
+
+      return `<button
+        data-index="${i}"
+        onclick="${clickFn}"
+        onpointerdown="${longPressFn}"
+        onpointerup="_cancelLongPress()"
+        onpointercancel="_cancelLongPress()"
+        ${editAttr}
+        class="glaze-tile tile-landing ${wobbleClass} ${pulseClass}"
+        style="background:${group.color};color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;align-items:center;justify-content:center;text-align:center;animation-delay:${i * 0.035}s;position:relative;">
+        <div style="font-size:19px;font-weight:800;line-height:1.2;padding:8px;">${group.label}</div>
+        ${hasSuggestion && !_gridEditMode ? '<div style="position:absolute;top:6px;right:6px;width:8px;height:8px;background:#2e7d32;border-radius:50%;border:2px solid white;"></div>' : ''}
+      </button>`;
+    } else {
+      // Promoted sub-tile
+      const { item: sub, group } = item;
+      const wobbleClass = _gridEditMode ? 'tile-editing' : '';
+      const clickFn = _gridEditMode
+        ? `demoteSubTile('${sub.tab}')`
+        : `_tileGoToTab('${sub.tab}')`;
+      return `<button
+        data-index="${i}"
+        onclick="${clickFn}"
+        class="glaze-tile tile-landing ${wobbleClass}"
+        style="background:${group.color};filter:brightness(0.88);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;animation-delay:${i * 0.035}s;position:relative;">
+        <div style="font-size:15px;font-weight:800;line-height:1.2;">${sub.label}</div>
+        <div style="font-size:10px;opacity:0.85;margin-top:5px;line-height:1.3;">${sub.desc}</div>
+        ${_gridEditMode ? '<div style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;background:#e53935;border-radius:50%;font-size:11px;font-weight:800;color:white;display:flex;align-items:center;justify-content:center;">✕</div>' : ''}
+      </button>`;
+    }
+  }).join('');
+
+  // Edit mode: done button
+  if (_gridEditMode) {
+    wrap.insertAdjacentHTML('afterend', `
+      <div id="grid-edit-done" style="margin-top:14px;text-align:center;">
+        <button onclick="_exitEditMode()" style="background:#2B2724;color:white;border:none;border-radius:12px;padding:12px 32px;font-size:14px;font-weight:800;cursor:pointer;">Done</button>
+      </div>`);
+  } else {
+    const done = document.getElementById('grid-edit-done');
+    if (done) done.remove();
+  }
 }
+
+// Tap-to-navigate with usage tracking
+function _tileGoToTab(tabId) {
+  _recordTabUsage(tabId);
+  goToTab(tabId);
+}
+
+// Long press detection
+let _longPressTimer = null;
+function _startLongPress(index) {
+  _cancelLongPress();
+  _longPressTimer = setTimeout(() => {
+    _longPressTimer = null;
+    _handleTileLongPress(index);
+  }, 600);
+}
+function _cancelLongPress() {
+  if (_longPressTimer) { clearTimeout(_longPressTimer); _longPressTimer = null; }
+}
+
+// Drag reorder
+function _onDragStart(e, index) {
+  _dragSrcIndex = index;
+  e.currentTarget.classList.add('tile-dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+function _onDragOver(e, index) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('[data-index]').forEach(el => el.classList.remove('tile-drag-over'));
+  e.currentTarget.classList.add('tile-drag-over');
+}
+function _onDrop(e, dropIndex) {
+  e.preventDefault();
+  if (_dragSrcIndex === null || _dragSrcIndex === dropIndex) return;
+
+  // Re-order the flat items list, extract the new group order from it
+  const items = _buildTopLevelItems();
+  const moved = items.splice(_dragSrcIndex, 1)[0];
+  items.splice(dropIndex, 0, moved);
+
+  // Extract new group order (in order of appearance, deduplicated)
+  const newOrder = [];
+  items.forEach(item => {
+    const id = item.type === 'group' ? item.group.id : item.group.id;
+    if (!newOrder.includes(id)) newOrder.push(id);
+  });
+  _saveGridOrder(newOrder);
+  _dragSrcIndex = null;
+  showGridNavTop();
+}
+function _onDragEnd(e) {
+  _dragSrcIndex = null;
+  document.querySelectorAll('[data-index]').forEach(el => {
+    el.classList.remove('tile-dragging', 'tile-drag-over');
+  });
+}
+
 
 function showGridNavSub(groupId) {
   const group = GRID_NAV_STRUCTURE.find(g => g.id === groupId);
   if (!group || !group.items) return;
+
+  // If this group only has one item and it's not been promoted,
+  // go straight to that screen — no point showing a sub-grid of one.
+  const promoted = _getPromoted();
+  const unpromoted = group.items.filter(i => !promoted.includes(i.tab));
+  if (unpromoted.length === 1) {
+    _tileGoToTab(unpromoted[0].tab);
+    return;
+  }
+
   document.getElementById('grid-nav-top').style.display = 'none';
   document.getElementById('grid-nav-sub').style.display = 'block';
   document.getElementById('grid-nav-sub-title').textContent = group.label;
   const wrap = document.getElementById('grid-nav-sub-tiles');
-  // Genuine, real per-tile colour variation within a group — same
-  // base hue, stepped lighter/darker, so every real tile in the
-  // whole app is visually distinct per direct request, not just one
-  // flat colour per group. Second level gets a real short description
-  // under the name, per direct clarification — "slightly more detail"
-  // than the top level, since these name actual specific functions.
-  wrap.innerHTML = group.items.map((item, i) => `
-    <button onclick="goToTab('${item.tab}')" class="glaze-tile tile-landing" style="background:${group.color};filter:brightness(${1 - i * 0.12});color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;animation-delay:${i * 0.035}s;">
+  wrap.innerHTML = unpromoted.map((item, i) => `
+    <button onclick="_tileGoToTab('${item.tab}')" class="glaze-tile tile-landing" style="background:${group.color};filter:brightness(${1 - i * 0.12});color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;animation-delay:${i * 0.035}s;">
       <div style="font-size:16px;font-weight:800;line-height:1.2;">${item.label}</div>
       <div style="font-size:11px;opacity:0.85;margin-top:6px;line-height:1.3;">${item.desc}</div>
     </button>
