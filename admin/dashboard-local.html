@@ -1399,30 +1399,27 @@
 
     /* ── Staff walkthrough ── */
     #swt-overlay { position: fixed; inset: 0; z-index: 9000; pointer-events: none; display: none; }
-    #swt-backdrop { position: absolute; inset: 0; background: rgba(43,39,36,0.8); backdrop-filter: blur(2px); }
+    #swt-backdrop { position: absolute; inset: 0; background: rgba(43,39,36,0.82); backdrop-filter: blur(3px); }
     #swt-spotlight {
       position: absolute; pointer-events: none;
-      transition: all 0.4s cubic-bezier(0.34,1.2,0.4,1);
-      box-shadow: 0 0 0 9999px rgba(43,39,36,0.8);
-      border: 2px solid #B87946; border-radius: 12px;
+      transition: all 0.45s cubic-bezier(0.34,1.2,0.4,1);
+      box-shadow: 0 0 0 9999px rgba(43,39,36,0.82);
+      border: 2.5px solid #B87946; border-radius: 14px;
     }
     #swt-arrow {
-      position: absolute; font-size: 26px; pointer-events: none;
-      animation: swt-bounce 1s ease-in-out infinite;
+      position: absolute; font-size: 28px; pointer-events: none;
+      animation: swt-bounce 0.9s ease-in-out infinite;
     }
-    @keyframes swt-bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
+    @keyframes swt-bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
     #swt-card {
-      position: absolute; background: #fff; border-radius: 18px;
-      padding: 18px 16px 14px; max-width: 310px; width: calc(100vw - 32px);
-      box-shadow: 0 12px 40px rgba(43,39,36,0.35);
-      pointer-events: all; transition: all 0.3s cubic-bezier(0.34,1.2,0.4,1);
+      position: absolute; background: #fff; border-radius: 20px;
+      padding: 20px 18px 16px; max-width: 320px; width: calc(100vw - 32px);
+      box-shadow: 0 16px 48px rgba(43,39,36,0.4);
+      pointer-events: all; transition: all 0.35s cubic-bezier(0.34,1.2,0.4,1);
     }
-    /* Genuine real content reveal, per direct request for animations —
-       each new step's text visibly settles in rather than silently
-       swapping, matching the same tile-landing feel used elsewhere. */
     @keyframes swt-content-in {
-      from { opacity: 0; transform: translateY(6px); }
-      to { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
     #swt-step-label.swt-content-animate,
     #swt-title.swt-content-animate,
@@ -1435,24 +1432,36 @@
       #swt-body.swt-content-animate { animation: none; }
     }
     #swt-step-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: #B87946; text-transform: uppercase; margin-bottom: 5px; }
-    #swt-title { font-size: 16px; font-weight: 700; color: #2B2724; margin-bottom: 5px; line-height: 1.25; }
+    #swt-title { font-size: 17px; font-weight: 800; color: #2B2724; margin-bottom: 6px; line-height: 1.2; }
     #swt-body { font-size: 12px; color: #8a8175; line-height: 1.55; margin-bottom: 14px; }
     #swt-actions { display: flex; flex-direction: column; gap: 8px; }
     #swt-nav-row { display: flex; gap: 8px; }
-    /* Big, unmissable GO/BACK buttons — replaces a small "Next →" text
-       link with a genuinely large, obvious action, matching the same
-       "easy to see and remember" principle as the Clock Out button. */
-    #swt-next-btn { flex: 1; background: #2e7d32; color: #fff; border: none; padding: 15px; border-radius: 12px; font-weight: 800; font-size: 15px; cursor: pointer; letter-spacing: 0.02em; }
-    #swt-back-btn { background: #3d3833; color: #fff; border: none; padding: 15px 18px; border-radius: 12px; font-weight: 800; font-size: 15px; cursor: pointer; }
-    #swt-back-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-    #swt-bottom-row { display: flex; justify-content: space-between; align-items: center; }
-    #swt-skip-btn { background: none; border: none; color: #8a8175; font-size: 11px; cursor: pointer; padding: 6px; }
-    #swt-dots { display: flex; gap: 4px; align-items: center; }
-    .swt-dot { width: 5px; height: 5px; border-radius: 50%; background: #C8BFB2; transition: all 0.2s; }
-    .swt-dot.active { background: #B87946; width: 16px; border-radius: 3px; }
-    #swt-voice-btn { background: none; border: 1.5px solid #C8BFB2; border-radius: 20px; padding: 4px 10px; font-size: 10px; color: #8a8175; cursor: pointer; }
-    #swt-voice-btn.speaking { background: #B87946; color: #fff; border-color: #B87946; }
-    #swt-trigger { position: fixed; bottom: 20px; left: 20px; z-index: 8000; background: #2B2724; color: #fff; border: none; border-radius: 22px; padding: 9px 14px; font-size: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 14px rgba(43,39,36,0.3); display: none; align-items: center; gap: 5px; }
+    #swt-next-btn { flex:1; background:#2e7d32; color:#fff; border:none; padding:15px; border-radius:12px; font-weight:800; font-size:15px; cursor:pointer; }
+    #swt-back-btn { background:#3d3833; color:#fff; border:none; padding:15px 18px; border-radius:12px; font-weight:800; font-size:15px; cursor:pointer; }
+    #swt-back-btn:disabled { opacity:0.3; cursor:not-allowed; }
+    #swt-bottom-row { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+    #swt-skip-btn { background:none; border:none; color:#8a8175; font-size:11px; cursor:pointer; padding:6px; flex-shrink:0; }
+    #swt-dots { display:flex; gap:4px; align-items:center; flex:1; }
+    .swt-dot { width:5px; height:5px; border-radius:50%; background:#C8BFB2; transition:all 0.2s; }
+    .swt-dot.active { background:#B87946; width:16px; border-radius:3px; }
+    /* Autoplay controls */
+    #swt-audio-controls { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+    #swt-autoplay-btn {
+      background:#2B2724; color:#fff; border:none; border-radius:20px;
+      padding:5px 11px; font-size:11px; font-weight:700; cursor:pointer;
+      display:flex; align-items:center; gap:4px; white-space:nowrap;
+    }
+    #swt-autoplay-btn.playing { background:#B87946; }
+    #swt-mute-btn {
+      background:none; border:1.5px solid #C8BFB2; border-radius:50%;
+      width:28px; height:28px; font-size:13px; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+    }
+    #swt-mute-btn.muted { border-color:#e53935; }
+    /* Narration progress bar — shows how far through the current step's audio we are */
+    #swt-audio-bar-wrap { height:3px; background:#f0ebe5; border-radius:2px; margin-bottom:12px; overflow:hidden; display:none; }
+    #swt-audio-bar { height:100%; background:#B87946; border-radius:2px; width:0%; transition:width 0.1s linear; }
+    #swt-trigger { position:fixed; bottom:20px; left:20px; z-index:8000; background:#2B2724; color:#fff; border:none; border-radius:22px; padding:9px 14px; font-size:12px; font-weight:600; cursor:pointer; box-shadow:0 4px 14px rgba(43,39,36,0.3); display:none; align-items:center; gap:5px; }
   </style>
 </head>
 <body>
@@ -1466,6 +1475,7 @@
     <div id="swt-step-label">Step 1 of 12</div>
     <div id="swt-title">Welcome</div>
     <div id="swt-body">Quick tour — tap GO to begin.</div>
+    <div id="swt-audio-bar-wrap"><div id="swt-audio-bar"></div></div>
     <div id="swt-actions">
       <div id="swt-nav-row">
         <button id="swt-back-btn" onclick="swtBack()" disabled>← BACK</button>
@@ -1473,7 +1483,10 @@
       </div>
       <div id="swt-bottom-row">
         <div id="swt-dots"></div>
-        <button id="swt-voice-btn" onclick="swtToggleVoice()">🔊 Read aloud</button>
+        <div id="swt-audio-controls">
+          <button id="swt-mute-btn" onclick="swtToggleMute()" title="Mute narration">🔊</button>
+          <button id="swt-autoplay-btn" onclick="swtToggleAutoplay()">▶ Autoplay</button>
+        </div>
       </div>
     </div>
     <button id="swt-skip-btn" onclick="swtEnd()">Skip tour</button>
@@ -5962,37 +5975,44 @@ const SWT_STEPS = [
 
 ];
 
+// ── Staff Walkthrough Tour ────────────────────────────────────────────
+// Autoplay: narration starts automatically on each step.
+// Auto-advance: when narration finishes the tour moves to the next
+//   step by itself — no button press needed.
+// Mute: persistent toggle, remembered in localStorage.
+// Progress bar: shows how far through the current step's narration.
+// Interactive: each step navigates the real app to show the thing
+//   being described, not just a static highlight.
+// ─────────────────────────────────────────────────────────────────────
+
 let swtStep = 0;
-let swtVoiceOn = false;
+let swtAutoplay = true;  // on by default — real learning tool
+let swtMuted = localStorage.getItem('swt_muted') === '1';
+let _swtUtterance = null;
+let _swtAutoAdvanceTimer = null;
+let _swtAudioBarTimer = null;
+let _swtAudioBarStart = null;
+let _swtAudioBarDuration = 0;
 
 function swtStart() {
   swtStep = 0;
+  swtAutoplay = true;
   document.getElementById('swt-trigger').style.display = 'none';
   document.getElementById('swt-overlay').style.display = 'block';
-  // Genuine real fix: the tour card's own real footprint (centered,
-  // near the bottom or top of the screen) was overlapping the
-  // floating Find My Piece / Cleo buttons on narrow real iPhone
-  // screens, making them genuinely untappable underneath the card —
-  // even where the card was just empty padding. Hiding them for the
-  // real duration of the tour is more reliable than chasing exact
-  // pixel positioning across every possible screen size.
   document.getElementById('find-piece-fab')?.style.setProperty('display', 'none', 'important');
   document.getElementById('cleo-admin-floating-fab')?.style.setProperty('display', 'none', 'important');
   document.getElementById('cleo-admin-floating-bubble')?.style.setProperty('display', 'none', 'important');
+  _swtUpdateAudioControls();
   swtRender();
 }
 
 function swtEnd() {
+  _swtCancelAudio();
   document.getElementById('swt-overlay').style.display = 'none';
   document.getElementById('swt-spotlight').style.cssText = 'display:none';
   document.getElementById('swt-arrow').style.display = 'none';
   document.getElementById('swt-trigger').style.display = 'flex';
-  swtStopVoice();
   localStorage.setItem('swt_done', '1');
-  // Genuine real restore — only if actually still logged in (these
-  // buttons' real base state is hidden until login), removing the
-  // real forced override rather than blindly setting display:flex
-  // regardless of the genuine current login state.
   const findFab = document.getElementById('find-piece-fab');
   const cleoFab = document.getElementById('cleo-admin-floating-fab');
   const cleoBubble = document.getElementById('cleo-admin-floating-bubble');
@@ -6001,80 +6021,194 @@ function swtEnd() {
   if (cleoBubble) cleoBubble.style.removeProperty('display');
   if (currentShiftStaff) {
     if (findFab) findFab.style.display = 'flex';
-    // Cleo's own real widget re-init call handles her correct visibility/rotation state properly, rather than guessing here
     if (typeof initCleoAdminFloatingWidget === 'function') initCleoAdminFloatingWidget();
   }
 }
 
 function swtNext() {
-  swtStopVoice();
+  _swtCancelAudio();
   swtStep++;
   if (swtStep >= SWT_STEPS.length) { swtEnd(); return; }
   swtRender();
 }
 
-// Genuine backward navigation — the tour never had this before, only
-// forward + skip. Disabled on the first step since there's nowhere to
-// go back to.
 function swtBack() {
   if (swtStep <= 0) return;
-  swtStopVoice();
+  _swtCancelAudio();
   swtStep--;
   swtRender();
+}
+
+function swtToggleAutoplay() {
+  swtAutoplay = !swtAutoplay;
+  _swtUpdateAudioControls();
+  if (swtAutoplay) {
+    // Start narration for current step immediately
+    const step = SWT_STEPS[swtStep];
+    if (step?.voice) _swtNarrate(step.voice);
+  } else {
+    _swtCancelAudio();
+  }
+}
+
+function swtToggleMute() {
+  swtMuted = !swtMuted;
+  localStorage.setItem('swt_muted', swtMuted ? '1' : '0');
+  _swtUpdateAudioControls();
+  if (swtMuted) {
+    // Cancel current speech but keep autoplay state
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+  } else if (swtAutoplay) {
+    // Resume narration for current step
+    const step = SWT_STEPS[swtStep];
+    if (step?.voice) _swtNarrate(step.voice);
+  }
+}
+
+function _swtUpdateAudioControls() {
+  const autoBtn = document.getElementById('swt-autoplay-btn');
+  const muteBtn = document.getElementById('swt-mute-btn');
+  if (autoBtn) {
+    autoBtn.textContent = swtAutoplay ? '⏸ Pause' : '▶ Autoplay';
+    autoBtn.classList.toggle('playing', swtAutoplay);
+  }
+  if (muteBtn) {
+    muteBtn.textContent = swtMuted ? '🔇' : '🔊';
+    muteBtn.classList.toggle('muted', swtMuted);
+    muteBtn.title = swtMuted ? 'Unmute narration' : 'Mute narration';
+  }
+}
+
+function _swtCancelAudio() {
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+  if (_swtAutoAdvanceTimer) { clearTimeout(_swtAutoAdvanceTimer); _swtAutoAdvanceTimer = null; }
+  if (_swtAudioBarTimer) { cancelAnimationFrame(_swtAudioBarTimer); _swtAudioBarTimer = null; }
+  const bar = document.getElementById('swt-audio-bar');
+  const wrap = document.getElementById('swt-audio-bar-wrap');
+  if (bar) bar.style.width = '0%';
+  if (wrap) wrap.style.display = 'none';
+}
+
+function _swtNarrate(text) {
+  if (!window.speechSynthesis || !text) {
+    // No speech API — just auto-advance after a readable delay
+    if (swtAutoplay) {
+      const readTime = Math.max(3000, text.length * 60);
+      _swtAutoAdvanceTimer = setTimeout(() => swtNext(), readTime);
+    }
+    return;
+  }
+  window.speechSynthesis.cancel();
+
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.rate = 0.92;
+  utt.pitch = 1.0;
+  const voice = getCleoAdminPreferredVoice();
+  if (voice) { utt.voice = voice; utt.lang = voice.lang; }
+  else utt.lang = 'en-GB';
+
+  // Estimate duration for the progress bar (words / 2.8 words per second)
+  const wordCount = text.split(/\s+/).length;
+  _swtAudioBarDuration = (wordCount / 2.8) * 1000;
+
+  utt.onstart = () => {
+    if (swtMuted) { window.speechSynthesis.cancel(); return; }
+    const wrap = document.getElementById('swt-audio-bar-wrap');
+    const bar = document.getElementById('swt-audio-bar');
+    if (wrap) wrap.style.display = 'block';
+    if (bar) bar.style.width = '0%';
+    _swtAudioBarStart = performance.now();
+    _swtAnimateBar();
+  };
+
+  utt.onend = () => {
+    const bar = document.getElementById('swt-audio-bar');
+    const wrap = document.getElementById('swt-audio-bar-wrap');
+    if (bar) bar.style.width = '100%';
+    if (_swtAudioBarTimer) { cancelAnimationFrame(_swtAudioBarTimer); _swtAudioBarTimer = null; }
+    // Auto-advance after a brief pause at the end of narration
+    if (swtAutoplay) {
+      _swtAutoAdvanceTimer = setTimeout(() => {
+        if (swtStep < SWT_STEPS.length - 1) swtNext();
+        else swtEnd();
+      }, 900);
+    }
+  };
+
+  utt.onerror = () => {
+    // Narration failed silently — just advance if autoplay is on
+    if (swtAutoplay) _swtAutoAdvanceTimer = setTimeout(() => swtNext(), 2500);
+  };
+
+  if (!swtMuted) window.speechSynthesis.speak(utt);
+  else if (swtAutoplay) {
+    // Muted but autoplay on — advance after estimated read time
+    _swtAutoAdvanceTimer = setTimeout(() => swtNext(), _swtAudioBarDuration + 900);
+  }
+}
+
+function _swtAnimateBar() {
+  const bar = document.getElementById('swt-audio-bar');
+  if (!bar || !_swtAudioBarStart) return;
+  const elapsed = performance.now() - _swtAudioBarStart;
+  const pct = Math.min(99, (elapsed / _swtAudioBarDuration) * 100);
+  bar.style.width = pct + '%';
+  if (pct < 99) _swtAudioBarTimer = requestAnimationFrame(_swtAnimateBar);
 }
 
 function swtRender() {
   const step = SWT_STEPS[swtStep];
 
-  // Navigate to the right real screen if needed. Most steps use the
-  // simple `nav` shortcut (goToTab), but some genuinely need to
-  // demonstrate the grid itself — `navFn` runs any real function by
-  // name for those, e.g. showing the top grid or a specific sub-grid.
+  // Navigate the real app to demonstrate the thing being described
   if (step.navFn) {
     window[step.navFn](...(step.navArgs || []));
-    setTimeout(() => swtPositionCard(step), 350);
+    setTimeout(() => { swtPositionCard(step); _swtStartStep(step); }, 400);
   } else if (step.nav) {
     goToTab(step.nav);
-    setTimeout(() => swtPositionCard(step), 350);
+    setTimeout(() => { swtPositionCard(step); _swtStartStep(step); }, 400);
   } else {
     swtPositionCard(step);
+    _swtStartStep(step);
   }
 
-  // Genuine real fix — find-piece-fab is deliberately force-hidden for
-  // the whole tour (see swtStart) to stop the tour card overlapping it
-  // on narrow screens, but the one step that specifically points it
-  // out genuinely needs it visible to actually show something. Every
-  // other step keeps it hidden as before.
-  const findFabDuringTour = document.getElementById('find-piece-fab');
-  if (findFabDuringTour) {
-    findFabDuringTour.style.setProperty('display', step.target === '#find-piece-fab' ? 'flex' : 'none', 'important');
+  // Find Piece button: hidden during tour except the step that spotlights it
+  const findFab = document.getElementById('find-piece-fab');
+  if (findFab) {
+    findFab.style.setProperty('display', step.target === '#find-piece-fab' || step.target === '#shift-badge' ? 'flex' : 'none', 'important');
   }
+}
 
+function _swtStartStep(step) {
+  // Update card content
   const stepLabelEl = document.getElementById('swt-step-label');
-  const titleEl = document.getElementById('swt-title');
-  const bodyEl = document.getElementById('swt-body');
+  const titleEl     = document.getElementById('swt-title');
+  const bodyEl      = document.getElementById('swt-body');
   stepLabelEl.textContent = `Step ${swtStep + 1} of ${SWT_STEPS.length}`;
   titleEl.textContent = step.title;
-  bodyEl.textContent = step.body;
-  // Genuine real animation replay, per direct request for animations
-  // — removes then re-adds the class so the CSS animation genuinely
-  // restarts on every step, not just the first time. Same proven
-  // technique already used for the tile-landing animation elsewhere.
+  bodyEl.textContent  = step.body;
+
+  // Animate content in
   [stepLabelEl, titleEl, bodyEl].forEach(el => {
     el.classList.remove('swt-content-animate');
     void el.offsetWidth;
     el.classList.add('swt-content-animate');
   });
-  document.getElementById('swt-next-btn').textContent = swtStep === SWT_STEPS.length - 1 ? 'DONE ✓' : 'GO →';
-  const backBtn = document.getElementById('swt-back-btn');
-  backBtn.disabled = swtStep === 0;
 
-  const dots = document.getElementById('swt-dots');
-  dots.innerHTML = SWT_STEPS.map((_,i) =>
+  // Navigation buttons
+  document.getElementById('swt-next-btn').textContent = swtStep === SWT_STEPS.length - 1 ? 'DONE ✓' : 'NEXT →';
+  document.getElementById('swt-back-btn').disabled = swtStep === 0;
+
+  // Progress dots
+  document.getElementById('swt-dots').innerHTML = SWT_STEPS.map((_,i) =>
     `<div class="swt-dot ${i===swtStep?'active':''}"></div>`
   ).join('');
 
-  if (swtVoiceOn && step.voice) swtSpeak(step.voice);
+  // Start narration if autoplay is on
+  if (swtAutoplay && step.voice) {
+    _swtNarrate(step.voice);
+  }
+
+  _swtUpdateAudioControls();
 }
 
 function swtPositionCard(step) {
@@ -6130,16 +6264,7 @@ function swtPositionCard(step) {
   card.style.cssText = 'top:50%;left:50%;transform:translate(-50%,-50%);max-width:310px;';
 }
 
-function swtToggleVoice() {
-  swtVoiceOn = !swtVoiceOn;
-  const btn = document.getElementById('swt-voice-btn');
-  btn.classList.toggle('speaking', swtVoiceOn);
-  btn.textContent = swtVoiceOn ? '🔊 Speaking…' : '🔊 Read aloud';
-  if (swtVoiceOn) swtSpeak(SWT_STEPS[swtStep].voice);
-  else swtStopVoice();
-}
-
-// Genuine, generic speech function — real UK voice preference, shared
+// Show trigger after the dashboard loads
 // by the walkthrough tour AND Cleo's actual staff-side chat, rather
 // than duplicating this logic (same real fix already applied on the
 // customer app earlier tonight).
@@ -6246,17 +6371,6 @@ function selectCleoAdminVoice(voiceName) {
   localStorage.setItem('klnk_cleo_admin_voice_name', voiceName);
   testCleoAdminVoice(voiceName);
   openCleoAdminVoicePicker(); // genuinely refresh so the new ✓ shows immediately
-}
-
-function swtSpeak(text) {
-  cleoAdminSpeak(text, null, () => {
-    const btn = document.getElementById('swt-voice-btn');
-    if (btn) { btn.textContent = '🔊 Read aloud'; btn.classList.remove('speaking'); }
-  }, 1, 0.95); // genuine plain, neutral narrator voice for the tour, not Cleo's cute character voice
-}
-
-function swtStopVoice() {
-  if (window.speechSynthesis) window.speechSynthesis.cancel();
 }
 
 // Show trigger after the dashboard loads
