@@ -5559,6 +5559,10 @@ function completeAppReset() {
   localStorage.clear();
   sessionStorage.clear();
   
+  // Mark tour as completed so it doesn't auto-start
+  localStorage.setItem('swt_done', 'true');
+  sessionStorage.setItem('klnk_a2hs_onboarding_shown_this_session', '1');
+  
   // Reset all global state
   if (typeof currentShiftStaff !== 'undefined') currentShiftStaff = null;
   if (typeof currentTab !== 'undefined') currentTab = 'dashboard';
@@ -5575,13 +5579,14 @@ function completeAppReset() {
   // Hide everything, show splash
   setTimeout(() => {
     document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+    document.querySelectorAll('[id*="swt"], [id*="onboarding"]').forEach(el => el.style.display = 'none');
     const splash = document.getElementById('splash-screen');
     const login = document.getElementById('login-screen');
     const modal = document.getElementById('booking-modal');
     if (splash) splash.style.display = 'block';
     if (login) login.style.display = 'none';
     if (modal) modal.style.display = 'none';
-    console.log('✓ App reset — splash showing, fresh start');
+    console.log('✓ App reset — splash showing, tour disabled, fresh start');
   }, 100);
 }
 
