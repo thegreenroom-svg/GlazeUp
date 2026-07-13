@@ -2485,58 +2485,67 @@
      from any real screen or second-level grid always returns to
      THIS top-level grid, never one level up. ═══════════════════ -->
 <!-- ── Live Table Floor Plan ─────────────────────────────────────────
-     Becomes a staff member's home screen when they have active
-     bookings. Shows all tables as draggable diagram tiles.
-     Tap a table to enter the full-screen detail view.
+     Always visible as a tab for all staff. Shows the whole studio
+     floor plan. When a staff member has active tables these are
+     highlighted. Proper glaze-tile exit button back to home.
 ──────────────────────────────────────────────────────────────────── -->
 <div id="floor-plan-view" class="view" style="display:none;flex-direction:column;height:100%;background:#F7F4EE;">
 
-  <!-- Floor plan header -->
-  <div style="background:white;border-bottom:1px solid var(--gu-border);padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+  <!-- Floor plan header — glaze tile style -->
+  <div style="background:#2B2724;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
     <div>
-      <div style="font-size:14px;font-weight:800;color:var(--gu-text);" id="floor-greeting">Tables</div>
-      <div style="font-size:11px;color:var(--gu-dust);" id="floor-subtitle">Your active bookings</div>
+      <div style="font-size:15px;font-weight:800;color:white;" id="floor-greeting">Tables</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.6);" id="floor-subtitle">Live floor plan</div>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;">
-      <button onclick="showAllTablesView()" style="background:var(--gu-bg);border:1.5px solid var(--gu-border);border-radius:10px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;color:var(--gu-text);">🗺️ Full Studio</button>
-      <button onclick="goToRealLandingPage()" style="background:#2e7d32;color:white;border:none;border-radius:10px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">🏠 Home</button>
-    </div>
+    <!-- Glaze-tile style exit button — same visual language as rest of app -->
+    <button onclick="goToRealLandingPage()"
+      class="glaze-tile"
+      style="background:#2e7d32;color:white;border:none;border-radius:14px;padding:10px 16px;font-size:13px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(0,0,0,0.3);">
+      🏠 <span>My Home</span>
+    </button>
   </div>
 
-  <!-- My tables — scales to fit however many are active -->
+  <!-- Room tabs -->
+  <div style="background:#2B2724;border-top:1px solid rgba(255,255,255,0.1);display:flex;gap:2px;padding:0 12px 10px;flex-shrink:0;">
+    <button onclick="filterFloorByRoom('all')" id="floor-tab-all"
+      style="background:#B87946;color:white;border:none;border-radius:20px;padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;">All</button>
+    <button onclick="filterFloorByRoom('Main Studio')" id="floor-tab-main"
+      style="background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.8);border:none;border-radius:20px;padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;">Main Studio</button>
+    <button onclick="filterFloorByRoom('Lounge')" id="floor-tab-lounge"
+      style="background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.8);border:none;border-radius:20px;padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;">Lounge</button>
+    <button onclick="filterFloorByRoom('The Vault')" id="floor-tab-vault"
+      style="background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.8);border:none;border-radius:20px;padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;">Vault</button>
+  </div>
+
+  <!-- Table grid — all tables, occupied ones highlighted -->
   <div id="floor-my-tables" style="flex:1;overflow-y:auto;padding:12px;display:grid;gap:10px;grid-template-columns:1fr 1fr;align-content:start;"></div>
-
-  <!-- All tables modal -->
-  <div id="floor-all-tables-modal" style="display:none;position:fixed;inset:0;z-index:9500;background:#F7F4EE;flex-direction:column;">
-    <div style="background:white;border-bottom:1px solid var(--gu-border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-      <div style="font-size:15px;font-weight:800;">Full Studio</div>
-      <button onclick="document.getElementById('floor-all-tables-modal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--gu-dust);">✕</button>
-    </div>
-    <div id="floor-all-tables-content" style="flex:1;overflow-y:auto;padding:12px;"></div>
-  </div>
 
   <!-- Table detail full-screen -->
   <div id="floor-table-detail" style="display:none;position:fixed;inset:0;z-index:9600;background:#F7F4EE;flex-direction:column;">
-    <div style="background:white;border-bottom:1px solid var(--gu-border);padding:10px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;">
-      <button onclick="closeTableDetail()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--gu-dust);">←</button>
+    <div style="background:#2B2724;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;">
+      <button onclick="closeTableDetail()"
+        class="glaze-tile"
+        style="background:#B87946;color:white;border:none;border-radius:12px;padding:8px 14px;font-size:13px;font-weight:800;cursor:pointer;">
+        ← Back
+      </button>
       <div style="flex:1;">
-        <div style="font-size:15px;font-weight:800;color:var(--gu-text);" id="detail-table-name">Table 4</div>
-        <div style="font-size:11px;color:var(--gu-dust);" id="detail-booking-info">—</div>
+        <div style="font-size:15px;font-weight:800;color:white;" id="detail-table-name">Table 4</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.6);" id="detail-booking-info">—</div>
       </div>
       <!-- Session timer -->
       <div id="detail-timer" style="text-align:right;">
-        <div style="font-size:18px;font-weight:800;color:#2e7d32;" id="detail-time-remaining">—</div>
-        <div style="font-size:9px;color:var(--gu-dust);text-transform:uppercase;letter-spacing:0.05em;">remaining</div>
+        <div style="font-size:20px;font-weight:800;color:#4CAF50;" id="detail-time-remaining">—</div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.05em;">remaining</div>
       </div>
     </div>
     <!-- Session progress bar -->
-    <div style="height:4px;background:var(--gu-border);flex-shrink:0;">
+    <div style="height:5px;background:rgba(255,255,255,0.1);flex-shrink:0;">
       <div id="detail-progress-bar" style="height:100%;background:#2e7d32;transition:width 1s linear;width:0%;"></div>
     </div>
     <!-- Table canvas -->
     <div id="detail-canvas-wrap" style="flex:1;position:relative;overflow:hidden;touch-action:none;"></div>
     <!-- Flow checklist bottom panel -->
-    <div id="detail-checklist" style="background:white;border-top:1px solid var(--gu-border);padding:12px 16px;flex-shrink:0;max-height:40vh;overflow-y:auto;"></div>
+    <div id="detail-checklist" style="background:white;border-top:2px solid var(--gu-border);padding:12px 16px;flex-shrink:0;max-height:45vh;overflow-y:auto;"></div>
   </div>
 
 </div>
@@ -8575,6 +8584,23 @@ async function logOutOfShift() {
 
 const SESSION_DURATION_MINS = 90; // 1.5 hours
 
+// Floor plan room filter state
+let _floorRoomFilter = 'all';
+
+function filterFloorByRoom(room) {
+  _floorRoomFilter = room;
+  // Update tab styles
+  ['all','Main Studio','Lounge','The Vault'].forEach(r => {
+    const id = r === 'all' ? 'floor-tab-all' : r === 'Main Studio' ? 'floor-tab-main' : r === 'Lounge' ? 'floor-tab-lounge' : 'floor-tab-vault';
+    const el = document.getElementById(id);
+    if (!el) return;
+    const active = r === room;
+    el.style.background = active ? '#B87946' : 'rgba(255,255,255,0.15)';
+    el.style.color = active ? 'white' : 'rgba(255,255,255,0.8)';
+  });
+  renderFloorPlan();
+}
+
 // Flow checklist definitions per stage
 const FLOW_CHECKS = {
   booking: [
@@ -8618,7 +8644,6 @@ let _floorData = { bookings: [], tables: [] };
 let _floorRefreshTimer = null;
 let _detailBooking = null;
 let _detailItems = [];
-let _detailDragging = null;
 let _detailTimerInterval = null;
 
 async function loadFloorPlan() {
@@ -8639,126 +8664,122 @@ async function loadFloorPlan() {
   }
 }
 
+// Show the floor plan view (accessible to everyone at all times)
+function showFloorPlan() {
+  document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+  document.getElementById('floor-plan-view').style.display = 'flex';
+  loadFloorPlan();
+  toggleFloatingBackBtn();
+}
+
 function renderFloorPlan() {
   const now = new Date();
   const myId = currentShiftStaff?.id;
+  const name = currentShiftStaff?.name?.split(' ')[0] || 'Staff';
 
-  // My active bookings = assigned to me, or unassigned and active
-  const myBookings = _floorData.bookings.filter(b => {
+  // Count active bookings across the whole studio
+  const activeBookings = _floorData.bookings.filter(b => {
     const start = b.session_start ? new Date(b.session_start) : null;
-    if (!start || start > now) return false;
-    const myAssignment = (b.assignments||[]).find(a => a.staff_member_id === myId);
-    return myAssignment || (b.assignments||[]).length === 0;
+    return start && start <= now;
   });
 
+  document.getElementById('floor-greeting').textContent = `${name} — Floor Plan`;
+  document.getElementById('floor-subtitle').textContent = activeBookings.length
+    ? `${activeBookings.length} active booking${activeBookings.length > 1 ? 's' : ''}`
+    : 'All tables clear';
+
+  // Build booking lookup by table number (from real Square sync data)
+  const bookingByTable = {};
+  activeBookings.forEach(b => {
+    if (b.table_number) bookingByTable[b.table_number] = b;
+  });
+
+  // Filter tables by room
+  const tables = _floorData.tables.filter(t =>
+    _floorRoomFilter === 'all' || t.room === _floorRoomFilter
+  );
+
+  // Scale columns based on number of visible tables
   const grid = document.getElementById('floor-my-tables');
   if (!grid) return;
-
-  // Update greeting
-  const name = currentShiftStaff?.name?.split(' ')[0] || 'Staff';
-  document.getElementById('floor-greeting').textContent = myBookings.length
-    ? `${name}'s tables` : `${name} — no active tables`;
-  document.getElementById('floor-subtitle').textContent = myBookings.length
-    ? `${myBookings.length} booking${myBookings.length > 1 ? 's' : ''} on the floor`
-    : 'All clear';
-
-  // Scale tiles — more bookings = smaller tiles
-  const cols = myBookings.length <= 2 ? '1fr' :
-               myBookings.length <= 4 ? '1fr 1fr' : '1fr 1fr 1fr';
+  const cols = tables.length <= 4 ? '1fr 1fr' : tables.length <= 9 ? '1fr 1fr 1fr' : '1fr 1fr 1fr 1fr';
   grid.style.gridTemplateColumns = cols;
 
-  grid.innerHTML = myBookings.map(b => _renderTableTile(b, now, myId)).join('');
+  if (!tables.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;padding:20px;text-align:center;color:var(--gu-dust);font-size:13px;">No tables in this area yet — add them in Setup → Studio Tables.</div>';
+    return;
+  }
 
-  // Auto-assign current staff to unassigned bookings on first view
-  myBookings.forEach(b => {
-    if ((b.assignments||[]).length === 0 && myId) {
-      fetch(`${API_URL}/api/floor/assign`, {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({
-          studioId, bookingCode: b.booking_code,
-          staffMemberId: myId, staffName: currentShiftStaff.name, isPrimary: true
-        })
-      }).catch(() => {});
-    }
-  });
+  grid.innerHTML = tables.map(t => {
+    const b = bookingByTable[t.name];
+    const occupied = !!b;
+    return occupied ? _renderOccupiedTile(t, b, now) : _renderEmptyTile(t);
+  }).join('');
 }
 
-function _renderTableTile(b, now, myId) {
+function _renderEmptyTile(table) {
+  return `
+    <div style="background:white;border:1.5px solid var(--gu-border);border-radius:16px;padding:12px;text-align:center;opacity:0.5;">
+      <div style="font-size:12px;font-weight:800;color:var(--gu-text);margin-bottom:6px;">${table.name}</div>
+      <div style="margin:4px auto;">${_miniTableSvg(table.capacity || 4)}</div>
+      <div style="font-size:9px;color:var(--gu-dust);margin-top:4px;">${table.room}</div>
+      <div style="font-size:9px;color:var(--gu-dust);">Empty</div>
+    </div>`;
+}
+
+function _renderOccupiedTile(table, b, now) {
   const start = b.session_start ? new Date(b.session_start) : null;
-  const end = start ? new Date(start.getTime() + SESSION_DURATION_MINS * 60000) : null;
   const elapsedMins = start ? Math.floor((now - start) / 60000) : 0;
-  const remainingMins = end ? Math.max(0, Math.floor((end - now) / 60000)) : 0;
+  const remainingMins = Math.max(0, SESSION_DURATION_MINS - elapsedMins);
   const pct = Math.min(100, (elapsedMins / SESSION_DURATION_MINS) * 100);
 
   const stage = b.current_stage || 'booking';
   const stageColor = { booking:'#2e7d32', engagement:'#B87946', completion:'#c0392b', kiln:'#FF5722' }[stage] || '#2e7d32';
   const stageIcon = { booking:'📋', engagement:'🎨', completion:'📷', kiln:'🔥' }[stage] || '📋';
-  const stageLabel = { booking:'Booking', engagement:'Painting', completion:'Complete', kiln:'Kiln' }[stage] || '';
-
-  // Check completion for current stage
-  const stageChecks = FLOW_CHECKS[stage] || [];
-  const completedChecks = stageChecks.filter(c => b.checks?.[`${stage}:${c.key}`]).length;
-  const checkProgress = stageChecks.length ? `${completedChecks}/${stageChecks.length}` : '';
-
-  // Time warning
   const timeColor = remainingMins <= 15 ? '#e53935' : remainingMins <= 30 ? '#F9A825' : '#2e7d32';
 
-  // Chair diagram — small version
-  const capacity = b.num_people || 2;
-  const chairSvg = _miniTableSvg(capacity);
+  const stageChecks = FLOW_CHECKS[stage] || [];
+  const completedChecks = stageChecks.filter(c => b.checks?.[`${stage}:${c.key}`]).length;
 
   return `
     <button onclick="openTableDetail('${b.booking_code}')"
       style="background:white;border:2px solid ${stageColor};border-radius:16px;padding:12px;cursor:pointer;text-align:left;position:relative;overflow:hidden;">
-      <!-- Stage colour top bar -->
       <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${stageColor};"></div>
-      <!-- Session progress -->
-      <div style="position:absolute;top:3px;left:0;height:2px;background:${stageColor};opacity:0.3;width:${pct}%;"></div>
-
-      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px;">
+      <div style="position:absolute;top:3px;left:0;height:2px;background:${stageColor};opacity:0.25;width:${pct}%;"></div>
+      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px;">
         <div>
-          <div style="font-size:14px;font-weight:800;color:var(--gu-text);">${b.table_number || '—'}</div>
-          <div style="font-size:11px;color:var(--gu-dust);">${b.customer_name}</div>
+          <div style="font-size:12px;font-weight:800;color:var(--gu-text);">${table.name}</div>
+          <div style="font-size:10px;color:var(--gu-dust);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;">${b.customer_name}</div>
         </div>
-        <div style="text-align:right;">
-          <div style="font-size:16px;font-weight:800;color:${timeColor};">${remainingMins}<span style="font-size:9px;">m</span></div>
-          <div style="font-size:9px;color:var(--gu-dust);">left</div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:14px;font-weight:800;color:${timeColor};">${remainingMins}<span style="font-size:8px;">m</span></div>
         </div>
       </div>
-
-      <!-- Mini table diagram -->
-      <div style="margin:6px auto;text-align:center;">${chairSvg}</div>
-
-      <!-- Stage + checks -->
+      <div style="margin:4px auto;text-align:center;">${_miniTableSvg(b.num_people || table.capacity || 4)}</div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
-        <span style="background:${stageColor};color:white;border-radius:20px;padding:2px 8px;font-size:9px;font-weight:700;">${stageIcon} ${stageLabel}</span>
-        ${checkProgress ? `<span style="font-size:10px;color:var(--gu-dust);">${checkProgress} done</span>` : ''}
+        <span style="background:${stageColor};color:white;border-radius:20px;padding:2px 7px;font-size:8px;font-weight:700;">${stageIcon}</span>
+        <span style="font-size:9px;color:var(--gu-dust);">${completedChecks}/${stageChecks.length}</span>
       </div>
-
-      ${remainingMins <= 15 && remainingMins > 0 ? '<div style="margin-top:6px;text-align:center;font-size:9px;font-weight:800;color:#e53935;letter-spacing:0.05em;">⚠️ FINISHING SOON</div>' : ''}
+      ${remainingMins <= 15 && remainingMins > 0 ? '<div style="margin-top:4px;text-align:center;font-size:8px;font-weight:800;color:#e53935;">⚠️ FINISHING SOON</div>' : ''}
     </button>`;
 }
 
 function _miniTableSvg(covers) {
-  // Simple top-down table with chairs around it
   const chairs = Math.min(covers, 8);
   const top = Math.ceil(chairs / 2);
   const bottom = Math.floor(chairs / 2);
-  const chairW = 8; const gap = 4;
+  const chairW = 7; const gap = 3;
   const tableW = Math.max(top, bottom) * (chairW + gap);
-  const totalW = tableW + 20; const totalH = 52;
+  const totalW = tableW + 16; const totalH = 46;
   let svg = `<svg viewBox="0 0 ${totalW} ${totalH}" width="${totalW}" height="${totalH}" xmlns="http://www.w3.org/2000/svg">`;
-  // Table
-  svg += `<rect x="10" y="16" width="${tableW}" height="20" rx="4" fill="#E8D8C0" stroke="#B87946" stroke-width="1.5"/>`;
-  // Top chairs
+  svg += `<rect x="8" y="14" width="${tableW}" height="18" rx="3" fill="#E8D8C0" stroke="#B87946" stroke-width="1.5"/>`;
   for (let i=0;i<top;i++) {
-    const x = 10 + i*(chairW+gap) + gap/2;
-    svg += `<rect x="${x}" y="4" width="${chairW}" height="10" rx="2" fill="#B87946"/>`;
+    const x = 8 + i*(chairW+gap) + gap/2;
+    svg += `<rect x="${x}" y="4" width="${chairW}" height="8" rx="2" fill="#B87946"/>`;
   }
-  // Bottom chairs
   for (let i=0;i<bottom;i++) {
-    const x = 10 + i*(chairW+gap) + gap/2;
-    svg += `<rect x="${x}" y="38" width="${chairW}" height="10" rx="2" fill="#B87946"/>`;
+    const x = 8 + i*(chairW+gap) + gap/2;
+    svg += `<rect x="${x}" y="34" width="${chairW}" height="8" rx="2" fill="#B87946"/>`;
   }
   svg += '</svg>';
   return svg;
@@ -8769,14 +8790,12 @@ async function openTableDetail(bookingCode) {
   if (!b) return;
   _detailBooking = b;
 
-  // Load items for this booking
   try {
     const res = await fetch(`${API_URL}/api/floor/items/${bookingCode}?studioId=${studioId}`);
     const data = await res.json();
     _detailItems = data.items || [];
   } catch(e) { _detailItems = []; }
 
-  // If no items yet, auto-populate placemats based on cover count
   if (_detailItems.length === 0) {
     const covers = b.num_people || 2;
     _detailItems = Array.from({length: covers}, (_, i) => ({
@@ -8785,14 +8804,27 @@ async function openTableDetail(bookingCode) {
     }));
   }
 
+  // Find real table name from tables data
+  const tableData = _floorData.tables.find(t => t.name === b.table_number) || {};
   document.getElementById('detail-table-name').textContent = b.table_number || 'Table';
   document.getElementById('detail-booking-info').textContent =
-    `${b.customer_name} · ${b.num_people || '?'} people`;
+    `${b.customer_name} · ${b.num_people || tableData.capacity || '?'} covers · ${tableData.room || ''}`;
 
   document.getElementById('floor-table-detail').style.display = 'flex';
   _startDetailTimer();
   renderDetailCanvas();
   renderDetailChecklist();
+
+  // Auto-assign current staff if unassigned
+  if (currentShiftStaff && (b.assignments||[]).length === 0) {
+    fetch(`${API_URL}/api/floor/assign`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        studioId, bookingCode, staffMemberId: currentShiftStaff.id,
+        staffName: currentShiftStaff.name, isPrimary: true
+      })
+    }).catch(() => {});
+  }
 }
 
 function closeTableDetail() {
@@ -8800,6 +8832,7 @@ function closeTableDetail() {
   if (_detailTimerInterval) { clearInterval(_detailTimerInterval); _detailTimerInterval = null; }
   _detailBooking = null;
   _saveDetailItems();
+  renderFloorPlan();
 }
 
 function _startDetailTimer() {
@@ -8822,7 +8855,7 @@ function _updateDetailTimer() {
   const barEl = document.getElementById('detail-progress-bar');
   if (timerEl) {
     timerEl.textContent = `${remainingMins}m ${remainingSecs}s`;
-    timerEl.style.color = remainingMins <= 15 ? '#e53935' : remainingMins <= 30 ? '#F9A825' : '#2e7d32';
+    timerEl.style.color = remainingMins <= 15 ? '#e53935' : remainingMins <= 30 ? '#F9A825' : '#4CAF50';
   }
   if (barEl) {
     barEl.style.width = pct + '%';
@@ -8835,122 +8868,73 @@ function renderDetailCanvas() {
   if (!wrap || !_detailBooking) return;
   const b = _detailBooking;
   const capacity = b.num_people || 2;
-  const isSplit = false; // TODO: use saved layout
 
   wrap.innerHTML = '';
-
-  // Table canvas
   const canvas = document.createElement('div');
   canvas.style.cssText = 'position:absolute;inset:0;overflow:hidden;background:#F7F4EE;';
   wrap.appendChild(canvas);
 
-  // Draw table
   const tableEl = document.createElement('div');
-  tableEl.style.cssText = `
-    position:absolute; left:50%; top:50%;
-    transform:translate(-50%,-50%);
-    width:65%; height:35%;
-    background:#E8D8C0; border:2px solid #B87946;
-    border-radius:16px; display:flex;
-    align-items:center; justify-content:center;
-    font-size:13px; font-weight:700; color:#8a5520;
-  `;
+  tableEl.style.cssText = `position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:65%;height:32%;background:#E8D8C0;border:2px solid #B87946;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#8a5520;`;
   tableEl.textContent = b.table_number || 'Table';
   canvas.appendChild(tableEl);
 
-  // Chairs around the table — top and bottom
-  const top = Math.ceil(capacity / 2);
-  const bottom = Math.floor(capacity / 2);
   const canvasW = wrap.offsetWidth || 360;
   const canvasH = wrap.offsetHeight || 400;
   const tableW = canvasW * 0.65;
   const tableX = canvasW * 0.175;
-  const tableY = canvasH * 0.35;
-  const tableH = canvasH * 0.3;
+  const tableY = canvasH * 0.34;
+  const tableH = canvasH * 0.32;
+  const top = Math.ceil(capacity / 2);
+  const bottom = Math.floor(capacity / 2);
 
   for (let i=0; i<top; i++) {
-    const chairEl = _makeChair(tableX + (tableW/(top+1))*(i+1) - 18, tableY - 44, i);
-    canvas.appendChild(chairEl);
+    canvas.appendChild(_makeChair(tableX + (tableW/(top+1))*(i+1) - 18, tableY - 44, i));
   }
   for (let i=0; i<bottom; i++) {
-    const chairEl = _makeChair(tableX + (tableW/(bottom+1))*(i+1) - 18, tableY + tableH + 8, i + top);
-    canvas.appendChild(chairEl);
+    canvas.appendChild(_makeChair(tableX + (tableW/(bottom+1))*(i+1) - 18, tableY + tableH + 8, i + top));
   }
 
-  // Draggable items
   _detailItems.forEach((item, idx) => {
     const x = (item.pos_x / 100) * canvasW - 20;
     const y = (item.pos_y / 100) * canvasH - 20;
-    const el = _makeDraggableItem(item, idx, x, y, canvas);
-    canvas.appendChild(el);
+    canvas.appendChild(_makeDraggableItem(item, idx, x, y, canvas));
   });
 
-  // Add item bar at bottom of canvas
+  // Add item bar
   const addBar = document.createElement('div');
-  addBar.style.cssText = 'position:absolute;bottom:8px;left:0;right:0;display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:0 8px;';
+  addBar.style.cssText = 'position:absolute;bottom:8px;left:0;right:0;display:flex;gap:5px;justify-content:center;flex-wrap:wrap;padding:0 8px;';
   addBar.innerHTML = Object.entries(TABLE_ITEM_TYPES).map(([type, {emoji, label}]) =>
-    `<button onclick="addTableItem('${type}')"
-      style="background:white;border:1px solid var(--gu-border);border-radius:20px;padding:4px 10px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:4px;">
-      ${emoji}<span style="font-size:10px;color:var(--gu-dust);">${label}</span>
-    </button>`
+    `<button onclick="addTableItem('${type}')" style="background:white;border:1px solid var(--gu-border);border-radius:20px;padding:4px 9px;font-size:11px;cursor:pointer;">${emoji}</button>`
   ).join('');
   canvas.appendChild(addBar);
 }
 
 function _makeChair(x, y, index) {
   const el = document.createElement('div');
-  el.style.cssText = `
-    position:absolute; left:${x}px; top:${y}px;
-    width:36px; height:36px;
-    background:#B87946; border-radius:8px;
-    display:flex; align-items:center; justify-content:center;
-    font-size:18px; cursor:grab; user-select:none;
-  `;
+  el.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:36px;height:36px;background:#B87946;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:grab;user-select:none;`;
   el.textContent = '🪑';
-  _makeDraggable(el, x, y, (nx, ny) => {
-    el.style.left = nx + 'px';
-    el.style.top = ny + 'px';
-  });
+  _makeDraggable(el, x, y, (nx, ny) => { el.style.left = nx+'px'; el.style.top = ny+'px'; });
   return el;
 }
 
 function _makeDraggableItem(item, idx, x, y, canvas) {
   const el = document.createElement('div');
   const typeInfo = TABLE_ITEM_TYPES[item.item_type] || { emoji: '●', label: '' };
-  el.style.cssText = `
-    position:absolute; left:${x}px; top:${y}px;
-    width:40px; height:40px; border-radius:50%;
-    background:white; border:1.5px solid var(--gu-border);
-    display:flex; align-items:center; justify-content:center;
-    font-size:22px; cursor:grab; user-select:none;
-    box-shadow:0 2px 8px rgba(0,0,0,0.1);
-    z-index:10;
-  `;
+  el.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:40px;height:40px;border-radius:50%;background:white;border:1.5px solid var(--gu-border);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:grab;user-select:none;box-shadow:0 2px 8px rgba(0,0,0,0.1);z-index:10;`;
   el.textContent = typeInfo.emoji;
   el.title = typeInfo.label;
-  el.dataset.itemIdx = idx;
 
-  // Long press to remove
   let longPressTimer;
-  el.addEventListener('pointerdown', () => {
-    longPressTimer = setTimeout(() => {
-      if (confirm(`Remove ${typeInfo.label}?`)) {
-        _detailItems.splice(idx, 1);
-        renderDetailCanvas();
-        _saveDetailItems();
-      }
-    }, 800);
-  });
+  el.addEventListener('pointerdown', () => { longPressTimer = setTimeout(() => {
+    if (confirm(`Remove ${typeInfo.label}?`)) { _detailItems.splice(idx, 1); renderDetailCanvas(); _saveDetailItems(); }
+  }, 800); });
   el.addEventListener('pointerup', () => clearTimeout(longPressTimer));
 
   _makeDraggable(el, x, y, (nx, ny) => {
-    el.style.left = nx + 'px';
-    el.style.top = ny + 'px';
+    el.style.left = nx+'px'; el.style.top = ny+'px';
     const wrap = document.getElementById('detail-canvas-wrap');
-    if (wrap) {
-      _detailItems[idx].pos_x = ((nx + 20) / wrap.offsetWidth) * 100;
-      _detailItems[idx].pos_y = ((ny + 20) / wrap.offsetHeight) * 100;
-    }
+    if (wrap) { _detailItems[idx].pos_x = ((nx+20)/wrap.offsetWidth)*100; _detailItems[idx].pos_y = ((ny+20)/wrap.offsetHeight)*100; }
   });
   return el;
 }
@@ -8958,39 +8942,28 @@ function _makeDraggableItem(item, idx, x, y, canvas) {
 function _makeDraggable(el, startX, startY, onMove) {
   let isDragging = false, startPX, startPY, origX, origY;
   el.addEventListener('pointerdown', e => {
-    isDragging = true;
-    startPX = e.clientX; startPY = e.clientY;
+    isDragging = true; startPX = e.clientX; startPY = e.clientY;
     origX = parseInt(el.style.left); origY = parseInt(el.style.top);
-    el.setPointerCapture(e.pointerId);
-    e.stopPropagation();
+    el.setPointerCapture(e.pointerId); e.stopPropagation();
   });
   el.addEventListener('pointermove', e => {
     if (!isDragging) return;
-    const dx = e.clientX - startPX; const dy = e.clientY - startPY;
-    onMove(origX + dx, origY + dy);
+    onMove(origX + e.clientX - startPX, origY + e.clientY - startPY);
   });
-  el.addEventListener('pointerup', () => {
-    isDragging = false;
-    _saveDetailItems();
-  });
+  el.addEventListener('pointerup', () => { isDragging = false; _saveDetailItems(); });
 }
 
 function addTableItem(type) {
-  const wrap = document.getElementById('detail-canvas-wrap');
-  const newItem = {
-    id: `item_${Date.now()}`, item_type: type, item_label: TABLE_ITEM_TYPES[type]?.label || '',
-    pos_x: 45 + Math.random()*10, pos_y: 45 + Math.random()*10
-  };
-  _detailItems.push(newItem);
+  _detailItems.push({ id:`item_${Date.now()}`, item_type:type, item_label: TABLE_ITEM_TYPES[type]?.label||'', pos_x:45+Math.random()*10, pos_y:45+Math.random()*10 });
   renderDetailCanvas();
 }
 
 function _saveDetailItems() {
   if (!_detailBooking) return;
   fetch(`${API_URL}/api/floor/items/${_detailBooking.booking_code}`, {
-    method: 'POST', headers: {'Content-Type':'application/json'},
+    method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ studioId, items: _detailItems })
-  }).catch(() => {});
+  }).catch(()=>{});
 }
 
 function renderDetailChecklist() {
@@ -9001,114 +8974,50 @@ function renderDetailChecklist() {
   const el = document.getElementById('detail-checklist');
   if (!el) return;
 
+  const stageColor = { booking:'#2e7d32', engagement:'#B87946', completion:'#c0392b', kiln:'#FF5722' }[stage] || '#2e7d32';
+
   el.innerHTML = `
-    <div style="font-size:11px;font-weight:700;color:var(--gu-dust);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;">
-      ${stage === 'booking' ? '📋 Booking' : stage === 'engagement' ? '🎨 Painting' : stage === 'completion' ? '📷 Completion' : '🔥 Kiln'} checklist
+    <div style="font-size:11px;font-weight:700;color:${stageColor};text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;">
+      ${{ booking:'📋 Booking', engagement:'🎨 Painting', completion:'📷 Completion', kiln:'🔥 Kiln' }[stage]} checklist
     </div>
     ${checks.map(c => {
       const done = !!b.checks?.[`${stage}:${c.key}`];
-      return `
-        <button onclick="toggleFlowCheck('${b.booking_code}','${stage}','${c.key}',${!done})"
-          style="width:100%;text-align:left;background:${done ? '#f0f8f0' : 'var(--gu-bg)'};
-          border:1.5px solid ${done ? '#2e7d32' : 'var(--gu-border)'};
-          border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer;
-          display:flex;align-items:center;gap:10px;">
-          <span style="font-size:18px;">${done ? '✅' : '⬜'}</span>
-          <span style="font-size:13px;font-weight:600;color:${done ? '#2e7d32' : 'var(--gu-text)'};
-          text-decoration:${done ? 'line-through' : 'none'};opacity:${done ? 0.7 : 1};">${c.label}</span>
-        </button>`;
+      return `<button onclick="toggleFlowCheck('${b.booking_code}','${stage}','${c.key}',${!done})"
+        style="width:100%;text-align:left;background:${done?'#f0f8f0':'var(--gu-bg)'};border:1.5px solid ${done?'#2e7d32':'var(--gu-border)'};border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:18px;">${done?'✅':'⬜'}</span>
+        <span style="font-size:13px;font-weight:600;color:${done?'#2e7d32':'var(--gu-text)'};text-decoration:${done?'line-through':'none'};opacity:${done?0.7:1};">${c.label}</span>
+      </button>`;
     }).join('')}
-    <div style="margin-top:10px;">
-      <button onclick="openBookingAtRealStage('${b.booking_code}','${stage}')"
-        style="width:100%;background:#2e7d32;color:white;border:none;border-radius:12px;
-        padding:12px;font-size:13px;font-weight:800;cursor:pointer;">
-        Open full booking →
-      </button>
-    </div>
-  `;
+    <button onclick="openBookingAtRealStage('${b.booking_code}','${stage}')"
+      style="width:100%;background:${stageColor};color:white;border:none;border-radius:12px;padding:12px;font-size:13px;font-weight:800;cursor:pointer;margin-top:4px;">
+      Open full booking →
+    </button>`;
 }
 
 async function toggleFlowCheck(bookingCode, stage, checkKey, completed) {
   const staffName = currentShiftStaff?.name || 'Staff';
   await fetch(`${API_URL}/api/floor/check`, {
-    method: 'POST', headers: {'Content-Type':'application/json'},
+    method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ studioId, bookingCode, stage, checkKey, completed, staffName })
   });
-  // Update local state
   if (_detailBooking?.booking_code === bookingCode) {
     if (!_detailBooking.checks) _detailBooking.checks = {};
     _detailBooking.checks[`${stage}:${checkKey}`] = completed;
     renderDetailChecklist();
   }
-  // Refresh floor
   await loadFloorPlan();
 }
 
-function showAllTablesView() {
-  const modal = document.getElementById('floor-all-tables-modal');
-  const content = document.getElementById('floor-all-tables-content');
-  if (!modal || !content) return;
-
-  const rooms = {};
-  _floorData.tables.forEach(t => {
-    if (!rooms[t.room]) rooms[t.room] = [];
-    rooms[t.room].push(t);
-  });
-
-  const now = new Date();
-  const bookingByTable = {};
-  _floorData.bookings.forEach(b => {
-    const start = b.session_start ? new Date(b.session_start) : null;
-    if (start && start <= now) bookingByTable[b.table_number] = b;
-  });
-
-  content.innerHTML = Object.entries(rooms).map(([room, tables]) => `
-    <div style="margin-bottom:20px;">
-      <div style="font-size:11px;font-weight:700;color:var(--gu-dust);text-transform:uppercase;
-        letter-spacing:0.06em;margin-bottom:8px;">${room}</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;">
-        ${tables.map(t => {
-          const b = bookingByTable[t.name];
-          const occupied = !!b;
-          const stage = b?.current_stage || 'booking';
-          const stageColor = {booking:'#2e7d32',engagement:'#B87946',completion:'#c0392b',kiln:'#FF5722'}[stage]||'#2e7d32';
-          return `
-            <button onclick="${occupied ? `openTableDetail('${b.booking_code}')` : ''}"
-              style="background:${occupied ? 'white' : '#F7F4EE'};
-              border:2px solid ${occupied ? stageColor : 'var(--gu-border)'};
-              border-radius:12px;padding:10px 8px;cursor:${occupied ? 'pointer' : 'default'};
-              text-align:center;opacity:${occupied ? 1 : 0.5};">
-              <div style="font-size:12px;font-weight:800;color:var(--gu-text);">${t.name}</div>
-              <div style="margin:6px auto;">${_miniTableSvg(b?.num_people || t.capacity)}</div>
-              ${occupied ? `<div style="font-size:9px;font-weight:700;color:${stageColor};">${b.customer_name}</div>` : '<div style="font-size:9px;color:var(--gu-dust);">Empty</div>'}
-            </button>`;
-        }).join('')}
-      </div>
-    </div>
-  `).join('');
-
-  modal.style.display = 'flex';
-}
-
-// Check whether the floor plan should be the home screen right now.
-// Called after login and after every floor plan refresh.
+// _checkFloorPlanMode — no longer auto-switches home screen.
+// Floor plan is always accessible via the Tables tile on the grid.
+// This just refreshes the render if the floor plan is currently visible.
 function _checkFloorPlanMode() {
-  if (!currentShiftStaff) return;
-  const now = new Date();
-  const hasActiveTables = _floorData.bookings.some(b => {
-    const start = b.session_start ? new Date(b.session_start) : null;
-    return start && start <= now;
-  });
-  // Switch to floor plan view only if we're currently on the grid home screen
-  const gridVisible = document.getElementById('grid-nav-view')?.style.display !== 'none';
-  const floorVisible = document.getElementById('floor-plan-view')?.style.display !== 'none';
-  if (hasActiveTables && (gridVisible || floorVisible)) {
-    document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
-    document.getElementById('floor-plan-view').style.display = 'flex';
-  } else if (!hasActiveTables && floorVisible) {
-    showGridNav();
-  }
+  const floorVisible = document.getElementById('floor-plan-view')?.style.display === 'flex';
+  if (floorVisible) renderFloorPlan();
 }
+
+function showAllTablesView() { /* legacy — now built into main floor plan */ }
+
 
 // ── Grid navigation history — back, forward, undo ────────────────────
 // A simple three-button bar present on every grid screen.
@@ -9757,6 +9666,9 @@ function demoteSubTile(tabId) {
 })();
 
 const GRID_NAV_STRUCTURE = [
+  { id: 'tables', label: 'Tables', color: '#00695c', items: [
+    { tab: '_floorplan', label: 'Floor Plan', desc: 'Live view of all tables', fn: 'showFloorPlan' },
+  ]},
   { id: 'dashboard', label: 'Dashboard', color: '#B87946', items: [
     { tab: 'dashboard', label: 'Overview', desc: 'Your daily overview' },
   ]},
@@ -10031,7 +9943,9 @@ function showGridNavSub(groupId, skipHistoryPush) {
   const promoted = _getPromoted();
   const unpromoted = group.items.filter(i => !promoted.includes(i.tab));
   if (unpromoted.length === 1) {
-    _tileGoToTab(unpromoted[0].tab);
+    const singleItem = unpromoted[0];
+    if (singleItem.fn && window[singleItem.fn]) { window[singleItem.fn](); }
+    else { _tileGoToTab(singleItem.tab); }
     return;
   }
 
@@ -10041,7 +9955,7 @@ function showGridNavSub(groupId, skipHistoryPush) {
   document.getElementById('grid-nav-sub-title').textContent = group.label;
   const wrap = document.getElementById('grid-nav-sub-tiles');
   wrap.innerHTML = unpromoted.map((item, i) => `
-    <button onclick="_tileGoToTab('${item.tab}')" class="glaze-tile tile-landing" style="background:${group.color};filter:brightness(${1 - i * 0.12});color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;animation-delay:${i * 0.035}s;">
+    <button onclick="${item.fn ? `${item.fn}()` : `_tileGoToTab('${item.tab}')`}" class="glaze-tile tile-landing" style="background:${group.color};filter:brightness(${1 - i * 0.12});color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;animation-delay:${i * 0.035}s;">
       <div style="font-size:16px;font-weight:800;line-height:1.2;">${item.label}</div>
       <div style="font-size:11px;opacity:0.85;margin-top:6px;line-height:1.3;">${item.desc}</div>
     </button>
