@@ -2477,12 +2477,6 @@
   <div id="grid-nav-top" style="padding:20px;">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:4px;">
       <h2 style="margin:0;">The Kiln Cafe</h2>
-      <!-- Genuine real, separate mini tile, per direct request —
-           Host By Post is genuinely a different business, not a
-           Kiln Cafe operational task, so it sits apart from the
-           main grid, next to the heading. Real, direct link straight
-           into its actual working section — same postal-stamp mark
-           already built for it. -->
       <button onclick="goToTab('setup'); showSetupSection('hostbypost');" class="glaze-tile" style="flex-shrink:0;width:60px;background:#2B2724;color:white;border:none;border-radius:12px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:4px;gap:2px;">
         <img src="/brand-assets/kiln-cafe-logo-demo/hostbypost-mark-demo.svg" alt="" style="width:20px;height:auto;">
         <span style="font-size:7px;font-weight:800;line-height:1.1;">Host By Post</span>
@@ -2497,6 +2491,8 @@
     <p style="color:var(--gu-dust);margin:0 0 20px;">Tap a square to open it.</p>
     <div id="grid-nav-sub-tiles" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;"></div>
   </div>
+  <!-- Back / Forward / Undo / Redo — always present on the grid -->
+  <div id="grid-nav-controls" style="display:flex;gap:8px;padding:0 20px 20px;"></div>
 </div>
 
 <!-- Genuine real Barista landing page, per direct request — David's
@@ -8221,6 +8217,127 @@ async function logOutOfShift() {
 // single tile calls the exact same, unmodified goToTab() already
 // used by the sidebar — nothing underneath was changed at all.
 // ═══════════════════════════════════════════════════════════
+// ── Grid navigation history — back, forward, undo ────────────────────
+// A simple three-button bar present on every grid screen.
+// Back/Forward: navigate through the history of screens visited.
+// Undo: reverses the last tile layout change (reorder, promote, remove).
+//
+// History tracks: which grid was showing (top, sub, or personal) and
+// what groupId was showing for sub-grids. Layout changes tracked
+// separately so undo is always a layout action, not a navigation action.
+// ─────────────────────────────────────────────────────────────────────
+
+const _navHistory = [];
+let _navHistoryIndex = -1;
+const _layoutHistory = []; // stack of {tileOrder, promotedTiles} snapshots
+const _layoutFuture  = []; // for redo
+
+function _navPush(state) {
+  // Trim any forward history when a new navigation happens
+  if (_navHistoryIndex < _navHistory.length - 1) {
+    _navHistory.splice(_navHistoryIndex + 1);
+  }
+  _navHistory.push(state);
+  _navHistoryIndex = _navHistory.length - 1;
+  _updateNavControls();
+}
+
+function _navBack() {
+  if (_navHistoryIndex <= 0) return;
+  _navHistoryIndex--;
+  _applyNavState(_navHistory[_navHistoryIndex]);
+  _updateNavControls();
+}
+
+function _navForward() {
+  if (_navHistoryIndex >= _navHistory.length - 1) return;
+  _navHistoryIndex++;
+  _applyNavState(_navHistory[_navHistoryIndex]);
+  _updateNavControls();
+}
+
+function _applyNavState(state) {
+  if (!state) return;
+  if (state.type === 'top') {
+    showGridNavTop();
+  } else if (state.type === 'personal') {
+    showPersonalHomeScreen();
+  } else if (state.type === 'sub') {
+    showGridNavSub(state.groupId, true); // true = skip history push
+  }
+}
+
+// Layout undo/redo — snapshots taken before every tile layout change
+function _layoutSnapshot() {
+  if (!_personalScreen) return;
+  _layoutHistory.push({
+    tileOrder: [..._personalScreen.tileOrder],
+    promotedTiles: [..._personalScreen.promotedTiles]
+  });
+  // A new change invalidates the redo stack
+  _layoutFuture.length = 0;
+  _updateNavControls();
+}
+
+function _layoutUndo() {
+  if (!_personalScreen || !_layoutHistory.length) return;
+  // Save current state to redo stack
+  _layoutFuture.push({
+    tileOrder: [..._personalScreen.tileOrder],
+    promotedTiles: [..._personalScreen.promotedTiles]
+  });
+  const prev = _layoutHistory.pop();
+  _personalScreen.tileOrder = prev.tileOrder;
+  _personalScreen.promotedTiles = prev.promotedTiles;
+  savePersonalHomeScreen();
+  showPersonalHomeScreen();
+  _updateNavControls();
+}
+
+function _layoutRedo() {
+  if (!_personalScreen || !_layoutFuture.length) return;
+  _layoutHistory.push({
+    tileOrder: [..._personalScreen.tileOrder],
+    promotedTiles: [..._personalScreen.promotedTiles]
+  });
+  const next = _layoutFuture.pop();
+  _personalScreen.tileOrder = next.tileOrder;
+  _personalScreen.promotedTiles = next.promotedTiles;
+  savePersonalHomeScreen();
+  showPersonalHomeScreen();
+  _updateNavControls();
+}
+
+function _updateNavControls() {
+  const bar = document.getElementById('grid-nav-controls');
+  if (!bar) return;
+  const canBack = _navHistoryIndex > 0;
+  const canForward = _navHistoryIndex < _navHistory.length - 1;
+  const canUndo = _personalScreen && _layoutHistory.length > 0;
+  const canRedo = _personalScreen && _layoutFuture.length > 0;
+
+  bar.innerHTML = `
+    <button onclick="_navBack()" ${canBack ? '' : 'disabled'}
+      style="flex:1;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:8px;font-size:13px;font-weight:700;cursor:${canBack ? 'pointer' : 'default'};color:${canBack ? 'var(--gu-text)' : 'var(--gu-dust)'};">
+      ← Back
+    </button>
+    <button onclick="_navForward()" ${canForward ? '' : 'disabled'}
+      style="flex:1;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:8px;font-size:13px;font-weight:700;cursor:${canForward ? 'pointer' : 'default'};color:${canForward ? 'var(--gu-text)' : 'var(--gu-dust)'};">
+      Forward →
+    </button>
+    ${canUndo || canRedo ? `
+    <button onclick="_layoutUndo()" ${canUndo ? '' : 'disabled'}
+      style="flex:1;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:8px;font-size:13px;font-weight:700;cursor:${canUndo ? 'pointer' : 'default'};color:${canUndo ? '#c0392b' : 'var(--gu-dust)'};">
+      ↩ Undo
+    </button>
+    ${canRedo ? `<button onclick="_layoutRedo()"
+      style="flex:1;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:8px;font-size:13px;font-weight:700;cursor:pointer;color:#2e7d32;">
+      Redo ↪
+    </button>` : ''}
+    ` : ''}
+  `;
+}
+
 // ── Personal staff home screen ────────────────────────────────────────
 // Each staff member gets their own tile home screen, saved to Supabase
 // so it follows them to any tablet in the studio.
@@ -8395,13 +8512,12 @@ function _buildPersonalItems() {
 
 function _personalTileTap(index) {
   if (!_personalEditMode) return;
-  // In edit mode — tap removes the tile
   const items = _buildPersonalItems();
   const item = items[index];
   if (!item) return;
+  _layoutSnapshot(); // capture before change so undo can restore
   if (item.type === 'group') {
     _personalScreen.tileOrder = _personalScreen.tileOrder.filter(id => id !== item.group.id);
-    // Also remove any promoted sub-tiles from this group
     item.group.items.forEach(sub => {
       _personalScreen.promotedTiles = _personalScreen.promotedTiles.filter(t => t !== sub.tab);
     });
@@ -8471,6 +8587,7 @@ function _showAddTileSheet() {
 }
 
 function _addPersonalTile(type, id) {
+  _layoutSnapshot();
   if (type === 'group') {
     if (!_personalScreen.tileOrder.includes(id)) {
       _personalScreen.tileOrder.push(id);
@@ -8497,6 +8614,7 @@ function _pDragOver(e, i) { e.preventDefault(); document.querySelectorAll('[data
 function _pDrop(e, dropIndex) {
   e.preventDefault();
   if (_pDragSrc === null || _pDragSrc === dropIndex) return;
+  _layoutSnapshot();
   const items = _buildPersonalItems();
   const moved = items.splice(_pDragSrc, 1)[0];
   items.splice(dropIndex, 0, moved);
@@ -8845,13 +8963,11 @@ async function openBookingAtRealStage(bookingCode, stage) {
 function showGridNav() {
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
   document.getElementById('grid-nav-view').style.display = 'block';
-  // Use personal home screen if this staff member has one set up
-  // (or has role defaults that haven't been personalised yet).
-  // Fall back to the full shared grid if no personal screen exists
-  // — e.g. before login resolves, or for shared/testing use.
   if (_personalScreen && _personalScreen.tileOrder.length > 0) {
+    _navPush({ type: 'personal' });
     showPersonalHomeScreen();
   } else {
+    _navPush({ type: 'top' });
     showGridNavTop();
   }
   toggleFloatingBackBtn();
@@ -8928,10 +9044,10 @@ function showGridNavTop() {
     if (done) done.remove();
   }
 
-  // Glaze name labels — one beneath each tile, same grid as tiles
   const glazeLabelsEl = document.getElementById('grid-glaze-labels');
   if (glazeLabelsEl) glazeLabelsEl.innerHTML = '';
 
+  _updateNavControls();
 }
 
 // Tap-to-navigate with usage tracking
@@ -8998,7 +9114,7 @@ function _onDragEnd(e) {
 }
 
 
-function showGridNavSub(groupId) {
+function showGridNavSub(groupId, skipHistoryPush) {
   const group = GRID_NAV_STRUCTURE.find(g => g.id === groupId);
   if (!group || !group.items) return;
 
@@ -9011,6 +9127,7 @@ function showGridNavSub(groupId) {
     return;
   }
 
+  if (!skipHistoryPush) _navPush({ type: 'sub', groupId });
   document.getElementById('grid-nav-top').style.display = 'none';
   document.getElementById('grid-nav-sub').style.display = 'block';
   document.getElementById('grid-nav-sub-title').textContent = group.label;
@@ -9021,6 +9138,7 @@ function showGridNavSub(groupId) {
       <div style="font-size:11px;opacity:0.85;margin-top:6px;line-height:1.3;">${item.desc}</div>
     </button>
   `).join('');
+  _updateNavControls();
 }
 
 function applyShiftUI() {
@@ -9141,11 +9259,7 @@ function confirmDirectLogout() {
   if (!currentShiftStaff) return;
   const name = currentShiftStaff.name;
   if (confirm(`Log out ${name}?`)) {
-    // Closing checklist — PARKED, per direct request, kept as demo
-    // for now. Genuinely nothing deleted: the real modal, its data,
-    // and every function are completely untouched — this is the
-    // single, reversible line to restore it.
-    // maybeShowClosingChecklist();
+    logOutOfShift();
   }
 }
 
