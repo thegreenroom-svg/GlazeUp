@@ -2657,7 +2657,7 @@
       </div>
       <div style="text-align:right;">
         <div style="font-size:20px;font-weight:800;color:#4CAF50;" id="detail-time-remaining">—</div>
-        <div style="font-size:9px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.05em;">remaining</div>
+        <div style="font-size:9px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.05em;" id="detail-timer-label">remaining</div>
       </div>
     </div>
     <div style="height:5px;background:rgba(255,255,255,0.1);flex-shrink:0;">
@@ -8702,9 +8702,43 @@ async function logOutOfShift() {
 // and draggable items (placemats, drinks, cake, etc).
 // ─────────────────────────────────────────────────────────────────────
 
-const SESSION_DURATION_MINS = 90; // 1.5 hours
+const SESSION_DURATION_MINS = 90; // default for standard sessions
 
-// Floor plan room filter state
+// Work out the real session duration for a booking based on its type,
+// the day of the week (Thursdays = all-day painting sessions), and
+// the room. All-day sessions show elapsed time rather than countdown.
+function _sessionDuration(booking) {
+  const type = booking.booking_type || 'standard';
+  if (type === 'all_day') return null; // null = all day, no countdown
+  if (type === 'group') return null;   // groups book the room, no fixed end
+  // Check if the session was booked on a Thursday (all-day painting day)
+  const start = booking.session_start ? new Date(booking.session_start) : null;
+  if (start && start.getDay() === 4) return null; // Thursday = all day
+  // Standard = 90 minutes
+  return 90;
+}
+
+function _sessionTimerDisplay(booking, now) {
+  const start = booking.session_start ? new Date(booking.session_start) : null;
+  if (!start) return { label: '—', color: '#8a8175', pct: 0, isAllDay: false };
+
+  const durationMins = _sessionDuration(booking);
+
+  if (durationMins === null) {
+    // All-day or group — show elapsed time, no countdown
+    const elapsedMins = Math.floor((now - start) / 60000);
+    const hrs = Math.floor(elapsedMins / 60);
+    const mins = elapsedMins % 60;
+    const label = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+    return { label, sublabel: 'in', color: '#2e7d32', pct: 0, isAllDay: true };
+  }
+
+  const elapsedMins = Math.floor((now - start) / 60000);
+  const remainingMins = Math.max(0, durationMins - elapsedMins);
+  const pct = Math.min(100, (elapsedMins / durationMins) * 100);
+  const color = remainingMins <= 15 ? '#e53935' : remainingMins <= 30 ? '#F9A825' : '#2e7d32';
+  return { label: `${remainingMins}m`, sublabel: 'left', color, pct, isAllDay: false };
+}
 let _floorRoomFilter = 'all';
 
 function filterFloorByRoom(room) {
@@ -8879,31 +8913,32 @@ function _renderEmptyTile(table) {
 }
 
 function _renderOccupiedTile(table, b, now) {
-  const start = b.session_start ? new Date(b.session_start) : null;
-  const elapsedMins = start ? Math.floor((now - start) / 60000) : 0;
-  const remainingMins = Math.max(0, SESSION_DURATION_MINS - elapsedMins);
-  const pct = Math.min(100, (elapsedMins / SESSION_DURATION_MINS) * 100);
-
+  const timer = _sessionTimerDisplay(b, now);
   const stage = b.current_stage || 'booking';
   const stageColor = { booking:'#2e7d32', engagement:'#B87946', completion:'#c0392b', kiln:'#FF5722' }[stage] || '#2e7d32';
   const stageIcon = { booking:'📋', engagement:'🎨', completion:'📷', kiln:'🔥' }[stage] || '📋';
-  const timeColor = remainingMins <= 15 ? '#e53935' : remainingMins <= 30 ? '#F9A825' : '#2e7d32';
-
   const stageChecks = FLOW_CHECKS[stage] || [];
   const completedChecks = stageChecks.filter(c => b.checks?.[`${stage}:${c.key}`]).length;
+
+  // Special badges for booking type
+  const isAllDay = timer.isAllDay;
+  const isThursday = b.session_start && new Date(b.session_start).getDay() === 4;
+  const typeBadge = isThursday ? '<span style="font-size:8px;background:#5E35B1;color:white;border-radius:4px;padding:1px 4px;margin-left:4px;">ALL DAY</span>'
+    : (b.booking_type === 'group' ? '<span style="font-size:8px;background:#F9A825;color:#2B2724;border-radius:4px;padding:1px 4px;margin-left:4px;">GROUP</span>' : '');
 
   return `
     <button onclick="openTableDetail('${b.booking_code}')"
       style="background:white;border:2px solid ${stageColor};border-radius:16px;padding:12px;cursor:pointer;text-align:left;position:relative;overflow:hidden;">
       <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${stageColor};"></div>
-      <div style="position:absolute;top:3px;left:0;height:2px;background:${stageColor};opacity:0.25;width:${pct}%;"></div>
+      ${!isAllDay ? `<div style="position:absolute;top:3px;left:0;height:2px;background:${stageColor};opacity:0.25;width:${timer.pct}%;"></div>` : ''}
       <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px;">
-        <div>
-          <div style="font-size:12px;font-weight:800;color:var(--gu-text);">${table.name}</div>
-          <div style="font-size:10px;color:var(--gu-dust);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;">${b.customer_name}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;font-weight:800;color:var(--gu-text);">${table.name}${typeBadge}</div>
+          <div style="font-size:10px;color:var(--gu-dust);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${b.customer_name}</div>
         </div>
-        <div style="text-align:right;flex-shrink:0;">
-          <div style="font-size:14px;font-weight:800;color:${timeColor};">${remainingMins}<span style="font-size:8px;">m</span></div>
+        <div style="text-align:right;flex-shrink:0;margin-left:6px;">
+          <div style="font-size:${isAllDay?'11px':'14px'};font-weight:800;color:${timer.color};">${timer.label}</div>
+          <div style="font-size:8px;color:var(--gu-dust);">${timer.sublabel||''}</div>
         </div>
       </div>
       <div style="margin:4px auto;text-align:center;">${_miniTableSvg(b.num_people || table.capacity || 4)}</div>
@@ -8911,7 +8946,7 @@ function _renderOccupiedTile(table, b, now) {
         <span style="background:${stageColor};color:white;border-radius:20px;padding:2px 7px;font-size:8px;font-weight:700;">${stageIcon}</span>
         <span style="font-size:9px;color:var(--gu-dust);">${completedChecks}/${stageChecks.length}</span>
       </div>
-      ${remainingMins <= 15 && remainingMins > 0 ? '<div style="margin-top:4px;text-align:center;font-size:8px;font-weight:800;color:#e53935;">⚠️ FINISHING SOON</div>' : ''}
+      ${!isAllDay && timer.label.replace('m','') <= 15 && timer.label !== '0m' ? '<div style="margin-top:4px;text-align:center;font-size:8px;font-weight:800;color:#e53935;">⚠️ FINISHING SOON</div>' : ''}
     </button>`;
 }
 
@@ -8957,9 +8992,11 @@ async function openTableDetail(bookingCode) {
 
   // Find real table name from tables data
   const tableData = _floorData.tables.find(t => t.name === b.table_number) || {};
+  const isThursday = b.session_start && new Date(b.session_start).getDay() === 4;
+  const typeLabel = isThursday ? ' · All-day session' : b.booking_type === 'group' ? ' · Group booking' : ' · 90 min session';
   document.getElementById('detail-table-name').textContent = b.table_number || 'Table';
   document.getElementById('detail-booking-info').textContent =
-    `${b.customer_name} · ${b.num_people || tableData.capacity || '?'} covers · ${tableData.room || ''}`;
+    `${b.customer_name} · ${b.num_people || tableData.capacity || '?'} covers · ${tableData.room || ''}${typeLabel}`;
 
   document.getElementById('floor-table-detail').style.display = 'flex';
   _startDetailTimer();
@@ -8995,22 +9032,28 @@ function _startDetailTimer() {
 function _updateDetailTimer() {
   if (!_detailBooking?.session_start) return;
   const now = new Date();
-  const start = new Date(_detailBooking.session_start);
-  const end = new Date(start.getTime() + SESSION_DURATION_MINS * 60000);
-  const remaining = Math.max(0, end - now);
-  const remainingMins = Math.floor(remaining / 60000);
-  const remainingSecs = Math.floor((remaining % 60000) / 1000);
-  const pct = Math.min(100, ((now - start) / (SESSION_DURATION_MINS * 60000)) * 100);
-
+  const timer = _sessionTimerDisplay(_detailBooking, now);
   const timerEl = document.getElementById('detail-time-remaining');
   const barEl = document.getElementById('detail-progress-bar');
-  if (timerEl) {
-    timerEl.textContent = `${remainingMins}m ${remainingSecs}s`;
-    timerEl.style.color = remainingMins <= 15 ? '#e53935' : remainingMins <= 30 ? '#F9A825' : '#4CAF50';
-  }
-  if (barEl) {
-    barEl.style.width = pct + '%';
-    barEl.style.background = remainingMins <= 15 ? '#e53935' : remainingMins <= 30 ? '#F9A825' : '#2e7d32';
+
+  if (timer.isAllDay) {
+    if (timerEl) { timerEl.textContent = `${timer.label} in`; timerEl.style.color = '#4CAF50'; }
+    if (barEl) { barEl.style.width = '100%'; barEl.style.background = '#2e7d32'; }
+  } else {
+    const start = new Date(_detailBooking.session_start);
+    const durationMins = _sessionDuration(_detailBooking) || 90;
+    const remaining = Math.max(0, (start.getTime() + durationMins * 60000) - now.getTime());
+    const remainingMins = Math.floor(remaining / 60000);
+    const remainingSecs = Math.floor((remaining % 60000) / 1000);
+    const pct = Math.min(100, ((now - start) / (durationMins * 60000)) * 100);
+    if (timerEl) {
+      timerEl.textContent = `${remainingMins}m ${remainingSecs}s`;
+      timerEl.style.color = remainingMins <= 15 ? '#e53935' : remainingMins <= 30 ? '#F9A825' : '#4CAF50';
+    }
+    if (barEl) {
+      barEl.style.width = pct + '%';
+      barEl.style.background = remainingMins <= 15 ? '#e53935' : remainingMins <= 30 ? '#F9A825' : '#2e7d32';
+    }
   }
 }
 
