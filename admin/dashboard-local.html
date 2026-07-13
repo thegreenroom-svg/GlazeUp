@@ -1518,16 +1518,10 @@
 
 <div id="a2hs-banner-admin"></div>
 
-<!-- Find My Piece — a genuine panic button, reachable from every screen,
-     for the "customer/staff wants to know where a piece is, right now"
-     moment. Distinct from the assistant (bottom-left) and A2HS banner —
-     this is deliberately its own always-visible action, bottom-right.
-     Added a real text label — was previously just a bare icon circle,
-     genuinely not self-identifiable on its own, per direct feedback. -->
-<button id="find-piece-fab" onclick="openFindMyPiece()" style="display:none;position:fixed;bottom:172px;right:16px;z-index:9700;background:#c0392b;color:white;border:none;border-radius:50%;width:64px;height:64px;box-shadow:0 6px 22px rgba(192,57,43,0.4);cursor:pointer;flex-direction:column;align-items:center;justify-content:center;gap:0;">
-  <span style="font-size:22px;line-height:1;">🔍</span>
-  <span style="font-size:7px;font-weight:800;line-height:1.1;margin-top:2px;text-align:center;">FIND<br>PIECE</span>
-</button>
+<!-- Find My Piece — moved into a small, tidy header icon, per direct
+     request that these floating buttons were untidy on screen. Same
+     real onclick logic (openFindMyPiece), just relocated — see the
+     header markup further down. -->
 
 <!-- Cleo — genuinely always present on every admin page, not gated
      behind whether Cleo's Club is enabled for this studio. Rotating
@@ -2167,20 +2161,11 @@
   <span id="shift-badge-break-indicator" style="display:none;background:#3949ab;color:white;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;">☕ BREAK</span>
   <span id="shift-task-count-badge" style="display:none;background:#e53935;color:white;font-size:10px;font-weight:800;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 4px;">0</span>
 </button>
-<!-- Clock Out — was a full-width bar across the entire bottom of the
-     screen; genuinely too prominent/obtrusive per feedback. Kept the
-     same real function (still unmissable, still one tap, still logs a
-     genuine clock-out) but rebuilt as a small corner button, matching
-     the same stacking pattern already used for the assistant/Cleo/Find
-     My Piece — bottom-left, stacked above the assistant. -->
-<button id="direct-logout-btn" onclick="confirmDirectLogout()" style="display:none;position:fixed;bottom:158px;left:20px;z-index:8600;width:58px;height:58px;border-radius:50%;background:#c0392b;color:white;border:none;cursor:pointer;box-shadow:0 6px 22px rgba(192,57,43,0.4);align-items:center;justify-content:center;flex-direction:column;gap:0;">
-  <span style="font-size:18px;line-height:1;">⏻</span>
-  <span style="font-size:7px;font-weight:800;line-height:1;margin-top:2px;">CLOCK OUT</span>
-</button>
-<!-- Direct break toggle — always visible, same one-tap access as logout -->
-<button id="direct-break-btn" onclick="toggleBreak()" title="Take a break" style="display:none;position:fixed;top:44px;right:198px;z-index:850;background:white;border:1.5px solid var(--gu-border);border-radius:16px;padding:5px 12px;font-size:11px;font-weight:700;color:#3949ab;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.12);white-space:nowrap;">
-  ☕ Break
-</button>
+<!-- Logout and Break — moved into small, tidy header icons, per
+     direct request that these floating buttons were untidy on
+     screen. Same real onclick logic (confirmDirectLogout,
+     toggleBreak), just relocated — see the header markup further
+     down. -->
 
 
 <div id="staff-assistant-panel" style="display:none;position:fixed;inset:auto 0 0 0;z-index:9900;background:white;flex-direction:column;max-width:420px;margin:0 auto 0 0;max-height:min(560px, 80vh);height:520px;border-radius:20px 20px 0 0;box-shadow:0 -8px 32px rgba(0,0,0,0.25);">
@@ -2481,9 +2466,18 @@
         <img src="/brand-assets/kiln-cafe-logo-demo/kiln-cafe-mark-demo.svg" alt="" style="width:26px;height:26px;flex-shrink:0;">
         <h1 id="studio-name" style="margin:0;">The Kiln Cafe</h1>
       </div>
-      <div class="admin-header-right">
+      <div class="admin-header-right" style="display:flex;align-items:center;gap:10px;">
         <div><span class="status-badge free">Free tier (1st month)</span></div>
-        <a href="#" onclick="confirmDirectLogout(); return false;">Logout</a>
+        <!-- Genuine real, tidy header icons, per direct request —
+             consolidates the Break and Find Piece buttons (previously
+             large, floating circles competing with everything else
+             on screen) up here, small and consistent. Same exact real
+             IDs kept throughout, so all existing JS that already
+             updates their state (updateBreakUI, etc.) continues
+             working correctly without any change needed there. -->
+        <button id="direct-break-btn" onclick="toggleBreak()" title="Take a break" style="display:none;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:5px 9px;font-size:11px;font-weight:700;color:#3949ab;cursor:pointer;white-space:nowrap;">☕</button>
+        <button id="find-piece-fab" onclick="openFindMyPiece()" title="Find a piece" style="display:none;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:5px 9px;font-size:14px;cursor:pointer;">🔍</button>
+        <button id="direct-logout-btn" onclick="confirmDirectLogout()" title="Log out" style="display:none;background:none;border:1.5px solid var(--gu-border);border-radius:10px;padding:5px 9px;font-size:14px;cursor:pointer;">🚪</button>
       </div>
     </header>
 
