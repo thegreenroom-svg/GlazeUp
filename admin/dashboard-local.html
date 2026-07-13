@@ -175,7 +175,7 @@
 
     .admin-wrapper {
       display: grid;
-      grid-template-columns: 220px 1fr;
+      grid-template-columns: 1fr;
       height: 100vh;
     }
 
@@ -199,23 +199,8 @@
       }
     }
 
-    /* iPad portrait & narrower: slim the sidebar so content breathes */
-    @media (max-width: 900px) {
-      .admin-wrapper {
-        grid-template-columns: 76px 1fr;
-      }
-      .admin-sidebar {
-        padding: 16px 10px !important;
-      }
-      .link-logo,
-      .admin-sidebar nav a span.nav-label {
-        display: none;
-      }
-      .admin-sidebar nav a {
-        justify-content: center;
-        font-size: 20px;
-      }
-    }
+    /* Sidebar removed entirely, per direct request — genuinely
+       nothing left here that needs adjusting at this breakpoint. */
 
     /* Genuine real "Focus Mode" for tablets — iPad/Android in the real
        521-900px range (below that is already the dedicated phone
@@ -2017,22 +2002,9 @@
   </div>
 </div>
 
-<!-- On phone widths, these three buttons flow into this horizontal bar instead
+<!-- On phone widths, these buttons flow into this horizontal bar instead
      of stacking as separate fixed-position circles (which overlap on narrow screens) -->
 <div id="phone-header-menu">
-
-<!-- Compact wordmark, phone only — the full sidebar logo is hidden at
-     this width (horizontal tab bar leaves no room for it), so this is
-     the one place it's still shown consistently. -->
-<span id="phone-header-wordmark" class="klnk-wordmark klnk-wordmark-phone" style="display:none;flex-shrink:0;margin-right:6px;color:var(--gu-text);">
-  <span class="klnk-flip-outer"><span class="klnk-flip-inner"><span class="klnk-face klnk-face-link">LINK</span><span class="klnk-face klnk-face-kiln">kiln</span></span></span>
-</span>
-
-<!-- Handoff Alert Bell -->
-<button id="alert-bell-btn" onclick="toggleAlertFeed()" style="position:fixed;top:16px;right:170px;z-index:850;background:#2B2724;color:white;border:none;border-radius:50%;width:44px;height:44px;font-size:19px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;">
-  🔔
-  <span id="alert-bell-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#e53935;color:white;font-size:10px;font-weight:800;width:20px;height:20px;border-radius:50%;align-items:center;justify-content:center;border:2px solid white;">0</span>
-</button>
 
 <!-- Alert Feed Panel (slide-in) -->
 <div id="alert-feed-panel" style="display:none;position:fixed;top:0;right:0;bottom:0;width:340px;max-width:92vw;background:white;z-index:9200;box-shadow:-8px 0 32px rgba(0,0,0,0.2);flex-direction:column;">
@@ -2171,18 +2143,8 @@
   </div>
 </div>
 
-<!-- Current shift badge (shows who's logged in) -->
-<button id="shift-badge" onclick="toggleTaskQueue()" style="display:none;position:fixed;top:16px;right:222px;z-index:850;background:white;border:1.5px solid var(--gu-border);border-radius:24px 0 0 24px;padding:8px 10px 8px 8px;font-size:12px;font-weight:700;color:var(--gu-text);cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.12);display:flex;align-items:center;gap:6px;border-right:none;">
-  <span id="shift-badge-avatar" style="width:26px;height:26px;border-radius:50%;background:var(--gu-primary);color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">–</span>
-  <span id="shift-badge-name">–</span>
-  <span id="shift-badge-break-indicator" style="display:none;background:#3949ab;color:white;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;">☕ BREAK</span>
-  <span id="shift-task-count-badge" style="display:none;background:#e53935;color:white;font-size:10px;font-weight:800;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 4px;">0</span>
-</button>
-<!-- Logout and Break — moved into small, tidy header icons, per
-     direct request that these floating buttons were untidy on
-     screen. Same real onclick logic (confirmDirectLogout,
-     toggleBreak), just relocated — see the header markup further
-     down. -->
+<!-- Shift badge and alert bell moved into the header cluster, per
+     direct request — same real IDs, all JS continues working. -->
 
 
 <div id="staff-assistant-panel" style="display:none;position:fixed;inset:auto 0 0 0;z-index:9900;background:white;flex-direction:column;max-width:420px;margin:0 auto 0 0;max-height:min(560px, 80vh);height:520px;border-radius:20px 20px 0 0;box-shadow:0 -8px 32px rgba(0,0,0,0.25);">
@@ -2437,42 +2399,13 @@
 
 <div class="admin-wrapper">
   <!-- SIDEBAR -->
-  <aside class="admin-sidebar">
-    <div class="link-logo" onclick="goToTab('dashboard')" style="cursor:pointer;display:flex;align-items:center;justify-content:center;padding:10px 0;" title="Back to Dashboard">
-      <span class="klnk-wordmark klnk-wordmark-sidebar" style="color:white;">
-        <span class="klnk-flip-outer"><span class="klnk-flip-inner"><span class="klnk-face klnk-face-link">LINK</span><span class="klnk-face klnk-face-kiln">kiln</span></span></span>
-      </span>
-    </div>
-    <nav>
-      <a href="#" class="nav-link active" onclick="goToTab('dashboard', event)" title="Your daily overview — extra charges, device status, loyalty leaderboard, and add-on discovery."><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7.5" height="7.5" rx="1.6"/><rect x="13" y="3.5" width="7.5" height="4.8" rx="1.6"/><rect x="13" y="10.5" width="7.5" height="10" rx="1.6"/><rect x="3.5" y="13" width="7.5" height="7.5" rx="1.6"/></svg></span><span class="nav-label">Dashboard</span></a>
-      <a href="#" class="nav-link" id="nav-staff-tab" onclick="goToTab('staff', event)" title="Where every shift starts — open a booking, walk-in, or non-hosted party, and see who's on today."><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="16" rx="2.2"/><path d="M3.5 9.5h17M8 3v3M16 3v3"/><path d="M8 14l2.4 2.4L16.5 10.5"/></svg></span><span class="nav-label">Daily Bookings</span></a>
-      <a href="#" class="nav-link" id="nav-tablecards-tab" onclick="goToTab('tablecards', event)" title="Print or reprint a table's QR card so customers can reach their own session on their phone."><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="6" width="17" height="13" rx="1.8"/><rect x="7" y="9" width="6" height="6" rx="0.8"/><path d="M15 10h3M15 13h3M15 16h2"/></svg></span><span class="nav-label">Table Cards</span></a>
-      <a href="#" class="nav-link" id="nav-piecematch-tab" onclick="goToTab('piecematch', event)" title="Scan a booking, then photograph a fired piece from the jumbled pile — AI suggests which reference photo it matches."><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20.5 20.5l-4-4"/><path d="M8 11h6M11 8v6"/></svg></span><span class="nav-label">Piece Matching</span></a>
-      <a href="#" class="nav-link" id="nav-labels-tab" onclick="goToTab('labels', event)" title="Print a collection or postal label for any booking — name, ready date, piece count, damage notes."><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h11l5 5v11H4z"/><path d="M15 4v5h5"/><path d="M8 13h8M8 16h5"/></svg></span><span class="nav-label">Labels</span></a>
-      <a href="#" class="nav-link" id="nav-menu-tab" onclick="goToTab('menu', event)" title="Add today's specials and toggle which Square catalogue items customers can see right now."><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5v6.4a2.2 2.2 0 004.4 0V3.5M8.2 3.5v17M17 3.5c-1.7 0-2.6 1.9-2.6 4.6 0 2 .8 3.3 2 3.7v9.2"/></svg></span><span class="nav-label">Daily Menu</span></a>
-      <a href="#" class="nav-link" id="nav-stock-tab" onclick="goToTab('stock', event)" title="Photograph bisque and manage customer reservations on real, in-stock pieces."><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 7.2L12 3l8.5 4.2v9.6L12 21 3.5 16.8V7.2z"/><path d="M3.5 7.2L12 11l8.5-3.8M12 11v10"/></svg></span><span class="nav-label">Stock</span></a>
-      <a href="#" class="nav-link" id="nav-catalogue-tab" onclick="goToTab('catalogue', event)" title="Real photographed stock customers can browse and reserve from home before their visit."><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="7.5" height="7.5" rx="1.5"/><rect x="13" y="4" width="7.5" height="7.5" rx="1.5"/><rect x="3.5" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg></span><span class="nav-label">Piece Catalogue</span></a>
-      <a href="#" class="nav-link" id="nav-printqueue-tab" onclick="goToTab('printqueue', event)" title="Review and approve customer-submitted ceramic transfer designs before they go to print."><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5V4h11v5.5"/><rect x="3.5" y="9.5" width="17" height="7.5" rx="1.8"/><rect x="6.5" y="13.5" width="11" height="6.5" rx="1"/><circle cx="17" cy="12.3" r=".9" fill="currentColor" stroke="none"/></svg></span><span class="nav-label">Print Queue</span></a>
-      <a href="#" class="nav-link" onclick="goToTab('community', event)" title="Feature great customer work, moderate the worldwide Club Pages feed, and manage sharing."><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 15.5H6.2a2.7 2.7 0 01-2.7-2.7V7.7A2.7 2.7 0 016.2 5h9.6a2.7 2.7 0 012.7 2.7v1.4"/><path d="M6.5 15.5v3.3l3.7-3.3"/><path d="M11 19h6.8a2.7 2.7 0 002.7-2.7v-3.6a2.7 2.7 0 00-2.7-2.7H11a2.7 2.7 0 00-2.7 2.7v3.6A2.7 2.7 0 0011 19z"/></svg></span><span class="nav-label">Community</span></a>
-      <a href="#" class="nav-link" id="nav-team-tab" onclick="goToTab('team', event)" title="Manage your team, duty lists, timekeeping, holidays, and who's completed home screen setup."><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7.5" r="3"/><circle cx="16.3" cy="8.7" r="2.3"/><path d="M3.2 20c0-3.4 2.6-5.5 5.8-5.5s5.8 2.1 5.8 5.5"/><path d="M15.2 14.9c2.6.2 4.6 2.1 4.6 5.1"/></svg></span><span class="nav-label">Team &amp; Duties</span></a>
-      <a href="#" class="nav-link" id="nav-progress-tab" onclick="goToTab('progress', event)" title="See every incomplete task across the whole team, grouped by role, live."><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="2.4"/><path d="M7.5 15l2.8-3.4 2.4 2 3.8-5.4"/></svg></span><span class="nav-label">Daily Progress</span></a>
-      <a href="#" class="nav-link" onclick="goToTab('branding', event)" title="Customise the studio's colours, logo, and how the customer app looks and feels."><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15.8 4.2l4 4-8.6 8.6a2.4 2.4 0 01-1.2.65l-3.6.8.8-3.6a2.4 2.4 0 01.65-1.2l8-8z"/><path d="M13.9 6.1l4 4"/><path d="M4 20h4"/></svg></span><span class="nav-label">Branding</span></a>
-      <a href="#" class="nav-link" onclick="goToTab('shapes', event)" title="Your real Square catalogue, shown as simple silhouettes instead of photos — reliable on every device."><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 5c0-1 1.5-1.8 3.5-1.8S15.5 4 15.5 5c0 .7-.3 5.5-.6 8.6-.3 2.6-1.3 4.7-2.9 4.7s-2.6-2.1-2.9-4.7C8.8 10.5 8.5 5.7 8.5 5z"/><ellipse cx="12" cy="5" rx="3.5" ry="1.3"/><path d="M9.3 9.5c1.8.7 3.6.7 5.4 0"/></svg></span><span class="nav-label">Bisque</span></a>
-      <a href="#" class="nav-link" id="nav-setup-tab" onclick="goToTab('setup', event)" title="One-time studio configuration — connections, Cleo's Club, add-ons, and offers. Rarely needs revisiting."><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.2v2.3M12 18.5v2.3M20.8 12h-2.3M5.5 12H3.2M17.9 6.1l-1.6 1.6M7.7 16.3l-1.6 1.6M17.9 17.9l-1.6-1.6M7.7 7.7L6.1 6.1"/></svg></span><span class="nav-label">Studio Setup</span></a>
-      <a href="#" class="nav-link" id="nav-platformrev" onclick="goToTab('platformrev', event)" style="display:none;" title="Director-only: real revenue across the whole platform, every studio, add-ons included."><span class="nav-icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 20.5V3.5M3.5 20.5h17"/><path d="M7 17l3.2-4.6 3 2.4L19 8"/><path d="M14.8 8h4.2v4.2"/></svg></span><span class="nav-label">Platform Revenue</span></a>
-      <style>
-        #nav-platformrev { background: rgba(249,168,37,0.12); border-radius: 10px; }
-        #nav-platformrev .nav-icon-badge { color: #F9A825; }
-        @media (max-width: 520px) {
-          #nav-platformrev {
-            border: 1.5px solid #F9A825 !important;
-            border-radius: 12px !important;
-            margin: 0 4px;
-          }
-        }
-      </style>
-    </nav>
-  </aside>
+  <!-- Sidebar removed entirely, per direct request — every real
+       destination it linked to (Dashboard, Daily Bookings, Table
+       Cards, Piece Matching, Labels, Menu, Stock, Catalogue, Print
+       Queue, Community, Team, Progress, Branding, Bisque, Setup,
+       Platform Revenue) remains fully reachable through the grid
+       tile system, confirmed with an exact tab-name cross-check
+       before removing this. -->
 
   <!-- MAIN -->
   <div class="admin-main">
@@ -2484,6 +2417,31 @@
         <h1 id="studio-name" style="margin:0;">The Kiln Cafe</h1>
       </div>
       <div class="admin-header-right" style="display:flex;align-items:center;gap:10px;">
+        <!-- Genuine real consolidated cluster, per direct request —
+             replaces the old sidebar and its spinning logo entirely.
+             The staff avatar and alerts bell (moved here from their
+             old fixed positions, exact same real IDs kept so all
+             existing JS continues updating them correctly) sit
+             alongside two quick-access mini tiles. Nothing else to
+             look at. -->
+        <button id="shift-badge" onclick="toggleTaskQueue()" style="display:none;background:linear-gradient(135deg,#2B2724,var(--link-clay));border:none;border-radius:20px;padding:6px 12px 6px 6px;font-size:12px;font-weight:700;color:white;cursor:pointer;align-items:center;gap:6px;position:relative;">
+          <span id="shift-badge-avatar" style="width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,0.25);color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;">–</span>
+          <span id="shift-badge-name">–</span>
+          <span id="shift-badge-break-indicator" style="display:none;background:#3949ab;color:white;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;">☕ BREAK</span>
+          <span id="shift-task-count-badge" style="display:none;background:#e53935;color:white;font-size:10px;font-weight:800;min-width:18px;height:18px;border-radius:9px;align-items:center;justify-content:center;padding:0 4px;">0</span>
+        </button>
+        <button id="alert-bell-btn" onclick="toggleAlertFeed()" style="background:#2B2724;color:white;border:none;border-radius:50%;width:36px;height:36px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0;">
+          🔔
+          <span id="alert-bell-badge" style="display:none;position:absolute;top:-3px;right:-3px;background:#e53935;color:white;font-size:9px;font-weight:800;width:16px;height:16px;border-radius:50%;align-items:center;justify-content:center;border:1.5px solid white;">0</span>
+        </button>
+        <button onclick="goToTab('setup'); showSetupSection('hostbypost');" class="glaze-tile" style="flex-shrink:0;width:44px;background:#2B2724;color:white;border:none;border-radius:10px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:3px;gap:1px;">
+          <img src="/brand-assets/kiln-cafe-logo-demo/hostbypost-mark-demo.svg" alt="" style="width:15px;height:auto;">
+          <span style="font-size:5.5px;font-weight:800;line-height:1;">Host By Post</span>
+        </button>
+        <button onclick="openFindMyPiece()" class="glaze-tile" style="flex-shrink:0;width:44px;background:#c0392b;color:white;border:none;border-radius:10px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:3px;gap:1px;">
+          <span style="font-size:15px;line-height:1;">🔍</span>
+          <span style="font-size:5.5px;font-weight:800;line-height:1;">Find Piece</span>
+        </button>
         <div><span class="status-badge free">Free tier (1st month)</span></div>
         <!-- Genuine real, tidy header icons, per direct request —
              consolidates the Break and Find Piece buttons (previously
@@ -5561,7 +5519,11 @@ function goToTab(tab, event) {
   // Trigger reflow so the animation replays every time, not just on first show
   void targetView.offsetWidth;
   targetView.classList.add('fade-in');
-  document.querySelector(`a[onclick*="${tab}"]`).classList.add('active');
+  // Genuine real safety fix — the sidebar (and its nav-link elements)
+  // is being removed entirely, per direct request, so this lookup can
+  // genuinely, correctly find nothing now. Guarded rather than left to
+  // throw and silently break every real tab switch across the app.
+  document.querySelector(`a[onclick*="${tab}"]`)?.classList.add('active');
 
   // Genuine, real usage logging — feeds Cleo's honest shortcut
   // awareness (an actual counted table, never a vague claim). Only
