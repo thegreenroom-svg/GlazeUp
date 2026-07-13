@@ -5889,7 +5889,9 @@ function goToTab(tab, event) {
   }
 
   // Load data for specific tabs
-  if (tab === 'staff') {
+  if (tab === 'floor-plan') {
+    refreshFloorPlan();
+  } else if (tab === 'staff') {
     showStaffSection('booking');
     loadBookingsOverview();
     loadTodaysBookings(); // was manual-tap-only before — for real studio use, staff should see real bookings the instant they open this tab, not a "tap to load" placeholder
@@ -10205,7 +10207,7 @@ function demoteSubTile(tabId) {
 
 const GRID_NAV_STRUCTURE = [
   { id: 'tables', label: 'Tables', color: '#00695c', items: [
-    { tab: '_floorplan', label: 'Floor Plan', desc: 'Live view of all tables', fn: 'showFloorPlan' },
+    { tab: 'floor-plan', label: 'Floor Plan', desc: 'Live view of all tables', fn: 'showFloorPlan' },
   ]},
   { id: 'dashboard', label: 'Dashboard', color: '#B87946', items: [
     { tab: 'dashboard', label: 'Overview', desc: 'Your daily overview' },
