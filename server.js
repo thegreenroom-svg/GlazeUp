@@ -5414,6 +5414,48 @@ app.post('/api/staff/shift-login', async (req, res) => {
   res.json({ member, shiftId: shift?.id || null });
 });
 
+// GET /api/staff/:memberId/home-screen — load this staff member's
+// personal tile layout. Returns tile_order and promoted_tiles arrays.
+// Empty arrays if they haven't set one up yet — client applies role
+// defaults in that case.
+app.get('/api/staff/:memberId/home-screen', async (req, res) => {
+  const { memberId } = req.params;
+  const { studioId } = req.query;
+  if (!studioId || !memberId) return res.status(400).json({ error: 'studioId and memberId required' });
+  const { data } = await supabase
+    .from('staff_home_screens')
+    .select('tile_order, promoted_tiles, updated_at')
+    .eq('studio_id', studioId)
+    .eq('staff_member_id', memberId)
+    .single();
+  // .single() returns null data if no row — that's fine, client handles it
+  res.json({
+    tileOrder: data?.tile_order || [],
+    promotedTiles: data?.promoted_tiles || [],
+    hasPersonalScreen: !!data?.tile_order?.length
+  });
+});
+
+// POST /api/staff/:memberId/home-screen — save this staff member's
+// personal tile layout. Upserts so first save and subsequent updates
+// use the same endpoint.
+app.post('/api/staff/:memberId/home-screen', async (req, res) => {
+  const { memberId } = req.params;
+  const { studioId, tileOrder, promotedTiles } = req.body;
+  if (!studioId || !memberId) return res.status(400).json({ error: 'studioId and memberId required' });
+  const { error } = await supabase
+    .from('staff_home_screens')
+    .upsert({
+      studio_id: studioId,
+      staff_member_id: memberId,
+      tile_order: tileOrder || [],
+      promoted_tiles: promotedTiles || [],
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'studio_id,staff_member_id' });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ saved: true });
+});
+
 // POST /api/staff/welcome-back-login — genuine device-trust login, no
 // PIN required. Only ever reachable from the real picker screen when
 // the frontend has already confirmed (via klnk_last_logged_in_id in

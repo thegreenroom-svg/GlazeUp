@@ -8185,6 +8185,10 @@ async function logOutOfShift() {
   if (stepMotionActive) stopStepCounting();
   stepCount = 0;
   document.body.classList.remove('focus-mode'); // genuine safety reset — never leave this stuck across a login/logout cycle
+  // Reset personal home screen so the next person who logs in
+  // gets their own, not the previous person's layout.
+  _personalScreen = null;
+  _personalEditMode = false;
 
   // Automatic clock-out
   if (currentShiftStaff && currentShiftStaff.id !== 'testing') {
@@ -8240,6 +8244,318 @@ async function logOutOfShift() {
 // single tile calls the exact same, unmodified goToTab() already
 // used by the sidebar — nothing underneath was changed at all.
 // ═══════════════════════════════════════════════════════════
+// ── Personal staff home screen ────────────────────────────────────────
+// Each staff member gets their own tile home screen, saved to Supabase
+// so it follows them to any tablet in the studio.
+//
+// First login: role-based defaults pre-populate a sensible starting
+// point. From there, long press to enter edit mode — same wobble
+// mechanic as the main grid — to add, remove, or reorder tiles.
+//
+// The full grid is replaced entirely by the personal screen. Nothing
+// is hidden from staff — they can always add any tile back.
+// ─────────────────────────────────────────────────────────────────────
+
+// Role-based default tile sets — applied on first login if no personal
+// screen exists yet. Sub-tile tab IDs can be included as promoted tiles.
+const ROLE_HOME_DEFAULTS = {
+  'Barista': {
+    // David has his own dedicated page — no tile grid needed
+    tileOrder: [],
+    promotedTiles: []
+  },
+  'Ceramic Technician': {
+    // Lucy's world is fired pieces — matching, labels, kiln, stock
+    tileOrder: ['pieces', 'stock', 'team'],
+    promotedTiles: ['piecematch', 'labels']
+  },
+  'Studio Assistant': {
+    // Ruby runs the floor — bookings, tables, community
+    tileOrder: ['bookings', 'menu', 'community', 'team'],
+    promotedTiles: ['staff', 'tablecards']
+  },
+  'Studio Manager': {
+    // Daisy sees everything
+    tileOrder: ['bookings', 'pieces', 'stock', 'team', 'menu', 'community', 'dashboard', 'setup'],
+    promotedTiles: ['staff']
+  },
+  'Studio Executive': {
+    // Jenny sees everything
+    tileOrder: ['bookings', 'pieces', 'stock', 'team', 'menu', 'community', 'dashboard', 'setup'],
+    promotedTiles: ['staff']
+  }
+};
+
+// Current personal screen state — loaded on login, saved on change
+let _personalScreen = null; // { tileOrder: [], promotedTiles: [], hasPersonalScreen: bool }
+let _personalEditMode = false;
+
+async function loadPersonalHomeScreen() {
+  if (!currentShiftStaff || !studioId) return;
+  // Barista (David) has a dedicated page — skip the personal grid entirely
+  if (currentShiftStaff.name?.trim().split(' ')[0].toLowerCase() === 'david') return;
+
+  try {
+    const res = await fetch(`${API_URL}/api/staff/${currentShiftStaff.id}/home-screen?studioId=${studioId}`);
+    const data = await res.json();
+
+    if (data.hasPersonalScreen) {
+      _personalScreen = data;
+    } else {
+      // First time — apply role defaults
+      const role = currentShiftStaff.role || '';
+      const defaults = ROLE_HOME_DEFAULTS[role] || ROLE_HOME_DEFAULTS['Studio Assistant'];
+      _personalScreen = {
+        tileOrder: defaults.tileOrder,
+        promotedTiles: defaults.promotedTiles,
+        hasPersonalScreen: false
+      };
+    }
+  } catch(e) {
+    // Network issue — fall back to full grid gracefully
+    _personalScreen = null;
+  }
+}
+
+async function savePersonalHomeScreen() {
+  if (!currentShiftStaff || !studioId || !_personalScreen) return;
+  try {
+    await fetch(`${API_URL}/api/staff/${currentShiftStaff.id}/home-screen`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId,
+        tileOrder: _personalScreen.tileOrder,
+        promotedTiles: _personalScreen.promotedTiles
+      })
+    });
+    _personalScreen.hasPersonalScreen = true;
+  } catch(e) { /* silent — local state still correct */ }
+}
+
+// The main render function for the personal home screen.
+// Called from showGridNav() when a personal screen exists.
+function showPersonalHomeScreen() {
+  document.getElementById('grid-nav-top').style.display = 'block';
+  document.getElementById('grid-nav-sub').style.display = 'none';
+
+  const wrap = document.getElementById('grid-nav-top-tiles');
+  const glazeLabels = document.getElementById('grid-glaze-labels');
+  const note = document.getElementById('grid-specialist-note');
+
+  // Build the display items from the personal screen state
+  const items = _buildPersonalItems();
+  const suggestions = _getSuggestions();
+  const groupsWithSuggestions = new Set();
+  suggestions.forEach(tabId => {
+    const group = GRID_NAV_STRUCTURE.find(g => g.items.some(i => i.tab === tabId));
+    if (group) groupsWithSuggestions.add(group.id);
+  });
+
+  wrap.innerHTML = items.map((item, i) => {
+    const isGroup = item.type === 'group';
+    const group = isGroup ? item.group : item.group;
+    const label = isGroup ? group.label : item.sub.label;
+    const desc = isGroup ? '' : item.sub.desc;
+    const color = group.color;
+    const brightness = isGroup ? 1 : 0.88;
+    const hasSuggestion = isGroup && groupsWithSuggestions.has(group.id);
+    const wobble = _personalEditMode ? 'tile-editing' : '';
+    const pulse = hasSuggestion && !_personalEditMode ? 'tile-has-suggestion' : '';
+    const clickFn = _personalEditMode
+      ? `_personalTileTap(${i})`
+      : isGroup
+        ? `showGridNavSub('${group.id}')`
+        : `_tileGoToTab('${item.sub.tab}')`;
+
+    return `<button
+      data-pindex="${i}"
+      onclick="${clickFn}"
+      onpointerdown="_startLongPress(${i})"
+      onpointerup="_cancelLongPress()"
+      onpointercancel="_cancelLongPress()"
+      ${_personalEditMode ? `draggable="true" ondragstart="_pDragStart(event,${i})" ondragover="_pDragOver(event,${i})" ondrop="_pDrop(event,${i})" ondragend="_pDragEnd(event)"` : ''}
+      class="glaze-tile tile-landing ${wobble} ${pulse}"
+      style="background:${color};filter:brightness(${brightness});color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;animation-delay:${i * 0.035}s;position:relative;">
+      <div style="font-size:${isGroup ? '19px' : '15px'};font-weight:800;line-height:1.2;">${label}</div>
+      ${desc ? `<div style="font-size:10px;opacity:0.85;margin-top:5px;line-height:1.3;">${desc}</div>` : ''}
+      ${hasSuggestion && !_personalEditMode ? '<div style="position:absolute;top:6px;right:6px;width:8px;height:8px;background:#2e7d32;border-radius:50%;border:2px solid white;"></div>' : ''}
+      ${_personalEditMode ? '<div style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;background:#e53935;border-radius:50%;font-size:11px;font-weight:800;color:white;display:flex;align-items:center;justify-content:center;">✕</div>' : ''}
+    </button>`;
+  }).join('');
+
+  // Glaze labels beneath each tile
+  if (glazeLabels) {
+    glazeLabels.style.display = _personalEditMode ? 'none' : 'grid';
+    glazeLabels.innerHTML = items.map(item => {
+      const glaze = item.type === 'group' ? (item.group.glaze || '') : '';
+      return `<div style="text-align:center;font-size:9px;font-weight:600;color:var(--gu-dust);letter-spacing:0.04em;padding:0 4px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${glaze}</div>`;
+    }).join('');
+  }
+
+  // Add tile button + done button in edit mode
+  const existingControls = document.getElementById('personal-edit-controls');
+  if (existingControls) existingControls.remove();
+
+  if (_personalEditMode) {
+    const controls = document.createElement('div');
+    controls.id = 'personal-edit-controls';
+    controls.style.cssText = 'margin-top:14px;display:flex;gap:10px;justify-content:center;';
+    controls.innerHTML = `
+      <button onclick="_showAddTileSheet()" style="background:white;border:1.5px solid var(--gu-border);color:var(--gu-text);border-radius:12px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;">+ Add tile</button>
+      <button onclick="_exitPersonalEdit()" style="background:#2B2724;color:white;border:none;border-radius:12px;padding:10px 20px;font-size:13px;font-weight:800;cursor:pointer;">Done</button>
+    `;
+    wrap.parentNode.insertBefore(controls, wrap.nextSibling.nextSibling || null);
+    if (note) note.style.display = 'none';
+  } else {
+    if (note) {
+      note.style.display = 'block';
+      note.innerHTML = '✨ ' + SPECIALIST_GLAZE_NOTE;
+    }
+  }
+}
+
+function _buildPersonalItems() {
+  if (!_personalScreen) return [];
+  const { tileOrder, promotedTiles } = _personalScreen;
+  const items = [];
+  tileOrder.forEach(groupId => {
+    const group = GRID_NAV_STRUCTURE.find(g => g.id === groupId);
+    if (!group) return;
+    items.push({ type: 'group', group });
+    // Promoted sub-tiles from this group sit right after it
+    group.items.forEach(sub => {
+      if (promotedTiles.includes(sub.tab)) {
+        items.push({ type: 'sub', sub, group });
+      }
+    });
+  });
+  return items;
+}
+
+function _personalTileTap(index) {
+  if (!_personalEditMode) return;
+  // In edit mode — tap removes the tile
+  const items = _buildPersonalItems();
+  const item = items[index];
+  if (!item) return;
+  if (item.type === 'group') {
+    _personalScreen.tileOrder = _personalScreen.tileOrder.filter(id => id !== item.group.id);
+    // Also remove any promoted sub-tiles from this group
+    item.group.items.forEach(sub => {
+      _personalScreen.promotedTiles = _personalScreen.promotedTiles.filter(t => t !== sub.tab);
+    });
+  } else {
+    _personalScreen.promotedTiles = _personalScreen.promotedTiles.filter(t => t !== item.sub.tab);
+  }
+  savePersonalHomeScreen();
+  showPersonalHomeScreen();
+}
+
+function _exitPersonalEdit() {
+  _personalEditMode = false;
+  savePersonalHomeScreen();
+  showPersonalHomeScreen();
+}
+
+// Long press on personal screen enters edit mode
+function _personalLongPress(index) {
+  if (!_personalEditMode) {
+    _personalEditMode = true;
+    showPersonalHomeScreen();
+  }
+}
+
+// Add tile sheet — shows everything not already on the personal screen
+function _showAddTileSheet() {
+  const existing = document.getElementById('add-tile-sheet');
+  if (existing) existing.remove();
+
+  const onScreen = new Set(_personalScreen.tileOrder);
+  const onScreenSubs = new Set(_personalScreen.promotedTiles);
+  const available = [];
+
+  GRID_NAV_STRUCTURE.forEach(group => {
+    if (!onScreen.has(group.id)) {
+      available.push({ type: 'group', group, label: group.label, color: group.color });
+    }
+    group.items.forEach(sub => {
+      if (!onScreenSubs.has(sub.tab)) {
+        available.push({ type: 'sub', sub, group, label: sub.label, color: group.color });
+      }
+    });
+  });
+
+  const sheet = document.createElement('div');
+  sheet.id = 'add-tile-sheet';
+  sheet.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:flex-end;background:rgba(43,39,36,0.5);backdrop-filter:blur(4px);';
+  sheet.onclick = e => { if (e.target === sheet) sheet.remove(); };
+
+  const inner = document.createElement('div');
+  inner.style.cssText = 'background:white;border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:480px;margin:0 auto;max-height:70vh;overflow-y:auto;';
+  inner.innerHTML = `
+    <div style="font-size:16px;font-weight:800;color:#2B2724;margin-bottom:4px;">Add a tile</div>
+    <div style="font-size:12px;color:#8a8175;margin-bottom:16px;">Tap anything to add it to your home screen.</div>
+    ${available.length ? available.map(item => `
+      <button onclick="_addPersonalTile('${item.type}','${item.type === 'group' ? item.group.id : item.sub.tab}')" style="width:100%;text-align:left;background:#F7F4EE;border:none;border-radius:12px;padding:12px 14px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:12px;">
+        <div style="width:32px;height:32px;border-radius:8px;background:${item.color};flex-shrink:0;"></div>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#2B2724;">${item.label}</div>
+          ${item.type === 'sub' ? `<div style="font-size:10px;color:#8a8175;margin-top:1px;">from ${item.group.label}</div>` : ''}
+        </div>
+      </button>`).join('') : '<div style="padding:16px;text-align:center;color:#8a8175;font-size:13px;">Everything is already on your home screen.</div>'}
+    <button onclick="document.getElementById('add-tile-sheet').remove()" style="width:100%;background:none;border:none;padding:12px;font-size:14px;color:#8a8175;cursor:pointer;margin-top:4px;">Cancel</button>
+  `;
+  sheet.appendChild(inner);
+  document.body.appendChild(sheet);
+}
+
+function _addPersonalTile(type, id) {
+  if (type === 'group') {
+    if (!_personalScreen.tileOrder.includes(id)) {
+      _personalScreen.tileOrder.push(id);
+    }
+  } else {
+    if (!_personalScreen.promotedTiles.includes(id)) {
+      _personalScreen.promotedTiles.push(id);
+      // Make sure the parent group is also on screen
+      const group = GRID_NAV_STRUCTURE.find(g => g.items.some(i => i.tab === id));
+      if (group && !_personalScreen.tileOrder.includes(group.id)) {
+        _personalScreen.tileOrder.push(group.id);
+      }
+    }
+  }
+  document.getElementById('add-tile-sheet')?.remove();
+  savePersonalHomeScreen();
+  showPersonalHomeScreen();
+}
+
+// Drag reorder for personal screen
+let _pDragSrc = null;
+function _pDragStart(e, i) { _pDragSrc = i; e.currentTarget.classList.add('tile-dragging'); e.dataTransfer.effectAllowed = 'move'; }
+function _pDragOver(e, i) { e.preventDefault(); document.querySelectorAll('[data-pindex]').forEach(el => el.classList.remove('tile-drag-over')); e.currentTarget.classList.add('tile-drag-over'); }
+function _pDrop(e, dropIndex) {
+  e.preventDefault();
+  if (_pDragSrc === null || _pDragSrc === dropIndex) return;
+  const items = _buildPersonalItems();
+  const moved = items.splice(_pDragSrc, 1)[0];
+  items.splice(dropIndex, 0, moved);
+  // Rebuild tileOrder from the new sequence
+  const newOrder = [];
+  items.forEach(item => {
+    const id = item.type === 'group' ? item.group.id : item.group.id;
+    if (!newOrder.includes(id)) newOrder.push(id);
+  });
+  _personalScreen.tileOrder = newOrder;
+  _pDragSrc = null;
+  savePersonalHomeScreen();
+  showPersonalHomeScreen();
+}
+function _pDragEnd(e) {
+  _pDragSrc = null;
+  document.querySelectorAll('[data-pindex]').forEach(el => el.classList.remove('tile-dragging', 'tile-drag-over'));
+}
+
 // ── Glaze colour training system ─────────────────────────────────────
 // Learns quietly through real use — no separate training module.
 // Every time a staff member adds a Mayco glaze to a bill, the app
@@ -8789,7 +9105,15 @@ async function openBookingAtRealStage(bookingCode, stage) {
 function showGridNav() {
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
   document.getElementById('grid-nav-view').style.display = 'block';
-  showGridNavTop();
+  // Use personal home screen if this staff member has one set up
+  // (or has role defaults that haven't been personalised yet).
+  // Fall back to the full shared grid if no personal screen exists
+  // — e.g. before login resolves, or for shared/testing use.
+  if (_personalScreen && _personalScreen.tileOrder.length > 0) {
+    showPersonalHomeScreen();
+  } else {
+    showGridNavTop();
+  }
   toggleFloatingBackBtn();
 }
 
@@ -8902,7 +9226,13 @@ function _startLongPress(index) {
   _cancelLongPress();
   _longPressTimer = setTimeout(() => {
     _longPressTimer = null;
-    _handleTileLongPress(index);
+    // Use personal edit mode if personal screen is active, otherwise shared grid edit
+    if (_personalScreen && _personalScreen.tileOrder.length > 0) {
+      _personalEditMode = true;
+      showPersonalHomeScreen();
+    } else {
+      _handleTileLongPress(index);
+    }
   }, 600);
 }
 function _cancelLongPress() {
@@ -9008,6 +9338,16 @@ function applyShiftUI() {
   if (firstNameForRouting.toLowerCase() === 'david') {
     document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
     document.getElementById('barista-view').style.display = 'block';
+  } else {
+    // Load this staff member's personal home screen from Supabase,
+    // then re-render the grid so it shows their own tiles.
+    // Done async so the grid shows immediately (with defaults or the
+    // previous state) and updates smoothly once the load completes.
+    loadPersonalHomeScreen().then(() => {
+      if (document.getElementById('grid-nav-view')?.style.display !== 'none') {
+        showGridNav();
+      }
+    });
   }
   // Opening checklist — PARKED, per direct request, kept as demo for
   // now. Genuinely nothing deleted: the real modal, its data, and
