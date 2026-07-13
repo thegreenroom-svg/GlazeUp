@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>The Kiln Cafe · Studio Admin</title>
   <link rel="manifest" href="/admin/manifest.json">
   <link rel="apple-touch-icon" href="/brand-assets/kiln-cafe-icon/kiln-cafe-icon-180.png">
@@ -452,15 +452,16 @@
       position: relative;
       background: linear-gradient(180deg, #ffffff 0%, #fdf9f6 100%);
       border-bottom: 1px solid var(--gu-border);
-      padding: 6px 10px;
+      padding: 6px 10px 6px max(10px, env(safe-area-inset-left, 10px));
       display: flex;
       justify-content: space-between;
       align-items: center;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       gap: 4px;
       box-shadow:
         inset 0 1px 0 rgba(255,255,255,0.7),
         0 4px 14px -4px rgba(61,28,18,0.1);
+      overflow: hidden;
     }
 
     .admin-header h1 {
@@ -10379,9 +10380,11 @@ function applyShiftUI() {
   document.getElementById('headset-setup-btn').style.display = 'flex';
   document.getElementById('step-counter-btn').style.display = 'flex';
   document.getElementById('direct-logout-btn').style.display = 'flex';
-  document.getElementById('direct-break-btn').style.display = 'flex';
-  document.getElementById('find-piece-fab').style.display = 'flex';
-  document.getElementById('returns-btn').style.display = 'flex';
+  document.getElementById('direct-break-btn').style.display = 'none';
+  // find-piece-fab and returns-btn are legacy text buttons — now replaced
+  // by permanent glaze tiles in the header. Keep hidden always.
+  document.getElementById('find-piece-fab').style.display = 'none';
+  document.getElementById('returns-btn').style.display = 'none';
   // Genuine real bug fix: the break button's visual state (Start vs
   // End) was never refreshed when a session resumed after the device
   // went idle/was put down — currentBreakId correctly restored in
