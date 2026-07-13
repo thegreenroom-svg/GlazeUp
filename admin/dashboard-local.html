@@ -1785,15 +1785,13 @@
 
 <!-- Splash / resting screen -->
 <div id="splash-screen">
-  <!-- Genuine real large glaze-tile, per direct request — same
-       established .glaze-tile treatment (shadow, soft highlight
-       sweep) used on every tile across the app, so this launch
-       screen genuinely previews what the app looks like inside.
-       The real, actual uploaded logo sits centred within it at
-       roughly a third of the tile's own size, its own edges
-       visible around it. -->
-  <div class="glaze-tile" style="background:var(--link-clay);border-radius:28px;width:min(78vw,340px);aspect-ratio:1;display:flex;align-items:center;justify-content:center;">
-    <img src="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png" alt="The Kiln Cafe" style="width:33%;height:auto;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,0.25);">
+  <!-- Genuine real large glaze-tile, per direct request — the
+       actual, real logo now fills the tile, per direct request,
+       leaving a small real margin so the outer tile's own rounded
+       glazed edges stay visible framing it, matching the same
+       format used across the rest of the app. -->
+  <div class="glaze-tile" style="background:var(--link-clay);border-radius:28px;width:min(78vw,340px);aspect-ratio:1;display:flex;align-items:center;justify-content:center;padding:14px;">
+    <img src="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png" alt="The Kiln Cafe" style="width:100%;height:100%;object-fit:cover;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,0.25);">
   </div>
   <div class="splash-hint">Tap anywhere to continue</div>
 </div>
@@ -8341,9 +8339,11 @@ function applyShiftUI() {
     document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
     document.getElementById('barista-view').style.display = 'block';
   }
-  // Opening checklist only appears once we genuinely know who's logged in —
-  // sequence is always: splash -> login -> checklist, never overlapping.
-  checkOpeningChecklistStatus();
+  // Opening checklist — PARKED, per direct request, kept as demo for
+  // now. Genuinely nothing deleted: the real modal, its data, and
+  // every function are completely untouched — this is the single,
+  // reversible line to restore it.
+  // checkOpeningChecklistStatus();
   // Morning kiln check — same idea: only makes sense once someone's
   // actually logged in and the rest of the UI has settled. Checks if
   // there's an overnight firing still waiting on confirmation.
@@ -8410,10 +8410,12 @@ function remindStaffA2HSLater() {
 function confirmDirectLogout() {
   if (!currentShiftStaff) return;
   const name = currentShiftStaff.name;
-  if (confirm(`Log out ${name}? This clocks you out and ends any break in progress.`)) {
-    // Genuine real check: only the LAST person clocking out sees the
-    // closing checklist — anyone else just clocks out normally.
-    maybeShowClosingChecklist();
+  if (confirm(`Log out ${name}?`)) {
+    // Closing checklist — PARKED, per direct request, kept as demo
+    // for now. Genuinely nothing deleted: the real modal, its data,
+    // and every function are completely untouched — this is the
+    // single, reversible line to restore it.
+    // maybeShowClosingChecklist();
   }
 }
 
