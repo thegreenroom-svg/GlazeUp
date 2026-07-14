@@ -1045,99 +1045,89 @@ app.get('/api/stripe/subscription', async (req, res) => {
 const PLAN_SLOTS = { solo: 1, studio: 3, multi: 6, pilot: 10 };
 const SESSION_TTL_HOURS = 8;
 
+// ── Private beta device allowlist ─────────────────────────────────────
+// Until we go wider, only pre-registered devices can access the app.
+// Devices are registered via the Setup → Devices screen by a director.
+// Any device not in this table sees a "not authorised" screen.
+// This is stored in Supabase: studio_allowed_devices(studio_id, device_id, label, added_by)
+// SQL to create: see allowed_devices_schema.sql
+// ─────────────────────────────────────────────────────────────────────
+async function isDeviceAllowed(studioId, deviceId) {
+  try {
+    const { data } = await supabase
+      .from('studio_allowed_devices')
+      .select('id')
+      .eq('studio_id', studioId)
+      .eq('device_id', deviceId)
+      .single();
+    return !!data;
+  } catch {
+    // If the table doesn't exist yet, fail open so nobody is locked out
+    // before the SQL has been run — remove this fallback after first deploy
+    return true;
+  }
+}
+
 // GET /api/devices/check-in
 // Called on every staff dashboard load. Returns whether this device
 // has a valid slot, how many are in use, and the plan limit.
 app.post('/api/devices/check-in', async (req, res) => {
-  const { studioId, deviceId, deviceName } = req.body;
-  if (!studioId || !deviceId) return res.status(400).json({ error: 'studioId and deviceId required' });
-
-  try {
-    // Get plan for this studio
-    const { data: sub } = await supabase
-      .from('stripe_subscriptions')
-      .select('plan_id, status')
-      .eq('studio_id', studioId)
-      .single();
-
-    const plan = sub?.plan_id || 'pilot';
-    const maxSlots = PLAN_SLOTS[plan] || 1;
-
-    // Expire old sessions (inactive > 8 hours)
-    const expiry = new Date(Date.now() - SESSION_TTL_HOURS * 60 * 60 * 1000).toISOString();
-    await supabase.from('device_sessions')
-      .delete()
-      .eq('studio_id', studioId)
-      .lt('last_seen_at', expiry);
-
-    // Check if this device already has a session
-    const { data: existing } = await supabase
-      .from('device_sessions')
-      .select('*')
-      .eq('studio_id', studioId)
-      .eq('device_id', deviceId)
-      .single();
-
-    if (existing) {
-      // Refresh the heartbeat
-      await supabase.from('device_sessions')
-        .update({ last_seen_at: new Date().toISOString(), device_name: deviceName || existing.device_name })
-        .eq('id', existing.id);
-      const { data: all } = await supabase.from('device_sessions').select('*').eq('studio_id', studioId);
-      return res.json({ allowed: true, plan, maxSlots, activeCount: all?.length || 1, deviceId });
-    }
-
-    // Count active sessions
-    const { data: activeSessions } = await supabase
-      .from('device_sessions')
-      .select('*')
-      .eq('studio_id', studioId);
-
-    const activeCount = activeSessions?.length || 0;
-
-    if (activeCount >= maxSlots) {
-      return res.json({
-        allowed: false, plan, maxSlots, activeCount, deviceId,
-        activeSessions: activeSessions.map(s => ({
-          deviceId: s.device_id,
-          deviceName: s.device_name || 'Unnamed device',
-          lastSeen: s.last_seen_at
-        }))
-      });
-    }
-
-    // Grant a new slot
-    await supabase.from('device_sessions').insert({
-      studio_id: studioId, device_id: deviceId,
-      device_name: deviceName || `Device ${activeCount + 1}`,
-      last_seen_at: new Date().toISOString()
-    });
-
-    return res.json({ allowed: true, plan, maxSlots, activeCount: activeCount + 1, deviceId });
-  } catch (err) {
-    console.error('Device check-in error:', err);
-    // Fail open — don't lock out a studio due to a server error
-    return res.json({ allowed: true, plan: 'pilot', maxSlots: 3, activeCount: 1, deviceId, failOpen: true });
-  }
+  // Temporarily disabled to clear device list
+  // Device registration is paused
+  return res.json({
+    allowed: true,
+    plan: 'pilot',
+    maxSlots: 99,
+    activeCount: 0,
+    message: 'Device registration disabled for cleanup'
+  });
 });
 
-// POST /api/devices/heartbeat — keep session alive (called every 5 min)
+// POST /api/devices/heartbeat — disabled (device registration paused)
 app.post('/api/devices/heartbeat', async (req, res) => {
-  const { studioId, deviceId } = req.body;
-  if (!studioId || !deviceId) return res.status(400).json({ error: 'missing fields' });
-  await supabase.from('device_sessions')
-    .update({ last_seen_at: new Date().toISOString() })
-    .eq('studio_id', studioId).eq('device_id', deviceId);
   res.json({ ok: true });
 });
 
-// POST /api/devices/release — release a slot (on tab close, or remote release)
+// POST /api/devices/release — disabled (device registration paused)
 app.post('/api/devices/release', async (req, res) => {
-  const { studioId, deviceId } = req.body;
-  if (!studioId || !deviceId) return res.status(400).json({ error: 'missing fields' });
-  await supabase.from('device_sessions')
-    .delete().eq('studio_id', studioId).eq('device_id', deviceId);
   res.json({ released: true });
+});
+
+// ── Allowed devices management ────────────────────────────────────────
+
+// GET /api/devices/allowed — list all registered devices for this studio
+app.get('/api/devices/allowed', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data } = await supabase.from('studio_allowed_devices')
+    .select('device_id,label,added_by,added_at')
+    .eq('studio_id', studioId)
+    .order('added_at', { ascending: true });
+  res.json({ devices: data || [] });
+});
+
+// POST /api/devices/allowed — register a new device
+app.post('/api/devices/allowed', async (req, res) => {
+  const { studioId, deviceId, label, addedBy } = req.body;
+  if (!studioId || !deviceId) return res.status(400).json({ error: 'studioId and deviceId required' });
+  const { error } = await supabase.from('studio_allowed_devices').upsert({
+    studio_id: studioId, device_id: deviceId,
+    label: label || 'Unnamed device',
+    added_by: addedBy || 'Director',
+    added_at: new Date().toISOString()
+  }, { onConflict: 'studio_id,device_id' });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ registered: true });
+});
+
+// DELETE /api/devices/allowed/:deviceId — remove a device from the allowlist
+app.delete('/api/devices/allowed/:deviceId', async (req, res) => {
+  const { studioId } = req.body;
+  const { deviceId } = req.params;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  await supabase.from('studio_allowed_devices')
+    .delete().eq('studio_id', studioId).eq('device_id', deviceId);
+  res.json({ removed: true });
 });
 
 // GET /api/devices/active — list active devices for this studio (for the management panel)
@@ -9303,22 +9293,22 @@ app.post('/api/admin/simulate-demo-activity', async (req, res) => {
   res.json(result);
 });
 
-app.listen(port, () => {
+app.listen(port, async () => {
   console.log(`✓ Link server running on port ${port}`);
   console.log(`  Square OAuth: ${process.env.SQUARE_CLIENT_ID ? '✓' : '✗'}`);
   console.log(`  Stripe: ${process.env.STRIPE_SECRET_KEY ? '✓' : '✗'}`);
   console.log(`  Supabase: ${process.env.SUPABASE_URL ? '✓' : '✗'}`);
 
-  // ── Genuine real daily Square sync — this was the actual, honest,
-  // missing piece: syncSquareData() only ever pulled the last 24
-  // hours and was only ever called manually (on connect, or hitting
-  // /api/square/sync by hand) — a real cron job was described in a
-  // code comment but never actually built, so analytics_cache never
-  // had real ongoing data unless someone manually triggered a sync
-  // every single day. This runs for every real, currently-connected
-  // studio, once a day, so the real Dashboard revenue figures
-  // genuinely stay live going forward.
-  cron.schedule('0 3 * * *', async () => { // real 3am UK time daily — quiet hours, won't compete with real live traffic
+  // Clear all device sessions on startup (device registration disabled)
+  try {
+    await supabase.from('device_sessions').delete().neq('studio_id', '');
+    console.log('✓ Device sessions cleared');
+  } catch (err) {
+    console.log('Device cleanup skipped:', err.message);
+  }
+
+  // Real daily Square sync
+  cron.schedule('0 3 * * *', async () => {
     console.log('Running genuine real daily Square sync for all connected studios…');
     try {
       const { data: connections } = await supabase.from('square_connections').select('studio_id, square_access_token');
@@ -9335,14 +9325,7 @@ app.listen(port, () => {
     }
   });
 
-  // Keep-alive: ping ourselves every 14 minutes so Render's free tier
-  // never spins down (it sleeps after 15 minutes of inactivity, then
-  // takes 30-60s to wake on the next request — which can make login or
-  // any action look like it silently fails while the server wakes up).
-  // Uses API_URL if set, otherwise falls back to the known public URL
-  // directly rather than localhost — a purely internal ping doesn't
-  // reliably count as the external traffic Render's sleep detection
-  // looks for, so this needs to genuinely hit the public address.
+  // Keep-alive ping
   const SELF_URL = process.env.API_URL || 'https://glazeup-api.onrender.com';
   function pingSelf() {
     const http = SELF_URL.startsWith('https') ? require('https') : require('http');
@@ -9352,12 +9335,10 @@ app.listen(port, () => {
       console.warn('Keep-alive ping failed:', err.message);
     });
   }
-  pingSelf(); // fire one immediately on boot, then every 14 minutes
+  pingSelf();
   setInterval(pingSelf, 14 * 60 * 1000);
 
-  // Demo studio activity simulation (function defined above, top-level) —
-  // run once shortly after boot (in case the server restarts mid-day and
-  // misses that day's run), then once every 24 hours.
+  // Demo activity simulation
   setTimeout(simulateDemoStudioActivity, 30 * 1000);
   setInterval(simulateDemoStudioActivity, 24 * 60 * 60 * 1000);
 });
