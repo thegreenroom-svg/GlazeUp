@@ -1934,30 +1934,22 @@
 </div>
 
 <!-- Splash / resting screen -->
-<div id="splash-screen" style="position:fixed;inset:0;z-index:5000;background:#0E1A18;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow:hidden;cursor:pointer;padding-top:80px;padding-bottom:20px;" onclick="dismissSplash()">
-
-  <!-- Kiln Logo top-left -->
-  <div style="position:absolute;top:60px;left:20px;width:48px;height:48px;background:transparent;border-radius:50%;display:flex;align-items:center;justify-content:center;">
-    <img src="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png" style="width:40px;opacity:0.95;filter:drop-shadow(0 2px 8px rgba(184,121,70,0.5));">
+<div id="splash-screen" style="position:fixed;inset:0;z-index:5000;background:#0E1A18;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;" onclick="dismissSplash()">
+  
+  <!-- Kiln logo top-left -->
+  <div style="position:absolute;top:20px;left:20px;">
+    <img src="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png" style="width:40px;opacity:0.9;">
   </div>
 
-  <!-- "Touch screen to enter" button (top-right) -->
-  <button onclick="dismissSplash()" style="position:absolute;top:60px;right:20px;background:linear-gradient(135deg,#B87946,#9A6435);color:white;border:none;border-radius:20px;padding:10px 16px;font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(184,121,70,0.4);">
-    Touch to enter →
-  </button>
+  <!-- Enter button top-right -->
+  <button onclick="dismissSplash()" style="position:absolute;top:20px;right:20px;background:linear-gradient(135deg,#B87946,#9A6435);color:white;border:none;border-radius:20px;padding:10px 16px;font-size:12px;font-weight:800;cursor:pointer;">Touch to enter →</button>
 
-  <!-- Full-screen animated table demo (centered with margin) -->
-  <div id="splash-table-demo" style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;width:100%;margin:0;padding:0 20px;">
-    <!-- Tables and chairs will render here -->
-  </div>
-
-  <!-- Instructions text -->
-  <div style="text-align:center;padding-bottom:40px;">
-    <div style="color:#B87946;font-size:16px;font-weight:700;opacity:0.8;letter-spacing:0.05em;">Drag • Tap • Manage • Track</div>
+  <!-- Centered Kiln logo - BIG -->
+  <div style="text-align:center;">
+    <img src="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png" style="width:120px;opacity:0.95;filter:drop-shadow(0 8px 24px rgba(184,121,70,0.3));">
   </div>
 
 </div>
-
 <!-- ═══════════════════════════════════════════
      PLATFORM REVENUE STRIP — pinned to the very top
      of the entire app, above every tab, always visible
@@ -8347,16 +8339,12 @@ const ROLE_COLORS_LOGIN = { 'Studio Manager':'#5E35B1', 'Studio Executive':'#1E8
 let selectedLoginMember = null;
 
 function skipLoginUseSharedView() {
-  // Show the floor plan without login, skip any tours/onboarding
   currentShiftStaff = null;
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('splash-screen').style.display = 'none';
-  
-  // Hide any tours or onboarding
-  document.querySelectorAll('[id*="tour"], [id*="onboarding"]').forEach(el => el.style.display = 'none');
-  
-  // Go straight to floor plan
+  document.querySelectorAll('[id*="swt"], [id*="onboarding"]').forEach(el => el.style.display = 'none');
   goToTab('floor-plan');
+  showHomeScreen();
 }
 
 function showLoginScreen(screen) {
@@ -19595,247 +19583,183 @@ let _splashTableDemo = 0;
 
 // Splash — fullscreen logo with auto-dismiss
 function wireSplash() {
-  const el = document.getElementById('splash-screen');
   const demoEl = document.getElementById('splash-table-demo');
-  if (!el || !demoEl) return;
-  
-  // Render animated table demo
-  renderSplashTableDemo(demoEl);
-  
-  // Splash stays until user clicks
-  el.style.cursor = 'pointer';
+  if (!demoEl) return;
+  const container = document.createElement('div');
+  container.style.cssText = 'width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;';
+  demoEl.appendChild(container);
+  renderElegantLineTable(container, 'large');
 }
 
-function renderSplashTableDemo(container) {
-  // Create main SVG for table planner
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 360 600');
-  svg.setAttribute('width', '100%');
-  svg.setAttribute('height', '100%');
-  svg.setAttribute('style', 'max-width: 100%; max-height: 100%; margin: auto;');
 
-  // Defs with vibrant animations
-  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-  defs.innerHTML = `
-    <defs>
-      <style>
-        @keyframes dragChair { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(50px, -30px); } }
-        @keyframes movePlacemat { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-40px, 40px); } }
-        @keyframes floatHand { 0%, 100% { transform: translate(80px, 120px) rotate(0deg); } 50% { transform: translate(120px, 90px) rotate(-15deg); } }
-        @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
-        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-      </style>
-      <linearGradient id="tableGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" style="stop-color:#D4A574;stop-opacity:1"/>
-        <stop offset="100%" style="stop-color:#B87946;stop-opacity:1"/>
-      </linearGradient>
-      <radialGradient id="chairGrad" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" style="stop-color:#64B5F6;stop-opacity:1"/>
-        <stop offset="100%" style="stop-color:#1976D2;stop-opacity:0.8"/>
-      </radialGradient>
-    </defs>
-  `;
-  svg.appendChild(defs);
+// Elegant line-art table renderer (splash + home screen)
 
-  // Background
-  const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-  bg.setAttribute('width', '360');
-  bg.setAttribute('height', '600');
-  bg.setAttribute('fill', '#0E1A18');
-  svg.appendChild(bg);
 
-  // MAIN TABLE (fills most of screen, vibrant)
-  const tableGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+// Show home screen with all tables from booking system
+function showHomeScreen() {
+  const view = document.getElementById('floor-plan-view');
+  if (!view) return;
   
-  const tableRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-  tableRect.setAttribute('x', '60');
-  tableRect.setAttribute('y', '120');
-  tableRect.setAttribute('width', '240');
-  tableRect.setAttribute('height', '200');
-  tableRect.setAttribute('rx', '16');
-  tableRect.setAttribute('fill', 'url(#tableGrad)');
-  tableRect.setAttribute('stroke', '#D4A574');
-  tableRect.setAttribute('stroke-width', '3');
-  tableRect.setAttribute('opacity', '0.9');
-  tableGroup.appendChild(tableRect);
+  view.innerHTML = '';
+  view.style.overflow = 'auto';
+  
+  const container = document.createElement('div');
+  container.style.cssText = 'padding: 20px; max-width: 1200px; margin: 0 auto;';
 
-  // TABLE LABEL
-  const tableLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-  tableLabel.setAttribute('x', '180');
-  tableLabel.setAttribute('y', '225');
-  tableLabel.setAttribute('text-anchor', 'middle');
-  tableLabel.setAttribute('fill', '#fff');
-  tableLabel.setAttribute('font-size', '18');
-  tableLabel.setAttribute('font-weight', '800');
-  tableLabel.setAttribute('letter-spacing', '0.05em');
-  tableLabel.textContent = 'TABLE 1';
-  tableGroup.appendChild(tableLabel);
+  // Main Studio
+  const mainStudio = document.createElement('div');
+  mainStudio.style.cssText = 'margin-bottom: 40px;';
+  mainStudio.innerHTML = '<h2 style="color: #B87946; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px;">Main Studio</h2>';
+  
+  const mainGrid = document.createElement('div');
+  mainGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px;';
+  
+  ['1', '2', '3', '4', '5', '6', '7', '8', '5A'].forEach(num => {
+    const btn = document.createElement('button');
+    btn.style.cssText = 'background: linear-gradient(135deg,#2B2724,#1C1814); border: 1.5px solid #B87946; border-radius: 10px; padding: 16px; cursor: pointer; color: #F4ECE0; font-weight: 700; font-size: 14px; transition: all 0.2s;';
+    btn.onmouseover = () => { btn.style.borderColor = '#D4A574'; btn.style.background = 'linear-gradient(135deg,#3d2e28,#2B2724)'; };
+    btn.onmouseout = () => { btn.style.borderColor = '#B87946'; btn.style.background = 'linear-gradient(135deg,#2B2724,#1C1814)'; };
+    btn.onclick = () => enterBookingFlow('Main Studio', 'Table ' + num);
+    btn.textContent = 'Table ' + num;
+    mainGrid.appendChild(btn);
+  });
+  
+  mainStudio.appendChild(mainGrid);
+  container.appendChild(mainStudio);
 
-  svg.appendChild(tableGroup);
+  // Lounge
+  const lounge = document.createElement('div');
+  lounge.style.cssText = 'margin-bottom: 40px;';
+  lounge.innerHTML = '<h2 style="color: #B87946; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px;">The Lounge</h2>';
+  
+  const loungeGrid = document.createElement('div');
+  loungeGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px;';
+  
+  ['1', '2', '3', '4', '5', '6'].forEach(num => {
+    const btn = document.createElement('button');
+    btn.style.cssText = 'background: linear-gradient(135deg,#2B2724,#1C1814); border: 1.5px solid #B87946; border-radius: 10px; padding: 16px; cursor: pointer; color: #F4ECE0; font-weight: 700; font-size: 14px; transition: all 0.2s;';
+    btn.onmouseover = () => { btn.style.borderColor = '#D4A574'; btn.style.background = 'linear-gradient(135deg,#3d2e28,#2B2724)'; };
+    btn.onmouseout = () => { btn.style.borderColor = '#B87946'; btn.style.background = 'linear-gradient(135deg,#2B2724,#1C1814)'; };
+    btn.onclick = () => enterBookingFlow('Lounge', 'Lounge ' + num);
+    btn.textContent = 'Lounge ' + num;
+    loungeGrid.appendChild(btn);
+  });
+  
+  lounge.appendChild(loungeGrid);
+  container.appendChild(lounge);
 
-  // PLACEMAT (with Kiln logo, moveable)
-  const placematGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  placematGroup.setAttribute('style', 'animation: movePlacemat 4s ease-in-out infinite;');
+  // Vault
+  const vault = document.createElement('div');
+  vault.innerHTML = '<h2 style="color: #B87946; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px;">The Vault</h2>';
+  
+  const vaultGrid = document.createElement('div');
+  vaultGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px;';
+  
+  const vaultBtn = document.createElement('button');
+  vaultBtn.style.cssText = 'background: linear-gradient(135deg,#2B2724,#1C1814); border: 1.5px solid #B87946; border-radius: 10px; padding: 16px; cursor: pointer; color: #F4ECE0; font-weight: 700; font-size: 14px; transition: all 0.2s;';
+  vaultBtn.onmouseover = () => { vaultBtn.style.borderColor = '#D4A574'; vaultBtn.style.background = 'linear-gradient(135deg,#3d2e28,#2B2724)'; };
+  vaultBtn.onmouseout = () => { vaultBtn.style.borderColor = '#B87946'; vaultBtn.style.background = 'linear-gradient(135deg,#2B2724,#1C1814)'; };
+  vaultBtn.onclick = () => enterBookingFlow('Vault', 'Group Space');
+  vaultBtn.textContent = 'Group Space';
+  vaultGrid.appendChild(vaultBtn);
+  
+  vault.appendChild(vaultGrid);
+  container.appendChild(vault);
 
-  const placemat = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-  placemat.setAttribute('x', '80');
-  placemat.setAttribute('y', '150');
-  placemat.setAttribute('width', '80');
-  placemat.setAttribute('height', '60');
-  placemat.setAttribute('rx', '8');
-  placemat.setAttribute('fill', '#E8D8C0');
-  placemat.setAttribute('stroke', '#B87946');
-  placemat.setAttribute('stroke-width', '2');
-  placemat.setAttribute('opacity', '0.85');
-  placematGroup.appendChild(placemat);
+  view.appendChild(container);
+}
 
-  // Kiln logo on placemat (small)
-  const placematLogo = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-  placematLogo.setAttribute('cx', '120');
-  placematLogo.setAttribute('cy', '180');
-  placematLogo.setAttribute('r', '12');
-  placematLogo.setAttribute('fill', '#B87946');
-  placematGroup.appendChild(placematLogo);
-
-  const placematLogoK = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-  placematLogoK.setAttribute('x', '120');
-  placematLogoK.setAttribute('y', '185');
-  placematLogoK.setAttribute('text-anchor', 'middle');
-  placematLogoK.setAttribute('fill', '#fff');
-  placematLogoK.setAttribute('font-size', '12');
-  placematLogoK.setAttribute('font-weight', '800');
-  placematLogoK.textContent = 'K.';
-  placematGroup.appendChild(placematLogoK);
-
-  svg.appendChild(placematGroup);
-
-  // CHAIRS (vibrant blue, draggable demo on one)
-  const chairPositions = [
-    { x: 180, y: 90, animate: false },
-    { x: 180, y: 340, animate: false },
-    { x: 50, y: 210, animate: false },
-    { x: 310, y: 210, animate: true },
-    { x: 75, y: 130, animate: false },
-    { x: 285, y: 130, animate: false },
-    { x: 75, y: 290, animate: false },
-    { x: 285, y: 290, animate: false }
+// Enter booking flow for a table
+function enterBookingFlow(room, table) {
+  const view = document.getElementById('floor-plan-view');
+  if (!view) return;
+  
+  view.innerHTML = '';
+  
+  const stages = [
+    { emoji: '🎨', label: 'Painting' },
+    { emoji: '✓', label: 'Completion' },
+    { emoji: '🔥', label: 'Kiln' },
+    { emoji: '📋', label: 'Returns' },
+    { emoji: '🍺', label: 'Drinks' },
+    { emoji: '📝', label: 'Notes' },
+    { emoji: '💳', label: 'Payment' },
+    { emoji: '⏱️', label: 'Time' },
+    { emoji: '👥', label: 'Party' }
   ];
 
-  chairPositions.forEach((pos, idx) => {
-    const chairGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    if (pos.animate) {
-      chairGroup.setAttribute('style', 'animation: dragChair 3s ease-in-out infinite;');
-    }
+  const container = document.createElement('div');
+  container.style.cssText = 'padding: 20px; max-width: 900px; margin: 0 auto;';
 
-    const chair = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    chair.setAttribute('cx', pos.x);
-    chair.setAttribute('cy', pos.y);
-    chair.setAttribute('r', '16');
-    chair.setAttribute('fill', 'url(#chairGrad)');
-    chair.setAttribute('stroke', '#64B5F6');
-    chair.setAttribute('stroke-width', '2');
-    chairGroup.appendChild(chair);
+  // Header
+  const header = document.createElement('div');
+  header.style.cssText = 'margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid rgba(184,121,70,0.2);';
+  header.innerHTML = `
+    <button onclick="showHomeScreen();" style="background: #B87946; color: white; border: none; border-radius: 8px; padding: 10px 14px; cursor: pointer; font-weight: 700; font-size: 12px; margin-bottom: 12px;">← Back to tables</button>
+    <div style="color: #B87946; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;">Booking Flow</div>
+    <div style="color: #F4ECE0; font-size: 20px; font-weight: 800; margin-top: 4px;">${room} • ${table}</div>
+  `;
+  container.appendChild(header);
 
-    const person = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    person.setAttribute('x', pos.x);
-    person.setAttribute('y', pos.y + 6);
-    person.setAttribute('text-anchor', 'middle');
-    person.setAttribute('font-size', '14');
-    person.textContent = '👤';
-    chairGroup.appendChild(person);
+  // Stages grid - flexible, can tap any
+  const stagesGrid = document.createElement('div');
+  stagesGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px;';
 
-    svg.appendChild(chairGroup);
+  stages.forEach(stage => {
+    const tile = document.createElement('button');
+    tile.style.cssText = 'background: linear-gradient(135deg,#2B2724,#1C1814); border: 1.5px solid #B87946; border-radius: 10px; padding: 20px; cursor: pointer; text-align: center; transition: all 0.2s; color: #F4ECE0;';
+    tile.onmouseover = () => { tile.style.borderColor = '#D4A574'; tile.style.transform = 'scale(1.05)'; };
+    tile.onmouseout = () => { tile.style.borderColor = '#B87946'; tile.style.transform = 'scale(1)'; };
+    tile.onclick = () => showStageTile(stage, room, table);
+    tile.innerHTML = `<div style="font-size: 32px; margin-bottom: 8px;">${stage.emoji}</div><div style="font-size: 13px; font-weight: 700;">${stage.label}</div>`;
+    stagesGrid.appendChild(tile);
   });
 
-  // DRAGGING HAND
-  const hand = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  hand.setAttribute('style', 'animation: floatHand 3s ease-in-out infinite;');
+  container.appendChild(stagesGrid);
+  
+  // Info
+  const info = document.createElement('div');
+  info.style.cssText = 'margin-top: 24px; padding: 16px; background: rgba(184,121,70,0.08); border-radius: 8px; color: rgba(184,121,70,0.8); font-size: 12px; text-align: center;';
+  info.textContent = 'Tap any stage to manage • Flexible workflow • No forced sequence';
+  container.appendChild(info);
 
-  const finger = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-  finger.setAttribute('cx', '0');
-  finger.setAttribute('cy', '0');
-  finger.setAttribute('r', '8');
-  finger.setAttribute('fill', '#FFB84D');
-  finger.setAttribute('stroke', '#FF9800');
-  finger.setAttribute('stroke-width', '1.5');
-  hand.appendChild(finger);
-
-  const fingerTip = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-  fingerTip.setAttribute('cx', '0');
-  fingerTip.setAttribute('cy', '-12');
-  fingerTip.setAttribute('r', '5');
-  fingerTip.setAttribute('fill', '#FFB84D');
-  hand.appendChild(fingerTip);
-
-  svg.appendChild(hand);
-
-  container.innerHTML = '';
-  container.appendChild(svg);
-
-  // Handle chair clicks to show booking modal
-  setTimeout(() => {
-    const chairElements = svg.querySelectorAll('circle[r="16"]');
-    chairElements.forEach((chair, idx) => {
-      chair.style.cursor = 'pointer';
-      chair.addEventListener('click', (e) => {
-        e.stopPropagation();
-        showSampleBookingModal(idx);
-      });
-    });
-  }, 100);
+  view.appendChild(container);
 }
 
-function showSampleBookingModal(chairIdx) {
-  const sampleData = [
-    { name: 'Sarah', party: 3, status: '🎨 Painting', time: '45m left', drinks: '2x Coffee' },
-    { name: 'James', party: 2, status: '✓ Done', time: '10m left', drinks: 'Tea' },
-    { name: 'Emma', party: 1, status: '🔥 Kiln', time: 'Complete', drinks: 'None' },
-    { name: 'David', party: 4, status: '🎨 Painting', time: '30m left', drinks: '4x Beer' },
-    { name: 'Lucy', party: 2, status: '✓ Done', time: '5m left', drinks: '2x Water' },
-    { name: 'Tom', party: 3, status: '🎨 Painting', time: '50m left', drinks: 'Coffee, Tea' },
-    { name: 'Rose', party: 1, status: 'Booking', time: '—', drinks: '—' },
-    { name: 'Mike', party: 5, status: 'Group', time: '60m left', drinks: '5x Mixed' }
-  ];
+// Show individual stage
+function showStageTile(stage, room, table) {
+  const view = document.getElementById('floor-plan-view');
+  if (!view) return;
+  
+  view.innerHTML = '';
 
-  const booking = sampleData[chairIdx % sampleData.length];
+  const container = document.createElement('div');
+  container.style.cssText = 'padding: 20px; max-width: 600px; margin: 0 auto;';
 
-  const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;';
-  overlay.onclick = () => overlay.remove();
-
-  const modal = document.createElement('div');
-  modal.style.cssText = 'background:linear-gradient(135deg,#2B2724,#1C1814);border:2px solid #B87946;border-radius:16px;padding:24px;max-width:300px;box-shadow:0 20px 60px rgba(0,0,0,0.8);';
-  modal.onclick = (e) => e.stopPropagation();
-
-  modal.innerHTML = `
-    <div style="text-align:center;margin-bottom:16px;">
-      <div style="font-size:20px;margin-bottom:8px;">👤</div>
-      <div style="font-size:18px;font-weight:800;color:#D4A574;">${booking.name}</div>
-    </div>
-    <div style="border-top:1px solid rgba(184,121,70,0.3);padding-top:12px;font-size:12px;color:#F4ECE0;">
-      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-        <span style="color:rgba(184,121,70,0.7);">Party Size</span>
-        <span style="font-weight:700;">${booking.party}</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-        <span style="color:rgba(184,121,70,0.7);">Status</span>
-        <span style="font-weight:700;">${booking.status}</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-        <span style="color:rgba(184,121,70,0.7);">Time</span>
-        <span style="font-weight:700;">${booking.time}</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;">
-        <span style="color:rgba(184,121,70,0.7);">Drinks</span>
-        <span style="font-weight:700;">${booking.drinks}</span>
-      </div>
-    </div>
-    <button onclick="this.parentElement.parentElement.remove()" style="width:100%;margin-top:16px;background:#B87946;color:white;border:none;border-radius:8px;padding:10px;font-weight:700;cursor:pointer;">Close</button>
+  const header = document.createElement('div');
+  header.style.cssText = 'margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid rgba(184,121,70,0.2);';
+  header.innerHTML = `
+    <button onclick="enterBookingFlow('${room}', '${table}');" style="background: #B87946; color: white; border: none; border-radius: 8px; padding: 10px 14px; cursor: pointer; font-weight: 700; font-size: 12px; margin-bottom: 12px;">← Back to stages</button>
+    <div style="color: #B87946; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;">Stage</div>
+    <div style="color: #F4ECE0; font-size: 20px; font-weight: 800; margin-top: 4px;">${stage.emoji} ${stage.label}</div>
+    <div style="color: rgba(184,121,70,0.7); font-size: 13px; margin-top: 4px;">${room} • ${table}</div>
   `;
+  container.appendChild(header);
 
-  overlay.appendChild(modal);
-  document.body.appendChild(overlay);
+  const content = document.createElement('div');
+  content.style.cssText = 'background: rgba(184,121,70,0.08); border: 1.5px solid #B87946; border-radius: 10px; padding: 32px; text-align: center; color: #F4ECE0;';
+  content.innerHTML = `
+    <div style="font-size: 48px; margin-bottom: 16px;">${stage.emoji}</div>
+    <div style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">${stage.label}</div>
+    <div style="font-size: 13px; color: rgba(184,121,70,0.8); line-height: 1.6;">Managing ${stage.label.toLowerCase()} for ${table}</div>
+    <div style="margin-top: 24px; font-size: 12px; color: rgba(184,121,70,0.7);">Tap back button to switch to any stage • No restrictions</div>
+  `;
+  container.appendChild(content);
+
+  view.appendChild(container);
 }
+
+
 
 // Animated arrow motif (splash only) — traces K, over the kiln, to I,
 // to L, then dips back into the kiln for a final stop. Positions are
