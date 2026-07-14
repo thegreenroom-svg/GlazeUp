@@ -1217,10 +1217,242 @@
     }
 
     /* ══════════════════════════════════════════════════════
+       STAFF AVATAR MOTION — login picker
+       Each avatar is rigged: head, arms, hair and eyes are
+       separate groups that move independently, so they wave
+       and dance rather than the whole sticker rotating.
+       This is the one bit of the app that's purely for fun.
+       ══════════════════════════════════════════════════════ */
+    .av-frame svg { display: block; width: 100%; height: 100%; }
+
+    /* SVG parts need an explicit box to transform about, or they
+       pivot around the viewBox origin instead of themselves. */
+    .av-head, .av-arm, .av-hair-back, .av-curls, .av-brow, .av-mouth {
+      transform-box: view-box;
+      will-change: transform;
+    }
+    .av-eye { transform-box: fill-box; transform-origin: center; }
+
+    /* ── Arms ───────────────────────────────────────────── */
+    @keyframes avWaveR {
+      0%,52%,100% { transform: rotate(0deg); }
+      60% { transform: rotate(-58deg); }
+      68% { transform: rotate(-38deg); }
+      76% { transform: rotate(-60deg); }
+      84% { transform: rotate(-40deg); }
+      92% { transform: rotate(0deg); }
+    }
+    @keyframes avSwayArmL {
+      0%,60%,100% { transform: rotate(0deg); }
+      74% { transform: rotate(11deg); }
+      88% { transform: rotate(-4deg); }
+    }
+    @keyframes avDanceL {
+      0%,50%,100% { transform: rotate(0deg); }
+      60% { transform: rotate(48deg); }
+      70% { transform: rotate(8deg); }
+      80% { transform: rotate(44deg); }
+      90% { transform: rotate(6deg); }
+    }
+    @keyframes avDanceR {
+      0%,50%,100% { transform: rotate(0deg); }
+      60% { transform: rotate(-8deg); }
+      70% { transform: rotate(-46deg); }
+      80% { transform: rotate(-6deg); }
+      90% { transform: rotate(-42deg); }
+    }
+    @keyframes avShakeL {
+      0%,55%,100% { transform: rotate(0deg) translateY(0); }
+      62%,74%,86% { transform: rotate(14deg) translateY(-1px); }
+      68%,80%,92% { transform: rotate(2deg) translateY(0); }
+    }
+    @keyframes avShakeR {
+      0%,55%,100% { transform: rotate(0deg) translateY(0); }
+      62%,74%,86% { transform: rotate(-2deg) translateY(0); }
+      68%,80%,92% { transform: rotate(-14deg) translateY(-1px); }
+    }
+    @keyframes avFlailL {
+      0%,45%,100% { transform: rotate(0deg); }
+      55% { transform: rotate(62deg); }
+      65% { transform: rotate(-10deg); }
+      75% { transform: rotate(70deg); }
+      85% { transform: rotate(20deg); }
+    }
+    @keyframes avFlailR {
+      0%,45%,100% { transform: rotate(0deg); }
+      55% { transform: rotate(-14deg); }
+      65% { transform: rotate(-66deg); }
+      75% { transform: rotate(-18deg); }
+      85% { transform: rotate(-72deg); }
+    }
+    @keyframes avFlapL {
+      0%,40%,100% { transform: rotate(0deg); }
+      50%,66%,82% { transform: rotate(52deg); }
+      58%,74%,90% { transform: rotate(6deg); }
+    }
+    @keyframes avFlapR {
+      0%,40%,100% { transform: rotate(0deg); }
+      50%,66%,82% { transform: rotate(-52deg); }
+      58%,74%,90% { transform: rotate(-6deg); }
+    }
+
+    /* ── Heads ──────────────────────────────────────────── */
+    @keyframes avHeadNod {
+      0%,52%,100% { transform: rotate(0deg) translateY(0); }
+      64% { transform: rotate(-5deg) translateY(-1px); }
+      78% { transform: rotate(3deg) translateY(0); }
+      88% { transform: rotate(-2deg) translateY(0); }
+    }
+    @keyframes avHeadTilt {
+      0%,60%,100% { transform: rotate(0deg); }
+      76% { transform: rotate(6deg) translateY(-1px); }
+      90% { transform: rotate(1deg); }
+    }
+    @keyframes avHeadBob {
+      0%,50%,100% { transform: translateY(0) rotate(0deg); }
+      62% { transform: translateY(-2.5px) rotate(-4deg); }
+      74% { transform: translateY(0) rotate(3deg); }
+      86% { transform: translateY(-1.5px) rotate(-2deg); }
+    }
+    @keyframes avHeadSway {
+      0%,55%,100% { transform: rotate(0deg); }
+      70% { transform: rotate(4deg); }
+      85% { transform: rotate(-4deg); }
+    }
+    @keyframes avHeadBounce {
+      0%,52%,100% { transform: translateY(0) scale(1); }
+      64% { transform: translateY(-3px) scale(1.03); }
+      74% { transform: translateY(0) scale(0.98); }
+      84% { transform: translateY(-1.5px) scale(1); }
+    }
+    @keyframes avHeadShimmy {
+      0%,50%,100% { transform: translateX(0) rotate(0deg); }
+      60% { transform: translateX(-2px) rotate(-3deg); }
+      70% { transform: translateX(2px) rotate(3deg); }
+      80% { transform: translateX(-1.5px) rotate(-2deg); }
+      90% { transform: translateX(1px) rotate(1deg); }
+    }
+    @keyframes avHeadWiggle {
+      0%,45%,100% { transform: rotate(0deg); }
+      55% { transform: rotate(-9deg); }
+      65% { transform: rotate(7deg); }
+      75% { transform: rotate(-5deg); }
+      85% { transform: rotate(3deg); }
+    }
+    @keyframes avHeadGiggle {
+      0%,38%,100% { transform: rotate(0deg) translateY(0) scale(1); }
+      48% { transform: rotate(-9deg) translateY(-2px) scale(1.04); }
+      58% { transform: rotate(8deg) translateY(0) scale(1); }
+      68% { transform: rotate(-7deg) translateY(-2px) scale(1.04); }
+      78% { transform: rotate(6deg) translateY(0) scale(1); }
+      88% { transform: rotate(-3deg) translateY(-1px) scale(1.02); }
+    }
+
+    /* ── Hair, brows, mouths ────────────────────────────── */
+    @keyframes avHairSway {
+      0%,55%,100% { transform: rotate(0deg); }
+      72% { transform: rotate(2.5deg); }
+      88% { transform: rotate(-1.5deg); }
+    }
+    @keyframes avCurlBounce {
+      0%,38%,100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-1.2px) rotate(-3deg); }
+      62% { transform: translateY(0.6px) rotate(2deg); }
+      76% { transform: translateY(-0.8px) rotate(-2deg); }
+    }
+    @keyframes avBrowRaise {
+      0%,50%,100% { transform: translateY(0); }
+      60%,80% { transform: translateY(-1.6px); }
+      70% { transform: translateY(0); }
+    }
+    @keyframes avBabble {
+      0%,40%,100% { transform: scale(1); }
+      50% { transform: scale(1.25, 0.7); }
+      60% { transform: scale(0.85, 1.2); }
+      72% { transform: scale(1.2, 0.8); }
+      84% { transform: scale(0.9, 1.1); }
+    }
+    @keyframes avWink {
+      0%,80%,100% { transform: scaleY(1); }
+      86%,90% { transform: scaleY(0.08); }
+    }
+    @keyframes avBlink {
+      0%,90%,100% { transform: scaleY(1); }
+      94%,96% { transform: scaleY(0.1); }
+    }
+
+    /* ── Cast ───────────────────────────────────────────── */
+
+    /* David — a friendly wave and a warm nod */
+    .av-david .av-wave-r    { animation: avWaveR 6.4s ease-in-out infinite; }
+    .av-david .av-head-nod  { animation: avHeadNod 6.4s ease-in-out infinite; }
+    .av-david .av-eye       { animation: avBlink 6.4s ease-in-out infinite; }
+
+    /* Jenny — a poised tilt, hair swinging with it */
+    .av-jenny .av-head-tilt  { animation: avHeadTilt 7.2s ease-in-out infinite; }
+    .av-jenny .av-hair-back  { animation: avHairSway 7.2s ease-in-out infinite; }
+    .av-jenny .av-arm-sway-l { animation: avSwayArmL 7.2s ease-in-out infinite; }
+    .av-jenny .av-eye        { animation: avBlink 7.2s ease-in-out infinite; }
+
+    /* Daisy — a little dance, and the wink */
+    .av-daisy .av-dance-l   { animation: avDanceL 5.6s ease-in-out infinite; }
+    .av-daisy .av-dance-r   { animation: avDanceR 5.6s ease-in-out infinite; }
+    .av-daisy .av-head-bob  { animation: avHeadBob 5.6s ease-in-out infinite; }
+    .av-daisy .av-eye-r     { animation: avWink 5.6s ease-in-out infinite; }
+
+    /* Dave — hands always busy, easy sway */
+    .av-dave .av-shake-l    { animation: avShakeL 5.8s ease-in-out infinite; }
+    .av-dave .av-shake-r    { animation: avShakeR 5.8s ease-in-out infinite; }
+    .av-dave .av-head-sway  { animation: avHeadSway 5.8s ease-in-out infinite; }
+    .av-dave .av-eye        { animation: avBlink 5.8s ease-in-out infinite; }
+
+    /* Lucy — bright, bouncy, waves hello */
+    .av-lucy .av-wave-r      { animation: avWaveR 5.2s ease-in-out infinite; }
+    .av-lucy .av-head-bounce { animation: avHeadBounce 5.2s ease-in-out infinite; }
+    .av-lucy .av-hair-back   { animation: avCurlBounce 5.2s ease-in-out infinite; }
+    .av-lucy .av-eye         { animation: avBlink 5.2s ease-in-out infinite; }
+
+    /* Ruby — a shimmy, long hair swinging */
+    .av-ruby .av-dance-l      { animation: avDanceL 6s ease-in-out infinite; }
+    .av-ruby .av-dance-r      { animation: avDanceR 6s ease-in-out infinite; }
+    .av-ruby .av-head-shimmy  { animation: avHeadShimmy 6s ease-in-out infinite; }
+    .av-ruby .av-hair-back    { animation: avHairSway 6s ease-in-out infinite; }
+    .av-ruby .av-eye          { animation: avBlink 6s ease-in-out infinite; }
+
+    /* Elliott — arms everywhere, eyebrow doing the work */
+    .av-elliott .av-flail-l      { animation: avFlailL 5.4s ease-in-out infinite; }
+    .av-elliott .av-flail-r      { animation: avFlailR 5.4s ease-in-out infinite; }
+    .av-elliott .av-head-wiggle  { animation: avHeadWiggle 5.4s ease-in-out infinite; }
+    .av-elliott .av-brow         { animation: avBrowRaise 5.4s ease-in-out infinite; }
+    .av-elliott .av-eye-r        { animation: avWink 5.4s ease-in-out infinite; }
+
+    /* Cleo — arms flapping, curls bouncing, mid-babble, big wonky wink */
+    .av-cleo .av-flap-l       { animation: avFlapL 4.4s ease-in-out infinite; }
+    .av-cleo .av-flap-r       { animation: avFlapR 4.4s ease-in-out infinite; }
+    .av-cleo .av-head-giggle  { animation: avHeadGiggle 4.4s ease-in-out infinite; }
+    .av-cleo .av-curls        { animation: avCurlBounce 4.4s ease-in-out infinite; }
+    .av-cleo .av-mouth        { animation: avBabble 4.4s ease-in-out infinite; }
+    .av-cleo .av-eye-r        { animation: avWink 4.4s ease-in-out infinite; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .av-frame * { animation: none !important; }
+    }
+
+    /* ══════════════════════════════════════════════════════
        SPLASH / RESTING SCREEN — shown on open, and whenever
        the app goes idle, so a shared studio iPad settles back
        to the branded moment between uses.
        ══════════════════════════════════════════════════════ */
+
+    /* A fixed inset:0 element is sized to the SMALL viewport on iOS.
+       When Safari's toolbar collapses, the extra strip at the bottom
+       is painted by html/body — which are ivory — giving a white gap
+       under the splash. So while the splash is up, paint the page
+       itself the splash colour. Removed again on dismiss. */
+    html.splash-showing,
+    body.splash-showing {
+      background: #0E1A18;
+    }
     #splash-screen {
       position: fixed;
       inset: 0;
@@ -1934,9 +2166,15 @@
 </div>
 
 <!-- Splash / resting screen -->
-<div id="splash-screen" style="position:fixed;inset:0;z-index:5000;background:#0E1A18;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;padding-top:max(20px,env(safe-area-inset-top));padding-bottom:max(20px,env(safe-area-inset-bottom));" onclick="dismissSplash()">
+<div id="splash-screen" style="position:fixed;inset:0;height:100vh;height:100dvh;min-height:100dvh;z-index:5000;background:#0E1A18;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;padding-top:max(20px,env(safe-area-inset-top));padding-bottom:max(20px,env(safe-area-inset-bottom));" onclick="dismissSplash()">
   <img src="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png" style="width:90%;max-width:400px;opacity:0.95;filter:drop-shadow(0 12px 40px rgba(184,121,70,0.4));">
 </div>
+<script>
+  /* Paint the page dark immediately — before any of the main app script
+     runs — so there is never an ivory strip under the splash. */
+  document.documentElement.classList.add('splash-showing');
+  document.body.classList.add('splash-showing');
+</script>
 <!-- ═══════════════════════════════════════════
      PLATFORM REVENUE STRIP — pinned to the very top
      of the entire app, above every tab, always visible
@@ -2205,9 +2443,6 @@
       <div id="login-name-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
         <div style="grid-column:1/-1;color:var(--gu-dust);font-size:13px;padding:20px;">Loading team…</div>
       </div>
-      <button onclick="skipShiftLogin()" style="width:100%;background:none;border:none;color:var(--gu-dust);font-size:12px;cursor:pointer;padding:8px;">
-        Skip — use shared/manager view
-      </button>
     </div>
 
     <!-- Screen 2: enter existing PIN -->
@@ -8113,13 +8348,17 @@ const SHIFT_PIN_LOGIN_ENABLED = true; // genuine real login restored after tonig
 const APP_VERSION = '1.1.0';
 const DEMO_MODE = true;
 
+// Local fallback team — used only when the API can't be reached, so the
+// login picker never dead-ends. PINs here must match the real ones in
+// Supabase (reset_all_pins_to_0000.sql sets everyone to 0000).
 const DEMO_STAFF = [
-  { id: '1', name: 'David', pin: '000', role: 'Manager' },
-  { id: '2', name: 'Jenny', pin: '000', role: 'Manager' },
-  { id: '3', name: 'Daisy', pin: '000', role: 'Manager' },
-  { id: '4', name: 'Dave', pin: '000', role: 'Barista' },
-  { id: '5', name: 'Lucy', pin: '000', role: 'Staff' },
-  { id: '6', name: 'Ruby', pin: '000', role: 'Staff' }
+  { id: '1', name: 'David', pin: '0000', role: 'Manager' },
+  { id: '2', name: 'Jenny', pin: '0000', role: 'Manager' },
+  { id: '3', name: 'Daisy', pin: '0000', role: 'Manager' },
+  { id: '4', name: 'Dave', pin: '0000', role: 'Barista' },
+  { id: '5', name: 'Lucy', pin: '0000', role: 'Staff' },
+  { id: '6', name: 'Ruby', pin: '0000', role: 'Staff' },
+  { id: '7', name: 'Cleo', pin: '0000', role: 'Chief Taster' }
 ];
 
 let currentShiftStaff = null; // { id, name, role }
@@ -8331,7 +8570,7 @@ function checkShiftLogin() {
   loadLoginNamePicker();
 }
 
-const ROLE_COLORS_LOGIN = { 'Studio Manager':'#5E35B1', 'Studio Executive':'#1E88E5', 'Ceramic Technician':'#8D6E63', 'Studio Assistant':'#00897B', 'Barista':'#F4511E', 'CEO':'#F9A825' };
+const ROLE_COLORS_LOGIN = { 'Chief Taster':'#F4A9C0', 'Studio Manager':'#5E35B1', 'Studio Executive':'#1E88E5', 'Ceramic Technician':'#8D6E63', 'Studio Assistant':'#00897B', 'Barista':'#F4511E', 'CEO':'#F9A825' };
 let selectedLoginMember = null;
 
 function skipLoginUseSharedView() {
@@ -8356,155 +8595,312 @@ function showLoginScreen(screen) {
 // Where we don't have confirmed physical descriptions, avatars reflect
 // personality and role rather than literal appearance.
 const STAFF_AVATARS = {
-  // David — Daisy's father, co-director, warm older man, barista background
+  // David — Daisy's father, co-director. Warm older man, close-cropped grey
+  // hair, laughter lines, barista background. Gives you a friendly wave.
   'David': `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
     <circle cx="30" cy="30" r="30" fill="#B87946"/>
-    <!-- Face -->
-    <ellipse cx="30" cy="27" rx="13" ry="15" fill="#F5D5B0"/>
-    <!-- Grey hair — close-cropped sides, fuller on top -->
-    <ellipse cx="30" cy="14" rx="13" ry="7" fill="#888"/>
-    <rect x="17" y="14" width="4" height="10" fill="#888"/>
-    <rect x="39" y="14" width="4" height="10" fill="#888"/>
-    <!-- Kind eyes -->
-    <ellipse cx="25" cy="25" rx="2.5" ry="2" fill="#5A3E28"/>
-    <ellipse cx="35" cy="25" rx="2.5" ry="2" fill="#5A3E28"/>
-    <!-- Warm smile with laughter lines -->
-    <path d="M23 33 Q30 38 37 33" fill="none" stroke="#8a5520" stroke-width="1.5" stroke-linecap="round"/>
-    <path d="M20 28 Q18 26 20 24" fill="none" stroke="#D4A870" stroke-width="1" stroke-linecap="round"/>
-    <path d="M40 28 Q42 26 40 24" fill="none" stroke="#D4A870" stroke-width="1" stroke-linecap="round"/>
-    <!-- Collar -->
-    <path d="M17 42 Q30 46 43 42 L43 60 L17 60Z" fill="#2B2724"/>
+    <g class="av-arm av-arm-still" style="transform-origin:21px 45px">
+      <path d="M21 45 Q15.5 49.5 13.6 55" fill="none" stroke="#2B2724" stroke-width="4.8" stroke-linecap="round"/>
+      <path d="M16.8 50.5 Q14.6 52.8 13.6 55" fill="none" stroke="#F5D5B0" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="13.4" cy="55.8" r="2.5" fill="#F5D5B0"/>
+    </g>
+    <g class="av-arm av-wave-r" style="transform-origin:39px 45px">
+      <path d="M39 45 Q44.5 49.5 46.4 55" fill="none" stroke="#2B2724" stroke-width="4.8" stroke-linecap="round"/>
+      <path d="M43.2 50.5 Q45.4 52.8 46.4 55" fill="none" stroke="#F5D5B0" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="46.6" cy="55.8" r="2.5" fill="#F5D5B0"/>
+    </g>
+    <path d="M26.5 34 h7 v9 h-7 Z" fill="#F5D5B0" opacity="0.85"/>
+    <path d="M19 44 Q30 49.5 41 44 L44.5 60 L15.5 60 Z" fill="#2B2724"/>
+    <path d="M19 44 Q30 49.5 41 44 L40 47 Q30 52 20 47 Z" fill="#43403C" opacity="0.5"/>
+    <g class="av-head av-head-nod" style="transform-origin:30px 36px"><ellipse cx="30" cy="24" rx="11.5" ry="13" fill="#F5D5B0"/>
+      <path d="M19.5 27 Q18 22 20 19" fill="none" stroke="#E3BE96" stroke-width="1"/>
+      <path d="M18.6 24 Q18 10.5 30 10.2 Q42 10.5 41.4 24 Q40 13.5 30 13 Q20 13.5 18.6 24 Z" fill="#8E8B86"/>
+      <path d="M18.6 24 Q18.2 18 19.4 15.5 L21.6 16.6 Q20.2 19.5 20.2 24 Z" fill="#A5A29C"/>
+      <path d="M41.4 24 Q41.8 18 40.6 15.5 L38.4 16.6 Q39.8 19.5 39.8 24 Z" fill="#A5A29C"/>
+      <path d="M22.4 19.4 Q25 18.2 27.6 19.2" fill="none" stroke="#9C9894" stroke-width="1.2" stroke-linecap="round"/>
+      <path d="M32.4 19.2 Q35 18.2 37.6 19.4" fill="none" stroke="#9C9894" stroke-width="1.2" stroke-linecap="round"/>
+      <ellipse class="av-eye av-eye-l" cx="25" cy="23" rx="2.4" ry="2.1" fill="#5A3E28"/>
+      <ellipse class="av-eye av-eye-r" cx="35" cy="23" rx="2.4" ry="2.1" fill="#5A3E28"/>
+      <circle cx="25.9" cy="22.1" r="0.8" fill="white"/>
+      <circle cx="35.9" cy="22.1" r="0.8" fill="white"/>
+      <path d="M20.6 25.4 Q19 23.6 20.4 21.8" fill="none" stroke="#DBAF84" stroke-width="0.9" stroke-linecap="round"/>
+      <path d="M39.4 25.4 Q41 23.6 39.6 21.8" fill="none" stroke="#DBAF84" stroke-width="0.9" stroke-linecap="round"/>
+      <path d="M29.2 26 Q28.4 29 30.4 29.6" fill="none" stroke="#E0B588" stroke-width="0.9" stroke-linecap="round"/>
+      <path d="M23.4 31.4 Q30 36.6 36.6 31.4" fill="none" stroke="#8a5520" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M22.6 30.4 Q22 32.6 23.6 34" fill="none" stroke="#E0B588" stroke-width="0.8" stroke-linecap="round"/>
+      <path d="M37.4 30.4 Q38 32.6 36.4 34" fill="none" stroke="#E0B588" stroke-width="0.8" stroke-linecap="round"/>
+    </g>
   </svg>`,
 
-  // Jenny — co-director, professional, confident
+  // Jenny — co-director. Long, lovely, slightly wavy auburn hair. Poised and
+  // confident; her hair sways as she tilts.
   'Jenny': `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
     <circle cx="30" cy="30" r="30" fill="#2e7d32"/>
-    <!-- Face -->
-    <ellipse cx="30" cy="27" rx="12" ry="14" fill="#F0C8A0"/>
-    <!-- Hair — dark, neat, shoulder length suggested -->
-    <ellipse cx="30" cy="13" rx="13" ry="7" fill="#3D2B1F"/>
-    <path d="M17 13 Q14 28 16 40" fill="none" stroke="#3D2B1F" stroke-width="5" stroke-linecap="round"/>
-    <path d="M43 13 Q46 28 44 40" fill="none" stroke="#3D2B1F" stroke-width="5" stroke-linecap="round"/>
-    <!-- Confident eyes -->
-    <ellipse cx="25" cy="26" rx="2.5" ry="2.2" fill="#3D2B1F"/>
-    <ellipse cx="35" cy="26" rx="2.5" ry="2.2" fill="#3D2B1F"/>
-    <path d="M22 23 Q25 21.5 28 23" fill="none" stroke="#3D2B1F" stroke-width="1" stroke-linecap="round"/>
-    <path d="M32 23 Q35 21.5 38 23" fill="none" stroke="#3D2B1F" stroke-width="1" stroke-linecap="round"/>
-    <!-- Poised smile -->
-    <path d="M24 33 Q30 37 36 33" fill="none" stroke="#8a5520" stroke-width="1.5" stroke-linecap="round"/>
-    <!-- Smart collar -->
-    <path d="M18 42 Q30 47 42 42 L42 60 L18 60Z" fill="#1a4d1e"/>
+    <g class="av-hair-back">
+      <path d="M16.4 20 Q12.4 32 15 42 Q17 50 15.4 58" fill="none" stroke="#8C3B1E" stroke-width="7.5" stroke-linecap="round"/>
+      <path d="M43.6 20 Q47.6 32 45 42 Q43 50 44.6 58" fill="none" stroke="#8C3B1E" stroke-width="7.5" stroke-linecap="round"/>
+      <path d="M14.2 26 Q12.4 35 14.4 43" fill="none" stroke="#A8502C" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M45.8 26 Q47.6 35 45.6 43" fill="none" stroke="#A8502C" stroke-width="2.2" stroke-linecap="round"/>
+    </g>
+    <g class="av-arm av-arm-sway-l" style="transform-origin:21px 45px">
+      <path d="M21 45 Q15.5 49.5 13.6 55" fill="none" stroke="#1a4d1e" stroke-width="4.8" stroke-linecap="round"/>
+      <path d="M16.8 50.5 Q14.6 52.8 13.6 55" fill="none" stroke="#F0C8A0" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="13.4" cy="55.8" r="2.5" fill="#F0C8A0"/>
+    </g>
+    <g class="av-arm av-arm-still" style="transform-origin:39px 45px">
+      <path d="M39 45 Q44.5 49.5 46.4 55" fill="none" stroke="#1a4d1e" stroke-width="4.8" stroke-linecap="round"/>
+      <path d="M43.2 50.5 Q45.4 52.8 46.4 55" fill="none" stroke="#F0C8A0" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="46.6" cy="55.8" r="2.5" fill="#F0C8A0"/>
+    </g>
+    <path d="M26.5 34 h7 v9 h-7 Z" fill="#F0C8A0" opacity="0.85"/>
+    <path d="M19 44 Q30 49.5 41 44 L44.5 60 L15.5 60 Z" fill="#1a4d1e"/>
+    <path d="M19 44 Q30 49.5 41 44 L40 47 Q30 52 20 47 Z" fill="#2e7d32" opacity="0.5"/>
+    <g class="av-head av-head-tilt" style="transform-origin:30px 36px"><ellipse cx="30" cy="24" rx="10.8" ry="12.6" fill="#F0C8A0"/>
+      <path d="M18.8 22 Q18.4 9.6 30 9.4 Q41.6 9.6 41.2 22 Q40.6 14 34 13 Q26 15.4 21.4 13.6 Q19.4 16.4 18.8 22 Z" fill="#8C3B1E"/>
+      <path d="M22 12.6 Q28 9.8 34.6 12.4" fill="none" stroke="#A8502C" stroke-width="1.4" stroke-linecap="round"/>
+      <path d="M22.6 19.6 Q25.2 18.2 27.8 19.4" fill="none" stroke="#6E2E16" stroke-width="1.1" stroke-linecap="round"/>
+      <path d="M32.2 19.4 Q34.8 18.2 37.4 19.6" fill="none" stroke="#6E2E16" stroke-width="1.1" stroke-linecap="round"/>
+      <ellipse class="av-eye av-eye-l" cx="25" cy="23.4" rx="2.5" ry="2.2" fill="#3D5B3A"/>
+      <ellipse class="av-eye av-eye-r" cx="35" cy="23.4" rx="2.5" ry="2.2" fill="#3D5B3A"/>
+      <circle cx="25.9" cy="22.5" r="0.8" fill="white"/>
+      <circle cx="35.9" cy="22.5" r="0.8" fill="white"/>
+      <path d="M22.4 21.4 Q25 20.4 27.6 21.4" fill="none" stroke="#5A3A1A" stroke-width="0.6" stroke-linecap="round" opacity="0.6"/>
+      <path d="M32.4 21.4 Q35 20.4 37.6 21.4" fill="none" stroke="#5A3A1A" stroke-width="0.6" stroke-linecap="round" opacity="0.6"/>
+      <ellipse cx="21.8" cy="28.4" rx="2.2" ry="1.6" fill="#E79A93" opacity="0.35"/>
+      <ellipse cx="38.2" cy="28.4" rx="2.2" ry="1.6" fill="#E79A93" opacity="0.35"/><path d="M25 31.4 Q30 35.4 35 31.4" fill="none" stroke="#B45A52" stroke-width="1.6" stroke-linecap="round"/>
+    </g>
   </svg>`,
 
-  // Daisy — the owner, creative, warm, mid-late 30s
+  // Daisy — the owner. Number three crew cut all over, warm brown. Creative,
+  // very cool. Dances a bit and winks.
   'Daisy': `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
     <circle cx="30" cy="30" r="30" fill="#B87946"/>
-    <!-- Face -->
-    <ellipse cx="30" cy="27" rx="12" ry="14" fill="#F2C49A"/>
-    <!-- Hair — warm brown, loose wavy -->
-    <ellipse cx="30" cy="12" rx="14" ry="8" fill="#7B4A2D"/>
-    <path d="M16 12 Q11 30 13 44" fill="none" stroke="#7B4A2D" stroke-width="6" stroke-linecap="round"/>
-    <path d="M44 12 Q49 30 47 44" fill="none" stroke="#7B4A2D" stroke-width="6" stroke-linecap="round"/>
-    <path d="M14 20 Q10 32 12 40" fill="none" stroke="#9B6A4D" stroke-width="3" stroke-linecap="round"/>
-    <!-- Warm eyes with a spark -->
-    <ellipse cx="25" cy="25" rx="2.8" ry="2.5" fill="#5A3018"/>
-    <ellipse cx="35" cy="25" rx="2.8" ry="2.5" fill="#5A3018"/>
-    <circle cx="26" cy="24" r="0.8" fill="white"/>
-    <circle cx="36" cy="24" r="0.8" fill="white"/>
-    <!-- Genuine smile -->
-    <path d="M23 33 Q30 39 37 33" fill="none" stroke="#8a5520" stroke-width="1.8" stroke-linecap="round"/>
-    <!-- Creative top -->
-    <path d="M18 42 Q30 48 42 42 L42 60 L18 60Z" fill="#c0392b"/>
+    <g class="av-arm av-dance-l" style="transform-origin:21px 45px">
+      <path d="M21 45 Q15.5 49.5 13.6 55" fill="none" stroke="#c0392b" stroke-width="4.8" stroke-linecap="round"/>
+      <path d="M16.8 50.5 Q14.6 52.8 13.6 55" fill="none" stroke="#F2C49A" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="13.4" cy="55.8" r="2.5" fill="#F2C49A"/>
+    </g>
+    <g class="av-arm av-dance-r" style="transform-origin:39px 45px">
+      <path d="M39 45 Q44.5 49.5 46.4 55" fill="none" stroke="#c0392b" stroke-width="4.8" stroke-linecap="round"/>
+      <path d="M43.2 50.5 Q45.4 52.8 46.4 55" fill="none" stroke="#F2C49A" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="46.6" cy="55.8" r="2.5" fill="#F2C49A"/>
+    </g>
+    <path d="M26.5 34 h7 v9 h-7 Z" fill="#F2C49A" opacity="0.85"/>
+    <path d="M19 44 Q30 49.5 41 44 L44.5 60 L15.5 60 Z" fill="#c0392b"/>
+    <path d="M19 44 Q30 49.5 41 44 L40 47 Q30 52 20 47 Z" fill="#e05a4a" opacity="0.5"/>
+    <g class="av-head av-head-bob" style="transform-origin:30px 36px"><ellipse cx="30" cy="24" rx="10.8" ry="12.6" fill="#F2C49A"/>
+      <path d="M19 24 Q18.4 10.6 30 10.2 Q41.6 10.6 41 24 Q39.8 14 30 13.6 Q20.2 14 19 24 Z" fill="#6B4227"/>
+      <path d="M21.4 17 Q30 13.4 38.6 17" fill="none" stroke="#8A5C3C" stroke-width="0.7" stroke-linecap="round" opacity="0.75"/>
+      <path d="M20.6 20.4 Q30 16.6 39.4 20.4" fill="none" stroke="#8A5C3C" stroke-width="0.6" stroke-linecap="round" opacity="0.55"/>
+      <path d="M22.4 19.4 Q25 18 27.6 19.2" fill="none" stroke="#5A3018" stroke-width="1.1" stroke-linecap="round"/>
+      <path d="M32.4 19.2 Q35 18 37.6 19.4" fill="none" stroke="#5A3018" stroke-width="1.1" stroke-linecap="round"/>
+      <ellipse class="av-eye av-eye-l" cx="25" cy="23.4" rx="2.7" ry="2.4" fill="#5A3018"/>
+      <ellipse class="av-eye av-eye-r" cx="35" cy="23.4" rx="2.7" ry="2.4" fill="#5A3018"/>
+      <circle cx="25.9" cy="22.5" r="0.85" fill="white"/>
+      <circle cx="35.9" cy="22.5" r="0.85" fill="white"/>
+      <ellipse cx="21.6" cy="28.6" rx="2.3" ry="1.7" fill="#E8877E" opacity="0.4"/>
+      <ellipse cx="38.4" cy="28.6" rx="2.3" ry="1.7" fill="#E8877E" opacity="0.4"/>
+      <circle cx="19.4" cy="24" r="1.5" fill="#F9A825"/>
+      <circle cx="19.4" cy="24" r="0.5" fill="#fff" opacity="0.7"/>
+      <path d="M23.6 31.2 Q30 37 36.4 31.2" fill="none" stroke="#8a5520" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M26.6 33.6 Q30 35.4 33.4 33.6" fill="#fff" opacity="0.85"/>
+    </g>
   </svg>`,
 
-  // Lucy — ceramicist, artistic, Cancer warmth beneath a grounded exterior
+  // Lucy — ceramicist. Light brown hair gone blonde in places, tied up in a
+  // bun for studio work. Bouncy, waves hello.
   'Lucy': `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
     <circle cx="30" cy="30" r="30" fill="#c0392b"/>
-    <!-- Face -->
-    <ellipse cx="30" cy="27" rx="12" ry="14" fill="#F5D0A8"/>
-    <!-- Hair — light brown, often up/tied back for studio work -->
-    <ellipse cx="30" cy="12" rx="13" ry="7" fill="#A07040"/>
-    <circle cx="38" cy="11" r="5" fill="#A07040"/>
-    <!-- Bun suggestion -->
-    <circle cx="40" cy="9" r="4" fill="#C09060"/>
-    <!-- Warm eyes -->
-    <ellipse cx="25" cy="26" rx="2.5" ry="2.2" fill="#5A3A1A"/>
-    <ellipse cx="35" cy="26" rx="2.5" ry="2.2" fill="#5A3A1A"/>
-    <circle cx="25.8" cy="25.2" r="0.7" fill="white"/>
-    <circle cx="35.8" cy="25.2" r="0.7" fill="white"/>
-    <!-- Gentle smile -->
-    <path d="M24 33 Q30 37 36 33" fill="none" stroke="#8a5520" stroke-width="1.5" stroke-linecap="round"/>
-    <!-- Studio apron hint -->
-    <path d="M18 42 Q30 47 42 42 L42 60 L18 60Z" fill="#8e44ad"/>
-    <rect x="26" y="42" width="8" height="14" fill="#7a3d96" rx="2"/>
+    <g class="av-hair-back">
+      <circle cx="41.5" cy="12.5" r="4.6" fill="#A07040"/>
+      <path d="M39 9.6 Q42.6 8.8 44.8 12" fill="none" stroke="#D8B278" stroke-width="1.5" stroke-linecap="round"/>
+    </g>
+    <g class="av-arm av-arm-still" style="transform-origin:21px 45px">
+      <path d="M21 45 Q15.5 49.5 13.6 55" fill="none" stroke="#8e44ad" stroke-width="4.8" stroke-linecap="round"/>
+      <path d="M16.8 50.5 Q14.6 52.8 13.6 55" fill="none" stroke="#F5D0A8" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="13.4" cy="55.8" r="2.5" fill="#F5D0A8"/>
+    </g>
+    <g class="av-arm av-wave-r" style="transform-origin:39px 45px">
+      <path d="M39 45 Q44.5 49.5 46.4 55" fill="none" stroke="#8e44ad" stroke-width="4.8" stroke-linecap="round"/>
+      <path d="M43.2 50.5 Q45.4 52.8 46.4 55" fill="none" stroke="#F5D0A8" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="46.6" cy="55.8" r="2.5" fill="#F5D0A8"/>
+    </g>
+    <path d="M26.5 34 h7 v9 h-7 Z" fill="#F5D0A8" opacity="0.85"/>
+    <path d="M19 44 Q30 49.5 41 44 L44.5 60 L15.5 60 Z" fill="#8e44ad"/>
+    <path d="M19 44 Q30 49.5 41 44 L40 47 Q30 52 20 47 Z" fill="#a55cc4" opacity="0.5"/>
+    <rect x="25.5" y="44" width="9" height="16" fill="#7a3d96" rx="1.5"/>
+    <path d="M25.5 47 h9" stroke="#5f2f75" stroke-width="0.8"/>
+    <g class="av-head av-head-bounce" style="transform-origin:30px 36px"><ellipse cx="30" cy="24" rx="10.8" ry="12.6" fill="#F5D0A8"/>
+      <path d="M19 23 Q18.6 9.8 30 9.6 Q41.4 9.8 41 23 Q40.2 13.6 33.4 12.6 Q25 15 21 13.4 Q19.6 16.4 19 23 Z" fill="#A07040"/>
+      <path d="M21.4 13 Q26 10 31 11.4" fill="none" stroke="#D8B278" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M32.4 11.2 Q36.4 10 39.6 12.6" fill="none" stroke="#E0C089" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M22.6 19.6 Q25.2 18.4 27.8 19.4" fill="none" stroke="#7A5330" stroke-width="1.1" stroke-linecap="round"/>
+      <path d="M32.2 19.4 Q34.8 18.4 37.4 19.6" fill="none" stroke="#7A5330" stroke-width="1.1" stroke-linecap="round"/>
+      <ellipse class="av-eye av-eye-l" cx="25" cy="23.4" rx="2.5" ry="2.3" fill="#5A3A1A"/>
+      <ellipse class="av-eye av-eye-r" cx="35" cy="23.4" rx="2.5" ry="2.3" fill="#5A3A1A"/>
+      <circle cx="25.9" cy="22.5" r="0.8" fill="white"/>
+      <circle cx="35.9" cy="22.5" r="0.8" fill="white"/>
+      <ellipse cx="21.8" cy="28.4" rx="2.2" ry="1.6" fill="#E8877E" opacity="0.35"/>
+      <ellipse cx="38.2" cy="28.4" rx="2.2" ry="1.6" fill="#E8877E" opacity="0.35"/><path d="M24.6 31.4 Q30 35.8 35.4 31.4" fill="none" stroke="#8a5520" stroke-width="1.6" stroke-linecap="round"/>
+    </g>
   </svg>`,
 
-  // Ruby — studio assistant, young, bubbly energy
+  // Ruby — studio assistant. Very long, very straight, lovely grey-blonde
+  // hair. Bubbly — shimmies, and her hair swings with her.
   'Ruby': `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
     <circle cx="30" cy="30" r="30" fill="#00838f"/>
-    <!-- Face -->
-    <ellipse cx="30" cy="28" rx="11" ry="13" fill="#F8D4B0"/>
-    <!-- Hair — longer, perhaps wavy, youthful -->
-    <ellipse cx="30" cy="14" rx="13" ry="8" fill="#4A2C10"/>
-    <path d="M17 14 Q12 32 15 46" fill="none" stroke="#4A2C10" stroke-width="7" stroke-linecap="round"/>
-    <path d="M43 14 Q48 32 45 46" fill="none" stroke="#4A2C10" stroke-width="7" stroke-linecap="round"/>
-    <!-- Big bright eyes -->
-    <ellipse cx="25" cy="27" rx="3" ry="2.8" fill="#3D2010"/>
-    <ellipse cx="35" cy="27" rx="3" ry="2.8" fill="#3D2010"/>
-    <circle cx="26" cy="26" r="1" fill="white"/>
-    <circle cx="36" cy="26" r="1" fill="white"/>
-    <!-- Big smile -->
-    <path d="M22 34 Q30 40 38 34" fill="none" stroke="#8a5520" stroke-width="2" stroke-linecap="round"/>
-    <!-- Colourful top -->
-    <path d="M18 42 Q30 48 42 42 L42 60 L18 60Z" fill="#00695c"/>
+    <g class="av-hair-back">
+      <path d="M17.2 18 L15.4 58" fill="none" stroke="#C9BFA6" stroke-width="7.5" stroke-linecap="round"/>
+      <path d="M42.8 18 L44.6 58" fill="none" stroke="#C9BFA6" stroke-width="7.5" stroke-linecap="round"/>
+      <path d="M19.6 22 L18.4 54" fill="none" stroke="#E2DAC6" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M40.4 22 L41.6 54" fill="none" stroke="#E2DAC6" stroke-width="1.8" stroke-linecap="round"/>
+    </g>
+    <g class="av-arm av-dance-l" style="transform-origin:21px 45px">
+      <path d="M21 45 Q15.5 49.5 13.6 55" fill="none" stroke="#00695c" stroke-width="4.8" stroke-linecap="round"/>
+      <path d="M16.8 50.5 Q14.6 52.8 13.6 55" fill="none" stroke="#F8D4B0" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="13.4" cy="55.8" r="2.5" fill="#F8D4B0"/>
+    </g>
+    <g class="av-arm av-dance-r" style="transform-origin:39px 45px">
+      <path d="M39 45 Q44.5 49.5 46.4 55" fill="none" stroke="#00695c" stroke-width="4.8" stroke-linecap="round"/>
+      <path d="M43.2 50.5 Q45.4 52.8 46.4 55" fill="none" stroke="#F8D4B0" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="46.6" cy="55.8" r="2.5" fill="#F8D4B0"/>
+    </g>
+    <path d="M26.5 34 h7 v9 h-7 Z" fill="#F8D4B0" opacity="0.85"/>
+    <path d="M19 44 Q30 49.5 41 44 L44.5 60 L15.5 60 Z" fill="#00695c"/>
+    <path d="M19 44 Q30 49.5 41 44 L40 47 Q30 52 20 47 Z" fill="#00897b" opacity="0.5"/>
+    <g class="av-head av-head-shimmy" style="transform-origin:30px 36px"><ellipse cx="30" cy="24.5" rx="10.4" ry="12.2" fill="#F8D4B0"/>
+      <path d="M19 22.5 Q18.6 9.6 30 9.4 Q41.4 9.6 41 22.5 Q40.4 13.4 30 12.8 Q19.6 13.4 19 22.5 Z" fill="#C9BFA6"/>
+      <path d="M24 12.4 L22.4 20" fill="none" stroke="#E2DAC6" stroke-width="1.2" stroke-linecap="round"/>
+      <path d="M36 12.4 L37.6 20" fill="none" stroke="#E2DAC6" stroke-width="1.2" stroke-linecap="round"/>
+      <path d="M22.8 19.8 Q25.2 18.6 27.6 19.6" fill="none" stroke="#A89A80" stroke-width="1.1" stroke-linecap="round"/>
+      <path d="M32.4 19.6 Q34.8 18.6 37.2 19.8" fill="none" stroke="#A89A80" stroke-width="1.1" stroke-linecap="round"/>
+      <ellipse class="av-eye av-eye-l" cx="25" cy="23.8" rx="2.9" ry="2.7" fill="#3D2010"/>
+      <ellipse class="av-eye av-eye-r" cx="35" cy="23.8" rx="2.9" ry="2.7" fill="#3D2010"/>
+      <circle cx="25.9" cy="22.900000000000002" r="1.0" fill="white"/>
+      <circle cx="35.9" cy="22.900000000000002" r="1.0" fill="white"/>
+      <ellipse cx="21.8" cy="29" rx="2.3" ry="1.7" fill="#F08A80" opacity="0.4"/>
+      <ellipse cx="38.2" cy="29" rx="2.3" ry="1.7" fill="#F08A80" opacity="0.4"/>
+      <path d="M23.4 31.6 Q30 37.6 36.6 31.6" fill="none" stroke="#8a5520" stroke-width="1.9" stroke-linecap="round"/>
+      <path d="M26.4 34 Q30 36 33.6 34" fill="#fff" opacity="0.85"/>
+    </g>
   </svg>`,
 
-  // Elliott — Daisy's brother, early 30s, good-looking, creative, very funny
+  // Elliott — Daisy's brother, early 30s, very funny. One eyebrow does the
+  // work. Flails his arms about and winks.
   'Elliott': `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
     <circle cx="30" cy="30" r="30" fill="#5E35B1"/>
-    <!-- Face — strong jaw, good bone structure -->
-    <ellipse cx="30" cy="27" rx="12" ry="15" fill="#F2C49A"/>
-    <!-- Hair — dark, styled, a bit of character -->
-    <ellipse cx="30" cy="12" rx="13" ry="7" fill="#2B1F14"/>
-    <path d="M17 12 Q16 20 17 24" fill="#2B1F14" stroke="#2B1F14" stroke-width="3"/>
-    <!-- Slight quiff/texture suggestion -->
-    <path d="M22 8 Q30 5 36 9" fill="none" stroke="#2B1F14" stroke-width="3" stroke-linecap="round"/>
-    <!-- Expressive eyes — there's a joke behind them -->
-    <ellipse cx="25" cy="25" rx="2.8" ry="2.5" fill="#2B1F14"/>
-    <ellipse cx="35" cy="25" rx="2.8" ry="2.5" fill="#2B1F14"/>
-    <circle cx="26" cy="24" r="0.9" fill="white"/>
-    <circle cx="36" cy="24" r="0.9" fill="white"/>
-    <!-- One eyebrow slightly raised — the comedian -->
-    <path d="M22 21 Q25 19.5 28 20.5" fill="none" stroke="#2B1F14" stroke-width="1.2" stroke-linecap="round"/>
-    <path d="M32 20 Q35 18.5 38 20" fill="none" stroke="#2B1F14" stroke-width="1.5" stroke-linecap="round"/>
-    <!-- A grin rather than a smile -->
-    <path d="M23 33 Q27 37 33 36 Q36 35 37 33" fill="none" stroke="#8a5520" stroke-width="1.8" stroke-linecap="round"/>
-    <!-- Creative, slightly interesting collar -->
-    <path d="M18 42 Q30 47 42 42 L42 60 L18 60Z" fill="#4527A0"/>
-    <path d="M27 42 L30 48 L33 42" fill="white" opacity="0.3"/>
+    <g class="av-arm av-flail-l" style="transform-origin:21px 45px">
+      <path d="M21 45 Q15.5 49.5 13.6 55" fill="none" stroke="#4527A0" stroke-width="4.8" stroke-linecap="round"/>
+      <path d="M16.8 50.5 Q14.6 52.8 13.6 55" fill="none" stroke="#F2C49A" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="13.4" cy="55.8" r="2.5" fill="#F2C49A"/>
+    </g>
+    <g class="av-arm av-flail-r" style="transform-origin:39px 45px">
+      <path d="M39 45 Q44.5 49.5 46.4 55" fill="none" stroke="#4527A0" stroke-width="4.8" stroke-linecap="round"/>
+      <path d="M43.2 50.5 Q45.4 52.8 46.4 55" fill="none" stroke="#F2C49A" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="46.6" cy="55.8" r="2.5" fill="#F2C49A"/>
+    </g>
+    <path d="M26.5 34 h7 v9 h-7 Z" fill="#F2C49A" opacity="0.85"/>
+    <path d="M19 44 Q30 49.5 41 44 L44.5 60 L15.5 60 Z" fill="#4527A0"/>
+    <path d="M19 44 Q30 49.5 41 44 L40 47 Q30 52 20 47 Z" fill="#6a45c9" opacity="0.5"/><path d="M27 44 L30 50 L33 44" fill="white" opacity="0.3"/>
+    <g class="av-head av-head-wiggle" style="transform-origin:30px 36px"><ellipse cx="30" cy="24" rx="11" ry="13" fill="#F2C49A"/>
+      <path d="M19 22.5 Q18.6 10 30 9.8 Q41.4 10 41 22.5 Q40.4 13.6 30 13.2 Q19.6 13.6 19 22.5 Z" fill="#2B1F14"/>
+      <path d="M23 11.4 Q28.6 6.6 35.4 10.6" fill="none" stroke="#2B1F14" stroke-width="3.2" stroke-linecap="round"/>
+      <path d="M25.4 10.4 Q29.4 8 33.4 10.4" fill="none" stroke="#4A3826" stroke-width="1.1" stroke-linecap="round"/>
+      <path d="M22.4 20 Q25 18.8 27.6 19.6" fill="none" stroke="#2B1F14" stroke-width="1.2" stroke-linecap="round"/>
+      <path class="av-brow" style="transform-origin:35px 18.6px" d="M32.4 19 Q35 16.8 37.6 18.6" fill="none" stroke="#2B1F14" stroke-width="1.5" stroke-linecap="round"/>
+      <ellipse class="av-eye av-eye-l" cx="25" cy="23.4" rx="2.7" ry="2.4" fill="#2B1F14"/>
+      <ellipse class="av-eye av-eye-r" cx="35" cy="23.4" rx="2.7" ry="2.4" fill="#2B1F14"/>
+      <circle cx="25.9" cy="22.5" r="0.9" fill="white"/>
+      <circle cx="35.9" cy="22.5" r="0.9" fill="white"/><path d="M29.2 26 Q28.2 29 30.6 29.6" fill="none" stroke="#D9A87C" stroke-width="0.9" stroke-linecap="round"/>
+      <path d="M23 31.4 Q27.4 35.8 33.4 34.6 Q36.4 33.6 37.4 31.4" fill="none" stroke="#8a5520" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M25.6 33 Q29.6 35 33.4 33.6" fill="#fff" opacity="0.8"/>
+    </g>
   </svg>`,
 
-  // Dave (barista) — separate from David — friendly, coffee-expert energy
+  // Dave (barista) — separate from David. Friendly, coffee-expert energy,
+  // stained apron. Hands never stop moving.
   'Dave': `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
     <circle cx="30" cy="30" r="30" fill="#F4511E"/>
-    <!-- Face -->
-    <ellipse cx="30" cy="27" rx="12" ry="14" fill="#F5D5B0"/>
-    <!-- Hair — shorter, neat -->
-    <ellipse cx="30" cy="13" rx="12" ry="6" fill="#5A3A1A"/>
-    <rect x="18" y="13" width="3" height="8" fill="#5A3A1A"/>
-    <rect x="39" y="13" width="3" height="8" fill="#5A3A1A"/>
-    <!-- Friendly eyes -->
-    <ellipse cx="25" cy="26" rx="2.5" ry="2.2" fill="#3D2010"/>
-    <ellipse cx="35" cy="26" rx="2.5" ry="2.2" fill="#3D2010"/>
-    <!-- Big welcoming smile — barista energy -->
-    <path d="M22 33 Q30 39 38 33" fill="none" stroke="#8a5520" stroke-width="2" stroke-linecap="round"/>
-    <!-- Coffee-stained apron hint -->
-    <path d="M18 42 Q30 47 42 42 L42 60 L18 60Z" fill="#2B2724"/>
-    <ellipse cx="30" cy="46" rx="4" ry="3" fill="#3D2010" opacity="0.6"/>
+    <g class="av-arm av-shake-l" style="transform-origin:21px 45px">
+      <path d="M21 45 Q15.5 49.5 13.6 55" fill="none" stroke="#2B2724" stroke-width="4.8" stroke-linecap="round"/>
+      <path d="M16.8 50.5 Q14.6 52.8 13.6 55" fill="none" stroke="#F5D5B0" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="13.4" cy="55.8" r="2.5" fill="#F5D5B0"/>
+    </g>
+    <g class="av-arm av-shake-r" style="transform-origin:39px 45px">
+      <path d="M39 45 Q44.5 49.5 46.4 55" fill="none" stroke="#2B2724" stroke-width="4.8" stroke-linecap="round"/>
+      <path d="M43.2 50.5 Q45.4 52.8 46.4 55" fill="none" stroke="#F5D5B0" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="46.6" cy="55.8" r="2.5" fill="#F5D5B0"/>
+    </g>
+    <path d="M26.5 34 h7 v9 h-7 Z" fill="#F5D5B0" opacity="0.85"/>
+    <path d="M19 44 Q30 49.5 41 44 L44.5 60 L15.5 60 Z" fill="#2B2724"/>
+    <path d="M19 44 Q30 49.5 41 44 L40 47 Q30 52 20 47 Z" fill="#4a4540" opacity="0.5"/>
+    <path d="M26.5 44 L26.5 60 M33.5 44 L33.5 60" stroke="#8a8175" stroke-width="0.8" opacity="0.5"/>
+    <circle cx="22" cy="52" r="1.6" fill="#6B4227" opacity="0.7"/>
+    <g class="av-head av-head-sway" style="transform-origin:30px 36px"><ellipse cx="30" cy="24" rx="11" ry="12.6" fill="#F5D5B0"/>
+      <path d="M19 23 Q18.6 10.4 30 10.2 Q41.4 10.4 41 23 Q40 13.6 30 13.2 Q20 13.6 19 23 Z" fill="#5A3A1A"/>
+      <path d="M23.4 12.6 Q29 9.8 35.4 12.6" fill="none" stroke="#7A5330" stroke-width="1.3" stroke-linecap="round"/>
+      <path d="M22.6 19.6 Q25.2 18.4 27.8 19.4" fill="none" stroke="#4A2E12" stroke-width="1.1" stroke-linecap="round"/>
+      <path d="M32.2 19.4 Q34.8 18.4 37.4 19.6" fill="none" stroke="#4A2E12" stroke-width="1.1" stroke-linecap="round"/>
+      <ellipse class="av-eye av-eye-l" cx="25" cy="23.4" rx="2.4" ry="2.2" fill="#3D2010"/>
+      <ellipse class="av-eye av-eye-r" cx="35" cy="23.4" rx="2.4" ry="2.2" fill="#3D2010"/>
+      <circle cx="25.9" cy="22.5" r="0.8" fill="white"/>
+      <circle cx="35.9" cy="22.5" r="0.8" fill="white"/><path d="M29.2 26 Q28.4 28.8 30.4 29.4" fill="none" stroke="#E0B588" stroke-width="0.9" stroke-linecap="round"/>
+      <path d="M22.8 31 Q30 37.4 37.2 31" fill="none" stroke="#8a5520" stroke-width="1.9" stroke-linecap="round"/>
+      <path d="M26 33.6 Q30 35.6 34 33.6" fill="#fff" opacity="0.85"/>
+    </g>
   </svg>`,
+
+  // Cleo — Daisy's daughter, one year old. Big brown ringlets, huge brown
+  // eyes, mid-babble. Flaps her arms, giggles, and winks. The cutest.
+  'Cleo': `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="30" cy="30" r="30" fill="#F4A9C0"/>
+    <g class="av-arm av-flap-l" style="transform-origin:22px 47px">
+      <path d="M22 47 Q16.4 50 14.4 54.4" fill="none" stroke="#FBD9BB" stroke-width="4.4" stroke-linecap="round"/>
+      <circle cx="14" cy="54.8" r="2.8" fill="#FBD9BB"/>
+    </g>
+    <g class="av-arm av-flap-r" style="transform-origin:38px 47px">
+      <path d="M38 47 Q43.6 50 45.6 54.4" fill="none" stroke="#FBD9BB" stroke-width="4.4" stroke-linecap="round"/>
+      <circle cx="46" cy="54.8" r="2.8" fill="#FBD9BB"/>
+    </g>
+    <path d="M21.5 46 Q30 51 38.5 46 L41.5 60 L18.5 60 Z" fill="#F7E5D0"/>
+    <path d="M24.5 47.5 Q30 51.5 35.5 47.5 L34.5 56 Q30 58 25.5 56 Z" fill="#9FD5E0"/>
+    <circle cx="30" cy="51.5" r="1.6" fill="#F4A9C0"/>
+    <g class="av-head av-head-giggle" style="transform-origin:30px 44px">
+      <ellipse cx="30" cy="30" rx="13.6" ry="14.2" fill="#FBD9BB"/>
+      <g class="av-curls">
+        <circle cx="30" cy="14.6" r="6.6" fill="#6E4426"/>
+        <circle cx="21" cy="17.2" r="5.6" fill="#6E4426"/>
+        <circle cx="39" cy="17.2" r="5.6" fill="#6E4426"/>
+        <circle cx="16.4" cy="24" r="4.8" fill="#6E4426"/>
+        <circle cx="43.6" cy="24" r="4.8" fill="#6E4426"/>
+        <circle cx="15.4" cy="31" r="4" fill="#7D5030"/>
+        <circle cx="44.6" cy="31" r="4" fill="#7D5030"/>
+        <circle cx="17.4" cy="37" r="3.2" fill="#7D5030"/>
+        <circle cx="42.6" cy="37" r="3.2" fill="#7D5030"/>
+        <circle cx="27.8" cy="12.4" r="1.8" fill="#9A6740" opacity="0.85"/>
+        <circle cx="19.8" cy="15" r="1.3" fill="#9A6740" opacity="0.85"/>
+        <circle cx="41" cy="15.4" r="1.3" fill="#9A6740" opacity="0.85"/>
+        <circle cx="14.6" cy="28.6" r="1.1" fill="#9A6740" opacity="0.7"/>
+      </g>
+      <path d="M26.6 21.4 Q30 18.2 33.4 21.4" fill="none" stroke="#6E4426" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M21.6 25.4 Q24.4 24.2 27 25.2" fill="none" stroke="#8A5C3C" stroke-width="0.9" stroke-linecap="round"/>
+      <path d="M33 25.2 Q35.6 24.2 38.4 25.4" fill="none" stroke="#8A5C3C" stroke-width="0.9" stroke-linecap="round"/>
+      <ellipse class="av-eye av-eye-l" cx="24.4" cy="30" rx="3.5" ry="3.5" fill="#4A2A14"/>
+      <ellipse class="av-eye av-eye-r" cx="35.6" cy="30" rx="3.5" ry="3.5" fill="#4A2A14"/>
+      <circle cx="25.7" cy="28.7" r="1.4" fill="white"/>
+      <circle cx="36.9" cy="28.7" r="1.4" fill="white"/>
+      <circle cx="23.4" cy="31.4" r="0.6" fill="white" opacity="0.6"/>
+      <circle cx="34.6" cy="31.4" r="0.6" fill="white" opacity="0.6"/>
+      <ellipse cx="20.2" cy="35.4" rx="3.2" ry="2.4" fill="#F6A8A0" opacity="0.6"/>
+      <ellipse cx="39.8" cy="35.4" rx="3.2" ry="2.4" fill="#F6A8A0" opacity="0.6"/>
+      <ellipse cx="30" cy="34.2" rx="1.3" ry="0.9" fill="#E8B48E"/>
+      <ellipse class="av-mouth" style="transform-origin:30px 39px" cx="30" cy="39" rx="3.8" ry="3.2" fill="#C4626B"/>
+      <ellipse cx="30" cy="37.7" rx="2.9" ry="1.1" fill="#FFF4F2"/>
+      <ellipse cx="30" cy="41.4" rx="1.6" ry="0.9" fill="#E08A90"/>
+    </g>
+  </svg>`
 };
 
-// Fallback SVG for any staff member without a defined portrait
 function _staffAvatarSvg(name, roleColor) {
   return STAFF_AVATARS[name] || `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
     <circle cx="30" cy="30" r="30" fill="${roleColor}"/>
@@ -8514,20 +8910,28 @@ function _staffAvatarSvg(name, roleColor) {
 
 async function loadLoginNamePicker() {
   const grid = document.getElementById('login-name-grid');
+  let team = null;
+
   try {
     const res = await fetch(`${API_URL}/api/staff/team-for-login?studioId=${studioId}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    const team = data.team || [];
+    team = data.team || [];
+  } catch(e) {
+    console.error('Team loading error — falling back to demo staff:', e);
+    team = null;
+  }
 
-    if (!team.length) {
-      grid.innerHTML = '<div style="grid-column:1/-1;color:var(--gu-dust);font-size:12px;padding:16px;">No team members set up yet — ask your manager to add the team in Team &amp; Duties.</div>';
-      return;
-    }
+  // Never dead-end on a blank or broken team list. If Supabase is down,
+  // or the studio has nobody set up yet, show the demo team so the
+  // picker with avatars is always what you land on.
+  if (!team || !team.length) {
+    team = DEMO_STAFF.map(s => ({ ...s, hasPinSet: true, isDemoFallback: true }));
+  }
 
-    window._loginTeamData = team;
+  window._loginTeamData = team;
 
-    grid.innerHTML = team.map((m, i) => {
+  grid.innerHTML = team.map((m, i) => {
       const color = ROLE_COLORS_LOGIN[m.role] || '#999';
       const avatarSvg = _staffAvatarSvg(m.name, color);
 
@@ -8547,23 +8951,14 @@ async function loadLoginNamePicker() {
         <button onclick="selectLoginMember(window._loginTeamData[${i}])"
           style="background:var(--gu-bg);border:${cardBorder};border-radius:14px;padding:14px 8px 12px;cursor:pointer;text-align:center;position:relative;opacity:${cardOpacity};">
           ${statusBadge}
-          <div style="width:56px;height:56px;margin:0 auto 8px;border-radius:50%;overflow:hidden;border:2px solid ${color};">
+          <div class="av-frame av-${(m.name || '').toLowerCase().replace(/[^a-z]/g,'')}" style="width:56px;height:56px;margin:0 auto 8px;border-radius:50%;overflow:hidden;border:2px solid ${color};">
             ${avatarSvg}
           </div>
           <div style="font-size:13px;font-weight:700;color:var(--gu-text);">${m.name}</div>
           <div style="font-size:10px;color:var(--gu-dust);margin-top:2px;">${m.role}</div>
           ${!m.hasPinSet ? '<div style="font-size:9px;color:var(--link-clay);margin-top:4px;font-weight:700;">● Set PIN first</div>' : ''}
         </button>`;
-    }).join('');
-  } catch(e) {
-    console.error('Team loading error:', e);
-    grid.innerHTML = `<div style="grid-column:1/-1;color:var(--gu-dust);font-size:12px;padding:16px;">
-      Could not load the team list.
-      <div style="font-size:10px;margin-top:8px;color:var(--link-clay);">
-        <a href="javascript:skipLoginUseSharedView()" style="color:inherit;text-decoration:underline;">Skip — use shared/manager view</a>
-      </div>
-    </div>`;
-  }
+  }).join('');
 }
 
 function selectLoginMember(member) {
@@ -8801,6 +9196,28 @@ async function submitShiftPin() {
   const originalBtnText = submitBtn?.textContent;
   if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Checking…'; }
   errorEl.style.display = 'none';
+
+  // If this member came from the offline fallback team, the API is
+  // already known to be unreachable — checking the PIN against the
+  // server would fail every time. Validate locally instead so the
+  // studio isn't locked out of its own tablet when Supabase is down.
+  if (selectedLoginMember?.isDemoFallback) {
+    const match = DEMO_STAFF.find(s => s.id === selectedLoginMember.id && s.pin === pin);
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = originalBtnText; }
+    if (!match) {
+      errorEl.textContent = 'Incorrect PIN — try again.';
+      errorEl.style.display = 'block';
+      document.getElementById('shift-pin-input').value = '';
+      return;
+    }
+    currentShiftStaff = { id: match.id, name: match.name, role: match.role };
+    currentShiftId = null; // no server shift row — timesheet stays honest
+    localStorage.setItem('klnk_shift_staff', JSON.stringify(currentShiftStaff));
+    document.getElementById('shift-login-modal').style.display = 'none';
+    goToTab('floor-plan');
+    showHomeScreen();
+    return;
+  }
 
   try {
     const res = await fetch(`${API_URL}/api/staff/shift-login`, {
@@ -19867,6 +20284,8 @@ function dismissSplash() {
   splash.classList.add('fading-out');
   setTimeout(async () => {
     splash.remove();
+    document.documentElement.classList.remove('splash-showing');
+    document.body.classList.remove('splash-showing');
     await deviceCheckIn();
   }, 600);
 }
@@ -19875,6 +20294,8 @@ function showSplash() {
   if (document.getElementById('splash-screen')) return; // already showing
   splashDismissed = false;
   document.body.insertAdjacentHTML('afterbegin', splashTemplate);
+  document.documentElement.classList.add('splash-showing');
+  document.body.classList.add('splash-showing');
   wireSplash();
 }
 

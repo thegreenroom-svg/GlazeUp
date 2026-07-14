@@ -979,3 +979,67 @@ Session 4+ (TBD):
   - Scale to 10+ studios
 
 ═══════════════════════════════════════════════════════════════════════════════
+
+---
+
+## Session — 14 July 2026: Splash, login picker, animated staff cast
+
+**Splash white gap (fixed).** The gap was never the splash — `#splash-screen` is
+`position:fixed; inset:0`, which iOS sizes to the SMALL viewport. When Safari's
+toolbar collapses, the extra strip at the bottom is painted by `body`, which is
+ivory (`--gu-secondary`). Fix: `html/body.splash-showing` painted `#0E1A18`,
+added by an inline script the moment the splash renders and removed after it
+fades; splash also now uses `100dvh`. Covers both the initial load and the idle
+re-show via `showSplash()`.
+
+**Login picker (fixed).** `loadLoginNamePicker()` had a dead-end: if the team
+fetch failed or returned empty it rendered "Could not load the team list" with a
+skip link as the only way out — so you never saw the picker and landed in shared
+view. It now always resolves to a team: real from Supabase, or `DEMO_STAFF` as an
+offline fallback. The "Skip — use shared/manager view" button has been removed
+from the picker; the avatar picker is the only route in.
+
+**Demo PIN — it is 0000, not 000.** `reset_all_pins_to_0000.sql` sets every Kiln
+Cafe PIN to the SHA-256 of "0000" and the server checks against that. The old
+`DEMO_STAFF` `pin: '000'` was dead data — nothing read it. Now aligned to 0000.
+Also: `submitShiftPin()` always POSTed to the API, so in the exact situation the
+fallback exists for (API down) picking a face then failed at the PIN. It now
+validates locally when `isDemoFallback` is set, and sets no `currentShiftId` so
+the timesheet stays honest.
+
+**Staff avatars — rebuilt and rigged.** All eight (David, Jenny, Daisy, Lucy,
+Ruby, Elliott, Dave, Cleo) redrawn with head/arms/hair/brows/mouth as separate
+groups so they actually perform rather than the badge rotating. Real hair per
+Daisy's descriptions: Daisy a number-three crew cut, Jenny long slightly wavy
+auburn, Lucy light brown gone blonde with the studio bun, Ruby very long very
+straight grey-blonde. **Cleo added** — Daisy's daughter, one year old, brown
+ringlets, big brown eyes, mid-babble, flaps and giggles and winks; role "Chief
+Taster". Motion is CSS-only, staggered per person, `transform-box: view-box` for
+the SVG parts, and fully disabled under `prefers-reduced-motion`. Avatars render
+at 56px in the picker — the detail doesn't read at that size; bumping to ~76px is
+open.
+
+**Opening hours — the website is not a source of truth.** thekilncafe.com says
+three different things: home Thu-Sat 10-5, FAQ Thu-Sat 10-3:30, contact Thu 10-3:30
+/ Fri 10-3:30 / Sat 10-5 / Sun 10-2:30. Contact reconciles the other two. Evenings
+are discontinued but What We Offer still advertises monthly Thursday 6-9pm sessions.
+**Decision: read hours from Square (what's bookable IS the hours), add a "Closed
+today" staff toggle for ad-hoc closures, website stays for humans only.** Do not
+scrape the site.
+
+**Agreed next — auto-learning, and the blocker.** The app should learn from real
+usage and suggest changes, with Claude shipping them. Bones already exist:
+`staff_task_usage` (per-tab counts) and `staff_home_screens` (`tile_order`,
+`promoted_tiles`). Approach: a **local rules engine, no model, no API cost** —
+plain arithmetic over counted tables — plus a dev-diary table Claude reads at the
+start of each session. **The app must not write or deploy its own code.**
+*The blocker:* `GRID_NAV_STRUCTURE` is hardcoded in the client (~line 10119), so
+"recondense the tiles" is a code change every time. Move it to a table and tile
+structure becomes data the engine can reshape with no deploy. Same for the seating
+plan (coordinates in a table, not in the drawing code). This gates both the 9 → 2-3
+mega-tile consolidation and the learning engine.
+
+*Cadence caution:* the studio trades Thu-Sun only, so "daily learning" is four
+days of signal a week. Fire suggestions on confidence, not on a nightly timer.
+
+---
