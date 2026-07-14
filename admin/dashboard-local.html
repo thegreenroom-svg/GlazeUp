@@ -2365,7 +2365,7 @@
      shows what's actually changed first (in plain English), THEN reloads
      — since there's no developer on hand to explain updates individually,
      this is genuinely the changelog. -->
-<div id="update-available-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:99999;background:#2e7d32;color:white;padding:10px 16px;text-align:center;font-size:13px;font-weight:700;box-shadow:0 2px 10px rgba(0,0,0,0.3);">
+<div id="update-available-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#2e7d32;color:white;padding:12px 16px;padding-bottom:calc(12px + env(safe-area-inset-bottom));text-align:center;font-size:13px;font-weight:700;box-shadow:0 -2px 14px rgba(0,0,0,0.3);">
   ✨ A new version is available —
   <button onclick="showChangelogBeforeUpdate()" style="background:white;color:#2e7d32;border:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:800;cursor:pointer;margin-left:8px;">What's new?</button>
 </div>
@@ -20009,75 +20009,169 @@ function wireSplash() {
 
 
 // Show home screen with all tables from booking system
+// ═══════════════════════════════════════════════════════════
+// THE FLOOR PLAN — the landing page. This is the screen the
+// studio looks at all day, so it is drawn, not listed: real
+// tables, real chairs, in roughly their real positions.
+//
+// It is never empty. Before the doors open, or on a Monday,
+// it rests in DEMO state — the same drawing, populated with
+// example covers so the room still reads as a room. The
+// moment real bookings load, demo is dropped entirely and
+// the plan shows only what is genuinely there. The demo
+// state is always labelled, because a member of staff must
+// never mistake an example for a real table.
+// ═══════════════════════════════════════════════════════════
+
+// Seats decide the table's footprint. Sizes are in plan units.
+function _tableSize(seats) {
+  if (seats <= 2) return { w: 86, h: 86 };
+  if (seats <= 4) return { w: 124, h: 92 };
+  if (seats <= 6) return { w: 168, h: 92 };
+  return { w: 212, h: 96 };
+}
+
+// Chairs sit around the table: twos face each other across it,
+// everything larger seats along the two long edges.
+function _chairPositions(seats, w, h) {
+  const out = [];
+  if (seats <= 2) {
+    out.push({ x: w / 2, y: -15 }, { x: w / 2, y: h + 15 });
+    return out.slice(0, seats);
+  }
+  const top = Math.ceil(seats / 2), bottom = seats - top;
+  for (let i = 0; i < top; i++) out.push({ x: (w / (top + 1)) * (i + 1), y: -15 });
+  for (let i = 0; i < bottom; i++) out.push({ x: (w / (bottom + 1)) * (i + 1), y: h + 15 });
+  return out;
+}
+
+// The real rooms. Positions are hand-placed to match the studio.
+const FLOOR_PLAN = {
+  'Main Studio': { w: 940, h: 560, tables: [
+    { id: '1', seats: 4, x: 60,  y: 70 },
+    { id: '2', seats: 4, x: 300, y: 70 },
+    { id: '3', seats: 6, x: 540, y: 70 },
+    { id: '4', seats: 2, x: 800, y: 70 },
+    { id: '5', seats: 6, x: 60,  y: 260 },
+    { id: '5A', seats: 2, x: 300, y: 260 },
+    { id: '6', seats: 8, x: 460, y: 260 },
+    { id: '7', seats: 4, x: 60,  y: 430 },
+    { id: '8', seats: 8, x: 300, y: 430 }
+  ]},
+  'The Lounge': { w: 620, h: 320, tables: [
+    { id: '1', seats: 2, x: 50,  y: 60 },
+    { id: '2', seats: 2, x: 200, y: 60 },
+    { id: '3', seats: 4, x: 350, y: 60 },
+    { id: '4', seats: 2, x: 50,  y: 200 },
+    { id: '5', seats: 4, x: 200, y: 200 },
+    { id: '6', seats: 2, x: 420, y: 200 }
+  ]},
+  'The Vault': { w: 420, h: 260, tables: [
+    { id: 'Group Space', seats: 8, x: 100, y: 80 }
+  ]}
+};
+
+// Stage colours — same language as the booking flow.
+const STAGE_COLOURS = {
+  booking: '#4CAF50', painting: '#B87946', engagement: '#B87946',
+  completion: '#e53935', kiln: '#F9A825', pickup: '#00897B'
+};
+
+// The resting state. Plausible, clearly fictional, and only
+// ever shown when there is genuinely nothing real to show.
+const DEMO_COVERS = {
+  'Main Studio': {
+    '1':  { name: 'Sarah + 3', covers: 4, stage: 'painting' },
+    '3':  { name: 'WI Group',  covers: 5, stage: 'engagement' },
+    '5A': { name: 'Hendersons', covers: 2, stage: 'completion' },
+    '6':  { name: "Mia's Party", covers: 8, stage: 'booking' }
+  },
+  'The Lounge': {
+    '2': { name: 'J & E', covers: 2, stage: 'painting' },
+    '5': { name: 'Book Club', covers: 4, stage: 'engagement' }
+  },
+  'The Vault': {}
+};
+
+// Real covers, once bookings exist. Populated by the booking
+// layer; empty means we have nothing real yet.
+let _liveCovers = null;
+
+function _isRestingState() {
+  if (!_liveCovers) return true;
+  return !Object.values(_liveCovers).some(room => Object.keys(room || {}).length);
+}
+
+function _renderRoom(roomName, resting) {
+  const room = FLOOR_PLAN[roomName];
+  const covers = resting ? (DEMO_COVERS[roomName] || {}) : ((_liveCovers || {})[roomName] || {});
+
+  const tables = room.tables.map(t => {
+    const size = _tableSize(t.seats);
+    const c = covers[t.id];
+    const occupied = !!c;
+    const colour = occupied ? (STAGE_COLOURS[c.stage] || '#B87946') : '#B87946';
+    const lineOpacity = occupied ? 0.9 : 0.28;
+
+    const chairs = _chairPositions(t.seats, size.w, size.h).map((ch, i) => {
+      const seated = occupied && i < c.covers;
+      return `<rect x="${(t.x + ch.x - 11).toFixed(1)}" y="${(t.y + ch.y - 7).toFixed(1)}"
+        width="22" height="14" rx="5"
+        fill="${seated ? colour : 'none'}" fill-opacity="${seated ? 0.5 : 0}"
+        stroke="${colour}" stroke-opacity="${seated ? 0.9 : 0.22}" stroke-width="1.4"/>`;
+    }).join('');
+
+    const label = occupied
+      ? `<text x="${t.x + size.w / 2}" y="${t.y + size.h / 2 - 4}" text-anchor="middle"
+           font-size="15" font-weight="800" fill="#F4ECE0">${t.id}</text>
+         <text x="${t.x + size.w / 2}" y="${t.y + size.h / 2 + 12}" text-anchor="middle"
+           font-size="10" fill="${colour}">${c.name}</text>`
+      : `<text x="${t.x + size.w / 2}" y="${t.y + size.h / 2 + 5}" text-anchor="middle"
+           font-size="15" font-weight="700" fill="#B87946" fill-opacity="0.45">${t.id}</text>`;
+
+    return `<g class="fp-table" style="cursor:pointer" onclick="enterBookingFlow('${roomName}', '${t.id}')">
+      ${chairs}
+      <rect x="${t.x}" y="${t.y}" width="${size.w}" height="${size.h}" rx="12"
+        fill="${occupied ? '#241B14' : 'rgba(255,255,255,0.02)'}"
+        stroke="${colour}" stroke-opacity="${lineOpacity}" stroke-width="1.6"/>
+      ${label}
+    </g>`;
+  }).join('');
+
+  return `
+    <div style="margin-bottom:26px;">
+      <h2 style="color:#B87946;font-size:12px;font-weight:800;text-transform:uppercase;
+        letter-spacing:0.1em;margin:0 0 10px;">${roomName}</h2>
+      <svg viewBox="0 0 ${room.w} ${room.h}" style="width:100%;height:auto;display:block;
+        background:radial-gradient(ellipse at 50% 40%,#1C2E28 0%,#0E1A18 72%);
+        border:1px solid rgba(184,121,70,0.18);border-radius:16px;">
+        ${tables}
+      </svg>
+    </div>`;
+}
+
 function showHomeScreen() {
   const view = document.getElementById('floor-plan-view');
   if (!view) return;
-  
+
+  const resting = _isRestingState();
   view.innerHTML = '';
   view.style.overflow = 'auto';
-  
+
   const container = document.createElement('div');
-  container.style.cssText = 'padding: 20px; max-width: 1200px; margin: 0 auto;';
+  container.style.cssText = 'padding:16px;max-width:1200px;margin:0 auto;';
 
-  // Main Studio
-  const mainStudio = document.createElement('div');
-  mainStudio.style.cssText = 'margin-bottom: 40px;';
-  mainStudio.innerHTML = '<h2 style="color: #B87946; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px;">Main Studio</h2>';
-  
-  const mainGrid = document.createElement('div');
-  mainGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px;';
-  
-  ['1', '2', '3', '4', '5', '6', '7', '8', '5A'].forEach(num => {
-    const btn = document.createElement('button');
-    btn.style.cssText = 'background: linear-gradient(135deg,#2B2724,#1C1814); border: 1.5px solid #B87946; border-radius: 10px; padding: 16px; cursor: pointer; color: #F4ECE0; font-weight: 700; font-size: 14px; transition: all 0.2s;';
-    btn.onmouseover = () => { btn.style.borderColor = '#D4A574'; btn.style.background = 'linear-gradient(135deg,#3d2e28,#2B2724)'; };
-    btn.onmouseout = () => { btn.style.borderColor = '#B87946'; btn.style.background = 'linear-gradient(135deg,#2B2724,#1C1814)'; };
-    btn.onclick = () => enterBookingFlow('Main Studio', 'Table ' + num);
-    btn.textContent = 'Table ' + num;
-    mainGrid.appendChild(btn);
-  });
-  
-  mainStudio.appendChild(mainGrid);
-  container.appendChild(mainStudio);
-
-  // Lounge
-  const lounge = document.createElement('div');
-  lounge.style.cssText = 'margin-bottom: 40px;';
-  lounge.innerHTML = '<h2 style="color: #B87946; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px;">The Lounge</h2>';
-  
-  const loungeGrid = document.createElement('div');
-  loungeGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px;';
-  
-  ['1', '2', '3', '4', '5', '6'].forEach(num => {
-    const btn = document.createElement('button');
-    btn.style.cssText = 'background: linear-gradient(135deg,#2B2724,#1C1814); border: 1.5px solid #B87946; border-radius: 10px; padding: 16px; cursor: pointer; color: #F4ECE0; font-weight: 700; font-size: 14px; transition: all 0.2s;';
-    btn.onmouseover = () => { btn.style.borderColor = '#D4A574'; btn.style.background = 'linear-gradient(135deg,#3d2e28,#2B2724)'; };
-    btn.onmouseout = () => { btn.style.borderColor = '#B87946'; btn.style.background = 'linear-gradient(135deg,#2B2724,#1C1814)'; };
-    btn.onclick = () => enterBookingFlow('Lounge', 'Lounge ' + num);
-    btn.textContent = 'Lounge ' + num;
-    loungeGrid.appendChild(btn);
-  });
-  
-  lounge.appendChild(loungeGrid);
-  container.appendChild(lounge);
-
-  // Vault
-  const vault = document.createElement('div');
-  vault.innerHTML = '<h2 style="color: #B87946; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px;">The Vault</h2>';
-  
-  const vaultGrid = document.createElement('div');
-  vaultGrid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px;';
-  
-  const vaultBtn = document.createElement('button');
-  vaultBtn.style.cssText = 'background: linear-gradient(135deg,#2B2724,#1C1814); border: 1.5px solid #B87946; border-radius: 10px; padding: 16px; cursor: pointer; color: #F4ECE0; font-weight: 700; font-size: 14px; transition: all 0.2s;';
-  vaultBtn.onmouseover = () => { vaultBtn.style.borderColor = '#D4A574'; vaultBtn.style.background = 'linear-gradient(135deg,#3d2e28,#2B2724)'; };
-  vaultBtn.onmouseout = () => { vaultBtn.style.borderColor = '#B87946'; vaultBtn.style.background = 'linear-gradient(135deg,#2B2724,#1C1814)'; };
-  vaultBtn.onclick = () => enterBookingFlow('Vault', 'Group Space');
-  vaultBtn.textContent = 'Group Space';
-  vaultGrid.appendChild(vaultBtn);
-  
-  vault.appendChild(vaultGrid);
-  container.appendChild(vault);
+  // Never let an example pass for a real table.
+  container.innerHTML = (resting ? `
+    <div style="display:flex;align-items:center;gap:8px;justify-content:center;
+      background:rgba(249,168,37,0.1);border:1px solid rgba(249,168,37,0.35);
+      border-radius:20px;padding:7px 14px;margin:0 auto 16px;width:fit-content;">
+      <span style="width:7px;height:7px;border-radius:50%;background:#F9A825;"></span>
+      <span style="font-size:11px;font-weight:700;color:#F9A825;letter-spacing:0.03em;">
+        Example layout — no live bookings yet
+      </span>
+    </div>` : '')
+    + Object.keys(FLOOR_PLAN).map(r => _renderRoom(r, resting)).join('');
 
   view.appendChild(container);
 }

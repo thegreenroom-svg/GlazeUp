@@ -1043,3 +1043,41 @@ mega-tile consolidation and the learning engine.
 days of signal a week. Fire suggestions on confidence, not on a nightly timer.
 
 ---
+
+## Session — 14 July 2026 (cont): Update banner, drawn floor plan
+
+**Green update banner (fixed).** `#update-available-banner` was `position:fixed;
+top:0` at `z-index:99999` with **no safe-area padding** — so on iPhone it sat under
+the notch/status bar and covered everything including the revenue strip. Commit
+0b2ac47 ("Update bar: safe area padding") fixed the *platform revenue strip*, not
+this element; the banner was missed. Moved to the bottom with
+`padding-bottom: calc(12px + env(safe-area-inset-bottom))` — clear of the notch,
+above the home indicator, "What's new?" in thumb reach.
+*Outstanding:* Daisy reports it "is moving" — unexplained, nothing animates on it.
+The revenue strip nearby does shimmer (tickerShimmer 8s) and has a pulsing dot.
+Needs a look on device.
+
+**Floor plan — built properly.** `showHomeScreen()` was not a plan at all: three
+grids of rectangular buttons labelled "Table 1", "Lounge 1". Nothing to populate.
+Replaced with a drawn SVG plan per room — real tables sized by seat count, chairs
+around the edges (outlined = empty, filled = a cover), stage colours matching the
+booking flow. Tap a table → `enterBookingFlow(room, id)`.
+**Resting state:** never empty. With no live bookings it shows `DEMO_COVERS` on the
+same drawing, so the room still reads as a room — always behind an amber "Example
+layout — no live bookings yet" pill so nobody mistakes an example for a real table.
+Drops to real data the moment `_liveCovers` has anything.
+*Outstanding:* table positions and seat counts in `FLOOR_PLAN` are **guessed** —
+Daisy to correct which tables are 2s/4s/6s/8s and roughly where they sit.
+*Not yet wired:* `_liveCovers` has no producer — the booking layer must populate it.
+
+**Auto-learning — status: not built.** Nothing installed, nothing learning.
+BUT the counter is already wired: the dashboard posts to
+`/api/staff/log-task-usage` (dashboard ~6138) and the server upserts into
+`staff_task_usage` (server.js ~4187). If that SQL was ever run on Supabase it has
+been collecting all along. The only consumer was Cleo's chat context
+(server.js ~4070), and Cleo is disabled — so it counts into a void.
+**First job next session: query `staff_task_usage` and find out whether there is
+real data banked.** Unverified: whether the schema was ever run, and whether the
+client call fires on every tab or only some.
+
+---
