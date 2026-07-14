@@ -4197,6 +4197,207 @@ app.post('/api/staff/log-task-usage', async (req, res) => {
   res.json({ status: 'logged' });
 });
 
+// ═══════════════════════════════════════════════════════════
+// THE LEARNING ENGINE
+//
+// No model. No API call. No cost. Every line below is
+// arithmetic over tables the app already fills in as staff
+// use it. If a claim here can't be traced to a counted row,
+// it doesn't get made.
+//
+// Three hard rules:
+//   1. Nothing applies itself. Every suggestion needs a tap.
+//   2. Nothing is shown below the confidence floor. A studio
+//      that trades four days a week generates signal slowly;
+//      firing on a nightly timer would produce noise, and
+//      noise gets ignored, which kills the whole idea.
+//   3. A suggestion dismissed twice is never raised again.
+//      Dismissal is the studio telling us we were wrong.
+// ═══════════════════════════════════════════════════════════
+
+const LEARN = {
+  MIN_TRANSITIONS: 12,   // per pair, before a habit is a habit
+  MIN_SHARE: 0.6,        // 60% of the time you leave A, you go to B
+  MIN_TAB_USES: 15,      // before we'll say a tab matters
+  QUIET_DAYS: 45,        // untouched this long = probably buried
+  CONFIDENCE_FLOOR: 0.55
+};
+
+// Records what follows what. staff_task_usage counts opens;
+// this is the ordering, which is where the workflow actually is.
+app.post('/api/staff/log-transition', async (req, res) => {
+  const { studioId, staffMemberId, fromTab, toTab } = req.body;
+  if (!studioId || !staffMemberId || !fromTab || !toTab) {
+    return res.status(400).json({ error: 'studioId, staffMemberId, fromTab, toTab required' });
+  }
+  if (fromTab === toTab) return res.json({ status: 'ignored' }); // not a move
+  await supabase.from('staff_task_transitions')
+    .insert({ studio_id: studioId, staff_member_id: staffMemberId, from_tab: fromTab, to_tab: toTab });
+  res.json({ status: 'logged' });
+});
+
+// Honest diagnostic: what has actually been collected? Answers
+// "is it learning yet" without anyone opening the SQL editor.
+app.get('/api/studio/learning/report', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const { data: usage, error: uErr } = await supabase.from('staff_task_usage')
+      .select('staff_member_id, tab_name, use_count, last_used_at').eq('studio_id', studioId);
+    if (uErr) throw uErr;
+
+    let transitions = [];
+    const { data: tr } = await supabase.from('staff_task_transitions')
+      .select('from_tab, to_tab, occurred_at').eq('studio_id', studioId);
+    transitions = tr || [];
+
+    const totalUses = (usage || []).reduce((s, r) => s + (r.use_count || 0), 0);
+    const dates = (usage || []).map(r => r.last_used_at).filter(Boolean).sort();
+
+    res.json({
+      collecting: (usage || []).length > 0,
+      distinctTabs: new Set((usage || []).map(r => r.tab_name)).size,
+      distinctStaff: new Set((usage || []).map(r => r.staff_member_id)).size,
+      totalTabOpens: totalUses,
+      transitionsRecorded: transitions.length,
+      oldestSignal: dates[0] || null,
+      newestSignal: dates[dates.length - 1] || null,
+      // The honest bit: say plainly whether there's enough to learn from.
+      readyToLearn: totalUses >= LEARN.MIN_TAB_USES * 3 && transitions.length >= LEARN.MIN_TRANSITIONS,
+      note: (usage || []).length === 0
+        ? 'No rows. Either staff_task_usage_schema.sql has never been run on this database, or the client is not logging.'
+        : transitions.length === 0
+          ? 'Tab opens are being counted, but no transitions yet — run learning_engine_schema.sql and redeploy so ordering starts recording.'
+          : 'Collecting.'
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message, hint: 'If this is a missing-table error, the schema has not been run yet.' });
+  }
+});
+
+// Runs the rules and writes what it found. Safe to run repeatedly:
+// suggestions are deduped, and re-running refreshes the evidence
+// rather than piling up copies.
+app.post('/api/studio/learning/run', async (req, res) => {
+  const { studioId } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    const found = [];
+
+    // ── Rule 1: a habit worth a shortcut ──────────────────
+    // If leaving A almost always means going to B, B should be
+    // one tap from A. Counted, per person, not assumed.
+    const { data: trs } = await supabase.from('staff_task_transitions')
+      .select('staff_member_id, from_tab, to_tab').eq('studio_id', studioId);
+
+    const pairs = {}, fromTotals = {};
+    (trs || []).forEach(t => {
+      const pk = `${t.staff_member_id}|${t.from_tab}|${t.to_tab}`;
+      const fk = `${t.staff_member_id}|${t.from_tab}`;
+      pairs[pk] = (pairs[pk] || 0) + 1;
+      fromTotals[fk] = (fromTotals[fk] || 0) + 1;
+    });
+
+    for (const [pk, count] of Object.entries(pairs)) {
+      const [staffId, fromTab, toTab] = pk.split('|');
+      const total = fromTotals[`${staffId}|${fromTab}`] || 0;
+      if (count < LEARN.MIN_TRANSITIONS) continue;
+      const share = count / total;
+      if (share < LEARN.MIN_SHARE) continue;
+      found.push({
+        studio_id: studioId, kind: 'layout', staff_member_id: staffId,
+        headline: `Put ${toTab} one tap from ${fromTab}`,
+        detail: `${Math.round(share * 100)}% of the time this tab is left, ${toTab} is what's opened next (${count} of ${total} times).`,
+        evidence: { sample: total, hits: count, share: Number(share.toFixed(2)) },
+        action: { action: 'promote', tab: toTab, after: fromTab },
+        confidence: Number(Math.min(0.95, share).toFixed(2)),
+        dedupe_key: `shortcut:${staffId}:${fromTab}:${toTab}`
+      });
+    }
+
+    // ── Rule 2: something nobody opens ────────────────────
+    // Quiet for this long, across the whole team, is a tile
+    // earning its place on the screen and not paying rent.
+    const { data: usage } = await supabase.from('staff_task_usage')
+      .select('tab_name, use_count, last_used_at').eq('studio_id', studioId);
+
+    const byTab = {};
+    (usage || []).forEach(r => {
+      const t = byTab[r.tab_name] || (byTab[r.tab_name] = { uses: 0, last: null });
+      t.uses += r.use_count || 0;
+      if (!t.last || r.last_used_at > t.last) t.last = r.last_used_at;
+    });
+
+    const cutoff = Date.now() - LEARN.QUIET_DAYS * 86400000;
+    for (const [tab, t] of Object.entries(byTab)) {
+      if (!t.last || new Date(t.last).getTime() >= cutoff) continue;
+      const days = Math.round((Date.now() - new Date(t.last).getTime()) / 86400000);
+      found.push({
+        studio_id: studioId, kind: 'layout', staff_member_id: null,
+        headline: `Nobody has opened ${tab} in ${days} days`,
+        detail: `${t.uses} opens ever, none since ${new Date(t.last).toLocaleDateString('en-GB')}. Worth moving off the top level?`,
+        evidence: { sample: t.uses, quietDays: days },
+        action: { action: 'demote', tab },
+        confidence: Number(Math.min(0.9, 0.5 + days / 180).toFixed(2)),
+        dedupe_key: `quiet:${tab}`
+      });
+    }
+
+    // Never re-raise what's been rejected twice. The studio has
+    // told us twice; a third time is nagging, not learning.
+    const { data: prior } = await supabase.from('studio_suggestions')
+      .select('dedupe_key, dismiss_count, status').eq('studio_id', studioId);
+    const blocked = new Set((prior || [])
+      .filter(p => p.dismiss_count >= 2 || p.status === 'shipped')
+      .map(p => p.dedupe_key));
+
+    const toWrite = found.filter(f => f.confidence >= LEARN.CONFIDENCE_FLOOR && !blocked.has(f.dedupe_key));
+
+    for (const s of toWrite) {
+      await supabase.from('studio_suggestions')
+        .upsert({ ...s, status: 'pending' }, { onConflict: 'studio_id,dedupe_key' });
+    }
+
+    res.json({
+      considered: found.length,
+      written: toWrite.length,
+      suppressed: found.length - toWrite.length,
+      note: found.length === 0 ? 'Not enough signal yet — this is expected early on.' : 'Done.'
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message, hint: 'Has learning_engine_schema.sql been run?' });
+  }
+});
+
+// What's waiting for a human.
+app.get('/api/studio/learning/suggestions', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  const { data, error } = await supabase.from('studio_suggestions')
+    .select('*').eq('studio_id', studioId).eq('status', 'pending')
+    .order('confidence', { ascending: false }).limit(20);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ suggestions: data || [] });
+});
+
+// Approve or dismiss. Dismissal counts — it is how the engine
+// learns it was wrong, and it is the only thing that silences it.
+app.post('/api/studio/learning/respond', async (req, res) => {
+  const { studioId, suggestionId, decision } = req.body;
+  if (!studioId || !suggestionId || !['approved', 'dismissed'].includes(decision)) {
+    return res.status(400).json({ error: "studioId, suggestionId, decision ('approved'|'dismissed') required" });
+  }
+  const { data: s } = await supabase.from('studio_suggestions')
+    .select('*').eq('id', suggestionId).eq('studio_id', studioId).single();
+  if (!s) return res.status(404).json({ error: 'No such suggestion' });
+
+  const patch = { status: decision, resolved_at: new Date().toISOString() };
+  if (decision === 'dismissed') patch.dismiss_count = (s.dismiss_count || 0) + 1;
+  await supabase.from('studio_suggestions').update(patch).eq('id', suggestionId);
+  res.json({ status: decision, applied: false, note: 'Layout changes are applied by the client on approval.' });
+});
+
 // ── Studio Promotions — a real, genuine history, separate from the
 // single current Offer of the Week, so Cleo can honestly reference
 // past promotions and upcoming ones, not just "what's live right now". ──

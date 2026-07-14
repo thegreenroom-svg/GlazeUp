@@ -1081,3 +1081,47 @@ real data banked.** Unverified: whether the schema was ever run, and whether the
 client call fires on every tab or only some.
 
 ---
+
+## Session — 14 July 2026 (cont): Learning engine — foundation built
+
+**Built, not yet verified against real data.**
+
+`learning_engine_schema.sql` (NEW — needs running on Supabase):
+- `staff_task_transitions` — what follows what. `staff_task_usage` counts opens;
+  this records ordering, which is where the workflow actually lives.
+- `studio_suggestions` — the dev diary. `kind='layout'` applies in-app on approval;
+  `kind='code'` is what Claude picks up at the start of a session. Carries the
+  arithmetic in `evidence` so any suggestion can be challenged, plus `dismiss_count`.
+
+`server.js` (NEW endpoints, no model, no API cost — plain arithmetic):
+- `POST /api/staff/log-transition` — records from_tab → to_tab
+- `GET  /api/studio/learning/report` — honest diagnostic: is anything collecting,
+  how much, since when, and is there enough to learn from yet
+- `POST /api/studio/learning/run` — runs the rules, writes suggestions (deduped)
+- `GET  /api/studio/learning/suggestions` — what is waiting for a human
+- `POST /api/studio/learning/respond` — approve / dismiss
+
+**Rules v1:**
+1. *Habit → shortcut.* If leaving tab A means opening B ≥60% of the time over ≥12
+   moves, suggest putting B one tap from A. Per person.
+2. *Quiet tile.* Untouched by the whole team for ≥45 days → suggest demoting it.
+
+**Thresholds** (`LEARN` in server.js): MIN_TRANSITIONS 12, MIN_SHARE 0.6,
+MIN_TAB_USES 15, QUIET_DAYS 45, CONFIDENCE_FLOOR 0.55. Tuned deliberately slow —
+the studio trades Thu-Sun, so signal accrues over roughly a fortnight of trading.
+Firing nightly would produce noise, and noise gets ignored.
+
+**Three hard rules, enforced in code:** nothing applies itself without a tap;
+nothing shows below the confidence floor; a suggestion dismissed twice is never
+raised again.
+
+**STILL OUTSTANDING:**
+- Client does not yet call `log-transition` — needs wiring into `goToTab`.
+- No suggestion UI yet — nothing surfaces to staff.
+- Approval does not yet apply anything; `respond` returns `applied:false`.
+  The client must action `layout` suggestions against `staff_home_screens`.
+- `GRID_NAV_STRUCTURE` still hardcoded (~10119). Until tile *structure* is data,
+  the engine can only reorder/promote what already exists — it cannot recondense
+  the tiles without a deploy. **This is still the gate.**
+
+---
