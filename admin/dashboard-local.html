@@ -19607,134 +19607,234 @@ function wireSplash() {
 }
 
 function renderSplashTableDemo(container) {
-  // Create SVG canvas for animated table demo
+  // Create main SVG for table planner
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 400 400');
+  svg.setAttribute('viewBox', '0 0 360 600');
   svg.setAttribute('width', '100%');
   svg.setAttribute('height', '100%');
-  svg.setAttribute('style', 'max-width: 500px; max-height: 500px;');
+  svg.setAttribute('style', 'max-width: 100%; max-height: 100%; margin: auto;');
 
-  // Defs with animations
+  // Defs with vibrant animations
   const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
   defs.innerHTML = `
-    <style>
-      @keyframes splashDrag { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(40px); } }
-      @keyframes splashTap { 0%, 100% { r: 60; opacity: 0; } 50% { r: 90; opacity: 0.3; } }
-      @keyframes splashFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-      @keyframes splashPulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
-    </style>
-    <radialGradient id="tableGlow" cx="50%" cy="50%" r="60%">
-      <stop offset="0%" style="stop-color:#B87946;stop-opacity:0.2"/>
-      <stop offset="100%" style="stop-color:#B87946;stop-opacity:0"/>
-    </radialGradient>
+    <defs>
+      <style>
+        @keyframes dragChair { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(50px, -30px); } }
+        @keyframes movePlacemat { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-40px, 40px); } }
+        @keyframes floatHand { 0%, 100% { transform: translate(80px, 120px) rotate(0deg); } 50% { transform: translate(120px, 90px) rotate(-15deg); } }
+        @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+      </style>
+      <linearGradient id="tableGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#D4A574;stop-opacity:1"/>
+        <stop offset="100%" style="stop-color:#B87946;stop-opacity:1"/>
+      </linearGradient>
+      <radialGradient id="chairGrad" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" style="stop-color:#64B5F6;stop-opacity:1"/>
+        <stop offset="100%" style="stop-color:#1976D2;stop-opacity:0.8"/>
+      </radialGradient>
+    </defs>
   `;
   svg.appendChild(defs);
 
-  // Background glow
-  const bgGlow = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-  bgGlow.setAttribute('cx', '200');
-  bgGlow.setAttribute('cy', '250');
-  bgGlow.setAttribute('r', '200');
-  bgGlow.setAttribute('fill', 'url(#tableGlow)');
-  svg.appendChild(bgGlow);
+  // Background
+  const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  bg.setAttribute('width', '360');
+  bg.setAttribute('height', '600');
+  bg.setAttribute('fill', '#0E1A18');
+  svg.appendChild(bg);
 
-  // Main table (draggable demo)
+  // MAIN TABLE (fills most of screen, vibrant)
   const tableGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  tableGroup.setAttribute('style', 'animation: splashDrag 3s ease-in-out infinite;');
   
   const tableRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-  tableRect.setAttribute('x', '140');
-  tableRect.setAttribute('y', '180');
-  tableRect.setAttribute('width', '120');
-  tableRect.setAttribute('height', '90');
-  tableRect.setAttribute('rx', '12');
-  tableRect.setAttribute('fill', 'none');
-  tableRect.setAttribute('stroke', '#B87946');
+  tableRect.setAttribute('x', '60');
+  tableRect.setAttribute('y', '120');
+  tableRect.setAttribute('width', '240');
+  tableRect.setAttribute('height', '200');
+  tableRect.setAttribute('rx', '16');
+  tableRect.setAttribute('fill', 'url(#tableGrad)');
+  tableRect.setAttribute('stroke', '#D4A574');
   tableRect.setAttribute('stroke-width', '3');
+  tableRect.setAttribute('opacity', '0.9');
   tableGroup.appendChild(tableRect);
 
-  // Table label
+  // TABLE LABEL
   const tableLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-  tableLabel.setAttribute('x', '200');
-  tableLabel.setAttribute('y', '230');
+  tableLabel.setAttribute('x', '180');
+  tableLabel.setAttribute('y', '225');
   tableLabel.setAttribute('text-anchor', 'middle');
-  tableLabel.setAttribute('fill', '#B87946');
-  tableLabel.setAttribute('font-size', '14');
+  tableLabel.setAttribute('fill', '#fff');
+  tableLabel.setAttribute('font-size', '18');
   tableLabel.setAttribute('font-weight', '800');
+  tableLabel.setAttribute('letter-spacing', '0.05em');
   tableLabel.textContent = 'TABLE 1';
   tableGroup.appendChild(tableLabel);
 
   svg.appendChild(tableGroup);
 
-  // Chairs around table
+  // PLACEMAT (with Kiln logo, moveable)
+  const placematGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  placematGroup.setAttribute('style', 'animation: movePlacemat 4s ease-in-out infinite;');
+
+  const placemat = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  placemat.setAttribute('x', '80');
+  placemat.setAttribute('y', '150');
+  placemat.setAttribute('width', '80');
+  placemat.setAttribute('height', '60');
+  placemat.setAttribute('rx', '8');
+  placemat.setAttribute('fill', '#E8D8C0');
+  placemat.setAttribute('stroke', '#B87946');
+  placemat.setAttribute('stroke-width', '2');
+  placemat.setAttribute('opacity', '0.85');
+  placematGroup.appendChild(placemat);
+
+  // Kiln logo on placemat (small)
+  const placematLogo = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  placematLogo.setAttribute('cx', '120');
+  placematLogo.setAttribute('cy', '180');
+  placematLogo.setAttribute('r', '12');
+  placematLogo.setAttribute('fill', '#B87946');
+  placematGroup.appendChild(placematLogo);
+
+  const placematLogoK = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  placematLogoK.setAttribute('x', '120');
+  placematLogoK.setAttribute('y', '185');
+  placematLogoK.setAttribute('text-anchor', 'middle');
+  placematLogoK.setAttribute('fill', '#fff');
+  placematLogoK.setAttribute('font-size', '12');
+  placematLogoK.setAttribute('font-weight', '800');
+  placematLogoK.textContent = 'K.';
+  placematGroup.appendChild(placematLogoK);
+
+  svg.appendChild(placematGroup);
+
+  // CHAIRS (vibrant blue, draggable demo on one)
   const chairPositions = [
-    { x: 200, y: 150 }, { x: 200, y: 300 },
-    { x: 120, y: 225 }, { x: 280, y: 225 },
-    { x: 135, y: 165 }, { x: 265, y: 165 },
-    { x: 135, y: 285 }, { x: 265, y: 285 }
+    { x: 180, y: 90, animate: false },
+    { x: 180, y: 340, animate: false },
+    { x: 50, y: 210, animate: false },
+    { x: 310, y: 210, animate: true },
+    { x: 75, y: 130, animate: false },
+    { x: 285, y: 130, animate: false },
+    { x: 75, y: 290, animate: false },
+    { x: 285, y: 290, animate: false }
   ];
 
   chairPositions.forEach((pos, idx) => {
+    const chairGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    if (pos.animate) {
+      chairGroup.setAttribute('style', 'animation: dragChair 3s ease-in-out infinite;');
+    }
+
     const chair = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     chair.setAttribute('cx', pos.x);
     chair.setAttribute('cy', pos.y);
-    chair.setAttribute('r', '8');
-    chair.setAttribute('fill', 'none');
-    chair.setAttribute('stroke', '#B87946');
-    chair.setAttribute('stroke-width', '1.5');
-    chair.setAttribute('style', `animation: splashFloat ${1 + idx * 0.15}s ease-in-out infinite;`);
-    svg.appendChild(chair);
+    chair.setAttribute('r', '16');
+    chair.setAttribute('fill', 'url(#chairGrad)');
+    chair.setAttribute('stroke', '#64B5F6');
+    chair.setAttribute('stroke-width', '2');
+    chairGroup.appendChild(chair);
 
-    // Person icon in chair
     const person = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     person.setAttribute('x', pos.x);
-    person.setAttribute('y', pos.y + 4);
+    person.setAttribute('y', pos.y + 6);
     person.setAttribute('text-anchor', 'middle');
-    person.setAttribute('font-size', '10');
+    person.setAttribute('font-size', '14');
     person.textContent = '👤';
-    svg.appendChild(person);
+    chairGroup.appendChild(person);
+
+    svg.appendChild(chairGroup);
   });
 
-  // Status icons (top right)
-  const icons = [
-    { x: 320, y: 120, emoji: '🎨', label: 'Painting' },
-    { x: 360, y: 120, emoji: '✓', label: 'Done' },
-    { x: 340, y: 160, emoji: '🔥', label: 'Kiln' }
-  ];
+  // DRAGGING HAND
+  const hand = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  hand.setAttribute('style', 'animation: floatHand 3s ease-in-out infinite;');
 
-  icons.forEach((icon, idx) => {
-    const iconCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    iconCircle.setAttribute('cx', icon.x);
-    iconCircle.setAttribute('cy', icon.y);
-    iconCircle.setAttribute('r', '14');
-    iconCircle.setAttribute('fill', 'none');
-    iconCircle.setAttribute('stroke', '#B87946');
-    iconCircle.setAttribute('stroke-width', '2');
-    iconCircle.setAttribute('style', `animation: splashPulse ${1.5 + idx * 0.2}s ease-in-out infinite;`);
-    svg.appendChild(iconCircle);
+  const finger = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  finger.setAttribute('cx', '0');
+  finger.setAttribute('cy', '0');
+  finger.setAttribute('r', '8');
+  finger.setAttribute('fill', '#FFB84D');
+  finger.setAttribute('stroke', '#FF9800');
+  finger.setAttribute('stroke-width', '1.5');
+  hand.appendChild(finger);
 
-    const iconText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    iconText.setAttribute('x', icon.x);
-    iconText.setAttribute('y', icon.y + 6);
-    iconText.setAttribute('text-anchor', 'middle');
-    iconText.setAttribute('font-size', '16');
-    iconText.textContent = icon.emoji;
-    svg.appendChild(iconText);
-  });
+  const fingerTip = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  fingerTip.setAttribute('cx', '0');
+  fingerTip.setAttribute('cy', '-12');
+  fingerTip.setAttribute('r', '5');
+  fingerTip.setAttribute('fill', '#FFB84D');
+  hand.appendChild(fingerTip);
 
-  // Tap ripple (showing interaction)
-  const ripple = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-  ripple.setAttribute('cx', '200');
-  ripple.setAttribute('cy', '200');
-  ripple.setAttribute('r', '60');
-  ripple.setAttribute('fill', 'none');
-  ripple.setAttribute('stroke', '#B87946');
-  ripple.setAttribute('stroke-width', '2');
-  ripple.setAttribute('style', 'animation: splashTap 2s ease-out infinite;');
-  svg.appendChild(ripple);
+  svg.appendChild(hand);
 
   container.innerHTML = '';
   container.appendChild(svg);
+
+  // Handle chair clicks to show booking modal
+  setTimeout(() => {
+    const chairElements = svg.querySelectorAll('circle[r="16"]');
+    chairElements.forEach((chair, idx) => {
+      chair.style.cursor = 'pointer';
+      chair.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showSampleBookingModal(idx);
+      });
+    });
+  }, 100);
+}
+
+function showSampleBookingModal(chairIdx) {
+  const sampleData = [
+    { name: 'Sarah', party: 3, status: '🎨 Painting', time: '45m left', drinks: '2x Coffee' },
+    { name: 'James', party: 2, status: '✓ Done', time: '10m left', drinks: 'Tea' },
+    { name: 'Emma', party: 1, status: '🔥 Kiln', time: 'Complete', drinks: 'None' },
+    { name: 'David', party: 4, status: '🎨 Painting', time: '30m left', drinks: '4x Beer' },
+    { name: 'Lucy', party: 2, status: '✓ Done', time: '5m left', drinks: '2x Water' },
+    { name: 'Tom', party: 3, status: '🎨 Painting', time: '50m left', drinks: 'Coffee, Tea' },
+    { name: 'Rose', party: 1, status: 'Booking', time: '—', drinks: '—' },
+    { name: 'Mike', party: 5, status: 'Group', time: '60m left', drinks: '5x Mixed' }
+  ];
+
+  const booking = sampleData[chairIdx % sampleData.length];
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;';
+  overlay.onclick = () => overlay.remove();
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'background:linear-gradient(135deg,#2B2724,#1C1814);border:2px solid #B87946;border-radius:16px;padding:24px;max-width:300px;box-shadow:0 20px 60px rgba(0,0,0,0.8);';
+  modal.onclick = (e) => e.stopPropagation();
+
+  modal.innerHTML = `
+    <div style="text-align:center;margin-bottom:16px;">
+      <div style="font-size:20px;margin-bottom:8px;">👤</div>
+      <div style="font-size:18px;font-weight:800;color:#D4A574;">${booking.name}</div>
+    </div>
+    <div style="border-top:1px solid rgba(184,121,70,0.3);padding-top:12px;font-size:12px;color:#F4ECE0;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <span style="color:rgba(184,121,70,0.7);">Party Size</span>
+        <span style="font-weight:700;">${booking.party}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <span style="color:rgba(184,121,70,0.7);">Status</span>
+        <span style="font-weight:700;">${booking.status}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <span style="color:rgba(184,121,70,0.7);">Time</span>
+        <span style="font-weight:700;">${booking.time}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;">
+        <span style="color:rgba(184,121,70,0.7);">Drinks</span>
+        <span style="font-weight:700;">${booking.drinks}</span>
+      </div>
+    </div>
+    <button onclick="this.parentElement.parentElement.remove()" style="width:100%;margin-top:16px;background:#B87946;color:white;border:none;border-radius:8px;padding:10px;font-weight:700;cursor:pointer;">Close</button>
+  `;
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
 }
 
 // Animated arrow motif (splash only) — traces K, over the kiln, to I,
