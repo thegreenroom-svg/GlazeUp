@@ -8124,7 +8124,16 @@ const SHIFT_PIN_LOGIN_ENABLED = true; // genuine real login restored after tonig
 // this hint shown any more — the notice is purely cosmetic, it doesn't
 // affect which PINs actually work.
 const APP_VERSION = '1.1.0';
-const DEMO_MODE = false;
+const DEMO_MODE = true;
+
+const DEMO_STAFF = [
+  { id: '1', name: 'David', pin: '000', role: 'Manager' },
+  { id: '2', name: 'Jenny', pin: '000', role: 'Manager' },
+  { id: '3', name: 'Daisy', pin: '000', role: 'Manager' },
+  { id: '4', name: 'Dave', pin: '000', role: 'Barista' },
+  { id: '5', name: 'Lucy', pin: '000', role: 'Staff' },
+  { id: '6', name: 'Ruby', pin: '000', role: 'Staff' }
+];
 
 let currentShiftStaff = null; // { id, name, role }
 let currentShiftId = null; // timesheet row ID for automatic clock-out
