@@ -1934,24 +1934,22 @@
 </div>
 
 <!-- Splash / resting screen -->
-<div id="splash-screen" style="position:fixed;inset:0;z-index:5000;background:#0E1A18;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;" onclick="dismissSplash()">
+<div id="splash-screen" style="position:fixed;inset:0;z-index:5000;background:#0E1A18;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;" onclick="dismissSplash()">
 
-  <!-- Fullscreen animated logo -->
-  <div style="position:relative;width:140px;height:140px;display:flex;align-items:center;justify-content:center;">
-    <!-- Animated glow ring -->
-    <div style="position:absolute;inset:-20px;border:2px solid #B87946;border-radius:50%;opacity:0.2;animation:splash-glow-rotate 8s linear infinite;"></div>
-    <div style="position:absolute;inset:-40px;border:1px solid #B87946;border-radius:50%;opacity:0.1;animation:splash-glow-rotate 12s linear infinite reverse;"></div>
-    
-    <!-- Logo container with float animation -->
-    <div style="width:120px;height:120px;background:linear-gradient(135deg,#B87946,#9A6435);border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 0 60px rgba(184,121,70,0.6),0 12px 40px rgba(0,0,0,0.8);animation:splash-float 4s ease-in-out infinite;">
-      <img src="/brand-assets/kiln-cafe-logo-demo/kiln-cafe-mark-demo.svg" style="width:64px;opacity:0.98;filter:drop-shadow(0 2px 8px rgba(0,0,0,0.3));">
-    </div>
+  <!-- Kiln Logo top-left -->
+  <div style="position:absolute;top:20px;left:20px;width:48px;height:48px;background:linear-gradient(135deg,#B87946,#9A6435);border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 0 40px rgba(184,121,70,0.4);">
+    <img src="/brand-assets/kiln-cafe-icon/kiln-cafe-app-icon.svg" style="width:28px;opacity:0.95;">
   </div>
 
-  <!-- Subtle loading indicator below -->
-  <div style="position:absolute;bottom:80px;left:0;right:0;text-align:center;">
-    <div style="width:40px;height:3px;background:linear-gradient(90deg,transparent,#B87946,transparent);margin:0 auto;border-radius:2px;animation:splash-pulse-bar 2s ease-in-out infinite;"></div>
+  <!-- Full-screen animated table demo -->
+  <div id="splash-table-demo" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+    <!-- Tables and chairs will render here -->
   </div>
+
+  <!-- "Touch screen to enter" button (top-right) -->
+  <button onclick="dismissSplash()" style="position:absolute;top:20px;right:20px;background:linear-gradient(135deg,#B87946,#9A6435);color:white;border:none;border-radius:20px;padding:10px 16px;font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(184,121,70,0.4);">
+    Touch to enter →
+  </button>
 
 </div>
 
@@ -19593,10 +19591,157 @@ let _splashTableDemo = 0;
 // Splash — fullscreen logo with auto-dismiss
 function wireSplash() {
   const el = document.getElementById('splash-screen');
-  if (!el) return;
+  const demoEl = document.getElementById('splash-table-demo');
+  if (!el || !demoEl) return;
   
-  // Splash stays until user clicks it
-  el.addEventListener('click', dismissSplash);
+  // Render animated table demo
+  renderSplashTableDemo(demoEl);
+  
+  // Splash stays until user clicks
+  el.style.cursor = 'pointer';
+}
+
+function renderSplashTableDemo(container) {
+  // Create SVG canvas for animated table demo
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 400 500');
+  svg.setAttribute('width', '100%');
+  svg.setAttribute('height', '100%');
+  svg.setAttribute('style', 'max-width: 500px; max-height: 600px; filter: drop-shadow(0 20px 60px rgba(0,0,0,0.5));');
+
+  // Defs with animations
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  defs.innerHTML = `
+    <style>
+      @keyframes splashDrag { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(40px); } }
+      @keyframes splashTap { 0%, 100% { r: 60; opacity: 0; } 50% { r: 90; opacity: 0.3; } }
+      @keyframes splashFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+      @keyframes splashPulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+    </style>
+    <radialGradient id="tableGlow" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" style="stop-color:#B87946;stop-opacity:0.2"/>
+      <stop offset="100%" style="stop-color:#B87946;stop-opacity:0"/>
+    </radialGradient>
+  `;
+  svg.appendChild(defs);
+
+  // Background glow
+  const bgGlow = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  bgGlow.setAttribute('cx', '200');
+  bgGlow.setAttribute('cy', '250');
+  bgGlow.setAttribute('r', '200');
+  bgGlow.setAttribute('fill', 'url(#tableGlow)');
+  svg.appendChild(bgGlow);
+
+  // Main table (draggable demo)
+  const tableGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  tableGroup.setAttribute('style', 'animation: splashDrag 3s ease-in-out infinite;');
+  
+  const tableRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  tableRect.setAttribute('x', '140');
+  tableRect.setAttribute('y', '180');
+  tableRect.setAttribute('width', '120');
+  tableRect.setAttribute('height', '90');
+  tableRect.setAttribute('rx', '12');
+  tableRect.setAttribute('fill', 'none');
+  tableRect.setAttribute('stroke', '#B87946');
+  tableRect.setAttribute('stroke-width', '3');
+  tableGroup.appendChild(tableRect);
+
+  // Table label
+  const tableLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  tableLabel.setAttribute('x', '200');
+  tableLabel.setAttribute('y', '230');
+  tableLabel.setAttribute('text-anchor', 'middle');
+  tableLabel.setAttribute('fill', '#B87946');
+  tableLabel.setAttribute('font-size', '14');
+  tableLabel.setAttribute('font-weight', '800');
+  tableLabel.textContent = 'TABLE 1';
+  tableGroup.appendChild(tableLabel);
+
+  svg.appendChild(tableGroup);
+
+  // Chairs around table
+  const chairPositions = [
+    { x: 200, y: 150 }, { x: 200, y: 300 },
+    { x: 120, y: 225 }, { x: 280, y: 225 },
+    { x: 135, y: 165 }, { x: 265, y: 165 },
+    { x: 135, y: 285 }, { x: 265, y: 285 }
+  ];
+
+  chairPositions.forEach((pos, idx) => {
+    const chair = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    chair.setAttribute('cx', pos.x);
+    chair.setAttribute('cy', pos.y);
+    chair.setAttribute('r', '8');
+    chair.setAttribute('fill', 'none');
+    chair.setAttribute('stroke', '#B87946');
+    chair.setAttribute('stroke-width', '1.5');
+    chair.setAttribute('style', `animation: splashFloat ${1 + idx * 0.15}s ease-in-out infinite;`);
+    svg.appendChild(chair);
+
+    // Person icon in chair
+    const person = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    person.setAttribute('x', pos.x);
+    person.setAttribute('y', pos.y + 4);
+    person.setAttribute('text-anchor', 'middle');
+    person.setAttribute('font-size', '10');
+    person.textContent = '👤';
+    svg.appendChild(person);
+  });
+
+  // Status icons (top right)
+  const icons = [
+    { x: 320, y: 120, emoji: '🎨', label: 'Painting' },
+    { x: 360, y: 120, emoji: '✓', label: 'Done' },
+    { x: 340, y: 160, emoji: '🔥', label: 'Kiln' }
+  ];
+
+  icons.forEach((icon, idx) => {
+    const iconCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    iconCircle.setAttribute('cx', icon.x);
+    iconCircle.setAttribute('cy', icon.y);
+    iconCircle.setAttribute('r', '14');
+    iconCircle.setAttribute('fill', 'none');
+    iconCircle.setAttribute('stroke', '#B87946');
+    iconCircle.setAttribute('stroke-width', '2');
+    iconCircle.setAttribute('style', `animation: splashPulse ${1.5 + idx * 0.2}s ease-in-out infinite;`);
+    svg.appendChild(iconCircle);
+
+    const iconText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    iconText.setAttribute('x', icon.x);
+    iconText.setAttribute('y', icon.y + 6);
+    iconText.setAttribute('text-anchor', 'middle');
+    iconText.setAttribute('font-size', '16');
+    iconText.textContent = icon.emoji;
+    svg.appendChild(iconText);
+  });
+
+  // Tap ripple (showing interaction)
+  const ripple = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  ripple.setAttribute('cx', '200');
+  ripple.setAttribute('cy', '225');
+  ripple.setAttribute('r', '60');
+  ripple.setAttribute('fill', 'none');
+  ripple.setAttribute('stroke', '#B87946');
+  ripple.setAttribute('stroke-width', '2');
+  ripple.setAttribute('style', 'animation: splashTap 2s ease-out infinite;');
+  svg.appendChild(ripple);
+
+  // Instructions text
+  const instructions = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  instructions.setAttribute('x', '200');
+  instructions.setAttribute('y', '420');
+  instructions.setAttribute('text-anchor', 'middle');
+  instructions.setAttribute('fill', '#B87946');
+  instructions.setAttribute('font-size', '16');
+  instructions.setAttribute('font-weight', '700');
+  instructions.setAttribute('opacity', '0.8');
+  instructions.textContent = 'Drag • Tap • Manage • Track';
+  svg.appendChild(instructions);
+
+  container.innerHTML = '';
+  container.appendChild(svg);
 }
 
 // Animated arrow motif (splash only) — traces K, over the kiln, to I,
