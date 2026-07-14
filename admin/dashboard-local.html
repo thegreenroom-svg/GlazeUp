@@ -10,7 +10,7 @@
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="icon" type="image/png" sizes="32x32" href="/brand-assets/kiln-cafe-icon/kiln-cafe-icon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/brand-assets/kiln-cafe-icon/kiln-cafe-icon-16.png">
-  <link rel="icon" type="image/svg+xml" href="/brand-assets/kiln-cafe-logo-demo/kiln-cafe-mark-demo.svg">
+  <link rel="icon" type="image/svg+xml" href="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#2B2724">
@@ -1934,22 +1934,27 @@
 </div>
 
 <!-- Splash / resting screen -->
-<div id="splash-screen" style="position:fixed;inset:0;z-index:5000;background:#0E1A18;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;" onclick="dismissSplash()">
+<div id="splash-screen" style="position:fixed;inset:0;z-index:5000;background:#0E1A18;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow:hidden;cursor:pointer;padding-top:80px;padding-bottom:20px;" onclick="dismissSplash()">
 
   <!-- Kiln Logo top-left -->
-  <div style="position:absolute;top:20px;left:20px;width:48px;height:48px;background:linear-gradient(135deg,#B87946,#9A6435);border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 0 40px rgba(184,121,70,0.4);">
-    <img src="/brand-assets/kiln-cafe-icon/kiln-cafe-app-icon.svg" style="width:28px;opacity:0.95;">
-  </div>
-
-  <!-- Full-screen animated table demo -->
-  <div id="splash-table-demo" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
-    <!-- Tables and chairs will render here -->
+  <div style="position:absolute;top:60px;left:20px;width:48px;height:48px;background:transparent;border-radius:50%;display:flex;align-items:center;justify-content:center;">
+    <img src="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png" style="width:40px;opacity:0.95;filter:drop-shadow(0 2px 8px rgba(184,121,70,0.5));">
   </div>
 
   <!-- "Touch screen to enter" button (top-right) -->
-  <button onclick="dismissSplash()" style="position:absolute;top:20px;right:20px;background:linear-gradient(135deg,#B87946,#9A6435);color:white;border:none;border-radius:20px;padding:10px 16px;font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(184,121,70,0.4);">
+  <button onclick="dismissSplash()" style="position:absolute;top:60px;right:20px;background:linear-gradient(135deg,#B87946,#9A6435);color:white;border:none;border-radius:20px;padding:10px 16px;font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(184,121,70,0.4);">
     Touch to enter →
   </button>
+
+  <!-- Full-screen animated table demo (centered with margin) -->
+  <div id="splash-table-demo" style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;width:100%;margin:0;padding:0 20px;">
+    <!-- Tables and chairs will render here -->
+  </div>
+
+  <!-- Instructions text -->
+  <div style="text-align:center;padding-bottom:40px;">
+    <div style="color:#B87946;font-size:16px;font-weight:700;opacity:0.8;letter-spacing:0.05em;">Drag • Tap • Manage • Track</div>
+  </div>
 
 </div>
 
@@ -2602,7 +2607,7 @@
     <header class="admin-header">
       <!-- Left: logo + abbreviated studio name -->
       <div style="display:flex;align-items:center;gap:7px;flex-shrink:0;min-width:0;">
-        <img src="/brand-assets/kiln-cafe-logo-demo/kiln-cafe-mark-demo.svg" alt="The Kiln Cafe" style="width:28px;height:28px;flex-shrink:0;">
+        <img src="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png" alt="The Kiln Cafe" style="width:28px;height:28px;flex-shrink:0;">
         <h1 id="studio-name" style="margin:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;">The Kiln Cafe</h1>
       </div>
 
@@ -6355,7 +6360,7 @@ function _swtVisual(key) {
         <!-- Kiln Cafe mark, large and glowing -->
         <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:20px;">
           <div style="width:100px;height:100px;border-radius:50%;background:linear-gradient(135deg,#B87946,#E8A03C);display:flex;align-items:center;justify-content:center;box-shadow:0 0 60px rgba(184,121,70,0.5),0 0 120px rgba(184,121,70,0.2);animation:swt-float 2.5s ease-in-out infinite;">
-            <img src="/brand-assets/kiln-cafe-logo-demo/kiln-cafe-mark-demo.svg" style="width:60px;opacity:0.95;">
+            <img src="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png" style="width:60px;opacity:0.95;">
           </div>
           <!-- Orbiting feature pills -->
           <div style="position:absolute;top:-10px;left:-140px;background:rgba(184,121,70,0.15);border:1px solid rgba(184,121,70,0.3);border-radius:20px;padding:6px 14px;font-size:11px;font-weight:700;color:#E8A03C;white-space:nowrap;animation:swt-float 3s ease-in-out infinite 0.3s;">🗺 Floor Plan</div>
@@ -6660,7 +6665,7 @@ function _swtVisual(key) {
         <div style="position:relative;width:160px;height:160px;">
           <!-- Central mark -->
           <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#B87946,#E8A03C);display:flex;align-items:center;justify-content:center;box-shadow:0 0 40px rgba(184,121,70,0.5);animation:swt-float 3s ease-in-out infinite;">
-            <img src="/brand-assets/kiln-cafe-logo-demo/kiln-cafe-mark-demo.svg" style="width:38px;">
+            <img src="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png" style="width:38px;">
           </div>
           <!-- Orbiting icons -->
           ${[
@@ -6680,7 +6685,7 @@ function _swtVisual(key) {
         </div>
         <!-- Kiln Cafe branding -->
         <div style="display:flex;align-items:center;gap:8px;opacity:0.4;">
-          <img src="/brand-assets/kiln-cafe-logo-demo/kiln-cafe-mark-demo.svg" style="width:18px;">
+          <img src="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png" style="width:18px;">
           <span style="font-size:11px;font-weight:700;color:#F4ECE0;letter-spacing:0.04em;">The Kiln Cafe · Studio Manager</span>
         </div>
       </div>`,
@@ -19604,10 +19609,10 @@ function wireSplash() {
 function renderSplashTableDemo(container) {
   // Create SVG canvas for animated table demo
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 400 500');
+  svg.setAttribute('viewBox', '0 0 400 400');
   svg.setAttribute('width', '100%');
   svg.setAttribute('height', '100%');
-  svg.setAttribute('style', 'max-width: 500px; max-height: 600px; filter: drop-shadow(0 20px 60px rgba(0,0,0,0.5));');
+  svg.setAttribute('style', 'max-width: 500px; max-height: 500px;');
 
   // Defs with animations
   const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
@@ -19720,25 +19725,13 @@ function renderSplashTableDemo(container) {
   // Tap ripple (showing interaction)
   const ripple = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
   ripple.setAttribute('cx', '200');
-  ripple.setAttribute('cy', '225');
+  ripple.setAttribute('cy', '200');
   ripple.setAttribute('r', '60');
   ripple.setAttribute('fill', 'none');
   ripple.setAttribute('stroke', '#B87946');
   ripple.setAttribute('stroke-width', '2');
   ripple.setAttribute('style', 'animation: splashTap 2s ease-out infinite;');
   svg.appendChild(ripple);
-
-  // Instructions text
-  const instructions = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-  instructions.setAttribute('x', '200');
-  instructions.setAttribute('y', '420');
-  instructions.setAttribute('text-anchor', 'middle');
-  instructions.setAttribute('fill', '#B87946');
-  instructions.setAttribute('font-size', '16');
-  instructions.setAttribute('font-weight', '700');
-  instructions.setAttribute('opacity', '0.8');
-  instructions.textContent = 'Drag • Tap • Manage • Track';
-  svg.appendChild(instructions);
 
   container.innerHTML = '';
   container.appendChild(svg);
