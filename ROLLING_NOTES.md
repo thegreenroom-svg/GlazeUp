@@ -1331,3 +1331,44 @@ is what everyone else in the sector already has. Plan stays.
 4. `GRID_NAV_STRUCTURE` → data. Still the gate for everything.
 5. Learning engine: wire `log-transition`, build the suggestion card, repoint
    studio-wide (one screen for everyone — no per-person split, see reasoning above).
+
+## Host By Post — the structural gap (found 14 July 2026, NOT yet fixed)
+
+**The problem.** Host By Post is reached via `showSetupSection('hostbypost')` — it lives
+**inside Setup**. Setup is a configuration screen: Click & Drop API key, return address.
+So the tile logic does not run through to it at all; it dead-ends in a settings panel.
+An entire business line is parked in the options menu.
+
+Built and real behind it: `hostbypost_postal_schema.sql`, `postal_labels_schema.sql`,
+its own mark (`hostbypost-mark-demo.svg`), glazed tiles at dashboard-local.html ~2844,
+~3025, ~3916 — all of which route into Setup.
+
+**Today's model made it worse.** We agreed the navigation is Floor → Table → Job, where
+home is a physical room. Host By Post has no room: it is kits going out and pieces
+coming back by post. So under the agreed model it has no home and no path. Someone
+processing returns has no table to tap.
+
+**The shape it should take — mirror the floor, don't bolt it on:**
+
+    FLOOR  → TABLE → JOB        (rooms, covers, service)
+    POST   → ORDER → JOB        (kits, stages, fulfilment)
+
+- Host By Post becomes a **top level alongside the floor**, reached from the nav rail —
+  NOT a section under Setup.
+- **An order is the table.** Tap it, see what is true of it, pick the next step from
+  tiles. Identical junction logic to `showTableDetail()`.
+- Order stages, mirroring the booking flow: sent → painted → back with us → fired →
+  posted home.
+- Setup keeps ONLY the configuration: API key, return address. Nothing operational.
+
+**Why this matters beyond tidiness:** build the Post side against the same three-level
+model and both halves of the business share one mental model, one nav rail, one set of
+glazed tiles, and the learning engine counts both in the same `staff_task_usage` table.
+Bolt it on later and you get a second grammar staff have to learn.
+
+**Already helping it, for free:** the piece-finder work (photo downscale + wave
+batching) runs on the same `/api/pieces/find-by-photo` endpoint, so anything posted
+back and photographed is ~30x faster to upload and ~3x faster to match.
+
+**Dependency:** this needs `GRID_NAV_STRUCTURE` to be data before Post can be a real top
+level without hardcoding it. Same gate as everything else. Do that first.
