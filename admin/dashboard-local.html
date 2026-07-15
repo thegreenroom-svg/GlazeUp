@@ -20025,127 +20025,147 @@ function wireSplash() {
 
 // Seats decide the table's footprint. Sizes are in plan units.
 function _tableSize(seats) {
-  if (seats <= 2) return { w: 86, h: 86 };
-  if (seats <= 4) return { w: 124, h: 92 };
-  if (seats <= 6) return { w: 168, h: 92 };
-  return { w: 212, h: 96 };
+  if (seats <= 2) return { w: 88, h: 88 };
+  if (seats <= 4) return { w: 126, h: 94 };
+  if (seats <= 6) return { w: 170, h: 94 };
+  return { w: 214, h: 98 };
 }
 
 // Chairs sit around the table: twos face each other across it,
 // everything larger seats along the two long edges.
 function _chairPositions(seats, w, h) {
   const out = [];
-  if (seats <= 2) {
-    out.push({ x: w / 2, y: -15 }, { x: w / 2, y: h + 15 });
-    return out.slice(0, seats);
-  }
+  if (seats <= 2) return [{ x: w / 2, y: -17, up: true }, { x: w / 2, y: h + 17, up: false }];
   const top = Math.ceil(seats / 2), bottom = seats - top;
-  for (let i = 0; i < top; i++) out.push({ x: (w / (top + 1)) * (i + 1), y: -15 });
-  for (let i = 0; i < bottom; i++) out.push({ x: (w / (bottom + 1)) * (i + 1), y: h + 15 });
+  for (let i = 0; i < top; i++) out.push({ x: (w / (top + 1)) * (i + 1), y: -17, up: true });
+  for (let i = 0; i < bottom; i++) out.push({ x: (w / (bottom + 1)) * (i + 1), y: h + 17, up: false });
   return out;
 }
 
-// The real rooms. Positions are hand-placed to match the studio.
+// A drawn chair: seat, back, and legs. Facing the table.
+function _chair(cx, cy, up, stroke, weight) {
+  const d = up ? 1 : -1;
+  return `<g stroke="${stroke}" stroke-width="${weight}" fill="none" stroke-linecap="round">
+    <rect x="${cx - 10}" y="${cy - 8}" width="20" height="16" rx="3"/>
+    <line x1="${cx - 10}" y1="${cy - d * 8}" x2="${cx + 10}" y2="${cy - d * 8}" stroke-width="${weight * 1.6}"/>
+    <line x1="${cx - 7}" y1="${cy + d * 8}" x2="${cx - 7}" y2="${cy + d * 12}"/>
+    <line x1="${cx + 7}" y1="${cy + d * 8}" x2="${cx + 7}" y2="${cy + d * 12}"/>
+  </g>`;
+}
+
 const FLOOR_PLAN = {
   'Main Studio': { w: 940, h: 560, tables: [
-    { id: '1', seats: 4, x: 60,  y: 70 },
-    { id: '2', seats: 4, x: 300, y: 70 },
-    { id: '3', seats: 6, x: 540, y: 70 },
-    { id: '4', seats: 2, x: 800, y: 70 },
-    { id: '5', seats: 6, x: 60,  y: 260 },
-    { id: '5A', seats: 2, x: 300, y: 260 },
-    { id: '6', seats: 8, x: 460, y: 260 },
-    { id: '7', seats: 4, x: 60,  y: 430 },
+    { id: '1', seats: 4, x: 60,  y: 70 },  { id: '2', seats: 4, x: 300, y: 70 },
+    { id: '3', seats: 6, x: 540, y: 70 },  { id: '4', seats: 2, x: 800, y: 70 },
+    { id: '5', seats: 6, x: 60,  y: 260 }, { id: '5A', seats: 2, x: 300, y: 260 },
+    { id: '6', seats: 8, x: 460, y: 260 }, { id: '7', seats: 4, x: 60,  y: 430 },
     { id: '8', seats: 8, x: 300, y: 430 }
   ]},
   'The Lounge': { w: 620, h: 320, tables: [
-    { id: '1', seats: 2, x: 50,  y: 60 },
-    { id: '2', seats: 2, x: 200, y: 60 },
-    { id: '3', seats: 4, x: 350, y: 60 },
-    { id: '4', seats: 2, x: 50,  y: 200 },
-    { id: '5', seats: 4, x: 200, y: 200 },
-    { id: '6', seats: 2, x: 420, y: 200 }
+    { id: '1', seats: 2, x: 50,  y: 60 },  { id: '2', seats: 2, x: 200, y: 60 },
+    { id: '3', seats: 4, x: 350, y: 60 },  { id: '4', seats: 2, x: 50,  y: 200 },
+    { id: '5', seats: 4, x: 200, y: 200 }, { id: '6', seats: 2, x: 420, y: 200 }
   ]},
   'The Vault': { w: 420, h: 260, tables: [
     { id: 'Group Space', seats: 8, x: 100, y: 80 }
   ]}
 };
 
-// Stage colours — same language as the booking flow.
 const STAGE_COLOURS = {
   booking: '#4CAF50', painting: '#B87946', engagement: '#B87946',
   completion: '#e53935', kiln: '#F9A825', pickup: '#00897B'
 };
+const STAGE_LABELS = {
+  booking: 'Booked in', painting: 'Painting', engagement: 'Painting',
+  completion: 'Finishing up', kiln: 'In the kiln', pickup: 'Ready for pickup'
+};
 
-// The resting state. Plausible, clearly fictional, and only
-// ever shown when there is genuinely nothing real to show.
+// The resting state — plausible, clearly fictional, always labelled.
 const DEMO_COVERS = {
   'Main Studio': {
-    '1':  { name: 'Sarah + 3', covers: 4, stage: 'painting' },
-    '3':  { name: 'WI Group',  covers: 5, stage: 'engagement' },
-    '5A': { name: 'Hendersons', covers: 2, stage: 'completion' },
-    '6':  { name: "Mia's Party", covers: 8, stage: 'booking' }
+    '1':  { name: 'Sarah + 3',   covers: 4, stage: 'painting',   since: '11:20' },
+    '3':  { name: 'WI Group',    covers: 5, stage: 'engagement', since: '10:45' },
+    '5A': { name: 'Hendersons',  covers: 2, stage: 'completion', since: '10:05' },
+    '6':  { name: "Mia's Party", covers: 8, stage: 'booking',    since: '13:00' }
   },
   'The Lounge': {
-    '2': { name: 'J & E', covers: 2, stage: 'painting' },
-    '5': { name: 'Book Club', covers: 4, stage: 'engagement' }
+    '2': { name: 'J & E',      covers: 2, stage: 'painting',   since: '11:50' },
+    '5': { name: 'Book Club',  covers: 4, stage: 'engagement', since: '10:30' }
   },
   'The Vault': {}
 };
 
-// Real covers, once bookings exist. Populated by the booking
-// layer; empty means we have nothing real yet.
 let _liveCovers = null;
 
 function _isRestingState() {
   if (!_liveCovers) return true;
   return !Object.values(_liveCovers).some(room => Object.keys(room || {}).length);
 }
+function _coversFor(roomName) {
+  return _isRestingState()
+    ? (DEMO_COVERS[roomName] || {})
+    : ((_liveCovers || {})[roomName] || {});
+}
 
-function _renderRoom(roomName, resting) {
+// The pencil. A little turbulence displaces every stroke so the plan
+// reads as drawn by hand rather than plotted — the studio's own
+// character, not a CAD export.
+const _PENCIL_FILTER = `
+  <filter id="pencil" x="-6%" y="-6%" width="112%" height="112%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.028" numOctaves="3" seed="7" result="noise"/>
+    <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.8" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>`;
+
+function _renderRoom(roomName) {
   const room = FLOOR_PLAN[roomName];
-  const covers = resting ? (DEMO_COVERS[roomName] || {}) : ((_liveCovers || {})[roomName] || {});
+  const covers = _coversFor(roomName);
+  const INK = '#2B2724';
 
   const tables = room.tables.map(t => {
     const size = _tableSize(t.seats);
     const c = covers[t.id];
-    const occupied = !!c;
-    const colour = occupied ? (STAGE_COLOURS[c.stage] || '#B87946') : '#B87946';
-    const lineOpacity = occupied ? 0.9 : 0.28;
+    const busy = !!c;
+    const accent = busy ? (STAGE_COLOURS[c.stage] || INK) : INK;
 
     const chairs = _chairPositions(t.seats, size.w, size.h).map((ch, i) => {
-      const seated = occupied && i < c.covers;
-      return `<rect x="${(t.x + ch.x - 11).toFixed(1)}" y="${(t.y + ch.y - 7).toFixed(1)}"
-        width="22" height="14" rx="5"
-        fill="${seated ? colour : 'none'}" fill-opacity="${seated ? 0.5 : 0}"
-        stroke="${colour}" stroke-opacity="${seated ? 0.9 : 0.22}" stroke-width="1.4"/>`;
+      const seated = busy && i < c.covers;
+      return _chair(t.x + ch.x, t.y + ch.y, ch.up, INK, seated ? 1.5 : 0.8)
+           + (seated ? `<circle cx="${t.x + ch.x}" cy="${t.y + ch.y}" r="4" fill="${accent}" fill-opacity="0.65"/>` : '');
     }).join('');
 
-    const label = occupied
-      ? `<text x="${t.x + size.w / 2}" y="${t.y + size.h / 2 - 4}" text-anchor="middle"
-           font-size="15" font-weight="800" fill="#F4ECE0">${t.id}</text>
-         <text x="${t.x + size.w / 2}" y="${t.y + size.h / 2 + 12}" text-anchor="middle"
-           font-size="10" fill="${colour}">${c.name}</text>`
+    const label = busy
+      ? `<text x="${t.x + size.w / 2}" y="${t.y + size.h / 2 - 3}" text-anchor="middle"
+           font-size="16" font-weight="700" fill="${INK}">${t.id}</text>
+         <text x="${t.x + size.w / 2}" y="${t.y + size.h / 2 + 13}" text-anchor="middle"
+           font-size="10" fill="${INK}" fill-opacity="0.7">${c.name}</text>`
       : `<text x="${t.x + size.w / 2}" y="${t.y + size.h / 2 + 5}" text-anchor="middle"
-           font-size="15" font-weight="700" fill="#B87946" fill-opacity="0.45">${t.id}</text>`;
+           font-size="16" font-weight="600" fill="${INK}" fill-opacity="0.35">${t.id}</text>`;
 
-    return `<g class="fp-table" style="cursor:pointer" onclick="enterBookingFlow('${roomName}', '${t.id}')">
+    // A busy table gets a stage stripe along its front edge — the only
+    // colour on the page, so it reads across the room at a glance.
+    const stripe = busy
+      ? `<line x1="${t.x + 8}" y1="${t.y + size.h - 5}" x2="${t.x + size.w - 8}" y2="${t.y + size.h - 5}"
+           stroke="${accent}" stroke-width="3" stroke-linecap="round"/>` : '';
+
+    return `<g class="fp-table" style="cursor:pointer"
+      onclick="showTableDetail('${roomName}', '${t.id}')">
       ${chairs}
-      <rect x="${t.x}" y="${t.y}" width="${size.w}" height="${size.h}" rx="12"
-        fill="${occupied ? '#241B14' : 'rgba(255,255,255,0.02)'}"
-        stroke="${colour}" stroke-opacity="${lineOpacity}" stroke-width="1.6"/>
-      ${label}
+      <rect x="${t.x}" y="${t.y}" width="${size.w}" height="${size.h}" rx="6"
+        fill="#FFFDF9" stroke="${INK}" stroke-width="${busy ? 1.9 : 1}"
+        stroke-opacity="${busy ? 1 : 0.5}"/>
+      ${stripe}${label}
     </g>`;
   }).join('');
 
   return `
-    <div style="margin-bottom:26px;">
-      <h2 style="color:#B87946;font-size:12px;font-weight:800;text-transform:uppercase;
-        letter-spacing:0.1em;margin:0 0 10px;">${roomName}</h2>
-      <svg viewBox="0 0 ${room.w} ${room.h}" style="width:100%;height:auto;display:block;
-        background:radial-gradient(ellipse at 50% 40%,#1C2E28 0%,#0E1A18 72%);
-        border:1px solid rgba(184,121,70,0.18);border-radius:16px;">
-        ${tables}
+    <div style="margin-bottom:24px;">
+      <h2 style="color:#2B2724;font-size:11px;font-weight:800;text-transform:uppercase;
+        letter-spacing:0.12em;margin:0 0 8px;opacity:0.55;">${roomName}</h2>
+      <svg viewBox="-20 -30 ${room.w + 40} ${room.h + 60}"
+        style="width:100%;height:auto;display:block;background:#F4ECE0;
+        border:1px solid rgba(43,39,36,0.15);border-radius:10px;">
+        <defs>${_PENCIL_FILTER}</defs>
+        <g filter="url(#pencil)">${tables}</g>
       </svg>
     </div>`;
 }
@@ -20153,27 +20173,83 @@ function _renderRoom(roomName, resting) {
 function showHomeScreen() {
   const view = document.getElementById('floor-plan-view');
   if (!view) return;
-
-  const resting = _isRestingState();
   view.innerHTML = '';
   view.style.overflow = 'auto';
 
   const container = document.createElement('div');
-  container.style.cssText = 'padding:16px;max-width:1200px;margin:0 auto;';
-
-  // Never let an example pass for a real table.
-  container.innerHTML = (resting ? `
+  container.style.cssText = 'padding:14px;max-width:1200px;margin:0 auto;';
+  container.innerHTML = (_isRestingState() ? `
     <div style="display:flex;align-items:center;gap:8px;justify-content:center;
-      background:rgba(249,168,37,0.1);border:1px solid rgba(249,168,37,0.35);
-      border-radius:20px;padding:7px 14px;margin:0 auto 16px;width:fit-content;">
+      background:rgba(249,168,37,0.12);border:1px solid rgba(249,168,37,0.4);
+      border-radius:20px;padding:6px 14px;margin:0 auto 14px;width:fit-content;">
       <span style="width:7px;height:7px;border-radius:50%;background:#F9A825;"></span>
-      <span style="font-size:11px;font-weight:700;color:#F9A825;letter-spacing:0.03em;">
-        Example layout — no live bookings yet
-      </span>
+      <span style="font-size:11px;font-weight:700;color:#8a6a12;">Example layout — no live bookings yet</span>
     </div>` : '')
-    + Object.keys(FLOOR_PLAN).map(r => _renderRoom(r, resting)).join('');
-
+    + Object.keys(FLOOR_PLAN).map(_renderRoom).join('');
   view.appendChild(container);
+}
+
+// ── TABLE DETAIL ──────────────────────────────────────────────────
+// The middle level. Floor → Table → Job. You tap a table and see
+// what is actually true of it, then choose the next step. Nothing
+// here does any work itself; it is a junction, and it stays small.
+// ──────────────────────────────────────────────────────────────────
+const TABLE_ACTIONS = [
+  { tab: 'bookings', label: 'Take an order', hint: 'Food and drinks' },
+  { tab: 'bookings', label: 'Painting',      hint: 'Bisque, glazes, help' },
+  { tab: 'pieces',   label: 'Finishing up',  hint: 'Names on, collect pieces' },
+  { tab: 'pieces',   label: 'Into the kiln', hint: 'Log the shelf' },
+  { tab: 'bookings', label: 'The bill',      hint: 'Split, pay, close' }
+];
+
+function showTableDetail(roomName, tableId) {
+  const view = document.getElementById('floor-plan-view');
+  if (!view) return;
+  const c = _coversFor(roomName)[tableId];
+  const t = (FLOOR_PLAN[roomName].tables || []).find(x => x.id === tableId) || { seats: 0 };
+  const accent = c ? (STAGE_COLOURS[c.stage] || '#B87946') : '#8a8175';
+
+  view.innerHTML = `
+    <div style="padding:16px;max-width:640px;margin:0 auto;">
+      <button onclick="showHomeScreen()" class="glaze-tile"
+        style="border:none;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:14px;">
+        ← Floor plan
+      </button>
+
+      <div style="border:1.5px solid rgba(43,39,36,0.15);border-radius:14px;padding:18px;
+        background:#FFFDF9;margin-bottom:18px;">
+        <div style="font-size:26px;font-weight:800;color:#2B2724;">
+          ${roomName === 'The Vault' ? tableId : 'Table ' + tableId}
+        </div>
+        <div style="font-size:12px;color:#8a8175;margin-top:2px;">${roomName} · seats ${t.seats}</div>
+        ${c ? `
+          <div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(43,39,36,0.1);">
+            <div style="font-size:17px;font-weight:700;color:#2B2724;">${c.name}</div>
+            <div style="display:flex;align-items:center;gap:7px;margin-top:7px;">
+              <span style="width:8px;height:8px;border-radius:50%;background:${accent};"></span>
+              <span style="font-size:12px;font-weight:700;color:${accent};">
+                ${STAGE_LABELS[c.stage] || c.stage}
+              </span>
+              <span style="font-size:12px;color:#8a8175;">
+                · ${c.covers} of ${t.seats} seats${c.since ? ' · since ' + c.since : ''}
+              </span>
+            </div>
+          </div>`
+        : `<div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(43,39,36,0.1);
+             font-size:13px;color:#8a8175;">Empty — nobody sat here.</div>`}
+      </div>
+
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;
+        color:#8a8175;margin-bottom:8px;">Next step</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        ${TABLE_ACTIONS.map(a => `
+          <button class="glaze-tile" onclick="enterBookingFlow('${roomName}', '${tableId}'); goToTab('${a.tab}');"
+            style="border:none;padding:16px 12px;text-align:left;cursor:pointer;">
+            <div style="font-size:14px;font-weight:700;color:#2B2724;">${a.label}</div>
+            <div style="font-size:10px;color:#8a8175;margin-top:3px;">${a.hint}</div>
+          </button>`).join('')}
+      </div>
+    </div>`;
 }
 
 // Enter booking flow for a table

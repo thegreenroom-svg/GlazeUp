@@ -1125,3 +1125,44 @@ raised again.
   the tiles without a deploy. **This is still the gate.**
 
 ---
+
+## Session — 14 July 2026 (cont): Hand-drawn plan + Table detail page
+
+**Agreed navigation model — three levels, nothing else:**
+`SPLASH → LOGIN (avatars, PIN) → FLOOR PLAN (home, always on) → TABLE → JOB (tile grid)`
+Every route back to the floor is one tap. Studio (stock/team/settings/revenue) hangs
+off the nav rail, not off the floor.
+
+**Floor plan redrawn.** Thin black line, hand-drawn: an feTurbulence displacement
+filter (`#pencil`) wobbles every stroke so it reads as drawn, not plotted. Chairs are
+properly drawn — seat, back, legs, facing the table — heavier stroke when occupied,
+with a dot for a cover. Ivory ground (#F4ECE0), ink #2B2724.
+**Restraint that matters:** the stage colour appears ONLY as a stripe along the front
+edge of a busy table. It is the only colour on the page, so it reads across a room at
+a glance. Resist adding more.
+
+**Table detail page (NEW) — `showTableDetail(room, id)`.** The middle level. Shows
+what is actually true of a table (who, stage, covers of seats, how long) then five
+next steps. It is a junction and does no work itself — keep it that way.
+
+**Decision — per-person tile splitting is being removed.** Daisy: too cumbersome.
+Consequence flagged and accepted: the learning engine's Rule 1 promoted tiles per
+person into `staff_home_screens` — that target is going.
+**New model: studio-wide tile order by default, split per-person ONLY where one
+person's behaviour diverges from the team's by a wide margin over a real sample.**
+Rationale: on a shared iPad six divergent layouts break "it's the third tile" and make
+training harder; and per-person signal is thin when the studio trades four days a week.
+
+**STILL OUTSTANDING (next session, in this order):**
+1. **Excise the tile splitter** — `_personalScreen`, `promotedTiles`, `tileOrder`,
+   `_layoutHistory`/`_layoutFuture`, `_layoutUndo`/`_layoutRedo`, `ROLE_HOME_DEFAULTS`,
+   `showPersonalHomeScreen`, `savePersonalHomeScreen`, and the undo/redo buttons in
+   `_updateNavControls`. ~200 interlinked lines through the nav stack — **its own
+   commit**, so it can be reverted alone if it breaks the floor.
+2. Repoint the engine at studio-wide order + divergence threshold.
+3. Nav rail (Back · Home · Refresh · You) + shift actions under the avatar
+   (Break / Stepping out / Clock out).
+4. `GRID_NAV_STRUCTURE` → data. Still the gate for mega-tiles and for the engine
+   changing tile structure without a deploy.
+5. `_liveCovers` has no producer — booking layer must populate it.
+6. `FLOOR_PLAN` seat counts and positions are still **guessed**. Daisy to correct.
