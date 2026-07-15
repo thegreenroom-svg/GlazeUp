@@ -2381,7 +2381,7 @@
       <div style="text-align:center;color:var(--gu-dust);font-size:13px;padding:20px 0;">Loading…</div>
     </div>
     <div style="padding:14px 20px;border-top:1px solid var(--gu-border);">
-      <button onclick="window.location.reload()" style="width:100%;background:#2e7d32;color:white;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:800;cursor:pointer;">✓ Update now</button>
+      <button onclick="applyAppUpdate()" style="width:100%;background:#2e7d32;color:white;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:800;cursor:pointer;">✓ Update now</button>
     </div>
   </div>
 </div>
@@ -20994,6 +20994,38 @@ async function showChangelogBeforeUpdate() {
   }
 }
 
+// ── Actually applying an update ────────────────────────────────────
+// "Update now" used to call location.reload(), which did nothing
+// visible: /admin is served with Cache-Control max-age=300, so for
+// five minutes the browser is entitled to serve the cached page
+// WITHOUT asking the server. A reload obeys that and lands straight
+// back on the same stale version — which is why staff had to leave
+// and reopen the app to get the update they had just been told about.
+//
+// So: reload a URL the cache has never seen. The build id changes on
+// every deploy, so ?v=<commit> is fresh exactly when there is genuinely
+// something new, and stable otherwise. Caches are cleared first for
+// good measure, and replace() avoids leaving the stale page in history
+// where a back-swipe would return to it.
+// ───────────────────────────────────────────────────────────────────
+let _latestBuildId = null;
+
+async function applyAppUpdate() {
+  try {
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+  } catch (e) { /* cache clearing is a bonus, not the mechanism */ }
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set('v', _latestBuildId || Date.now());
+    window.location.replace(url.toString());
+  } catch (e) {
+    window.location.reload(); // last resort — better than a dead button
+  }
+}
+
 async function checkForAppUpdate() {
   try {
     const res = await fetch(`${API_URL}/api/version`, { cache: 'no-store' });
@@ -21012,6 +21044,7 @@ async function checkForAppUpdate() {
       return;
     }
     if (stamp !== _initialBootTime) {
+      _latestBuildId = stamp;
       document.getElementById('update-available-banner').style.display = 'block';
       clearInterval(window._versionCheckTimer); // stop polling once we know
     }

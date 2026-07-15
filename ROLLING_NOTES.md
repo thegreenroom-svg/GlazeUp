@@ -1238,3 +1238,22 @@ diagnostics.
 
 *Note:* Daisy's earlier report that the banner "is moving" is still unexplained and may
 simply have been it appearing repeatedly. Worth re-checking on device now.
+
+## Session — 14 July 2026 (cont): "Update now" did nothing
+
+**The button was dead and it wasn't obvious why.** It called `location.reload()`.
+`/admin` is served with `Cache-Control: public, max-age=300`, so for five minutes the
+browser may serve the cached page **without revalidating** — and a reload obeys that.
+Staff tapped "Update now", landed back on the identical stale version, and had to quit
+and reopen the app to get the update they'd just been told about. Not the service
+worker: sw.js only caches the customer app shell, not the admin dashboard.
+
+**Fix — `applyAppUpdate()`:** reload a URL the cache has never seen.
+`?v=<buildId>` where buildId is the deployed commit, so it is fresh exactly when there
+is genuinely something new and stable otherwise. Clears `caches` first for good measure,
+and uses `location.replace()` so the stale page isn't left in history where a back-swipe
+returns to it. Falls back to a plain reload if anything throws — better than a dead
+button.
+
+Pairs with the buildId change above: the banner now only fires on a real deploy, and
+tapping it now actually gets you that deploy.
