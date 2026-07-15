@@ -1959,3 +1959,34 @@ zero deploy risk.
 **This is genuinely additive.** Every existing, tested photo-recognition path is
 unchanged and still there as the fallback. If phash finds nothing, the app behaves
 exactly as it did an hour ago.
+
+## Stock-to-customer lineage — the real fix, not photo matching
+
+Daisy asked to capture data from photos of incoming stock and use it to identify
+which customers bought/painted a given piece.
+
+**Checked the schema before building anything.** `pottery_pieces` already links to
+`customers` (`customer_id`) and has a free-text `piece_type`. It does NOT link to
+`bisque_shapes` — the actual catalogue table, which already has `image_url`, supplier,
+and price per shape. That missing link is the real gap.
+
+**Why this is NOT a photo-matching job, said plainly rather than built blind:** raw,
+unpainted stock of the same mould is genuinely visually identical — every blank mug of
+a shape looks like every other blank mug of that shape. A perceptual hash would "match"
+any one to any other, which is a false answer dressed up as a clever one, and would be
+actively embarrassing if demoed live (two identical mugs "matching" each other proves
+nothing). Photo-hash matching is right for a customer's *painted* piece, which has a
+unique pattern — that's what got built this session. It is the wrong tool for
+distinguishing identical blanks from each other.
+
+**`add_piece_shape_link.sql` (NEW — needs running):** adds
+`pottery_pieces.bisque_shape_id → bisque_shapes(id)`, nullable, additive. Comment
+includes the actual query this unlocks — every customer who's ever painted a given
+shape, ordered by date.
+
+**NOT done — deliberately, given the hour:** wiring a shape-picker into wherever a
+piece is currently created/booked, so staff actually select a `bisque_shape_id` at
+that point. Found the schema gap; didn't touch UI creation flows blind at 6am without
+knowing every call site. That's a real, calm next-session feature: find where pieces
+get created, add a shape picker (or default from `piece_type` string-matching against
+`bisque_shapes.name` as an interim heuristic), backfill sensibly.
