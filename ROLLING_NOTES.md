@@ -2735,3 +2735,36 @@ types it, forever. The data can stay messy; the screen stays right.
     rooms drawn: Lounge, Main Studio     (2, was 3)
     Main Studio holds BOTH tables: true
     container: display flex, bg rgb(244,236,224)
+
+## "Update now" — why a hard refresh was always needed. 15 July 2026
+
+Daisy: "when I update from the green update button, I then have to always do a hard
+refresh. That's a pain in the ass for everyone."
+
+**The reload mechanism was never broken.** `applyAppUpdate()` clears CacheStorage and
+does `location.replace()` with a fresh `?v=<commit>`, and the HTML is served
+`no-store, must-revalidate` (~120). All correct.
+
+**The banner had no update button on it.** It read:
+
+    ✨ A new version is available — [What's new?]
+
+The only tappable thing was "What's new?", which opens the changelog modal — and the
+actual "✓ Update now" lived inside THAT (~2389). So the obvious target, the big green
+bar, did nothing. Tap it, nothing happens, go and hard refresh, which works. The button
+looked dead because the button wasn't there.
+
+**Fixed:** "✓ Update now" is now on the banner itself, calling `applyAppUpdate()`
+directly. "What's new?" stays as the secondary, de-emphasised action. One tap to update,
+which is what everyone was going to do anyway.
+
+**Also hardened `applyAppUpdate()`:** it set only `?v`. If the URL already carried that
+exact `v` — updating twice to the same build, or landing on a link that already had it —
+the URL came out byte-for-byte identical, and `location.replace()` to an identical URL
+is a no-op in some browsers. Dead button, again, for a completely different reason.
+Added a `t` timestamp alongside `v`, so the URL is always genuinely new. `v` stays as the
+honest record of which build is being loaded.
+
+**The shape, one more time:** the mechanism worked, the wiring worked, the thing that
+failed was that nobody could reach it. Same as `#floor-table-detail`, same as the room
+drill-down being bound to a 14px heading.

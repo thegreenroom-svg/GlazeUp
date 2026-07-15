@@ -2373,7 +2373,8 @@
      this is genuinely the changelog. -->
 <div id="update-available-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#2e7d32;color:white;padding:12px 16px;padding-bottom:calc(12px + env(safe-area-inset-bottom));text-align:center;font-size:13px;font-weight:700;box-shadow:0 -2px 14px rgba(0,0,0,0.3);">
   ✨ A new version is available —
-  <button onclick="showChangelogBeforeUpdate()" style="background:white;color:#2e7d32;border:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:800;cursor:pointer;margin-left:8px;">What's new?</button>
+  <button onclick="applyAppUpdate()" style="background:white;color:#2e7d32;border:none;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:800;cursor:pointer;margin-left:8px;">✓ Update now</button>
+  <button onclick="showChangelogBeforeUpdate()" style="background:rgba(255,255,255,0.18);color:white;border:1px solid rgba(255,255,255,0.5);border-radius:20px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;margin-left:6px;">What's new?</button>
 </div>
 
 <div id="changelog-modal" style="display:none;position:fixed;inset:0;z-index:99998;background:rgba(43,39,36,0.7);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:16px;">
@@ -21960,7 +21961,17 @@ async function applyAppUpdate() {
   } catch (e) { /* cache clearing is a bonus, not the mechanism */ }
   try {
     const url = new URL(window.location.href);
-    url.searchParams.set('v', _latestBuildId || Date.now());
+    // Two params on purpose. `v` is the real deployed commit, so the URL is
+    // honest about what it's loading and is stable if you share it. `t` is a
+    // timestamp, and it is the belt to `v`'s braces: if the URL already
+    // carried this exact `v` — which happens whenever someone updates twice
+    // to the same build, or lands on a link that already had it — then
+    // setting `v` alone leaves the URL byte-for-byte identical, and
+    // location.replace() to the identical URL is a no-op in some browsers.
+    // Nothing happens, and it looks like a dead button. `t` guarantees the
+    // URL is always new, so the navigation always actually navigates.
+    url.searchParams.set('v', _latestBuildId || 'manual');
+    url.searchParams.set('t', Date.now());
     window.location.replace(url.toString());
   } catch (e) {
     window.location.reload(); // last resort — better than a dead button
