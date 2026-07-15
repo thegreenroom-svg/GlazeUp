@@ -9670,8 +9670,20 @@ async function loadFloorPlan() {
       fetch(`${API_URL}/api/floor/active?studioId=${studioId}`),
       fetch(`${API_URL}/api/floor/tables?studioId=${studioId}`)
     ]);
+    // A failed request used to be swallowed here — console.warn only,
+    // nothing shown on screen. That left staff staring at the raw
+    // static placeholder text ("Floor Plan" / "Live studio view") with
+    // no tables and no clue why. Found 14 July 2026 from a real, fresh
+    // device screenshot the morning of a presentation. Now every
+    // failure is readable on the screen itself, no devtools needed.
+    if (!floorRes.ok || !tablesRes.ok) {
+      throw new Error(`Server error — bookings: ${floorRes.status}, tables: ${tablesRes.status}`);
+    }
     const floorData = await floorRes.json();
     const tablesData = await tablesRes.json();
+    if (floorData.error || tablesData.error) {
+      throw new Error(floorData.error || tablesData.error);
+    }
     _floorData = {
       bookings: floorData.bookings || [],
       tables: tablesData.tables || []
@@ -9679,6 +9691,16 @@ async function loadFloorPlan() {
     renderFloorPlan();
   } catch(e) {
     console.warn('Floor plan load failed:', e);
+    const mainGrid = document.getElementById('floor-main-studio');
+    if (mainGrid) {
+      mainGrid.innerHTML = `<div style="grid-column:1/-1;padding:20px;text-align:center;">
+        <div style="font-size:13px;font-weight:700;color:#FF8A65;margin-bottom:6px;">Couldn't load the floor plan</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:14px;">${(e.message||'Unknown error').replace(/</g,'&lt;')}</div>
+        <button onclick="loadFloorPlan()" class="glaze-tile" style="border:none;padding:9px 18px;font-size:12px;font-weight:700;cursor:pointer;">Try again</button>
+      </div>`;
+    }
+    const subtitle = document.getElementById('floor-subtitle');
+    if (subtitle) subtitle.textContent = 'Could not load — see message below';
   }
 }
 

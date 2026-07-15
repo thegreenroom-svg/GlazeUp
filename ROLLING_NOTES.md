@@ -1785,3 +1785,44 @@ Force-quit, reopen, log in fully through the normal picker (not the offline fall
 open the floor plan, leave it open past 60 seconds, confirm it does NOT change. Then tap
 a real table and confirm the panel from the second fix still opens correctly now that
 the 60-second corruption is gone.
+
+# ═══════════════════════════════════════════════════════════
+# ⚠️  FOURTH FIND — same morning, real device, fresh cache-busted load
+# ═══════════════════════════════════════════════════════════
+
+## The floor plan is genuinely failing to load, and was failing silently
+
+Confirmed via a real screenshot in Safari with a cache-busted URL (`?v=999`), so this is
+NOT the caching issue suspected earlier. The header shows the raw static placeholder
+text — "Floor Plan" / "Live studio view" — which is the HTML's hardcoded DEFAULT
+content, written before any JS runs. `renderFloorPlan()` overwrites both the moment it
+runs successfully. **Seeing the defaults means it never ran.** `#floor-main-studio` is
+completely empty too — not even the "No tables set up yet" fallback text, which also
+only gets written by `renderFloorPlan()`.
+
+**Root cause: `loadFloorPlan()`'s catch block was silent.** A failed fetch to
+`/api/floor/active` or `/api/floor/tables` — for any reason: network, 500, bad
+`studioId`, anything — only did `console.warn()`. Nothing was ever shown on screen.
+Staff (and Daisy, at 6am, hours before presenting) were left looking at a black void
+with zero information about what had gone wrong.
+
+**Checked both endpoints by reading server.js — no obvious server-side bug found.**
+Neither references the new `room` column or anything else touched tonight. The actual
+cause is still unknown — could be network, could be a genuine server error, could be
+something else. **This needs the real error message to diagnose properly.**
+
+**Fixed, but only the visibility, not (yet) the underlying cause:**
+`loadFloorPlan()` now checks `res.ok` and any `{error}` in the response body, throws
+with a real message, and the catch block writes that message straight into
+`#floor-main-studio` with a "Try again" button — readable on the device itself, no
+console or logs needed.
+
+## URGENT — next thing to do, before anything else
+
+**Reload the app once more and read whatever error now appears in the black area.**
+That message is the actual diagnosis. Likely candidates once seen:
+- A Supabase error (bad column, RLS blocking the anon/service key, etc.)
+- A genuine network/CORS failure
+- `studioId` resolving to something unexpected
+
+Do not guess further blind — get the real message first, then fix precisely.
