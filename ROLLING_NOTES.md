@@ -2246,3 +2246,46 @@ back later. The bare domain root now redirects to the real staff app instead of 
 old pitch. Confirmed nothing else in the codebase linked to `/promo`, so this is a
 clean removal with no dangling references. The customer app (`/app`) and its data are
 completely untouched — different route, never part of this change.
+
+# ═══════════════════════════════════════════════════════════
+# HANDOFF — 15 July 2026, scoped fix for the persistent floor plan 502
+# ═══════════════════════════════════════════════════════════
+
+Three changes made, exactly as requested, nothing else touched.
+
+**1. Both floor endpoints hardened.** `/api/floor/active` and `/api/floor/tables`
+previously destructured only `data` from every Supabase call and never checked
+`error` — a failed query silently returned `data: null`, and nothing downstream
+guarded against that consistently. Both are now wrapped in try/catch, every
+Supabase call's `error` is checked explicitly and thrown, and any failure returns
+a clean `500 { error: <real message> }` instead of risking an uncaught throw.
+
+**2. Process-level safety net added**, just above `app.listen`:
+`process.on('unhandledRejection', ...)` and `process.on('uncaughtException', ...)`
+— both log the full error and stack and do **not** exit. This is the theory for why
+a redeploy didn't clear the 502: if either route threw unguarded, the resulting
+unhandled rejection would crash the whole Node process by default — not just that
+request — and Render would report the instance down and restart it, which then
+dies again the moment the same route is hit. This is explicitly a backstop, not a
+substitute for fixing the real cause — logged clearly so the actual error is
+visible next time, rather than the process just vanishing.
+
+**3. Correction to the working theory, checked rather than assumed:** neither
+endpoint actually selects `bookings.room` — only `/api/floor/tables` selects
+`studio_tables.room`, a different, already-existing column, unrelated to the
+un-run `add_booking_room.sql` migration. So a missing `bookings.room` column was
+not, in fact, a live risk in these two specific routes. Change #1's blanket error
+handling already covers this class of problem generally (any missing column,
+any RLS failure, any transient error, from any table) — so the *spirit* of "don't
+let a missing column be fatal" is satisfied, even though the literal column
+named didn't apply here. Said plainly rather than silently implementing something
+that wasn't needed.
+
+**Not touched, as instructed:** `renderFloorPlanElegant()`, `openTableDetail()`,
+the checklist, `GRID_NAV_STRUCTURE`. No `render.yaml` added. No new npm dependency.
+
+**Next step, per the person's own plan:** once this deploys, open the floor plan.
+If it 502s again, the ivory error screen (built earlier tonight) will now show
+the REAL Supabase error message rather than a generic one — that message is the
+actual diagnosis. If it loads, the crash theory was likely correct and this is
+resolved.

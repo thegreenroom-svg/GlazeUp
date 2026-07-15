@@ -5145,57 +5145,94 @@ app.post('/api/hbp/orders/:orderId/return-label', async (req, res) => {
 
 // GET /api/floor/active — all active bookings today with assignment
 // and session timing info, for the floor plan screen.
+// Both floor endpoints below previously destructured only `data` from
+// every Supabase call and never checked `error`. If a query failed for
+// any reason — a bad RLS policy, a transient connection issue, a
+// missing column on a table these don't even touch directly — `data`
+// comes back null, and downstream code that assumed an array could
+// throw. An uncaught throw inside an async route handler becomes an
+// unhandled promise rejection, and Node's default behaviour (until the
+// process-level handlers added near app.listen below) is to crash the
+// whole process. That would explain a route-specific 502 that survives
+// a redeploy: the fresh instance boots fine, then dies the moment one
+// of these two routes is hit again, and Render reports it as down.
+// Everything below is now try/caught, every Supabase error is checked
+// explicitly, and a real failure returns a normal 500 instead of taking
+// the server down.
 app.get('/api/floor/active', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
-  const today = new Date(); today.setHours(0,0,0,0);
-  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
-  const { data: bookings } = await supabase.from('bookings')
-    .select('booking_code,customer_name,table_number,current_stage,session_start,party_size,status,booking_type')
-    .eq('studio_id', studioId)
-    .gte('session_start', today.toISOString())
-    .lt('session_start', tomorrow.toISOString())
-    .not('status', 'eq', 'cancelled');
-  const { data: assignments } = await supabase.from('booking_assignments')
-    .select('booking_code,staff_name,staff_member_id,is_primary')
-    .eq('studio_id', studioId).is('released_at', null);
-  const { data: checks } = await supabase.from('booking_flow_checks')
-    .select('booking_code,stage,check_key,completed')
-    .eq('studio_id', studioId);
-  const assignMap = {};
-  (assignments||[]).forEach(a => {
-    if (!assignMap[a.booking_code]) assignMap[a.booking_code] = [];
-    assignMap[a.booking_code].push(a);
-  });
-  const checkMap = {};
-  (checks||[]).forEach(c => {
-    if (!checkMap[c.booking_code]) checkMap[c.booking_code] = {};
-    checkMap[c.booking_code][`${c.stage}:${c.check_key}`] = c.completed;
-  });
-  res.json({
-    bookings: (bookings||[]).map(b => ({
-      ...b,
-      assignments: assignMap[b.booking_code] || [],
-      checks: checkMap[b.booking_code] || {}
-    }))
-  });
+  try {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+
+    const { data: bookings, error: bookingsErr } = await supabase.from('bookings')
+      .select('booking_code,customer_name,table_number,current_stage,session_start,party_size,status,booking_type')
+      .eq('studio_id', studioId)
+      .gte('session_start', today.toISOString())
+      .lt('session_start', tomorrow.toISOString())
+      .not('status', 'eq', 'cancelled');
+    if (bookingsErr) throw bookingsErr;
+
+    const { data: assignments, error: assignErr } = await supabase.from('booking_assignments')
+      .select('booking_code,staff_name,staff_member_id,is_primary')
+      .eq('studio_id', studioId).is('released_at', null);
+    if (assignErr) throw assignErr;
+
+    const { data: checks, error: checksErr } = await supabase.from('booking_flow_checks')
+      .select('booking_code,stage,check_key,completed')
+      .eq('studio_id', studioId);
+    if (checksErr) throw checksErr;
+
+    const assignMap = {};
+    (assignments || []).forEach(a => {
+      if (!assignMap[a.booking_code]) assignMap[a.booking_code] = [];
+      assignMap[a.booking_code].push(a);
+    });
+    const checkMap = {};
+    (checks || []).forEach(c => {
+      if (!checkMap[c.booking_code]) checkMap[c.booking_code] = {};
+      checkMap[c.booking_code][`${c.stage}:${c.check_key}`] = c.completed;
+    });
+
+    res.json({
+      bookings: (bookings || []).map(b => ({
+        ...b,
+        assignments: assignMap[b.booking_code] || [],
+        checks: checkMap[b.booking_code] || {}
+      }))
+    });
+  } catch (error) {
+    console.error('/api/floor/active failed:', error?.message || error);
+    res.status(500).json({ error: error?.message || 'Could not load active bookings.' });
+  }
 });
 
 // GET /api/floor/tables — studio table config for the floor plan
 app.get('/api/floor/tables', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
-  const { data: tables } = await supabase.from('studio_tables')
-    .select('id,name,room,capacity,sort_order')
-    .eq('studio_id', studioId).order('sort_order');
-  const { data: layouts } = await supabase.from('table_chair_layouts')
-    .select('table_name,chairs,split_position,is_split')
-    .eq('studio_id', studioId);
-  const layoutMap = {};
-  (layouts||[]).forEach(l => { layoutMap[l.table_name] = l; });
-  res.json({
-    tables: (tables||[]).map(t => ({ ...t, layout: layoutMap[t.name] || null }))
-  });
+  try {
+    const { data: tables, error: tablesErr } = await supabase.from('studio_tables')
+      .select('id,name,room,capacity,sort_order')
+      .eq('studio_id', studioId).order('sort_order');
+    if (tablesErr) throw tablesErr;
+
+    const { data: layouts, error: layoutsErr } = await supabase.from('table_chair_layouts')
+      .select('table_name,chairs,split_position,is_split')
+      .eq('studio_id', studioId);
+    if (layoutsErr) throw layoutsErr;
+
+    const layoutMap = {};
+    (layouts || []).forEach(l => { layoutMap[l.table_name] = l; });
+
+    res.json({
+      tables: (tables || []).map(t => ({ ...t, layout: layoutMap[t.name] || null }))
+    });
+  } catch (error) {
+    console.error('/api/floor/tables failed:', error?.message || error);
+    res.status(500).json({ error: error?.message || 'Could not load the table layout.' });
+  }
 });
 
 // POST /api/floor/assign — assign a staff member to a booking
@@ -9782,6 +9819,31 @@ app.post('/api/admin/simulate-demo-activity', async (req, res) => {
   }
   const result = await simulateDemoStudioActivity();
   res.json(result);
+});
+
+// Added 15 July 2026, tracking down a persistent 502 on the floor
+// plan endpoints. Node's default behaviour on an unhandled promise
+// rejection or a genuinely uncaught synchronous exception is to crash
+// the entire process — every route, every studio, everyone logged
+// in, all of it — over a single bad request. On Render that shows up
+// as the whole service going down and coming back up, which looks
+// exactly like what's been happening: warm instance, works, then a
+// specific route 502s and stays down until the next restart, which a
+// redeploy doesn't reliably clear because the same request just kills
+// the new instance too.
+//
+// Logging and continuing is the correct instinct here, not fixing the
+// symptom by staying silent: the real bug should still be hunted down
+// and fixed at its source (see the try/catch added to /api/floor/active
+// and /api/floor/tables above) — this is the backstop for whatever
+// hasn't been caught yet, not a replacement for catching it properly.
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('UNHANDLED REJECTION — logged, not crashing the process:', reason);
+  if (reason instanceof Error) console.error(reason.stack);
+});
+process.on('uncaughtException', (error) => {
+  console.error('UNCAUGHT EXCEPTION — logged, not crashing the process:', error?.message || error);
+  if (error?.stack) console.error(error.stack);
 });
 
 app.listen(port, async () => {
