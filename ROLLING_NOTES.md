@@ -1396,3 +1396,32 @@ walkthrough never mentions picking your face or starting a shift), and the `visu
 **No sales brochure exists in this repo.** Daisy asked for it to be updated — nothing
 matching brochure/sales/pitch anywhere in the tree. It lives elsewhere (Drive? Wix?).
 Ask her before hunting.
+
+## Host By Post — Post → Order → Job BUILT (14 July 2026)
+
+`showPostBoard()` and `showOrderDetail(ref)` — the mirror of the floor.
+`Floor → Table → Job` and `Post → Order → Job`. **An order is the table.** Same junction
+pattern as `showTableDetail()`, same glazed tiles, so staff learn one grammar.
+
+- Board groups orders by stage with counts; each order is a tile → its detail.
+- Detail shows what is true of the order, then the next step. Nothing does work itself.
+- Resting state: `DEMO_ORDERS` behind an "Example orders — nothing live yet" pill, same
+  honesty rule as the floor. `_liveOrders` has no producer yet — needs wiring to
+  `hbp_orders`.
+
+**Built ADDITIVELY on purpose.** New functions only; nothing existing was touched. It
+renders into `floor-plan-view`. It is NOT yet reachable from the nav — that needs
+`GRID_NAV_STRUCTURE` as data (the same gate as everything else). Call `showPostBoard()`
+to see it.
+
+**THE REAL FINDING — half the business isn't modelled.** `hbp_orders.status` is only
+`pending → labelled → dispatched`. That is the kit going OUT. There is **no return leg
+in the schema**: nothing for "back with us", "fired", "posted home". Those three stages
+are shown in `POST_STAGES` with `real: false` and marked "not saved yet" in the UI,
+because the work genuinely happens and pretending otherwise would be worse — but they
+have nowhere to persist. **The schema needs the return journey before this is more than
+a board.** That is the next Host By Post job, ahead of any UI polish.
+
+Also still true: Host By Post is reached via `showSetupSection('hostbypost')` from tiles
+at ~2844, ~3025, ~3916. Those should point at `showPostBoard()` once nav is data. Setup
+keeps only the Click & Drop key and return address.

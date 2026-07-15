@@ -20385,6 +20385,149 @@ function showTableDetail(roomName, tableId) {
     </div>`;
 }
 
+// ═══════════════════════════════════════════════════════════
+// HOST BY POST — Post → Order → Job
+//
+// The mirror of the floor. The floor is Floor → Table → Job;
+// this is Post → Order → Job, and an ORDER IS THE TABLE. Same
+// three levels, same junction, same glazed tiles, so staff
+// learn one grammar rather than two.
+//
+// Host By Post previously dead-ended inside Setup — a whole
+// business line parked in the options menu. Setup should hold
+// the Click & Drop key and the return address, nothing
+// operational.
+//
+// HONEST GAP: hbp_orders only models the kit going OUT
+// (pending → labelled → dispatched). There is no return leg in
+// the schema — nothing for "back with us", "fired", "posted
+// home". Those stages are shown below because the work really
+// happens, but they have nowhere to persist yet. The schema
+// needs the return journey before this is more than a board.
+// ═══════════════════════════════════════════════════════════
+
+const POST_STAGES = [
+  { id: 'pending',    label: 'To pack',    colour: '#F9A825', real: true },
+  { id: 'labelled',   label: 'Labelled',   colour: '#5E35B1', real: true },
+  { id: 'dispatched', label: 'On its way', colour: '#00897B', real: true },
+  // Below: the return journey. Real work, no column in hbp_orders yet.
+  { id: 'returned',   label: 'Back with us', colour: '#B87946', real: false },
+  { id: 'fired',      label: 'Fired',        colour: '#e53935', real: false },
+  { id: 'posted',     label: 'Posted home',  colour: '#4CAF50', real: false }
+];
+
+let _liveOrders = null;
+
+const DEMO_ORDERS = [
+  { order_reference: 'HBP-1042', customer_name: 'A. Whitfield', quantity: 2, status: 'pending',    shipping_city: 'Taunton' },
+  { order_reference: 'HBP-1041', customer_name: 'R. Okafor',    quantity: 1, status: 'pending',    shipping_city: 'Bristol' },
+  { order_reference: 'HBP-1039', customer_name: 'S. Bell',      quantity: 4, status: 'labelled',   shipping_city: 'Exeter' },
+  { order_reference: 'HBP-1036', customer_name: 'The Hardys',   quantity: 3, status: 'dispatched', shipping_city: 'Yeovil' },
+  { order_reference: 'HBP-1028', customer_name: 'M. Chen',      quantity: 1, status: 'returned',   shipping_city: 'Bath' },
+  { order_reference: 'HBP-1024', customer_name: 'J. Patel',     quantity: 2, status: 'fired',      shipping_city: 'Wells' }
+];
+
+function _ordersNow() {
+  return (_liveOrders && _liveOrders.length) ? _liveOrders : DEMO_ORDERS;
+}
+function _postResting() { return !(_liveOrders && _liveOrders.length); }
+
+// POST — the top level. The board is the room.
+function showPostBoard() {
+  const view = document.getElementById('floor-plan-view');
+  if (!view) return;
+  const orders = _ordersNow();
+
+  const columns = POST_STAGES.map(s => {
+    const inStage = orders.filter(o => o.status === s.id);
+    return `
+      <div style="margin-bottom:18px;">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:${s.colour};"></span>
+          <span style="font-size:11px;font-weight:800;text-transform:uppercase;
+            letter-spacing:0.09em;color:#2B2724;">${s.label}</span>
+          <span style="font-size:11px;color:#8a8175;">${inStage.length}</span>
+          ${s.real ? '' : `<span style="font-size:9px;color:#B87946;border:1px solid rgba(184,121,70,0.4);
+            border-radius:8px;padding:1px 6px;">not saved yet</span>`}
+        </div>
+        ${inStage.length ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          ${inStage.map(o => `
+            <button class="glaze-tile" onclick="showOrderDetail('${o.order_reference}')"
+              style="border:none;padding:13px;text-align:left;cursor:pointer;">
+              <div style="font-size:13px;font-weight:800;color:#2B2724;">${o.order_reference}</div>
+              <div style="font-size:11px;color:#2B2724;opacity:0.75;margin-top:2px;">${o.customer_name}</div>
+              <div style="font-size:10px;color:#8a8175;margin-top:3px;">
+                ${o.quantity} kit${o.quantity === 1 ? '' : 's'} · ${o.shipping_city || ''}
+              </div>
+            </button>`).join('')}
+        </div>` : `<div style="font-size:11px;color:#8a8175;padding:4px 2px;">Nothing here.</div>`}
+      </div>`;
+  }).join('');
+
+  view.innerHTML = `
+    <div style="padding:14px;max-width:900px;margin:0 auto;">
+      ${_postResting() ? `
+        <div style="display:flex;align-items:center;gap:8px;justify-content:center;
+          background:rgba(249,168,37,0.12);border:1px solid rgba(249,168,37,0.4);
+          border-radius:20px;padding:6px 14px;margin:0 auto 14px;width:fit-content;">
+          <span style="width:7px;height:7px;border-radius:50%;background:#F9A825;"></span>
+          <span style="font-size:11px;font-weight:700;color:#8a6a12;">Example orders — nothing live yet</span>
+        </div>` : ''}
+      <h1 style="font-family:'Caveat',cursive;font-size:26px;color:#2B2724;margin:0 0 14px;">Host By Post</h1>
+      ${columns}
+    </div>`;
+}
+
+// ORDER — the table. Same junction as showTableDetail().
+function showOrderDetail(ref) {
+  const view = document.getElementById('floor-plan-view');
+  if (!view) return;
+  const o = _ordersNow().find(x => x.order_reference === ref);
+  if (!o) { showPostBoard(); return; }
+  const stage = POST_STAGES.find(s => s.id === o.status) || POST_STAGES[0];
+  const idx = POST_STAGES.indexOf(stage);
+  const next = POST_STAGES[idx + 1];
+
+  view.innerHTML = `
+    <div style="padding:16px;max-width:640px;margin:0 auto;">
+      <button onclick="showPostBoard()" class="glaze-tile"
+        style="border:none;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:14px;">
+        ← Host By Post
+      </button>
+      <div style="border:1.5px solid rgba(43,39,36,0.15);border-radius:14px;padding:18px;
+        background:#FFFDF9;margin-bottom:18px;">
+        <div style="font-size:24px;font-weight:800;color:#2B2724;">${o.order_reference}</div>
+        <div style="font-size:13px;color:#2B2724;margin-top:4px;">${o.customer_name}</div>
+        <div style="display:flex;align-items:center;gap:7px;margin-top:10px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:${stage.colour};"></span>
+          <span style="font-size:12px;font-weight:700;color:${stage.colour};">${stage.label}</span>
+          <span style="font-size:12px;color:#8a8175;">· ${o.quantity} kit${o.quantity === 1 ? '' : 's'} · ${o.shipping_city || ''}</span>
+        </div>
+      </div>
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;
+        color:#8a8175;margin-bottom:8px;">Next step</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        ${next ? `<button class="glaze-tile" onclick="goToTab('labels')"
+          style="border:none;padding:16px 12px;text-align:left;cursor:pointer;">
+          <div style="font-size:14px;font-weight:700;color:#2B2724;">Move to ${next.label}</div>
+          <div style="font-size:10px;color:#8a8175;margin-top:3px;">
+            ${next.real ? 'Saves to the order' : 'Not saved — schema has no return leg yet'}
+          </div>
+        </button>` : ''}
+        <button class="glaze-tile" onclick="goToTab('labels')"
+          style="border:none;padding:16px 12px;text-align:left;cursor:pointer;">
+          <div style="font-size:14px;font-weight:700;color:#2B2724;">Print label</div>
+          <div style="font-size:10px;color:#8a8175;margin-top:3px;">Click &amp; Drop</div>
+        </button>
+        <button class="glaze-tile" onclick="goToTab('piecematch')"
+          style="border:none;padding:16px 12px;text-align:left;cursor:pointer;">
+          <div style="font-size:14px;font-weight:700;color:#2B2724;">Identify a piece</div>
+          <div style="font-size:10px;color:#8a8175;margin-top:3px;">Photograph what came back</div>
+        </button>
+      </div>
+    </div>`;
+}
+
 // Enter booking flow for a table
 function enterBookingFlow(room, table) {
   const view = document.getElementById('floor-plan-view');
