@@ -2938,6 +2938,35 @@
     </div>
   </div>
 
+  <!-- A demo table shouldn't just delete on tap. Give staff the choice
+       between actually taking the table for a real booking, and walking
+       through the same real panel with the training data intact so they
+       can learn the workflow without touching anything. -->
+  <div id="seed-table-choice-modal" style="display:none;position:fixed;inset:0;z-index:6100;
+    background:rgba(0,0,0,0.7);align-items:center;justify-content:center;padding:20px;">
+    <div style="background:#1E1812;border:1px solid rgba(184,121,70,0.35);border-radius:18px;
+      padding:22px;max-width:340px;width:100%;">
+      <div style="font-size:16px;font-weight:800;color:#F4ECE0;margin-bottom:6px;">This is a training table</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.55);margin-bottom:18px;">
+        It's example data for learning the app. What would you like to do?
+      </div>
+      <button class="glaze-tile" onclick="clearSeedBooking(_seedChoiceCode); closeSeedTableChoice();"
+        style="width:100%;border:none;padding:14px;text-align:left;cursor:pointer;margin-bottom:9px;">
+        <div style="font-size:14px;font-weight:700;color:#2B2724;">Clear it — I need this table</div>
+        <div style="font-size:10px;color:#8a8175;margin-top:2px;">Removes the training booking so it's ready for a real one</div>
+      </button>
+      <button class="glaze-tile" onclick="openTableDetail(_seedChoiceCode); closeSeedTableChoice();"
+        style="width:100%;border:none;padding:14px;text-align:left;cursor:pointer;margin-bottom:9px;">
+        <div style="font-size:14px;font-weight:700;color:#2B2724;">Show me how it works</div>
+        <div style="font-size:10px;color:#8a8175;margin-top:2px;">Opens the real table screen with this training data — nothing is changed</div>
+      </button>
+      <button onclick="closeSeedTableChoice()"
+        style="width:100%;background:none;border:none;color:rgba(255,255,255,0.4);font-size:12px;padding:8px;cursor:pointer;">
+        Cancel
+      </button>
+    </div>
+  </div>
+
 
 
   <!-- Header — rich dark with amber accent -->
@@ -9749,6 +9778,16 @@ function filterFloorByRoom() {}
 // real rows, even though they are only demo ones — then asks the
 // server to do it, which independently re-checks the (Demo) marker
 // before touching anything.
+let _seedChoiceCode = null;
+
+function openSeedTableChoice(bookingCode) {
+  _seedChoiceCode = bookingCode;
+  document.getElementById('seed-table-choice-modal').style.display = 'flex';
+}
+function closeSeedTableChoice() {
+  document.getElementById('seed-table-choice-modal').style.display = 'none';
+}
+
 async function clearSeedBooking(bookingCode) {
   if (!confirm('Clear this training booking? This only removes demo data used for learning the app — never a real booking.')) return;
   try {
@@ -9797,7 +9836,7 @@ function _renderOccupiedTile(table, b, now) {
     : '';
   const warningSoon = !timer.isAllDay && parseInt(timer.label) <= 15 && timer.label !== '0m';
   return `
-    <button onclick="${isSeedDemo ? `clearSeedBooking('${b.booking_code}')` : `openTableDetail('${b.booking_code}')`}"
+    <button onclick="${isSeedDemo ? `openSeedTableChoice('${b.booking_code}')` : `openTableDetail('${b.booking_code}')`}"
       style="background:linear-gradient(160deg,#2A1F18 0%,#1E1710 100%);
              border:1px solid ${stageColor}40;border-radius:14px;padding:11px;
              cursor:pointer;text-align:left;position:relative;overflow:hidden;

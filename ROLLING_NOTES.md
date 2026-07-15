@@ -1709,3 +1709,22 @@ There are still three systems referenced in this file:
 **TEST THIS TONIGHT IF AT ALL POSSIBLE, before presenting on it.** It has never been
 seen by a human. Tap a real (non-demo) booking's table, confirm the panel opens, try
 dragging a chair, tap a checklist item, tap "Open full booking".
+
+## Demo table tap — now a choice, not straight to delete
+
+Refined immediately after building the clear-demo-data tap: tapping a training table
+went straight to `clearSeedBooking()`, which is destructive on the first tap with only
+a browser confirm() between staff and losing the example. Daisy asked for a proper
+choice instead — practise with it, or actually use the table.
+
+**`openSeedTableChoice(bookingCode)`** — a small modal, two real options:
+- **"Clear it — I need this table"** → same `clearSeedBooking()` as before.
+- **"Show me how it works"** → calls `openTableDetail()` directly, the real panel built
+  moments earlier in this session — chairs, checklist, "Open full booking" — populated
+  with the training data. **Nothing is deleted.** `closeTableDetail()` only hides the
+  panel and re-renders the floor; it was never destructive, so this is safe to explore
+  freely, any number of times, without losing the example.
+
+This means new staff can genuinely learn the whole Table→Job workflow on real UI using
+the seeded data, then clear it whenever they're ready for a real booking — rather than
+the training data being a one-shot thing they might click away by accident.
