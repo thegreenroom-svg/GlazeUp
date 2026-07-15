@@ -1166,3 +1166,26 @@ training harder; and per-person signal is thin when the studio trades four days 
    changing tile structure without a deploy.
 5. `_liveCovers` has no producer — booking layer must populate it.
 6. `FLOOR_PLAN` seat counts and positions are still **guessed**. Daisy to correct.
+
+## Session — 14 July 2026 (cont): The plan is properly drawn
+
+**Hand-drawn, by geometry rather than by filter.** The turbulence filter alone read as
+"wobbly", not "drawn". Replaced with real strokes:
+- `_stroke()` — bows off the true line near its middle, and **overshoots both ends**,
+  because the hand keeps going past the corner. The overshoot is the tell.
+- `_handRect()` — four bowed strokes, **gone round twice**, second pass never landing
+  on the first. Corners left open where the pencil lifted.
+- `_chair()` — seat, back (heavier), legs, all sketched the same way.
+- Paper texture (`#pencil`) dialled right back (scale 1.8 → 0.7): the geometry does
+  the work now; leaving both on read as mush.
+
+**Seeded, and this matters.** Every stroke is seeded off the table's own room+id via
+`_seedFrom()` → `_rng()`. A given table always draws itself identically. Without it the
+plan re-scribbles on every repaint and the whole room visibly crawls. **Do not replace
+these with Math.random().**
+
+**Lettering is written, not typeset.** Caveat for table numbers and party names,
+Architects Daughter for room headings. Both added to the Google Fonts link at head.
+
+Tuning, if it ever reads too scruffy: the `bow` and `over` arguments in `_handRect`
+(0.9/1.2 first pass, 1.3/2.2 second). Two numbers.

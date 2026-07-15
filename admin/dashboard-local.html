@@ -17,6 +17,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Architects+Daughter&display=swap" rel="stylesheet">
   <style>
     .api-status {
       position: fixed;
@@ -20023,6 +20024,63 @@ function wireSplash() {
 // never mistake an example for a real table.
 // ═══════════════════════════════════════════════════════════
 
+// ── THE PENCIL ────────────────────────────────────────────────────
+// A hand-drawn line is not a wobbly straight line. It bows slightly
+// between its ends, it overshoots at corners because the hand keeps
+// going, and it gets gone over twice — the second pass never quite
+// landing on the first. That is what the eye reads as "drawn".
+//
+// Every stroke is seeded off the table's own id, so a given table
+// always draws itself the same way. Without that it would re-scribble
+// on every repaint and the room would crawl.
+// ──────────────────────────────────────────────────────────────────
+
+function _seedFrom(str) {
+  let s = 2166136261;
+  for (let i = 0; i < str.length; i++) { s ^= str.charCodeAt(i); s = Math.imul(s, 16777619); }
+  return s >>> 0;
+}
+function _rng(seed) {
+  let s = seed >>> 0;
+  return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
+}
+
+// One stroke: bowed between its ends, overshooting each end a little.
+function _stroke(x1, y1, x2, y2, r, bow, over) {
+  const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;      // along
+  const nx = -uy, ny = ux;                 // across
+  // The hand starts a touch early and stops a touch late.
+  const a = over * (0.4 + r() * 0.9), b = over * (0.4 + r() * 0.9);
+  const sx = x1 - ux * a, sy = y1 - uy * a;
+  const ex = x2 + ux * b, ey = y2 + uy * b;
+  // and bows off the true line somewhere near the middle.
+  const t = 0.4 + r() * 0.2;
+  const bx = sx + (ex - sx) * t + nx * (r() - 0.5) * bow * 2;
+  const by = sy + (ey - sy) * t + ny * (r() - 0.5) * bow * 2;
+  return `M${sx.toFixed(1)} ${sy.toFixed(1)} Q${bx.toFixed(1)} ${by.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}`;
+}
+
+// A drawn rectangle: four bowed strokes, gone round twice, corners
+// left open where the pencil lifted.
+function _handRect(x, y, w, h, seed, weight, ink, fill) {
+  const r = _rng(seed);
+  const corners = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+  let d = '';
+  for (let pass = 0; pass < 2; pass++) {
+    for (let i = 0; i < 4; i++) {
+      const [ax, ay] = corners[i], [bx, by] = corners[(i + 1) % 4];
+      d += _stroke(ax, ay, bx, by, r, pass ? 1.3 : 0.9, pass ? 2.2 : 1.2) + ' ';
+    }
+  }
+  // The fill is a separate, slightly shrunken shape — paper doesn't
+  // fill exactly to the pencil line.
+  const f = fill ? `<rect x="${x + 1}" y="${y + 1}" width="${w - 2}" height="${h - 2}" rx="3"
+    fill="${fill}" opacity="0.92"/>` : '';
+  return `${f}<path d="${d.trim()}" fill="none" stroke="${ink}" stroke-width="${weight}"
+    stroke-linecap="round" stroke-opacity="0.85"/>`;
+}
+
 // Seats decide the table's footprint. Sizes are in plan units.
 function _tableSize(seats) {
   if (seats <= 2) return { w: 88, h: 88 };
@@ -20042,15 +20100,24 @@ function _chairPositions(seats, w, h) {
   return out;
 }
 
-// A drawn chair: seat, back, and legs. Facing the table.
-function _chair(cx, cy, up, stroke, weight) {
+// A drawn chair: seat, back, legs — sketched, facing the table.
+function _chair(cx, cy, up, stroke, weight, seed) {
+  const r = _rng(seed);
   const d = up ? 1 : -1;
-  return `<g stroke="${stroke}" stroke-width="${weight}" fill="none" stroke-linecap="round">
-    <rect x="${cx - 10}" y="${cy - 8}" width="20" height="16" rx="3"/>
-    <line x1="${cx - 10}" y1="${cy - d * 8}" x2="${cx + 10}" y2="${cy - d * 8}" stroke-width="${weight * 1.6}"/>
-    <line x1="${cx - 7}" y1="${cy + d * 8}" x2="${cx - 7}" y2="${cy + d * 12}"/>
-    <line x1="${cx + 7}" y1="${cy + d * 8}" x2="${cx + 7}" y2="${cy + d * 12}"/>
-  </g>`;
+  let p = '';
+  // seat
+  const c = [[cx - 10, cy - 8], [cx + 10, cy - 8], [cx + 10, cy + 8], [cx - 10, cy + 8]];
+  for (let i = 0; i < 4; i++) {
+    const [ax, ay] = c[i], [bx, by] = c[(i + 1) % 4];
+    p += _stroke(ax, ay, bx, by, r, 0.7, 1.1) + ' ';
+  }
+  // back — the heavier line, away from the table
+  p += _stroke(cx - 10, cy - d * 8, cx + 10, cy - d * 8, r, 0.8, 1.4) + ' ';
+  // legs
+  p += _stroke(cx - 7, cy + d * 8, cx - 7.6, cy + d * 12.5, r, 0.4, 0.6) + ' ';
+  p += _stroke(cx + 7, cy + d * 8, cx + 7.6, cy + d * 12.5, r, 0.4, 0.6);
+  return `<path d="${p}" fill="none" stroke="${stroke}" stroke-width="${weight}"
+    stroke-linecap="round" stroke-opacity="0.8"/>`;
 }
 
 const FLOOR_PLAN = {
@@ -20112,8 +20179,8 @@ function _coversFor(roomName) {
 // character, not a CAD export.
 const _PENCIL_FILTER = `
   <filter id="pencil" x="-6%" y="-6%" width="112%" height="112%">
-    <feTurbulence type="fractalNoise" baseFrequency="0.028" numOctaves="3" seed="7" result="noise"/>
-    <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.8" xChannelSelector="R" yChannelSelector="G"/>
+    <feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="2" seed="7" result="noise"/>
+    <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.7" xChannelSelector="R" yChannelSelector="G"/>
   </filter>`;
 
 function _renderRoom(roomName) {
@@ -20129,17 +20196,18 @@ function _renderRoom(roomName) {
 
     const chairs = _chairPositions(t.seats, size.w, size.h).map((ch, i) => {
       const seated = busy && i < c.covers;
-      return _chair(t.x + ch.x, t.y + ch.y, ch.up, INK, seated ? 1.5 : 0.8)
-           + (seated ? `<circle cx="${t.x + ch.x}" cy="${t.y + ch.y}" r="4" fill="${accent}" fill-opacity="0.65"/>` : '');
+      return _chair(t.x + ch.x, t.y + ch.y, ch.up, INK, seated ? 1.4 : 0.75,
+                    _seedFrom(roomName + t.id + 'c' + i))
+           + (seated ? `<circle cx="${t.x + ch.x}" cy="${t.y + ch.y}" r="3.6" fill="${accent}" fill-opacity="0.55"/>` : '');
     }).join('');
 
     const label = busy
       ? `<text x="${t.x + size.w / 2}" y="${t.y + size.h / 2 - 3}" text-anchor="middle"
-           font-size="16" font-weight="700" fill="${INK}">${t.id}</text>
+           font-family="'Caveat', cursive" font-size="22" font-weight="700" fill="${INK}">${t.id}</text>
          <text x="${t.x + size.w / 2}" y="${t.y + size.h / 2 + 13}" text-anchor="middle"
-           font-size="10" fill="${INK}" fill-opacity="0.7">${c.name}</text>`
+           font-family="'Caveat', cursive" font-size="14" fill="${INK}" fill-opacity="0.75">${c.name}</text>`
       : `<text x="${t.x + size.w / 2}" y="${t.y + size.h / 2 + 5}" text-anchor="middle"
-           font-size="16" font-weight="600" fill="${INK}" fill-opacity="0.35">${t.id}</text>`;
+           font-family="'Caveat', cursive" font-size="21" font-weight="500" fill="${INK}" fill-opacity="0.4">${t.id}</text>`;
 
     // A busy table gets a stage stripe along its front edge — the only
     // colour on the page, so it reads across the room at a glance.
@@ -20150,17 +20218,16 @@ function _renderRoom(roomName) {
     return `<g class="fp-table" style="cursor:pointer"
       onclick="showTableDetail('${roomName}', '${t.id}')">
       ${chairs}
-      <rect x="${t.x}" y="${t.y}" width="${size.w}" height="${size.h}" rx="6"
-        fill="#FFFDF9" stroke="${INK}" stroke-width="${busy ? 1.9 : 1}"
-        stroke-opacity="${busy ? 1 : 0.5}"/>
+      ${_handRect(t.x, t.y, size.w, size.h, _seedFrom(roomName + t.id),
+                  busy ? 1.7 : 1.0, INK, '#FFFDF9')}
       ${stripe}${label}
     </g>`;
   }).join('');
 
   return `
     <div style="margin-bottom:24px;">
-      <h2 style="color:#2B2724;font-size:11px;font-weight:800;text-transform:uppercase;
-        letter-spacing:0.12em;margin:0 0 8px;opacity:0.55;">${roomName}</h2>
+      <h2 style="color:#2B2724;font-family:'Architects Daughter',cursive;font-size:14px;
+        letter-spacing:0.06em;margin:0 0 8px;opacity:0.6;">${roomName}</h2>
       <svg viewBox="-20 -30 ${room.w + 40} ${room.h + 60}"
         style="width:100%;height:auto;display:block;background:#F4ECE0;
         border:1px solid rgba(43,39,36,0.15);border-radius:10px;">
