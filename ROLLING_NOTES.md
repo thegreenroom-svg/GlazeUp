@@ -2069,3 +2069,32 @@ stop being cached.
 **Update-check polling sped up 2 minutes → 30 seconds.** Matters less now that HTML is
 never cached (a normal reopen already gets the latest version regardless), but still
 helps anyone with the app open continuously through a deploy notice sooner.
+
+# ═══════════════════════════════════════════════════════════
+# ⚠️  THE REAL ANSWER to "why isn't the floor plan my home screen"
+# ═══════════════════════════════════════════════════════════
+
+Daisy was right, precisely, and this was findable rather than a repeat of earlier
+confusion: the hand-drawn tiles ARE correct and approved. The problem was login never
+took you there.
+
+**There are three ways to log in. Two of them never navigated anywhere:**
+1. Offline demo-PIN fallback (`isDemoFallback` branch) — already correctly called
+   `goToTab('floor-plan')`, fixed earlier tonight.
+2. **The real, server-verified PIN path** — used on every genuine login when the API is
+   actually up, which is Daisy's normal case. Closed the login modal, called
+   `applyShiftUI()` (badges, buttons, polling — no navigation anywhere in it), and
+   stopped. Whatever was showing underneath the modal simply stayed there.
+3. **Face ID / WebAuthn login** — same omission, found by checking rather than
+   assuming it was fine given #2 had just been found broken.
+
+**Both fixed** — `goToTab('floor-plan')` added to the real PIN success branch and the
+Face ID success branch, matching exactly what the offline fallback already did
+correctly. All three login paths now land on the floor plan.
+
+**Why this took multiple exchanges to find:** Daisy kept saying "it's not my home
+screen" and I kept checking the RENDERING (is the floor plan drawing correctly) rather
+than the ROUTING (does login send you there at all). Both were real bugs tonight, in
+different places, and conflating them wasted time. The lesson: when someone says
+"X isn't happening," check whether X is reachable at all before checking whether X
+looks right once reached.

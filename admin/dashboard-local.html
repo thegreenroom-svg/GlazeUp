@@ -9262,6 +9262,7 @@ async function tryStaffFaceIdLogin() {
     localStorage.setItem('klnk_last_logged_in_name', currentShiftStaff.name);
     markSessionActive();
     document.getElementById('shift-login-modal').style.display = 'none';
+    goToTab('floor-plan'); // same fix as the PIN path above — was missing here too
     applyShiftUI();
   } catch (e) {
     // Genuine, honest — a cancelled/declined biometric prompt is
@@ -9329,6 +9330,16 @@ async function submitShiftPin() {
     markSessionActive();
     document.getElementById('shift-login-modal').style.display = 'none';
     errorEl.style.display = 'none';
+    // THE REAL BUG, found 15 July 2026 the morning of a presentation:
+    // this success branch — the one used on every genuine, server-
+    // verified login — never navigated anywhere. The offline demo-PIN
+    // fallback branch above (isDemoFallback) already correctly called
+    // goToTab('floor-plan') after a successful login; this, the path
+    // used on every real login when the API is actually up, did not.
+    // Whatever screen happened to be showing underneath the login
+    // modal simply stayed there. This is why the floor plan never
+    // appeared as home after logging in for real.
+    goToTab('floor-plan');
     applyShiftUI();
     offerStaffFaceIdSetup(); // genuine, real, one-time offer — silently no-ops if already registered/declined
   } catch(e) {
