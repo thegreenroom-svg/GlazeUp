@@ -9340,13 +9340,24 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// GET /api/version — reports when this server process started. A fresh
-// deploy = a fresh process = a new timestamp, so clients can poll this
-// and detect when a newer version has gone live, prompting a refresh
-// instead of silently running a stale version indefinitely.
+// GET /api/version — what is actually deployed.
+//
+// This used to report the process boot time, on the assumption that a
+// fresh deploy means a fresh process. It does — but so does a cold
+// start, and Render spins the process down when idle and restarts it.
+// So every wake-up looked like a new version and staff got the green
+// "please refresh" banner when nothing whatsoever had changed. Cry
+// wolf often enough and they stop reading it, which costs us the one
+// time it matters.
+//
+// The commit is the honest answer: it changes when, and only when, we
+// actually ship something. Render exposes it as RENDER_GIT_COMMIT.
+// Boot time is still reported for diagnostics, and stands in as the
+// build id when running locally where there is no commit to read.
 const SERVER_BOOT_TIME = new Date().toISOString();
+const BUILD_ID = process.env.RENDER_GIT_COMMIT || `local-${SERVER_BOOT_TIME}`;
 app.get('/api/version', (req, res) => {
-  res.json({ bootTime: SERVER_BOOT_TIME });
+  res.json({ buildId: BUILD_ID, bootTime: SERVER_BOOT_TIME });
 });
 
 // GET /api/changelog — plain-English "what's new" entries, shown when

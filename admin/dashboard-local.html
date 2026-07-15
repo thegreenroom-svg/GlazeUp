@@ -20998,13 +20998,22 @@ async function checkForAppUpdate() {
   try {
     const res = await fetch(`${API_URL}/api/version`, { cache: 'no-store' });
     const data = await res.json();
+
+    // Compare the deployed commit, not the process boot time. Render
+    // restarts the process when it wakes from idle — that is not a new
+    // version, and telling staff to refresh for it is crying wolf.
+    // Older servers only return bootTime; fall back to it so a stale
+    // API doesn't silently disable update prompts altogether.
+    const stamp = data.buildId || data.bootTime;
+    if (!stamp) return;
+
     if (!_initialBootTime) {
-      _initialBootTime = data.bootTime; // first check just establishes the baseline
+      _initialBootTime = stamp; // first check just establishes the baseline
       return;
     }
-    if (data.bootTime && data.bootTime !== _initialBootTime) {
+    if (stamp !== _initialBootTime) {
       document.getElementById('update-available-banner').style.display = 'block';
-      clearInterval(window._versionCheckTimer); // stop polling once we know — no need to keep asking
+      clearInterval(window._versionCheckTimer); // stop polling once we know
     }
   } catch (e) { /* silent — network hiccup, try again next interval */ }
 }

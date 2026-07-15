@@ -1220,3 +1220,21 @@ plan with two suspects and no way to bisect. Order unchanged in the list above.
 **Also still on the pile:** 12 other `readAsDataURL` sites (branding, shapes, uploads)
 that could use the same helper where a full-res original isn't genuinely needed —
 worth an audit, but not blind.
+
+## Session — 14 July 2026 (cont): The update banner was crying wolf
+
+**Root cause of the green banner appearing for no reason.** `/api/version` reported
+`SERVER_BOOT_TIME` — when the *process* started. A deploy restarts the process, so the
+logic seemed sound; but Render also spins the process down when idle and restarts it on
+the next request. **Every cold start looked like a new version**, so staff got "please
+refresh" when nothing had shipped. Cry wolf often enough and they stop reading it,
+which costs us the one time it matters.
+
+**Fix:** report `RENDER_GIT_COMMIT` as `buildId`. The commit changes when, and only
+when, we actually ship. Falls back to `local-<boot>` off-Render. Client compares
+`buildId || bootTime` — the fallback matters so that an older server (before this
+deploy) doesn't silently disable update prompts entirely. `bootTime` still returned for
+diagnostics.
+
+*Note:* Daisy's earlier report that the banner "is moving" is still unexplained and may
+simply have been it appearing repeatedly. Worth re-checking on device now.
