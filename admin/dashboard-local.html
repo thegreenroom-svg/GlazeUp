@@ -9905,8 +9905,17 @@ function renderFloorPlanElegant() {
           <div style="font-family:'Caveat',cursive;font-size:28px;font-weight:700;color:#2B2724;">The Kiln Cafe</div>
           <div style="font-size:11px;color:#8a8175;">Live studio view</div>
         </div>
-        <button onclick="goToRealLandingPage()" class="glaze-tile"
-          style="border:none;padding:9px 16px;font-size:12px;font-weight:800;cursor:pointer;">🏠 Home</button>
+        <!-- This said "🏠 Home" and called goToRealLandingPage(). That was
+             correct when the TILE GRID was home. It isn't any more — the
+             floor plan is, as of 4b4e40a, and goToRealLandingPage() now
+             returns you to the floor plan. So on the floor plan this
+             button became a no-op: it took you to where you already were,
+             and left the tile grid reachable from nowhere at all.
+             A regression I introduced this afternoon, found because Daisy
+             asked to check it still clicks through to the tiles.
+             The floor plan is home; this is the way OUT of home. -->
+        <button onclick="showGridNav()" class="glaze-tile"
+          style="border:none;padding:9px 16px;font-size:12px;font-weight:800;cursor:pointer;">▦ Everything else</button>
       </div>
       ${resting ? `<div style="text-align:center;padding:40px 20px;color:#8a8175;font-size:13px;">
         No tables set up yet for this studio.</div>`
@@ -11671,7 +11680,7 @@ function confirmDirectLogout() {
 // This is a simple name check, not a full permissions system — good
 // enough while it's just the three of you, worth revisiting properly
 // before other studios are on the platform.
-const PLATFORM_REVENUE_ACCESS = ['David', 'Jenny', 'Daisy', 'Elliott'];  // TWO t's — must match the staff_team row exactly or he is locked out
+const PLATFORM_REVENUE_ACCESS = ['David', 'Jenny', 'Daisy'];  // Elliott is Marketing & Host By Post Manager, not a director — confirmed 15 July 2026
 
 // Measures the ACTUAL rendered heights of the platform revenue strip and
 // phone header, and sets .admin-wrapper's margin-top to match exactly —

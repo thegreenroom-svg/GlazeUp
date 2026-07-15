@@ -3043,3 +3043,49 @@ suggestion still needs a human tap, and `respond` still returns `applied:false`.
 **Realistic timeline:** first meaningful run is the Sunday after roughly a fortnight of
 real trading. Anything sooner will honestly report that there isn't enough data yet —
 which is the engine working correctly, not failing.
+
+## Two Elliotts, and Elliott is not a director. 15 July 2026
+
+`FIX_ELLIOTT_SPELLING.sql` step 1 said: if both spellings exist as separate rows, STOP
+and say so. **Daisy ran it and stopped.** That guard earned its place.
+
+**There are two rows, same spelling.** So this is a duplicate person, not the typo it was
+assumed to be. `FIX_TWO_ELLIOTTS.sql` (NEW) **deactivates** the duplicate rather than
+deleting it — the same reversible pattern used for Dave. Shift history may be split
+across both rows; deleting one could destroy someone's timesheet. It keeps whichever row
+carries the most shifts (ties break to the oldest, since that is the one in use) and
+deactivates the rest. `team-for-login` filters on `active = true`, so that alone clears
+the picker. **Step 1 is still a SELECT to read first** — if BOTH rows carry shifts, that
+is genuinely split history and needs merging, which is not a guess anyone should make.
+
+**Elliott is Marketing & Host By Post Manager, not a director.** Removed from
+`PLATFORM_REVENUE_ACCESS` (client) and `PLATFORM_REVENUE_ACCESS_NAMES` (server). This
+governs Platform Revenue AND `/api/analytics/dashboard` — the real takings — so it is
+the difference between a colleague seeing the books or not.
+
+**This is the third revision of this list today, and the churn is the point.** Removed,
+restored, removed again — each time correctly, on new information. The mechanism is what
+is wrong: **a first-name string check, across six endpoints, deciding who sees the
+money.** It has misfired twice this week on near-identical names (Dave/David sent the
+co-director to the barista page; Elliot/Elliott would have silently locked out someone
+who was on the list). **Identifying who may see the accounts by whether a name was typed
+correctly is the wrong mechanism.** Use `staff_team.id` or a real role column. Flagged
+again, own commit, own session.
+
+## The tile grid was unreachable from home — a regression from 4b4e40a
+
+Daisy: "I just wanna make sure it does click through to the tile structure."
+
+Worth checking, and it was broken. **By me, this afternoon.** The floor plan header's
+"🏠 Home" button called `goToRealLandingPage()`, which was correct while the TILE GRID
+was home. `4b4e40a` made the floor plan home and repointed that function at the floor
+plan — so on the floor plan the button became a no-op that took you to where you already
+were, and `showGridNav()` was left reachable from **one** place: an "Everything Else"
+tile inside a view you could no longer get to.
+
+**Fixed:** that button now calls `showGridNav()` and says "▦ Everything else". The floor
+plan is home; that button is the way OUT of home; the green bar is the way back in.
+
+**The lesson, and it is the week's lesson again:** inverting "what is home" changed the
+meaning of every button that pointed at home, and I only re-checked the one I was
+looking at. Daisy caught it by asking whether the thing still worked.

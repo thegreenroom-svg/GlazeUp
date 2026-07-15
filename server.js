@@ -69,13 +69,20 @@ const app = express();
 // sensitive financial data: Platform Revenue (worldwide SaaS income) and
 // The Kiln Cafe's own real revenue/analytics. Declared once, early, so
 // every endpoint that needs it references the same single source of truth.
-// Elliott is a director and has access. Note the spelling: TWO t's.
-// This check is `firstName === 'elliott'`, so a staff_team row spelled
-// "Elliot" locks him out of every one of the six endpoints below even
-// though he is on this list — the list and the row have to agree.
-// (Removed briefly on 15 July on the basis of a one-t "Elliot" row that
-// shouldn't exist; the person is real, the row's spelling was the bug.)
-const PLATFORM_REVENUE_ACCESS_NAMES = ['david', 'jenny', 'daisy', 'elliott'];
+// Directors only. Elliott is NOT one — he is Marketing & Host By Post
+// Manager, confirmed 15 July 2026 after two rounds of getting this wrong.
+// This governs Platform Revenue AND /api/analytics/dashboard, i.e. the
+// studio's real takings, so it is the difference between a colleague
+// seeing the books and not.
+//
+// NOTE THE FRAGILITY, flagged and not yet fixed: this is a FIRST-NAME
+// string check across six endpoints. It has now misfired twice in one
+// week on near-identical names — Dave/David sent the co-director to the
+// barista page, and Elliot/Elliott would have silently locked a listed
+// person out. Identifying who may see the money by whether someone
+// typed their first name correctly is the wrong mechanism. Use
+// staff_team.id or a real role column. Own commit, own session.
+const PLATFORM_REVENUE_ACCESS_NAMES = ['david', 'jenny', 'daisy'];
 
 // Square's SDK returns some numbers as BigInt, which JSON.stringify cannot
 // serialize by default. Teach BigInt to serialize as a string, globally,
