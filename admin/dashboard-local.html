@@ -8665,8 +8665,7 @@ function skipLoginUseSharedView() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('splash-screen').style.display = 'none';
   document.querySelectorAll('[id*="swt"], [id*="onboarding"]').forEach(el => el.style.display = 'none');
-  goToTab('floor-plan');
-  showHomeScreen();
+  goToTab('floor-plan'); // already shows AND loads the real floor plan — see note above
 }
 
 function showLoginScreen(screen) {
@@ -9301,8 +9300,7 @@ async function submitShiftPin() {
     currentShiftId = null; // no server shift row — timesheet stays honest
     localStorage.setItem('klnk_shift_staff', JSON.stringify(currentShiftStaff));
     document.getElementById('shift-login-modal').style.display = 'none';
-    goToTab('floor-plan');
-    showHomeScreen();
+    goToTab('floor-plan'); // already shows AND loads the real floor plan — see note above
     return;
   }
 
@@ -20387,10 +20385,23 @@ async function refreshLiveCovers() {
   } catch (e) { /* leave the plan as it is — a blip must not blank the room */ }
 }
 
-// Poll gently. The studio trades Thu-Sun; a minute is plenty and this
-// runs on a tablet someone is carrying.
-setInterval(refreshLiveCovers, 60 * 1000);
-refreshLiveCovers();
+// DISABLED 14 July 2026, the same night this was written. This ran
+// unconditionally on every page load and every 60 seconds after,
+// and — because showHomeScreen() replaces the entire #floor-plan-view
+// container — it was silently overwriting the REAL, working floor
+// plan (loadFloorPlan()/renderFloorPlan(), see goToTab) with the
+// abandoned hand-drawn one, on a fixed timer, on every device, the
+// whole time the floor plan tab was open. This is very likely THE
+// cause of "Take order goes to nothing" reported tonight: a tap
+// landing on whichever system happened to have painted last.
+//
+// showHomeScreen()/FLOOR_PLAN are being kept in the file (see
+// ROLLING_NOTES) in case their ideas are deliberately revived as
+// their own separate, reachable screen — but they must never run
+// automatically over the real system again.
+//
+// setInterval(refreshLiveCovers, 60 * 1000);
+// refreshLiveCovers();
 
 
 function _isRestingState() {

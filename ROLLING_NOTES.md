@@ -1728,3 +1728,60 @@ choice instead — practise with it, or actually use the table.
 This means new staff can genuinely learn the whole Table→Job workflow on real UI using
 the seeded data, then clear it whenever they're ready for a real booking — rather than
 the training data being a one-shot thing they might click away by accident.
+
+# ═══════════════════════════════════════════════════════════
+# ⚠️  THIRD FIND, same night — the real bug behind "Take order goes to nothing"
+# ═══════════════════════════════════════════════════════════
+
+## The abandoned hand-drawn system was silently overwriting the real one. Repeatedly.
+
+Daisy: tapped through, hit a "Take order" option, it went to nothing. That label only
+ever existed in `TABLE_ACTIONS`, part of the abandoned hand-drawn floor plan
+(`showHomeScreen()`/`FLOOR_PLAN`/`showTableDetail()`, "system #3" in tonight's notes) —
+which should have been unreachable after `goToTab('floor-plan')` was fixed earlier to
+call the real `loadFloorPlan()`. It wasn't unreachable. **Three separate places still
+called `showHomeScreen()` directly**, and because it does `view.innerHTML = ''` on
+`#floor-plan-view`, every call **destroyed the real floor plan** (including
+`#floor-main-studio` and the `#floor-table-detail` panel fixed minutes earlier) and
+replaced it with the guessed-data one underneath.
+
+1. `skipLoginUseSharedView()` — called `goToTab('floor-plan'); showHomeScreen();`.
+   Redundant and destructive; `goToTab` already does both display and load.
+2. The offline demo-PIN fallback in `submitShiftPin()` — same pattern. Anyone logging
+   in through the `DEMO_STAFF` fallback (e.g. API slow/cold) landed on the dead system.
+3. **The dominant one:** `refreshLiveCovers()`, built earlier THIS session for the hand-
+   drawn plan's live data. `setInterval(refreshLiveCovers, 60 * 1000); refreshLiveCovers();`
+   ran **unconditionally on every page load and every 60 seconds after**, and called
+   `showHomeScreen()` any time `#floor-plan-view` was visible — which is whenever the
+   floor plan tab is open. This was not a one-off glitch. It was continuous, silent
+   corruption, on a fixed timer, on every device, for as long as this session's changes
+   have been live. **This is almost certainly the actual cause of tonight's bug report** —
+   Daisy's tap landed on whichever system had painted last within the last minute.
+
+**Fixed:** removed the two stray `showHomeScreen()` calls; commented out the interval
+and its immediate call, with a note explaining why, rather than deleting the function —
+`showHomeScreen()`/`FLOOR_PLAN` stay in the file in case their ideas (the hand-drawn
+look, the seeded strokes, Post→Order→Job) are deliberately revived as their OWN
+separate, reachable screen. They must never run automatically over the real system
+again.
+
+## Cumulative picture, this one file, one night
+
+Three genuine, separate bugs, all the same shape — a call into something that either
+didn't exist or silently destroyed what did:
+1. `refreshFloorPlan()` — called, never defined. Nothing ever rendered.
+2. `#floor-table-detail` — referenced, never built. Tapping a table did nothing.
+3. `showHomeScreen()` — called from three places outside its own system, each one
+   overwriting the real, working floor plan with an abandoned guess.
+
+**Given this pattern, the whole file deserves a proper pass for the same class of bug
+before anything else is added** — grep every `document.getElementById` for a matching
+element, and every bare function call for a matching definition. Not tonight. Next
+session, before building anything new on top of this.
+
+## STILL TO VERIFY ON DEVICE, updated
+
+Force-quit, reopen, log in fully through the normal picker (not the offline fallback),
+open the floor plan, leave it open past 60 seconds, confirm it does NOT change. Then tap
+a real table and confirm the panel from the second fix still opens correctly now that
+the 60-second corruption is gone.
