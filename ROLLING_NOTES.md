@@ -1557,3 +1557,73 @@ with a SELECT listing what still needs a human.
 **Still to do:** set `room` at booking time so the fallback never runs, then delete
 `_resolveRoom()` entirely. Until then, live covers are only reliable when Main Studio is
 the only room in use.
+
+# ═══════════════════════════════════════════════════════════
+# ⚠️  URGENT — found from a phone screenshot, night before presenting
+# ═══════════════════════════════════════════════════════════
+
+## The floor plan never showed. The real bug, and I nearly made it worse.
+
+Daisy sent a screenshot: the floor plan opened to a correct dark header ("Floor
+Plan / Live studio view"), correct Lounge/Vault side strips — and a black void
+where the tables should be.
+
+**Root cause:** `goToTab('floor-plan')` called `refreshFloorPlan()` —
+**a function that does not exist anywhere in this file.** It threw silently on
+every tap. The static frame rendered because it's plain HTML; the content that
+was meant to fill in never ran. This is the SAME bug the "Rebuilding the line-art
+table renderer" session found on a different code path: a call to a function
+whose body was never written.
+
+## There are THREE floor plan systems in this file. Know all three before touching this again.
+
+1. **The real, working one — `loadFloorPlan()` / `renderFloorPlan()`.**
+   Fetches `/api/floor/active` (real bookings) and `/api/floor/tables` (real
+   `studio_tables` from Supabase) in parallel, renders into `#floor-main-studio`
+   inside the EXISTING static `#floor-plan-view` markup (header, Lounge strip,
+   Vault strip all hardcoded HTML at ~2905-2940). `_renderOccupiedTile` /
+   `_renderEmptyTile` both exist. **This is the one that should run.** It was
+   simply never being called.
+
+2. **`renderElegantLineTable()`** — found by an earlier session today: a
+   comment header and a function CALL exist; the function body was never
+   written. Different dead end, same shape of bug.
+
+3. **`showHomeScreen()` / `FLOOR_PLAN` / `showTableDetail()`** — what I (this
+   session) built: hand-drawn SVG, seeded strokes, Post→Order→Job mirror,
+   GUESSED seat counts and positions, `DEMO_COVERS`. **I nearly wired this in
+   place of #1** by pointing `goToTab('floor-plan')` at `showHomeScreen()`.
+   Caught it before pushing: system #1 already reads real `studio_tables` and
+   real bookings properly. Mine would have thrown that away for a guess.
+
+## THE FIX ACTUALLY MADE (this commit)
+
+One line. `refreshFloorPlan()` → `loadFloorPlan()`. Nothing else touched.
+This makes the REAL system (#1) run, using REAL data from `studio_tables` and
+`/api/floor/active`. Not my hand-drawn one.
+
+## WHAT THIS MEANS FOR TOMORROW
+
+- **What Daisy will now see is system #1** — the dark, three-column layout with
+  Lounge/Vault side strips — NOT the hand-drawn ivory plan from earlier tonight.
+  That will look like a different app to her. Tell her this before she opens it
+  again, or she will think something else broke.
+- **Systems #2 and #3 are now dead code, reachable from nowhere.** Genuinely
+  decide which floor plan this app has — real dark grid (#1) or hand-drawn (#3)
+  — do not keep building both. #1 has real data behind it TONIGHT. #3 has better
+  design but guessed data and no producer wired in.
+- If the decision is #3 (hand-drawn) long-term: it needs to fetch from
+  `/api/floor/tables` and `/api/floor/active` exactly as #1 does, replacing
+  `FLOOR_PLAN`'s guessed positions with real ones from `studio_tables`, before
+  it's safe to be the thing `goToTab('floor-plan')` points at.
+- Either way: **`studio_tables` already has the real seat counts and table
+  positions.** Every guess made earlier tonight about which tables are 2s/4s/6s
+  was unnecessary — it was one query away the whole time.
+
+## LESSON, stated plainly so it isn't repeated
+
+Before wiring any tab to "the fix," grep for what it currently calls and
+whether that function exists elsewhere, fully working, before assuming it needs
+building. Tonight nearly cost a real, data-backed system in favour of a nicer
+looking guess, on the night before a presentation, from a bug report I could
+only see as a phone photo.

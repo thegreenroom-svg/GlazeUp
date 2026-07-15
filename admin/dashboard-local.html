@@ -6165,7 +6165,20 @@ function goToTab(tab, event) {
 
   // Load data for specific tabs
   if (tab === 'floor-plan') {
-    refreshFloorPlan();
+    // THE REAL BUG, found 14 July 2026 from a phone screenshot the
+    // night before a presentation: this called refreshFloorPlan(),
+    // which is never defined anywhere in this file. It threw silently
+    // every time, so the static header and side-strips (plain HTML,
+    // always present) rendered, and the middle grid that was meant to
+    // fill in — real tables from studio_tables, real bookings from
+    // /api/floor/active — simply never loaded. That was the black gap.
+    //
+    // The fix is NOT to replace this with the new hand-drawn plan.
+    // loadFloorPlan() / renderFloorPlan() already exist, already pull
+    // real data properly, and only needed the one correct function
+    // name. Calling the wrong replacement here would have thrown away
+    // a working, data-driven system for a guessed demo one.
+    loadFloorPlan();
   } else if (tab === 'staff') {
     showStaffSection('booking');
     loadBookingsOverview();
