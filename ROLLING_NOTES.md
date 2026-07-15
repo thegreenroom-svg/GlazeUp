@@ -1826,3 +1826,26 @@ That message is the actual diagnosis. Likely candidates once seen:
 - `studioId` resolving to something unexpected
 
 Do not guess further blind — get the real message first, then fix precisely.
+
+## Hand-drawn look, brought into the REAL system — 14 July 2026, morning
+
+Daisy was clear, twice: function first, but she wants the elegant hand-drawn look back,
+now, on the actual working system — not a return to the disconnected guessed-data one.
+
+**Done narrowly.** Only `_miniTableSvg()` — the small table+chairs icon inside every
+real tile in `_renderEmptyTile()`/`_renderOccupiedTile()` — was redrawn using the exact
+pencil technique from earlier tonight (`_stroke`/`_handRect`/`_chair`: bowed strokes,
+overshot corners, every edge gone round twice). Reused those helper functions directly
+rather than rewriting them.
+
+**Nothing else touched.** `loadFloorPlan()`, `renderFloorPlan()`, `openTableDetail()`,
+the `#floor-table-detail` junction, the checklist, chair-dragging, routing into the tile
+system — all exactly as fixed and verified working minutes earlier. This was reskinning
+one icon inside an already-working system, not reviving the abandoned one.
+
+**Seeded per real table/booking** — call sites updated to pass `table.name` (empty) or
+`b.booking_code` (occupied), not a generic key, so Table 3 and Table 6 genuinely draw
+differently and consistently rather than every 4-seater looking identical.
+
+Previewed standalone (extracted the exact functions from the file, rendered in
+isolation) before pushing — 2/4/6/8 seat, empty and occupied.
