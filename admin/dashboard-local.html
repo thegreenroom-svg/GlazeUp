@@ -9810,18 +9810,34 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable) {
       ? `<line x1="${t.x + 8}" y1="${t.y + t.size.h - 5}" x2="${t.x + t.size.w - 8}" y2="${t.y + t.size.h - 5}"
            stroke="${accent}" stroke-width="3" stroke-linecap="round"/>` : '';
 
-    return `<g style="cursor:pointer" onclick="${busy ? `openTableDetail('${b.booking_code}')` : ''}">
+    // On the HOME screen (tappable), the whole room drills into the room —
+    // so tables must NOT carry their own handler, or a tap on a busy table
+    // would fire openTableDetail AND bubble up to showRoomElegant, opening
+    // the panel and navigating away underneath it. On the room page
+    // (tappable === false) the table handler is the whole point and stays.
+    return `<g style="cursor:pointer" onclick="${(!tappable && busy) ? `openTableDetail('${b.booking_code}')` : ''}">
       ${chairs}
       ${_handRect(t.x, t.y, t.size.w, t.size.h, seed, busy ? 1.7 : 1.0, INK, '#FFFDF9')}
       ${stripe}${label}
     </g>`;
   }).join('');
 
+  // Room names come from studio_tables.room — real data, so an apostrophe
+  // ("Sophie's Room") is entirely possible. Escaped rather than interpolated
+  // raw: this is the same class of bug the Mayco colour names caused
+  // ("Jack O'Lantern" broke the onclick handlers), fixed once already.
+  const roomArg = String(roomName).replace(/'/g, "\\'");
+
+  // THE WHOLE ROOM IS THE TAP TARGET on the home screen, per direct request:
+  // "why don't we click just the whole image of the table on each area to
+  // take it through to the next area?" It was only ever the 14px handwritten
+  // heading — a genuinely tiny target on a phone, which is why it never felt
+  // like the drill-down existed. The heading keeps its → as the affordance.
   return `
-    <div style="margin-bottom:26px;">
-      <h2 onclick="${tappable ? `showRoomElegant('${roomName}')` : ''}"
-        style="color:#2B2724;font-family:'Architects Daughter',cursive;font-size:14px;
-        letter-spacing:0.06em;margin:0 0 8px;opacity:0.6;${tappable ? 'cursor:pointer;' : ''}">
+    <div ${tappable ? `onclick="showRoomElegant('${roomArg}')" style="margin-bottom:26px;cursor:pointer;"`
+                    : `style="margin-bottom:26px;"`}>
+      <h2 style="color:#2B2724;font-family:'Architects Daughter',cursive;font-size:14px;
+        letter-spacing:0.06em;margin:0 0 8px;opacity:0.6;">
         ${roomName}${tappable ? ' →' : ''}
       </h2>
       <svg viewBox="-10 -10 ${_ELEGANT_ROOM_WIDTH + 20} ${height}"

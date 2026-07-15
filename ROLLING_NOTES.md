@@ -2570,3 +2570,53 @@ shape that has cost this project five bugs.
 `GRID_NAV_STRUCTURE` is still hardcoded — so the engine can now LEARN, and can suggest,
 but cannot yet show or apply. It is collecting from tonight. It needs ~12 moves and a
 fortnight of trading before `/api/studio/learning/report` says anything meaningful.
+
+## The whole room is now the tap target — 15 July 2026
+
+Daisy, once she could finally see the floor plan: "it's quite a small click where you
+have to click the writing. Why don't we click just the whole image of the table on each
+area to take it through to the next area?"
+
+She was right, and this is why the drill-down never felt like it existed:
+`showRoomElegant()` was wired ONLY to the `<h2>` — a 14px handwritten room name, on a
+phone. The room drawing underneath it, which is 95% of the target, did nothing.
+
+**Fixed:** the whole room block (heading + SVG) carries the `showRoomElegant` handler on
+the home screen. The heading keeps its `→` as the affordance.
+
+**The trap avoided, and why the table handler had to change too:** table `<g>` elements
+carried `openTableDetail()` regardless of which screen they were on. Wrapping the room
+in a handler without touching that would mean a tap on a busy table fires
+`openTableDetail` AND bubbles to `showRoomElegant` — opening the detail panel and then
+navigating out from under it. So the table handler is now bound only when
+`tappable === false`, i.e. on the room page. Home → room → table, one target per screen,
+no bubbling.
+
+**Also fixed while in here:** `roomName` was interpolated raw into the onclick.
+Room names come from `studio_tables.room` — real data — so "Sophie's Room" would have
+broken the handler. Same class of bug as the Mayco colour names ("Jack O'Lantern"),
+already fixed once this project. Escaped now.
+
+**Verified, not assumed** (jsdom, real functions, real data shape):
+
+    HOME:  3 whole-room tap targets, each wrapping its SVG
+           table handlers on home: 0  (no double-fire)
+    ROOM:  drill into The Lounge -> renders, back button present,
+           0 room-level handlers (already there)
+
+## STILL OPEN from the same conversation — not done, stated plainly
+
+- **`goToRealLandingPage()` routes David to `barista-view`.** Hardcoded first-name check.
+  Almost certainly the Dave/David confusion the notes already warned about — Dave was the
+  barista and has been removed; David is the co-director. Daisy: "just get rid of that,
+  I'm the same as everyone else." `applyShiftUI()` shows `barista-view` on the same basis.
+- **Cleo is gone from the picker.** She is in `DEMO_STAFF` but almost certainly not in the
+  real `staff_team`. While the API was broken the picker fell back to DEMO_STAFF and Cleo
+  appeared; now the API works, the real team comes back and she does not. **This is a data
+  fix (insert her into `staff_team`), not a code fix.** Bring her back "as she was".
+- **"Elliot with one t" still showing.** Zero occurrences in the client — so he is coming
+  from real `staff_team` data, presumably `add_elliott_staff.sql` having been run at some
+  point. Also a data fix (deactivate in `staff_team`).
+
+All three are the same shape: the app got MORE honest when the API started working, and
+what Daisy is seeing now is her real database rather than the demo fallback.
