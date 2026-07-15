@@ -2386,3 +2386,45 @@ untouched and still genuine — only the list changed.
 Nobody has completed a login on a device yet. The floor plan chain itself is verified
 working in a real DOM with real data (7,868 chars of ivory SVG, no error path taken) —
 what has never been confirmed is what the live API returns to it.
+
+# ═══════════════════════════════════════════════════════════
+# ⚠️  THE FLOOR PLAN 502, SOLVED — from Render's own logs, 15 July 2026
+# ═══════════════════════════════════════════════════════════
+
+    /api/floor/active failed: column bookings.status does not exist
+
+**That log line only exists because of d664bea.** Before the hardening, this threw and
+took the process down silently. The first thing that push bought was the truth.
+
+**It was never `bookings.room`.** That theory (mine) was wrong, and the previous
+session's commit message was right to say the floor routes don't select `room`.
+`/api/floor/active` selects `booking_code, customer_name, table_number, current_stage,
+session_start, party_size, status, booking_type` and filters
+`.not('status','eq','cancelled')`. **`bookings.status` has never existed** —
+`sql/integration-schema.sql` never created it, and no migration in this repo ever added
+it. Every floor plan load has failed on it, for as long as that select has been there.
+It was never a Render free-tier problem either.
+
+**Found properly, not one column at a time:** diffed every `bookings` /
+`kiln_sessions` column the server code reads, writes or filters on against every column
+any SQL file in the repo creates. That turned up a second one — `home_access_unlocked`
+(read at 1759 and 6293, written at 1678) — which would have been the very next failure
+after `status` was fixed. And it explains the other log line, the morning kiln check
+failing every two minutes on `kiln_sessions.morning_check_confirmed_at`.
+
+**`FIX_FLOOR_PLAN_COLUMNS.sql` (NEW — needs running).** Idempotent. Adds `status`
+(TEXT default 'active' — demo_floor_seed.sql already writes 'active', and the only
+filter anywhere is `<> 'cancelled'`), `home_access_unlocked`, the two kiln columns, and
+re-asserts `current_stage` / `booking_type` / `room` since there is no record of
+`booking_stage_tracking_schema.sql` or `update_table_capacities.sql` ever running here.
+Ends with a verification SELECT.
+
+**`kiln_sessions` has no CREATE TABLE anywhere in this repo.** It was created outside
+version control. Worth knowing: the repo is not a complete description of the schema,
+which is exactly how a column like `status` goes missing for weeks without anyone
+noticing.
+
+**THE LESSON, and it is the same one as the four bugs before it:** the code and the
+schema drifted apart and nothing ever checked. A `select()` naming a column that does
+not exist is the SQL equivalent of `refreshFloorPlan()` — a call into something that was
+never built. Worth running that column diff for every table before the next feature.
