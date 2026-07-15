@@ -1372,3 +1372,27 @@ back and photographed is ~30x faster to upload and ~3x faster to match.
 
 **Dependency:** this needs `GRID_NAV_STRUCTURE` to be data before Post can be a real top
 level without hardcoding it. Same gate as everything else. Do that first.
+
+## Staff walkthrough — corrected 14 July 2026
+
+`SWT_STEPS` was teaching the old app. Step 2 called the **tile grid** home and told new
+starters to "hold and drag to reorder them into your own layout" — that is the personal
+splitter, which we are deleting. Step 3 then treated the floor plan as somewhere you
+navigate *to*.
+
+Both rewritten to the agreed model: **step 2 = the floor plan IS home** ("you don't
+navigate to it, it's just there"); **step 3 = tap a table** → what's true of it → pick
+the next step. Voice narration updated to match.
+
+**Rule going forward: the walkthrough changes when the app changes.** If it teaches the
+old app, new starters learn the old app. Steps 4-9 (booking flow, greet and seat,
+photograph and finish, fire/identify/collect, never lose a piece) still read true and
+were left alone.
+
+*Still to do when the rest lands:* a login/avatar step (there isn't one — the
+walkthrough never mentions picking your face or starting a shift), and the `visual:
+'grid'` renderer is now unused by steps 2-3.
+
+**No sales brochure exists in this repo.** Daisy asked for it to be updated — nothing
+matching brochure/sales/pitch anywhere in the tree. It lives elsewhere (Drive? Wix?).
+Ask her before hunting.

@@ -6477,21 +6477,26 @@ const SWT_STEPS = [
     visual: 'welcome',
   },
 
-  // ── 2. THE TILE GRID ──────────────────────────────────────────────
+  // ── 2. THE FLOOR PLAN IS HOME ─────────────────────────────────────
+  // Rewritten 14 July 2026. This step used to describe the tile grid
+  // as home and told staff to hold-and-drag their own layout. Both are
+  // wrong now: the floor plan is home, and per-person layouts are gone.
+  // If the walkthrough teaches the old app, new starters learn the old
+  // app — so it changes when the app changes.
   {
     label: 'Home',
-    title: 'Your home screen',
-    body: "Everything the studio needs, organised into coloured tiles. Tap any tile to open it. Hold and drag to reorder them into your own layout — the app remembers your arrangement.",
-    voice: "This is your home screen. Everything you need is in one of these coloured tiles. Tap one to open it, or hold and drag to rearrange them into the order that suits you best.",
-    visual: 'grid',
+    title: 'The floor plan is home',
+    body: "This is where you live all shift. Every table in the studio, drawn as it really is — who's sitting where, and how far through they are. You don't navigate to it. It's just there.",
+    voice: "This is your home screen — the floor plan. It's the whole studio, drawn as it really is. Every table, who's on it, and how far through their session they are. You don't have to go and find it. It's simply where you live all shift.",
+    visual: 'floorplan',
   },
 
-  // ── 3. FLOOR PLAN ─────────────────────────────────────────────────
+  // ── 3. TAP A TABLE ────────────────────────────────────────────────
   {
-    label: 'Floor Plan',
-    title: 'Your studio at a glance',
-    body: "Every table in real time — who's sitting where, how far through their session, what stage they're at. Tap any table to open its full detail with draggable chairs, place mats, drinks, and a live countdown.",
-    voice: "The floor plan shows you the whole studio in real time. Every table, every session, every stage. Tap a table and you get a full draggable layout — chairs, place mats, drinks — with a live countdown timer.",
+    label: 'A table',
+    title: 'Tap a table',
+    body: "Everything true of that table, in one place: who's on it, what stage they're at, how many seats are filled, how long they've been sat. Then pick the next step — take an order, painting, finishing up, the kiln, the bill.",
+    voice: "Tap any table and you'll see everything that's true of it. Who's on it, what stage they're at, how long they've been sitting. Then just pick the next step — take an order, painting, finishing up, into the kiln, or the bill.",
     visual: 'floorplan',
   },
 
