@@ -8979,10 +8979,19 @@ app.post('/api/pieces/find-by-photo', async (req, res) => {
     // Genuine real batching: split into chunks of 25 real images each
     // — keeps each individual AI request fast, while still genuinely
     // covering every real candidate rather than silently truncating.
-    // Batches run SEQUENTIALLY (not in parallel) to stay well within
-    // OpenAI's real rate limits for large-image requests, and because
-    // this is a systematic real search, not a race.
+    // Batches used to run STRICTLY SEQUENTIALLY — each waiting on the
+    // last. That was the "matching…" wait: 100 pieces on file meant four
+    // vision calls nose-to-tail, and staff stood there holding a mug.
+    //
+    // They now run in WAVES: a few concurrently, then a check. That
+    // preserves the early exit (stop the moment something is clearly
+    // right, rather than burning time and money on the rest) while
+    // cutting the wait by roughly the wave width. WAVE_WIDTH is kept
+    // deliberately modest — these are large-image requests and OpenAI's
+    // rate limits are real; hammering them in parallel gets us 429s,
+    // which is slower than doing it properly.
     const BATCH_SIZE = 25;
+    const WAVE_WIDTH = 3;
     const batches = [];
     for (let i = 0; i < allCandidates.length; i += BATCH_SIZE) batches.push(allCandidates.slice(i, i + BATCH_SIZE));
 
@@ -8990,7 +8999,9 @@ app.post('/api/pieces/find-by-photo', async (req, res) => {
     let anyBatchFoundSomething = false;
     const queryImageContent = { type: 'image_url', image_url: { url: photoBase64.startsWith('data:') ? photoBase64 : `data:image/jpeg;base64,${photoBase64}` } };
 
-    for (const batch of batches) {
+    // One batch → its matches. Pulled out of the loop so a wave can
+    // run several at once.
+    async function runBatch(batch) {
       const content = [
         {
           type: 'text',
@@ -9016,21 +9027,30 @@ Colour is NOT reliable evidence if this is comparing an unfired to a fired piece
       try {
         parsed = JSON.parse((aiData.choices?.[0]?.message?.content || '{}').replace(/```json|```/g, '').trim());
       } catch (e) {
-        continue; // genuinely skip a batch that failed to parse rather than aborting the whole real search
+        return []; // skip a batch that failed to parse rather than aborting the whole search
       }
 
-      const batchMatches = (parsed.matches || []).map(m => {
+      return (parsed.matches || []).map(m => {
         const candidate = batch.find(c => c.id === m.id);
         return { ...m, label: candidate?.label, photo_url: candidate?.photo_url, booking_id: candidate?.booking_id || null, source: candidate?.source };
       });
-      if (batchMatches.length) anyBatchFoundSomething = true;
-      bestMatches = bestMatches.concat(batchMatches);
+    }
 
-      // Genuine real early exit — if this batch already found a
-      // clearly high-confidence match, stop searching further batches
-      // immediately. No need to keep burning real time/cost once a
-      // strong real match is already in hand.
-      if (batchMatches[0]?.confidence === 'high') break;
+    // Run in waves, checking after each. A batch that throws is skipped,
+    // not fatal — a network blip on one wave shouldn't lose the search.
+    for (let i = 0; i < batches.length; i += WAVE_WIDTH) {
+      const wave = batches.slice(i, i + WAVE_WIDTH);
+      const results = await Promise.allSettled(wave.map(runBatch));
+      const waveMatches = results
+        .filter(r => r.status === 'fulfilled')
+        .flatMap(r => r.value || []);
+
+      if (waveMatches.length) anyBatchFoundSomething = true;
+      bestMatches = bestMatches.concat(waveMatches);
+
+      // Early exit — the moment a clearly high-confidence match is in
+      // hand, stop. No point burning time and cost on the rest.
+      if (waveMatches.some(m => m.confidence === 'high')) break;
     }
 
     // Genuine real re-ranking across every batch searched — confidence

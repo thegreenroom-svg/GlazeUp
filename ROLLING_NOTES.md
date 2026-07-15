@@ -1257,3 +1257,39 @@ button.
 
 Pairs with the buildId change above: the banner now only fires on a real deploy, and
 tapping it now actually gets you that deploy.
+
+## Session — 14 July 2026 (cont): The "matching…" wait
+
+**Two separate slownesses. The upload was one; this is the other.**
+`/api/pieces/find-by-photo` pulled every piece with a reference photo, chunked them
+into batches of 25 images, and ran the vision calls **strictly sequentially** — each
+waiting on the last. 100 pieces on file = 4 nose-to-tail calls of 26 images each.
+That is the spinner. It was never the tablet.
+
+**Fix:** batches now run in **waves** (`WAVE_WIDTH = 3`) via `Promise.allSettled`,
+checking after each wave. Preserves the existing early exit — stop the moment a
+high-confidence match is in hand — while cutting the wait by roughly the wave width.
+`allSettled` so one blip doesn't lose the whole search. WAVE_WIDTH kept modest on
+purpose: these are large-image requests, OpenAI's rate limits are real, and 429s are
+slower than doing it properly.
+
+**Further speedups available, NOT taken (each is a real tradeoff — ask Daisy):**
+1. **Narrow candidates before the model sees them.** At kiln unload we know the piece
+   is fired and recent; filtering by status/date before batching means fewer images,
+   fewer waves. Biggest win available, costs nothing in quality. Needs the caller to
+   say what context it's searching from.
+2. **`detail: 'low'` on candidate images** (85 tokens, ~512px). Much faster and cheaper,
+   but the prompt explicitly leans on "shape, proportions, and the pattern/linework" —
+   low detail may lose fine linework. Would need testing against real pieces.
+3. **Thumbnail the reference photos at capture.** OpenAI fetches every `photo_url`
+   full-size, every search, forever. Storing a ~512px thumbnail alongside would speed
+   up every search from here. Schema change.
+
+**Outstanding from Daisy this session:**
+- Confirm the floor plan really is the persistent home and the driver of the front end
+  (login → `goToTab('floor-plan')` → `showHomeScreen()` — believed wired, unverified on
+  device; she hasn't seen the hand-drawn version yet, likely still queued behind Render's
+  deploy backlog).
+- **Remove the table icons** — she wants them gone, streamlined.
+- **Move a chair / move a placement** — wants it possible, but deliberately minimal.
+  "Don't complicate anything at the table, it can get very busy."
