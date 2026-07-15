@@ -14375,6 +14375,60 @@ function jumpToLabelsFor(bookingCode) {
 const PHOTO_MAX_EDGE = 1024;
 const PHOTO_QUALITY = 0.82;
 
+// ── IN-APP PHOTO RECOGNITION — the actual thing that was agreed  ──
+// This was agreed back in an earlier session ("internal photo-
+// matching system, no external API, learns as staff photograph and
+// label pieces over time") and never built. Tonight's earlier work
+// only made the OpenAI path faster — it didn't replace it. This does.
+//
+// A dHash (difference hash): shrink to 9x8, greyscale, compare each
+// pixel to its neighbour, one bit per comparison = a 64-bit
+// fingerprint. Two photos of the same piece — even under different
+// light, even at a different size — produce near-identical hashes.
+// It runs entirely on the canvas already decoded for
+// preparePhotoForMatching(), on the device, in milliseconds. No
+// network call, no API, no cost. Matching is then just comparing
+// how many bits differ (Hamming distance) — pure arithmetic on the
+// server, the same spirit as the learning engine.
+//
+// HONEST LIMITS, stated once rather than buried: like any pixel-
+// pattern hash, it is strong on shape and linework and weak on the
+// unfired-to-fired colour shift the packing note above already
+// flags for the AI path too. And it only covers pieces photographed
+// AFTER this shipped — there is no way to retroactively hash old
+// photos from the browser. Both are why the OpenAI path is kept
+// fully intact as a fallback, not replaced.
+async function computePerceptualHash(file) {
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const canvas = document.createElement('canvas');
+    canvas.width = 9; canvas.height = 8; // dHash needs one extra column
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0, 9, 8);
+    bitmap.close?.();
+    const { data } = ctx.getImageData(0, 0, 9, 8);
+
+    const grey = [];
+    for (let i = 0; i < data.length; i += 4) {
+      grey.push(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+    }
+    let bits = '';
+    for (let row = 0; row < 8; row++) {
+      for (let col = 0; col < 8; col++) {
+        const left = grey[row * 9 + col], right = grey[row * 9 + col + 1];
+        bits += left > right ? '1' : '0';
+      }
+    }
+    // Store as hex — 64 bits -> 16 hex chars, compact for a TEXT column.
+    let hex = '';
+    for (let i = 0; i < 64; i += 4) hex += parseInt(bits.slice(i, i + 4), 2).toString(16);
+    return hex;
+  } catch (e) {
+    console.warn('Perceptual hash failed — falls back to AI matching only:', e);
+    return null;
+  }
+}
+
 async function preparePhotoForMatching(file) {
   try {
     const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
@@ -14408,6 +14462,7 @@ async function handlePieceMatchPhotoFirst(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   const photoBase64 = await preparePhotoForMatching(file);
+  const phash = await computePerceptualHash(file); // in-app, no cost — tried first server-side
   {
     // Show spinner
     const fallbackEl = document.getElementById('pm-qr-fallback');
@@ -14418,15 +14473,17 @@ async function handlePieceMatchPhotoFirst(event) {
     try {
       const res = await fetch(`${API_URL}/api/pieces/find-by-photo`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studioId, photoBase64, searchedBy: currentShiftStaff?.id || null, autoAssign: true })
+        body: JSON.stringify({ studioId, photoBase64, phash, searchedBy: currentShiftStaff?.id || null, autoAssign: true })
       });
       const data = await res.json();
       if (data.autoAssigned) {
         // High confidence — show confirmation, hide fallback
         if (fallbackEl) fallbackEl.style.display = 'none';
+        const viaLabel = data.autoAssigned.viaLocalHash
+          ? '<span style="font-size:9px;background:rgba(46,125,50,0.15);color:#2e7d32;border-radius:6px;padding:2px 6px;font-weight:800;margin-left:6px;">MATCHED ON-DEVICE — NO AI USED</span>' : '';
         if (matchResult) matchResult.innerHTML = `
           <div style="padding:16px;background:rgba(76,175,80,0.1);border:1.5px solid #4caf50;border-radius:12px;">
-            <div style="font-size:15px;font-weight:800;color:#2e7d32;margin-bottom:6px;">✓ Identified — ${data.autoAssigned.pieceType || 'Piece'}</div>
+            <div style="font-size:15px;font-weight:800;color:#2e7d32;margin-bottom:6px;">✓ Identified — ${data.autoAssigned.pieceType || 'Piece'}${viaLabel}</div>
             <div style="font-size:13px;color:var(--gu-text);margin-bottom:10px;">${data.autoAssigned.reason || 'Matched automatically.'}</div>
             <button onclick="undoAutoMatch('${data.autoAssigned.pieceId}')" style="background:none;border:1px solid #c0392b;color:#c0392b;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;">↩ Not right — undo</button>
           </div>`;
@@ -14450,6 +14507,7 @@ async function handleKilnUnloadPhoto(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   const photoBase64 = await preparePhotoForMatching(file);
+  const phash = await computePerceptualHash(file);
   {
     const resultEl = document.getElementById('kiln-unload-result');
     const fallbackEl = document.getElementById('kiln-unload-qr-fallback');
@@ -14457,7 +14515,7 @@ async function handleKilnUnloadPhoto(event) {
     try {
       const res = await fetch(`${API_URL}/api/pieces/find-by-photo`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studioId, photoBase64, searchedBy: currentShiftStaff?.id || null, autoAssign: true })
+        body: JSON.stringify({ studioId, photoBase64, phash, searchedBy: currentShiftStaff?.id || null, autoAssign: true })
       });
       const data = await res.json();
       if (data.autoAssigned) {
@@ -17707,12 +17765,16 @@ function captureRefPhoto(pieceId) {
 async function handleRefPhotoCapture(event) {
   const file = event.target.files[0];
   if (!file || !_capturingPieceId) return;
+  // Hashed here, once, at the moment the reference photo is taken —
+  // this is what lets a future search match this piece on-device,
+  // with no AI call, going forward.
+  const phash = await computePerceptualHash(file);
   const reader = new FileReader();
   reader.onload = async () => {
     try {
       const res = await fetch(`${API_URL}/api/pieces/${_capturingPieceId}/reference-photo`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studioId, photoBase64: reader.result })
+        body: JSON.stringify({ studioId, photoBase64: reader.result, phash })
       });
       if (!res.ok) { alert('Could not save the photo — try again.'); return; }
       const bookingCode = document.getElementById('ref-photo-booking-select').value;
@@ -18588,8 +18650,10 @@ function captureFp1AutoMatchPhoto() {
     // Downscaled before it leaves the device — and the retry reuses
     // this same prepared photo, so a retry costs nothing extra.
     const photo = await preparePhotoForMatching(file);
+    const phash = await computePerceptualHash(file);
     _fp1LastAutoMatchPhoto = photo;
-    runFp1AutoMatch(photo);
+    _fp1LastAutoMatchHash = phash;
+    runFp1AutoMatch(photo, phash);
   };
   input.click();
 }
@@ -18600,17 +18664,17 @@ function captureFp1AutoMatchPhoto() {
 // shouldn't be the only option.
 function retryFp1AutoMatch() {
   if (!_fp1LastAutoMatchPhoto) { alert('No photo to retry with — please take a new one.'); return; }
-  runFp1AutoMatch(_fp1LastAutoMatchPhoto);
+  runFp1AutoMatch(_fp1LastAutoMatchPhoto, _fp1LastAutoMatchHash);
 }
 
-async function runFp1AutoMatch(photoDataUrl) {
+async function runFp1AutoMatch(photoDataUrl, phash = null) {
   const resultEl = document.getElementById('fp1-automatch-result');
   resultEl.innerHTML = '<div style="padding:14px;text-align:center;color:#8a8175;font-size:13px;">🔍 Searching every real piece on file — this takes a few seconds…</div>';
 
   try {
     const res = await fetch(`${API_URL}/api/pieces/find-by-photo`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studioId, photoBase64: photoDataUrl, searchedBy: currentShiftStaff?.id || null, autoAssign: true })
+      body: JSON.stringify({ studioId, photoBase64: photoDataUrl, phash, searchedBy: currentShiftStaff?.id || null, autoAssign: true })
     });
     const data = await res.json();
     if (!res.ok) {

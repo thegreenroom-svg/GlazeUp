@@ -1906,3 +1906,56 @@ it is actively learning today, because it is not yet.
 already computed for that tile's pill and border — Painting tables draw in clay,
 Kiln tables in amber, etc. — so the drawn chairs and the tile's own colour language
 finally agree with each other.
+
+# ═══════════════════════════════════════════════════════════
+# IN-APP PHOTO RECOGNITION — the thing agreed way back, actually built
+# ═══════════════════════════════════════════════════════════
+
+Daisy asked again, plainly: this was agreed a previous session ("internal photo-
+matching system, no external API") and never delivered — tonight's earlier work only
+made the OpenAI path faster, not replaced it. Built now, properly, additively.
+
+**`add_perceptual_hash.sql` (NEW — needs running)**: `pottery_pieces.photo_phash TEXT`,
+nullable. Old pieces have none until re-photographed; nothing breaks either way.
+
+**How it works — a dHash (difference hash), computed entirely on the device:**
+- `computePerceptualHash(file)` — shrinks to 9×8 on the same canvas already used for
+  photo downscaling, greyscales, compares each pixel to its right-hand neighbour,
+  64 bits, stored as 16 hex chars. Milliseconds, zero network, zero API.
+- Matching is `_hammingDistanceHex()` — how many of the 64 bits differ. Pure integer
+  XOR/popcount, same spirit as the learning engine. Tested standalone before pushing:
+  identical hashes → 0, near-identical → small, opposite → 64.
+- **≤10 bits different = a confident match** (an established threshold for dHash).
+
+**Wired into every photo-recognition call site**, alongside the existing code, not
+replacing it:
+- `handlePieceMatchPhotoFirst`, `handleKilnUnloadPhoto`, FP1 auto-match (+ its retry) —
+  all now also compute and send `phash`.
+- `handleRefPhotoCapture` — hashes and stores it the moment a piece's reference photo
+  is taken, so **new pieces from now on are searchable with zero AI cost.**
+- Server (`find-by-photo`): the hash is checked FIRST, before any OpenAI call. A
+  confident local match returns immediately — same real state change as the AI path
+  (`status: 'packed'`, `packed_at`, `auto_matched: true`, same `piece_match_attempts`
+  audit row shape) so nothing downstream needs to know which method matched it. Only
+  when nothing confident is found does it fall through to the **existing, completely
+  unchanged** OpenAI batching. The `viaLocalHash: true` flag lets the UI show
+  **"MATCHED ON-DEVICE — NO AI USED"** when it happens.
+
+**Honest limits, stated rather than buried:**
+- Like the AI path, weak on the unfired→fired colour shift — that's inherent to any
+  pixel-pattern approach, not a bug.
+- **Only covers pieces photographed from now on.** There is no way to retroactively
+  hash the studio's existing reference photos from the browser (no server-side image
+  library was added on purpose — see below). Old pieces fall straight through to the
+  AI path exactly as before, until they're next photographed.
+
+**Deliberately NOT done, and why:** did not add `sharp`/`jimp`/`canvas` to backfill
+hashes server-side. No image-processing dependency existed in `package.json`; adding
+one hours before a presentation risks a failed `npm install` on Render taking down the
+*entire app*, not just this feature. The browser's own `createImageBitmap`+canvas
+(already used and tested tonight) does the decoding instead — zero new dependencies,
+zero deploy risk.
+
+**This is genuinely additive.** Every existing, tested photo-recognition path is
+unchanged and still there as the fallback. If phash finds nothing, the app behaves
+exactly as it did an hour ago.

@@ -8686,7 +8686,7 @@ app.post('/api/kiln/morning-check/report-misfire', async (req, res) => {
 // piece photo at table-clearing time, next to the booking's QR card
 app.post('/api/pieces/:pieceId/reference-photo', async (req, res) => {
   const { pieceId } = req.params;
-  const { studioId, photoBase64 } = req.body;
+  const { studioId, photoBase64, phash } = req.body;
   if (!studioId || !photoBase64) return res.status(400).json({ error: 'studioId and photoBase64 required' });
 
   try {
@@ -8701,8 +8701,15 @@ app.post('/api/pieces/:pieceId/reference-photo', async (req, res) => {
 
     const { data: urlData } = supabase.storage.from('booking-photos').getPublicUrl(fileName);
 
+    // photo_phash is a real column (add_perceptual_hash.sql) — stored
+    // if the client computed one. Never blocks the save if it's null;
+    // a piece with no hash simply skips straight to the AI fallback
+    // when someone later searches for it.
+    const updatePayload = { reference_photo_url: urlData.publicUrl, reference_photo_taken_at: new Date().toISOString() };
+    if (phash) updatePayload.photo_phash = phash;
+
     const { data: piece, error } = await supabase.from('pottery_pieces')
-      .update({ reference_photo_url: urlData.publicUrl, reference_photo_taken_at: new Date().toISOString() })
+      .update(updatePayload)
       .eq('id', pieceId).select().single();
     if (error) throw error;
 
@@ -9008,10 +9015,24 @@ app.get('/api/damage-reports', async (req, res) => {
   res.json({ reports: data || [] });
 });
 
+// Pure arithmetic — same spirit as the learning engine. How many of
+// the 64 bits differ between two hex-encoded dHashes. Lower = more
+// alike. No model, no API, microseconds.
+function _hammingDistanceHex(a, b) {
+  if (!a || !b || a.length !== b.length) return 64;
+  let dist = 0;
+  for (let i = 0; i < a.length; i++) {
+    let x = parseInt(a[i], 16) ^ parseInt(b[i], 16);
+    while (x) { dist += x & 1; x >>= 1; }
+  }
+  return dist;
+}
+// ≤10 of 64 bits differing is a well-established strong dHash match.
+const PHASH_CONFIDENT_DISTANCE = 10;
+
 app.post('/api/pieces/find-by-photo', async (req, res) => {
-  const { studioId, photoBase64, searchedBy } = req.body;
+  const { studioId, photoBase64, phash, searchedBy } = req.body;
   if (!studioId || !photoBase64) return res.status(400).json({ error: 'studioId and photoBase64 required' });
-  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'Photo search is not yet available.' });
 
   try {
     // Genuine real fix: pull EVERY real open candidate, no artificial
@@ -9021,7 +9042,7 @@ app.post('/api/pieces/find-by-photo', async (req, res) => {
     // cap-based "fix" for speed genuinely broke coverage at scale;
     // real batching below solves speed properly without that tradeoff.
     const { data: candidates } = await supabase.from('pottery_pieces')
-      .select('id, booking_id, piece_type, status, reference_photo_url')
+      .select('id, booking_id, piece_type, status, reference_photo_url, photo_phash')
       .eq('studio_id', studioId).not('reference_photo_url', 'is', null)
       .not('status', 'eq', 'picked_up')
       .not('damaged', 'is', true) // genuinely never search for a piece already reported damaged/lost — .not('is', true) rather than .eq('damaged', false) so existing pieces with a real NULL value (before this column existed) are correctly still included, not silently excluded
@@ -9037,6 +9058,63 @@ app.post('/api/pieces/find-by-photo', async (req, res) => {
 
     if (!allCandidates.length) {
       return res.json({ matches: [], noConfidentMatch: true, note: 'No reference photos on file yet to search against.' });
+    }
+
+    // ── IN-APP MATCH, TRIED FIRST — no model, no API, no cost ──────
+    // Every candidate with a stored hash (pieces photographed since
+    // add_perceptual_hash.sql shipped) is compared against the query
+    // photo's hash on pure bit arithmetic. A confident hit answers
+    // the request here and skips OpenAI entirely — genuinely faster
+    // and genuinely free, not just cheaper. Anything without a
+    // confident local match falls through to the AI batching below,
+    // completely unchanged from how it already worked.
+    if (phash) {
+      let best = null;
+      for (const c of candidates || []) {
+        if (!c.photo_phash) continue;
+        const dist = _hammingDistanceHex(phash, c.photo_phash);
+        if (!best || dist < best.dist) best = { dist, candidate: c };
+      }
+      if (best && best.dist <= PHASH_CONFIDENT_DISTANCE) {
+        const reason = `Matched on-device, no AI used (${best.dist} of 64 bits different).`;
+        let autoAssigned = null;
+        if (req.body.autoAssign) {
+          // Mirrors the AI path's real state change exactly — same
+          // status, same fields, same audit log shape — so nothing
+          // downstream needs to know or care which method matched it.
+          const { data: updatedPiece, error: assignError } = await supabase.from('pottery_pieces')
+            .update({ status: 'packed', packed_at: new Date().toISOString(), auto_matched: true })
+            .eq('id', best.candidate.id).eq('studio_id', studioId).select().single();
+          if (!assignError && updatedPiece) {
+            autoAssigned = { pieceId: best.candidate.id, pieceType: best.candidate.piece_type,
+              bookingId: best.candidate.booking_id, reason, viaLocalHash: true };
+            await supabase.from('piece_match_attempts').insert({
+              studio_id: studioId, booking_code: best.candidate.booking_id,
+              query_photo_url: '(on-device hash match — no photo sent anywhere)',
+              ai_reasoning: reason, ai_confidence: 'high',
+              all_candidates: [{ id: best.candidate.id, distance: best.dist }],
+              packer_id: searchedBy || null, packer_confirmed: true,
+            }).catch(() => {});
+          }
+        }
+        await supabase.from('piece_search_log').insert({
+          studio_id: studioId, searched_by: searchedBy || null,
+          results_count: 1, top_result_piece_id: best.candidate.id,
+        }).catch(() => {});
+        return res.json({
+          matches: [{ id: best.candidate.id, source: 'piece', label: best.candidate.piece_type,
+            confidence: 'high', reason }],
+          noConfidentMatch: false, autoAssigned, viaLocalHash: true
+        });
+      }
+    }
+
+    // No confident local match — fall through to the existing,
+    // unchanged AI-assisted search below. Needs a configured key;
+    // if there isn't one, decline gracefully rather than crash on a
+    // bad auth header.
+    if (!process.env.OPENAI_API_KEY) {
+      return res.json({ matches: [], noConfidentMatch: true, note: 'No on-device match found, and AI search is not configured.' });
     }
 
     // Genuine real batching: split into chunks of 25 real images each
