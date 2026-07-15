@@ -1425,3 +1425,93 @@ a board.** That is the next Host By Post job, ahead of any UI polish.
 Also still true: Host By Post is reached via `showSetupSection('hostbypost')` from tiles
 at ~2844, ~3025, ~3916. Those should point at `showPostBoard()` once nav is data. Setup
 keeps only the Click & Drop key and return address.
+
+# ═══════════════════════════════════════════════════════════
+# HANDOFF — end of 14 July 2026
+# Read this section first. Everything below is unfinished.
+# ═══════════════════════════════════════════════════════════
+
+## THE MISTAKE I MADE TODAY — fix this first
+
+**The in-house photo matcher was agreed in a previous session and never built.**
+Day 5's record: *"an internal photo-matching system (no external API, learns as staff
+photograph and label pieces over time) planned for the Returns tile."* Daisy asked about
+it today; I initially told her it was never agreed and that vision matching can't run
+in-house. **I was wrong on both counts** — she was right, and I found the record only
+after pushing back twice.
+
+Worse: today I **optimised the OpenAI path instead** (downscale + wave batching). I made
+the wrong thing faster. Those changes are fine and worth keeping, but they are not what
+was asked for.
+
+**It does not need a vision model.** Every piece already gets a reference photo:
+1. Compute a perceptual hash (pHash/dHash) at capture time, store it beside
+   `reference_photo_url`. Schema change on `pottery_pieces`.
+2. Matching = hash the query photo, compare Hamming distance against stored hashes.
+   Milliseconds, on-device, no API, no cost.
+3. It improves as staff label pieces — which is what "learns over time" meant.
+4. **Honest caveat:** strong on shape/pattern, weak on the unfired→fired colour shift.
+   So: local-first, fall back to OpenAI only when the hash isn't confident. Rare, cheap.
+
+**This is the top of the list. Do not start anywhere else.**
+
+## STATE — what is live on main
+
+Live and working: splash (gap fixed), avatar picker (8 rigged characters at 88px,
+incl. Cleo), PIN 0000, hand-drawn floor plan + Table detail page, resting state with
+studio facts, Host By Post board (Post → Order → Job, additive, not yet reachable from
+nav), update banner off the notch + only fires on real deploys + "Update now" actually
+updates, piece photos downscaled ~30x, matching batches run in waves.
+
+**NEVER VERIFIED ON A DEVICE.** Not once, all session. Daisy was presenting on an
+iPhone; the floor plan was designed for an iPad. Expect layout problems at phone width:
+three room plans squeezed narrow, the Table page's two-column grid, the picker's
+two-column 88px avatars. **First job after the matcher: open it and look.**
+
+## UNFINISHED, roughly in order
+
+1. **In-house photo matcher** (above). The real one.
+2. **Tap-a-chair name assignment.** Chairs are already drawn. Tap Table 6 → tap a chair
+   → assign a name from the booking; extra arrivals get an empty chair; leavers tap out.
+   Bill splits by seat. **This replaced Daisy's facial-recognition idea — see the GDPR
+   reasoning above; do not revisit face recognition.**
+3. **`GRID_NAV_STRUCTURE` → data.** THE GATE. Blocks: mega-tiles, Host By Post reaching
+   the nav, and the learning engine changing structure without a deploy. It blocked four
+   separate things today.
+4. **Tile splitter excision** — `_personalScreen`, `promotedTiles`, `tileOrder`,
+   `_layoutHistory`/`_layoutFuture`, `_layoutUndo`/`_layoutRedo`, `ROLE_HOME_DEFAULTS`,
+   `showPersonalHomeScreen`, `savePersonalHomeScreen`, undo/redo in `_updateNavControls`.
+   ~200 interlinked lines. **Own commit.** Decision: one studio-wide screen, no
+   per-person split (six divergent layouts break "it's the third tile" on a shared iPad).
+5. **Learning engine finishing** — client never calls `log-transition` (so ordering isn't
+   recording); no suggestion card; `respond` returns `applied:false` and applies nothing.
+   Repoint studio-wide. Check `learning_engine_schema.sql` actually ran.
+6. **Host By Post return leg.** `hbp_orders` only models pending → labelled → dispatched.
+   No "back with us", "fired", "posted home". Half the business has nowhere to persist.
+7. **Nav rail** (Back · Home · Refresh · You) + shift actions under the avatar:
+   Break / Stepping out / Clock out. Note `#direct-break-btn` is `display:none` on
+   phone — Break is invisible on the device Daisy uses.
+8. **Avatar profile page** — tap a face pre-login, see them + stats. Needs a device.
+9. **Walkthrough** has no login step at all.
+10. **`_liveCovers` and `_liveOrders` have no producers.** Both boards are demo-only
+    until the booking/hbp layers populate them.
+11. **`FLOOR_PLAN` seat counts and positions are GUESSED.** Daisy never confirmed them.
+12. **Green banner "is moving"** — never explained, never reproduced.
+13. **Sales brochure** — not in this repo. Ask where it lives.
+
+## DON'T
+
+- Don't scrape thekilncafe.com for hours (three pages, three answers). Square is the
+  source of truth; add a "Closed today" staff toggle.
+- Don't replace the floor plan with a tile grid. It is the app's one differentiator.
+- Don't do face recognition. Biometric data, Art. 9, children on site.
+- Don't use Math.random() in the plan's strokes — seeded per table on purpose.
+- Don't add render.yaml blind; the service is dashboard-configured and a blueprint
+  would stamp over env vars including Supabase keys.
+
+## HOUSEKEEPING
+
+- **Rotate the GitHub token.** It is in plain text in an old chat transcript and I used
+  it all day.
+- Overlapping Deploy Policy (Render workspace settings) still not flipped — builds queue.
+- Use `[skip render]` on notes-only commits. Batch pushes; 10 today, 10 builds.
