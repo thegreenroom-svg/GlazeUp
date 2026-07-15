@@ -3113,3 +3113,57 @@ title must never change what he can see.** It doesn't.
 
 **Still the wrong mechanism, for the third time of writing:** a first-name string check
 across six endpoints. Two misfires this week. `staff_team.id` or a permission column.
+
+# ═══════════════════════════════════════════════════════════
+# An empty table opens the tile square. The last push. 15 July 2026
+# ═══════════════════════════════════════════════════════════
+
+Daisy: "if there's no bookings, go to that big tiles where everything's there, where you
+can start a journey to try things out. If there's bookings, it will go anyway to the
+structure we have."
+
+**Her answer is better than the one being built for this.** A "practice mode" panel was
+half-designed earlier tonight: fake a booking, open `openTableDetail()`, fence off the
+writes. It would have worked, and it was the wrong idea. Everything behind that panel
+writes to the server keyed on `booking_code` — chair positions, assignments, checklist
+ticks — so it needed a synthetic code, and any leak past the fences writes orphaned rows
+against a booking that does not exist. Fake rows in production. **Exactly the mess that
+took hours out of today to clear.**
+
+`showGridNav()` is a real screen that already exists, writes nothing, and is genuinely
+where you start anything. No invention required, no fences to leak, nothing to clean up
+later.
+
+**The routing, one line in `_renderElegantRoomSVG`:**
+
+    home screen (tappable)  -> whole room drills in, tables carry no handler
+    room page, booked table -> openTableDetail(booking_code)   the real job
+    room page, empty table  -> showGridNav()                   the tile square
+
+Empty table means "nothing here yet — what do you want to do?". Booked table means the
+real job. Both honest, neither invented.
+
+**Verified** (jsdom, real functions, one booked + one empty table):
+
+    booked table -> openTableDetail('bk1')   true
+    empty table  -> showGridNav()            true
+    fake booking codes written               false
+
+## Where this leaves the app, end of 15 July
+
+Working, on a real device, verified by Daisy: floor plan is home for everyone; whole
+rooms tap through; room -> booked table -> job; room -> empty table -> tile square;
+"▦ Everything else" from home; green Home bar back from anywhere; HBP header button
+opens the Post board; no demo data; real Square takings; learning engine collecting and
+running Sundays 04:00.
+
+**Still open, in order, for a fresh head:**
+1. **Permission by name.** Six endpoints decide who sees the money on a first-name
+   string compare. Two misfires this week. `staff_team.id` or a permission column.
+2. **No suggestion card.** The engine learns and runs and nothing surfaces it.
+3. **`GRID_NAV_STRUCTURE` -> data.** Still THE GATE: mega-tiles, HBP in the nav, the
+   engine changing structure without a deploy.
+4. **`openCleoAdminVoicePicker`** — called from a handler, never defined. Last known
+   dead link in the file.
+5. **Rotate the GitHub token.** Admin on a public repo, plain text in several
+   transcripts, used all day.

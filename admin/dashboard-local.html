@@ -9836,7 +9836,24 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable) {
     // would fire openTableDetail AND bubble up to showRoomElegant, opening
     // the panel and navigating away underneath it. On the room page
     // (tappable === false) the table handler is the whole point and stays.
-    return `<g style="cursor:pointer" onclick="${(!tappable && busy) ? `openTableDetail('${b.booking_code}')` : ''}">
+    //
+    // AN EMPTY TABLE GOES TO THE TILE SQUARE. Per direct request: "if
+    // there's no bookings, go to that big tiles where everything's there,
+    // where you can start a journey to try things out."
+    //
+    // This is a much better answer than the practice-mode panel that was
+    // half-designed for this. That would have needed a synthetic booking
+    // to open openTableDetail(), and everything behind that panel writes
+    // to the server keyed on booking_code — chair positions, assignments,
+    // checklist ticks — so it would have written orphaned rows against a
+    // booking that does not exist. Fake rows in production, which is the
+    // exact mess that took hours out of 15 July to clear.
+    //
+    // showGridNav() is a real screen that already exists, writes nothing,
+    // and is genuinely where you start anything. No invention required.
+    // Empty table = "nothing here yet, what do you want to do?" Booked
+    // table = the real job. Both honest.
+    return `<g style="cursor:pointer" onclick="${!tappable ? (busy ? `openTableDetail('${b.booking_code}')` : `showGridNav()`) : ''}">
       ${chairs}
       ${_handRect(t.x, t.y, t.size.w, t.size.h, seed, busy ? 1.7 : 1.0, INK, '#FFFDF9')}
       ${stripe}${label}
