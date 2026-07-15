@@ -13,8 +13,20 @@
 -- destroyed; the row and its history stay, and it stops appearing in
 -- the picker (team-for-login filters on active = true).
 --
--- His director access is removed IN CODE, not here — he is Marketing &
--- Host By Post Manager. That is a separate commit and already pushed.
+-- ⚠️  SUPERSEDES FIX_ELLIOTT_SPELLING.sql (and section 4 of
+-- RUN_ALL_FOUR.sql). That file set his role to 'Co-Director', which was
+-- wrong. If you have already run it, this corrects the role. Run this
+-- one AFTER it, or instead of it. No harm either way.
+--
+-- ROLE AND ACCESS ARE TWO DIFFERENT THINGS, and conflating them is what
+-- caused three revisions of this in one evening:
+--   • ROLE   — 'Marketing & Host By Post Manager'. Set below. It is his
+--              job title and it shows in the login picker.
+--   • ACCESS — he DOES see everything the directors see. That lives in
+--              code (PLATFORM_REVENUE_ACCESS), is already pushed, and is
+--              deliberately NOT derived from his role. Nothing in this
+--              file grants or removes it.
+-- Changing his job title must never change what he can see. It doesn't.
 -- ═══════════════════════════════════════════════════════════════════
 
 -- ── 1. LOOK FIRST. Run this alone and read it. ──
@@ -34,7 +46,13 @@ SELECT st.id,
    AND st.name ILIKE 'elliot%'
  ORDER BY st.created_at;
 
--- ── 2. Set the real role on BOTH rows, so it is right either way ──
+-- ── 2. Set the real name and role on BOTH rows, so it is right either way ──
+-- The name MUST end up exactly 'Elliott', two t's: the access check in
+-- code is a first-name string compare, so 'Elliot' silently locks him
+-- out of the takings dashboard while looking correct everywhere else.
+-- The role is his job title only — it grants nothing.
+-- This also overwrites the 'Co-Director' that FIX_ELLIOTT_SPELLING.sql
+-- set, which was wrong.
 UPDATE staff_team
    SET name = 'Elliott',
        role = 'Marketing & Host By Post Manager'

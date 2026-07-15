@@ -69,20 +69,28 @@ const app = express();
 // sensitive financial data: Platform Revenue (worldwide SaaS income) and
 // The Kiln Cafe's own real revenue/analytics. Declared once, early, so
 // every endpoint that needs it references the same single source of truth.
-// Directors only. Elliott is NOT one — he is Marketing & Host By Post
-// Manager, confirmed 15 July 2026 after two rounds of getting this wrong.
-// This governs Platform Revenue AND /api/analytics/dashboard, i.e. the
-// studio's real takings, so it is the difference between a colleague
-// seeing the books and not.
+// WHO MAY SEE THE MONEY. This is NOT a list of directors, and today
+// proved why the distinction matters: Elliott is Marketing & Host By
+// Post Manager — genuinely not a director — and Daisy still wants him
+// seeing exactly what the directors see. Role and access are two
+// different questions and this list only answers the second one.
 //
-// NOTE THE FRAGILITY, flagged and not yet fixed: this is a FIRST-NAME
-// string check across six endpoints. It has now misfired twice in one
-// week on near-identical names — Dave/David sent the co-director to the
-// barista page, and Elliot/Elliott would have silently locked a listed
-// person out. Identifying who may see the money by whether someone
-// typed their first name correctly is the wrong mechanism. Use
-// staff_team.id or a real role column. Own commit, own session.
-const PLATFORM_REVENUE_ACCESS_NAMES = ['david', 'jenny', 'daisy'];
+// The list changed three times on 15 July (removed, restored, removed)
+// because it was being read as "the directors". It isn't. Named for
+// what it does, so nobody re-litigates his job title to decide his
+// permissions.
+//
+// Governs Platform Revenue AND /api/analytics/dashboard — the studio's
+// real takings. Six endpoints check it, server-side.
+//
+// THE FRAGILITY, flagged and still not fixed: it is a FIRST-NAME string
+// check. It has misfired twice this week on near-identical names —
+// Dave/David sent the co-director to the barista page, Elliot/Elliott
+// would have silently locked out someone who was on the list. Deciding
+// who sees the accounts by whether a name was typed correctly is the
+// wrong mechanism. Use staff_team.id or a real permission column.
+// Own commit, own session.
+const PLATFORM_REVENUE_ACCESS_NAMES = ['david', 'jenny', 'daisy', 'elliott'];
 
 // Square's SDK returns some numbers as BigInt, which JSON.stringify cannot
 // serialize by default. Teach BigInt to serialize as a string, globally,

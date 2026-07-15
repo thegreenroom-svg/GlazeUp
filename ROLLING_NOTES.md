@@ -3089,3 +3089,27 @@ plan is home; that button is the way OUT of home; the green bar is the way back 
 **The lesson, and it is the week's lesson again:** inverting "what is home" changed the
 meaning of every button that pointed at home, and I only re-checked the one I was
 looking at. Daisy caught it by asking whether the thing still worked.
+
+## Role and access are two different things — the actual lesson. 15 July 2026
+
+Daisy, correcting the correction: "he isn't a director, but I still want him to see what
+the directors see."
+
+**That is not a flip-flop. That is the distinction that was missing all along.**
+`PLATFORM_REVENUE_ACCESS` was being read as "the directors" and it never was — it is
+**who may see the money**. Elliott is Marketing & Host By Post Manager AND sees the
+takings. Both true, no contradiction.
+
+The list changed three times tonight — removed, restored, removed, restored — and every
+change was correct on the information at the time. The churn was caused by treating one
+question ("is he a director?") as the answer to a different one ("may he see the
+accounts?"). Comments rewritten in both files to say what the list actually is, so
+nobody re-litigates a job title to decide a permission.
+
+**`FIX_TWO_ELLIOTTS.sql` supersedes `FIX_ELLIOTT_SPELLING.sql`** (and section 4 of
+`RUN_ALL_FOUR.sql`), which set `role = 'Co-Director'` — wrong. If it has already run,
+this corrects it. Role lives in the database; access lives in code; **changing his job
+title must never change what he can see.** It doesn't.
+
+**Still the wrong mechanism, for the third time of writing:** a first-name string check
+across six endpoints. Two misfires this week. `staff_team.id` or a permission column.
