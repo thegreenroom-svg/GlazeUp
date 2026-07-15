@@ -2034,3 +2034,18 @@ gets identified against it, no AI cost → when that identification sets
 `pottery_pieces.square_item_id` at booking time, "which customers have bought this
 shape" becomes a real, honest SQL join against Square's own catalogue — the actual
 thing asked for, built on the right foundation this time.
+
+## The button — built, not deferred
+
+Daisy pushed back, rightly, on labelling this "next session's job" — it was one button
+calling an already-tested function, smaller than several things built earlier the same
+night. Should have just built it the first time.
+
+**Done:** every tile in Admin → Bisque/Shapes now has a small 📷 button (top-right
+corner) calling `captureStockShapePhoto(item.id)` — already-tested, unchanged. Nothing
+else in `showBisqueCategory()` touched; the button is the only addition.
+
+**To use it:** Admin → Shapes/Bisque tab → any category → tap 📷 on an item → photograph
+the physical piece → saved with its on-device hash, tied to that real Square item.
+Needs `add_stock_shape_photos.sql` run first or the save will fail with a clear error
+(table won't exist yet).

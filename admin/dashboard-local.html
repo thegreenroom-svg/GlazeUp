@@ -17523,7 +17523,11 @@ function showBisqueCategory(idx) {
   const category = bisqueCatalogCategories[idx];
 
   gridEl.innerHTML = category.items.map(item => `
-    <div style="background: linear-gradient(180deg, #ffffff 0%, #fdf9f6 100%); border: 1.5px solid var(--gu-border); border-radius: 16px; padding: 16px 12px; text-align: center; min-height: 128px; display: flex; flex-direction: column; justify-content: center;">
+    <div style="position:relative;background: linear-gradient(180deg, #ffffff 0%, #fdf9f6 100%); border: 1.5px solid var(--gu-border); border-radius: 16px; padding: 16px 12px; text-align: center; min-height: 128px; display: flex; flex-direction: column; justify-content: center;">
+      <button onclick="captureStockShapePhoto('${item.id}')" title="Photograph this shape line — lets the app recognise it from a photo, no AI cost"
+        style="position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:50%;border:none;
+          background:rgba(184,121,70,0.12);color:var(--link-clay);font-size:13px;cursor:pointer;
+          display:flex;align-items:center;justify-content:center;">📷</button>
       <div style="height: 68px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px;">${bisqueSilhouette(item.name)}</div>
       <div style="font-size: 14px; font-weight: 700; color: var(--gu-accent); line-height: 1.3;">${item.name}</div>
       ${item.priceCents != null ? `<div style="font-size: 13px; font-weight: 600; color: var(--link-clay); margin-top: 4px;">£${(item.priceCents / 100).toFixed(2)}</div>` : ''}
