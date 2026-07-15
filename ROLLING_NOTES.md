@@ -3196,3 +3196,66 @@ survives the next one, and the one after.
 **Live count: 9 buttons in that row**, 5 of them hidden until login (badge, Out, Break,
 and the two legacy ones). So it looks fine logged out and overflows the moment someone
 logs in — which is exactly when nobody is looking at the CSS.
+
+# ═══════════════════════════════════════════════════════════
+# applyShiftUI must not navigate — the fix to this morning's fix. 15 July 2026
+# ═══════════════════════════════════════════════════════════
+
+Daisy, within the hour of the last push: "when you hit dashboard from the main task
+screen, it returns to the floor plan."
+
+**Mine, from `4b4e40a`.** That commit ended `applyShiftUI()` with `goToTab('floor-plan')`.
+
+    goToTab('dashboard') -> populateDashboard() -> checkShiftLogin()
+      -> applyShiftUI() -> goToTab('floor-plan')
+
+Tap Dashboard, land on the floor plan. `showGridNavSub()` calls `applyShiftUI()` too, so
+tile sub-menus bounced as well. **SIX things call it**: checkShiftLogin (x2),
+confirmWelcomeBackLogin, tryStaffFaceIdLogin, submitShiftPin, submitNewPin,
+showGridNavSub. Navigation in there fires on all of them.
+
+**And it was redundant.** All four login paths already call `goToTab('floor-plan')`
+themselves (~8729, ~9341, ~9380, ~9418) before calling `applyShiftUI()`. Belt and
+braces, where the braces yanked.
+
+**THE RULE, now learned twice in one day from the same six lines:** a function whose job
+is "make the UI reflect who is on shift" must not also decide where you are. The
+barista-view branch broke login for exactly this reason. I removed that branch and put
+my own navigation in its place. Same bug, new coat.
+
+## Per-person tiles were switched off by the same commit
+
+Daisy: "those tiles in the person round, they should have an option to add tiles, remove
+tiles, and shuffle them about like we said."
+
+**All of it exists and always did.** Long-press 600ms → `_personalEditMode` → tiles
+wobble. Add via `_showAddTileSheet()`. Remove by tapping a tile in edit mode
+(`_personalTileTap` filters it out of `tileOrder`/`promotedTiles`) with a red ✕ badge
+drawn on each. Rearrange by drag (`_pDragStart`/`_pDragOver`/`_pDrop`/`_pDragEnd`).
+Undo/redo via `_layoutSnapshot`. Auto-saves to `staff_home_screens`. Green dot where the
+learning engine has a suggestion for that group.
+
+**`4b4e40a` removed `loadPersonalHomeScreen()` from `applyShiftUI()`** — I read it as
+routing; it is data. It populates `_personalScreen`, and `showGridNav()` only shows a
+personal screen when `_personalScreen.tileOrder.length > 0`. So per-person tiles have
+been silently OFF since this afternoon. Restored. `startFloorDemo()` stays gone — that
+one genuinely was navigation.
+
+**⚠️ HONEST FLAG — rearranging by drag almost certainly does NOT work on Daisy's
+iPhone.** The tiles use HTML5 drag-and-drop (`draggable="true"`, `dragstart`, `drop`).
+**iOS Safari does not fire drag events from touch.** Add and remove will work; dragging
+will do nothing, silently. This file has already learned this once, on 15 July, for the
+stage checklists: *"tap ▲▼ to reorder, not drag. Touchscreen drag-and-drop is exactly
+the class of thing that fails silently and can't be verified without a device."* That
+lesson was applied to the checklists and never back-ported here. **Needs the same ▲▼
+substitution — flagged, not built, because it needs a device to confirm rather than a
+blind patch.**
+
+## Swipe back/forward — asked for, not built
+
+Daisy: "swipe right, swipe left doesn't seem to go forward or back."
+
+Correct — it doesn't. **The history stack already exists**: `_navPush`, `_navBack`,
+`_navForward`, `_applyNavState`, `_updateNavControls`, all defined, with `_navBack`
+wired to a button in only 2 places. There is no gesture layer on top of it. So the hard
+part (knowing where "back" goes) is done; the swipe itself is not. Next session.

@@ -11630,10 +11630,37 @@ function applyShiftUI() {
   //     login, landed on the plain floor plan. It navigated there and
   //     then straight back out from under itself.
   //
-  // Nothing is deleted: barista-view, loadPersonalHomeScreen() and
-  // startFloorDemo() are all untouched and still callable. Only this
-  // routing changed, so any of them is one line away from returning.
-  goToTab('floor-plan');
+  // ─── AND THE FIX TO THE FIX, 15 July 2026 evening ───
+  // The line here used to be goToTab('floor-plan'). That was WRONG, and
+  // Daisy found it within the hour: "when you hit dashboard from the
+  // main task screen, it returns to the floor plan."
+  //
+  // applyShiftUI() must NOT navigate. It is not a login step — it is
+  // "make the UI reflect who is on shift", and SIX things call it:
+  //   checkShiftLogin (x2), confirmWelcomeBackLogin, tryStaffFaceIdLogin,
+  //   submitShiftPin, submitNewPin, and showGridNavSub.
+  // Navigation in here fires on all of them. The chain that broke the
+  // Dashboard:
+  //     goToTab('dashboard') -> populateDashboard() -> checkShiftLogin()
+  //       -> applyShiftUI() -> goToTab('floor-plan')
+  // Tap Dashboard, land on the floor plan. showGridNavSub() calls it too,
+  // so tile sub-menus bounced as well.
+  //
+  // It was redundant anyway: all four login paths ALREADY call
+  // goToTab('floor-plan') themselves (~8729, ~9341, ~9380, ~9418) before
+  // calling this. Belt and braces, where the braces yanked.
+  //
+  // THE RULE, learned twice in one day: a function that makes the UI
+  // reflect state must not also decide where you are. The barista-view
+  // branch broke login for the same reason, from the same lines.
+  //
+  // loadPersonalHomeScreen() restored below — NOT navigation, just data.
+  // It populates _personalScreen, which is what lets each person have
+  // their own tiles and rearrange them. Removing it earlier today
+  // silently turned per-person tiles off, because showGridNav() only
+  // shows a personal screen when _personalScreen has tiles in it.
+  // startFloorDemo() stays gone: that one WAS navigation.
+  loadPersonalHomeScreen();
   // Opening checklist — PARKED, per direct request, kept as demo for
   // now. Genuinely nothing deleted: the real modal, its data, and
   // every function are completely untouched — this is the single,
