@@ -5879,13 +5879,19 @@ app.get('/api/staff/team-for-login', async (req, res) => {
   const onShift = new Set((activeShifts || []).map(s => s.staff_member_id));
 
   // Check for holidays today
+  // NOTE: no .catch() here. A supabase-js query builder is a thenable
+  // (it implements `then` only) — it has NO .catch, so chaining one throws
+  // TypeError: q.catch is not a function. That threw inside this async
+  // handler, Express 4 does not catch rejections from async handlers, so
+  // the request never got a response and the login picker hung on
+  // "Loading team..." forever. supabase-js returns errors in the result
+  // rather than throwing, so the (holidays || []) below is the guard.
   const { data: holidays } = await supabase.from('staff_holidays')
     .select('staff_member_id')
     .eq('studio_id', studioId)
     .lte('start_date', today)
     .gte('end_date', today)
-    .eq('approved', true)
-    .catch(() => ({ data: [] }));
+    .eq('approved', true);
   const onHoliday = new Set(((holidays || [])).map(h => h.staff_member_id));
 
   res.json({
@@ -9249,13 +9255,13 @@ app.post('/api/pieces/find-by-photo', async (req, res) => {
               ai_reasoning: reason, ai_confidence: 'high',
               all_candidates: [{ id: best.candidate.id, distance: best.dist }],
               packer_id: searchedBy || null, packer_confirmed: true,
-            }).catch(() => {});
+            });  // no .catch — builder is a thenable, chaining .catch throws
           }
         }
         await supabase.from('piece_search_log').insert({
           studio_id: studioId, searched_by: searchedBy || null,
           results_count: 1, top_result_piece_id: best.candidate.id,
-        }).catch(() => {});
+        });  // no .catch — builder is a thenable, chaining .catch throws
         return res.json({
           matches: [{ id: best.candidate.id, source: 'piece', label: best.candidate.piece_type,
             confidence: 'high', reason }],

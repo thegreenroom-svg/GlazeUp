@@ -2289,3 +2289,48 @@ If it 502s again, the ivory error screen (built earlier tonight) will now show
 the REAL Supabase error message rather than a generic one — that message is the
 actual diagnosis. If it loads, the crash theory was likely correct and this is
 resolved.
+
+# ═══════════════════════════════════════════════════════════
+# ⚠️  THE LOGIN HANG — .catch() on a Supabase builder. Three places.
+# ═══════════════════════════════════════════════════════════
+
+Daisy: login picker stuck on "Loading team..." for 4+ minutes, green "API Connected"
+badge showing. The badge was honest — the server was up. One route was hanging.
+
+**Root cause, verified rather than guessed.** `/api/staff/team-for-login` chained
+`.catch(() => ({ data: [] }))` onto the `staff_holidays` query. A supabase-js query
+builder is a **thenable, not a Promise** — it implements `then` and nothing else.
+Installed the real library and checked:
+
+    typeof builder.then   : function
+    typeof builder.catch  : undefined
+    is real Promise       : false
+    .catch()              : TypeError: q.catch is not a function
+
+So that line threw a TypeError on **every single request**, inside an async handler.
+**Express 4 does not catch rejections from async handlers** — it never responds. The
+request hangs forever. Not a 502. A hang. Which is exactly what "Loading team..."
+forever looks like, and why no error ever appeared.
+
+**Note the irony:** the `unhandledRejection` handler added in d664bea keeps the process
+alive now instead of letting it die and restart. Correct change, but it made this bug
+*quieter*. It had to be found by reading, not by waiting.
+
+**Two more instances of the identical bug, in the photo-match path** (`find-by-photo`,
+the on-device hash route built the previous session): `.catch(() => {})` chained onto
+`piece_match_attempts.insert()` and `piece_search_log.insert()`. Both fire the moment a
+confident local hash match is found — meaning **the free on-device photo matcher has
+never once worked.** It threw and hung the request every time it succeeded. Nobody
+noticed because a hang looks like slowness, and the AI fallback path never reaches
+those lines.
+
+**Fixed:** removed `.catch()` from all three. supabase-js returns errors in the result
+rather than throwing, so the existing `(holidays || [])` and fire-and-forget semantics
+are preserved exactly. `extractCustomerMemory(...).catch(() => {})` at ~4229 is left
+alone — that one is a real async function returning a real Promise, so it is correct.
+
+**The lesson, same family as the four bugs before it:** `await supabase.from(...)` looks
+like a Promise and behaves like one under `await`. It is not one. Never chain `.catch`,
+`.then`, or `.finally` onto it. Destructure `{ data, error }` and check `error`.
+
+**Grepped the whole file** — no other `.catch` on a supabase builder remains.
