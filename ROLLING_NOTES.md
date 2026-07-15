@@ -2428,3 +2428,31 @@ noticing.
 schema drifted apart and nothing ever checked. A `select()` naming a column that does
 not exist is the SQL equivalent of `refreshFloorPlan()` — a call into something that was
 never built. Worth running that column diff for every table before the next feature.
+
+## The overnight kiln modal is an unbreakable loop — same root cause, found 15 July 2026
+
+Daisy hit the red "Overnight kiln check" modal (batch `KILN-DEMO-QUEUED`, from
+`demo_workflow_seed.sql`) repeatedly. **It can never be dismissed**, and it is the same
+schema drift as `bookings.status`:
+
+`POST /api/kiln/morning-check/confirm-fired-ok` writes `morning_check_confirmed_at`,
+`morning_check_confirmed_by` AND `morning_check_result`. `report-misfire` writes
+`misfire_notes`. **None of those four columns exist.** So tapping "Yes — fired OK"
+returns 500, the confirmation is never recorded, the batch stays unconfirmed, and the
+modal fires again on the very next load. Forever. That is the "fire error" in Daisy's
+words, and the `42703` in the Render log every two minutes.
+
+`FIX_FLOOR_PLAN_COLUMNS.sql` now adds all four (the first pass had only two — found by
+grepping every `morning_check_*` reference rather than trusting the column the error
+named).
+
+**Note the shape, for the fifth time this week:** the modal is not broken. The button is
+not broken. The endpoint is not broken. A column the code writes to was never created.
+Same as `refreshFloorPlan()`, same as `#floor-table-detail`, same as `.catch()` on a
+thenable — a call into something that was never built.
+
+**Separately, Daisy wants the demo data out of this section entirely.** `KILN-DEMO-QUEUED`
+and `KILN-DEMO-FIRED` come from `demo_workflow_seed.sql`. Deleting those two rows stops
+the modal appearing at all, independently of the column fix. Both are worth doing: the
+columns because the feature is genuinely broken for real batches too, the demo rows
+because she does not want training data in the way.

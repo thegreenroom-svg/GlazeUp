@@ -49,6 +49,12 @@ ALTER TABLE bookings ADD COLUMN IF NOT EXISTS room TEXT;
 -- outside it. Only the two genuinely missing columns are added here.
 ALTER TABLE kiln_sessions ADD COLUMN IF NOT EXISTS morning_check_confirmed_at TIMESTAMPTZ;
 ALTER TABLE kiln_sessions ADD COLUMN IF NOT EXISTS morning_check_confirmed_by TEXT;
+-- Added after seeing the modal on a real device: confirm-fired-ok also writes
+-- morning_check_result, and report-misfire writes misfire_notes. Missing either
+-- makes the confirm fail, so the check can never be recorded — which is why the
+-- overnight kiln modal reappears on every single load no matter what you tap.
+ALTER TABLE kiln_sessions ADD COLUMN IF NOT EXISTS morning_check_result TEXT;
+ALTER TABLE kiln_sessions ADD COLUMN IF NOT EXISTS misfire_notes TEXT;
 
 -- ═══════════════════════════════════════════════════════════════════
 -- VERIFY — every row should read ✓
@@ -60,4 +66,6 @@ UNION ALL SELECT 'bookings.current_stage', CASE WHEN EXISTS (SELECT 1 FROM infor
 UNION ALL SELECT 'bookings.booking_type', CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='bookings' AND column_name='booking_type') THEN '✓' ELSE '✗ MISSING' END
 UNION ALL SELECT 'bookings.room', CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='bookings' AND column_name='room') THEN '✓' ELSE '✗ MISSING' END
 UNION ALL SELECT 'kiln_sessions.morning_check_confirmed_at', CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='kiln_sessions' AND column_name='morning_check_confirmed_at') THEN '✓' ELSE '✗ MISSING' END
-UNION ALL SELECT 'kiln_sessions.morning_check_confirmed_by', CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='kiln_sessions' AND column_name='morning_check_confirmed_by') THEN '✓' ELSE '✗ MISSING' END;
+UNION ALL SELECT 'kiln_sessions.morning_check_confirmed_by', CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='kiln_sessions' AND column_name='morning_check_confirmed_by') THEN '✓' ELSE '✗ MISSING' END
+UNION ALL SELECT 'kiln_sessions.morning_check_result', CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='kiln_sessions' AND column_name='morning_check_result') THEN '✓' ELSE '✗ MISSING' END
+UNION ALL SELECT 'kiln_sessions.misfire_notes', CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='kiln_sessions' AND column_name='misfire_notes') THEN '✓' ELSE '✗ MISSING' END;
