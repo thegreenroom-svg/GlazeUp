@@ -2862,3 +2862,61 @@ own numbers, which is the only reason this was ever acceptable. But "harmless fa
 accumulating in production" is precisely the shape of tonight's other problem: nobody
 could tell Women's Institute from a real booking. Fake rows are only ever safe while
 someone remembers they're fake.
+
+## The Vault was missing because a safety guard locked the gate. 15 July 2026
+
+Daisy: "there's only two areas. We need the lounge, the main studio, and the vault.
+You've got all that detail."
+
+She was right on both counts. `seed_real_table_structure.sql` has been in this repo the
+whole time and describes itself as "confirmed directly": **8 Main Studio tables, 6
+Lounge tables (9-14), The Vault**. Nobody needed to guess anything.
+
+**It has never run.** The whole file is wrapped in:
+
+    IF NOT EXISTS (SELECT 1 FROM studio_tables WHERE studio_id = ...)
+
+— it only seeds a studio with ZERO tables. Three had already been added by hand ("1",
+"10", "Table 5A"), so the guard blocked all fifteen, silently, permanently. A safety
+rail that locked the gate it was protecting. The floor plan reads rooms straight from
+`studio_tables`, so no Vault row means no Vault on screen. The design was never wrong.
+
+`FIX_STUDIO_TABLES.sql` (NEW — needs running). Additive, re-runnable, never deletes.
+
+**Step 2 is the one that matters and is easy to skip.** The hand-typed rows are named
+"1" and "10"; the confirmed structure calls them "Table 1" and "Table 10". Inserting
+without renaming first would put a "Table 1" NEXT TO the existing "1" — two tiles for
+one real table, which is worse than the missing Vault. So bare-number names are
+renamed before the insert, and the insert is per-row `NOT EXISTS`.
+
+**The Vault is 14, not 12.** `seed_real_table_structure.sql` says 12;
+`update_table_capacities.sql` corrects it to 14 ("The Vault: up to 14 as one group")
+and is the later confirmed word. Applied on insert so it is right first time.
+
+## Empty tables can't open the task panel — and the obvious fix writes junk
+
+Daisy: "even if there aren't any bookings... I'd like to see the task, so staff can muck
+around."
+
+`openTableDetail(bookingCode)` starts `const b = _floorData.bookings.find(...); if (!b)
+return;`. No booking, no panel. Empty tables genuinely have no handler.
+
+**DO NOT just fake a booking object to get in.** Everything behind that panel writes to
+the server keyed on `booking_code`:
+- `renderDetailCanvas()` saves chair/placemat positions to `/api/floor/items/:bookingCode`
+- the auto-assign fires `POST /api/floor/assign`
+- checklist ticks persist against the booking
+
+A synthetic code like `practice-table-3` would write real rows into `table_session_items`,
+`booking_assignments` and `booking_flow_checks` referencing a booking that does not
+exist. That is orphaned junk in production, indistinguishable from real data — which is
+**exactly** the mess that took hours to clean out of this database today. Building it
+that way would undo the day's main lesson.
+
+**Two honest options, for Daisy to choose:**
+1. **Practice mode** — panel opens, everything renders, nothing persists. Explicitly
+   labelled so nobody thinks their taps saved. Staff can muck around freely.
+2. **Empty table starts a booking** — tapping an empty table opens the walk-in flow, so
+   the tap means something real. This is arguably what a studio actually wants.
+
+Not built. Asked.
