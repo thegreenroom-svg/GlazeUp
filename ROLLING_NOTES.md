@@ -2236,3 +2236,13 @@ same way.
 502s will keep happening — that's Render's free tier, not this code — but from now on
 they'll show an on-brand "couldn't load, try again" rather than the jarring old dark
 screen, and a retry once the instance is warm will show the real elegant design.
+
+## Old marketing page disconnected, per direct request
+
+The `/promo` marketing pitch (for other studios considering kilnLINK) is no longer
+reachable — the static route serving it and the root redirect to it are both removed.
+**Files left untouched in the repo**, only the routes removed — reversible if wanted
+back later. The bare domain root now redirects to the real staff app instead of the
+old pitch. Confirmed nothing else in the codebase linked to `/promo`, so this is a
+clean removal with no dangling references. The customer app (`/app`) and its data are
+completely untouched — different route, never part of this change.

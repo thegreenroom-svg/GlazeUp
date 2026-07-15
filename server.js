@@ -135,9 +135,13 @@ app.use('/app', express.static(path.join(__dirname, 'app'), staticCacheOptions))
 // under this path has always genuinely 404'd. Confirmed via a real,
 // live browser console error, not assumed.
 app.use('/brand-assets', express.static(path.join(__dirname, 'brand-assets'), staticCacheOptions));
-app.use('/promo', express.static(path.join(__dirname, 'promo'), staticCacheOptions));
-// Redirect root to promo page for prospective studio owners
-app.get('/', (req, res) => res.redirect('/promo'));
+// The old kilnLINK marketing/pitch page, previously served at /promo and
+// redirected to from the bare root, is disconnected as of 15 July 2026 —
+// "old marketing," per direct request. The files themselves are left in
+// the /promo folder, untouched, in case they're wanted again — only the
+// routes that made them reachable are removed. Nothing about the
+// customer app (/app) or the staff app (/admin) is touched by this.
+app.get('/', (req, res) => res.redirect('/admin/dashboard-local.html'));
 
 // Favicon — served from root so browsers find it automatically
 // at glazeup-api.onrender.com/favicon.ico
