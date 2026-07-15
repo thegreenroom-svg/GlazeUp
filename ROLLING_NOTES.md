@@ -2139,3 +2139,70 @@ modal. Reliable, no new DOM to get subtly wrong, appropriate for an infrequent a
 It is one screen, chosen because it is real, already verified working, and small. If
 this pattern is wanted more broadly, it is a rollout of an already-tested approach next
 session — not a blind rebuild of everything tonight.
+
+# ═══════════════════════════════════════════════════════════
+# The elegant home screen, room drill-down, and login fix — all approved, pushed together
+# ═══════════════════════════════════════════════════════════
+
+Daisy confirmed via two real previews (built from the exact live functions, not mockups)
+that this is correct and wants it live:
+
+- **`renderFloorPlanElegant()`** — the ivory, pencil-drawn screen as the actual home
+  screen (not a dark grid with one small icon reskinned — that was a genuine
+  misunderstanding on my part earlier tonight, corrected here). Shows all three rooms
+  (Main Studio, Lounge, Vault), reading REAL data from `_floorData` (real `studio_tables`,
+  real `bookings`) — no guessed positions, no DEMO_COVERS. Tables auto-flow in reading
+  order since `studio_tables` has no x/y columns — honest, since a hand-picked position
+  would have been just as much a guess.
+- **`showRoomElegant(roomName)`** — tap a room's name on the home screen, get a full
+  page for just that room, with its own back button. Tapping a table still opens the
+  real, working `openTableDetail()` panel — chairs, checklist, routes into the tile
+  system — completely unchanged.
+- Shared drawing logic refactored into `_elegantRoomsData()` / `_elegantLayoutRoom()` /
+  `_renderElegantRoomSVG()` so home and drill-down can never drift apart from each other.
+- **Login now actually navigates there.** All three login paths (real PIN, Face ID,
+  offline fallback) call `goToTab('floor-plan')`, which now renders this elegant view.
+
+## Staff picker — roles shown, Dave removed
+
+- **A role line already existed** under each name in the picker (`${m.role}`) — it
+  just needed correct values, not new UI.
+- **`DEMO_STAFF`** (offline fallback): Dave (barista) removed entirely — "no longer
+  relevant," per direct instruction. Roles updated: Daisy = General Manager, Jenny =
+  Studio Executive, David = Co-Director, Lucy = Studio Assistant, Ruby = Studio
+  Assistant. `ROLE_COLORS_LOGIN` extended so General Manager/Co-Director don't fall
+  back to grey.
+- **`add_staff_titles_and_dave.sql` (NEW — needs running):** sets Dave inactive in the
+  real `staff_team` table (not deleted — reversible, keeps his shift history intact;
+  `/api/staff/team-for-login` already filters on `active = true`, so this alone removes
+  him from the real picker) and updates the same role titles in the real data.
+
+## Platform Revenue access — checked, already correct, no change needed
+
+Verified `PLATFORM_REVENUE_ACCESS_NAMES = ['david', 'jenny', 'daisy', 'elliott']` in
+server.js — genuinely enforced server-side across six separate endpoints (spot-checked
+one), not just hidden in the UI. This is David (co-director father), not Dave (barista,
+just removed) — the two names look near-identical in dictation and this was worth
+verifying rather than assuming. Already exactly matches what was asked for. No change.
+
+## Notes for Elliott
+
+Wrote `host-by-post-notes-for-elliott.md` — a real handoff document, not code. Explains
+Post→Order→Job, the three-leg journey (out / customer posts back / studio posts back),
+and flags it's a reference from the app side, not overriding his own Host By Post work.
+
+## Every SQL file outstanding right now, in one place
+
+Run these in Supabase project `mdpchpjnlzlmldtlqrns`, in any order, all safe to re-run:
+
+1. `add_booking_room.sql` — room column on bookings (Main/Lounge/Vault ambiguity)
+2. `learning_engine_schema.sql` — the two learning-engine tables
+3. `add_perceptual_hash.sql` — on-device photo fingerprint column on pottery_pieces
+4. `add_stock_shape_photos.sql` — stock shape recognition, tied to real Square items
+5. `add_staff_checklist_customization.sql` — per-staff checklist reorder/rename/describe
+6. `add_staff_titles_and_dave.sql` — NEW, this session: deactivate Dave, set real titles
+
+**Superseded — do NOT run:** `add_piece_shape_link.sql`. It links to the dead
+`bisque_shapes` table, corrected later the same night by `add_stock_shape_photos.sql`,
+which uses the real Square item id instead. Left in the repo for the record but should
+not be run.

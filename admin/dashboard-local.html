@@ -8438,13 +8438,18 @@ const DEMO_MODE = true;
 // Local fallback team — used only when the API can't be reached, so the
 // login picker never dead-ends. PINs here must match the real ones in
 // Supabase (reset_all_pins_to_0000.sql sets everyone to 0000).
+// Dave (barista) removed 15 July 2026 — no longer relevant, per direct
+// request. Roles updated to match the actual titles confirmed the
+// same night: Daisy is general manager, Jenny is studio executive,
+// David remains co-director, Lucy is studio assistant / in-house
+// artist. This is the offline fallback only — the real team list and
+// its roles live in staff_team; see add_staff_titles_and_dave.sql.
 const DEMO_STAFF = [
-  { id: '1', name: 'David', pin: '0000', role: 'Manager' },
-  { id: '2', name: 'Jenny', pin: '0000', role: 'Manager' },
-  { id: '3', name: 'Daisy', pin: '0000', role: 'Manager' },
-  { id: '4', name: 'Dave', pin: '0000', role: 'Barista' },
-  { id: '5', name: 'Lucy', pin: '0000', role: 'Staff' },
-  { id: '6', name: 'Ruby', pin: '0000', role: 'Staff' },
+  { id: '1', name: 'David', pin: '0000', role: 'Co-Director' },
+  { id: '2', name: 'Jenny', pin: '0000', role: 'Studio Executive' },
+  { id: '3', name: 'Daisy', pin: '0000', role: 'General Manager' },
+  { id: '5', name: 'Lucy', pin: '0000', role: 'Studio Assistant' },
+  { id: '6', name: 'Ruby', pin: '0000', role: 'Studio Assistant' },
   { id: '7', name: 'Cleo', pin: '0000', role: 'Chief Taster' }
 ];
 
@@ -8657,7 +8662,7 @@ function checkShiftLogin() {
   loadLoginNamePicker();
 }
 
-const ROLE_COLORS_LOGIN = { 'Chief Taster':'#F4A9C0', 'Studio Manager':'#5E35B1', 'Studio Executive':'#1E88E5', 'Ceramic Technician':'#8D6E63', 'Studio Assistant':'#00897B', 'Barista':'#F4511E', 'CEO':'#F9A825' };
+const ROLE_COLORS_LOGIN = { 'Chief Taster':'#F4A9C0', 'Studio Manager':'#5E35B1', 'Studio Executive':'#1E88E5', 'Ceramic Technician':'#8D6E63', 'Studio Assistant':'#00897B', 'Barista':'#F4511E', 'CEO':'#F9A825', 'General Manager':'#B87946', 'Co-Director':'#B87946' };
 let selectedLoginMember = null;
 
 function skipLoginUseSharedView() {
@@ -9675,6 +9680,158 @@ let _detailBooking = null;
 let _detailItems = [];
 let _detailTimerInterval = null;
 
+// ═══════════════════════════════════════════════════════════
+// THE ELEGANT FLOOR PLAN — real data, hand-drawn, correctly this time
+//
+// Corrects a genuine mistake this same night: "bring the hand-drawn
+// look into the real system" was done by reskinning the small icon
+// inside the dark grid tiles. That was not what was asked for — the
+// ivory, pencil-drawn SCREEN itself, as the actual home screen,
+// reading real data. This is that, built properly:
+//
+// - The drawing itself reuses _stroke/_handRect/_chair/_tableSize/
+//   _chairPositions/_PENCIL_FILTER exactly as already built and
+//   tested earlier tonight for the (now-unused-for-data) FLOOR_PLAN
+//   system. Nothing about the pencil technique is new or unverified.
+// - The DATA is real: _floorData.tables (from studio_tables via
+//   /api/floor/tables) and _floorData.bookings (from bookings via
+//   /api/floor/active) — the same fetch loadFloorPlan() already does.
+//   No guessed positions, no DEMO_COVERS.
+// - studio_tables has no x/y position columns, so tables are laid
+//   out automatically, in reading order (their real sort_order),
+//   flowing left to right and wrapping — honest, since a hand-picked
+//   pixel position would have been just as much a guess as the
+//   position data doesn't exist to begin with.
+// - Tapping a table opens the REAL, working openTableDetail() panel
+//   (chairs, checklist, routes into the tile system) — not the dead
+//   showTableDetail()/TABLE_ACTIONS system.
+// ═══════════════════════════════════════════════════════════
+
+// ── Shared drawing helpers, used by BOTH the all-rooms home view and
+// the single-room drill-down page, so the two can never drift apart. ──
+const _ELEGANT_ROOM_WIDTH = 900, _ELEGANT_PAD = 30, _ELEGANT_GAP = 26;
+
+function _elegantRoomsData() {
+  const tables = _floorData.tables || [];
+  const bookings = _floorData.bookings || [];
+  const bookingByTable = {};
+  bookings.forEach(b => { if (b.table_number) bookingByTable[b.table_number] = b; });
+  const rooms = {};
+  tables.forEach(t => { (rooms[t.room || 'Studio'] ||= []).push(t); });
+  Object.values(rooms).forEach(list => list.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
+  return { rooms, bookingByTable };
+}
+
+function _elegantLayoutRoom(list) {
+  let x = _ELEGANT_PAD, y = _ELEGANT_PAD, rowH = 0;
+  const placed = list.map(t => {
+    const size = _tableSize(t.capacity || 4);
+    if (x + size.w > _ELEGANT_ROOM_WIDTH - _ELEGANT_PAD) { x = _ELEGANT_PAD; y += rowH + _ELEGANT_GAP; rowH = 0; }
+    const pos = { ...t, x, y, size };
+    x += size.w + _ELEGANT_GAP;
+    rowH = Math.max(rowH, size.h);
+    return pos;
+  });
+  return { placed, height: y + rowH + _ELEGANT_PAD * 2 + 20 };
+}
+
+// tappable = whether the room's own <h2> heading opens the full-page
+// drill-down (true on the home overview, false once already on that
+// room's own page — no point tapping through to where you already are).
+function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable) {
+  const { placed, height } = _elegantLayoutRoom(list);
+  const INK = '#2B2724';
+
+  const tableEls = placed.map(t => {
+    const b = bookingByTable[t.name];
+    const busy = !!b;
+    const accent = busy ? (STAGE_COLOURS[b.current_stage] || INK) : INK;
+    const seed = _seedFrom(t.id || t.name);
+
+    const chairs = _chairPositions(t.capacity || 4, t.size.w, t.size.h).map((ch, i) => {
+      const seated = busy && i < (b.party_size || 0);
+      return _chair(t.x + ch.x, t.y + ch.y, ch.up, INK, seated ? 1.4 : 0.75, seed + i)
+           + (seated ? `<circle cx="${t.x + ch.x}" cy="${t.y + ch.y}" r="3.6" fill="${accent}" fill-opacity="0.55"/>` : '');
+    }).join('');
+
+    const label = busy
+      ? `<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 - 3}" text-anchor="middle"
+           font-family="'Caveat',cursive" font-size="22" font-weight="700" fill="${INK}">${t.name}</text>
+         <text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 + 13}" text-anchor="middle"
+           font-family="'Caveat',cursive" font-size="14" fill="${INK}" fill-opacity="0.75">${b.customer_name || ''}</text>`
+      : `<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 + 5}" text-anchor="middle"
+           font-family="'Caveat',cursive" font-size="21" font-weight="500" fill="${INK}" fill-opacity="0.4">${t.name}</text>`;
+
+    const stripe = busy
+      ? `<line x1="${t.x + 8}" y1="${t.y + t.size.h - 5}" x2="${t.x + t.size.w - 8}" y2="${t.y + t.size.h - 5}"
+           stroke="${accent}" stroke-width="3" stroke-linecap="round"/>` : '';
+
+    return `<g style="cursor:pointer" onclick="${busy ? `openTableDetail('${b.booking_code}')` : ''}">
+      ${chairs}
+      ${_handRect(t.x, t.y, t.size.w, t.size.h, seed, busy ? 1.7 : 1.0, INK, '#FFFDF9')}
+      ${stripe}${label}
+    </g>`;
+  }).join('');
+
+  return `
+    <div style="margin-bottom:26px;">
+      <h2 onclick="${tappable ? `showRoomElegant('${roomName}')` : ''}"
+        style="color:#2B2724;font-family:'Architects Daughter',cursive;font-size:14px;
+        letter-spacing:0.06em;margin:0 0 8px;opacity:0.6;${tappable ? 'cursor:pointer;' : ''}">
+        ${roomName}${tappable ? ' →' : ''}
+      </h2>
+      <svg viewBox="-10 -10 ${_ELEGANT_ROOM_WIDTH + 20} ${height}"
+        style="width:100%;height:auto;display:block;background:#F4ECE0;
+        border:1px solid rgba(43,39,36,0.15);border-radius:10px;">
+        <defs>${_PENCIL_FILTER}</defs>
+        <g filter="url(#pencil)">${tableEls}</g>
+      </svg>
+    </div>`;
+}
+
+function renderFloorPlanElegant() {
+  const view = document.getElementById('floor-plan-view');
+  if (!view) return;
+  const { rooms, bookingByTable } = _elegantRoomsData();
+  const resting = Object.keys(rooms).length === 0;
+
+  view.innerHTML = `
+    <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div>
+          <div style="font-family:'Caveat',cursive;font-size:28px;font-weight:700;color:#2B2724;">The Kiln Cafe</div>
+          <div style="font-size:11px;color:#8a8175;">Live studio view</div>
+        </div>
+        <button onclick="goToRealLandingPage()" class="glaze-tile"
+          style="border:none;padding:9px 16px;font-size:12px;font-weight:800;cursor:pointer;">🏠 Home</button>
+      </div>
+      ${resting ? `<div style="text-align:center;padding:40px 20px;color:#8a8175;font-size:13px;">
+        No tables set up yet for this studio.</div>`
+        : Object.entries(rooms).map(([name, list]) => _renderElegantRoomSVG(name, list, bookingByTable, true)).join('')}
+    </div>`;
+}
+
+// The drill-down: one room, full page, its own back button. Tables
+// still tap through to the same real openTableDetail() panel.
+function showRoomElegant(roomName) {
+  const view = document.getElementById('floor-plan-view');
+  if (!view) return;
+  const { rooms, bookingByTable } = _elegantRoomsData();
+  const list = rooms[roomName] || [];
+
+  view.innerHTML = `
+    <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+        <button onclick="renderFloorPlanElegant()" class="glaze-tile"
+          style="border:none;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;">← Floor plan</button>
+        <div style="font-family:'Caveat',cursive;font-size:24px;font-weight:700;color:#2B2724;">${roomName}</div>
+      </div>
+      ${list.length
+        ? _renderElegantRoomSVG(roomName, list, bookingByTable, false)
+        : `<div style="text-align:center;padding:40px 20px;color:#8a8175;font-size:13px;">No tables set up in ${roomName} yet.</div>`}
+    </div>`;
+}
+
 async function loadFloorPlan() {
   try {
     const [floorRes, tablesRes] = await Promise.all([
@@ -9699,7 +9856,7 @@ async function loadFloorPlan() {
       bookings: floorData.bookings || [],
       tables: tablesData.tables || []
     };
-    renderFloorPlan();
+    renderFloorPlanElegant();
   } catch(e) {
     console.warn('Floor plan load failed:', e);
     const mainGrid = document.getElementById('floor-main-studio');
@@ -10008,7 +10165,7 @@ function closeTableDetail() {
   if (_detailTimerInterval) { clearInterval(_detailTimerInterval); _detailTimerInterval = null; }
   _detailBooking = null;
   _saveDetailItems();
-  renderFloorPlan();
+  renderFloorPlanElegant();
 }
 
 function _startDetailTimer() {
@@ -10274,7 +10431,7 @@ async function toggleFlowCheck(bookingCode, stage, checkKey, completed) {
 // This just refreshes the render if the floor plan is currently visible.
 function _checkFloorPlanMode() {
   const floorVisible = document.getElementById('floor-plan-view')?.style.display === 'flex';
-  if (floorVisible) renderFloorPlan();
+  if (floorVisible) renderFloorPlanElegant();
 }
 
 function showAllTablesView() { /* legacy — now built into main floor plan */ }
