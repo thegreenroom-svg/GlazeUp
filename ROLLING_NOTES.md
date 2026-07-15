@@ -2768,3 +2768,49 @@ honest record of which build is being loaded.
 **The shape, one more time:** the mechanism worked, the wiring worked, the thing that
 failed was that nobody could reach it. Same as `#floor-table-detail`, same as the room
 drill-down being bound to a 14px heading.
+
+## Elliott restored — and the one-t row was the actual bug. 15 July 2026
+
+Removed earlier today on Daisy's instruction ("the Elliot with the one t is still there...
+he doesn't exist"). Corrected by her within the hour: **"Eliot. Two t's. Director."**
+
+The two statements are not a contradiction — they resolve into one bug. Elliott is a
+real director. A `staff_team` row spelled **"Elliot"** is a typo, not a person.
+
+**And the typo is not cosmetic.** Director access is a first-name check, server-side,
+across six endpoints:
+
+    PLATFORM_REVENUE_ACCESS_NAMES.includes(firstName)   // 'elliott'
+
+`'Elliot'.toLowerCase()` is not `'elliott'`. So he would be **silently locked out of
+Platform Revenue and `/api/analytics/dashboard`** — the takings figures — while sitting
+on the access list, looking correct in code review. **Exactly the same failure mode as
+Dave/David**, which sent the co-director to the barista page. That is twice this week
+that a hardcoded first-name check has misfired on a near-identical name. **The real fix
+is to stop identifying directors by first name and use `staff_team.id` or a `role`
+column — flagged, not done, because it touches six endpoints and tonight is not the
+night.**
+
+`FIX_ELLIOTT_SPELLING.sql` (NEW — needs running). Also brings Cleo back into the real
+`staff_team`: she is in the client's `DEMO_STAFF` fallback but not in the database, so
+while `team-for-login` was hanging the picker fell back to demo staff and she appeared —
+and the moment the API started working, she didn't. Nothing broke. The app got honest.
+
+**Step 1 is a SELECT on its own, deliberately.** If there is both an "Elliot" AND an
+"Elliott", that is a duplicate person with split shift history, not a typo, and merging
+it is not something to guess at.
+
+## The HR system — searched, and there is nothing to find
+
+Daisy: "Can you link to HR? I know we have a system. Can you find it?"
+
+**It was never named.** On 10 July she asked the same question, was given the list (Xero,
+QuickBooks, Sage, BrightPay, Moneysoft, Breathe HR, BambooHR) and asked which one — and
+replied **"Forget that."** So it is in no chat and no file. Nothing to find. It needs
+naming before anything can be checked.
+
+**Worth knowing: kilnLINK already does this.** Built 10 July — 🕐 Timekeeping (date
+filter, per-person totals, shift list, CSV export) and 🏖️ Holiday requests (request →
+manager approve/reject → running allowance, 28 days default, editable per person). It
+deliberately does not calculate pay, tax or NI; the CSV is the bridge to real payroll.
+That was the right call and should stay the right call.

@@ -69,7 +69,13 @@ const app = express();
 // sensitive financial data: Platform Revenue (worldwide SaaS income) and
 // The Kiln Cafe's own real revenue/analytics. Declared once, early, so
 // every endpoint that needs it references the same single source of truth.
-const PLATFORM_REVENUE_ACCESS_NAMES = ['david', 'jenny', 'daisy'];  // Elliott removed 15 July 2026 — not a director
+// Elliott is a director and has access. Note the spelling: TWO t's.
+// This check is `firstName === 'elliott'`, so a staff_team row spelled
+// "Elliot" locks him out of every one of the six endpoints below even
+// though he is on this list — the list and the row have to agree.
+// (Removed briefly on 15 July on the basis of a one-t "Elliot" row that
+// shouldn't exist; the person is real, the row's spelling was the bug.)
+const PLATFORM_REVENUE_ACCESS_NAMES = ['david', 'jenny', 'daisy', 'elliott'];
 
 // Square's SDK returns some numbers as BigInt, which JSON.stringify cannot
 // serialize by default. Teach BigInt to serialize as a string, globally,
