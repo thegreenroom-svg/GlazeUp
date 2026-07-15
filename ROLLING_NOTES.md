@@ -2334,3 +2334,55 @@ like a Promise and behaves like one under `await`. It is not one. Never chain `.
 `.then`, or `.finally` onto it. Destructure `{ data, error }` and check `error`.
 
 **Grepped the whole file** — no other `.catch` on a supabase builder remains.
+
+# ═══════════════════════════════════════════════════════════
+# Login picker can never gate the demo again + Elliott removed — 15 July 2026
+# ═══════════════════════════════════════════════════════════
+
+## The picker's fallback was always right. It just never got a chance to run.
+
+`loadLoginNamePicker()` has always caught a failed team fetch and fallen back to
+`DEMO_STAFF`, so the avatar picker is always what you land on. That code was correct.
+
+**But a fallback can only run if the fetch resolves OR rejects.** The server bug fixed
+in 71d27bb did neither — Express 4 accepted the connection and never answered, so
+`await fetch` hung forever, the catch never fired, and the fallback never ran. Four
+minutes on "Loading team...". The fallback was sitting right there the whole time,
+unreachable.
+
+**Fixed with a 6-second AbortController timeout.** Hanging becomes a real rejection,
+which the existing catch already handles. **Verified rather than assumed** — ran the
+real file in jsdom against a stubbed server that accepts and never responds:
+
+    fell back after : 6.1s
+    names shown     : David, Jenny, Daisy, Lucy, Ruby, Cleo
+
+**Why this matters beyond today's bug:** the server fix removes the known cause. This
+removes the whole class. Whatever the API does — hang, die, cold-start, 502 — staff see
+a working picker within 6 seconds. Daisy's requirement, stated plainly: the demo must
+never be gated on the team loading.
+
+## Elliott removed from director access
+
+Per direct instruction: "he doesn't exist, he was just for me to work with." Removed
+from `PLATFORM_REVENUE_ACCESS_NAMES` (server.js) and `PLATFORM_REVENUE_ACCESS` (client).
+Both now `['david', 'jenny', 'daisy']`. Server-side enforcement across six endpoints is
+untouched and still genuine — only the list changed.
+
+**NOT done, deliberately, flagged rather than guessed:**
+- `add_elliott_staff.sql` still exists in the repo and would add him to the real
+  `staff_team` if ever run. It is NOT in RUN_ALL_SIX.sql, so it has almost certainly
+  never run — but if Elliott appears in the real login picker, that is why. Say the
+  word and it gets deleted, or a deactivation line added.
+- His avatar SVG (~8881) and its CSS (~1423) are left in place. Harmless — the avatar
+  only renders for a name that actually comes back from `staff_team` or `DEMO_STAFF`,
+  and he is in neither. Removing ~40 lines of working art blind, at this point in the
+  week, is not worth the risk for zero gain.
+- `host-by-post-notes-for-elliott.md` untouched — that is a handoff document for a real
+  person, not app access.
+
+## Still true, still unverified
+
+Nobody has completed a login on a device yet. The floor plan chain itself is verified
+working in a real DOM with real data (7,868 chars of ivory SVG, no error path taken) —
+what has never been confirmed is what the live API returns to it.

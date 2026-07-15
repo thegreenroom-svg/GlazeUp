@@ -9003,14 +9003,29 @@ async function loadLoginNamePicker() {
   const grid = document.getElementById('login-name-grid');
   let team = null;
 
+  // A 6-second timeout, added 15 July 2026 after the picker sat on
+  // "Loading team..." for four minutes on a real device. The fallback
+  // below was always correct — but it can only run if the fetch either
+  // resolves or rejects. A server that accepts the connection and then
+  // never responds (which is exactly what a thrown-and-unanswered async
+  // handler does in Express 4) leaves `await fetch` hanging forever, so
+  // the catch never fires and the fallback never gets its chance.
+  // AbortController turns "hanging" into a real rejection, which the
+  // existing catch already handles. Nobody waits more than 6 seconds
+  // for a login screen again, whatever the server is doing.
+  const _pickerAbort = new AbortController();
+  const _pickerTimer = setTimeout(() => _pickerAbort.abort(), 6000);
   try {
-    const res = await fetch(`${API_URL}/api/staff/team-for-login?studioId=${studioId}`);
+    const res = await fetch(`${API_URL}/api/staff/team-for-login?studioId=${studioId}`,
+      { signal: _pickerAbort.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     team = data.team || [];
   } catch(e) {
     console.error('Team loading error — falling back to demo staff:', e);
     team = null;
+  } finally {
+    clearTimeout(_pickerTimer);
   }
 
   // Never dead-end on a blank or broken team list. If Supabase is down,
@@ -11552,7 +11567,7 @@ function confirmDirectLogout() {
 // This is a simple name check, not a full permissions system — good
 // enough while it's just the three of you, worth revisiting properly
 // before other studios are on the platform.
-const PLATFORM_REVENUE_ACCESS = ['David', 'Jenny', 'Daisy', 'Elliott'];
+const PLATFORM_REVENUE_ACCESS = ['David', 'Jenny', 'Daisy'];  // Elliott removed 15 July 2026 — not a director, was only ever a working placeholder
 
 // Measures the ACTUAL rendered heights of the platform revenue strip and
 // phone header, and sets .admin-wrapper's margin-top to match exactly —
