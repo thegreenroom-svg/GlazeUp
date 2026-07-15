@@ -1653,3 +1653,59 @@ needs the same treatment.
 
 **Not yet done:** no equivalent for Host By Post's demo orders, if those ever get seeded
 the same way.
+
+# ═══════════════════════════════════════════════════════════
+# ⚠️  SECOND URGENT FIND, same night — "where do you need to go?"
+# ═══════════════════════════════════════════════════════════
+
+## Tapping a table has been broken since before tonight. Fixed.
+
+Daisy asked, after seeing the real floor plan work: does tapping a table lead to a
+"where do you need to go?" page listing the next steps. **It was already built — and
+completely unreachable**, same shape of bug as `refreshFloorPlan()`.
+
+`openTableDetail(bookingCode)` has always called
+`document.getElementById('floor-table-detail').style.display = 'flex'` —
+**but no element with that id existed anywhere in the file.** It threw immediately,
+every single time, for every table, on every device, presumably since this was written.
+Nobody has ever seen it.
+
+**Everything behind it was already real and fully built** — I checked each piece before
+adding anything:
+- `renderDetailCanvas()` — draggable chairs and place-mat items, add/remove, saves
+  position back to `/api/floor/items/:bookingCode`. **This is the "move a chair, move a
+  placement" feature Daisy asked for hours earlier tonight — it already existed.**
+- `renderDetailChecklist()` — the current stage's checklist (Booking/Painting/
+  Completion/Kiln from `FLOW_CHECKS`), tap to tick off each item.
+- `"Open full booking →"` → `openBookingAtRealStage()` → `goToTab('staff')` +
+  `showStaffSection(stage)`. **This IS the "where do you need to go?" junction into the
+  wider tile system**, already wired, already correct.
+- Live timer, progress bar, auto-assigns the current staff member.
+
+**The fix:** added the missing `#floor-table-detail` container and its child elements
+(`#detail-table-name`, `#detail-booking-info`, `#detail-time-remaining`,
+`#detail-progress-bar`, `#detail-canvas-wrap`, `#detail-checklist`) inside
+`#floor-plan-view`. Pure shell — zero JS logic touched, because none needed to be.
+
+## What this means
+
+**Tables → chairs/items → checklist → full booking in the tile system is the
+Table→Job junction Daisy has been asking for all night.** It was never missing from
+the design. It was one `<div>` away from working the whole time.
+
+## THIRD floor plan system status, for clarity
+
+There are still three systems referenced in this file:
+1. `loadFloorPlan()`/`renderFloorPlan()` + now `openTableDetail()` — **the real one,
+   fully working as of this fix.** This is what Daisy is looking at and should be the
+   only one built on from here.
+2. `renderElegantLineTable()` — comment + call, no body. Dead.
+3. `showHomeScreen()`/`FLOOR_PLAN`/`showTableDetail()`/Post→Order→Job — built earlier
+   tonight, hand-drawn, guessed data, unreachable from any tab. Its ideas (seeded
+   strokes, the Post→Order→Job mirror for Host By Post) are still worth keeping, but
+   NOT as a replacement for system #1. If Host By Post ever needs this junction pattern,
+   build it as its own reachable screen — do not revive #3 in place of #1.
+
+**TEST THIS TONIGHT IF AT ALL POSSIBLE, before presenting on it.** It has never been
+seen by a human. Tap a real (non-demo) booking's table, confirm the panel opens, try
+dragging a chair, tap a checklist item, tap "Open full booking".
