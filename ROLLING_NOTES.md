@@ -3167,3 +3167,32 @@ running Sundays 04:00.
    dead link in the file.
 5. **Rotate the GitHub token.** Admin on a public repo, plain text in several
    transcripts, used all day.
+
+## The header button row ran off the screen. 15 July 2026
+
+Daisy: "the icons at the top... it's a bit squeezed and I can't see the edges of the ones
+running off the screen at the top right."
+
+`.admin-header-right` was `flex-shrink:0`, so it could not compress and simply overflowed
+the phone. Badge + bell + HBP + Find + Returns + Out needs roughly 60px more than an
+iPhone has, so Out was half cut and **anything added after it would have been invisible
+entirely** — not clipped-but-reachable, just gone.
+
+**Fixed by making the ROW scroll, not by shrinking the icons.** Deliberate: buttons keep
+getting added to this row (HBP, Find, Returns, Out, and Host By Post got repointed into
+it today). Shaving pixels buys room for exactly one more and then this recurs. Scrolling
+survives the next one, and the one after.
+
+- `.admin-header-right` → `min-width:0; overflow-x:auto` (was `flex-shrink:0`)
+- `.admin-header-right > button { flex-shrink: 0 }` — the ROW scrolls; the controls keep
+  their real size. Without this, flex squashes the badge and bell to nothing instead.
+- Scrollbar hidden; **right edge masked with a 14px fade** so it READS as scrollable
+  rather than looking accidentally chopped. That was the actual complaint — not that the
+  buttons were unreachable, but that it looked broken.
+- The left group is now `flex-shrink:1`, so the studio name gives way first. It is
+  redundant on the floor plan anyway — "The Kiln Cafe" is already the Caveat heading
+  right underneath it.
+
+**Live count: 9 buttons in that row**, 5 of them hidden until login (badge, Out, Break,
+and the two legacy ones). So it looks fine logged out and overflows the moment someone
+logs in — which is exactly when nobody is looking at the CSS.

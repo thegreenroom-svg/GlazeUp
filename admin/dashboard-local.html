@@ -486,7 +486,25 @@
     .admin-header-right {
       text-align: right;
       font-size: 12px;
+      /* The button row was flex-shrink:0 and simply ran off the right edge
+         of the phone — the Out button was half cut and anything added after
+         it would have been invisible entirely. Reported 15 July 2026 from a
+         real device: "can't see the edges of the ones running off the screen".
+         Now it scrolls horizontally instead. Deliberately NOT solved by
+         shrinking the icons: more buttons keep getting added (HBP, Find,
+         Returns, Out...), and shaving pixels only buys room for one more.
+         This survives the next one. */
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      /* Fades the last few pixels so it READS as scrollable rather than
+         looking accidentally chopped — the thing actually complained about. */
+      -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 14px), transparent 100%);
+      mask-image: linear-gradient(to right, #000 calc(100% - 14px), transparent 100%);
     }
+    .admin-header-right::-webkit-scrollbar { display: none; }
+    /* Every control keeps its real size while the ROW scrolls — without this,
+       flex would squash the badge and the bell to nothing instead. */
+    .admin-header-right > button { flex-shrink: 0; }
 
     .admin-header-right div {
       margin-bottom: 4px;
@@ -2827,13 +2845,13 @@
   <div class="admin-main">
     <header class="admin-header">
       <!-- Left: logo + abbreviated studio name -->
-      <div style="display:flex;align-items:center;gap:7px;flex-shrink:0;min-width:0;">
+      <div style="display:flex;align-items:center;gap:7px;flex-shrink:1;min-width:0;">
         <img src="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png" alt="The Kiln Cafe" style="width:28px;height:28px;flex-shrink:0;">
         <h1 id="studio-name" style="margin:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;">The Kiln Cafe</h1>
       </div>
 
       <!-- Right: shift badge + bell + mini tiles including logout -->
-      <div class="admin-header-right" style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+      <div class="admin-header-right" style="display:flex;align-items:center;gap:6px;min-width:0;overflow-x:auto;overscroll-behavior-x:contain;">
 
         <button id="shift-badge" onclick="toggleTaskQueue()" style="display:none;background:linear-gradient(135deg,#2B2724,var(--link-clay));border:none;border-radius:20px;padding:5px 10px 5px 5px;font-size:11px;font-weight:700;color:white;cursor:pointer;align-items:center;gap:5px;position:relative;max-width:100px;">
           <span id="shift-badge-avatar" style="width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,0.25);color:white;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;">–</span>
