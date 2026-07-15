@@ -20,6 +20,40 @@ const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const Stripe = require('stripe');
 const { Client, Environment } = require('square');
+
+// ═══════════════════════════════════════════════════════════
+// SQUARE WRITE PROTECTION — added 14 July 2026, before a live
+// presentation, at Daisy's explicit request that demo actions must
+// never touch the real, live Kiln Cafe business.
+//
+// Everywhere else in this file, Square is read from (locations,
+// catalog, team, orders history for analytics) — genuinely safe.
+// The ONE place that writes is ordersApi.createOrder(), used to
+// send a drinks/food order to the real connected Square account so
+// Square KDS picks it up. That is correct in real production use —
+// but reachable from a table's "Drinks offered" flow, which is
+// exactly the kind of thing a demo walkthrough taps through.
+//
+// DEFAULT IS SAFE: unless SQUARE_WRITES_ENABLED=true is explicitly
+// set in the environment, every write is intercepted, logged, and a
+// realistic success response is returned so the app's UI flow
+// completes normally — nothing in the demo looks broken, and
+// nothing real ever gets touched. Flip SQUARE_WRITES_ENABLED=true
+// in Render once this is back to being a real, live studio again.
+// ═══════════════════════════════════════════════════════════
+const SQUARE_WRITES_ENABLED = process.env.SQUARE_WRITES_ENABLED === 'true';
+
+function _safeCreateOrder(squareClient, orderPayload, context) {
+  if (!SQUARE_WRITES_ENABLED) {
+    console.log(`[SQUARE WRITE BLOCKED — safe mode] Would have sent an order (${context}):`,
+      JSON.stringify(orderPayload.order?.lineItems || []));
+    return Promise.resolve({
+      result: { order: { id: `SIMULATED-${Date.now()}`, state: 'OPEN' } }
+    });
+  }
+  return squareClient.ordersApi.createOrder(orderPayload);
+}
+
 const {
   generateRegistrationOptions, verifyRegistrationResponse,
   generateAuthenticationOptions, verifyAuthenticationResponse,
@@ -618,7 +652,7 @@ app.post('/api/kds/order', async (req, res) => {
 
     // Create the order — Square KDS will pick this up automatically
     const idempotencyKey = `klnk-${bookingCode || 'wk'}-${Date.now()}`;
-    const orderRes = await squareClient.ordersApi.createOrder({
+    const orderRes = await _safeCreateOrder(squareClient, {
       order: {
         locationId,
         lineItems,
@@ -811,10 +845,10 @@ app.post('/api/kds/dispatch', async (req, res) => {
         else { li.name = item.name; if (item.priceCents) li.basePriceMoney = { amount: BigInt(item.priceCents), currency: 'GBP' }; }
         return li;
       });
-      const orderRes = await squareClient.ordersApi.createOrder({
+      const orderRes = await _safeCreateOrder(squareClient, {
         order: { locationId, lineItems, referenceId: bookingCode || undefined, note: `kilnLINK · ${customerName || bookingCode || 'Customer'}`, state: 'OPEN' },
         idempotencyKey: `klnk-${bookingCode || 'wk'}-${Date.now()}`,
-      });
+      }, 'kds webhook path');
       return res.json({ status: 'sent', system: 'square', orderId: orderRes.result.order?.id });
 
     } else if (kdsType === 'webhook' && config.webhook_url) {

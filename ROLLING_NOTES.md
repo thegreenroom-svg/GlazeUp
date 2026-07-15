@@ -1849,3 +1849,60 @@ differently and consistently rather than every 4-seater looking identical.
 
 Previewed standalone (extracted the exact functions from the file, rendered in
 isolation) before pushing — 2/4/6/8 seat, empty and occupied.
+
+# ═══════════════════════════════════════════════════════════
+# ⚠️  SQUARE WRITE PROTECTION — added the morning of the presentation
+# ═══════════════════════════════════════════════════════════
+
+Daisy asked, correctly and urgently, whether Square/website data was genuinely
+read-only, worried about the real live Kiln Cafe business being touched by a demo.
+**She was right to ask — it was not fully read-only.**
+
+`squareClient.ordersApi.createOrder()` is called from two places (the drinks/KDS
+send-order path and its webhook variant) and **genuinely writes a real order to the
+connected, live Square account** — correct behaviour in real production use, but
+reachable from a table's "Drinks offered" flow, which is exactly the kind of thing a
+demo walkthrough taps through.
+
+**Fixed with a default-safe kill switch, `SQUARE_WRITES_ENABLED`.** Unless that
+environment variable is explicitly set to `true` in Render, every order-creation call
+is intercepted, logged server-side, and a realistic simulated response is returned —
+the app's UI completes normally, nothing looks broken, and nothing real is ever
+touched. **Nothing needs to be done for the demo to be safe — the default is safe.**
+Set `SQUARE_WRITES_ENABLED=true` in Render once this needs to be a real, live studio
+taking real orders again.
+
+Everywhere else Square is touched, it is genuinely read-only (locations, catalog,
+team, order history for analytics) — checked and confirmed.
+
+**NOT audited tonight, for honesty:** any website/booking-widget write path outside
+Square. Time did not allow a full sweep. If the demo includes anything that creates a
+booking through a public-facing widget rather than inside this app, that has not been
+checked and should not be assumed safe.
+
+## AI cost claims — corrected, plainly
+
+Daisy said "no AI costs, all within the app." **Two different systems, two different
+true answers:**
+
+- **The learning engine — genuinely £0, no API, no model.** Confirmed again tonight:
+  pure arithmetic over counted tables. True as stated.
+- **Piece matching — genuinely costs money, real OpenAI (gpt-4o) calls.** NOT free,
+  was never claimed to be in this session, and must not be described as such live.
+  Photographing a piece during a demo makes a real, billed API call.
+
+**"Learning AI switched on" — it is not, and should not be presented as such.**
+Confirmed again: the client never calls `log-transition` (grep: zero references),
+so no ordering data is being recorded. Nothing schedules `/api/studio/learning/run`
+automatically — no cron, no trigger. The tables and rules exist; nothing is feeding
+them or running them. If this needs to look "on" for the demo, the honest version is
+showing `/api/studio/learning/report` and explaining the architecture — not implying
+it is actively learning today, because it is not yet.
+
+## Hand-drawn tile colour — done
+
+`_miniTableSvg()` takes an optional `accent` colour. Empty tables: a faint warm wash
+(`rgba(184,121,70,0.55)`) instead of flat ink. Occupied tables: the SAME `stageColor`
+already computed for that tile's pill and border — Painting tables draw in clay,
+Kiln tables in amber, etc. — so the drawn chairs and the tile's own colour language
+finally agree with each other.
