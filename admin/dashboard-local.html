@@ -456,7 +456,12 @@
       position: relative;
       background: linear-gradient(180deg, #ffffff 0%, #fdf9f6 100%);
       border-bottom: 1px solid var(--gu-border);
-      padding: 6px 10px 6px max(10px, env(safe-area-inset-left, 10px));
+      /* The safe-area inset was on the LEFT only — the one edge that needed
+         it (the top, under the iPhone status bar and notch) got a flat 6px,
+         so the clock and battery sat on top of the studio name and the staff
+         badge. Fixed 15 July 2026 from a real device screenshot. max() keeps
+         the original 6px on anything without a notch. */
+      padding: max(6px, env(safe-area-inset-top, 6px)) 10px 6px max(10px, env(safe-area-inset-left, 10px));
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -21626,6 +21631,42 @@ function triggerIdleSplash() {
   document.addEventListener(evt, resetIdleTimer, { passive: true });
 });
 resetIdleTimer();
+
+// ═══════════════════════════════════════════════════════
+// RETURN TO THE FLOOR PLAN WHEN A TILE SCREEN IS LEFT OPEN
+// ═══════════════════════════════════════════════════════
+// Per direct request: a tile screen left open just sits there. The floor
+// plan is the home screen, so an abandoned tab should fall back to it.
+//
+// Deliberately SEPARATE from the 2-minute idle splash above, which does a
+// different job (force re-login on a shared iPad). This one never logs
+// anyone out — it only navigates home.
+//
+// Daisy suggested ten seconds, hedged ("I don't know"). Ten is too short:
+// reading a checklist, taking an order, or talking to a customer are all
+// normal reasons to not touch the screen, and being yanked home mid-task
+// would be worse than the problem. Sixty is long enough to not fight
+// anyone and short enough that a screen left behind is home before the
+// next person picks the iPad up. ONE NUMBER TO CHANGE if that's wrong.
+const RETURN_TO_FLOOR_MS = 60 * 1000;
+let _returnToFloorTimer = null;
+function resetReturnToFloorTimer() {
+  clearTimeout(_returnToFloorTimer);
+  _returnToFloorTimer = setTimeout(() => {
+    if (!currentShiftStaff) return;              // nobody on shift — leave it alone
+    if (currentTab === 'floor-plan') return;     // already home
+    // Never yank someone out of an open modal — they're mid-task, just not
+    // touching the glass. Checked by real visibility, not a guessed list.
+    const modalOpen = [...document.querySelectorAll('[id*="modal"]')]
+      .some(m => m.offsetParent !== null);
+    if (modalOpen) return;
+    goToTab('floor-plan');
+  }, RETURN_TO_FLOOR_MS);
+}
+['touchstart', 'mousedown', 'keydown', 'scroll'].forEach(evt => {
+  document.addEventListener(evt, resetReturnToFloorTimer, { passive: true });
+});
+resetReturnToFloorTimer();
 
 // ═══════════════════════════════════════════════════════
 // EXTRAS ALERT SYSTEM

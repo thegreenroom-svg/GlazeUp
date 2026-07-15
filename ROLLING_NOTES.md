@@ -2456,3 +2456,43 @@ and `KILN-DEMO-FIRED` come from `demo_workflow_seed.sql`. Deleting those two row
 the modal appearing at all, independently of the column fix. Both are worth doing: the
 columns because the feature is genuinely broken for real batches too, the demo rows
 because she does not want training data in the way.
+
+# ═══════════════════════════════════════════════════════════
+# It works. Two polish fixes on the back of it — 15 July 2026
+# ═══════════════════════════════════════════════════════════
+
+Daisy confirmed the floor plan is up on a real device after the column fixes. First time
+this has ever been seen working end to end.
+
+## The iPhone status bar was sitting on the header — a real CSS bug
+
+    .admin-header { padding: 6px 10px 6px max(10px, env(safe-area-inset-left, 10px)); }
+
+That is `top right bottom left`. The safe-area inset was applied to the **left** — which
+only matters in landscape on a notched phone — while the **top**, the one edge actually
+under the status bar and notch, got a flat 6px. So the clock and battery overlapped the
+studio name and the staff badge on every portrait iPhone, always. Fixed with
+`max(6px, env(safe-area-inset-top, 6px))` on the top, keeping 6px on anything without a
+notch. The splash and the revenue strip already did this correctly (~2175, ~2190) —
+the header was simply missed.
+
+## Return to the floor plan when a tile screen is left open
+
+`RETURN_TO_FLOOR_MS`, 60 seconds, calls `goToTab('floor-plan')`.
+
+**Deliberately separate from `IDLE_TIMEOUT_MS`** (2 minutes → splash + force re-login).
+Different jobs: that one protects a shared iPad, this one just goes home. This never
+logs anyone out.
+
+**Daisy suggested ten seconds and hedged ("I don't know"). Built at sixty, and said so
+rather than silently overriding her.** Ten is shorter than reading a checklist, taking
+an order, or answering a customer — staff would be thrown home mid-task constantly, and
+the cure would be worse than the disease. Sixty is long enough not to fight anyone,
+short enough that an abandoned screen is home before the next person picks the iPad up.
+**One named constant to change if that judgement is wrong.**
+
+Two guards, both checked rather than assumed:
+- Never fires when nobody is on shift, or when already on the floor plan.
+- **Never yanks anyone out of an open modal** — tested by real visibility
+  (`offsetParent !== null`) across every `[id*="modal"]`, not a hand-maintained list
+  that would rot the first time a modal was added.
