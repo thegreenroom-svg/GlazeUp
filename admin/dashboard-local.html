@@ -8952,7 +8952,7 @@ async function loadLoginNamePicker() {
         <button onclick="selectLoginMember(window._loginTeamData[${i}])"
           style="background:var(--gu-bg);border:${cardBorder};border-radius:14px;padding:14px 8px 12px;cursor:pointer;text-align:center;position:relative;opacity:${cardOpacity};">
           ${statusBadge}
-          <div class="av-frame av-${(m.name || '').toLowerCase().replace(/[^a-z]/g,'')}" style="width:56px;height:56px;margin:0 auto 8px;border-radius:50%;overflow:hidden;border:2px solid ${color};">
+          <div class="av-frame av-${(m.name || '').toLowerCase().replace(/[^a-z]/g,'')}" style="width:88px;height:88px;margin:0 auto 10px;border-radius:50%;overflow:hidden;border:2px solid ${color};">
             ${avatarSvg}
           </div>
           <div style="font-size:13px;font-weight:700;color:var(--gu-text);">${m.name}</div>
@@ -20280,21 +20280,39 @@ function _renderRoom(roomName) {
     </div>`;
 }
 
+// Something worth reading when the room is quiet. Facts about this
+// studio, not filler — a Monday morning shouldn't feel like an error
+// state. Rotates by the day so it isn't the same line every time.
+const STUDIO_NOTES = [
+  'The kiln takes about 8 hours to reach temperature — and a full day to cool before anything can be unpacked.',
+  'Glaze goes on looking nothing like it comes out. That gap is the whole magic of the place.',
+  'Three coats. It is always three coats. Two looks patchy once it is fired.',
+  'Every piece in the kiln belongs to somebody who is looking forward to it.',
+  'A piece painted today is ready for collection about a week later, once it has been fired and cooled.',
+  'The Vault seats up to sixteen around one table — the whole room talks to each other.',
+  'Thursday is open house: arrive when you like, stay as long as you like.'
+];
+
 function showHomeScreen() {
   const view = document.getElementById('floor-plan-view');
   if (!view) return;
   view.innerHTML = '';
   view.style.overflow = 'auto';
 
+  const note = STUDIO_NOTES[new Date().getDate() % STUDIO_NOTES.length];
+
   const container = document.createElement('div');
   container.style.cssText = 'padding:14px;max-width:1200px;margin:0 auto;';
   container.innerHTML = (_isRestingState() ? `
     <div style="display:flex;align-items:center;gap:8px;justify-content:center;
       background:rgba(249,168,37,0.12);border:1px solid rgba(249,168,37,0.4);
-      border-radius:20px;padding:6px 14px;margin:0 auto 14px;width:fit-content;">
+      border-radius:20px;padding:6px 14px;margin:0 auto 12px;width:fit-content;">
       <span style="width:7px;height:7px;border-radius:50%;background:#F9A825;"></span>
       <span style="font-size:11px;font-weight:700;color:#8a6a12;">Example layout — no live bookings yet</span>
-    </div>` : '')
+    </div>
+    <div style="max-width:560px;margin:0 auto 18px;text-align:center;
+      font-family:'Caveat',cursive;font-size:19px;line-height:1.45;
+      color:#2B2724;opacity:0.75;">${note}</div>` : '')
     + Object.keys(FLOOR_PLAN).map(_renderRoom).join('');
   view.appendChild(container);
 }

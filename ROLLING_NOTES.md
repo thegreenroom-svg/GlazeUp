@@ -1293,3 +1293,41 @@ slower than doing it properly.
 - **Remove the table icons** — she wants them gone, streamlined.
 - **Move a chair / move a placement** — wants it possible, but deliberately minimal.
   "Don't complicate anything at the table, it can get very busy."
+
+## Session — 14 July 2026 (final): Polish before the presentation
+
+**Avatars 56px → 88px** in the login picker. The rigs were always detailed enough;
+56px simply threw it away. One number, big payoff.
+
+**Resting state now says something.** `STUDIO_NOTES` — seven real facts about the Kiln
+Cafe (kiln takes 8 hours up and a day to cool; three coats, always; a piece painted
+today is ready in about a week; the Vault seats sixteen; Thursday is open house).
+Rotates by day-of-month so it isn't the same line every visit, set in Caveat under the
+example-layout pill. A Monday morning shouldn't look like an error state.
+
+**Rejected: facial recognition of customers.** Daisy proposed photographing tables to
+identify who is sitting where, for bill splitting. Declined, and this should stay
+declined: faces processed for identification are biometric data under UK GDPR Art. 9 —
+same tier as health records. Needs explicit consent from every person, a mandatory
+DPIA, and "freely given" fails when someone has already paid and sat down. **The studio
+is full of children** — the ICO ordered Serco to stop using facial recognition for adult
+staff attendance in 2024; this would be four-year-olds at birthday parties. It also
+solves nothing: the names are already in the booking. The gap is *which seat*, not *who*.
+
+**The answer instead — tap a chair.** Every chair is already drawn on the floor plan.
+Tap Table 6 → tap a chair → assign a name from the booking. Someone extra arrives, tap
+an empty chair. Someone leaves, tap, paid. The bill splits by seat because the app knows
+who sat where. Two taps, no camera, no consent form, no DPIA. **This is the next build.**
+
+**Rejected: replacing the floor plan with a big tile.** Proposed 8 hours before a
+presentation. The hand-drawn plan is the app's one genuine differentiator; a tile grid
+is what everyone else in the sector already has. Plan stays.
+
+**NEXT SESSION — start here:**
+1. Tap-a-chair name assignment (above). Uses what is already drawn.
+2. Avatar profile page — tap a face before login, see them + their stats.
+   New screen, touches nothing existing, demos well.
+3. Tile splitter excision — own commit. Still ~200 interlinked lines.
+4. `GRID_NAV_STRUCTURE` → data. Still the gate for everything.
+5. Learning engine: wire `log-transition`, build the suggestion card, repoint
+   studio-wide (one screen for everyone — no per-person split, see reasoning above).
