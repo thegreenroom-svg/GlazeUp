@@ -6213,6 +6213,30 @@ function goToTab(tab, event) {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ studioId, staffMemberId: currentShiftStaff.id, tabName: tab })
     }).catch(() => {});
+
+    // ── The learning engine's grain ──────────────────────────────
+    // log-task-usage counts OPENS. That answers "which tiles get
+    // touched", which only ever powered the quiet-tile rule.
+    // log-transition records ORDERING — what follows what — and that
+    // is where the actual workflow lives, and what the habit→shortcut
+    // rule (60% over 12+ moves) needs. The endpoint has existed since
+    // bb4f5ad. The client has never called it once: grep log-transition
+    // in this file before this line and you get zero. So the engine has
+    // had no grain to mill — not because it was unbuilt, but because
+    // nothing fed it. Wired 15 July 2026, the day the schema finally ran.
+    //
+    // `currentTab` is still the PREVIOUS tab here — goToTab reassigns it
+    // further down. That is exactly what we want, and worth stating,
+    // because moving this line below that assignment would silently log
+    // every transition as tab→itself, which the server discards as
+    // 'ignored'. It would look wired and record nothing.
+    if (currentTab && currentTab !== tab) {
+      fetch(`${API_URL}/api/staff/log-transition`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId, staffMemberId: currentShiftStaff.id,
+                               fromTab: currentTab, toTab: tab })
+      }).catch(() => {});
+    }
   }
 
   // Reset scroll to the top of the new tab, and update the floating

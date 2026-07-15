@@ -2525,3 +2525,48 @@ not exist is exactly the trade this week keeps punishing.
 
 `studio_tables` is deliberately untouched — the tables are real furniture. Only the
 fake customers go.
+
+# ═══════════════════════════════════════════════════════════
+# The learning engine now has grain — log-transition wired, 15 July 2026
+# ═══════════════════════════════════════════════════════════
+
+**Daisy was right, and I was wrong to file this as "not built."** The engine is real
+and has been since `bb4f5ad`: schema, five endpoints, two rules, thresholds tuned to a
+four-day trading week, three hard rules enforced in code. No model, no API, no cost.
+
+**What was missing was one wire, and the last session said so at the time.** It offered
+to do it — "the quickest useful thing I can do without you" — Daisy couldn't run the SQL
+from her phone, the conversation moved on, and it never happened. Grep on main today:
+`log-transition` appeared **zero** times in the client. The engine wasn't unbuilt. It was
+unfed.
+
+**`learning_engine_schema.sql` went in with RUN_ALL_SIX today**, so `staff_task_transitions`
+now genuinely exists. That's what made this worth doing tonight rather than parking it:
+the table is there, so the wire starts banking real workflow data on the next tap.
+
+**Wired into `goToTab`, beside the existing `log-task-usage` call.** The difference
+matters and is worth keeping straight:
+- `log-task-usage` counts **opens** → only ever powered the quiet-tile rule.
+- `log-transition` records **ordering**, what follows what → this is where the workflow
+  actually lives, and it is what the habit→shortcut rule (60% share over 12+ moves)
+  has been waiting for.
+
+**The one trap in this edit, written down so nobody undoes it:** the call sits ABOVE
+`currentTab = tab`, so `currentTab` is still the PREVIOUS tab when it reads it. Move it
+below that assignment and every transition logs as tab→itself, which the server discards
+as `'ignored'`. It would look wired and record nothing — a silent failure of exactly the
+shape that has cost this project five bugs.
+
+**Verified, not assumed.** Walked floor-plan → staff → catalogue → floor-plan in jsdom:
+
+    dashboard  ->  floor-plan
+    floor-plan ->  staff
+    staff      ->  catalogue
+    catalogue  ->  floor-plan
+    self-transitions: none
+
+**Still outstanding, unchanged and stated honestly:** no suggestion card in the app
+(nothing surfaces to staff), `respond` still returns `applied:false`, and
+`GRID_NAV_STRUCTURE` is still hardcoded — so the engine can now LEARN, and can suggest,
+but cannot yet show or apply. It is collecting from tonight. It needs ~12 moves and a
+fortnight of trading before `/api/studio/learning/report` says anything meaningful.
