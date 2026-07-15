@@ -14429,6 +14429,65 @@ async function computePerceptualHash(file) {
   }
 }
 
+// ── STOCK SHAPE PHOTOS — "which shape line is this" ─────────────────
+// Not per-unit matching (two blank mugs of the same mould genuinely
+// look identical — see the note on computePerceptualHash above). This
+// is a different, sound problem: which of the studio's actual shape
+// lines — an elephant, a jug, Mug Design #4 — is in front of the
+// camera. Different lines really do look different from each other,
+// even unpainted, which is exactly where a photo fingerprint works.
+// Same on-device hash, same zero-cost comparison, just pointed at a
+// small catalogue instead of one customer's own piece history.
+
+// Called from Admin → Stock: photograph a new line as it arrives,
+// tie it to the real Square catalog item it corresponds to.
+async function captureStockShapePhoto(squareItemId) {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.onchange = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const photoBase64 = await preparePhotoForMatching(file);
+    const phash = await computePerceptualHash(file);
+    try {
+      const res = await fetch(`${API_URL}/api/stock/shape-photo`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId, squareItemId, photoBase64, phash, photographedBy: currentShiftStaff?.id || null })
+      });
+      if (!res.ok) { alert('Could not save this photo — try again.'); return; }
+      alert('Saved — this shape line can now be recognised from a photo.');
+    } catch (e) {
+      alert('Could not reach the server — try again.');
+    }
+  };
+  input.click();
+}
+
+// Called wherever staff have an unidentified blank in hand and want
+// to know which Square catalog item it is.
+async function identifyStockShape(onIdentified) {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.onchange = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const phash = await computePerceptualHash(file);
+    if (!phash) { alert('Could not read that photo — try again.'); return; }
+    try {
+      const res = await fetch(`${API_URL}/api/stock/identify-by-photo`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId, phash })
+      });
+      const data = await res.json();
+      if (data.matched) { onIdentified?.(data.squareItemId); }
+      else { alert(data.note || 'No confident match.'); }
+    } catch (e) {
+      alert('Could not reach the server — try again.');
+    }
+  };
+  input.click();
+}
+
 async function preparePhotoForMatching(file) {
   try {
     const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });

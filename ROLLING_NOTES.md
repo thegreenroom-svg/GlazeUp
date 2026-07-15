@@ -1990,3 +1990,47 @@ that point. Found the schema gap; didn't touch UI creation flows blind at 6am wi
 knowing every call site. That's a real, calm next-session feature: find where pieces
 get created, add a shape picker (or default from `piece_type` string-matching against
 `bisque_shapes.name` as an interim heuristic), backfill sensibly.
+
+# ═══════════════════════════════════════════════════════════
+# STOCK SHAPE RECOGNITION — built properly, tied to Square, corrects an earlier mistake
+# ═══════════════════════════════════════════════════════════
+
+**Correction to an earlier answer this same night:** I suggested linking
+`pottery_pieces.bisque_shape_id → bisque_shapes(id)`. Checked properly this time —
+`bisque_shapes` is dead schema, touched by **zero** server code. The real, live
+catalogue is Square's own (`/api/square/catalog`) — confirmed via `loadBisqueCatalog()`
+in the client, which pulls straight from Square, read-only, exactly matching Daisy's
+own instinct ("look at that in our stock lines with Square"). That endpoint returns
+`{id, name, priceCents}` per item — **no image at all**. That's the actual, real gap.
+
+**The reframing that made this buildable:** Daisy clarified she's not asking to tell
+two identical blank mugs apart (genuinely impossible from a photo — they look
+identical). She's asking which *shape line* something is — an elephant vs a jug vs
+Mug Design #4. Different lines genuinely look different from each other, even
+unpainted. That's a real, sound recognition problem, and the small catalogue size
+(tens of shape lines, not thousands of units) is exactly where a photo fingerprint is
+reliable rather than misleading.
+
+**Built, additive, reusing tonight's already-tested pattern exactly:**
+- `add_stock_shape_photos.sql` (NEW — needs running): `stock_shape_photos` table
+  (photo + phash per shape line, linked by `square_item_id` — Square stays the single
+  source of truth for name/price). Also adds `pottery_pieces.square_item_id`,
+  **replacing** the earlier wrong `bisque_shape_id` suggestion.
+- `POST /api/stock/shape-photo` — save a new shape line's photo + hash.
+- `POST /api/stock/identify-by-photo` — same `_hammingDistanceHex` comparison already
+  written and tested for pieces, pointed at this small catalogue instead.
+- Client: `captureStockShapePhoto(squareItemId)` and `identifyStockShape(callback)` —
+  both reuse `preparePhotoForMatching`/`computePerceptualHash` untouched.
+
+**NOT done — deliberately, given the hour:** no UI button wired into the Bisque tab yet.
+`renderBisqueTabs()` (client, ~17450) needs a small camera-icon button per Square item
+calling `captureStockShapePhoto(item.id)` — that's real UI work needing a device to
+verify, not a blind patch this close to presenting. The backend is ready and waiting
+for it. **This is the first real next-session job on this thread.**
+
+**What this enables once that button exists, stated plainly:** photograph each new
+stock line as it arrives → tied to its real Square item → any future photo of a blank
+gets identified against it, no AI cost → when that identification sets
+`pottery_pieces.square_item_id` at booking time, "which customers have bought this
+shape" becomes a real, honest SQL join against Square's own catalogue — the actual
+thing asked for, built on the right foundation this time.

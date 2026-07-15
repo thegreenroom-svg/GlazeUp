@@ -8953,6 +8953,70 @@ Respond ONLY as JSON: {"found": true or false, "confidence": "high" | "medium" |
   }
 });
 
+// ═══════════════════════════════════════════════════════════
+// STOCK SHAPE PHOTOS — tied to the real Square catalogue, not the
+// dead bisque_shapes table. Reuses the exact dHash + Hamming
+// distance pattern already tested in find-by-photo, above.
+// ═══════════════════════════════════════════════════════════
+
+// POST /api/stock/shape-photo — staff photograph a new stock line
+// in (an elephant, Mug Design #4, whatever's in the box) and tie it
+// to the real Square catalog item it corresponds to.
+app.post('/api/stock/shape-photo', async (req, res) => {
+  const { studioId, squareItemId, photoBase64, phash, photographedBy } = req.body;
+  if (!studioId || !squareItemId || !photoBase64) {
+    return res.status(400).json({ error: 'studioId, squareItemId and photoBase64 required' });
+  }
+  try {
+    const base64Data = photoBase64.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+    const fileName = `${studioId}/stock-shapes/${squareItemId}-${Date.now()}.jpg`;
+    const { error: uploadError } = await supabase.storage.from('booking-photos').upload(fileName, buffer, { contentType: 'image/jpeg' });
+    if (uploadError) throw uploadError;
+    const { data: urlData } = supabase.storage.from('booking-photos').getPublicUrl(fileName);
+
+    const { data: row, error } = await supabase.from('stock_shape_photos').insert({
+      studio_id: studioId, square_item_id: squareItemId,
+      photo_url: urlData.publicUrl, photo_phash: phash || null,
+      photographed_by: photographedBy || null
+    }).select().single();
+    if (error) throw error;
+    res.json({ status: 'saved', row });
+  } catch (error) {
+    console.error('Stock shape photo error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/stock/identify-by-photo — given a photo of an
+// unidentified blank, which Square catalog item is it? Pure
+// on-device-hash comparison against the small studio catalogue —
+// no model, no API, no cost. Small catalogue (tens of shape lines,
+// not thousands of individual pieces) is exactly where this
+// approach is genuinely reliable — see the honest limits noted
+// where computePerceptualHash is defined client-side.
+app.post('/api/stock/identify-by-photo', async (req, res) => {
+  const { studioId, phash } = req.body;
+  if (!studioId || !phash) return res.status(400).json({ error: 'studioId and phash required' });
+  try {
+    const { data: shapes } = await supabase.from('stock_shape_photos')
+      .select('square_item_id, photo_phash, photo_url')
+      .eq('studio_id', studioId).not('photo_phash', 'is', null);
+
+    let best = null;
+    for (const s of shapes || []) {
+      const dist = _hammingDistanceHex(phash, s.photo_phash);
+      if (!best || dist < best.dist) best = { dist, shape: s };
+    }
+    if (best && best.dist <= PHASH_CONFIDENT_DISTANCE) {
+      return res.json({ matched: true, squareItemId: best.shape.square_item_id, distance: best.dist });
+    }
+    res.json({ matched: false, note: shapes?.length ? 'No confident match against the photographed stock lines.' : 'No stock lines have been photographed yet.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ── Genuine real damage/loss reporting — covers both a customer's
 // painted piece and raw unpainted stock. Alerts staff via the real
 // existing staff_alerts system, genuinely removes the item from
