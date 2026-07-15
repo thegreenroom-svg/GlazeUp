@@ -2620,3 +2620,67 @@ already fixed once this project. Escaped now.
 
 All three are the same shape: the app got MORE honest when the API started working, and
 what Daisy is seeing now is her real database rather than the demo fallback.
+
+# ═══════════════════════════════════════════════════════════
+# THE FLOOR PLAN IS HOME — the reason it never was. 15 July 2026
+# ═══════════════════════════════════════════════════════════
+
+Daisy, repeatedly, over days: "it's the first thing you see when you log in... whoever I
+log in as... that's all I want." It never happened, and this is why.
+
+**Every login path was correct.** All four call `goToTab('floor-plan')` — fixed last
+session. Then they call `applyShiftUI()`, and `applyShiftUI()` navigated straight back
+out from under it:
+
+    if (firstName === 'david') -> barista-view
+    else -> loadPersonalHomeScreen().then(loadFloorPlan).then(startFloorDemo)
+
+So David landed on the barista page, and **everyone else landed on a demo intro that
+loops all three rooms**. Nobody has ever, on any login, landed on the plain floor plan.
+The navigation was right; something downstream undid it 200ms later.
+
+**Same shape as the `showHomeScreen()` bug from 14 July** — a second system quietly
+painting over the real one. Worth stating: when a screen "won't stay", look for what
+runs AFTER the thing that puts it there, not at the thing itself.
+
+**The David branch is the Dave/David confusion, again.** Dave was the barista and has
+been removed from the team. David is the co-director. This file has already been warned
+once that "the two names look near-identical in dictation" — and a hardcoded
+`firstName === 'david'` check survived the removal. Daisy: "I'm the same as everyone
+else."
+
+**Fixed:** `applyShiftUI()` now ends with `goToTab('floor-plan')`. No name checks, no
+demo intro, no personal screen. **Nothing deleted** — `barista-view`,
+`loadPersonalHomeScreen()` and `startFloorDemo()` are all untouched and still callable.
+One line away from returning if any of them is ever wanted.
+
+## "Go home" now means the floor plan, everywhere
+
+`goToRealLandingPage()` (the green floating bar) was the same inversion: David ->
+barista-view, everyone else -> `showGridNav()`, i.e. **it treated the TILE GRID as
+home**. The tiles are a destination, not a home — they are where the floor plan sends
+you. Now: `goToTab('floor-plan')`, for everyone.
+
+`toggleFloatingBackBtn()` hid the bar on grid-nav and barista-view, which left the tile
+grid as a dead end with no route back to the floor plan. Now hidden ONLY on the floor
+plan itself — because that is home and you are already there — and visible on every
+other screen, tiles included.
+
+Label: "✓ Finished — back to tasks" -> "🏠 Home — back to the floor plan".
+
+**Verified, not assumed** (jsdom, real functions):
+
+    login as David : lands on floor plan TRUE, barista view FALSE
+    login as Daisy : lands on floor plan TRUE, barista view FALSE
+    on stock tile  : Home button visible TRUE
+    tap Home       : floor plan TRUE, button hides TRUE
+
+## Full link audit — the pass this file asked for on 14 July
+
+    handlers wired      361   dead: 1  (openCleoAdminVoicePicker, still)
+    goToTab targets      11   all have a -view element
+    GRID_NAV tiles       16   ALL 16 land on a real view
+    tile fn: refs         1   defined
+
+The flow is genuinely sound. Every tile goes somewhere real. The problem was never dead
+links — it was routing that overrode itself.

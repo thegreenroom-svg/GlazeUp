@@ -2602,8 +2602,8 @@
      other than Dashboard itself, so there's always a quick way back
      without needing to scroll up to find the sidebar. -->
 <button id="floating-back-btn" onclick="goToRealLandingPage()" style="display:none;position:fixed;bottom:20px;left:16px;right:16px;z-index:900;background:#2e7d32;color:white;border:none;border-radius:14px;padding:16px;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.25);align-items:center;justify-content:center;gap:8px;">
-  ✓ Finished — back to tasks
-</button>
+          🏠 Home — back to the floor plan
+        </button>
 
 <!-- Genuine real Focus Mode back bar — tablet-only (CSS above scopes
      this to 521-900px), always visible at the top the whole time
@@ -6181,9 +6181,13 @@ function toggleFloatingBackBtn() {
   // function screen (not scroll-gated like before), hidden only
   // while genuinely already on someone's own real landing page —
   // the shared grid for most staff, or David's own Barista page.
-  const onGridNav = document.getElementById('grid-nav-view')?.style.display !== 'none';
-  const onBaristaHome = document.getElementById('barista-view')?.style.display !== 'none';
-  btn.style.display = (onGridNav || onBaristaHome) ? 'none' : 'flex';
+  // Hidden ONLY on the floor plan, because that is home and you are
+  // already there. Visible on every other screen INCLUDING the tile
+  // grid — the tiles are a destination, not a home, so you need a way
+  // back out of them too. Previously hid on grid-nav and barista-view,
+  // which left the tiles as a dead end with no route to the floor plan.
+  const onFloorPlan = document.getElementById('floor-plan-view')?.style.display !== 'none';
+  btn.style.display = onFloorPlan ? 'none' : 'flex';
 }
 
 function goToTab(tab, event) {
@@ -11222,14 +11226,12 @@ const GRID_NAV_STRUCTURE = [
 // else gets. Same real first-name check already proven for the
 // initial login routing.
 function goToRealLandingPage() {
-  const firstNameForRouting = (currentShiftStaff?.name || '').trim().split(' ')[0];
-  if (firstNameForRouting.toLowerCase() === 'david') {
-    document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
-    document.getElementById('barista-view').style.display = 'block';
-    toggleFloatingBackBtn();
-  } else {
-    showGridNav();
-  }
+  // "Just say go home, and it goes straight back to the table planner,
+  // everywhere." Home is the floor plan — for everyone, no name checks.
+  // This used to send David to barista-view and everyone else to the
+  // TILE GRID, which treated the tiles as home. They are not; they are
+  // where the floor plan sends you. Same inversion as applyShiftUI had.
+  goToTab('floor-plan');
 }
 
 // ── Genuine real persistent booking strip, per direct request ──
@@ -11511,26 +11513,30 @@ function applyShiftUI() {
   }, 30 * 1000);
   applyPlatformRevenueAccess();
 
-  // Genuine real personalized landing page, per direct request —
-  // David specifically sees his own dedicated Barista page
-  // automatically on login, rather than the shared 8-tile grid
-  // everyone else sees. Checked by real first name, same honest
-  // pattern already proven for director-only access checks.
-  const firstNameForRouting = (currentShiftStaff.name || '').trim().split(' ')[0];
-  if (firstNameForRouting.toLowerCase() === 'david') {
-    document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
-    document.getElementById('barista-view').style.display = 'block';
-  } else {
-    // Load personal home screen, then show the floor plan demo intro.
-    // The demo plays once per login session, loops through all three
-    // rooms, and drops straight into the real floor plan on dismiss.
-    loadPersonalHomeScreen().then(() => {
-      loadFloorPlan().then(() => {
-        // Show demo intro — it lands on the floor plan when dismissed
-        startFloorDemo();
-      });
-    });
-  }
+  // ═══════════════════════════════════════════════════════════
+  // THE FLOOR PLAN IS HOME. FOR EVERYONE. ALWAYS.
+  // ═══════════════════════════════════════════════════════════
+  // Per direct request, said more than once: "it's the first thing you
+  // see when you log in... whoever I log in as... that's all I want."
+  //
+  // THIS BLOCK WAS WHY THAT NEVER HAPPENED. Every login path correctly
+  // calls goToTab('floor-plan') and then calls applyShiftUI() — which
+  // immediately navigated somewhere else, from right here:
+  //
+  //   - David (first-name check) -> barista-view. This is the Dave/David
+  //     confusion this file has been warned about before: Dave was the
+  //     barista and has been removed from the team; David is the
+  //     co-director. Daisy: "just get rid of that, I'm the same as
+  //     everyone else."
+  //   - Everyone else -> loadPersonalHomeScreen() then startFloorDemo(),
+  //     a demo intro looping all three rooms. So nobody, ever, on any
+  //     login, landed on the plain floor plan. It navigated there and
+  //     then straight back out from under itself.
+  //
+  // Nothing is deleted: barista-view, loadPersonalHomeScreen() and
+  // startFloorDemo() are all untouched and still callable. Only this
+  // routing changed, so any of them is one line away from returning.
+  goToTab('floor-plan');
   // Opening checklist — PARKED, per direct request, kept as demo for
   // now. Genuinely nothing deleted: the real modal, its data, and
   // every function are completely untouched — this is the single,
