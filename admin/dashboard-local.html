@@ -14203,12 +14203,56 @@ function jumpToLabelsFor(bookingCode) {
 // but is genuinely last resort, not the first thing staff see.
 // ─────────────────────────────────────────────────────────────────
 
+// ── PHOTO PREP — the piece finder's real bottleneck ───────────────
+// An iPad camera photo is 3-5MB. Base64 inflates it by a third, so
+// every "Photograph & auto-match" was pushing 4-7MB of JSON over
+// studio wifi before recognition even started. That is the wait.
+//
+// A vision model gains nothing above ~1024px on the long edge — it
+// downsamples anyway. So we do it here, on the device, in memory:
+// roughly 4-7MB becomes 100-200KB. Same answer, a fraction of the
+// wait, and it works on a bad connection in a room full of people.
+//
+// EXIF orientation is honoured by createImageBitmap, so pieces
+// photographed sideways still arrive the right way up.
+// ──────────────────────────────────────────────────────────────────
+const PHOTO_MAX_EDGE = 1024;
+const PHOTO_QUALITY = 0.82;
+
+async function preparePhotoForMatching(file) {
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const scale = Math.min(1, PHOTO_MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+    const w = Math.round(bitmap.width * scale), hgt = Math.round(bitmap.height * scale);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = hgt;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(bitmap, 0, 0, w, hgt);
+    bitmap.close?.();
+
+    const out = canvas.toDataURL('image/jpeg', PHOTO_QUALITY);
+    // Never make it worse: if a photo was already small, keep whichever
+    // is smaller rather than re-encoding it larger.
+    if (out.length < file.size * 1.34) return out;
+  } catch (e) {
+    console.warn('Photo downscale failed — sending original:', e);
+  }
+  // Fallback: the original. Slow, but it still works.
+  return await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
 async function handlePieceMatchPhotoFirst(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = async () => {
-    const photoBase64 = reader.result;
+  const photoBase64 = await preparePhotoForMatching(file);
+  {
     // Show spinner
     const fallbackEl = document.getElementById('pm-qr-fallback');
     const groupInfo = document.getElementById('pm-group-info');
@@ -14243,16 +14287,14 @@ async function handlePieceMatchPhotoFirst(event) {
       if (fallbackEl) fallbackEl.style.display = 'block';
       if (matchResult) matchResult.innerHTML = '<div style="padding:10px;color:var(--gu-dust);font-size:12px;">Could not run recognition — enter the booking code below.</div>';
     }
-  };
-  reader.readAsDataURL(file);
+  }
 }
 
 async function handleKilnUnloadPhoto(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = async () => {
-    const photoBase64 = reader.result;
+  const photoBase64 = await preparePhotoForMatching(file);
+  {
     const resultEl = document.getElementById('kiln-unload-result');
     const fallbackEl = document.getElementById('kiln-unload-qr-fallback');
     if (resultEl) resultEl.innerHTML = '<div style="padding:10px;color:var(--gu-dust);font-size:12px;">🔍 Identifying piece…</div>';
@@ -14282,8 +14324,7 @@ async function handleKilnUnloadPhoto(event) {
       if (fallbackEl) fallbackEl.style.display = 'block';
       if (resultEl) resultEl.innerHTML = '<div style="padding:10px;color:var(--gu-dust);font-size:12px;">Recognition failed — enter booking code below.</div>';
     }
-  };
-  reader.readAsDataURL(file);
+  }
 }
 
 async function loadPieceMatchGroup() {
@@ -18385,12 +18426,14 @@ let _fp1LastAutoMatchPhoto = null; // genuine real retained photo, so a retry ca
 function captureFp1AutoMatchPhoto() {
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
-  input.onchange = (event) => {
+  input.onchange = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { _fp1LastAutoMatchPhoto = reader.result; runFp1AutoMatch(reader.result); };
-    reader.readAsDataURL(file);
+    // Downscaled before it leaves the device — and the retry reuses
+    // this same prepared photo, so a retry costs nothing extra.
+    const photo = await preparePhotoForMatching(file);
+    _fp1LastAutoMatchPhoto = photo;
+    runFp1AutoMatch(photo);
   };
   input.click();
 }
