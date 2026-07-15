@@ -1515,3 +1515,29 @@ two-column 88px avatars. **First job after the matcher: open it and look.**
   it all day.
 - Overlapping Deploy Policy (Render workspace settings) still not flipped — builds queue.
 - Use `[skip render]` on notes-only commits. Batch pushes; 10 today, 10 builds.
+
+## Live covers — wired, with a data-model problem underneath
+
+**The plan was never in "demo mode".** `_liveCovers` simply had no producer.
+`/api/bookings/today` already existed; the floor plan never called it. Now wired:
+`refreshLiveCovers()` fetches today's bookings, maps them onto tables, polls every 60s,
+repaints only when the plan is actually on screen. A failed fetch leaves the plan alone
+— a network blip must never blank the room. The example pill lifts by itself the moment
+a real booking lands.
+
+**THE PROBLEM — bookings have no room.** `bookings.table_number` is TEXT ("5A", "3"),
+added by `sql/integration-schema.sql`. There is **no room column**. Main Studio and The
+Lounge both have a Table 1, 2, 3, 4. So a booking cannot say which room it is in.
+`_resolveRoom()` currently resolves Main Studio → Lounge → Vault, i.e. **it guesses**,
+and a Lounge booking on a colliding number will draw in the wrong room. On a busy
+Saturday that is worse than useless.
+
+**The fix is a room column on bookings, not cleverer matching.** Add `room TEXT` to
+bookings, backfill, set it at booking time, and delete `_resolveRoom()`. **Do this before
+anyone relies on the live plan.** Until then the plan is honest only when Main Studio is
+the only room in use.
+
+**Also still unbuilt: the live admin dashboard Daisy asked for** — takings this week /
+today / trend. `/api/analytics/dashboard` and `loadDashboardData()` already exist; nobody
+has checked whether they pull real Square figures or stubs. Start there rather than
+building new.

@@ -20212,6 +20212,71 @@ const DEMO_COVERS = {
 
 let _liveCovers = null;
 
+// ── LIVE COVERS — the producer the plan never had ─────────────────
+// The floor plan showed example data not because it was in a demo
+// mode, but because nothing ever filled _liveCovers. /api/bookings/today
+// already existed; the plan simply never called it.
+//
+// HONEST LIMITATION: bookings.table_number is TEXT ("5A", "3") with
+// NO room column. Main Studio and The Lounge both have a Table 1, so
+// a booking cannot say which room it is in. Resolution order below is
+// Main Studio → Lounge → Vault, i.e. a guess. **The fix is a room
+// column on bookings, not cleverer matching here.** Until then a
+// Lounge booking on a number Main Studio also has will appear in the
+// wrong room, and that is worse than useless on a busy Saturday.
+// Flagged in ROLLING_NOTES.
+const BOOKING_STAGE_TO_PLAN = {
+  booking: 'booking', engagement: 'engagement',
+  completion: 'completion', kiln: 'kiln', pickup: 'pickup'
+};
+
+function _resolveRoom(tableNumber) {
+  const id = String(tableNumber || '').trim();
+  for (const room of Object.keys(FLOOR_PLAN)) {
+    if ((FLOOR_PLAN[room].tables || []).some(t => t.id === id)) return room;
+  }
+  return null;
+}
+
+async function refreshLiveCovers() {
+  try {
+    const res = await fetch(`${API_URL}/api/bookings/today?studioId=${studioId}`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const { bookings } = await res.json();
+    if (!Array.isArray(bookings)) return;
+
+    const next = {};
+    bookings.forEach(b => {
+      if (!b.table_number) return; // unseated booking — not on the plan
+      const room = _resolveRoom(b.table_number);
+      if (!room) return;
+      next[room] = next[room] || {};
+      next[room][String(b.table_number).trim()] = {
+        name: b.customer_name || 'Booking',
+        covers: b.party_size || 1,
+        stage: BOOKING_STAGE_TO_PLAN[b.current_stage] || 'booking',
+        since: b.session_start
+          ? new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+          : null
+      };
+    });
+
+    const had = _isRestingState();
+    _liveCovers = next;
+    // Only repaint if the plan is actually on screen and something changed
+    // state — no point redrawing a hand-drawn room every 60 seconds.
+    if (had !== _isRestingState() || Object.keys(next).length) {
+      if (document.getElementById('floor-plan-view')?.offsetParent !== null) showHomeScreen();
+    }
+  } catch (e) { /* leave the plan as it is — a blip must not blank the room */ }
+}
+
+// Poll gently. The studio trades Thu-Sun; a minute is plenty and this
+// runs on a tablet someone is carrying.
+setInterval(refreshLiveCovers, 60 * 1000);
+refreshLiveCovers();
+
+
 function _isRestingState() {
   if (!_liveCovers) return true;
   return !Object.values(_liveCovers).some(room => Object.keys(room || {}).length);
