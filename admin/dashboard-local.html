@@ -21574,7 +21574,7 @@ async function checkForAppUpdate() {
   } catch (e) { /* silent — network hiccup, try again next interval */ }
 }
 checkForAppUpdate();
-window._versionCheckTimer = setInterval(checkForAppUpdate, 2 * 60 * 1000); // check every 2 minutes
+window._versionCheckTimer = setInterval(checkForAppUpdate, 30 * 1000); // check every 30s — was 2 minutes; HTML is no longer cached at all (see server.js), so a normal reload now always gets the latest version anyway. This just makes the banner notice sooner for anyone with the app open continuously through a deploy.
 
 </script>
 

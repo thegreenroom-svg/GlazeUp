@@ -101,12 +101,29 @@ const path = require('path');
 // stale cached code for hours. Genuinely static image assets (icons,
 // which never change) get a real long cache, since there's no
 // downside to caching something that's never going to be different.
+// FIXED 14/15 July 2026 — the 5-minute HTML cache below was the root
+// cause of most of tonight's "I pushed a fix but the app still shows
+// the old version" confusion. A returning visitor within that window
+// could get a stale copy without ever knowing, and on iOS the effective
+// window is often longer than the header implies. Cache-busting a URL
+// by hand (?v=123) was never a real fix, just a way to force past it
+// while debugging — nobody can ask six staff members to remember a
+// magic query string every shift.
+//
+// The real fix: HTML is never cached at all — every open/refresh always
+// asks the server, so whatever's actually deployed is what loads, for
+// everyone, automatically. Images and other static assets (icons, which
+// never change) keep a real long cache, since there's no downside to
+// caching something that's never going to be different — only the HTML
+// entry points needed this.
 const staticCacheOptions = {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.png') || filePath.endsWith('.jpg') || filePath.endsWith('.svg')) {
       res.setHeader('Cache-Control', 'public, max-age=604800'); // 7 real days — genuinely static assets
+    } else if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-store, must-revalidate'); // never cached — always the live version
     } else {
-      res.setHeader('Cache-Control', 'public, max-age=300, must-revalidate'); // 5 real minutes — actively developed, needs to stay fresh
+      res.setHeader('Cache-Control', 'public, max-age=300, must-revalidate'); // 5 minutes — other assets (css/js), still fine to cache briefly
     }
   },
 };

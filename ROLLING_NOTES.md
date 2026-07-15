@@ -2049,3 +2049,23 @@ else in `showBisqueCategory()` touched; the button is the only addition.
 the physical piece → saved with its on-device hash, tied to that real Square item.
 Needs `add_stock_shape_photos.sql` run first or the save will fail with a clear error
 (table won't exist yet).
+
+## Fixed the actual root cause of tonight's stale-load confusion — no more URL trick needed
+
+Daisy asked for everyone to always load fresh, and to be notified faster. The `?v=`
+trick used all night was only ever a debugging workaround — never realistic for six
+staff to remember every shift. Fixed properly instead:
+
+**HTML is now never cached, anywhere** (`Cache-Control: no-store, must-revalidate` on
+every `.html` file served from `/admin` and `/app`). Every open or refresh always asks
+the server and gets whatever's actually deployed — automatically, for everyone, no
+special URL required. This is the real fix for the "I pushed something but the app
+still shows the old version" problem that caused most of tonight's confusion.
+
+**Images and other static assets are untouched** — 7-day cache for icons/photos (fine,
+they don't change), 5-minute for anything else. Only the HTML entry point needed to
+stop being cached.
+
+**Update-check polling sped up 2 minutes → 30 seconds.** Matters less now that HTML is
+never cached (a normal reopen already gets the latest version regardless), but still
+helps anyone with the app open continuously through a deploy notice sooner.
