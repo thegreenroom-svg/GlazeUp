@@ -9034,6 +9034,39 @@ app.post('/api/stock/identify-by-photo', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════
+// STAFF CHECKLIST CUSTOMIZATION — per staff member, not shared.
+// Order, custom label, custom description for the stage checklists
+// in the real table detail panel. Deliberately separate from, and
+// much smaller than, the top-level tile grid — that stays one shared
+// order for everyone (see ROLLING_NOTES for why).
+// ═══════════════════════════════════════════════════════════
+
+app.get('/api/staff/checklist-customization', async (req, res) => {
+  const { studioId, staffMemberId, stage } = req.query;
+  if (!studioId || !staffMemberId || !stage) return res.status(400).json({ error: 'studioId, staffMemberId, stage required' });
+  const { data, error } = await supabase.from('staff_checklist_customization')
+    .select('check_key, custom_order, custom_label, custom_description')
+    .eq('studio_id', studioId).eq('staff_member_id', staffMemberId).eq('stage', stage)
+    .order('custom_order');
+  if (error) return res.status(500).json({ error: error.message, hint: 'Has add_staff_checklist_customization.sql been run?' });
+  res.json({ customizations: data || [] });
+});
+
+app.post('/api/staff/checklist-customization', async (req, res) => {
+  const { studioId, staffMemberId, stage, checkKey, order, label, description } = req.body;
+  if (!studioId || !staffMemberId || !stage || !checkKey) {
+    return res.status(400).json({ error: 'studioId, staffMemberId, stage, checkKey required' });
+  }
+  const { error } = await supabase.from('staff_checklist_customization').upsert({
+    studio_id: studioId, staff_member_id: staffMemberId, stage, check_key: checkKey,
+    custom_order: order ?? 0, custom_label: label || null, custom_description: description || null,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'studio_id,staff_member_id,stage,check_key' });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ status: 'saved' });
+});
+
 // ── Genuine real damage/loss reporting — covers both a customer's
 // painted piece and raw unpainted stock. Alerts staff via the real
 // existing staff_alerts system, genuinely removes the item from

@@ -2098,3 +2098,44 @@ than the ROUTING (does login send you there at all). Both were real bugs tonight
 different places, and conflating them wasted time. The lesson: when someone says
 "X isn't happening," check whether X is reachable at all before checking whether X
 looks right once reached.
+
+# ═══════════════════════════════════════════════════════════
+# Per-staff checklist reordering, renaming, describing — built
+# ═══════════════════════════════════════════════════════════
+
+Daisy explicitly reversed the earlier "one shared order, no per-person customization"
+decision, after being shown the conflict and choosing deliberately. Scoped narrowly on
+purpose: the stage checklists inside the real, working table detail panel (Booking/
+Painting/Completion/Kiln) — NOT the top-level tile grid (`GRID_NAV_STRUCTURE`), which
+stays untouched. That system is separately, repeatedly flagged all night as the single
+largest, riskiest piece of remaining work and was not the right thing to touch blind at
+this hour on top of five bugs already found tonight.
+
+**`add_staff_checklist_customization.sql` (NEW — needs running):**
+`staff_checklist_customization` — per studio, per staff member, per stage, per check:
+order, custom label, custom description. Falls back to the built-in `FLOW_CHECKS`
+order/wording for anything not customized.
+
+**Server:** `GET`/`POST /api/staff/checklist-customization`.
+
+**Client:**
+- `_orderedChecksFor(stage)` merges built-in checks with this staff member's saved
+  customization.
+- Loaded once when the table panel opens (`openTableDetail`), cached in
+  `_checklistCustom`, same pattern as `_detailItems`/`_floorData` already used
+  elsewhere in this file.
+- Each checklist item now has **▲▼** (move) and **✎** (rename/describe) buttons
+  alongside the existing tick button.
+
+**Deliberate substitution, stated rather than hidden:** tap ▲▼ to reorder, not drag.
+Touchscreen drag-and-drop is exactly the class of thing that fails silently and can't be
+verified without a device — tonight's whole failure pattern. Tap-based reordering
+reflows the list identically, with none of that risk.
+
+**Deliberate substitution #2:** rename/describe uses plain `prompt()` dialogs, not a new
+modal. Reliable, no new DOM to get subtly wrong, appropriate for an infrequent action.
+
+**Genuinely NOT done, stated plainly:** this does not extend to "throughout the app."
+It is one screen, chosen because it is real, already verified working, and small. If
+this pattern is wanted more broadly, it is a rollout of an already-tested approach next
+session — not a blind rebuild of everything tonight.

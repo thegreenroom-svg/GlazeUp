@@ -9926,10 +9926,42 @@ function _miniTableSvg(covers, dark = false, seedKey = '', accent = null) {
   </svg>`;
 }
 
+let _checklistCustom = {}; // { [stage]: [{check_key, custom_order, custom_label, custom_description}] }
+
+async function _loadChecklistCustomization(stage) {
+  if (!currentShiftStaff?.id) { _checklistCustom[stage] = []; return; }
+  try {
+    const res = await fetch(`${API_URL}/api/staff/checklist-customization?studioId=${studioId}&staffMemberId=${currentShiftStaff.id}&stage=${stage}`);
+    const data = await res.json();
+    _checklistCustom[stage] = data.customizations || [];
+  } catch (e) {
+    _checklistCustom[stage] = []; // no customization yet — falls back to the built-in order/labels
+  }
+}
+
+// Merge the built-in FLOW_CHECKS with whatever this staff member has
+// customized — order, label, description. Anything not customized
+// keeps its built-in position and wording.
+function _orderedChecksFor(stage) {
+  const builtIn = FLOW_CHECKS[stage] || [];
+  const custom = _checklistCustom[stage] || [];
+  const customByKey = {};
+  custom.forEach(c => { customByKey[c.check_key] = c; });
+  return builtIn
+    .map((c, i) => ({
+      key: c.key,
+      label: customByKey[c.key]?.custom_label || c.label,
+      description: customByKey[c.key]?.custom_description || null,
+      order: customByKey[c.key]?.custom_order ?? i
+    }))
+    .sort((a, b) => a.order - b.order);
+}
+
 async function openTableDetail(bookingCode) {
   const b = _floorData.bookings.find(x => x.booking_code === bookingCode);
   if (!b) return;
   _detailBooking = b;
+  await _loadChecklistCustomization(b.current_stage || 'booking');
 
   try {
     const res = await fetch(`${API_URL}/api/floor/items/${bookingCode}?studioId=${studioId}`);
@@ -10116,34 +10148,103 @@ function _saveDetailItems() {
   }).catch(()=>{});
 }
 
+// Move one item up or down. The others reflow around it automatically
+// — this just re-numbers the whole ordered list and saves every
+// position that actually changed, then re-renders from the merged
+// order. Tap-based on purpose, not drag — see the note above
+// renderDetailChecklist for why.
+async function _moveChecklistItem(stage, index, direction) {
+  const checks = _orderedChecksFor(stage);
+  const target = index + direction;
+  if (target < 0 || target >= checks.length) return;
+  [checks[index], checks[target]] = [checks[target], checks[index]];
+
+  // Re-save every item's new position — cheap (a handful of rows),
+  // and guarantees the whole list is internally consistent rather
+  // than only patching the two that swapped.
+  await Promise.all(checks.map((c, i) => _saveChecklistCustom(stage, c.key, i, c.label, c.description)));
+  await _loadChecklistCustomization(stage);
+  renderDetailChecklist();
+}
+
+// Rename and/or describe one item. Plain prompts rather than a new
+// modal — reliable, no new DOM to get wrong, and this is exactly the
+// kind of small, infrequent action a prompt suits.
+async function _editChecklistItem(stage, checkKey) {
+  const checks = _orderedChecksFor(stage);
+  const current = checks.find(c => c.key === checkKey);
+  if (!current) return;
+
+  const newLabel = prompt('Rename this step (leave as-is to keep it):', current.label);
+  if (newLabel === null) return; // cancelled
+  const newDesc = prompt('Add a short note under it (optional, leave blank for none):', current.description || '');
+  if (newDesc === null) return;
+
+  await _saveChecklistCustom(stage, checkKey, current.order, newLabel.trim() || current.label, newDesc.trim() || null);
+  await _loadChecklistCustomization(stage);
+  renderDetailChecklist();
+}
+
+async function _saveChecklistCustom(stage, checkKey, order, label, description) {
+  if (!currentShiftStaff?.id) return;
+  try {
+    await fetch(`${API_URL}/api/staff/checklist-customization`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId, staffMemberId: currentShiftStaff.id, stage, checkKey,
+        order, label, description
+      })
+    });
+  } catch (e) { /* saved locally in the re-render regardless; will retry next open */ }
+}
+
 function renderDetailChecklist() {
   if (!_detailBooking) return;
   const b = _detailBooking;
   const stage = b.current_stage || 'booking';
-  const checks = FLOW_CHECKS[stage] || [];
+  const checks = _orderedChecksFor(stage); // this staff member's order/labels, built-ins as fallback
   const el = document.getElementById('detail-checklist');
   if (!el) return;
 
   const stageColor = { booking:'#2e7d32', engagement:'#B87946', completion:'#c0392b', kiln:'#FF5722' }[stage] || '#2e7d32';
 
   el.innerHTML = `
-    <div style="font-size:10px;font-weight:700;color:${stageColor};text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">
-      ${{ booking:'📋 Booking', engagement:'🎨 Painting', completion:'📷 Completion', kiln:'🔥 Kiln' }[stage]} checklist
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-size:10px;font-weight:700;color:${stageColor};text-transform:uppercase;letter-spacing:0.08em;">
+        ${{ booking:'📋 Booking', engagement:'🎨 Painting', completion:'📷 Completion', kiln:'🔥 Kiln' }[stage]} checklist
+      </div>
+      <div style="font-size:9px;color:rgba(255,255,255,0.3);">Tap ✎ to rename · ▲▼ to reorder</div>
     </div>
-    ${checks.map(c => {
+    ${checks.map((c, i) => {
       const done = !!b.checks?.[`${stage}:${c.key}`];
-      return `<button onclick="toggleFlowCheck('${b.booking_code}','${stage}','${c.key}',${!done})"
-        style="width:100%;text-align:left;
-          background:${done ? 'rgba(76,175,80,0.1)' : 'rgba(255,255,255,0.04)'};
-          border:1px solid ${done ? 'rgba(76,175,80,0.35)' : 'rgba(255,255,255,0.1)'};
-          border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer;
-          display:flex;align-items:center;gap:10px;">
-        <span style="font-size:18px;">${done ? '✅' : '⬜'}</span>
-        <span style="font-size:13px;font-weight:600;
-          color:${done ? '#4CAF50' : '#F4ECE0'};
-          text-decoration:${done ? 'line-through' : 'none'};
-          opacity:${done ? 0.6 : 1};">${c.label}</span>
-      </button>`;
+      return `<div style="display:flex;align-items:stretch;gap:6px;margin-bottom:6px;">
+        <button onclick="toggleFlowCheck('${b.booking_code}','${stage}','${c.key}',${!done})"
+          style="flex:1;text-align:left;
+            background:${done ? 'rgba(76,175,80,0.1)' : 'rgba(255,255,255,0.04)'};
+            border:1px solid ${done ? 'rgba(76,175,80,0.35)' : 'rgba(255,255,255,0.1)'};
+            border-radius:10px;padding:10px 12px;cursor:pointer;
+            display:flex;align-items:center;gap:10px;">
+          <span style="font-size:18px;">${done ? '✅' : '⬜'}</span>
+          <div>
+            <div style="font-size:13px;font-weight:600;
+              color:${done ? '#4CAF50' : '#F4ECE0'};
+              text-decoration:${done ? 'line-through' : 'none'};
+              opacity:${done ? 0.6 : 1};">${c.label}</div>
+            ${c.description ? `<div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;">${c.description}</div>` : ''}
+          </div>
+        </button>
+        <div style="display:flex;flex-direction:column;gap:2px;">
+          <button onclick="_moveChecklistItem('${stage}',${i},-1)" ${i === 0 ? 'disabled' : ''}
+            style="flex:1;width:28px;border:none;border-radius:6px 6px 0 0;background:rgba(255,255,255,0.06);
+              color:${i === 0 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.6)'};font-size:10px;cursor:pointer;">▲</button>
+          <button onclick="_moveChecklistItem('${stage}',${i},1)" ${i === checks.length - 1 ? 'disabled' : ''}
+            style="flex:1;width:28px;border:none;background:rgba(255,255,255,0.06);
+              color:${i === checks.length - 1 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.6)'};font-size:10px;cursor:pointer;">▼</button>
+          <button onclick="_editChecklistItem('${stage}','${c.key}')"
+            style="flex:1;width:28px;border:none;border-radius:0 0 6px 6px;background:rgba(184,121,70,0.15);
+              color:#B87946;font-size:10px;cursor:pointer;">✎</button>
+        </div>
+      </div>`;
     }).join('')}
     <button onclick="openBookingAtRealStage('${b.booking_code}','${stage}')"
       style="width:100%;background:linear-gradient(135deg,${stageColor},${stageColor}cc);
