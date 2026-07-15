@@ -1627,3 +1627,29 @@ whether that function exists elsewhere, fully working, before assuming it needs
 building. Tonight nearly cost a real, data-backed system in favour of a nicer
 looking guess, on the night before a presentation, from a bug report I could
 only see as a phone photo.
+
+## Clear-demo-data tap — added 14 July 2026, after seeing the real floor plan
+
+Daisy's reaction to the real (working) floor plan: the seeded training bookings (Sarah
++3 style, from `demo_workflow_seed.sql`) are good for teaching staff, but need a plain
+"this is demo, tap to clear" label right on the tile.
+
+**Every seeded row already carried an honest marker** — `customer_name` contains
+"(Demo)", `booking_code` starts `demo-booking-`. Built on top of that rather than
+inventing a new flag:
+
+- `_renderOccupiedTile()` now shows an amber "TRAINING — TAP TO CLEAR" pill on any
+  booking matching either marker, and taps route to `clearSeedBooking()` instead of
+  the normal table detail.
+- `DELETE /api/bookings/:bookingCode/seed` — **checks the marker server-side too**,
+  independently of what the client sends, and refuses to delete anything that isn't
+  genuinely seeded. Deletes the booking's `pottery_pieces` rows first, then the booking.
+- Client confirms before calling it.
+
+**This only touches the real, working floor plan** (`_renderOccupiedTile`), not the
+hand-drawn one built earlier tonight — that one still uses static `DEMO_COVERS` with no
+delete path, since it isn't the live view any more. If that system is ever revived, it
+needs the same treatment.
+
+**Not yet done:** no equivalent for Host By Post's demo orders, if those ever get seeded
+the same way.

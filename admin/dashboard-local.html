@@ -9706,6 +9706,21 @@ function closeRoomPanel() {
 function filterFloorByRoom() {}
 
 
+// Clears one seeded training booking. Confirms first — this removes
+// real rows, even though they are only demo ones — then asks the
+// server to do it, which independently re-checks the (Demo) marker
+// before touching anything.
+async function clearSeedBooking(bookingCode) {
+  if (!confirm('Clear this training booking? This only removes demo data used for learning the app — never a real booking.')) return;
+  try {
+    const res = await fetch(`${API_URL}/api/bookings/${bookingCode}/seed?studioId=${studioId}`, { method: 'DELETE' });
+    if (!res.ok) { const d = await res.json(); alert(d.error || 'Could not clear this.'); return; }
+    await loadFloorPlan();
+  } catch (e) {
+    alert('Could not reach the server — try again.');
+  }
+}
+
 function _renderEmptyTile(table) {
   return `
     <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:11px;text-align:center;">
@@ -9733,9 +9748,17 @@ function _renderOccupiedTile(table, b, now) {
     : isGroup
     ? `<span style="background:rgba(249,168,37,0.2);color:#FFD54F;border-radius:4px;padding:1px 5px;font-size:8px;font-weight:700;">GROUP</span>`
     : '';
+  // Seeded rows from demo_workflow_seed.sql always carry "(Demo)" in the
+  // customer name and a booking_code starting demo-booking-. Real bookings
+  // never will. Flag them plainly so nobody mistakes a training booking
+  // for a real one on a genuinely busy floor.
+  const isSeedDemo = /\(Demo\)/.test(b.customer_name || '') || /^demo-booking-/.test(b.booking_code || '');
+  const demoPill = isSeedDemo
+    ? `<span style="background:rgba(249,168,37,0.2);color:#F9A825;border-radius:4px;padding:1px 5px;font-size:8px;font-weight:700;">TRAINING — TAP TO CLEAR</span>`
+    : '';
   const warningSoon = !timer.isAllDay && parseInt(timer.label) <= 15 && timer.label !== '0m';
   return `
-    <button onclick="openTableDetail('${b.booking_code}')"
+    <button onclick="${isSeedDemo ? `clearSeedBooking('${b.booking_code}')` : `openTableDetail('${b.booking_code}')`}"
       style="background:linear-gradient(160deg,#2A1F18 0%,#1E1710 100%);
              border:1px solid ${stageColor}40;border-radius:14px;padding:11px;
              cursor:pointer;text-align:left;position:relative;overflow:hidden;
@@ -9760,6 +9783,7 @@ function _renderOccupiedTile(table, b, now) {
           <span style="font-size:9px;color:${allDone ? '#4CAF50' : 'rgba(255,255,255,0.2)'};">${completedChecks}/${stageChecks.length}</span>
         </div>
       </div>
+      ${demoPill ? `<div style="margin-top:6px;text-align:center;">${demoPill}</div>` : ''}
       ${warningSoon ? `<div style="margin-top:5px;text-align:center;font-size:8px;font-weight:800;color:#FF5252;letter-spacing:0.04em;">⚠ FINISHING SOON</div>` : ''}
     </button>`;
 }

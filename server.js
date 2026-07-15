@@ -1929,6 +1929,35 @@ app.get('/api/bookings/search', async (req, res) => {
   }
 });
 
+// DELETE /api/bookings/:bookingCode/seed — remove ONE demo/training
+// booking, and only if it genuinely looks seeded. Every row written by
+// demo_workflow_seed.sql carries "(Demo)" in the customer name and a
+// booking_code starting demo-booking- — both checked here, server-side,
+// so this can never be pointed at a real booking no matter what the
+// client sends. Added 14 July 2026 after Daisy asked for a way to clear
+// training data straight from the floor plan.
+app.delete('/api/bookings/:bookingCode/seed', async (req, res) => {
+  const { bookingCode } = req.params;
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  if (!/^demo-booking-/.test(bookingCode || '')) {
+    return res.status(400).json({ error: 'Only seeded demo bookings (demo-booking-*) can be cleared this way.' });
+  }
+  try {
+    const { data: booking } = await supabase.from('bookings')
+      .select('id, customer_name').eq('studio_id', studioId).eq('booking_code', bookingCode).single();
+    if (!booking) return res.status(404).json({ error: 'No such booking' });
+    if (!/\(Demo\)/.test(booking.customer_name || '')) {
+      return res.status(400).json({ error: 'This booking is not marked as demo data — refusing to delete.' });
+    }
+    await supabase.from('pottery_pieces').delete().eq('studio_id', studioId).eq('booking_id', bookingCode);
+    await supabase.from('bookings').delete().eq('id', booking.id);
+    res.json({ cleared: bookingCode });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/api/bookings/today', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
