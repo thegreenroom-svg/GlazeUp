@@ -1541,3 +1541,19 @@ the only room in use.
 today / trend. `/api/analytics/dashboard` and `loadDashboardData()` already exist; nobody
 has checked whether they pull real Square figures or stubs. Start there rather than
 building new.
+
+## Room column — added 14 July 2026
+
+`add_booking_room.sql` (NEW — **needs running on Supabase**): adds `bookings.room TEXT`.
+The floor plan now uses `b.room` whenever it is set, and only falls back to
+`_resolveRoom()`'s Main-Studio-first guess for old rows written before the column existed.
+
+**Backfill is deliberately partial.** Only '5A', '7', '8' → Main Studio and 'Group%' →
+The Vault, because those exist in exactly one room. Tables 1-6 are ambiguous (both Main
+Studio and The Lounge have them) and are **left NULL rather than guessed** — a null room
+is honest, a wrong room is a member of staff walking to the wrong table. The script ends
+with a SELECT listing what still needs a human.
+
+**Still to do:** set `room` at booking time so the fallback never runs, then delete
+`_resolveRoom()` entirely. Until then, live covers are only reliable when Main Studio is
+the only room in use.

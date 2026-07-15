@@ -20217,14 +20217,12 @@ let _liveCovers = null;
 // mode, but because nothing ever filled _liveCovers. /api/bookings/today
 // already existed; the plan simply never called it.
 //
-// HONEST LIMITATION: bookings.table_number is TEXT ("5A", "3") with
-// NO room column. Main Studio and The Lounge both have a Table 1, so
-// a booking cannot say which room it is in. Resolution order below is
-// Main Studio → Lounge → Vault, i.e. a guess. **The fix is a room
-// column on bookings, not cleverer matching here.** Until then a
-// Lounge booking on a number Main Studio also has will appear in the
-// wrong room, and that is worse than useless on a busy Saturday.
-// Flagged in ROLLING_NOTES.
+// Bookings now carry their own room (add_booking_room.sql). We use it
+// whenever it is set. _resolveRoom() below survives only as a fallback
+// for old rows written before that column existed — Main Studio and The
+// Lounge both have a Table 1, so for those it is a GUESS, and a guess
+// puts a member of staff at the wrong table. Set `room` at booking time
+// and the fallback never runs.
 const BOOKING_STAGE_TO_PLAN = {
   booking: 'booking', engagement: 'engagement',
   completion: 'completion', kiln: 'kiln', pickup: 'pickup'
@@ -20248,7 +20246,10 @@ async function refreshLiveCovers() {
     const next = {};
     bookings.forEach(b => {
       if (!b.table_number) return; // unseated booking — not on the plan
-      const room = _resolveRoom(b.table_number);
+      // Use the room the booking actually states. Only fall back to
+      // guessing when it genuinely doesn't know — a null room is an
+      // old booking from before the column existed.
+      const room = (b.room && FLOOR_PLAN[b.room]) ? b.room : _resolveRoom(b.table_number);
       if (!room) return;
       next[room] = next[room] || {};
       next[room][String(b.table_number).trim()] = {
