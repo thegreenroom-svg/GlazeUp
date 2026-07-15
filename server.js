@@ -9903,6 +9903,58 @@ app.listen(port, async () => {
   pingSelf();
   setInterval(pingSelf, 14 * 60 * 1000);
 
+  // ═══════════════════════════════════════════════════════════
+  // THE LEARNING ENGINE — actually run it. Sundays, 04:00.
+  // ═══════════════════════════════════════════════════════════
+  // The engine has been complete since bb4f5ad and the client finally
+  // started feeding it on 15 July (log-transition wired into goToTab).
+  // But NOTHING has ever called /api/studio/learning/run — no cron, no
+  // trigger, nothing. So it would have banked transitions forever and
+  // never once produced a suggestion. Collecting is not learning.
+  //
+  // WHY WEEKLY, NOT NIGHTLY: LEARN.MIN_TRANSITIONS is 12 per pair and
+  // MIN_SHARE is 0.6. The studio trades roughly four days a week, so
+  // signal accrues over about a fortnight of trading. Running nightly
+  // would mostly re-derive the same not-yet-significant numbers and
+  // produce noise — and noise gets ignored, which costs us the one time
+  // a suggestion matters. Sunday 04:00 is after the trading week and
+  // before anyone opens the app.
+  //
+  // WHY AN HTTP CALL TO OUR OWN ENDPOINT, WHICH LOOKS ODD: the rules
+  // live inline inside the route handler, not in a callable function.
+  // Extracting ~100 lines of tested arithmetic into one, purely so a
+  // cron could call it, is a refactor with real risk and no user-facing
+  // gain. This reuses the exact pattern pingSelf already uses against
+  // the real public URL, and touches none of the tested logic. If that
+  // handler is ever refactored for other reasons, call it directly here.
+  //
+  // Suggestions land in studio_suggestions with status 'pending'. There
+  // is still NO card in the app — nothing surfaces to staff yet. Until
+  // that exists, read them at:
+  //   GET /api/studio/learning/suggestions?studioId=...
+  // Nothing applies itself; every suggestion still needs a human tap.
+  cron.schedule('0 4 * * 0', async () => {
+    console.log('Learning engine: weekly run starting…');
+    try {
+      const { data: studios } = await supabase.from('studios').select('id').eq('is_demo', false);
+      for (const st of (studios || [])) {
+        await new Promise((resolve) => {
+          const lib = SELF_URL.startsWith('https') ? require('https') : require('http');
+          const body = JSON.stringify({ studioId: st.id });
+          const req = lib.request(`${SELF_URL}/api/studio/learning/run`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+          }, (res) => { res.resume(); res.on('end', resolve); });
+          req.on('error', (err) => { console.warn(`Learning run failed for ${st.id}:`, err.message); resolve(); });
+          req.write(body); req.end();
+        });
+      }
+      console.log(`Learning engine: weekly run complete — ${(studios || []).length} studio(s).`);
+    } catch (err) {
+      console.error('Learning engine weekly run failed:', err.message);
+    }
+  });
+
   // Demo activity simulation — PARKED 15 July 2026, alongside the
   // Platform Revenue strip it exists to feed. It was inventing AI
   // generations and extra charges for ~170 is_demo studios on a timer

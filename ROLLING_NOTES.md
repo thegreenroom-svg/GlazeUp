@@ -2994,3 +2994,52 @@ through to paid OpenAI until it is next photographed.
 (`71d27bb`) hung the request every single time a confident local match was found. The
 free matcher is correct, is live, and has never actually run. First real photograph is
 its first real test.
+
+## The learning engine now actually runs. Sundays 04:00. — 15 July 2026
+
+Daisy: "and it was learning our stock and ai learning."
+
+**Stock recognition: genuinely wired and ready.** `captureStockShapePhoto` /
+`identifyStockShape` defined, the 📷 button is on every item in Admin → Bisque (~17962),
+and `stock_shape_photos` was created by RUN_ALL_SIX. It works from the first photo.
+
+**The learning engine had a third gap nobody had named.** Checked rather than assumed:
+
+    client sends log-transition      True    (wired earlier today, 12d5dbf)
+    learning tables exist            True    (RUN_ALL_SIX)
+    /api/studio/learning/run exists  True
+    cron schedules in server.js      ['0 3 * * *']   <- the Square sync, not this
+    anything auto-calls learning/run FALSE
+    suggestion card in client        FALSE
+
+So as of this morning it had no input; as of this afternoon it had input and **no
+trigger**. It would have banked transitions forever and never produced one suggestion.
+**Collecting is not learning.** Three separate gaps, each of which alone made the whole
+thing inert — and each looked fine from the others' point of view.
+
+**`cron.schedule('0 4 * * 0')`** — Sundays at 04:00.
+
+**Why weekly, not nightly.** `LEARN.MIN_TRANSITIONS` is 12 per pair, `MIN_SHARE` 0.6.
+The studio trades ~4 days a week, so signal accrues over roughly a fortnight of trading.
+Nightly would re-derive the same not-yet-significant numbers and produce noise — and
+noise gets ignored, which costs us the one time a suggestion matters. Sunday 04:00 is
+after the trading week and before anyone opens the app.
+
+**Why it makes an HTTP call to our own endpoint, which looks odd.** The rules live
+inline inside the route handler, not in a callable function. Extracting ~100 lines of
+tested arithmetic purely so a cron could call it is a refactor with real risk and no
+user-facing gain, at the end of a day whose entire lesson has been "don't touch working
+things blind." It reuses the exact pattern `pingSelf()` already uses against the real
+public URL. **If that handler is ever refactored for other reasons, call it directly.**
+
+Scoped to `is_demo = false`, so it only ever runs for real studios.
+
+**STILL OUTSTANDING, and this is now the last gap in the chain:** there is no suggestion
+card. Suggestions will land in `studio_suggestions` as 'pending' and nothing surfaces
+them to staff. Until that exists, read them at
+`GET /api/studio/learning/suggestions?studioId=...`. Nothing applies itself; every
+suggestion still needs a human tap, and `respond` still returns `applied:false`.
+
+**Realistic timeline:** first meaningful run is the Sunday after roughly a fortnight of
+real trading. Anything sooner will honestly report that there isn't enough data yet —
+which is the engine working correctly, not failing.
