@@ -2684,3 +2684,54 @@ Label: "✓ Finished — back to tasks" -> "🏠 Home — back to the floor plan
 
 The flow is genuinely sound. Every tile goes somewhere real. The problem was never dead
 links — it was routing that overrode itself.
+
+# ═══════════════════════════════════════════════════════════
+# Two bugs off one real screenshot — 15 July 2026, post-login
+# ═══════════════════════════════════════════════════════════
+
+Daisy landed on the floor plan as David after `4b4e40a`. Routing fix confirmed working
+on a real device. Her screenshot showed two things wrong.
+
+## The "black hole" at the bottom of the screen
+
+`#floor-plan-view` still carried `background:#1A1714` — **the dead dark skeleton's
+colour**, left over from floor plan system #1, which the elegant renderer replaced days
+ago. Nothing dark has been rendered into that container since. It was invisible until
+now only because the ivory content used to fill the viewport.
+
+Compounded by layout: `goToTab` sets the container to `display:block`, but everything
+rendered into it is styled `flex:1` — which does nothing in block layout. So the ivory
+grew only as tall as its content, and the dead dark background showed through below it.
+On a shut day with two rooms, that is half the screen.
+
+**Fixed both ends:** container background → `#F4ECE0`, and `renderFloorPlanElegant()` /
+`showRoomElegant()` now set `view.style.display = 'flex'` so `flex:1` fills the viewport
+and the child's `overflow-y:auto` can actually scroll when there ARE lots of tables.
+
+**Worth noting:** the dark background is the last physical trace of system #1. If
+anything else still assumes a dark floor plan container, it will show now.
+
+## "Main studio" and "Main Studio" were two different rooms
+
+Her screenshot listed three rooms: Lounge, **Main studio**, **Main Studio** — one table
+in each. Table 1 and Table 5A are in the same physical room.
+
+`_elegantRoomsData()` grouped on the raw string: `rooms[t.room || 'Studio']`.
+`studio_tables.room` is typed by hand over time, so a lowercase 's' makes a whole second
+room. The tables were right; the grouping was case-sensitive.
+
+**Fixed with a canonical key** — trimmed, whitespace collapsed, Title Cased. Every
+spelling lands in one group and the label is consistent. The key IS the display label
+and `showRoomElegant()` looks up by that same label, so the drill-down needs no second
+mapping.
+
+**Deliberately a client fix, not SQL.** Normalising `studio_tables.room` in the database
+would fix today's rows and nothing about tomorrow's — the next table added by hand
+re-creates the bug. Canonicalising at the point of grouping is immune to how anyone
+types it, forever. The data can stay messy; the screen stays right.
+
+**Verified against the exact data from the screenshot** (Lounge/'Main studio'/'Main Studio'):
+
+    rooms drawn: Lounge, Main Studio     (2, was 3)
+    Main Studio holds BOTH tables: true
+    container: display flex, bg rgb(244,236,224)

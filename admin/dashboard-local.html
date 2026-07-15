@@ -2904,7 +2904,7 @@
      floor plan. When a staff member has active tables these are
      highlighted. Proper glaze-tile exit button back to home.
 ──────────────────────────────────────────────────────────────────── -->
-<div id="floor-plan-view" class="view" style="display:none;flex-direction:column;height:100vh;max-width:100%;background:#1A1714;overflow:hidden;">
+<div id="floor-plan-view" class="view" style="display:none;flex-direction:column;height:100vh;max-width:100%;background:#F4ECE0;overflow:hidden;">
 
   <!-- ═══════════════════════════════════════════════════════════
        TABLE DETAIL — "where do you need to go?"
@@ -9764,8 +9764,20 @@ function _elegantRoomsData() {
   const bookings = _floorData.bookings || [];
   const bookingByTable = {};
   bookings.forEach(b => { if (b.table_number) bookingByTable[b.table_number] = b; });
+  // Room names come from studio_tables.room, typed by hand over time, so
+  // "Main studio" and "Main Studio" both exist — and keying the group on
+  // the raw string made them TWO rooms on the home screen, each holding
+  // some of the real tables. Seen on a real device 15 July 2026: three
+  // rooms listed, two of them the same room.
+  //
+  // Canonicalised: trimmed, whitespace collapsed, Title Cased. So every
+  // spelling of a room lands in one group, and the label is consistent.
+  // The key IS the display label, and showRoomElegant() looks up by that
+  // same label, so the drill-down keeps working without a second mapping.
+  const _canonRoom = str => String(str || 'Studio').trim().replace(/\s+/g, ' ')
+    .toLowerCase().replace(/\b\w/g, ch => ch.toUpperCase());
   const rooms = {};
-  tables.forEach(t => { (rooms[t.room || 'Studio'] ||= []).push(t); });
+  tables.forEach(t => { (rooms[_canonRoom(t.room)] ||= []).push(t); });
   Object.values(rooms).forEach(list => list.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
   return { rooms, bookingByTable };
 }
@@ -9856,6 +9868,13 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable) {
 function renderFloorPlanElegant() {
   const view = document.getElementById('floor-plan-view');
   if (!view) return;
+  // goToTab sets this container to display:block. Everything rendered into
+  // it is styled flex:1, which does nothing in block layout — so the ivory
+  // only grew as tall as its content and the container's own background
+  // showed through underneath it. That was the "black hole" at the bottom
+  // of the screen on a real device. Restoring flex lets flex:1 fill the
+  // viewport and lets the child's overflow-y:auto actually scroll.
+  view.style.display = 'flex';
   const { rooms, bookingByTable } = _elegantRoomsData();
   const resting = Object.keys(rooms).length === 0;
 
@@ -9880,6 +9899,13 @@ function renderFloorPlanElegant() {
 function showRoomElegant(roomName) {
   const view = document.getElementById('floor-plan-view');
   if (!view) return;
+  // goToTab sets this container to display:block. Everything rendered into
+  // it is styled flex:1, which does nothing in block layout — so the ivory
+  // only grew as tall as its content and the container's own background
+  // showed through underneath it. That was the "black hole" at the bottom
+  // of the screen on a real device. Restoring flex lets flex:1 fill the
+  // viewport and lets the child's overflow-y:auto actually scroll.
+  view.style.display = 'flex';
   const { rooms, bookingByTable } = _elegantRoomsData();
   const list = rooms[roomName] || [];
 
