@@ -2847,7 +2847,7 @@
           <span id="alert-bell-badge" style="display:none;position:absolute;top:-2px;right:-2px;background:#e53935;color:white;font-size:8px;font-weight:800;width:14px;height:14px;border-radius:50%;align-items:center;justify-content:center;border:1.5px solid white;">0</span>
         </button>
 
-        <button onclick="goToTab('setup'); showSetupSection('hostbypost');" class="glaze-tile" style="flex-shrink:0;width:36px;height:36px;background:#2B2724;color:white;border:none;border-radius:9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:3px;">
+        <button onclick="openHostByPost()" class="glaze-tile" style="flex-shrink:0;width:36px;height:36px;background:#2B2724;color:white;border:none;border-radius:9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:3px;">
           <img src="/brand-assets/kiln-cafe-logo-demo/hostbypost-mark-demo.svg" alt="" style="width:13px;height:auto;">
           <span style="font-size:5px;font-weight:800;line-height:1;color:white;">HBP</span>
         </button>
@@ -3096,7 +3096,7 @@
   <div id="grid-nav-top" style="padding:20px;">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:4px;">
       <h2 style="margin:0;">The Kiln Cafe</h2>
-      <button onclick="goToTab('setup'); showSetupSection('hostbypost');" class="glaze-tile" style="flex-shrink:0;width:60px;background:#2B2724;color:white;border:none;border-radius:12px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:4px;gap:2px;">
+      <button onclick="openHostByPost()" class="glaze-tile" style="flex-shrink:0;width:60px;background:#2B2724;color:white;border:none;border-radius:12px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:4px;gap:2px;">
         <img src="/brand-assets/kiln-cafe-logo-demo/hostbypost-mark-demo.svg" alt="" style="width:20px;height:auto;">
         <span style="font-size:7px;font-weight:800;line-height:1.1;">Host By Post</span>
       </button>
@@ -6187,8 +6187,12 @@ function toggleFloatingBackBtn() {
   // grid — the tiles are a destination, not a home, so you need a way
   // back out of them too. Previously hid on grid-nav and barista-view,
   // which left the tiles as a dead end with no route to the floor plan.
-  const onFloorPlan = document.getElementById('floor-plan-view')?.style.display !== 'none';
-  btn.style.display = onFloorPlan ? 'none' : 'flex';
+  // Only the floor plan proper is home. A room drill-down or the Host By
+  // Post board live in the same container but are NOT home — you need the
+  // way back out of them.
+  const onFloorContainer = document.getElementById('floor-plan-view')?.style.display !== 'none';
+  const atHome = onFloorContainer && _floorViewMode === 'plan';
+  btn.style.display = atHome ? 'none' : 'flex';
 }
 
 function goToTab(tab, event) {
@@ -9866,9 +9870,24 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable) {
     </div>`;
 }
 
+// #floor-plan-view is the canvas for THREE different screens now: the
+// floor plan itself, a room drill-down, and the Host By Post board.
+// The Home button hides "when the floor plan container is visible",
+// which was fine when that container only ever held the floor plan.
+// It doesn't any more — without this, opening Host By Post would strand
+// you there with no way home. Each renderer declares what it is.
+let _floorViewMode = 'plan';   // 'plan' | 'room' | 'post'
+
 function renderFloorPlanElegant() {
   const view = document.getElementById('floor-plan-view');
   if (!view) return;
+  _floorViewMode = 'plan';
+  // goToTab() calls toggleFloatingBackBtn() BEFORE the async loadFloorPlan()
+  // resolves, so at that moment the mode is still whatever the last screen
+  // set — tapping Home from Host By Post left the Home button on screen
+  // while sitting on the floor plan. The renderer knows what it is; it
+  // refreshes the button itself rather than relying on the caller's timing.
+  toggleFloatingBackBtn();
   // goToTab sets this container to display:block. Everything rendered into
   // it is styled flex:1, which does nothing in block layout — so the ivory
   // only grew as tall as its content and the container's own background
@@ -9900,6 +9919,13 @@ function renderFloorPlanElegant() {
 function showRoomElegant(roomName) {
   const view = document.getElementById('floor-plan-view');
   if (!view) return;
+  _floorViewMode = 'room';
+  // goToTab() calls toggleFloatingBackBtn() BEFORE the async loadFloorPlan()
+  // resolves, so at that moment the mode is still whatever the last screen
+  // set — tapping Home from Host By Post left the Home button on screen
+  // while sitting on the floor plan. The renderer knows what it is; it
+  // refreshes the button itself rather than relying on the caller's timing.
+  toggleFloatingBackBtn();
   // goToTab sets this container to display:block. Everything rendered into
   // it is styled flex:1, which does nothing in block layout — so the ivory
   // only grew as tall as its content and the container's own background
@@ -21199,7 +21225,29 @@ function _ordersNow() {
 function _postResting() { return !(_liveOrders && _liveOrders.length); }
 
 // POST — the top level. The board is the room.
+// Host By Post — the entry point that never existed. showPostBoard() has
+// been fully built since 14 July (Post -> Order -> Job, the exact mirror of
+// Floor -> Table -> Job, same glaze tiles, same grammar) and was reachable
+// from precisely nowhere: the HBP header button went to Setup instead, and
+// the nav route needs GRID_NAV_STRUCTURE as data, which is still the gate.
+//
+// This is NOT goToTab('floor-plan') + showPostBoard(). goToTab fires
+// loadFloorPlan(), which is async and would repaint the floor plan over the
+// board a moment later — the exact shape of the showHomeScreen() bug from
+// 14 July, where an abandoned system silently overwrote the real one on a
+// timer. Show the container directly instead, and let the board own it.
+function openHostByPost() {
+  document.querySelectorAll('.view').forEach(v => { v.style.display = 'none'; v.classList.remove('fade-in'); });
+  const view = document.getElementById('floor-plan-view');
+  if (!view) return;
+  view.style.display = 'flex';
+  currentTab = 'hostbypost';
+  showPostBoard();
+  toggleFloatingBackBtn();
+}
+
 function showPostBoard() {
+  _floorViewMode = 'post';
   const view = document.getElementById('floor-plan-view');
   if (!view) return;
   const orders = _ordersNow();

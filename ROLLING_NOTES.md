@@ -2920,3 +2920,77 @@ that way would undo the day's main lesson.
    the tap means something real. This is arguably what a studio actually wants.
 
 Not built. Asked.
+
+# ═══════════════════════════════════════════════════════════
+# Host By Post is reachable. It has been built since 14 July. 15 July 2026
+# ═══════════════════════════════════════════════════════════
+
+Daisy asked for the HBP header button to lead to "a square grid system like we agreed,
+rendered the same as our app, sister app, same styling, same routine, same coding, step
+process".
+
+**That is showPostBoard(), and it has existed since 14 July** — Post → Order → Job, the
+exact mirror of Floor → Table → Job, same glaze tiles, same grammar, deliberately so
+staff learn one language. Nothing needed designing.
+
+**It was reachable from nowhere.** The HBP header buttons (both of them) went to
+`goToTab('setup'); showSetupSection('hostbypost')` — the Setup page. The board itself
+had no entry point at all. The notes said the nav route needed `GRID_NAV_STRUCTURE` as
+data (still true, still the gate) — but the *header button* was never blocked by that
+gate. It just pointed somewhere else. **Fifth thing this week that was fully built and
+simply unreachable.**
+
+`openHostByPost()` — new, and deliberately NOT `goToTab('floor-plan') + showPostBoard()`.
+`goToTab` fires the async `loadFloorPlan()`, which would repaint the floor plan over the
+board a moment later: **precisely the `showHomeScreen()` bug from 14 July**, where an
+abandoned system silently overwrote the real one on a timer. It shows the container
+directly and lets the board own it.
+
+## `#floor-plan-view` is three screens now, and the Home button assumed it was one
+
+`toggleFloatingBackBtn()` hid Home whenever that container was visible — correct while
+it only ever held the floor plan. It now holds the floor plan, room drill-downs, AND the
+Post board. Without a fix, tapping HBP would strand you on the board with no way back.
+
+**`_floorViewMode`** ('plan' | 'room' | 'post'), declared by each renderer. Home hides
+only on `'plan'`.
+
+**One real timing trap, found by testing rather than reasoning:** `goToTab()` calls
+`toggleFloatingBackBtn()` BEFORE the async `loadFloorPlan()` resolves — so at that
+moment the mode is still whatever the previous screen set, and tapping Home from Host
+By Post left the Home button sitting on screen while you were already home. Each
+renderer now refreshes the button itself once its own mode is set, rather than trusting
+the caller's timing.
+
+**Verified** (jsdom):
+
+    floor plan : mode plan, Home hidden
+    tap HBP    : mode post, board rendered, Home SHOWN (can escape)
+    tap Home   : mode plan, Home hidden
+
+## Recognition chain — verified end to end, with two honest caveats
+
+Daisy: "make sure our recognition system is completely compliant with our booking
+system... take a table shot, pieces grouped, knows it's that booking, recognition,
+through the kiln process. Just make sure."
+
+Checked rather than claimed:
+
+    computePerceptualHash on device        OK
+    phash sent from all 3 capture points   OK  (ref photo, piece match, kiln unload)
+    server checks hash BEFORE OpenAI       OK  (the 'openai' string at char 2359 is a
+                                                COMMENT; the real compare is at 2724)
+    match returns booking_id               OK  <- the piece->booking link
+    stock shape endpoints                  OK  (shape-photo, identify-by-photo)
+
+The chain is real: photo → dHash → Hamming → piece → `pottery_pieces.booking_id` →
+booking → kiln. The free path genuinely wins before anything paid fires.
+
+**Caveat 1: there are zero stored hashes.** `add_perceptual_hash.sql` only ran TODAY.
+Only pieces photographed from now on are matchable locally; everything existing falls
+through to paid OpenAI until it is next photographed.
+
+**Caveat 2: it has never once succeeded.** The `.catch()` bug fixed this afternoon
+(`71d27bb`) hung the request every single time a confident local match was found. The
+free matcher is correct, is live, and has never actually run. First real photograph is
+its first real test.
