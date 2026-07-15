@@ -2496,3 +2496,32 @@ Two guards, both checked rather than assumed:
 - **Never yanks anyone out of an open modal** — tested by real visibility
   (`offsetParent !== null`) across every `[id*="modal"]`, not a hand-maintained list
   that would rot the first time a modal was added.
+
+## Demo cut from the floor plan route — and the marker gap that made it necessary
+
+`REMOVE_ALL_DEMO_DATA.sql` (NEW — needs running). Data only, no code, fully reversible
+by re-running the two seed files.
+
+**THE REAL FINDING: the two demo seeds mark their rows differently, and the client only
+knows about one of them.**
+
+- `demo_workflow_seed.sql` → `demo-booking-*` + "(Demo)" in the customer name. The
+  client spots these (`isSeedDemo`, ~10062) and draws the amber TRAINING pill.
+- `demo_floor_seed.sql` → `DEMO-T1`, `DEMO-WI`, `DEMO-HEN`… with customer names like
+  "Women's Institute" and "Sophie's Hen Do" and **no marker whatsoever**.
+  `/^demo-booking-/` does not match `DEMO-WI`. So **these five have always rendered as
+  genuine bookings** — no pill, no warning — and `DELETE /api/bookings/:code/seed`
+  actively refuses them. They were unremovable from inside the app.
+
+That is why Daisy kept seeing "the WI" and could not tell what was real. She was right
+that something was confusing; the confusion was a bug, not her.
+
+**Not fixed in code, deliberately:** widening `isSeedDemo` to also match `/^DEMO-/`
+(client) and the server's seed-delete guard would make the training feature honest for
+both seeds. Worth doing IF the demo data is ever wanted back. Pointless right now —
+she wants it gone, and deleting the rows makes the marker moot. Flagged rather than
+patched, because touching the working floor plan tonight to guard data that is about to
+not exist is exactly the trade this week keeps punishing.
+
+`studio_tables` is deliberately untouched — the tables are real furniture. Only the
+fake customers go.
