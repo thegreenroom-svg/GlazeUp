@@ -9859,16 +9859,37 @@ async function loadFloorPlan() {
     renderFloorPlanElegant();
   } catch(e) {
     console.warn('Floor plan load failed:', e);
-    const mainGrid = document.getElementById('floor-main-studio');
-    if (mainGrid) {
-      mainGrid.innerHTML = `<div style="grid-column:1/-1;padding:20px;text-align:center;">
-        <div style="font-size:13px;font-weight:700;color:#FF8A65;margin-bottom:6px;">Couldn't load the floor plan</div>
-        <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:14px;">${(e.message||'Unknown error').replace(/</g,'&lt;')}</div>
-        <button onclick="loadFloorPlan()" class="glaze-tile" style="border:none;padding:9px 18px;font-size:12px;font-weight:700;cursor:pointer;">Try again</button>
-      </div>`;
+    // THE REAL BUG behind "the elegant screen keeps reverting" — found
+    // 15 July 2026. renderFloorPlanElegant() replaces the WHOLE
+    // #floor-plan-view with the ivory design on success. This catch
+    // block, written before that existed, was still poking error text
+    // into #floor-main-studio / #floor-subtitle — elements belonging to
+    // the OLD dark skeleton. Those elements are only ever what's on
+    // screen when the elegant renderer has never successfully run yet,
+    // so every transient failure (a 502 from a cold Render instance,
+    // for instance — common on the free tier, not a code bug) showed
+    // the old dark error screen instead of anything ivory, making it
+    // look like the new design had regressed. It hadn't; the error
+    // path just never got updated to match. Now it replaces the whole
+    // view, same as a successful render does, so the app is
+    // consistently one design, error state included.
+    const view = document.getElementById('floor-plan-view');
+    if (view) {
+      view.innerHTML = `
+        <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;
+          display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">
+          <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;margin-bottom:6px;">
+            Couldn't load the floor plan
+          </div>
+          <div style="font-size:12px;color:#8a8175;margin-bottom:18px;max-width:320px;">
+            ${(e.message || 'Unknown error').replace(/</g, '&lt;')}
+          </div>
+          <button onclick="loadFloorPlan()" class="glaze-tile"
+            style="border:none;padding:11px 22px;font-size:13px;font-weight:700;cursor:pointer;">
+            Try again
+          </button>
+        </div>`;
     }
-    const subtitle = document.getElementById('floor-subtitle');
-    if (subtitle) subtitle.textContent = 'Could not load — see message below';
   }
 }
 

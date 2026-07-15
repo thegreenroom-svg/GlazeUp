@@ -2206,3 +2206,33 @@ Run these in Supabase project `mdpchpjnlzlmldtlqrns`, in any order, all safe to 
 `bisque_shapes` table, corrected later the same night by `add_stock_shape_photos.sql`,
 which uses the real Square item id instead. Left in the repo for the record but should
 not be run.
+
+# ═══════════════════════════════════════════════════════════
+# ⚠️  THE REAL, RECURRING BUG — found from a repeat 502 screenshot
+# ═══════════════════════════════════════════════════════════
+
+Daisy: "still no elegant table... this needs to be fixed, it's a recurring issue all
+the time." She was right that this kept happening, and it's a real, precise, fixable
+bug — not the design regressing.
+
+**Root cause:** `renderFloorPlanElegant()` replaces the ENTIRE `#floor-plan-view` on
+success. But `loadFloorPlan()`'s CATCH block — written before the elegant renderer
+existed — still poked error text into `#floor-main-studio` and `#floor-subtitle`,
+elements belonging to the OLD dark skeleton. Those elements are only ever what's still
+on screen when the elegant renderer has never successfully run. So **every transient
+failure** (a 502 from a cold Render free-tier instance — which happens often, confirmed
+multiple times tonight, nothing to do with this code) showed the old dark error screen
+instead of anything ivory. It looked exactly like "the elegant design keeps reverting."
+It never reverted — the success path and the error path were simply two different,
+un-reconciled designs, and a 502 always routes through the error path.
+
+**Fixed:** the catch block now does `view.innerHTML = ...` on the whole
+`#floor-plan-view`, ivory background, Caveat heading, same visual language as
+everything else, "Try again" calling `loadFloorPlan()`. The app is now one consistent
+design end to end — success, error, and drill-down all replace the same container the
+same way.
+
+**This should now be genuinely resolved, not just calmed.** The free-tier cold-start
+502s will keep happening — that's Render's free tier, not this code — but from now on
+they'll show an on-brand "couldn't load, try again" rather than the jarring old dark
+screen, and a retry once the instance is warm will show the real elegant design.
