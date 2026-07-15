@@ -2814,3 +2814,51 @@ filter, per-person totals, shift list, CSV export) and 🏖️ Holiday requests 
 manager approve/reject → running allowance, 28 days default, editable per person). It
 deliberately does not calculate pay, tax or NI; the CSV is the bridge to real payroll.
 That was the right call and should stay the right call.
+
+# ═══════════════════════════════════════════════════════════
+# Platform Revenue PARKED — and the demo simulation with it. 15 July 2026
+# ═══════════════════════════════════════════════════════════
+
+Daisy: "the platform revenue strip is parked. We don't want anything like that going on
+at the moment." Said immediately after being shown that the network figures are
+simulated.
+
+**One flag, one line to reverse:** `PLATFORM_REVENUE_PARKED = true` in the client.
+Nothing deleted — the strip markup, `loadPlatformRevenueStrip()`, the `platformrev` tab
+and all six server endpoints are untouched and still work. Set it to `false` and it all
+comes back exactly as it was.
+
+## THE TRAP IN THIS ONE — do not collapse these two things
+
+`applyPlatformRevenueAccess()` governs **two completely different things** behind one
+access check:
+
+1. **The Platform Revenue strip + nav link** — network-wide, across ~170 seeded
+   `is_demo` studios, fed by `simulateDemoStudioActivity()` inventing AI generations and
+   extra charges on a timer. **PARKED.**
+2. **`kiln-cafe-revenue-section` + the three Dashboard tiles + `refreshKilnCafeRevenueData()`**
+   — The Kiln Cafe's **REAL Square takings**. The speedometer, month-to-date,
+   year-to-date, out of `analytics_cache`, synced from genuine Square orders. **KEPT.
+   This is real money and must never be parked by accident.**
+
+They share one function and have opposite fates. A naive "hide the revenue stuff" would
+have taken Daisy's actual takings off her dashboard — the thing she'd asked for an hour
+earlier. Hence a separate `showPlatform` variable rather than reusing `hasAccess`.
+
+**Verified** (jsdom, as Daisy, a director):
+
+    platform strip     : false   nav link: hidden
+    Kiln Cafe revenue  : true    speedo tile: true
+
+## The demo simulation is parked too — it was writing fake money into production
+
+`setTimeout/setInterval(simulateDemoStudioActivity)` at the bottom of `app.listen`.
+Commented out, both lines, nothing deleted.
+
+**Worth being blunt about why.** With the strip parked, *nothing reads the output* — so
+it was manufacturing fake financial rows into the live database on a timer, for an
+audience of nobody. It was guarded to `is_demo = true` and never touched The Kiln Cafe's
+own numbers, which is the only reason this was ever acceptable. But "harmless fake data
+accumulating in production" is precisely the shape of tonight's other problem: nobody
+could tell Women's Institute from a real booking. Fake rows are only ever safe while
+someone remembers they're fake.

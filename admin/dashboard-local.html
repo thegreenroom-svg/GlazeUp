@@ -11667,18 +11667,42 @@ function updatePhoneStripOffset() {
   wrapper.style.marginTop = `${Math.round(realOffset)}px`;
 }
 
+// PLATFORM REVENUE — PARKED, 15 July 2026, per direct request:
+// "the platform revenue strip is parked, we don't want anything like
+// that going on at the moment."
+//
+// Set this back to false and everything returns exactly as it was.
+// Nothing is deleted: the strip markup, loadPlatformRevenueStrip(),
+// the six server endpoints and the whole platformrev tab are all
+// untouched and still work.
+//
+// WHY IT WAS PARKED, for the record: the network-wide figures are fed
+// by ~170 seeded is_demo studios and simulateDemoStudioActivity(),
+// which invents AI generations and extra charges on a timer. That is
+// fine as a showcase and dishonest as a business number. It never
+// touched The Kiln Cafe's own figures (guarded on is_demo = true).
+//
+// CRITICAL — READ BEFORE CHANGING ANYTHING BELOW: this function also
+// governs kiln-cafe-revenue-section and the three Dashboard tiles,
+// which are The Kiln Cafe's REAL Square takings — the speedometer,
+// month-to-date, year-to-date. Those are real money and MUST keep
+// working. Only the network strip and its nav link are parked. The two
+// live in one function and have opposite fates; do not collapse them.
+const PLATFORM_REVENUE_PARKED = true;
+
 function applyPlatformRevenueAccess() {
   const link = document.getElementById('nav-platformrev');
   const strip = document.getElementById('platform-revenue-strip');
   const firstName = (currentShiftStaff?.name || '').trim().split(' ')[0];
   const hasAccess = PLATFORM_REVENUE_ACCESS.some(n => n.toLowerCase() === firstName.toLowerCase());
+  const showPlatform = hasAccess && !PLATFORM_REVENUE_PARKED;
 
-  if (link) link.style.display = hasAccess ? 'flex' : 'none';
+  if (link) link.style.display = showPlatform ? 'flex' : 'none';
 
   if (strip) {
-    strip.style.display = hasAccess ? 'block' : 'none';
-    document.body.classList.toggle('has-platform-strip', hasAccess);
-    if (hasAccess) {
+    strip.style.display = showPlatform ? 'block' : 'none';
+    document.body.classList.toggle('has-platform-strip', showPlatform);
+    if (showPlatform) {
       loadPlatformRevenueStrip();
       clearInterval(window._platformStripTimer);
       window._platformStripTimer = setInterval(loadPlatformRevenueStrip, 5 * 60 * 1000);
@@ -11702,6 +11726,8 @@ function applyPlatformRevenueAccess() {
 
   // Assistant context: director gets Platform Revenue lookups too, staff
   // gets studio-operations-only. Same access check as the strip/nav link.
+  // Unchanged by the park: this is about The Kiln Cafe's own real data,
+  // which directors still get. Only the platform figures went away.
   window.assistantContext = hasAccess ? 'director' : 'staff';
   const subtitle = document.getElementById('staff-assistant-subtitle');
   if (subtitle) {

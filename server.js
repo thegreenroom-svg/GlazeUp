@@ -9903,9 +9903,18 @@ app.listen(port, async () => {
   pingSelf();
   setInterval(pingSelf, 14 * 60 * 1000);
 
-  // Demo activity simulation
-  setTimeout(simulateDemoStudioActivity, 30 * 1000);
-  setInterval(simulateDemoStudioActivity, 24 * 60 * 60 * 1000);
+  // Demo activity simulation — PARKED 15 July 2026, alongside the
+  // Platform Revenue strip it exists to feed. It was inventing AI
+  // generations and extra charges for ~170 is_demo studios on a timer
+  // and writing them to the live database. With the strip parked,
+  // nothing reads any of it — so it was manufacturing fake financial
+  // rows into production for an audience of nobody.
+  //
+  // Nothing deleted: simulateDemoStudioActivity() and its manual
+  // trigger endpoint are untouched. These two lines are the whole
+  // mechanism — uncomment to restore.
+  // setTimeout(simulateDemoStudioActivity, 30 * 1000);
+  // setInterval(simulateDemoStudioActivity, 24 * 60 * 60 * 1000);
 });
 
 module.exports = app;
