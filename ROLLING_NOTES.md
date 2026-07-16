@@ -3259,3 +3259,78 @@ Correct — it doesn't. **The history stack already exists**: `_navPush`, `_navB
 `_navForward`, `_applyNavState`, `_updateNavControls`, all defined, with `_navBack`
 wired to a button in only 2 places. There is no gesture layer on top of it. So the hard
 part (knowing where "back" goes) is done; the swipe itself is not. Next session.
+
+# ═══════════════════════════════════════════════════════════
+# 16 July 2026 — test bookings, the marker that was lost, timers, last dead link
+# ═══════════════════════════════════════════════════════════
+
+## The TRAINING marker only ever existed on the floor plan we deleted
+
+Daisy asked for one test booking per room so staff can practise. Building that would
+have walked straight back into yesterday's four-hour problem, and this is why:
+
+`isSeedDemo` and the amber "TRAINING — TAP TO CLEAR" pill live in
+`_renderOccupiedTile` — part of floor plan **system #1**, the dark grid the elegant
+renderer replaced days ago. **The elegant renderer never carried the marker across.**
+So a seeded booking on the current floor plan renders identically to a real one. That
+is exactly how "Women's Institute" sat there for days looking like a genuine booking,
+and why the whole demo set had to be deleted rather than cleared from the app.
+
+**Added to `_renderElegantRoomSVG`**: same `isSeedDemo` test as the rest of the app (one
+definition, so the two can't drift), drawn as an amber dashed border and a TRAINING
+label. Deliberately ugly against the pencil work — a fake booking must never pass for
+real at a glance from across the studio.
+
+`SEED_ONE_BOOKING_PER_ROOM.sql` (NEW): The Hartleys (4, Table 1, Main Studio), Priya &
+Sam (2, Table 9, Lounge), Langport Book Club (12, The Vault). **Both markers on every
+row** — `demo-booking-` code AND "(Demo)" in the name — so they show the pill AND can be
+cleared from the app with one tap. Yesterday's seed had neither.
+
+**Second reason yesterday's seed looked wrong, worth recording:** the floor plan matches
+bookings with `bookingByTable[t.name]`, so `table_number` must equal the table's NAME
+exactly. `demo_floor_seed.sql` used '1' and '5A' against tables called 'Table 1'. It
+never matched, and nobody noticed because the rows looked fine in the database.
+
+Verified in jsdom against the exact rows the SQL inserts: 3 rooms drawn, 3 bookings on
+the right tables, TRAINING 3 of 3, tap drills through to `openTableDetail`.
+
+## Both idle timers were hostile
+
+Daisy: "the table planner returns the home screen too quickly."
+
+    RETURN_TO_FLOOR_MS   60s   -> 5 minutes
+    IDLE_TIMEOUT_MS      2 min -> 15 minutes   (this one FORCES A RE-LOGIN)
+
+60s was my guess, made without a studio in front of me, and it is shorter than reading a
+checklist. Worse: **two minutes of not touching the glass forced a full PIN re-login** —
+shorter than packing a booking or serving one customer. A lock that punishes normal work
+teaches staff never to log out, which is worse for security than a longer timer.
+
+`RETURN_TO_FLOOR_MS` must stay BELOW `IDLE_TIMEOUT_MS` or the splash fires first and
+going home never happens. Both are still guesses; tune them after three weeks of real
+trading rather than another opinion.
+
+## The last dead link in the file is gone
+
+Full audit: every handler, every `goToTab` target, all 13 `showStaffSection` /
+`showSetupSection` targets. **One dead link in the whole app** —
+`openCleoAdminVoicePicker`, called from the header button AND from
+`selectCleoAdminVoice()` (which re-opens it after a choice), defined nowhere. So the
+voice button threw on every tap and choosing a voice threw immediately after saving it.
+
+Everything around it was already written and correct — `getCleoAdminPreferredVoice`,
+`selectCleoAdminVoice`, `testCleoAdminVoice`, `_SWT_VOICE_PRIORITY`. Only the sheet that
+lets you SEE the list was missing. **Same shape as every other bug this week: the
+machinery finished, the way in never built.**
+
+Built it: device voices only, English filtered, en-GB first, no API, no cost, nothing
+stored but the chosen name. Handles Safari's empty first `getVoices()` via
+`voiceschanged` rather than reporting "no voices" when it simply asked too early.
+
+**Dead links in the app: zero.**
+
+## Still not done, and still the gate
+
+`GRID_NAV_STRUCTURE` -> data. Daisy wants every part of the admin side tile-driven, with
+the big glazed tiles running all the way through Host By Post to the end of each job.
+That is this, it is ~200 interlinked lines, and it is a session of its own.

@@ -7124,6 +7124,72 @@ function selectCleoAdminVoice(voiceName) {
   openCleoAdminVoicePicker();
 }
 
+// ═══════════════════════════════════════════════════════════
+// THE LAST DEAD LINK IN THE FILE. Built 16 July 2026.
+// ═══════════════════════════════════════════════════════════
+// openCleoAdminVoicePicker() was called from TWO places and defined in
+// NONE: the header button (~2602) and selectCleoAdminVoice() above,
+// which re-opens the picker after a choice. So the voice button threw
+// on every tap, and choosing a voice threw immediately after saving it.
+//
+// Everything around it was already written and correct —
+// getCleoAdminPreferredVoice(), selectCleoAdminVoice(),
+// testCleoAdminVoice(), _SWT_VOICE_PRIORITY. Only the sheet that lets
+// you SEE the list was missing. Same shape as every other bug this
+// week: the machinery was finished, the way in was never built.
+//
+// Voices come from the device, not from us: no API, no cost, nothing
+// stored beyond the chosen name in localStorage.
+function openCleoAdminVoicePicker() {
+  const synth = window.speechSynthesis;
+  if (!synth) { alert("This browser can't do speech, so there are no voices to choose from."); return; }
+
+  // getVoices() is famously empty on the first call in Safari — the list
+  // arrives asynchronously. Ask once, and if it's empty wait for the
+  // voiceschanged event rather than showing an honest-looking "no voices
+  // available" that is really just "we asked too early".
+  let voices = synth.getVoices();
+  if (!voices.length) {
+    synth.addEventListener('voiceschanged', () => openCleoAdminVoicePicker(), { once: true });
+    setTimeout(() => { if (!synth.getVoices().length) alert("No voices available on this device."); }, 1200);
+    return;
+  }
+
+  // English only — the rest are noise for a Somerset pottery studio.
+  const list = voices.filter(v => /^en/i.test(v.lang))
+                     .sort((a, b) => (/GB/i.test(b.lang) - /GB/i.test(a.lang)) || a.name.localeCompare(b.name));
+  const current = getCleoAdminPreferredVoice();
+
+  document.getElementById('cleo-voice-picker')?.remove();
+  const sheet = document.createElement('div');
+  sheet.id = 'cleo-voice-picker';
+  sheet.style.cssText = 'position:fixed;inset:0;z-index:9900;background:rgba(43,39,36,0.85);' +
+    'display:flex;align-items:flex-end;justify-content:center;padding:0;';
+  sheet.onclick = (e) => { if (e.target === sheet) sheet.remove(); };
+  sheet.innerHTML = `
+    <div style="background:#fff;width:100%;max-width:520px;border-radius:18px 18px 0 0;
+      padding:18px 16px calc(18px + env(safe-area-inset-bottom));max-height:72vh;display:flex;flex-direction:column;">
+      <div style="font-family:'Caveat',cursive;font-size:26px;color:#2B2724;margin-bottom:2px;">Cleo's voice</div>
+      <div style="font-size:12px;color:#8a8175;margin-bottom:14px;">Tap one to hear it. It's saved on this device only.</div>
+      <div style="overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;">
+        ${list.map(v => {
+          const on = current && current.name === v.name;
+          return `<button onclick="selectCleoAdminVoice(${JSON.stringify(v.name).replace(/"/g, '&quot;')})"
+            style="display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;
+            background:${on ? '#F4ECE0' : 'none'};border:1px solid ${on ? '#2B2724' : 'rgba(43,39,36,0.12)'};
+            border-radius:10px;padding:11px 13px;margin-bottom:7px;font-size:14px;color:#2B2724;cursor:pointer;">
+            <span>${v.name}<span style="color:#8a8175;font-size:11px;"> · ${v.lang}</span></span>
+            <span style="color:#2B2724;font-weight:800;">${on ? '✓' : '▸'}</span>
+          </button>`;
+        }).join('')}
+      </div>
+      <button onclick="document.getElementById('cleo-voice-picker').remove()"
+        style="margin-top:10px;width:100%;background:#2B2724;color:#fff;border:none;border-radius:12px;
+        padding:13px;font-size:14px;font-weight:800;cursor:pointer;">Done</button>
+    </div>`;
+  document.body.appendChild(sheet);
+}
+
 // ── Tour engine ───────────────────────────────────────────────────────
 
 let swtStep = 0;
@@ -9831,6 +9897,29 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable) {
     const accent = busy ? (STAGE_COLOURS[b.current_stage] || INK) : INK;
     const seed = _seedFrom(t.id || t.name);
 
+    // TRAINING DATA MUST LOOK LIKE TRAINING DATA.
+    // The old dark floor plan marked seeded bookings with an amber
+    // "TRAINING — TAP TO CLEAR" pill (_renderOccupiedTile, ~4417). The
+    // elegant renderer replaced that screen and never carried the marker
+    // across — so on 15 July a seeded Women's Institute booking sat on
+    // the floor plan looking exactly like a real one, for days, and the
+    // whole lot had to be deleted because nobody could tell them apart.
+    //
+    // Same test the rest of the app uses, so there is one definition of
+    // "this isn't real" rather than two that can drift:
+    const isSeedDemo = busy && (/\(Demo\)/.test(b.customer_name || '')
+                             || /^demo-booking-/.test(b.booking_code || ''));
+    // Amber, dashed, and labelled. Deliberately ugly against the pencil
+    // line-work — a fake booking should never be able to pass for real
+    // at a glance from across the studio.
+    const demoMark = isSeedDemo
+      ? `<rect x="${t.x - 4}" y="${t.y - 4}" width="${t.size.w + 8}" height="${t.size.h + 8}"
+           fill="none" stroke="#F9A825" stroke-width="1.6" stroke-dasharray="5 4" rx="4"/>
+         <text x="${t.x + t.size.w / 2}" y="${t.y - 9}" text-anchor="middle"
+           font-family="'Architects Daughter',cursive" font-size="10" letter-spacing="0.08em"
+           fill="#F9A825">TRAINING</text>`
+      : '';
+
     const chairs = _chairPositions(t.capacity || 4, t.size.w, t.size.h).map((ch, i) => {
       const seated = busy && i < (b.party_size || 0);
       return _chair(t.x + ch.x, t.y + ch.y, ch.up, INK, seated ? 1.4 : 0.75, seed + i)
@@ -9874,7 +9963,7 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable) {
     return `<g style="cursor:pointer" onclick="${!tappable ? (busy ? `openTableDetail('${b.booking_code}')` : `showGridNav()`) : ''}">
       ${chairs}
       ${_handRect(t.x, t.y, t.size.w, t.size.h, seed, busy ? 1.7 : 1.0, INK, '#FFFDF9')}
-      ${stripe}${label}
+      ${stripe}${label}${demoMark}
     </g>`;
   }).join('');
 
@@ -21831,7 +21920,14 @@ async function loadDevicePanel() {
 // real idle time rather than a normal page load. Fixed to set a real
 // force-relogin flag, so tapping back in always asks who's using it —
 // no silent resume, no matter how little time has actually passed.
-const IDLE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes — shared studio iPad
+// 15 minutes. Was 2, which forced a full re-login after two minutes of
+// not touching the glass — shorter than packing a booking, taking a
+// payment, or talking to a customer. A shared iPad does want to lock,
+// but a lock that punishes normal work just teaches staff to never log
+// out, which is worse for security than a longer timer.
+// MUST stay LONGER than RETURN_TO_FLOOR_MS below, or the splash gets
+// there first and going home never happens.
+const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 let idleTimer = null;
 function resetIdleTimer() {
   clearTimeout(idleTimer);
@@ -21866,7 +21962,24 @@ resetIdleTimer();
 // would be worse than the problem. Sixty is long enough to not fight
 // anyone and short enough that a screen left behind is home before the
 // next person picks the iPad up. ONE NUMBER TO CHANGE if that's wrong.
-const RETURN_TO_FLOOR_MS = 60 * 1000;
+// 5 minutes. Daisy, 16 July: "the table planner returns the home screen
+// too quickly. There needs to be a longer time."
+//
+// She is right and 60s was my guess, made without a studio in front of
+// me. Sixty seconds is shorter than reading a stage checklist, shorter
+// than glazing a piece, shorter than one customer conversation. It was
+// firing mid-task, constantly.
+//
+// Five minutes is the honest shape of the actual requirement: "an iPad
+// someone walked away from should be showing the floor plan before the
+// next person picks it up." Nobody stares at one screen for five
+// minutes and still wants to be on it. Nothing is lost if it fires —
+// it only navigates, it never logs anyone out.
+//
+// STILL A GUESS, and worth revisiting with three weeks of real trading
+// behind it rather than another opinion. If staff are still being
+// interrupted, raise it; the number is meant to be tuned, not defended.
+const RETURN_TO_FLOOR_MS = 5 * 60 * 1000;
 let _returnToFloorTimer = null;
 function resetReturnToFloorTimer() {
   clearTimeout(_returnToFloorTimer);
