@@ -5347,7 +5347,7 @@ app.get('/api/floor/active', async (req, res) => {
             locationIds,
             query: {
               filter: {
-                dateTimeFilter: { createdAt: { startAt: today.toISOString(), endAt: tomorrow.toISOString() } },
+                dateTimeFilter: { createdAt: { startAt: openTime.toISOString(), endAt: closeTime.toISOString() } },
                 stateFilter: { states: ['OPEN','COMPLETED'] }
               },
               sort: { sortField: 'CREATED_AT', sortOrder: 'ASC' }
