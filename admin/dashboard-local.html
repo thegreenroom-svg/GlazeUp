@@ -2458,7 +2458,7 @@
 <div id="alert-feed-panel" style="display:none;position:fixed;top:0;right:0;bottom:0;padding-top:env(safe-area-inset-top, 0px);padding-bottom:env(safe-area-inset-bottom, 0px);box-sizing:border-box;width:340px;max-width:92vw;background:white;z-index:9200;box-shadow:-8px 0 32px rgba(0,0,0,0.2);flex-direction:column;">
   <div style="background:#2B2724;color:white;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;">
     <div style="font-size:15px;font-weight:700;">🔔 Handoff Alerts</div>
-    <button     <button id="my-page-btn" onclick="showGridNav()" title="My page"
+    <button id="my-page-btn" onclick="showGridNav()" title="My page"
       style="display:none;background:rgba(255,255,255,0.12);border:none;border-radius:8px;
       color:white;font-size:11px;font-weight:800;padding:5px 10px;cursor:pointer;flex-shrink:0;">
       My page
@@ -10471,7 +10471,7 @@ function renderFloorPlanElegant() {
       ${_renderArrivals(unseated)}
       ${resting ? `<div style="text-align:center;padding:40px 20px;color:#8a8175;font-size:13px;">
         No tables set up yet for this studio.</div>`
-        : Object.entries(rooms).map(([name, list]) => _renderElegantRoomSVG(name, list, bookingByTable, true)).join('')}
+        : `<div style='display:flex;flex-direction:column;gap:16px;width:100%;'>${Object.entries(rooms).map(([name, list]) => _renderElegantRoomSVG(name, list, bookingByTable, true)).join('')}</div>`}
     </div>`;
 }
 
