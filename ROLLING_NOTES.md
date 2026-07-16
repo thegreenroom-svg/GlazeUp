@@ -3940,3 +3940,29 @@ Square" button on the home screen — that was the "pull data" button Daisy said
     tables become seat targets    true
     unseated count                2   (was silently 0 before)
     bookingByTable unchanged      ['Table 1'] only (no phantom entries)
+
+## Tables go red when occupied. Header stripped to bell only. 16 July 2026.
+
+Daisy: "I want to see the customer name in the middle of the table, and the table goes red
+so we can see it on the planner and click from there."
+
+**The customer name was already there** — `b.customer_name` in the label block, shown at
+the centre of the table. It just wasn't visible because the fill was always cream.
+
+**The table fill was always #FFFDF9 — busy or not.** The accent colour (the stage colour)
+only went on the tiny chair dots and the bottom stripe. Nobody could see "that table is
+finishing" from across the room. Fixed: `busy ? _hexWithOpacity(accent, 0.18) : '#FFFDF9'`.
+
+At 18% opacity the pencil line-work shows through — the drawing stays readable while the
+stage colour is unmistakable. `completion` (#e53935) = red = finishing up. `painting`
+(#B87946) = clay. `booking` (#4CAF50) = green = just arrived. You read the room.
+
+Verified: `fill="rgba(229,57,53,0.18)"` on a completion-stage booking. Customer name TRUE.
+
+**Header stripped to the bell.** Three buttons removed: HBP, Find My Piece, Returns.
+They belong on tiles, not in the header. The header is now: avatar/badge (login), 🔔 bell
+(alerts). Out and Break stay but are `display:none` on phone — they're not gone, just
+waiting on the tile build to give them a proper home.
+
+`_hexWithOpacity()` added — converts #RRGGBB to rgba() at a given opacity, so the stage
+fill works against any future colour without magic numbers.

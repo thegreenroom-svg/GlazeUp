@@ -2882,18 +2882,9 @@
           <span id="alert-bell-badge" style="display:none;position:absolute;top:-2px;right:-2px;background:#e53935;color:white;font-size:8px;font-weight:800;width:14px;height:14px;border-radius:50%;align-items:center;justify-content:center;border:1.5px solid white;">0</span>
         </button>
 
-        <button onclick="openHostByPost()" class="glaze-tile" style="flex-shrink:0;width:36px;height:36px;background:#2B2724;color:white;border:none;border-radius:9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:3px;">
-          <img src="/brand-assets/kiln-cafe-logo-demo/hostbypost-mark-demo.svg" alt="" style="width:13px;height:auto;">
-          <span style="font-size:5px;font-weight:800;line-height:1;color:white;">HBP</span>
-        </button>
-        <button onclick="openFindMyPiece()" class="glaze-tile" style="flex-shrink:0;width:36px;height:36px;background:#c0392b;color:white;border:none;border-radius:9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:3px;">
-          <span style="font-size:14px;line-height:1;">🔍</span>
-          <span style="font-size:5px;font-weight:800;line-height:1;">Find</span>
-        </button>
-        <button onclick="openReturns()" class="glaze-tile" style="flex-shrink:0;width:36px;height:36px;background:#5E35B1;color:white;border:none;border-radius:9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:3px;">
-          <span style="font-size:14px;line-height:1;">📦</span>
-          <span style="font-size:5px;font-weight:800;line-height:1;">Returns</span>
-        </button>
+        
+        
+        
         <button id="direct-logout-btn" onclick="confirmDirectLogout()" class="glaze-tile" style="display:none;flex-shrink:0;width:36px;height:36px;background:#8B1A1A;color:white;border:none;border-radius:9px;cursor:pointer;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:3px;">
           <span style="font-size:14px;line-height:1;">🚪</span>
           <span style="font-size:5px;font-weight:800;line-height:1;">Out</span>
@@ -10241,7 +10232,7 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable) {
       : (!tappable ? (busy ? `openTableDetail('${b.booking_code}')` : `showGridNav()`) : '');
     return `<g style="cursor:pointer" onclick="${tableClick}">
       ${chairs}
-      ${_handRect(t.x, t.y, t.size.w, t.size.h, seed, busy ? 1.7 : 1.0, INK, '#FFFDF9')}
+      ${_handRect(t.x, t.y, t.size.w, t.size.h, seed, busy ? 1.7 : 1.0, INK, busy ? _hexWithOpacity(accent, 0.18) : '#FFFDF9')}
       ${stripe}${label}${demoMark}
     </g>`;
   }).join('');
@@ -21501,6 +21492,16 @@ function wireSplash() {
 // always draws itself the same way. Without that it would re-scribble
 // on every repaint and the room would crawl.
 // ──────────────────────────────────────────────────────────────────
+
+// Converts a hex colour to rgba() at the given opacity, so the pencil
+// line-work shows through the stage fill. Accepts #RGB, #RRGGBB.
+function _hexWithOpacity(hex, opacity) {
+  const h = hex.replace('#','');
+  const r = parseInt(h.length===3 ? h[0]+h[0] : h.slice(0,2), 16);
+  const g = parseInt(h.length===3 ? h[1]+h[1] : h.slice(2,4), 16);
+  const b = parseInt(h.length===3 ? h[2]+h[2] : h.slice(4,6), 16);
+  return `rgba(${r},${g},${b},${opacity})`;
+}
 
 function _seedFrom(str) {
   let s = 2166136261;
