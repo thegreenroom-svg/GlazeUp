@@ -1818,18 +1818,16 @@
     }
   </style>
   <style>
-    /* Force portrait on mobile — a studio floor plan is portrait work */
+    /* Portrait nudge — gentle banner, doesn't block the app */
     @media screen and (orientation: landscape) and (max-height: 500px) {
       body::before {
-        content: 'Please rotate your phone to portrait';
-        position: fixed; inset: 0; z-index: 99999;
-        background: #1A1714; color: #F4ECE0;
+        content: '↺  Portrait works best';
+        position: fixed; top: 0; left: 0; right: 0; z-index: 99999;
+        background: rgba(43,39,36,0.85); color: #F4ECE0;
         font-family: 'Architects Daughter', cursive;
-        font-size: 18px; display: flex;
-        align-items: center; justify-content: center;
-        text-align: center; padding: 32px;
+        font-size: 13px; text-align: center;
+        padding: 6px; pointer-events: none;
       }
-      body > *:not(style) { visibility: hidden; }
     }
   </style>
   <script>
