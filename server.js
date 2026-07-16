@@ -5294,57 +5294,44 @@ app.get('/api/floor/active', async (req, res) => {
     const today = new Date(); today.setHours(0,0,0,0);
     const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
 
-    const { data: bookings, error: bookingsErr } = await supabase.from('bookings')
-      // room AND space_name, deliberately. `room` is ours (add_booking_room.sql).
-      // `space_name` is Square's service name — "Studio", "The Lounge", "The Vault" —
-      // and it is the ONLY thing a synced Square booking knows about where it goes,
-      // because Square has no idea your tables exist. Without both, a real booking
-      // arrives and cannot even be shown in the right room.
-      .select('booking_code,customer_name,table_number,current_stage,session_start,party_size,status,booking_type')
-      .eq('studio_id', studioId)
-      .gte('session_start', today.toISOString())
-      .lt('session_start', tomorrow.toISOString())
-      .not('status', 'eq', 'cancelled');
-    // room and space_name may not exist yet — try adding them, fall back if not
-    if (bookingsErr) {
-      console.warn('/api/floor/active bookings query failed, retrying without new columns:', bookingsErr.message);
-      const { data: fallback } = await supabase.from('bookings')
+    // ── 1. Our own bookings ──
+    let ownBookings = [];
+    try {
+      const { data, error } = await supabase.from('bookings')
         .select('booking_code,customer_name,table_number,current_stage,session_start,party_size,status,booking_type')
         .eq('studio_id', studioId)
         .gte('session_start', today.toISOString())
         .lt('session_start', tomorrow.toISOString())
         .not('status', 'eq', 'cancelled');
-      ownBookings = fallback || [];
-    } else {
-      ownBookings = ownBookings || [];
-    }
+      if (!error) ownBookings = data || [];
+    } catch(e) { console.warn('bookings query failed:', e.message); }
 
-    // These two degrade gracefully — a missing column or table returns
-    // an empty result rather than killing the floor plan with a 500.
-    const { data: assignments } = await supabase.from('booking_assignments')
-      .select('booking_code,staff_name,staff_member_id,is_primary')
-      .eq('studio_id', studioId).is('released_at', null);
+    // ── 2. Assignments ──
+    let assignMap = {};
+    try {
+      const { data } = await supabase.from('booking_assignments')
+        .select('booking_code,staff_name,staff_member_id,is_primary')
+        .eq('studio_id', studioId).is('released_at', null);
+      (data||[]).forEach(a => {
+        if (!assignMap[a.booking_code]) assignMap[a.booking_code] = [];
+        assignMap[a.booking_code].push(a);
+      });
+    } catch(e) { console.warn('assignments query failed:', e.message); }
 
-    const { data: checks } = await supabase.from('booking_flow_checks')
-      .select('booking_code,stage,check_key,completed')
-      .eq('studio_id', studioId);
+    // ── 3. Flow checks ──
+    let checkMap = {};
+    try {
+      const { data } = await supabase.from('booking_flow_checks')
+        .select('booking_code,stage,check_key,completed')
+        .eq('studio_id', studioId);
+      (data||[]).forEach(c => {
+        if (!checkMap[c.booking_code]) checkMap[c.booking_code] = {};
+        if (!checkMap[c.booking_code][c.stage]) checkMap[c.booking_code][c.stage] = {};
+        checkMap[c.booking_code][c.stage][c.key] = c.done;
+      });
+    } catch(e) { console.warn('checks query failed:', e.message); }
 
-    const assignMap = {};
-    (assignments || []).forEach(a => {
-      if (!assignMap[a.booking_code]) assignMap[a.booking_code] = [];
-      assignMap[a.booking_code].push(a);
-    });
-    const checkMap = {};
-    (checks || []).forEach(c => {
-      if (!checkMap[c.booking_code]) checkMap[c.booking_code] = {};
-      checkMap[c.booking_code][`${c.stage}:${c.check_key}`] = c.completed;
-    });
-
-    // ── 2. Square LIVE — today's real orders, right now ──
-    // No sync step. No database middleman. Read Square directly, merge
-    // with what we know, return. If Square is not connected, fall back
-    // to our own data only — which at least shows demo and manually
-    // entered bookings.
+    // ── 4. Square live ──
     let squareLiveBookings = [];
     try {
       const { data: conn } = await supabase.from('square_connections')
@@ -5352,79 +5339,51 @@ app.get('/api/floor/active', async (req, res) => {
       if (conn?.square_access_token) {
         const client = await getSquareClient(conn.square_access_token);
         const locRes = await client.locationsApi.listLocations();
-        const locationIds = (locRes.result.locations || []).map(l => l.id);
+        const locationIds = (locRes.result.locations||[]).map(l=>l.id);
         if (locationIds.length) {
-          // Today's orders — read only, nothing written
           const ordersRes = await client.ordersApi.searchOrders({
             locationIds,
             query: {
               filter: {
-                dateTimeFilter: {
-                  createdAt: {
-                    startAt: today.toISOString(),
-                    endAt: tomorrow.toISOString(),
-                  }
-                },
-                stateFilter: { states: ['OPEN', 'COMPLETED'] }
+                dateTimeFilter: { createdAt: { startAt: today.toISOString(), endAt: tomorrow.toISOString() } },
+                stateFilter: { states: ['OPEN','COMPLETED'] }
               },
               sort: { sortField: 'CREATED_AT', sortOrder: 'ASC' }
             },
             limit: 200,
           });
-          const orders = ordersRes.result.orders || [];
-          // Map each Square order to our booking shape.
-          // booking_code is derived from the Square order ID so we can
-          // always join the two — if we already have a row for this order,
-          // our data (table, stage, checks) wins.
-          const ownCodes = new Set((ownBookings||[]).map(b => b.booking_code));
-          squareLiveBookings = orders
-            .filter(o => !ownCodes.has(`order-${o.id}`))
+          const ownCodes = new Set(ownBookings.map(b=>b.booking_code));
+          squareLiveBookings = (ordersRes.result.orders||[])
+            .filter(o=>!ownCodes.has('order-'+o.id))
             .map(o => {
-              // Customer name: try line items, then taker info
-              const customerName = o.lineItems?.[0]?.name
-                || o.fulfillments?.[0]?.pickupDetails?.recipient?.displayName
-                || 'Booking';
-              // Party size: from line item quantity or note
-              const party = parseInt(o.lineItems?.[0]?.quantity || 1);
-              // Room hint: from line item name or category
-              const itemName = (o.lineItems?.[0]?.name || '').toLowerCase();
-              const space_name = itemName.includes('vault') ? 'The Vault'
-                : itemName.includes('lounge') ? 'Lounge'
-                : 'Main Studio';
+              const itemName = (o.lineItems?.[0]?.name||'').toLowerCase();
               return {
-                booking_code: `order-${o.id}`,
-                customer_name: customerName,
-                table_number: null,   // not yet seated — appears in arrivals strip
-                room: null,
-                space_name,
-                current_stage: o.state === 'COMPLETED' ? 'completion' : 'booking',
-                session_start: o.createdAt || today.toISOString(),
-                party_size: party,
-                status: 'active',
-                booking_type: 'square_order',
-                assignments: [],
-                checks: {},
+                booking_code: 'order-'+o.id,
+                customer_name: o.lineItems?.[0]?.name || 'Booking',
+                table_number: null, room: null,
+                space_name: itemName.includes('vault')?'The Vault':itemName.includes('lounge')?'Lounge':'Main Studio',
+                current_stage: o.state==='COMPLETED'?'completion':'booking',
+                session_start: o.createdAt||today.toISOString(),
+                party_size: parseInt(o.lineItems?.[0]?.quantity||1),
+                status: 'active', booking_type: 'square_order',
+                assignments: [], checks: {},
               };
             });
         }
       }
-    } catch (squareErr) {
-      // Square unavailable — our own data is still returned below.
-      console.warn('/api/floor/active Square live read failed:', squareErr.message);
-    }
+    } catch(e) { console.warn('Square live read failed:', e.message); }
 
-    // ── 3. Merge: our data wins where we have it ──
-    const ownMapped = (ownBookings || []).map(b => ({
+    // ── 5. Merge ──
+    const ownMapped = ownBookings.map(b=>({
       ...b,
-      assignments: assignMap[b.booking_code] || [],
-      checks: checkMap[b.booking_code] || {}
+      assignments: assignMap[b.booking_code]||[],
+      checks: checkMap[b.booking_code]||{}
     }));
-    const merged = [...ownMapped, ...squareLiveBookings];
+    res.json({ bookings: [...ownMapped, ...squareLiveBookings] });
 
-    res.json({ bookings: merged });
-  } catch (error) {
-    console.error('/api/floor/active failed:', error?.message || error);
-    res.status(500).json({ error: error?.message || 'Could not load active bookings.' });
+  } catch(error) {
+    console.error('/api/floor/active failed:', error?.message||error);
+    res.status(500).json({ error: error?.message||'Could not load active bookings.' });
   }
 });
 
