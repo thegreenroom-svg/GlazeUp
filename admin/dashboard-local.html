@@ -10390,7 +10390,7 @@ function _renderArrivals(unseated) {
         letter-spacing:0.06em;margin:0 0 8px;opacity:0.6;">
         Arriving — not seated yet${_seatingBooking ? ' · now tap a table' : ''}
       </h2>
-      <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;">
+      <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;max-width:100%;">
         ${unseated.sort((a,b) => (a.session_start||'').localeCompare(b.session_start||'')).map(b => {
           const on = _seatingBooking === b.booking_code;
           // Square's service name is the only clue to the room. Ours wins if set.
