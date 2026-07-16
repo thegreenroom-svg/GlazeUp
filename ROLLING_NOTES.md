@@ -4302,3 +4302,25 @@ Also in the same commit: `renderFloorPlanElegant` and `showRoomElegant` both wra
 in `try/catch` — any future throw shows a real, readable ivory error card instead of
 a silent blank screen. Any future "why is it blank" question now has its own answer
 displayed on the screen itself.
+
+## Portrait buffer widened — comfortable breathing room, no more flush edges
+
+Real-device screenshot 16 Jul 22:53 showed Lounge Table 12 sitting flush against
+the right room border on iPhone portrait. Technically fitting, visually cramped.
+Widened the safety buffer from 10px to 30px.
+
+Verified real margins on real DB contents at every real device:
+
+| Device | Lounge margin | Main Studio margin |
+|---|---|---|
+| iPhone SE (375) | 86px | 36px |
+| iPhone 15 (393) | 29px | 29px |
+| iPhone 15 Plus (428) | 64px | 14px |
+| iPhone Pro Max (430) | 66px | 16px |
+| iPhone landscape (812) | 298px | 33px |
+| iPad portrait (768) | 254px | 54px |
+| Desktop (1440) | 448px | 183px |
+
+Main Studio margins on iPhone Plus/Pro Max stay tight (14-16px) because Table 1
+is an 8-seater sitting alongside 4-seaters on the same row — geometry, not a bug.
+The Lounge and larger screens all now have generous visible breathing room.

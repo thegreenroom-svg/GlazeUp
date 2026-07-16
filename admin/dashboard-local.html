@@ -10196,10 +10196,15 @@ function _measureFloorPlanWidth() {
   const winW = window.innerWidth || document.documentElement.clientWidth;
   const viewW = view ? view.clientWidth : winW;
   const raw = Math.min(viewW || winW, winW);
-  // 16px ivory padding × 2 = 32, plus a 10px real-world safety buffer
-  // that stops the RIGHTMOST table sitting flush against the border.
-  // Trade: tiny bit of empty space, zero chance of clipping.
-  const usable = Math.max(0, raw - 42);
+  // 16px ivory padding × 2 = 32, plus a 30px real-world visual buffer.
+  // At 10px buffer the rightmost table technically fit but looked
+  // cramped on iPhone portrait — Daisy's screenshot 16 Jul, Lounge
+  // Table 12 flush against the room edge while row 2 sat half-empty.
+  // 30px buys enough margin for a genuinely comfortable border AND
+  // makes rows balance better (e.g. 6 same-size tables now go 3+3
+  // instead of 4+2, which reads far cleaner). Trade: a bit of empty
+  // space overall, honest visual breathing room.
+  const usable = Math.max(0, raw - 62);
   return Math.max(_ELEGANT_MIN_WIDTH, Math.min(_ELEGANT_MAX_WIDTH, usable));
 }
 
