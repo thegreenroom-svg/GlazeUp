@@ -4267,3 +4267,38 @@ Tightened both callbacks (resize + orientationchange): now they also check wheth
 for the floor-plan-view check too. Belt-and-braces — nothing the listener does can
 now fight the login or splash sequence, even in edge cases where inline styles
 haven't been set yet.
+
+## Right-edge clipping fixed — real device screenshot confirmed 6 4-seater Lounge tables clipping the 6th on iPhone
+
+Working backwards from her real screenshot: 6 4-seaters in one row means her measured
+room width was >= 464px, which is only possible if `_measureFloorPlanWidth` was
+returning something larger than the actually visible area. Confirmed by real DB query:
+Lounge has 6 4-seaters, Main Studio has 1 8-seater + 7 4-seaters + 1 2-seater.
+
+**Root cause:** `view.clientWidth` on iOS Safari and Chrome mobile can report a larger
+value than the actually-visible area during page settle, when the "Add to Home Screen"
+banner is active, or when a horizontally-scrolling ancestor is in play.
+
+**Fix:** measurement now takes the **smaller** of `view.clientWidth` and
+`window.innerWidth` — whichever is more conservative wins. Then subtracts 42px (16px
+padding × 2 + 10px real-world safety buffer, so the rightmost table sits comfortably
+inside its room instead of flush against the border).
+
+**Verified against her actual tables at seven real device widths:**
+
+| Device | Viewport | Room | Lounge | Main Studio |
+|---|---|---|---|---|
+| iPhone SE | 375 | 333 | 2 rows ✓ | 3 rows ✓ |
+| iPhone 15 | 393 | 351 | 2 rows ✓ | 3 rows ✓ |
+| iPhone 15 Plus | 428 | 386 | 2 rows ✓ | 2 rows ✓ |
+| iPhone Pro Max | 430 | 388 | 2 rows ✓ | 2 rows ✓ |
+| iPhone landscape | 812 | 770 | 1 row ✓ | 1 row ✓ |
+| iPad portrait | 768 | 726 | 1 row ✓ | 2 rows ✓ |
+| Desktop | 1440 | 900 (cap) | 1 row ✓ | 1 row ✓ |
+
+Every table's right edge inside its room. No clipping possible.
+
+Also in the same commit: `renderFloorPlanElegant` and `showRoomElegant` both wrapped
+in `try/catch` — any future throw shows a real, readable ivory error card instead of
+a silent blank screen. Any future "why is it blank" question now has its own answer
+displayed on the screen itself.

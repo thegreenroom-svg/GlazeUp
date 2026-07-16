@@ -10183,14 +10183,23 @@ const _ELEGANT_PAD = 12, _ELEGANT_GAP = 10;
 const _ELEGANT_MIN_WIDTH = 300;    // below this, layout won't wrap nicely
 const _ELEGANT_MAX_WIDTH = 900;    // above this on a huge screen, further scale is empty
 function _measureFloorPlanWidth() {
-  // Prefer the actual current #floor-plan-view width (accounts for its
-  // real padding, its parent, everything). Falls back to the window
-  // when the container isn't in the DOM yet — first paint before flex
-  // has laid out.
+  // Take the SMALLER of the container's reported width and the
+  // window's own inner width. Real device screenshot 16 July 2026:
+  // view.clientWidth on iOS Safari was returning enough for six 4-
+  // seater tables in one row (needs ~464px design pixels), but only
+  // five fit visibly — the 6th clipped on the right. Chrome mobile
+  // and iOS Safari can BOTH report a clientWidth larger than the
+  // actually-visible area when the "Add to Home Screen" banner, a
+  // page-settle mid-load, or a horizontally-scrolling ancestor is
+  // in play. Take the min of both signals as the truth.
   const view = document.getElementById('floor-plan-view');
-  const raw = (view && view.clientWidth) ? view.clientWidth : window.innerWidth;
-  // 16px of ivory padding inside the scroll area on each side.
-  const usable = Math.max(0, raw - 32);
+  const winW = window.innerWidth || document.documentElement.clientWidth;
+  const viewW = view ? view.clientWidth : winW;
+  const raw = Math.min(viewW || winW, winW);
+  // 16px ivory padding × 2 = 32, plus a 10px real-world safety buffer
+  // that stops the RIGHTMOST table sitting flush against the border.
+  // Trade: tiny bit of empty space, zero chance of clipping.
+  const usable = Math.max(0, raw - 42);
   return Math.max(_ELEGANT_MIN_WIDTH, Math.min(_ELEGANT_MAX_WIDTH, usable));
 }
 
@@ -10517,6 +10526,14 @@ let _currentRoomName = null;
 function renderFloorPlanElegant() {
   const view = document.getElementById('floor-plan-view');
   if (!view) return;
+  // The whole function had no try/catch. If ANY of the helpers below
+  // threw (toggleFloatingBackBtn, _elegantRoomsData, _renderArrivals,
+  // _renderElegantRoomSVG, _measureFloorPlanWidth), innerHTML never
+  // got set and you'd stare at a blank ivory area with no error
+  // anywhere — Daisy hit exactly this on desktop, 16 July 2026. The
+  // outer catch below replaces blank silence with a real, readable
+  // error, so any future breakage self-diagnoses instead of hiding.
+  try {
   _floorViewMode = 'plan';
   // goToTab() calls toggleFloatingBackBtn() BEFORE the async loadFloorPlan()
   // resolves, so at that moment the mode is still whatever the last screen
@@ -10568,6 +10585,26 @@ function renderFloorPlanElegant() {
         No tables set up yet for this studio.</div>`
         : (function(){ const w = _measureFloorPlanWidth(); return `<div style='display:flex;flex-direction:column;gap:16px;width:100%;max-width:100%;overflow:hidden;box-sizing:border-box;'>${Object.entries(rooms).map(([name, list]) => _renderElegantRoomSVG(name, list, bookingByTable, true, w)).join('')}</div>`; })()}
     </div>`;
+  } catch (renderErr) {
+    // Real, visible failure — no more blank screen. Also logs the
+    // full stack to the console for whoever's debugging.
+    console.error('renderFloorPlanElegant threw:', renderErr);
+    try {
+      view.style.display = 'flex';
+      view.innerHTML = `
+        <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;
+          display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">
+          <div style="font-family:'Caveat',cursive;font-size:24px;font-weight:700;color:#2B2724;margin-bottom:6px;">
+            The floor plan hit a snag
+          </div>
+          <div style="font-size:12px;color:#8a8175;margin-bottom:14px;max-width:340px;">
+            ${(renderErr && renderErr.message ? renderErr.message : String(renderErr)).replace(/</g,'&lt;')}
+          </div>
+          <button onclick="loadFloorPlan()" class="glaze-tile"
+            style="border:none;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;">Try again</button>
+        </div>`;
+    } catch (_ignore) {} // absolute last resort
+  }
 }
 
 // The drill-down: one room, full page, its own back button. Tables
@@ -10575,6 +10612,7 @@ function renderFloorPlanElegant() {
 function showRoomElegant(roomName) {
   const view = document.getElementById('floor-plan-view');
   if (!view) return;
+  try {
   _currentRoomName = roomName;
   _floorViewMode = 'room';
   // goToTab() calls toggleFloatingBackBtn() BEFORE the async loadFloorPlan()
@@ -10604,6 +10642,24 @@ function showRoomElegant(roomName) {
         ? _renderElegantRoomSVG(roomName, list, bookingByTable, false, _measureFloorPlanWidth())
         : `<div style="text-align:center;padding:40px 20px;color:#8a8175;font-size:13px;">No tables set up in ${roomName} yet.</div>`}
     </div>`;
+  } catch (renderErr) {
+    console.error('showRoomElegant threw:', renderErr);
+    try {
+      view.style.display = 'flex';
+      view.innerHTML = `
+        <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;
+          display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">
+          <div style="font-family:'Caveat',cursive;font-size:22px;font-weight:700;color:#2B2724;margin-bottom:6px;">
+            Couldn't open ${(roomName||'').replace(/</g,'&lt;')}
+          </div>
+          <div style="font-size:12px;color:#8a8175;margin-bottom:14px;max-width:340px;">
+            ${(renderErr && renderErr.message ? renderErr.message : String(renderErr)).replace(/</g,'&lt;')}
+          </div>
+          <button onclick="renderFloorPlanElegant()" class="glaze-tile"
+            style="border:none;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;">← Back to floor plan</button>
+        </div>`;
+    } catch (_ignore) {}
+  }
 }
 
 async function loadFloorPlan() {
