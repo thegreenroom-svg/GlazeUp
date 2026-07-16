@@ -3887,3 +3887,56 @@ Without them, an unseated booking couldn't even be shown in the right place.
     tap Sophie → seating mode true
     tap Table 2 → POST /api/floor/seat  { bookingCode:'real-sq-001', tableName:'Table 2' }
     seating mode cleared      true
+
+# ═══════════════════════════════════════════════════════════
+# Arrivals strip — real bookings were there all along. 16 July 2026.
+# ═══════════════════════════════════════════════════════════
+
+Daisy: "I can't see any live data from today's bookings anywhere."
+
+**They were there all along. They were UNSEATED.** Square tells us WHEN, WHO and WHICH
+ROOM (via the service name → space_name). It has never known which TABLE — this studio's
+`table_tracking_mode` is 'none' — so every synced booking arrived with `table_number =
+null`, and `_elegantRoomsData()`'s `if (b.table_number)` silently binned it. Real
+bookings have been syncing in perfectly and vanishing.
+
+The auto-refresh was already running — built in a previous session per Daisy's exact
+words: *"I want all the bookings live on the screen at all times with a background
+refresh if necessary."* Square syncs every 5min silently, floor plan refreshes every 30s.
+The floor plan was polling a database that wasn't being populated with seated bookings.
+
+**The underlying point, which is the design doc's recommendation #4:** arrival and seating
+are TWO events. The app only ever modelled the second. That is why walk-ins, re-seats,
+split collections and this are all hard — they are all the missing half.
+
+**What was built:**
+
+`_renderArrivals(unseated)` — a strip above the rooms on the home screen showing every
+booking in today's window with no table number. Sorted by session_start. Tap one →
+seating mode. In seating mode every table becomes a seat target on home AND room screens.
+Tap the table → `POST /api/floor/seat` → writes `table_number` and `room` to our own
+`bookings` row. Square is never touched.
+
+`POST /api/floor/seat` (NEW) — writes table_number and room to our own db only.
+- Takes the room from the TABLE, not the caller (the table knows which room it's in).
+- Checks for a clash (returns 409) rather than silently overwriting — that was scenario 5's
+  bug, and it's not being repeated server-side.
+- Compares party_size to table.capacity and warns if over (arithmetic, not memory).
+- No Square write, no order, nothing leaves. Safe with every write switch off.
+
+`/api/floor/active` now returns `room` and `space_name` — without them an unseated
+booking couldn't even be shown in the right part of the arrivals strip.
+
+**Sync indicator** — a small dot and "X min ago" label in the floor plan header. Green =
+synced within 5min, amber = stale. Tappable for an immediate refresh. No full "Sync from
+Square" button on the home screen — that was the "pull data" button Daisy said to remove.
+
+**Verified** (jsdom, one demo booking on a table + two real Square-style unseated ones):
+
+    demo booking on table (red)  true
+    Jones Family in arrivals      true
+    Sarah Mitchell in arrivals    true
+    tap Jones → seating mode      true
+    tables become seat targets    true
+    unseated count                2   (was silently 0 before)
+    bookingByTable unchanged      ['Table 1'] only (no phantom entries)

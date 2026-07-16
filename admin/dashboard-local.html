@@ -10380,7 +10380,17 @@ function renderFloorPlanElegant() {
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
         <div>
           <div style="font-family:'Caveat',cursive;font-size:28px;font-weight:700;color:#2B2724;">The Kiln Cafe</div>
-          <div style="font-size:11px;color:#8a8175;">Live studio view</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div style="font-size:11px;color:#8a8175;">Live studio view</div>
+            <!-- The tiny dot + last-sync time. Green = synced in the last 6min (within the 5min window).
+                 Amber = stale. Tapping it triggers a sync + floor plan refresh immediately. -->
+            <button id="floor-sync-btn" onclick="_manualFloorSync()" title="Tap to refresh now"
+              style="background:none;border:none;cursor:pointer;font-size:10px;color:#8a8175;
+              padding:2px 4px;border-radius:6px;display:flex;align-items:center;gap:3px;">
+              <span id="floor-sync-dot" style="width:6px;height:6px;border-radius:50%;background:#8a8175;display:inline-block;"></span>
+              <span id="floor-sync-label">–</span>
+            </button>
+          </div>
         </div>
         <!-- This said "🏠 Home" and called goToRealLandingPage(). That was
              correct when the TILE GRID was home. It isn't any more — the
@@ -12136,6 +12146,49 @@ function applyShiftUI() {
       });
     } catch (e) { /* silent — if it fails, the next poll will catch it */ }
   }
+
+  let _lastSquareSync = null;
+
+  function _updateSyncIndicator(ok) {
+    const dot=document.getElementById('floor-sync-dot');
+    const lbl=document.getElementById('floor-sync-label');
+    if (!dot||!lbl) return;
+    if (ok) {
+      _lastSquareSync = Date.now();
+      dot.style.background='#4CAF50'; // green — fresh
+      lbl.textContent='just now';
+    } else {
+      dot.style.background='#F9A825'; // amber — stale or failed
+      lbl.textContent='–';
+    }
+  }
+
+  // Keep the "X min ago" label ticking every minute
+  setInterval(() => {
+    if (!_lastSquareSync) return;
+    const mins=Math.round((Date.now()-_lastSquareSync)/60000);
+    const dot=document.getElementById('floor-sync-dot');
+    const lbl=document.getElementById('floor-sync-label');
+    if (!dot||!lbl) return;
+    if (mins<6){ dot.style.background='#4CAF50'; lbl.textContent=mins<1?'just now':mins+'m ago'; }
+    else       { dot.style.background='#F9A825'; lbl.textContent=mins+'m ago'; }
+  }, 60000);
+
+  // Tap the dot = refresh now
+  window._manualFloorSync = async function() {
+    const dot=document.getElementById('floor-sync-dot');
+    if (dot) dot.style.background='#8a8175';
+    await _silentSquareSync();
+    await loadFloorPlan();
+    _updateSyncIndicator(true);
+  };
+
+  // Wrap _silentSquareSync to update the indicator
+  const _origSync=_silentSquareSync;
+  _silentSquareSync = async function() {
+    try { await _origSync(); _updateSyncIndicator(true); }
+    catch(e) { _updateSyncIndicator(false); }
+  };
 
   // Run once now so the first load has the freshest Square data
   _silentSquareSync();
