@@ -5438,10 +5438,10 @@ app.get('/api/floor/tables', async (req, res) => {
       .eq('studio_id', studioId).order('sort_order');
     if (tablesErr) throw tablesErr;
 
-    const { data: layouts, error: layoutsErr } = await supabase.from('table_chair_layouts')
+    // table_chair_layouts may not exist — optional, degrade gracefully
+    const { data: layouts } = await supabase.from('table_chair_layouts')
       .select('table_name,chairs,split_position,is_split')
       .eq('studio_id', studioId);
-    if (layoutsErr) throw layoutsErr;
 
     const layoutMap = {};
     (layouts || []).forEach(l => { layoutMap[l.table_name] = l; });
