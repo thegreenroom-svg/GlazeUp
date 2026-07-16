@@ -5303,7 +5303,8 @@ app.get('/api/floor/active', async (req, res) => {
         .gte('session_start', today.toISOString())
         .lt('session_start', tomorrow.toISOString())
         .not('status', 'eq', 'cancelled')
-        .not('status', 'eq', 'completed');  // completed bookings clear from the floor plan
+        .not('status', 'eq', 'completed')   // completed bookings clear from the floor plan
+        .gt('session_start', new Date(Date.now() - 4*60*60*1000).toISOString());  // only last 4 hours + future
       if (!error) ownBookings = data || [];
     } catch(e) { console.warn('bookings query failed:', e.message); }
 
