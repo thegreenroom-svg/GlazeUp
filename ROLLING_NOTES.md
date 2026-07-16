@@ -3611,3 +3611,49 @@ broken?".
 functions, 24 screens, 242 mentions of Cleo. The three open questions are the mascot,
 the periphery (marketplace / community feed / loyalty), and the voice picker. Core +
 paid tools + kids club stay either way.
+
+## DESIGN_RECOMMENDATIONS.md — written 16 July 2026, for the next session
+
+Daisy asked for high-end recommendations across both apps, referencing everything from
+this session, as a professional designer would. `DESIGN_RECOMMENDATIONS.md` in the repo
+root. Every factual claim in it was verified against the code before it was written, not
+after.
+
+**The one idea:** the plan is a picture, every tile is a verb. The floor plan earns its
+exemption because it is not a decision — it is a picture of the room.
+
+**Ten difficult scenarios**, chosen because the happy path designs itself. They surface
+three shapes that keep recurring:
+1. **Every event is two events** — arrival/seating, booking/collection, firing/collecting.
+   The app models the second and assumes the first. That is why walk-ins, re-seats and
+   split collections are all hard: they are the missing half.
+2. **Every flow needs an honest bad exit.** Kiln didn't fire, piece broke, they walked
+   out. If the only button is the good one, staff press the good one anyway and the data
+   becomes fiction. Cheapest, highest-value thing on the list.
+3. **Constraints should be arithmetic, not memory.** The app knows capacity, room, party
+   size. It should refuse impossible seatings rather than wait for a human to notice.
+
+**⚠️ A LIVE BUG SURFACED BY SCENARIO 5, not previously known:**
+
+    bookings.forEach(b => { if (b.table_number) bookingByTable[b.table_number] = b; });
+
+Two bookings on one table do not clash — **the second silently overwrites the first**. It
+does not warn, it does not draw twice. It disappears. Present in BOTH the floor plan
+(~9896) and the room view (~10211). Square can and does double-book. This is a bug
+wearing a design question's clothes, and it is #2 on the recommendation list.
+
+**Recommended order:** (1) honest bad exits, (2) fix the silent double-booking, (3) access
+on the furniture (`studio_tables.step_free` — unblocks accessibility AND removes an
+Article 9 exposure for one column), (4) arrival ≠ seating, (5) THEN tiles everywhere
+(486 always-on non-tile controls: 372 studio, 114 customer — mechanical once 1-4 are
+decided, a guess before), (6) the suggestion card.
+
+**The doc is explicit about what is guessed:** every timer number, the tile priorities,
+ROLE_HOME_DEFAULTS. All placeholders for what three weeks of trading will measure. Written
+down so nobody defends them later.
+
+**The closing observation, which is the week in one line:** the floor plan wasn't broken,
+it was unreachable. Host By Post wasn't unbuilt, it was unreachable. The learning engine
+wasn't unbuilt, it was unfed. The voice picker wasn't broken, it was missing its front
+door. **This app's problem has never been that things don't exist — it's that nobody could
+get to them.** Which is why tiles are right, and why the scenarios come first.
