@@ -2910,8 +2910,16 @@
           <span id="alert-bell-badge" style="display:none;position:absolute;top:-2px;right:-2px;background:#e53935;color:white;font-size:8px;font-weight:800;width:14px;height:14px;border-radius:50%;align-items:center;justify-content:center;border:1.5px solid white;">0</span>
         </button>
 
-        
-        
+        <!-- Find a piece — visible, called out clearly. Was previously
+             hidden as a "legacy" button. Restored 16 July 2026. -->
+        <button onclick="openFindMyPiece()" title="Find a piece" style="background:#2B2724;color:white;border:none;border-radius:50%;width:32px;height:32px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">🔍</button>
+
+        <!-- Returns — same style. Restored 16 July 2026. -->
+        <button onclick="openReturns()" title="Returns" style="background:#2B2724;color:white;border:none;border-radius:50%;width:32px;height:32px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">📦</button>
+
+        <!-- Host By Post — same style. Restored 16 July 2026. -->
+        <button onclick="showPostBoard()" title="Host By Post" style="background:#2B2724;color:white;border:none;border-radius:50%;width:32px;height:32px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">📮</button>
+
         
         <button id="direct-logout-btn" onclick="confirmDirectLogout()" class="glaze-tile" style="display:none;flex-shrink:0;width:36px;height:36px;background:#8B1A1A;color:white;border:none;border-radius:9px;cursor:pointer;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:3px;">
           <span style="font-size:14px;line-height:1;">🚪</span>
@@ -10191,29 +10199,28 @@ const _ELEGANT_PAD = 12, _ELEGANT_GAP = 10;
 const _ELEGANT_MIN_WIDTH = 300;    // below this, layout won't wrap nicely
 const _ELEGANT_MAX_WIDTH = 900;    // above this on a huge screen, further scale is empty
 function _measureFloorPlanWidth() {
-  // Take the SMALLER of the container's reported width and the
-  // window's own inner width. Real device screenshot 16 July 2026:
-  // view.clientWidth on iOS Safari was returning enough for six 4-
-  // seater tables in one row (needs ~464px design pixels), but only
-  // five fit visibly — the 6th clipped on the right. Chrome mobile
-  // and iOS Safari can BOTH report a clientWidth larger than the
-  // actually-visible area when the "Add to Home Screen" banner, a
-  // page-settle mid-load, or a horizontally-scrolling ancestor is
-  // in play. Take the min of both signals as the truth.
-  const view = document.getElementById('floor-plan-view');
+  // Kept for compatibility with older callers — returns the room's
+  // TARGET design width, which is more generous than the raw viewport
+  // so tables get proper breathing room in wider layouts. The room
+  // renderer now ALSO computes a per-room "natural" width (see
+  // _roomNaturalWidth below) and uses whichever is larger.
   const winW = window.innerWidth || document.documentElement.clientWidth;
-  const viewW = view ? view.clientWidth : winW;
-  const raw = Math.min(viewW || winW, winW);
-  // 16px ivory padding × 2 = 32, plus a 30px real-world visual buffer.
-  // At 10px buffer the rightmost table technically fit but looked
-  // cramped on iPhone portrait — Daisy's screenshot 16 Jul, Lounge
-  // Table 12 flush against the room edge while row 2 sat half-empty.
-  // 30px buys enough margin for a genuinely comfortable border AND
-  // makes rows balance better (e.g. 6 same-size tables now go 3+3
-  // instead of 4+2, which reads far cleaner). Trade: a bit of empty
-  // space overall, honest visual breathing room.
-  const usable = Math.max(0, raw - 62);
-  return Math.max(_ELEGANT_MIN_WIDTH, Math.min(_ELEGANT_MAX_WIDTH, usable));
+  const target = Math.max(360, Math.min(_ELEGANT_MAX_WIDTH, winW - 40));
+  return target;
+}
+
+// Compute how wide a room WOULD need to be to fit every table in a
+// single row. If the viewport is at least this wide, the room fills
+// available space and looks great; if narrower, the SVG holds this
+// as its min-width and horizontal scroll kicks in — real fit-or-scroll
+// exactly as Daisy asked for.
+function _roomNaturalWidth(list) {
+  let total = _ELEGANT_PAD * 2;
+  for (let i = 0; i < list.length; i++) {
+    total += _tableSize(list[i].capacity || 4).w;
+    if (i < list.length - 1) total += _ELEGANT_GAP;
+  }
+  return Math.max(_ELEGANT_MIN_WIDTH, total);
 }
 
 // Two bookings can genuinely land on the same table_number — a data
@@ -10291,11 +10298,18 @@ function _elegantLayoutRoom(list, roomWidth) {
 // drill-down (true on the home overview, false once already on that
 // room's own page — no point tapping through to where you already are).
 function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWidth) {
-  // Fallback keeps every existing caller working, but the main callers
-  // pass a real measured width so portrait/landscape/tablet/desktop
-  // all lay out to fit their own real screen instead of a fixed guess.
-  roomWidth = roomWidth || _measureFloorPlanWidth();
-  const { placed, height } = _elegantLayoutRoom(list, roomWidth);
+  // Two widths in play now, matching Daisy's "fit or scroll" ask:
+  //   viewportW  — what the room COULD occupy on screen
+  //   naturalW   — what the room actually NEEDS to show every table in one row
+  // The room uses the LARGER of the two, so:
+  //   viewport ≥ natural → room fills viewport, tables spread out nicely
+  //   viewport < natural → room stays at natural width, container scrolls left-right
+  // Either way, no cramped wrapping, no clipping.
+  const viewportW = roomWidth || _measureFloorPlanWidth();
+  const naturalW = _roomNaturalWidth(list);
+  const useWidth = Math.max(viewportW, naturalW);
+  const { placed, height } = _elegantLayoutRoom(list, useWidth);
+  roomWidth = useWidth;
   const INK = '#2B2724';
 
   const tableEls = placed.map(t => {
@@ -10404,7 +10418,7 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
         ${roomName}${tappable ? ' →' : ''}
       </h2>
       <svg viewBox="-10 -10 ${roomWidth + 20} ${height}"
-        style="width:100%;height:auto;display:block;background:#F4ECE0;
+        style="width:100%;min-width:${roomWidth + 20}px;height:auto;display:block;background:#F4ECE0;
         border:1px solid rgba(43,39,36,0.15);border-radius:10px;">
         <defs>${_PENCIL_FILTER}</defs>
         <g filter="url(#pencil)">${tableEls}</g>
@@ -12134,7 +12148,12 @@ async function loadActiveBookingsStrip() {
       stripEl.style.display = 'none';
       return;
     }
-    stripEl.style.display = 'block';
+    // Deliberately hidden 16 July 2026 per direct request. Red live
+    // tables on the floor plan already show every active booking at
+    // its own real position. Strip removed as duplicate clutter.
+    stripEl.style.display = 'none';
+    return;
+    /* eslint-disable no-unreachable */
     stripEl.innerHTML = active.map(b => {
       const stage = REAL_STAGE_META[b.current_stage] || REAL_STAGE_META.booking;
       return `

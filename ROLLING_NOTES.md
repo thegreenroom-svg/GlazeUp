@@ -4340,3 +4340,31 @@ content that didn't fit. Changed to `overflow-x:auto` with iOS momentum
 scrolling. If tables fit naturally in the viewport, nothing changes visually. If
 they don't, you can swipe/drag left-right to see everything without cramped
 wrapping. Best of both worlds — fit when possible, real scroll when not.
+
+## Fit-or-scroll for real, green booking strip hidden, top toolbar buttons restored
+
+Three real changes together, per Daisy's direct requests:
+
+**1. Real fit-or-scroll** — my previous "overflow-x:auto" attempt didn't work
+because the SVG had `width:100%` and just scaled to fit its container, so nothing
+overflowed. Now the SVG has an explicit `min-width` equal to the room's natural
+design width (computed from every table in a single row). Result:
+
+| Device | Behavior |
+|---|---|
+| iPhone (SE / 15 / Pro Max) | Lounge natural 464px + Main Studio 729px both scroll horizontally |
+| iPad (728px viewport) | Lounge fits, Main Studio scrolls |
+| Desktop (900px+ cap) | Both fit comfortably |
+
+Tables always stay at their proper size — never squeezed down to fit — and if the
+room is wider than viewport, you swipe left/right to see the rest.
+
+**2. Green booking strip removed.** Daisy: "remove green bookings completely,
+represented already by red for live etc." The red live-table styling on the floor
+plan is now the single source of truth; the strip is hidden entirely (kept in
+DOM as a no-op in case any legacy JS references it).
+
+**3. Top toolbar buttons restored.** Find piece 🔍, Returns 📦, and Host By Post
+📮 all now visible in the header alongside the alert bell — same dark ink round
+tiles for visual consistency. Previously the parallel session had hidden them
+as "legacy" but Daisy wants them back.
