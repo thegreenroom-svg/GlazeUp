@@ -3657,3 +3657,47 @@ it was unreachable. Host By Post wasn't unbuilt, it was unreachable. The learnin
 wasn't unbuilt, it was unfed. The voice picker wasn't broken, it was missing its front
 door. **This app's problem has never been that things don't exist — it's that nobody could
 get to them.** Which is why tiles are right, and why the scenarios come first.
+
+## One voice. 16 July 2026.
+
+Daisy: "make sure the voice is the same throughout. It seems to change." Right, and there
+were TWO separate causes.
+
+**CAUSE 1 — two hand-written pickers that disagreed:**
+
+    ~7317  walkthrough      getCleoAdminPreferredVoice() -> saved pref, _SWT_VOICE_PRIORITY, en-GB
+    ~12713 task narration   its OWN inline /UK|British|Sonia|Libby|Karen/ then en-GB
+
+Two lists, hand-written, drifting. **Same bug as the tour, the TRAINING pill and the alert
+kinds.** The task narration did not know about the saved preference at all, so choosing a
+voice changed one and not the other.
+
+**CAUSE 2 — why it was INTERMITTENT rather than merely wrong:** `getVoices()` returns
+EMPTY on Safari's first call; the list loads asynchronously. An early utterance got null
+and fell back to the browser default, a later one got the good voice. Same session, same
+app, different voice, purely on timing.
+
+**Fixed:** ONE resolver, `resolveStudioVoice()`. **Scored, not listed** — a hand-ordered
+list of names goes stale the moment a device ships a new voice, which is this week's
+lesson; score what makes a voice good and any future voice sorts itself. Resolved once
+and cached for the session so it cannot change mid-shift. Waits for `voiceschanged`
+rather than guessing. Both speak paths call it; nothing else picks a voice.
+
+Scoring: Siri +100, Neural/Premium/Enhanced/Natural +80, non-local (cloud neural) +25,
+known-good UK names sliding, en-GB +40, other English +15, **non-English −100** (never
+speak French at a customer).
+
+**Verified** against a realistic iPhone list, with Safari's empty-first behaviour simulated:
+
+    first call while empty : null   (waited — did NOT fall back to default)
+    after voiceschanged    : Microsoft Sonia Online (Natural) — en-GB, score 165
+    Serena (Premium) 142 · Daniel 46 · Samantha 19 · Karen 17 · Thomas (fr-FR) -100
+    walkthrough === task narration : true (same cached object, cannot drift)
+
+No picker: it is parked with the Cleo helper, and per Daisy — "you're the best Siri or
+device one you can" — the app chooses, and chooses the same one every time.
+
+**Honest limit, recorded:** these are the DEVICE's voices. On an iPhone the good ones are
+Siri-quality neural and genuinely excellent, but the app can only pick from what is
+installed. Anything better means a paid API, per-word cost and network latency on every
+utterance — which cuts straight across "no cost until used".

@@ -267,6 +267,48 @@ Last link in a chain that's otherwise complete.
 
 ---
 
+## The staff tour is lying, and animating it would make that worse
+
+The tour has **41 steps**, hand-written as `const STEPS = [...]`. Audited against the app:
+
+```
+✗ "🚨 The alert — big, flashing, hard to miss"   the flashing alert was parked 16 July
+✗ "Morning opening checklist"                    parked
+✗ "☕ Taking a break"                             that button is display:none on phone
+
+'flashing' × 7    'sidebar' × 22    'Cleo' × 27      all stale
+```
+
+**Fifty-six stale references — and roughly a third were caused on 16 July alone**, by
+changes nobody thought to reflect back into the tour.
+
+**"Update it every time I do an update" is exactly the right instinct, and the answer is
+not to update it. It is to stop hand-writing it.** The tour is a second, hand-written
+description of the app. That is this week's bug at documentation scale:
+
+- two renderers, one knew about the TRAINING pill → the WI passed for real for days
+- two lists of alert kinds → which is why `/api/staff/alert-kinds` is a RENDERING of
+  `ALERT_TRIGGERS` and not a second list
+- **two descriptions of the app** → the tour teaches a flashing alert that no longer flashes
+
+Anything written twice will drift. It is not discipline, it is arithmetic.
+
+**And the hard part about the animation request:** an animated tour of a screen that does
+not exist is *worse* than a plain one. Animation makes a lie more convincing. Polish here
+buys staff confidently learning the wrong app.
+
+**Build order:**
+1. **Generate what is generatable.** Tile steps from `GRID_NAV_STRUCTURE`, stage steps
+   from `FLOW_CHECKS`, alert steps from `ALERT_TRIGGERS`. Change the app, the tour changes.
+   That is "link it in" — a single source, not a sync job.
+2. **Hand-write only the WHY.** "Photograph the pieces together so the kiln knows whose
+   they are" does not drift. "Tap the sidebar" does.
+3. **A check that fails when the tour lies** — same shape as the dead-link audit. That is
+   how it STAYS true.
+4. **Then animate.** On a tour that is true, animation is worth every hour.
+
+---
+
 ## The honest ledger
 
 **Real and verified:** floor plan reads live data; whole rooms tap through; Square, Royal

@@ -7078,7 +7078,87 @@ const _SWT_VOICE_PRIORITY = [
   'Hazel', 'Susan', 'Zira', 'Samantha', 'Victoria', 'Karen',
 ];
 
+// ═══════════════════════════════════════════════════════════
+// ONE VOICE. 16 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Daisy: "make sure the voice is the same throughout. It seems to
+// change." She is right, and there were TWO separate causes.
+//
+// CAUSE 1 — two hand-written pickers that disagreed.
+//   ~7317 (walkthrough) : getCleoAdminPreferredVoice()  -> saved pref,
+//                         then _SWT_VOICE_PRIORITY, then any en-GB
+//   ~12713 (task narration): its OWN inline list —
+//                         /UK|British|Sonia|Libby|Karen/ then en-GB
+// Two lists, written by hand, drifting. Same bug as the tour, the
+// TRAINING pill and the alert kinds: anything written twice diverges.
+// The task narration did not know about the saved preference at all.
+//
+// CAUSE 2, and this is why it was INTERMITTENT rather than just wrong:
+// getVoices() returns EMPTY on Safari's first call — the list loads
+// asynchronously. So an early utterance got null and fell back to the
+// browser default; a later one got the good voice. Same session, same
+// app, different voice, purely on timing.
+//
+// FIXED: one resolver, scored not listed, resolved ONCE and cached for
+// the session so it can never change under you mid-shift. Both speak
+// paths call it. Nothing else picks a voice.
+let _voiceCache = null;
+
+// Scored, because a hand-ordered list of names goes stale the moment a
+// device ships a new voice — which is the whole lesson of this week.
+// Score what makes a voice GOOD, and any future voice sorts itself.
+function _scoreVoice(v) {
+  let score = 0;
+  const n = v.name;
+  // The genuinely good modern ones announce themselves. Apple's Siri
+  // voices, and Microsoft/Google neural, all carry these words.
+  if (/Siri/i.test(n))                        score += 100;
+  if (/Neural|Premium|Enhanced|Natural/i.test(n)) score += 80;
+  // Not a local service usually means a cloud neural voice (Google,
+  // Microsoft) — markedly better than the old on-device formants.
+  if (v.localService === false)               score += 25;
+  // Named voices known to be the good UK ones, in rough order.
+  const known = ['Serena','Sonia','Libby','Kate','Moira','Tessa','Fiona','Hazel','Daniel','Samantha','Karen'];
+  const i = known.findIndex(k => n.includes(k));
+  if (i >= 0)                                 score += (known.length - i) * 2;
+  // British first — this is a Somerset pottery studio.
+  if (v.lang === 'en-GB')                     score += 40;
+  else if (/^en/i.test(v.lang))               score += 15;
+  else                                        score -= 100;   // never speak French at a customer
+  return score;
+}
+
+// Resolve once, cache forever. Awaits voiceschanged rather than
+// reporting "no voice" when it simply asked too early.
+function resolveStudioVoice(cb) {
+  if (_voiceCache) { cb && cb(_voiceCache); return _voiceCache; }
+  const synth = window.speechSynthesis;
+  if (!synth) return null;
+  const pick = () => {
+    const voices = synth.getVoices();
+    if (!voices.length) return null;
+    const best = voices.slice().sort((a, b) => _scoreVoice(b) - _scoreVoice(a))[0];
+    _voiceCache = best;
+    console.log(`[voice] using "${best.name}" (${best.lang}) — score ${_scoreVoice(best)}`);
+    return best;
+  };
+  const v = pick();
+  if (v) { cb && cb(v); return v; }
+  // Empty list — Safari has not loaded them yet. Wait, don't guess.
+  synth.addEventListener('voiceschanged', () => { const w = pick(); if (w && cb) cb(w); }, { once: true });
+  return null;
+}
+
+// Kept as the single entry point both speak paths already reach for,
+// so nothing else had to change. The voice picker is parked with the
+// Cleo helper, so there is no saved preference to honour any more —
+// per Daisy: "you're the best Siri or device one you can", i.e. the
+// app chooses, and chooses the same one every time.
 function getCleoAdminPreferredVoice() {
+  return resolveStudioVoice();
+}
+
+function _getCleoAdminPreferredVoice_LEGACY() {
   const voices = window.speechSynthesis?.getVoices() || [];
   if (!voices.length) return null;
 
@@ -12710,9 +12790,11 @@ function speakTask(text) {
   if (isStaffAssistantVoiceMuted()) return;
   window.speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
-  const voices = window.speechSynthesis.getVoices();
-  const preferred = voices.find(v => /UK|British|Sonia|Libby|Karen/i.test(v.name)) || voices.find(v => v.lang === 'en-GB');
-  if (preferred) utter.voice = preferred;
+  // Was its own inline list — /UK|British|Sonia|Libby|Karen/ — which
+  // disagreed with the walkthrough's picker, so the voice changed
+  // depending on which part of the app was talking. One resolver now.
+  const preferred = resolveStudioVoice();
+  if (preferred) { utter.voice = preferred; utter.lang = preferred.lang; }
   utter.rate = 0.92;
   utter.pitch = 1.0;
   window.speechSynthesis.speak(utter);
