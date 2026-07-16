@@ -4006,3 +4006,48 @@ the beginning of this session.
 
 **The backfill endpoint uses the same connection table.** Which means the backfill button
 I said to press two days ago also silently did nothing if Square wasn't connected.
+
+# ═══════════════════════════════════════════════════════════
+# Live Square data — no sync needed. 16 July 2026.
+# ═══════════════════════════════════════════════════════════
+
+Daisy: "Can we not just have it live all the time?"
+
+Yes. The sync-to-database approach had two fatal problems discovered simultaneously:
+
+1. **Square's searchOrders API requires locationIds** — missing from every call, meaning
+   every sync (backfill, daily, 5-minute) has ALWAYS failed with a 400 from Square,
+   silently. Nothing was ever pulled from Square. The database only held hand-entered data.
+
+2. **The sync needed a connection check, a cron, and a catch block that swallowed errors.**
+   "Live all the time" means: read Square now, merge with our own data, return. No sync.
+
+**`/api/floor/active` now reads from TWO sources and merges:**
+
+1. **Our own database** — table assignments, stage, flow checks, demo bookings. We win
+   where we have data.
+2. **Square live** — `searchOrders` called directly, today's window, right now. Orders we
+   don't already have a row for appear as unseated arrivals in the arrivals strip.
+
+The merge key is `booking_code = 'order-' + o.id`. If we've seated an order and set its
+stage, our row wins. New orders from Square appear immediately, unseated, in the arrivals
+strip. Tap → tap a table → seated. No sync step, no cron, no silent failure.
+
+**READ ONLY.** `searchOrders` is a GET equivalent. Nothing writes to Square.
+Falls back to our own data only if Square is not connected — which at least shows demos.
+
+**The room hint** — Square orders don't know which room. The line item name is the only
+clue: "Vault" → The Vault, "Lounge" → Lounge, else Main Studio. Rough but honest: it puts
+them in the arrivals strip in approximately the right section, and a human seats them
+precisely. That is exactly what the arrivals flow is for.
+
+**The tile flow for a new Square order:** `current_stage: 'booking'` → tap the name in
+the arrivals strip → tap a table → seated → tap the (now red) table →
+`openBookingAtRealStage('order-xxx', 'booking')` →
+
+    🪑 Table set up
+    👋 Customers greeted & seated
+    ☕ Drinks offered
+    🏺 Pieces selected
+
+That is the exact right starting point for someone who has just arrived.
