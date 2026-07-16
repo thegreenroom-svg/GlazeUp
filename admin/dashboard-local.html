@@ -2599,7 +2599,7 @@
       </div>
     </div>
     <div style="display:flex; align-items:center; gap:6px;">
-      <button onclick="openCleoAdminVoicePicker()" title="Choose Cleo's voice" style="background:rgba(255,255,255,0.2); border:none; color:white; width:30px; height:30px; border-radius:50%; font-size:13px; cursor:pointer;">🎙️</button>
+      <button onclick="openCleoAdminVoicePicker()" title="Choose Cleo's voice" data-cleo-helper style="display:none;background:rgba(255,255,255,0.2); border:none; color:white; width:30px; height:30px; border-radius:50%; font-size:13px; cursor:pointer;">🎙️</button>
       <button id="staff-assistant-voice-toggle-btn" onclick="toggleStaffAssistantVoice()" title="Turn Cleo's voice on/off" style="background:rgba(255,255,255,0.2); border:none; color:white; width:30px; height:30px; border-radius:50%; font-size:14px; cursor:pointer;">🔊</button>
       <button onclick="toggleStaffAssistant()" title="Close" style="background:rgba(255,255,255,0.2);border:none;color:white;width:34px;height:34px;border-radius:50%;font-size:18px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
     </div>
@@ -7141,6 +7141,7 @@ function selectCleoAdminVoice(voiceName) {
 // Voices come from the device, not from us: no API, no cost, nothing
 // stored beyond the chosen name in localStorage.
 function openCleoAdminVoicePicker() {
+  if (!CLEO_HELPER_ENABLED) return;   // the helper is parked; so is its voice
   const synth = window.speechSynthesis;
   if (!synth) { alert("This browser can't do speech, so there are no voices to choose from."); return; }
 
@@ -20014,7 +20015,46 @@ function getCleoAdminSeasonalChitchatLine() {
   return null;
 }
 
+// ═══════════════════════════════════════════════════════════
+// THE CLEO HELPER IS PARKED. 16 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Daisy: "For the purposes of this studio app, Cleo is just the avatar on
+// the picker, and she has her own pages. There should be no Cleo avatar
+// helper or anything at all now. Just literally that."
+//
+// Precisely — and the precision is the point, because "the Cleo stuff"
+// meant four unrelated things and one of them is children's data:
+//
+//   KEEP  Cleo the person  — her avatar on the login picker (static SVG in
+//                            the avatar map, ~9068). Untouched. Daisy asked
+//                            for her back this morning.
+//   KEEP  Cleo's Club      — "her own pages": setup, stickers, rewards,
+//                            paywall (~4144+) and SEVEN live tables of
+//                            children's stickers and bonuses. Untouched.
+//   PARK  The helper       — this. Floating FAB, mascot, bubble, seasonal
+//                            chitchat, context tips, voice.
+//
+// renderCleoMascotSVG(age) is the HELPER's mascot, NOT the picker avatar —
+// different things, checked before touching either. The avatar is raw SVG
+// in the avatar map; this paints into #cleo-admin-floating-mascot.
+//
+// Wry note: openCleoAdminVoicePicker() was built THIS MORNING because it was
+// the last dead link in the file. It lasted six hours. It goes with the rest
+// of the helper — which is the right outcome, and a decent argument for
+// asking "should this exist?" before "why is this broken?".
+//
+// PARKED, NOT DELETED. One line back.
+const CLEO_HELPER_ENABLED = false;
+
 function initCleoAdminFloatingWidget() {
+  if (!CLEO_HELPER_ENABLED) {
+    ['cleo-admin-floating-fab', 'cleo-admin-floating-bubble'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+    document.querySelectorAll('[data-cleo-helper]').forEach(el => el.style.display = 'none');
+    return;
+  }
   const fab = document.getElementById('cleo-admin-floating-fab');
   const bubble = document.getElementById('cleo-admin-floating-bubble');
   if (!fab) return;
@@ -20067,6 +20107,7 @@ let _cleoAdminContextHoldTimer = null;
 let _cleoAdminTooltipVoiceLastPlayedAt = 0;
 
 function showCleoAdminContextTip(text) {
+  if (!CLEO_HELPER_ENABLED) return;   // parked with the rest of the helper
   const bubble = document.getElementById('cleo-admin-floating-bubble');
   if (!bubble || !text) return;
   clearInterval(_cleoAdminFloatingRotationTimer); // pause the normal rotation while explaining something specific

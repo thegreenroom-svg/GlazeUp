@@ -3566,3 +3566,48 @@ Both need an inventory in front of Daisy so she can point. Today alone turned up
 checks, drag that never worked on the only device that matters, and an email queued into
 the void — **every one of them something built or removed at speed without being looked
 at.** Doing that in reverse with a delete key across two apps is how you lose a week.
+
+## Cleo: helper parked, avatar kept, club untouched. 16 July 2026.
+
+Daisy, on the fourth go at asking and finally unambiguous:
+
+> "For the purposes of this studio app, Cleo is just the avatar on the picker, and she
+>  has their own pages. There should be no Cleo avatar helper or anything at all now.
+>  Just literally that."
+
+**Worth the four goes.** "The Cleo stuff" meant FOUR unrelated things, and acting on the
+first phrasing would have deleted two of them wrongly:
+
+| | verdict |
+|---|---|
+| **Cleo the person** — avatar on the login picker, static SVG in the avatar map (~9068) | **KEPT** — Daisy asked for her BACK this morning; she is in FIX_TWO_ELLIOTTS.sql |
+| **Cleo's Club** — "her own pages": setup, stickers, rewards, paywall (~4144+), **7 live tables of children's stickers and bonuses** | **KEPT** — she said "apart from the kids club thing" |
+| **The helper** — floating FAB, mascot, bubble, seasonal chitchat, context tips | **PARKED** |
+| **The voice picker** — built this morning as the last dead link | **PARKED** with the helper |
+
+`CLEO_HELPER_ENABLED = false`. Parked, not deleted, per the house pattern. One line back.
+
+**The check that mattered:** `renderCleoMascotSVG(age)` is the HELPER's mascot and is NOT
+the picker avatar. Different things — the avatar is raw SVG in the avatar map, the mascot
+paints into `#cleo-admin-floating-mascot`. Deleting on the name would have taken her face
+off the login screen the day after being asked to put it back.
+
+**Verified** (jsdom):
+
+    FAB false · bubble false · context tip false · voice picker false · voice button hidden
+    Cleo on the picker TRUE · Cleo in DEMO_STAFF TRUE
+    Cleo's Club: 6 of 6 functions · setup page TRUE · sticker list TRUE
+
+(The first run said 5 of 6 — my test asked for `openCleosClub`, which is a CUSTOMER app
+function and never existed on the admin side. Test wrong, code right. Worth writing down:
+the check that finds nothing is only useful if you check the check.)
+
+**Wry note:** `openCleoAdminVoicePicker()` was built at ~09:00 today because it was the
+last dead link in the file, and parked at ~18:00 because the feature it belonged to is
+gone. Six hours. A decent argument for asking "should this exist?" before "why is this
+broken?".
+
+**STILL NOT DONE — the customer app.** Inventoried, not touched: 7,301 lines, 251
+functions, 24 screens, 242 mentions of Cleo. The three open questions are the mascot,
+the periphery (marketplace / community feed / loyalty), and the voice picker. Core +
+paid tools + kids club stay either way.
