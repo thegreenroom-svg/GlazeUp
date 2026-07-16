@@ -10471,7 +10471,7 @@ function renderFloorPlanElegant() {
       ${_renderArrivals(unseated)}
       ${resting ? `<div style="text-align:center;padding:40px 20px;color:#8a8175;font-size:13px;">
         No tables set up yet for this studio.</div>`
-        : `<div style='display:flex;flex-direction:column;gap:16px;width:100%;'>${Object.entries(rooms).map(([name, list]) => _renderElegantRoomSVG(name, list, bookingByTable, true)).join('')}</div>`}
+        : `<div style='display:flex;flex-direction:column;gap:16px;width:100%;max-width:100%;overflow:hidden;box-sizing:border-box;'>${Object.entries(rooms).map(([name, list]) => _renderElegantRoomSVG(name, list, bookingByTable, true)).join('')}</div>`}
     </div>`;
 }
 
