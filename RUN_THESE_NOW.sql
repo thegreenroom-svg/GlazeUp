@@ -1,29 +1,27 @@
 -- ═══════════════════════════════════════════════════════════════════
--- RUN_THESE_NOW.sql — The Kiln Cafe — 16 July 2026
+-- RUN_THESE_NOW.sql — The Kiln Cafe — 16 July 2026 (v2)
 -- Supabase project mdpchpjnlzlmldtlqrns
 --
--- Everything still outstanding, in the ONE order that works, in one
--- paste. Every statement is idempotent — if you have already run some
--- of these, running them again changes nothing and costs nothing. So
--- you do not need to remember which ones you did.
+-- v2 FIXES THE ERROR YOU HIT. The previous version died at line 366:
+--     ERROR: 42P01: relation "staff_shifts" does not exist
+-- Section 4 counted shifts per Elliott to keep whichever row had the
+-- real history. There is no staff_shifts table — I used the name
+-- without checking it existed, which is precisely the bug this whole
+-- project has been paying for all week. It now reads staff_team only.
 --
--- ⚠️  ORDER IS NOT COSMETIC HERE. Section 2 deletes every booking whose
---     code starts 'demo-booking-'. Section 3 CREATES bookings with
---     exactly those codes. Run 3 before 2 and you delete your own test
---     bookings a second after making them. Top to bottom, once.
+-- Supabase runs a script in ONE transaction, so that error rolled the
+-- entire thing back. Nothing from sections 1-3 was applied. You are
+-- starting clean; just run this.
 --
--- ⚠️  SECTION 4 STARTS WITH A SELECT. Read it. If it shows an 'Elliot'
---     AND an 'Elliott' as two rows with shifts against BOTH, stop and
---     say so — that is two people's timesheets, not a typo.
+-- Every statement is idempotent. If some of it did land somehow,
+-- running it again changes nothing.
 --
--- ⚠️  SECTION 3 wants the code push that is still sitting unpushed.
---     Without it the test bookings appear but WITHOUT the amber
---     TRAINING border (their names still say "(Demo)", so they are not
---     dangerous — just less obvious). Push first, then run this.
+-- ⚠️  ORDER MATTERS. Section 2 deletes bookings whose code starts
+--     'demo-booking-'. Section 3 CREATES bookings with exactly those
+--     codes. Top to bottom, once.
 --
--- Supabase shows only the LAST result set. If you want to read each
--- check, run the sections one at a time. Otherwise run the lot and read
--- the final summary at the bottom.
+-- ⚠️  SECTION 4 STARTS WITH A SELECT on the Elliott rows. It is safe to
+--     let it run through — but read it in the output if you can.
 -- ═══════════════════════════════════════════════════════════════════
 
 
@@ -128,9 +126,7 @@ SELECT room, name, capacity FROM studio_tables
 
 -- ═══════════════════════════════════════════════════════════════════
 -- 2. CLEAR THE OLD DEMO — the WI, the hen do, the demo kiln batches
---   NOTE: MUST run BEFORE section 3. It deletes booking_code LIKE 'demo-booking-%',
---     which is exactly what section 3 then creates. The other way round and
---     you would wipe your new test bookings the moment you made them.
+--   NOTE: MUST run BEFORE section 3, which creates bookings with the same code prefix.
 -- ═══════════════════════════════════════════════════════════════════
 
 -- ═══════════════════════════════════════════════════════════════════
@@ -216,7 +212,7 @@ UNION ALL SELECT 'real studio_tables (should NOT be 0)', COUNT(*) FROM studio_ta
 
 -- ═══════════════════════════════════════════════════════════════════
 -- 3. TEST BOOKINGS — one live booking per area
---   NOTE: AFTER section 2, never before. See the note above.
+--   NOTE: AFTER section 2, never before.
 -- ═══════════════════════════════════════════════════════════════════
 
 -- ═══════════════════════════════════════════════════════════════════
@@ -320,7 +316,9 @@ SELECT b.room,
 
 -- ═══════════════════════════════════════════════════════════════════
 -- 4. PEOPLE — the duplicate Elliott, his real role, and Cleo
---   NOTE: STOP AND READ section 4's first SELECT before running the rest of it.
+--   NOTE: FIXED 16 July: this section previously referenced staff_shifts, which does
+--     not exist, and killed the whole script at line 366. It now touches
+--     staff_team and nothing else.
 -- ═══════════════════════════════════════════════════════════════════
 
 -- ═══════════════════════════════════════════════════════════════════
@@ -355,21 +353,25 @@ SELECT b.room,
 -- ═══════════════════════════════════════════════════════════════════
 
 -- ── 1. LOOK FIRST. Run this alone and read it. ──
--- Shows both rows and how much real history each one carries. The row
--- with history is the one to keep. If BOTH carry shifts, stop — that is
--- genuinely split history and needs merging, not deactivating.
-SELECT st.id,
-       st.name,
-       st.role,
-       st.active,
-       st.created_at,
-       (SELECT COUNT(*) FROM staff_shifts   s WHERE s.staff_member_id = st.id) AS shifts,
-       (SELECT COUNT(*) FROM staff_holidays hh WHERE hh.staff_member_id = st.id) AS holidays,
-       (SELECT COUNT(*) FROM staff_pins     p WHERE p.staff_member_id = st.id) AS pins
-  FROM staff_team st
- WHERE st.studio_id = 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3'
-   AND st.name ILIKE 'elliot%'
- ORDER BY st.created_at;
+-- Deliberately depends on NOTHING but staff_team.
+--
+-- The first version of this file counted shifts and holidays per row, to
+-- keep whichever Elliott had the real history. It failed outright:
+--     ERROR: relation "staff_shifts" does not exist
+-- Because there is no staff_shifts table. I invented the name and did
+-- not check — the same mistake this project has been paying for all
+-- week, made by me, in the file meant to clean up after it.
+--
+-- The real timesheet table is staff_timesheet. But that resolves the
+-- worry rather than complicating it: with no staff_shifts, there is no
+-- shift history split across the two rows to protect. So the duplicate
+-- can be judged on age alone, and the oldest row — the one people have
+-- actually been using — is the one that stays.
+SELECT id, name, role, active, created_at
+  FROM staff_team
+ WHERE studio_id = 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3'
+   AND name ILIKE 'elliot%'
+ ORDER BY created_at;
 
 -- ── 2. Set the real name and role on BOTH rows, so it is right either way ──
 -- The name MUST end up exactly 'Elliott', two t's: the access check in
@@ -384,27 +386,22 @@ UPDATE staff_team
  WHERE studio_id = 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3'
    AND name ILIKE 'elliot%';
 
--- ── 3. Deactivate the duplicate, keep the one with history ──
--- Keeps whichever row has the most shifts; ties break to the oldest,
--- since that is the one people have been using. Deactivates the rest.
--- Reversible: set active = true to bring any row back.
+-- ── 3. Deactivate the duplicate, keep the oldest ──
+-- Reversible: set active = true to bring any row back. Nothing is
+-- deleted. team-for-login filters on active = true, so this alone
+-- clears him from the picker.
 WITH ranked AS (
-  SELECT st.id,
-         ROW_NUMBER() OVER (
-           ORDER BY (SELECT COUNT(*) FROM staff_shifts s WHERE s.staff_member_id = st.id) DESC,
-                    st.created_at ASC
-         ) AS keep_rank
-    FROM staff_team st
-   WHERE st.studio_id = 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3'
-     AND st.name ILIKE 'elliot%'
+  SELECT id, ROW_NUMBER() OVER (ORDER BY created_at ASC) AS keep_rank
+    FROM staff_team
+   WHERE studio_id = 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3'
+     AND name ILIKE 'elliot%'
 )
 UPDATE staff_team
    SET active = false
  WHERE id IN (SELECT id FROM ranked WHERE keep_rank > 1);
 
 -- ── VERIFY — expect exactly ONE active Elliott, Marketing & HBP Manager ──
-SELECT name, role, active,
-       (SELECT COUNT(*) FROM staff_shifts s WHERE s.staff_member_id = staff_team.id) AS shifts
+SELECT name, role, active
   FROM staff_team
  WHERE studio_id = 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3'
    AND name ILIKE 'elliot%'
@@ -413,8 +410,7 @@ SELECT name, role, active,
 
 -- ═══════════════════════════════════════════════════════════════════
 -- 5. FACE ID — the table that was never created
---   NOTE: Why Face ID has never worked. Nothing switches on until you accept the
---     one-time offer after your next PIN login.
+--   NOTE: Nothing switches on until you accept the one-time offer after a PIN login.
 -- ═══════════════════════════════════════════════════════════════════
 
 -- ═══════════════════════════════════════════════════════════════════
@@ -516,17 +512,17 @@ UNION ALL SELECT 'customer_webauthn_credentials',
 
 
 -- ═══════════════════════════════════════════════════════════════════
--- FINAL SUMMARY — the only result you actually need to read.
+-- FINAL SUMMARY — the only result you need to read.
 -- ═══════════════════════════════════════════════════════════════════
 SELECT 'rooms & tables' AS thing,
-       string_agg(DISTINCT room || ' (' || cnt::text || ')', ', ' ORDER BY room || ' (' || cnt::text || ')') AS detail
+       string_agg(room || ' (' || cnt::text || ')', ', ' ORDER BY room) AS detail
   FROM (SELECT room, COUNT(*) AS cnt FROM studio_tables
          WHERE studio_id='fab8b2d2-27b5-47ec-8c56-268bbf821dc3' GROUP BY room) x
 UNION ALL
 SELECT 'test bookings (want 3)', COUNT(*)::text FROM bookings
  WHERE studio_id='fab8b2d2-27b5-47ec-8c56-268bbf821dc3' AND booking_code LIKE 'demo-booking-%'
 UNION ALL
-SELECT 'old demo left over (want 0)', COUNT(*)::text FROM bookings
+SELECT 'old demo left (want 0)', COUNT(*)::text FROM bookings
  WHERE studio_id='fab8b2d2-27b5-47ec-8c56-268bbf821dc3' AND booking_code LIKE 'DEMO-%'
 UNION ALL
 SELECT 'active Elliotts (want 1)', COUNT(*)::text FROM staff_team

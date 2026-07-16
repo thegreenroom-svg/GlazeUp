@@ -30,21 +30,25 @@
 -- ═══════════════════════════════════════════════════════════════════
 
 -- ── 1. LOOK FIRST. Run this alone and read it. ──
--- Shows both rows and how much real history each one carries. The row
--- with history is the one to keep. If BOTH carry shifts, stop — that is
--- genuinely split history and needs merging, not deactivating.
-SELECT st.id,
-       st.name,
-       st.role,
-       st.active,
-       st.created_at,
-       (SELECT COUNT(*) FROM staff_shifts   s WHERE s.staff_member_id = st.id) AS shifts,
-       (SELECT COUNT(*) FROM staff_holidays hh WHERE hh.staff_member_id = st.id) AS holidays,
-       (SELECT COUNT(*) FROM staff_pins     p WHERE p.staff_member_id = st.id) AS pins
-  FROM staff_team st
- WHERE st.studio_id = 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3'
-   AND st.name ILIKE 'elliot%'
- ORDER BY st.created_at;
+-- Deliberately depends on NOTHING but staff_team.
+--
+-- The first version of this file counted shifts and holidays per row, to
+-- keep whichever Elliott had the real history. It failed outright:
+--     ERROR: relation "staff_shifts" does not exist
+-- Because there is no staff_shifts table. I invented the name and did
+-- not check — the same mistake this project has been paying for all
+-- week, made by me, in the file meant to clean up after it.
+--
+-- The real timesheet table is staff_timesheet. But that resolves the
+-- worry rather than complicating it: with no staff_shifts, there is no
+-- shift history split across the two rows to protect. So the duplicate
+-- can be judged on age alone, and the oldest row — the one people have
+-- actually been using — is the one that stays.
+SELECT id, name, role, active, created_at
+  FROM staff_team
+ WHERE studio_id = 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3'
+   AND name ILIKE 'elliot%'
+ ORDER BY created_at;
 
 -- ── 2. Set the real name and role on BOTH rows, so it is right either way ──
 -- The name MUST end up exactly 'Elliott', two t's: the access check in
@@ -59,27 +63,22 @@ UPDATE staff_team
  WHERE studio_id = 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3'
    AND name ILIKE 'elliot%';
 
--- ── 3. Deactivate the duplicate, keep the one with history ──
--- Keeps whichever row has the most shifts; ties break to the oldest,
--- since that is the one people have been using. Deactivates the rest.
--- Reversible: set active = true to bring any row back.
+-- ── 3. Deactivate the duplicate, keep the oldest ──
+-- Reversible: set active = true to bring any row back. Nothing is
+-- deleted. team-for-login filters on active = true, so this alone
+-- clears him from the picker.
 WITH ranked AS (
-  SELECT st.id,
-         ROW_NUMBER() OVER (
-           ORDER BY (SELECT COUNT(*) FROM staff_shifts s WHERE s.staff_member_id = st.id) DESC,
-                    st.created_at ASC
-         ) AS keep_rank
-    FROM staff_team st
-   WHERE st.studio_id = 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3'
-     AND st.name ILIKE 'elliot%'
+  SELECT id, ROW_NUMBER() OVER (ORDER BY created_at ASC) AS keep_rank
+    FROM staff_team
+   WHERE studio_id = 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3'
+     AND name ILIKE 'elliot%'
 )
 UPDATE staff_team
    SET active = false
  WHERE id IN (SELECT id FROM ranked WHERE keep_rank > 1);
 
 -- ── VERIFY — expect exactly ONE active Elliott, Marketing & HBP Manager ──
-SELECT name, role, active,
-       (SELECT COUNT(*) FROM staff_shifts s WHERE s.staff_member_id = staff_team.id) AS shifts
+SELECT name, role, active
   FROM staff_team
  WHERE studio_id = 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3'
    AND name ILIKE 'elliot%'

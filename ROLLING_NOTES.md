@@ -3334,3 +3334,35 @@ stored but the chosen name. Handles Safari's empty first `getVoices()` via
 `GRID_NAV_STRUCTURE` -> data. Daisy wants every part of the admin side tile-driven, with
 the big glazed tiles running all the way through Host By Post to the end of each job.
 That is this, it is ~200 interlinked lines, and it is a session of its own.
+
+## I invented a table name. 16 July 2026.
+
+    ERROR: 42P01: relation "staff_shifts" does not exist
+    LINE 366: (SELECT COUNT(*) FROM staff_shifts s WHERE ...)
+
+`FIX_TWO_ELLIOTTS.sql` counted shifts per Elliott row so it could keep whichever one held
+the real history. **There is no `staff_shifts` table.** I used the name without checking
+it existed — which is, exactly and precisely, the bug this project has been paying for
+all week, committed by me, in the file written to clean up after it. Supabase runs a
+script in one transaction, so it took the whole thing down and nothing was applied.
+
+**Rewritten to touch `staff_team` and nothing else.** And the error resolves the original
+worry rather than complicating it: with no `staff_shifts`, there is no shift history
+split across the two rows to protect, so the duplicate can be judged on age alone and
+the oldest row — the one people have been using — stays.
+
+**The real timesheet table is `staff_timesheet`** (created in `ALL_SQL_TONIGHT.sql`, read
+by `/api/staff/other-active-shifts`).
+
+**⚠️ SEPARATE FINDING, NOT FIXED — `server.js:5895` queries `staff_shifts` too:**
+
+    const { data: activeShifts } = await supabase.from('staff_shifts')...
+
+So a real endpoint reads a table that has never existed anywhere in this repo. Same
+family as `bookings.status`: code and schema drifted and nothing checked. It needs
+pointing at `staff_timesheet` or the table needs creating — but which of those is right
+depends on what that endpoint is for, and guessing is what caused this note.
+
+**The lesson, restated because I am the one who needed it:** grep for the table before
+writing SQL against it. `grep -rn "from('staff_shifts')" --include=*.sql .` would have
+taken four seconds and returned nothing.
