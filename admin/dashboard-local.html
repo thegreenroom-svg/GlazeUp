@@ -22942,9 +22942,14 @@ async function applyAppUpdate() {
     // URL is always new, so the navigation always actually navigates.
     url.searchParams.set('v', _latestBuildId || 'manual');
     url.searchParams.set('t', Date.now());
-    window.location.replace(url.toString());
+    // On iOS Safari PWA, location.replace() with a new URL can still
+    // serve from disk cache even with no-store headers. The only reliable
+    // escape is window.location.href with a unique timestamp, which forces
+    // a true network request rather than a cache hit.
+    window.location.href = url.toString();
   } catch (e) {
-    window.location.reload(); // last resort — better than a dead button
+    // Absolute last resort — clear everything and force a true reload
+    window.location.href = window.location.pathname + '?nocache=' + Date.now();
   }
 }
 
