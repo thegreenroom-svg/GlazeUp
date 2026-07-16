@@ -4324,3 +4324,19 @@ Verified real margins on real DB contents at every real device:
 Main Studio margins on iPhone Plus/Pro Max stay tight (14-16px) because Table 1
 is an 8-seater sitting alongside 4-seaters on the same row — geometry, not a bug.
 The Lounge and larger screens all now have generous visible breathing room.
+
+## Third missing-navigation login-path found + horizontal scroll fallback
+
+**Desktop blank screen was the SAME class of bug I fixed twice tonight** — a login
+path that never called `goToTab('floor-plan')`. This time it was the
+resume-from-localStorage path (line ~9060), which fires on every page reload
+during an active shift. All three login paths (PIN, Face ID, resume) now
+consistently land on the floor plan. This fixes David's D-avatar showing on
+desktop with nothing else rendered.
+
+**Horizontal scroll fallback added** — Daisy: "would be ok if it fitted or i could
+scroll left and right." The room container's overflow was `hidden`, which clipped
+content that didn't fit. Changed to `overflow-x:auto` with iOS momentum
+scrolling. If tables fit naturally in the viewport, nothing changes visually. If
+they don't, you can swipe/drag left-right to see everything without cramped
+wrapping. Best of both worlds — fit when possible, real scroll when not.

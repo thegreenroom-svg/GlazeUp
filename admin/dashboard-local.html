@@ -9063,6 +9063,14 @@ function checkShiftLogin() {
       currentShiftId = localStorage.getItem('klnk_shift_id') || null;
       currentBreakId = localStorage.getItem('klnk_break_id') || null;
       markSessionActive();
+      // THIRD login-path missing navigation — found 16 July 2026 by
+      // tracing why David's D-avatar shows on desktop but the floor
+      // plan never appears. Same class of bug I fixed in the PIN and
+      // Face ID paths earlier tonight, but this one was for the
+      // silent resume-from-localStorage case, which fires on every
+      // page reload during an active shift. All three login paths
+      // now consistently land on the floor plan.
+      goToTab('floor-plan');
       applyShiftUI();
       return;
     } catch (e) { /* fall through to fresh login if the saved session is corrupt */ }
@@ -10588,7 +10596,7 @@ function renderFloorPlanElegant() {
       ${_renderArrivals(unseated)}
       ${resting ? `<div style="text-align:center;padding:40px 20px;color:#8a8175;font-size:13px;">
         No tables set up yet for this studio.</div>`
-        : (function(){ const w = _measureFloorPlanWidth(); return `<div style='display:flex;flex-direction:column;gap:16px;width:100%;max-width:100%;overflow:hidden;box-sizing:border-box;'>${Object.entries(rooms).map(([name, list]) => _renderElegantRoomSVG(name, list, bookingByTable, true, w)).join('')}</div>`; })()}
+        : (function(){ const w = _measureFloorPlanWidth(); return `<div style='display:flex;flex-direction:column;gap:16px;width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;box-sizing:border-box;'>${Object.entries(rooms).map(([name, list]) => _renderElegantRoomSVG(name, list, bookingByTable, true, w)).join('')}</div>`; })()}
     </div>`;
   } catch (renderErr) {
     // Real, visible failure — no more blank screen. Also logs the
