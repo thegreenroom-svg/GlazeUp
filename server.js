@@ -5436,7 +5436,7 @@ app.get('/api/floor/tables', async (req, res) => {
     const { data: tables, error: tablesErr } = await supabase.from('studio_tables')
       .select('id,name,room,capacity,sort_order')
       .eq('studio_id', studioId).order('sort_order');
-    if (tablesErr) throw tablesErr;
+    // degrade if studio_tables missing
 
     // table_chair_layouts may not exist — optional, degrade gracefully
     const { data: layouts } = await supabase.from('table_chair_layouts')
