@@ -4051,3 +4051,21 @@ the arrivals strip → tap a table → seated → tap the (now red) table →
     🏺 Pieces selected
 
 That is the exact right starting point for someone who has just arrived.
+
+## WhatsApp contact tile. 16 July 2026.
+
+Daisy: "We have a WhatsApp group for The Kiln Cafe staff. Is it possible to integrate this?"
+
+Deep links, not the Business API. Free, instant, zero setup. `wa.me/<number>?text=<message>`
+opens WhatsApp on the phone with the message pre-filled. One tap, no cost.
+
+`openContactSheet()` — a tile sheet showing each staff member with a WhatsApp number.
+The message pre-fills with context the app already knows: if you're on a booking detail,
+it says "Hi, it's about The Hartleys at Table 4." If not, it says "Hi, can you help at
+the studio?" Staff members on shift are highlighted.
+
+`staff_team.whatsapp_number` — new column, `ADD_WHATSAPP.sql`. Directors only via
+`/api/staff/contact` — phone numbers are personal data.
+
+Business API is the right answer when we want CUSTOMER messaging (collection reminders,
+confirmations). That's a different decision and a bigger one. This is staff-to-staff.

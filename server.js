@@ -6227,6 +6227,27 @@ app.get('/api/staff/daily-progress', async (req, res) => {
 
 function hashPin(pin) { return crypto.createHash('sha256').update(String(pin)).digest('hex'); }
 
+// GET /api/staff/contact — phone numbers for the WhatsApp tile.
+// Directors only — phone numbers are personal data and should not be
+// accessible to every logged-in device.
+// Returns only staff who have a phone number set.
+app.get('/api/staff/contact', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const { data, error } = await supabase.from('staff_team')
+      .select('id, name, role, whatsapp_number')
+      .eq('studio_id', studioId)
+      .eq('active', true)
+      .not('whatsapp_number', 'is', null)
+      .order('name');
+    if (error) throw error;
+    res.json({ staff: data || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/staff/team-for-login — names + roles + shift/holiday status,
 // for the login picker so staff can see who's on shift, off shift, or
 // on holiday without logging in first.
