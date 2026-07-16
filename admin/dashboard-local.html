@@ -10173,7 +10173,7 @@ let _detailTimerInterval = null;
 
 // ── Shared drawing helpers, used by BOTH the all-rooms home view and
 // the single-room drill-down page, so the two can never drift apart. ──
-const _ELEGANT_ROOM_WIDTH = 680, _ELEGANT_PAD = 20, _ELEGANT_GAP = 16;
+const _ELEGANT_ROOM_WIDTH = 360, _ELEGANT_PAD = 12, _ELEGANT_GAP = 10;
 
 function _elegantRoomsData() {
   const tables = _floorData.tables || [];
@@ -21689,12 +21689,12 @@ function _handRect(x, y, w, h, seed, weight, ink, fill) {
 
 // Seats decide the table's footprint. Sizes are in plan units.
 function _tableSize(seats) {
-  if (seats <= 2) return { w: 80, h: 80 };
-  if (seats <= 4) return { w: 120, h: 90 };
-  if (seats <= 6) return { w: 160, h: 90 };
-  if (seats <= 8) return { w: 200, h: 90 };
-  if (seats <= 12) return { w: 260, h: 90 };
-  return { w: 300, h: 95 };
+  if (seats <= 2) return { w: 60, h: 60 };
+  if (seats <= 4) return { w: 72, h: 68 };
+  if (seats <= 6) return { w: 100, h: 68 };
+  if (seats <= 8) return { w: 130, h: 68 };
+  if (seats <= 12) return { w: 160, h: 68 };
+  return { w: 200, h: 72 };
 }
 
 // Chairs sit around the table: twos face each other across it,
