@@ -10522,20 +10522,23 @@ async function loadFloorPlan() {
     // consistently one design, error state included.
     const view = document.getElementById('floor-plan-view');
     if (view) {
+      // Auto-retry — no "Try again" button. The floor plan must always
+      // be there; a button that asks staff to notice and tap is wrong.
+      // Daisy: "I don't want to tap Try again. I want it to be
+      // automatically there." So: show a quiet spinner, retry in 10s,
+      // keep trying every 30s until it works. If it's a deploy in
+      // progress, it will be there within 2-4 minutes without anyone
+      // having to do anything.
       view.innerHTML = `
-        <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;
-          display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">
-          <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;margin-bottom:6px;">
-            Couldn't load the floor plan
-          </div>
-          <div style="font-size:12px;color:#8a8175;margin-bottom:18px;max-width:320px;">
-            ${(e.message || 'Unknown error').replace(/</g, '&lt;')}
-          </div>
-          <button onclick="loadFloorPlan()" class="glaze-tile"
-            style="border:none;padding:11px 22px;font-size:13px;font-weight:700;cursor:pointer;">
-            Try again
-          </button>
+        <div style="flex:1;background:#F4ECE0;display:flex;flex-direction:column;
+          align-items:center;justify-content:center;text-align:center;padding:32px;">
+          <div style="font-family:'Architects Daughter',cursive;font-size:15px;
+            color:#8a8175;letter-spacing:0.06em;margin-bottom:8px;">Loading the studio…</div>
+          <div style="width:32px;height:32px;border:3px solid rgba(43,39,36,0.12);
+            border-top-color:#B87946;border-radius:50%;animation:spin 0.9s linear infinite;"></div>
         </div>`;
+      // Retry in 10s, then the normal 30s poll takes over
+      setTimeout(() => loadFloorPlan(), 10000);
     }
   }
 }
