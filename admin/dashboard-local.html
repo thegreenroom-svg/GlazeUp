@@ -10480,8 +10480,15 @@ let _floorPlanResizeTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(_floorPlanResizeTimer);
   _floorPlanResizeTimer = setTimeout(() => {
+    // Belt-and-braces: bail if the login modal or any splash is
+    // currently visible. Original inline-style check was correct but
+    // only catches an explicit style attribute; getComputedStyle
+    // picks up the CSS default too, so nothing my listener does can
+    // ever fight the login/splash sequence.
+    const loginModal = document.getElementById('shift-login-modal');
+    if (loginModal && getComputedStyle(loginModal).display !== 'none') return;
     const view = document.getElementById('floor-plan-view');
-    if (!view || view.style.display === 'none') return;
+    if (!view || getComputedStyle(view).display === 'none') return;
     if (_floorViewMode === 'plan') renderFloorPlanElegant();
     else if (_floorViewMode === 'room' && _currentRoomName) showRoomElegant(_currentRoomName);
   }, 120);
@@ -10492,8 +10499,15 @@ window.addEventListener('resize', () => {
 window.addEventListener('orientationchange', () => {
   clearTimeout(_floorPlanResizeTimer);
   _floorPlanResizeTimer = setTimeout(() => {
+    // Belt-and-braces: bail if the login modal or any splash is
+    // currently visible. Original inline-style check was correct but
+    // only catches an explicit style attribute; getComputedStyle
+    // picks up the CSS default too, so nothing my listener does can
+    // ever fight the login/splash sequence.
+    const loginModal = document.getElementById('shift-login-modal');
+    if (loginModal && getComputedStyle(loginModal).display !== 'none') return;
     const view = document.getElementById('floor-plan-view');
-    if (!view || view.style.display === 'none') return;
+    if (!view || getComputedStyle(view).display === 'none') return;
     if (_floorViewMode === 'plan') renderFloorPlanElegant();
     else if (_floorViewMode === 'room' && _currentRoomName) showRoomElegant(_currentRoomName);
   }, 250);

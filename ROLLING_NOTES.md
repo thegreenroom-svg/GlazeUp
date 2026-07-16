@@ -4253,3 +4253,17 @@ grid/flex layouts that adapt naturally. The floor plan was the single place with
 hardcoded viewBox that couldn't respond to viewport width. This is a genuine "one
 targeted class of bug" fix, not a whole-app rewrite — that's the honest scope, said
 plainly.
+
+## Resize listener — additional guard to protect the login/picker sequence
+
+Daisy flagged that the picker/login sequence had lost its way after the responsive
+floor plan commit. Traced the risk: my resize listener guarded on
+`view.style.display === 'none'`, which only checks the inline style attribute —
+if `#floor-plan-view`'s display is set by CSS rules rather than inline, that check
+reads empty string and the listener would proceed even while login was showing.
+
+Tightened both callbacks (resize + orientationchange): now they also check whether
+`#shift-login-modal` is visible via `getComputedStyle`, and use `getComputedStyle`
+for the floor-plan-view check too. Belt-and-braces — nothing the listener does can
+now fight the login or splash sequence, even in edge cases where inline styles
+haven't been set yet.
