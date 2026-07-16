@@ -5300,12 +5300,24 @@ app.get('/api/floor/active', async (req, res) => {
       // and it is the ONLY thing a synced Square booking knows about where it goes,
       // because Square has no idea your tables exist. Without both, a real booking
       // arrives and cannot even be shown in the right room.
-      .select('booking_code,customer_name,table_number,room,space_name,current_stage,session_start,party_size,status,booking_type')
+      .select('booking_code,customer_name,table_number,current_stage,session_start,party_size,status,booking_type')
       .eq('studio_id', studioId)
       .gte('session_start', today.toISOString())
       .lt('session_start', tomorrow.toISOString())
       .not('status', 'eq', 'cancelled');
-    if (bookingsErr) throw bookingsErr;
+    // room and space_name may not exist yet — try adding them, fall back if not
+    if (bookingsErr) {
+      console.warn('/api/floor/active bookings query failed, retrying without new columns:', bookingsErr.message);
+      const { data: fallback } = await supabase.from('bookings')
+        .select('booking_code,customer_name,table_number,current_stage,session_start,party_size,status,booking_type')
+        .eq('studio_id', studioId)
+        .gte('session_start', today.toISOString())
+        .lt('session_start', tomorrow.toISOString())
+        .not('status', 'eq', 'cancelled');
+      ownBookings = fallback || [];
+    } else {
+      ownBookings = ownBookings || [];
+    }
 
     // These two degrade gracefully — a missing column or table returns
     // an empty result rather than killing the floor plan with a 500.
