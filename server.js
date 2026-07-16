@@ -5302,7 +5302,8 @@ app.get('/api/floor/active', async (req, res) => {
         .eq('studio_id', studioId)
         .gte('session_start', today.toISOString())
         .lt('session_start', tomorrow.toISOString())
-        .not('status', 'eq', 'cancelled');
+        .not('status', 'eq', 'cancelled')
+        .not('status', 'eq', 'completed');  // completed bookings clear from the floor plan
       if (!error) ownBookings = data || [];
     } catch(e) { console.warn('bookings query failed:', e.message); }
 
@@ -5425,6 +5426,23 @@ app.post('/api/floor/assign', async (req, res) => {
   }, { onConflict: 'studio_id,booking_code,staff_member_id' });
   if (error) return res.status(500).json({ error: error.message });
   res.json({ assigned: true });
+});
+
+// POST /api/bookings/:bookingCode/complete — marks a booking done.
+// Called at the end of the completion tile flow — photos taken, payment done,
+// customers gone. Sets status='completed' so the floor plan filters it out
+// on the next refresh and the table goes back to cream/empty.
+// This is the moment the table is available for the next booking.
+app.post('/api/bookings/:bookingCode/complete', async (req, res) => {
+  const { bookingCode } = req.params;
+  const { studioId } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    await supabase.from('bookings')
+      .update({ status: 'completed', current_stage: 'done', updated_at: new Date().toISOString() })
+      .eq('studio_id', studioId).eq('booking_code', bookingCode);
+    res.json({ completed: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // POST /api/floor/seat — put a booking on a table.

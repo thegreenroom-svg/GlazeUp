@@ -21516,6 +21516,18 @@ async function savePiecesToDatabase(bookingCode, pieces, summaryText, customerNa
         }
         completingTableSessionId = null;
         loadOpenTablesForCompletion();
+        // Mark the booking completed in our database so the floor plan
+        // clears the table immediately — it will go back to cream/empty
+        // on the next 30-second refresh. The table is done.
+        try {
+          await fetch(`${API_URL}/api/bookings/${bookingCode}/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ studioId })
+          });
+        } catch(e) { console.warn('Could not mark booking completed:', e.message); }
+        // Refresh the floor plan so the table goes blank immediately
+        loadFloorPlan();
         // Fire handoff alert — booking fully complete
         fireHandoffAlert('booking_completed', bookingCode, { customerName });
       }
