@@ -323,7 +323,7 @@
          genuinely tappable — alert bell and your name badge. Headset
          and step counter move into the task queue drawer, since four
          buttons squeezed into ~375px were all too small to use reliably. */
-      #alert-bell-btn, #shift-badge {
+      #alert-bell-btn, #shift-badge, #my-page-btn {
         position: static !important;
         box-shadow: none !important;
       }
@@ -2458,7 +2458,12 @@
 <div id="alert-feed-panel" style="display:none;position:fixed;top:0;right:0;bottom:0;padding-top:env(safe-area-inset-top, 0px);padding-bottom:env(safe-area-inset-bottom, 0px);box-sizing:border-box;width:340px;max-width:92vw;background:white;z-index:9200;box-shadow:-8px 0 32px rgba(0,0,0,0.2);flex-direction:column;">
   <div style="background:#2B2724;color:white;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;">
     <div style="font-size:15px;font-weight:700;">🔔 Handoff Alerts</div>
-    <button onclick="toggleAlertFeed()" style="background:none;border:none;color:rgba(255,255,255,0.7);font-size:18px;cursor:pointer;">✕</button>
+    <button     <button id="my-page-btn" onclick="showGridNav()" title="My page"
+      style="display:none;background:rgba(255,255,255,0.12);border:none;border-radius:8px;
+      color:white;font-size:11px;font-weight:800;padding:5px 10px;cursor:pointer;flex-shrink:0;">
+      My page
+    </button>
+    onclick="toggleAlertFeed()" style="background:none;border:none;color:rgba(255,255,255,0.7);font-size:18px;cursor:pointer;">✕</button>
   </div>
   <div style="padding:10px 14px;border-bottom:1px solid #f0ebe4;display:flex;gap:8px;">
     <button onclick="goToTab('progress');toggleAlertFeed();" style="flex:1;background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;">📊 Daily Progress</button>
@@ -3993,6 +3998,7 @@
       <!-- ═════════════════════════════════════════════ -->
       <div id="setup-view" class="view" style="display: none;">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+        <button onclick="goToRealLandingPage()" style="background:none;border:none;color:var(--gu-primary);font-size:13px;font-weight:700;padding:4px 0 12px;cursor:pointer;">← Floor plan</button>
           <h2 style="margin-top:0;">Setup</h2>
           <span style="font-size:10px;color:var(--gu-dust);font-weight:600;">v1.1.0</span>
         </div>
