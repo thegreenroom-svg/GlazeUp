@@ -4143,3 +4143,65 @@ kind of unfounded assumption, risks the same mistake with new code.
 Ask Daisy for a week or two of real examples of what staff actually type at the
 till before writing the parser — anything else is guessing at a business's own
 shorthand from the outside.
+
+# ═══════════════════════════════════════════════════════════
+# Cross-referenced the parallel session — real findings acted on
+# ═══════════════════════════════════════════════════════════
+
+Read the other session's own record directly (via conversation search) to make sure
+nothing from the last few hours was missed. Two real things found there needed
+action; a third is flagged rather than fixed, on purpose.
+
+## Confirmed via direct Supabase access — every SQL file has actually been run
+
+Queried `information_schema.columns` directly against project `mdpchpjnlzlmldtlqrns`.
+Every column discussed tonight is genuinely present: `bookings.status`, `.room`,
+`.session_end`, `.current_stage`, `.booking_type`, `.home_access_unlocked`;
+`kiln_sessions.morning_check_confirmed_at/by`, `.morning_check_result`,
+`.misfire_notes`; `staff_alerts.priority`; `staff_checklist_customization`;
+`stock_shape_photos`; `pottery_pieces.photo_phash`/`.square_item_id`;
+`staff_task_transitions`; `studio_suggestions`. **No SQL is outstanding.** This is
+confirmed by direct query, not inferred from a screenshot.
+
+## Fixed: bookings silently vanishing when two share a table
+
+Three places built `bookingByTable[table_number] = booking` and silently overwrote
+on a collision — two bookings on the same table meant one simply disappeared from
+the floor plan with no sign anything was wrong. Real, live, found by the other
+session, not yet fixed there.
+
+**Fixed with one shared function, `_assignBookingToTable()`**, used in all three
+places. On a genuine collision: keeps whichever booking's session has actually
+started over one that hasn't; if both or neither have started, keeps whichever
+started first. Every collision is also logged to the console, so a genuine
+double-booking is visible to whoever's looking, rather than silently hidden.
+
+## NOT fixed, deliberately — needs a business/legal decision, not code
+
+**`bookings.notes` receives Square's `customerNote` verbatim, unfiltered**
+(server.js, the Square booking sync — `notes: booking.sellerNote ||
+booking.customerNote || null`). Whatever a customer types into Square's own note
+field when booking — which could include health information, an allergy, a
+mobility need, anything — lands directly in this database with no consent flow
+and no documented lawful basis. Under UK GDPR that is Article 9 special category
+data if it touches health.
+
+**Why I haven't touched the code:** this may serve a real safety purpose — staff
+plausibly need to know about allergies — which could itself provide a lawful basis
+(e.g. vital interests), but that has to be a deliberate, documented decision with
+appropriate access controls and a retention policy, not an accidental side effect
+of a sync job. Stripping it unilaterally could remove genuinely safety-relevant
+information; leaving it unaddressed is a real compliance risk either way.
+
+**This needs Daisy's decision, ideally with proper advice, on one of:**
+1. Stop copying `customerNote` into `notes` entirely.
+2. Keep it, but restrict who can see it and add a clear privacy notice covering why.
+3. Extract only an allergy/access-need flag through an explicit, considered process,
+   discarding the rest.
+
+Also still open from the other session, re-flagged here because it matters:
+- **The GitHub PAT is still exposed in plain text** in an old chat transcript and
+  has been reused for pushes all night. Needs rotating — this has been flagged
+  more than once now.
+- **`api.qrserver.com` receives booking access tokens in a URL**, sent to a third
+  party with no contract in place. Worth a look, not touched tonight.

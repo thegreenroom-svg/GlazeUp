@@ -10175,6 +10175,29 @@ let _detailTimerInterval = null;
 // the single-room drill-down page, so the two can never drift apart. ──
 const _ELEGANT_ROOM_WIDTH = 320, _ELEGANT_PAD = 10, _ELEGANT_GAP = 8;
 
+// Two bookings can genuinely land on the same table_number — a data
+// entry slip, an overlap at a shift change, someone re-using a table
+// before the last booking was marked complete. Three places used to
+// do `bookingByTable[t] = b` and silently overwrite whichever came
+// last in the array — the other booking simply vanished from the
+// floor plan with no sign anything was wrong. Found by reading a
+// note left after tonight's work: a real, live bug, not a display
+// detail. This decides which one wins on purpose, and says so.
+function _assignBookingToTable(map, b) {
+  const existing = map[b.table_number];
+  if (!existing) { map[b.table_number] = b; return; }
+  const bIsLive = b.is_live || (b.session_start && new Date(b.session_start) <= new Date());
+  const existingIsLive = existing.is_live || (existing.session_start && new Date(existing.session_start) <= new Date());
+  console.warn(`Two bookings on table ${b.table_number}: ${existing.booking_code} and ${b.booking_code} — keeping the one whose session has actually started.`);
+  if (bIsLive && !existingIsLive) { map[b.table_number] = b; return; }
+  if (existingIsLive && !bIsLive) { return; }
+  // Both or neither live — keep whichever started first, so the
+  // longer-running (more likely genuinely current) booking wins.
+  if (b.session_start && existing.session_start && b.session_start < existing.session_start) {
+    map[b.table_number] = b;
+  }
+}
+
 function _elegantRoomsData() {
   const tables = _floorData.tables || [];
   const bookings = _floorData.bookings || [];
@@ -10186,7 +10209,7 @@ function _elegantRoomsData() {
   // and the app had no word for that. It does now.
   const unseated = [];
   bookings.forEach(b => {
-    if (b.table_number) bookingByTable[b.table_number] = b;
+    if (b.table_number) _assignBookingToTable(bookingByTable, b);
     else unseated.push(b);
   });
   // Room names come from studio_tables.room, typed by hand over time, so
@@ -10602,7 +10625,7 @@ function renderFloorPlan() {
 
   // Build booking lookup by table number
   const bookingByTable = {};
-  activeBookings.forEach(b => { if (b.table_number) bookingByTable[b.table_number] = b; });
+  activeBookings.forEach(b => { if (b.table_number) _assignBookingToTable(bookingByTable, b); });
 
   // Main Studio — always visible in the centre
   const mainTables = _floorData.tables.filter(t => t.room === 'Main Studio');
@@ -10646,7 +10669,7 @@ function openRoomPanel(room) {
   const bookingByTable = {};
   _floorData.bookings.forEach(b => {
     const start = b.session_start ? new Date(b.session_start) : null;
-    if (start && start <= now && b.table_number) bookingByTable[b.table_number] = b;
+    if (start && start <= now && b.table_number) _assignBookingToTable(bookingByTable, b);
   });
 
   const tables = _floorData.tables.filter(t => t.room === room);
