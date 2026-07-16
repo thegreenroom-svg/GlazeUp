@@ -3469,3 +3469,100 @@ silently promote or demote a tile, which is not what an arrow means.
 scenarios and the flow design FIRST, then building against it — not jammed in behind six
 other changes at the end of a session. That is precisely the pattern that produced five
 silent bugs this week. Next session, design first.
+
+# ═══════════════════════════════════════════════════════════
+# 16 July 2026 (evening) — the nag is parked, Stripe is guarded,
+# the email stopped lying, and the to-do list has a spine.
+# ═══════════════════════════════════════════════════════════
+
+## "Strip out the archaic alert system" — there was only ever ONE
+
+Daisy: "the other alert system we have in place is archaic and silly, strip that out and
+instigate this with all connections."
+
+**Checked before deleting, and it is as well.** `fireHandoffAlert()` and
+`pollHandoffAlerts()` BOTH talk to `/api/staff/alerts` — the same `ALERT_TRIGGERS`
+machinery she had just fallen in love with and wants "Tell Daisy" built on. **Stripping
+"the alert system" out would have deleted the good one.**
+
+What is archaic is the FACE: a modal that covers your work, FLASHES, and re-nags on a
+timer you tune with a slider. That is the same "bossy" she rejected in the idle-timer
+conversation an hour earlier — interrupt rather than ask. The calm face of the identical
+data already existed: the bell, `toggleAlertFeed()`, `renderAlertFeed()`, the badge.
+
+**`HANDOFF_POPUP_ENABLED = false`.** Parked, not deleted, because
+`applyAlertFlashing()` is SHARED with a `#task-card-card` system at ~12574 that nobody
+has traced — deleting it breaks something unlooked-at. Same pattern this repo already
+uses: Dave deactivated, platform revenue behind a flag, the opening checklist behind one
+comment. One line back.
+
+## Stripe was the last one holding the door open
+
+Square guarded 15 July. Royal Mail this morning. **Stripe was still live and it BILLS:**
+`customers.create`, `subscriptions.create`, and `subscriptionItems.createUsageRecord` —
+which puts AI usage on a real invoice. And the AI generator is deliberately staying live
+for three weeks of testing. **The one system Daisy wants switched on is wired to the one
+that charges.**
+
+`_safeStripe()`, `STRIPE_WRITES_ENABLED`, default false. **3 of 3 guarded, 0 unguarded.**
+All three outside systems now share one contract: default safe, shape-matched so the flow
+completes, and always flagged.
+
+## The email said "queued". Nothing was queued.
+
+    return res.json({ status: 'queued', system: 'email', ... })
+
+There is no SendGrid, no SMTP, no sender of any kind. "Queued" implies a queue something
+drains. **Nothing drains it.** Now `status: 'stored', delivered: false` and a note that
+says NOBODY HAS BEEN EMAILED.
+
+**Fourth instance this week of the same bug**: `(Demo)` bookings, `SIMULATED` orders,
+unguarded Royal Mail, and an email queued into the void. Every time, the truth was in the
+payload and the word on top of it was a lie.
+
+**The `manual` KDS branch was left alone deliberately** — it also says 'queued', and it is
+TELLING THE TRUTH: it stores to `kds_orders` and a human drains it off the KDS screen.
+Same word, opposite honesty. Worth the two minutes it took to tell them apart.
+
+## The to-do list has a spine now
+
+**`priority` on every trigger, next to `nextRole`, as a fact about the KIND of thing.**
+1 = act now (kiln loaded, kiln fired — something is physically waiting or cooling and
+blocking the next firing), 2 = someone is waiting on you, 3 = for information.
+
+**The sender cannot set it.** If they could, everything is urgent by Thursday and Daisy
+stops looking, which is worse than no list. `nextRole` has worked this way since
+`bb4f5ad`, probably by accident; priority now matches it on purpose.
+
+**`GET /api/staff/alerts` gained `?role=` and `?openOnly=`**, both optional, both default
+off — every existing caller behaves exactly as before. It returned EVERYTHING to
+EVERYONE: a to-do list showing other people's jobs is the "bossy" Daisy asked to avoid.
+Ordered by priority, then **oldest first** — the thing waiting longest is likeliest to
+have gone cold, and a newest-first to-do list buries its own worst item.
+
+**`GET /api/staff/alert-kinds` (NEW)** — the vocabulary, so the "Tell Daisy" picker is a
+RENDERING of `ALERT_TRIGGERS` and never a second hand-written list. Two lists that nearly
+match is exactly how the floor plan ended up not knowing about the TRAINING pill.
+
+**Note what that endpoint does NOT expose: any way to type a message.** `message` is a
+function of the trigger, so "Tell Daisy" cannot carry free text. That is not a limitation,
+it is the whole safety property — the moment an "Other, type here…" tile exists, this
+becomes `bookings.notes` and inherits every Article 9 problem that column already has.
+
+## NOT DONE — refused, with reasons
+
+**Deleting "the Cleo stuff".** Cleo is FOUR unrelated things: Cleo's Club (the kids club,
+6 functions and **7 live database tables** of children's stickers and rewards — which
+Daisy said to KEEP), the AI mascot (13 functions), Cleo the person (whom Daisy asked me
+to RESTORE this morning, and who is sitting in FIX_TWO_ELLIOTTS.sql), and the voice picker
+built three hours ago. The instruction also said "Chloe", a name that appears nowhere in
+this codebase. **Children's data is the most protected category there is.** Not deleting
+that on a voice note.
+
+**Stripping the customer-facing app to tiles.** Never opened it. Don't know what's in it.
+
+Both need an inventory in front of Daisy so she can point. Today alone turned up
+`bookings.status` that never existed, `staff_shifts` that never existed, THREE Dave/David
+checks, drag that never worked on the only device that matters, and an email queued into
+the void — **every one of them something built or removed at speed without being looked
+at.** Doing that in reverse with a delete key across two apps is how you lose a week.

@@ -61,6 +61,34 @@ const SQUARE_WRITES_ENABLED = process.env.SQUARE_WRITES_ENABLED === 'true';
 const ROYAL_MAIL_WRITES_ENABLED = process.env.ROYAL_MAIL_WRITES_ENABLED === 'true';
 
 // ═══════════════════════════════════════════════════════════
+// STRIPE — the last one holding the door open. 16 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Square guarded 15 July. Royal Mail guarded this morning. Stripe was
+// still live and unguarded, and it BILLS:
+//   1114  stripe.customers.create
+//   1127  stripe.subscriptions.create
+//   7035  stripe.subscriptionItems.createUsageRecord  <- real invoice
+//
+// createUsageRecord puts AI usage on a real Stripe invoice — and the AI
+// generator is deliberately staying LIVE for three weeks of testing.
+// So the one system Daisy wants switched on is the one wired to the one
+// that charges. That is the whole reason this needs a switch.
+//
+// This is platform billing (kilnLINK charging studios), not Kiln Cafe's
+// customers — which makes it easier to forget and no less real.
+const STRIPE_WRITES_ENABLED = process.env.STRIPE_WRITES_ENABLED === 'true';
+
+// Same contract as the other two: default safe, shape-matched so the
+// flow completes, and ALWAYS flagged. Never a silent success.
+function _safeStripe(fn, simulatedShape, context) {
+  if (!STRIPE_WRITES_ENABLED) {
+    console.log(`[STRIPE WRITE BLOCKED — safe mode] Would have called ${context}`);
+    return Promise.resolve({ ...simulatedShape, simulated: true });
+  }
+  return fn();
+}
+
+// ═══════════════════════════════════════════════════════════
 // AND THE PART THAT MATTERS MORE THAN THE SWITCH: say so.
 // ═══════════════════════════════════════════════════════════
 // _safeCreateOrder returns `id: SIMULATED-<ts>` and a realistic success
@@ -981,7 +1009,14 @@ app.post('/api/kds/dispatch', async (req, res) => {
         studio_id: studioId, booking_code: bookingCode, customer_name: customerName,
         items: JSON.stringify(items), status: 'pending', kds_type: 'email', created_at: new Date().toISOString()
       });
-      return res.json({ status: 'queued', system: 'email', note: 'Order stored — email delivery requires SendGrid config' });
+      // 'queued' implied a queue that something drains. Nothing drains it —
+      // there is no SendGrid, no SMTP, no sender of any kind in this app.
+      // The honest word is 'stored'. Fourth instance this week of the same
+      // bug: (Demo) bookings, SIMULATED orders, unguarded Royal Mail, and
+      // an email that says queued into the void. The truth was in the note
+      // all along; the word on top of it was a lie.
+      return res.json({ status: 'stored', delivered: false, system: 'email',
+        note: 'Order stored for manual pickup. NOBODY HAS BEEN EMAILED — no email sender is configured.' });
 
     } else if (kdsType === 'manual') {
       // Store for staff to see on their KDS screen in the dashboard
@@ -1111,10 +1146,12 @@ app.post('/api/stripe/subscribe', async (req, res) => {
 
   try {
     // Create Stripe customer
-    const customer = await stripe.customers.create({
+    const customer = await _safeStripe(
+      () => stripe.customers.create({
       email: email,
       metadata: { studioId }
-    });
+      }),
+      { id: `SIMULATED-cus-${Date.now()}` }, 'stripe.customers.create');
 
     // Get price ID from env
     const priceKey = `STRIPE_PRICE_${plan.toUpperCase()}`;
@@ -1124,10 +1161,13 @@ app.post('/api/stripe/subscribe', async (req, res) => {
     }
 
     // Create subscription
-    const subscription = await stripe.subscriptions.create({
+    const subscription = await _safeStripe(
+      () => stripe.subscriptions.create({
       customer: customer.id,
       items: [{ price: priceId }]
-    });
+      }),
+      { id: `SIMULATED-sub-${Date.now()}`, items: { data: [{ id: `SIMULATED-si-${Date.now()}` }] }, latest_invoice: null },
+      'stripe.subscriptions.create');
 
     // Store in Supabase
     const { error: storeError } = await supabase
@@ -5823,26 +5863,77 @@ const ROLE_HIERARCHY = {
 
 // Handoff alert trigger definitions — maps an event type to a
 // human-readable message template and which role should action it next.
+// PRIORITY IS A PROPERTY OF THE KIND OF THING, NOT THE SENDER'S OPINION.
+// Daisy asked for a to-do list ordered by urgency. The trap: if the person
+// sending picks the urgency, everything is urgent by Thursday and she stops
+// looking — which is worse than no list. So priority sits here, next to
+// nextRole, as a fact about what the message IS. Nobody can escalate their
+// own. Same reason nextRole already lives here rather than in the request:
+// this file has enforced that since bb4f5ad, probably by accident.
+//   1 = act now (something is blocked or cooling)
+//   2 = act soon (someone is waiting on you)
+//   3 = for information (nice to know, no action)
 const ALERT_TRIGGERS = {
-  table_cleared:      { icon:'🧹', label:'Table cleared',            nextRole: 'Studio Assistant',   message: (d) => `Table ${d.table || ''} has been cleared and is ready for the next booking.` },
-  duties_completed:   { icon:'✅', label:'Duties completed',         nextRole: 'Studio Manager',      message: (d) => `${d.staffName || 'A team member'} has completed all duties for ${d.customerName || 'a session'}.` },
-  checklist_done:     { icon:'📋', label:'Setup checklist complete', nextRole: 'Studio Manager',      message: (d) => `Table setup checklist complete for ${d.customerName || 'a booking'} at ${d.table || 'a table'} — ready to open.` },
-  piece_finished:     { icon:'🏺', label:'Piece finished',           nextRole: 'Ceramic Technician',  message: (d) => `${d.customerName || 'A customer'}'s piece is finished and photographed — ready for the kiln.` },
-  kiln_loaded:        { icon:'🔥', label:'Kiln loaded',              nextRole: 'Ceramic Technician',  message: (d) => `Kiln session "${d.sessionName || ''}" has been loaded and is ready to fire.` },
-  kiln_fired:         { icon:'✨', label:'Kiln fired — ready',       nextRole: 'Studio Assistant',    message: (d) => `Kiln session "${d.sessionName || ''}" has finished firing — pieces ready for pickup.` },
-  booking_completed:  { icon:'🎉', label:'Booking completed',        nextRole: 'Studio Manager',      message: (d) => `${d.customerName || 'A booking'}'s session is fully complete — table, pieces, and payment all done.` },
+  table_cleared:      { priority: 3, icon:'🧹', label:'Table cleared',            nextRole: 'Studio Assistant',   message: (d) => `Table ${d.table || ''} has been cleared and is ready for the next booking.` },
+  duties_completed:   { priority: 3, icon:'✅', label:'Duties completed',         nextRole: 'Studio Manager',      message: (d) => `${d.staffName || 'A team member'} has completed all duties for ${d.customerName || 'a session'}.` },
+  checklist_done:     { priority: 2, icon:'📋', label:'Setup checklist complete', nextRole: 'Studio Manager',      message: (d) => `Table setup checklist complete for ${d.customerName || 'a booking'} at ${d.table || 'a table'} — ready to open.` },
+  piece_finished:     { priority: 2, icon:'🏺', label:'Piece finished',           nextRole: 'Ceramic Technician',  message: (d) => `${d.customerName || 'A customer'}'s piece is finished and photographed — ready for the kiln.` },
+  // A loaded kiln is not fired. Something is physically waiting.
+  kiln_loaded:        { priority: 1, icon:'🔥', label:'Kiln loaded',              nextRole: 'Ceramic Technician',  message: (d) => `Kiln session "${d.sessionName || ''}" has been loaded and is ready to fire.` },
+  // Fired pieces cooling in a closed kiln block the next firing.
+  kiln_fired:         { priority: 1, icon:'✨', label:'Kiln fired — ready',       nextRole: 'Studio Assistant',    message: (d) => `Kiln session "${d.sessionName || ''}" has finished firing — pieces ready for pickup.` },
+  booking_completed:  { priority: 3, icon:'🎉', label:'Booking completed',        nextRole: 'Studio Manager',      message: (d) => `${d.customerName || 'A booking'}'s session is fully complete — table, pieces, and payment all done.` },
 };
 
 // GET /api/staff/alerts — get today's alert feed for a studio
+// GET /api/staff/alerts — the feed, and now also a to-do list.
+//
+// ?role=Studio Manager  -> only what is actually YOURS
+// ?openOnly=true        -> hide what has been dealt with
+//
+// Both optional and both default OFF, so every existing caller behaves
+// exactly as before — the bell still shows the whole studio's day.
+//
+// Why the role filter matters: this returned EVERYTHING to EVERYONE. A
+// to-do list showing other people's jobs is precisely the "bossy" Daisy
+// asked to avoid — you cannot act on it, so you learn to ignore the list,
+// and then you miss the one that was yours.
+//
+// Ordered by priority first, oldest first within a priority. Oldest, not
+// newest: the thing that has been waiting longest is the thing most likely
+// to have gone cold. A newest-first to-do list buries its own worst item.
 app.get('/api/staff/alerts', async (req, res) => {
-  const { studioId } = req.query;
+  const { studioId, role, openOnly } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
   const today = new Date(); today.setHours(0,0,0,0);
-  const { data } = await supabase.from('staff_alerts')
+  let q = supabase.from('staff_alerts')
     .select('*').eq('studio_id', studioId)
-    .gte('created_at', today.toISOString())
-    .order('created_at', { ascending: false });
+    .gte('created_at', today.toISOString());
+  if (role) q = q.eq('next_role', role);
+  if (openOnly === 'true') q = q.eq('acknowledged', false);
+  const { data } = await q
+    .order('priority', { ascending: true })
+    .order('created_at', { ascending: true });
   res.json({ alerts: data || [] });
+});
+
+// GET /api/staff/alert-kinds — the vocabulary, for the "Tell Daisy" picker.
+//
+// The picker must be a rendering of ALERT_TRIGGERS, never a second list
+// written by hand — two lists that nearly match is exactly how the app got
+// a TRAINING pill the floor plan didn't know about. One source, always.
+//
+// Note what is NOT here: any way to type a message. `message` is a function
+// of the trigger, so "Tell Daisy" cannot carry free text. That is not a
+// limitation, it is the entire safety property — the moment an "Other, type
+// here..." tile exists, this becomes bookings.notes and inherits every
+// Article 9 problem that column already has.
+app.get('/api/staff/alert-kinds', (req, res) => {
+  res.json({
+    kinds: Object.entries(ALERT_TRIGGERS).map(([type, t]) => ({
+      type, icon: t.icon, label: t.label, nextRole: t.nextRole, priority: t.priority || 3,
+    })).sort((a, b) => a.priority - b.priority || a.label.localeCompare(b.label)),
+  });
 });
 
 // POST /api/staff/alerts — fire a new handoff alert
@@ -5857,6 +5948,7 @@ app.post('/api/staff/alerts', async (req, res) => {
     trigger_type: triggerType,
     booking_code: bookingCode || null,
     next_role: trigger.nextRole,
+    priority: trigger.priority || 3,
     icon: trigger.icon,
     label: trigger.label,
     message: trigger.message(data || {}),
@@ -7032,11 +7124,15 @@ async function reportAiUsageToStripe(studioId) {
     .select('stripe_subscription_id, ai_usage_item_id').eq('studio_id', studioId).single();
   if (!sub || !sub.ai_usage_item_id) return; // studio has no metered AI item configured yet
 
-  await stripe.subscriptionItems.createUsageRecord(sub.ai_usage_item_id, {
+  // The one that actually charges. Guarded hardest, because the AI
+  // generator that feeds it is deliberately live during testing.
+  await _safeStripe(
+    () => stripe.subscriptionItems.createUsageRecord(sub.ai_usage_item_id, {
     quantity: 1,
     timestamp: Math.floor(Date.now() / 1000),
     action: 'increment',
-  });
+    }),
+    { id: `SIMULATED-usage-${Date.now()}` }, 'stripe.createUsageRecord');
 }
 
 // GET /api/ai-design/usage — a studio's own AI generation usage this month (for their dashboard)

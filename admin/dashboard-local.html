@@ -8382,7 +8382,47 @@ async function loadAlertSettings() {
   } catch(e) { /* silent, use defaults */ }
 }
 
+// ═══════════════════════════════════════════════════════════
+// THE NAGGING POPUP IS PARKED. 16 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Daisy: "the other alert system we have in place is archaic and silly,
+// strip that out and instigate this with all connections."
+//
+// FIRST, THE IMPORTANT CORRECTION: there are not two alert systems.
+// fireHandoffAlert() and pollHandoffAlerts() BOTH talk to
+// /api/staff/alerts — the same ALERT_TRIGGERS machinery Daisy wants to
+// keep and build "Tell Daisy" on. Stripping "the alert system" out would
+// have deleted the good one.
+//
+// What is archaic is the FACE it wears: a modal that covers your work,
+// FLASHES, and re-nags on a timer you tune with a slider. That is the
+// exact "bossy" she rejected in the idle-timer conversation an hour
+// earlier, and the same instinct — interrupt rather than ask.
+//
+// The calm face of the identical data already exists and always did:
+// the 🔔 bell, toggleAlertFeed(), renderAlertFeed(), the badge. Same
+// alerts, no flashing, waits until you look.
+//
+// PARKED, NOT DELETED, and deliberately:
+//   • applyAlertFlashing() is SHARED — #handoff-alert-card AND
+//     #task-card-card (~12574). Deleting it breaks a task-card system
+//     nobody has traced. So it stays; it just never gets called from here.
+//   • This is the pattern this repo already uses everywhere: Dave
+//     deactivated not deleted, platform revenue behind one flag, the
+//     opening checklist behind one commented line. One line back.
+//
+// Set to true and the popup returns exactly as it was.
+const HANDOFF_POPUP_ENABLED = false;
+
 function showNextHandoffPopup() {
+  if (!HANDOFF_POPUP_ENABLED) {
+    // Drain the queue so alerts are still marked seen and the badge is
+    // right — the bell is now the only face, and it is already correct.
+    alertPopupQueue.length = 0;
+    currentPopupAlert = null;
+    updateAlertBellBadge();
+    return;
+  }
   if (!alertPopupQueue.length) { currentPopupAlert = null; return; }
   currentPopupAlert = alertPopupQueue.shift();
   handoffRepeatCount = 0;
