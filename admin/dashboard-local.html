@@ -10085,17 +10085,19 @@ function _sessionTimerDisplay(booking, now) {
 let _floorRoomFilter = 'all';
 
 function filterFloorByRoom(room) {
+  // This function belonged to the OLD dark floor plan which had room tabs
+  // at the top. The elegant floor plan replaced it — rooms are shown as
+  // hand-drawn sections, tapping a room calls showRoomElegant(), not this.
+  // BUT: the old HTML tab buttons still exist in the DOM and still call
+  // filterFloorByRoom(), which called renderFloorPlan() (the dark renderer).
+  // That is what put the dark screen back — tapping a room tab triggered
+  // the old system. Fixed: route to the elegant renderer instead.
   _floorRoomFilter = room;
-  // Update tab styles
-  ['all','Main Studio','Lounge','The Vault'].forEach(r => {
-    const id = r === 'all' ? 'floor-tab-all' : r === 'Main Studio' ? 'floor-tab-main' : r === 'Lounge' ? 'floor-tab-lounge' : 'floor-tab-vault';
-    const el = document.getElementById(id);
-    if (!el) return;
-    const active = r === room;
-    el.style.background = active ? '#B87946' : 'rgba(255,255,255,0.15)';
-    el.style.color = active ? 'white' : 'rgba(255,255,255,0.8)';
-  });
-  renderFloorPlan();
+  if (room === 'all') {
+    renderFloorPlanElegant();
+  } else {
+    showRoomElegant(room);
+  }
 }
 
 // Flow checklist definitions per stage
