@@ -10392,7 +10392,7 @@ function _renderArrivals(unseated) {
         letter-spacing:0.06em;margin:0 0 8px;opacity:0.6;">
         Arriving — not seated yet${_seatingBooking ? ' · now tap a table' : ''}
       </h2>
-      <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;max-width:100%;">
+      <div style="display:flex;flex-direction:column;gap:8px;width:100%;">
         ${unseated.sort((a,b) => (a.session_start||'').localeCompare(b.session_start||'')).map(b => {
           const on = _seatingBooking === b.booking_code;
           // Square's service name is the only clue to the room. Ours wins if set.
@@ -10400,7 +10400,7 @@ function _renderArrivals(unseated) {
           return `<button onclick="_startSeating('${b.booking_code}')"
             style="flex-shrink:0;text-align:left;background:${on ? '#2B2724' : '#FFFDF9'};
             color:${on ? '#FFFDF9' : '#2B2724'};border:1.5px ${on ? 'solid #2B2724' : 'dashed rgba(43,39,36,0.3)'};
-            border-radius:12px;padding:10px 13px;cursor:pointer;min-width:132px;max-width:calc(100vw - 48px);box-sizing:border-box;">
+            border-radius:12px;padding:10px 13px;cursor:pointer;width:100%;box-sizing:border-box;text-align:left;">
             <div style="font-family:'Caveat',cursive;font-size:19px;font-weight:700;">${b.customer_name || 'Booking'}</div>
             <div style="font-size:11px;opacity:0.75;">${t(b)}${b.party_size ? ` · ${b.party_size} covers` : ''}</div>
             ${where ? `<div style="font-size:10px;opacity:0.6;margin-top:2px;">${where}</div>` : ''}
