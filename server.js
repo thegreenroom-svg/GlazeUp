@@ -5298,17 +5298,29 @@ app.get('/api/floor/active', async (req, res) => {
     const closeTime = new Date(today); closeTime.setHours(16,0,0,0);
 
     // ── 1. Our own bookings ──
+    // Was cut off with a rough "last 4 hours" guess, unrelated to when a
+    // booking actually finishes. Now uses the booking's own real
+    // session_end: a two-hour session shows for two hours, a thirty-
+    // minute one for thirty — exactly the booking system's own timing,
+    // not an arbitrary window. session_end can be null on older/legacy
+    // rows, so those fall back to session_start + 2h rather than being
+    // silently dropped or shown forever.
     let ownBookings = [];
     try {
+      const nowIso = new Date().toISOString();
       const { data, error } = await supabase.from('bookings')
-        .select('booking_code,customer_name,table_number,current_stage,session_start,party_size,status,booking_type')
+        .select('booking_code,customer_name,table_number,current_stage,session_start,session_end,party_size,status,booking_type')
         .eq('studio_id', studioId)
         .gte('session_start', today.toISOString())
         .lt('session_start', tomorrow.toISOString())
         .not('status', 'eq', 'cancelled')
-        .not('status', 'eq', 'completed')   // completed bookings clear from the floor plan
-        .gt('session_start', new Date(Date.now() - 4*60*60*1000).toISOString());  // only last 4 hours + future
-      if (!error) ownBookings = data || [];
+        .not('status', 'eq', 'completed');   // completed bookings clear from the floor plan
+      if (!error) {
+        ownBookings = (data || []).filter(b => {
+          const end = b.session_end || new Date(new Date(b.session_start).getTime() + 2 * 60 * 60 * 1000).toISOString();
+          return end >= nowIso; // still within its real booked window — not yet ended
+        });
+      }
     } catch(e) { console.warn('bookings query failed:', e.message); }
 
     // ── 2. Assignments ──
@@ -5358,8 +5370,13 @@ app.get('/api/floor/active', async (req, res) => {
     let squareLiveBookings = [];
 
     // ── 5. Merge ──
+    // is_live: has this booking's actual scheduled time begun? The
+    // client uses this to show the table in red the moment its real
+    // session starts — not on a guess, on the booking's own timing.
+    const nowIso2 = new Date().toISOString();
     const ownMapped = ownBookings.map(b=>({
       ...b,
+      is_live: b.session_start <= nowIso2,
       assignments: assignMap[b.booking_code]||[],
       checks: checkMap[b.booking_code]||{}
     }));

@@ -10230,7 +10230,11 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable) {
   const tableEls = placed.map(t => {
     const b = bookingByTable[t.name];
     const busy = !!b;
-    const accent = busy ? (STAGE_COLOURS[b.current_stage] || INK) : INK;
+    // A booking that has genuinely reached its own scheduled start time
+    // goes red, regardless of stage — the clearest possible "this is
+    // meant to be happening right now" signal. Server computes is_live
+    // from the real session_start, not a guess.
+    const accent = busy ? (b.is_live ? '#e53935' : (STAGE_COLOURS[b.current_stage] || INK)) : INK;
     const seed = _seedFrom(t.id || t.name);
 
     // TRAINING DATA MUST LOOK LIKE TRAINING DATA.

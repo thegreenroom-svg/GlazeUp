@@ -4097,3 +4097,49 @@ cancelled/rescheduled appointments), not a quick fix to bolt on blind.
 now only shows genuine bookings from our own table, hand-drawn rooms and tables
 render, tapping a table opens the real booking panel, login navigates there
 correctly. This is the most complete, correct state the app has been in tonight.
+
+## Booking window now matches the real booking, not a rough guess
+
+Daisy: bookings should cut off at the end of their actual slot and go live/red at
+the actual start, not on a rough heuristic.
+
+**Fixed properly**, using `bookings.session_end` (a real, existing column that was
+simply never read here): a booking now shows on the floor plan for exactly its own
+real duration — a 30-minute slot for 30 minutes, a 2-hour one for 2 hours — not the
+old flat "last 4 hours" guess. Rows with no `session_end` (older/legacy bookings)
+fall back to `session_start + 2h` rather than being dropped or shown forever.
+
+**"Live and red at the actual start"**: server now computes `is_live` per booking
+(`session_start <= now`). Client-side, a live booking's table goes red
+(`#e53935`) regardless of its stage — the clearest possible "this is meant to be
+happening right now" signal, distinct from the stage-colour system.
+
+## Square terminal table-shorthand idea — designed, not built tonight
+
+Daisy's idea: staff type rough, inconsistent table references at the Square
+terminal ("L12" for Lounge 12, "7" for Main Studio, "Party", "Vault" and
+nicknames) — she wants the learning engine to learn to parse these, falling back
+to time-slot correlation when unsure.
+
+**This is a sound idea, and genuinely different from the bug just fixed** — that
+was inventing phantom bookings from till sales; this would be using a sale's table
+reference to help confirm which table an EXISTING booking is at. But it needs real
+examples of what staff actually type before writing any parsing logic — inventing
+patterns blind, right after removing a different Square merge for exactly that
+kind of unfounded assumption, risks the same mistake with new code.
+
+**Not built tonight, on purpose.** The right shape for it, for next session:
+- A small parser attempting common patterns (letter+number, known room keywords)
+  returning a candidate match or nothing — never guessing past its confidence.
+- Log every (raw terminal text) → (confirmed real table) pair when a human
+  corrects or confirms a match — this is exactly what the existing learning
+  engine tables are for.
+- Surface only as a SUGGESTION (`studio_suggestions`, already built) for a human
+  to confirm — never auto-assigned live on the floor plan. That's the lesson from
+  tonight's actual bug: guessed data must never be presented as real data.
+- Time-slot correlation as the fallback when no pattern matches, exactly as
+  Daisy described.
+
+Ask Daisy for a week or two of real examples of what staff actually type at the
+till before writing the parser — anything else is guessing at a business's own
+shorthand from the outside.
