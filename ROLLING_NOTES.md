@@ -3366,3 +3366,106 @@ depends on what that endpoint is for, and guessing is what caused this note.
 **The lesson, restated because I am the one who needed it:** grep for the table before
 writing SQL against it. `grep -rn "from('staff_shifts')" --include=*.sql .` would have
 taken four seconds and returned nothing.
+
+# ═══════════════════════════════════════════════════════════
+# 16 July 2026 — the safety session. Royal Mail, honest simulation,
+# ask-don't-yank, personal pages for everyone, touch-native reorder.
+# ═══════════════════════════════════════════════════════════
+
+## Royal Mail could buy real postage. It can't now.
+
+Square got a safety switch on 15 July. **Royal Mail never did**, and Royal Mail is the
+one that spends money. Three live endpoints POSTing straight to
+`api.parcel.royalmail.com`:
+
+    /api/bookings/:code/create-royal-mail-label
+    /api/hbp/orders/:id/create-royal-mail-label
+    /api/hbp/orders/:id/return-label
+
+No switch, no interception. And there is **no ROYALMAIL env var anywhere** — the key
+comes out of the database, so the moment Royal Mail is configured in Setup those are
+live. Three weeks of testing, with big friendly tiles staff are encouraged to press, and
+one of those tiles buys postage.
+
+`_safeRoyalMailFetch()` mirrors `_safeCreateOrder` exactly. `ROYAL_MAIL_WRITES_ENABLED`,
+default false. **All 5 Royal Mail calls now route through it; 0 unguarded.** GETs pass
+straight through — only writes are intercepted.
+
+## THE RULE: never claim to have done something we didn't.
+
+`_safeCreateOrder` returned `id: SIMULATED-<ts>` plus a realistic success, so "nothing in
+the demo looks broken". Correct for a demo. **Wrong for a real test:** staff tap "send to
+till", get a tick, walk away. Nothing was sent.
+
+**`SIMULATED` appeared exactly once in the entire codebase — where it was created.**
+Nothing read it. Nothing showed it.
+
+**That is the same bug, for the THIRD time:**
+
+| marker in the data | screen never showed it |
+|---|---|
+| `(Demo)` bookings | elegant floor plan lacked the pill → the WI passed for real for days |
+| `SIMULATED-` orders | no UI read it → a blocked order looked sent |
+| Royal Mail | no marker at all → a real label, silently |
+
+Fixed: every simulated call returns an explicit top-level `simulated: true`, and both
+Square endpoints now return `status: 'simulated'` rather than `'sent'` when it wasn't.
+**Silent success is worse than silent failure, because failure gets investigated.**
+
+**NEW: `GET /api/safety`** — one switch, one indicator. Any tile can ask "am I live?"
+BEFORE it is pressed rather than after. Reports square/royalMail/ai mode. Deliberately
+unauthenticated and secret-free: it reports whether writes are on, never a key.
+
+## Ask, don't yank
+
+Daisy's idea, and better than what it replaced. `RETURN_TO_FLOOR_MS` was 60s, then 5min,
+and both times I said it was a guess. **The reason it had to be a guess is that taking
+someone's screen away is rude** — so the number must be long enough to never interrupt,
+which makes it too long to be useful. A question at 90s costs nothing. A silent yank at
+90s is a bug. Ask, and the number stops mattering.
+
+    90s    ask: "Still with Table 4?" — Yes / floor plan / somewhere else
+    +45s   no answer -> home on its own (the iPad was put down)
+    15min  splash + re-login (shared device)
+
+Three guards, or it becomes the thing it prevents: never over an open modal (checked by
+real visibility, not a list that would rot), never while an input is focused, and an
+interaction dismisses it implicitly — a nag gets dismissed reflexively, which is worse
+than silence.
+
+## Everyone gets their own page. The shared grid retires itself.
+
+The square tile selector was never a screen — it is `showGridNav()`'s fallback when
+`_personalScreen.tileOrder.length === 0`. So "do away with it" = make sure everyone
+always has a personal screen, and it simply never renders. Nothing deleted.
+
+**THIRD Dave/David special-case found, in `loadPersonalHomeScreen()`:**
+
+    if (firstName === 'david') return;   // "has a dedicated page"
+
+The dedicated page was removed on 15 July per direct instruction. This survived it — so
+David got **no personal screen at all** and fell straight through to the shared grid.
+And `ROLE_HOME_DEFAULTS['Barista']` was `tileOrder: []`, which is not "no grid needed" —
+an empty default **guarantees** the fallback. Given real defaults (menu, bookings, team
++ staff).
+
+Verified every role seeds: David/Barista 3, Lucy 3, Ruby 4, Daisy 8, unknown role 4.
+**Nobody reaches the shared grid.**
+
+## Drag never worked on the device this app runs on
+
+Tiles used `draggable="true"` + dragstart/drop. **iOS Safari does not fire drag events
+from touch.** So on the one device that matters, dragging silently did nothing.
+
+This file learned that on 15 July for the stage checklists — *"tap ▲▼ to reorder, not
+drag; touchscreen drag-and-drop is exactly the class of thing that fails silently"* — and
+the lesson never came back here. `_movePersonalTile()` with ◀ ▶ arrows. Undo still works.
+Deliberately refuses to swap across `tileOrder`/`promotedTiles`, since that would
+silently promote or demote a tile, which is not what an arrow means.
+
+## NOT DONE, and deliberately
+
+**"Tiles everywhere and nothing else"** is a rebuild of every screen. It wants the ten
+scenarios and the flow design FIRST, then building against it — not jammed in behind six
+other changes at the end of a session. That is precisely the pattern that produced five
+silent bugs this week. Next session, design first.

@@ -43,12 +43,73 @@ const { Client, Environment } = require('square');
 // ═══════════════════════════════════════════════════════════
 const SQUARE_WRITES_ENABLED = process.env.SQUARE_WRITES_ENABLED === 'true';
 
+// ═══════════════════════════════════════════════════════════
+// ROYAL MAIL — the same guard, added 16 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Square got a safety switch on 15 July. Royal Mail did not, and it is
+// the one that spends money: /api/bookings/:code/create-royal-mail-label,
+// /api/hbp/orders/:id/create-royal-mail-label and
+// /api/hbp/orders/:id/return-label all POST straight to
+// api.parcel.royalmail.com and buy real postage on the real account.
+// There is no ROYALMAIL env var anywhere — the key comes out of the
+// database, so the moment Royal Mail is configured in Setup those
+// endpoints are live. During a three-week test, with big friendly tiles
+// staff are encouraged to press, one of those tiles buys postage.
+//
+// Default is safe, exactly like Square: unless ROYAL_MAIL_WRITES_ENABLED
+// is explicitly 'true', the POST never leaves the building.
+const ROYAL_MAIL_WRITES_ENABLED = process.env.ROYAL_MAIL_WRITES_ENABLED === 'true';
+
+// ═══════════════════════════════════════════════════════════
+// AND THE PART THAT MATTERS MORE THAN THE SWITCH: say so.
+// ═══════════════════════════════════════════════════════════
+// _safeCreateOrder returns `id: SIMULATED-<ts>` and a realistic success
+// so "nothing in the demo looks broken". Correct for a demo. WRONG for a
+// real test: a member of staff taps "send to till", gets a tick, and
+// walks away believing it went through. It didn't.
+//
+// `SIMULATED` appears exactly once in this entire codebase — where it is
+// created. Nothing reads it. Nothing shows it. That is the same bug as
+// the "(Demo)" bookings the elegant floor plan never marked, and it is
+// worse, because silent SUCCESS never gets investigated.
+//
+// So every simulated call returns an explicit `simulated: true` that the
+// UI is obliged to render. Not a hidden id prefix anyone can miss.
+// THE RULE: the app must never claim to have done something it didn't.
+function _safeRoyalMailFetch(url, options, context) {
+  if (!ROYAL_MAIL_WRITES_ENABLED && (options?.method || 'GET').toUpperCase() !== 'GET') {
+    console.log(`[ROYAL MAIL WRITE BLOCKED — safe mode] Would have called ${url} (${context})`);
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      _simulated: true,
+      json: async () => ({
+        simulated: true,
+        createdOrders: [{ orderIdentifier: `SIMULATED-${Date.now()}`, orderReference: `SIMULATED-${context}` }],
+        // Shape-matched to a real Royal Mail response so the tile flow
+        // completes — but flagged, so the tile can say what it did.
+        errors: [], successCount: 1, errorsCount: 0,
+      }),
+      text: async () => 'SIMULATED — no Royal Mail order was created.',
+      arrayBuffer: async () => new ArrayBuffer(0),
+    });
+  }
+  return fetch(url, options);
+}
+
 function _safeCreateOrder(squareClient, orderPayload, context) {
   if (!SQUARE_WRITES_ENABLED) {
     console.log(`[SQUARE WRITE BLOCKED — safe mode] Would have sent an order (${context}):`,
       JSON.stringify(orderPayload.order?.lineItems || []));
+    // `simulated: true` is explicit and top-level, NOT just a prefix
+    // buried in the id. The old version returned SIMULATED-<ts> and
+    // nothing anywhere ever read it — grep the repo, it appeared once,
+    // where it was created. A blocked order looked exactly like a sent
+    // one, so a member of staff taps "send to till", gets a tick, and
+    // walks away. THE RULE: never claim to have done something we didn't.
     return Promise.resolve({
-      result: { order: { id: `SIMULATED-${Date.now()}`, state: 'OPEN' } }
+      simulated: true,
+      result: { order: { id: `SIMULATED-${Date.now()}`, state: 'OPEN', simulated: true } }
     });
   }
   return squareClient.ordersApi.createOrder(orderPayload);
@@ -706,7 +767,11 @@ app.post('/api/kds/order', async (req, res) => {
     });
 
     const orderId = orderRes.result.order?.id;
-    res.json({ status: 'sent', orderId, locationId });
+    // 'sent' when it was sent; 'simulated' when it wasn't. The client
+    // renders this verbatim, so the tile cannot show a tick for a thing
+    // that never left the building.
+    res.json({ status: orderRes.simulated ? 'simulated' : 'sent',
+               simulated: orderRes.simulated === true, orderId, locationId });
 
   } catch (err) {
     console.error('KDS order error:', err);
@@ -891,7 +956,9 @@ app.post('/api/kds/dispatch', async (req, res) => {
         order: { locationId, lineItems, referenceId: bookingCode || undefined, note: `kilnLINK · ${customerName || bookingCode || 'Customer'}`, state: 'OPEN' },
         idempotencyKey: `klnk-${bookingCode || 'wk'}-${Date.now()}`,
       }, 'kds webhook path');
-      return res.json({ status: 'sent', system: 'square', orderId: orderRes.result.order?.id });
+      return res.json({ status: orderRes.simulated ? 'simulated' : 'sent',
+                        simulated: orderRes.simulated === true,
+                        system: 'square', orderId: orderRes.result.order?.id });
 
     } else if (kdsType === 'webhook' && config.webhook_url) {
       // POST order as JSON to the studio's own webhook endpoint
@@ -4838,7 +4905,7 @@ app.post('/api/studio/test-royal-mail-connection', async (req, res) => {
 
   try {
     const testRef = `KLNK-TEST-${Date.now()}`;
-    const orderRes = await fetch('https://api.parcel.royalmail.com/api/v1/Orders', {
+    const orderRes = await _safeRoyalMailFetch('https://api.parcel.royalmail.com/api/v1/Orders', {
       method: 'POST',
       headers: { 'Authorization': returnAddress.royal_mail_oba_api_key, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -4867,7 +4934,7 @@ app.post('/api/studio/test-royal-mail-connection', async (req, res) => {
 
     // Now genuinely attempt to fetch the label — this is the real test,
     // the part that's documented to fail on some account tiers.
-    const labelRes = await fetch(`https://api.parcel.royalmail.com/api/v1/orders/label?orderIdentifiers=${orderIdentifier}&documentType=postageLabel`, {
+    const labelRes = await _safeRoyalMailFetch(`https://api.parcel.royalmail.com/api/v1/orders/label?orderIdentifiers=${orderIdentifier}&documentType=postageLabel`, {
       headers: { 'Authorization': returnAddress.royal_mail_oba_api_key },
     });
 
@@ -4905,7 +4972,7 @@ app.post('/api/bookings/:bookingCode/create-royal-mail-label', async (req, res) 
   if (!booking.shipping_postcode) return res.status(400).json({ error: 'No shipping address saved for this booking yet.' });
 
   try {
-    const rmRes = await fetch('https://api.parcel.royalmail.com/api/v1/Orders', {
+    const rmRes = await _safeRoyalMailFetch('https://api.parcel.royalmail.com/api/v1/Orders', {
       method: 'POST',
       headers: { 'Authorization': returnAddress.royal_mail_oba_api_key, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -4997,7 +5064,7 @@ app.post('/api/hbp/orders/:orderId/create-royal-mail-label', async (req, res) =>
   const weightIsHonestPlaceholder = !order.product?.weight_confirmed;
 
   try {
-    const rmRes = await fetch('https://api.parcel.royalmail.com/api/v1/Orders', {
+    const rmRes = await _safeRoyalMailFetch('https://api.parcel.royalmail.com/api/v1/Orders', {
       method: 'POST',
       headers: { 'Authorization': returnAddress.royal_mail_oba_api_key, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -5143,7 +5210,7 @@ app.post('/api/hbp/orders/:orderId/return-label', async (req, res) => {
   };
 
   try {
-    const rmRes = await fetch('https://api.parcel.royalmail.com/api/v1/orders', {
+    const rmRes = await _safeRoyalMailFetch('https://api.parcel.royalmail.com/api/v1/orders', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${rm.apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(returnLabelPayload)
@@ -9681,6 +9748,29 @@ app.post('/api/pieces/:pieceId/undo-auto-match', async (req, res) => {
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
+});
+
+// GET /api/safety — which outside systems can this studio actually touch?
+//
+// So a tile can say what it will do BEFORE it is pressed, rather than
+// after. One switch, one indicator, everywhere: if the studio is in test
+// mode, every tile that would reach the outside world says so on its face.
+//
+// Deliberately unauthenticated and free of secrets — it reports whether
+// writes are on, never a key. Anyone who can load the app can know
+// whether their tap is real, which is the entire point.
+app.get('/api/safety', (req, res) => {
+  res.json({
+    square:    { writes: SQUARE_WRITES_ENABLED,     mode: SQUARE_WRITES_ENABLED     ? 'live' : 'simulated' },
+    royalMail: { writes: ROYAL_MAIL_WRITES_ENABLED, mode: ROYAL_MAIL_WRITES_ENABLED ? 'live' : 'simulated' },
+    // The AI generator is deliberately live during testing — it is the
+    // one outside system Daisy wants real, and it costs pennies rather
+    // than postage. Reported for completeness, not as a warning.
+    ai:        { live: !!process.env.OPENAI_API_KEY, mode: process.env.OPENAI_API_KEY ? 'live' : 'off' },
+    // Reads are always real. The floor plan, takings and stock are the
+    // studio's actual data and always have been.
+    reads: 'live',
+  });
 });
 
 // GET /api/version — what is actually deployed.

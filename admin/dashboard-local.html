@@ -10860,9 +10860,13 @@ function _updateNavControls() {
 // screen exists yet. Sub-tile tab IDs can be included as promoted tiles.
 const ROLE_HOME_DEFAULTS = {
   'Barista': {
-    // David has his own dedicated page — no tile grid needed
-    tileOrder: [],
-    promotedTiles: []
+    // Was tileOrder: [] with the comment "David has his own dedicated page —
+    // no tile grid needed". That page is gone, and an EMPTY tileOrder is not
+    // "no grid needed" — showGridNav() falls back to the shared selector when
+    // tileOrder.length === 0, so an empty default guaranteed the one screen we
+    // are trying to retire. A real barista's day is drinks and the floor.
+    tileOrder: ['menu', 'bookings', 'team'],
+    promotedTiles: ['staff']
   },
   'Ceramic Technician': {
     // Lucy's world is fired pieces — matching, labels, kiln, stock
@@ -10892,8 +10896,19 @@ let _personalEditMode = false;
 
 async function loadPersonalHomeScreen() {
   if (!currentShiftStaff || !studioId) return;
-  // Barista (David) has a dedicated page — skip the personal grid entirely
-  if (currentShiftStaff.name?.trim().split(' ')[0].toLowerCase() === 'david') return;
+  // The David early-return is GONE (16 July 2026). It read:
+  //   if (firstName === 'david') return;   // "has a dedicated page"
+  // That dedicated page — barista-view — no longer routes to anyone; the
+  // hardcoded name checks that sent him there were removed on 15 July per
+  // direct instruction ("I'm the same as everyone else"). This one survived
+  // them, so David got NO personal screen at all and fell straight through
+  // to the shared tile grid — the exact screen Daisy wants gone.
+  //
+  // THIRD instance of the Dave/David confusion in this one file: applyShiftUI
+  // routed him to the barista page, goToRealLandingPage did too, and this
+  // silently denied him a home screen. Dave was the barista and has been
+  // removed from the team. David is the co-director. Nobody gets special-cased
+  // by first name any more.
 
   try {
     const res = await fetch(`${API_URL}/api/staff/${currentShiftStaff.id}/home-screen?studioId=${studioId}`);
@@ -10972,13 +10987,17 @@ function showPersonalHomeScreen() {
       onpointerdown="_startLongPress(${i})"
       onpointerup="_cancelLongPress()"
       onpointercancel="_cancelLongPress()"
-      ${_personalEditMode ? `draggable="true" ondragstart="_pDragStart(event,${i})" ondragover="_pDragOver(event,${i})" ondrop="_pDrop(event,${i})" ondragend="_pDragEnd(event)"` : ''}
+      ${/* drag attributes removed — iOS Safari never fired them. See _movePersonalTile. */ ''}
       class="glaze-tile tile-landing ${wobble} ${pulse}"
       style="background:${color};filter:brightness(${brightness});color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;animation-delay:${i * 0.035}s;position:relative;">
       <div style="font-size:${isGroup ? '19px' : '15px'};font-weight:800;line-height:1.2;">${label}</div>
       ${desc ? `<div style="font-size:10px;opacity:0.85;margin-top:5px;line-height:1.3;">${desc}</div>` : ''}
       ${hasSuggestion && !_personalEditMode ? '<div style="position:absolute;top:6px;right:6px;width:8px;height:8px;background:#2e7d32;border-radius:50%;border:2px solid white;"></div>' : ''}
       ${_personalEditMode ? '<div style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;background:#e53935;border-radius:50%;font-size:11px;font-weight:800;color:white;display:flex;align-items:center;justify-content:center;">✕</div>' : ''}
+      ${_personalEditMode ? `<div style="position:absolute;bottom:4px;left:0;right:0;display:flex;justify-content:center;gap:10px;">
+        <span onclick="_movePersonalTile(${i},-1,event)" style="width:26px;height:26px;background:rgba(0,0,0,0.35);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;">◀</span>
+        <span onclick="_movePersonalTile(${i},1,event)" style="width:26px;height:26px;background:rgba(0,0,0,0.35);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;">▶</span>
+      </div>` : ''}
     </button>`;
   }).join('');
 
@@ -11014,6 +11033,45 @@ function _buildPersonalItems() {
     });
   });
   return items;
+}
+
+// ═══════════════════════════════════════════════════════════
+// TOUCH-NATIVE REORDER. 16 July 2026.
+// ═══════════════════════════════════════════════════════════
+// The tiles used draggable="true" + dragstart/dragover/drop. iOS Safari
+// DOES NOT FIRE DRAG EVENTS FROM TOUCH. So on the one device this app is
+// actually used on, dragging silently did nothing — and silently doing
+// nothing looks exactly like the app ignoring you.
+//
+// This file already learned this, on 15 July, for the stage checklists:
+//   "Deliberate substitution: tap ▲▼ to reorder, not drag. Touchscreen
+//    drag-and-drop is exactly the class of thing that fails silently and
+//    can't be verified without a device."
+// That lesson was applied there and never came back here. Applying it now.
+//
+// ◀ ▶ arrows on each tile in edit mode. Same outcome, works on glass,
+// and — unlike drag — you can see the affordance without discovering it.
+function _movePersonalTile(index, dir, ev) {
+  if (ev) ev.stopPropagation();   // must not also fire the tile's remove
+  const items = _buildPersonalItems();
+  const target = index + dir;
+  if (target < 0 || target >= items.length) return;
+  _layoutSnapshot();              // undo still works, same as drag did
+
+  // tileOrder and promotedTiles are two lists rendered as one grid, so a
+  // move is only meaningful WITHIN a list. Swapping across them would
+  // silently promote or demote a tile, which is not what an arrow means.
+  const a = items[index], b = items[target];
+  const listOf = (it) => it.type === 'group' ? _personalScreen.tileOrder : _personalScreen.promotedTiles;
+  const idOf   = (it) => it.type === 'group' ? it.group.id : it.sub.tab;
+  if (listOf(a) !== listOf(b)) return;   // different lists — not a swap
+
+  const list = listOf(a);
+  const ia = list.indexOf(idOf(a)), ib = list.indexOf(idOf(b));
+  if (ia < 0 || ib < 0) return;
+  list[ia] = idOf(b); list[ib] = idOf(a);
+  savePersonalHomeScreen();
+  showPersonalHomeScreen();
 }
 
 function _personalTileTap(index) {
@@ -21980,19 +22038,89 @@ resetIdleTimer();
 // behind it rather than another opinion. If staff are still being
 // interrupted, raise it; the number is meant to be tuned, not defended.
 const RETURN_TO_FLOOR_MS = 5 * 60 * 1000;
-let _returnToFloorTimer = null;
+
+// ═══════════════════════════════════════════════════════════
+// ASK, DON'T YANK. 16 July 2026, per direct request:
+// "if you're just idle, pops up after a while and says, are you still
+//  in this workflow, or would you like to rest for a while."
+// ═══════════════════════════════════════════════════════════
+// This is a better idea than what it replaces, and it fixes a problem
+// I could not solve. RETURN_TO_FLOOR_MS was 60s, then 5 minutes, and I
+// said both times it was a guess. The reason it HAD to be a guess is
+// that taking someone's screen away is rude — so the number has to be
+// long enough to never interrupt anyone, which makes it too long to be
+// useful. A polite question at 90 seconds costs nothing. A silent yank
+// at 90 seconds is a bug. Ask, and the number stops mattering.
+//
+// The ladder, three rungs:
+//   90s   ask: still on this? / floor plan / somewhere else
+//   +45s  no answer -> go home on its own (the iPad was put down)
+//   15min splash + re-login (shared device, someone else picks it up)
+const ASK_IDLE_MS = 90 * 1000;        // ask
+const ASK_GRACE_MS = 45 * 1000;       // then act, if nobody answers
+let _askIdleTimer = null, _askGraceTimer = null, _askShownAt = 0;
+
+function _dismissIdleAsk(stay) {
+  document.getElementById('idle-ask-card')?.remove();
+  clearTimeout(_askGraceTimer);
+  if (stay) resetReturnToFloorTimer();   // "yes I'm here" restarts the clock
+}
+
+function showIdleAsk() {
+  if (document.getElementById('idle-ask-card')) return;
+  if (!currentShiftStaff) return;                       // nobody on shift
+  if (_floorViewMode === 'plan' && currentTab === 'floor-plan') return;  // already home
+  // NEVER interrupt someone mid-task who simply isn't touching the glass.
+  // Checked by real visibility, not a hand-maintained list that would rot
+  // the first time a modal was added.
+  if ([...document.querySelectorAll('[id*="modal"]')].some(m => m.offsetParent !== null)) return;
+  // Never while typing — an input focused means they are working.
+  const ae = document.activeElement;
+  if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;
+
+  // What are they actually on? Name it, so the question is about their
+  // work rather than about the app.
+  const where = _detailBooking?.table_number ? `Table ${String(_detailBooking.table_number).replace(/^Table /i,'')}`
+              : (STAGE_LABELS[currentTab] || null);
+  _askShownAt = Date.now();
+
+  const card = document.createElement('div');
+  card.id = 'idle-ask-card';
+  card.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));' +
+    'z-index:9700;background:#FFFDF9;border:1px solid rgba(43,39,36,0.18);border-radius:16px;' +
+    'box-shadow:0 10px 34px rgba(43,39,36,0.22);padding:16px;max-width:520px;margin:0 auto;';
+  // Plain and slightly warm, never chirpy — it fires when someone is busy.
+  card.innerHTML = `
+    <div style="font-family:'Caveat',cursive;font-size:24px;color:#2B2724;">
+      ${where ? `Still with ${where}?` : 'Still on this?'}
+    </div>
+    <div style="font-size:12px;color:#8a8175;margin:2px 0 12px;">
+      Nothing's changed here for a couple of minutes.
+    </div>
+    <button onclick="_dismissIdleAsk(true)" class="glaze-tile"
+      style="width:100%;border:none;border-radius:12px;padding:13px;font-size:14px;font-weight:800;
+      cursor:pointer;margin-bottom:7px;">Yes — I'm still on this</button>
+    <button onclick="_dismissIdleAsk(false); goToTab('floor-plan');"
+      style="width:100%;background:#F4ECE0;border:1px solid rgba(43,39,36,0.15);border-radius:12px;
+      padding:13px;font-size:14px;font-weight:700;color:#2B2724;cursor:pointer;margin-bottom:7px;">
+      Back to the floor plan</button>
+    <button onclick="_dismissIdleAsk(false); showGridNav();"
+      style="width:100%;background:none;border:1px solid rgba(43,39,36,0.15);border-radius:12px;
+      padding:11px;font-size:13px;font-weight:600;color:#8a8175;cursor:pointer;">
+      Somewhere else</button>`;
+  document.body.appendChild(card);
+
+  // If nobody answers, the iPad was put down. Go home quietly.
+  _askGraceTimer = setTimeout(() => { _dismissIdleAsk(false); goToTab('floor-plan'); }, ASK_GRACE_MS);
+}
+
 function resetReturnToFloorTimer() {
-  clearTimeout(_returnToFloorTimer);
-  _returnToFloorTimer = setTimeout(() => {
-    if (!currentShiftStaff) return;              // nobody on shift — leave it alone
-    if (currentTab === 'floor-plan') return;     // already home
-    // Never yank someone out of an open modal — they're mid-task, just not
-    // touching the glass. Checked by real visibility, not a guessed list.
-    const modalOpen = [...document.querySelectorAll('[id*="modal"]')]
-      .some(m => m.offsetParent !== null);
-    if (modalOpen) return;
-    goToTab('floor-plan');
-  }, RETURN_TO_FLOOR_MS);
+  clearTimeout(_askIdleTimer);
+  // An interaction while the card is up answers it implicitly — they are
+  // clearly still here. Never nag twice without a real interaction
+  // between: a nag gets dismissed reflexively, which is worse than silence.
+  if (document.getElementById('idle-ask-card') && Date.now() - _askShownAt > 400) _dismissIdleAsk(true);
+  _askIdleTimer = setTimeout(showIdleAsk, ASK_IDLE_MS);
 }
 ['touchstart', 'mousedown', 'keydown', 'scroll'].forEach(evt => {
   document.addEventListener(evt, resetReturnToFloorTimer, { passive: true });
