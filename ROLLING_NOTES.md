@@ -3966,3 +3966,43 @@ waiting on the tile build to give them a proper home.
 
 `_hexWithOpacity()` added — converts #RRGGBB to rgba() at a given opacity, so the stage
 fill works against any future colour without magic numbers.
+
+## Live data not pulling — Square connection is the gate. 16 July 2026.
+
+Daisy: "it should be live updated, I think that might be the problem, it's not pulling data."
+
+**The auto-refresh is running.** Square sync every 5 minutes, floor plan every 30 seconds —
+built in a previous session. The floor plan was polling correctly. The sync was failing
+silently.
+
+`POST /api/bookings/sync` starts:
+
+    const { data: squareConnection } = await supabase
+      .from('square_connections')
+      .select('square_access_token')
+      .eq('studio_id', studioId)
+      .single();
+    if (!squareConnection) return res.status(400).json({ error: 'Square not connected' });
+
+The catch block in `_silentSquareSync` swallowed the 400, the dot stayed grey, nothing
+appeared. The floor plan looked live. It wasn't.
+
+**Fixed:** the sync wrapper now reads the response, logs failures with `console.warn`, and
+turns the dot amber with a tooltip ("Square not connected — set up in Setup → Square
+Connection") when it gets the "not connected" error.
+
+**The gate is the `square_connections` row.** Both the backfill button AND the live sync
+need it. If Square was never connected in Setup → Square Connection, no booking will ever
+appear from Square, silently. This has been the most likely cause of "no live data" since
+the beginning of this session.
+
+**What to check:**
+1. `glazeup-api.onrender.com/api/safety` — does it show Square reads as live?
+2. Setup → Square Connection — is there a connected account?
+3. If yes to both: tap the sync dot on the floor plan. If the dot goes amber, check the
+   browser console for the exact error.
+4. If no Square connection: connect it in Setup, then tap 📥 Pull all real Square history
+   on the Dashboard.
+
+**The backfill endpoint uses the same connection table.** Which means the backfill button
+I said to press two days ago also silently did nothing if Square wasn't connected.

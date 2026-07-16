@@ -10744,6 +10744,32 @@ async function openTableDetail(bookingCode) {
   const b = _floorData.bookings.find(x => x.booking_code === bookingCode);
   if (!b) return;
   _detailBooking = b;
+
+  // ═══════════════════════════════════════════════════════════
+  // TAP A BOOKED TABLE → THE TILE PROCESS. 16 July 2026.
+  // ═══════════════════════════════════════════════════════════
+  // Before: tapping a booked table opened a canvas + checklist panel —
+  // the seating planner with drag-and-drop placemats. Fine for arranging
+  // chairs. Not what you want mid-shift when you tap a red table across
+  // the room.
+  //
+  // The tile flow (FLOW_CHECKS) already exists and is the right answer:
+  //   booking    → 🪑 Set up · 👋 Greet · ☕ Drinks · 🏺 Pieces
+  //   engagement → 🎨 Paints · ✅ Check in · ☕ Drinks check
+  //   completion → 📷 Photos · 💳 Payment · 🎉 Done
+  //
+  // `openBookingAtRealStage` already navigates to that stage in the staff
+  // tab and shows the checklist. That is the tile process. Use it.
+  //
+  // The canvas / drag planner is still reachable from WITHIN the flow —
+  // it's the seating layout tool, which belongs at setup, not at the
+  // entry point of every table tap mid-shift.
+  const stage = b.current_stage || 'booking';
+  openBookingAtRealStage(bookingCode, stage);
+  return;   // canvas panel no longer opens from a table tap
+
+  // ── BELOW: the canvas panel, kept for reference and still reachable
+  // from within the booking flow. Not deleted — one line to restore. ──
   await _loadChecklistCustomization(b.current_stage || 'booking');
 
   try {
@@ -12174,11 +12200,35 @@ function applyShiftUI() {
     _updateSyncIndicator(true);
   };
 
-  // Wrap _silentSquareSync to update the indicator
+  // Wrap _silentSquareSync to update the indicator AND log failures
+  // honestly rather than swallowing them in silence.
   const _origSync=_silentSquareSync;
   _silentSquareSync = async function() {
-    try { await _origSync(); _updateSyncIndicator(true); }
-    catch(e) { _updateSyncIndicator(false); }
+    try {
+      const res = await fetch(`${API_URL}/api/bookings/sync`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        // Square not connected, or other error. The dot goes amber so it
+        // is visible rather than silently wrong. The most common cause is
+        // Square not connected in Setup → Dashboard → Square Connection.
+        console.warn('[sync] Square sync failed:', data.error || res.status);
+        _updateSyncIndicator(false);
+        // Show a one-time nudge if Square has never been connected — not
+        // an alert (too aggressive mid-shift), just the dot with a tooltip.
+        const dot=document.getElementById('floor-sync-dot');
+        if (dot && data.error && data.error.includes('not connected')) {
+          dot.title='Square not connected — set up in Setup → Square Connection';
+        }
+      } else {
+        _updateSyncIndicator(true);
+      }
+    } catch(e) {
+      console.warn('[sync] Square sync network error:', e.message);
+      _updateSyncIndicator(false);
+    }
   };
 
   // Run once now so the first load has the freshest Square data
