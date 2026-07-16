@@ -10173,9 +10173,7 @@ let _detailTimerInterval = null;
 
 // ── Shared drawing helpers, used by BOTH the all-rooms home view and
 // the single-room drill-down page, so the two can never drift apart. ──
-// Room canvas width. Was 900px — on a 390px phone that renders at 2.3x
-// scale making empty rooms enormous. Reduced to fit a phone screen properly.
-const _ELEGANT_ROOM_WIDTH = 340, _ELEGANT_PAD = 16, _ELEGANT_GAP = 14;
+const _ELEGANT_ROOM_WIDTH = 680, _ELEGANT_PAD = 20, _ELEGANT_GAP = 16;
 
 function _elegantRoomsData() {
   const tables = _floorData.tables || [];
@@ -21691,10 +21689,10 @@ function _handRect(x, y, w, h, seed, weight, ink, fill) {
 
 // Seats decide the table's footprint. Sizes are in plan units.
 function _tableSize(seats) {
-  if (seats <= 2) return { w: 72, h: 72 };
-  if (seats <= 4) return { w: 100, h: 76 };
-  if (seats <= 6) return { w: 140, h: 76 };
-  return { w: 290, h: 80 };   // large groups span the full width
+  if (seats <= 2) return { w: 80, h: 80 };
+  if (seats <= 4) return { w: 120, h: 90 };
+  if (seats <= 6) return { w: 160, h: 90 };
+  return { w: 620, h: 95 };   // large groups span the full width
 }
 
 // Chairs sit around the table: twos face each other across it,
