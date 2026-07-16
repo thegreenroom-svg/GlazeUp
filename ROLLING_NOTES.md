@@ -4205,3 +4205,21 @@ Also still open from the other session, re-flagged here because it matters:
   more than once now.
 - **`api.qrserver.com` receives booking access tokens in a URL**, sent to a third
   party with no contract in place. Worth a look, not touched tonight.
+
+## Square access token was being logged in plaintext — fixed
+
+Real logs shown from Render, 16 July 2026 21:20: the Square SDK's ApiError
+includes the full request headers, and this catch block was logging the whole
+object — meaning the studio's Square Bearer token appeared in plaintext in Render's
+log stream. Anyone with access to the logs (Render account, log retention,
+future audit) could have read a live access token from them.
+
+Fixed: this specific catch now logs only the status code and Square's own error
+code (enough to diagnose "insufficient scopes", no secrets). Every OTHER Square
+catch in this file logs `error.message` only, which is safe. The token exposure
+was specific to this one place logging the whole error object.
+
+Also worth noting: this 403 is genuinely harmless — the code path is only hit when
+`tableTrackingMode === 'staff_as_tables'`, which The Kiln Cafe does not use. If
+that stays true, the whole team-members read could be dropped entirely; leaving it
+in for now because it's benign and other studios may want that mode later.

@@ -2325,7 +2325,14 @@ app.post('/api/bookings/sync', async (req, res) => {
           teamMemberNameById[member.id] = name || member.id;
         });
       } catch (teamErr) {
-        console.error('Could not fetch Square team members for table mapping:', teamErr);
+        // Was logging the entire ApiError object, which includes the
+        // request headers, which includes the studio's Square Bearer
+        // token in plaintext. Real logs, real token exposure. Now logs
+        // only the status and code — enough to diagnose, no secrets.
+        // Also less noisy in general: this is expected whenever a
+        // studio hasn't granted EMPLOYEES_READ and doesn't use
+        // staff-as-tables mode, which is almost every studio.
+        console.warn(`Square team-members read skipped: ${teamErr?.statusCode || '?'} ${teamErr?.errors?.[0]?.code || teamErr?.message || 'unknown'}`);
       }
     }
 
