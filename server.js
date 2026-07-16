@@ -5295,7 +5295,12 @@ app.get('/api/floor/active', async (req, res) => {
     const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
 
     const { data: bookings, error: bookingsErr } = await supabase.from('bookings')
-      .select('booking_code,customer_name,table_number,current_stage,session_start,party_size,status,booking_type')
+      // room AND space_name, deliberately. `room` is ours (add_booking_room.sql).
+      // `space_name` is Square's service name — "Studio", "The Lounge", "The Vault" —
+      // and it is the ONLY thing a synced Square booking knows about where it goes,
+      // because Square has no idea your tables exist. Without both, a real booking
+      // arrives and cannot even be shown in the right room.
+      .select('booking_code,customer_name,table_number,room,space_name,current_stage,session_start,party_size,status,booking_type')
       .eq('studio_id', studioId)
       .gte('session_start', today.toISOString())
       .lt('session_start', tomorrow.toISOString())
@@ -5374,6 +5379,76 @@ app.post('/api/floor/assign', async (req, res) => {
   }, { onConflict: 'studio_id,booking_code,staff_member_id' });
   if (error) return res.status(500).json({ error: error.message });
   res.json({ assigned: true });
+});
+
+// POST /api/floor/seat — put a booking on a table.
+//
+// THE MISSING HALF. Square tells us WHEN, WHO and WHICH ROOM (via the
+// service name). It has never known which table — table_tracking_mode is
+// 'none', so every synced booking arrives with table_number = null and the
+// floor plan, which matches bookingByTable[t.name], silently drops it.
+//
+// That is not a bug in the sync. Arrival and seating are two different
+// events and the app only ever modelled the second. A human puts people at
+// a table; that is what this records.
+//
+// Writes ONLY to our own bookings row. Square is never touched — no order,
+// no update, nothing leaves. This is safe with every write switch off.
+app.post('/api/floor/seat', async (req, res) => {
+  const { studioId, bookingCode, tableName } = req.body;
+  if (!studioId || !bookingCode || !tableName) {
+    return res.status(400).json({ error: 'studioId, bookingCode and tableName required' });
+  }
+  try {
+    // The table must genuinely exist, and we take its room from the table
+    // rather than trusting the caller — the table knows which room it is in,
+    // and that is the only thing that cannot drift.
+    const { data: table } = await supabase.from('studio_tables')
+      .select('name, room, capacity').eq('studio_id', studioId).eq('name', tableName).single();
+    if (!table) return res.status(404).json({ error: `No table called "${tableName}" in this studio.` });
+
+    const { data: booking } = await supabase.from('bookings')
+      .select('booking_code, party_size, customer_name').eq('studio_id', studioId)
+      .eq('booking_code', bookingCode).single();
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    // Is someone already there? Answer honestly rather than overwrite them —
+    // the floor plan's bookingByTable[] silently replaces a clash, which is
+    // exactly the bug scenario 5 turned up. Do not repeat it server-side.
+    const today = new Date(); today.setHours(0,0,0,0);
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+    const { data: clash } = await supabase.from('bookings')
+      .select('booking_code, customer_name').eq('studio_id', studioId)
+      .eq('table_number', tableName)
+      .neq('booking_code', bookingCode)
+      .gte('session_start', today.toISOString()).lt('session_start', tomorrow.toISOString())
+      .not('status', 'eq', 'cancelled');
+    if (clash && clash.length) {
+      return res.status(409).json({
+        error: `${clash[0].customer_name || 'Someone'} is already on ${tableName}.`,
+        clashWith: clash[0].booking_code,
+      });
+    }
+
+    // Arithmetic, not memory: the app knows both numbers, so it should say so
+    // rather than let someone discover it with six people stood there.
+    const overCapacity = (booking.party_size || 0) > (table.capacity || 0);
+
+    const { error } = await supabase.from('bookings')
+      .update({ table_number: table.name, room: table.room })
+      .eq('studio_id', studioId).eq('booking_code', bookingCode);
+    if (error) return res.status(500).json({ error: error.message });
+
+    res.json({
+      seated: true, table: table.name, room: table.room,
+      overCapacity,
+      warning: overCapacity
+        ? `${booking.party_size} people on a table for ${table.capacity}.`
+        : null,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // POST /api/floor/release — release a staff member from a booking

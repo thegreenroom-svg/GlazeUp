@@ -10115,7 +10115,16 @@ function _elegantRoomsData() {
   const tables = _floorData.tables || [];
   const bookings = _floorData.bookings || [];
   const bookingByTable = {};
-  bookings.forEach(b => { if (b.table_number) bookingByTable[b.table_number] = b; });
+  // ARRIVALS — the bookings this line used to silently drop.
+  // `if (b.table_number)` quietly binned every real Square booking, because
+  // Square has never known which table (table_tracking_mode is 'none'). They
+  // synced in perfectly and vanished. They were not lost — they were UNSEATED,
+  // and the app had no word for that. It does now.
+  const unseated = [];
+  bookings.forEach(b => {
+    if (b.table_number) bookingByTable[b.table_number] = b;
+    else unseated.push(b);
+  });
   // Room names come from studio_tables.room, typed by hand over time, so
   // "Main studio" and "Main Studio" both exist — and keying the group on
   // the raw string made them TWO rooms on the home screen, each holding
@@ -10131,7 +10140,7 @@ function _elegantRoomsData() {
   const rooms = {};
   tables.forEach(t => { (rooms[_canonRoom(t.room)] ||= []).push(t); });
   Object.values(rooms).forEach(list => list.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
-  return { rooms, bookingByTable };
+  return { rooms, bookingByTable, unseated };
 }
 
 function _elegantLayoutRoom(list) {
@@ -10223,7 +10232,14 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable) {
     // and is genuinely where you start anything. No invention required.
     // Empty table = "nothing here yet, what do you want to do?" Booked
     // table = the real job. Both honest.
-    return `<g style="cursor:pointer" onclick="${!tappable ? (busy ? `openTableDetail('${b.booking_code}')` : `showGridNav()`) : ''}">
+    // While seating an arrival, EVERY table is a seat target — on the home
+    // screen too, where tables normally carry no handler at all. Tap the
+    // arrival, tap the table, done. Outside seating mode nothing changes.
+    const seatMode = !!_seatingBooking;
+    const tableClick = seatMode
+      ? `event.stopPropagation(); _seatAt(${JSON.stringify(t.name)})`
+      : (!tappable ? (busy ? `openTableDetail('${b.booking_code}')` : `showGridNav()`) : '');
+    return `<g style="cursor:pointer" onclick="${tableClick}">
       ${chairs}
       ${_handRect(t.x, t.y, t.size.w, t.size.h, seed, busy ? 1.7 : 1.0, INK, '#FFFDF9')}
       ${stripe}${label}${demoMark}
@@ -10257,6 +10273,80 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable) {
     </div>`;
 }
 
+// ═══════════════════════════════════════════════════════════
+// ARRIVALS — people who are booked but not yet at a table.
+// 16 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Daisy: "I can't see any live data from today's bookings anywhere."
+// She was right and they were never lost. Square tells us WHEN, WHO and
+// WHICH ROOM (its service name -> space_name). It has never known which
+// TABLE — table_tracking_mode is 'none' — so every synced booking arrived
+// with table_number = null, and _elegantRoomsData's `if (b.table_number)`
+// silently binned it. Real bookings have been syncing in and vanishing.
+//
+// THE REAL POINT, and it is the design doc's recommendation #4: arrival
+// and seating are TWO EVENTS. The app only ever modelled the second. That
+// single gap is why walk-ins, re-seats, split collections and this are all
+// hard — they are all the missing half.
+//
+// Tap an arrival, tap a table, seated. That is the whole flow, and it is
+// also what "setting up the table" has always meant.
+let _seatingBooking = null;
+
+function _startSeating(code) {
+  _seatingBooking = _seatingBooking === code ? null : code;   // tap again to cancel
+  renderFloorPlanElegant();
+}
+
+async function _seatAt(tableName) {
+  if (!_seatingBooking) return;
+  const code = _seatingBooking;
+  try {
+    const res = await fetch(`${API_URL}/api/floor/seat`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, bookingCode: code, tableName }),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || "Couldn't seat them there."); return; }
+    _seatingBooking = null;
+    // Arithmetic, not memory — the server compared party size to capacity
+    // so nobody has to notice with six people stood in front of them.
+    if (data.warning) alert(`Seated — but note: ${data.warning}`);
+    await loadFloorPlan();
+  } catch (e) {
+    alert("Couldn't reach the server — try again in a moment.");
+  }
+}
+
+function _renderArrivals(unseated) {
+  if (!unseated.length) return '';
+  const t = (b) => b.session_start
+    ? new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
+  return `
+    <div style="margin-bottom:22px;">
+      <h2 style="color:#2B2724;font-family:'Architects Daughter',cursive;font-size:14px;
+        letter-spacing:0.06em;margin:0 0 8px;opacity:0.6;">
+        Arriving — not seated yet${_seatingBooking ? ' · now tap a table' : ''}
+      </h2>
+      <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;">
+        ${unseated.sort((a,b) => (a.session_start||'').localeCompare(b.session_start||'')).map(b => {
+          const on = _seatingBooking === b.booking_code;
+          // Square's service name is the only clue to the room. Ours wins if set.
+          const where = b.room || b.space_name || '';
+          return `<button onclick="_startSeating('${b.booking_code}')"
+            style="flex-shrink:0;text-align:left;background:${on ? '#2B2724' : '#FFFDF9'};
+            color:${on ? '#FFFDF9' : '#2B2724'};border:1.5px ${on ? 'solid #2B2724' : 'dashed rgba(43,39,36,0.3)'};
+            border-radius:12px;padding:10px 13px;cursor:pointer;min-width:132px;">
+            <div style="font-family:'Caveat',cursive;font-size:19px;font-weight:700;">${b.customer_name || 'Booking'}</div>
+            <div style="font-size:11px;opacity:0.75;">${t(b)}${b.party_size ? ` · ${b.party_size} covers` : ''}</div>
+            ${where ? `<div style="font-size:10px;opacity:0.6;margin-top:2px;">${where}</div>` : ''}
+            <div style="font-size:10px;font-weight:800;margin-top:5px;">${on ? 'tap a table →' : 'tap to seat'}</div>
+          </button>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
 // #floor-plan-view is the canvas for THREE different screens now: the
 // floor plan itself, a room drill-down, and the Host By Post board.
 // The Home button hides "when the floor plan container is visible",
@@ -10282,7 +10372,7 @@ function renderFloorPlanElegant() {
   // of the screen on a real device. Restoring flex lets flex:1 fill the
   // viewport and lets the child's overflow-y:auto actually scroll.
   view.style.display = 'flex';
-  const { rooms, bookingByTable } = _elegantRoomsData();
+  const { rooms, bookingByTable, unseated } = _elegantRoomsData();
   const resting = Object.keys(rooms).length === 0;
 
   view.innerHTML = `
@@ -10304,6 +10394,7 @@ function renderFloorPlanElegant() {
         <button onclick="showGridNav()" class="glaze-tile"
           style="border:none;padding:9px 16px;font-size:12px;font-weight:800;cursor:pointer;">▦ Everything else</button>
       </div>
+      ${_renderArrivals(unseated)}
       ${resting ? `<div style="text-align:center;padding:40px 20px;color:#8a8175;font-size:13px;">
         No tables set up yet for this studio.</div>`
         : Object.entries(rooms).map(([name, list]) => _renderElegantRoomSVG(name, list, bookingByTable, true)).join('')}
@@ -10329,7 +10420,7 @@ function showRoomElegant(roomName) {
   // of the screen on a real device. Restoring flex lets flex:1 fill the
   // viewport and lets the child's overflow-y:auto actually scroll.
   view.style.display = 'flex';
-  const { rooms, bookingByTable } = _elegantRoomsData();
+  const { rooms, bookingByTable, unseated } = _elegantRoomsData();
   const list = rooms[roomName] || [];
 
   view.innerHTML = `
@@ -12013,11 +12104,50 @@ function applyShiftUI() {
   clearInterval(window._activeBookingsStripTimer);
   window._activeBookingsStripTimer = setInterval(loadActiveBookingsStrip, 30 * 1000);
   // Load floor plan and check if it should be the home screen
+  // AUTO-REFRESH — always live, no manual button.
+  // Daisy: "I want all the booking live on the screen at all times
+  // with a background refresh if necessary."
+  //
+  // What we had: floor plan polls loadFloorPlan() every 30 seconds —
+  // which reads /api/floor/active (our database). That part is fine.
+  //
+  // What was MISSING: Square bookings never reached our database
+  // automatically. The sync was a manual button. So the floor plan
+  // was polling perfectly... a database that was never updated.
+  //
+  // Now: the booking sync from Square runs every 5 minutes, silently,
+  // before the floor plan refresh so any new arrivals from Square land
+  // immediately. Square returns today's bookings; we write them to our
+  // db; the floor plan reads them. No manual button, no stale data.
+  //
+  // 5 min for the sync (Square rate limits aggressive polling),
+  // 30s for the floor plan (so a tap-to-seat updates everyone's screen).
   loadFloorPlan().then(() => _checkFloorPlanMode());
   clearInterval(window._floorPlanTimer);
+  clearInterval(window._squareSyncTimer);
+
+  // Sync Square → our db (quietly, no spinner, no status update)
+  async function _silentSquareSync() {
+    if (!apiConnected) return;
+    try {
+      await fetch(`${API_URL}/api/bookings/sync`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId }),
+      });
+    } catch (e) { /* silent — if it fails, the next poll will catch it */ }
+  }
+
+  // Run once now so the first load has the freshest Square data
+  _silentSquareSync();
+
+  window._squareSyncTimer = setInterval(async () => {
+    await _silentSquareSync();
+    loadFloorPlan().then(() => _checkFloorPlanMode());
+  }, 5 * 60 * 1000);   // 5 minutes — respectful of Square's rate limits
+
   window._floorPlanTimer = setInterval(() => {
     loadFloorPlan().then(() => _checkFloorPlanMode());
-  }, 30 * 1000);
+  }, 30 * 1000);   // 30 seconds — fast enough to see a tap-to-seat land
   applyPlatformRevenueAccess();
 
   // ═══════════════════════════════════════════════════════════

@@ -3834,3 +3834,56 @@ rather than something introduced today. **First thing on the security list.**
 The Host By Post logo: use the existing mark (perforations one side, no type), or draw the
 wordmark Daisy describes (perforations both sides, "Host By Post" set in brand type)?
 Asked three times, never answered. Nothing will be invented in the meantime.
+
+# ═══════════════════════════════════════════════════════════
+# 16 July 2026 — live bookings, arrivals strip, auto-refresh.
+# ═══════════════════════════════════════════════════════════
+
+## "I can't see any live data from today's bookings anywhere"
+
+Daisy was right, and they were never lost. Two separate reasons.
+
+**REASON 1 — the sync was a manual button.** `/api/bookings/sync` pulls today's Square
+bookings into our database. It was wired to a 🔄 button in Daily Bookings, pressed by a
+person, never run automatically. So the floor plan was polling every 30 seconds...
+against a database that was never updated. Now: silent sync every 5 minutes, before the
+floor plan refresh, no button, no spinner, no status update. Square → our db → floor plan.
+
+**REASON 2 — the floor plan silently dropped every real Square booking.**
+
+    bookings.forEach(b => { if (b.table_number) bookingByTable[b.table_number] = b; });
+
+`if (b.table_number)` quietly binned every synced booking, because Square has never known
+which table (`table_tracking_mode` is `'none'`). They synced in perfectly and vanished.
+**They were not lost. They were UNSEATED.** And the app had no word for that.
+
+## ARRIVAL ≠ SEATING — the structural gap the ten scenarios kept finding
+
+This is design doc recommendation #4. The app modelled seating and assumed arrival. That
+single gap explains why walk-ins, re-seats, split collections and "I can't see my
+bookings" are all hard: they are all the missing half.
+
+**The arrivals strip** — above the rooms on the floor plan. Every booking Square knows
+about but hasn't been given a table yet. Sorted by session start. Shows the customer
+name, time, party size, and the room Square thinks they're in (from the service name).
+
+**The seating flow** — tap an arrival card, every table becomes a tap target. Tap a table,
+they're seated, the strip updates, the floor plan shows them in colour. Server-side: the
+seat endpoint takes the room FROM THE TABLE (not the caller), refuses if there's already
+someone there (the silent-overwrite bug, prevented), and checks capacity — arithmetic,
+not memory, so nobody discovers a size mismatch with six people stood there.
+
+**`POST /api/floor/seat`** — writes only to our own `bookings` row. Square is NEVER
+touched. Safe with every write switch off.
+
+**Also: `/api/floor/active` now returns `room` and `space_name`** — previously dropped.
+Without them, an unseated booking couldn't even be shown in the right place.
+
+**Verified** (jsdom, two unseated + one seated booking):
+
+    arrivals strip shown      true
+    unseated cards            2 of 2
+    seated booking drawn      true
+    tap Sophie → seating mode true
+    tap Table 2 → POST /api/floor/seat  { bookingCode:'real-sq-001', tableName:'Table 2' }
+    seating mode cleared      true
