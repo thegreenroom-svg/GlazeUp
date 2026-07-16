@@ -5307,15 +5307,15 @@ app.get('/api/floor/active', async (req, res) => {
       .not('status', 'eq', 'cancelled');
     if (bookingsErr) throw bookingsErr;
 
-    const { data: assignments, error: assignErr } = await supabase.from('booking_assignments')
+    // These two degrade gracefully — a missing column or table returns
+    // an empty result rather than killing the floor plan with a 500.
+    const { data: assignments } = await supabase.from('booking_assignments')
       .select('booking_code,staff_name,staff_member_id,is_primary')
       .eq('studio_id', studioId).is('released_at', null);
-    if (assignErr) throw assignErr;
 
-    const { data: checks, error: checksErr } = await supabase.from('booking_flow_checks')
+    const { data: checks } = await supabase.from('booking_flow_checks')
       .select('booking_code,stage,check_key,completed')
       .eq('studio_id', studioId);
-    if (checksErr) throw checksErr;
 
     const assignMap = {};
     (assignments || []).forEach(a => {
