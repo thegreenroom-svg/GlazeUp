@@ -11941,7 +11941,7 @@ async function loadActiveBookingsStrip() {
       return `
         <button onclick="openBookingAtRealStage('${b.booking_code}', '${b.current_stage || 'booking'}')" style="display:inline-flex;align-items:center;gap:6px;background:#2e7d32;filter:brightness(${stage.brightness});color:white;border:none;border-radius:20px;padding:7px 14px;margin-right:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">
           <span>${stage.icon}</span>
-          <span>${b.table_number ? 'Table ' + b.table_number : b.customer_name}</span>
+          <span>${b.table_number ? (b.table_number.toLowerCase().startsWith('table') ? b.table_number : 'Table ' + b.table_number) : b.customer_name}</span>
           <span style="opacity:0.8;font-weight:600;">· ${stage.label}</span>
         </button>
       `;

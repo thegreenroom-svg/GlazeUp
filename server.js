@@ -5338,12 +5338,7 @@ app.get('/api/floor/active', async (req, res) => {
       const { data: conn } = await supabase.from('square_connections')
         .select('square_access_token').eq('studio_id', studioId).single();
       if (conn?.square_access_token) {
-        const { Client, Environment } = require('square');
-        const client = new Client({
-          accessToken: conn.square_access_token,
-          environment: process.env.SQUARE_ENVIRONMENT === 'sandbox'
-            ? Environment.Sandbox : Environment.Production,
-        });
+        const client = await getSquareClient(conn.square_access_token);
         const locRes = await client.locationsApi.listLocations();
         const locationIds = (locRes.result.locations || []).map(l => l.id);
         if (locationIds.length) {
