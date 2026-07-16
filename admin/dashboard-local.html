@@ -10173,7 +10173,26 @@ let _detailTimerInterval = null;
 
 // ── Shared drawing helpers, used by BOTH the all-rooms home view and
 // the single-room drill-down page, so the two can never drift apart. ──
-const _ELEGANT_ROOM_WIDTH = 320, _ELEGANT_PAD = 10, _ELEGANT_GAP = 8;
+// Portrait iPhone was the fixed target. Landscape, tablet and desktop
+// stretched the same 320px design 2-4x, which either clipped tables at
+// the right edge or made them cartoonishly large — three attempts to
+// fix this by tweaking a fixed number earlier tonight. Real fix:
+// measure the container at render time, cap sensibly, re-render on
+// resize / rotation. One layout, works everywhere.
+const _ELEGANT_PAD = 12, _ELEGANT_GAP = 10;
+const _ELEGANT_MIN_WIDTH = 300;    // below this, layout won't wrap nicely
+const _ELEGANT_MAX_WIDTH = 900;    // above this on a huge screen, further scale is empty
+function _measureFloorPlanWidth() {
+  // Prefer the actual current #floor-plan-view width (accounts for its
+  // real padding, its parent, everything). Falls back to the window
+  // when the container isn't in the DOM yet — first paint before flex
+  // has laid out.
+  const view = document.getElementById('floor-plan-view');
+  const raw = (view && view.clientWidth) ? view.clientWidth : window.innerWidth;
+  // 16px of ivory padding inside the scroll area on each side.
+  const usable = Math.max(0, raw - 32);
+  return Math.max(_ELEGANT_MIN_WIDTH, Math.min(_ELEGANT_MAX_WIDTH, usable));
+}
 
 // Two bookings can genuinely land on the same table_number — a data
 // entry slip, an overlap at a shift change, someone re-using a table
@@ -10230,11 +10249,14 @@ function _elegantRoomsData() {
   return { rooms, bookingByTable, unseated };
 }
 
-function _elegantLayoutRoom(list) {
+function _elegantLayoutRoom(list, roomWidth) {
   let x = _ELEGANT_PAD, y = _ELEGANT_PAD, rowH = 0;
   const placed = list.map(t => {
     const size = _tableSize(t.capacity || 4);
-    if (x + size.w > _ELEGANT_ROOM_WIDTH - _ELEGANT_PAD) { x = _ELEGANT_PAD; y += rowH + _ELEGANT_GAP; rowH = 0; }
+    // Wrap based on the ACTUAL current room width, not a fixed constant.
+    // A landscape iPhone gets a wide room and lays out three-across;
+    // portrait wraps sooner. Same code, both work.
+    if (x + size.w > roomWidth - _ELEGANT_PAD) { x = _ELEGANT_PAD; y += rowH + _ELEGANT_GAP; rowH = 0; }
     const pos = { ...t, x, y, size };
     x += size.w + _ELEGANT_GAP;
     rowH = Math.max(rowH, size.h);
@@ -10246,8 +10268,12 @@ function _elegantLayoutRoom(list) {
 // tappable = whether the room's own <h2> heading opens the full-page
 // drill-down (true on the home overview, false once already on that
 // room's own page — no point tapping through to where you already are).
-function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable) {
-  const { placed, height } = _elegantLayoutRoom(list);
+function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWidth) {
+  // Fallback keeps every existing caller working, but the main callers
+  // pass a real measured width so portrait/landscape/tablet/desktop
+  // all lay out to fit their own real screen instead of a fixed guess.
+  roomWidth = roomWidth || _measureFloorPlanWidth();
+  const { placed, height } = _elegantLayoutRoom(list, roomWidth);
   const INK = '#2B2724';
 
   const tableEls = placed.map(t => {
@@ -10355,7 +10381,7 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable) {
         letter-spacing:0.06em;margin:0 0 8px;opacity:0.6;">
         ${roomName}${tappable ? ' →' : ''}
       </h2>
-      <svg viewBox="-10 -10 ${_ELEGANT_ROOM_WIDTH + 20} ${height}"
+      <svg viewBox="-10 -10 ${roomWidth + 20} ${height}"
         style="width:100%;height:auto;display:block;background:#F4ECE0;
         border:1px solid rgba(43,39,36,0.15);border-radius:10px;">
         <defs>${_PENCIL_FILTER}</defs>
@@ -10446,6 +10472,34 @@ function _renderArrivals(unseated) {
 // you there with no way home. Each renderer declares what it is.
 let _floorViewMode = 'plan';   // 'plan' | 'room' | 'post'
 
+// Re-lay-out on rotation and window resize — debounced, so a slow
+// drag on desktop doesn't repaint 50 times. Registered once at load.
+// Only fires when the elegant floor plan is what's currently on screen;
+// harmlessly ignored on any other tab.
+let _floorPlanResizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(_floorPlanResizeTimer);
+  _floorPlanResizeTimer = setTimeout(() => {
+    const view = document.getElementById('floor-plan-view');
+    if (!view || view.style.display === 'none') return;
+    if (_floorViewMode === 'plan') renderFloorPlanElegant();
+    else if (_floorViewMode === 'room' && _currentRoomName) showRoomElegant(_currentRoomName);
+  }, 120);
+});
+// orientationchange fires slightly before iOS Safari finishes settling
+// the new viewport dimensions, so we listen to both and let debouncing
+// collapse them into one render.
+window.addEventListener('orientationchange', () => {
+  clearTimeout(_floorPlanResizeTimer);
+  _floorPlanResizeTimer = setTimeout(() => {
+    const view = document.getElementById('floor-plan-view');
+    if (!view || view.style.display === 'none') return;
+    if (_floorViewMode === 'plan') renderFloorPlanElegant();
+    else if (_floorViewMode === 'room' && _currentRoomName) showRoomElegant(_currentRoomName);
+  }, 250);
+});
+let _currentRoomName = null;
+
 function renderFloorPlanElegant() {
   const view = document.getElementById('floor-plan-view');
   if (!view) return;
@@ -10498,7 +10552,7 @@ function renderFloorPlanElegant() {
       ${_renderArrivals(unseated)}
       ${resting ? `<div style="text-align:center;padding:40px 20px;color:#8a8175;font-size:13px;">
         No tables set up yet for this studio.</div>`
-        : `<div style='display:flex;flex-direction:column;gap:16px;width:100%;max-width:100%;overflow:hidden;box-sizing:border-box;'>${Object.entries(rooms).map(([name, list]) => _renderElegantRoomSVG(name, list, bookingByTable, true)).join('')}</div>`}
+        : (function(){ const w = _measureFloorPlanWidth(); return `<div style='display:flex;flex-direction:column;gap:16px;width:100%;max-width:100%;overflow:hidden;box-sizing:border-box;'>${Object.entries(rooms).map(([name, list]) => _renderElegantRoomSVG(name, list, bookingByTable, true, w)).join('')}</div>`; })()}
     </div>`;
 }
 
@@ -10507,6 +10561,7 @@ function renderFloorPlanElegant() {
 function showRoomElegant(roomName) {
   const view = document.getElementById('floor-plan-view');
   if (!view) return;
+  _currentRoomName = roomName;
   _floorViewMode = 'room';
   // goToTab() calls toggleFloatingBackBtn() BEFORE the async loadFloorPlan()
   // resolves, so at that moment the mode is still whatever the last screen
@@ -10532,7 +10587,7 @@ function showRoomElegant(roomName) {
         <div style="font-family:'Caveat',cursive;font-size:24px;font-weight:700;color:#2B2724;">${roomName}</div>
       </div>
       ${list.length
-        ? _renderElegantRoomSVG(roomName, list, bookingByTable, false)
+        ? _renderElegantRoomSVG(roomName, list, bookingByTable, false, _measureFloorPlanWidth())
         : `<div style="text-align:center;padding:40px 20px;color:#8a8175;font-size:13px;">No tables set up in ${roomName} yet.</div>`}
     </div>`;
 }

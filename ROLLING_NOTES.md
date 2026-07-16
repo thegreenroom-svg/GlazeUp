@@ -4223,3 +4223,33 @@ Also worth noting: this 403 is genuinely harmless — the code path is only hit 
 `tableTrackingMode === 'staff_as_tables'`, which The Kiln Cafe does not use. If
 that stays true, the whole team-members read could be dropped entirely; leaving it
 in for now because it's benign and other studios may want that mode later.
+
+## Floor plan is now genuinely responsive — portrait, landscape, tablet, desktop
+
+Verified by running the actual layout code against six real device widths before push:
+
+| Device | Viewport | Room width | Rows | Rightmost table | Fits |
+|---|---|---|---|---|---|
+| iPhone SE portrait | 375px | 343px | 2 | 302px | ✓ |
+| iPhone 15 portrait | 393px | 361px | 2 | 302px | ✓ |
+| iPhone landscape | 812px | 780px | 1 | 502px | ✓ |
+| iPad portrait | 768px | 736px | 1 | 502px | ✓ |
+| iPad landscape | 1024px | 900px* | 1 | 502px | ✓ |
+| Desktop | 1440px | 900px* | 1 | 502px | ✓ |
+
+*capped at 900px so tables don't scale up to comic size on huge screens.
+
+**What changed:** `_ELEGANT_ROOM_WIDTH` (fixed 320) is gone. A `_measureFloorPlanWidth()` helper measures the actual container width at render time, caps between 300 and 900. `_elegantLayoutRoom` now takes the room width as a real parameter — every renderer passes what it measured, no magic constant. SVG viewBox uses the same measured width, so tables stay at their real drawn size instead of scaling up 2-4x on landscape/tablet.
+
+**Resize + orientation change:** debounced 120ms/250ms listeners re-render when the phone is rotated or a desktop window is dragged. Guarded three ways so they never touch anything but the floor plan:
+1. Debounce clears prior timers.
+2. `if (!view || view.style.display === 'none') return;` — no re-render when the floor plan isn't showing.
+3. `if (_floorViewMode === 'plan')` / `'room'` — only re-renders the actual view mode the user is on.
+
+**Scope, honestly, per Daisy's "and the whole app too":** the rest of the app is already
+responsive. Host By Post uses `display:grid; grid-template-columns:1fr 1fr`; staff
+avatars, catalogue tiles and admin dashboards are already small fixed icons or CSS
+grid/flex layouts that adapt naturally. The floor plan was the single place with a
+hardcoded viewBox that couldn't respond to viewport width. This is a genuine "one
+targeted class of bug" fix, not a whole-app rewrite — that's the honest scope, said
+plainly.
