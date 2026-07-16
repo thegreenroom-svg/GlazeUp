@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="screen-orientation" content="portrait">
   <title>The Kiln Cafe · Studio Admin</title>
   <meta name="version" content="1.1.0">
   <link rel="manifest" href="/admin/manifest.json">
@@ -1816,6 +1817,28 @@
       box-shadow: 0 6px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
     }
   </style>
+  <style>
+    /* Force portrait on mobile — a studio floor plan is portrait work */
+    @media screen and (orientation: landscape) and (max-height: 500px) {
+      body::before {
+        content: 'Please rotate your phone to portrait';
+        position: fixed; inset: 0; z-index: 99999;
+        background: #1A1714; color: #F4ECE0;
+        font-family: 'Architects Daughter', cursive;
+        font-size: 18px; display: flex;
+        align-items: center; justify-content: center;
+        text-align: center; padding: 32px;
+      }
+      body > *:not(style) { visibility: hidden; }
+    }
+  </style>
+  <script>
+    // Screen Orientation API — locks portrait where supported (Chrome Android,
+    // some iOS contexts). iOS Safari ignores it but the CSS overlay covers it.
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock('portrait').catch(() => {});
+    }
+  </script>
 </head>
 <body>
 
