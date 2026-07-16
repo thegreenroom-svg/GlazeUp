@@ -4069,3 +4069,31 @@ the studio?" Staff members on shift are highlighted.
 
 Business API is the right answer when we want CUSTOMER messaging (collection reminders,
 confirmations). That's a different decision and a bigger one. This is staff-to-staff.
+
+# ═══════════════════════════════════════════════════════════
+# Arrivals list showing till sales as customers — fixed 16 July 2026
+# ═══════════════════════════════════════════════════════════
+
+After `FIX_FLOOR_PLAN_COLUMNS.sql` fixed the real crash (missing `bookings.status`
+column), the floor plan loaded for the first time — and immediately showed a new,
+real bug: "Flat white", "Iced Latte Oat Milk", "Gecko" appearing in the "Arriving —
+not seated yet" list, each with "1 covers" and a "tap to seat" button.
+
+**Root cause:** the "Square live read" section of `/api/floor/active` called
+`client.ordersApi.searchOrders()` — Square's **retail till API** — and mapped each
+order's first line item name into `customer_name`. A till sale and an unseated
+customer are two different concepts; conflating them was the actual mistake, not a
+labelling detail. Buying a flat white doesn't mean someone new has arrived needing a
+table — they might already be seated, or it might be a takeaway sale.
+
+**Fixed by removing the merge entirely**, not patching the label. Arrivals now come
+only from our own `bookings` table — real, controlled, correct. Left a full comment
+explaining why, and what the CORRECT future version would actually need: Square's
+BOOKINGS/APPOINTMENTS API (`bookingsApi.listBookings`), not Orders — a real,
+separate piece of design work (resolving a customer's actual name, handling
+cancelled/rescheduled appointments), not a quick fix to bolt on blind.
+
+**State as of this commit:** floor plan loads (crash fixed via SQL), arrivals list
+now only shows genuine bookings from our own table, hand-drawn rooms and tables
+render, tapping a table opens the real booking panel, login navigates there
+correctly. This is the most complete, correct state the app has been in tonight.

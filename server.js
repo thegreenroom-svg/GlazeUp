@@ -5336,47 +5336,26 @@ app.get('/api/floor/active', async (req, res) => {
       });
     } catch(e) { console.warn('checks query failed:', e.message); }
 
-    // ── 4. Square live ──
+    // ── 4. Square live — REMOVED 16 July 2026 ──
+    // This used to call Square's ORDERS API (client.ordersApi.searchOrders)
+    // and treat every till transaction as an unseated arrival, using the
+    // FIRST LINE ITEM'S NAME as the customer's name. A flat white, a slice
+    // of cake, a bisque piece sold at the till — none of these are a
+    // customer waiting for a table. Seen on a real device: "Flat white",
+    // "Iced Latte Oat Milk", "Gecko" all appeared in the arrivals list as
+    // if they were people. The premise was wrong, not just the label: a
+    // retail sale and an unseated booking are two different things, and
+    // Square's Orders API was never going to answer "who's arrived and not
+    // sat down yet" — that question needs Square's BOOKINGS/APPOINTMENTS
+    // API instead (client.bookingsApi.listBookings), which carries real
+    // customer info against a real appointment. That's a genuine, separate
+    // piece of work for later, not a quick fix here — it needs designing
+    // properly (what counts as "not yet in our own bookings table",
+    // resolving a customer's real name from Square, handling appointments
+    // that were cancelled or rescheduled). Until then, arrivals only ever
+    // come from our own bookings table, which is real, controlled, and
+    // correct.
     let squareLiveBookings = [];
-    try {
-      const { data: conn } = await supabase.from('square_connections')
-        .select('square_access_token').eq('studio_id', studioId).single();
-      if (conn?.square_access_token) {
-        const client = await getSquareClient(conn.square_access_token);
-        const locRes = await client.locationsApi.listLocations();
-        const locationIds = (locRes.result.locations||[]).map(l=>l.id);
-        if (locationIds.length) {
-          const ordersRes = await client.ordersApi.searchOrders({
-            locationIds,
-            query: {
-              filter: {
-                dateTimeFilter: { createdAt: { startAt: openTime.toISOString(), endAt: closeTime.toISOString() } },
-                stateFilter: { states: ['OPEN','COMPLETED'] }
-              },
-              sort: { sortField: 'CREATED_AT', sortOrder: 'ASC' }
-            },
-            limit: 200,
-          });
-          const ownCodes = new Set(ownBookings.map(b=>b.booking_code));
-          squareLiveBookings = (ordersRes.result.orders||[])
-            .filter(o=>!ownCodes.has('order-'+o.id))
-            .map(o => {
-              const itemName = (o.lineItems?.[0]?.name||'').toLowerCase();
-              return {
-                booking_code: 'order-'+o.id,
-                customer_name: o.lineItems?.[0]?.name || 'Booking',
-                table_number: null, room: null,
-                space_name: itemName.includes('vault')?'The Vault':itemName.includes('lounge')?'Lounge':'Main Studio',
-                current_stage: o.state==='COMPLETED'?'completion':'booking',
-                session_start: o.createdAt||today.toISOString(),
-                party_size: parseInt(o.lineItems?.[0]?.quantity||1),
-                status: 'active', booking_type: 'square_order',
-                assignments: [], checks: {},
-              };
-            });
-        }
-      }
-    } catch(e) { console.warn('Square live read failed:', e.message); }
 
     // ── 5. Merge ──
     const ownMapped = ownBookings.map(b=>({
