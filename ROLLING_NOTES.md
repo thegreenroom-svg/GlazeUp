@@ -3701,3 +3701,50 @@ device one you can" — the app chooses, and chooses the same one every time.
 Siri-quality neural and genuinely excellent, but the app can only pick from what is
 installed. Anything better means a paid API, per-word cost and network latency on every
 utterance — which cuts straight across "no cost until used".
+
+## The iPhone status bar — five things were sitting on it. 16 July 2026.
+
+Daisy: "the iPhone's still messy at the top end, it just needs adjusting so it's not
+interfering at the top of the iPhone screen."
+
+The `.admin-header` fix this morning was correct and was not the problem. **Five OTHER
+elements were pinned to `top: 0`** — and with `viewport-fit=cover` (line 5) and
+`apple-mobile-web-app-status-bar-style: black-translucent`, **`top: 0` is the physical top
+of the glass**, not the top of the usable screen.
+
+| | |
+|---|---|
+| `.api-status` | **the green "✓ API Connected" badge, sitting on the battery** |
+| `#alert-feed-panel` | the bell drawer — **which I made the ONLY face of the alert system today** |
+| `#task-queue-panel` | same shape |
+| `#focus-mode-back-bar` | a 56px bar with the clock eating the top of it |
+| `#booking-modal` | full-height drawer |
+
+**`#platform-revenue-strip` was the only one already handling it** — and there is a lesson
+in that. `.api-status` was hidden by `body.has-platform-strip .api-status { display:none }`
+whenever the strip was showing. **I parked the strip on 15 July, which un-hid the badge and
+uncovered a bug that had been there all along.** Parking one thing revealed a fault in
+another. Worth remembering the next time something is "just" switched off.
+
+**Fixed, and the two cases are genuinely different:**
+- **Bars** (`focus-mode-back-bar`): must sit BELOW the status bar.
+  `height: calc(56px + env(safe-area-inset-top))` + matching `padding-top` — 56px of bar
+  below the clock, not 56px total with the clock eating it.
+- **Drawers** (alert feed, task queue, booking modal): SHOULD reach the glass — that is
+  what a full-height drawer is — so only their CONTENT insets, via `padding-top` +
+  `box-sizing: border-box`.
+
+`.api-status` also gained `pointer-events: none`: it is a diagnostic, not a feature, and
+it was silently swallowing taps in the corner.
+
+**Why env() resolves at all:** `viewport-fit=cover` is set on line 5. Without that meta,
+`env(safe-area-inset-*)` silently returns 0 and every one of these fixes would do nothing
+while looking correct. Checked first, before writing any of it.
+
+**Final sweep: nothing in the studio app is pinned to the physical top any more.**
+
+**NOTE for the customer app:** `app/index.html` line 5 does NOT have `viewport-fit=cover`.
+Its safe-area handling therefore cannot work — every `env(safe-area-inset-*)` in it
+resolves to 0. Not touched (Daisy's instruction was the studio app), but it means the
+customer app has the same class of problem, silently, and adding the meta without checking
+what it uncovers would be the mistake this note is about.
