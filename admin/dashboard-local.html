@@ -21692,7 +21692,9 @@ function _tableSize(seats) {
   if (seats <= 2) return { w: 80, h: 80 };
   if (seats <= 4) return { w: 120, h: 90 };
   if (seats <= 6) return { w: 160, h: 90 };
-  return { w: 620, h: 95 };   // large groups span the full width
+  if (seats <= 8) return { w: 200, h: 90 };
+  if (seats <= 12) return { w: 260, h: 90 };
+  return { w: 300, h: 95 };
 }
 
 // Chairs sit around the table: twos face each other across it,
