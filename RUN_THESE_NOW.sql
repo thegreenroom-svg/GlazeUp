@@ -1,27 +1,27 @@
 -- ═══════════════════════════════════════════════════════════════════
--- RUN_THESE_NOW.sql — The Kiln Cafe — 16 July 2026 (v2)
+-- RUN_THESE_NOW.sql — The Kiln Cafe — 16 July 2026 (v3)
 -- Supabase project mdpchpjnlzlmldtlqrns
 --
--- v2 FIXES THE ERROR YOU HIT. The previous version died at line 366:
---     ERROR: 42P01: relation "staff_shifts" does not exist
--- Section 4 counted shifts per Elliott to keep whichever row had the
--- real history. There is no staff_shifts table — I used the name
--- without checking it existed, which is precisely the bug this whole
--- project has been paying for all week. It now reads staff_team only.
+-- v3 ADDS SECTION 6 and it is not optional. Today's code writes
+-- staff_alerts.priority so the to-do list can sort by urgency. That
+-- column has never existed — staff_alerts has no CREATE TABLE anywhere
+-- in the repo. Without section 6 EVERY alert insert fails and the whole
+-- messaging system goes down silently, new and old alike.
 --
--- Supabase runs a script in ONE transaction, so that error rolled the
--- entire thing back. Nothing from sections 1-3 was applied. You are
--- starting clean; just run this.
+-- (v2 fixed the staff_shifts error that killed v1 at line 366.)
 --
--- Every statement is idempotent. If some of it did land somehow,
--- running it again changes nothing.
+-- Everything is idempotent. If you have already run some of it, running
+-- it again changes nothing. Don't try to remember; just run the lot.
 --
 -- ⚠️  ORDER MATTERS. Section 2 deletes bookings whose code starts
 --     'demo-booking-'. Section 3 CREATES bookings with exactly those
 --     codes. Top to bottom, once.
 --
--- ⚠️  SECTION 4 STARTS WITH A SELECT on the Elliott rows. It is safe to
---     let it run through — but read it in the output if you can.
+-- ⚠️  SECTION 4 opens with a SELECT on the Elliott rows. Safe to let it
+--     run through, but worth reading in the output if you can.
+--
+-- Supabase shows only the LAST result set — read the summary at the
+-- bottom, or run the sections one at a time to see each check.
 -- ═══════════════════════════════════════════════════════════════════
 
 
@@ -316,9 +316,7 @@ SELECT b.room,
 
 -- ═══════════════════════════════════════════════════════════════════
 -- 4. PEOPLE — the duplicate Elliott, his real role, and Cleo
---   NOTE: FIXED 16 July: this section previously referenced staff_shifts, which does
---     not exist, and killed the whole script at line 366. It now touches
---     staff_team and nothing else.
+--   NOTE: Touches staff_team and nothing else.
 -- ═══════════════════════════════════════════════════════════════════
 
 -- ═══════════════════════════════════════════════════════════════════
@@ -512,6 +510,66 @@ UNION ALL SELECT 'customer_webauthn_credentials',
 
 
 -- ═══════════════════════════════════════════════════════════════════
+-- 6. ALERTS — the priority column (NEW, 16 July)
+--   NOTE: WITHOUT THIS, EVERY ALERT INSERT FAILS. The code writes staff_alerts.priority
+--     as of today; the column has never existed. That breaks 'Tell Daisy' AND the
+--     existing handoff alerts. Run this before the next push lands.
+-- ═══════════════════════════════════════════════════════════════════
+
+-- ═══════════════════════════════════════════════════════════════════
+-- FIX_ALERT_PRIORITY.sql — 16 July 2026
+-- Studio fab8b2d2-27b5-47ec-8c56-268bbf821dc3 (The Kiln Cafe)
+--
+-- WHY THIS EXISTS, honestly: on 16 July I added `priority` to the
+-- staff_alerts insert so Daisy's to-do list could sort by urgency, and
+-- did not check the column existed. It doesn't. `staff_alerts` has no
+-- CREATE TABLE anywhere in this repo — it was made outside version
+-- control, like kiln_sessions — and `priority` appears in no SQL file.
+--
+-- Without this file, EVERY alert insert fails with
+--     column "priority" of relation "staff_alerts" does not exist
+-- and that breaks not just the new "Tell Daisy" tiles but the existing
+-- handoff alerts too. The whole messaging system, silently, at once.
+--
+-- This is the THIRD time this exact bug has appeared in two days:
+--   bookings.status  — code read a column nobody created (cost a week)
+--   staff_shifts     — I wrote SQL against a table that never existed
+--   staff_alerts.priority — this
+-- Caught before shipping only because the SQL was checked rather than
+-- assumed. The lesson is not "be careful", it is: grep for the column
+-- before writing to it. It takes four seconds.
+--
+-- Safe to re-run.
+-- ═══════════════════════════════════════════════════════════════════
+
+-- ── The column the code now writes to ──
+-- 1 = act now (something is blocked, cooling, or a customer is waiting)
+-- 2 = act soon (someone is waiting on you)
+-- 3 = for information
+-- Default 3, so any alert written by older code is filed as information
+-- rather than screaming at the top of someone's list.
+ALTER TABLE staff_alerts ADD COLUMN IF NOT EXISTS priority SMALLINT DEFAULT 3;
+UPDATE staff_alerts SET priority = 3 WHERE priority IS NULL;
+
+-- ── The index the to-do list sorts on ──
+-- GET /api/staff/alerts now filters ?role= and orders by priority then
+-- created_at. Without this it is a full scan of the day's alerts on every
+-- bell tap — fine today with a handful, not fine in a year.
+CREATE INDEX IF NOT EXISTS idx_staff_alerts_todo
+  ON staff_alerts (studio_id, next_role, acknowledged, priority, created_at);
+
+-- ═══════════════════════════════════════════════════════════════════
+-- VERIFY — both should read ok
+-- ═══════════════════════════════════════════════════════════════════
+SELECT 'staff_alerts.priority' AS thing,
+  CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns
+    WHERE table_name='staff_alerts' AND column_name='priority') THEN 'ok' ELSE 'MISSING' END AS present
+UNION ALL SELECT 'to-do index',
+  CASE WHEN EXISTS (SELECT 1 FROM pg_indexes
+    WHERE indexname='idx_staff_alerts_todo') THEN 'ok' ELSE 'MISSING' END;
+
+
+-- ═══════════════════════════════════════════════════════════════════
 -- FINAL SUMMARY — the only result you need to read.
 -- ═══════════════════════════════════════════════════════════════════
 SELECT 'rooms & tables' AS thing,
@@ -532,4 +590,7 @@ SELECT 'Cleo back (want 1)', COUNT(*)::text FROM staff_team
  WHERE studio_id='fab8b2d2-27b5-47ec-8c56-268bbf821dc3' AND name = 'Cleo' AND active = true
 UNION ALL
 SELECT 'face id table', CASE WHEN EXISTS (SELECT 1 FROM information_schema.tables
-   WHERE table_name='staff_webauthn_credentials') THEN 'ok' ELSE 'MISSING' END;
+   WHERE table_name='staff_webauthn_credentials') THEN 'ok' ELSE 'MISSING' END
+UNION ALL
+SELECT 'alerts can be sent', CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns
+   WHERE table_name='staff_alerts' AND column_name='priority') THEN 'ok' ELSE 'MISSING' END;

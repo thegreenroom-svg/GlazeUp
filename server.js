@@ -5883,7 +5883,37 @@ const ALERT_TRIGGERS = {
   // Fired pieces cooling in a closed kiln block the next firing.
   kiln_fired:         { priority: 1, icon:'✨', label:'Kiln fired — ready',       nextRole: 'Studio Assistant',    message: (d) => `Kiln session "${d.sessionName || ''}" has finished firing — pieces ready for pickup.` },
   booking_completed:  { priority: 3, icon:'🎉', label:'Booking completed',        nextRole: 'Studio Manager',      message: (d) => `${d.customerName || 'A booking'}'s session is fully complete — table, pieces, and payment all done.` },
+
+  // ═══════════════════════════════════════════════════════════
+  // BAD NEWS. Added 16 July 2026. There was none.
+  // ═══════════════════════════════════════════════════════════
+  // Counted before writing: SEVEN triggers, seven successes, ZERO
+  // problems. The entire vocabulary could say "table cleared" and
+  // "kiln fired" and could not say one single thing had gone wrong.
+  //
+  // That is not a gap in a feature, it is the shape of the whole app —
+  // every flow models success and assumes it. And it MATTERS: if the
+  // only tile is the good one, staff press the good one anyway. A piece
+  // breaks, there is nowhere to say so, the booking gets marked
+  // complete, and the pot quietly never existed. The data becomes
+  // fiction, and it becomes fiction politely.
+  //
+  // Same shape as the good news, deliberately: fixed vocabulary, routed
+  // by kind, priority is a fact not an opinion, NO FREE TEXT anywhere.
+  piece_broken:       { priority: 1, icon:'💔', label:'Piece broken',              nextRole: 'Studio Manager',      message: (d) => `A piece broke${d.table ? ` at ${d.table}` : ''}${d.customerName ? ` (${d.customerName})` : ''} — someone needs to decide what to tell the customer.` },
+  customer_unhappy:   { priority: 1, icon:'😟', label:'Customer needs you',        nextRole: 'Studio Manager',      message: (d) => `Someone${d.table ? ` at ${d.table}` : ''} isn't happy and has asked for a manager.` },
+  equipment_broken:   { priority: 1, icon:'🔧', label:'Something is broken',       nextRole: 'Studio Manager',      needs: 'equipment', message: (d) => `${d.equipment || 'Equipment'} isn't working${d.staffName ? ` — reported by ${d.staffName}` : ''}.` },
+  no_show:            { priority: 2, icon:'🚫', label:'No-show',                   nextRole: 'Studio Manager',      message: (d) => `${d.customerName || 'A booking'}${d.table ? ` at ${d.table}` : ''} hasn't turned up — the table is free, the money isn't.` },
+  low_stock:          { priority: 2, icon:'🎨', label:'Running low on…',           nextRole: 'Studio Manager',      needs: 'stockItem', message: (d) => `Running low on ${d.item || 'something'} — worth ordering before it runs out.` },
+  running_behind:     { priority: 2, icon:'⏰', label:'Running behind',            nextRole: 'Studio Assistant',    message: (d) => `${d.table || 'A table'} is running over — the next booking there is affected.` },
+  needs_a_decision:   { priority: 2, icon:'❓', label:'Not sure what to do',        nextRole: 'Studio Manager',      message: (d) => `${d.staffName || 'A team member'} needs a steer${d.table ? ` on ${d.table}` : ''} — better asked than guessed.` },
 };
+
+// The vocabulary for "Something is broken". A FIXED LIST, not a text box —
+// the whole safety property of this system is that you cannot type into it.
+// If a studio has something not on this list, add it here; do not add a
+// free-text escape hatch, because that is bookings.notes all over again.
+const EQUIPMENT_KINDS = ['Kiln', 'Till / Square', 'Tablet', 'Wheel', 'Glaze sprayer', 'Printer', 'Card reader', 'Sink / water', 'Heating', 'Lights'];
 
 // GET /api/staff/alerts — get today's alert feed for a studio
 // GET /api/staff/alerts — the feed, and now also a to-do list.
@@ -5932,7 +5962,11 @@ app.get('/api/staff/alert-kinds', (req, res) => {
   res.json({
     kinds: Object.entries(ALERT_TRIGGERS).map(([type, t]) => ({
       type, icon: t.icon, label: t.label, nextRole: t.nextRole, priority: t.priority || 3,
+      // 'equipment' or 'stockItem' — the picker asks a SECOND question,
+      // from a real list. Never a text box.
+      needs: t.needs || null,
     })).sort((a, b) => a.priority - b.priority || a.label.localeCompare(b.label)),
+    equipment: EQUIPMENT_KINDS,
   });
 });
 

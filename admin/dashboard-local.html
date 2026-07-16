@@ -7222,6 +7222,131 @@ function selectCleoAdminVoice(voiceName) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// "TELL DAISY" — the picker. 16 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Daisy's idea, and most of it was already built: POST /api/staff/alerts
+// is the send, GET is her to-do list, PATCH is ticking it off, the bell
+// and badge are the pop-up, and escalate_to_staff already routes by role.
+// What was missing was the way IN, and half the language.
+//
+// THIS IS A RENDERING OF /api/staff/alert-kinds, NEVER A SECOND LIST.
+// A hand-written copy of the vocabulary would drift from ALERT_TRIGGERS
+// within a week — which is exactly how the elegant floor plan ended up
+// not knowing about the TRAINING pill, and how the tour ended up teaching
+// a flashing alert that no longer flashes. One source. Always.
+//
+// AND NOTE WHAT IS NOT HERE: any way to type. There is no "Other…" tile,
+// no text box, no notes field. `message` is a function of the trigger on
+// the server, so this physically cannot carry free text. That is not a
+// limitation — it is the entire safety property. The moment someone adds
+// "Other, type here…", this becomes bookings.notes and inherits every
+// Article 9 problem that column has. Do not add it.
+async function openTellPicker() {
+  document.getElementById('tell-picker')?.remove();
+  let kinds = [], equipment = [];
+  try {
+    const res = await fetch(`${API_URL}/api/staff/alert-kinds`);
+    const data = await res.json();
+    kinds = data.kinds || []; equipment = data.equipment || [];
+  } catch (e) {
+    alert("Can't reach the server — try again in a moment."); return;
+  }
+  _renderTellSheet(kinds, equipment);
+}
+
+function _renderTellSheet(kinds, equipment, step) {
+  document.getElementById('tell-picker')?.remove();
+  const P = { 1: '#e53935', 2: '#F9A825', 3: '#8a8175' };   // colour = kind, never sorted by
+  const sheet = document.createElement('div');
+  sheet.id = 'tell-picker';
+  sheet.style.cssText = 'position:fixed;inset:0;z-index:9750;background:rgba(43,39,36,0.85);' +
+    'display:flex;align-items:flex-end;justify-content:center;';
+  sheet.onclick = (e) => { if (e.target === sheet) sheet.remove(); };
+
+  // Second step: a REAL list, never a text box.
+  if (step) {
+    sheet.innerHTML = `
+      <div style="background:#fff;width:100%;max-width:520px;border-radius:18px 18px 0 0;
+        padding:18px 16px calc(18px + env(safe-area-inset-bottom));max-height:76vh;display:flex;flex-direction:column;">
+        <div style="font-family:'Caveat',cursive;font-size:26px;color:#2B2724;">${step.title}</div>
+        <div style="font-size:12px;color:#8a8175;margin-bottom:14px;">Tap one. Nothing to type.</div>
+        <div style="overflow-y:auto;flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          ${step.options.map(o => `<button onclick="_sendTell('${step.type}', ${JSON.stringify(step.key)}, ${JSON.stringify(String(o))})"
+            class="glaze-tile" style="border:none;border-radius:12px;padding:16px 10px;font-size:13px;
+            font-weight:700;cursor:pointer;">${o}</button>`).join('')}
+        </div>
+        <button onclick="document.getElementById('tell-picker').remove()"
+          style="margin-top:10px;width:100%;background:none;border:1px solid rgba(43,39,36,0.15);
+          border-radius:12px;padding:12px;font-size:13px;color:#8a8175;cursor:pointer;">Cancel</button>
+      </div>`;
+    document.body.appendChild(sheet);
+    return;
+  }
+
+  sheet.innerHTML = `
+    <div style="background:#fff;width:100%;max-width:520px;border-radius:18px 18px 0 0;
+      padding:18px 16px calc(18px + env(safe-area-inset-bottom));max-height:80vh;display:flex;flex-direction:column;">
+      <div style="font-family:'Caveat',cursive;font-size:26px;color:#2B2724;">What's happened?</div>
+      <div style="font-size:12px;color:#8a8175;margin-bottom:14px;">
+        Tap one — it goes to whoever deals with it. Nothing to type.</div>
+      <div style="overflow-y:auto;flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        ${kinds.map(k => `
+          <button onclick="_tellTap(${JSON.stringify(k)}, ${JSON.stringify(equipment)})" class="glaze-tile"
+            style="border:none;border-radius:14px;padding:14px 10px;cursor:pointer;text-align:left;
+            border-left:4px solid ${P[k.priority] || P[3]};">
+            <div style="font-size:20px;">${k.icon}</div>
+            <div style="font-size:13px;font-weight:800;line-height:1.2;margin-top:4px;">${k.label}</div>
+            <div style="font-size:10px;opacity:0.7;margin-top:3px;">→ ${k.nextRole}</div>
+          </button>`).join('')}
+      </div>
+      <button onclick="document.getElementById('tell-picker').remove()"
+        style="margin-top:10px;width:100%;background:#2B2724;color:#fff;border:none;border-radius:12px;
+        padding:13px;font-size:14px;font-weight:800;cursor:pointer;">Nothing right now</button>
+    </div>`;
+  document.body.appendChild(sheet);
+}
+
+// Some kinds need one more fact — WHICH equipment, WHICH stock item. Both
+// come from a real list, so there is still nothing to type.
+async function _tellTap(kind, equipment) {
+  if (kind.needs === 'equipment') {
+    return _renderTellSheet(null, null, { title: "What's broken?", type: kind.type, key: 'equipment', options: equipment });
+  }
+  if (kind.needs === 'stockItem') {
+    let items = [];
+    try {
+      const res = await fetch(`${API_URL}/api/stock?studioId=${studioId}`);
+      const data = await res.json();
+      items = (data.stock || data.items || []).map(i => i.name || i.item_name).filter(Boolean).slice(0, 40);
+    } catch (e) { /* fall through — an empty list is honest, a text box is not */ }
+    if (!items.length) { alert("No stock list to choose from yet — add stock in Setup first."); return; }
+    return _renderTellSheet(null, null, { title: 'Running low on what?', type: kind.type, key: 'item', options: items });
+  }
+  _sendTell(kind.type);
+}
+
+async function _sendTell(triggerType, extraKey, extraVal) {
+  // Context the app already knows — never asked for, never typed.
+  const data = {
+    staffName: currentShiftStaff?.name || null,
+    table: _detailBooking?.table_number || null,
+    customerName: _detailBooking?.customer_name || null,
+  };
+  if (extraKey) data[extraKey] = extraVal;
+  try {
+    const res = await fetch(`${API_URL}/api/staff/alerts`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, triggerType, bookingCode: _detailBooking?.booking_code || null, data }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    document.getElementById('tell-picker')?.remove();
+    updateAlertBellBadge();
+  } catch (e) {
+    alert("Couldn't send that — the server didn't take it. Try again in a moment.");
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
 // THE LAST DEAD LINK IN THE FILE. Built 16 July 2026.
 // ═══════════════════════════════════════════════════════════
 // openCleoAdminVoicePicker() was called from TWO places and defined in

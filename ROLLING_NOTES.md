@@ -3748,3 +3748,89 @@ Its safe-area handling therefore cannot work — every `env(safe-area-inset-*)` 
 resolves to 0. Not touched (Daisy's instruction was the studio app), but it means the
 customer app has the same class of problem, silently, and adding the meta without checking
 what it uncovers would be the mistake this note is about.
+
+# ═══════════════════════════════════════════════════════════
+# 16 July 2026 — bad news exists now. Plus a firewall finding.
+# ═══════════════════════════════════════════════════════════
+
+## The app could not say anything had gone wrong
+
+Counted before writing a line: **7 triggers, 7 successes, 0 problems.** The entire
+messaging vocabulary could say "table cleared" and "kiln fired" and could not report a
+single thing going wrong. Not a broken piece, not a no-show, not an unhappy customer.
+
+**That is not a gap in a feature — it is the shape of the whole app.** Every flow models
+success and assumes it. And it matters: if the only tile is the good one, staff press the
+good one anyway. A piece breaks, there is nowhere to say so, the booking is marked
+complete, and the pot quietly never existed. **The data becomes fiction, and politely.**
+
+**Seven bad-news triggers added.** Same shape as the good news: fixed vocabulary, routed
+by kind, priority a fact not an opinion, **no free text anywhere**.
+
+    💔 p1 Piece broken          -> Studio Manager
+    😟 p1 Customer needs you    -> Studio Manager
+    🔧 p1 Something is broken   -> Studio Manager   (asks: equipment)
+    🚫 p2 No-show               -> Studio Manager
+    🎨 p2 Running low on…       -> Studio Manager   (asks: stockItem)
+    ⏰ p2 Running behind        -> Studio Assistant
+    ❓ p2 Not sure what to do   -> Studio Manager
+
+**The trap in two of them, solved rather than dodged:** "Running low on…" and "Something
+is broken" need a WHAT. A text box would have been the obvious answer and would have
+destroyed the entire safety property. So both ask a SECOND question from a REAL list —
+equipment from `EQUIPMENT_KINDS`, stock from `/api/stock`. **There is still nothing to
+type anywhere in this system.** Do not add an "Other…" tile. Ever.
+
+`openTellPicker()` is a RENDERING of `/api/staff/alert-kinds`, never a second list —
+verified: 14 tiles from 14 kinds, 0 text inputs, no "Other". Previewed before pushing.
+
+## ⚠️ I nearly shipped bookings.status FOR THE THIRD TIME
+
+`staff_alerts.priority` — I added it to the insert this morning and did not check the
+column existed. **It doesn't.** `staff_alerts` has no CREATE TABLE anywhere in this repo.
+Without `FIX_ALERT_PRIORITY.sql`, **every alert insert fails** and the whole messaging
+system goes down silently — new tiles AND existing handoffs.
+
+    bookings.status         code read a column nobody created      (cost a week)
+    staff_shifts            I wrote SQL against a table that never existed
+    staff_alerts.priority   I wrote code against a column that never existed
+
+**Three times in two days. The last two were me.** Caught only because Daisy asked for the
+SQL and it got checked rather than assumed. **The lesson is not "be careful" — it is: grep
+for the column before you write to it. Four seconds.** Now section 6 of RUN_THESE_NOW.sql.
+
+## THE FIREWALL — what can reach the real world
+
+Every external host in both apps, swept:
+
+| host | what | verdict |
+|---|---|---|
+| `api.openai.com` | the AI generator | **LIVE — deliberately.** Hash-first, so it only fires when the free path is unsure |
+| `connect.squareup.com` | till / orders | **guarded** — 2 sites, 0 unguarded |
+| `api.parcel.royalmail.com` | postage | **guarded** — 5 sites, 0 unguarded |
+| Stripe | billing | **guarded** — 3 sites, 0 unguarded |
+| `fonts.googleapis.com` | fonts | free, harmless |
+| `your-kds-system.com` | **not a real call** — a placeholder in an input's `placeholder` attribute | fine |
+| `api.qrserver.com` | QR images | **⚠️ SEE BELOW** |
+
+**All three money paths default to OFF with no env set — i.e. Render right now.**
+
+### ⚠️ QR codes leak booking access tokens to a third party
+
+    const customerUrl = `${API_URL}/app?booking=${booking.booking_code}`;
+    // ...sent to:
+    https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(customerUrl)}
+
+**The booking code IS the access token** — it is how a customer opens their booking and
+sees their pieces. Every QR generation sends it **in a URL** to goqr.me, a third party
+with no contract, where it is logged, cached and passed in referrer headers. Seven call
+sites. It has always done this.
+
+**Completely avoidable:** QR renders locally in ~3KB of JS with no network call at all.
+**Not fixed** — it needs a dependency decision and a preview, and it is pre-existing
+rather than something introduced today. **First thing on the security list.**
+
+## Still open
+The Host By Post logo: use the existing mark (perforations one side, no type), or draw the
+wordmark Daisy describes (perforations both sides, "Host By Post" set in brand type)?
+Asked three times, never answered. Nothing will be invented in the meantime.
