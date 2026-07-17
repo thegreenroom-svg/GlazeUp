@@ -7012,7 +7012,13 @@
       cleoSpeak(text,
         () => { const btn = document.getElementById('wt-voice-btn'); if (btn) { btn.textContent = '🔊 Speaking…'; btn.classList.add('speaking'); } wtSpeaking = true; },
         () => { const btn = document.getElementById('wt-voice-btn'); if (btn) { btn.textContent = '🔊 Read aloud'; btn.classList.remove('speaking'); } wtSpeaking = false; },
-        1, 0.95 // genuine plain, neutral narrator voice for the walkthrough tour — not Cleo's cute character voice
+        // WAS 1, 0.95 — an explicit override that deliberately made the
+        // tour a different, neutral narrator. That was a reasonable call
+        // once, but it directly contradicts "the same voice all the way
+        // through": Cleo introduced herself in a voice that was not hers,
+        // then answered in one that was. She is one character. Passing
+        // her own numbers means the tour and her answers now match.
+        CLEO_VOICE_PITCH, CLEO_VOICE_RATE
       );
     }
 

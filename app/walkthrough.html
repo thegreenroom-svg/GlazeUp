@@ -14,6 +14,27 @@
   .wt-close { background:rgba(255,255,255,0.12); border:none; color:white; border-radius:20px; padding:7px 16px; font-size:13px; cursor:pointer; }
   .wt-progress-bar { height:3px; background:rgba(255,255,255,0.15); flex-shrink:0; }
   .wt-progress-fill { height:100%; background:var(--clay); transition:width 0.4s ease; }
+
+  /* ── Step transitions. The steps used to SNAP: render() swapped
+     innerHTML with nothing easing it, so every advance was a hard cut
+     even though the progress bar underneath was smoothly animating.
+     One shared class means every step moves identically instead of
+     each one being tuned by hand. ── */
+  .wt-anim-out { animation: wtOut 0.16s cubic-bezier(0.4,0,1,1) forwards; }
+  .wt-anim-in  { animation: wtIn 0.34s cubic-bezier(0.22,1,0.36,1) forwards; }
+  @keyframes wtOut {
+    to { opacity: 0; transform: translateY(-6px) scale(0.995); }
+  }
+  @keyframes wtIn {
+    from { opacity: 0; transform: translateY(10px) scale(0.99); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  /* The screen mock rises a touch later than the words, so the eye is
+     led text-first rather than everything arriving at once. */
+  .wt-screen.wt-anim-in { animation-delay: 0.05s; animation-fill-mode: both; }
+  .wt-dot.active { transform: scale(1.4); }
+  .wt-btn { transition: transform .12s ease, opacity .12s ease; }
+  .wt-btn:active:not(:disabled) { transform: scale(0.94); }
   .wt-info { padding:12px 20px 8px; flex-shrink:0; }
   .wt-step-label { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--clay); font-weight:600; margin-bottom:4px; }
   .wt-title { font-size:17px; font-weight:700; line-height:1.25; margin-bottom:5px; }
@@ -50,6 +71,8 @@
   @media (prefers-reduced-motion: reduce) {
     .wt-progress-fill { transition: none; }
     .wt-dot { transition: none; }
+    .wt-anim-out, .wt-anim-in, .wt-screen.wt-anim-in { animation: none !important; opacity: 1; transform: none; }
+    .wt-btn { transition: none; }
   }
 
   /* Large text / zoom support */
@@ -445,7 +468,9 @@ const STEPS = [
 ];
 
 // ── Voice ──
-let voiceOn = true;
+// Mute is remembered between visits — being re-muted every time you
+// open it is exactly the kind of small rudeness nobody reports.
+let voiceOn = localStorage.getItem('klnk_wt_muted') !== '1';
 
 function getBestVoice() {
   const voices = window.speechSynthesis.getVoices();
@@ -470,11 +495,19 @@ function getBestVoice() {
   return voices.find(v => v.lang.startsWith('en')) || null;
 }
 
+// ── THE one voice. Same two numbers as the staff app and the customer
+// app. This file was MISSED in the first voice pass and was running
+// 0.88/1.1 — a fifth Cleo, on the one screen whose entire job is to
+// introduce her. Guarded on the constructor too: an unguarded
+// SpeechSynthesisUtterance has silently killed her once before.
+const CLEO_VOICE_RATE  = 0.9;
+const CLEO_VOICE_PITCH = 1.22;
+
 function speak(text, onEnd) {
-  if (!window.speechSynthesis || !text) { if (onEnd) onEnd(); return; }
+  if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined' || !text) { if (onEnd) onEnd(); return; }
   window.speechSynthesis.cancel();
   const utt = new SpeechSynthesisUtterance(text);
-  utt.rate = 0.88; utt.pitch = 1.1; utt.lang = 'en-GB';
+  utt.rate = CLEO_VOICE_RATE; utt.pitch = CLEO_VOICE_PITCH; utt.lang = 'en-GB';
   const v = getBestVoice();
   if (v) utt.voice = v;
   utt.onstart = () => { const b = document.getElementById('btn-voice'); if (b) b.textContent = '🔊 Speaking…'; };
@@ -486,43 +519,92 @@ function stopVoice() { if (window.speechSynthesis) window.speechSynthesis.cancel
 
 function toggleVoice() {
   voiceOn = !voiceOn;
+  localStorage.setItem('klnk_wt_muted', voiceOn ? '0' : '1');
   const btn = document.getElementById('btn-voice');
   const narEl = document.getElementById('step-narration');
+
+  // Muting or unmuting mid-tour used to KILL autoplay, both ways.
+  // Unmute fired a bare speak() with no onEnd — and onEnd is the only
+  // thing that advances — so the chain just stopped. Mute called
+  // stopVoice(), which cancelled the utterance whose onEnd was, again,
+  // the only thing advancing. Either way the tour froze while the
+  // button still said Pause. scheduleNext() already knows how to run
+  // both ways (voice+onEnd when audible, a plain timer when muted), so
+  // the honest fix is to re-enter it rather than speak from here.
+  stopVoice();
+  clearTimeout(playTimer);
+
   if (voiceOn) {
     btn.textContent = '🔇 Mute';
     btn.style.background = '#B87946'; btn.style.color = 'white'; btn.style.borderColor = '#B87946';
     narEl.style.display = 'block';
+    if (playing) { scheduleNext(); return; }
     speak(STEPS[cur].voice);
   } else {
     btn.textContent = '🔊 Unmute';
     btn.style.background = ''; btn.style.color = ''; btn.style.borderColor = '';
     narEl.style.display = 'none';
-    stopVoice();
+    if (playing) { scheduleNext(); return; }  // keep running, silently, on the timer
   }
 }
 
 // Voices load async in Chrome — retry speaking once they're ready
 function initVoice() {
   if (!window.speechSynthesis) return;
+  // Single boot trigger. getVoices() is empty until onvoiceschanged on
+  // iOS, so starting autoplay before that means step one narrates in
+  // the wrong voice, or not at all. Guarded so it can only ever fire
+  // once however many times the event lands.
+  let booted = false;
   const tryStart = () => {
+    if (booted) return;
     const voices = window.speechSynthesis.getVoices();
-    if (voices.length > 0) {
-      // Voices ready — update button and speak first step
-      const btn = document.getElementById('btn-voice');
-      if (btn) { btn.textContent = '🔇 Mute'; btn.style.background = '#B87946'; btn.style.color = 'white'; btn.style.borderColor = '#B87946'; }
-      document.getElementById('step-narration').style.display = 'block';
-      speak(STEPS[0].voice);
-    }
+    if (!voices.length) return;
+    booted = true;
+    const btn = document.getElementById('btn-voice');
+    if (btn && voiceOn) { btn.textContent = '🔇 Mute'; btn.style.background = '#B87946'; btn.style.color = 'white'; btn.style.borderColor = '#B87946'; }
+    document.getElementById('step-narration').style.display = voiceOn ? 'block' : 'none';
+    _bootPlayback();
   };
   window.speechSynthesis.onvoiceschanged = tryStart;
-  // Also try immediately in case already loaded (Firefox/Safari)
   setTimeout(tryStart, 300);
+  // Voices may never arrive (no speech engine at all). Autoplay must
+  // still run on the silent timer rather than the tour just sitting there.
+  setTimeout(() => { if (!booted) { booted = true; _bootPlayback(); } }, 1500);
+}
+
+function _bootPlayback() {
+  if (playing) scheduleNext();          // defaults to play, per request
+  else if (voiceOn) speak(STEPS[cur].voice);
+  _syncPlayBtn();
 }
 
 // ── Render ──
-let cur = 0, playing = false, playTimer = null, bounceAngle = 0;
+// Defaults to playing, per direct request — you tap the icon and it
+// just runs. Pause/Back/Next/dots are all still there for frame-by-frame.
+let cur = 0, playing = true, playTimer = null, bounceAngle = 0;
 
+// Kept as the synchronous painter — everything already calls it, and
+// making it async would have meant chasing every caller. The easing
+// wraps it instead: fade the old out, paint, fade the new in.
 function render() {
+  _renderPaint();
+  // #wt-main-content is the real text block. The screen mock is an SVG
+  // <g> — animating THAT would scale it from the SVG's 0,0 origin
+  // rather than its own centre, so it would sail in from the top-left
+  // corner. Its HTML wrapper .wt-screen transforms predictably, so the
+  // wrapper is what moves.
+  const t = document.getElementById('wt-main-content');
+  const s = document.querySelector('.wt-screen');
+  [t, s].forEach(el => {
+    if (!el) return;
+    el.classList.remove('wt-anim-in');
+    void el.offsetWidth;            // force reflow or the replay won't retrigger
+    el.classList.add('wt-anim-in');
+  });
+}
+
+function _renderPaint() {
   const step = STEPS[cur];
   document.getElementById('progress').style.width = `${((cur+1)/STEPS.length)*100}%`;
   document.getElementById('step-label').textContent = `Step ${cur+1} of ${STEPS.length}`;
@@ -538,7 +620,11 @@ function render() {
   document.getElementById('dots').innerHTML = STEPS.map((_,i) =>
     `<button class="wt-dot${i===cur?' active':''}" onclick="goTo(${i})" role="tab" aria-selected="${i===cur}" aria-label="Go to step ${i+1}"></button>`
   ).join('');
-  if (voiceOn) speak(step.voice);
+  // Deliberately does NOT speak. It used to, and so did scheduleNext()
+  // for the very same line — so every autoplay step fired cancel() and
+  // then speak() back to back, which is a documented way to make iOS
+  // drop the utterance entirely. One owner per job: painting here,
+  // speaking at the call site that knows whether it needs an onEnd.
   renderArrows();
   if (typeof updateProgressAria !== 'undefined') updateProgressAria();
 }
@@ -579,13 +665,30 @@ function renderArrows() {
   });
 }
 
-function goTo(i) { if (i < 0 || i >= STEPS.length) return; stopVoice(); cur = i; render(); }
+function goTo(i) {
+  if (i < 0 || i >= STEPS.length) return;
+  // Stepping by hand takes the wheel. It used to leave `playing` true
+  // while stopVoice() killed the utterance whose onEnd was the only
+  // thing driving the advance — so autoplay died on the spot but the
+  // button still claimed to be playing. Now it pauses honestly.
+  if (playing) { playing = false; clearTimeout(playTimer); }
+  stopVoice();
+  cur = i;
+  render();
+  _syncPlayBtn();
+  if (voiceOn) speak(STEPS[cur].voice);
+}
+
+function _syncPlayBtn() {
+  const b = document.getElementById('btn-play');
+  if (b) b.textContent = playing ? '⏸ Pause' : (cur === STEPS.length - 1 ? '↺ Replay' : '▶ Play');
+}
 
 function togglePlay() {
   if (cur === STEPS.length - 1 && !playing) cur = 0;
   playing = !playing;
   if (playing) scheduleNext(); else { clearTimeout(playTimer); stopVoice(); }
-  document.getElementById('btn-play').textContent = playing ? '⏸ Pause' : '▶ Play';
+  _syncPlayBtn();
 }
 
 function scheduleNext() {
