@@ -10307,8 +10307,9 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
   // Either way, no cramped wrapping, no clipping.
   const viewportW = roomWidth || _measureFloorPlanWidth();
   const naturalW = _roomNaturalWidth(list);
-  // Always use viewport width — tables wrap into rows rather than overflow
-  const useWidth = viewportW;
+  // Use the wider of viewport and natural width
+  // Tables stay proper size; room scrolls horizontally if it won't fit
+  const useWidth = Math.max(viewportW, naturalW);
   const { placed, height } = _elegantLayoutRoom(list, useWidth);
   roomWidth = useWidth;
   const INK = '#2B2724';
