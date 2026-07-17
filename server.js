@@ -10567,6 +10567,211 @@ app.post('/api/stock/identify-by-photo', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════
+// JENNY'S STOCK ARRIVAL WORKFLOW — pallet box to shelf.
+//
+// Built ON TOP OF the existing stock_shape_photos + dHash matcher
+// above, not beside it. "Do I already know this piece?" is the same
+// question /api/stock/identify-by-photo already answers for free,
+// on-device, with no model and no API bill. Jenny photographs a
+// piece, that endpoint says matched:true/false, and this flow simply
+// branches on the answer. Reusing it means her workflow inherits
+// every hour of tuning already done on PHASH_CONFIDENT_DISTANCE.
+// ═══════════════════════════════════════════════════════════
+
+// POST /api/stock/arrival — a box has landed. Either the phash matched
+// a line we know (squareItemId set) or it didn't and Jenny said "add it"
+// (wasNewProduct true). Both paths end up here.
+app.post('/api/stock/arrival', async (req, res) => {
+  const { studioId, squareItemId, productLabel, quantityInBox, batchRef,
+          boxPhotoUrl, identifiedBy, wasNewProduct, recordedBy } = req.body;
+  if (!studioId || !quantityInBox) {
+    return res.status(400).json({ error: 'studioId and quantityInBox required' });
+  }
+  try {
+    const { data, error } = await supabase.from('stock_arrivals').insert({
+      studio_id: studioId,
+      square_item_id: squareItemId || null,
+      product_label: productLabel || null,
+      quantity_in_box: parseInt(quantityInBox, 10) || 0,
+      batch_ref: batchRef || null,
+      box_photo_url: boxPhotoUrl || null,
+      identified_by: identifiedBy || 'manual',
+      was_new_product: !!wasNewProduct,
+      recorded_by: recordedBy || null,
+      status: 'unpacking'
+    }).select().single();
+    if (error) throw error;
+
+    // What does the app already know about where this goes? Suggested,
+    // never imposed — Jenny confirms or overrides on the shelf step.
+    let suggestion = null;
+    if (squareItemId) {
+      const { data: mem } = await supabase.from('stock_location_memory')
+        .select('typical_shelf_location, times_placed, last_quantity')
+        .eq('studio_id', studioId).eq('square_item_id', squareItemId).maybeSingle();
+      if (mem?.typical_shelf_location) suggestion = mem;
+    }
+    res.json({ arrival: data, suggestion });
+  } catch (error) {
+    console.error('Stock arrival error:', error);
+    res.status(500).json({ error: error.message, hint: 'Has add_stock_arrivals_workflow been run?' });
+  }
+});
+
+// POST /api/stock/unpack — one tap per item as it leaves the box.
+// Idempotent on (arrival_id, item_number) so a double-tap on a phone
+// in a busy studio cannot double-count the stock.
+app.post('/api/stock/unpack', async (req, res) => {
+  const { arrivalId, itemNumber, status, reason, unpackedBy } = req.body;
+  if (!arrivalId || itemNumber == null || !status) {
+    return res.status(400).json({ error: 'arrivalId, itemNumber and status required' });
+  }
+  if (status !== 'good' && status !== 'defective') {
+    return res.status(400).json({ error: 'status must be good or defective' });
+  }
+  try {
+    const { error } = await supabase.from('stock_unpack_log').upsert({
+      arrival_id: arrivalId,
+      item_number: parseInt(itemNumber, 10),
+      status, reason: reason || null,
+      unpacked_by: unpackedBy || null,
+      unpacked_at: new Date().toISOString()
+    }, { onConflict: 'arrival_id,item_number' });
+    if (error) throw error;
+
+    const { data: rows } = await supabase.from('stock_unpack_log')
+      .select('status').eq('arrival_id', arrivalId);
+    const good = (rows || []).filter(r => r.status === 'good').length;
+    const defective = (rows || []).filter(r => r.status === 'defective').length;
+    res.json({ status: 'logged', good, defective, total: (rows || []).length });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/stock/arrival/:id — rebuild the whole flow's state from the
+// database, so Jenny can put the phone down mid-box, lose the tab, come
+// back, and carry on exactly where she was. Nothing lives only in memory.
+app.get('/api/stock/arrival/:id', async (req, res) => {
+  try {
+    const { data: arrival, error } = await supabase.from('stock_arrivals')
+      .select('*').eq('id', req.params.id).single();
+    if (error) throw error;
+    const { data: items } = await supabase.from('stock_unpack_log')
+      .select('item_number, status, reason').eq('arrival_id', req.params.id)
+      .order('item_number');
+    res.json({ arrival, items: items || [] });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/shelf/place — items are on the shelf. This is the step that
+// teaches the app: next time this line arrives it can say "these usually
+// go on B2" instead of asking cold.
+app.post('/api/shelf/place', async (req, res) => {
+  const { studioId, squareItemId, arrivalId, shelfLocation,
+          quantityPlaced, shelfPhotoUrl, placedBy } = req.body;
+  if (!studioId || !shelfLocation) {
+    return res.status(400).json({ error: 'studioId and shelfLocation required' });
+  }
+  try {
+    const { data, error } = await supabase.from('shelf_placement').insert({
+      studio_id: studioId,
+      square_item_id: squareItemId || null,
+      arrival_id: arrivalId || null,
+      shelf_location: shelfLocation,
+      quantity_placed: parseInt(quantityPlaced, 10) || 0,
+      shelf_photo_url: shelfPhotoUrl || null,
+      placed_by: placedBy || null
+    }).select().single();
+    if (error) throw error;
+
+    // Learn — but only from a real product line, never from an
+    // unidentified box, or the memory would fill with noise.
+    if (squareItemId) {
+      const { data: prev } = await supabase.from('stock_location_memory')
+        .select('times_placed, defective_count, total_count')
+        .eq('studio_id', studioId).eq('square_item_id', squareItemId).maybeSingle();
+
+      let defective = prev?.defective_count || 0;
+      let total = prev?.total_count || 0;
+      if (arrivalId) {
+        const { data: rows } = await supabase.from('stock_unpack_log')
+          .select('status').eq('arrival_id', arrivalId);
+        defective += (rows || []).filter(r => r.status === 'defective').length;
+        total += (rows || []).length;
+      }
+
+      await supabase.from('stock_location_memory').upsert({
+        studio_id: studioId, square_item_id: squareItemId,
+        typical_shelf_location: shelfLocation,
+        times_placed: (prev?.times_placed || 0) + 1,
+        last_quantity: parseInt(quantityPlaced, 10) || 0,
+        defective_count: defective, total_count: total,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'studio_id,square_item_id' });
+    }
+
+    if (arrivalId) {
+      await supabase.from('stock_arrivals')
+        .update({ status: 'done', completed_at: new Date().toISOString() })
+        .eq('id', arrivalId);
+    }
+    res.json({ placement: data });
+  } catch (error) {
+    console.error('Shelf place error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/shelf/expected — what SHOULD be on this shelf, so the
+// full-shelf verification photo has something honest to compare against.
+app.get('/api/shelf/expected', async (req, res) => {
+  const { studioId, shelfLocation } = req.query;
+  if (!studioId || !shelfLocation) return res.status(400).json({ error: 'studioId and shelfLocation required' });
+  try {
+    const { data } = await supabase.from('shelf_placement')
+      .select('square_item_id, quantity_placed, placed_at')
+      .eq('studio_id', studioId).eq('shelf_location', shelfLocation)
+      .order('placed_at', { ascending: false });
+
+    // Latest placement per line is the current expectation.
+    const seen = new Set(); const expected = [];
+    for (const row of data || []) {
+      if (!row.square_item_id || seen.has(row.square_item_id)) continue;
+      seen.add(row.square_item_id);
+      expected.push({ squareItemId: row.square_item_id, expectedQty: row.quantity_placed, placedAt: row.placed_at });
+    }
+    res.json({ shelfLocation, expected });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/shelf/adjust — the photo and the record disagreed and Jenny
+// said why. An honest audit trail: never silently overwrite a count.
+app.post('/api/shelf/adjust', async (req, res) => {
+  const { studioId, squareItemId, shelfLocation, countedQty, reason, adjustedBy } = req.body;
+  if (!studioId || !shelfLocation || countedQty == null || !reason) {
+    return res.status(400).json({ error: 'studioId, shelfLocation, countedQty and reason required' });
+  }
+  try {
+    const { data, error } = await supabase.from('shelf_placement').insert({
+      studio_id: studioId, square_item_id: squareItemId || null,
+      shelf_location: shelfLocation,
+      quantity_placed: parseInt(countedQty, 10) || 0,
+      placed_by: adjustedBy || null,
+      shelf_photo_url: null
+    }).select().single();
+    if (error) throw error;
+    res.json({ status: 'adjusted', reason, placement: data });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
 // STAFF CHECKLIST CUSTOMIZATION — per staff member, not shared.
 // Order, custom label, custom description for the stage checklists
 // in the real table detail panel. Deliberately separate from, and

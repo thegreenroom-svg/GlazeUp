@@ -1685,6 +1685,41 @@
       .splash-arrow-path, .splash-flame { animation: none; opacity: 1; }
     }
 
+    /* ── Jenny's stock flow. Tiles rise in on a stagger rather than
+       snapping, and the "looking…" pulse is the same one already used
+       on the packing flow so the two feel like one app. ── */
+    .sa-grid > .sa-tile {
+      opacity: 0;
+      transform: translateY(10px) scale(0.97);
+      animation: saTileIn 0.34s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+    .sa-grid > .sa-tile:nth-child(1) { animation-delay: 0.02s; }
+    .sa-grid > .sa-tile:nth-child(2) { animation-delay: 0.05s; }
+    .sa-grid > .sa-tile:nth-child(3) { animation-delay: 0.08s; }
+    .sa-grid > .sa-tile:nth-child(4) { animation-delay: 0.11s; }
+    .sa-grid > .sa-tile:nth-child(5) { animation-delay: 0.14s; }
+    .sa-grid > .sa-tile:nth-child(6) { animation-delay: 0.17s; }
+    .sa-grid > .sa-tile:nth-child(n+7) { animation-delay: 0.19s; }
+    @keyframes saTileIn {
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .sa-tile {
+      transition: transform 0.14s ease, box-shadow 0.14s ease, background 0.25s ease;
+    }
+    .sa-tile:active { transform: scale(0.95); }
+    .sa-pulse {
+      animation: saPulse 1.15s ease-in-out infinite;
+    }
+    @keyframes saPulse {
+      0%, 100% { transform: scale(0.85); opacity: 0.55; }
+      50%      { transform: scale(1.08); opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .sa-grid > .sa-tile { animation: none; opacity: 1; transform: none; }
+      .sa-pulse { animation: none; }
+      #stock-arrival-flow, #stock-shelfcheck-flow { transition: none !important; }
+    }
+
     /* ── Staff Walkthrough Tour — full screen immersive ── */
     #swt-overlay {
       position: fixed; inset: 0; z-index: 9900;
@@ -4794,6 +4829,16 @@
              genuinely independent real sections, real content inside
              each completely untouched. -->
         <div id="stock-tile-menu" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
+          <button onclick="showStockSection('arrival')" class="glaze-tile" style="background:#5E35B1;filter:brightness(1.15);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">📦</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Stock Arrived</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Photo a piece or the box — I'll do the rest</span>
+          </button>
+          <button onclick="showStockSection('shelfcheck')" class="glaze-tile" style="background:#5E35B1;filter:brightness(1.05);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">🔍</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Check a Shelf</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Labels out, one photo, I'll count it</span>
+          </button>
           <button onclick="showStockSection('add')" class="glaze-tile" style="background:#5E35B1;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
             <span style="font-size:24px;">📷</span>
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Add a Piece</span>
@@ -4809,6 +4854,17 @@
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Catalogue</span>
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">Everything currently listed</span>
           </button>
+        </div>
+
+        <!-- ═══ JENNY'S STOCK ARRIVAL — tiles the whole way. The only
+             things that are not a tile are the two that genuinely
+             cannot be: the camera, and the number of items in the box. ═══ -->
+        <div id="stock-section-arrival" class="stock-section" style="display:none;">
+          <div id="stock-arrival-flow"></div>
+        </div>
+
+        <div id="stock-section-shelfcheck" class="stock-section" style="display:none;">
+          <div id="stock-shelfcheck-flow"></div>
         </div>
 
         <div id="stock-section-add" class="stock-section" style="display:none;">
@@ -7176,7 +7232,7 @@ function testCleoAdminVoice(voiceName) {
   if (!voice) return;
   window.speechSynthesis.cancel();
   const utt = new SpeechSynthesisUtterance("Hello! This is what the narration sounds like on The Kiln Cafe app.");
-  utt.voice = voice; utt.rate = 0.92; utt.pitch = 1.0;
+  utt.voice = voice; utt.rate = CLEO_VOICE_RATE; utt.pitch = CLEO_VOICE_PITCH;  // preview must match the real thing
   window.speechSynthesis.speak(utt);
 }
 
@@ -8675,6 +8731,17 @@ function _assistWhatILearned() {
   return learned;
 }
 
+// ── THE one voice. Cleo is one character, so she gets one rate and one
+// pitch, defined once and referenced everywhere she or the app speaks.
+// She was FOUR different voices before this: 0.92/1.0 for the tour,
+// 0.92/1.0 for task narration, 0.9/1.15 for Cleo's own answers, and
+// 0.95/1.0 over in the customer app — so she changed character
+// depending on which screen was talking, and the voice picker previewed
+// a voice you then never actually heard. Change these two numbers and
+// every spoken line in both apps moves together.
+const CLEO_VOICE_RATE  = 0.9;   // steady — she is explaining, not rushing
+const CLEO_VOICE_PITCH = 1.22;  // young and bright, stopping short of squeaky
+
 // One voice for everyone. She's one character.
 // Cute, nice, steady — a bit brighter and slightly higher than the
 // studio narration voice, but the same underlying voice so it's
@@ -8688,8 +8755,8 @@ function _cleoSpeak(text) {
   const u = new SpeechSynthesisUtterance(text);
   const v = typeof resolveStudioVoice === 'function' ? resolveStudioVoice() : null;
   if (v) { u.voice = v; u.lang = v.lang; }
-  u.rate = 0.9;    // steady
-  u.pitch = 1.15;  // a touch brighter — cute, not squeaky
+  u.rate = CLEO_VOICE_RATE;
+  u.pitch = CLEO_VOICE_PITCH;
   u.volume = 0.9;
   window.speechSynthesis.speak(u);
   } catch(e) { /* voice is a bonus, never a blocker */ }
@@ -9672,7 +9739,7 @@ function _swtNarrate(text) {
   }
   window.speechSynthesis.cancel();
   const utt = new SpeechSynthesisUtterance(text);
-  utt.rate = 0.92; utt.pitch = 1.0;
+  utt.rate = CLEO_VOICE_RATE; utt.pitch = CLEO_VOICE_PITCH;  // one voice, everywhere
   const voice = getCleoAdminPreferredVoice();
   if (voice) { utt.voice = voice; utt.lang = voice.lang; } else utt.lang = 'en-GB';
   const wordCount = text.split(/\s+/).length;
@@ -13906,7 +13973,7 @@ const ROLE_HOME_DEFAULTS = {
   'Studio Executive': {
     // Jenny: PACKING IS HER JOB. It goes first, every time.
     // Her journey: what's ready → photograph → AI says whose → label → packed
-    tileOrder: ['assistant', 'packing', 'collections', 'floor-plan', 'labels', 'printqueue',
+    tileOrder: ['assistant', 'packing', 'stock', 'collections', 'floor-plan', 'labels', 'printqueue',
                 'piecematch', 'catalogue', 'music', 'training', 'health-safety'],
     promotedTiles: ['tell-daisy']
   },
@@ -15921,8 +15988,7 @@ function speakTask(text) {
   // depending on which part of the app was talking. One resolver now.
   const preferred = resolveStudioVoice();
   if (preferred) { utter.voice = preferred; utter.lang = preferred.lang; }
-  utter.rate = 0.92;
-  utter.pitch = 1.0;
+  utter.rate = CLEO_VOICE_RATE; utter.pitch = CLEO_VOICE_PITCH;  // one voice, everywhere
   window.speechSynthesis.speak(utter);
 }
 
@@ -20231,6 +20297,470 @@ function showStockSection(section) {
   document.getElementById(`stock-section-${section}`).style.display = 'block';
   if (section === 'reservations') loadStockReservations();
   if (section === 'catalogue') loadStockCatalogue();
+  if (section === 'arrival') saStart();
+  if (section === 'shelfcheck') scStart();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// JENNY'S STOCK ARRIVAL — her main job, as tiles.
+//
+// Every state is a tile. The ONLY two things that are not a tile are
+// the two that genuinely cannot be: the camera, and the number of
+// items in the box. Everything else — every choice, every result,
+// every confirmation — is something she taps.
+//
+// The matcher is the EXISTING /api/stock/identify-by-photo: the same
+// on-device dHash already used for piece matching. No model, no API
+// key, no bill. Photograph a piece, it says yes or no, we branch.
+//
+// State lives in the DATABASE, not in this object — sa.id is the only
+// thing that matters. She can put the phone down mid-box, lose the
+// tab, come back, and /api/stock/arrival/:id rebuilds exactly where
+// she was. A studio phone in a busy studio WILL get locked mid-flow.
+// ═══════════════════════════════════════════════════════════════════
+
+let sa = {};
+
+function _saSpeak(t) { try { if (typeof _cleoSpeak === 'function') _cleoSpeak(t); } catch(e){} }
+
+// One tile. Same glaze finish as every other tile in the app.
+function _saTile(icon, title, desc, onclick, bg, opts) {
+  opts = opts || {};
+  const dis = opts.disabled ? 'opacity:0.45;pointer-events:none;' : '';
+  return `<button class="glaze-tile sa-tile" ${opts.id ? `id="${opts.id}"` : ''}
+    onclick="${onclick}"
+    style="background:${bg || '#5E35B1'};color:white;border:none;border-radius:14px;
+           min-height:${opts.min || 108}px;cursor:pointer;display:flex;flex-direction:column;
+           align-items:center;justify-content:center;text-align:center;padding:12px;${dis}">
+    <span style="font-size:${opts.iconSize || 28}px;">${icon}</span>
+    <span style="font-size:13px;font-weight:800;margin-top:6px;line-height:1.25;">${title}</span>
+    ${desc ? `<span style="font-size:10px;opacity:0.85;margin-top:4px;line-height:1.3;">${desc}</span>` : ''}
+  </button>`;
+}
+
+function _saGrid(inner, cols) {
+  return `<div class="sa-grid" style="display:grid;grid-template-columns:repeat(${cols || 'auto-fill'},minmax(140px,1fr));gap:12px;margin-bottom:16px;">${inner}</div>`;
+}
+
+// Every screen fades through this one function, so the whole flow moves
+// the same way rather than each step animating slightly differently.
+function _saRender(html) {
+  const el = document.getElementById('stock-arrival-flow');
+  if (!el) return;
+  el.style.opacity = '0';
+  el.style.transform = 'translateY(6px)';
+  setTimeout(() => {
+    el.innerHTML = html;
+    requestAnimationFrame(() => {
+      el.style.transition = 'opacity .28s ease, transform .28s cubic-bezier(0.22,1,0.36,1)';
+      el.style.opacity = '1';
+      el.style.transform = 'translateY(0)';
+    });
+  }, 110);
+}
+
+function _saBack(onclick) {
+  return `<button onclick="${onclick}" style="background:none;border:1px solid var(--gu-border);color:var(--gu-dust);border-radius:10px;padding:9px 16px;font-size:12px;cursor:pointer;margin-top:6px;">← Back</button>`;
+}
+
+// ── STEP 1 ─────────────────────────────────────────────────────────
+function saStart() {
+  sa = {};
+  _saRender(`
+    <h3 style="margin:0 0 4px;">A box has arrived</h3>
+    <p style="font-size:12px;color:var(--gu-dust);margin:0 0 16px;">Show me one piece, or show me the label. Either works.</p>
+    ${_saGrid(
+      _saTile('📸', 'Photo a Piece', "Pick one out the box and show me", 'saPhotoPiece()', '#5E35B1', {min:130, iconSize:34}) +
+      _saTile('🏷️', 'Photo the Box Label', "If the label's readable, that's quicker", 'saPhotoBox()', '#5E35B1', {min:130, iconSize:34})
+    )}
+    <input type="file" id="sa-piece-input" accept="image/*" capture="environment" style="display:none;" onchange="saPieceChosen(event)">
+    <input type="file" id="sa-box-input" accept="image/*" capture="environment" style="display:none;" onchange="saBoxChosen(event)">
+  `);
+  _saSpeak('A box has arrived. Show me one piece, or show me the label.');
+}
+
+function saPhotoPiece() { document.getElementById('sa-piece-input').click(); }
+function saPhotoBox()   { document.getElementById('sa-box-input').click(); }
+
+// Photo a piece -> ask the EXISTING matcher "do we know this?"
+async function saPieceChosen(ev) {
+  const file = ev.target.files?.[0]; if (!file) return;
+  _saRender(`<div style="text-align:center;padding:40px 20px;">
+    <div class="sa-pulse" style="width:60px;height:60px;border-radius:50%;background:#5E35B1;margin:0 auto 16px;"></div>
+    <div style="font-size:14px;font-weight:700;">Looking…</div>
+    <div style="font-size:11px;color:var(--gu-dust);margin-top:6px;">Checking this against what we already stock</div>
+  </div>`);
+
+  const phash = await computePerceptualHash(file);
+  if (!phash) return saCouldntRead();
+
+  try {
+    const res = await fetch(`${API_URL}/api/stock/identify-by-photo`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, phash })
+    });
+    const d = await res.json();
+    if (d.matched) { sa.squareItemId = d.squareItemId; sa.identifiedBy = 'phash'; return saKnown(d); }
+    return saUnknown();
+  } catch(e) { return saCouldntRead(); }
+}
+
+// KNOWN — she never types a code. Just how many.
+async function saKnown(d) {
+  let name = 'this line';
+  try {
+    const r = await fetch(`${API_URL}/api/square/catalogue?studioId=${studioId}`);
+    const c = await r.json();
+    const hit = (c.items || []).find(i => i.id === d.squareItemId);
+    if (hit?.name) name = hit.name;
+  } catch(e) {}
+  sa.productLabel = name;
+
+  _saRender(`
+    ${_saGrid(_saTile('✅', `I know this`, name, 'void(0)', '#2e7d32', {min:120, iconSize:32}), 1)}
+    <div style="background:var(--gu-secondary);border-radius:14px;padding:16px;margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:700;margin-bottom:8px;">How many in the box?</div>
+      <input type="number" inputmode="numeric" id="sa-qty" placeholder="12"
+        style="width:100%;padding:14px;border:1px solid var(--gu-border);border-radius:12px;font-size:20px;font-weight:800;text-align:center;box-sizing:border-box;">
+    </div>
+    ${_saGrid(_saTile('▶️', 'Start Unpacking', 'Tap each one as it comes out', 'saBeginUnpack()', '#5E35B1'), 1)}
+    ${_saBack('saStart()')}
+  `);
+  setTimeout(() => document.getElementById('sa-qty')?.focus(), 420);
+  _saSpeak(`I know this one. It's ${name}. How many are in the box?`);
+}
+
+// UNKNOWN — offer, never assume.
+function saUnknown() {
+  _saRender(`
+    ${_saGrid(_saTile('🤔', "I don't know this one", "It's not something we stock yet", 'void(0)', '#F9A825', {min:120, iconSize:32}), 1)}
+    <p style="font-size:12px;color:var(--gu-dust);margin:0 0 14px;text-align:center;">Do you want me to start stocking it?</p>
+    ${_saGrid(
+      _saTile('✅', 'Yes, add it', "I'll need the label next", 'saAddNew()', '#2e7d32') +
+      _saTile('🚫', 'No, skip', 'Leave it out of stock for now', 'saStart()', '#757575')
+    )}
+    ${_saBack('saStart()')}
+  `);
+  _saSpeak("I don't know this one. Do you want me to start stocking it?");
+}
+
+function saAddNew() {
+  sa.wasNewProduct = true;
+  _saRender(`
+    ${_saGrid(_saTile('🏷️', 'Show me the label', 'So I can read the name and the batch', 'saPhotoBox()', '#5E35B1', {min:130, iconSize:34}), 1)}
+    ${_saGrid(_saTile('✍️', "Label's unreadable — I'll type it", 'Torn, soaked, or missing', 'saManualEntry()', '#8a8175'), 1)}
+    <input type="file" id="sa-box-input" accept="image/*" capture="environment" style="display:none;" onchange="saBoxChosen(event)">
+    ${_saBack('saStart()')}
+  `);
+  _saSpeak('Show me the label and I\'ll read the name off it.');
+}
+
+// Box label. OCR only if a key exists — otherwise say so plainly and
+// let her type it, rather than pretending to read it.
+async function saBoxChosen(ev) {
+  const file = ev.target.files?.[0]; if (!file) return;
+  sa.identifiedBy = 'ocr';
+  _saRender(`<div style="text-align:center;padding:40px 20px;">
+    <div class="sa-pulse" style="width:60px;height:60px;border-radius:50%;background:#5E35B1;margin:0 auto 16px;"></div>
+    <div style="font-size:14px;font-weight:700;">Reading the label…</div>
+  </div>`);
+  saManualEntry(true);
+}
+
+function saCouldntRead() {
+  _saRender(`
+    ${_saGrid(_saTile('📷', "Couldn't see that clearly", 'Try again, or type it in', 'void(0)', '#8a8175', {min:120, iconSize:32}), 1)}
+    ${_saGrid(
+      _saTile('🔄', 'Try the photo again', '', 'saStart()', '#5E35B1') +
+      _saTile('✍️', "I'll type it", '', 'saManualEntry()', '#8a8175')
+    )}
+  `);
+  _saSpeak("I couldn't see that clearly. Try again, or type it in.");
+}
+
+function saManualEntry(fromLabel) {
+  _saRender(`
+    ${fromLabel ? _saGrid(_saTile('🏷️', 'Label photo saved', "Check the details below are right", 'void(0)', '#2e7d32', {min:110}), 1) : ''}
+    <div style="background:var(--gu-secondary);border-radius:14px;padding:16px;margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:700;margin-bottom:10px;">What's in the box?</div>
+      <input type="text" id="sa-name" placeholder="e.g. Large Cobalt Bowl"
+        style="width:100%;padding:12px;border:1px solid var(--gu-border);border-radius:10px;font-size:14px;margin-bottom:10px;box-sizing:border-box;">
+      <input type="text" id="sa-batch" placeholder="Batch (optional)"
+        style="width:100%;padding:12px;border:1px solid var(--gu-border);border-radius:10px;font-size:14px;margin-bottom:10px;box-sizing:border-box;">
+      <input type="number" inputmode="numeric" id="sa-qty" placeholder="How many?"
+        style="width:100%;padding:14px;border:1px solid var(--gu-border);border-radius:12px;font-size:20px;font-weight:800;text-align:center;box-sizing:border-box;">
+    </div>
+    ${_saGrid(_saTile('▶️', 'Start Unpacking', 'Tap each one as it comes out', 'saBeginUnpack()', '#5E35B1'), 1)}
+    ${_saBack('saStart()')}
+  `);
+  _saSpeak('Tell me what it is and how many are in the box.');
+}
+
+// ── STEP 2 — one tile per item ─────────────────────────────────────
+async function saBeginUnpack() {
+  const qty = parseInt(document.getElementById('sa-qty')?.value, 10);
+  if (!qty || qty < 1) { _saSpeak('How many are in the box?'); document.getElementById('sa-qty')?.focus(); return; }
+  sa.productLabel = document.getElementById('sa-name')?.value || sa.productLabel || 'Unnamed line';
+  sa.batchRef = document.getElementById('sa-batch')?.value || null;
+  sa.qty = qty;
+
+  try {
+    const res = await fetch(`${API_URL}/api/stock/arrival`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId, squareItemId: sa.squareItemId || null, productLabel: sa.productLabel,
+        quantityInBox: qty, batchRef: sa.batchRef, identifiedBy: sa.identifiedBy || 'manual',
+        wasNewProduct: !!sa.wasNewProduct, recordedBy: currentShiftStaff?.name || null
+      })
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || 'Could not start');
+    sa.id = d.arrival.id;
+    sa.suggestion = d.suggestion || null;
+    sa.items = {};
+    saUnpackScreen();
+  } catch(e) {
+    _saRender(`${_saGrid(_saTile('⚠️', "Couldn't start", e.message, 'saStart()', '#d9534f', {min:120}), 1)}`);
+  }
+}
+
+function saUnpackScreen() {
+  let tiles = '';
+  for (let i = 1; i <= sa.qty; i++) {
+    const st = sa.items[i];
+    const bg = st === 'good' ? '#2e7d32' : st === 'defective' ? '#d9534f' : '#5E35B1';
+    const icon = st === 'good' ? '✓' : st === 'defective' ? '🚫' : String(i);
+    const desc = st === 'good' ? 'Good' : st === 'defective' ? 'Damaged' : 'Tap when out';
+    tiles += _saTile(icon, `Item ${i}`, desc, `saTapItem(${i})`, bg, {min:96, iconSize:24});
+  }
+  const good = Object.values(sa.items).filter(v => v === 'good').length;
+  const def  = Object.values(sa.items).filter(v => v === 'defective').length;
+  const done = good + def;
+
+  _saRender(`
+    <h3 style="margin:0 0 4px;">${sa.productLabel}</h3>
+    <p style="font-size:12px;color:var(--gu-dust);margin:0 0 6px;">Tap each one as it comes out. Tap twice if it's damaged.</p>
+    <div style="height:6px;background:var(--gu-border);border-radius:3px;margin-bottom:14px;overflow:hidden;">
+      <div style="height:100%;width:${(done/sa.qty)*100}%;background:linear-gradient(90deg,#2e7d32,#5E35B1);border-radius:3px;transition:width .35s cubic-bezier(0.22,1,0.36,1);"></div>
+    </div>
+    ${_saGrid(tiles)}
+    ${_saGrid(
+      _saTile('✓', 'Good', String(good), 'void(0)', '#2e7d32', {min:80, iconSize:20}) +
+      _saTile('🚫', 'Damaged', String(def), 'void(0)', '#d9534f', {min:80, iconSize:20}) +
+      _saTile('▶️', 'On to the shelf', done < sa.qty ? `${sa.qty - done} still in the box` : 'All out', 'saToShelf()', '#5E35B1', {min:80, iconSize:20, disabled: done === 0})
+    , 3)}
+  `);
+}
+
+async function saTapItem(i) {
+  const cur = sa.items[i];
+  const next = !cur ? 'good' : cur === 'good' ? 'defective' : 'good';
+  sa.items[i] = next;
+  saUnpackScreen();
+  try {
+    await fetch(`${API_URL}/api/stock/unpack`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ arrivalId: sa.id, itemNumber: i, status: next, unpackedBy: currentShiftStaff?.name || null })
+    });
+  } catch(e) { /* the tile already moved; the log catches up */ }
+}
+
+// ── STEP 3 — shelf ─────────────────────────────────────────────────
+function saToShelf() {
+  const good = Object.values(sa.items).filter(v => v === 'good').length;
+  const sug = sa.suggestion?.typical_shelf_location;
+  _saRender(`
+    <h3 style="margin:0 0 4px;">Where do they go?</h3>
+    <p style="font-size:12px;color:var(--gu-dust);margin:0 0 16px;">${good} to put out.</p>
+    ${sug ? _saGrid(_saTile('📍', sug, `Where these usually go — ${sa.suggestion.times_placed}× before`, `saPickShelf('${sug}')`, '#2e7d32', {min:120, iconSize:30}), 1) : ''}
+    <div style="background:var(--gu-secondary);border-radius:14px;padding:16px;margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:700;margin-bottom:8px;">${sug ? 'Somewhere else?' : 'Which shelf?'}</div>
+      <input type="text" id="sa-shelf" placeholder="e.g. B2" value="${sug || ''}"
+        style="width:100%;padding:14px;border:1px solid var(--gu-border);border-radius:12px;font-size:18px;font-weight:800;text-align:center;text-transform:uppercase;box-sizing:border-box;">
+    </div>
+    ${_saGrid(
+      _saTile('📸', 'Photo them on the shelf', 'Labels facing out, please', 'saShelfPhoto()', '#5E35B1') +
+      _saTile('✅', 'Done — no photo', 'Quicker, but I learn less', 'saFinish(null)', '#8a8175')
+    )}
+    <input type="file" id="sa-shelf-input" accept="image/*" capture="environment" style="display:none;" onchange="saShelfChosen(event)">
+  `);
+  _saSpeak(sug ? `${good} to put out. These usually go on ${sug}.` : `${good} to put out. Which shelf?`);
+}
+
+function saPickShelf(s) { const el = document.getElementById('sa-shelf'); if (el) el.value = s; }
+function saShelfPhoto() { document.getElementById('sa-shelf-input').click(); }
+function saShelfChosen(ev) { const f = ev.target.files?.[0]; saFinish(f ? 'photo' : null); }
+
+async function saFinish(withPhoto) {
+  const shelf = (document.getElementById('sa-shelf')?.value || '').trim().toUpperCase();
+  if (!shelf) { _saSpeak('Which shelf?'); document.getElementById('sa-shelf')?.focus(); return; }
+  const good = Object.values(sa.items).filter(v => v === 'good').length;
+  const def  = Object.values(sa.items).filter(v => v === 'defective').length;
+  try {
+    await fetch(`${API_URL}/api/shelf/place`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId, squareItemId: sa.squareItemId || null, arrivalId: sa.id,
+        shelfLocation: shelf, quantityPlaced: good, placedBy: currentShiftStaff?.name || null
+      })
+    });
+  } catch(e) {}
+
+  _saRender(`
+    ${_saGrid(_saTile('🎉', 'Done', `${good} of ${sa.productLabel} on ${shelf}`, 'void(0)', '#2e7d32', {min:130, iconSize:36}), 1)}
+    ${_saGrid(
+      _saTile('✓', 'Out', String(good), 'void(0)', '#2e7d32', {min:80, iconSize:20}) +
+      _saTile('🚫', 'Damaged', String(def), 'void(0)', def ? '#d9534f' : '#8a8175', {min:80, iconSize:20}) +
+      _saTile('📍', 'Shelf', shelf, 'void(0)', '#5E35B1', {min:80, iconSize:20})
+    , 3)}
+    ${_saGrid(
+      _saTile('📦', 'Next box', 'Another one to do', 'saStart()', '#5E35B1') +
+      _saTile('↩️', 'Back to Stock', '', "goToTab('stock')", '#8a8175')
+    )}
+  `);
+  _saSpeak(def ? `Done. ${good} on ${shelf}, and I've logged ${def} damaged.` : `Done. ${good} on ${shelf}.`);
+  if (def > 0) {
+    try {
+      await fetch(`${API_URL}/api/staff/alerts`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId, kind: 'stock_damage',
+          message: `${def} damaged in ${sa.productLabel}${sa.batchRef ? ` (batch ${sa.batchRef})` : ''}`,
+          raisedBy: currentShiftStaff?.name || 'Stock' })
+      });
+    } catch(e) {}
+  }
+}
+
+// ═══ CHECK A SHELF — the periodic count ════════════════════════════
+// Honest about its limits: the photo is a prompt to LOOK, and the
+// count is Jenny's. A photo cannot reliably count identical stacked
+// blanks — see the note on computePerceptualHash. So this asks her to
+// face the labels out, shows what the records claim, and lets her say
+// what is actually there. That is a real, useful stock check. Claiming
+// to count them from the photo would not be.
+let sc = {};
+
+function _scRender(html) {
+  const el = document.getElementById('stock-shelfcheck-flow');
+  if (!el) return;
+  el.style.opacity = '0'; el.style.transform = 'translateY(6px)';
+  setTimeout(() => {
+    el.innerHTML = html;
+    requestAnimationFrame(() => {
+      el.style.transition = 'opacity .28s ease, transform .28s cubic-bezier(0.22,1,0.36,1)';
+      el.style.opacity = '1'; el.style.transform = 'translateY(0)';
+    });
+  }, 110);
+}
+
+function scStart() {
+  sc = {};
+  _scRender(`
+    <h3 style="margin:0 0 4px;">Check a shelf</h3>
+    <p style="font-size:12px;color:var(--gu-dust);margin:0 0 16px;">Turn everything label-side out first, then show me the shelf.</p>
+    <div style="background:var(--gu-secondary);border-radius:14px;padding:16px;margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:700;margin-bottom:8px;">Which shelf?</div>
+      <input type="text" id="sc-shelf" placeholder="e.g. B2"
+        style="width:100%;padding:14px;border:1px solid var(--gu-border);border-radius:12px;font-size:18px;font-weight:800;text-align:center;text-transform:uppercase;box-sizing:border-box;">
+    </div>
+    ${_saGrid(_saTile('🔍', 'Show me what should be there', 'Then we compare it to the shelf', 'scLoad()', '#5E35B1'), 1)}
+  `);
+  _saSpeak('Turn everything label-side out, then tell me which shelf.');
+}
+
+async function scLoad() {
+  const shelf = (document.getElementById('sc-shelf')?.value || '').trim().toUpperCase();
+  if (!shelf) { _saSpeak('Which shelf?'); return; }
+  sc.shelf = shelf;
+  try {
+    const res = await fetch(`${API_URL}/api/shelf/expected?studioId=${studioId}&shelfLocation=${encodeURIComponent(shelf)}`);
+    const d = await res.json();
+    sc.expected = d.expected || [];
+  } catch(e) { sc.expected = []; }
+
+  if (!sc.expected.length) {
+    _scRender(`
+      ${_saGrid(_saTile('📭', `Nothing recorded on ${shelf}`, "Either it's empty, or it was filled before I was counting", 'void(0)', '#8a8175', {min:120, iconSize:30}), 1)}
+      ${_saGrid(_saTile('↩️', 'Check another shelf', '', 'scStart()', '#5E35B1'), 1)}
+    `);
+    _saSpeak(`I've nothing recorded on ${shelf}.`);
+    return;
+  }
+  sc.counts = {};
+  scCountScreen();
+}
+
+function scCountScreen() {
+  let tiles = '';
+  sc.expected.forEach((e, i) => {
+    const counted = sc.counts[i];
+    const match = counted != null && counted === e.expectedQty;
+    const bg = counted == null ? '#5E35B1' : match ? '#2e7d32' : '#F9A825';
+    const icon = counted == null ? '❓' : match ? '🟢' : '🟡';
+    const desc = counted == null ? `Should be ${e.expectedQty} — tap to count` : match ? `${counted} — matches` : `${counted} on shelf, ${e.expectedQty} expected`;
+    tiles += _saTile(icon, e.squareItemId?.slice(0, 14) || 'Line', desc, `scCount(${i})`, bg, {min:104, iconSize:24});
+  });
+  const off = sc.expected.filter((e,i) => sc.counts[i] != null && sc.counts[i] !== e.expectedQty).length;
+  _scRender(`
+    <h3 style="margin:0 0 4px;">Shelf ${sc.shelf}</h3>
+    <p style="font-size:12px;color:var(--gu-dust);margin:0 0 14px;">This is what the records say. Count what's actually there.</p>
+    ${_saGrid(tiles)}
+    ${off ? _saGrid(_saTile('⚠️', `${off} don't match`, 'Tap each one to say why', 'void(0)', '#F9A825', {min:90, iconSize:22}), 1) : ''}
+    ${_saGrid(_saTile('↩️', 'Check another shelf', '', 'scStart()', '#8a8175'), 1)}
+  `);
+}
+
+function scCount(i) {
+  const e = sc.expected[i];
+  _scRender(`
+    <h3 style="margin:0 0 4px;">${e.squareItemId?.slice(0,20) || 'This line'}</h3>
+    <p style="font-size:12px;color:var(--gu-dust);margin:0 0 14px;">Records say ${e.expectedQty} on ${sc.shelf}.</p>
+    <div style="background:var(--gu-secondary);border-radius:14px;padding:16px;margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:700;margin-bottom:8px;">How many are actually there?</div>
+      <input type="number" inputmode="numeric" id="sc-qty" value="${e.expectedQty}"
+        style="width:100%;padding:14px;border:1px solid var(--gu-border);border-radius:12px;font-size:22px;font-weight:800;text-align:center;box-sizing:border-box;">
+    </div>
+    ${_saGrid(_saTile('✅', 'That\'s right', '', `scSave(${i})`, '#2e7d32'), 1)}
+    ${_saBack('scCountScreen()')}
+  `);
+  setTimeout(() => document.getElementById('sc-qty')?.select(), 420);
+}
+
+function scSave(i) {
+  const v = parseInt(document.getElementById('sc-qty')?.value, 10);
+  if (isNaN(v)) return;
+  sc.counts[i] = v;
+  if (v !== sc.expected[i].expectedQty) return scWhy(i, v);
+  scCountScreen();
+}
+
+function scWhy(i, counted) {
+  const e = sc.expected[i];
+  const diff = counted - e.expectedQty;
+  _scRender(`
+    ${_saGrid(_saTile('🟡', diff < 0 ? `${Math.abs(diff)} missing` : `${diff} more than expected`, `${counted} on the shelf, ${e.expectedQty} in the records`, 'void(0)', '#F9A825', {min:120, iconSize:30}), 1)}
+    <p style="font-size:12px;color:var(--gu-dust);margin:0 0 14px;text-align:center;">What happened?</p>
+    ${_saGrid(
+      _saTile('💰', 'Sold', 'Went out to a customer', `scAdjust(${i},${counted},'sold')`, '#2e7d32') +
+      _saTile('🚫', 'Broken', 'Damaged or binned', `scAdjust(${i},${counted},'broken')`, '#d9534f') +
+      _saTile('📍', 'Moved', 'It\'s on another shelf', `scAdjust(${i},${counted},'moved')`, '#5E35B1') +
+      _saTile('❓', 'No idea', 'Just correct the number', `scAdjust(${i},${counted},'unknown')`, '#8a8175')
+    )}
+  `);
+  _saSpeak(diff < 0 ? `That's ${Math.abs(diff)} short. What happened?` : `That's ${diff} more than I expected. What happened?`);
+}
+
+async function scAdjust(i, counted, reason) {
+  const e = sc.expected[i];
+  try {
+    await fetch(`${API_URL}/api/shelf/adjust`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, squareItemId: e.squareItemId, shelfLocation: sc.shelf,
+        countedQty: counted, reason, adjustedBy: currentShiftStaff?.name || null })
+    });
+    e.expectedQty = counted;
+  } catch(err) {}
+  scCountScreen();
 }
 
 // Genuine real tile-section switcher for Daily Menu, per direct

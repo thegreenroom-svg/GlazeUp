@@ -6873,6 +6873,13 @@
       if (btn) btn.textContent = isMuted ? '🔇' : '🔊';
     }
 
+    // ── THE one voice — identical to the staff app's. Cleo is one
+    // character across both; she was 0.95/1.0 here and 0.9/1.15 there,
+    // so she sounded like a different girl depending on whether you
+    // were staff or a customer. Same two numbers now, both sides.
+    const CLEO_VOICE_RATE  = 0.9;
+    const CLEO_VOICE_PITCH = 1.22;
+
     // Genuine, generic speech function — real UK voice preference,
     // shared by the walkthrough tour AND Cleo's actual chat/tooltip
     // voice, rather than duplicating this logic in three places.
@@ -6885,8 +6892,10 @@
       // (clever and a little cheeky, not a flat neutral narrator).
       // Callers that want the plain neutral voice (the walkthrough
       // tour) pass their own values; anything else defaults to hers.
-      utt.rate = rate != null ? rate : 0.95;
-      utt.pitch = pitch != null ? pitch : 1.0; // genuine real natural pitch, per direct request tonight
+      // Same two numbers as the staff app — she is the same character in
+      // both, so callers may still override, but the DEFAULT is now hers.
+      utt.rate = rate != null ? rate : CLEO_VOICE_RATE;
+      utt.pitch = pitch != null ? pitch : CLEO_VOICE_PITCH;
       const selectedVoice = getCleoPreferredVoice();
       utt.voice = selectedVoice;
       // Genuine fix: lang was hardcoded to en-GB regardless of which
@@ -6988,8 +6997,8 @@
       window.speechSynthesis.cancel();
       const utt = new SpeechSynthesisUtterance("Hi, I'm Cleo! This is what I sound like.");
       utt.voice = voice;
-      utt.rate = 0.95;
-      utt.pitch = 1.0;
+      utt.rate = CLEO_VOICE_RATE;   // preview must match the real thing
+      utt.pitch = CLEO_VOICE_PITCH;
       window.speechSynthesis.speak(utt);
     }
 
