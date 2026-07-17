@@ -14301,9 +14301,31 @@ function renderDetailChecklist() {
     </div>
     ${checks.map((c, i) => {
       const done = !!b.checks?.[`${stage}:${c.key}`];
-      return `<div style="display:flex;align-items:stretch;gap:6px;margin-bottom:6px;">
+      // ═══════════════════════════════════════════════════════════
+      // TWO GENUINE CONSTRAINTS IN CONFLICT. 17 July 2026.
+      // ═══════════════════════════════════════════════════════════
+      // Three stacked buttons at a real 44px each need 132px of vertical
+      // space. A checklist row's own content needs about 48px. Stretching
+      // the row to fit the buttons inflated every item into a slab —
+      // "slow loading" was four items filling the whole screen, not a
+      // fetch. Shrinking the buttons back to fit the row undoes the tap
+      // fix entirely — I checked the arithmetic rather than assume it:
+      // 44px of column height split three ways with two 1px gaps is
+      // 14px each, WORSE than the 19px that caused the mis-tap in the
+      // first place. Stacking cannot give both at once; the two
+      // constraints are genuinely incompatible in that shape.
+      //
+      // So: horizontal instead of stacked. Width is the dimension a
+      // phone actually has to spare — this row is the full screen width
+      // minus one label button. Three 44px squares side by side fit
+      // comfortably and need no more vertical space than the row's own
+      // content already uses, because height is set by the tallest
+      // sibling and 44px is close to what the label button needs anyway.
+      // Order left to right: rename, then the two moves, so the one
+      // that was mis-hit into is no longer adjacent to either arrow.
+      return `<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px;">
         <button onclick="toggleFlowCheck('${b.booking_code}','${stage}','${c.key}',${!done})"
-          style="flex:1;text-align:left;
+          style="width:100%;text-align:left;
             background:${done ? 'rgba(76,175,80,0.1)' : 'rgba(255,255,255,0.04)'};
             border:1px solid ${done ? 'rgba(76,175,80,0.35)' : 'rgba(255,255,255,0.1)'};
             border-radius:10px;padding:10px 12px;cursor:pointer;
@@ -14317,31 +14339,21 @@ function renderDetailChecklist() {
             ${c.description ? `<div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;">${c.description}</div>` : ''}
           </div>
         </button>
-        <!-- ═══════════════════════════════════════════════════════════
-             ▲ ▼ ✎ WERE 28px TALL EACH, STACKED WITH NO GAP. 17 July 2026.
-             ═══════════════════════════════════════════════════════════
-             A rename dialog appeared where a reorder tap was meant — the
-             screenshot showed it happening right after the arrows were
-             used. Not a routing bug: three buttons in a 28px-wide column,
-             each roughly 19px tall, is well under Apple's own 44x44
-             minimum tap target in BOTH dimensions, with zero gap between
-             them. Missing by a few pixels on a real thumb isn't user
-             error, it's the target being smaller than a fingertip.
-             Visible icon size is unchanged — only the tappable area
-             grows, via a transparent padded hit zone around each glyph,
-             so the row doesn't get visually bulkier. -->
-        <div style="display:flex;flex-direction:column;gap:3px;">
+        <!-- Explained above, where the row's own shape is decided —
+             this is the horizontal 44x44 strip that resolved it. -->
+        <div style="display:flex;gap:4px;">
+          <button onclick="_editChecklistItem('${stage}','${c.key}')"
+            style="width:44px;height:44px;border:none;border-radius:8px;background:rgba(184,121,70,0.15);
+              color:#B87946;font-size:14px;cursor:pointer;flex-shrink:0;
+              display:flex;align-items:center;justify-content:center;">✎</button>
           <button onclick="_moveChecklistItem('${stage}',${i},-1)" ${i === 0 ? 'disabled' : ''}
-            style="flex:1;min-width:44px;min-height:44px;border:none;border-radius:8px 8px 0 0;background:rgba(255,255,255,0.06);
-              color:${i === 0 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.6)'};font-size:14px;cursor:pointer;
+            style="width:44px;height:44px;border:none;border-radius:8px;background:rgba(255,255,255,0.06);
+              color:${i === 0 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.6)'};font-size:14px;cursor:pointer;flex-shrink:0;
               display:flex;align-items:center;justify-content:center;">▲</button>
           <button onclick="_moveChecklistItem('${stage}',${i},1)" ${i === checks.length - 1 ? 'disabled' : ''}
-            style="flex:1;min-width:44px;min-height:44px;border:none;background:rgba(255,255,255,0.06);
-              color:${i === checks.length - 1 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.6)'};font-size:14px;cursor:pointer;
+            style="width:44px;height:44px;border:none;border-radius:8px;background:rgba(255,255,255,0.06);
+              color:${i === checks.length - 1 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.6)'};font-size:14px;cursor:pointer;flex-shrink:0;
               display:flex;align-items:center;justify-content:center;">▼</button>
-          <button onclick="_editChecklistItem('${stage}','${c.key}')"
-            style="flex:1;min-width:44px;min-height:44px;border:none;border-radius:0 0 8px 8px;background:rgba(184,121,70,0.15);
-              color:#B87946;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✎</button>
         </div>
       </div>`;
     }).join('')}
