@@ -12443,6 +12443,7 @@ const GRID_NAV_STRUCTURE = [
   // demo booking so it's fully functional, not a mockup.
   { tab: 'customer-demo', label: '👀 Customer App', desc: 'See what customers see', fn: 'openCustomerDemo' },
   { tab: 'whats-on', label: '📅 What\'s On', desc: 'Local events & school holidays', fn: 'openWhatsOn' },
+  { tab: 'tell-daisy', label: '💬 Tell Daisy', desc: 'Something good or bad happened', fn: 'openTellPicker' },
   ]},
   { id: 'dashboard', label: 'Dashboard', color: '#B87946', items: [
     { tab: 'dashboard', label: 'Overview', desc: 'Your daily overview' },
@@ -22658,39 +22659,34 @@ function openHostByPost() {
 }
 
 function showPostBoard() {
+  // ═══════════════════════════════════════════════════════════
+  // HOST BY POST — TILES. 17 July 2026.
+  // ═══════════════════════════════════════════════════════════
+  // Daisy: "I want the tile system we have everywhere. I don't
+  // wanna see the orders until there's a button saying new order."
+  // Was a kanban list — every order visible at once. Now: stage
+  // tiles with counts, tap to drill in. Same grammar as everywhere.
   _floorViewMode = 'post';
   const view = document.getElementById('floor-plan-view');
   if (!view) return;
   const orders = _ordersNow();
 
-  const columns = POST_STAGES.map(s => {
-    const inStage = orders.filter(o => o.status === s.id);
-    return `
-      <div style="margin-bottom:18px;">
-        <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;">
-          <span style="width:8px;height:8px;border-radius:50%;background:${s.colour};"></span>
-          <span style="font-size:11px;font-weight:800;text-transform:uppercase;
-            letter-spacing:0.09em;color:#2B2724;">${s.label}</span>
-          <span style="font-size:11px;color:#8a8175;">${inStage.length}</span>
-          ${s.real ? '' : `<span style="font-size:9px;color:#B87946;border:1px solid rgba(184,121,70,0.4);
-            border-radius:8px;padding:1px 6px;">not saved yet</span>`}
-        </div>
-        ${inStage.length ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-          ${inStage.map(o => `
-            <button class="glaze-tile" onclick="showOrderDetail('${o.order_reference}')"
-              style="border:none;padding:13px;text-align:left;cursor:pointer;">
-              <div style="font-size:13px;font-weight:800;color:#2B2724;">${o.order_reference}</div>
-              <div style="font-size:11px;color:#2B2724;opacity:0.75;margin-top:2px;">${o.customer_name}</div>
-              <div style="font-size:10px;color:#8a8175;margin-top:3px;">
-                ${o.quantity} kit${o.quantity === 1 ? '' : 's'} · ${o.shipping_city || ''}
-              </div>
-            </button>`).join('')}
-        </div>` : `<div style="font-size:11px;color:#8a8175;padding:4px 2px;">Nothing here.</div>`}
-      </div>`;
+  const stageTiles = POST_STAGES.map(st => {
+    const count = orders.filter(o => o.status === st.id).length;
+    const dim = count === 0;
+    return `<button onclick="showPostStage('${st.id}')" class="glaze-tile"
+      style="border:none;border-radius:16px;padding:18px 14px;cursor:pointer;
+      background:${dim ? 'rgba(43,39,36,0.06)' : st.colour};
+      color:${dim ? '#8a8175' : '#fff'};text-align:left;min-height:88px;
+      display:flex;flex-direction:column;justify-content:space-between;">
+      <div style="font-size:26px;font-weight:900;line-height:1;">${count}</div>
+      <div style="font-family:'Caveat',cursive;font-size:18px;font-weight:700;">${st.label}</div>
+      ${st.real ? '' : '<div style="font-size:9px;opacity:0.7;">not tracked yet</div>'}
+    </button>`;
   }).join('');
 
   view.innerHTML = `
-    <div style="padding:14px;max-width:900px;margin:0 auto;">
+    <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
       ${_postResting() ? `
         <div style="display:flex;align-items:center;gap:8px;justify-content:center;
           background:rgba(249,168,37,0.12);border:1px solid rgba(249,168,37,0.4);
@@ -22698,9 +22694,62 @@ function showPostBoard() {
           <span style="width:7px;height:7px;border-radius:50%;background:#F9A825;"></span>
           <span style="font-size:11px;font-weight:700;color:#8a6a12;">Example orders — nothing live yet</span>
         </div>` : ''}
-      <h1 style="font-family:'Caveat',cursive;font-size:26px;color:#2B2724;margin:0 0 14px;">Host By Post</h1>
-      ${columns}
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+        <div>
+          <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">Host By Post</div>
+          <div style="font-size:11px;color:#8a8175;">${orders.length} order${orders.length===1?'':'s'}</div>
+        </div>
+        <button onclick="goToRealLandingPage()" class="glaze-tile"
+          style="border:none;padding:8px 12px;font-size:11px;font-weight:800;cursor:pointer;flex-shrink:0;">← Floor plan</button>
+      </div>
+      <button onclick="openNewPostOrder()" class="glaze-tile"
+        style="width:100%;border:none;border-radius:16px;padding:20px;cursor:pointer;
+        background:linear-gradient(135deg,#B87946,#9A6435);color:#fff;margin-bottom:16px;
+        font-size:17px;font-weight:800;">📦 New order</button>
+      <div style="font-size:10px;color:#8a8175;font-family:'Architects Daughter',cursive;
+        letter-spacing:0.06em;margin-bottom:8px;">Tap a stage</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${stageTiles}</div>
     </div>`;
+  toggleFloatingBackBtn();
+}
+
+// Drill into one stage — orders live here, as tiles
+function showPostStage(stageId) {
+  const view = document.getElementById('floor-plan-view');
+  if (!view) return;
+  const st = POST_STAGES.find(x => x.id === stageId);
+  if (!st) return;
+  const orders = _ordersNow().filter(o => o.status === stageId);
+
+  const orderTiles = orders.length
+    ? orders.map(o => `
+        <button onclick="showOrderDetail('${o.order_reference}')" class="glaze-tile"
+          style="width:100%;border:none;border-radius:14px;padding:16px;cursor:pointer;
+          text-align:left;margin-bottom:8px;">
+          <div style="font-family:'Caveat',cursive;font-size:20px;font-weight:700;color:#2B2724;">${o.customer_name || 'Order'}</div>
+          <div style="font-size:11px;color:#8a8175;margin-top:2px;">
+            ${o.order_reference} · ${o.quantity} kit${o.quantity===1?'':'s'}${o.shipping_city ? ' · ' + o.shipping_city : ''}
+          </div>
+        </button>`).join('')
+    : `<div style="text-align:center;padding:40px 20px;color:#8a8175;font-size:13px;">Nothing in ${st.label.toLowerCase()} right now.</div>`;
+
+  view.innerHTML = `
+    <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="width:10px;height:10px;border-radius:50%;background:${st.colour};"></span>
+          <div style="font-family:'Caveat',cursive;font-size:24px;font-weight:700;color:#2B2724;">${st.label}</div>
+        </div>
+        <button onclick="showPostBoard()" class="glaze-tile"
+          style="border:none;padding:8px 12px;font-size:11px;font-weight:800;cursor:pointer;">← Back</button>
+      </div>
+      ${orderTiles}
+    </div>`;
+}
+
+// New order — the flow itself is next session's work
+function openNewPostOrder() {
+  alert('New order flow — next session.');
 }
 
 // ORDER — the table. Same junction as showTableDetail().
