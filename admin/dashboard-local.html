@@ -10220,7 +10220,7 @@ let _detailTimerInterval = null;
 // fix this by tweaking a fixed number earlier tonight. Real fix:
 // measure the container at render time, cap sensibly, re-render on
 // resize / rotation. One layout, works everywhere.
-const _ELEGANT_PAD = 18, _ELEGANT_GAP = 10;
+const _ELEGANT_PAD = 10, _ELEGANT_GAP = 8;
 const _ELEGANT_MIN_WIDTH = 300;    // below this, layout won't wrap nicely
 const _ELEGANT_MAX_WIDTH = 900;    // above this on a huge screen, further scale is empty
 function _measureFloorPlanWidth() {
@@ -10229,8 +10229,8 @@ function _measureFloorPlanWidth() {
   // so tables get proper breathing room in wider layouts. The room
   // renderer now ALSO computes a per-room "natural" width (see
   // _roomNaturalWidth below) and uses whichever is larger.
-  const winW = window.innerWidth || document.documentElement.clientWidth;
-  const target = Math.max(360, Math.min(_ELEGANT_MAX_WIDTH, winW - 40));
+  const winW = Math.min(window.innerWidth, document.documentElement.clientWidth) || 390;
+  const target = Math.max(300, Math.min(_ELEGANT_MAX_WIDTH, winW - 32));
   return target;
 }
 
@@ -21898,11 +21898,11 @@ function _handRect(x, y, w, h, seed, weight, ink, fill) {
 
 // Seats decide the table's footprint. Sizes are in plan units.
 function _tableSize(seats) {
-  if (seats <= 2) return { w: 55, h: 55 };
-  if (seats <= 4) return { w: 65, h: 62 };
-  if (seats <= 6) return { w: 90, h: 62 };
-  if (seats <= 8) return { w: 115, h: 62 };
-  if (seats <= 12) return { w: 140, h: 62 };
+  if (seats <= 2) return { w: 50, h: 48 };
+  if (seats <= 4) return { w: 58, h: 54 };
+  if (seats <= 6) return { w: 82, h: 54 };
+  if (seats <= 8) return { w: 105, h: 54 };
+  if (seats <= 12) return { w: 130, h: 54 };
   return { w: 180, h: 65 };
 }
 
