@@ -11572,13 +11572,13 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
            + (seated ? `<circle cx="${t.x + ch.x}" cy="${t.y + ch.y}" r="3.6" fill="${accent}" fill-opacity="0.55"/>` : '');
     }).join('');
 
-    const label = tappable ? '' : (busy
-      ? `<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 - 3}" text-anchor="middle"
-           font-family="'Caveat',cursive" font-size="22" font-weight="700" fill="${INK}">${t.name}</text>
-         <text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 + 13}" text-anchor="middle"
-           font-family="'Caveat',cursive" font-size="14" fill="${INK}" fill-opacity="0.75">${b.customer_name || ''}</text>`
-      : `<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 + 5}" text-anchor="middle"
-           font-family="'Caveat',cursive" font-size="21" font-weight="500" fill="${INK}" fill-opacity="0.4">${t.name}</text>`);
+    const label = busy
+      ? `<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 + 4}" text-anchor="middle"
+           font-family="'Caveat',cursive" font-size="${tappable ? 11 : 14}" font-weight="700"
+           fill="${INK}">${(b.customer_name || '').split(' ')[0]}</text>`
+      : (tappable ? '' : `<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 + 5}" text-anchor="middle"
+           font-family="'Architects Daughter',cursive" font-size="11" fill="${INK}"
+           fill-opacity="0.25">${t.name}</text>`);
 
     const stripe = busy
       ? `<line x1="${t.x + 8}" y1="${t.y + t.size.h - 5}" x2="${t.x + t.size.w - 8}" y2="${t.y + t.size.h - 5}"
