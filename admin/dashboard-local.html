@@ -10474,32 +10474,27 @@ async function _seatAt(tableName) {
 }
 
 function _renderArrivals(unseated) {
+  // Compact chips above each room — not a full-screen list.
+  // The floor plan is the home screen; arrivals are a small prompt.
   if (!unseated.length) return '';
   const t = (b) => b.session_start
     ? new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
-  return `
-    <div style="margin-bottom:22px;">
-      <h2 style="color:#2B2724;font-family:'Architects Daughter',cursive;font-size:14px;
-        letter-spacing:0.06em;margin:0 0 8px;opacity:0.6;">
-        Arriving — not seated yet${_seatingBooking ? ' · now tap a table' : ''}
-      </h2>
-      <div style="display:flex;flex-direction:column;gap:8px;width:100%;">
-        ${unseated.sort((a,b) => (a.session_start||'').localeCompare(b.session_start||'')).map(b => {
-          const on = _seatingBooking === b.booking_code;
-          // Square's service name is the only clue to the room. Ours wins if set.
-          const where = b.room || b.space_name || '';
-          return `<button onclick="_startSeating('${b.booking_code}')"
-            style="flex-shrink:0;text-align:left;background:${on ? '#2B2724' : '#FFFDF9'};
-            color:${on ? '#FFFDF9' : '#2B2724'};border:1.5px ${on ? 'solid #2B2724' : 'dashed rgba(43,39,36,0.3)'};
-            border-radius:12px;padding:10px 13px;cursor:pointer;width:100%;box-sizing:border-box;text-align:left;">
-            <div style="font-family:'Caveat',cursive;font-size:19px;font-weight:700;">${b.customer_name || 'Booking'}</div>
-            <div style="font-size:11px;opacity:0.75;">${t(b)}${b.party_size ? ` · ${b.party_size} covers` : ''}</div>
-            ${where ? `<div style="font-size:10px;opacity:0.6;margin-top:2px;">${where}</div>` : ''}
-            <div style="font-size:10px;font-weight:800;margin-top:5px;">${on ? 'tap a table →' : 'tap to seat'}</div>
-          </button>`;
-        }).join('')}
-      </div>
-    </div>`;
+  const sorted = unseated.slice().sort((a,b) => (a.session_start||'').localeCompare(b.session_start||''));
+  const chips = sorted.map(b => {
+    const on = _seatingBooking === b.booking_code;
+    const name = (b.customer_name||'Booking').split(' ')[0];
+    return `<button onclick="_startSeating('${b.booking_code}')"
+      style="background:${on?'#2B2724':'rgba(43,39,36,0.1)'};color:${on?'#fff':'#2B2724'};
+      border:1px ${on?'solid #2B2724':'dashed rgba(43,39,36,0.4)'};border-radius:20px;
+      padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;
+      font-family:'Caveat',cursive;flex-shrink:0;">${name} ${t(b)}</button>`;
+  }).join('');
+  const label = _seatingBooking ? 'Now tap a table' : 'Tap to seat';
+  return `<div style="margin-bottom:12px;">
+    <div style="font-size:10px;color:#8a8175;font-family:'Architects Daughter',cursive;
+      letter-spacing:0.06em;margin-bottom:6px;">${label}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">${chips}</div>
+  </div>`;
 }
 
 // #floor-plan-view is the canvas for THREE different screens now: the
