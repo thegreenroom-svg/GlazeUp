@@ -4368,3 +4368,70 @@ DOM as a no-op in case any legacy JS references it).
 📮 all now visible in the header alongside the alert bell — same dark ink round
 tiles for visual consistency. Previously the parallel session had hidden them
 as "legacy" but Daisy wants them back.
+
+# ═══════════════════════════════════════════════════════════
+# TRIAL MODE — things switched off, how to restore them
+# 17 July 2026
+# ═══════════════════════════════════════════════════════════
+
+## Switched OFF for the trial (one line each to restore):
+
+1. **PIN + Face ID login** — `selectLoginMember()` in dashboard-local.html
+   Set `TRIAL_SKIP_AUTH = false` to restore full login flow.
+
+2. **Nagging popup alerts** — `HANDOFF_POPUP_ENABLED = false`
+   Set to `true` to restore the flashing handoff modal.
+
+3. **Cleo helper/mascot** — `CLEO_HELPER_ENABLED = false`
+   Set to `true` to restore the floating helper and voice picker.
+
+4. **Square writes** — `SQUARE_WRITES_ENABLED` env var (Render)
+   Set to `true` in Render environment variables to enable.
+
+5. **Royal Mail writes** — `ROYAL_MAIL_WRITES_ENABLED` env var
+   Set to `true` in Render environment variables to enable.
+
+6. **Stripe writes** — `STRIPE_WRITES_ENABLED` env var
+   Set to `true` in Render environment variables to enable.
+
+7. **Opening checklist** — `checkOpeningChecklistStatus()` in applyShiftUI()
+   Uncomment that line to restore.
+
+8. **Platform revenue strip** — `applyPlatformRevenueAccess()` gates it
+   by `PLATFORM_REVENUE_ENABLED` flag. Set to enable.
+
+9. **QR token leak fix** — `api.qrserver.com` still used (7 call sites)
+   Replace with local QR renderer before going public.
+
+## Trial hours (10am-4pm):
+   In server.js `/api/floor/active`: `TRIAL_OPEN_HOUR = 10`, `TRIAL_CLOSE_HOUR = 16`
+   Change to real studio hours when trial ends.
+
+# ═══════════════════════════════════════════════════════════
+# TRIAL MODE — things switched off, how to restore them
+# 17 July 2026
+# ═══════════════════════════════════════════════════════════
+
+## Switched OFF for the trial (one line each to restore):
+
+1. **PIN + Face ID login** — `selectLoginMember()` in dashboard-local.html
+   Set `TRIAL_SKIP_AUTH = false` to restore full login flow.
+
+2. **Nagging popup alerts** — `HANDOFF_POPUP_ENABLED = false`
+   Set to `true` to restore the flashing handoff modal.
+
+3. **Cleo helper/mascot** — `CLEO_HELPER_ENABLED = false`
+   Set to `true` to restore floating helper and voice picker.
+
+4. **Square writes** — `SQUARE_WRITES_ENABLED` env var (Render)
+   Set to `true` in Render environment variables.
+
+5. **Royal Mail writes** — `ROYAL_MAIL_WRITES_ENABLED` env var
+
+6. **Stripe writes** — `STRIPE_WRITES_ENABLED` env var
+
+7. **Opening checklist** — uncomment `checkOpeningChecklistStatus()` in applyShiftUI()
+
+8. **QR token leak** — replace `api.qrserver.com` with local renderer (7 sites)
+
+## Trial hours: server.js TRIAL_OPEN_HOUR=10, TRIAL_CLOSE_HOUR=16

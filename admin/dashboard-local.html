@@ -9537,6 +9537,25 @@ async function loadLoginNamePicker() {
 }
 
 function selectLoginMember(member) {
+  // ═══════════════════════════════════════════════════════
+  // TRIAL MODE — tap name = straight in. No PIN, no Face ID.
+  // TO RESTORE FULL LOGIN: set TRIAL_SKIP_AUTH = false
+  // Everything else (PIN, Face ID, welcome back) is untouched.
+  // ═══════════════════════════════════════════════════════
+  const TRIAL_SKIP_AUTH = true;
+  if (TRIAL_SKIP_AUTH) {
+    currentShiftStaff = { id: member.id, name: member.name, role: member.role || '' };
+    localStorage.setItem('klnk_last_logged_in_id', member.id);
+    localStorage.setItem('klnk_shift_staff', JSON.stringify(currentShiftStaff));
+    markSessionActive();
+    document.getElementById('shift-login-modal').style.display = 'none';
+    goToTab('floor-plan');
+    applyShiftUI();
+    window._floorPlanLocked = true;
+    setTimeout(() => { window._floorPlanLocked = false; }, 3000);
+    return;
+  }
+  // ═══════════════════════════════════════════════════════
   selectedLoginMember = member;
   const color = ROLE_COLORS_LOGIN[member.role] || '#999';
 
