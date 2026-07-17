@@ -6159,9 +6159,17 @@ function goToTab(tab, event) {
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
 
   const targetView = document.getElementById(tab + '-view');
-  // floor-plan-view uses flex layout — must be 'flex' not 'block'
-  // or _checkFloorPlanMode won't recognise it as visible
-  targetView.style.display = tab === 'floor-plan' ? 'flex' : 'block';
+  // FLOOR PLAN: render BEFORE showing, so the dark legacy children
+  // inside the container never flash. Everything else shows immediately.
+  // 17 July 2026 — this was the black flash Daisy kept seeing: the
+  // container went display:flex with dark modals still inside it, and
+  // loadFloorPlan() only replaced them a moment later.
+  if (tab === 'floor-plan') {
+    // stay hidden — loadFloorPlan() below will show it once rendered
+    targetView.style.display = 'none';
+  } else {
+    targetView.style.display = 'block';
+  }
   // Trigger reflow so the animation replays every time, not just on first show
   void targetView.offsetWidth;
   targetView.classList.add('fade-in');
@@ -6243,7 +6251,16 @@ function goToTab(tab, event) {
     // real data properly, and only needed the one correct function
     // name. Calling the wrong replacement here would have thrown away
     // a working, data-driven system for a guessed demo one.
-    loadFloorPlan();
+    //
+    // 17 July 2026: render FIRST, reveal AFTER. The container holds
+    // legacy dark children; showing it before render flashed black.
+    loadFloorPlan().then(() => {
+      const v = document.getElementById('floor-plan-view');
+      if (v && currentTab === 'floor-plan') v.style.display = 'flex';
+    }).catch(() => {
+      const v = document.getElementById('floor-plan-view');
+      if (v) v.style.display = 'flex';   // show anyway on error
+    });
   } else if (tab === 'staff') {
     showStaffSection('booking');
     loadBookingsOverview();
