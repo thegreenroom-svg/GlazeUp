@@ -2892,20 +2892,20 @@
       <!-- Left: logo + abbreviated studio name -->
       <div style="display:flex;align-items:center;gap:7px;flex-shrink:1;min-width:0;">
         <img src="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png" alt="The Kiln Cafe" style="width:28px;height:28px;flex-shrink:0;">
-        <h1 id="studio-name" style="margin:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px;">The Kiln Cafe</h1>
+        <h1 id="studio-name" style="margin:0;font-size:14px;font-weight:700;white-space:nowrap;">The Kiln Cafe</h1>
       </div>
 
       <!-- Right: shift badge + bell + mini tiles including logout -->
-      <div class="admin-header-right" style="display:flex;align-items:center;gap:6px;min-width:0;overflow-x:auto;overscroll-behavior-x:contain;">
+      <div class="admin-header-right" style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
 
-        <button id="shift-badge" onclick="toggleTaskQueue()" style="display:none;background:linear-gradient(135deg,#2B2724,var(--link-clay));border:none;border-radius:20px;padding:5px 10px 5px 5px;font-size:11px;font-weight:700;color:white;cursor:pointer;align-items:center;gap:5px;position:relative;max-width:100px;">
-          <span id="shift-badge-avatar" style="width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,0.25);color:white;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;">–</span>
+        <button id="shift-badge" onclick="toggleTaskQueue()" style="display:none;background:linear-gradient(135deg,#2B2724,var(--link-clay));border:none;border-radius:16px;padding:3px 8px 3px 3px;font-size:10px;font-weight:700;color:white;cursor:pointer;align-items:center;gap:4px;position:relative;flex-shrink:0;">
+          <span id="shift-badge-avatar" style="width:18px;height:18px;border-radius:50%;font-size:9px;background:rgba(255,255,255,0.25);color:white;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;">–</span>
           <span id="shift-badge-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52px;">–</span>
           <span id="shift-badge-break-indicator" style="display:none;background:#3949ab;color:white;font-size:8px;font-weight:800;padding:1px 5px;border-radius:8px;">☕</span>
           <span id="shift-task-count-badge" style="display:none;background:#e53935;color:white;font-size:9px;font-weight:800;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 3px;">0</span>
         </button>
 
-        <button id="alert-bell-btn" onclick="toggleAlertFeed()" style="background:#2B2724;color:white;border:none;border-radius:50%;width:32px;height:32px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0;">
+        <button id="alert-bell-btn" onclick="toggleAlertFeed()" style="background:#2B2724;color:white;border:none;border-radius:50%;width:28px;height:28px;flex-shrink:0;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0;">
           🔔
           <span id="alert-bell-badge" style="display:none;position:absolute;top:-2px;right:-2px;background:#e53935;color:white;font-size:8px;font-weight:800;width:14px;height:14px;border-radius:50%;align-items:center;justify-content:center;border:1.5px solid white;">0</span>
         </button>
@@ -10470,7 +10470,9 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
   // Tables stay proper size; room scrolls horizontally if it won't fit
   // On mobile, always wrap to viewport. On tablet/desktop, allow natural width.
   // Always wrap to viewport width — works portrait and landscape
-  const useWidth = viewportW;
+  // OVERVIEW: always fit viewport — tables wrap, never scroll sideways
+  // The home screen is a click-through portal, not a working view.
+  const useWidth = tappable ? viewportW : Math.max(viewportW, naturalW);
   const { placed, height } = _elegantLayoutRoom(list, useWidth);
   roomWidth = useWidth;
   const INK = '#2B2724';
@@ -10581,7 +10583,7 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
         ${roomName}${tappable ? ' →' : ''}
       </h2>
       <svg viewBox="0 -10 ${roomWidth} ${height}"
-        style="width:100%;min-width:${roomWidth + 20}px;height:auto;display:block;background:#F4ECE0;
+        style="width:100%;${tappable ? '' : `min-width:${roomWidth + 20}px;`}height:auto;display:block;background:#F4ECE0;
         border:1px solid rgba(43,39,36,0.15);border-radius:10px;">
         <defs>${_PENCIL_FILTER}</defs>
         <g filter="url(#pencil)">${tableEls}</g>
