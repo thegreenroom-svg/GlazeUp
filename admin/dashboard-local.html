@@ -3104,6 +3104,9 @@
   <!-- Instant ivory placeholder — shows while loadFloorPlan() runs, prevents dark flash -->
   <div id="floor-plan-placeholder" style="flex:1;background:#F4ECE0;display:flex;align-items:center;justify-content:center;">
     <div style="font-family:'Architects Daughter',cursive;font-size:14px;color:#c8bfb0;letter-spacing:0.06em;">Loading studio…</div>
+      <div id="floor-trace-loading" style="font-family:'Architects Daughter',cursive;font-size:9px;
+        color:#B87946;opacity:0.8;margin-top:14px;text-align:center;max-width:90vw;line-height:1.5;
+        word-break:break-word;"></div>
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════
@@ -6341,6 +6344,8 @@ function goToTab(tab, event) {
   if (tab === 'floor-plan') {
     // stay hidden — loadFloorPlan() below will show it once rendered
     targetView.style.display = 'none';
+    const _tl2 = document.getElementById('floor-trace-loading');
+    if (_tl2) _tl2.textContent = 'how I got here: ' + (window._navTrace || []).join(' → ');
   } else {
     targetView.style.display = 'block';
   }
@@ -13623,6 +13628,30 @@ async function loadFloorPlan() {
 }
 
 // Show the floor plan view (accessible to everyone at all times)
+// ═══════════════════════════════════════════════════════════
+// THE DARK SKELETON, STILL ALIVE IN HERE. 17 July 2026.
+// ═══════════════════════════════════════════════════════════
+// A real screenshot at 20:40: "Loading studio…" over the OLD dark
+// floor plan — MAIN STUDIO · TABLES 1-8, LOUNGE, THE VAULT, in black
+// and green and purple. That is the legacy markup sitting inside
+// #floor-plan-view in the HTML, and this file has fought it for days.
+//
+// goToTab('floor-plan') was taught the fix already, in as many words:
+// "render BEFORE showing, so the dark legacy children inside the
+// container never flash." It hides the view, awaits loadFloorPlan(),
+// and only then reveals it.
+//
+// This function never learned it. It did the opposite, in this order:
+//     display = 'flex'      <- container revealed, still full of the
+//                              old dark children
+//     loadFloorPlan()       <- replaces them a moment LATER
+// So every route through here — the Floor Plan tile, dismissFloorDemo —
+// showed the dark skeleton for the length of a fetch. On Render's free
+// tier, that is a cold start: seconds, not milliseconds. The bug was
+// never "the elegant design keeps reverting"; it was two functions
+// showing the same container, and only one of them knowing the rule.
+//
+// Same order as goToTab now. One rule, both doors.
 function showFloorPlan() {
   _trace('showFloorPlan()');
   // Never set currentTab, so the app's answer to "where am I" went stale
@@ -13631,9 +13660,20 @@ function showFloorPlan() {
   currentTab = 'floor-plan';
   _homeGuardUntil = 0;              // deliberate: you asked for the floor plan
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
-  document.getElementById('floor-plan-view').style.display = 'flex';
-  loadFloorPlan();
-  toggleFloatingBackBtn();
+  const v = document.getElementById('floor-plan-view');
+  if (v) v.style.display = 'none';  // stay hidden until there is something to show
+  const _tl = document.getElementById('floor-trace-loading');
+  if (_tl) _tl.textContent = 'how I got here: ' + (window._navTrace || []).join(' → ');
+  loadFloorPlan().then(() => {
+    if (v && currentTab === 'floor-plan') v.style.display = 'flex';
+    toggleFloatingBackBtn();
+  }).catch(() => {
+    // The error path renders its own ivory screen into the same
+    // container (fixed 15 July), so revealing it here is safe and
+    // shows a readable message rather than the dark skeleton.
+    if (v && currentTab === 'floor-plan') v.style.display = 'flex';
+    toggleFloatingBackBtn();
+  });
 }
 
 function renderFloorPlan() {
