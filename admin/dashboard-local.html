@@ -15609,7 +15609,34 @@ function _tileGoToTab(tabId, fnName) {
   _recordTabUsage(tabId);
   if (fnName) {
     const f = window[fnName];
-    if (typeof f === 'function') { f(); return; }
+    if (typeof f === 'function') {
+      // ═══════════════════════════════════════════════════════════
+      // EVERY fn-BASED TILE RENDERED UNDERNEATH THE GRID. 17 July 2026.
+      // ═══════════════════════════════════════════════════════════
+      // "click on music and it goes to this page again" — the tile
+      // grid, unmoved. It wasn't a dead tap: openMusic() genuinely ran,
+      // wrote "Music" into #floor-plan-view, and set it to display:flex.
+      // But #grid-nav-view — the tiles page itself — was never hidden,
+      // stayed on top of it, and covered it completely. Tap Music, get
+      // Music, see tiles. Indistinguishable from nothing happening.
+      //
+      // This was never a Music bug. It is every fn-based tile at once:
+      // Packing, Health & Safety, Collections, My Training, What's On,
+      // Customer Demo, Tell Daisy, Trial Reset — none of these functions
+      // hide the grid, because none of them were ever asked to. The path
+      // for a plain tab (goToTab, below) always hid every view first;
+      // the path for an ACTION never did, because nobody had reason to
+      // notice until an action's own screen needed to be seen and
+      // wasn't.
+      //
+      // Fixed at the one place both paths already pass through, so nine
+      // functions did not need nine individual edits and can't drift
+      // out of sync with each other again.
+      const grid = document.getElementById('grid-nav-view');
+      if (grid) grid.style.display = 'none';
+      f();
+      return;
+    }
     console.warn(`Tile "${tabId}" declares fn "${fnName}" but no such function exists — falling back to goToTab.`);
   }
   goToTab(tabId);
