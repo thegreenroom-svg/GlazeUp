@@ -5508,6 +5508,110 @@ app.get('/api/local-events', (req, res) => {
   res.json({ events: upcoming });
 });
 
+// ═══════════════════════════════════════════════════════════
+// STAFF TRAINING — tick, sign, logged. 17 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Daisy: "a tick box that then completes and gives Daisy a file to
+// log, or automatically logs under staff profile on her page that
+// they've ticked and understood and read, and therefore fully trained."
+//
+// Nothing to type except the signature — everything else is a tile.
+// The modules are a fixed vocabulary here, same principle as
+// ALERT_TRIGGERS: one source, never a second hand-written list.
+
+const TRAINING_MODULES = [
+  // Induction — everyone, before working unsupervised
+  { id: 'fire',      icon: '🚨', label: 'Fire safety',      role: 'all', order: 1 },
+  { id: 'kiln',      icon: '🔥', label: 'Kiln safety',      role: 'all', order: 2 },
+  { id: 'coshh',     icon: '🧪', label: 'COSHH & glazes',   role: 'all', order: 3 },
+  { id: 'handling',  icon: '📦', label: 'Manual handling',  role: 'all', order: 4 },
+  { id: 'slips',     icon: '💧', label: 'Slips & clean floors', role: 'all', order: 5 },
+  { id: 'children',  icon: '👶', label: 'Children in the studio', role: 'all', order: 6 },
+  { id: 'firstaid',  icon: '🩹', label: 'First aid & accidents', role: 'all', order: 7 },
+  { id: 'opening',   icon: '🌅', label: 'Opening the studio', role: 'all', order: 8 },
+  { id: 'closing',   icon: '🌙', label: 'Closing the studio', role: 'all', order: 9 },
+  // Role-specific
+  { id: 'tech_kiln',   icon: '⚙️', label: 'Kiln programming',  role: 'Ceramic Technician', order: 10 },
+  { id: 'tech_glaze',  icon: '🎨', label: 'Glaze mixing',      role: 'Ceramic Technician', order: 11 },
+  { id: 'tech_faults', icon: '🔍', label: 'Firing faults',     role: 'Ceramic Technician', order: 12 },
+  { id: 'asst_seat',   icon: '🪑', label: 'Seating customers', role: 'Studio Assistant', order: 10 },
+  { id: 'asst_photo',  icon: '📷', label: 'Photographing pieces', role: 'Studio Assistant', order: 11 },
+  { id: 'asst_break',  icon: '💔', label: 'Handling breakages', role: 'Studio Assistant', order: 12 },
+  { id: 'mgr_riddor',  icon: '📋', label: 'Accident reporting', role: 'Studio Manager', order: 10 },
+  { id: 'mgr_risk',    icon: '⚠️', label: 'Risk assessment review', role: 'Studio Manager', order: 11 },
+  { id: 'mgr_fire',    icon: '🧯', label: 'Fire drill coordination', role: 'Studio Manager', order: 12 },
+];
+
+// GET /api/training/modules?role= — what this person needs to complete
+app.get('/api/training/modules', (req, res) => {
+  const { role } = req.query;
+  const mods = TRAINING_MODULES
+    .filter(m => m.role === 'all' || (role && m.role === role))
+    .sort((a,b) => a.order - b.order);
+  res.json({ modules: mods });
+});
+
+// GET /api/training/status?studioId=&staffMemberId= — what they've done
+app.get('/api/training/status', async (req, res) => {
+  const { studioId, staffMemberId } = req.query;
+  if (!studioId || !staffMemberId) return res.status(400).json({ error: 'studioId and staffMemberId required' });
+  try {
+    const { data } = await supabase.from('staff_training')
+      .select('module_id, completed, completed_at, signed_name')
+      .eq('studio_id', studioId).eq('staff_member_id', staffMemberId);
+    const done = {};
+    (data || []).forEach(r => { if (r.completed) done[r.module_id] = r; });
+    res.json({ completed: done });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/training/complete — tick a module
+app.post('/api/training/complete', async (req, res) => {
+  const { studioId, staffMemberId, moduleId, signedName } = req.body;
+  if (!studioId || !staffMemberId || !moduleId) {
+    return res.status(400).json({ error: 'studioId, staffMemberId and moduleId required' });
+  }
+  try {
+    await supabase.from('staff_training').upsert({
+      studio_id: studioId, staff_member_id: staffMemberId, module_id: moduleId,
+      completed: true, completed_at: new Date().toISOString(), signed_name: signedName || null,
+    }, { onConflict: 'studio_id,staff_member_id,module_id' });
+    res.json({ completed: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/training/overview?studioId= — Daisy's view of everyone
+app.get('/api/training/overview', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const { data: staff } = await supabase.from('staff_team')
+      .select('id, name, role').eq('studio_id', studioId).eq('active', true).order('name');
+    const { data: training } = await supabase.from('staff_training')
+      .select('staff_member_id, module_id, completed, completed_at')
+      .eq('studio_id', studioId).eq('completed', true);
+
+    const byStaff = {};
+    (training || []).forEach(t => {
+      if (!byStaff[t.staff_member_id]) byStaff[t.staff_member_id] = [];
+      byStaff[t.staff_member_id].push(t.module_id);
+    });
+
+    const overview = (staff || []).map(s => {
+      const required = TRAINING_MODULES.filter(m => m.role === 'all' || m.role === s.role);
+      const done = byStaff[s.id] || [];
+      const doneCount = required.filter(m => done.includes(m.id)).length;
+      return {
+        id: s.id, name: s.name, role: s.role,
+        done: doneCount, total: required.length,
+        complete: doneCount === required.length,
+        outstanding: required.filter(m => !done.includes(m.id)).map(m => m.label),
+      };
+    });
+    res.json({ staff: overview });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // POST /api/floor/seat — put a booking on a table.
 //
 // THE MISSING HALF. Square tells us WHEN, WHO and WHICH ROOM (via the

@@ -11999,35 +11999,64 @@ function _updateNavControls() {
 // Role-based default tile sets — applied on first login if no personal
 // screen exists yet. Sub-tile tab IDs can be included as promoted tiles.
 const ROLE_HOME_DEFAULTS = {
-  'Barista': {
-    // Was tileOrder: [] with the comment "David has his own dedicated page —
-    // no tile grid needed". That page is gone, and an EMPTY tileOrder is not
-    // "no grid needed" — showGridNav() falls back to the shared selector when
-    // tileOrder.length === 0, so an empty default guaranteed the one screen we
-    // are trying to retire. A real barista's day is drinks and the floor.
-    tileOrder: ['menu', 'bookings', 'team'],
-    promotedTiles: ['staff']
+  // ═══════════════════════════════════════════════════════════
+  // ORDERED BY THE JOURNEY, NOT BY WHEN IT WAS BUILT. 17 July 2026.
+  // ═══════════════════════════════════════════════════════════
+  // Every role's tiles follow the actual path a piece takes through
+  // the studio, from that person's position in it. First tile = what
+  // you do most. Last tile = what you do rarely.
+  //
+  // Cross-role tiles (Health & Safety, Tell Daisy) sit at the end —
+  // always there, never in the way.
+
+  'General Manager': {
+    // Daisy: the whole studio at a glance, then people, then money
+    tileOrder: ['floor-plan', 'progress', 'team', 'dashboard', 'staff',
+                'stock', 'health-safety', 'whats-on', 'customer-demo', 'setup'],
+    promotedTiles: ['tell-daisy']
   },
-  'Ceramic Technician': {
-    // Lucy's world is fired pieces — matching, labels, kiln, stock
-    tileOrder: ['pieces', 'stock', 'team'],
-    promotedTiles: ['piecematch', 'labels']
+
+  'Co-Director': {
+    // David: same as Daisy — full visibility
+    tileOrder: ['floor-plan', 'progress', 'dashboard', 'team', 'staff',
+                'stock', 'health-safety', 'whats-on', 'customer-demo', 'setup'],
+    promotedTiles: ['tell-daisy']
   },
-  'Studio Assistant': {
-    // Ruby runs the floor — bookings, tables, community
-    tileOrder: ['bookings', 'menu', 'community', 'team'],
-    promotedTiles: ['staff', 'tablecards']
-  },
-  'Studio Manager': {
-    // Daisy sees everything
-    tileOrder: ['bookings', 'pieces', 'stock', 'team', 'menu', 'community', 'dashboard', 'setup'],
-    promotedTiles: ['staff']
-  },
+
   'Studio Executive': {
-    // Jenny sees everything
-    tileOrder: ['bookings', 'pieces', 'stock', 'team', 'menu', 'community', 'dashboard', 'setup'],
-    promotedTiles: ['staff']
-  }
+    // Jenny: the packing end. Pieces come out of the kiln and go home.
+    // Her journey: what's ready → match it → label it → pack it → done
+    tileOrder: ['floor-plan', 'piecematch', 'labels', 'printqueue',
+                'catalogue', 'health-safety', 'team'],
+    promotedTiles: ['tell-daisy']
+  },
+
+  'Ceramic Technician': {
+    // Lucy: bisque in, fired pieces out. Kiln is her world.
+    tileOrder: ['floor-plan', 'piecematch', 'shapes', 'catalogue',
+                'stock', 'labels', 'health-safety'],
+    promotedTiles: ['tell-daisy']
+  },
+
+  'Studio Assistant': {
+    // Ruby: the floor. Seat people, take orders, photograph pieces.
+    tileOrder: ['floor-plan', 'staff', 'menu', 'tablecards',
+                'piecematch', 'health-safety'],
+    promotedTiles: ['tell-daisy']
+  },
+
+  'Marketing & Host By Post Manager': {
+    // Elliott: Host By Post and the customer-facing side
+    tileOrder: ['floor-plan', 'community', 'branding', 'customer-demo',
+                'whats-on', 'health-safety'],
+    promotedTiles: ['tell-daisy']
+  },
+
+  'Chief Taster': {
+    // Cleo: her club, her pages
+    tileOrder: ['floor-plan', 'community', 'menu'],
+    promotedTiles: []
+  },
 };
 
 // Current personal screen state — loaded on login, saved on change
