@@ -2968,6 +2968,10 @@
      highlighted. Proper glaze-tile exit button back to home.
 ──────────────────────────────────────────────────────────────────── -->
 <div id="floor-plan-view" class="view" style="display:none;flex-direction:column;height:100vh;max-width:100%;background:#F4ECE0;overflow:hidden;">
+  <!-- Instant ivory placeholder — shows while loadFloorPlan() runs, prevents dark flash -->
+  <div id="floor-plan-placeholder" style="flex:1;background:#F4ECE0;display:flex;align-items:center;justify-content:center;">
+    <div style="font-family:'Architects Daughter',cursive;font-size:14px;color:#c8bfb0;letter-spacing:0.06em;">Loading studio…</div>
+  </div>
 
   <!-- ═══════════════════════════════════════════════════════════
        TABLE DETAIL — "where do you need to go?"
