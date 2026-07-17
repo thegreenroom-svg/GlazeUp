@@ -1051,6 +1051,80 @@
       margin-bottom: 10px;
     }
     .dp-sub-row label { font-size: 11px; color: rgba(255,255,255,0.7); flex-shrink: 0; }
+
+    /* ═══════════════════════════════════════════════════════════
+       SLIDERS, FOR A STYLUS AND A PAINTY FINGER. 17 July 2026.
+       ═══════════════════════════════════════════════════════════
+       "all the slide selectors make that as technical and as good as
+       you can because it needs to be able to use on Android and
+       anything with the stylus."
+
+       Every range input here was bare. Three real problems, and the
+       first is the one that actually breaks:
+
+       1. NO touch-action. A native range has no opinion about
+          gestures, so on a scrollable page a drag across it is
+          ambiguous — and the browser resolves that ambiguity in
+          favour of SCROLLING. You go to nudge opacity and the page
+          moves instead. touch-action:none tells the browser this
+          element owns the drag. This is the single most common reason
+          a slider "doesn't work properly" on a touch device.
+
+       2. THUMB TOO SMALL. The default is ~20px on iOS and smaller on
+          some Android skins. Apple's HIG and WCAG 2.5.5 both put the
+          minimum target at 44px. With a stylus, or a child's finger
+          with paint on it, 20px is a miss. The thumb is drawn at 26px
+          and given a 44px-tall transparent lane to be grabbed in — big
+          target, small-looking control.
+
+       3. -moz- RULES MISSING. Styling only ::-webkit- leaves Firefox
+          and Firefox-for-Android on the unstyled default. Both vendor
+          prefixes are written out because "Android" is not one browser.
+       ═══════════════════════════════════════════════════════════ */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      touch-action: none;          /* the fix that matters */
+      background: transparent;
+      height: 44px;                /* WCAG 2.5.5 target size */
+      cursor: pointer;
+      margin: 0;
+    }
+    input[type="range"]:focus { outline: none; }
+    input[type="range"]:focus-visible { outline: 2px solid #B87946; outline-offset: 2px; }
+
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 6px; border-radius: 3px;
+      background: rgba(43,39,36,0.15);
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 26px; height: 26px; border-radius: 50%;
+      background: #B87946; border: 2px solid #fff;
+      box-shadow: 0 2px 8px rgba(43,39,36,0.3);
+      margin-top: -10px;           /* centre the thumb on the track */
+      transition: transform 0.12s ease;
+    }
+    input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.15); }
+
+    input[type="range"]::-moz-range-track {
+      height: 6px; border-radius: 3px;
+      background: rgba(43,39,36,0.15); border: none;
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: #B87946; border: 2px solid #fff;
+      box-shadow: 0 2px 8px rgba(43,39,36,0.3);
+    }
+    input[type="range"]:active::-moz-range-thumb { transform: scale(1.15); }
+
+    @media (prefers-reduced-motion: reduce) {
+      input[type="range"]::-webkit-slider-thumb,
+      input[type="range"]::-moz-range-thumb { transition: none; }
+      input[type="range"]:active::-webkit-slider-thumb,
+      input[type="range"]:active::-moz-range-thumb { transform: none; }
+    }
+
     .dp-sub-row input[type="range"] { flex: 1; }
 
     .dp-brush-sizes { display: flex; gap: 6px; }

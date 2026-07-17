@@ -109,6 +109,80 @@
        across the app needed individual editing — applied once,
        consistently, everywhere.
        ═══════════════════════════════════════════════════════════ */
+
+    /* ═══════════════════════════════════════════════════════════
+       SLIDERS, FOR A STYLUS AND A PAINTY FINGER. 17 July 2026.
+       ═══════════════════════════════════════════════════════════
+       "all the slide selectors make that as technical and as good as
+       you can because it needs to be able to use on Android and
+       anything with the stylus."
+
+       Every range input here was bare. Three real problems, and the
+       first is the one that actually breaks:
+
+       1. NO touch-action. A native range has no opinion about
+          gestures, so on a scrollable page a drag across it is
+          ambiguous — and the browser resolves that ambiguity in
+          favour of SCROLLING. You go to nudge opacity and the page
+          moves instead. touch-action:none tells the browser this
+          element owns the drag. This is the single most common reason
+          a slider "doesn't work properly" on a touch device.
+
+       2. THUMB TOO SMALL. The default is ~20px on iOS and smaller on
+          some Android skins. Apple's HIG and WCAG 2.5.5 both put the
+          minimum target at 44px. With a stylus, or a child's finger
+          with paint on it, 20px is a miss. The thumb is drawn at 26px
+          and given a 44px-tall transparent lane to be grabbed in — big
+          target, small-looking control.
+
+       3. -moz- RULES MISSING. Styling only ::-webkit- leaves Firefox
+          and Firefox-for-Android on the unstyled default. Both vendor
+          prefixes are written out because "Android" is not one browser.
+       ═══════════════════════════════════════════════════════════ */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      touch-action: none;          /* the fix that matters */
+      background: transparent;
+      height: 44px;                /* WCAG 2.5.5 target size */
+      cursor: pointer;
+      margin: 0;
+    }
+    input[type="range"]:focus { outline: none; }
+    input[type="range"]:focus-visible { outline: 2px solid #B87946; outline-offset: 2px; }
+
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 6px; border-radius: 3px;
+      background: rgba(43,39,36,0.15);
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 26px; height: 26px; border-radius: 50%;
+      background: #B87946; border: 2px solid #fff;
+      box-shadow: 0 2px 8px rgba(43,39,36,0.3);
+      margin-top: -10px;           /* centre the thumb on the track */
+      transition: transform 0.12s ease;
+    }
+    input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.15); }
+
+    input[type="range"]::-moz-range-track {
+      height: 6px; border-radius: 3px;
+      background: rgba(43,39,36,0.15); border: none;
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: #B87946; border: 2px solid #fff;
+      box-shadow: 0 2px 8px rgba(43,39,36,0.3);
+    }
+    input[type="range"]:active::-moz-range-thumb { transform: scale(1.15); }
+
+    @media (prefers-reduced-motion: reduce) {
+      input[type="range"]::-webkit-slider-thumb,
+      input[type="range"]::-moz-range-thumb { transition: none; }
+      input[type="range"]:active::-webkit-slider-thumb,
+      input[type="range"]:active::-moz-range-thumb { transform: none; }
+    }
+
     .glaze-tile {
       position: relative;
       overflow: hidden;
@@ -8091,10 +8165,16 @@ function _packingDone() {
   if (typeof _assistNote === 'function') _assistNote('packed', _packingPiece?.id);
   // Mark packed, straight to the next piece — no ceremony
   if (_packingPiece?.id) {
+    // Was `.catch(() => {})`. That empty catch is exactly why this went
+    // unnoticed: the route it posts to did not exist until tonight, so
+    // every "mark packed" 404'd and the swallow made a failure look
+    // identical to a success. Jenny's main job, silently not saving.
+    // Now a real failure says so, once, without stopping her flow.
     fetch(`${API_URL}/api/pieces/${_packingPiece.id}/status`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ studioId, status: 'ready_for_pickup', by: currentShiftStaff?.id })
-    }).catch(() => {});
+    }).then(r => { if (!r.ok) console.error('Mark packed failed:', r.status, _packingPiece.id); })
+      .catch(e => console.error('Mark packed failed:', e));
   }
   _packingPiece = null;
   _startPackingPiece();
@@ -20893,11 +20973,23 @@ async function saPieceChosen(ev) {
 async function saKnown(d) {
   let name = 'this line';
   try {
-    const r = await fetch(`${API_URL}/api/square/catalogue?studioId=${studioId}`);
+    // Was /api/square/catalogue — an endpoint I INVENTED. The real one
+    // is /api/square/catalog, no 'ue'. And the shape was wrong too: it
+    // returns { connected, categories: [{ name, items: [{id,name}] }] },
+    // not a flat items[]. Both mistakes sat inside this try/catch, so
+    // it failed silently and Jenny would have been told "I know this —
+    // this line" instead of "Large Cobalt Bowl", with nothing in the
+    // console to say why. Caught by auditing every fetch against the
+    // routes the server actually defines rather than trusting what I
+    // wrote. A silent catch around a wrong URL is indistinguishable
+    // from a working feature until someone reads the screen.
+    const r = await fetch(`${API_URL}/api/square/catalog?studioId=${studioId}`);
     const c = await r.json();
-    const hit = (c.items || []).find(i => i.id === d.squareItemId);
-    if (hit?.name) name = hit.name;
-  } catch(e) {}
+    for (const cat of (c.categories || [])) {
+      const hit = (cat.items || []).find(i => i.id === d.squareItemId);
+      if (hit?.name) { name = hit.name; break; }
+    }
+  } catch(e) { /* name stays generic — the flow still works */ }
   sa.productLabel = name;
 
   _saRender(`
@@ -23389,9 +23481,17 @@ async function _renderReturnMatches(matches, photoBase64) {
   let bookingInfo = null;
   if (topMatch?.booking_id) {
     try {
-      const res = await fetch(`${API_URL}/api/bookings/${topMatch.booking_id}?studioId=${studioId}`);
+      // Was /api/bookings/ — PLURAL. The route is /api/booking/:bookingCode,
+      // singular. One character, and the Returns flow has never once
+      // enriched a match with its booking: res.ok was always false, so
+      // bookingInfo stayed null and nobody saw an error, because the
+      // catch is empty and the guard is silent. Same shape of bug as the
+      // packing one above — a call written in good faith, pointed a
+      // hair off, and a swallow that made failure look like "no data".
+      const res = await fetch(`${API_URL}/api/booking/${topMatch.booking_id}?studioId=${studioId}`);
       if (res.ok) bookingInfo = (await res.json()).booking;
-    } catch(e) {}
+      else console.warn('Returns: could not load booking', topMatch.booking_id, res.status);
+    } catch(e) { console.warn('Returns: booking lookup failed', e); }
   }
 
   const confColor = CONF_COLOR[topMatch.confidence] || '#8a8175';

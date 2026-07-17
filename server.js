@@ -6893,6 +6893,50 @@ app.get('/api/packing/log', async (req, res) => {
   res.json({ log: data || [] });
 });
 
+// POST /api/pieces/:pieceId/status — set one piece's status.
+//
+// THIS ROUTE DID NOT EXIST. Found 17 July 2026 by auditing every fetch
+// in the app against the routes the server actually defines, rather
+// than trusting that a call which had clearly been written on purpose
+// pointed at anything.
+//
+// Two places called it and BOTH failed silently, every time:
+//   - Jenny's packing flow, "mark packed" (~8168) — `.catch(() => {})`
+//   - markPieceCollected, the collections flow (~23612)
+//
+// So Jenny taps Mark Packed, the tile advances, the piece looks done,
+// and the database was never told. Her main job. The empty catch is
+// what made it invisible: a 404 and a success are indistinguishable
+// when nobody looks at the response.
+//
+// Deliberately mirrors /api/pieces/mark-picked-up exactly — same table,
+// same updated_at, same shape — rather than inventing a second way to
+// write the same column. Status is validated against the values the
+// app genuinely uses, so a typo at a call site fails loudly here
+// instead of writing nonsense into a piece's history.
+const PIECE_STATUSES = ['awaiting_dip','dipped','in_kiln','fired','ready_for_pickup','collected','picked_up','damaged'];
+
+app.post('/api/pieces/:pieceId/status', async (req, res) => {
+  const { studioId, status } = req.body;
+  const { pieceId } = req.params;
+  if (!studioId || !status) return res.status(400).json({ error: 'studioId and status required' });
+  if (!PIECE_STATUSES.includes(status)) {
+    return res.status(400).json({ error: `Unknown status "${status}". Expected one of: ${PIECE_STATUSES.join(', ')}` });
+  }
+  try {
+    const { data, error } = await supabase.from('pottery_pieces')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('studio_id', studioId).eq('id', pieceId)
+      .select('id, booking_id, status').maybeSingle();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: 'No such piece for this studio.' });
+    res.json({ status: 'updated', piece: data });
+  } catch (error) {
+    console.error('Piece status error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/pieces/mark-picked-up', async (req, res) => {
   const { studioId, pieceIds } = req.body;
   if (!studioId || !pieceIds || !Array.isArray(pieceIds)) {
