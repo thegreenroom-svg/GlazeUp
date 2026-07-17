@@ -6496,6 +6496,62 @@ app.get('/api/spotify/search', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// GET /api/studio/today — the numbers, for the tiles page
+// ═══════════════════════════════════════════════════════════
+// Daisy: "I want to see the speedometer again and all those figures
+// on that page for our staff, in a bar down the side. All the totals."
+//
+// Everything counted from real rows. No estimates, no projections.
+app.get('/api/studio/today', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+    const now = new Date();
+
+    const [bookingsRes, tablesRes, piecesRes] = await Promise.all([
+      supabase.from('bookings')
+        .select('table_number, session_start, session_end, party_size, current_stage, status, arrived_at')
+        .eq('studio_id', studioId)
+        .gte('session_start', today.toISOString()).lt('session_start', tomorrow.toISOString())
+        .not('status', 'eq', 'cancelled'),
+      supabase.from('studio_tables').select('name').eq('studio_id', studioId),
+      supabase.from('pottery_pieces').select('status').eq('studio_id', studioId),
+    ]);
+
+    const bookings = bookingsRes.data || [];
+    const tables = tablesRes.data || [];
+    const pieces = piecesRes.data || [];
+
+    const live = bookings.filter(b => b.table_number && b.status !== 'completed'
+      && b.session_start && new Date(b.session_start) <= now);
+    const upcoming = bookings.filter(b => b.session_start && new Date(b.session_start) > now
+      && b.status !== 'completed');
+    const done = bookings.filter(b => b.status === 'completed');
+    const waiting = bookings.filter(b => b.arrived_at && !b.table_number);
+
+    const covers = bookings.reduce((n,b) => n + (b.party_size || 0), 0);
+    const coversNow = live.reduce((n,b) => n + (b.party_size || 0), 0);
+
+    res.json({
+      bookings: bookings.length,
+      live: live.length,
+      upcoming: upcoming.length,
+      done: done.length,
+      waiting: waiting.length,
+      covers, coversNow,
+      tables: tables.length,
+      tablesFree: tables.length - live.length,
+      toPack: pieces.filter(p => p.status === 'fired').length,
+      toCollect: pieces.filter(p => p.status === 'ready_for_pickup').length,
+      inKiln: pieces.filter(p => p.status === 'in_kiln' || p.status === 'dipped').length,
+      nextAt: upcoming.length
+        ? upcoming.map(b=>b.session_start).sort()[0] : null,
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // POST /api/floor/seat — put a booking on a table.
 //
 // THE MISSING HALF. Square tells us WHEN, WHO and WHICH ROOM (via the

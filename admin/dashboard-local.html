@@ -11144,7 +11144,7 @@ function checkShiftLogin() {
       // silent resume-from-localStorage case, which fires on every
       // page reload during an active shift. All three login paths
       // now consistently land on the floor plan.
-      goToTab('floor-plan');
+      showGridNav();
       applyShiftUI();
       // Guard: after resume, lock the floor plan for 3s so nothing
       // navigates away before loadFloorPlan completes
@@ -11624,8 +11624,11 @@ function selectLoginMember(member) {
       notice.style.display = 'block';
       notice.textContent = 'Trial mode — PIN is 0000';
     }
-    // Hide Face ID during trial
-    const faceBtn = document.getElementById('faceid-login-btn');
+    // Hide Face ID during the trial — the button is 'shift-faceid-btn',
+    // not 'faceid-login-btn'. I had the wrong id, so this hid nothing
+    // and Face ID was still showing. Found 17 July by grepping the real
+    // element ids rather than trusting the name I'd used.
+    const faceBtn = document.getElementById('shift-faceid-btn');
     if (faceBtn) faceBtn.style.display = 'none';
     showLoginScreen('pin');
     return;
@@ -11864,17 +11867,21 @@ async function submitShiftPin() {
       localStorage.setItem('klnk_last_logged_in_id', selectedLoginMember.id);
       localStorage.setItem('klnk_shift_staff', JSON.stringify(currentShiftStaff));
       markSessionActive();
-      // Start a real shift so time tracking works
+      // Start a REAL shift so timekeeping, breaks and holidays work.
+      // 17 July 2026: this called /api/staff/shift/start, which does not
+      // exist and never has — I invented it. The real one is shift-login,
+      // and it validates the PIN properly. Found by auditing every client
+      // call against every server route.
       try {
-        const res = await fetch(`${API_URL}/api/staff/shift/start`, {
+        const res = await fetch(`${API_URL}/api/staff/shift-login`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ studioId, staffMemberId: selectedLoginMember.id })
+          body: JSON.stringify({ studioId, pin: '0000', staffMemberId: selectedLoginMember.id })
         });
         const d = await res.json();
         if (d.shiftId) { currentShiftId = d.shiftId; localStorage.setItem('klnk_shift_id', d.shiftId); }
       } catch(e) { console.warn('shift start failed:', e.message); }
       document.getElementById('shift-login-modal').style.display = 'none';
-      goToTab('floor-plan');
+      showGridNav();
       applyShiftUI();
       window._floorPlanLocked = true;
       setTimeout(() => { window._floorPlanLocked = false; }, 3000);
@@ -12526,7 +12533,42 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
     // goes red, regardless of stage — the clearest possible "this is
     // meant to be happening right now" signal. Server computes is_live
     // from the real session_start, not a guess.
-    const accent = busy ? (b.is_live ? '#e53935' : (STAGE_COLOURS[b.current_stage] || INK)) : INK;
+    // ═══════════════════════════════════════════════════════════
+    // WHAT THE COLOURS MEAN. 17 July 2026.
+    // ═══════════════════════════════════════════════════════════
+    // Daisy: "the green ones are bookings coming up with the time of
+    // the booking. And the red ones with current bookings, and off if
+    // they have checked out."
+    //
+    // RED    — happening now (past its session_start, not finished)
+    // GREEN  — booked, not started yet
+    // CREAM  — free, or finished and gone
+    //
+    // A table with nothing coming stays cream. Daisy first said every
+    // table should be green because everything has an upcoming booking
+    // eventually — but that isn't true (16 tables, 7 bookings today),
+    // and if everything's green then green means nothing. Cream means
+    // free, which is what a floor plan is for.
+    // GREEN   — booked, not started yet
+    // CLAY     — painting (they're at it)
+    // RED      — finishing up: photos, bill, clearing
+    // AMBER    — pieces gone to the kiln
+    // TEAL     — waiting to be collected
+    // CREAM    — free
+    //
+    // I flattened this to red/green an hour ago and lost the stage
+    // detail, which is the thing that actually tells you what a table
+    // needs. is_live only overrides when a booking has passed its start
+    // time but nobody has moved it off 'booking' — that's the one case
+    // where the stage is lying and the clock is telling the truth.
+    // RED means one thing: this needs you now.
+    // Past their start time and still sat at 'booking' = nobody has
+    // been over. That's the only automatic red — everything else is
+    // green or amber by stage.
+    const needsYouNow = busy && b.is_live && b.current_stage === 'booking';
+    const accent = !busy ? INK
+      : needsYouNow ? '#e53935'
+      : (STAGE_COLOURS[b.current_stage] || '#4CAF50');
     const seed = _seedFrom(t.id || t.name);
 
     // TRAINING DATA MUST LOOK LIKE TRAINING DATA.
@@ -12563,16 +12605,28 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
     // cannot tell 1A from 8B and the whole map is useless.
     // Busy: name at the top, customer underneath.
     // Free: just the name, faint.
+    // Free: just the table name.
+    // Booked: name, who, and — if it hasn't started — when.
+    const bTime = busy && !b.is_live && b.session_start
+      ? new Date(b.session_start).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})
+      : null;
     const label = busy
-      ? `<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 - 4}" text-anchor="middle"
-           font-family="'Architects Daughter',cursive" font-size="${tappable ? 9 : 11}"
-           fill="${INK}" fill-opacity="0.5">${t.name}</text>
-         <text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 + 11}" text-anchor="middle"
+      ? `<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 - 8}" text-anchor="middle"
+           font-family="'Architects Daughter',cursive" font-size="${tappable ? 8 : 10}"
+           fill="${INK}" fill-opacity="0.45">${t.name}</text>
+         <text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 + 4}" text-anchor="middle"
            font-family="'Caveat',cursive" font-size="${tappable ? 12 : 15}" font-weight="700"
-           fill="${INK}">${(b.customer_name || '').split(' ')[0]}</text>`
+           fill="${INK}">${(b.customer_name || '').split(' ')[0]}</text>
+         ${bTime ? `<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 + 15}"
+           text-anchor="middle" font-family="'Architects Daughter',cursive"
+           font-size="${tappable ? 8 : 10}" fill="${accent}">${bTime}</text>`
+          : `<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 + 15}"
+           text-anchor="middle" font-family="'Architects Daughter',cursive"
+           font-size="${tappable ? 7 : 9}" fill="${accent}" fill-opacity="0.9">${
+             STAGE_WORDS[b.current_stage] || ''}</text>`}`
       : `<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 + 4}" text-anchor="middle"
            font-family="'Architects Daughter',cursive" font-size="${tappable ? 10 : 12}"
-           fill="${INK}" fill-opacity="0.35">${t.name}</text>`;
+           fill="${INK}" fill-opacity="0.3">${t.name}</text>`;
 
     const stripe = busy
       ? `<line x1="${t.x + 8}" y1="${t.y + t.size.h - 5}" x2="${t.x + t.size.w - 8}" y2="${t.y + t.size.h - 5}"
@@ -12888,6 +12942,17 @@ function renderFloorPlanElegant() {
         </button>
       </div>
       ${_renderArrivals(unseated)}
+      <!-- The traffic light, explained. Small, always there, so nobody
+           has to remember what amber means. -->
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px;
+        font-size:9px;color:#8a8175;font-family:'Architects Daughter',cursive;">
+        <span style="display:flex;align-items:center;gap:4px;">
+          <span style="width:7px;height:7px;border-radius:50%;background:#4CAF50;"></span>fine</span>
+        <span style="display:flex;align-items:center;gap:4px;">
+          <span style="width:7px;height:7px;border-radius:50%;background:#F9A825;"></span>needs you soon</span>
+        <span style="display:flex;align-items:center;gap:4px;">
+          <span style="width:7px;height:7px;border-radius:50%;background:#e53935;"></span>needs you now</span>
+      </div>
       <div style="display:flex;gap:8px;align-items:flex-start;width:100%;">
         <div style="flex:1;min-width:0;">
       ${resting ? `<div style="text-align:center;padding:40px 20px;color:#8a8175;font-size:13px;">
@@ -13930,6 +13995,7 @@ function showPersonalHomeScreen() {
   document.getElementById('grid-nav-top').style.display = 'block';
   document.getElementById('grid-nav-sub').style.display = 'none';
 
+  _renderTodayStrip();
   const wrap = document.getElementById('grid-nav-top-tiles');
 
   // Build the display items from the personal screen state
@@ -14464,7 +14530,7 @@ function goToRealLandingPage() {
   // This used to send David to barista-view and everyone else to the
   // TILE GRID, which treated the tiles as home. They are not; they are
   // where the floor plan sends you. Same inversion as applyShiftUI had.
-  goToTab('floor-plan');
+  showGridNav();   // HOME IS YOUR TILES. 17 July 2026.
 }
 
 // ── Genuine real persistent booking strip, per direct request ──
@@ -14534,7 +14600,6 @@ async function openBookingAtRealStage(bookingCode, stage) {
 }
 
 function showGridNav() {
-  if (window._floorPlanLocked) return;  // floor plan just loaded — don't navigate away
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
   document.getElementById('grid-nav-view').style.display = 'block';
   if (_personalScreen && _personalScreen.tileOrder.length > 0) {
@@ -14545,6 +14610,74 @@ function showGridNav() {
     showGridNavTop();
   }
   toggleFloatingBackBtn();
+}
+
+// ═══════════════════════════════════════════════════════════
+// TODAY'S NUMBERS — a strip on the tiles page. 17 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Daisy: "I want to see the speedometer again and all those figures
+// on that page for our staff, in a bar down the side. All the totals."
+//
+// Everything here is counted from real rows. If a number isn't real,
+// it doesn't appear.
+async function _renderTodayStrip() {
+  let el = document.getElementById('today-strip');
+  if (!el) {
+    const wrap = document.getElementById('grid-nav-view');
+    if (!wrap) return;
+    el = document.createElement('div');
+    el.id = 'today-strip';
+    wrap.insertBefore(el, wrap.firstChild);
+  }
+  try {
+    const r = await fetch(`${API_URL}/api/studio/today?studioId=${studioId}`);
+    const d = await r.json();
+
+    // The meter — calibrated on 25 days of real trading.
+    // Quiet ≤3, filling 4-7, busy 8+, peak 15.
+    const pct = Math.min(1, d.bookings / 15);
+    const mood = d.bookings === 0 ? 'Empty'
+      : d.bookings <= 3 ? 'Quiet' : d.bookings < 8 ? 'Filling' : 'Busy';
+    const moodColour = d.bookings === 0 ? '#8a8175'
+      : d.bookings <= 3 ? '#4CAF50' : d.bookings < 8 ? '#F9A825' : '#e53935';
+
+    const stat = (n, label, colour) => `
+      <div style="text-align:center;flex:1;min-width:0;">
+        <div style="font-size:20px;font-weight:900;color:${colour||'#2B2724'};line-height:1;">${n}</div>
+        <div style="font-size:9px;color:#8a8175;margin-top:2px;white-space:nowrap;">${label}</div>
+      </div>`;
+
+    el.innerHTML = `
+      <div style="background:#FFFDF9;border-radius:14px;padding:14px;margin:0 0 14px;
+        box-shadow:0 1px 3px rgba(43,39,36,0.06);">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
+          <div style="font-family:'Caveat',cursive;font-size:19px;font-weight:700;color:#2B2724;">Today</div>
+          <div style="font-size:11px;font-weight:800;color:${moodColour};">${mood}</div>
+        </div>
+        <div style="height:5px;background:rgba(43,39,36,0.08);border-radius:3px;overflow:hidden;margin-bottom:12px;">
+          <div style="height:100%;width:${pct*100}%;background:${moodColour};border-radius:3px;
+            transition:width 0.5s;"></div>
+        </div>
+        <div style="display:flex;gap:4px;">
+          ${stat(d.live, 'in now', '#e53935')}
+          ${stat(d.upcoming, 'to come', '#4CAF50')}
+          ${d.waiting ? stat(d.waiting, 'waiting', '#F9A825') : ''}
+          ${stat(d.coversNow || '—', 'covers')}
+          ${stat(d.tablesFree, 'free')}
+        </div>
+        ${(d.toPack || d.toCollect) ? `
+          <div style="display:flex;gap:4px;margin-top:10px;padding-top:10px;
+            border-top:1px solid rgba(43,39,36,0.06);">
+            ${d.toPack ? stat(d.toPack, 'to pack', '#00897B') : ''}
+            ${d.toCollect ? stat(d.toCollect, 'to collect', '#5E35B1') : ''}
+            ${d.inKiln ? stat(d.inKiln, 'in kiln', '#B87946') : ''}
+          </div>` : ''}
+        ${d.nextAt ? `<div style="font-size:10px;color:#8a8175;text-align:center;margin-top:10px;">
+          Next in at ${new Date(d.nextAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</div>` : ''}
+      </div>`;
+  } catch(e) {
+    el.innerHTML = '';   // quiet — the tiles still work
+  }
 }
 
 function showGridNavTop() {
@@ -24290,10 +24423,35 @@ const FLOOR_PLAN = {
   ]}
 };
 
+// ═══════════════════════════════════════════════════════════
+// TRAFFIC LIGHTS. 17 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Daisy: "traffic lights would be cool."
+//
+// Three colours everyone already knows, read from across the studio,
+// no learning required:
+//
+//   🟢 GREEN  — fine, leave them. Booked in, or happily painting.
+//   🟠 AMBER  — needs you soon. Finishing up, bill to do, table to clear.
+//   🔴 RED    — needs you NOW. Past their start time and nobody's been
+//               over, or something's gone wrong.
+//
+// The stage still drives it — this is a rendering of FLOW_CHECKS, not
+// a second list. But six colours was six things to learn. Three is none.
 const STAGE_COLOURS = {
-  booking: '#4CAF50', painting: '#B87946', engagement: '#B87946',
-  completion: '#e53935', kiln: '#F9A825', pickup: '#00897B'
+  booking: '#4CAF50',      // green — settling in
+  painting: '#4CAF50',     // green — happily painting, leave them
+  engagement: '#4CAF50',   // green — same thing, older name
+  completion: '#F9A825',   // amber — photos, bill, clearing. Go over.
+  kiln: '#F9A825',         // amber — pieces need bagging
+  pickup: '#4CAF50',       // green — done, waiting to be collected
 };
+
+// What each stage means, in words you can read across the studio.
+const STAGE_WORDS = {
+  booking: 'settling in', painting: 'painting', engagement: 'painting',
+  completion: 'needs finishing', kiln: 'for the kiln', pickup: 'ready',
+};;
 const STAGE_LABELS = {
   booking: 'Booked in', painting: 'Painting', engagement: 'Painting',
   completion: 'Finishing up', kiln: 'In the kiln', pickup: 'Ready for pickup'
@@ -24992,6 +25150,21 @@ function dismissSplash() {
 function showSplash() {
   if (document.getElementById('splash-screen')) return; // already showing
   splashDismissed = false;
+  // ═══════════════════════════════════════════════════════════
+  // THE SCREENSAVER IS THE FLOOR PLAN. 17 July 2026.
+  // ═══════════════════════════════════════════════════════════
+  // Daisy: "the screensaver, which reverts on inactivity, has the
+  // three floor plans — vault, main studio and the lounge — all live
+  // with any bookings going on."
+  //
+  // Home is your tiles. This is what the studio looks at when nobody's
+  // touching it: the whole floor, live. Tap it and you're back on your
+  // tiles.
+  if (currentShiftStaff) {
+    goToTab('floor-plan');
+    // The overlay below is what makes it a screensaver rather than a
+    // screen you're using — it says "tap to carry on" over the top.
+  }
   // IDLE SCREENSAVER: instead of reinserting the dark login splash,
   // just show the floor plan underneath — it is already the screensaver.
   // The login picker comes up on tap via wireSplash's click handler.
