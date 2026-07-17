@@ -7267,10 +7267,32 @@ function _scoreVoice(v) {
   // Not a local service usually means a cloud neural voice (Google,
   // Microsoft) — markedly better than the old on-device formants.
   if (v.localService === false)               score += 25;
-  // Named voices known to be the good UK ones, in rough order.
-  const known = ['Serena','Sonia','Libby','Kate','Moira','Tessa','Fiona','Hazel','Daniel','Samantha','Karen'];
-  const i = known.findIndex(k => n.includes(k));
-  if (i >= 0)                                 score += (known.length - i) * 2;
+  // ═══════════════════════════════════════════════════════════
+  // CLEO IS A GIRL. 17 July 2026.
+  // ═══════════════════════════════════════════════════════════
+  // "Cleo's voice is a man's."
+  //
+  // This scorer had NO gender preference whatsoever — and DANIEL was in
+  // the preferred list. Daniel is Apple's default male en-GB voice, and
+  // on a stock iPhone he is very often the ONLY en-GB voice installed.
+  // So he scored en-GB +40, list bonus +6, and won. Cleo has been a
+  // grown man reading a little girl's lines because the list asked for
+  // one. Every pitch tweak tonight was tuning the wrong voice.
+  //
+  // Named explicitly rather than guessed: the API exposes no gender
+  // field, and inferring from a name is exactly how you end up with
+  // Daniel. Apple, Microsoft and Google all ship known, stable names.
+  const FEMALE = ['Serena','Kate','Stephanie','Martha','Sonia','Libby',
+                  'Hazel','Fiona','Moira','Tessa','Samantha','Karen',
+                  'Amelie','Emily','Ada','Aria','Jenny','Michelle'];
+  const MALE   = ['Daniel','Oliver','Arthur','Ryan','George','Rishi',
+                  'Alex','Fred','Gordon','Guy','Eric','Thomas'];
+
+  if (MALE.some(m => n.includes(m)))          score -= 200;  // never Cleo
+  if (/\bmale\b/i.test(n) && !/female/i.test(n)) score -= 200;
+  if (/female/i.test(n))                      score += 60;
+  const fi = FEMALE.findIndex(k => n.includes(k));
+  if (fi >= 0)                                score += 60 + (FEMALE.length - fi);
   // British first — this is a Somerset pottery studio.
   if (v.lang === 'en-GB')                     score += 40;
   else if (/^en/i.test(v.lang))               score += 15;
@@ -15111,10 +15133,43 @@ async function loadActiveBookingsStrip() {
 // Genuine real deep-link, per direct request — opens Daily Bookings,
 // loads this specific real booking, and jumps straight to the exact
 // tile matching its actual current stage.
+// ═══════════════════════════════════════════════════════════
+// EVERY TABLE TAP OPENED THE DIP MODAL. 17 July 2026.
+// ═══════════════════════════════════════════════════════════
+// "this has been quite regular coming up every time I've clicked on
+// something." Reported after tapping tables all evening and landing on
+// "Mark Pieces Ready for Dip" regardless of what was tapped.
+//
+// openQRModal() IS that modal (its <h2> is literally "Mark Pieces Ready
+// for Dip", ~line 5815) and it was called UNCONDITIONALLY here. So every
+// table tap, at every stage, opened the dip flow over the top of
+// whatever you actually asked for. Removed: tapping a booking should
+// show the booking, and dipping is one stage of it, not the front door.
+//
+// AND A SECOND BUG, found while reading this. The stage vocabularies do
+// not match:
+//   bookings carry:  booking, painting, engagement, completion, kiln,
+//                    pickup, done
+//   sections exist:  booking, engagement, completion, kiln
+// showStaffSection() loops the four it knows and hides every one that
+// doesn't match — so 'painting', 'pickup' and 'done' hid ALL FOUR and
+// showed a blank staff tab. No error, just nothing. Mapped explicitly,
+// with an honest fallback, so a stage can never blank the screen again.
+const STAGE_TO_SECTION = {
+  booking:    'booking',
+  painting:   'engagement',   // same thing, older name
+  engagement: 'engagement',
+  completion: 'completion',
+  kiln:       'kiln',
+  pickup:     'completion',   // collected from the completion flow
+  done:       'completion',
+};
+
 async function openBookingAtRealStage(bookingCode, stage) {
   goToTab('staff');
-  openQRModal(bookingCode);
-  showStaffSection(stage);
+  const section = STAGE_TO_SECTION[stage];
+  if (!section) console.warn(`Unknown booking stage "${stage}" — opening at booking. Add it to STAGE_TO_SECTION.`);
+  showStaffSection(section || 'booking');
 }
 
 function showGridNav() {
