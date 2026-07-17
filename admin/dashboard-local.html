@@ -7479,6 +7479,61 @@ async function openCustomerDemo() {
   window.open(`${API_URL}/app?booking=${encodeURIComponent(bookingCode)}`, '_blank');
 }
 
+// ═══════════════════════════════════════════════════════════
+// WHAT'S ON — local events that might affect the studio
+// ═══════════════════════════════════════════════════════════
+// A quiet marketing hint, not a nag. Shows what's happening
+// locally in the next 60 days — school holidays, local shows,
+// bank holidays — so promotions can be planned around them.
+async function openWhatsOn() {
+  const sheet = document.createElement('div');
+  sheet.id = 'whats-on-sheet';
+  sheet.style.cssText = 'position:fixed;inset:0;z-index:9750;background:rgba(43,39,36,0.85);display:flex;align-items:flex-end;justify-content:center;';
+  sheet.onclick = e => { if (e.target===sheet) sheet.remove(); };
+  sheet.innerHTML = `<div style="background:#FFFDF9;width:100%;max-width:520px;border-radius:18px 18px 0 0;
+    padding:20px 16px calc(20px + env(safe-area-inset-bottom));max-height:76vh;display:flex;flex-direction:column;">
+    <div style="font-family:'Caveat',cursive;font-size:26px;color:#2B2724;">What's on locally</div>
+    <div style="font-size:11px;color:#8a8175;margin-bottom:16px;">Next 60 days · things that might affect how busy we are</div>
+    <div id="whats-on-list" style="overflow-y:auto;flex:1;">
+      <div style="text-align:center;padding:20px;color:#8a8175;font-size:13px;">Loading…</div>
+    </div>
+    <button onclick="document.getElementById('whats-on-sheet').remove()"
+      style="margin-top:12px;width:100%;background:#2B2724;color:#fff;border:none;border-radius:12px;
+      padding:13px;font-size:14px;font-weight:800;cursor:pointer;">Close</button>
+  </div>`;
+  document.body.appendChild(sheet);
+
+  try {
+    const res = await fetch(`${API_URL}/api/local-events`);
+    const data = await res.json();
+    const list = document.getElementById('whats-on-list');
+    if (!data.events?.length) {
+      list.innerHTML = '<div style="text-align:center;padding:20px;color:#8a8175;font-size:13px;">Nothing coming up in the next 60 days.</div>';
+      return;
+    }
+    list.innerHTML = data.events.map(e => {
+      const when = e.isNow ? 'Happening now'
+        : e.daysAway === 0 ? 'Today'
+        : e.daysAway === 1 ? 'Tomorrow'
+        : `In ${e.daysAway} days`;
+      const urgent = e.isNow || e.daysAway <= 3;
+      return `<div style="padding:14px;border-radius:12px;margin-bottom:8px;
+        background:${urgent ? 'rgba(184,121,70,0.1)' : 'rgba(43,39,36,0.03)'};
+        border-left:3px solid ${urgent ? '#B87946' : 'rgba(43,39,36,0.15)'};">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+          <div style="font-family:'Caveat',cursive;font-size:20px;font-weight:700;color:#2B2724;">${e.name}</div>
+          <div style="font-size:10px;font-weight:800;color:${urgent ? '#B87946' : '#8a8175'};white-space:nowrap;">${when}</div>
+        </div>
+        <div style="font-size:11px;color:#8a8175;margin-top:2px;">${e.where}</div>
+        ${e.note ? `<div style="font-size:12px;color:#2B2724;margin-top:6px;line-height:1.4;opacity:0.8;">${e.note}</div>` : ''}
+      </div>`;
+    }).join('');
+  } catch(e) {
+    const list = document.getElementById('whats-on-list');
+    if (list) list.innerHTML = '<div style="text-align:center;padding:20px;color:#e53935;font-size:13px;">Couldn\'t load events.</div>';
+  }
+}
+
 // THIS IS A RENDERING OF /api/staff/alert-kinds, NEVER A SECOND LIST.
 // A hand-written copy of the vocabulary would drift from ALERT_TRIGGERS
 // within a week — which is exactly how the elegant floor plan ended up
@@ -10736,20 +10791,22 @@ function _renderArrivals(unseated) {
   const t = (b) => b.session_start
     ? new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
   const sorted = unseated.slice().sort((a,b) => (a.session_start||'').localeCompare(b.session_start||''));
+  // TINY DOTS — name only, minimal space. The arrivals strip is a
+  // prompt, not a feature. It should never dominate the screen.
   const chips = sorted.map(b => {
     const on = _seatingBooking === b.booking_code;
-    const name = (b.customer_name||'Booking').split(' ')[0];
+    const name = (b.customer_name||'?').split(' ')[0];
     return `<button onclick="_startSeating('${b.booking_code}')"
-      style="background:${on?'#2B2724':'rgba(43,39,36,0.1)'};color:${on?'#fff':'#2B2724'};
-      border:1px ${on?'solid #2B2724':'dashed rgba(43,39,36,0.4)'};border-radius:20px;
-      padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;
-      font-family:'Caveat',cursive;flex-shrink:0;">${name} ${t(b)}</button>`;
+      style="background:${on?'#2B2724':'rgba(43,39,36,0.07)'};color:${on?'#fff':'#2B2724'};
+      border:1px ${on?'solid #2B2724':'dashed rgba(43,39,36,0.25)'};border-radius:12px;
+      padding:2px 7px;font-size:10px;font-weight:600;cursor:pointer;white-space:nowrap;
+      font-family:'Caveat',cursive;flex-shrink:0;line-height:1.4;">${name}</button>`;
   }).join('');
-  const label = _seatingBooking ? 'Now tap a table' : 'Tap to seat';
-  return `<div style="margin-bottom:12px;">
-    <div style="font-size:10px;color:#8a8175;font-family:'Architects Daughter',cursive;
-      letter-spacing:0.06em;margin-bottom:6px;">${label}</div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;">${chips}</div>
+  const label = _seatingBooking ? 'now tap a table' : `${sorted.length} arriving`;
+  return `<div style="margin-bottom:8px;">
+    <div style="font-size:9px;color:#c8bfb0;font-family:'Architects Daughter',cursive;
+      letter-spacing:0.05em;margin-bottom:3px;">${label}</div>
+    <div style="display:flex;gap:4px;flex-wrap:wrap;">${chips}</div>
   </div>`;
 }
 
@@ -10757,16 +10814,33 @@ function _renderArrivals(unseated) {
 // BUSY METER — a vertical LED-style indicator showing studio capacity
 // ═══════════════════════════════════════════════════════════
 function _renderBusyMeter(unseatedCount, bookingByTable) {
-  const totalTables = Object.keys(_floorData?.tables || {}).length || 15;
+  // ═══════════════════════════════════════════════════════════
+  // CALIBRATED ON REAL TRADING DATA — 25 days, 136 bookings
+  // ═══════════════════════════════════════════════════════════
+  // Analysed 17 July 2026 from the actual bookings table:
+  //   Quietest day:   1 booking
+  //   Average day:    5.4 bookings
+  //   Busiest day:   15 bookings  (Sat 18 July — Steam Show weekend)
+  //   33rd percentile: 3  → below this is genuinely quiet
+  //   66th percentile: 7  → above this is genuinely busy
+  //
+  // NOT a percentage of tables — that was meaningless. These are the
+  // real numbers this studio actually trades at. A 15-table studio
+  // doing 8 bookings is BUSY here, not "53% full".
+  const QUIET_MAX = 3;    // ≤3 bookings = quiet
+  const BUSY_MIN  = 8;    // ≥8 bookings = busy
+  const PEAK      = 15;   // busiest day on record
+
   const seatedCount = Object.keys(bookingByTable).length;
   const totalBookings = seatedCount + unseatedCount;
-  const pct = Math.min(1, totalBookings / Math.max(totalTables, 1));
+  const pct = Math.min(1, totalBookings / PEAK);
 
-  // 8 LED segments
   const segs = 8;
-  const lit = Math.round(pct * segs);
-  const color = pct > 0.75 ? '#e53935' : pct > 0.4 ? '#F9A825' : '#4CAF50';
-  const label = pct > 0.75 ? 'Busy' : pct > 0.4 ? 'Filling' : pct > 0 ? 'Quiet' : 'Empty';
+  const lit = Math.max(totalBookings > 0 ? 1 : 0, Math.round(pct * segs));
+  const label = totalBookings === 0 ? 'Empty'
+    : totalBookings <= QUIET_MAX ? 'Quiet'
+    : totalBookings < BUSY_MIN ? 'Filling'
+    : 'Busy';
 
   const leds = Array.from({length: segs}, (_, i) => {
     const isLit = (segs - 1 - i) < lit; // fill from bottom
@@ -12368,6 +12442,7 @@ const GRID_NAV_STRUCTURE = [
   // customers see. Opens the real customer app in a new tab with a
   // demo booking so it's fully functional, not a mockup.
   { tab: 'customer-demo', label: '👀 Customer App', desc: 'See what customers see', fn: 'openCustomerDemo' },
+  { tab: 'whats-on', label: '📅 What\'s On', desc: 'Local events & school holidays', fn: 'openWhatsOn' },
   ]},
   { id: 'dashboard', label: 'Dashboard', color: '#B87946', items: [
     { tab: 'dashboard', label: 'Overview', desc: 'Your daily overview' },

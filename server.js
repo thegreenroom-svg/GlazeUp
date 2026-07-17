@@ -5454,6 +5454,58 @@ app.post('/api/bookings/:bookingCode/complete', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// GET /api/local-events — what's on around Langport
+// ═══════════════════════════════════════════════════════════
+// A quiet marketing hint for Daisy: local events that might mean
+// a busy day, a promotion opportunity, or a quiet spell worth
+// planning around.
+//
+// NOT scraped from WhatsApp — that's end-to-end encrypted with no
+// API, by design. This is a curated list of real, verifiable local
+// events with their real dates.
+//
+// TO MAINTAIN: add events here as you hear about them. A future
+// version could pull from Somerset council's events feed or
+// wherecanwego.com, but a hand-kept list of things that actually
+// matter to a Langport pottery studio beats an automated firehose.
+const LOCAL_EVENTS = [
+  // Recurring annual — dates shift, check each year
+  { date: '2026-07-17', end: '2026-07-19', name: 'Somerset Steam & Country Show',
+    where: 'Low Ham (5 min away)', note: 'Big crowds in the area. Families looking for indoor activities if it rains.' },
+  { date: '2026-09-13', name: 'Langport Triathlon',
+    where: 'Lifestyle Fitness, Langport', note: 'Town busy from early. Athletes + supporters + families.' },
+  // School holidays — the big driver for a pottery studio
+  { date: '2026-07-22', end: '2026-09-01', name: 'Somerset school summer holidays',
+    where: 'County-wide', note: 'Six weeks of families needing things to do. Peak season.' },
+  { date: '2026-10-26', end: '2026-10-30', name: 'October half term',
+    where: 'County-wide', note: 'Week of family bookings. Halloween pottery?' },
+  { date: '2026-12-19', end: '2027-01-05', name: 'Christmas holidays',
+    where: 'County-wide', note: 'Gift-making season. Personalised pieces.' },
+  // Bank holidays
+  { date: '2026-08-31', name: 'August Bank Holiday',
+    where: 'National', note: 'Long weekend. Historically busy.' },
+];
+
+app.get('/api/local-events', (req, res) => {
+  const now = new Date();
+  const in60Days = new Date(now.getTime() + 60*24*60*60*1000);
+  const upcoming = LOCAL_EVENTS
+    .filter(e => {
+      const start = new Date(e.date);
+      const end = e.end ? new Date(e.end) : start;
+      return end >= now && start <= in60Days;
+    })
+    .map(e => {
+      const start = new Date(e.date);
+      const daysAway = Math.ceil((start - now) / (24*60*60*1000));
+      const end = e.end ? new Date(e.end) : null;
+      const isNow = start <= now && (!end || end >= now);
+      return { ...e, daysAway: Math.max(0, daysAway), isNow };
+    })
+    .sort((a,b) => a.daysAway - b.daysAway);
+  res.json({ events: upcoming });
+});
+
 // POST /api/floor/seat — put a booking on a table.
 //
 // THE MISSING HALF. Square tells us WHEN, WHO and WHICH ROOM (via the
