@@ -13970,12 +13970,34 @@ async function openTableDetail(bookingCode) {
   // The canvas / drag planner is still reachable from WITHIN the flow —
   // it's the seating layout tool, which belongs at setup, not at the
   // entry point of every table tap mid-shift.
+  // ═══════════════════════════════════════════════════════════
+  // TAPPING A TABLE NEVER SHOWED THAT BOOKING. 17 July 2026.
+  // ═══════════════════════════════════════════════════════════
+  // Reported: tapped Megan's booking for tomorrow, landed on "Daily
+  // Bookings & Customer Engagement" — a generic list of 29 free tables.
+  // Not Megan. Not her booking. Nothing to do with what was tapped.
+  //
+  // This early return sent every table tap to openBookingAtRealStage,
+  // whose comment claimed it "already navigates to that stage in the
+  // staff tab and shows the checklist". It does not. It called
+  // openQRModal(bookingCode) — and openQRModal IGNORES ITS ARGUMENT
+  // ENTIRELY. Read it: the signature takes bookingCode, the body never
+  // mentions it once. It resets some inputs and opens the dip modal.
+  //
+  // So the booking was NEVER loaded. The dip modal simply covered the
+  // generic list underneath, and everyone assumed the tap worked.
+  // Removing that modal an hour ago did not break this — it uncovered
+  // it. The feature has never existed on this path.
+  //
+  // The panel that genuinely shows a booking is right below and has
+  // been all along: it reads b.customer_name, b.table_number, the
+  // covers, the room, the stage, and opens #floor-table-detail. It was
+  // switched off by this one line.
+  //
+  // Turned back on. It is the only code in this file that actually
+  // answers "which booking did I just tap".
   const stage = b.current_stage || 'booking';
-  openBookingAtRealStage(bookingCode, stage);
-  return;   // canvas panel no longer opens from a table tap
 
-  // ── BELOW: the canvas panel, kept for reference and still reachable
-  // from within the booking flow. Not deleted — one line to restore. ──
   await _loadChecklistCustomization(b.current_stage || 'booking');
 
   try {
