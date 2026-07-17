@@ -245,6 +245,8 @@ app.use('/app', express.static(path.join(__dirname, 'app'), staticCacheOptions))
 // under this path has always genuinely 404'd. Confirmed via a real,
 // live browser console error, not assumed.
 app.use('/brand-assets', express.static(path.join(__dirname, 'brand-assets'), staticCacheOptions));
+// Health & Safety documents — risk assessment, training record
+app.use('/docs', express.static(path.join(__dirname, 'docs'), staticCacheOptions));
 // The old kilnLINK marketing/pitch page, previously served at /promo and
 // redirected to from the bare root, is disconnected as of 15 July 2026 —
 // "old marketing," per direct request. The files themselves are left in
