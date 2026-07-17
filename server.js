@@ -7356,10 +7356,35 @@ app.get('/api/staff/daily-progress', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
   const today = new Date(); today.setHours(0,0,0,0);
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
 
+  // ═══════════════════════════════════════════════════════════
+  // "FIGURES DON'T MAKE SENSE." 17 July 2026.
+  // ═══════════════════════════════════════════════════════════
+  // The screen's own words: "every booking today, every stage" — that
+  // is a promise about session_start, when the booking HAPPENS. This
+  // filtered on created_at, when the ROW WAS TYPED IN. Those are
+  // different dates for most bookings: someone rings up today to book
+  // a table for next Tuesday, and that row's created_at is today while
+  // its session_start is a week away.
+  //
+  // Checked against the real database rather than assumed: 12 bookings
+  // were created today. Their session_start dates: the 18th, 19th,
+  // 24th, 25th, 30th, 31st, and 14th of August. NONE of them is today.
+  // So this screen would show 12 "today's bookings", every one stuck at
+  // "not started" forever, alongside the real 7 that are actually on
+  // for today — a report that can never be completed because most of
+  // what it counts isn't happening today at all.
+  //
+  // Sessions, duties, alerts and takings below are left on created_at
+  // deliberately — those are activity LOGS with no scheduled date of
+  // their own; "created today" is the correct question for them. Only
+  // bookings needed session_start, because a booking is the one row
+  // here with two genuinely different dates.
   const [bookingsRes, sessionsRes, dutiesRes, alertsRes] = await Promise.all([
     supabase.from('bookings').select('booking_code, customer_name, status, created_at')
-      .eq('studio_id', studioId).gte('created_at', today.toISOString()),
+      .eq('studio_id', studioId)
+      .gte('session_start', today.toISOString()).lt('session_start', tomorrow.toISOString()),
     supabase.from('table_sessions').select('booking_code, table_name, status, created_at')
       .eq('studio_id', studioId).gte('created_at', today.toISOString()),
     supabase.from('session_duties').select('booking_code, staff_name, duty_text, completed, status')
