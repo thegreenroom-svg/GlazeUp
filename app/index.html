@@ -7254,7 +7254,22 @@
     // report pressure 0 or unset; treated as 0.5 ("normal") so existing
     // finger-drawing behaviour is unchanged.
     function wireDpPointerEvents(canvas) {
+      // Design Preview gets exactly what Transfer Designer got. I fixed
+      // the other canvas an hour ago and stopped there, which was the
+      // same mistake I made with the walkthrough file earlier tonight:
+      // fixing the surface I was looking at and calling it done. There
+      // are TWO drawing surfaces in this app and a customer cannot be
+      // expected to know which one rejects their palm.
+      //
+      // Palm rejection only helps ACTIVE styluses — a passive or
+      // fingertip stylus is electrically identical to a finger, so
+      // nothing in software can tell them apart. That is physics.
+      let _penSeen = false;
+      const _isPalm = (evt) => _penSeen && evt.pointerType === 'touch';
+
       const start = (evt) => {
+        if (evt.pointerType === 'pen') _penSeen = true;
+        if (_isPalm(evt)) return;
         evt.preventDefault();
         canvas.setPointerCapture(evt.pointerId);
         const pt = getCanvasPoint(canvas, evt);
@@ -7277,7 +7292,22 @@
       };
       const move = (evt) => {
         if (!dpDrawing || dpTool !== 'brush') return;
+        if (_isPalm(evt)) return;
         evt.preventDefault();
+        // Every sample the digitiser took, not just the one that
+        // survived to this frame — a pen samples ~240Hz against a 60Hz
+        // screen and the browser bins the rest unless asked. Guarded:
+        // absent on older Safari and some Android webviews.
+        const pts = (typeof evt.getCoalescedEvents === 'function')
+          ? evt.getCoalescedEvents() : null;
+        if (pts && pts.length) {
+          for (const e of pts) {
+            const pt = getCanvasPoint(canvas, e);
+            dpPaintLine(dpLastPoint, pt);
+            dpLastPoint = pt;
+          }
+          return;
+        }
         const pt = getCanvasPoint(canvas, evt);
         dpPaintLine(dpLastPoint, pt);
         dpLastPoint = pt;
