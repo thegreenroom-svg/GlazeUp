@@ -6351,7 +6351,26 @@ function goToTab(tab, event) {
       if (v && currentTab === 'floor-plan') v.style.display = 'flex';
     }).catch(() => {
       const v = document.getElementById('floor-plan-view');
-      if (v) v.style.display = 'flex';   // show anyway on error
+      // ═══════════════════════════════════════════════════════════
+      // THE RACE THAT ATE THE LANDING PAGE. 17 July 2026.
+      // ═══════════════════════════════════════════════════════════
+      // This catch used to be `if (v) v.style.display = 'flex';` with
+      // the comment "show anyway on error" — UNGUARDED, unlike the
+      // .then() directly above it.
+      //
+      // loadFloorPlan() is a fetch. It resolves whenever it resolves.
+      // If you logged in while one was still in flight — which is
+      // exactly what happens, because the screensaver calls
+      // goToTab('floor-plan') and then you tap it — this fired AFTER
+      // you had already landed on your tiles and slammed the floor plan
+      // back over the top of them.
+      //
+      // And on Render's free tier the fetch FAILS often: cold-start
+      // 502s are documented all over this file as routine. So the more
+      // the server slept, the more reliably the landing page was eaten.
+      // Every fix to the login paths was correct and made no difference,
+      // because none of them were the thing doing it.
+      if (v && currentTab === 'floor-plan') v.style.display = 'flex';
     });
   } else if (tab === 'staff') {
     showStaffSection('booking');
@@ -12572,6 +12591,52 @@ function _elegantRoomsData() {
     if (b.table_number) _assignBookingToTable(bookingByTable, b);
     else unseated.push(b);
   });
+
+  // ═══════════════════════════════════════════════════════════
+  // TOMORROW: A PROPOSAL, NOT A FACT. 17 July 2026.
+  // ═══════════════════════════════════════════════════════════
+  // "you need to put them in order. One, two, three, four, five, six,
+  // seven just for now" ... "if they're movable... we can then just
+  // place them when we know where we're going. And that could be in
+  // Jenny's workflow... in the morning when they set up."
+  //
+  // That last part is what makes this honest, and it's a better design
+  // than either of the two we started with. Earlier tonight I refused
+  // to colour tables for tomorrow, because tomorrow's bookings have no
+  // table (Square has never carried one) and picking one silently would
+  // mean the app inventing a fact and showing it as truth — someone
+  // walks in at 10am and sits where the app guessed.
+  //
+  // A PROPOSAL that a human confirms is a different thing entirely.
+  // The app is not claiming to know; it is doing the boring half of the
+  // job — laying them out in order — and leaving the decision where it
+  // belongs. Setup in the morning becomes: look, move the few that are
+  // wrong, done.
+  //
+  // So these are marked is_provisional the whole way through: drawn
+  // differently, never counted as trade, and the moment anyone taps one
+  // onto a real table it goes through /api/floor/seat like any other
+  // seating and stops being provisional at all.
+  //
+  // Deterministic — sorted by time, filling tables in the studio's own
+  // sort_order, skipping anything already taken. Same input, same
+  // layout, every render. Nothing random, nothing remembered, nothing
+  // written to the database until a person says so.
+  const taken = new Set(Object.keys(bookingByTable));
+  const free = tables
+    .filter(t => !taken.has(t.name))
+    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  tomorrow
+    .slice()
+    .sort((a, b) => String(a.session_start || '').localeCompare(String(b.session_start || '')))
+    .forEach((b, i) => {
+      if (b.table_number) { _assignBookingToTable(bookingByTable, b); return; } // already placed by a human
+      const t = free[i];
+      if (!t) return;                   // more bookings than tables — say nothing rather than guess
+      b.table_number = t.name;
+      b.is_provisional = true;
+      _assignBookingToTable(bookingByTable, b);
+    });
   // Room names come from studio_tables.room, typed by hand over time, so
   // "Main studio" and "Main Studio" both exist — and keying the group on
   // the raw string made them TWO rooms on the home screen, each holding
@@ -12745,6 +12810,17 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
       : (STAGE_COLOURS[b.current_stage] || '#4CAF50');
     const seed = _seedFrom(t.id || t.name);
 
+    // A proposal must never look like a booking. Same green so it reads
+    // as "expected", but dashed and set back so nobody mistakes it for a
+    // decision anyone has actually made. There is already a precedent
+    // for exactly this honesty a few lines below: seeded TRAINING data
+    // carries its own marker so it can't pass as real trade. Same
+    // principle, same reason.
+    const provOutline = provisional
+      ? `<rect x="${t.x - 3}" y="${t.y - 3}" width="${t.size.w + 6}" height="${t.size.h + 6}"
+           fill="none" stroke="${accent}" stroke-width="1.4" stroke-dasharray="4 4"
+           stroke-opacity="0.7" rx="3"/>` : '';
+
     // TRAINING DATA MUST LOOK LIKE TRAINING DATA.
     // The old dark floor plan marked seeded bookings with an amber
     // "TRAINING — TAP TO CLEAR" pill (_renderOccupiedTile, ~4417). The
@@ -12789,8 +12865,12 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
     const bTime = busy && !b.is_live && b.session_start
       ? (b.is_tomorrow ? 'tmw ' : '') + new Date(b.session_start).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})
       : null;
+    // A proposal must never look like a booking. Same green, but dashed
+    // and see-through: readable at a glance as "we put this here, move
+    // it if it's wrong" rather than "this is where they're sitting".
+    const provisional = busy && b.is_provisional;
     const label = busy
-      ? `<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 - 8}" text-anchor="middle"
+      ? `${provOutline}<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 - 8}" text-anchor="middle"
            font-family="'Architects Daughter',cursive" font-size="${tappable ? 8 : 10}"
            fill="${INK}" fill-opacity="0.45">${t.name}</text>
          <text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 + 4}" text-anchor="middle"
@@ -12839,7 +12919,13 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
     const seatMode = !!_seatingBooking;
     const tableClick = seatMode
       ? `event.stopPropagation(); _seatAt(${JSON.stringify(t.name)})`
-      : (!tappable ? (busy ? `openTableDetail('${b.booking_code}')` : `showGridNav()`) : '');
+      : (!tappable
+          ? (busy
+              ? (b.is_provisional
+                  ? `_pickProvisional('${b.booking_code}', '${String(t.name).replace(/'/g, "\\'")}')`
+                  : `openTableDetail('${b.booking_code}')`)
+              : `_placeProvisional('${String(t.name).replace(/'/g, "\\'")}')`)
+          : '');
     return `<g style="cursor:pointer" onclick="${tableClick}">
       ${chairs}
       ${_handRect(t.x, t.y, t.size.w, t.size.h, seed, busy ? 1.7 : 1.0, INK, busy ? _hexWithOpacity(accent, 0.18) : '#FFFDF9')}
@@ -12969,6 +13055,59 @@ function _renderArrivals(unseated) {
 // is. Pre-assigning tables to tomorrow's bookings is a real, sensible
 // feature — it just has to be a decision someone makes, not one this
 // renderer invents.
+// ── Placing tomorrow's proposals. Tap one, tap where it really goes. ──
+//
+// Tap-to-move, not drag: drag genuinely does not work on iOS Safari
+// inside an SVG, which this file has already learned the hard way on
+// the table arranger. Two taps work everywhere — iPad, Android, a
+// stylus, a fingertip with paint on it.
+let _provPick = null;
+
+function _pickProvisional(bookingCode, tableName) {
+  if (_provPick && _provPick.bookingCode === bookingCode) { _provPick = null; _provToast(null); return; }
+  _provPick = { bookingCode, tableName };
+  const b = (_floorData.bookings || []).find(x => x.booking_code === bookingCode);
+  const who = (b?.customer_name || 'This booking').split(' ')[0];
+  _provToast(`${who} — tap the table they should be on. Tap again to cancel.`);
+}
+
+async function _placeProvisional(tableName) {
+  if (!_provPick) return showGridNav();     // nothing picked — a free table is just "go home"
+  const { bookingCode } = _provPick;
+  _provPick = null;
+  _provToast('Placing…');
+  try {
+    // The SAME endpoint any real seating goes through — it checks for a
+    // clash and writes table_number properly. The moment this succeeds
+    // the booking has a real table chosen by a person, so is_provisional
+    // never applies to it again: it stops being a proposal because
+    // someone decided.
+    const res = await fetch(`${API_URL}/api/floor/seat`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, bookingCode, tableName })
+    });
+    const d = await res.json();
+    if (!res.ok) { _provToast(d.error || 'Could not place that one.'); return; }
+    _provToast(`Placed on ${tableName}.`);
+    await loadFloorPlan();
+  } catch(e) { _provToast('Could not place that one — try again.'); }
+}
+
+function _provToast(msg) {
+  document.getElementById('prov-toast')?.remove();
+  if (!msg) return;
+  const el = document.createElement('div');
+  el.id = 'prov-toast';
+  el.style.cssText = `position:fixed;left:50%;transform:translateX(-50%);
+    bottom:calc(22px + env(safe-area-inset-bottom));z-index:6000;background:rgba(43,39,36,0.94);
+    color:#F7F4EE;padding:11px 18px;border-radius:22px;font-family:'Architects Daughter',cursive;
+    font-size:12px;box-shadow:0 6px 24px rgba(0,0,0,0.28);max-width:88vw;text-align:center;`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  clearTimeout(window._provToastTimer);
+  window._provToastTimer = setTimeout(() => el.remove(), 4000);
+}
+
 function _renderTomorrow(tomorrow) {
   if (!tomorrow || !tomorrow.length) return '';
   const first = tomorrow.map(b => b.session_start).filter(Boolean).sort()[0];
@@ -12979,7 +13118,7 @@ function _renderTomorrow(tomorrow) {
     border:1px solid rgba(184,121,70,0.2);border-radius:20px;width:fit-content;">
     <span style="font-size:13px;">🌅</span>
     <span style="font-family:'Architects Daughter',cursive;font-size:11px;color:#8a8175;">
-      Tomorrow · ${tomorrow.length} booking${tomorrow.length===1?'':'s'}${covers?` · ${covers} covers`:''}${at?` · from ${at}`:''} · no tables yet
+      Tomorrow · ${tomorrow.length} booking${tomorrow.length===1?'':'s'}${covers?` · ${covers} covers`:''}${at?` · from ${at}`:''} · laid out in order — tap any to move it
     </span>
   </div>`;
 }
@@ -13007,7 +13146,10 @@ function _renderBusyMeter(unseatedCount, bookingByTable) {
   // "how busy are we RIGHT NOW", so a booking sixteen hours away must
   // never light a segment. It did tonight, and it read Busy with the
   // doors shut.
-  const seatedCount = Object.keys(bookingByTable).length;
+  // Object.keys() would now count tomorrow's proposals, which are not
+  // trade and are not happening. Count the values and filter: this meter
+  // answers "how busy are we RIGHT NOW" and nothing else.
+  const seatedCount = Object.values(bookingByTable).filter(b => !b.is_tomorrow).length;
   const totalBookings = seatedCount + unseatedCount;
   const pct = Math.min(1, totalBookings / PEAK);
 
@@ -14873,6 +15015,17 @@ async function openBookingAtRealStage(bookingCode, stage) {
 }
 
 function showGridNav() {
+  // ─── AND THE OTHER HALF OF THE SAME RACE ───
+  // This never touched currentTab, so after the screensaver had set it
+  // to 'floor-plan' it STAYED 'floor-plan' while you stood on your
+  // tiles. The guard in goToTab's .then() — `currentTab === 'floor-plan'`
+  // — therefore passed, and even a SUCCESSFUL floor plan load dropped
+  // itself on top of the tiles a moment after they rendered.
+  //
+  // So the guard was not weak, it was lied to: nothing told it you had
+  // left. currentTab is the app's answer to "where am I", and this
+  // screen is somewhere. It has to say so.
+  currentTab = 'grid-nav';
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
   document.getElementById('grid-nav-view').style.display = 'block';
   if (_personalScreen && _personalScreen.tileOrder.length > 0) {
@@ -26473,7 +26626,10 @@ const RETURN_TO_FLOOR_MS = 5 * 60 * 1000;
 //   90s   ask: still on this? / floor plan / somewhere else
 //   +45s  no answer -> go home on its own (the iPad was put down)
 //   15min splash + re-login (shared device, someone else picks it up)
-const ASK_IDLE_MS = 90 * 1000;        // ask
+// 17 July 2026: "I want it to revert after a longer time now. It's too
+// short... maybe two minutes." Was 90s — which, mid-conversation with a
+// customer, is nothing. Now nothing happens for a full two minutes.
+const ASK_IDLE_MS = 120 * 1000;       // ask
 const ASK_GRACE_MS = 45 * 1000;       // then act, if nobody answers
 let _askIdleTimer = null, _askGraceTimer = null, _askShownAt = 0;
 
