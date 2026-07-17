@@ -8852,347 +8852,307 @@ async function _cleoAsk(preset) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// MUSIC — four speakers, volume, skip. 17 July 2026.
+// MUSIC — Spotify, with a morning setup check. 17 July 2026.
 // ═══════════════════════════════════════════════════════════
-// Daisy: "there are four speakers. One in the kitchen, one in the
-// vault, one in the front door, and one in the safe in the corner
-// by table three."
+// Daisy: "we have problems in the morning getting everything connected.
+// Could you do a setup system with a workflow and tiles to get you to
+// connect, and make sure it's done before the next step, because
+// sometimes it's slow to react."
 //
-// THE SPLIT THAT MATTERS:
-//   Sonos API  → volume per speaker, skip, pause, what's playing
-//   Spotify app → choosing the music
+// So: four checks, in order, each one only meaningful if the last
+// passed. It WAITS and VERIFIES rather than firing and hoping.
+// It never says "something went wrong" — it says which step is stuck
+// and exactly what to do.
 //
-// Choosing music is what Spotify's app is FOR. Rebuilding a worse
-// version of it in here would be daft. But turning down the speaker
-// by table three without leaving the app — that's worth having.
-//
-// Dormant until SONOS_CLIENT_ID and SONOS_CLIENT_SECRET are set on
-// Render. Same contract as Square, Royal Mail, Stripe: no
-// credentials, no tile, no calls, no errors.
+// WHY SPOTIFY NOT SONOS: the Symfonisk speakers ARE Sonos speakers —
+// IKEA make the box, Sonos make the software inside. Can't route round
+// that. But Spotify Connect sees them as devices, so Spotify's API does
+// everything Sonos's does PLUS search and playlists. The Sonos app
+// groups them once and is then never opened again — which was the
+// actual complaint.
 
-// Where they actually are, so the tile reads like the building.
-const SPEAKER_MAP = {
-  'kitchen':    { label: 'Kitchen',    where: 'by the bar',        icon: '☕' },
-  'vault':      { label: 'The Vault',  where: '',                  icon: '🚪' },
-  'front door': { label: 'Front Door', where: 'as you come in',    icon: '🔔' },
-  'safe':       { label: 'Safe',       where: 'corner by table 3', icon: '🏺' },
+let _musicDevices = [];
+let _musicNow = {};
+
+// Where the speakers actually are, so the tile reads like the building.
+// Matched loosely against whatever Spotify reports them as.
+const SPEAKER_WHERE = {
+  kitchen: 'by the bar', vault: '', front: 'as you come in',
+  door: 'as you come in', safe: 'corner by table 3', lounge: '',
 };
-
-let _musicGroup = null;
+function _speakerWhere(name) {
+  const n = (name || '').toLowerCase();
+  for (const [k, v] of Object.entries(SPEAKER_WHERE)) if (n.includes(k)) return v;
+  return '';
+}
 
 async function openMusic() {
   const view = document.getElementById('floor-plan-view');
   if (!view) return;
   _floorViewMode = 'music';
-
+  view.style.display = 'flex';
   view.innerHTML = `
     <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
       <div style="margin-bottom:16px;">
         <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">Music</div>
-        <div style="font-size:11px;color:#8a8175;">Four speakers · volume, skip, what's on</div>
+        <div style="font-size:11px;color:#8a8175;">Spotify · four speakers</div>
       </div>
       <div id="music-body">
-        <div style="text-align:center;padding:40px;color:#8a8175;font-size:13px;">Loading…</div>
+        <div style="text-align:center;padding:40px;color:#8a8175;font-size:13px;">Checking…</div>
       </div>
     </div>`;
   toggleFloatingBackBtn();
-  _loadMusic();
+  _musicCheck();
 }
 
-async function _loadMusic() {
+// THE MORNING CHECK. Waits, verifies, tells you what's stuck.
+async function _musicCheck() {
   const el = document.getElementById('music-body');
   if (!el) return;
-
-  // Is it even set up?
-  let status;
+  let setup;
   try {
-    const res = await fetch(`${API_URL}/api/sonos/status?studioId=${studioId}`);
-    status = await res.json();
-  } catch(e) { status = { enabled: false }; }
-
-  if (!status.enabled) {
-    el.innerHTML = `
-      <div style="text-align:center;padding:30px 20px;">
-        <div style="font-size:44px;margin-bottom:12px;">🎵</div>
-        <div style="font-family:'Caveat',cursive;font-size:24px;color:#2B2724;">Not set up yet</div>
-        <div style="font-size:13px;color:#8a8175;margin-top:8px;line-height:1.6;max-width:300px;margin-left:auto;margin-right:auto;">
-          Register at developer.sonos.com, then put the Key and Secret
-          into Render's environment variables. There's a note with the
-          steps in it.</div>
-      </div>
-      ${_spotifyTile()}`;
+    const r = await fetch(`${API_URL}/api/spotify/setup?studioId=${studioId}`);
+    setup = await r.json();
+  } catch(e) {
+    el.innerHTML = `<div style="text-align:center;padding:30px;color:#e53935;font-size:13px;">
+      Can't reach the server. Try again in a moment.</div>`;
     return;
   }
 
-  if (!status.connected) {
-    el.innerHTML = `
-      <div class="glaze-tile" style="border-radius:16px;padding:24px;text-align:center;margin-bottom:12px;">
-        <div style="font-size:40px;margin-bottom:10px;">🔗</div>
-        <div style="font-family:'Caveat',cursive;font-size:22px;color:#2B2724;margin-bottom:12px;">
-          Connect Sonos</div>
-        <button onclick="window.location.href='${API_URL}/api/sonos/connect?studioId=${studioId}'"
-          style="width:100%;background:#2B2724;color:#fff;border:none;border-radius:12px;
-          padding:16px;font-size:15px;font-weight:800;cursor:pointer;">
-          Sign in to Sonos
-        </button>
-      </div>
-      ${_spotifyTile()}`;
-    return;
+  if (setup.ready) return _musicPlayer();
+
+  // Show the ladder — done, stuck, and not-yet-checked
+  const blockedIdx = setup.steps.findIndex(s => !s.ok);
+  el.innerHTML = `
+    <div style="font-size:10px;color:#8a8175;font-family:'Architects Daughter',cursive;
+      letter-spacing:0.06em;margin-bottom:10px;">Getting the music going</div>
+
+    ${setup.steps.map((st, i) => {
+      const stuck = i === blockedIdx;
+      const done = st.ok;
+      return `<div class="glaze-tile" style="border-radius:14px;padding:16px;margin-bottom:8px;
+        ${stuck ? 'border:2px solid #B87946;' : ''}
+        opacity:${done || stuck ? 1 : 0.4};">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:26px;height:26px;border-radius:50%;flex-shrink:0;
+            background:${done ? '#4CAF50' : stuck ? '#B87946' : 'rgba(43,39,36,0.1)'};
+            color:#fff;display:flex;align-items:center;justify-content:center;
+            font-size:13px;font-weight:800;">${done ? '✓' : i + 1}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:14px;font-weight:700;color:#2B2724;">${st.label}</div>
+            ${st.detail ? `<div style="font-size:11px;color:#8a8175;">${st.detail}</div>` : ''}
+          </div>
+        </div>
+        ${stuck && st.fix ? `
+          <div style="font-size:12px;color:#2B2724;line-height:1.5;margin-top:10px;
+            padding:12px;background:rgba(184,121,70,0.1);border-radius:10px;">${st.fix}</div>
+          ${st.action === 'connect' ? `
+            <button onclick="window.location.href='${API_URL}/api/spotify/connect?studioId=${studioId}'"
+              style="width:100%;background:#1DB954;color:#fff;border:none;border-radius:12px;
+              padding:16px;font-size:15px;font-weight:800;cursor:pointer;margin-top:10px;">
+              Sign in to Spotify
+            </button>` : ''}
+          ${st.action === 'recheck' ? `
+            <button onclick="_musicWake()"
+              style="width:100%;background:#B87946;color:#fff;border:none;border-radius:12px;
+              padding:16px;font-size:15px;font-weight:800;cursor:pointer;margin-top:10px;">
+              I've woken them up — check again
+            </button>
+            <button onclick="window.open('spotify://','_blank')"
+              style="width:100%;background:rgba(43,39,36,0.06);color:#2B2724;border:none;
+              border-radius:12px;padding:12px;font-size:13px;cursor:pointer;margin-top:6px;">
+              Open Spotify to wake them
+            </button>` : ''}
+        ` : ''}
+      </div>`;
+    }).join('')}`;
+}
+
+// "Check again" — but actually WAIT for it. Speakers are slow to wake.
+async function _musicWake() {
+  const el = document.getElementById('music-body');
+  if (!el) return;
+  el.innerHTML = `
+    <div style="text-align:center;padding:40px 20px;">
+      <div style="font-size:44px;margin-bottom:14px;animation:swt-float 1.4s ease-in-out infinite;">🔊</div>
+      <div style="font-family:'Caveat',cursive;font-size:24px;color:#2B2724;">Listening for them…</div>
+      <div id="wake-status" style="font-size:12px;color:#8a8175;margin-top:8px;">
+        Speakers can take a few seconds</div>
+    </div>`;
+
+  // Poll — up to 5 tries over 15 seconds. They really are slow.
+  for (let i = 1; i <= 5; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+    const st = document.getElementById('wake-status');
+    if (st) st.textContent = `Still listening… (${i} of 5)`;
+    try {
+      const r = await fetch(`${API_URL}/api/spotify/setup?studioId=${studioId}`);
+      const d = await r.json();
+      if (d.ready) return _musicPlayer();
+    } catch(e) { /* keep trying */ }
   }
+  // Gave up — honest about it
+  _musicCheck();
+}
 
-  // Connected — show what's on
-  let now = {};
-  try {
-    const res = await fetch(`${API_URL}/api/sonos/now?studioId=${studioId}`);
-    now = await res.json();
-    _musicGroup = now.groupId;
-  } catch(e) { /* show controls anyway */ }
-
+async function _musicPlayer() {
+  const el = document.getElementById('music-body');
+  if (!el) return;
   const canControl = ['General Manager','Co-Director','Studio Executive']
     .includes(currentShiftStaff?.role);
 
+  try {
+    const [nowRes, setupRes] = await Promise.all([
+      fetch(`${API_URL}/api/spotify/now?studioId=${studioId}`),
+      fetch(`${API_URL}/api/spotify/setup?studioId=${studioId}`),
+    ]);
+    _musicNow = await nowRes.json();
+    _musicDevices = (await setupRes.json()).devices || [];
+  } catch(e) {}
+
   el.innerHTML = `
-    <!-- WHAT'S PLAYING -->
-    <div class="glaze-tile" style="border-radius:18px;padding:20px;margin-bottom:12px;
-      background:linear-gradient(135deg,#2B2724,#3d2e28);color:#fff;">
+    <div class="glaze-tile" style="border-radius:18px;padding:18px;margin-bottom:12px;
+      background:linear-gradient(135deg,#1DB954,#0f7a35);color:#fff;">
       <div style="display:flex;gap:14px;align-items:center;">
-        ${now.art
-          ? `<img src="${now.art}" style="width:64px;height:64px;border-radius:10px;object-fit:cover;flex-shrink:0;">`
-          : `<div style="width:64px;height:64px;border-radius:10px;background:rgba(255,255,255,0.1);
-             display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">🎵</div>`}
+        ${_musicNow.art
+          ? `<img src="${_musicNow.art}" style="width:60px;height:60px;border-radius:8px;flex-shrink:0;">`
+          : `<div style="width:60px;height:60px;border-radius:8px;background:rgba(255,255,255,0.15);
+             display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;">🎵</div>`}
         <div style="flex:1;min-width:0;">
-          <div style="font-family:'Caveat',cursive;font-size:22px;font-weight:700;
+          <div style="font-family:'Caveat',cursive;font-size:21px;font-weight:700;
             white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-            ${now.track || 'Nothing playing'}</div>
-          ${now.artist ? `<div style="font-size:12px;opacity:0.8;white-space:nowrap;overflow:hidden;
-            text-overflow:ellipsis;">${now.artist}</div>` : ''}
+            ${_musicNow.track || 'Nothing playing'}</div>
+          ${_musicNow.artist ? `<div style="font-size:12px;opacity:0.9;white-space:nowrap;
+            overflow:hidden;text-overflow:ellipsis;">${_musicNow.artist}</div>` : ''}
+          ${_musicNow.device ? `<div style="font-size:10px;opacity:0.7;margin-top:2px;">
+            on ${_musicNow.device}</div>` : ''}
         </div>
       </div>
       ${canControl ? `
-        <div style="display:flex;gap:8px;margin-top:16px;">
-          <button onclick="_music('prev')" style="flex:1;background:rgba(255,255,255,0.12);color:#fff;
-            border:none;border-radius:12px;padding:14px;font-size:18px;cursor:pointer;">⏮</button>
-          <button onclick="_music('${now.playing ? 'pause' : 'play'}')"
-            style="flex:2;background:rgba(255,255,255,0.2);color:#fff;border:none;border-radius:12px;
-            padding:14px;font-size:18px;cursor:pointer;">${now.playing ? '⏸' : '▶'}</button>
-          <button onclick="_music('next')" style="flex:1;background:rgba(255,255,255,0.12);color:#fff;
-            border:none;border-radius:12px;padding:14px;font-size:18px;cursor:pointer;">⏭</button>
-        </div>` : `
-        <div style="margin-top:12px;font-size:11px;opacity:0.6;">Directors only</div>`}
+        <div style="display:flex;gap:8px;margin-top:14px;">
+          <button onclick="_music('prev')" style="flex:1;background:rgba(255,255,255,0.15);
+            color:#fff;border:none;border-radius:10px;padding:13px;font-size:17px;cursor:pointer;">⏮</button>
+          <button onclick="_music('${_musicNow.playing ? 'pause' : 'play'}')"
+            style="flex:2;background:rgba(255,255,255,0.25);color:#fff;border:none;
+            border-radius:10px;padding:13px;font-size:17px;cursor:pointer;">
+            ${_musicNow.playing ? '⏸' : '▶'}</button>
+          <button onclick="_music('next')" style="flex:1;background:rgba(255,255,255,0.15);
+            color:#fff;border:none;border-radius:10px;padding:13px;font-size:17px;cursor:pointer;">⏭</button>
+        </div>` : `<div style="margin-top:10px;font-size:11px;opacity:0.7;">Directors only</div>`}
     </div>
 
-    ${canControl ? `
+    ${canControl && _musicDevices.length ? `
       <div style="font-size:10px;color:#8a8175;font-family:'Architects Daughter',cursive;
         letter-spacing:0.06em;margin-bottom:8px;">Volume · each speaker on its own</div>
-      ${Object.entries(SPEAKER_MAP).map(([key, sp]) => `
-        <div class="glaze-tile" style="border-radius:14px;padding:14px;margin-bottom:8px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="font-size:18px;">${sp.icon}</span>
-              <div>
-                <div style="font-size:14px;font-weight:700;color:#2B2724;">${sp.label}</div>
-                ${sp.where ? `<div style="font-size:10px;color:#8a8175;">${sp.where}</div>` : ''}
-              </div>
+      ${_musicDevices.map(d => {
+        const where = _speakerWhere(d.name);
+        return `<div class="glaze-tile" style="border-radius:14px;padding:14px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+            <div>
+              <div style="font-size:14px;font-weight:700;color:#2B2724;">
+                ${d.active ? '<span style="color:#1DB954;">●</span> ' : ''}${d.name}</div>
+              ${where ? `<div style="font-size:10px;color:#8a8175;">${where}</div>` : ''}
             </div>
+            <div style="font-size:11px;color:#8a8175;">${d.volume ?? '—'}%</div>
           </div>
-          <input type="range" min="0" max="100" value="30"
-            oninput="_musicVolume('${key}', this.value)"
-            style="width:100%;accent-color:#B87946;">
-        </div>`).join('')}
-    ` : ''}
+          <input type="range" min="0" max="100" value="${d.volume ?? 30}"
+            oninput="_musicVolume('${d.id}', this.value)"
+            style="width:100%;accent-color:#1DB954;">
+        </div>`;
+      }).join('')}` : ''}
 
-    ${_spotifyTile()}`;
-}
+    ${canControl ? `
+      <button onclick="_musicPlaylists()" class="glaze-tile"
+        style="width:100%;border:none;border-radius:16px;padding:18px;cursor:pointer;
+        text-align:left;margin-top:6px;">
+        <div style="font-family:'Caveat',cursive;font-size:19px;font-weight:700;color:#2B2724;">
+          🎧 Choose something else</div>
+        <div style="font-size:11px;color:#8a8175;margin-top:2px;">Your playlists</div>
+      </button>` : ''}
 
-// Choosing music is Spotify's job. Their app is better at it than
-// anything I'd build, and it already knows the Sonos group.
-function _spotifyTile() {
-  return `
-    <button onclick="window.open('spotify://','_blank')" class="glaze-tile"
-      style="width:100%;border:none;border-radius:16px;padding:20px;cursor:pointer;
-      background:linear-gradient(135deg,#1DB954,#159944);color:#fff;text-align:left;margin-top:12px;">
-      <div style="font-size:26px;margin-bottom:4px;">🎧</div>
-      <div style="font-family:'Caveat',cursive;font-size:20px;font-weight:700;">Choose music</div>
-      <div style="font-size:11px;opacity:0.9;margin-top:4px;line-height:1.4;">
-        Opens Spotify · pick anything, it plays on the Sonos group.
-        Swipe back when you're done.</div>
+    <button onclick="_musicCheck()" style="width:100%;background:none;
+      border:1px dashed rgba(43,39,36,0.2);border-radius:12px;padding:12px;
+      font-size:12px;color:#8a8175;cursor:pointer;margin-top:10px;">
+      🔌 Something not working? Run the check
     </button>`;
 }
 
 async function _music(action) {
-  if (!_musicGroup) return;
   try {
-    await fetch(`${API_URL}/api/sonos/control`, {
+    const r = await fetch(`${API_URL}/api/spotify/control`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studioId, groupId: _musicGroup, action,
-                             staffRole: currentShiftStaff?.role })
+      body: JSON.stringify({ studioId, action, staffRole: currentShiftStaff?.role })
     });
-    setTimeout(_loadMusic, 400);
-  } catch(e) { /* quiet */ }
+    if (!r.ok) {
+      const e = await r.json();
+      // Honest, actionable — not "something went wrong"
+      alert(e.error || "That didn't work.");
+      return;
+    }
+    setTimeout(_musicPlayer, 500);
+  } catch(e) {}
 }
 
 let _volTimer = null;
-function _musicVolume(speaker, value) {
+function _musicVolume(deviceId, value) {
   clearTimeout(_volTimer);
-  _volTimer = setTimeout(async () => {
-    try {
-      await fetch(`${API_URL}/api/sonos/control`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studioId, groupId: _musicGroup, action: 'volume',
-                               volume: parseInt(value), speaker,
-                               staffRole: currentShiftStaff?.role })
-      });
-    } catch(e) { /* quiet */ }
-  }, 300);
-}
-
-// ═══════════════════════════════════════════════════════════
-// ARRANGE TABLES — put them where they really are
-// ═══════════════════════════════════════════════════════════
-// Rebuilt 17 July 2026. I built this earlier today and a later patch
-// silently overwrote it — the ⊞ Arrange button was calling a function
-// that no longer existed. Found by auditing every onclick against
-// every defined function, which is the only way to catch this.
-//
-// TAP TO MOVE, not drag — drag events don't fire on iOS Safari.
-// Tap a table to pick it up, tap a space to put it down.
-
-let _arrangeRoom = null;
-let _arrangePicked = null;
-let _arrangeGrid = {};
-
-function openArrangeTables(roomName) {
-  _arrangeRoom = roomName;
-  _arrangePicked = null;
-  const { rooms } = _elegantRoomsData();
-  const list = rooms[roomName] || [];
-
-  // Group A/B halves — they move as one table
-  _arrangeGrid = {};
-  const seen = new Set();
-  let flow = 0;
-  list.forEach(t => {
-    const pair = t.pair_id || t.name;
-    if (seen.has(pair)) return;
-    seen.add(pair);
-    const row = t.grid_row != null ? t.grid_row : (flow % 4);
-    const col = t.grid_col != null ? t.grid_col : Math.floor(flow / 4);
-    _arrangeGrid[`${row},${col}`] = pair;
-    flow++;
-  });
-  _renderArrange();
-}
-
-function _renderArrange() {
-  const view = document.getElementById('floor-plan-view');
-  if (!view) return;
-  _floorViewMode = 'arrange';
-  view.style.display = 'flex';
-
-  const maxRow = Math.max(...Object.keys(_arrangeGrid).map(k => parseInt(k.split(',')[0])), 3);
-  const rows = maxRow + 2;   // always a spare row to grow into
-
-  let cells = '';
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < 3; c++) {
-      const key = `${r},${c}`;
-      const name = _arrangeGrid[key];
-      const picked = _arrangePicked === name;
-      cells += `<button onclick="_arrangeTap(${r},${c})"
-        style="aspect-ratio:1.5;border-radius:10px;cursor:pointer;
-        border:${name ? '2px solid #2B2724' : '2px dashed rgba(43,39,36,0.18)'};
-        background:${picked ? '#B87946' : name ? '#FFFDF9' : 'rgba(43,39,36,0.02)'};
-        color:${picked ? '#fff' : '#2B2724'};
-        font-family:'Architects Daughter',cursive;font-size:13px;font-weight:700;
-        display:flex;align-items:center;justify-content:center;padding:4px;
-        ${picked ? 'transform:scale(1.06);box-shadow:0 4px 18px rgba(184,121,70,0.45);' : ''}">
-        ${name || ''}
-      </button>`;
-    }
-  }
-
-  view.innerHTML = `
-    <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
-      <div style="margin-bottom:14px;">
-        <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">
-          Arrange ${_arrangeRoom}</div>
-        <div style="font-size:11px;color:#8a8175;">
-          ${_arrangePicked
-            ? `<strong style="color:#B87946;">${_arrangePicked} picked up</strong> — tap where it goes`
-            : 'Tap a table to pick it up, then tap where it should be'}</div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:20px;">
-        ${cells}
-      </div>
-      <div style="display:flex;gap:8px;">
-        <button onclick="_saveArrange()" class="glaze-tile"
-          style="flex:1;border:none;border-radius:14px;padding:18px;cursor:pointer;
-          background:#4CAF50;color:#fff;font-size:16px;font-weight:800;">
-          ✓ Save this layout
-        </button>
-        <button onclick="_cancelArrange()" class="glaze-tile"
-          style="border:none;border-radius:14px;padding:18px 20px;cursor:pointer;
-          font-size:14px;font-weight:700;">Cancel</button>
-      </div>
-      <div style="margin-top:16px;padding:14px;background:rgba(43,39,36,0.04);border-radius:12px;
-        font-size:11px;color:#8a8175;line-height:1.5;">
-        Put the tables where they really are. Three across, as many rows as you need.
-        Empty squares are gaps — the sink, the kiln door, wherever there isn't a table.
-        A and B halves move together.
-      </div>
-    </div>`;
-  toggleFloatingBackBtn();
-}
-
-function _arrangeTap(row, col) {
-  const key = `${row},${col}`;
-  const here = _arrangeGrid[key];
-  if (!_arrangePicked) {
-    if (here) _arrangePicked = here;
-  } else {
-    const from = Object.keys(_arrangeGrid).find(k => _arrangeGrid[k] === _arrangePicked);
-    if (here && here !== _arrangePicked) {
-      _arrangeGrid[from] = here;          // swap
-      _arrangeGrid[key] = _arrangePicked;
-    } else {
-      delete _arrangeGrid[from];          // move
-      _arrangeGrid[key] = _arrangePicked;
-    }
-    _arrangePicked = null;
-  }
-  _renderArrange();
-}
-
-async function _saveArrange() {
-  // Every half of a pair gets the same position — they're one table
-  const { rooms } = _elegantRoomsData();
-  const list = rooms[_arrangeRoom] || [];
-  const positions = [];
-  Object.entries(_arrangeGrid).forEach(([key, pair]) => {
-    const [row, col] = key.split(',').map(Number);
-    list.filter(t => (t.pair_id || t.name) === pair)
-        .forEach(t => positions.push({ name: t.name, row, col }));
-  });
-  try {
-    const res = await fetch(`${API_URL}/api/floor/layout`, {
+  _volTimer = setTimeout(() => {
+    fetch(`${API_URL}/api/spotify/control`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studioId, positions })
-    });
-    if (!res.ok) throw new Error('Save failed');
-    _arrangeRoom = null;
-    await loadFloorPlan();
-    showRoomElegant(_arrangeRoom || Object.keys(rooms)[0]);
+      body: JSON.stringify({ studioId, action: 'volume', deviceId,
+        volume: parseInt(value), staffRole: currentShiftStaff?.role })
+    }).catch(() => {});
+  }, 350);
+}
+
+async function _musicPlaylists() {
+  const sheet = document.createElement('div');
+  sheet.id = 'pl-sheet';
+  sheet.style.cssText = 'position:fixed;inset:0;z-index:9700;background:rgba(43,39,36,0.9);display:flex;align-items:flex-end;justify-content:center;';
+  sheet.onclick = e => { if (e.target===sheet) sheet.remove(); };
+  sheet.innerHTML = `<div style="background:#FFFDF9;width:100%;max-width:520px;border-radius:18px 18px 0 0;
+    padding:20px 16px calc(20px + env(safe-area-inset-bottom));max-height:78vh;display:flex;flex-direction:column;">
+    <div style="font-family:'Caveat',cursive;font-size:24px;color:#2B2724;margin-bottom:12px;">Your playlists</div>
+    <div id="pl-list" style="overflow-y:auto;flex:1;">
+      <div style="text-align:center;padding:20px;color:#8a8175;font-size:13px;">Loading…</div>
+    </div>
+    <button onclick="document.getElementById('pl-sheet').remove()"
+      style="margin-top:10px;width:100%;background:#2B2724;color:#fff;border:none;border-radius:12px;
+      padding:13px;font-size:14px;font-weight:800;cursor:pointer;">Close</button>
+  </div>`;
+  document.body.appendChild(sheet);
+  try {
+    const r = await fetch(`${API_URL}/api/spotify/playlists?studioId=${studioId}`);
+    const d = await r.json();
+    const list = document.getElementById('pl-list');
+    list.innerHTML = (d.playlists || []).map(p => `
+      <button onclick="_musicPlay('${p.uri}')" class="glaze-tile"
+        style="width:100%;border:none;border-radius:12px;padding:12px;cursor:pointer;
+        text-align:left;margin-bottom:6px;display:flex;gap:10px;align-items:center;">
+        ${p.art ? `<img src="${p.art}" style="width:40px;height:40px;border-radius:6px;flex-shrink:0;">`
+                : `<div style="width:40px;height:40px;border-radius:6px;background:rgba(43,39,36,0.08);
+                   display:flex;align-items:center;justify-content:center;flex-shrink:0;">🎵</div>`}
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:700;color:#2B2724;white-space:nowrap;
+            overflow:hidden;text-overflow:ellipsis;">${p.name}</div>
+          <div style="font-size:10px;color:#8a8175;">${p.tracks} tracks</div>
+        </div>
+      </button>`).join('') || '<div style="text-align:center;padding:20px;color:#8a8175;font-size:13px;">No playlists found.</div>';
   } catch(e) {
-    alert("Couldn't save the layout — try again in a moment.");
+    document.getElementById('pl-list').innerHTML = '<div style="text-align:center;padding:20px;color:#e53935;font-size:13px;">Couldn\'t load.</div>';
   }
 }
 
-function _cancelArrange() {
-  const room = _arrangeRoom;
-  _arrangeRoom = null;
-  _arrangePicked = null;
-  if (room) showRoomElegant(room);
-  else renderFloorPlanElegant();
+async function _musicPlay(uri) {
+  try {
+    const r = await fetch(`${API_URL}/api/spotify/control`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, action: 'play', uri, staffRole: currentShiftStaff?.role })
+    });
+    if (!r.ok) { const e = await r.json(); alert(e.error || "That didn't work."); return; }
+    document.getElementById('pl-sheet')?.remove();
+    setTimeout(_musicPlayer, 700);
+  } catch(e) {}
 }
 
 // THIS IS A RENDERING OF /api/staff/alert-kinds, NEVER A SECOND LIST.

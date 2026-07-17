@@ -6241,6 +6241,261 @@ app.post('/api/sonos/control', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// ═══════════════════════════════════════════════════════════
+// SPOTIFY — the music itself. 17 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Daisy: "it's Spotify that we use. Can we not get an API from Spotify
+// developer to see if we can have the controls and change tracks?"
+//
+// WHY SPOTIFY NOT SONOS: the Symfonisk speakers ARE Sonos speakers —
+// IKEA make the box, Sonos make the software. But Spotify Connect sees
+// them as devices, so Spotify's API can do everything Sonos's can
+// (volume per speaker, play, pause, skip) PLUS the thing Sonos can't:
+// search and play anything from the library.
+//
+// The Sonos app still groups the speakers. It's set once and then
+// nobody opens it again — which was the actual complaint.
+//
+// PREMIUM ONLY. Playback control doesn't work on free accounts.
+// Dev Mode is capped at 5 authorised users since Feb 2026 — three
+// directors is fine.
+const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
+const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
+const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI ||
+  'https://glazeup-api.onrender.com/api/spotify/callback';
+const SPOTIFY_ENABLED = !!(SPOTIFY_CLIENT_ID && SPOTIFY_CLIENT_SECRET);
+const SPOTIFY_ACCESS_ROLES = ['General Manager', 'Co-Director', 'Studio Executive'];
+
+async function _spotifyToken(studioId) {
+  const { data } = await supabase.from('spotify_connections')
+    .select('access_token, refresh_token, expires_at').eq('studio_id', studioId).single();
+  if (!data) return null;
+  if (data.expires_at && new Date(data.expires_at) < new Date(Date.now() + 60*1000)) {
+    try {
+      const auth = Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64');
+      const r = await fetch('https://accounts.spotify.com/api/token', {
+        method: 'POST',
+        headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(data.refresh_token)}`,
+      });
+      const t = await r.json();
+      if (t.access_token) {
+        await supabase.from('spotify_connections').update({
+          access_token: t.access_token,
+          refresh_token: t.refresh_token || data.refresh_token,
+          expires_at: new Date(Date.now() + (t.expires_in || 3600) * 1000).toISOString(),
+        }).eq('studio_id', studioId);
+        return t.access_token;
+      }
+    } catch(e) { console.warn('Spotify refresh failed:', e.message); }
+  }
+  return data.access_token;
+}
+
+async function _spotify(studioId, path, method = 'GET', body = null) {
+  const token = await _spotifyToken(studioId);
+  if (!token) throw new Error('NOT_CONNECTED');
+  const r = await fetch(`https://api.spotify.com/v1${path}`, {
+    method,
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (r.status === 204) return {};
+  if (r.status === 404) throw new Error('NO_DEVICE');
+  if (r.status === 403) throw new Error('PREMIUM_REQUIRED');
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error(e.error?.message || `Spotify ${r.status}`);
+  }
+  return r.json();
+}
+
+// GET /api/spotify/setup — THE MORNING CHECK
+// ═══════════════════════════════════════════════════════════
+// Daisy: "we have problems in the morning getting everything connected.
+// Could you do a setup system with a workflow and tiles to get you to
+// connect, and make sure it's done before the next step, because
+// sometimes it's slow to react."
+//
+// Four checks, in order. Each one only makes sense if the one before
+// passed. Returns exactly which step is blocking and what to do about
+// it — never "something went wrong".
+app.get('/api/spotify/setup', async (req, res) => {
+  const { studioId } = req.query;
+  const steps = [];
+
+  // 1. Is it even set up on the server?
+  steps.push({
+    id: 'credentials', label: 'Spotify set up on the server',
+    ok: SPOTIFY_ENABLED,
+    fix: SPOTIFY_ENABLED ? null : 'Client ID and secret need adding to Render. See the setup note.',
+  });
+  if (!SPOTIFY_ENABLED) return res.json({ steps, ready: false, blockedAt: 'credentials' });
+
+  // 2. Has anyone signed in?
+  let connected = false;
+  try {
+    const { data } = await supabase.from('spotify_connections')
+      .select('studio_id').eq('studio_id', studioId).single();
+    connected = !!data;
+  } catch(e) {}
+  steps.push({
+    id: 'connected', label: 'Signed in to Spotify',
+    ok: connected,
+    fix: connected ? null : 'Tap Connect and sign in with the studio account.',
+    action: connected ? null : 'connect',
+  });
+  if (!connected) return res.json({ steps, ready: false, blockedAt: 'connected' });
+
+  // 3. Is the account Premium? Control doesn't work without it.
+  let premium = false, accountName = null;
+  try {
+    const me = await _spotify(studioId, '/me');
+    premium = me.product === 'premium';
+    accountName = me.display_name || me.id;
+  } catch(e) {}
+  steps.push({
+    id: 'premium', label: 'Premium account',
+    ok: premium,
+    detail: accountName,
+    fix: premium ? null : "This account isn't Premium. Control only works on Premium.",
+  });
+  if (!premium) return res.json({ steps, ready: false, blockedAt: 'premium' });
+
+  // 4. Are the speakers awake? This is the one that bites in the morning.
+  let devices = [];
+  try {
+    const d = await _spotify(studioId, '/me/player/devices');
+    devices = d.devices || [];
+  } catch(e) {}
+  const awake = devices.length > 0;
+  steps.push({
+    id: 'devices', label: awake ? `${devices.length} speaker${devices.length===1?'':'s'} awake` : 'Speakers asleep',
+    ok: awake,
+    detail: devices.map(d => d.name).join(', ') || null,
+    fix: awake ? null : 'The speakers are asleep. Play something from the Spotify app once to wake them, then check again.',
+    action: awake ? null : 'recheck',
+  });
+
+  res.json({
+    steps, ready: awake, blockedAt: awake ? null : 'devices',
+    devices: devices.map(d => ({ id: d.id, name: d.name, active: d.is_active, volume: d.volume_percent })),
+  });
+});
+
+app.get('/api/spotify/connect', (req, res) => {
+  if (!SPOTIFY_ENABLED) return res.status(503).send('Spotify is not set up on this server yet.');
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).send('studioId required');
+  const url = 'https://accounts.spotify.com/authorize?' + new URLSearchParams({
+    client_id: SPOTIFY_CLIENT_ID, response_type: 'code',
+    redirect_uri: SPOTIFY_REDIRECT_URI, state: studioId,
+    scope: 'user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private',
+  });
+  res.redirect(url);
+});
+
+app.get('/api/spotify/callback', async (req, res) => {
+  const { code, state: studioId, error } = req.query;
+  if (error) return res.send(`<html><body style="font-family:system-ui;text-align:center;padding:60px;background:#F4ECE0;"><h2>Not connected</h2><p>${error}</p></body></html>`);
+  if (!code || !studioId) return res.status(400).send('Missing code');
+  try {
+    const auth = Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64');
+    const r = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `grant_type=authorization_code&code=${encodeURIComponent(code)}&redirect_uri=${encodeURIComponent(SPOTIFY_REDIRECT_URI)}`,
+    });
+    const t = await r.json();
+    if (!t.access_token) throw new Error(t.error_description || 'No token');
+    await supabase.from('spotify_connections').upsert({
+      studio_id: studioId, access_token: t.access_token, refresh_token: t.refresh_token,
+      expires_at: new Date(Date.now() + (t.expires_in || 3600) * 1000).toISOString(),
+    }, { onConflict: 'studio_id' });
+    res.send(`<html><body style="font-family:system-ui;text-align:center;padding:60px;background:#F4ECE0;">
+      <div style="font-size:52px;">🎵</div><h2 style="color:#2B2724;">Spotify connected</h2>
+      <p style="color:#8a8175;">Close this and go back to the app.</p></body></html>`);
+  } catch(e) {
+    res.status(500).send(`<html><body style="font-family:system-ui;text-align:center;padding:60px;"><h2>Couldn't connect</h2><p>${e.message}</p></body></html>`);
+  }
+});
+
+app.get('/api/spotify/now', async (req, res) => {
+  const { studioId } = req.query;
+  if (!SPOTIFY_ENABLED) return res.status(503).json({ error: 'Not set up' });
+  try {
+    const p = await _spotify(studioId, '/me/player');
+    if (!p || !p.item) return res.json({ playing: false });
+    res.json({
+      playing: p.is_playing,
+      track: p.item.name,
+      artist: (p.item.artists || []).map(a => a.name).join(', '),
+      album: p.item.album?.name,
+      art: p.item.album?.images?.[0]?.url,
+      device: p.device?.name,
+      deviceId: p.device?.id,
+      volume: p.device?.volume_percent,
+    });
+  } catch(e) {
+    res.status(e.message === 'NOT_CONNECTED' ? 404 : 500).json({ error: e.message });
+  }
+});
+
+app.post('/api/spotify/control', async (req, res) => {
+  const { studioId, action, deviceId, volume, uri, staffRole } = req.body;
+  if (!SPOTIFY_ENABLED) return res.status(503).json({ error: 'Not set up' });
+  if (!SPOTIFY_ACCESS_ROLES.includes(staffRole)) {
+    return res.status(403).json({ error: 'Music is directors only.' });
+  }
+  try {
+    const q = deviceId ? `?device_id=${deviceId}` : '';
+    switch (action) {
+      case 'play':   await _spotify(studioId, `/me/player/play${q}`, 'PUT', uri ? { context_uri: uri } : null); break;
+      case 'pause':  await _spotify(studioId, `/me/player/pause${q}`, 'PUT'); break;
+      case 'next':   await _spotify(studioId, `/me/player/next${q}`, 'POST'); break;
+      case 'prev':   await _spotify(studioId, `/me/player/previous${q}`, 'POST'); break;
+      case 'volume':
+        if (typeof volume !== 'number') return res.status(400).json({ error: 'volume required' });
+        await _spotify(studioId, `/me/player/volume?volume_percent=${Math.round(volume)}${deviceId?'&device_id='+deviceId:''}`, 'PUT');
+        break;
+      default: return res.status(400).json({ error: 'Unknown action' });
+    }
+    res.json({ done: true, action });
+  } catch(e) {
+    const msg = e.message === 'NO_DEVICE' ? 'No speaker is awake. Play something from the Spotify app first.'
+              : e.message === 'PREMIUM_REQUIRED' ? 'This needs Spotify Premium.'
+              : e.message;
+    res.status(400).json({ error: msg });
+  }
+});
+
+app.get('/api/spotify/playlists', async (req, res) => {
+  const { studioId } = req.query;
+  if (!SPOTIFY_ENABLED) return res.status(503).json({ error: 'Not set up' });
+  try {
+    const d = await _spotify(studioId, '/me/playlists?limit=30');
+    res.json({ playlists: (d.items || []).map(p => ({
+      id: p.id, uri: p.uri, name: p.name,
+      art: p.images?.[0]?.url, tracks: p.tracks?.total,
+    })) });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/spotify/search', async (req, res) => {
+  const { studioId, q } = req.query;
+  if (!SPOTIFY_ENABLED) return res.status(503).json({ error: 'Not set up' });
+  if (!q) return res.status(400).json({ error: 'q required' });
+  try {
+    const d = await _spotify(studioId, `/search?q=${encodeURIComponent(q)}&type=album,playlist&limit=8`);
+    const out = [];
+    (d.albums?.items || []).forEach(a => out.push({ type: 'album', uri: a.uri, name: a.name,
+      by: (a.artists||[]).map(x=>x.name).join(', '), art: a.images?.[0]?.url }));
+    (d.playlists?.items || []).forEach(p => out.push({ type: 'playlist', uri: p.uri, name: p.name,
+      by: p.owner?.display_name, art: p.images?.[0]?.url }));
+    res.json({ results: out });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // POST /api/floor/seat — put a booking on a table.
 //
 // THE MISSING HALF. Square tells us WHEN, WHO and WHICH ROOM (via the
