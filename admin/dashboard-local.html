@@ -8672,7 +8672,10 @@ function _assistWhatILearned() {
 // studio narration voice, but the same underlying voice so it's
 // consistent and never surprises anyone.
 function _cleoSpeak(text) {
-  if (!window.speechSynthesis) return;
+  // Guarded properly — some browsers have speechSynthesis but not the
+  // constructor, and an unguarded throw here silently killed her answers.
+  if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') return;
+  try {
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   const v = typeof resolveStudioVoice === 'function' ? resolveStudioVoice() : null;
@@ -8681,6 +8684,7 @@ function _cleoSpeak(text) {
   u.pitch = 1.15;  // a touch brighter — cute, not squeaky
   u.volume = 0.9;
   window.speechSynthesis.speak(u);
+  } catch(e) { /* voice is a bonus, never a blocker */ }
 }
 
 let _cleoChat = [];
