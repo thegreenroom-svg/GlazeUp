@@ -12768,6 +12768,16 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
   const tableEls = placed.map(t => {
     const b = bookingByTable[t.name];
     const busy = !!b;
+    // MUST be declared here, with busy — not further down next to bTime
+    // where it naturally reads. provOutline (~50 lines below) uses it,
+    // and `const` is not hoisted like `var`: it sits in the temporal
+    // dead zone until its declaration RUNS. So declaring it late threw
+    // "Cannot access 'provisional' before initialization" and took the
+    // whole floor plan down with it — every table, on the one screen the
+    // studio watches all day. Seen on a real device within minutes.
+    // node --check never catches this: it is valid syntax and a runtime
+    // error, which is exactly why the syntax check passing meant nothing.
+    const provisional = busy && b.is_provisional;
     // A booking that has genuinely reached its own scheduled start time
     // goes red, regardless of stage — the clearest possible "this is
     // meant to be happening right now" signal. Server computes is_live
@@ -12865,10 +12875,7 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
     const bTime = busy && !b.is_live && b.session_start
       ? (b.is_tomorrow ? 'tmw ' : '') + new Date(b.session_start).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})
       : null;
-    // A proposal must never look like a booking. Same green, but dashed
-    // and see-through: readable at a glance as "we put this here, move
-    // it if it's wrong" rather than "this is where they're sitting".
-    const provisional = busy && b.is_provisional;
+
     const label = busy
       ? `${provOutline}<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 - 8}" text-anchor="middle"
            font-family="'Architects Daughter',cursive" font-size="${tappable ? 8 : 10}"
