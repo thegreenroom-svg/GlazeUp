@@ -13558,12 +13558,18 @@ function showRoomElegant(roomName) {
     <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
         <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;flex:1;">${roomName}</div>
+        <!-- padding:7px 11px on 11px text sat under Apple's 44px minimum
+             tap target — real, though less severe than the checklist
+             reorder cluster (no adjacent button to mis-hit into). Same
+             fix, same reasoning: min-height grows the tappable area,
+             the visible pill stays the same size. -->
         <button onclick="openArrangeTables('${roomName}')" class="glaze-tile"
-          style="border:none;padding:7px 11px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;">
+          style="border:none;padding:7px 11px;min-height:44px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;
+          display:flex;align-items:center;">
           ⊞ Arrange</button>
         <!-- Same tile as the splash — one way to your tiles from anywhere -->
         <button onclick="showGridNav()" class="glaze-tile"
-          style="border:none;border-radius:12px;padding:9px 13px;cursor:pointer;flex-shrink:0;
+          style="border:none;border-radius:12px;padding:9px 13px;min-height:44px;cursor:pointer;flex-shrink:0;
           background:linear-gradient(135deg,#2B2724,#3d2e28);color:#fff;
           box-shadow:0 2px 8px -2px rgba(43,39,36,0.4);">
           <div style="font-size:14px;line-height:1;">▦</div>
@@ -14311,16 +14317,31 @@ function renderDetailChecklist() {
             ${c.description ? `<div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;">${c.description}</div>` : ''}
           </div>
         </button>
-        <div style="display:flex;flex-direction:column;gap:2px;">
+        <!-- ═══════════════════════════════════════════════════════════
+             ▲ ▼ ✎ WERE 28px TALL EACH, STACKED WITH NO GAP. 17 July 2026.
+             ═══════════════════════════════════════════════════════════
+             A rename dialog appeared where a reorder tap was meant — the
+             screenshot showed it happening right after the arrows were
+             used. Not a routing bug: three buttons in a 28px-wide column,
+             each roughly 19px tall, is well under Apple's own 44x44
+             minimum tap target in BOTH dimensions, with zero gap between
+             them. Missing by a few pixels on a real thumb isn't user
+             error, it's the target being smaller than a fingertip.
+             Visible icon size is unchanged — only the tappable area
+             grows, via a transparent padded hit zone around each glyph,
+             so the row doesn't get visually bulkier. -->
+        <div style="display:flex;flex-direction:column;gap:3px;">
           <button onclick="_moveChecklistItem('${stage}',${i},-1)" ${i === 0 ? 'disabled' : ''}
-            style="flex:1;width:28px;border:none;border-radius:6px 6px 0 0;background:rgba(255,255,255,0.06);
-              color:${i === 0 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.6)'};font-size:10px;cursor:pointer;">▲</button>
+            style="flex:1;min-width:44px;min-height:44px;border:none;border-radius:8px 8px 0 0;background:rgba(255,255,255,0.06);
+              color:${i === 0 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.6)'};font-size:14px;cursor:pointer;
+              display:flex;align-items:center;justify-content:center;">▲</button>
           <button onclick="_moveChecklistItem('${stage}',${i},1)" ${i === checks.length - 1 ? 'disabled' : ''}
-            style="flex:1;width:28px;border:none;background:rgba(255,255,255,0.06);
-              color:${i === checks.length - 1 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.6)'};font-size:10px;cursor:pointer;">▼</button>
+            style="flex:1;min-width:44px;min-height:44px;border:none;background:rgba(255,255,255,0.06);
+              color:${i === checks.length - 1 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.6)'};font-size:14px;cursor:pointer;
+              display:flex;align-items:center;justify-content:center;">▼</button>
           <button onclick="_editChecklistItem('${stage}','${c.key}')"
-            style="flex:1;width:28px;border:none;border-radius:0 0 6px 6px;background:rgba(184,121,70,0.15);
-              color:#B87946;font-size:10px;cursor:pointer;">✎</button>
+            style="flex:1;min-width:44px;min-height:44px;border:none;border-radius:0 0 8px 8px;background:rgba(184,121,70,0.15);
+              color:#B87946;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✎</button>
         </div>
       </div>`;
     }).join('')}
