@@ -12497,8 +12497,33 @@ function _elegantRoomsData() {
   // Square has never known which table (table_tracking_mode is 'none'). They
   // synced in perfectly and vanished. They were not lost — they were UNSEATED,
   // and the app had no word for that. It does now.
+  // ═══════════════════════════════════════════════════════════
+  // TOMORROW IS NOT AN ARRIVAL. 17 July 2026.
+  // ═══════════════════════════════════════════════════════════
+  // Reported from a real device at 18:15, studio closed: "no green
+  // tables and by meter looks v busy now we're closed."
+  //
+  // Both halves of that were MY fault, from widening the floor window
+  // to include tomorrow earlier tonight. Checked against the real
+  // database: tomorrow's 16 bookings ALL have table_number = null —
+  // as the note above says, Square has never known about tables, so a
+  // booking only gets one when a human seats someone. So all 16 fell
+  // into `unseated`, and unseated means ONE thing in this app: "they're
+  // here, standing up, nobody's sat them down yet."
+  //
+  // Consequences, both visible in the screenshot:
+  //   - the busy meter counts unseated -> 16 -> pegged at Busy, at
+  //     quarter past six, with the doors shut
+  //   - the arrivals strip would show 16 chips for people who are not
+  //     due for another sixteen hours
+  //
+  // Tomorrow's bookings are real and worth seeing, but they are not on
+  // the floor and they are not arrivals. Split at the source so nothing
+  // downstream can mistake one for the other.
   const unseated = [];
+  const tomorrow = [];
   bookings.forEach(b => {
+    if (b.is_tomorrow) { tomorrow.push(b); return; }
     if (b.table_number) _assignBookingToTable(bookingByTable, b);
     else unseated.push(b);
   });
@@ -12517,7 +12542,7 @@ function _elegantRoomsData() {
   const rooms = {};
   tables.forEach(t => { (rooms[_canonRoom(t.room)] ||= []).push(t); });
   Object.values(rooms).forEach(list => list.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
-  return { rooms, bookingByTable, unseated };
+  return { rooms, bookingByTable, unseated, tomorrow };
 }
 
 function _elegantLayoutRoom(list, roomWidth) {
@@ -12885,6 +12910,35 @@ function _renderArrivals(unseated) {
 // ═══════════════════════════════════════════════════════════
 // BUSY METER — a vertical LED-style indicator showing studio capacity
 // ═══════════════════════════════════════════════════════════
+// Tomorrow, stated plainly — NOT drawn onto tables.
+//
+// You asked for tomorrow morning's bookings to show green on the tables
+// so they could be actioned. I can't do that honestly: tomorrow's
+// bookings have no table_number, because a table is only attached when
+// someone is actually seated (Square doesn't carry tables at all). There
+// is no table to colour. Painting one green would mean CHOOSING a table
+// on the app's own initiative and showing it as if it were booked — and
+// then someone walks in tomorrow and sits where the app guessed.
+//
+// So it says the true thing instead: how many, and when the first one
+// is. Pre-assigning tables to tomorrow's bookings is a real, sensible
+// feature — it just has to be a decision someone makes, not one this
+// renderer invents.
+function _renderTomorrow(tomorrow) {
+  if (!tomorrow || !tomorrow.length) return '';
+  const first = tomorrow.map(b => b.session_start).filter(Boolean).sort()[0];
+  const at = first ? new Date(first).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'}) : null;
+  const covers = tomorrow.reduce((n,b) => n + (b.party_size || 0), 0);
+  return `<div style="display:flex;align-items:center;gap:8px;justify-content:center;
+    padding:7px 12px;margin:0 auto 8px;background:rgba(184,121,70,0.08);
+    border:1px solid rgba(184,121,70,0.2);border-radius:20px;width:fit-content;">
+    <span style="font-size:13px;">🌅</span>
+    <span style="font-family:'Architects Daughter',cursive;font-size:11px;color:#8a8175;">
+      Tomorrow · ${tomorrow.length} booking${tomorrow.length===1?'':'s'}${covers?` · ${covers} covers`:''}${at?` · from ${at}`:''} · no tables yet
+    </span>
+  </div>`;
+}
+
 function _renderBusyMeter(unseatedCount, bookingByTable) {
   // ═══════════════════════════════════════════════════════════
   // CALIBRATED ON REAL TRADING DATA — 25 days, 136 bookings
@@ -12903,6 +12957,11 @@ function _renderBusyMeter(unseatedCount, bookingByTable) {
   const BUSY_MIN  = 8;    // ≥8 bookings = busy
   const PEAK      = 15;   // busiest day on record
 
+  // unseatedCount is now today's only — tomorrow is filtered out in
+  // _elegantRoomsData before it ever reaches here. This meter answers
+  // "how busy are we RIGHT NOW", so a booking sixteen hours away must
+  // never light a segment. It did tonight, and it read Busy with the
+  // doors shut.
   const seatedCount = Object.keys(bookingByTable).length;
   const totalBookings = seatedCount + unseatedCount;
   const pct = Math.min(1, totalBookings / PEAK);
@@ -13005,7 +13064,7 @@ function renderFloorPlanElegant() {
   // of the screen on a real device. Restoring flex lets flex:1 fill the
   // viewport and lets the child's overflow-y:auto actually scroll.
   view.style.display = 'flex';
-  const { rooms, bookingByTable, unseated } = _elegantRoomsData();
+  const { rooms, bookingByTable, unseated, tomorrow } = _elegantRoomsData();
   const resting = Object.keys(rooms).length === 0;
 
   view.innerHTML = `
@@ -13051,6 +13110,7 @@ function renderFloorPlanElegant() {
         </button>
       </div>
       ${_renderArrivals(unseated)}
+      ${_renderTomorrow(tomorrow)}
       <!-- The traffic light, explained. Small, always there, so nobody
            has to remember what amber means. -->
       <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px;
@@ -13114,7 +13174,7 @@ function showRoomElegant(roomName) {
   // of the screen on a real device. Restoring flex lets flex:1 fill the
   // viewport and lets the child's overflow-y:auto actually scroll.
   view.style.display = 'flex';
-  const { rooms, bookingByTable, unseated } = _elegantRoomsData();
+  const { rooms, bookingByTable, unseated, tomorrow } = _elegantRoomsData();
   const list = rooms[roomName] || [];
 
   view.innerHTML = `
