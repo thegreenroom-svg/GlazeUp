@@ -481,7 +481,7 @@
          so the clock and battery sat on top of the studio name and the staff
          badge. Fixed 15 July 2026 from a real device screenshot. max() keeps
          the original 6px on anything without a notch. */
-      padding: max(6px, env(safe-area-inset-top, 6px)) 10px 6px max(10px, env(safe-area-inset-left, 10px));
+      padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px 12px;
       display: flex;
       justify-content: space-between;
       align-items: center;
