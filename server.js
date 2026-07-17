@@ -5581,10 +5581,30 @@ app.get('/api/floor/active', async (req, res) => {
       const { data } = await supabase.from('booking_flow_checks')
         .select('booking_code,stage,check_key,completed')
         .eq('studio_id', studioId);
+      // ═══════════════════════════════════════════════════════════
+      // THE CHECKLIST COULD NEVER TICK. 17 July 2026.
+      // ═══════════════════════════════════════════════════════════
+      // Reported: "won't click though". Two bugs, and either alone was
+      // enough to make every tick vanish.
+      //
+      // 1. WRONG COLUMNS. The select above asks for check_key and
+      //    completed. This read c.key and c.done. Both undefined, on
+      //    every row, forever — so the map filled with
+      //    { undefined: undefined } and no check ever came back from
+      //    the server. JavaScript does not complain about reading a
+      //    property that isn't there; it hands you undefined and lets
+      //    you build a map out of it.
+      //
+      // 2. WRONG SHAPE. This built NESTED — checks[stage][key] — while
+      //    the client reads FLAT: checks[`${stage}:${checkKey}`]
+      //    (~14274, and toggleFlowCheck writes the same flat key at
+      //    ~14330). Two structures, one name. Even with the columns
+      //    fixed, nothing would have matched.
+      //
+      // Flat now, matching what the client has always read and written.
       (data||[]).forEach(c => {
         if (!checkMap[c.booking_code]) checkMap[c.booking_code] = {};
-        if (!checkMap[c.booking_code][c.stage]) checkMap[c.booking_code][c.stage] = {};
-        checkMap[c.booking_code][c.stage][c.key] = c.done;
+        checkMap[c.booking_code][`${c.stage}:${c.check_key}`] = !!c.completed;
       });
     } catch(e) { console.warn('checks query failed:', e.message); }
 
