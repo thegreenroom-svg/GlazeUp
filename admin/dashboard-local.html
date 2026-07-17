@@ -10380,13 +10380,13 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
            + (seated ? `<circle cx="${t.x + ch.x}" cy="${t.y + ch.y}" r="3.6" fill="${accent}" fill-opacity="0.55"/>` : '');
     }).join('');
 
-    const label = busy
+    const label = tappable ? '' : (busy
       ? `<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 - 3}" text-anchor="middle"
            font-family="'Caveat',cursive" font-size="22" font-weight="700" fill="${INK}">${t.name}</text>
          <text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 + 13}" text-anchor="middle"
            font-family="'Caveat',cursive" font-size="14" fill="${INK}" fill-opacity="0.75">${b.customer_name || ''}</text>`
       : `<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 + 5}" text-anchor="middle"
-           font-family="'Caveat',cursive" font-size="21" font-weight="500" fill="${INK}" fill-opacity="0.4">${t.name}</text>`;
+           font-family="'Caveat',cursive" font-size="21" font-weight="500" fill="${INK}" fill-opacity="0.4">${t.name}</text>`);
 
     const stripe = busy
       ? `<line x1="${t.x + 8}" y1="${t.y + t.size.h - 5}" x2="${t.x + t.size.w - 8}" y2="${t.y + t.size.h - 5}"
@@ -10524,6 +10524,37 @@ function _renderArrivals(unseated) {
   </div>`;
 }
 
+// ═══════════════════════════════════════════════════════════
+// BUSY METER — a vertical LED-style indicator showing studio capacity
+// ═══════════════════════════════════════════════════════════
+function _renderBusyMeter(unseatedCount, bookingByTable) {
+  const totalTables = Object.keys(_floorData?.tables || {}).length || 15;
+  const seatedCount = Object.keys(bookingByTable).length;
+  const totalBookings = seatedCount + unseatedCount;
+  const pct = Math.min(1, totalBookings / Math.max(totalTables, 1));
+
+  // 8 LED segments
+  const segs = 8;
+  const lit = Math.round(pct * segs);
+  const color = pct > 0.75 ? '#e53935' : pct > 0.4 ? '#F9A825' : '#4CAF50';
+  const label = pct > 0.75 ? 'Busy' : pct > 0.4 ? 'Filling' : pct > 0 ? 'Quiet' : 'Empty';
+
+  const leds = Array.from({length: segs}, (_, i) => {
+    const isLit = (segs - 1 - i) < lit; // fill from bottom
+    const segColor = isLit ? (i < 2 ? '#e53935' : i < 4 ? '#F9A825' : '#4CAF50') : 'rgba(43,39,36,0.1)';
+    return `<div style="width:12px;height:8px;border-radius:2px;background:${segColor};
+      margin-bottom:3px;transition:background 0.5s;"></div>`;
+  }).join('');
+
+  return `<div style="display:flex;flex-direction:column;align-items:center;
+    padding-top:4px;flex-shrink:0;width:24px;">
+    <div style="font-size:8px;color:#8a8175;font-family:'Architects Daughter',cursive;
+      writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);
+      margin-bottom:6px;letter-spacing:0.05em;">${label}</div>
+    <div style="display:flex;flex-direction:column;">${leds}</div>
+  </div>`;
+}
+
 // #floor-plan-view is the canvas for THREE different screens now: the
 // floor plan itself, a room drill-down, and the Host By Post board.
 // The Home button hides "when the floor plan container is visible",
@@ -10632,9 +10663,14 @@ function renderFloorPlanElegant() {
           style="border:none;padding:6px 10px;font-size:10px;font-weight:800;cursor:pointer;flex-shrink:0;">▦ More</button>
       </div>
       ${_renderArrivals(unseated)}
+      <div style="display:flex;gap:8px;align-items:flex-start;width:100%;">
+        <div style="flex:1;min-width:0;">
       ${resting ? `<div style="text-align:center;padding:40px 20px;color:#8a8175;font-size:13px;">
         No tables set up yet for this studio.</div>`
         : (function(){ const w = _measureFloorPlanWidth(); return `<div style='display:flex;flex-direction:column;gap:16px;width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;box-sizing:border-box;'>${Object.entries(rooms).map(([name, list]) => _renderElegantRoomSVG(name, list, bookingByTable, true, w)).join('')}</div>`; })()}
+        </div>
+        ${_renderBusyMeter(unseated.length, bookingByTable)}
+      </div>
     </div>`;
   } catch (renderErr) {
     // Real, visible failure — no more blank screen. Also logs the
