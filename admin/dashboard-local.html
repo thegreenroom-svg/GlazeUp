@@ -12165,11 +12165,18 @@ function _renderArrivals(unseated) {
   const chips = sorted.map(b => {
     const on = _seatingBooking === b.booking_code;
     const name = (b.customer_name||'?').split(' ')[0];
+    // They've tapped "we're here" on their own phone — green dot.
+    // No WiFi tracking, no beacons: they told us.
+    const here = !!b.arrived_at;
+    // Paying separately? Staff want to know BEFORE they start totting up.
+    const split = b.payment_split === 'separately' ? '½' : '';
     return `<button onclick="_startSeating('${b.booking_code}')"
-      style="background:${on?'#2B2724':'rgba(43,39,36,0.07)'};color:${on?'#fff':'#2B2724'};
-      border:1px ${on?'solid #2B2724':'dashed rgba(43,39,36,0.25)'};border-radius:12px;
-      padding:2px 7px;font-size:10px;font-weight:600;cursor:pointer;white-space:nowrap;
-      font-family:'Caveat',cursive;flex-shrink:0;line-height:1.4;">${name}</button>`;
+      style="background:${on?'#2B2724':here?'rgba(76,175,80,0.15)':'rgba(43,39,36,0.07)'};
+      color:${on?'#fff':'#2B2724'};
+      border:1px ${on?'solid #2B2724':here?'solid rgba(76,175,80,0.5)':'dashed rgba(43,39,36,0.25)'};
+      border-radius:12px;padding:2px 7px;font-size:10px;font-weight:600;cursor:pointer;
+      white-space:nowrap;font-family:'Caveat',cursive;flex-shrink:0;line-height:1.4;">
+      ${here ? '<span style="color:#4CAF50;">●</span> ' : ''}${name}${split}</button>`;
   }).join('');
   const label = _seatingBooking ? 'now tap a table' : `${sorted.length} arriving`;
   return `<div style="margin-bottom:8px;">

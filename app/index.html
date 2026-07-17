@@ -2055,6 +2055,9 @@
     }
 
     async function init() {
+      // Today's booking tile — arrival + payment split. Quiet if there
+      // isn't one; never an empty state.
+      setTimeout(() => { try { loadTodaysBooking(); } catch(e) {} }, 600);
       const bookingCode = getParam('booking');
       const root = document.getElementById('app-root');
 
@@ -2233,6 +2236,23 @@
           </div>
 
           <!-- ── Core tiles — consistent .tile structure throughout ── -->
+
+          <!-- ═══════════════════════════════════════════════════════
+               TODAY'S BOOKING — the live one. 17 July 2026.
+               ═══════════════════════════════════════════════════════
+               Daisy: "they can see their booking clearly in big tiles.
+               They can click that to say we're here waiting to be seated.
+               Or your table number is so and so."
+
+               No WiFi tracking, no Bluetooth, no MAC addresses — all of
+               that is either broken (phones randomise MACs) or a GDPR
+               problem. They tap because they chose to. That's consent,
+               and it's warmer than a beacon.
+
+               Only renders when there IS a booking today. Otherwise
+               nothing — no empty state, no clutter.
+          -->
+          <div id="todays-booking-tile" style="display:none;"></div>
 
           <button class="tile tile-oxblood" id="tile-my-bookings" onclick="openMyBookings()">
             <span class="tile-icon">📅</span>
@@ -4418,6 +4438,247 @@
         }
 
       } catch (e) { /* silent */ }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // TODAY'S BOOKING TILE — arrival + payment split. 17 July 2026.
+    // ═══════════════════════════════════════════════════════════
+    // Daisy: "they can see their booking clearly in big tiles. They can
+    // click that to say we're here waiting to be seated. Or your table
+    // number is so and so." Plus: "are you paying altogether, or would
+    // you like to split this booking so the staff already know."
+    //
+    // Asked while they're sat down and relaxed, not at the till with a
+    // queue behind them.
+    //
+    // NO WIFI TRACKING, NO BLUETOOTH. Phones randomise MAC addresses,
+    // browsers can't read network info, and tying a device ID to a
+    // person is a GDPR problem needing consent, a lawful basis and a
+    // DPIA. They tap because they chose to. That IS the consent.
+
+    let _todaysBooking = null;
+    let _bookingPoll = null;
+
+    async function loadTodaysBooking() {
+      const code = _resolveBookingCode();
+      if (!code) return;
+      try {
+        const res = await fetch(`${API_URL}/api/booking/status?studioId=${STUDIO_ID}&bookingCode=${encodeURIComponent(code)}`);
+        if (!res.ok) return;
+        const d = await res.json();
+        if (!d.sessionStart) return;
+        // Only show it if the session is today
+        const s = new Date(d.sessionStart), n = new Date();
+        if (s.toDateString() !== n.toDateString()) return;
+        _todaysBooking = { ...d, bookingCode: code };
+        _renderTodaysBooking();
+        // Keep it honest — poll every 30s so "your table is 3A" appears
+        // the moment staff seat them
+        clearInterval(_bookingPoll);
+        _bookingPoll = setInterval(loadTodaysBooking, 30000);
+      } catch(e) { /* quiet — the tile just doesn't show */ }
+    }
+
+    function _resolveBookingCode() {
+      const p = new URLSearchParams(window.location.search);
+      return p.get('booking') || localStorage.getItem('klnk_booking_code') || null;
+    }
+
+    function _renderTodaysBooking() {
+      const el = document.getElementById('todays-booking-tile');
+      if (!el || !_todaysBooking) return;
+      const b = _todaysBooking;
+      const first = (b.customerName || '').split(' ')[0];
+      const time = b.sessionStart
+        ? new Date(b.sessionStart).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '';
+
+      let body;
+      if (b.tableNumber) {
+        // SEATED — tell them where
+        body = `
+          <div style="font-size:13px;opacity:0.85;margin-bottom:6px;">You're at</div>
+          <div style="font-family:var(--gu-font-display);font-size:42px;font-weight:800;line-height:1;">
+            ${b.tableNumber}</div>
+          ${b.room ? `<div style="font-size:14px;opacity:0.85;margin-top:4px;">${b.room}</div>` : ''}
+          <div style="font-size:13px;opacity:0.8;margin-top:12px;line-height:1.5;">
+            Settle in — someone will be over shortly.</div>`;
+      } else if (b.arrivedAt) {
+        // ARRIVED, WAITING — honest about it
+        body = `
+          <div style="font-size:32px;margin-bottom:8px;">👋</div>
+          <div style="font-family:var(--gu-font-display);font-size:26px;font-weight:800;">
+            We know you're here</div>
+          <div style="font-size:14px;opacity:0.9;margin-top:8px;line-height:1.5;">
+            Please take a seat anywhere and someone will come over.
+            If we look busy, do grab a member of staff.</div>`;
+      } else {
+        // NOT ARRIVED — the tap
+        body = `
+          <div style="font-size:13px;opacity:0.85;margin-bottom:4px;">Today at ${time}</div>
+          <div style="font-family:var(--gu-font-display);font-size:26px;font-weight:800;margin-bottom:14px;">
+            ${first ? first + ", you're booked in" : "You're booked in"}</div>
+          <div onclick="event.stopPropagation(); markArrived();"
+            style="background:rgba(255,255,255,0.22);border-radius:14px;padding:18px;
+            font-size:18px;font-weight:800;cursor:pointer;">
+            👋 We're here
+          </div>
+          <div style="font-size:12px;opacity:0.8;margin-top:10px;line-height:1.5;">
+            Tap when you arrive and we'll know you're waiting.</div>`;
+      }
+
+      el.innerHTML = `
+        <div class="tile" style="background:linear-gradient(135deg,#00897B,#00695C);
+          margin-bottom:14px;cursor:default;">
+          ${body}
+        </div>
+        ${b.arrivedAt || b.tableNumber ? _renderPaymentSplit(b) : ''}`;
+      el.style.display = 'block';
+    }
+
+    // PAYING TOGETHER OR SEPARATELY — asked once, calmly, before the till
+    function _renderPaymentSplit(b) {
+      if (b.paymentSplit === 'together') {
+        return `<div class="tile" style="background:rgba(43,39,36,0.06);color:var(--gu-accent);
+          margin-bottom:14px;cursor:pointer;" onclick="openPaymentSplit()">
+          <div style="font-size:13px;font-weight:700;">💳 Paying together</div>
+          <div style="font-size:11px;opacity:0.7;margin-top:2px;">Tap to change</div>
+        </div>`;
+      }
+      if (b.paymentSplit === 'separately') {
+        const n = (b.payers || []).length;
+        return `<div class="tile" style="background:rgba(43,39,36,0.06);color:var(--gu-accent);
+          margin-bottom:14px;cursor:pointer;" onclick="openPaymentSplit()">
+          <div style="font-size:13px;font-weight:700;">💳 Paying separately${n ? ` · ${n} people` : ''}</div>
+          <div style="font-size:11px;opacity:0.7;margin-top:2px;">
+            ${n ? (b.payers || []).join(', ') : 'Tap to add names'}</div>
+        </div>`;
+      }
+      return `<div class="tile" style="background:linear-gradient(135deg,#B87946,#9A6435);
+        margin-bottom:14px;cursor:pointer;" onclick="openPaymentSplit()">
+        <div style="font-size:28px;margin-bottom:6px;">💳</div>
+        <div style="font-family:var(--gu-font-display);font-size:20px;font-weight:800;">
+          Paying together or separately?</div>
+        <div style="font-size:12px;opacity:0.9;margin-top:6px;line-height:1.5;">
+          Let us know now and we'll have it ready. No queueing at the end.</div>
+      </div>`;
+    }
+
+    async function markArrived() {
+      const code = _todaysBooking?.bookingCode;
+      if (!code) return;
+      try {
+        const res = await fetch(`${API_URL}/api/booking/arrived`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studioId: STUDIO_ID, bookingCode: code })
+        });
+        const d = await res.json();
+        _todaysBooking = { ..._todaysBooking, arrivedAt: new Date().toISOString(),
+                           tableNumber: d.tableNumber, room: d.room };
+        _renderTodaysBooking();
+      } catch(e) { /* they'll try again or ask someone */ }
+    }
+
+    let _splitPayers = [];
+
+    function openPaymentSplit() {
+      const b = _todaysBooking;
+      if (!b) return;
+      _splitPayers = [...(b.payers || [])];
+
+      const sheet = document.createElement('div');
+      sheet.id = 'split-sheet';
+      sheet.style.cssText = 'position:fixed;inset:0;z-index:9600;background:rgba(43,39,36,0.9);display:flex;align-items:flex-end;justify-content:center;';
+      sheet.onclick = e => { if (e.target===sheet) sheet.remove(); };
+      sheet.innerHTML = `<div style="background:#FFFDF9;width:100%;max-width:520px;border-radius:18px 18px 0 0;
+        padding:24px 18px calc(24px + env(safe-area-inset-bottom));max-height:82vh;display:flex;flex-direction:column;">
+        <div style="text-align:center;margin-bottom:20px;">
+          <div style="font-size:36px;">💳</div>
+          <div style="font-family:var(--gu-font-display);font-size:24px;font-weight:800;color:var(--gu-accent);margin-top:6px;">
+            How are you paying?</div>
+          <div style="font-size:12px;color:var(--gu-dust);margin-top:4px;">
+            We'll have it ready so there's no queueing</div>
+        </div>
+
+        <button onclick="_saveSplit('together')" class="tile"
+          style="background:linear-gradient(135deg,#00897B,#00695C);margin-bottom:10px;cursor:pointer;">
+          <div style="font-size:26px;margin-bottom:4px;">🧾</div>
+          <div style="font-family:var(--gu-font-display);font-size:20px;font-weight:800;">All together</div>
+          <div style="font-size:12px;opacity:0.9;margin-top:4px;">One bill, one card</div>
+        </button>
+
+        <button onclick="_showSplitNames()" class="tile"
+          style="background:linear-gradient(135deg,#5E35B1,#4527A0);margin-bottom:14px;cursor:pointer;">
+          <div style="font-size:26px;margin-bottom:4px;">👥</div>
+          <div style="font-family:var(--gu-font-display);font-size:20px;font-weight:800;">Separately</div>
+          <div style="font-size:12px;opacity:0.9;margin-top:4px;">Tell us who's paying for what</div>
+        </button>
+
+        <div id="split-names" style="display:none;"></div>
+
+        <button onclick="document.getElementById('split-sheet').remove()"
+          style="width:100%;background:none;color:var(--gu-dust);border:none;padding:12px;
+          font-size:13px;cursor:pointer;">Not sure yet</button>
+      </div>`;
+      document.body.appendChild(sheet);
+    }
+
+    function _showSplitNames() {
+      const el = document.getElementById('split-names');
+      if (!el) return;
+      el.style.display = 'block';
+      el.innerHTML = `
+        <div style="font-size:11px;color:var(--gu-dust);font-weight:700;letter-spacing:0.06em;margin-bottom:8px;">
+          WHO'S PAYING?</div>
+        <div style="display:flex;gap:6px;margin-bottom:10px;">
+          <input id="payer-name" type="text" placeholder="First name"
+            onkeydown="if(event.key==='Enter')_addPayer()"
+            style="flex:1;border:1.5px solid rgba(43,39,36,0.15);border-radius:12px;padding:12px 14px;
+            font-size:15px;font-family:inherit;min-width:0;">
+          <button onclick="_addPayer()" style="background:#5E35B1;color:#fff;border:none;
+            border-radius:12px;padding:12px 18px;font-size:15px;font-weight:800;cursor:pointer;flex-shrink:0;">Add</button>
+        </div>
+        <div id="payer-list" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">
+          ${_splitPayers.map((p,i) => `<button onclick="_removePayer(${i})"
+            style="background:rgba(94,53,177,0.12);border:1px solid rgba(94,53,177,0.3);
+            border-radius:16px;padding:6px 12px;font-size:13px;color:var(--gu-accent);cursor:pointer;">
+            ${p} ✕</button>`).join('')}
+        </div>
+        <button onclick="_saveSplit('separately')"
+          style="width:100%;background:#4CAF50;color:#fff;border:none;border-radius:14px;
+          padding:18px;font-size:17px;font-weight:800;cursor:pointer;margin-bottom:8px;">
+          ✓ Done — ${_splitPayers.length} paying separately
+        </button>`;
+      document.getElementById('payer-name')?.focus();
+    }
+
+    function _addPayer() {
+      const input = document.getElementById('payer-name');
+      const name = input?.value?.trim();
+      if (!name) return;
+      _splitPayers.push(name);
+      input.value = '';
+      _showSplitNames();
+    }
+
+    function _removePayer(i) {
+      _splitPayers.splice(i, 1);
+      _showSplitNames();
+    }
+
+    async function _saveSplit(split) {
+      const code = _todaysBooking?.bookingCode;
+      if (!code) return;
+      try {
+        await fetch(`${API_URL}/api/booking/payment-split`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studioId: STUDIO_ID, bookingCode: code, split,
+                                 payers: split === 'separately' ? _splitPayers : null })
+        });
+        _todaysBooking.paymentSplit = split;
+        _todaysBooking.payers = split === 'separately' ? _splitPayers : [];
+        document.getElementById('split-sheet')?.remove();
+        _renderTodaysBooking();
+      } catch(e) { /* they can try again */ }
     }
 
     function openMyBookings() {

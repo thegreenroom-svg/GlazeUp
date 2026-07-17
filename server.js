@@ -5795,6 +5795,90 @@ app.post('/api/floor/layout', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// POST /api/booking/arrived — the customer says "we're here"
+// ═══════════════════════════════════════════════════════════
+// Daisy: "they can see their booking clearly in big tiles. They can
+// click that to say we're here waiting to be seated. Or there could
+// be an option, your table number is so and so."
+//
+// No WiFi tracking. No Bluetooth. No MAC addresses. The customer
+// taps a tile because they chose to — that's consent, and it's
+// faster and warmer than any beacon.
+//
+// Writes arrived_at to their own booking row. Nothing else.
+app.post('/api/booking/arrived', async (req, res) => {
+  const { studioId, bookingCode } = req.body;
+  if (!studioId || !bookingCode) return res.status(400).json({ error: 'studioId and bookingCode required' });
+  try {
+    const { data, error } = await supabase.from('bookings')
+      .update({ arrived_at: new Date().toISOString() })
+      .eq('studio_id', studioId).eq('booking_code', bookingCode)
+      .select('customer_name, table_number, room, session_start')
+      .single();
+    if (error) throw error;
+    res.json({
+      arrived: true,
+      customerName: data?.customer_name,
+      // If staff have already seated them, tell them where to go.
+      // If not, tell them to wait — honestly.
+      tableNumber: data?.table_number || null,
+      room: data?.room || null,
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/booking/status?bookingCode= — where am I up to?
+// The customer app polls this so their tile stays honest: waiting,
+// seated at table 3A, or finished.
+app.get('/api/booking/status', async (req, res) => {
+  const { studioId, bookingCode } = req.query;
+  if (!studioId || !bookingCode) return res.status(400).json({ error: 'studioId and bookingCode required' });
+  try {
+    const { data } = await supabase.from('bookings')
+      .select('customer_name, table_number, room, current_stage, status, session_start, arrived_at, payment_split, payers')
+      .eq('studio_id', studioId).eq('booking_code', bookingCode).single();
+    if (!data) return res.status(404).json({ error: 'Booking not found' });
+    res.json({
+      customerName: data.customer_name,
+      sessionStart: data.session_start,
+      arrivedAt: data.arrived_at,
+      tableNumber: data.table_number,
+      room: data.room,
+      stage: data.current_stage,
+      status: data.status,
+      paymentSplit: data.payment_split || null,
+      payers: data.payers || [],
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/booking/payment-split — together or separately?
+// ═══════════════════════════════════════════════════════════
+// Daisy: "are you paying altogether, or would you like to split this
+// booking so that the staff already know when they come to tally up
+// and it's split into the names?"
+//
+// Asked while they're sat down and relaxed, not at the till with a
+// queue behind them. Staff see the answer before they start totting up.
+app.post('/api/booking/payment-split', async (req, res) => {
+  const { studioId, bookingCode, split, payers } = req.body;
+  if (!studioId || !bookingCode || !split) {
+    return res.status(400).json({ error: 'studioId, bookingCode and split required' });
+  }
+  if (!['together', 'separately'].includes(split)) {
+    return res.status(400).json({ error: "split must be 'together' or 'separately'" });
+  }
+  try {
+    await supabase.from('bookings')
+      .update({
+        payment_split: split,
+        payers: split === 'separately' ? (payers || []) : null,
+      })
+      .eq('studio_id', studioId).eq('booking_code', bookingCode);
+    res.json({ saved: true, split, payers: payers || [] });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // POST /api/floor/seat — put a booking on a table.
 //
 // THE MISSING HALF. Square tells us WHEN, WHO and WHICH ROOM (via the
