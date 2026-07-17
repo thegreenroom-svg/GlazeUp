@@ -11273,12 +11273,41 @@ function checkShiftLogin() {
 const ROLE_COLORS_LOGIN = { 'Chief Taster':'#F4A9C0', 'Studio Manager':'#5E35B1', 'Studio Executive':'#1E88E5', 'Ceramic Technician':'#8D6E63', 'Studio Assistant':'#00897B', 'Barista':'#F4511E', 'CEO':'#F9A825', 'General Manager':'#B87946', 'Co-Director':'#B87946' };
 let selectedLoginMember = null;
 
+// ═══════════════════════════════════════════════════════════
+// HOME IS YOUR TILES. 17 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Commit a40248e was titled "Home is your tiles. Screensaver is the
+// floor plan." HALF of it shipped. showSplash() genuinely does show the
+// floor plan as the screensaver — that half is real. The home half
+// never landed: all four login paths still called goToTab('floor-plan'),
+// so everyone arrived on the floor plan and nobody ever saw their own
+// tiles unless they went looking. The title described the intent; the
+// code never changed.
+//
+// MUST await loadPersonalHomeScreen() before showGridNav(). showGridNav
+// silently falls back to the generic everyone-gets-the-same grid
+// whenever _personalScreen is empty — so landing before that fetch
+// resolves would show the wrong screen INTERMITTENTLY, depending on how
+// quick the network was. That is the worst kind of bug to chase later,
+// because it looks like it works on the desk and fails in the studio.
+//
+// Deliberately NOT inside applyShiftUI(). Six things call that, and the
+// note above it records this exact mistake being made twice in one day:
+// a function that makes the UI reflect state must not also decide where
+// you are. This is a login step, so it lives on the login paths.
+async function landOnHome() {
+  if (currentShiftStaff) {
+    try { await loadPersonalHomeScreen(); } catch(e) { /* grid fallback is fine */ }
+  }
+  showGridNav();
+}
+
 function skipLoginUseSharedView() {
   currentShiftStaff = null;
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('splash-screen').style.display = 'none';
   document.querySelectorAll('[id*="swt"], [id*="onboarding"]').forEach(el => el.style.display = 'none');
-  goToTab('floor-plan'); // already shows AND loads the real floor plan — see note above
+  landOnHome(); // home is your tiles — the screensaver is the floor plan
 }
 
 function showLoginScreen(screen) {
@@ -11923,7 +11952,7 @@ async function tryStaffFaceIdLogin() {
     localStorage.setItem('klnk_last_logged_in_name', currentShiftStaff.name);
     markSessionActive();
     document.getElementById('shift-login-modal').style.display = 'none';
-    goToTab('floor-plan'); // same fix as the PIN path above — was missing here too
+    await landOnHome(); // home is your tiles
     applyShiftUI();
   } catch (e) {
     // Genuine, honest — a cancelled/declined biometric prompt is
@@ -11997,7 +12026,7 @@ async function submitShiftPin() {
     currentShiftId = null; // no server shift row — timesheet stays honest
     localStorage.setItem('klnk_shift_staff', JSON.stringify(currentShiftStaff));
     document.getElementById('shift-login-modal').style.display = 'none';
-    goToTab('floor-plan'); // already shows AND loads the real floor plan — see note above
+    await landOnHome(); // home is your tiles
     return;
   }
 
@@ -12033,9 +12062,9 @@ async function submitShiftPin() {
     // goToTab('floor-plan') after a successful login; this, the path
     // used on every real login when the API is actually up, did not.
     // Whatever screen happened to be showing underneath the login
-    // modal simply stayed there. This is why the floor plan never
-    // appeared as home after logging in for real.
-    goToTab('floor-plan');
+    // modal simply stayed there. That fix was right; the destination
+    // was not — see landOnHome above.
+    await landOnHome();
     applyShiftUI();
     offerStaffFaceIdSetup(); // genuine, real, one-time offer — silently no-ops if already registered/declined
   } catch(e) {
@@ -12682,8 +12711,13 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
     // Free: just the name, faint.
     // Free: just the table name.
     // Booked: name, who, and — if it hasn't started — when.
+    // "10:00" on its own is a lie once tomorrow is in the window — it
+    // reads as this morning and someone goes looking for a customer who
+    // is not due for a day. is_tomorrow comes from the server, which
+    // knows the studio's own day boundary, rather than being guessed
+    // here from a timestamp.
     const bTime = busy && !b.is_live && b.session_start
-      ? new Date(b.session_start).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})
+      ? (b.is_tomorrow ? 'tmw ' : '') + new Date(b.session_start).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})
       : null;
     const label = busy
       ? `<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 - 8}" text-anchor="middle"
@@ -12820,7 +12854,7 @@ function _renderArrivals(unseated) {
   // The floor plan is the home screen; arrivals are a small prompt.
   if (!unseated.length) return '';
   const t = (b) => b.session_start
-    ? new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
+    ? (b.is_tomorrow ? 'tmw ' : '') + new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
   const sorted = unseated.slice().sort((a,b) => (a.session_start||'').localeCompare(b.session_start||''));
   // TINY DOTS — name only, minimal space. The arrivals strip is a
   // prompt, not a feature. It should never dominate the screen.
@@ -14138,17 +14172,76 @@ function _buildPersonalItems() {
   if (!_personalScreen) return [];
   const { tileOrder, promotedTiles } = _personalScreen;
   const items = [];
-  tileOrder.forEach(groupId => {
-    const group = GRID_NAV_STRUCTURE.find(g => g.id === groupId);
-    if (!group) return;
-    items.push({ type: 'group', group });
-    // Promoted sub-tiles from this group sit right after it
-    group.items.forEach(sub => {
-      if (promotedTiles.includes(sub.tab)) {
-        items.push({ type: 'sub', sub, group });
-      }
-    });
+  const seen = new Set();
+
+  // ═══════════════════════════════════════════════════════════
+  // THE GHOST TILES. 17 July 2026.
+  // ═══════════════════════════════════════════════════════════
+  // This used to be `find(g => g.id === groupId); if (!group) return;`
+  // — and that `return` was eating most of the app.
+  //
+  // ROLE_HOME_DEFAULTS is written in TAB ids: 'assistant', 'floor-plan',
+  // 'packing', 'piecematch'. This function matched them against GROUP
+  // ids, of which there are only nine: bookings, community, dashboard,
+  // menu, pieces, setup, stock, tables, team. Two different namespaces,
+  // silently. Anything that wasn't a group hit `return` and vanished
+  // with no error, no warning, nothing in the console.
+  //
+  // Counted before fixing, against the real file:
+  //   Jenny        12 tiles ->  1 rendered   (eleven gone)
+  //   Daisy        15 tiles ->  4 rendered
+  //   Lucy         11 tiles ->  1 rendered
+  //   Ruby         10 tiles ->  2 rendered
+  //   Elliott       7 tiles ->  1 rendered
+  //   Cleo          4 tiles ->  2 rendered
+  //
+  // So the carefully role-ordered home screen — the whole point of
+  // ROLE_HOME_DEFAULTS — was showing Jenny a single tile. That is why
+  // the tiles page looked like nothing and the floor plan looked like
+  // home: the tiles page genuinely WAS nearly empty. The landing was a
+  // symptom; this was the disease.
+  //
+  // Group first, so the six ids that ARE groups (dashboard, stock, team,
+  // setup, menu, community) keep their existing expand-to-sub-tiles
+  // behaviour exactly. Then fall back to resolving a tab inside a group,
+  // which is what the other twenty always meant.
+  tileOrder.forEach(id => {
+    if (seen.has(id)) return;          // a duplicate would render twice
+    seen.add(id);
+
+    const group = GRID_NAV_STRUCTURE.find(g => g.id === id);
+    if (group) {
+      items.push({ type: 'group', group });
+      group.items.forEach(sub => {
+        if (promotedTiles.includes(sub.tab) && !seen.has(sub.tab)) {
+          seen.add(sub.tab);
+          items.push({ type: 'sub', sub, group });
+        }
+      });
+      return;
+    }
+
+    // Not a group — it's a tab. Find whichever group owns it.
+    for (const g of GRID_NAV_STRUCTURE) {
+      const sub = g.items.find(i => i.tab === id);
+      if (sub) { items.push({ type: 'sub', sub, group: g }); return; }
+    }
+
+    // Genuinely unknown. NOW it's a real bug rather than a namespace
+    // mismatch, so say so instead of swallowing it like the old code did.
+    console.warn(`Home tile "${id}" matches no group and no tab — it will not render. Check ROLE_HOME_DEFAULTS against GRID_NAV_STRUCTURE.`);
   });
+
+  // Promoted tiles that don't sit under a group already in the order
+  // (e.g. 'tell-daisy' for everyone) would otherwise never appear.
+  promotedTiles.forEach(tab => {
+    if (seen.has(tab)) return;
+    for (const g of GRID_NAV_STRUCTURE) {
+      const sub = g.items.find(i => i.tab === tab);
+      if (sub) { seen.add(tab); items.push({ type: 'sub', sub, group: g }); return; }
+    }
+  });
+
   return items;
 }
 
@@ -26224,7 +26317,11 @@ function showIdleAsk() {
       Somewhere else</button>`;
   document.body.appendChild(card);
 
-  // If nobody answers, the iPad was put down. Go home quietly.
+  // If nobody answers, the iPad was put down — so it rests on the floor
+  // plan, which IS the screensaver. Note this deliberately no longer
+  // says "go home": home is now your tiles (see landOnHome), and an
+  // unattended iPad should show the room, not somebody's private tile
+  // order. Same line, different reason — worth saying so.
   _askGraceTimer = setTimeout(() => { _dismissIdleAsk(false); goToTab('floor-plan'); }, ASK_GRACE_MS);
 }
 

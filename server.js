@@ -5505,6 +5505,30 @@ app.get('/api/floor/active', async (req, res) => {
   try {
     const today = new Date(); today.setHours(0,0,0,0);
     const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+    // ═══════════════════════════════════════════════════════════
+    // WHY THE WINDOW REACHES INTO TOMORROW. 17 July 2026.
+    // ═══════════════════════════════════════════════════════════
+    // Reported from a real device: the screensaver showed no green
+    // tables for tomorrow morning's bookings. It was NOT the
+    // screensaver. This endpoint only ever fetched TODAY, so a booking
+    // at 10:00 tomorrow was never sent to the client at all — and no
+    // renderer downstream can colour a table for a booking it never
+    // received.
+    //
+    // Worse than the symptom reported. Checked against the real
+    // database: today has 7 bookings, all finished by 13:30, and every
+    // one is dropped by the session_end filter below. Tomorrow has 16,
+    // all excluded by this window. So by early evening this endpoint
+    // returned ZERO bookings and every table went cream — not "missing
+    // tomorrow", completely empty, on the floor plan AND the
+    // screensaver.
+    //
+    // Safe to widen because _assignBookingToTable on the client already
+    // resolves collisions on purpose: a live booking always beats an
+    // upcoming one for the same table, and between two upcoming ones
+    // the earlier wins. Today's live sessions keep their tables; only
+    // genuinely free tables show tomorrow.
+    const dayAfterTomorrow = new Date(today); dayAfterTomorrow.setDate(today.getDate()+2);
     // Trial hours — Square live read uses these
     // No trial hours. Today's bookings, all of them, whenever they are.
     // Daisy: "get rid of our ten till three session thing. Just use live
@@ -5528,7 +5552,7 @@ app.get('/api/floor/active', async (req, res) => {
         .select('booking_code,customer_name,table_number,current_stage,session_start,session_end,party_size,status,booking_type')
         .eq('studio_id', studioId)
         .gte('session_start', today.toISOString())
-        .lt('session_start', tomorrow.toISOString())
+        .lt('session_start', dayAfterTomorrow.toISOString())
         .not('status', 'eq', 'cancelled')
         .not('status', 'eq', 'completed');   // completed bookings clear from the floor plan
       if (!error) {
@@ -5593,6 +5617,12 @@ app.get('/api/floor/active', async (req, res) => {
     const ownMapped = ownBookings.map(b=>({
       ...b,
       is_live: b.session_start <= nowIso2,
+      // The tile shows a TIME, never a date. With tomorrow now in the
+      // window, a green "10:00" would read as this morning, and someone
+      // would go looking for a customer who isn't due for a day. Told
+      // explicitly rather than left to the client to infer from a
+      // timestamp it may well parse in a different timezone to this.
+      is_tomorrow: b.session_start >= tomorrow.toISOString(),
       assignments: assignMap[b.booking_code]||[],
       checks: checkMap[b.booking_code]||{}
     }));
