@@ -8803,9 +8803,11 @@ async function openArrangeTables(roomName) {
 
   // Build the grid from current positions
   _arrangeGrid = {};
+  const perCol = Math.ceil(list.length / 3);
   list.forEach((t, i) => {
-    const row = t.grid_row != null ? t.grid_row : Math.floor(i / 3);
-    const col = t.grid_col != null ? t.grid_col : (i % 3);
+    // Fill down each column, not across — matches how the room reads
+    const row = t.grid_row != null ? t.grid_row : (i % perCol);
+    const col = t.grid_col != null ? t.grid_col : Math.floor(i / perCol);
     _arrangeGrid[`${row},${col}`] = t.name;
   });
   _renderArrange();
@@ -12009,10 +12011,14 @@ function _gridLayoutRoom(list, roomWidth) {
   const cellW = Math.floor((roomWidth - _ELEGANT_PAD * 2 - _ELEGANT_GAP * (COLS - 1)) / COLS);
   const cellH = 62;
 
+  // Default order fills DOWN each column, not across.
+  // Daisy: "columns run one to twelve downwards, then down the middle
+  // one, then down the end." That's how a studio actually reads — you
+  // walk down a row of tables, not across three.
+  const perCol = Math.ceil(list.length / COLS);
   const placed = list.map((t, i) => {
-    // Use the saved position, or fall back to flowing in order
-    const row = t.grid_row != null ? t.grid_row : Math.floor(i / COLS);
-    const col = t.grid_col != null ? t.grid_col : (i % COLS);
+    const row = t.grid_row != null ? t.grid_row : (i % perCol);
+    const col = t.grid_col != null ? t.grid_col : Math.floor(i / perCol);
     return {
       ...t,
       x: _ELEGANT_PAD + col * (cellW + _ELEGANT_GAP),
