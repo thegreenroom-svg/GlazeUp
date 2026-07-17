@@ -8140,8 +8140,9 @@ async function openMyTraining() {
     <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
         <div>
-          <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">My Training</div>
-          <div style="font-size:11px;color:#8a8175;">Read it, tick it, done</div>
+          <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">
+            ${(currentShiftStaff?.name || '').split(' ')[0]}'s Training</div>
+          <div style="font-size:11px;color:#8a8175;">${currentShiftStaff?.role || ''} · read it, tick it, done</div>
         </div>
         <button onclick="goToRealLandingPage()" class="glaze-tile"
           style="border:none;padding:8px 12px;font-size:11px;font-weight:800;cursor:pointer;flex-shrink:0;">← Floor plan</button>
@@ -8172,6 +8173,9 @@ async function _loadTrainingTiles() {
         <div style="font-size:36px;">✅</div>
         <div style="font-family:'Caveat',cursive;font-size:22px;color:#2e7d32;margin-top:4px;">Fully trained</div>
         <div style="font-size:11px;color:#8a8175;margin-top:2px;">Daisy has been told</div>
+        <button onclick="_showMyTrainingRecord()" style="margin-top:12px;background:#2e7d32;color:#fff;
+          border:none;border-radius:10px;padding:10px 16px;font-size:12px;font-weight:700;cursor:pointer;">
+          📄 See my record</button>
       </div>` : `<div style="padding:14px;background:rgba(184,121,70,0.1);border-radius:12px;margin-bottom:16px;">
         <div style="font-size:13px;color:#2B2724;font-weight:700;">${doneCount} of ${mods.length} done</div>
         <div style="height:6px;background:rgba(43,39,36,0.1);border-radius:3px;margin-top:6px;overflow:hidden;">
@@ -8252,6 +8256,83 @@ async function _tickTrainingModule(moduleId) {
     _loadTrainingTiles();
   } catch(e) {
     alert("Couldn't save that — try again in a moment.");
+  }
+}
+
+// Personal training record — everything we already know, filled in
+async function _showMyTrainingRecord() {
+  const sheet = document.createElement('div');
+  sheet.id = 'my-record';
+  sheet.style.cssText = 'position:fixed;inset:0;z-index:9760;background:rgba(43,39,36,0.9);display:flex;align-items:flex-end;justify-content:center;';
+  sheet.onclick = e => { if (e.target===sheet) sheet.remove(); };
+  sheet.innerHTML = `<div style="background:#FFFDF9;width:100%;max-width:520px;border-radius:18px 18px 0 0;
+    padding:22px 18px calc(22px + env(safe-area-inset-bottom));max-height:85vh;display:flex;flex-direction:column;">
+    <div id="record-body" style="overflow-y:auto;flex:1;">
+      <div style="text-align:center;padding:30px;color:#8a8175;font-size:13px;">Loading…</div>
+    </div>
+    <button onclick="document.getElementById('my-record').remove()"
+      style="margin-top:12px;width:100%;background:#2B2724;color:#fff;border:none;border-radius:12px;
+      padding:13px;font-size:14px;font-weight:800;cursor:pointer;">Close</button>
+  </div>`;
+  document.body.appendChild(sheet);
+
+  try {
+    const res = await fetch(`${API_URL}/api/training/my-record?studioId=${studioId}&staffMemberId=${currentShiftStaff?.id}`);
+    const d = await res.json();
+    const body = document.getElementById('record-body');
+    body.innerHTML = `
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-family:'Caveat',cursive;font-size:30px;color:#B87946;font-weight:700;">${d.studio.name}</div>
+        <div style="font-size:13px;color:#8a8175;">Training Record</div>
+      </div>
+
+      <div style="background:rgba(43,39,36,0.04);border-radius:12px;padding:14px;margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-size:12px;color:#8a8175;">Name</span>
+          <span style="font-size:13px;font-weight:700;color:#2B2724;">${d.staff.name}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-size:12px;color:#8a8175;">Role</span>
+          <span style="font-size:13px;font-weight:700;color:#2B2724;">${d.staff.role}</span>
+        </div>
+        ${d.staff.startDate ? `<div style="display:flex;justify-content:space-between;">
+          <span style="font-size:12px;color:#8a8175;">On the team since</span>
+          <span style="font-size:13px;font-weight:700;color:#2B2724;">${d.staff.startDate}</span>
+        </div>` : ''}
+      </div>
+
+      ${d.summary.fullyTrained ? `<div style="background:rgba(76,175,80,0.12);border-radius:12px;
+        padding:14px;margin-bottom:16px;text-align:center;">
+        <div style="font-size:14px;font-weight:800;color:#2e7d32;">✓ Fully trained</div>
+        <div style="font-size:11px;color:#8a8175;margin-top:2px;">
+          All ${d.summary.total} modules complete</div>
+      </div>` : ''}
+
+      <div style="font-size:10px;color:#8a8175;font-family:'Architects Daughter',cursive;
+        letter-spacing:0.06em;margin-bottom:8px;">Modules</div>
+      ${d.modules.map(m => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;
+          border-radius:10px;margin-bottom:6px;
+          background:${m.completed ? 'rgba(76,175,80,0.08)' : 'rgba(43,39,36,0.03)'};">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:16px;">${m.icon}</span>
+            <span style="font-size:13px;color:#2B2724;">${m.label}</span>
+          </div>
+          <div style="text-align:right;">
+            ${m.completed
+              ? `<div style="font-size:11px;color:#2e7d32;font-weight:700;">✓ ${m.completedAt}</div>`
+              : `<div style="font-size:11px;color:#8a8175;">not yet</div>`}
+          </div>
+        </div>`).join('')}
+
+      <div style="margin-top:16px;padding:12px;background:rgba(43,39,36,0.03);border-radius:10px;
+        font-size:10px;color:#8a8175;text-align:center;line-height:1.5;">
+        Generated ${d.summary.generatedAt}<br>
+        This record is held in the app. Daisy can see it any time.
+      </div>`;
+  } catch(e) {
+    document.getElementById('record-body').innerHTML =
+      '<div style="text-align:center;padding:30px;color:#e53935;font-size:13px;">Couldn\'t load your record.</div>';
   }
 }
 

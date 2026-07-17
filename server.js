@@ -5580,6 +5580,60 @@ app.post('/api/training/complete', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// GET /api/training/my-record?studioId=&staffMemberId=
+// ═══════════════════════════════════════════════════════════
+// A personalised training record — their name, role, what they've
+// done, what's outstanding, dates. Everything we already know,
+// filled in for them. Returns JSON the client renders.
+//
+// Daisy: "pre-populate anything you know about our staff members
+// from the system into these documents. Make life easy for them."
+app.get('/api/training/my-record', async (req, res) => {
+  const { studioId, staffMemberId } = req.query;
+  if (!studioId || !staffMemberId) return res.status(400).json({ error: 'studioId and staffMemberId required' });
+  try {
+    const { data: staff } = await supabase.from('staff_team')
+      .select('id, name, role, created_at').eq('id', staffMemberId).single();
+    if (!staff) return res.status(404).json({ error: 'Staff member not found' });
+
+    const { data: training } = await supabase.from('staff_training')
+      .select('module_id, completed, completed_at, signed_name')
+      .eq('studio_id', studioId).eq('staff_member_id', staffMemberId).eq('completed', true);
+
+    const { data: studio } = await supabase.from('studios')
+      .select('name, address').eq('id', studioId).single();
+
+    const done = {};
+    (training || []).forEach(t => { done[t.module_id] = t; });
+    const required = TRAINING_MODULES.filter(m => m.role === 'all' || m.role === staff.role);
+
+    res.json({
+      staff: {
+        name: staff.name,
+        role: staff.role,
+        startDate: staff.created_at ? new Date(staff.created_at).toLocaleDateString('en-GB') : null,
+      },
+      studio: {
+        name: studio?.name || 'The Kiln Cafe',
+        address: studio?.address || null,
+      },
+      modules: required.map(m => ({
+        id: m.id, label: m.label, icon: m.icon,
+        completed: !!done[m.id],
+        completedAt: done[m.id]?.completed_at
+          ? new Date(done[m.id].completed_at).toLocaleDateString('en-GB') : null,
+        signedName: done[m.id]?.signed_name || null,
+      })),
+      summary: {
+        done: required.filter(m => done[m.id]).length,
+        total: required.length,
+        fullyTrained: required.every(m => done[m.id]),
+        generatedAt: new Date().toLocaleDateString('en-GB'),
+      },
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // GET /api/training/overview?studioId= — Daisy's view of everyone
 app.get('/api/training/overview', async (req, res) => {
   const { studioId } = req.query;
