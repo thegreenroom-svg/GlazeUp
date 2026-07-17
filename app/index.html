@@ -5683,11 +5683,49 @@
         return {
           x: (evt.clientX - rect.left) * (canvas.width / rect.width),
           y: (evt.clientY - rect.top) * (canvas.height / rect.height),
-          pressure: evt.pressure > 0 ? evt.pressure : 0.5 // some browsers report 0 for mouse; treat as normal
+          // A reported 0 is not "pressed infinitely lightly", it is
+          // "this device has no pressure sensor" — a mouse, a passive
+          // stylus, most Android capacitive pens. Those must draw a
+          // normal-weight line, not a hairline. Only a device that
+          // genuinely reports pressure gets to vary the width.
+          pressure: evt.pressure > 0 ? evt.pressure : 0.5,
+          pointerType: evt.pointerType || 'mouse'
         };
       };
+      // ═══════════════════════════════════════════════════════════
+      // STYLUS. 17 July 2026.
+      // ═══════════════════════════════════════════════════════════
+      // "make that as technical and as good as you can because it needs
+      // to be able to use on Android and anything with the stylus as
+      // well that we might hire out."
+      //
+      // The foundation here was already right — Pointer Events, real
+      // pressure, setPointerCapture, touch-action:none. Pointer Events
+      // is the correct choice precisely BECAUSE it is one API for an
+      // Apple Pencil, an Android active stylus, a cheap capacitive one,
+      // a finger and a mouse. Two things were genuinely missing, and
+      // both bite hardest on exactly the hardware you'd hire out.
+      //
+      // 1. PALM REJECTION. There was none. Rest your hand on the glass
+      //    while drawing with a pen and the palm is just another touch
+      //    pointer: it drew. Any child leaning on an iPad would smear
+      //    the piece. Now, the moment a pen is seen, touch is ignored
+      //    for drawing — which is what every real drawing app does.
+      //
+      // 2. COALESCED EVENTS. A stylus samples far faster than the screen
+      //    refreshes (Apple Pencil ~240Hz vs 60Hz display), and the
+      //    browser THROWS THE EXTRA POINTS AWAY unless you ask for them.
+      //    Without this a quick stroke is a jagged polyline of ~4 samples
+      //    joined by straight lines — the exact "why does my curve have
+      //    corners" complaint. getCoalescedEvents() hands back every
+      //    sample the digitiser actually took.
+      let _penSeen = false;
+      const _isPalm = (evt) => _penSeen && evt.pointerType === 'touch';
+
       const start = (evt) => {
         if (tdMode !== 'draw') return;
+        if (evt.pointerType === 'pen') _penSeen = true;
+        if (_isPalm(evt)) return;                 // hand resting on the glass
         evt.preventDefault();
         canvas.setPointerCapture(evt.pointerId);
         const pt = getPt(evt);
@@ -5703,7 +5741,27 @@
       };
       const move = (evt) => {
         if (!tdDrawing || tdMode !== 'draw' || tdDrawTool === 'fill') return;
+        if (_isPalm(evt)) return;
         evt.preventDefault();
+        // Every sample the digitiser took, not just the one that
+        // survived to this frame. On a 240Hz pen that is roughly four
+        // times the points through a fast curve, each with its OWN
+        // pressure — so the line genuinely thins and thickens within a
+        // single flick instead of stepping once per frame.
+        // Guarded: getCoalescedEvents is absent on older Safari and on
+        // some Android webviews, where the single event is all there is
+        // and the old behaviour is exactly right.
+        const pts = (typeof evt.getCoalescedEvents === 'function')
+          ? evt.getCoalescedEvents()
+          : null;
+        if (pts && pts.length) {
+          for (const e of pts) {
+            const pt = getPt(e);
+            tdPaintLine(tdLastPoint, pt);
+            tdLastPoint = pt;
+          }
+          return;
+        }
         const pt = getPt(evt);
         tdPaintLine(tdLastPoint, pt);
         tdLastPoint = pt;
