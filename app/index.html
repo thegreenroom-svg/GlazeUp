@@ -4503,14 +4503,14 @@
           <div style="font-size:13px;opacity:0.8;margin-top:12px;line-height:1.5;">
             Settle in — someone will be over shortly.</div>`;
       } else if (b.arrivedAt) {
-        // ARRIVED, WAITING — honest about it
+        // ARRIVED, WAITING. Not "sit anywhere" — the studio decides where
+        // people go, by looking at the grid. So: wait, and we'll come.
         body = `
           <div style="font-size:32px;margin-bottom:8px;">👋</div>
-          <div style="font-family:var(--gu-font-display);font-size:26px;font-weight:800;">
-            We know you're here</div>
+          <div style="font-family:var(--gu-font-display);font-size:24px;font-weight:800;">
+            Please wait to be seated</div>
           <div style="font-size:14px;opacity:0.9;margin-top:8px;line-height:1.5;">
-            Please take a seat anywhere and someone will come over.
-            If we look busy, do grab a member of staff.</div>`;
+            Someone will be over as soon as they can.</div>`;
       } else {
         // NOT ARRIVED — the tap
         body = `
