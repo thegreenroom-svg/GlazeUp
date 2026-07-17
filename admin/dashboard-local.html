@@ -13402,7 +13402,35 @@ function renderFloorPlanElegant() {
   // showed through underneath it. That was the "black hole" at the bottom
   // of the screen on a real device. Restoring flex lets flex:1 fill the
   // viewport and lets the child's overflow-y:auto actually scroll.
-  view.style.display = 'flex';
+  // ═══════════════════════════════════════════════════════════
+  // THE LANDING BUG. FOUND 17 July 2026, by the trace, not by me.
+  // ═══════════════════════════════════════════════════════════
+  // The app's own words, from a real device:
+  //   "how I got here: showGridNav() → renderFloorPlanElegant()
+  //                                  → renderFloorPlanElegant()"
+  //
+  // showGridNav ran FIRST. The tiles WERE there. Then the renderer put
+  // the floor plan over the top of them — twice — and landOnHome,
+  // goToTab and showFloorPlan appear nowhere in that trace, because
+  // none of them were involved. Every fix I made tonight guarded
+  // goToTab's callbacks. This line never went through goToTab.
+  //
+  // A RENDERER WAS DECIDING WHERE YOU STAND. It showed the container
+  // unconditionally, every single time it drew — and loadFloorPlan is
+  // POLLED (10s retry, then every 30s, see ~13625). So it did not
+  // matter what I fixed on the login path: you landed on your tiles
+  // correctly, and up to thirty seconds later the poll fired and took
+  // you away again. That is why it always came back, and why it looked
+  // like the landing had never been fixed. It had. This was undoing it
+  // on a timer.
+  //
+  // Fixed at the cause: draw always, reveal only if the floor plan is
+  // genuinely where you are. Same rule the rest of the app already
+  // follows — a function that reflects state must not also decide where
+  // you are. That rule has now been broken four separate ways in this
+  // one file (applyShiftUI, checkShiftLogin, showFloorPlan, and here),
+  // and this was the one that mattered.
+  if (currentTab === 'floor-plan') view.style.display = 'flex';
   const { rooms, bookingByTable, unseated, tomorrow } = _elegantRoomsData();
   const resting = Object.keys(rooms).length === 0;
 
