@@ -187,20 +187,28 @@
       color: var(--gu-text);
       -webkit-tap-highlight-color: transparent;
       /* The page itself should never scroll — .admin-wrapper is already
-         100vh and .admin-content scrolls internally. Without this, an
+         the full height of the body and .admin-content scrolls internally. Without this, an
          auto-focused input (e.g. the PIN field on login) can trigger the
          browser to scroll the whole BODY to bring it into view, landing
          the page halfway down instead of at the top on load. */
       overflow: hidden;
-      height: 100vh;
+      /* Was height:100vh + width:100% + position:fixed. On iOS with
+         viewport-fit=cover, 100vh is the LARGE viewport (as if the
+         toolbars were hidden) and does not track the real visible
+         area, which is what left a strip of ivory showing at the
+         bottom edge. inset:0 on a fixed element is resolved straight
+         from the viewport itself, so it is always exactly the screen
+         with no unit to mis-resolve and nothing to re-measure. */
       position: fixed;
-      width: 100%;
+      inset: 0;
     }
 
     .admin-wrapper {
       display: grid;
       grid-template-columns: 1fr;
-      height: 100vh;
+      /* 100% of a body that is now exactly the viewport — not 100vh,
+         which on iOS is taller than the glass and caused the gap. */
+      height: 100%;
     }
 
     /* Added by JS only for directors while the platform revenue strip is
@@ -211,7 +219,7 @@
        screen width. Regular staff never get this class, so their layout
        is completely unaffected. */
     body.has-platform-strip .admin-wrapper {
-      height: calc(100vh - 52px);
+      height: calc(100% - 52px);
       margin-top: 52px;
     }
     @media (max-width: 520px) {
@@ -2230,7 +2238,7 @@
 </div>
 
 <!-- Splash / resting screen -->
-<div id="splash-screen" style="position:fixed;inset:0;height:100vh;height:100dvh;min-height:100dvh;z-index:5000;background:#0E1A18;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;padding-top:max(20px,env(safe-area-inset-top));padding-bottom:max(20px,env(safe-area-inset-bottom));" onclick="dismissSplash()">
+<div id="splash-screen" style="position:fixed;inset:0;z-index:5000;background:#0E1A18;display:grid;place-items:center;overflow:hidden;cursor:pointer;padding:max(20px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));" onclick="dismissSplash()">
   <img src="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png" style="width:90%;max-width:400px;opacity:0.95;filter:drop-shadow(0 12px 40px rgba(184,121,70,0.4));">
 </div>
 <script>
@@ -2983,7 +2991,7 @@
      floor plan. When a staff member has active tables these are
      highlighted. Proper glaze-tile exit button back to home.
 ──────────────────────────────────────────────────────────────────── -->
-<div id="floor-plan-view" class="view" style="display:none;flex-direction:column;height:100vh;max-width:100%;background:#F4ECE0;overflow:hidden;">
+<div id="floor-plan-view" class="view" style="display:none;flex-direction:column;height:100%;max-width:100%;background:#F4ECE0;overflow:hidden;">
   <!-- Instant ivory placeholder — shows while loadFloorPlan() runs, prevents dark flash -->
   <div id="floor-plan-placeholder" style="flex:1;background:#F4ECE0;display:flex;align-items:center;justify-content:center;">
     <div style="font-family:'Architects Daughter',cursive;font-size:14px;color:#c8bfb0;letter-spacing:0.06em;">Loading studio…</div>
