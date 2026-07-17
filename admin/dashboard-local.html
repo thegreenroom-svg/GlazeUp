@@ -12142,26 +12142,59 @@ function _elegantLayoutRoom(list, roomWidth) {
 // room's own page — no point tapping through to where you already are).
 // Lay tables out on their real grid positions
 function _gridLayoutRoom(list, roomWidth) {
-  const COLS = 3;   // three columns — enough to represent a room, fits a phone
+  // ═══════════════════════════════════════════════════════════
+  // A/B SPLIT TABLES. 17 July 2026.
+  // ═══════════════════════════════════════════════════════════
+  // Daisy's schematic: every table in Main Studio and the Lounge is
+  // split into an A half and a B half. 1A and 1B are ONE table with a
+  // line down the middle, not two tables.
+  //
+  // They share grid_row and grid_col — which meant they rendered on
+  // top of each other and you saw one blank box. Now: A takes the left
+  // half of the cell, B the right, and the line between them is the
+  // split.
+  const COLS = 3;
   const cellW = Math.floor((roomWidth - _ELEGANT_PAD * 2 - _ELEGANT_GAP * (COLS - 1)) / COLS);
   const cellH = 62;
 
-  // Default order fills DOWN each column, not across.
-  // Daisy: "columns run one to twelve downwards, then down the middle
-  // one, then down the end." That's how a studio actually reads — you
-  // walk down a row of tables, not across three.
-  const perCol = Math.ceil(list.length / COLS);
-  const placed = list.map((t, i) => {
-    const row = t.grid_row != null ? t.grid_row : (i % perCol);
-    const col = t.grid_col != null ? t.grid_col : Math.floor(i / perCol);
-    return {
-      ...t,
-      x: _ELEGANT_PAD + col * (cellW + _ELEGANT_GAP),
-      y: _ELEGANT_PAD + row * (cellH + _ELEGANT_GAP),
-      size: { w: cellW, h: cellH },
-      _row: row, _col: col,
-    };
+  // Group by pair_id so halves stay together
+  const cells = {};
+  const perCol = Math.ceil(list.length / 2 / COLS) || 1;
+  let flowIdx = 0;
+
+  list.forEach(t => {
+    const row = t.grid_row != null ? t.grid_row : (flowIdx % perCol);
+    const col = t.grid_col != null ? t.grid_col : Math.floor(flowIdx / perCol);
+    const key = `${row},${col}`;
+    if (!cells[key]) { cells[key] = []; flowIdx++; }
+    cells[key].push(t);
   });
+
+  const placed = [];
+  Object.entries(cells).forEach(([key, halves]) => {
+    const [row, col] = key.split(',').map(Number);
+    const cellX = _ELEGANT_PAD + col * (cellW + _ELEGANT_GAP);
+    const cellY = _ELEGANT_PAD + row * (cellH + _ELEGANT_GAP);
+
+    if (halves.length === 1) {
+      // Not split — one table, whole cell
+      placed.push({ ...halves[0], x: cellX, y: cellY,
+        size: { w: cellW, h: cellH }, _row: row, _col: col });
+    } else {
+      // Split — A left, B right, sharing the cell. Sorted so A is always left.
+      const sorted = halves.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+      const halfW = Math.floor((cellW - 1) / 2);
+      sorted.forEach((t, i) => {
+        placed.push({ ...t,
+          x: cellX + i * (halfW + 1),
+          y: cellY,
+          size: { w: halfW, h: cellH },
+          _row: row, _col: col, _half: i === 0 ? 'A' : 'B',
+        });
+      });
+    }
+  });
+
   const maxRow = Math.max(...placed.map(p => p._row), 0);
   return { placed, height: _ELEGANT_PAD * 2 + (maxRow + 1) * (cellH + _ELEGANT_GAP) + 20 };
 }
@@ -12228,13 +12261,21 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
            + (seated ? `<circle cx="${t.x + ch.x}" cy="${t.y + ch.y}" r="3.6" fill="${accent}" fill-opacity="0.55"/>` : '');
     }).join('');
 
+    // ALWAYS show the table name. Daisy: "the table should have their
+    // numbers on, obviously, according to the plan." Without it you
+    // cannot tell 1A from 8B and the whole map is useless.
+    // Busy: name at the top, customer underneath.
+    // Free: just the name, faint.
     const label = busy
-      ? `<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 + 4}" text-anchor="middle"
-           font-family="'Caveat',cursive" font-size="${tappable ? 11 : 14}" font-weight="700"
+      ? `<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 - 4}" text-anchor="middle"
+           font-family="'Architects Daughter',cursive" font-size="${tappable ? 9 : 11}"
+           fill="${INK}" fill-opacity="0.5">${t.name}</text>
+         <text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 + 11}" text-anchor="middle"
+           font-family="'Caveat',cursive" font-size="${tappable ? 12 : 15}" font-weight="700"
            fill="${INK}">${(b.customer_name || '').split(' ')[0]}</text>`
-      : (tappable ? '' : `<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 + 5}" text-anchor="middle"
-           font-family="'Architects Daughter',cursive" font-size="11" fill="${INK}"
-           fill-opacity="0.25">${t.name}</text>`);
+      : `<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 + 4}" text-anchor="middle"
+           font-family="'Architects Daughter',cursive" font-size="${tappable ? 10 : 12}"
+           fill="${INK}" fill-opacity="0.35">${t.name}</text>`;
 
     const stripe = busy
       ? `<line x1="${t.x + 8}" y1="${t.y + t.size.h - 5}" x2="${t.x + t.size.w - 8}" y2="${t.y + t.size.h - 5}"
