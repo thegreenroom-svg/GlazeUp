@@ -6235,10 +6235,22 @@ function toggleFloatingBackBtn() {
 function goToTab(tab, event) {
   if (event) event.preventDefault();
 
+  // ─── LOOK BEFORE YOU HIDE ───
+  // This lookup used to sit AFTER the hide loop below, and nothing
+  // guarded it. So goToTab('music') — no #music-view exists — hid every
+  // view in the app and then threw a TypeError on the null, leaving a
+  // blank screen and a dead handler. The order was the bug: it
+  // destroyed the current screen before checking it had anywhere to go.
+  // Now it looks first and refuses to move rather than leaving someone
+  // staring at nothing mid-service.
+  const targetView = document.getElementById(tab + '-view');
+  if (!targetView) {
+    console.error(`goToTab('${tab}') — there is no #${tab}-view. Not navigating. If this is meant to be an action rather than a tab, it needs an fn in GRID_NAV_STRUCTURE (see _tileGoToTab).`);
+    return;
+  }
+
   document.querySelectorAll('.view').forEach(v => { v.style.display = 'none'; v.classList.remove('fade-in'); });
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-
-  const targetView = document.getElementById(tab + '-view');
   // FLOOR PLAN: render BEFORE showing, so the dark legacy children
   // inside the container never flash. Everything else shows immediately.
   // 17 July 2026 — this was the black flash Daisy kept seeing: the
@@ -14223,7 +14235,7 @@ function showPersonalHomeScreen() {
       ? `_personalTileTap(${i})`
       : isGroup
         ? `showGridNavSub('${group.id}')`
-        : `_tileGoToTab('${item.sub.tab}')`;
+        : `_tileGoToTab('${item.sub.tab}'${item.sub.fn ? `, '${item.sub.fn}'` : ''})`;
 
     return `<button
       data-pindex="${i}"
@@ -15019,8 +15031,36 @@ function showGridNavTop() {
 }
 
 // Tap-to-navigate with usage tracking
-function _tileGoToTab(tabId) {
+// ═══════════════════════════════════════════════════════════
+// NOT EVERY TILE IS A TAB. 17 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Reported: "nothing is connecting tiles from my screen, music,
+// everything in the app." Entirely my fault, from fixing the ghost
+// tiles an hour ago.
+//
+// Eleven of the twenty-six sub-items in GRID_NAV_STRUCTURE carry an
+// `fn` because they are ACTIONS, not tabs — they open a sheet or a
+// modal. Ten of those eleven have no #<tab>-view at all: music,
+// packing, collections, assistant, training, health-safety, whats-on,
+// customer-demo, tell-daisy, trial-reset.
+//
+// This function ignored `fn` and called goToTab() regardless. goToTab
+// hides EVERY view first and only then looks up the target — so for
+// these ten it hid the whole app and threw on a null before it could
+// show anything. Tap Music, get a blank screen and a TypeError.
+//
+// It was invisible until tonight only because those ten tiles never
+// rendered: the ghost-tile bug silently dropped them. Fixing that
+// didn't create these landmines, it armed them — twenty tiles appeared
+// and half of them detonated. Both bugs were real; one was hiding the
+// other.
+function _tileGoToTab(tabId, fnName) {
   _recordTabUsage(tabId);
+  if (fnName) {
+    const f = window[fnName];
+    if (typeof f === 'function') { f(); return; }
+    console.warn(`Tile "${tabId}" declares fn "${fnName}" but no such function exists — falling back to goToTab.`);
+  }
   goToTab(tabId);
 }
 
@@ -26085,16 +26125,71 @@ function showSplash() {
   document.body.classList.add('splash-showing');
   // Create a lightweight ivory overlay that says "Tap to continue"
   // rather than the full dark branded splash — keeps the floor plan visible
+  // ═══════════════════════════════════════════════════════════
+  // THE SCREENSAVER LINKS INTO THE WORKFLOW. 17 July 2026.
+  // ═══════════════════════════════════════════════════════════
+  // "the screen saver floor plans should link into the workflow."
+  //
+  // It couldn't. The floor plan underneath is fully live and its tables
+  // already carry real handlers — a busy table fires openTableDetail()
+  // and opens that booking. But this overlay was position:fixed inset:0
+  // at 92% opacity across the WHOLE screen with its own onclick. So
+  // every tap, wherever it landed, hit the overlay and did one thing:
+  // dismiss. You could see the tables and never touch them. The live
+  // floor plan was behind glass.
+  //
+  // Now it depends on who's there, which is the honest distinction:
+  //
+  //  - NOBODY LOGGED IN: full overlay, as before. The floor plan is a
+  //    backdrop and the only sensible action is to start a shift. A
+  //    stranger must not tap into a customer's booking.
+  //
+  //  - ON SHIFT: no blocking layer. A dimming veil that ignores clicks
+  //    (pointer-events:none) plus a small tappable hint. Tap a table and
+  //    you go straight into that booking — which is the whole point.
+  //    Tap the hint, or anywhere that isn't a table, and you land back
+  //    on your tiles.
+  const loggedIn = !!currentShiftStaff;
   const overlay = document.createElement('div');
   overlay.id = 'splash-screen';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:5000;background:rgba(244,236,224,0.92);display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer;';
-  overlay.innerHTML = `
-    <div style="text-align:center;padding:40px;">
-      <div style="font-family:'Caveat',cursive;font-size:48px;font-weight:700;color:#2B2724;margin-bottom:8px;">The Kiln Cafe</div>
-      <div style="font-family:'Architects Daughter',cursive;font-size:16px;color:#8a8175;letter-spacing:0.08em;">Tap to start your shift</div>
-      <div style="margin-top:32px;font-size:32px;animation:swt-float 2s ease-in-out infinite;">🏺</div>
-    </div>`;
-  overlay.onclick = () => dismissSplash();
+
+  if (!loggedIn) {
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:5000;background:rgba(244,236,224,0.92);display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer;';
+    overlay.innerHTML = `
+      <div style="text-align:center;padding:40px;">
+        <div style="font-family:'Caveat',cursive;font-size:48px;font-weight:700;color:#2B2724;margin-bottom:8px;">The Kiln Cafe</div>
+        <div style="font-family:'Architects Daughter',cursive;font-size:16px;color:#8a8175;letter-spacing:0.08em;">Tap to start your shift</div>
+        <div style="margin-top:32px;font-size:32px;animation:swt-float 2s ease-in-out infinite;">🏺</div>
+      </div>`;
+    overlay.onclick = () => dismissSplash();
+  } else {
+    // Veil ignores clicks entirely, so taps reach the real tables.
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:5000;pointer-events:none;background:rgba(244,236,224,0.35);';
+    overlay.innerHTML = `
+      <div id="ss-hint" style="pointer-events:auto;cursor:pointer;position:absolute;
+        left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom));
+        background:rgba(43,39,36,0.9);color:#F7F4EE;border-radius:22px;padding:10px 18px;
+        display:flex;align-items:center;gap:9px;box-shadow:0 6px 24px rgba(0,0,0,0.25);">
+        <span style="font-size:15px;">🏺</span>
+        <span style="font-family:'Architects Daughter',cursive;font-size:12px;letter-spacing:0.04em;">
+          Tap a table to open it &middot; or tap here for your tiles
+        </span>
+      </div>`;
+    overlay.querySelector('#ss-hint').onclick = (e) => { e.stopPropagation(); dismissSplash(); };
+    // Touching a table wakes the screen AND opens the booking: the
+    // table's own handler runs, so all this has to do is get the
+    // screensaver out of the way without navigating on top of it.
+    const wake = () => {
+      if (splashDismissed) return;
+      splashDismissed = true;
+      overlay.remove();
+      document.documentElement.classList.remove('splash-showing');
+      document.body.classList.remove('splash-showing');
+      resetIdleTimer();
+      document.removeEventListener('pointerdown', wake, true);
+    };
+    document.addEventListener('pointerdown', wake, true);
+  }
   document.body.insertAdjacentElement('afterbegin', overlay);
   wireSplash();
 }
