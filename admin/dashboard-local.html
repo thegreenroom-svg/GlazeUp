@@ -10310,7 +10310,8 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
   // Use the wider of viewport and natural width
   // Tables stay proper size; room scrolls horizontally if it won't fit
   // On mobile, always wrap to viewport. On tablet/desktop, allow natural width.
-  const useWidth = window.innerWidth < 600 ? viewportW : Math.max(viewportW, naturalW);
+  // Always wrap to viewport width — works portrait and landscape
+  const useWidth = viewportW;
   const { placed, height } = _elegantLayoutRoom(list, useWidth);
   roomWidth = useWidth;
   const INK = '#2B2724';
