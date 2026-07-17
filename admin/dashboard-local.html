@@ -481,7 +481,7 @@
          so the clock and battery sat on top of the studio name and the staff
          badge. Fixed 15 July 2026 from a real device screenshot. max() keeps
          the original 6px on anything without a notch. */
-      padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px 12px;
+      padding: calc(env(safe-area-inset-top, 0px) + 8px) calc(env(safe-area-inset-right, 0px) + 14px) 8px calc(env(safe-area-inset-left, 0px) + 12px);
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -2890,20 +2890,19 @@
   <div class="admin-main">
     <header class="admin-header">
       <!-- Left: logo + abbreviated studio name -->
-      <div style="display:flex;align-items:center;gap:7px;flex-shrink:1;min-width:0;">
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:1;min-width:0;overflow:hidden;">
         <img src="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png" alt="The Kiln Cafe" style="width:28px;height:28px;flex-shrink:0;">
-        <h1 id="studio-name" style="margin:0;font-size:14px;font-weight:700;white-space:nowrap;">The Kiln Cafe</h1>
+        <h1 id="studio-name" style="margin:0;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">The Kiln Cafe</h1>
       </div>
 
       <!-- Right: shift badge + bell + mini tiles including logout -->
-      <div class="admin-header-right" style="display:flex;align-items:center;gap:5px;flex-shrink:0;
-        padding-right:env(safe-area-inset-right, 0px);">
+      <div class="admin-header-right" style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
 
         <!-- Who's on shift — tap for task queue -->
         <button id="shift-badge" onclick="toggleTaskQueue()" style="display:none;
           background:linear-gradient(135deg,#2B2724,var(--link-clay));border:none;border-radius:16px;
-          padding:3px 8px 3px 3px;font-size:10px;font-weight:700;color:white;cursor:pointer;
-          align-items:center;gap:4px;position:relative;flex-shrink:0;">
+          padding:2px 7px 2px 2px;font-size:9px;font-weight:700;color:white;cursor:pointer;
+          align-items:center;gap:3px;position:relative;flex-shrink:0;max-width:78px;overflow:hidden;">
           <span id="shift-badge-avatar" style="width:18px;height:18px;border-radius:50%;font-size:9px;
             background:rgba(255,255,255,0.25);color:white;display:flex;align-items:center;
             justify-content:center;font-weight:800;">D</span>
@@ -2914,19 +2913,19 @@
         <!-- Tell Daisy: broken piece, unhappy customer, running low -->
         <button id="qt-tell" onclick="openTellPicker()" title="Tell Daisy"
           style="display:none;background:#e53935;color:white;border:none;border-radius:50%;
-          width:30px;height:30px;font-size:13px;cursor:pointer;flex-shrink:0;
+          width:26px;height:26px;font-size:11px;cursor:pointer;flex-shrink:0;
           align-items:center;justify-content:center;">💬</button>
 
         <!-- Find My Piece -->
         <button id="qt-find" onclick="openFindMyPiece()" title="Find a piece"
           style="display:none;background:#5E35B1;color:white;border:none;border-radius:50%;
-          width:30px;height:30px;font-size:13px;cursor:pointer;flex-shrink:0;
+          width:26px;height:26px;font-size:11px;cursor:pointer;flex-shrink:0;
           align-items:center;justify-content:center;">🔍</button>
 
         <!-- Alerts -->
         <button id="alert-bell-btn" onclick="toggleAlertFeed()" title="Alerts"
           style="display:none;background:#2B2724;color:white;border:none;border-radius:50%;
-          width:30px;height:30px;font-size:13px;cursor:pointer;flex-shrink:0;
+          width:26px;height:26px;font-size:11px;cursor:pointer;flex-shrink:0;
           align-items:center;justify-content:center;position:relative;">🔔
           <span id="alert-bell-count" style="display:none;position:absolute;top:-2px;right:-2px;
             background:#e53935;color:white;border-radius:50%;min-width:14px;height:14px;
@@ -2936,13 +2935,13 @@
         <!-- Install to home screen — only in Safari -->
         <button id="a2hs-header-btn" onclick="showAdminA2HSModal()" title="Add to Home Screen"
           style="display:none;background:#B87946;color:white;border:none;border-radius:50%;
-          width:30px;height:30px;font-size:12px;cursor:pointer;flex-shrink:0;
+          width:26px;height:26px;font-size:11px;cursor:pointer;flex-shrink:0;
           align-items:center;justify-content:center;">⬇</button>
 
         <!-- Out -->
         <button id="direct-logout-btn" onclick="confirmDirectLogout()" title="End shift"
           style="display:none;background:#8B1A1A;color:white;border:none;border-radius:50%;
-          width:30px;height:30px;font-size:12px;cursor:pointer;flex-shrink:0;
+          width:26px;height:26px;font-size:11px;cursor:pointer;flex-shrink:0;
           align-items:center;justify-content:center;">🚪</button>
 
         <!-- Hidden legacy — kept, never shown -->
