@@ -5301,8 +5301,10 @@ app.get('/api/floor/active', async (req, res) => {
     const today = new Date(); today.setHours(0,0,0,0);
     const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
     // Trial hours — Square live read uses these
-    const openTime  = new Date(today); openTime.setHours(10,0,0,0);
-    const closeTime = new Date(today); closeTime.setHours(16,0,0,0);
+    // Trial hours in UTC: BST is UTC+1, so 10am BST = 9am UTC, 4pm BST = 3pm UTC
+    // Using 8am-4pm UTC to give a comfortable buffer either side
+    const openTime  = new Date(today); openTime.setHours(8,0,0,0);
+    const closeTime = new Date(today); closeTime.setHours(17,0,0,0);
 
     // ── 1. Our own bookings ──
     // Was cut off with a rough "last 4 hours" guess, unrelated to when a
