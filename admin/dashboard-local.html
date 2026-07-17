@@ -3100,9 +3100,9 @@
      floor plan. When a staff member has active tables these are
      highlighted. Proper glaze-tile exit button back to home.
 ──────────────────────────────────────────────────────────────────── -->
-<div id="floor-plan-view" class="view" style="display:none;flex-direction:column;height:100%;max-width:100%;background:#F4ECE0;overflow:hidden;">
+<div id="floor-plan-view" class="view" style="display:none;position:relative;flex-direction:column;height:100%;max-width:100%;background:#F4ECE0;overflow:hidden;">
   <!-- Instant ivory placeholder — shows while loadFloorPlan() runs, prevents dark flash -->
-  <div id="floor-plan-placeholder" style="flex:1;background:#F4ECE0;display:flex;align-items:center;justify-content:center;">
+  <div id="floor-plan-placeholder" style="position:absolute;inset:0;z-index:5;background:#F4ECE0;display:flex;align-items:center;justify-content:center;flex-direction:column;">
     <div style="font-family:'Architects Daughter',cursive;font-size:14px;color:#c8bfb0;letter-spacing:0.06em;">Loading studio…</div>
       <div id="floor-trace-loading" style="font-family:'Architects Daughter',cursive;font-size:9px;
         color:#B87946;opacity:0.8;margin-top:14px;text-align:center;max-width:90vw;line-height:1.5;
@@ -6342,8 +6342,12 @@ function goToTab(tab, event) {
   // container went display:flex with dark modals still inside it, and
   // loadFloorPlan() only replaced them a moment later.
   if (tab === 'floor-plan') {
-    // stay hidden — loadFloorPlan() below will show it once rendered
-    targetView.style.display = 'none';
+    // Ivory placeholder covers the legacy dark children (z-index:5,
+    // inset:0), so this can show at once. Was display:none, which meant
+    // a blank screen for a whole cold start.
+    const ph = document.getElementById('floor-plan-placeholder');
+    if (ph) ph.style.display = 'flex';
+    targetView.style.display = 'flex';
     const _tl2 = document.getElementById('floor-trace-loading');
     if (_tl2) _tl2.textContent = 'how I got here: ' + (window._navTrace || []).join(' → ');
   } else {
@@ -13688,8 +13692,28 @@ function showFloorPlan() {
   currentTab = 'floor-plan';
   _homeGuardUntil = 0;              // deliberate: you asked for the floor plan
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+  // ─── SHOW INSTANTLY. MY OWN REGRESSION, AN HOUR OLD. ───
+  // I fixed the dark skeleton by refusing to show this until the fetch
+  // returned. That killed the flash and replaced it with NOTHING — a
+  // blank screen for the length of a Render cold start, which is
+  // seconds. "Floor plan very slow to open." It was not slow; I was
+  // hiding it.
+  //
+  // The placeholder was built for exactly this ("Instant ivory
+  // placeholder — shows while loadFloorPlan() runs, prevents dark
+  // flash") and it was already right. It just sat as a SIBLING of the
+  // legacy dark markup rather than over it, so both showed at once —
+  // which is why it looked like it wasn't working and why I reached for
+  // the wrong fix. Now it is position:absolute;inset:0;z-index:5 and
+  // genuinely covers them.
+  //
+  // So: reveal immediately, ivory, with the spinner — the studio sees
+  // something the instant it taps — and the renderer paints over the
+  // placeholder when the data lands. No flash, no wait.
   const v = document.getElementById('floor-plan-view');
-  if (v) v.style.display = 'none';  // stay hidden until there is something to show
+  const ph = document.getElementById('floor-plan-placeholder');
+  if (ph) ph.style.display = 'flex';
+  if (v) v.style.display = 'flex';
   const _tl = document.getElementById('floor-trace-loading');
   if (_tl) _tl.textContent = 'how I got here: ' + (window._navTrace || []).join(' → ');
   loadFloorPlan().then(() => {
