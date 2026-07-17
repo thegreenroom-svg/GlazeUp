@@ -9082,6 +9082,10 @@ function checkShiftLogin() {
       // now consistently land on the floor plan.
       goToTab('floor-plan');
       applyShiftUI();
+      // Guard: after resume, lock the floor plan for 3s so nothing
+      // navigates away before loadFloorPlan completes
+      window._floorPlanLocked = true;
+      setTimeout(() => { window._floorPlanLocked = false; }, 3000);
       return;
     } catch (e) { /* fall through to fresh login if the saved session is corrupt */ }
   }
@@ -12182,6 +12186,7 @@ async function openBookingAtRealStage(bookingCode, stage) {
 }
 
 function showGridNav() {
+  if (window._floorPlanLocked) return;  // floor plan just loaded — don't navigate away
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
   document.getElementById('grid-nav-view').style.display = 'block';
   if (_personalScreen && _personalScreen.tileOrder.length > 0) {
