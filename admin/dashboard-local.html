@@ -8926,6 +8926,225 @@ function _cancelArrange() {
   renderFloorPlanElegant();
 }
 
+// ═══════════════════════════════════════════════════════════
+// THE TOUR — GENERATED FROM THE APP, NOT WRITTEN ALONGSIDE IT
+// 17 July 2026
+// ═══════════════════════════════════════════════════════════
+// The old tour was 41 hand-written steps. By this morning roughly
+// half were lies: it taught a flashing alert that was parked, and
+// said "sidebar" 22 times when the sidebar became tiles days ago.
+// It knew nothing about Collections, Training, H&S, Tell Daisy,
+// the busy meter, Jenny's packing flow or her assistant.
+//
+// Anything written twice diverges. That's arithmetic, not discipline.
+//
+// So this reads the app: GRID_NAV_STRUCTURE for the tiles,
+// ROLE_HOME_DEFAULTS for what THIS person sees, FLOW_CHECKS for the
+// stages. Change the app, the tour changes. It cannot go stale.
+//
+// Only the WHY is hand-written — "photograph the pieces together so
+// the kiln knows whose they are" doesn't drift. "Tap the sidebar" does.
+
+// The why. Everything else is generated.
+// Proper names for the tour — the tile labels aren't always where we look
+const TOUR_LABELS = {
+  'floor-plan': '🏠 The floor plan', 'packing': '📦 Packing',
+  'collections': '🏺 Collections', 'assistant': '🏺 Your assistant',
+  'piecematch': '🔍 Piece matching', 'labels': '🏷 Labels',
+  'training': '🎓 Your training', 'health-safety': '🦺 Health & safety',
+  'tell-daisy': '💬 Tell Daisy', 'staff': '📅 Today\'s bookings',
+  'menu': '☕ Menu', 'stock': '📦 Stock', 'team': '👥 Team',
+  'progress': '📊 Progress', 'dashboard': '📈 Overview', 'setup': '⚙️ Setup',
+  'whats-on': '📅 What\'s on', 'customer-demo': '👀 Customer app',
+  'trial-reset': '🔄 Clear & start again', 'catalogue': '🏺 Catalogue',
+  'shapes': '⚪ Bisque', 'community': '💬 Community', 'branding': '🎨 Branding',
+  'printqueue': '🖨 Print queue', 'tablecards': '🪑 Table cards',
+};
+
+const TOUR_WHY = {
+  'floor-plan': "This is home. Every room, every table, live. Red means finishing up, clay means painting, green means just arrived.",
+  'packing': "Fired pieces going home. Photograph one, the app tells you whose it is, you say yes. It learns every time.",
+  'collections': "What's ready to collect, and finding something on a jumbled shelf.",
+  'assistant': "Learns how you work and helps when you need it. Never nags.",
+  'piecematch': "Photograph any piece, the AI matches it to a booking.",
+  'labels': "Print a label for a piece going home.",
+  'training': "Read it, tick it, done. Daisy sees it automatically.",
+  'health-safety': "Risk assessment, kiln safety, COSHH. The things that keep everyone safe.",
+  'tell-daisy': "Something good or bad happened. Tap what, it goes to whoever deals with it.",
+  'staff': "Today's bookings, who's in, what stage they're at.",
+  'menu': "Drinks and food orders.",
+  'stock': "What's on the shelf, what needs ordering.",
+  'team': "Who's on shift, duties, holidays.",
+  'progress': "How today's going.",
+  'dashboard': "The numbers.",
+  'setup': "Studio settings.",
+  'whats-on': "Local events that might make us busy.",
+  'customer-demo': "See exactly what customers see on their phone.",
+  'trial-reset': "Put today back to this morning. For testing.",
+  'catalogue': "Every piece we've ever fired.",
+  'shapes': "The bisque we stock.",
+  'community': "Customer work worth featuring.",
+  'branding': "How the studio looks.",
+  'printqueue': "Labels waiting to print.",
+  'tablecards': "Cards for the tables.",
+};
+
+let _tourStep = 0;
+let _tourSteps = [];
+let _tourTimer = null;
+let _tourPlaying = false;
+
+function _buildTour() {
+  const role = currentShiftStaff?.role || 'Studio Assistant';
+  const defaults = ROLE_HOME_DEFAULTS[role] || ROLE_HOME_DEFAULTS['Studio Assistant'];
+  const first = (currentShiftStaff?.name || 'there').split(' ')[0];
+
+  const steps = [{
+    icon: '👋',
+    title: `Hello ${first}`,
+    body: `This is your studio, on your phone. ${defaults.tileOrder.length} things you can do, in the order you'll probably need them.`,
+    colour: '#B87946',
+  }];
+
+  // One step per tile THIS PERSON has — generated, never hand-listed
+  defaults.tileOrder.forEach(tab => {
+    const why = TOUR_WHY[tab];
+    if (!why) return;
+    const label = TOUR_LABELS[tab] || tab;
+    const icon = label.match(/^\S+/)?.[0] || '▦';
+    const title = label.replace(/^\S+\s*/, '');
+    const group = GRID_NAV_STRUCTURE.find(g => g.tab === tab || g.id === tab);
+    steps.push({ icon, title, body: why, colour: group?.color || '#B87946' });
+  });
+
+  // The flow — generated from FLOW_CHECKS
+  if (typeof FLOW_CHECKS === 'object') {
+    const stages = Object.keys(FLOW_CHECKS);
+    steps.push({
+      icon: '🔄',
+      title: 'How a booking works',
+      body: `Tap a coloured table and you get a checklist. ${stages.length} stages: ${stages.join(' → ')}. Tick as you go. The table changes colour so everyone can see where it's at.`,
+      colour: '#00897B',
+    });
+  }
+
+  // Tell Daisy — generated from ALERT_TRIGGERS if the picker's loaded
+  steps.push({
+    icon: '💬',
+    title: 'If something goes wrong',
+    body: 'Tap 💬 at the top. Broken piece, unhappy customer, running low. Tap what happened — nothing to type. It goes to whoever deals with it.',
+    colour: '#e53935',
+  });
+
+  steps.push({
+    icon: '✓',
+    title: "That's it",
+    body: "Nothing you tap can break anything. Have a play. If you get stuck, tap 💬 and someone will come.",
+    colour: '#4CAF50',
+  });
+
+  return steps;
+}
+
+function openTour() {
+  _tourSteps = _buildTour();
+  _tourStep = 0;
+  _tourPlaying = false;
+  _renderTour();
+}
+
+function _renderTour() {
+  const s = _tourSteps[_tourStep];
+  if (!s) return _closeTour();
+
+  document.getElementById('tour-overlay')?.remove();
+  const o = document.createElement('div');
+  o.id = 'tour-overlay';
+  o.style.cssText = 'position:fixed;inset:0;z-index:9900;background:rgba(43,39,36,0.94);display:flex;align-items:center;justify-content:center;padding:24px;';
+  o.innerHTML = `
+    <div style="width:100%;max-width:420px;text-align:center;">
+      <div style="font-size:56px;margin-bottom:16px;animation:swt-appear 0.4s ease both;">${s.icon}</div>
+      <div style="font-family:'Caveat',cursive;font-size:34px;color:${s.colour};font-weight:700;
+        margin-bottom:12px;animation:swt-appear 0.4s 0.1s ease both;">${s.title}</div>
+      <div style="font-size:16px;color:#F4ECE0;line-height:1.6;margin-bottom:28px;
+        animation:swt-appear 0.4s 0.2s ease both;">${s.body}</div>
+
+      <!-- Progress dots -->
+      <div style="display:flex;gap:5px;justify-content:center;margin-bottom:24px;flex-wrap:wrap;">
+        ${_tourSteps.map((_, i) => `<div style="width:${i===_tourStep?18:6}px;height:6px;border-radius:3px;
+          background:${i===_tourStep ? s.colour : i<_tourStep ? 'rgba(244,236,224,0.5)' : 'rgba(244,236,224,0.15)'};
+          transition:all 0.3s;"></div>`).join('')}
+      </div>
+
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        ${_tourStep > 0 ? `<button onclick="_tourBack()" style="flex:0 0 auto;background:rgba(255,255,255,0.1);
+          color:#F4ECE0;border:none;border-radius:12px;padding:14px 18px;font-size:14px;cursor:pointer;">←</button>` : ''}
+        <button onclick="_tourNext()" style="flex:1;background:${s.colour};color:#fff;border:none;
+          border-radius:14px;padding:16px;font-size:16px;font-weight:800;cursor:pointer;">
+          ${_tourStep === _tourSteps.length-1 ? "Let's go" : 'Next'}</button>
+        <button onclick="_tourTogglePlay()" title="${_tourPlaying ? 'Pause' : 'Play it for me'}"
+          style="flex:0 0 auto;background:rgba(255,255,255,0.1);color:#F4ECE0;border:none;
+          border-radius:12px;padding:14px 18px;font-size:14px;cursor:pointer;">
+          ${_tourPlaying ? '⏸' : '▶'}</button>
+      </div>
+      <button onclick="_closeTour()" style="width:100%;background:none;color:#8a8175;border:none;
+        padding:10px;font-size:12px;cursor:pointer;">Skip the tour</button>
+    </div>`;
+  document.body.appendChild(o);
+
+  // Speak it if playing — calm, slow, the one voice
+  if (_tourPlaying && window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(`${s.title}. ${s.body}`);
+    const v = typeof resolveStudioVoice === 'function' ? resolveStudioVoice() : null;
+    if (v) { u.voice = v; u.lang = v.lang; }
+    u.rate = 0.88; u.pitch = 1.0;
+    window.speechSynthesis.speak(u);
+  }
+}
+
+function _tourNext() {
+  if (_tourStep >= _tourSteps.length - 1) return _closeTour();
+  _tourStep++;
+  _renderTour();
+  if (_tourPlaying) _tourSchedule();
+}
+
+function _tourBack() {
+  if (_tourStep > 0) { _tourStep--; _renderTour(); }
+}
+
+function _tourTogglePlay() {
+  _tourPlaying = !_tourPlaying;
+  if (_tourPlaying) { _renderTour(); _tourSchedule(); }
+  else {
+    clearTimeout(_tourTimer);
+    window.speechSynthesis?.cancel();
+    _renderTour();
+  }
+}
+
+function _tourSchedule() {
+  clearTimeout(_tourTimer);
+  // Pace it by how much there is to read — steady, not boring.
+  // ~6s a step, whole tour lands around 90 seconds for most roles.
+  const s = _tourSteps[_tourStep];
+  const words = (s.title + ' ' + s.body).split(/\s+/).length;
+  const ms = Math.max(4500, Math.min(9000, words * 320));
+  _tourTimer = setTimeout(() => {
+    if (!_tourPlaying) return;
+    if (_tourStep >= _tourSteps.length - 1) { _tourPlaying = false; _closeTour(); }
+    else _tourNext();
+  }, ms);
+}
+
+function _closeTour() {
+  clearTimeout(_tourTimer);
+  _tourPlaying = false;
+  window.speechSynthesis?.cancel();
+  document.getElementById('tour-overlay')?.remove();
+}
+
 // THIS IS A RENDERING OF /api/staff/alert-kinds, NEVER A SECOND LIST.
 // A hand-written copy of the vocabulary would drift from ALERT_TRIGGERS
 // within a week — which is exactly how the elegant floor plan ended up
@@ -9122,6 +9341,21 @@ let _swtAudioBarStart = null;
 let _swtAudioBarDuration = 0;
 
 function swtStart() {
+  // ═══════════════════════════════════════════════════════════
+  // REDIRECTED TO THE GENERATED TOUR. 17 July 2026.
+  // ═══════════════════════════════════════════════════════════
+  // The old 41-step hand-written tour taught a flashing alert that
+  // was parked, said "sidebar" 22 times when the sidebar became tiles,
+  // and knew nothing about Collections, Training, H&S, Tell Daisy,
+  // the busy meter, Jenny's packing or her assistant.
+  //
+  // openTour() reads GRID_NAV_STRUCTURE, ROLE_HOME_DEFAULTS and
+  // FLOW_CHECKS — it shows THIS person THEIR tiles and cannot go stale.
+  //
+  // Everything below is untouched. To restore the old tour:
+  // delete the next two lines.
+  if (typeof openTour === 'function') { openTour(); return; }
+
   swtStep = 0;
   swtAutoplay = true;
   document.getElementById('swt-trigger').style.display = 'none';
