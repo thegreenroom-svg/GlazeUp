@@ -2905,6 +2905,11 @@
           <span id="shift-task-count-badge" style="display:none;background:#e53935;color:white;font-size:9px;font-weight:800;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 3px;">0</span>
         </button>
 
+        <!-- Install to home screen — only shows in Safari, not when installed -->
+        <button id="a2hs-header-btn" onclick="showAdminA2HSModal()" title="Add to Home Screen"
+          style="display:none;background:#B87946;color:white;border:none;border-radius:50%;
+          width:28px;height:28px;font-size:13px;cursor:pointer;flex-shrink:0;
+          align-items:center;justify-content:center;">⬇</button>
         <button id="alert-bell-btn" onclick="toggleAlertFeed()" style="background:#2B2724;color:white;border:none;border-radius:50%;width:28px;height:28px;flex-shrink:0;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0;">
           🔔
           <span id="alert-bell-badge" style="display:none;position:absolute;top:-2px;right:-2px;background:#e53935;color:white;font-size:8px;font-weight:800;width:14px;height:14px;border-radius:50%;align-items:center;justify-content:center;border:1.5px solid white;">0</span>
@@ -7435,6 +7440,28 @@ function _closePieceCheckout() {
   document.getElementById('piece-checkout-modal')?.remove();
 }
 
+// Install prompt — one tap from the header, not a permanent banner
+function showAdminA2HSModal() {
+  const m = document.createElement('div');
+  m.style.cssText = 'position:fixed;inset:0;z-index:9900;background:rgba(43,39,36,0.85);display:flex;align-items:center;justify-content:center;padding:24px;';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  m.innerHTML = `
+    <div style="background:#FFFDF9;border-radius:20px;padding:28px 24px;max-width:340px;text-align:center;">
+      <div style="font-size:40px;margin-bottom:12px;">📱</div>
+      <div style="font-family:'Caveat',cursive;font-size:26px;color:#2B2724;margin-bottom:8px;">Add to Home Screen</div>
+      <div style="font-size:13px;color:#8a8175;line-height:1.5;margin-bottom:20px;">
+        ${isIOS
+          ? 'Tap the Share button below, then choose "Add to Home Screen"'
+          : 'Tap the menu (⋮) then "Install app" or "Add to Home Screen"'}
+      </div>
+      <button onclick="this.closest('div[style*=fixed]').remove()"
+        style="width:100%;background:#2B2724;color:white;border:none;border-radius:12px;
+        padding:14px;font-size:14px;font-weight:800;cursor:pointer;">Got it</button>
+    </div>`;
+  document.body.appendChild(m);
+}
+
 // THIS IS A RENDERING OF /api/staff/alert-kinds, NEVER A SECOND LIST.
 // A hand-written copy of the vocabulary would drift from ALERT_TRIGGERS
 // within a week — which is exactly how the elegant floor plan ended up
@@ -9069,6 +9096,13 @@ function isIOSAdmin() {
 }
 
 function showAdminA2HSBanner() {
+  // ── TRIAL MODE ──────────────────────────────────────────
+  // The Add-to-Home-Screen banner is clutter during the trial.
+  // Staff install once via the ⬇ button in the header instead.
+  // TO RESTORE: set A2HS_BANNER_ENABLED = true
+  const A2HS_BANNER_ENABLED = false;
+  if (!A2HS_BANNER_ENABLED) return;
+  // ────────────────────────────────────────────────────────
   if (isStandaloneAdmin()) return; // already installed, running as a real app
   if (localStorage.getItem('klnk_admin_a2hs_dismissed')) return;
 
