@@ -5580,6 +5580,74 @@ app.post('/api/training/complete', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// POST /api/trial/reset — clear and start again
+// ═══════════════════════════════════════════════════════════
+// Daisy: "why don't we have a clear and start again button?"
+//
+// Puts the studio back to how it looked this morning. Unseats
+// everyone, clears the stages, wipes the checklists and alerts.
+//
+// WHAT IT TOUCHES: only our own database, and only today.
+//   bookings          → table_number and room cleared, stage back to
+//                       'booking', status back to 'active'
+//   booking_flow_checks → today's checks deleted
+//   staff_alerts      → today's alerts deleted
+//
+// WHAT IT NEVER TOUCHES:
+//   Square (nothing written there, ever — writes are simulated)
+//   The bookings themselves (customers are not deleted)
+//   Staff training records (that's real, keep it)
+//   Anything before today
+//
+// Safe to press as often as you like during the trial.
+app.post('/api/trial/reset', async (req, res) => {
+  const { studioId } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+
+    // Unseat everyone, reset their stage
+    const { data: reset, error: resetErr } = await supabase.from('bookings')
+      .update({ table_number: null, room: null, current_stage: 'booking', status: 'active' })
+      .eq('studio_id', studioId)
+      .gte('session_start', today.toISOString())
+      .lt('session_start', tomorrow.toISOString())
+      .select('booking_code');
+    if (resetErr) throw resetErr;
+
+    // Clear today's checklists
+    let checksCleared = 0;
+    try {
+      const codes = (reset || []).map(b => b.booking_code);
+      if (codes.length) {
+        const { data: del } = await supabase.from('booking_flow_checks')
+          .delete().eq('studio_id', studioId).in('booking_code', codes).select('id');
+        checksCleared = (del || []).length;
+      }
+    } catch(e) { /* table may not exist */ }
+
+    // Clear today's alerts
+    let alertsCleared = 0;
+    try {
+      const { data: del } = await supabase.from('staff_alerts')
+        .delete().eq('studio_id', studioId)
+        .gte('created_at', today.toISOString()).select('id');
+      alertsCleared = (del || []).length;
+    } catch(e) { /* fine */ }
+
+    res.json({
+      reset: true,
+      bookingsUnseated: (reset || []).length,
+      checksCleared,
+      alertsCleared,
+      note: 'Everyone unseated, stages reset, checklists and alerts cleared. Square untouched.',
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/training/my-record?studioId=&staffMemberId=
 // ═══════════════════════════════════════════════════════════
 // A personalised training record — their name, role, what they've

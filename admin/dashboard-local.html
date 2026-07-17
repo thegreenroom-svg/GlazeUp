@@ -8336,6 +8336,98 @@ async function _showMyTrainingRecord() {
   }
 }
 
+// ═══════════════════════════════════════════════════════════
+// CLEAR AND START AGAIN — the trial reset. 17 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Daisy: "why don't we have a clear and start again button?"
+//
+// Puts today back to how it looked this morning so she can play
+// with the app freely. Honest about exactly what it touches.
+async function openTrialReset() {
+  const sheet = document.createElement('div');
+  sheet.id = 'trial-reset';
+  sheet.style.cssText = 'position:fixed;inset:0;z-index:9800;background:rgba(43,39,36,0.9);display:flex;align-items:center;justify-content:center;padding:20px;';
+  sheet.onclick = e => { if (e.target===sheet) sheet.remove(); };
+  sheet.innerHTML = `<div style="background:#FFFDF9;width:100%;max-width:420px;border-radius:20px;
+    padding:26px 22px;">
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:44px;margin-bottom:8px;">🔄</div>
+      <div style="font-family:'Caveat',cursive;font-size:28px;color:#2B2724;font-weight:700;">Clear &amp; start again</div>
+      <div style="font-size:12px;color:#8a8175;margin-top:4px;">Put today back to this morning</div>
+    </div>
+
+    <div style="background:rgba(76,175,80,0.08);border-left:3px solid #4CAF50;border-radius:8px;
+      padding:12px 14px;margin-bottom:12px;">
+      <div style="font-size:11px;font-weight:800;color:#2e7d32;margin-bottom:6px;">THIS WILL</div>
+      <div style="font-size:12px;color:#2B2724;line-height:1.6;">
+        • Unseat everyone from their tables<br>
+        • Put every booking back to the start<br>
+        • Clear today's checklists<br>
+        • Clear today's alerts
+      </div>
+    </div>
+
+    <div style="background:rgba(43,39,36,0.04);border-left:3px solid #8a8175;border-radius:8px;
+      padding:12px 14px;margin-bottom:20px;">
+      <div style="font-size:11px;font-weight:800;color:#8a8175;margin-bottom:6px;">THIS WILL NOT</div>
+      <div style="font-size:12px;color:#2B2724;line-height:1.6;">
+        • Touch Square — nothing is ever written there<br>
+        • Delete any customers or bookings<br>
+        • Clear anyone's training record<br>
+        • Change anything from before today
+      </div>
+    </div>
+
+    <button onclick="_doTrialReset()"
+      style="width:100%;background:#B87946;color:#fff;border:none;border-radius:14px;
+      padding:18px;font-size:17px;font-weight:800;cursor:pointer;margin-bottom:8px;">
+      Yes — clear today
+    </button>
+    <button onclick="document.getElementById('trial-reset').remove()"
+      style="width:100%;background:none;color:#8a8175;border:none;padding:12px;font-size:13px;cursor:pointer;">
+      Cancel
+    </button>
+  </div>`;
+  document.body.appendChild(sheet);
+}
+
+async function _doTrialReset() {
+  const sheet = document.getElementById('trial-reset');
+  if (sheet) sheet.innerHTML = `<div style="text-align:center;color:#F4ECE0;padding:40px;">
+    <div style="font-size:44px;margin-bottom:12px;animation:spin 1s linear infinite;">🔄</div>
+    <div style="font-family:'Caveat',cursive;font-size:24px;">Clearing…</div>
+  </div>`;
+  try {
+    const res = await fetch(`${API_URL}/api/trial/reset`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId })
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || 'Reset failed');
+    if (sheet) sheet.innerHTML = `<div style="background:#FFFDF9;max-width:380px;border-radius:20px;padding:28px;text-align:center;">
+      <div style="font-size:48px;color:#4CAF50;margin-bottom:10px;">✓</div>
+      <div style="font-family:'Caveat',cursive;font-size:26px;color:#2B2724;">Cleared</div>
+      <div style="font-size:12px;color:#8a8175;margin-top:8px;line-height:1.5;">
+        ${d.bookingsUnseated} booking${d.bookingsUnseated===1?'':'s'} unseated<br>
+        ${d.checksCleared} checklist item${d.checksCleared===1?'':'s'} cleared<br>
+        ${d.alertsCleared} alert${d.alertsCleared===1?'':'s'} cleared
+      </div>
+      <button onclick="document.getElementById('trial-reset').remove(); goToRealLandingPage();"
+        style="margin-top:18px;width:100%;background:#2B2724;color:#fff;border:none;border-radius:12px;
+        padding:14px;font-size:14px;font-weight:800;cursor:pointer;">Back to the floor plan</button>
+    </div>`;
+  } catch(e) {
+    if (sheet) sheet.innerHTML = `<div style="background:#FFFDF9;max-width:380px;border-radius:20px;padding:28px;text-align:center;">
+      <div style="font-size:44px;margin-bottom:10px;">😕</div>
+      <div style="font-family:'Caveat',cursive;font-size:22px;color:#2B2724;">Couldn't clear it</div>
+      <div style="font-size:12px;color:#8a8175;margin-top:6px;">${e.message}</div>
+      <button onclick="document.getElementById('trial-reset').remove()"
+        style="margin-top:16px;width:100%;background:#2B2724;color:#fff;border:none;border-radius:12px;
+        padding:13px;font-size:13px;font-weight:700;cursor:pointer;">Close</button>
+    </div>`;
+  }
+}
+
 // THIS IS A RENDERING OF /api/staff/alert-kinds, NEVER A SECOND LIST.
 // A hand-written copy of the vocabulary would drift from ALERT_TRIGGERS
 // within a week — which is exactly how the elegant floor plan ended up
@@ -12683,14 +12775,14 @@ const ROLE_HOME_DEFAULTS = {
   'General Manager': {
     // Daisy: the whole studio at a glance, then people, then money
     tileOrder: ['floor-plan', 'progress', 'team', 'packing', 'dashboard', 'staff',
-                'stock', 'training', 'health-safety', 'whats-on', 'customer-demo', 'setup'],
+                'stock', 'training', 'health-safety', 'whats-on', 'customer-demo', 'trial-reset', 'setup'],
     promotedTiles: ['tell-daisy']
   },
 
   'Co-Director': {
     // David: same as Daisy — full visibility
     tileOrder: ['floor-plan', 'progress', 'dashboard', 'team', 'packing', 'staff',
-                'stock', 'training', 'health-safety', 'whats-on', 'customer-demo', 'setup'],
+                'stock', 'training', 'health-safety', 'whats-on', 'customer-demo', 'trial-reset', 'setup'],
     promotedTiles: ['tell-daisy']
   },
 
@@ -13278,6 +13370,7 @@ const GRID_NAV_STRUCTURE = [
   { tab: 'health-safety', label: '🦺 Health & Safety', desc: 'Risk assessment, training, procedures', fn: 'openHealthSafety' },
   { tab: 'packing', label: '📦 Packing', desc: 'Fired pieces going home', fn: 'openPacking' },
   { tab: 'training', label: '🎓 My Training', desc: 'Read, tick, done', fn: 'openMyTraining' },
+  { tab: 'trial-reset', label: '🔄 Clear & Start Again', desc: 'Reset today for testing', fn: 'openTrialReset' },
   ]},
   { id: 'dashboard', label: 'Dashboard', color: '#B87946', items: [
     { tab: 'dashboard', label: 'Overview', desc: 'Your daily overview' },
