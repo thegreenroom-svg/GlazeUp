@@ -14067,6 +14067,23 @@ function _updateDetailTimer() {
   } else {
     const start = new Date(_detailBooking.session_start);
     const durationMins = _sessionDuration(_detailBooking) || 90;
+    // ─── A BOOKING THAT HASN'T STARTED IS NOT RUNNING OUT ───
+    // Reported: Maria's booking for TOMORROW showed "1017m 9s" — a
+    // seventeen-hour countdown, in green, as though she were sat there
+    // with plenty of time left. This counted (start + duration) - now,
+    // which for a future booking is just "how long until it ends" and
+    // means nothing. It only ever made sense for a session already
+    // running, and until tonight the floor plan only ever showed those.
+    // Now it shows tomorrow too, so the timer has to say which it is.
+    if (start.getTime() > now.getTime()) {
+      const mins = Math.round((start.getTime() - now.getTime()) / 60000);
+      const label = mins >= 90
+        ? `starts in ${Math.round(mins / 60)}h`
+        : `starts in ${mins}m`;
+      if (timerEl) { timerEl.textContent = label; timerEl.style.color = 'rgba(255,255,255,0.45)'; }
+      if (barEl) { barEl.style.width = '0%'; barEl.style.background = '#8a8175'; }
+      return;
+    }
     const remaining = Math.max(0, (start.getTime() + durationMins * 60000) - now.getTime());
     const remainingMins = Math.floor(remaining / 60000);
     const remainingSecs = Math.floor((remaining % 60000) / 1000);
@@ -27317,7 +27334,27 @@ window._versionCheckTimer = setInterval(checkForAppUpdate, 30 * 1000); // check 
 
     <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
       <!-- Draggable chairs and place items — real seating for this table -->
-      <div id="detail-canvas-wrap" style="position:relative;flex:1;min-height:260px;overflow:hidden;"></div>
+      <!-- ═══════════════════════════════════════════════════════════
+           THE SEATING PLANNER IS NOT A BOOKING. 17 July 2026.
+           ═══════════════════════════════════════════════════════════
+           "a strange looking vase is I don't like those at all, don't
+           know what they do, what the hell is going on."
+           Fair. This canvas is the drag-a-placemat seating layout tool:
+           vases, coffees, cake, champagne, dragged onto a table at
+           SETUP. Tapping a booked table mid-shift to see who is on it
+           and getting a drag palette of vases is nonsense.
+           Someone already knew that and switched the whole panel off
+           with an early return, saying so in a comment: "the canvas /
+           drag planner... belongs at setup, not at the entry point of
+           every table tap". They were RIGHT about the canvas. They were
+           wrong only that the alternative worked — openBookingAtRealStage
+           never loaded a booking at all (openQRModal ignores its
+           argument), which is why the panel had to come back.
+           So: keep the panel, lose the canvas. The header names the
+           customer, the checklist is the tiles, "Open full booking"
+           is the way deeper. Hidden, not deleted — it is still the real
+           seating tool and still reachable from setup. -->
+      <div id="detail-canvas-wrap" style="display:none;position:relative;flex:1;min-height:260px;overflow:hidden;"></div>
       <!-- Stage checklist + "Open full booking" into the real tile system -->
       <div id="detail-checklist" style="flex-shrink:0;max-height:44vh;overflow-y:auto;padding:14px 16px;
         background:linear-gradient(0deg,#1C1814 0%,#1A1714 100%);border-top:1px solid rgba(184,121,70,0.2);"></div>
