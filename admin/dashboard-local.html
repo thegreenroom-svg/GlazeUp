@@ -20299,7 +20299,44 @@ function showStockSection(section) {
   if (section === 'catalogue') loadStockCatalogue();
   if (section === 'arrival') saStart();
   if (section === 'shelfcheck') scStart();
+  // Live only where it's genuinely shared — never mid-unpack.
+  if (section === 'catalogue' || section === 'reservations') saStartLivePolling();
+  else saStopLivePolling();
 }
+
+// ── Live updating. The floor plan already polls; stock did not, so two
+// people stocking at once (or Daisy watching from the office) would each
+// see a frozen snapshot and believe it. Polls only while the tab is
+// actually open and the page is visible — a backgrounded phone in a
+// pocket must not sit there hammering a free-tier Render instance.
+let _saPollTimer = null;
+
+function saStartLivePolling() {
+  saStopLivePolling();
+  _saPollTimer = setInterval(async () => {
+    if (document.hidden) return;
+    const view = document.getElementById('stock-view');
+    if (!view || view.style.display === 'none') return saStopLivePolling();
+    // Only refresh the screen that is genuinely a shared view. Never
+    // yank the ground out from under someone mid-unpack.
+    const sect = document.getElementById('stock-section-catalogue');
+    if (sect && sect.style.display !== 'none' && typeof loadStockCatalogue === 'function') {
+      try { await loadStockCatalogue(); } catch(e) {}
+    }
+    const resv = document.getElementById('stock-section-reservations');
+    if (resv && resv.style.display !== 'none' && typeof loadStockReservations === 'function') {
+      try { await loadStockReservations(); } catch(e) {}
+    }
+  }, 20000);
+}
+
+function saStopLivePolling() {
+  if (_saPollTimer) { clearInterval(_saPollTimer); _saPollTimer = null; }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) saStopLivePolling();
+});
 
 // ═══════════════════════════════════════════════════════════════════
 // JENNY'S STOCK ARRIVAL — her main job, as tiles.
@@ -20364,7 +20401,68 @@ function _saBack(onclick) {
 }
 
 // ── STEP 1 ─────────────────────────────────────────────────────────
-function saStart() {
+async function saStart() {
+  sa = {};
+  // A studio phone WILL get locked, dropped or handed over mid-box.
+  // Without this the half-unpacked box is stranded in the database and
+  // she starts again from one — so the count would be wrong AND the
+  // work would be done twice. State lives in the database precisely so
+  // this is recoverable; this is the bit that actually recovers it.
+  try {
+    const res = await fetch(`${API_URL}/api/stock/arrivals/open?studioId=${studioId}`);
+    const d = await res.json();
+    if ((d.open || []).length) return saResumePrompt(d.open);
+  } catch(e) { /* offer the normal start rather than block on it */ }
+  saFreshStart();
+}
+
+function saResumePrompt(open) {
+  let tiles = '';
+  open.forEach(a => {
+    tiles += _saTile('📦', a.product_label || 'A box',
+      `${a.unpacked} of ${a.quantity_in_box} out — tap to carry on`,
+      `saResume('${a.id}')`, '#F9A825', {min:112, iconSize:28});
+  });
+  _saRender(`
+    <h3 style="margin:0 0 4px;">You've got a box on the go</h3>
+    <p style="font-size:12px;color:var(--gu-dust);margin:0 0 16px;">Carry on where you left off, or start a new one.</p>
+    ${_saGrid(tiles)}
+    ${_saGrid(_saTile('➕', 'Start a new box', 'Leave that one for now', 'saFreshStart()', '#5E35B1'), 1)}
+  `);
+  _saSpeak(open.length === 1
+    ? `You've still got a box on the go — ${open[0].unpacked} of ${open[0].quantity_in_box} out. Carry on?`
+    : `You've got ${open.length} boxes on the go.`);
+}
+
+async function saResume(id) {
+  _saRender(`<div style="text-align:center;padding:40px 20px;">
+    <div class="sa-pulse" style="width:60px;height:60px;border-radius:50%;background:#5E35B1;margin:0 auto 16px;"></div>
+    <div style="font-size:14px;font-weight:700;">Picking up where you left off…</div>
+  </div>`);
+  try {
+    const res = await fetch(`${API_URL}/api/stock/arrival/${id}`);
+    const d = await res.json();
+    sa = {
+      id: d.arrival.id,
+      qty: d.arrival.quantity_in_box,
+      productLabel: d.arrival.product_label || 'This box',
+      batchRef: d.arrival.batch_ref,
+      squareItemId: d.arrival.square_item_id,
+      items: {},
+    };
+    (d.items || []).forEach(i => { sa.items[i.item_number] = i.status; });
+    if (sa.squareItemId) {
+      try {
+        const m = await fetch(`${API_URL}/api/shelf/expected?studioId=${studioId}&shelfLocation=_`);
+        await m.json();
+      } catch(e) {}
+    }
+    saUnpackScreen();
+    _saSpeak(`Back to ${sa.productLabel}.`);
+  } catch(e) { saFreshStart(); }
+}
+
+function saFreshStart() {
   sa = {};
   _saRender(`
     <h3 style="margin:0 0 4px;">A box has arrived</h3>
@@ -20463,8 +20561,63 @@ async function saBoxChosen(ev) {
   _saRender(`<div style="text-align:center;padding:40px 20px;">
     <div class="sa-pulse" style="width:60px;height:60px;border-radius:50%;background:#5E35B1;margin:0 auto 16px;"></div>
     <div style="font-size:14px;font-weight:700;">Reading the label…</div>
+    <div style="font-size:11px;color:var(--gu-dust);margin-top:6px;">Looking for a name, a count and a batch</div>
   </div>`);
-  saManualEntry(true);
+  _saSpeak('Reading the label.');
+
+  try {
+    const b64 = await _saToBase64(file);
+    const res = await fetch(`${API_URL}/api/stock/read-label`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ photoBase64: b64 })
+    });
+    // 503 = label reading isn't switched on. Say so plainly and let her
+    // type it, rather than sitting on a spinner or inventing a name.
+    if (res.status === 503) { sa.identifiedBy = 'manual'; return saManualEntry(true, 'off'); }
+    if (!res.ok) return saManualEntry(true, 'failed');
+    const d = await res.json();
+    sa.ocr = d;
+    if (!d.confident) return saManualEntry(true, 'unsure');
+    return saLabelRead(d);
+  } catch(e) {
+    return saManualEntry(true, 'failed');
+  }
+}
+
+function _saToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1]);
+    r.onerror = () => reject(new Error('read failed'));
+    r.readAsDataURL(file);
+  });
+}
+
+// A confident read is still shown for confirmation before it touches
+// stock. She taps to accept, or taps to correct it.
+function saLabelRead(d) {
+  sa.productLabel = d.productName || null;
+  sa.batchRef = d.batch || null;
+  _saRender(`
+    ${_saGrid(_saTile('🏷️', 'Read the label', d.productName || 'Name not printed', 'void(0)', '#2e7d32', {min:120, iconSize:32}), 1)}
+    ${_saGrid(
+      _saTile('📦', 'Name', d.productName || '—', 'void(0)', '#5E35B1', {min:84, iconSize:18}) +
+      _saTile('🔢', 'Count', d.quantity != null ? String(d.quantity) : '—', 'void(0)', '#5E35B1', {min:84, iconSize:18}) +
+      _saTile('🧾', 'Batch', d.batch || '—', 'void(0)', '#5E35B1', {min:84, iconSize:18})
+    , 3)}
+    <div style="background:var(--gu-secondary);border-radius:14px;padding:16px;margin:4px 0 14px;">
+      <div style="font-size:12px;font-weight:700;margin-bottom:8px;">How many in the box?</div>
+      <input type="number" inputmode="numeric" id="sa-qty" value="${d.quantity != null ? d.quantity : ''}" placeholder="12"
+        style="width:100%;padding:14px;border:1px solid var(--gu-border);border-radius:12px;font-size:20px;font-weight:800;text-align:center;box-sizing:border-box;">
+      <input type="hidden" id="sa-name" value="${(d.productName || '').replace(/"/g, '&quot;')}">
+      <input type="hidden" id="sa-batch" value="${(d.batch || '').replace(/"/g, '&quot;')}">
+    </div>
+    ${_saGrid(_saTile('▶️', 'Start Unpacking', 'Tap each one as it comes out', 'saBeginUnpack()', '#5E35B1'), 1)}
+    ${_saGrid(_saTile('✍️', "That's not right — let me fix it", '', 'saManualEntry()', '#8a8175', {min:80, iconSize:18}), 1)}
+  `);
+  _saSpeak(d.quantity != null
+    ? `That's ${d.productName || 'a new line'}, ${d.quantity} in the box. Right?`
+    : `That's ${d.productName || 'a new line'}. How many are in the box?`);
 }
 
 function saCouldntRead() {
@@ -20478,16 +20631,25 @@ function saCouldntRead() {
   _saSpeak("I couldn't see that clearly. Try again, or type it in.");
 }
 
-function saManualEntry(fromLabel) {
+function saManualEntry(fromLabel, why) {
+  // Honest about which of these happened, rather than one vague message:
+  // "not switched on" and "I couldn't read it" are different problems
+  // with different fixes, and only one of them is worth retrying.
+  const banner = {
+    off:    ['🔌', "Label reading isn't switched on", "Type it in and I'll remember it from now on"],
+    unsure: ['🤔', "I couldn't read that clearly", "Have a look and correct anything wrong"],
+    failed: ['📷', "Couldn't read the label", 'Type it in instead'],
+  }[why];
   _saRender(`
-    ${fromLabel ? _saGrid(_saTile('🏷️', 'Label photo saved', "Check the details below are right", 'void(0)', '#2e7d32', {min:110}), 1) : ''}
+    ${banner ? _saGrid(_saTile(banner[0], banner[1], banner[2], 'void(0)', why === 'off' ? '#8a8175' : '#F9A825', {min:110}), 1)
+      : fromLabel ? _saGrid(_saTile('🏷️', 'Label photo saved', "Check the details below are right", 'void(0)', '#2e7d32', {min:110}), 1) : ''}
     <div style="background:var(--gu-secondary);border-radius:14px;padding:16px;margin-bottom:14px;">
       <div style="font-size:12px;font-weight:700;margin-bottom:10px;">What's in the box?</div>
-      <input type="text" id="sa-name" placeholder="e.g. Large Cobalt Bowl"
+      <input type="text" id="sa-name" placeholder="e.g. Large Cobalt Bowl" value="${(sa.ocr?.productName || '').replace(/"/g, '&quot;')}"
         style="width:100%;padding:12px;border:1px solid var(--gu-border);border-radius:10px;font-size:14px;margin-bottom:10px;box-sizing:border-box;">
-      <input type="text" id="sa-batch" placeholder="Batch (optional)"
+      <input type="text" id="sa-batch" placeholder="Batch (optional)" value="${(sa.ocr?.batch || '').replace(/"/g, '&quot;')}"
         style="width:100%;padding:12px;border:1px solid var(--gu-border);border-radius:10px;font-size:14px;margin-bottom:10px;box-sizing:border-box;">
-      <input type="number" inputmode="numeric" id="sa-qty" placeholder="How many?"
+      <input type="number" inputmode="numeric" id="sa-qty" placeholder="How many?" value="${sa.ocr?.quantity != null ? sa.ocr.quantity : ''}"
         style="width:100%;padding:14px;border:1px solid var(--gu-border);border-radius:12px;font-size:20px;font-weight:800;text-align:center;box-sizing:border-box;">
     </div>
     ${_saGrid(_saTile('▶️', 'Start Unpacking', 'Tap each one as it comes out', 'saBeginUnpack()', '#5E35B1'), 1)}
@@ -20619,13 +20781,17 @@ async function saFinish(withPhoto) {
     )}
   `);
   _saSpeak(def ? `Done. ${good} on ${shelf}, and I've logged ${def} damaged.` : `Done. ${good} on ${shelf}.`);
+  // My own bug, caught by reading the endpoint instead of assuming it:
+  // this used to send {kind, message, raisedBy}. /api/staff/alerts takes
+  // {triggerType, data} and validates against the fixed ALERT_TRIGGERS
+  // vocabulary — free text is deliberately impossible there. It was
+  // 400ing silently, so damaged stock raised nothing at all.
   if (def > 0) {
     try {
       await fetch(`${API_URL}/api/staff/alerts`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studioId, kind: 'stock_damage',
-          message: `${def} damaged in ${sa.productLabel}${sa.batchRef ? ` (batch ${sa.batchRef})` : ''}`,
-          raisedBy: currentShiftStaff?.name || 'Stock' })
+        body: JSON.stringify({ studioId, triggerType: 'stock_damaged',
+          data: { count: def, line: sa.productLabel, batch: sa.batchRef || null } })
       });
     } catch(e) {}
   }

@@ -7149,6 +7149,12 @@ const ALERT_TRIGGERS = {
   piece_broken:       { priority: 1, icon:'💔', label:'Piece broken',              nextRole: 'Studio Manager',      message: (d) => `A piece broke${d.table ? ` at ${d.table}` : ''}${d.customerName ? ` (${d.customerName})` : ''} — someone needs to decide what to tell the customer.` },
   customer_unhappy:   { priority: 1, icon:'😟', label:'Customer needs you',        nextRole: 'Studio Manager',      message: (d) => `Someone${d.table ? ` at ${d.table}` : ''} isn't happy and has asked for a manager.` },
   equipment_broken:   { priority: 1, icon:'🔧', label:'Something is broken',       nextRole: 'Studio Manager',      needs: 'equipment', message: (d) => `${d.equipment || 'Equipment'} isn't working${d.staffName ? ` — reported by ${d.staffName}` : ''}.` },
+  // Stock arriving broken is bad news about MONEY, not about a booking.
+  // It routes to the manager because the decision is commercial (chase
+  // the supplier, re-order, change supplier) and nobody else can make
+  // it. Fixed vocabulary like every other trigger — the count and the
+  // batch are DATA, not free text, so this cannot become a comment box.
+  stock_damaged:      { priority: 2, icon:'📦', label:'Damaged stock',            nextRole: 'Studio Manager',      message: (d) => `${d.count || 'Some'} of ${d.line || 'a stock line'} arrived damaged${d.batch ? ` (batch ${d.batch})` : ''} — worth chasing the supplier.` },
   no_show:            { priority: 2, icon:'🚫', label:'No-show',                   nextRole: 'Studio Manager',      message: (d) => `${d.customerName || 'A booking'}${d.table ? ` at ${d.table}` : ''} hasn't turned up — the table is free, the money isn't.` },
   low_stock:          { priority: 2, icon:'🎨', label:'Running low on…',           nextRole: 'Studio Manager',      needs: 'stockItem', message: (d) => `Running low on ${d.item || 'something'} — worth ordering before it runs out.` },
   running_behind:     { priority: 2, icon:'⏰', label:'Running behind',            nextRole: 'Studio Assistant',    message: (d) => `${d.table || 'A table'} is running over — the next booking there is affected.` },
@@ -10766,6 +10772,98 @@ app.post('/api/shelf/adjust', async (req, res) => {
     }).select().single();
     if (error) throw error;
     res.json({ status: 'adjusted', reason, placement: data });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/stock/read-label — read a box label photo.
+//
+// Gated on OPENAI_API_KEY exactly like every other AI endpoint here.
+// With no key it returns 503 and the app falls back to Jenny typing the
+// name — which is the honest outcome. It does NOT guess, and it does
+// not pretend to have read a label it never saw: a made-up SKU is worse
+// than an empty box, because it looks right.
+app.post('/api/stock/read-label', async (req, res) => {
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(503).json({ error: 'Label reading is not switched on for this studio.', fallback: 'manual' });
+  }
+  const { photoBase64 } = req.body;
+  if (!photoBase64) return res.status(400).json({ error: 'photoBase64 required' });
+  try {
+    const dataUrl = photoBase64.startsWith('data:') ? photoBase64 : `data:image/jpeg;base64,${photoBase64}`;
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: 'This is a photo of a label on a box of blank pottery delivered to a pottery painting studio. Read ONLY what is actually printed on it. Do not guess, infer, or invent any field — if something is not legible or not present, use null. Respond ONLY as JSON: {"productName": string or null, "sku": string or null, "quantity": integer or null, "batch": string or null, "confident": true or false}. Set confident to false if the label is blurred, torn, partially hidden, or you are unsure of any value you did return.' },
+            { type: 'image_url', image_url: { url: dataUrl } },
+          ],
+        }],
+        temperature: 0, max_tokens: 200,
+      }),
+    });
+    if (!r.ok) {
+      const t = await r.text();
+      console.error('Label OCR upstream error:', t);
+      return res.status(502).json({ error: 'Could not read the label — type it instead.', fallback: 'manual' });
+    }
+    const d = await r.json();
+    const parsed = JSON.parse((d.choices?.[0]?.message?.content || '{}').replace(/```json|```/g, '').trim());
+    // An unconfident read is handed back as a SUGGESTION for Jenny to
+    // correct, never written straight into stock.
+    res.json({
+      read: true,
+      confident: !!parsed.confident,
+      productName: parsed.productName || null,
+      sku: parsed.sku || null,
+      quantity: Number.isInteger(parsed.quantity) ? parsed.quantity : null,
+      batch: parsed.batch || null,
+    });
+  } catch (e) {
+    console.error('Label OCR error:', e);
+    res.status(500).json({ error: 'Could not read the label — type it instead.', fallback: 'manual' });
+  }
+});
+
+// GET /api/stock/arrivals/open — anything Jenny started and did not
+// finish. A studio phone gets locked, dropped, or handed over mid-box;
+// without this the box is stranded in the database forever and she has
+// to start again.
+app.get('/api/stock/arrivals/open', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const { data, error } = await supabase.from('stock_arrivals')
+      .select('id, product_label, quantity_in_box, batch_ref, square_item_id, created_at')
+      .eq('studio_id', studioId).eq('status', 'unpacking')
+      .order('created_at', { ascending: false }).limit(10);
+    if (error) throw error;
+    const out = [];
+    for (const a of data || []) {
+      const { data: rows } = await supabase.from('stock_unpack_log')
+        .select('status').eq('arrival_id', a.id);
+      out.push({ ...a, unpacked: (rows || []).length });
+    }
+    res.json({ open: out });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/stock/arrival/:id/abandon — she started it and it was wrong.
+// Keeps the row for the audit trail rather than deleting it.
+app.post('/api/stock/arrival/:id/abandon', async (req, res) => {
+  try {
+    const { error } = await supabase.from('stock_arrivals')
+      .update({ status: 'abandoned', completed_at: new Date().toISOString() })
+      .eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ status: 'abandoned' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
