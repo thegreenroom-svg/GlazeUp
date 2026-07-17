@@ -8778,6 +8778,152 @@ function _assistantSpeak() {
   window.speechSynthesis.speak(utter);
 }
 
+// ═══════════════════════════════════════════════════════════
+// ARRANGE TABLES — put them where they really are
+// 17 July 2026
+// ═══════════════════════════════════════════════════════════
+// Daisy: "the girls can basically drag the tables around into the
+// order they want to represent the tables in the studio."
+//
+// TAP TO MOVE, not drag — drag events don't fire on iOS Safari and
+// never have. Tap a table to pick it up, tap a space to put it down.
+// Same as the seating flow, so they already know how it works.
+//
+// Three columns. Grid positions, not pixels — survives any screen.
+
+let _arrangeRoom = null;
+let _arrangePicked = null;
+let _arrangeGrid = {};
+
+async function openArrangeTables(roomName) {
+  _arrangeRoom = roomName;
+  _arrangePicked = null;
+  const { rooms } = _elegantRoomsData();
+  const list = rooms[roomName] || [];
+
+  // Build the grid from current positions
+  _arrangeGrid = {};
+  list.forEach((t, i) => {
+    const row = t.grid_row != null ? t.grid_row : Math.floor(i / 3);
+    const col = t.grid_col != null ? t.grid_col : (i % 3);
+    _arrangeGrid[`${row},${col}`] = t.name;
+  });
+  _renderArrange();
+}
+
+function _renderArrange() {
+  const view = document.getElementById('floor-plan-view');
+  if (!view) return;
+  _floorViewMode = 'arrange';
+
+  const maxRow = Math.max(...Object.keys(_arrangeGrid).map(k => parseInt(k.split(',')[0])), 3);
+  const rows = maxRow + 2;   // always one empty row at the bottom to grow into
+
+  let cells = '';
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < 3; c++) {
+      const key = `${r},${c}`;
+      const name = _arrangeGrid[key];
+      const picked = _arrangePicked === name;
+      cells += `<button onclick="_arrangeTap(${r},${c})"
+        style="aspect-ratio:1.5;border-radius:10px;cursor:pointer;
+        border:${name ? '2px solid #2B2724' : '2px dashed rgba(43,39,36,0.2)'};
+        background:${picked ? '#B87946' : name ? '#FFFDF9' : 'rgba(43,39,36,0.02)'};
+        color:${picked ? '#fff' : '#2B2724'};
+        font-family:'Architects Daughter',cursive;font-size:11px;font-weight:700;
+        display:flex;align-items:center;justify-content:center;padding:4px;
+        ${picked ? 'transform:scale(1.05);box-shadow:0 4px 16px rgba(184,121,70,0.4);' : ''}">
+        ${name || ''}
+      </button>`;
+    }
+  }
+
+  view.innerHTML = `
+    <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
+      <div style="margin-bottom:14px;">
+        <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">
+          Arrange ${_arrangeRoom}</div>
+        <div style="font-size:11px;color:#8a8175;">
+          ${_arrangePicked
+            ? `<strong style="color:#B87946;">${_arrangePicked} picked up</strong> — tap where it goes`
+            : 'Tap a table to pick it up, then tap where it should be'}</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:20px;">
+        ${cells}
+      </div>
+
+      <div style="display:flex;gap:8px;">
+        <button onclick="_saveArrange()" class="glaze-tile"
+          style="flex:1;border:none;border-radius:14px;padding:18px;cursor:pointer;
+          background:#4CAF50;color:#fff;font-size:16px;font-weight:800;">
+          ✓ Save this layout
+        </button>
+        <button onclick="_cancelArrange()" class="glaze-tile"
+          style="border:none;border-radius:14px;padding:18px 20px;cursor:pointer;
+          font-size:14px;font-weight:700;">
+          Cancel
+        </button>
+      </div>
+
+      <div style="margin-top:16px;padding:14px;background:rgba(43,39,36,0.04);border-radius:12px;
+        font-size:11px;color:#8a8175;line-height:1.5;">
+        Put the tables where they really are in the room. Three across, as many rows as you need.
+        Empty squares are just gaps — use them for the sink, the kiln door, wherever there isn't a table.
+      </div>
+    </div>`;
+  toggleFloatingBackBtn();
+}
+
+function _arrangeTap(row, col) {
+  const key = `${row},${col}`;
+  const here = _arrangeGrid[key];
+
+  if (!_arrangePicked) {
+    // Picking up
+    if (here) _arrangePicked = here;
+  } else {
+    // Putting down
+    const from = Object.keys(_arrangeGrid).find(k => _arrangeGrid[k] === _arrangePicked);
+    if (here && here !== _arrangePicked) {
+      // Swap them
+      _arrangeGrid[from] = here;
+      _arrangeGrid[key] = _arrangePicked;
+    } else {
+      // Move to empty
+      delete _arrangeGrid[from];
+      _arrangeGrid[key] = _arrangePicked;
+    }
+    _arrangePicked = null;
+  }
+  _renderArrange();
+}
+
+async function _saveArrange() {
+  const positions = Object.entries(_arrangeGrid).map(([key, name]) => {
+    const [row, col] = key.split(',').map(Number);
+    return { name, row, col };
+  });
+  try {
+    const res = await fetch(`${API_URL}/api/floor/layout`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, positions })
+    });
+    if (!res.ok) throw new Error('Save failed');
+    _arrangeRoom = null;
+    await loadFloorPlan();
+    renderFloorPlanElegant();
+  } catch(e) {
+    alert("Couldn't save the layout — try again in a moment.");
+  }
+}
+
+function _cancelArrange() {
+  _arrangeRoom = null;
+  _arrangePicked = null;
+  renderFloorPlanElegant();
+}
+
 // THIS IS A RENDERING OF /api/staff/alert-kinds, NEVER A SECOND LIST.
 // A hand-written copy of the vocabulary would drift from ALERT_TRIGGERS
 // within a week — which is exactly how the elegant floor plan ended up
@@ -11830,6 +11976,15 @@ function _elegantRoomsData() {
 }
 
 function _elegantLayoutRoom(list, roomWidth) {
+  // ═══════════════════════════════════════════════════════════
+  // GRID POSITIONS — where the tables actually are in the studio
+  // ═══════════════════════════════════════════════════════════
+  // If a table has grid_row/grid_col set, it goes exactly there.
+  // Otherwise it flows in sort order. Mixed is fine — placed tables
+  // hold their spot, the rest fill in around them.
+  const hasGrid = list.some(t => t.grid_row != null && t.grid_col != null);
+  if (hasGrid) return _gridLayoutRoom(list, roomWidth);
+
   let x = _ELEGANT_PAD, y = _ELEGANT_PAD, rowH = 0;
   const placed = list.map(t => {
     const size = _tableSize(t.capacity || 4);
@@ -11848,6 +12003,28 @@ function _elegantLayoutRoom(list, roomWidth) {
 // tappable = whether the room's own <h2> heading opens the full-page
 // drill-down (true on the home overview, false once already on that
 // room's own page — no point tapping through to where you already are).
+// Lay tables out on their real grid positions
+function _gridLayoutRoom(list, roomWidth) {
+  const COLS = 3;   // three columns — enough to represent a room, fits a phone
+  const cellW = Math.floor((roomWidth - _ELEGANT_PAD * 2 - _ELEGANT_GAP * (COLS - 1)) / COLS);
+  const cellH = 62;
+
+  const placed = list.map((t, i) => {
+    // Use the saved position, or fall back to flowing in order
+    const row = t.grid_row != null ? t.grid_row : Math.floor(i / COLS);
+    const col = t.grid_col != null ? t.grid_col : (i % COLS);
+    return {
+      ...t,
+      x: _ELEGANT_PAD + col * (cellW + _ELEGANT_GAP),
+      y: _ELEGANT_PAD + row * (cellH + _ELEGANT_GAP),
+      size: { w: cellW, h: cellH },
+      _row: row, _col: col,
+    };
+  });
+  const maxRow = Math.max(...placed.map(p => p._row), 0);
+  return { placed, height: _ELEGANT_PAD * 2 + (maxRow + 1) * (cellH + _ELEGANT_GAP) + 20 };
+}
+
 function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWidth) {
   // Two widths in play now, matching Daisy's "fit or scroll" ask:
   //   viewportW  — what the room COULD occupy on screen
@@ -12270,7 +12447,10 @@ function showRoomElegant(roomName) {
   view.innerHTML = `
     <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-        <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">${roomName}</div>
+        <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;flex:1;">${roomName}</div>
+        <button onclick="openArrangeTables('${roomName}')" class="glaze-tile"
+          style="border:none;padding:7px 11px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;">
+          ⊞ Arrange</button>
       </div>
       ${list.length
         ? _renderElegantRoomSVG(roomName, list, bookingByTable, false, _measureFloorPlanWidth())

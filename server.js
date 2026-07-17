@@ -5407,7 +5407,7 @@ app.get('/api/floor/tables', async (req, res) => {
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
   try {
     const { data: tables, error: tablesErr } = await supabase.from('studio_tables')
-      .select('id,name,room,capacity,sort_order')
+      .select('id,name,room,capacity,sort_order,grid_row,grid_col')
       .eq('studio_id', studioId).order('sort_order');
     // degrade if studio_tables missing
 
@@ -5733,6 +5733,30 @@ app.get('/api/training/overview', async (req, res) => {
       };
     });
     res.json({ staff: overview });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/floor/layout — save where the tables actually are
+// ═══════════════════════════════════════════════════════════
+// Daisy: "I need to be able to have the people order the tables like
+// they are in the studio. So the girls can drag the tables around
+// into the order they want to represent the tables in the studio."
+//
+// Grid positions, not pixels. Row and column. Simple, survives any
+// screen size, and matches how a room actually reads.
+app.post('/api/floor/layout', async (req, res) => {
+  const { studioId, positions } = req.body;
+  if (!studioId || !Array.isArray(positions)) {
+    return res.status(400).json({ error: 'studioId and positions array required' });
+  }
+  try {
+    for (const p of positions) {
+      if (!p.name) continue;
+      await supabase.from('studio_tables')
+        .update({ grid_row: p.row ?? null, grid_col: p.col ?? null })
+        .eq('studio_id', studioId).eq('name', p.name);
+    }
+    res.json({ saved: true, count: positions.length });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
