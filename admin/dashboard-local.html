@@ -8864,12 +8864,13 @@ async function _cleoAsk(preset) {
 // It never says "something went wrong" — it says which step is stuck
 // and exactly what to do.
 //
-// WHY SPOTIFY NOT SONOS: the Symfonisk speakers ARE Sonos speakers —
-// IKEA make the box, Sonos make the software inside. Can't route round
-// that. But Spotify Connect sees them as devices, so Spotify's API does
-// everything Sonos's does PLUS search and playlists. The Sonos app
-// groups them once and is then never opened again — which was the
-// actual complaint.
+// ONE INTEGRATION, NOT TWO. Spotify's API sees the studio's speakers
+// as Connect devices and does the lot: play, pause, skip, volume per
+// speaker, search, playlists. Nothing else is needed here, and adding
+// a second music integration would only give you two things to debug
+// at 9am instead of one.
+//
+// Grouping is done once in the speakers' own app and then left alone.
 
 let _musicDevices = [];
 let _musicNow = {};
@@ -8906,16 +8907,62 @@ async function openMusic() {
 }
 
 // THE MORNING CHECK. Waits, verifies, tells you what's stuck.
+//
+// ON WIFI — being honest about what's possible:
+// A web app CANNOT connect to WiFi. No browser can. There is no API
+// for it on iOS, Android, or anywhere, deliberately — a website that
+// could silently join networks would be a security disaster.
+//
+// So there is no "connect to WiFi" button here, because it would be a
+// button that does nothing while looking like it did something. That's
+// worse than not having one.
+//
+// What CAN be done, and is: check whether this device can reach the
+// internet at all, and say so plainly. If the phone's offline, that's
+// the answer — not "Spotify is broken".
 async function _musicCheck() {
   const el = document.getElementById('music-body');
   if (!el) return;
+
+  // Step zero: is this device even online? Answer this before blaming Spotify.
+  if (!navigator.onLine) {
+    el.innerHTML = `
+      <div class="glaze-tile" style="border-radius:14px;padding:18px;border:2px solid #e53935;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:26px;height:26px;border-radius:50%;background:#e53935;color:#fff;
+            display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;">!</div>
+          <div style="font-size:14px;font-weight:700;color:#2B2724;">This phone is offline</div>
+        </div>
+        <div style="font-size:12px;color:#2B2724;line-height:1.5;margin-top:10px;padding:12px;
+          background:rgba(229,57,53,0.08);border-radius:10px;">
+          Nothing will work until it's back on the studio WiFi.
+          Check Settings → Wi-Fi on this device.
+        </div>
+        <button onclick="_musicCheck()" style="width:100%;background:#2B2724;color:#fff;border:none;
+          border-radius:12px;padding:14px;font-size:14px;font-weight:800;cursor:pointer;margin-top:10px;">
+          I'm back on — check again
+        </button>
+      </div>`;
+    return;
+  }
+
   let setup;
   try {
     const r = await fetch(`${API_URL}/api/spotify/setup?studioId=${studioId}`);
     setup = await r.json();
   } catch(e) {
-    el.innerHTML = `<div style="text-align:center;padding:30px;color:#e53935;font-size:13px;">
-      Can't reach the server. Try again in a moment.</div>`;
+    el.innerHTML = `
+      <div class="glaze-tile" style="border-radius:14px;padding:18px;border:2px solid #e53935;">
+        <div style="font-size:14px;font-weight:700;color:#2B2724;">Can't reach the server</div>
+        <div style="font-size:12px;color:#2B2724;line-height:1.5;margin-top:8px;">
+          This phone says it's online, but the app can't get through.
+          Usually the WiFi has dropped without saying so — try turning
+          Wi-Fi off and on.</div>
+        <button onclick="_musicCheck()" style="width:100%;background:#2B2724;color:#fff;border:none;
+          border-radius:12px;padding:14px;font-size:14px;font-weight:800;cursor:pointer;margin-top:12px;">
+          Try again
+        </button>
+      </div>`;
     return;
   }
 
