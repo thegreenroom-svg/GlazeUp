@@ -7665,6 +7665,596 @@ function showFirstAid() {
   ], 'Some incidents are legally reportable to the HSE under RIDDOR. A manager will handle this — your job is to record it accurately.');
 }
 
+// ═══════════════════════════════════════════════════════════
+// JENNY'S PACKING FLOW — tiles all the way. 17 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Daisy: "she's quite hard of learning when it comes to the
+// processing. She needs a very simple flow on big tiles until she
+// gets to the point where she has to identify."
+//
+// The whole journey, one decision per screen:
+//   1. What's waiting?  → big count tile
+//   2. Photograph it    → camera
+//   3. AI says what it is → big YES/NO
+//   4. Label it         → one tap
+//   5. Pack it          → one tap
+//   6. Done             → next piece
+//
+// Every tile explains itself. Nothing assumes she remembers.
+// The AI learns from every YES — it gets easier every day.
+
+let _packingPiece = null;
+let _packingSession = { done: 0, started: null };
+
+function openPacking() {
+  const view = document.getElementById('floor-plan-view');
+  if (!view) return;
+  _floorViewMode = 'packing';
+  _packingSession.started = _packingSession.started || Date.now();
+
+  view.innerHTML = `
+    <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+        <div>
+          <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">Packing</div>
+          <div style="font-size:11px;color:#8a8175;">Fired pieces going home</div>
+        </div>
+        <button onclick="goToRealLandingPage()" class="glaze-tile"
+          style="border:none;padding:8px 12px;font-size:11px;font-weight:800;cursor:pointer;flex-shrink:0;">← Floor plan</button>
+      </div>
+      <div id="packing-tiles" style="display:flex;flex-direction:column;gap:12px;">
+        <div style="text-align:center;padding:40px;color:#8a8175;font-size:13px;">Loading…</div>
+      </div>
+    </div>`;
+  toggleFloatingBackBtn();
+  _loadPackingTiles();
+}
+
+async function _loadPackingTiles() {
+  const el = document.getElementById('packing-tiles');
+  if (!el) return;
+  try {
+    const res = await fetch(`${API_URL}/api/packing/queue?studioId=${studioId}`);
+    const data = await res.json();
+    const pieces = data.pieces || [];
+
+    if (!pieces.length) {
+      el.innerHTML = `
+        <div style="text-align:center;padding:50px 20px;">
+          <div style="font-size:48px;margin-bottom:12px;">✨</div>
+          <div style="font-family:'Caveat',cursive;font-size:26px;color:#2B2724;">All caught up</div>
+          <div style="font-size:13px;color:#8a8175;margin-top:6px;">Nothing waiting to be packed.</div>
+        </div>
+        ${_packingSession.done ? `<div style="text-align:center;margin-top:20px;padding:16px;
+          background:rgba(76,175,80,0.1);border-radius:12px;">
+          <div style="font-size:14px;color:#2e7d32;font-weight:700;">
+            ${_packingSession.done} piece${_packingSession.done===1?'':'s'} packed today</div>
+        </div>` : ''}`;
+      return;
+    }
+
+    // Group pieces by booking so a family's pieces stay together
+    const byBooking = {};
+    pieces.forEach(p => {
+      const key = p.booking_id || p.booking_code || 'unknown';
+      if (!byBooking[key]) byBooking[key] = { customer: p.customer_name || 'Unknown', pieces: [] };
+      byBooking[key].pieces.push(p);
+    });
+    const groups = Object.entries(byBooking);
+
+    el.innerHTML = `
+      <!-- THE BIG ONE: start packing -->
+      <button onclick="_startPackingPiece()" class="glaze-tile"
+        style="width:100%;border:none;border-radius:18px;padding:28px 20px;cursor:pointer;
+        background:linear-gradient(135deg,#00897B,#00695C);color:#fff;text-align:left;">
+        <div style="font-size:42px;font-weight:900;line-height:1;">${pieces.length}</div>
+        <div style="font-family:'Caveat',cursive;font-size:24px;font-weight:700;margin-top:4px;">
+          piece${pieces.length===1?'':'s'} to pack</div>
+        <div style="font-size:12px;opacity:0.9;margin-top:8px;line-height:1.4;">
+          Tap to start. I'll show you one at a time — photograph it, I'll tell you whose it is,
+          you say yes or no.</div>
+      </button>
+
+      <!-- What's waiting, grouped by family -->
+      <div style="font-size:10px;color:#8a8175;font-family:'Architects Daughter',cursive;
+        letter-spacing:0.06em;margin-top:8px;">Waiting · ${groups.length} booking${groups.length===1?'':'s'}</div>
+      ${groups.map(([id, g]) => `
+        <div class="glaze-tile" style="border-radius:14px;padding:14px;display:flex;
+          justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-family:'Caveat',cursive;font-size:19px;font-weight:700;color:#2B2724;">${g.customer}</div>
+            <div style="font-size:11px;color:#8a8175;">${g.pieces.length} piece${g.pieces.length===1?'':'s'}</div>
+          </div>
+          <div style="display:flex;gap:3px;">
+            ${g.pieces.slice(0,5).map(() => `<div style="width:8px;height:8px;border-radius:50%;
+              background:#00897B;opacity:0.5;"></div>`).join('')}
+            ${g.pieces.length>5 ? `<div style="font-size:10px;color:#8a8175;margin-left:2px;">+${g.pieces.length-5}</div>` : ''}
+          </div>
+        </div>`).join('')}
+
+      <!-- Help tile — always there, never in the way -->
+      <button onclick="_showPackingHelp()" style="width:100%;background:none;border:1px dashed rgba(43,39,36,0.2);
+        border-radius:12px;padding:12px;font-size:12px;color:#8a8175;cursor:pointer;margin-top:8px;">
+        ❓ How does this work?
+      </button>`;
+  } catch(e) {
+    el.innerHTML = `<div style="text-align:center;padding:30px;color:#e53935;font-size:13px;">
+      Couldn't load the packing queue. Try again in a moment.</div>`;
+  }
+}
+
+function _showPackingHelp() {
+  _hsCard('How packing works', '#00897B', [
+    '<strong>Pick up any piece</strong> from the fired pile. Any one — order does not matter.',
+    '<strong>Photograph it.</strong> Hold it steady, good light, whole piece in frame.',
+    '<strong>I will tell you whose it is.</strong> A big card comes up with the name.',
+    '<strong>You say yes or no.</strong> That is all. If I am wrong, say no and I will try again.',
+    '<strong>Then label and pack.</strong> One tap each.',
+    '<strong>I get better every time.</strong> Every yes teaches me. After a week I will be right nearly every time.',
+  ], 'If a piece has no photo on file I cannot identify it — use the booking code instead. Tell Daisy if this keeps happening.');
+}
+
+async function _startPackingPiece() {
+  const modal = document.createElement('div');
+  modal.id = 'packing-camera';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9850;background:#0E1A18;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
+  modal.innerHTML = `
+    <div style="width:100%;max-width:420px;text-align:center;">
+      <div style="font-family:'Caveat',cursive;font-size:26px;color:#F4ECE0;margin-bottom:4px;">Photograph the piece</div>
+      <div style="font-size:12px;color:#8a8175;margin-bottom:18px;">Whole piece in frame · good light · hold steady</div>
+      <div style="position:relative;width:100%;aspect-ratio:1;max-width:320px;margin:0 auto 18px;
+        background:#1A2E28;border-radius:16px;overflow:hidden;">
+        <video id="packing-video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;"></video>
+        <div style="position:absolute;inset:12px;border:2px dashed rgba(0,137,123,0.5);border-radius:12px;pointer-events:none;"></div>
+      </div>
+      <button onclick="_capturePackingPhoto()"
+        style="width:100%;max-width:320px;background:#00897B;color:white;border:none;border-radius:16px;
+        padding:20px;font-size:19px;font-weight:800;cursor:pointer;margin-bottom:10px;">
+        📸 Take photo
+      </button>
+      <button onclick="_closePackingCamera()"
+        style="width:100%;max-width:320px;background:rgba(255,255,255,0.08);color:#8a8175;border:none;
+        border-radius:12px;padding:12px;font-size:13px;cursor:pointer;">Back</button>
+    </div>`;
+  document.body.appendChild(modal);
+
+  navigator.mediaDevices?.getUserMedia({ video: { facingMode: 'environment' } })
+    .then(stream => {
+      const v = document.getElementById('packing-video');
+      if (v) { v.srcObject = stream; }
+    })
+    .catch(() => {
+      const v = document.getElementById('packing-video');
+      if (v) v.outerHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#8a8175;font-size:13px;padding:20px;text-align:center;">Camera not available on this device</div>';
+    });
+}
+
+async function _capturePackingPhoto() {
+  const v = document.getElementById('packing-video');
+  if (!v?.srcObject) return;
+  const canvas = document.createElement('canvas');
+  canvas.width = v.videoWidth || 640;
+  canvas.height = v.videoHeight || 480;
+  canvas.getContext('2d').drawImage(v, 0, 0);
+  const photo = canvas.toDataURL('image/jpeg', 0.85);
+  v.srcObject.getTracks().forEach(t => t.stop());
+  _identifyPackingPiece(photo);
+}
+
+function _identifyPackingPiece(photo) {
+  const modal = document.getElementById('packing-camera');
+  if (!modal) return;
+  modal.innerHTML = `
+    <div style="text-align:center;color:#F4ECE0;padding:40px 20px;">
+      <div style="font-size:52px;margin-bottom:16px;animation:swt-float 1.5s ease-in-out infinite;">🔍</div>
+      <div style="font-family:'Caveat',cursive;font-size:26px;margin-bottom:6px;">Looking…</div>
+      <div style="font-size:13px;color:#8a8175;">Checking every piece on file</div>
+    </div>`;
+
+  fetch(`${API_URL}/api/pieces/find-by-photo`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ studioId, photoBase64: photo, searchedBy: currentShiftStaff?.id, autoAssign: false })
+  })
+  .then(r => r.json())
+  .then(data => {
+    const match = (data.matches || [])[0];
+    if (match && data.noConfidentMatch !== true) _showPackingMatch(photo, match, data);
+    else _showPackingNoMatch(photo);
+  })
+  .catch(() => _showPackingNoMatch(photo));
+}
+
+function _showPackingMatch(photo, match, data) {
+  const modal = document.getElementById('packing-camera');
+  if (!modal) return;
+  _packingPiece = match;
+  const conf = match.confidence || 'medium';
+  const confColour = conf === 'high' ? '#4CAF50' : conf === 'medium' ? '#F9A825' : '#e53935';
+  const confText = conf === 'high' ? "I'm sure" : conf === 'medium' ? "Fairly sure" : "Not certain";
+
+  modal.innerHTML = `
+    <div style="width:100%;max-width:420px;text-align:center;">
+      <div style="font-family:'Caveat',cursive;font-size:24px;color:#F4ECE0;margin-bottom:2px;">Is this right?</div>
+      <div style="font-size:11px;color:${confColour};font-weight:700;margin-bottom:16px;">${confText}</div>
+
+      <div style="display:flex;gap:12px;margin-bottom:18px;align-items:center;">
+        <div style="position:relative;flex-shrink:0;">
+          <img src="${photo}" style="width:110px;height:110px;object-fit:cover;border-radius:12px;">
+          <!-- THE CLEAR CIRCLE — Daisy asked for this specifically -->
+          <div style="position:absolute;inset:-4px;border:3px solid ${confColour};border-radius:16px;
+            animation:swt-pulse 1.5s ease-in-out infinite;"></div>
+        </div>
+        <div style="flex:1;text-align:left;">
+          <div style="font-family:'Caveat',cursive;font-size:28px;color:#F4ECE0;font-weight:700;line-height:1.1;">
+            ${match.customerName || match.customer_name || 'Unknown'}</div>
+          ${match.pieceType ? `<div style="font-size:13px;color:#8a8175;margin-top:3px;">${match.pieceType}</div>` : ''}
+          ${match.reason ? `<div style="font-size:11px;color:#8a8175;margin-top:6px;line-height:1.4;opacity:0.8;">${match.reason}</div>` : ''}
+        </div>
+      </div>
+
+      <button onclick="_confirmPackingMatch()"
+        style="width:100%;background:#4CAF50;color:white;border:none;border-radius:18px;
+        padding:26px;font-size:24px;font-weight:900;cursor:pointer;margin-bottom:10px;
+        box-shadow:0 4px 24px rgba(76,175,80,0.4);">
+        ✓ Yes, that's them
+      </button>
+      <button onclick="_startPackingPiece()"
+        style="width:100%;background:rgba(255,255,255,0.1);color:#F4ECE0;border:none;
+        border-radius:14px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:8px;">
+        ✗ No — try again
+      </button>
+      <button onclick="_closePackingCamera()"
+        style="width:100%;background:none;color:#8a8175;border:none;padding:10px;font-size:12px;cursor:pointer;">
+        Put it back for now
+      </button>
+    </div>`;
+}
+
+function _showPackingNoMatch(photo) {
+  const modal = document.getElementById('packing-camera');
+  if (!modal) return;
+  modal.innerHTML = `
+    <div style="width:100%;max-width:420px;text-align:center;">
+      <img src="${photo}" style="width:120px;height:120px;object-fit:cover;border-radius:14px;margin-bottom:16px;">
+      <div style="font-family:'Caveat',cursive;font-size:24px;color:#F4ECE0;margin-bottom:6px;">I don't know this one</div>
+      <div style="font-size:13px;color:#8a8175;margin-bottom:22px;line-height:1.5;">
+        Either there's no photo of it on file, or I can't see it clearly.<br>
+        Try another angle, or use the booking code.</div>
+      <button onclick="_startPackingPiece()"
+        style="width:100%;background:#B87946;color:white;border:none;border-radius:14px;
+        padding:18px;font-size:16px;font-weight:800;cursor:pointer;margin-bottom:10px;">
+        📸 Try another angle
+      </button>
+      <button onclick="_closePackingCamera()"
+        style="width:100%;background:rgba(255,255,255,0.08);color:#8a8175;border:none;
+        border-radius:12px;padding:14px;font-size:13px;cursor:pointer;">
+        Put it aside · tell Daisy
+      </button>
+    </div>`;
+}
+
+function _confirmPackingMatch() {
+  const modal = document.getElementById('packing-camera');
+  if (!modal || !_packingPiece) return;
+  _packingSession.done++;
+
+  modal.innerHTML = `
+    <div style="width:100%;max-width:420px;text-align:center;">
+      <div style="font-size:56px;color:#4CAF50;margin-bottom:8px;">✓</div>
+      <div style="font-family:'Caveat',cursive;font-size:26px;color:#F4ECE0;margin-bottom:20px;">
+        ${_packingPiece.customerName || _packingPiece.customer_name || 'Confirmed'}</div>
+
+      <div style="font-size:11px;color:#8a8175;margin-bottom:10px;">What now?</div>
+
+      <button onclick="_packingLabel()" class="glaze-tile"
+        style="width:100%;border:none;border-radius:16px;padding:22px;cursor:pointer;
+        background:#5E35B1;color:#fff;font-size:18px;font-weight:800;margin-bottom:10px;">
+        🏷 Print label
+      </button>
+      <button onclick="_packingDone()" class="glaze-tile"
+        style="width:100%;border:none;border-radius:16px;padding:22px;cursor:pointer;
+        background:#00897B;color:#fff;font-size:18px;font-weight:800;margin-bottom:10px;">
+        📦 Packed · next piece
+      </button>
+      <button onclick="_closePackingCamera()"
+        style="width:100%;background:none;color:#8a8175;border:none;padding:12px;font-size:12px;cursor:pointer;">
+        Stop for now · ${_packingSession.done} done
+      </button>
+    </div>`;
+}
+
+function _packingLabel() {
+  // Route into the existing label system with this piece
+  _closePackingCamera();
+  if (_packingPiece?.bookingCode || _packingPiece?.booking_code) {
+    goToTab('labels');
+    setTimeout(() => {
+      if (typeof jumpToLabelsFor === 'function') {
+        jumpToLabelsFor(_packingPiece.bookingCode || _packingPiece.booking_code);
+      }
+    }, 300);
+  } else {
+    goToTab('labels');
+  }
+}
+
+function _packingDone() {
+  // Mark packed, straight to the next piece — no ceremony
+  if (_packingPiece?.id) {
+    fetch(`${API_URL}/api/pieces/${_packingPiece.id}/status`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, status: 'ready_for_pickup', by: currentShiftStaff?.id })
+    }).catch(() => {});
+  }
+  _packingPiece = null;
+  _startPackingPiece();
+}
+
+function _closePackingCamera() {
+  document.getElementById('packing-video')?.srcObject?.getTracks().forEach(t => t.stop());
+  document.getElementById('packing-camera')?.remove();
+  _packingPiece = null;
+  _loadPackingTiles();
+}
+
+// ═══════════════════════════════════════════════════════════
+// MY TRAINING — tick, sign, logged. 17 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Daisy: "a tick box that then completes and automatically logs
+// under staff profile on her page that they've ticked and understood
+// and read, and therefore fully trained."
+//
+// Tiles, not a form. Tap a module → read it → tick it → logged.
+// The only typing is the signature, once, at the end.
+
+const TRAINING_CONTENT = {
+  fire: { icon: '🚨', colour: '#c0392b', title: 'Fire safety', points: [
+    'If you find a fire: <strong>raise the alarm, get everyone out, call 999.</strong>',
+    'Do not fight a fire unless trained and it is small.',
+    'Get everyone to the assembly point. Count them.',
+    '<strong>Never go back in.</strong>',
+    'Fire exits stay clear and unlocked. Every shift.',
+    'Know where the extinguishers are.',
+  ]},
+  kiln: { icon: '🔥', colour: '#B87946', title: 'Kiln safety', points: [
+    '<strong>Never open the kiln above 50°C.</strong> Check the controller.',
+    'Heat-resistant gloves live next to the kiln. Use them.',
+    'Extraction on before firing starts.',
+    'Two people lift large shelves. Never alone.',
+    'Log every firing.',
+    'If it looks, smells or sounds wrong — <strong>stop, tell a manager.</strong>',
+  ]},
+  coshh: { icon: '🧪', colour: '#F9A825', title: 'COSHH & glazes', points: [
+    'Only non-toxic, food-safe glazes in customer areas.',
+    '<strong>Safety Data Sheets are in the folder.</strong> Know where.',
+    'Wash hands before eating. Remind customers.',
+    'Aprons for everyone.',
+    '<strong>Spills: clean wet, immediately.</strong> Never sweep dry.',
+    'Glaze never goes down the drain.',
+  ]},
+  handling: { icon: '📦', colour: '#5E35B1', title: 'Manual handling', points: [
+    'Bend your knees, load close, do not twist.',
+    '<strong>Kiln shelves: two people, always.</strong>',
+    'Deliveries: use the trolley.',
+    'Glaze buckets: never above 10kg.',
+    '<strong>If it feels too heavy, it is.</strong> Ask for help.',
+  ]},
+  slips: { icon: '💧', colour: '#00897B', title: 'Slips & clean floors', points: [
+    'Wet floors get a sign. Every time.',
+    'Spills cleaned immediately, not later.',
+    'Walkways clear.',
+    'No cables across the floor.',
+    '<strong>Wet clean only</strong> — dry sweeping raises silica dust.',
+  ]},
+  children: { icon: '👶', colour: '#e53935', title: 'Children in the studio', points: [
+    'Children supervised by a parent or carer at all times.',
+    '<strong>Kiln area is staff only.</strong> No exceptions.',
+    'Watch for hand-to-mouth contact with glaze.',
+    'Clear breakages immediately — bisque edges are sharp.',
+    'If a child is unsupervised, find the adult.',
+  ]},
+  firstaid: { icon: '🩹', colour: '#00897B', title: 'First aid & accidents', points: [
+    'Know who the first aider is on your shift.',
+    'Know where the kit is.',
+    '<strong>Every accident goes in the book.</strong> However small.',
+    'Serious injury: tell a manager immediately.',
+    'Burns: cool under running water 20 minutes.',
+  ]},
+  opening: { icon: '🌅', colour: '#F9A825', title: 'Opening the studio', points: [
+    'Fire exits clear and unlocked.',
+    'Walkways clear.',
+    'Kiln area checked.',
+    'First aid kit stocked.',
+    'Soap and towels at the sink.',
+    'Glaze station tidy, lids on.',
+  ]},
+  closing: { icon: '🌙', colour: '#2B2724', title: 'Closing the studio', points: [
+    'All glaze lids on.',
+    'Tables and floor wet cleaned.',
+    'Waste disposed correctly.',
+    'Kiln programme confirmed if firing overnight.',
+    'Fire exits clear.',
+  ]},
+  tech_kiln: { icon: '⚙️', colour: '#B87946', title: 'Kiln programming', points: [
+    'Know every programme and when to use it.',
+    'Bisque and glaze firings are different — never mix.',
+    'Confirm the programme before you press start.',
+    'Log it: what, when, which programme.',
+  ]},
+  tech_glaze: { icon: '🎨', colour: '#F9A825', title: 'Glaze mixing', points: [
+    'Ventilated area only.',
+    '<strong>Wear the mask.</strong> Dry glaze powder is silica dust.',
+    'Follow the ratios exactly.',
+    'Clean up wet.',
+  ]},
+  tech_faults: { icon: '🔍', colour: '#5E35B1', title: 'Firing faults', points: [
+    'Crazing: glaze fit, cooling too fast.',
+    'Pinholing: fired too fast, or contamination.',
+    'Crawling: dust or grease on the bisque.',
+    'If it goes wrong, log it — patterns matter.',
+  ]},
+  asst_seat: { icon: '🪑', colour: '#4CAF50', title: 'Seating customers', points: [
+    'Check the arrivals list on the floor plan.',
+    'Tap their name, tap a table.',
+    'Check the table fits the party size.',
+    'Aprons offered before they start.',
+  ]},
+  asst_photo: { icon: '📷', colour: '#00897B', title: 'Photographing pieces', points: [
+    'Every piece gets photographed before it goes to the kiln.',
+    'Whole piece in frame, good light.',
+    '<strong>This is how we find it again.</strong> No photo, no match.',
+    'Group photos are fine if pieces are clearly separate.',
+  ]},
+  asst_break: { icon: '💔', colour: '#e53935', title: 'Handling breakages', points: [
+    'Clear it immediately — sharp edges.',
+    'Tell the customer honestly.',
+    '<strong>Tell Daisy</strong> — use the Tell Daisy tile.',
+    'Log it. We need to know what breaks and why.',
+  ]},
+  mgr_riddor: { icon: '📋', colour: '#2B2724', title: 'Accident reporting', points: [
+    'Every accident in the book.',
+    'RIDDOR reportable: death, specified injury, over-7-day absence, disease, dangerous occurrence.',
+    'Report online at hse.gov.uk/riddor.',
+    'Deaths and major injuries: report immediately by phone.',
+  ]},
+  mgr_risk: { icon: '⚠️', colour: '#F9A825', title: 'Risk assessment review', points: [
+    'Review annually, and after any incident.',
+    'Review after any significant change.',
+    'Record the review in the table at the back.',
+  ]},
+  mgr_fire: { icon: '🧯', colour: '#c0392b', title: 'Fire drill coordination', points: [
+    'Drill at least annually.',
+    'Alarm tested weekly, logged.',
+    'Extinguishers serviced annually.',
+    'Everyone knows the assembly point.',
+  ]},
+};
+
+let _trainingDone = {};
+
+async function openMyTraining() {
+  const view = document.getElementById('floor-plan-view');
+  if (!view) return;
+  _floorViewMode = 'training';
+  view.innerHTML = `
+    <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+        <div>
+          <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">My Training</div>
+          <div style="font-size:11px;color:#8a8175;">Read it, tick it, done</div>
+        </div>
+        <button onclick="goToRealLandingPage()" class="glaze-tile"
+          style="border:none;padding:8px 12px;font-size:11px;font-weight:800;cursor:pointer;flex-shrink:0;">← Floor plan</button>
+      </div>
+      <div id="training-tiles"><div style="text-align:center;padding:40px;color:#8a8175;font-size:13px;">Loading…</div></div>
+    </div>`;
+  toggleFloatingBackBtn();
+  _loadTrainingTiles();
+}
+
+async function _loadTrainingTiles() {
+  const el = document.getElementById('training-tiles');
+  if (!el) return;
+  try {
+    const [modsRes, statusRes] = await Promise.all([
+      fetch(`${API_URL}/api/training/modules?role=${encodeURIComponent(currentShiftStaff?.role || '')}`),
+      fetch(`${API_URL}/api/training/status?studioId=${studioId}&staffMemberId=${currentShiftStaff?.id}`)
+    ]);
+    const mods = (await modsRes.json()).modules || [];
+    _trainingDone = (await statusRes.json()).completed || {};
+
+    const doneCount = mods.filter(m => _trainingDone[m.id]).length;
+    const allDone = doneCount === mods.length;
+
+    el.innerHTML = `
+      ${allDone ? `<div style="text-align:center;padding:20px;background:rgba(76,175,80,0.12);
+        border-radius:14px;margin-bottom:16px;">
+        <div style="font-size:36px;">✅</div>
+        <div style="font-family:'Caveat',cursive;font-size:22px;color:#2e7d32;margin-top:4px;">Fully trained</div>
+        <div style="font-size:11px;color:#8a8175;margin-top:2px;">Daisy has been told</div>
+      </div>` : `<div style="padding:14px;background:rgba(184,121,70,0.1);border-radius:12px;margin-bottom:16px;">
+        <div style="font-size:13px;color:#2B2724;font-weight:700;">${doneCount} of ${mods.length} done</div>
+        <div style="height:6px;background:rgba(43,39,36,0.1);border-radius:3px;margin-top:6px;overflow:hidden;">
+          <div style="height:100%;width:${(doneCount/mods.length*100)}%;background:#B87946;border-radius:3px;
+            transition:width 0.4s;"></div>
+        </div>
+      </div>`}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        ${mods.map(m => {
+          const c = TRAINING_CONTENT[m.id];
+          const done = !!_trainingDone[m.id];
+          return `<button onclick="_openTrainingModule('${m.id}')" class="glaze-tile"
+            style="border:none;border-radius:16px;padding:16px 12px;cursor:pointer;
+            background:${done ? 'rgba(76,175,80,0.15)' : (c?.colour || '#8a8175')};
+            color:${done ? '#2e7d32' : '#fff'};text-align:left;min-height:92px;
+            display:flex;flex-direction:column;justify-content:space-between;position:relative;">
+            ${done ? '<div style="position:absolute;top:8px;right:8px;font-size:16px;">✓</div>' : ''}
+            <div style="font-size:24px;">${c?.icon || m.icon}</div>
+            <div style="font-family:'Caveat',cursive;font-size:17px;font-weight:700;line-height:1.2;">
+              ${c?.title || m.label}</div>
+          </button>`;
+        }).join('')}
+      </div>`;
+  } catch(e) {
+    el.innerHTML = '<div style="text-align:center;padding:30px;color:#e53935;font-size:13px;">Couldn\'t load training.</div>';
+  }
+}
+
+function _openTrainingModule(moduleId) {
+  const c = TRAINING_CONTENT[moduleId];
+  if (!c) return;
+  const done = !!_trainingDone[moduleId];
+
+  const sheet = document.createElement('div');
+  sheet.id = 'training-module';
+  sheet.style.cssText = 'position:fixed;inset:0;z-index:9750;background:rgba(43,39,36,0.9);display:flex;align-items:flex-end;justify-content:center;';
+  sheet.onclick = e => { if (e.target===sheet) sheet.remove(); };
+  sheet.innerHTML = `<div style="background:#FFFDF9;width:100%;max-width:520px;border-radius:18px 18px 0 0;
+    padding:22px 18px calc(22px + env(safe-area-inset-bottom));max-height:85vh;display:flex;flex-direction:column;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+      <div style="font-size:32px;">${c.icon}</div>
+      <div style="font-family:'Caveat',cursive;font-size:26px;color:${c.colour};font-weight:700;">${c.title}</div>
+    </div>
+    <div style="overflow-y:auto;flex:1;">
+      ${c.points.map(pt => `<div style="display:flex;gap:10px;margin-bottom:14px;align-items:flex-start;">
+        <div style="width:7px;height:7px;border-radius:50%;background:${c.colour};margin-top:7px;flex-shrink:0;"></div>
+        <div style="font-size:15px;color:#2B2724;line-height:1.5;">${pt}</div>
+      </div>`).join('')}
+    </div>
+    ${done
+      ? `<div style="margin-top:16px;padding:16px;background:rgba(76,175,80,0.12);border-radius:12px;text-align:center;">
+          <div style="font-size:14px;color:#2e7d32;font-weight:700;">✓ You've read this</div>
+          <div style="font-size:11px;color:#8a8175;margin-top:2px;">
+            ${_trainingDone[moduleId].completed_at ? new Date(_trainingDone[moduleId].completed_at).toLocaleDateString('en-GB') : ''}</div>
+        </div>`
+      : `<button onclick="_tickTrainingModule('${moduleId}')"
+          style="margin-top:16px;width:100%;background:#4CAF50;color:#fff;border:none;border-radius:16px;
+          padding:22px;font-size:19px;font-weight:900;cursor:pointer;
+          box-shadow:0 4px 20px rgba(76,175,80,0.35);">
+          ✓ Read and understood
+        </button>`}
+    <button onclick="document.getElementById('training-module').remove()"
+      style="margin-top:8px;width:100%;background:none;color:#8a8175;border:none;padding:12px;font-size:13px;cursor:pointer;">
+      Close
+    </button>
+  </div>`;
+  document.body.appendChild(sheet);
+}
+
+async function _tickTrainingModule(moduleId) {
+  try {
+    await fetch(`${API_URL}/api/training/complete`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, staffMemberId: currentShiftStaff?.id, moduleId,
+                             signedName: currentShiftStaff?.name })
+    });
+    document.getElementById('training-module')?.remove();
+    _loadTrainingTiles();
+  } catch(e) {
+    alert("Couldn't save that — try again in a moment.");
+  }
+}
+
 // THIS IS A RENDERING OF /api/staff/alert-kinds, NEVER A SECOND LIST.
 // A hand-written copy of the vocabulary would drift from ALERT_TRIGGERS
 // within a week — which is exactly how the elegant floor plan ended up
@@ -12011,37 +12601,37 @@ const ROLE_HOME_DEFAULTS = {
 
   'General Manager': {
     // Daisy: the whole studio at a glance, then people, then money
-    tileOrder: ['floor-plan', 'progress', 'team', 'dashboard', 'staff',
-                'stock', 'health-safety', 'whats-on', 'customer-demo', 'setup'],
+    tileOrder: ['floor-plan', 'progress', 'team', 'packing', 'dashboard', 'staff',
+                'stock', 'training', 'health-safety', 'whats-on', 'customer-demo', 'setup'],
     promotedTiles: ['tell-daisy']
   },
 
   'Co-Director': {
     // David: same as Daisy — full visibility
-    tileOrder: ['floor-plan', 'progress', 'dashboard', 'team', 'staff',
-                'stock', 'health-safety', 'whats-on', 'customer-demo', 'setup'],
+    tileOrder: ['floor-plan', 'progress', 'dashboard', 'team', 'packing', 'staff',
+                'stock', 'training', 'health-safety', 'whats-on', 'customer-demo', 'setup'],
     promotedTiles: ['tell-daisy']
   },
 
   'Studio Executive': {
-    // Jenny: the packing end. Pieces come out of the kiln and go home.
-    // Her journey: what's ready → match it → label it → pack it → done
-    tileOrder: ['floor-plan', 'piecematch', 'labels', 'printqueue',
-                'catalogue', 'health-safety', 'team'],
+    // Jenny: PACKING IS HER JOB. It goes first, every time.
+    // Her journey: what's ready → photograph → AI says whose → label → packed
+    tileOrder: ['packing', 'floor-plan', 'labels', 'printqueue',
+                'piecematch', 'catalogue', 'training', 'health-safety'],
     promotedTiles: ['tell-daisy']
   },
 
   'Ceramic Technician': {
     // Lucy: bisque in, fired pieces out. Kiln is her world.
-    tileOrder: ['floor-plan', 'piecematch', 'shapes', 'catalogue',
-                'stock', 'labels', 'health-safety'],
+    tileOrder: ['floor-plan', 'piecematch', 'packing', 'shapes', 'catalogue',
+                'stock', 'labels', 'training', 'health-safety'],
     promotedTiles: ['tell-daisy']
   },
 
   'Studio Assistant': {
     // Ruby: the floor. Seat people, take orders, photograph pieces.
     tileOrder: ['floor-plan', 'staff', 'menu', 'tablecards',
-                'piecematch', 'health-safety'],
+                'packing', 'piecematch', 'training', 'health-safety'],
     promotedTiles: ['tell-daisy']
   },
 
@@ -12605,6 +13195,8 @@ const GRID_NAV_STRUCTURE = [
   { tab: 'whats-on', label: '📅 What\'s On', desc: 'Local events & school holidays', fn: 'openWhatsOn' },
   { tab: 'tell-daisy', label: '💬 Tell Daisy', desc: 'Something good or bad happened', fn: 'openTellPicker' },
   { tab: 'health-safety', label: '🦺 Health & Safety', desc: 'Risk assessment, training, procedures', fn: 'openHealthSafety' },
+  { tab: 'packing', label: '📦 Packing', desc: 'Fired pieces going home', fn: 'openPacking' },
+  { tab: 'training', label: '🎓 My Training', desc: 'Read, tick, done', fn: 'openMyTraining' },
   ]},
   { id: 'dashboard', label: 'Dashboard', color: '#B87946', items: [
     { tab: 'dashboard', label: 'Overview', desc: 'Your daily overview' },
