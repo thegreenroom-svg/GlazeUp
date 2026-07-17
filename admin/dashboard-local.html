@@ -8851,6 +8851,201 @@ async function _cleoAsk(preset) {
   }
 }
 
+// ═══════════════════════════════════════════════════════════
+// MUSIC — four speakers, volume, skip. 17 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Daisy: "there are four speakers. One in the kitchen, one in the
+// vault, one in the front door, and one in the safe in the corner
+// by table three."
+//
+// THE SPLIT THAT MATTERS:
+//   Sonos API  → volume per speaker, skip, pause, what's playing
+//   Spotify app → choosing the music
+//
+// Choosing music is what Spotify's app is FOR. Rebuilding a worse
+// version of it in here would be daft. But turning down the speaker
+// by table three without leaving the app — that's worth having.
+//
+// Dormant until SONOS_CLIENT_ID and SONOS_CLIENT_SECRET are set on
+// Render. Same contract as Square, Royal Mail, Stripe: no
+// credentials, no tile, no calls, no errors.
+
+// Where they actually are, so the tile reads like the building.
+const SPEAKER_MAP = {
+  'kitchen':    { label: 'Kitchen',    where: 'by the bar',        icon: '☕' },
+  'vault':      { label: 'The Vault',  where: '',                  icon: '🚪' },
+  'front door': { label: 'Front Door', where: 'as you come in',    icon: '🔔' },
+  'safe':       { label: 'Safe',       where: 'corner by table 3', icon: '🏺' },
+};
+
+let _musicGroup = null;
+
+async function openMusic() {
+  const view = document.getElementById('floor-plan-view');
+  if (!view) return;
+  _floorViewMode = 'music';
+
+  view.innerHTML = `
+    <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
+      <div style="margin-bottom:16px;">
+        <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">Music</div>
+        <div style="font-size:11px;color:#8a8175;">Four speakers · volume, skip, what's on</div>
+      </div>
+      <div id="music-body">
+        <div style="text-align:center;padding:40px;color:#8a8175;font-size:13px;">Loading…</div>
+      </div>
+    </div>`;
+  toggleFloatingBackBtn();
+  _loadMusic();
+}
+
+async function _loadMusic() {
+  const el = document.getElementById('music-body');
+  if (!el) return;
+
+  // Is it even set up?
+  let status;
+  try {
+    const res = await fetch(`${API_URL}/api/sonos/status?studioId=${studioId}`);
+    status = await res.json();
+  } catch(e) { status = { enabled: false }; }
+
+  if (!status.enabled) {
+    el.innerHTML = `
+      <div style="text-align:center;padding:30px 20px;">
+        <div style="font-size:44px;margin-bottom:12px;">🎵</div>
+        <div style="font-family:'Caveat',cursive;font-size:24px;color:#2B2724;">Not set up yet</div>
+        <div style="font-size:13px;color:#8a8175;margin-top:8px;line-height:1.6;max-width:300px;margin-left:auto;margin-right:auto;">
+          Register at developer.sonos.com, then put the Key and Secret
+          into Render's environment variables. There's a note with the
+          steps in it.</div>
+      </div>
+      ${_spotifyTile()}`;
+    return;
+  }
+
+  if (!status.connected) {
+    el.innerHTML = `
+      <div class="glaze-tile" style="border-radius:16px;padding:24px;text-align:center;margin-bottom:12px;">
+        <div style="font-size:40px;margin-bottom:10px;">🔗</div>
+        <div style="font-family:'Caveat',cursive;font-size:22px;color:#2B2724;margin-bottom:12px;">
+          Connect Sonos</div>
+        <button onclick="window.location.href='${API_URL}/api/sonos/connect?studioId=${studioId}'"
+          style="width:100%;background:#2B2724;color:#fff;border:none;border-radius:12px;
+          padding:16px;font-size:15px;font-weight:800;cursor:pointer;">
+          Sign in to Sonos
+        </button>
+      </div>
+      ${_spotifyTile()}`;
+    return;
+  }
+
+  // Connected — show what's on
+  let now = {};
+  try {
+    const res = await fetch(`${API_URL}/api/sonos/now?studioId=${studioId}`);
+    now = await res.json();
+    _musicGroup = now.groupId;
+  } catch(e) { /* show controls anyway */ }
+
+  const canControl = ['General Manager','Co-Director','Studio Executive']
+    .includes(currentShiftStaff?.role);
+
+  el.innerHTML = `
+    <!-- WHAT'S PLAYING -->
+    <div class="glaze-tile" style="border-radius:18px;padding:20px;margin-bottom:12px;
+      background:linear-gradient(135deg,#2B2724,#3d2e28);color:#fff;">
+      <div style="display:flex;gap:14px;align-items:center;">
+        ${now.art
+          ? `<img src="${now.art}" style="width:64px;height:64px;border-radius:10px;object-fit:cover;flex-shrink:0;">`
+          : `<div style="width:64px;height:64px;border-radius:10px;background:rgba(255,255,255,0.1);
+             display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;">🎵</div>`}
+        <div style="flex:1;min-width:0;">
+          <div style="font-family:'Caveat',cursive;font-size:22px;font-weight:700;
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            ${now.track || 'Nothing playing'}</div>
+          ${now.artist ? `<div style="font-size:12px;opacity:0.8;white-space:nowrap;overflow:hidden;
+            text-overflow:ellipsis;">${now.artist}</div>` : ''}
+        </div>
+      </div>
+      ${canControl ? `
+        <div style="display:flex;gap:8px;margin-top:16px;">
+          <button onclick="_music('prev')" style="flex:1;background:rgba(255,255,255,0.12);color:#fff;
+            border:none;border-radius:12px;padding:14px;font-size:18px;cursor:pointer;">⏮</button>
+          <button onclick="_music('${now.playing ? 'pause' : 'play'}')"
+            style="flex:2;background:rgba(255,255,255,0.2);color:#fff;border:none;border-radius:12px;
+            padding:14px;font-size:18px;cursor:pointer;">${now.playing ? '⏸' : '▶'}</button>
+          <button onclick="_music('next')" style="flex:1;background:rgba(255,255,255,0.12);color:#fff;
+            border:none;border-radius:12px;padding:14px;font-size:18px;cursor:pointer;">⏭</button>
+        </div>` : `
+        <div style="margin-top:12px;font-size:11px;opacity:0.6;">Directors only</div>`}
+    </div>
+
+    ${canControl ? `
+      <div style="font-size:10px;color:#8a8175;font-family:'Architects Daughter',cursive;
+        letter-spacing:0.06em;margin-bottom:8px;">Volume · each speaker on its own</div>
+      ${Object.entries(SPEAKER_MAP).map(([key, sp]) => `
+        <div class="glaze-tile" style="border-radius:14px;padding:14px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:18px;">${sp.icon}</span>
+              <div>
+                <div style="font-size:14px;font-weight:700;color:#2B2724;">${sp.label}</div>
+                ${sp.where ? `<div style="font-size:10px;color:#8a8175;">${sp.where}</div>` : ''}
+              </div>
+            </div>
+          </div>
+          <input type="range" min="0" max="100" value="30"
+            oninput="_musicVolume('${key}', this.value)"
+            style="width:100%;accent-color:#B87946;">
+        </div>`).join('')}
+    ` : ''}
+
+    ${_spotifyTile()}`;
+}
+
+// Choosing music is Spotify's job. Their app is better at it than
+// anything I'd build, and it already knows the Sonos group.
+function _spotifyTile() {
+  return `
+    <button onclick="window.open('spotify://','_blank')" class="glaze-tile"
+      style="width:100%;border:none;border-radius:16px;padding:20px;cursor:pointer;
+      background:linear-gradient(135deg,#1DB954,#159944);color:#fff;text-align:left;margin-top:12px;">
+      <div style="font-size:26px;margin-bottom:4px;">🎧</div>
+      <div style="font-family:'Caveat',cursive;font-size:20px;font-weight:700;">Choose music</div>
+      <div style="font-size:11px;opacity:0.9;margin-top:4px;line-height:1.4;">
+        Opens Spotify · pick anything, it plays on the Sonos group.
+        Swipe back when you're done.</div>
+    </button>`;
+}
+
+async function _music(action) {
+  if (!_musicGroup) return;
+  try {
+    await fetch(`${API_URL}/api/sonos/control`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, groupId: _musicGroup, action,
+                             staffRole: currentShiftStaff?.role })
+    });
+    setTimeout(_loadMusic, 400);
+  } catch(e) { /* quiet */ }
+}
+
+let _volTimer = null;
+function _musicVolume(speaker, value) {
+  clearTimeout(_volTimer);
+  _volTimer = setTimeout(async () => {
+    try {
+      await fetch(`${API_URL}/api/sonos/control`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId, groupId: _musicGroup, action: 'volume',
+                               volume: parseInt(value), speaker,
+                               staffRole: currentShiftStaff?.role })
+      });
+    } catch(e) { /* quiet */ }
+  }, 300);
+}
+
 // THIS IS A RENDERING OF /api/staff/alert-kinds, NEVER A SECOND LIST.
 // A hand-written copy of the vocabulary would drift from ALERT_TRIGGERS
 // within a week — which is exactly how the elegant floor plan ended up
@@ -13258,14 +13453,14 @@ const ROLE_HOME_DEFAULTS = {
   'General Manager': {
     // Daisy: the whole studio at a glance, then people, then money
     tileOrder: ['assistant', 'floor-plan', 'progress', 'team', 'packing', 'dashboard', 'staff',
-                'stock', 'training', 'health-safety', 'whats-on', 'customer-demo', 'trial-reset', 'setup'],
+                'stock', 'music', 'training', 'health-safety', 'whats-on', 'customer-demo', 'trial-reset', 'setup'],
     promotedTiles: ['tell-daisy']
   },
 
   'Co-Director': {
     // David: same as Daisy — full visibility
     tileOrder: ['assistant', 'floor-plan', 'progress', 'dashboard', 'team', 'packing', 'staff',
-                'stock', 'training', 'health-safety', 'whats-on', 'customer-demo', 'trial-reset', 'setup'],
+                'stock', 'music', 'training', 'health-safety', 'whats-on', 'customer-demo', 'trial-reset', 'setup'],
     promotedTiles: ['tell-daisy']
   },
 
@@ -13273,7 +13468,7 @@ const ROLE_HOME_DEFAULTS = {
     // Jenny: PACKING IS HER JOB. It goes first, every time.
     // Her journey: what's ready → photograph → AI says whose → label → packed
     tileOrder: ['assistant', 'packing', 'collections', 'floor-plan', 'labels', 'printqueue',
-                'piecematch', 'catalogue', 'training', 'health-safety'],
+                'piecematch', 'catalogue', 'music', 'training', 'health-safety'],
     promotedTiles: ['tell-daisy']
   },
 
@@ -13856,6 +14051,7 @@ const GRID_NAV_STRUCTURE = [
   { tab: 'assistant', label: '💛 Ask Cleo', desc: 'She learns how you work · ask her anything', fn: 'openAssistant' },
   { tab: 'training', label: '🎓 My Training', desc: 'Read, tick, done', fn: 'openMyTraining' },
   { tab: 'trial-reset', label: '🔄 Clear & Start Again', desc: 'Reset today for testing', fn: 'openTrialReset' },
+  { tab: 'music', label: '🎵 Music', desc: 'Volume · skip · what\'s playing', fn: 'openMusic' },
   ]},
   { id: 'dashboard', label: 'Dashboard', color: '#B87946', items: [
     { tab: 'dashboard', label: 'Overview', desc: 'Your daily overview' },

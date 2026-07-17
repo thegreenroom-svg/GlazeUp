@@ -5879,6 +5879,200 @@ app.post('/api/booking/payment-split', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// ═══════════════════════════════════════════════════════════
+// SONOS — studio music. 17 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Daisy: "can we get a link to Sonos, an API, so that we can choose
+// music from this app, for the three directors. Not including Elliott."
+//
+// Same contract as Square, Royal Mail and Stripe: dormant until the
+// credentials exist. No credentials, no tile, no calls, no errors.
+//
+// Cloud API — api.ws.sonos.com. Your Render server talks to Sonos's
+// cloud, which talks to the speakers. Works from anywhere.
+//
+// HONEST LIMIT: the Control API does streams and cloud queues only.
+// You cannot play a specific track from a library. Play/pause/skip/
+// volume is all it does — which is what a studio actually needs.
+const SONOS_CLIENT_ID = process.env.SONOS_CLIENT_ID;
+const SONOS_CLIENT_SECRET = process.env.SONOS_CLIENT_SECRET;
+const SONOS_REDIRECT_URI = process.env.SONOS_REDIRECT_URI ||
+  'https://glazeup-api.onrender.com/api/sonos/callback';
+const SONOS_ENABLED = !!(SONOS_CLIENT_ID && SONOS_CLIENT_SECRET);
+
+// Who can touch the music. Daisy asked for three directors, not Elliott.
+const SONOS_ACCESS_ROLES = ['General Manager', 'Co-Director', 'Studio Executive'];
+
+async function _sonosToken(studioId) {
+  const { data } = await supabase.from('sonos_connections')
+    .select('access_token, refresh_token, expires_at').eq('studio_id', studioId).single();
+  if (!data) return null;
+  // Refresh if it's within 5 minutes of expiry
+  if (data.expires_at && new Date(data.expires_at) < new Date(Date.now() + 5*60*1000)) {
+    try {
+      const auth = Buffer.from(`${SONOS_CLIENT_ID}:${SONOS_CLIENT_SECRET}`).toString('base64');
+      const res = await fetch('https://api.sonos.com/login/v3/oauth/access', {
+        method: 'POST',
+        headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(data.refresh_token)}`,
+      });
+      const t = await res.json();
+      if (t.access_token) {
+        await supabase.from('sonos_connections').update({
+          access_token: t.access_token,
+          refresh_token: t.refresh_token || data.refresh_token,
+          expires_at: new Date(Date.now() + (t.expires_in || 86400) * 1000).toISOString(),
+        }).eq('studio_id', studioId);
+        return t.access_token;
+      }
+    } catch(e) { console.warn('Sonos token refresh failed:', e.message); }
+  }
+  return data.access_token;
+}
+
+async function _sonos(studioId, path, method = 'GET', body = null) {
+  const token = await _sonosToken(studioId);
+  if (!token) throw new Error('Sonos not connected');
+  const res = await fetch(`https://api.ws.sonos.com/control/api/v1${path}`, {
+    method,
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(`Sonos ${res.status}`);
+  return res.status === 204 ? {} : res.json();
+}
+
+// GET /api/sonos/status — is it set up, is it connected?
+app.get('/api/sonos/status', async (req, res) => {
+  const { studioId } = req.query;
+  if (!SONOS_ENABLED) {
+    return res.json({ enabled: false, connected: false,
+      note: 'Sonos credentials not set on the server. See SONOS-SETUP.md.' });
+  }
+  try {
+    const { data } = await supabase.from('sonos_connections')
+      .select('household_id').eq('studio_id', studioId).single();
+    res.json({ enabled: true, connected: !!data, householdId: data?.household_id || null });
+  } catch(e) { res.json({ enabled: true, connected: false }); }
+});
+
+// GET /api/sonos/connect — start the OAuth dance
+app.get('/api/sonos/connect', (req, res) => {
+  if (!SONOS_ENABLED) return res.status(503).send('Sonos is not set up on this server yet.');
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).send('studioId required');
+  const url = 'https://api.sonos.com/login/v3/oauth?' + new URLSearchParams({
+    client_id: SONOS_CLIENT_ID,
+    response_type: 'code',
+    state: studioId,
+    scope: 'playback-control-all',
+    redirect_uri: SONOS_REDIRECT_URI,
+  });
+  res.redirect(url);
+});
+
+// GET /api/sonos/callback — Sonos sends them back here
+app.get('/api/sonos/callback', async (req, res) => {
+  const { code, state: studioId } = req.query;
+  if (!code || !studioId) return res.status(400).send('Missing code or state');
+  try {
+    const auth = Buffer.from(`${SONOS_CLIENT_ID}:${SONOS_CLIENT_SECRET}`).toString('base64');
+    const tokenRes = await fetch('https://api.sonos.com/login/v3/oauth/access', {
+      method: 'POST',
+      headers: { 'Authorization': `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `grant_type=authorization_code&code=${encodeURIComponent(code)}&redirect_uri=${encodeURIComponent(SONOS_REDIRECT_URI)}`,
+    });
+    const t = await tokenRes.json();
+    if (!t.access_token) throw new Error(t.error_description || 'No token returned');
+
+    await supabase.from('sonos_connections').upsert({
+      studio_id: studioId,
+      access_token: t.access_token,
+      refresh_token: t.refresh_token,
+      expires_at: new Date(Date.now() + (t.expires_in || 86400) * 1000).toISOString(),
+    }, { onConflict: 'studio_id' });
+
+    // Find their household so we know which speakers
+    try {
+      const hh = await _sonos(studioId, '/households');
+      const householdId = hh.households?.[0]?.id;
+      if (householdId) {
+        await supabase.from('sonos_connections')
+          .update({ household_id: householdId }).eq('studio_id', studioId);
+      }
+    } catch(e) { /* they can still control if we find it later */ }
+
+    res.send(`<html><body style="font-family:system-ui;text-align:center;padding:60px;background:#F4ECE0;">
+      <div style="font-size:48px;">🎵</div>
+      <h2 style="color:#2B2724;">Sonos connected</h2>
+      <p style="color:#8a8175;">You can close this and go back to the app.</p>
+      </body></html>`);
+  } catch(e) {
+    res.status(500).send(`<html><body style="font-family:system-ui;text-align:center;padding:60px;">
+      <h2>Couldn't connect Sonos</h2><p>${e.message}</p></body></html>`);
+  }
+});
+
+// GET /api/sonos/now — what's playing
+app.get('/api/sonos/now', async (req, res) => {
+  const { studioId } = req.query;
+  if (!SONOS_ENABLED) return res.status(503).json({ error: 'Sonos not set up' });
+  try {
+    const { data: conn } = await supabase.from('sonos_connections')
+      .select('household_id').eq('studio_id', studioId).single();
+    if (!conn?.household_id) return res.status(404).json({ error: 'Not connected' });
+
+    const groups = await _sonos(studioId, `/households/${conn.household_id}/groups`);
+    const group = groups.groups?.[0];
+    if (!group) return res.json({ playing: false, note: 'No speakers found' });
+
+    const [meta, playback] = await Promise.all([
+      _sonos(studioId, `/groups/${group.id}/playbackMetadata`).catch(() => ({})),
+      _sonos(studioId, `/groups/${group.id}/playback`).catch(() => ({})),
+    ]);
+
+    res.json({
+      groupId: group.id,
+      groupName: group.name,
+      playing: playback.playbackState === 'PLAYBACK_STATE_PLAYING',
+      track: meta.currentItem?.track?.name || null,
+      artist: meta.currentItem?.track?.artist?.name || null,
+      album: meta.currentItem?.track?.album?.name || null,
+      art: meta.currentItem?.track?.imageUrl || null,
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/sonos/control — play, pause, skip, volume
+app.post('/api/sonos/control', async (req, res) => {
+  const { studioId, groupId, action, volume, staffRole } = req.body;
+  if (!SONOS_ENABLED) return res.status(503).json({ error: 'Sonos not set up' });
+  if (!studioId || !groupId || !action) {
+    return res.status(400).json({ error: 'studioId, groupId and action required' });
+  }
+  // Directors only. Daisy asked for three, not Elliott.
+  if (!SONOS_ACCESS_ROLES.includes(staffRole)) {
+    return res.status(403).json({ error: 'Music is directors only.' });
+  }
+  try {
+    const paths = {
+      play:  [`/groups/${groupId}/playback/play`, 'POST'],
+      pause: [`/groups/${groupId}/playback/pause`, 'POST'],
+      next:  [`/groups/${groupId}/playback/skipToNextTrack`, 'POST'],
+      prev:  [`/groups/${groupId}/playback/skipToPreviousTrack`, 'POST'],
+    };
+    if (action === 'volume') {
+      if (typeof volume !== 'number') return res.status(400).json({ error: 'volume required' });
+      await _sonos(studioId, `/groups/${groupId}/groupVolume`, 'POST', { volume });
+      return res.json({ done: true, volume });
+    }
+    const p = paths[action];
+    if (!p) return res.status(400).json({ error: 'Unknown action' });
+    await _sonos(studioId, p[0], p[1]);
+    res.json({ done: true, action });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // POST /api/floor/seat — put a booking on a table.
 //
 // THE MISSING HALF. Square tells us WHEN, WHO and WHICH ROOM (via the
