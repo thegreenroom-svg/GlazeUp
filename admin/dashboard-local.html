@@ -23207,6 +23207,10 @@ async function checkForAppUpdate() {
     }
     if (stamp !== _initialBootTime) {
       _latestBuildId = stamp;
+      // Show the short commit hash so Daisy can confirm the right version landed
+      const shortId = typeof stamp === 'string' ? stamp.slice(0,7) : stamp;
+      const bannerText = document.querySelector('#update-available-banner');
+      if (bannerText) bannerText.firstChild.textContent = ` New version ${shortId} is ready `;
       document.getElementById('update-available-banner').style.display = 'block';
       clearInterval(window._versionCheckTimer); // stop polling once we know
     }
