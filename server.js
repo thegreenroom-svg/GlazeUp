@@ -4289,11 +4289,113 @@ async function executeAssistantFunction(name, args, studioId, context, bookingCo
 }
 
 // POST /api/assistant/chat
+// ═══════════════════════════════════════════════════════════
+// ASSISTANT ANSWER CACHE — free, faster, more consistent.
+// 17 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Daisy: "is there any other aspect of the AI that could be brought
+// in-house so there are no costs?"
+//
+// "How do I pack a piece?" has ONE right answer. Asking OpenAI every
+// time costs money AND gives a slightly different answer each time,
+// which is worse for staff — they should all hear the same thing.
+//
+// So: first person to ask a question pays for it. Everyone after gets
+// it instantly and free. Cleo gets MORE consistent, not less.
+//
+// WHAT IS AND ISN'T CACHEABLE — the whole thing turns on this:
+//   CACHE: general how-do-I questions. Same answer for everyone.
+//   NEVER: anything about a specific booking, customer, piece, or
+//          this person's own patterns. Those are different every time
+//          and caching them would tell Jenny about Ruby's day.
+//
+// A cache that leaks one customer's booking into another's reply is
+// far worse than the pennies it saves.
+
+// Normalise a question so "How do I pack a piece?" and "how do i pack
+// pieces" hit the same entry. Deliberately blunt — a near-miss just
+// costs one API call, which is what we had before.
+function _cacheKey(q) {
+  return (q || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\b(the|a|an|do|does|i|my|me|we|our|us|is|are|to|for|of|how|what|can|could|please|hey|hi|cleo)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ').sort().join(' ');   // word order shouldn't matter
+}
+
+// Is this question about something specific to one person or booking?
+// If so it must never be cached — the answer isn't general.
+function _isCacheable(q, messages) {
+  const raw = q || '';
+  const t = raw.toLowerCase();
+
+  // ── ANYTHING WITH A NAME IN IT IS NEVER CACHED ──────────
+  // Found in testing: "Is Tabby here yet?" passed every other rule and
+  // would have been cached — meaning the NEXT person to ask anything
+  // similar would have been told about Tabby. A cache that leaks one
+  // customer into another's reply is far worse than the pennies saved.
+  //
+  // A capitalised word mid-sentence is almost always a name.
+  const midSentenceCaps = raw.split(/\s+/).slice(1)
+    .filter(w => /^[A-Z][a-z]{2,}/.test(w))
+    .filter(w => !['I','How','What','Where','When','Why','The','Do','Can','Is','Are'].includes(w));
+  if (midSentenceCaps.length) return false;
+
+  // Anything naming a booking, a time, or a table is specific
+  if (/\b\d{1,2}[:.]\d{2}\b/.test(t)) return false;           // a time
+  if (/\btable\s*\d|\b\d+[ab]\b/.test(t)) return false;      // a table
+  if (/\b(booking|order|code)\s*[a-z0-9-]{4,}/.test(t)) return false;
+  if (/\b(today|tomorrow|now|currently|right now|at the moment|yet)\b/.test(t)) return false;
+
+  // About this specific person — their day, their pieces, their patterns
+  if (/\b(my|mine|i've|i have|i did|for me|have i|am i|did i)\b/.test(t)) return false;
+  // A conversation with history isn't a standalone question
+  if ((messages || []).filter(m => m.role === 'user').length > 1) return false;
+  // Too short to be a real question, or too long to be general
+  const words = t.split(/\s+/).filter(Boolean).length;
+  if (words < 3 || words > 20) return false;
+  return true;
+}
+
 app.post('/api/assistant/chat', async (req, res) => {
   const { studioId, context, messages, bookingCode, staffMemberId, customerId } = req.body;
   if (!studioId || !context || !messages) return res.status(400).json({ error: 'studioId, context, messages required' });
   if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'The assistant is not yet available.' });
   if (!ASSISTANT_SYSTEM_PROMPTS[context]) return res.status(400).json({ error: 'Invalid context' });
+
+  // ── CACHE CHECK — before anything expensive ──────────────
+  // "How do I pack a piece?" has one right answer. First person pays
+  // for it, everyone after gets it free and instantly. Only general
+  // questions — anything about a specific booking, person or time
+  // goes straight to the model.
+  const _lastUser = [...(messages || [])].reverse().find(m => m.role === 'user');
+  const _q = _lastUser?.content || '';
+  const _cacheable = _isCacheable(_q, messages);
+  const _key = _cacheable ? _cacheKey(_q) : null;
+
+  if (_key) {
+    try {
+      const { data: hit } = await supabase.from('assistant_cache')
+        .select('reply, point_to, point_to_label, hits')
+        .eq('studio_id', studioId).eq('context', context).eq('question_key', _key).single();
+      if (hit?.reply) {
+        // Count the hit, don't wait for it
+        supabase.from('assistant_cache')
+          .update({ hits: (hit.hits || 0) + 1, last_hit_at: new Date().toISOString() })
+          .eq('studio_id', studioId).eq('context', context).eq('question_key', _key)
+          .then(() => {}, () => {});
+        return res.json({
+          reply: hit.reply,
+          pointTo: hit.point_to || null,
+          pointToLabel: hit.point_to_label || null,
+          cached: true,
+        });
+      }
+    } catch(e) { /* no hit, or table missing — fall through to the model */ }
+  }
+  // ── END CACHE CHECK ──────────────────────────────────────
 
   // Director context requires the same access check as Platform Revenue itself
   if (context === 'director') {
@@ -4443,6 +4545,19 @@ app.post('/api/assistant/chat', async (req, res) => {
     }
 
     res.json({ reply: replyText, pointTo, pointToLabel });
+
+    // ── SAVE TO CACHE — after the reply is already sent ──────
+    // Never blocks the answer. If it fails, the next person just
+    // pays for it again, which is what happened before anyway.
+    if (_key && replyText) {
+      supabase.from('assistant_cache').upsert({
+        studio_id: studioId, context, question_key: _key,
+        question_original: _q.slice(0, 200),
+        reply: replyText, point_to: pointTo, point_to_label: pointToLabel,
+        hits: 1, last_hit_at: new Date().toISOString(),
+      }, { onConflict: 'studio_id,context,question_key' })
+      .then(() => {}, () => {});
+    }
 
     // Genuine, lightweight, real memory extraction — runs AFTER the
     // real reply is already sent (never blocks or slows the actual

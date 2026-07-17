@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Your data · The Kiln Cafe</title>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Architects+Daughter&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #F4ECE0; color: #2B2724;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.6; overflow-x: hidden; max-width: 100vw;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; padding: calc(env(safe-area-inset-top,0px) + 28px) 20px 60px; }
+  h1 { font-family: 'Caveat', cursive; font-size: 40px; margin: 0 0 4px; color: #B87946; }
+  .sub { font-size: 13px; color: #8a8175; margin-bottom: 28px; }
+  h2 { font-family: 'Caveat', cursive; font-size: 26px; margin: 32px 0 10px; color: #2B2724; }
+  p { font-size: 15px; margin: 0 0 12px; }
+  ul { padding-left: 20px; margin: 0 0 12px; }
+  li { font-size: 15px; margin-bottom: 6px; }
+  .card { background: #FFFDF9; border-radius: 14px; padding: 18px; margin-bottom: 14px; }
+  .card.warm { background: rgba(184,121,70,0.08); border-left: 3px solid #B87946; }
+  .card.good { background: rgba(76,175,80,0.08); border-left: 3px solid #4CAF50; }
+  .label { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; color: #8a8175; margin-bottom: 8px; }
+  .thing { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0;
+           border-bottom: 1px solid rgba(43,39,36,0.07); font-size: 14px; }
+  .thing:last-child { border-bottom: none; }
+  .thing .why { color: #8a8175; font-size: 12px; text-align: right; flex-shrink: 0; max-width: 55%; }
+  a { color: #B87946; }
+  .foot { margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(43,39,36,0.1);
+          font-size: 12px; color: #8a8175; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Your data</h1>
+  <div class="sub">The Kiln Cafe · plain English, no lawyers</div>
+
+  <div class="card warm">
+    <p style="margin:0;"><strong>The short version.</strong> We keep what we need to run your session
+    and get your pottery back to you. We don't sell anything to anyone. You can ask us to
+    delete it and we will.</p>
+  </div>
+
+  <h2>What we keep</h2>
+  <div class="card">
+    <div class="label">FROM YOUR BOOKING</div>
+    <div class="thing"><span>Your name</span><span class="why">so we know who you are when you arrive</span></div>
+    <div class="thing"><span>Email and phone</span><span class="why">to tell you your pottery's ready</span></div>
+    <div class="thing"><span>When you're coming</span><span class="why">to have a table ready</span></div>
+    <div class="thing"><span>Anything you wrote in the booking note</span><span class="why">so we can help — a pram, a big group, a wheel</span></div>
+  </div>
+
+  <div class="card">
+    <div class="label">WHILE YOU'RE HERE</div>
+    <div class="thing"><span>Which table you're on</span><span class="why">so we can find you</span></div>
+    <div class="thing"><span>Photos of your pieces</span><span class="why">so we can match them to you after firing</span></div>
+    <div class="thing"><span>What you ordered</span><span class="why">to get you your bill right</span></div>
+  </div>
+
+  <div class="card">
+    <div class="label">IF YOU'RE HAVING IT POSTED</div>
+    <div class="thing"><span>Your address</span><span class="why">to send it</span></div>
+  </div>
+
+  <h2>What we don't do</h2>
+  <div class="card good">
+    <ul style="margin:0;">
+      <li><strong>We don't track your phone.</strong> No WiFi tracking, no Bluetooth beacons,
+      no watching you walk in. If you tap "we're here", that's you telling us.</li>
+      <li><strong>We don't sell your data.</strong> Not to anyone, ever.</li>
+      <li><strong>We don't advertise at you</strong> based on what you paint.</li>
+      <li><strong>We don't build a profile</strong> of your family, your diet, or your health
+      from what you write in a note. Staff read it to help you. That's all it's for.</li>
+    </ul>
+  </div>
+
+  <h2>The AI bit, honestly</h2>
+  <div class="card">
+    <p>When your fired pottery comes out of the kiln, it's in a pile with everyone else's.
+    We photograph pieces before firing, and use image matching to work out whose is whose.</p>
+    <p><strong>Most of the time this happens on our own server</strong> and never leaves the
+    building — it's comparing your photo to our photos, mathematically.</p>
+    <p>When it can't tell, the photo goes to OpenAI's vision service to ask "which of these
+    is it?". <strong>It's a photo of a mug. There's no name attached.</strong> OpenAI don't
+    keep it or train on it.</p>
+    <p>Our helper Cleo answers questions the same way. Common questions like "how does the
+    transfer designer work" are answered from a saved answer — no AI, nothing sent anywhere.</p>
+  </div>
+
+  <h2>How long we keep it</h2>
+  <div class="card">
+    <div class="thing"><span>Your booking and pieces</span><span class="why">while you've still got pottery with us, then 12 months</span></div>
+    <div class="thing"><span>Photos of pieces</span><span class="why">until collected, then 3 months</span></div>
+    <div class="thing"><span>Booking notes</span><span class="why">deleted with the booking</span></div>
+    <div class="thing"><span>Postal addresses</span><span class="why">6 months after posting, for lost parcels</span></div>
+  </div>
+
+  <h2>Your rights</h2>
+  <div class="card">
+    <p>Under UK GDPR you can ask us to:</p>
+    <ul>
+      <li><strong>Show you</strong> everything we hold about you</li>
+      <li><strong>Correct</strong> anything wrong</li>
+      <li><strong>Delete it</strong> — we'll do it, though we can't post you pottery
+      we no longer have an address for</li>
+      <li><strong>Stop</strong> using it for anything you'd rather we didn't</li>
+    </ul>
+    <p>Just ask a member of staff, or email us. No form, no fuss. We'll do it within a month,
+    usually the same day.</p>
+    <p style="font-size:13px;color:#8a8175;">If you think we've got it wrong you can complain
+    to the Information Commissioner's Office at <a href="https://ico.org.uk">ico.org.uk</a>.
+    We'd rather you told us first so we can fix it.</p>
+  </div>
+
+  <h2>Children</h2>
+  <div class="card">
+    <p>Children paint here all the time and we love it. We don't ask children for anything —
+    the booking is in a grown-up's name and that's who we talk to.</p>
+    <p>If your child collects stickers in Cleo's Club, that's a count of stickers against your
+    booking. Not a profile of your child.</p>
+  </div>
+
+  <h2>Who else sees it</h2>
+  <div class="card">
+    <div class="thing"><span>Square</span><span class="why">takes your booking and your payment</span></div>
+    <div class="thing"><span>Supabase</span><span class="why">where our data lives — UK/EU servers</span></div>
+    <div class="thing"><span>OpenAI</span><span class="why">photos only, no names, not kept</span></div>
+    <div class="thing"><span>Royal Mail</span><span class="why">your address, only if we're posting</span></div>
+    <p style="font-size:13px;color:#8a8175;margin-top:12px;margin-bottom:0;">That's the lot.
+    Nobody else.</p>
+  </div>
+
+  <div class="foot">
+    The Kiln Cafe · The Old Bank, Cheapside, Langport, Somerset<br>
+    Last updated 17 July 2026<br><br>
+    Something not clear? Ask any of us. We'd rather explain it than have you wonder.
+  </div>
+
+</div>
+</body>
+</html>

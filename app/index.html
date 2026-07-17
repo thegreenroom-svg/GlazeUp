@@ -2305,6 +2305,24 @@
             <div class="tile-desc">Order drinks, cakes, and snacks — sent straight to the kitchen.</div>
           </button>
 
+          <!-- ═══════════════════════════════════════════════════
+               YOUR DATA — findable, not shouty. 17 July 2026.
+               ═══════════════════════════════════════════════════
+               Daisy: "maybe statements on the customer about GDPR
+               compliance. Or a tile that takes them there."
+               
+               Deliberately NOT a big glazed tile. Nobody comes to a
+               pottery studio to read a privacy notice — but if they
+               want it, it should be right there and honest, not
+               buried in a footer nobody scrolls to.
+          -->
+          <button onclick="window.open('/docs/privacy.html','_blank')"
+            style="width:100%;background:none;border:1px dashed rgba(43,39,36,0.18);
+            border-radius:12px;padding:12px;margin-top:6px;margin-bottom:14px;
+            font-size:12px;color:var(--gu-dust);cursor:pointer;font-family:inherit;">
+            🔒 Your data · what we keep and why
+          </button>
+
           <button class="tile" onclick="openTakeItHome()" id="home-access-tile" style="position:relative;overflow:hidden;background:linear-gradient(135deg,#1a0a3d,#2d1065,#1a0a3d);border:1.5px solid rgba(184,121,70,0.5);animation:browse-pulse 3s ease-in-out infinite;">
             <span class="tile-icon" style="font-size:28px;" id="home-access-icon">🏠</span>
             <div class="tile-title" id="home-access-title">Take It Home</div>
