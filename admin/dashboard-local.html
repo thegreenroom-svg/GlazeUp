@@ -6265,7 +6265,9 @@ function goToTab(tab, event) {
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
 
   const targetView = document.getElementById(tab + '-view');
-  targetView.style.display = 'block';
+  // floor-plan-view uses flex layout — must be 'flex' not 'block'
+  // or _checkFloorPlanMode won't recognise it as visible
+  targetView.style.display = tab === 'floor-plan' ? 'flex' : 'block';
   // Trigger reflow so the animation replays every time, not just on first show
   void targetView.offsetWidth;
   targetView.classList.add('fade-in');
