@@ -8440,6 +8440,159 @@ async function _doTrialReset() {
   }
 }
 
+// ═══════════════════════════════════════════════════════════
+// COLLECTIONS — ready to collect, returns, find on the shelf
+// 17 July 2026
+// ═══════════════════════════════════════════════════════════
+// Daisy: "whether there's a completed piece to pick up, or a return
+// or pieces that they're returning to pick up. They can go into the
+// AI to find on a shelf if they needed to because it's quite jumbled
+// on the returners for painting pieces that we store."
+//
+// Three tiles. That's it.
+//   🏺 Ready to collect  → who's waiting, tap to mark collected
+//   🔍 Find on the shelf → photo it, AI says whose
+//   ↩️ Returns           → pieces coming back to us
+
+async function openCollections() {
+  const view = document.getElementById('floor-plan-view');
+  if (!view) return;
+  _floorViewMode = 'collections';
+
+  view.innerHTML = `
+    <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
+      <div style="margin-bottom:16px;">
+        <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">Collections</div>
+        <div style="font-size:11px;color:#8a8175;">Pieces waiting to go home</div>
+      </div>
+      <div id="collections-tiles" style="display:flex;flex-direction:column;gap:12px;">
+        <div style="text-align:center;padding:30px;color:#8a8175;font-size:13px;">Loading…</div>
+      </div>
+    </div>`;
+  toggleFloatingBackBtn();
+  _loadCollectionsTiles();
+}
+
+async function _loadCollectionsTiles() {
+  const el = document.getElementById('collections-tiles');
+  if (!el) return;
+  let readyCount = 0;
+  try {
+    const res = await fetch(`${API_URL}/api/pieces/ready-for-pickup?studioId=${studioId}`);
+    const d = await res.json();
+    readyCount = (d.pieces || d.bookings || []).length;
+  } catch(e) { /* show zero */ }
+
+  el.innerHTML = `
+    <!-- READY TO COLLECT — the main one -->
+    <button onclick="_showReadyToCollect()" class="glaze-tile"
+      style="width:100%;border:none;border-radius:18px;padding:24px 20px;cursor:pointer;
+      background:linear-gradient(135deg,#00897B,#00695C);color:#fff;text-align:left;">
+      <div style="font-size:38px;font-weight:900;line-height:1;">${readyCount}</div>
+      <div style="font-family:'Caveat',cursive;font-size:22px;font-weight:700;margin-top:4px;">
+        ready to collect</div>
+      <div style="font-size:11px;opacity:0.9;margin-top:6px;line-height:1.4;">
+        Fired, labelled, on the shelf. Tap to see who's waiting.</div>
+    </button>
+
+    <!-- FIND ON THE SHELF — when it's jumbled -->
+    <button onclick="openFindMyPiece()" class="glaze-tile"
+      style="width:100%;border:none;border-radius:18px;padding:24px 20px;cursor:pointer;
+      background:linear-gradient(135deg,#5E35B1,#4527A0);color:#fff;text-align:left;">
+      <div style="font-size:32px;">🔍</div>
+      <div style="font-family:'Caveat',cursive;font-size:22px;font-weight:700;margin-top:6px;">
+        Find on the shelf</div>
+      <div style="font-size:11px;opacity:0.9;margin-top:6px;line-height:1.4;">
+        Customer's here but you can't find it? Photograph any piece and
+        I'll tell you whose it is. Works even when the shelf is a jumble.</div>
+    </button>
+
+    <!-- RETURNS — pieces coming back -->
+    <button onclick="openReturns()" class="glaze-tile"
+      style="width:100%;border:none;border-radius:18px;padding:24px 20px;cursor:pointer;
+      background:linear-gradient(135deg,#B87946,#9A6435);color:#fff;text-align:left;">
+      <div style="font-size:32px;">↩️</div>
+      <div style="font-family:'Caveat',cursive;font-size:22px;font-weight:700;margin-top:6px;">
+        Returns</div>
+      <div style="font-size:11px;opacity:0.9;margin-top:6px;line-height:1.4;">
+        Something coming back to us — a repair, a re-fire, a piece
+        they left behind.</div>
+    </button>
+
+    <button onclick="_showCollectionsHelp()" style="width:100%;background:none;
+      border:1px dashed rgba(43,39,36,0.2);border-radius:12px;padding:12px;
+      font-size:12px;color:#8a8175;cursor:pointer;margin-top:4px;">
+      ❓ How does this work?
+    </button>`;
+}
+
+function _showCollectionsHelp() {
+  _hsCard('Collections', '#00897B', [
+    '<strong>Ready to collect</strong> — everything that\'s fired, labelled and on the shelf. Tap a name to mark it collected.',
+    '<strong>Find on the shelf</strong> — the shelf gets jumbled. Photograph any piece and the AI tells you whose it is. Faster than reading every label.',
+    '<strong>Returns</strong> — a piece coming back to us. Repair, re-fire, or something left behind.',
+    'The AI gets better every time you confirm a match. It learns from every yes.',
+    'If it can\'t identify something, use the booking code on the label instead.',
+  ], 'Pieces stay on the shelf until collected. If nobody comes for weeks, Tell Daisy.');
+}
+
+async function _showReadyToCollect() {
+  const sheet = document.createElement('div');
+  sheet.id = 'ready-collect';
+  sheet.style.cssText = 'position:fixed;inset:0;z-index:9750;background:rgba(43,39,36,0.9);display:flex;align-items:flex-end;justify-content:center;';
+  sheet.onclick = e => { if (e.target===sheet) sheet.remove(); };
+  sheet.innerHTML = `<div style="background:#FFFDF9;width:100%;max-width:520px;border-radius:18px 18px 0 0;
+    padding:20px 16px calc(20px + env(safe-area-inset-bottom));max-height:80vh;display:flex;flex-direction:column;">
+    <div style="font-family:'Caveat',cursive;font-size:26px;color:#00897B;margin-bottom:4px;">Ready to collect</div>
+    <div style="font-size:11px;color:#8a8175;margin-bottom:14px;">Tap a name when they've taken it</div>
+    <div id="ready-list" style="overflow-y:auto;flex:1;">
+      <div style="text-align:center;padding:20px;color:#8a8175;font-size:13px;">Loading…</div>
+    </div>
+    <button onclick="document.getElementById('ready-collect').remove()"
+      style="margin-top:12px;width:100%;background:#2B2724;color:#fff;border:none;border-radius:12px;
+      padding:13px;font-size:14px;font-weight:800;cursor:pointer;">Close</button>
+  </div>`;
+  document.body.appendChild(sheet);
+
+  try {
+    const res = await fetch(`${API_URL}/api/pieces/ready-for-pickup?studioId=${studioId}`);
+    const d = await res.json();
+    const items = d.pieces || d.bookings || [];
+    const list = document.getElementById('ready-list');
+    if (!items.length) {
+      list.innerHTML = `<div style="text-align:center;padding:40px 20px;">
+        <div style="font-size:40px;margin-bottom:8px;">✨</div>
+        <div style="font-family:'Caveat',cursive;font-size:22px;color:#2B2724;">Nothing waiting</div>
+        <div style="font-size:12px;color:#8a8175;margin-top:4px;">Everything's gone home.</div>
+      </div>`;
+      return;
+    }
+    list.innerHTML = items.map(p => `
+      <button onclick="_markCollected('${p.id || p.booking_code}')" class="glaze-tile"
+        style="width:100%;border:none;border-radius:14px;padding:16px;cursor:pointer;
+        text-align:left;margin-bottom:8px;">
+        <div style="font-family:'Caveat',cursive;font-size:20px;font-weight:700;color:#2B2724;">
+          ${p.customer_name || p.customerName || 'Unknown'}</div>
+        <div style="font-size:11px;color:#8a8175;margin-top:2px;">
+          ${p.piece_type || p.pieceType || 'piece'}${p.shelf ? ' · shelf ' + p.shelf : ''}</div>
+      </button>`).join('');
+  } catch(e) {
+    document.getElementById('ready-list').innerHTML =
+      '<div style="text-align:center;padding:30px;color:#e53935;font-size:13px;">Couldn\'t load.</div>';
+  }
+}
+
+async function _markCollected(id) {
+  try {
+    await fetch(`${API_URL}/api/pieces/mark-picked-up`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, pieceId: id, by: currentShiftStaff?.id })
+    });
+    _showReadyToCollect();
+    _loadCollectionsTiles();
+  } catch(e) { alert("Couldn't mark that collected — try again."); }
+}
+
 // THIS IS A RENDERING OF /api/staff/alert-kinds, NEVER A SECOND LIST.
 // A hand-written copy of the vocabulary would drift from ALERT_TRIGGERS
 // within a week — which is exactly how the elegant floor plan ended up
@@ -12801,14 +12954,14 @@ const ROLE_HOME_DEFAULTS = {
   'Studio Executive': {
     // Jenny: PACKING IS HER JOB. It goes first, every time.
     // Her journey: what's ready → photograph → AI says whose → label → packed
-    tileOrder: ['packing', 'floor-plan', 'labels', 'printqueue',
+    tileOrder: ['packing', 'collections', 'floor-plan', 'labels', 'printqueue',
                 'piecematch', 'catalogue', 'training', 'health-safety'],
     promotedTiles: ['tell-daisy']
   },
 
   'Ceramic Technician': {
     // Lucy: bisque in, fired pieces out. Kiln is her world.
-    tileOrder: ['floor-plan', 'piecematch', 'packing', 'shapes', 'catalogue',
+    tileOrder: ['floor-plan', 'piecematch', 'packing', 'collections', 'shapes', 'catalogue',
                 'stock', 'labels', 'training', 'health-safety'],
     promotedTiles: ['tell-daisy']
   },
@@ -12816,7 +12969,7 @@ const ROLE_HOME_DEFAULTS = {
   'Studio Assistant': {
     // Ruby: the floor. Seat people, take orders, photograph pieces.
     tileOrder: ['floor-plan', 'staff', 'menu', 'tablecards',
-                'packing', 'piecematch', 'training', 'health-safety'],
+                'collections', 'packing', 'piecematch', 'training', 'health-safety'],
     promotedTiles: ['tell-daisy']
   },
 
@@ -13381,6 +13534,7 @@ const GRID_NAV_STRUCTURE = [
   { tab: 'tell-daisy', label: '💬 Tell Daisy', desc: 'Something good or bad happened', fn: 'openTellPicker' },
   { tab: 'health-safety', label: '🦺 Health & Safety', desc: 'Risk assessment, training, procedures', fn: 'openHealthSafety' },
   { tab: 'packing', label: '📦 Packing', desc: 'Fired pieces going home', fn: 'openPacking' },
+  { tab: 'collections', label: '🏺 Collections', desc: 'Ready to collect · returns · find on shelf', fn: 'openCollections' },
   { tab: 'training', label: '🎓 My Training', desc: 'Read, tick, done', fn: 'openMyTraining' },
   { tab: 'trial-reset', label: '🔄 Clear & Start Again', desc: 'Reset today for testing', fn: 'openTrialReset' },
   ]},
