@@ -1596,7 +1596,7 @@
       <button onclick="closeMyBookings()">✕ Close</button>
     </div>
     <div style="flex:1; overflow-y:auto; padding:16px;">
-      <button class="tile tile-oxblood" style="margin-bottom:20px;" onclick="openNewBooking()">
+      <button class="tile tile-oxblood" id="tile-new-booking" style="margin-bottom:20px;" onclick="openNewBooking()">
         <span class="tile-icon">➕</span>
         <div class="tile-title">Book a New Session</div>
         <div class="tile-desc">Pick a date and time that works for you.</div>
@@ -2234,19 +2234,19 @@
 
           <!-- ── Core tiles — consistent .tile structure throughout ── -->
 
-          <button class="tile tile-oxblood" onclick="openMyBookings()">
+          <button class="tile tile-oxblood" id="tile-my-bookings" onclick="openMyBookings()">
             <span class="tile-icon">📅</span>
             <div class="tile-title">My Bookings</div>
             <div class="tile-desc">See your past visits and anything coming up.</div>
           </button>
 
-          <button class="tile tile-sage" onclick="window.open('https://www.thekilncafe.com/how-to-video', '_blank')">
+          <button class="tile tile-sage" id="tile-painting-guide" onclick="window.open('https://www.thekilncafe.com/how-to-video', '_blank')">
             <span class="tile-icon">🎥</span>
             <div class="tile-title">Painting Guide</div>
             <div class="tile-desc">New to painting pottery? Watch our quick how-to before you start.</div>
           </button>
 
-          <button class="tile tile-honey" onclick="requestTabletGated()" style="position:relative;">
+          <button class="tile tile-honey" id="tile-tablet" onclick="requestTabletGated()" style="position:relative;">
             <span class="tile-icon">📱</span>
             <div class="tile-title">Studio Tablet &amp; Stylus</div>
             <div class="tile-desc">Request a tablet and stylus for your table — makes the design tools much easier to use.</div>
@@ -2279,7 +2279,7 @@
             <div class="tile-desc">Browse our real pieces, pick one, and have it pre-glazed ready for your visit.</div>
           </button>
 
-          <button class="tile" onclick="openOrderScreen()" style="background:linear-gradient(135deg,#3d1f0a,#1a0e05);border:1.5px solid rgba(255,255,255,0.12);">
+          <button class="tile" id="tile-food-drinks" onclick="openOrderScreen()" style="background:linear-gradient(135deg,#3d1f0a,#1a0e05);border:1.5px solid rgba(255,255,255,0.12);">
             <span class="tile-icon">☕</span>
             <div class="tile-title">Food &amp; Drinks</div>
             <div class="tile-desc">Order drinks, cakes, and snacks — sent straight to the kitchen.</div>
