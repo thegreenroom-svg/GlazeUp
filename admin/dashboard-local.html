@@ -22879,9 +22879,25 @@ function dismissSplash() {
 function showSplash() {
   if (document.getElementById('splash-screen')) return; // already showing
   splashDismissed = false;
-  document.body.insertAdjacentHTML('afterbegin', splashTemplate);
+  // IDLE SCREENSAVER: instead of reinserting the dark login splash,
+  // just show the floor plan underneath — it is already the screensaver.
+  // The login picker comes up on tap via wireSplash's click handler.
+  // This stops the jarring black flash when idle fires.
   document.documentElement.classList.add('splash-showing');
   document.body.classList.add('splash-showing');
+  // Create a lightweight ivory overlay that says "Tap to continue"
+  // rather than the full dark branded splash — keeps the floor plan visible
+  const overlay = document.createElement('div');
+  overlay.id = 'splash-screen';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:5000;background:rgba(244,236,224,0.92);display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer;';
+  overlay.innerHTML = `
+    <div style="text-align:center;padding:40px;">
+      <div style="font-family:'Caveat',cursive;font-size:48px;font-weight:700;color:#2B2724;margin-bottom:8px;">The Kiln Cafe</div>
+      <div style="font-family:'Architects Daughter',cursive;font-size:16px;color:#8a8175;letter-spacing:0.08em;">Tap to start your shift</div>
+      <div style="margin-top:32px;font-size:32px;animation:swt-float 2s ease-in-out infinite;">🏺</div>
+    </div>`;
+  overlay.onclick = () => dismissSplash();
+  document.body.insertAdjacentElement('afterbegin', overlay);
   wireSplash();
 }
 
