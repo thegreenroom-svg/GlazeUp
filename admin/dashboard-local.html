@@ -3041,7 +3041,7 @@
   <div style="background:linear-gradient(135deg,#1C1814 0%,#2B2118 100%);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid rgba(184,121,70,0.3);">
     <div>
       <div style="font-size:16px;font-weight:800;color:#F4ECE0;letter-spacing:-0.01em;" id="floor-greeting">Floor Plan</div>
-      <div style="font-size:11px;color:rgba(184,121,70,0.8);font-weight:500;" id="floor-subtitle">Live studio view</div>
+      <div style="font-size:10px;color:#8a8175;" id="floor-subtitle">Live studio view</div>
     </div>
     <button onclick="goToRealLandingPage()" class="glaze-tile"
       style="background:linear-gradient(135deg,#B87946,#9A6435);color:white;border:none;border-radius:12px;padding:9px 16px;font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:7px;box-shadow:0 4px 16px rgba(184,121,70,0.35);letter-spacing:0.01em;">
@@ -10220,7 +10220,7 @@ let _detailTimerInterval = null;
 // fix this by tweaking a fixed number earlier tonight. Real fix:
 // measure the container at render time, cap sensibly, re-render on
 // resize / rotation. One layout, works everywhere.
-const _ELEGANT_PAD = 10, _ELEGANT_GAP = 8;
+const _ELEGANT_PAD = 8, _ELEGANT_GAP = 6;
 const _ELEGANT_MIN_WIDTH = 300;    // below this, layout won't wrap nicely
 const _ELEGANT_MAX_WIDTH = 900;    // above this on a huge screen, further scale is empty
 function _measureFloorPlanWidth() {
@@ -10629,7 +10629,7 @@ function renderFloorPlanElegant() {
              asked to check it still clicks through to the tiles.
              The floor plan is home; this is the way OUT of home. -->
         <button onclick="showGridNav()" class="glaze-tile"
-          style="border:none;padding:9px 12px;font-size:11px;font-weight:800;cursor:pointer;flex-shrink:0;max-width:140px;">▦ Everything else</button>
+          style="border:none;padding:6px 10px;font-size:10px;font-weight:800;cursor:pointer;flex-shrink:0;">▦ More</button>
       </div>
       ${_renderArrivals(unseated)}
       ${resting ? `<div style="text-align:center;padding:40px 20px;color:#8a8175;font-size:13px;">
@@ -21898,11 +21898,12 @@ function _handRect(x, y, w, h, seed, weight, ink, fill) {
 
 // Seats decide the table's footprint. Sizes are in plan units.
 function _tableSize(seats) {
-  if (seats <= 2) return { w: 50, h: 48 };
-  if (seats <= 4) return { w: 58, h: 54 };
-  if (seats <= 6) return { w: 82, h: 54 };
-  if (seats <= 8) return { w: 105, h: 54 };
-  if (seats <= 12) return { w: 130, h: 54 };
+  // HOME OVERVIEW: tiny tables — just show layout, tap to drill in
+  if (seats <= 2) return { w: 38, h: 36 };
+  if (seats <= 4) return { w: 44, h: 40 };
+  if (seats <= 6) return { w: 62, h: 40 };
+  if (seats <= 8) return { w: 80, h: 40 };
+  if (seats <= 12) return { w: 100, h: 40 };
   return { w: 180, h: 65 };
 }
 
