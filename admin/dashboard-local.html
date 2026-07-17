@@ -7301,6 +7301,229 @@ async function openContactSheet() {
   }
 }
 
+// ═══════════════════════════════════════════════════════════
+// PIECE CHECKOUT FLOW. 17 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Daisy: "photo each piece at the table, identify from stock,
+// put up a check tile to say I think it's this — yes or no
+// on a big shiny tile."
+//
+// Flow:
+//   1. Staff tap 📷 Piece photos taken in the completion checklist
+//   2. This opens — camera for the piece
+//   3. Hash-first match against stock_shape_photos (free, instant)
+//   4. If confident: BIG YES/NO TILE showing the stock item
+//   5. YES → logs the piece, marks the check, moves on
+//   6. NO → try again or skip
+//   7. If not confident: AI fallback via /api/pieces/find-by-photo
+//
+// The check box is ONLY ticked after confirmation — not before.
+let _checkoutBookingCode = null;
+let _checkoutPieces = [];
+
+function openPieceCheckoutFlow(bookingCode) {
+  _checkoutBookingCode = bookingCode;
+  _checkoutPieces = [];
+  _showPieceCheckoutCamera();
+}
+
+function _showPieceCheckoutCamera() {
+  const existing = document.getElementById('piece-checkout-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'piece-checkout-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9850;background:#0E1A18;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
+  modal.innerHTML = `
+    <div style="width:100%;max-width:420px;text-align:center;">
+      <div style="font-family:'Caveat',cursive;font-size:28px;color:#F4ECE0;margin-bottom:4px;">📷 Identify Piece</div>
+      <div style="font-size:12px;color:#8a8175;margin-bottom:20px;">
+        Photo each piece · AI matches to your stock
+        ${_checkoutPieces.length ? ` · ${_checkoutPieces.length} confirmed so far` : ''}
+      </div>
+      <div style="position:relative;width:100%;aspect-ratio:1;max-width:320px;margin:0 auto 20px;background:#1A2E28;border-radius:16px;overflow:hidden;">
+        <video id="piece-checkout-video" autoplay playsinline muted
+          style="width:100%;height:100%;object-fit:cover;"></video>
+        <div style="position:absolute;inset:0;border:2px solid rgba(76,175,80,0.4);border-radius:16px;pointer-events:none;"></div>
+      </div>
+      <button onclick="_captureCheckoutPhoto()"
+        style="width:100%;max-width:320px;background:#4CAF50;color:white;border:none;border-radius:14px;
+        padding:18px;font-size:18px;font-weight:800;cursor:pointer;margin-bottom:12px;">
+        📸 Photograph piece
+      </button>
+      <div style="display:flex;gap:10px;max-width:320px;margin:0 auto;">
+        <button onclick="_finishPieceCheckout()"
+          style="flex:1;background:rgba(255,255,255,0.1);color:#F4ECE0;border:none;border-radius:12px;
+          padding:12px;font-size:13px;font-weight:700;cursor:pointer;">
+          ✓ Done (${_checkoutPieces.length} pieces)
+        </button>
+        <button onclick="_closePieceCheckout()"
+          style="flex:1;background:rgba(255,255,255,0.05);color:#8a8175;border:none;border-radius:12px;
+          padding:12px;font-size:13px;cursor:pointer;">
+          Cancel
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  // Start camera
+  navigator.mediaDevices?.getUserMedia({ video: { facingMode: 'environment' } })
+    .then(stream => {
+      const vid = document.getElementById('piece-checkout-video');
+      if (vid) { vid.srcObject = stream; vid._stream = stream; }
+    })
+    .catch(() => {
+      // No camera — offer file upload
+      const vid = document.getElementById('piece-checkout-video');
+      if (vid) vid.outerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#8a8175;font-size:13px;">Camera not available</div>`;
+    });
+}
+
+async function _captureCheckoutPhoto() {
+  const vid = document.getElementById('piece-checkout-video');
+  if (!vid || !vid.srcObject) return;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = vid.videoWidth || 640;
+  canvas.height = vid.videoHeight || 480;
+  canvas.getContext('2d').drawImage(vid, 0, 0);
+  const photoBase64 = canvas.toDataURL('image/jpeg', 0.8);
+
+  // Stop camera while processing
+  vid.srcObject?.getTracks().forEach(t=>t.stop());
+
+  _showPieceIdentifying(photoBase64);
+}
+
+function _showPieceIdentifying(photoBase64) {
+  const modal = document.getElementById('piece-checkout-modal');
+  if (!modal) return;
+  modal.innerHTML = `
+    <div style="text-align:center;color:#F4ECE0;padding:40px 20px;">
+      <div style="font-size:48px;margin-bottom:16px;">🔍</div>
+      <div style="font-family:'Caveat',cursive;font-size:24px;margin-bottom:8px;">Identifying piece…</div>
+      <div style="font-size:13px;color:#8a8175;">Matching against your stock</div>
+    </div>`;
+
+  // Try AI identification
+  fetch(`${API_URL}/api/pieces/find-by-photo`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ studioId, photoBase64, bookingCode: _checkoutBookingCode,
+      searchedBy: currentShiftStaff?.id, autoAssign: false })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.match || data.piece || data.suggested) {
+      _showPieceConfirmTile(photoBase64, data.match || data.piece || data.suggested, data);
+    } else {
+      _showPieceNoMatch(photoBase64);
+    }
+  })
+  .catch(() => _showPieceNoMatch(photoBase64));
+}
+
+function _showPieceConfirmTile(photoBase64, piece, data) {
+  // THE BIG YES/NO TILE
+  const modal = document.getElementById('piece-checkout-modal');
+  if (!modal) return;
+  const name = piece.name || piece.item_name || piece.stockName || 'Unknown piece';
+  const price = piece.price ? `£${(piece.price/100).toFixed(2)}` : '';
+  const confidence = data.confidence ? `${Math.round(data.confidence*100)}% match` : '';
+
+  modal.innerHTML = `
+    <div style="width:100%;max-width:420px;text-align:center;">
+      <div style="font-family:'Caveat',cursive;font-size:24px;color:#F4ECE0;margin-bottom:4px;">Is this right?</div>
+      <div style="font-size:12px;color:#8a8175;margin-bottom:20px;">${confidence}</div>
+
+      <!-- Photo + suggestion side by side -->
+      <div style="display:flex;gap:12px;margin-bottom:20px;align-items:center;">
+        <img src="${photoBase64}" style="width:120px;height:120px;object-fit:cover;border-radius:12px;flex-shrink:0;">
+        <div style="flex:1;text-align:left;">
+          <div style="font-family:'Caveat',cursive;font-size:26px;color:#F4ECE0;font-weight:700;">${name}</div>
+          ${price ? `<div style="font-size:20px;color:#4CAF50;font-weight:700;margin-top:4px;">${price}</div>` : ''}
+        </div>
+      </div>
+
+      <!-- BIG YES tile -->
+      <button onclick="_confirmCheckoutPiece(${JSON.stringify(piece).replace(/"/g,"'")})"
+        style="width:100%;background:#4CAF50;color:white;border:none;border-radius:18px;
+        padding:24px;font-size:24px;font-weight:900;cursor:pointer;margin-bottom:12px;
+        box-shadow:0 4px 20px rgba(76,175,80,0.4);">
+        ✓ Yes, that's it
+      </button>
+
+      <!-- NO tile -->
+      <button onclick="_showPieceCheckoutCamera()"
+        style="width:100%;background:rgba(255,255,255,0.08);color:#F4ECE0;border:none;
+        border-radius:14px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;margin-bottom:8px;">
+        ✗ No — try again
+      </button>
+      <button onclick="_skipThisPiece()"
+        style="width:100%;background:none;color:#8a8175;border:none;padding:10px;font-size:13px;cursor:pointer;">
+        Skip this piece
+      </button>
+    </div>`;
+}
+
+function _showPieceNoMatch(photoBase64) {
+  const modal = document.getElementById('piece-checkout-modal');
+  if (!modal) return;
+  modal.innerHTML = `
+    <div style="width:100%;max-width:420px;text-align:center;">
+      <div style="font-size:48px;margin-bottom:12px;">🤷</div>
+      <div style="font-family:'Caveat',cursive;font-size:24px;color:#F4ECE0;margin-bottom:8px;">Couldn't identify it</div>
+      <div style="font-size:13px;color:#8a8175;margin-bottom:24px;">The AI couldn't match this to your stock. Try another angle, or skip.</div>
+      <button onclick="_showPieceCheckoutCamera()"
+        style="width:100%;background:#B87946;color:white;border:none;border-radius:14px;
+        padding:18px;font-size:16px;font-weight:800;cursor:pointer;margin-bottom:10px;">
+        Try again
+      </button>
+      <button onclick="_skipThisPiece()"
+        style="width:100%;background:none;color:#8a8175;border:none;padding:10px;font-size:13px;cursor:pointer;">
+        Skip this piece
+      </button>
+    </div>`;
+}
+
+function _confirmCheckoutPiece(piece) {
+  _checkoutPieces.push(piece);
+  // Brief success flash then back to camera for next piece
+  const modal = document.getElementById('piece-checkout-modal');
+  if (modal) {
+    modal.innerHTML = `
+      <div style="text-align:center;color:#4CAF50;padding:60px 20px;">
+        <div style="font-size:64px;margin-bottom:12px;">✓</div>
+        <div style="font-family:'Caveat',cursive;font-size:28px;">Added!</div>
+        <div style="font-size:14px;color:#8a8175;margin-top:8px;">${_checkoutPieces.length} piece${_checkoutPieces.length>1?'s':''} so far</div>
+      </div>`;
+    setTimeout(() => _showPieceCheckoutCamera(), 1000);
+  }
+}
+
+function _skipThisPiece() {
+  _showPieceCheckoutCamera();
+}
+
+function _finishPieceCheckout() {
+  _closePieceCheckout();
+  // Mark the checklist item as done
+  if (_checkoutBookingCode) {
+    toggleFlowCheck(_checkoutBookingCode, 'completion', 'piece_photos', true);
+  }
+  if (_checkoutPieces.length) {
+    // Brief summary
+    const names = _checkoutPieces.map(p=>p.name||p.item_name||'piece').join(', ');
+    console.log(`[checkout] ${_checkoutPieces.length} pieces confirmed: ${names}`);
+  }
+}
+
+function _closePieceCheckout() {
+  // Stop camera
+  const vid = document.getElementById('piece-checkout-video');
+  vid?.srcObject?.getTracks().forEach(t=>t.stop());
+  document.getElementById('piece-checkout-modal')?.remove();
+}
+
 // THIS IS A RENDERING OF /api/staff/alert-kinds, NEVER A SECOND LIST.
 // A hand-written copy of the vocabulary would drift from ALERT_TRIGGERS
 // within a week — which is exactly how the elegant floor plan ended up
@@ -11380,6 +11603,16 @@ function renderDetailChecklist() {
 }
 
 async function toggleFlowCheck(bookingCode, stage, checkKey, completed) {
+  // ── PIECE PHOTOS INTERCEPT ──────────────────────────────
+  // Tapping "📷 Piece photos taken" opens the camera flow rather than
+  // just checking a box. The box is checked AFTER confirmation.
+  // This is the exact flow Daisy described: photo the piece at the
+  // table → AI identifies from stock → big YES/NO tile → confirmed.
+  if (stage === 'completion' && checkKey === 'piece_photos' && completed) {
+    openPieceCheckoutFlow(bookingCode);
+    return;
+  }
+  // ── END INTERCEPT ───────────────────────────────────────
   const staffName = currentShiftStaff?.name || 'Staff';
   await fetch(`${API_URL}/api/floor/check`, {
     method:'POST', headers:{'Content-Type':'application/json'},
