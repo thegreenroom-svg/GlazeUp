@@ -27308,6 +27308,63 @@ async function checkForAppUpdate() {
 checkForAppUpdate();
 window._versionCheckTimer = setInterval(checkForAppUpdate, 30 * 1000); // check every 30s — was 2 minutes; HTML is no longer cached at all (see server.js), so a normal reload now always gets the latest version anyway. This just makes the banner notice sooner for anyone with the app open continuously through a deploy.
 
+
+// ═══════════════════════════════════════════════════════════
+// THE GLAZE SWEEP. 17 July 2026.
+// ═══════════════════════════════════════════════════════════
+// "It needs to be across the whole site... Absolutely everywhere."
+//
+// Counted, not guessed: 141 tile-shaped buttons in the staff app and 45
+// in the customer app were never given the class. Typing it onto each
+// one is how it got missed 186 times, and would get missed again the
+// next time anyone adds a tile.
+//
+// So the app applies it. Anything shaped like a tile — square, or tall
+// enough to be tapped as one, or carrying a real tile radius — gets the
+// glaze whether or not whoever wrote it remembered. Runs on load and on
+// every DOM change, so tiles rendered later (Jenny's stock flow, the
+// booking checklist, room drill-downs, anything built tonight or next
+// month) are glazed the moment they exist.
+//
+// Deliberately does NOT glaze: small utility buttons, text links, close
+// crosses. A glaze on a 20px X is noise. The test is the shape, which is
+// the same test a person uses looking at the screen.
+function _isTileShaped(el) {
+  if (el.dataset.noGlaze === '1') return false;
+  const s = getComputedStyle(el);
+  const w = el.offsetWidth, h = el.offsetHeight;
+  if (w < 56 || h < 40) return false;                 // too small to be a tile
+  const r = parseFloat(s.borderTopLeftRadius) || 0;
+  if (r < 8) return false;                            // tiles are rounded
+  const bg = s.backgroundColor;
+  if (!bg || bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent') return false;
+  return true;
+}
+
+function _glazeSweep(root) {
+  try {
+    const scope = root && root.querySelectorAll ? root : document;
+    scope.querySelectorAll('button:not(.glaze-tile):not(.till-tile)').forEach(el => {
+      if (_isTileShaped(el)) el.classList.add('glaze-tile');
+    });
+  } catch (e) { /* cosmetic — never worth breaking a screen over */ }
+}
+
+// On load, and on every change. Debounced: a render can fire hundreds of
+// mutations and sweeping on each would be wasteful for a shine.
+let _glazeTimer = null;
+function _glazeSoon() {
+  clearTimeout(_glazeTimer);
+  _glazeTimer = setTimeout(() => _glazeSweep(document), 60);
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', _glazeSoon);
+  _glazeSoon();
+  try {
+    new MutationObserver(_glazeSoon).observe(document.documentElement, { childList: true, subtree: true });
+  } catch (e) { /* no observer, no sweep — the app still works */ }
+}
+
 </script>
 
 

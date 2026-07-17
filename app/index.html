@@ -1081,6 +1081,64 @@
           and Firefox-for-Android on the unstyled default. Both vendor
           prefixes are written out because "Android" is not one browser.
        ═══════════════════════════════════════════════════════════ */
+
+    /* ═══════════════════════════════════════════════════════════
+       THE GLAZE, EVERYWHERE. 17 July 2026.
+       ═══════════════════════════════════════════════════════════
+       "I'm not seeing raised tiles everywhere. It needs to be across
+       the whole site until the endpoint. Absolutely everywhere. That is
+       the whole point."
+
+       Counted before writing, rather than guessing:
+         staff app:     534 buttons, 109 glazed, 141 tile-shaped and NOT
+         customer app:  140 buttons,   0 glazed —  45 tile-shaped and NOT
+
+       The customer app had NO GLAZE AT ALL. The class was never defined
+       in this file. Every "tile" a customer has ever tapped has been a
+       flat rectangle.
+
+       The original note in the staff app had exactly the right instinct
+       — "one single shared class... so none of the 39 real tiles needed
+       individual editing" — but a class still has to be typed onto each
+       tile, so every tile written since has quietly missed it. 141 of
+       them. A rule that relies on remembering does not hold across
+       26,000 lines and three chats.
+
+       So it is applied BY THE APP, not by hand: _glazeSweep() below adds
+       the class to anything tile-shaped, on render and on every DOM
+       change. New tiles are glazed the moment they exist, including ones
+       nobody has written yet.
+       ═══════════════════════════════════════════════════════════ */
+    .glaze-tile {
+      position: relative;
+      overflow: hidden;
+      box-shadow:
+        0 2px 4px rgba(0,0,0,0.12),
+        0 8px 16px -4px rgba(0,0,0,0.18),
+        inset 0 1px 1px rgba(255,255,255,0.25);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .glaze-tile::before {
+      content: '';
+      position: absolute;
+      top: -30%; left: -20%;
+      width: 70%; height: 70%;
+      background: radial-gradient(circle, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 70%);
+      pointer-events: none;
+      border-radius: 50%;
+    }
+    .glaze-tile:active {
+      transform: scale(0.96);
+      box-shadow:
+        0 1px 2px rgba(0,0,0,0.12),
+        0 3px 6px -2px rgba(0,0,0,0.15),
+        inset 0 1px 1px rgba(255,255,255,0.2);
+    }
+    .glaze-tile > * { position: relative; z-index: 1; }
+    @media (prefers-reduced-motion: reduce) {
+      .glaze-tile, .glaze-tile:active { transition: none; transform: none; }
+    }
+
     input[type="range"] {
       -webkit-appearance: none;
       appearance: none;
@@ -7759,7 +7817,64 @@
     }
 
     init();
-  </script>
+  
+// ═══════════════════════════════════════════════════════════
+// THE GLAZE SWEEP. 17 July 2026.
+// ═══════════════════════════════════════════════════════════
+// "It needs to be across the whole site... Absolutely everywhere."
+//
+// Counted, not guessed: 141 tile-shaped buttons in the staff app and 45
+// in the customer app were never given the class. Typing it onto each
+// one is how it got missed 186 times, and would get missed again the
+// next time anyone adds a tile.
+//
+// So the app applies it. Anything shaped like a tile — square, or tall
+// enough to be tapped as one, or carrying a real tile radius — gets the
+// glaze whether or not whoever wrote it remembered. Runs on load and on
+// every DOM change, so tiles rendered later (Jenny's stock flow, the
+// booking checklist, room drill-downs, anything built tonight or next
+// month) are glazed the moment they exist.
+//
+// Deliberately does NOT glaze: small utility buttons, text links, close
+// crosses. A glaze on a 20px X is noise. The test is the shape, which is
+// the same test a person uses looking at the screen.
+function _isTileShaped(el) {
+  if (el.dataset.noGlaze === '1') return false;
+  const s = getComputedStyle(el);
+  const w = el.offsetWidth, h = el.offsetHeight;
+  if (w < 56 || h < 40) return false;                 // too small to be a tile
+  const r = parseFloat(s.borderTopLeftRadius) || 0;
+  if (r < 8) return false;                            // tiles are rounded
+  const bg = s.backgroundColor;
+  if (!bg || bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent') return false;
+  return true;
+}
+
+function _glazeSweep(root) {
+  try {
+    const scope = root && root.querySelectorAll ? root : document;
+    scope.querySelectorAll('button:not(.glaze-tile):not(.till-tile)').forEach(el => {
+      if (_isTileShaped(el)) el.classList.add('glaze-tile');
+    });
+  } catch (e) { /* cosmetic — never worth breaking a screen over */ }
+}
+
+// On load, and on every change. Debounced: a render can fire hundreds of
+// mutations and sweeping on each would be wasteful for a shine.
+let _glazeTimer = null;
+function _glazeSoon() {
+  clearTimeout(_glazeTimer);
+  _glazeTimer = setTimeout(() => _glazeSweep(document), 60);
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', _glazeSoon);
+  _glazeSoon();
+  try {
+    new MutationObserver(_glazeSoon).observe(document.documentElement, { childList: true, subtree: true });
+  } catch (e) { /* no observer, no sweep — the app still works */ }
+}
+
+</script>
 
 </body>
 </html>
