@@ -8597,24 +8597,24 @@ async function _markCollected(id) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// JENNY'S ASSISTANT — calm, learns her, gently nudges
-// 17 July 2026
+// CLEO — everyone's helper. 17 July 2026.
 // ═══════════════════════════════════════════════════════════
-// Daisy: "can Jenny have an AI assistant that learns her ways and
-// gently nudges. Nice calm slow voice."
+// Daisy: "maybe that assistant could be Cleo represented."
 //
-// It watches what she does, notices her patterns, and offers help
-// at the right moment. It never nags. It never interrupts. It waits
-// to be tapped, and it speaks slowly and warmly when it does.
+// IMPORTANT — this is NOT the parked helper. Yesterday Daisy asked me
+// to park "the Cleo helper" and it took four goes to get clear what
+// that meant. What was parked: a floating mascot that chattered, aged,
+// made seasonal small talk and popped up unprompted. That stays parked
+// (CLEO_HELPER_ENABLED = false, untouched).
 //
-// WHAT IT LEARNS (all local, all hers):
-//   - what time she usually packs
-//   - how long a piece takes her
-//   - which pieces the AI gets wrong for her
-//   - when she gets stuck
+// This is different: she waits to be tapped, answers questions, shows
+// your duties, and learns how you work. Same face, opposite behaviour.
+// The first was noise. This is useful.
 //
-// It NEVER tells her off. It NEVER says "you should have". It says
-// "would you like me to" and "shall I".
+// Daisy's answers to the three questions:
+//   Same voice for everyone — she's one character. Cute, nice, steady.
+//   Task tracking — yes, from staff_duties.
+//   Voice — default play, not tap-to-listen.
 
 const ASSIST_KEY = 'klnk_assist_';
 
@@ -8626,19 +8626,18 @@ function _assistSave(staffId, data) {
   try { localStorage.setItem(ASSIST_KEY + staffId, JSON.stringify(data)); } catch(e) {}
 }
 
-// Note something she did — builds her pattern quietly over time
+// Note something they did — builds the pattern quietly
 function _assistNote(event, detail) {
   const id = currentShiftStaff?.id;
   if (!id) return;
   const d = _assistLoad(id);
   d.events = d.events || [];
   d.events.push({ event, detail, at: Date.now() });
-  // Keep it small — last 200 events is plenty to spot a pattern
   if (d.events.length > 200) d.events = d.events.slice(-200);
   _assistSave(id, d);
 }
 
-// What has she taught it? Honest, countable, no guessing.
+// What has she learned? Countable, honest, no guessing.
 function _assistWhatILearned() {
   const id = currentShiftStaff?.id;
   if (!id) return [];
@@ -8646,7 +8645,6 @@ function _assistWhatILearned() {
   const ev = d.events || [];
   const learned = [];
 
-  // Packing sessions
   const packs = ev.filter(e => e.event === 'packed');
   if (packs.length >= 3) {
     const hours = packs.map(p => new Date(p.at).getHours());
@@ -8660,650 +8658,193 @@ function _assistWhatILearned() {
     const avg = Math.round(gaps.reduce((a,b)=>a+b,0) / gaps.length / 1000);
     if (avg > 0 && avg < 600) learned.push(`About ${avg} seconds a piece. That's good going.`);
   }
-
-  // Matches she corrected
   const wrong = ev.filter(e => e.event === 'match_rejected').length;
   const right = ev.filter(e => e.event === 'match_confirmed').length;
   if (right + wrong >= 5) {
     const pct = Math.round(right / (right + wrong) * 100);
-    learned.push(`I'm getting ${pct}% right for you now. Every yes helps.`);
+    learned.push(`I'm getting ${pct}% right for you now. Every yes helps me.`);
   }
-
   return learned;
 }
 
-// The assistant — waits to be tapped, speaks calmly
-function openAssistant() {
-  // ═══════════════════════════════════════════════════════════
-  // CLEO — everyone's helper. 17 July 2026.
-  // ═══════════════════════════════════════════════════════════
-  // Daisy: "maybe that assistant could be Cleo represented."
-  //
-  // NOT the old floating helper — that stays parked. That one
-  // chattered unprompted, aged, made seasonal small talk and
-  // followed you round the screen. Daisy asked four times for it
-  // to go and she was right.
-  //
-  // This is different: she waits to be tapped, answers what you
-  // ask, learns how you work, and reads it out — one voice for
-  // everyone, cute and steady, autoplay on with a pause.
+// One voice for everyone. She's one character.
+// Cute, nice, steady — a bit brighter and slightly higher than the
+// studio narration voice, but the same underlying voice so it's
+// consistent and never surprises anyone.
+function _cleoSpeak(text) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  const v = typeof resolveStudioVoice === 'function' ? resolveStudioVoice() : null;
+  if (v) { u.voice = v; u.lang = v.lang; }
+  u.rate = 0.9;    // steady
+  u.pitch = 1.15;  // a touch brighter — cute, not squeaky
+  u.volume = 0.9;
+  window.speechSynthesis.speak(u);
+}
+
+let _cleoChat = [];
+
+async function openAssistant() {
   const learned = _assistWhatILearned();
   const first = (currentShiftStaff?.name || 'there').split(' ')[0];
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening';
-  const mascot = typeof renderCleoMascotSVG === 'function' ? renderCleoMascotSVG(9) : '🏺';
+
+  // Her duties — what they actually have to do
+  let duties = [];
+  try {
+    const res = await fetch(`${API_URL}/api/staff/duties?studioId=${studioId}&role=${encodeURIComponent(currentShiftStaff?.role || '')}`);
+    const d = await res.json();
+    duties = d.duties || [];
+  } catch(e) { /* fine, show without */ }
 
   const sheet = document.createElement('div');
   sheet.id = 'assistant';
   sheet.style.cssText = 'position:fixed;inset:0;z-index:9760;background:rgba(43,39,36,0.9);display:flex;align-items:flex-end;justify-content:center;';
-  sheet.onclick = e => { if (e.target===sheet) { _assistStopVoice(); sheet.remove(); } };
+  sheet.onclick = e => { if (e.target===sheet) { _cleoStop(); sheet.remove(); } };
   sheet.innerHTML = `<div style="background:#FFFDF9;width:100%;max-width:520px;border-radius:18px 18px 0 0;
-    padding:24px 20px calc(24px + env(safe-area-inset-bottom));max-height:84vh;display:flex;flex-direction:column;">
+    padding:22px 18px calc(22px + env(safe-area-inset-bottom));max-height:86vh;display:flex;flex-direction:column;">
 
+    <!-- Cleo -->
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-      <div style="width:56px;height:56px;flex-shrink:0;">${mascot}</div>
+      <div id="cleo-face" style="width:52px;height:52px;flex-shrink:0;"></div>
       <div style="flex:1;">
         <div style="font-family:'Caveat',cursive;font-size:24px;color:#2B2724;font-weight:700;">
           ${greeting}, ${first}</div>
         <div style="font-size:11px;color:#8a8175;">Cleo · ask me anything</div>
       </div>
-      <button onclick="_assistToggleVoice()" id="assist-voice-btn" title="Pause"
-        style="background:rgba(43,39,36,0.08);border:none;border-radius:50%;width:34px;height:34px;
-        font-size:14px;cursor:pointer;flex-shrink:0;">⏸</button>
+      <button onclick="_cleoStop()" title="Quiet" style="background:rgba(43,39,36,0.06);border:none;
+        border-radius:50%;width:32px;height:32px;font-size:14px;cursor:pointer;flex-shrink:0;">🔇</button>
     </div>
 
-    <div style="overflow-y:auto;flex:1;" id="assist-body">
+    <div id="cleo-body" style="overflow-y:auto;flex:1;">
+      ${duties.length ? `
+        <div style="background:rgba(0,137,123,0.08);border-radius:12px;padding:14px;margin-bottom:12px;">
+          <div style="font-size:10px;color:#00897B;font-weight:800;letter-spacing:0.06em;margin-bottom:8px;">
+            YOUR JOBS TODAY</div>
+          ${duties.slice(0,5).map(d => `<div style="font-size:13px;color:#2B2724;line-height:1.6;
+            display:flex;gap:8px;align-items:flex-start;margin-bottom:4px;">
+            <span style="color:#00897B;">•</span><span>${d.label || d.name || d}</span></div>`).join('')}
+        </div>` : ''}
+
       ${learned.length ? `
         <div style="background:rgba(184,121,70,0.08);border-radius:12px;padding:14px;margin-bottom:12px;">
           <div style="font-size:10px;color:#B87946;font-weight:800;letter-spacing:0.06em;margin-bottom:8px;">
             WHAT I'VE NOTICED</div>
-          ${learned.map(l => `<div style="font-size:13px;color:#2B2724;line-height:1.6;margin-bottom:6px;">
+          ${learned.map(l => `<div style="font-size:13px;color:#2B2724;line-height:1.6;margin-bottom:4px;">
             ${l}</div>`).join('')}
         </div>` : `
         <div style="background:rgba(43,39,36,0.04);border-radius:12px;padding:14px;margin-bottom:12px;">
           <div style="font-size:13px;color:#2B2724;line-height:1.6;">
-            I'm still learning how you work. Just carry on and I'll pick it up.</div>
+            I'm still learning how you work. The more you use me, the more helpful I'll be.
+            Nothing to set up — just carry on.</div>
         </div>`}
 
-      <div id="assist-tasks" style="margin-bottom:12px;"></div>
-
-      <!-- ASK HER SOMETHING -->
-      <button onclick="_assistAsk()" class="glaze-tile"
-        style="width:100%;border:none;border-radius:14px;padding:18px;cursor:pointer;
-        background:linear-gradient(135deg,#B87946,#9A6435);color:#fff;margin-bottom:10px;
-        text-align:left;">
-        <div style="font-size:24px;margin-bottom:4px;">🎤</div>
-        <div style="font-family:'Caveat',cursive;font-size:20px;font-weight:700;">Ask me a question</div>
-        <div style="font-size:11px;opacity:0.9;margin-top:2px;">"How do I do this?" — just say it</div>
-      </button>
-
+      <!-- ASK HER — the point of all this -->
       <div style="font-size:10px;color:#8a8175;font-weight:800;letter-spacing:0.06em;margin-bottom:8px;">
-        OR TAP ONE</div>
+        ASK ME</div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;">
+        <input id="cleo-q" type="text" placeholder="How do I…?"
+          onkeydown="if(event.key==='Enter')_cleoAsk()"
+          style="flex:1;border:1.5px solid rgba(43,39,36,0.15);border-radius:12px;padding:12px 14px;
+          font-size:14px;font-family:inherit;background:#fff;color:#2B2724;min-width:0;">
+        <button onclick="_cleoAsk()" style="background:#B87946;color:#fff;border:none;border-radius:12px;
+          padding:12px 16px;font-size:14px;font-weight:800;cursor:pointer;flex-shrink:0;">Ask</button>
+      </div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:14px;">
+        ${['How do I pack a piece?','What if it breaks?','Where are the glazes?','How do I seat someone?']
+          .map(q => `<button onclick="_cleoAsk('${q.replace(/'/g,"\\'")}')"
+            style="background:rgba(43,39,36,0.06);border:1px dashed rgba(43,39,36,0.2);border-radius:14px;
+            padding:5px 10px;font-size:11px;color:#2B2724;cursor:pointer;font-family:'Caveat',cursive;">
+            ${q}</button>`).join('')}
+      </div>
 
-      ${(ROLE_HOME_DEFAULTS[currentShiftStaff?.role]?.tileOrder || ['floor-plan'])
-        .slice(0,3).map(tab => {
-          const label = (typeof TOUR_LABELS !== 'undefined' && TOUR_LABELS[tab]) || tab;
-          const why = (typeof TOUR_WHY !== 'undefined' && TOUR_WHY[tab]) || '';
-          const group = GRID_NAV_STRUCTURE.find(g => g.tab===tab || g.id===tab);
-          return `<button onclick="_assistGo('${tab}')" class="glaze-tile"
-            style="width:100%;border:none;border-radius:14px;padding:14px;cursor:pointer;
-            text-align:left;margin-bottom:6px;">
-            <div style="font-family:'Caveat',cursive;font-size:18px;font-weight:700;color:#2B2724;">${label}</div>
-            <div style="font-size:11px;color:#8a8175;margin-top:2px;">${why.slice(0,60)}</div>
-          </button>`;
-        }).join('')}
+      <div id="cleo-answers"></div>
+
+      <div style="font-size:10px;color:#8a8175;font-weight:800;letter-spacing:0.06em;margin:14px 0 8px;">
+        OR JUST GO</div>
+      ${[['📦 Start packing','openPacking'],['🔍 Find on the shelf','openFindMyPiece'],
+         ['💬 Something\'s wrong','openTellPicker']].map(([label, fn]) => `
+        <button onclick="_cleoStop(); document.getElementById('assistant').remove(); ${fn}();"
+          class="glaze-tile" style="width:100%;border:none;border-radius:14px;padding:14px;
+          cursor:pointer;text-align:left;margin-bottom:6px;">
+          <div style="font-family:'Caveat',cursive;font-size:17px;font-weight:700;color:#2B2724;">${label}</div>
+        </button>`).join('')}
     </div>
 
-    <button onclick="_assistStopVoice(); document.getElementById('assistant').remove()"
+    <button onclick="_cleoStop(); document.getElementById('assistant').remove();"
       style="margin-top:12px;width:100%;background:#2B2724;color:#fff;border:none;border-radius:12px;
       padding:13px;font-size:14px;font-weight:800;cursor:pointer;">Thanks Cleo</button>
   </div>`;
   document.body.appendChild(sheet);
 
-  _assistLoadTasks();
-  // Autoplay on — Daisy: "should be default play"
-  _assistSpeakGreeting();
-}
-
-// Their tasks — from the real duties table, not invented
-async function _assistLoadTasks() {
-  const el = document.getElementById('assist-tasks');
-  if (!el || !currentShiftStaff?.id) return;
-  try {
-    const res = await fetch(`${API_URL}/api/staff/${currentShiftStaff.id}/duties?studioId=${studioId}`);
-    const d = await res.json();
-    const open = (d.duties || []).filter(x => !x.completed);
-    if (!open.length) return;
-    el.innerHTML = `
-      <div style="background:rgba(0,137,123,0.08);border-radius:12px;padding:14px;">
-        <div style="font-size:10px;color:#00897B;font-weight:800;letter-spacing:0.06em;margin-bottom:8px;">
-          STILL TO DO · ${open.length}</div>
-        ${open.slice(0,4).map(t => `<div style="font-size:13px;color:#2B2724;line-height:1.6;
-          margin-bottom:4px;">• ${t.title || t.label || t.duty}</div>`).join('')}
-        ${open.length > 4 ? `<div style="font-size:11px;color:#8a8175;margin-top:4px;">
-          and ${open.length-4} more</div>` : ''}
-      </div>`;
-  } catch(e) { /* no duties, no panel */ }
-}
-
-// Ask Cleo a question — voice in, voice out
-function _assistAsk() {
-  const body = document.getElementById('assist-body');
-  if (!body) return;
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) {
-    body.innerHTML = `<div style="text-align:center;padding:30px 20px;">
-      <div style="font-size:36px;margin-bottom:10px;">😕</div>
-      <div style="font-size:14px;color:#2B2724;line-height:1.5;">
-        This device can't hear me yet. Try Safari or Chrome.</div>
-      <button onclick="openAssistant()" style="margin-top:16px;background:#2B2724;color:#fff;
-        border:none;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer;">
-        Back</button>
-    </div>`;
-    return;
+  // Her face
+  const face = document.getElementById('cleo-face');
+  if (face && typeof renderCleoMascotSVG === 'function') {
+    try { face.innerHTML = renderCleoMascotSVG(8); } catch(e) {
+      face.innerHTML = '<div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#B87946,#9A6435);display:flex;align-items:center;justify-content:center;font-size:26px;">🏺</div>';
+    }
   }
 
-  body.innerHTML = `<div style="text-align:center;padding:40px 20px;">
-    <div style="font-size:52px;margin-bottom:14px;animation:swt-float 1.2s ease-in-out infinite;">🎤</div>
-    <div style="font-family:'Caveat',cursive;font-size:24px;color:#B87946;">I'm listening…</div>
-    <div style="font-size:12px;color:#8a8175;margin-top:6px;">Say your question</div>
-  </div>`;
-
-  const rec = new SR();
-  rec.lang = 'en-GB';
-  rec.interimResults = false;
-  rec.maxAlternatives = 1;
-  rec.onresult = (e) => {
-    const q = e.results[0][0].transcript;
-    _assistAnswer(q);
-  };
-  rec.onerror = () => {
-    body.innerHTML = `<div style="text-align:center;padding:30px 20px;">
-      <div style="font-size:36px;margin-bottom:10px;">🤷</div>
-      <div style="font-size:14px;color:#2B2724;">I didn't catch that.</div>
-      <button onclick="_assistAsk()" style="margin-top:16px;background:#B87946;color:#fff;
-        border:none;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer;">
-        Try again</button>
-    </div>`;
-  };
-  try { rec.start(); } catch(e) { /* already running */ }
+  // Default play — she says hello. Daisy: "should be default play"
+  const hello = learned.length
+    ? `${greeting} ${first}. ${learned[0]}`
+    : `${greeting} ${first}. Ask me anything, I'm here to help.`;
+  setTimeout(() => _cleoSpeak(hello), 400);
 }
 
-async function _assistAnswer(question) {
-  const body = document.getElementById('assist-body');
-  if (!body) return;
-  body.innerHTML = `<div style="padding:16px;">
-    <div style="font-size:11px;color:#8a8175;margin-bottom:6px;">You asked</div>
-    <div style="font-size:15px;color:#2B2724;font-style:italic;margin-bottom:18px;">"${question}"</div>
-    <div style="text-align:center;padding:20px;">
-      <div style="font-size:32px;animation:swt-float 1.2s ease-in-out infinite;">💭</div>
-      <div style="font-size:13px;color:#8a8175;margin-top:8px;">Thinking…</div>
-    </div>
-  </div>`;
+function _cleoStop() {
+  window.speechSynthesis?.cancel();
+}
 
+async function _cleoAsk(preset) {
+  const input = document.getElementById('cleo-q');
+  const q = preset || input?.value?.trim();
+  if (!q) return;
+  if (input) input.value = '';
+
+  const answers = document.getElementById('cleo-answers');
+  if (!answers) return;
+
+  // Show the question
+  answers.insertAdjacentHTML('beforeend', `
+    <div style="background:rgba(43,39,36,0.06);border-radius:12px 12px 4px 12px;padding:10px 13px;
+      margin-bottom:6px;margin-left:40px;font-size:13px;color:#2B2724;">${q}</div>`);
+
+  // Thinking
+  const id = 'a' + Date.now();
+  answers.insertAdjacentHTML('beforeend', `
+    <div id="${id}" style="background:rgba(184,121,70,0.1);border-radius:12px 12px 12px 4px;
+      padding:10px 13px;margin-bottom:10px;margin-right:40px;font-size:13px;color:#8a8175;">
+      thinking…</div>`);
+  answers.scrollTop = answers.scrollHeight;
+
+  _cleoChat.push({ role: 'user', content: q });
   try {
     const res = await fetch(`${API_URL}/api/assistant/chat`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        studioId, context: 'staff', staffMemberId: currentShiftStaff?.id,
-        messages: [{ role: 'user', content: question }],
+        studioId, context: 'staff',
+        staffMemberId: currentShiftStaff?.id,
+        messages: _cleoChat.slice(-6),
       })
     });
     const d = await res.json();
-    const answer = d.reply || d.message || d.content || "I'm not sure about that one. Ask Daisy?";
-    body.innerHTML = `<div style="padding:4px;">
-      <div style="font-size:11px;color:#8a8175;margin-bottom:6px;">You asked</div>
-      <div style="font-size:14px;color:#8a8175;font-style:italic;margin-bottom:16px;">"${question}"</div>
-      <div style="background:rgba(184,121,70,0.08);border-radius:12px;padding:16px;">
-        <div style="font-size:15px;color:#2B2724;line-height:1.6;">${answer}</div>
-      </div>
-      <button onclick="_assistAsk()" style="margin-top:14px;width:100%;background:#B87946;color:#fff;
-        border:none;border-radius:12px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;">
-        🎤 Ask something else</button>
-      <button onclick="openAssistant()" style="margin-top:8px;width:100%;background:none;color:#8a8175;
-        border:none;padding:10px;font-size:12px;cursor:pointer;">Back</button>
-    </div>`;
-    _assistSay(answer);
-    if (typeof _assistNote === 'function') _assistNote('asked', question);
-  } catch(e) {
-    body.innerHTML = `<div style="text-align:center;padding:30px 20px;">
-      <div style="font-size:36px;margin-bottom:10px;">😕</div>
-      <div style="font-size:14px;color:#2B2724;">I can't reach my brain right now.</div>
-      <button onclick="openAssistant()" style="margin-top:16px;background:#2B2724;color:#fff;
-        border:none;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer;">
-        Back</button>
-    </div>`;
-  }
-}
-
-function _assistGo(tab) {
-  _assistStopVoice();
-  document.getElementById('assistant')?.remove();
-  const g = GRID_NAV_STRUCTURE.find(x => x.tab===tab || x.id===tab);
-  if (g?.fn && typeof window[g.fn] === 'function') window[g.fn]();
-  else goToTab(tab);
-}
-
-// ── VOICE ── one voice for everyone. Cute, steady, autoplay on.
-let _assistVoiceOn = true;
-
-function _assistSpeakGreeting() {
-  const learned = _assistWhatILearned();
-  const first = (currentShiftStaff?.name || 'there').split(' ')[0];
-  const text = learned.length
-    ? `Hello ${first}. ${learned.join(' ')} Tap the microphone if you want to ask me something.`
-    : `Hello ${first}. I'm Cleo. I'm still learning how you work. Tap the microphone any time and ask me a question.`;
-  _assistSay(text);
-}
-
-function _assistSay(text) {
-  if (!_assistVoiceOn || !window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  const v = typeof resolveStudioVoice === 'function' ? resolveStudioVoice() : null;
-  if (v) { u.voice = v; u.lang = v.lang; }
-  // Cleo: cute, steady, never rushed. Same for everyone.
-  u.rate = 0.9; u.pitch = 1.15; u.volume = 0.9;
-  window.speechSynthesis.speak(u);
-}
-
-function _assistToggleVoice() {
-  _assistVoiceOn = !_assistVoiceOn;
-  const btn = document.getElementById('assist-voice-btn');
-  if (btn) { btn.textContent = _assistVoiceOn ? '⏸' : '🔊'; btn.title = _assistVoiceOn ? 'Pause' : 'Listen'; }
-  if (!_assistVoiceOn) window.speechSynthesis?.cancel();
-  else _assistSpeakGreeting();
-}
-
-function _assistStopVoice() {
-  window.speechSynthesis?.cancel();
-}
-
-// Calm, slow, warm. Uses the one voice resolver — no second voice picker.
-function _assistantSpeak() {
-  const learned = _assistWhatILearned();
-  const first = (currentShiftStaff?.name || '').split(' ')[0];
-  const text = learned.length
-    ? `Hello ${first}. ${learned.join(' ')}`
-    : `Hello ${first}. I'm still learning your ways. The more you use me, the more helpful I'll be. Just carry on as you are, and I'll pick it up.`;
-
-  if (!window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
-  const utter = new SpeechSynthesisUtterance(text);
-  const voice = typeof resolveStudioVoice === 'function' ? resolveStudioVoice() : null;
-  if (voice) { utter.voice = voice; utter.lang = voice.lang; }
-  // Calm and slow — Daisy asked for this specifically
-  utter.rate = 0.82;
-  utter.pitch = 1.0;
-  utter.volume = 0.9;
-  window.speechSynthesis.speak(utter);
-}
-
-// ═══════════════════════════════════════════════════════════
-// ARRANGE TABLES — put them where they really are
-// 17 July 2026
-// ═══════════════════════════════════════════════════════════
-// Daisy: "the girls can basically drag the tables around into the
-// order they want to represent the tables in the studio."
-//
-// TAP TO MOVE, not drag — drag events don't fire on iOS Safari and
-// never have. Tap a table to pick it up, tap a space to put it down.
-// Same as the seating flow, so they already know how it works.
-//
-// Three columns. Grid positions, not pixels — survives any screen.
-
-let _arrangeRoom = null;
-let _arrangePicked = null;
-let _arrangeGrid = {};
-
-async function openArrangeTables(roomName) {
-  _arrangeRoom = roomName;
-  _arrangePicked = null;
-  const { rooms } = _elegantRoomsData();
-  const list = rooms[roomName] || [];
-
-  // Build the grid from current positions
-  _arrangeGrid = {};
-  const perCol = Math.ceil(list.length / 3);
-  list.forEach((t, i) => {
-    // Fill down each column, not across — matches how the room reads
-    const row = t.grid_row != null ? t.grid_row : (i % perCol);
-    const col = t.grid_col != null ? t.grid_col : Math.floor(i / perCol);
-    _arrangeGrid[`${row},${col}`] = t.name;
-  });
-  _renderArrange();
-}
-
-function _renderArrange() {
-  const view = document.getElementById('floor-plan-view');
-  if (!view) return;
-  _floorViewMode = 'arrange';
-
-  const maxRow = Math.max(...Object.keys(_arrangeGrid).map(k => parseInt(k.split(',')[0])), 3);
-  const rows = maxRow + 2;   // always one empty row at the bottom to grow into
-
-  let cells = '';
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < 3; c++) {
-      const key = `${r},${c}`;
-      const name = _arrangeGrid[key];
-      const picked = _arrangePicked === name;
-      cells += `<button onclick="_arrangeTap(${r},${c})"
-        style="aspect-ratio:1.5;border-radius:10px;cursor:pointer;
-        border:${name ? '2px solid #2B2724' : '2px dashed rgba(43,39,36,0.2)'};
-        background:${picked ? '#B87946' : name ? '#FFFDF9' : 'rgba(43,39,36,0.02)'};
-        color:${picked ? '#fff' : '#2B2724'};
-        font-family:'Architects Daughter',cursive;font-size:11px;font-weight:700;
-        display:flex;align-items:center;justify-content:center;padding:4px;
-        ${picked ? 'transform:scale(1.05);box-shadow:0 4px 16px rgba(184,121,70,0.4);' : ''}">
-        ${name || ''}
-      </button>`;
+    const reply = d.reply || d.message || d.content ||
+      "I'm not sure about that one. Ask Daisy — tap 💬 at the top.";
+    _cleoChat.push({ role: 'assistant', content: reply });
+    const el = document.getElementById(id);
+    if (el) {
+      el.style.color = '#2B2724';
+      el.innerHTML = reply;
     }
-  }
-
-  view.innerHTML = `
-    <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
-      <div style="margin-bottom:14px;">
-        <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">
-          Arrange ${_arrangeRoom}</div>
-        <div style="font-size:11px;color:#8a8175;">
-          ${_arrangePicked
-            ? `<strong style="color:#B87946;">${_arrangePicked} picked up</strong> — tap where it goes`
-            : 'Tap a table to pick it up, then tap where it should be'}</div>
-      </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:20px;">
-        ${cells}
-      </div>
-
-      <div style="display:flex;gap:8px;">
-        <button onclick="_saveArrange()" class="glaze-tile"
-          style="flex:1;border:none;border-radius:14px;padding:18px;cursor:pointer;
-          background:#4CAF50;color:#fff;font-size:16px;font-weight:800;">
-          ✓ Save this layout
-        </button>
-        <button onclick="_cancelArrange()" class="glaze-tile"
-          style="border:none;border-radius:14px;padding:18px 20px;cursor:pointer;
-          font-size:14px;font-weight:700;">
-          Cancel
-        </button>
-      </div>
-
-      <div style="margin-top:16px;padding:14px;background:rgba(43,39,36,0.04);border-radius:12px;
-        font-size:11px;color:#8a8175;line-height:1.5;">
-        Put the tables where they really are in the room. Three across, as many rows as you need.
-        Empty squares are just gaps — use them for the sink, the kiln door, wherever there isn't a table.
-      </div>
-    </div>`;
-  toggleFloatingBackBtn();
-}
-
-function _arrangeTap(row, col) {
-  const key = `${row},${col}`;
-  const here = _arrangeGrid[key];
-
-  if (!_arrangePicked) {
-    // Picking up
-    if (here) _arrangePicked = here;
-  } else {
-    // Putting down
-    const from = Object.keys(_arrangeGrid).find(k => _arrangeGrid[k] === _arrangePicked);
-    if (here && here !== _arrangePicked) {
-      // Swap them
-      _arrangeGrid[from] = here;
-      _arrangeGrid[key] = _arrangePicked;
-    } else {
-      // Move to empty
-      delete _arrangeGrid[from];
-      _arrangeGrid[key] = _arrangePicked;
-    }
-    _arrangePicked = null;
-  }
-  _renderArrange();
-}
-
-async function _saveArrange() {
-  const positions = Object.entries(_arrangeGrid).map(([key, name]) => {
-    const [row, col] = key.split(',').map(Number);
-    return { name, row, col };
-  });
-  try {
-    const res = await fetch(`${API_URL}/api/floor/layout`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studioId, positions })
-    });
-    if (!res.ok) throw new Error('Save failed');
-    _arrangeRoom = null;
-    await loadFloorPlan();
-    renderFloorPlanElegant();
+    _cleoSpeak(reply);
+    _assistNote('asked', q);
   } catch(e) {
-    alert("Couldn't save the layout — try again in a moment.");
+    const el = document.getElementById(id);
+    if (el) { el.style.color = '#2B2724'; el.textContent = "I can't reach my brain right now. Try again in a moment."; }
   }
-}
-
-function _cancelArrange() {
-  _arrangeRoom = null;
-  _arrangePicked = null;
-  renderFloorPlanElegant();
-}
-
-// ═══════════════════════════════════════════════════════════
-// THE TOUR — GENERATED FROM THE APP, NOT WRITTEN ALONGSIDE IT
-// 17 July 2026
-// ═══════════════════════════════════════════════════════════
-// The old tour was 41 hand-written steps. By this morning roughly
-// half were lies: it taught a flashing alert that was parked, and
-// said "sidebar" 22 times when the sidebar became tiles days ago.
-// It knew nothing about Collections, Training, H&S, Tell Daisy,
-// the busy meter, Jenny's packing flow or her assistant.
-//
-// Anything written twice diverges. That's arithmetic, not discipline.
-//
-// So this reads the app: GRID_NAV_STRUCTURE for the tiles,
-// ROLE_HOME_DEFAULTS for what THIS person sees, FLOW_CHECKS for the
-// stages. Change the app, the tour changes. It cannot go stale.
-//
-// Only the WHY is hand-written — "photograph the pieces together so
-// the kiln knows whose they are" doesn't drift. "Tap the sidebar" does.
-
-// The why. Everything else is generated.
-// Proper names for the tour — the tile labels aren't always where we look
-const TOUR_LABELS = {
-  'floor-plan': '🏠 The floor plan', 'packing': '📦 Packing',
-  'collections': '🏺 Collections', 'assistant': '🏺 Your assistant',
-  'piecematch': '🔍 Piece matching', 'labels': '🏷 Labels',
-  'training': '🎓 Your training', 'health-safety': '🦺 Health & safety',
-  'tell-daisy': '💬 Tell Daisy', 'staff': '📅 Today\'s bookings',
-  'menu': '☕ Menu', 'stock': '📦 Stock', 'team': '👥 Team',
-  'progress': '📊 Progress', 'dashboard': '📈 Overview', 'setup': '⚙️ Setup',
-  'whats-on': '📅 What\'s on', 'customer-demo': '👀 Customer app',
-  'trial-reset': '🔄 Clear & start again', 'catalogue': '🏺 Catalogue',
-  'shapes': '⚪ Bisque', 'community': '💬 Community', 'branding': '🎨 Branding',
-  'printqueue': '🖨 Print queue', 'tablecards': '🪑 Table cards',
-};
-
-const TOUR_WHY = {
-  'floor-plan': "This is home. Every room, every table, live. Red means finishing up, clay means painting, green means just arrived.",
-  'packing': "Fired pieces going home. Photograph one, the app tells you whose it is, you say yes. It learns every time.",
-  'collections': "What's ready to collect, and finding something on a jumbled shelf.",
-  'assistant': "Learns how you work and helps when you need it. Never nags.",
-  'piecematch': "Photograph any piece, the AI matches it to a booking.",
-  'labels': "Print a label for a piece going home.",
-  'training': "Read it, tick it, done. Daisy sees it automatically.",
-  'health-safety': "Risk assessment, kiln safety, COSHH. The things that keep everyone safe.",
-  'tell-daisy': "Something good or bad happened. Tap what, it goes to whoever deals with it.",
-  'staff': "Today's bookings, who's in, what stage they're at.",
-  'menu': "Drinks and food orders.",
-  'stock': "What's on the shelf, what needs ordering.",
-  'team': "Who's on shift, duties, holidays.",
-  'progress': "How today's going.",
-  'dashboard': "The numbers.",
-  'setup': "Studio settings.",
-  'whats-on': "Local events that might make us busy.",
-  'customer-demo': "See exactly what customers see on their phone.",
-  'trial-reset': "Put today back to this morning. For testing.",
-  'catalogue': "Every piece we've ever fired.",
-  'shapes': "The bisque we stock.",
-  'community': "Customer work worth featuring.",
-  'branding': "How the studio looks.",
-  'printqueue': "Labels waiting to print.",
-  'tablecards': "Cards for the tables.",
-};
-
-let _tourStep = 0;
-let _tourSteps = [];
-let _tourTimer = null;
-let _tourPlaying = false;
-
-function _buildTour() {
-  const role = currentShiftStaff?.role || 'Studio Assistant';
-  const defaults = ROLE_HOME_DEFAULTS[role] || ROLE_HOME_DEFAULTS['Studio Assistant'];
-  const first = (currentShiftStaff?.name || 'there').split(' ')[0];
-
-  const steps = [{
-    icon: '👋',
-    title: `Hello ${first}`,
-    body: `This is your studio, on your phone. ${defaults.tileOrder.length} things you can do, in the order you'll probably need them.`,
-    colour: '#B87946',
-  }];
-
-  // One step per tile THIS PERSON has — generated, never hand-listed
-  defaults.tileOrder.forEach(tab => {
-    const why = TOUR_WHY[tab];
-    if (!why) return;
-    const label = TOUR_LABELS[tab] || tab;
-    const icon = label.match(/^\S+/)?.[0] || '▦';
-    const title = label.replace(/^\S+\s*/, '');
-    const group = GRID_NAV_STRUCTURE.find(g => g.tab === tab || g.id === tab);
-    steps.push({ icon, title, body: why, colour: group?.color || '#B87946' });
-  });
-
-  // The flow — generated from FLOW_CHECKS
-  if (typeof FLOW_CHECKS === 'object') {
-    const stages = Object.keys(FLOW_CHECKS);
-    steps.push({
-      icon: '🔄',
-      title: 'How a booking works',
-      body: `Tap a coloured table and you get a checklist. ${stages.length} stages: ${stages.join(' → ')}. Tick as you go. The table changes colour so everyone can see where it's at.`,
-      colour: '#00897B',
-    });
-  }
-
-  // Tell Daisy — generated from ALERT_TRIGGERS if the picker's loaded
-  steps.push({
-    icon: '💬',
-    title: 'If something goes wrong',
-    body: 'Tap 💬 at the top. Broken piece, unhappy customer, running low. Tap what happened — nothing to type. It goes to whoever deals with it.',
-    colour: '#e53935',
-  });
-
-  steps.push({
-    icon: '✓',
-    title: "That's it",
-    body: "Nothing you tap can break anything. Have a play. If you get stuck, tap 💬 and someone will come.",
-    colour: '#4CAF50',
-  });
-
-  return steps;
-}
-
-function openTour() {
-  _tourSteps = _buildTour();
-  _tourStep = 0;
-  _tourPlaying = false;
-  _renderTour();
-}
-
-function _renderTour() {
-  const s = _tourSteps[_tourStep];
-  if (!s) return _closeTour();
-
-  document.getElementById('tour-overlay')?.remove();
-  const o = document.createElement('div');
-  o.id = 'tour-overlay';
-  o.style.cssText = 'position:fixed;inset:0;z-index:9900;background:rgba(43,39,36,0.94);display:flex;align-items:center;justify-content:center;padding:24px;';
-  o.innerHTML = `
-    <div style="width:100%;max-width:420px;text-align:center;">
-      <div style="font-size:56px;margin-bottom:16px;animation:swt-appear 0.4s ease both;">${s.icon}</div>
-      <div style="font-family:'Caveat',cursive;font-size:34px;color:${s.colour};font-weight:700;
-        margin-bottom:12px;animation:swt-appear 0.4s 0.1s ease both;">${s.title}</div>
-      <div style="font-size:16px;color:#F4ECE0;line-height:1.6;margin-bottom:28px;
-        animation:swt-appear 0.4s 0.2s ease both;">${s.body}</div>
-
-      <!-- Progress dots -->
-      <div style="display:flex;gap:5px;justify-content:center;margin-bottom:24px;flex-wrap:wrap;">
-        ${_tourSteps.map((_, i) => `<div style="width:${i===_tourStep?18:6}px;height:6px;border-radius:3px;
-          background:${i===_tourStep ? s.colour : i<_tourStep ? 'rgba(244,236,224,0.5)' : 'rgba(244,236,224,0.15)'};
-          transition:all 0.3s;"></div>`).join('')}
-      </div>
-
-      <div style="display:flex;gap:8px;margin-bottom:10px;">
-        ${_tourStep > 0 ? `<button onclick="_tourBack()" style="flex:0 0 auto;background:rgba(255,255,255,0.1);
-          color:#F4ECE0;border:none;border-radius:12px;padding:14px 18px;font-size:14px;cursor:pointer;">←</button>` : ''}
-        <button onclick="_tourNext()" style="flex:1;background:${s.colour};color:#fff;border:none;
-          border-radius:14px;padding:16px;font-size:16px;font-weight:800;cursor:pointer;">
-          ${_tourStep === _tourSteps.length-1 ? "Let's go" : 'Next'}</button>
-        <button onclick="_tourTogglePlay()" title="${_tourPlaying ? 'Pause' : 'Play it for me'}"
-          style="flex:0 0 auto;background:rgba(255,255,255,0.1);color:#F4ECE0;border:none;
-          border-radius:12px;padding:14px 18px;font-size:14px;cursor:pointer;">
-          ${_tourPlaying ? '⏸' : '▶'}</button>
-      </div>
-      <button onclick="_closeTour()" style="width:100%;background:none;color:#8a8175;border:none;
-        padding:10px;font-size:12px;cursor:pointer;">Skip the tour</button>
-    </div>`;
-  document.body.appendChild(o);
-
-  // Speak it if playing — calm, slow, the one voice
-  if (_tourPlaying && window.speechSynthesis) {
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(`${s.title}. ${s.body}`);
-    const v = typeof resolveStudioVoice === 'function' ? resolveStudioVoice() : null;
-    if (v) { u.voice = v; u.lang = v.lang; }
-    u.rate = 0.88; u.pitch = 1.0;
-    window.speechSynthesis.speak(u);
-  }
-}
-
-function _tourNext() {
-  if (_tourStep >= _tourSteps.length - 1) return _closeTour();
-  _tourStep++;
-  _renderTour();
-  if (_tourPlaying) _tourSchedule();
-}
-
-function _tourBack() {
-  if (_tourStep > 0) { _tourStep--; _renderTour(); }
-}
-
-function _tourTogglePlay() {
-  _tourPlaying = !_tourPlaying;
-  if (_tourPlaying) { _renderTour(); _tourSchedule(); }
-  else {
-    clearTimeout(_tourTimer);
-    window.speechSynthesis?.cancel();
-    _renderTour();
-  }
-}
-
-function _tourSchedule() {
-  clearTimeout(_tourTimer);
-  // Pace it by how much there is to read — steady, not boring.
-  // ~6s a step, whole tour lands around 90 seconds for most roles.
-  const s = _tourSteps[_tourStep];
-  const words = (s.title + ' ' + s.body).split(/\s+/).length;
-  const ms = Math.max(4500, Math.min(9000, words * 320));
-  _tourTimer = setTimeout(() => {
-    if (!_tourPlaying) return;
-    if (_tourStep >= _tourSteps.length - 1) { _tourPlaying = false; _closeTour(); }
-    else _tourNext();
-  }, ms);
-}
-
-function _closeTour() {
-  clearTimeout(_tourTimer);
-  _tourPlaying = false;
-  window.speechSynthesis?.cancel();
-  document.getElementById('tour-overlay')?.remove();
 }
 
 // THIS IS A RENDERING OF /api/staff/alert-kinds, NEVER A SECOND LIST.
