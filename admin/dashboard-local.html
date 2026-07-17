@@ -8674,88 +8674,249 @@ function _assistWhatILearned() {
 
 // The assistant — waits to be tapped, speaks calmly
 function openAssistant() {
+  // ═══════════════════════════════════════════════════════════
+  // CLEO — everyone's helper. 17 July 2026.
+  // ═══════════════════════════════════════════════════════════
+  // Daisy: "maybe that assistant could be Cleo represented."
+  //
+  // NOT the old floating helper — that stays parked. That one
+  // chattered unprompted, aged, made seasonal small talk and
+  // followed you round the screen. Daisy asked four times for it
+  // to go and she was right.
+  //
+  // This is different: she waits to be tapped, answers what you
+  // ask, learns how you work, and reads it out — one voice for
+  // everyone, cute and steady, autoplay on with a pause.
   const learned = _assistWhatILearned();
-  const first = (currentShiftStaff?.name || '').split(' ')[0];
+  const first = (currentShiftStaff?.name || 'there').split(' ')[0];
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening';
+  const mascot = typeof renderCleoMascotSVG === 'function' ? renderCleoMascotSVG(9) : '🏺';
 
   const sheet = document.createElement('div');
   sheet.id = 'assistant';
   sheet.style.cssText = 'position:fixed;inset:0;z-index:9760;background:rgba(43,39,36,0.9);display:flex;align-items:flex-end;justify-content:center;';
-  sheet.onclick = e => { if (e.target===sheet) sheet.remove(); };
+  sheet.onclick = e => { if (e.target===sheet) { _assistStopVoice(); sheet.remove(); } };
   sheet.innerHTML = `<div style="background:#FFFDF9;width:100%;max-width:520px;border-radius:18px 18px 0 0;
-    padding:24px 20px calc(24px + env(safe-area-inset-bottom));max-height:80vh;display:flex;flex-direction:column;">
+    padding:24px 20px calc(24px + env(safe-area-inset-bottom));max-height:84vh;display:flex;flex-direction:column;">
 
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
-      <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#B87946,#9A6435);
-        display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">🏺</div>
-      <div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <div style="width:56px;height:56px;flex-shrink:0;">${mascot}</div>
+      <div style="flex:1;">
         <div style="font-family:'Caveat',cursive;font-size:24px;color:#2B2724;font-weight:700;">
           ${greeting}, ${first}</div>
-        <div style="font-size:11px;color:#8a8175;">I'm here if you need me</div>
+        <div style="font-size:11px;color:#8a8175;">Cleo · ask me anything</div>
       </div>
+      <button onclick="_assistToggleVoice()" id="assist-voice-btn" title="Pause"
+        style="background:rgba(43,39,36,0.08);border:none;border-radius:50%;width:34px;height:34px;
+        font-size:14px;cursor:pointer;flex-shrink:0;">⏸</button>
     </div>
 
-    <div style="overflow-y:auto;flex:1;">
+    <div style="overflow-y:auto;flex:1;" id="assist-body">
       ${learned.length ? `
-        <div style="background:rgba(184,121,70,0.08);border-radius:12px;padding:14px;margin-bottom:14px;">
+        <div style="background:rgba(184,121,70,0.08);border-radius:12px;padding:14px;margin-bottom:12px;">
           <div style="font-size:10px;color:#B87946;font-weight:800;letter-spacing:0.06em;margin-bottom:8px;">
-            WHAT I'VE LEARNED ABOUT YOU</div>
+            WHAT I'VE NOTICED</div>
           ${learned.map(l => `<div style="font-size:13px;color:#2B2724;line-height:1.6;margin-bottom:6px;">
             ${l}</div>`).join('')}
         </div>` : `
-        <div style="background:rgba(43,39,36,0.04);border-radius:12px;padding:14px;margin-bottom:14px;">
+        <div style="background:rgba(43,39,36,0.04);border-radius:12px;padding:14px;margin-bottom:12px;">
           <div style="font-size:13px;color:#2B2724;line-height:1.6;">
-            I'm still learning your ways. The more you use me, the more helpful I'll be.
-            I'll notice when you like to pack, how fast you work, and which pieces I keep
-            getting wrong. Nothing to set up — just carry on and I'll pick it up.</div>
+            I'm still learning how you work. Just carry on and I'll pick it up.</div>
         </div>`}
 
-      <div style="font-size:10px;color:#8a8175;font-weight:800;letter-spacing:0.06em;margin-bottom:10px;">
-        WHAT CAN I DO?</div>
+      <div id="assist-tasks" style="margin-bottom:12px;"></div>
 
-      <button onclick="document.getElementById('assistant').remove(); openPacking();"
-        class="glaze-tile" style="width:100%;border:none;border-radius:14px;padding:16px;
-        cursor:pointer;text-align:left;margin-bottom:8px;">
-        <div style="font-family:'Caveat',cursive;font-size:18px;font-weight:700;color:#2B2724;">
-          📦 Start packing</div>
-        <div style="font-size:11px;color:#8a8175;margin-top:2px;">
-          I'll show you one piece at a time</div>
+      <!-- ASK HER SOMETHING -->
+      <button onclick="_assistAsk()" class="glaze-tile"
+        style="width:100%;border:none;border-radius:14px;padding:18px;cursor:pointer;
+        background:linear-gradient(135deg,#B87946,#9A6435);color:#fff;margin-bottom:10px;
+        text-align:left;">
+        <div style="font-size:24px;margin-bottom:4px;">🎤</div>
+        <div style="font-family:'Caveat',cursive;font-size:20px;font-weight:700;">Ask me a question</div>
+        <div style="font-size:11px;opacity:0.9;margin-top:2px;">"How do I do this?" — just say it</div>
       </button>
 
-      <button onclick="document.getElementById('assistant').remove(); openFindMyPiece();"
-        class="glaze-tile" style="width:100%;border:none;border-radius:14px;padding:16px;
-        cursor:pointer;text-align:left;margin-bottom:8px;">
-        <div style="font-family:'Caveat',cursive;font-size:18px;font-weight:700;color:#2B2724;">
-          🔍 Find something on the shelf</div>
-        <div style="font-size:11px;color:#8a8175;margin-top:2px;">
-          Photograph it, I'll tell you whose it is</div>
-      </button>
+      <div style="font-size:10px;color:#8a8175;font-weight:800;letter-spacing:0.06em;margin-bottom:8px;">
+        OR TAP ONE</div>
 
-      <button onclick="document.getElementById('assistant').remove(); openTellPicker();"
-        class="glaze-tile" style="width:100%;border:none;border-radius:14px;padding:16px;
-        cursor:pointer;text-align:left;margin-bottom:8px;">
-        <div style="font-family:'Caveat',cursive;font-size:18px;font-weight:700;color:#2B2724;">
-          💬 Something's gone wrong</div>
-        <div style="font-size:11px;color:#8a8175;margin-top:2px;">
-          Broken piece, running low, need a hand</div>
-      </button>
-
-      <button onclick="_assistantSpeak()"
-        class="glaze-tile" style="width:100%;border:none;border-radius:14px;padding:16px;
-        cursor:pointer;text-align:left;">
-        <div style="font-family:'Caveat',cursive;font-size:18px;font-weight:700;color:#2B2724;">
-          🔊 Read it out to me</div>
-        <div style="font-size:11px;color:#8a8175;margin-top:2px;">
-          I'll say what I've learned, slowly</div>
-      </button>
+      ${(ROLE_HOME_DEFAULTS[currentShiftStaff?.role]?.tileOrder || ['floor-plan'])
+        .slice(0,3).map(tab => {
+          const label = (typeof TOUR_LABELS !== 'undefined' && TOUR_LABELS[tab]) || tab;
+          const why = (typeof TOUR_WHY !== 'undefined' && TOUR_WHY[tab]) || '';
+          const group = GRID_NAV_STRUCTURE.find(g => g.tab===tab || g.id===tab);
+          return `<button onclick="_assistGo('${tab}')" class="glaze-tile"
+            style="width:100%;border:none;border-radius:14px;padding:14px;cursor:pointer;
+            text-align:left;margin-bottom:6px;">
+            <div style="font-family:'Caveat',cursive;font-size:18px;font-weight:700;color:#2B2724;">${label}</div>
+            <div style="font-size:11px;color:#8a8175;margin-top:2px;">${why.slice(0,60)}</div>
+          </button>`;
+        }).join('')}
     </div>
 
-    <button onclick="document.getElementById('assistant').remove()"
-      style="margin-top:14px;width:100%;background:#2B2724;color:#fff;border:none;border-radius:12px;
-      padding:13px;font-size:14px;font-weight:800;cursor:pointer;">Thanks</button>
+    <button onclick="_assistStopVoice(); document.getElementById('assistant').remove()"
+      style="margin-top:12px;width:100%;background:#2B2724;color:#fff;border:none;border-radius:12px;
+      padding:13px;font-size:14px;font-weight:800;cursor:pointer;">Thanks Cleo</button>
   </div>`;
   document.body.appendChild(sheet);
+
+  _assistLoadTasks();
+  // Autoplay on — Daisy: "should be default play"
+  _assistSpeakGreeting();
+}
+
+// Their tasks — from the real duties table, not invented
+async function _assistLoadTasks() {
+  const el = document.getElementById('assist-tasks');
+  if (!el || !currentShiftStaff?.id) return;
+  try {
+    const res = await fetch(`${API_URL}/api/staff/${currentShiftStaff.id}/duties?studioId=${studioId}`);
+    const d = await res.json();
+    const open = (d.duties || []).filter(x => !x.completed);
+    if (!open.length) return;
+    el.innerHTML = `
+      <div style="background:rgba(0,137,123,0.08);border-radius:12px;padding:14px;">
+        <div style="font-size:10px;color:#00897B;font-weight:800;letter-spacing:0.06em;margin-bottom:8px;">
+          STILL TO DO · ${open.length}</div>
+        ${open.slice(0,4).map(t => `<div style="font-size:13px;color:#2B2724;line-height:1.6;
+          margin-bottom:4px;">• ${t.title || t.label || t.duty}</div>`).join('')}
+        ${open.length > 4 ? `<div style="font-size:11px;color:#8a8175;margin-top:4px;">
+          and ${open.length-4} more</div>` : ''}
+      </div>`;
+  } catch(e) { /* no duties, no panel */ }
+}
+
+// Ask Cleo a question — voice in, voice out
+function _assistAsk() {
+  const body = document.getElementById('assist-body');
+  if (!body) return;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    body.innerHTML = `<div style="text-align:center;padding:30px 20px;">
+      <div style="font-size:36px;margin-bottom:10px;">😕</div>
+      <div style="font-size:14px;color:#2B2724;line-height:1.5;">
+        This device can't hear me yet. Try Safari or Chrome.</div>
+      <button onclick="openAssistant()" style="margin-top:16px;background:#2B2724;color:#fff;
+        border:none;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer;">
+        Back</button>
+    </div>`;
+    return;
+  }
+
+  body.innerHTML = `<div style="text-align:center;padding:40px 20px;">
+    <div style="font-size:52px;margin-bottom:14px;animation:swt-float 1.2s ease-in-out infinite;">🎤</div>
+    <div style="font-family:'Caveat',cursive;font-size:24px;color:#B87946;">I'm listening…</div>
+    <div style="font-size:12px;color:#8a8175;margin-top:6px;">Say your question</div>
+  </div>`;
+
+  const rec = new SR();
+  rec.lang = 'en-GB';
+  rec.interimResults = false;
+  rec.maxAlternatives = 1;
+  rec.onresult = (e) => {
+    const q = e.results[0][0].transcript;
+    _assistAnswer(q);
+  };
+  rec.onerror = () => {
+    body.innerHTML = `<div style="text-align:center;padding:30px 20px;">
+      <div style="font-size:36px;margin-bottom:10px;">🤷</div>
+      <div style="font-size:14px;color:#2B2724;">I didn't catch that.</div>
+      <button onclick="_assistAsk()" style="margin-top:16px;background:#B87946;color:#fff;
+        border:none;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer;">
+        Try again</button>
+    </div>`;
+  };
+  try { rec.start(); } catch(e) { /* already running */ }
+}
+
+async function _assistAnswer(question) {
+  const body = document.getElementById('assist-body');
+  if (!body) return;
+  body.innerHTML = `<div style="padding:16px;">
+    <div style="font-size:11px;color:#8a8175;margin-bottom:6px;">You asked</div>
+    <div style="font-size:15px;color:#2B2724;font-style:italic;margin-bottom:18px;">"${question}"</div>
+    <div style="text-align:center;padding:20px;">
+      <div style="font-size:32px;animation:swt-float 1.2s ease-in-out infinite;">💭</div>
+      <div style="font-size:13px;color:#8a8175;margin-top:8px;">Thinking…</div>
+    </div>
+  </div>`;
+
+  try {
+    const res = await fetch(`${API_URL}/api/assistant/chat`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId, context: 'staff', staffMemberId: currentShiftStaff?.id,
+        messages: [{ role: 'user', content: question }],
+      })
+    });
+    const d = await res.json();
+    const answer = d.reply || d.message || d.content || "I'm not sure about that one. Ask Daisy?";
+    body.innerHTML = `<div style="padding:4px;">
+      <div style="font-size:11px;color:#8a8175;margin-bottom:6px;">You asked</div>
+      <div style="font-size:14px;color:#8a8175;font-style:italic;margin-bottom:16px;">"${question}"</div>
+      <div style="background:rgba(184,121,70,0.08);border-radius:12px;padding:16px;">
+        <div style="font-size:15px;color:#2B2724;line-height:1.6;">${answer}</div>
+      </div>
+      <button onclick="_assistAsk()" style="margin-top:14px;width:100%;background:#B87946;color:#fff;
+        border:none;border-radius:12px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;">
+        🎤 Ask something else</button>
+      <button onclick="openAssistant()" style="margin-top:8px;width:100%;background:none;color:#8a8175;
+        border:none;padding:10px;font-size:12px;cursor:pointer;">Back</button>
+    </div>`;
+    _assistSay(answer);
+    if (typeof _assistNote === 'function') _assistNote('asked', question);
+  } catch(e) {
+    body.innerHTML = `<div style="text-align:center;padding:30px 20px;">
+      <div style="font-size:36px;margin-bottom:10px;">😕</div>
+      <div style="font-size:14px;color:#2B2724;">I can't reach my brain right now.</div>
+      <button onclick="openAssistant()" style="margin-top:16px;background:#2B2724;color:#fff;
+        border:none;border-radius:12px;padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer;">
+        Back</button>
+    </div>`;
+  }
+}
+
+function _assistGo(tab) {
+  _assistStopVoice();
+  document.getElementById('assistant')?.remove();
+  const g = GRID_NAV_STRUCTURE.find(x => x.tab===tab || x.id===tab);
+  if (g?.fn && typeof window[g.fn] === 'function') window[g.fn]();
+  else goToTab(tab);
+}
+
+// ── VOICE ── one voice for everyone. Cute, steady, autoplay on.
+let _assistVoiceOn = true;
+
+function _assistSpeakGreeting() {
+  const learned = _assistWhatILearned();
+  const first = (currentShiftStaff?.name || 'there').split(' ')[0];
+  const text = learned.length
+    ? `Hello ${first}. ${learned.join(' ')} Tap the microphone if you want to ask me something.`
+    : `Hello ${first}. I'm Cleo. I'm still learning how you work. Tap the microphone any time and ask me a question.`;
+  _assistSay(text);
+}
+
+function _assistSay(text) {
+  if (!_assistVoiceOn || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  const v = typeof resolveStudioVoice === 'function' ? resolveStudioVoice() : null;
+  if (v) { u.voice = v; u.lang = v.lang; }
+  // Cleo: cute, steady, never rushed. Same for everyone.
+  u.rate = 0.9; u.pitch = 1.15; u.volume = 0.9;
+  window.speechSynthesis.speak(u);
+}
+
+function _assistToggleVoice() {
+  _assistVoiceOn = !_assistVoiceOn;
+  const btn = document.getElementById('assist-voice-btn');
+  if (btn) { btn.textContent = _assistVoiceOn ? '⏸' : '🔊'; btn.title = _assistVoiceOn ? 'Pause' : 'Listen'; }
+  if (!_assistVoiceOn) window.speechSynthesis?.cancel();
+  else _assistSpeakGreeting();
+}
+
+function _assistStopVoice() {
+  window.speechSynthesis?.cancel();
 }
 
 // Calm, slow, warm. Uses the one voice resolver — no second voice picker.
@@ -13544,14 +13705,14 @@ const ROLE_HOME_DEFAULTS = {
 
   'General Manager': {
     // Daisy: the whole studio at a glance, then people, then money
-    tileOrder: ['floor-plan', 'progress', 'team', 'packing', 'dashboard', 'staff',
+    tileOrder: ['assistant', 'floor-plan', 'progress', 'team', 'packing', 'dashboard', 'staff',
                 'stock', 'training', 'health-safety', 'whats-on', 'customer-demo', 'trial-reset', 'setup'],
     promotedTiles: ['tell-daisy']
   },
 
   'Co-Director': {
     // David: same as Daisy — full visibility
-    tileOrder: ['floor-plan', 'progress', 'dashboard', 'team', 'packing', 'staff',
+    tileOrder: ['assistant', 'floor-plan', 'progress', 'dashboard', 'team', 'packing', 'staff',
                 'stock', 'training', 'health-safety', 'whats-on', 'customer-demo', 'trial-reset', 'setup'],
     promotedTiles: ['tell-daisy']
   },
@@ -13566,28 +13727,28 @@ const ROLE_HOME_DEFAULTS = {
 
   'Ceramic Technician': {
     // Lucy: bisque in, fired pieces out. Kiln is her world.
-    tileOrder: ['floor-plan', 'piecematch', 'packing', 'collections', 'shapes', 'catalogue',
+    tileOrder: ['assistant', 'floor-plan', 'piecematch', 'packing', 'collections', 'shapes', 'catalogue',
                 'stock', 'labels', 'training', 'health-safety'],
     promotedTiles: ['tell-daisy']
   },
 
   'Studio Assistant': {
     // Ruby: the floor. Seat people, take orders, photograph pieces.
-    tileOrder: ['floor-plan', 'staff', 'menu', 'tablecards',
+    tileOrder: ['assistant', 'floor-plan', 'staff', 'menu', 'tablecards',
                 'collections', 'packing', 'piecematch', 'training', 'health-safety'],
     promotedTiles: ['tell-daisy']
   },
 
   'Marketing & Host By Post Manager': {
     // Elliott: Host By Post and the customer-facing side
-    tileOrder: ['floor-plan', 'community', 'branding', 'customer-demo',
+    tileOrder: ['assistant', 'floor-plan', 'community', 'branding', 'customer-demo',
                 'whats-on', 'health-safety'],
     promotedTiles: ['tell-daisy']
   },
 
   'Chief Taster': {
     // Cleo: her club, her pages
-    tileOrder: ['floor-plan', 'community', 'menu'],
+    tileOrder: ['assistant', 'floor-plan', 'community', 'menu'],
     promotedTiles: []
   },
 };
@@ -14140,7 +14301,7 @@ const GRID_NAV_STRUCTURE = [
   { tab: 'health-safety', label: '🦺 Health & Safety', desc: 'Risk assessment, training, procedures', fn: 'openHealthSafety' },
   { tab: 'packing', label: '📦 Packing', desc: 'Fired pieces going home', fn: 'openPacking' },
   { tab: 'collections', label: '🏺 Collections', desc: 'Ready to collect · returns · find on shelf', fn: 'openCollections' },
-  { tab: 'assistant', label: '🏺 My Assistant', desc: 'Learns your ways · gentle help', fn: 'openAssistant' },
+  { tab: 'assistant', label: '💛 Ask Cleo', desc: 'She learns how you work · ask her anything', fn: 'openAssistant' },
   { tab: 'training', label: '🎓 My Training', desc: 'Read, tick, done', fn: 'openMyTraining' },
   { tab: 'trial-reset', label: '🔄 Clear & Start Again', desc: 'Reset today for testing', fn: 'openTrialReset' },
   ]},
