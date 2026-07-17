@@ -7462,6 +7462,23 @@ function showAdminA2HSModal() {
   document.body.appendChild(m);
 }
 
+// ═══════════════════════════════════════════════════════════
+// CUSTOMER APP DEMO — staff see exactly what customers see
+// ═══════════════════════════════════════════════════════════
+// Opens the real customer app in a new tab with today's first
+// booking, so it's genuinely functional — not a mockup.
+// If no bookings today, opens with the demo booking.
+async function openCustomerDemo() {
+  let bookingCode = 'demo-booking-main';
+  try {
+    const res = await fetch(`${API_URL}/api/floor/active?studioId=${studioId}`);
+    const data = await res.json();
+    const first = (data.bookings || [])[0];
+    if (first?.booking_code) bookingCode = first.booking_code;
+  } catch(e) { /* fall back to demo */ }
+  window.open(`${API_URL}/app?booking=${encodeURIComponent(bookingCode)}`, '_blank');
+}
+
 // THIS IS A RENDERING OF /api/staff/alert-kinds, NEVER A SECOND LIST.
 // A hand-written copy of the vocabulary would drift from ALERT_TRIGGERS
 // within a week — which is exactly how the elegant floor plan ended up
@@ -9710,17 +9727,28 @@ function selectLoginMember(member) {
   // TO RESTORE FULL LOGIN: set TRIAL_SKIP_AUTH = false
   // Everything else (PIN, Face ID, welcome back) is untouched.
   // ═══════════════════════════════════════════════════════
-  const TRIAL_SKIP_AUTH = true;
-  if (TRIAL_SKIP_AUTH) {
-    currentShiftStaff = { id: member.id, name: member.name, role: member.role || '' };
-    localStorage.setItem('klnk_last_logged_in_id', member.id);
-    localStorage.setItem('klnk_shift_staff', JSON.stringify(currentShiftStaff));
-    markSessionActive();
-    document.getElementById('shift-login-modal').style.display = 'none';
-    goToTab('floor-plan');
-    applyShiftUI();
-    window._floorPlanLocked = true;
-    setTimeout(() => { window._floorPlanLocked = false; }, 3000);
+  // TRIAL MODE: PIN screen shows, hint says 0000, no Face ID.
+  // Staff see the real login experience but it's frictionless.
+  // TO RESTORE FULL SECURITY: set TRIAL_SIMPLE_PIN = false
+  const TRIAL_SIMPLE_PIN = true;
+  if (TRIAL_SIMPLE_PIN) {
+    selectedLoginMember = member;
+    const c = ROLE_COLORS_LOGIN[member.role] || '#999';
+    document.getElementById('login-pin-avatar').textContent = member.name.charAt(0).toUpperCase();
+    document.getElementById('login-pin-avatar').style.background = c;
+    document.getElementById('login-pin-name').textContent = member.name;
+    document.getElementById('shift-pin-input').value = '';
+    document.getElementById('shift-pin-error').style.display = 'none';
+    // Trial hint
+    const notice = document.getElementById('demo-pin-notice');
+    if (notice) {
+      notice.style.display = 'block';
+      notice.textContent = 'Trial mode — PIN is 0000';
+    }
+    // Hide Face ID during trial
+    const faceBtn = document.getElementById('faceid-login-btn');
+    if (faceBtn) faceBtn.style.display = 'none';
+    showLoginScreen('pin');
     return;
   }
   // ═══════════════════════════════════════════════════════
@@ -9947,6 +9975,37 @@ async function tryStaffFaceIdLogin() {
 }
 
 async function submitShiftPin() {
+  // TRIAL: accept 0000 for anyone. Set TRIAL_SIMPLE_PIN=false to restore.
+  const TRIAL_SIMPLE_PIN = true;
+  if (TRIAL_SIMPLE_PIN) {
+    const pin = document.getElementById('shift-pin-input').value;
+    if (pin === '0000') {
+      currentShiftStaff = { id: selectedLoginMember.id, name: selectedLoginMember.name,
+                            role: selectedLoginMember.role || '' };
+      localStorage.setItem('klnk_last_logged_in_id', selectedLoginMember.id);
+      localStorage.setItem('klnk_shift_staff', JSON.stringify(currentShiftStaff));
+      markSessionActive();
+      // Start a real shift so time tracking works
+      try {
+        const res = await fetch(`${API_URL}/api/staff/shift/start`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studioId, staffMemberId: selectedLoginMember.id })
+        });
+        const d = await res.json();
+        if (d.shiftId) { currentShiftId = d.shiftId; localStorage.setItem('klnk_shift_id', d.shiftId); }
+      } catch(e) { console.warn('shift start failed:', e.message); }
+      document.getElementById('shift-login-modal').style.display = 'none';
+      goToTab('floor-plan');
+      applyShiftUI();
+      window._floorPlanLocked = true;
+      setTimeout(() => { window._floorPlanLocked = false; }, 3000);
+      return;
+    } else {
+      const err = document.getElementById('shift-pin-error');
+      if (err) { err.textContent = 'Trial PIN is 0000'; err.style.display = 'block'; }
+      return;
+    }
+  }
   const pin = document.getElementById('shift-pin-input').value.trim();
   const errorEl = document.getElementById('shift-pin-error');
   const submitBtn = document.getElementById('shift-pin-submit-btn');
@@ -12305,6 +12364,10 @@ function demoteSubTile(tabId) {
 const GRID_NAV_STRUCTURE = [
   { id: 'tables', label: 'Tables', color: '#00695c', items: [
     { tab: 'floor-plan', label: 'Floor Plan', desc: 'Live view of all tables', fn: 'showFloorPlan' },
+  // Customer app demo — always visible so staff can see exactly what
+  // customers see. Opens the real customer app in a new tab with a
+  // demo booking so it's fully functional, not a mockup.
+  { tab: 'customer-demo', label: '👀 Customer App', desc: 'See what customers see', fn: 'openCustomerDemo' },
   ]},
   { id: 'dashboard', label: 'Dashboard', color: '#B87946', items: [
     { tab: 'dashboard', label: 'Overview', desc: 'Your daily overview' },
