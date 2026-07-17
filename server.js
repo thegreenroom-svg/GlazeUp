@@ -411,6 +411,33 @@ app.get('/api/square/callback', async (req, res) => {
 /**
  * Sync Square transactions and customers to analytics
  */
+// Pull a party size out of a customer's note. The number only.
+// Conservative on purpose: a wrong number is worse than no number,
+// because staff would lay out for it.
+function _partySizeFromNote(note) {
+  if (!note || typeof note !== 'string') return null;
+  const n = note.toLowerCase();
+
+  // "6 people", "3 adults", "5 ladies", "party of 4", "4 of us"
+  const patterns = [
+    /\b(\d{1,2})\s*(?:people|persons?|adults?|ladies|guests?|painters?|of us)\b/,
+    /\bparty of\s*(\d{1,2})\b/,
+    /\bbooking for\s*(\d{1,2})\b/,
+    /\btable for\s*(\d{1,2})\b/,
+    /\bgroup of\s*(\d{1,2})\b/,
+    /\bthere(?:'ll| will) be\s*(\d{1,2})\b/,
+  ];
+  for (const re of patterns) {
+    const m = n.match(re);
+    if (m) {
+      const size = parseInt(m[1], 10);
+      // Sanity: 1-20. Bigger than that and it's a date, a price, or a typo.
+      if (size >= 1 && size <= 20) return size;
+    }
+  }
+  return null;
+}
+
 async function syncSquareData(studioId, accessToken, daysBack = 1) {
   try {
     const { data: connectionRow } = await supabase
@@ -2432,7 +2459,33 @@ app.post('/api/bookings/sync', async (req, res) => {
         space_name: spaceName,
         session_start: booking.startAt,
         session_end: sessionEnd,
-        party_size: null,
+        // ═══════════════════════════════════════════════════════════
+        // PARTY SIZE — read from what customers already tell us.
+        // 17 July 2026.
+        // ═══════════════════════════════════════════════════════════
+        // Square's Bookings API has NO party size field. Each booking is
+        // one person booking one slot. This was hardcoded to null, so
+        // every booking has always been party_size: null — which is why
+        // the VU meter counts bookings, not covers, and why nobody could
+        // lay out the right number of aprons.
+        //
+        // But customers are TELLING us, in the note:
+        //   "6 people"  ·  "Booking for 6 people if tables can be added
+        //   together"  ·  "3 people paid"  ·  "5 ladies in together"
+        //
+        // So: pull the NUMBER only. Nothing else.
+        //
+        // WHAT THIS DELIBERATELY DOES NOT DO, and why:
+        // The same notes contain "Pushchair", "bringing a pram",
+        // "gluten free option cake". A pushchair tells you someone has a
+        // baby. Gluten-free is dietary. Both are Article 9 special
+        // category data under UK GDPR. Parsing those into structured
+        // fields would be building a database of who has babies and who
+        // has coeliac disease, with no consent and no lawful basis.
+        //
+        // Staff can READ the note — it's on the booking, they need it.
+        // The app extracts one integer and looks away.
+        party_size: _partySizeFromNote(booking.sellerNote || booking.customerNote),
         notes: booking.sellerNote || booking.customerNote || null
       };
     });
