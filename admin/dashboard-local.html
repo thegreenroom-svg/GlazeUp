@@ -10421,7 +10421,7 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
         letter-spacing:0.06em;margin:0 0 8px;opacity:0.6;">
         ${roomName}${tappable ? ' →' : ''}
       </h2>
-      <svg viewBox="-10 -10 ${roomWidth + 20} ${height}"
+      <svg viewBox="0 -10 ${roomWidth} ${height}"
         style="width:100%;min-width:${roomWidth + 20}px;height:auto;display:block;background:#F4ECE0;
         border:1px solid rgba(43,39,36,0.15);border-radius:10px;">
         <defs>${_PENCIL_FILTER}</defs>
@@ -10604,7 +10604,7 @@ function renderFloorPlanElegant() {
              asked to check it still clicks through to the tiles.
              The floor plan is home; this is the way OUT of home. -->
         <button onclick="showGridNav()" class="glaze-tile"
-          style="border:none;padding:9px 16px;font-size:12px;font-weight:800;cursor:pointer;">▦ Everything else</button>
+          style="border:none;padding:9px 12px;font-size:11px;font-weight:800;cursor:pointer;flex-shrink:0;max-width:140px;">▦ Everything else</button>
       </div>
       ${_renderArrivals(unseated)}
       ${resting ? `<div style="text-align:center;padding:40px 20px;color:#8a8175;font-size:13px;">
