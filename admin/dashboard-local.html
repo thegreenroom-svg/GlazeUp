@@ -11526,7 +11526,9 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
   // Always wrap to viewport width — works portrait and landscape
   // OVERVIEW: always fit viewport — tables wrap, never scroll sideways
   // The home screen is a click-through portal, not a working view.
-  const useWidth = tappable ? viewportW : Math.max(viewportW, naturalW);
+  // ALWAYS fit the viewport. Overview and room drill-down both wrap.
+  // Tables never run off the right edge on any screen.
+  const useWidth = viewportW;
   const { placed, height } = _elegantLayoutRoom(list, useWidth);
   roomWidth = useWidth;
   const INK = '#2B2724';
@@ -11930,9 +11932,7 @@ function showRoomElegant(roomName) {
   view.innerHTML = `
     <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-        <button onclick="renderFloorPlanElegant()" class="glaze-tile"
-          style="border:none;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;">← Floor plan</button>
-        <div style="font-family:'Caveat',cursive;font-size:24px;font-weight:700;color:#2B2724;">${roomName}</div>
+        <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">${roomName}</div>
       </div>
       ${list.length
         ? _renderElegantRoomSVG(roomName, list, bookingByTable, false, _measureFloorPlanWidth())
