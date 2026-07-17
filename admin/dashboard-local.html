@@ -2783,7 +2783,7 @@
      other than Dashboard itself, so there's always a quick way back
      without needing to scroll up to find the sidebar. -->
 <button id="floating-back-btn" onclick="goToRealLandingPage()" style="display:none;position:fixed;bottom:20px;left:16px;right:16px;z-index:900;background:#2e7d32;color:white;border:none;border-radius:14px;padding:16px;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.25);align-items:center;justify-content:center;gap:8px;">
-          🏠 Home — back to the floor plan
+          <span id="floating-back-label">🏠 My tiles</span>
         </button>
 
 <!-- Genuine real Focus Mode back bar — tablet-only (CSS above scopes
@@ -6301,9 +6301,16 @@ function toggleFloatingBackBtn() {
   // Only the floor plan proper is home. A room drill-down or the Host By
   // Post board live in the same container but are NOT home — you need the
   // way back out of them.
-  const onFloorContainer = document.getElementById('floor-plan-view')?.style.display !== 'none';
-  const atHome = onFloorContainer && _floorViewMode === 'plan';
-  btn.style.display = atHome ? 'none' : 'flex';
+  // ─── INVERTED, 17 July 2026 ───
+  // This read "the floor plan is home and the tiles are a destination".
+  // That was true when it was written and is now exactly backwards:
+  // home is your tiles, the floor plan is the screensaver. The button
+  // still said "Home — back to the floor plan" on the tiles page, which
+  // is the app telling you your own home screen is somewhere to leave.
+  const onGrid = document.getElementById('grid-nav-view')?.style.display !== 'none';
+  btn.style.display = onGrid ? 'none' : 'flex';
+  const label = document.getElementById('floating-back-label');
+  if (label) label.textContent = '🏠 My tiles';
 }
 
 function goToTab(tab, event) {
@@ -6422,7 +6429,7 @@ function goToTab(tab, event) {
     // legacy dark children; showing it before render flashed black.
     loadFloorPlan().then(() => {
       const v = document.getElementById('floor-plan-view');
-      if (v && currentTab === 'floor-plan') v.style.display = 'flex';
+      if (v && currentTab === 'floor-plan' && Date.now() > _homeGuardUntil) v.style.display = 'flex';
     }).catch(() => {
       const v = document.getElementById('floor-plan-view');
       // ═══════════════════════════════════════════════════════════
@@ -6444,7 +6451,7 @@ function goToTab(tab, event) {
       // the server slept, the more reliably the landing page was eaten.
       // Every fix to the login paths was correct and made no difference,
       // because none of them were the thing doing it.
-      if (v && currentTab === 'floor-plan') v.style.display = 'flex';
+      if (v && currentTab === 'floor-plan' && Date.now() > _homeGuardUntil) v.style.display = 'flex';
     });
   } else if (tab === 'staff') {
     showStaffSection('booking');
@@ -11438,12 +11445,24 @@ let selectedLoginMember = null;
 // note above it records this exact mistake being made twice in one day:
 // a function that makes the UI reflect state must not also decide where
 // you are. This is a login step, so it lives on the login paths.
+// Anything that reveals the floor plan inside this window is a race, not
+// a decision — no human taps anything in the first second after a login
+// resolves. I fixed the two races I could find (the unguarded .catch,
+// and showGridNav never setting currentTab) and it STILL landed on the
+// floor plan on a real device. Rather than keep guessing at the owner's
+// expense the night before opening, this makes the intent structural: for
+// one second after landing home, the floor plan does not get to appear
+// unless someone asks for it. If a third race exists, it loses.
+// Honest about what this is: a backstop, not a diagnosis.
+let _homeGuardUntil = 0;
+
 async function landOnHome() {
   _hasLanded = true;   // a real login has landed; checkShiftLogin must not re-land later
   if (currentShiftStaff) {
     try { await loadPersonalHomeScreen(); } catch(e) { /* grid fallback is fine */ }
   }
   showGridNav();
+  _homeGuardUntil = Date.now() + 1000;
 }
 
 function skipLoginUseSharedView() {
@@ -13006,12 +13025,26 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
     const seatMode = !!_seatingBooking;
     const tableClick = seatMode
       ? `event.stopPropagation(); _seatAt(${JSON.stringify(t.name)})`
+      // ─── EVERY BUSY TABLE OPENS ITS BOOKING. 17 July 2026 ───
+      // "when they're green or red, to be able to put my finger on it.
+      // Touch it. Have the booking information come up... tiles to do
+      // anything upfront until the booking is active and also when
+      // active."
+      //
+      // Red already did — openTableDetail is the booking panel with its
+      // action tiles, and it has been there all along. Green did NOT,
+      // because I intercepted the tap for "move this proposal", which
+      // made tomorrow's tables the one kind you couldn't open. A table
+      // is a booking; tapping it shows the booking. That holds whether
+      // it starts in ten minutes or tomorrow.
+      //
+      // Moving a proposal still works and is now where it belongs:
+      // inside the panel, next to everything else you might do to that
+      // booking, rather than as a hidden meaning for the same tap.
       : (!tappable
           ? (busy
-              ? (b.is_provisional
-                  ? `_pickProvisional('${b.booking_code}', '${String(t.name).replace(/'/g, "\\'")}')`
-                  : `openTableDetail('${b.booking_code}')`)
-              : `_placeProvisional('${String(t.name).replace(/'/g, "\\'")}')`)
+              ? `openTableDetail('${b.booking_code}')`
+              : `showGridNav()`)
           : '');
     return `<g style="cursor:pointer" onclick="${tableClick}">
       ${chairs}
@@ -13142,58 +13175,28 @@ function _renderArrivals(unseated) {
 // is. Pre-assigning tables to tomorrow's bookings is a real, sensible
 // feature — it just has to be a decision someone makes, not one this
 // renderer invents.
-// ── Placing tomorrow's proposals. Tap one, tap where it really goes. ──
+// ── MOVING A PROPOSAL: REMOVED, DELIBERATELY, AND NOT YET REBUILT ──
 //
-// Tap-to-move, not drag: drag genuinely does not work on iOS Safari
-// inside an SVG, which this file has already learned the hard way on
-// the table arranger. Two taps work everywhere — iPad, Android, a
-// stylus, a fingertip with paint on it.
-let _provPick = null;
-
-function _pickProvisional(bookingCode, tableName) {
-  if (_provPick && _provPick.bookingCode === bookingCode) { _provPick = null; _provToast(null); return; }
-  _provPick = { bookingCode, tableName };
-  const b = (_floorData.bookings || []).find(x => x.booking_code === bookingCode);
-  const who = (b?.customer_name || 'This booking').split(' ')[0];
-  _provToast(`${who} — tap the table they should be on. Tap again to cancel.`);
-}
-
-async function _placeProvisional(tableName) {
-  if (!_provPick) return showGridNav();     // nothing picked — a free table is just "go home"
-  const { bookingCode } = _provPick;
-  _provPick = null;
-  _provToast('Placing…');
-  try {
-    // The SAME endpoint any real seating goes through — it checks for a
-    // clash and writes table_number properly. The moment this succeeds
-    // the booking has a real table chosen by a person, so is_provisional
-    // never applies to it again: it stops being a proposal because
-    // someone decided.
-    const res = await fetch(`${API_URL}/api/floor/seat`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studioId, bookingCode, tableName })
-    });
-    const d = await res.json();
-    if (!res.ok) { _provToast(d.error || 'Could not place that one.'); return; }
-    _provToast(`Placed on ${tableName}.`);
-    await loadFloorPlan();
-  } catch(e) { _provToast('Could not place that one — try again.'); }
-}
-
-function _provToast(msg) {
-  document.getElementById('prov-toast')?.remove();
-  if (!msg) return;
-  const el = document.createElement('div');
-  el.id = 'prov-toast';
-  el.style.cssText = `position:fixed;left:50%;transform:translateX(-50%);
-    bottom:calc(22px + env(safe-area-inset-bottom));z-index:6000;background:rgba(43,39,36,0.94);
-    color:#F7F4EE;padding:11px 18px;border-radius:22px;font-family:'Architects Daughter',cursive;
-    font-size:12px;box-shadow:0 6px 24px rgba(0,0,0,0.28);max-width:88vw;text-align:center;`;
-  el.textContent = msg;
-  document.body.appendChild(el);
-  clearTimeout(window._provToastTimer);
-  window._provToastTimer = setTimeout(() => el.remove(), 4000);
-}
+// I built tap-a-proposal-then-tap-a-table earlier tonight. Then you
+// asked for something better and incompatible with it: "when they're
+// green or red... touch it. Have the booking information come up...
+// tiles to do anything." Tapping a table now opens its booking, for
+// green exactly as for red — which is right; a table is a booking, and
+// tomorrow's is no less of one.
+//
+// That leaves the move with no way in. Rather than keep a picker that
+// nothing calls and a drop target that silently does nothing — a dead
+// button in a working studio is worse than an absent one — it is out.
+//
+// WHERE IT BELONGS, from your own description: a tile inside the booking
+// panel, next to everything else you can do to that booking, rather than
+// a hidden second meaning for the same tap. openTableDetail delegates
+// straight to openBookingAtRealStage, so that is where a "Move table"
+// tile goes. I have not built it. Saying so plainly rather than leaving
+// the wiring half-connected and calling it done.
+//
+// Tomorrow's tables still lay out in order and still show green. They
+// just cannot be re-placed from the floor plan yet.
 
 function _renderTomorrow(tomorrow) {
   if (!tomorrow || !tomorrow.length) return '';
@@ -13205,7 +13208,7 @@ function _renderTomorrow(tomorrow) {
     border:1px solid rgba(184,121,70,0.2);border-radius:20px;width:fit-content;">
     <span style="font-size:13px;">🌅</span>
     <span style="font-family:'Architects Daughter',cursive;font-size:11px;color:#8a8175;">
-      Tomorrow · ${tomorrow.length} booking${tomorrow.length===1?'':'s'}${covers?` · ${covers} covers`:''}${at?` · from ${at}`:''} · laid out in order — tap any to move it
+      Tomorrow · ${tomorrow.length} booking${tomorrow.length===1?'':'s'}${covers?` · ${covers} covers`:''}${at?` · from ${at}`:''} · laid out in order — tap any to open it
     </span>
   </div>`;
 }
@@ -13558,6 +13561,11 @@ async function loadFloorPlan() {
 
 // Show the floor plan view (accessible to everyone at all times)
 function showFloorPlan() {
+  // Never set currentTab, so the app's answer to "where am I" went stale
+  // the moment this was used instead of goToTab — and the floor plan's
+  // own race guard reads currentTab. A screen that moves you must say so.
+  currentTab = 'floor-plan';
+  _homeGuardUntil = 0;              // deliberate: you asked for the floor plan
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
   document.getElementById('floor-plan-view').style.display = 'flex';
   loadFloorPlan();
@@ -15026,7 +15034,15 @@ const GRID_NAV_STRUCTURE = [
 // specifically is his own Barista page, not the shared grid everyone
 // else gets. Same real first-name check already proven for the
 // initial login routing.
+// Was "the real landing page" = the floor plan. Home is your tiles now,
+// so this goes there. Renamed in spirit, not in name, because six call
+// sites reference it and a rename at this hour is a bigger risk than the
+// stale name.
 function goToRealLandingPage() {
+  landOnHome();
+  return;
+}
+function _oldGoToRealLandingPage() {
   // "Just say go home, and it goes straight back to the table planner,
   // everywhere." Home is the floor plan — for everyone, no name checks.
   // This used to send David to barista-view and everyone else to the
