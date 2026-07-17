@@ -15321,6 +15321,37 @@ async function openBookingAtRealStage(bookingCode, stage) {
   const section = STAGE_TO_SECTION[stage];
   if (!section) console.warn(`Unknown booking stage "${stage}" — opening at booking. Add it to STAGE_TO_SECTION.`);
   showStaffSection(section || 'booking');
+
+  // ═══════════════════════════════════════════════════════════
+  // IT NEVER TOLD THE SCREEN WHICH BOOKING. 17 July 2026.
+  // ═══════════════════════════════════════════════════════════
+  // "Go to full booking link broken." Tapped Megan's booking, hit
+  // "Open full booking", landed on an empty lookup form.
+  //
+  // This function navigated to the right screen and then said nothing.
+  // It has ALWAYS done that. The staff screen loads a booking exactly
+  // one way — a code in #s1-booking-code, then lookupBookingSection1()
+  // fetches it and displayBookingResult() renders it — and nothing here
+  // ever filled that in. The bookingCode argument was carried all the
+  // way down and dropped on the floor, same as openQRModal dropped it.
+  //
+  // Twice, in the same journey, in two different functions: the code is
+  // passed, accepted, and ignored. That is not a coincidence, it is a
+  // habit — a function that takes a bookingCode and doesn't use it looks
+  // finished, compiles, resolves in every audit I ran tonight, and does
+  // nothing.
+  //
+  // Reuses the screen's own loader rather than a second path to the same
+  // data: fill the input it reads, call the function it calls.
+  if (!bookingCode) return;
+  const input = document.getElementById('s1-booking-code');
+  if (!input) { console.warn('openBookingAtRealStage: #s1-booking-code missing — cannot load the booking.'); return; }
+  input.value = bookingCode;
+  try {
+    await lookupBookingSection1();
+  } catch (e) {
+    console.warn('openBookingAtRealStage: could not load', bookingCode, e);
+  }
 }
 
 function showGridNav() {
