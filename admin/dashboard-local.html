@@ -460,11 +460,6 @@
         border-radius: 24px !important;
         height: 44px;
       }
-      #shift-badge-avatar {
-        width: 30px !important;
-        height: 30px !important;
-        font-size: 14px !important;
-      }
       #shift-badge-name {
         overflow: hidden;
         text-overflow: ellipsis;
@@ -12333,7 +12328,7 @@ async function landOnHome() {
 
 function skipLoginUseSharedView() {
   currentShiftStaff = null;
-  document.getElementById('login-screen').style.display = 'none';
+  const _ls = document.getElementById('login-screen'); if (_ls) _ls.style.display = 'none'; // guarded 18 Jul — id is login-screen-picker etc, plain login-screen never existed
   document.getElementById('splash-screen').style.display = 'none';
   document.querySelectorAll('[id*="swt"], [id*="onboarding"]').forEach(el => el.style.display = 'none');
   landOnHome(); // home is your tiles — the screensaver is the floor plan
@@ -13334,7 +13329,7 @@ async function logOutOfShift() {
   localStorage.removeItem('klnk_break_id');
   localStorage.removeItem('klnk_last_active');
   currentShiftStaff = null;
-  document.getElementById('shift-badge').style.display = 'none';
+  const _sbn = document.getElementById('shift-badge-name'); if (_sbn) _sbn.style.display = 'none'; // avatar button removed 18 Jul
   document.getElementById('step-counter-btn').style.display = 'none';
   document.getElementById('headset-setup-btn').style.display = 'none';
   document.getElementById('direct-logout-btn').style.display = 'none';
@@ -14826,10 +14821,10 @@ function renderFloorPlan() {
     return start && start <= now;
   });
 
-  document.getElementById('floor-greeting').textContent = `${name} — Floor Plan`;
+  const _fg = document.getElementById('floor-greeting'); if (_fg) _fg.textContent = `${name} — Floor Plan`; // guarded 18 Jul — element may not exist in current layout
   const _sub = document.getElementById('floor-subtitle');
   if (_sub) _sub.title = (window._navTrace || []).join(' | ');
-  document.getElementById('floor-subtitle').textContent = activeBookings.length
+  if (_sub) _sub.textContent = activeBookings.length
     ? `${activeBookings.length} active booking${activeBookings.length > 1 ? 's' : ''}`
     : 'All tables clear';
 
@@ -17425,10 +17420,12 @@ function showGridNavSub(groupId, skipHistoryPush) {
 
 function applyShiftUI() {
   if (!currentShiftStaff) return;
-  const badge = document.getElementById('shift-badge');
-  badge.style.display = 'flex';
-  document.getElementById('shift-badge-avatar').textContent = currentShiftStaff.name.charAt(0).toUpperCase();
-  document.getElementById('shift-badge-name').textContent = currentShiftStaff.name;
+  // 18 Jul late: the avatar-letter button was removed at Daisy's
+  // request, but these lines still reached for it — null on
+  // .style killed every login. My own boot overlay caught it,
+  // naming this exact line. Name span only now.
+  const nameEl = document.getElementById('shift-badge-name');
+  if (nameEl) { nameEl.textContent = currentShiftStaff.name; nameEl.style.display = 'inline'; }
   document.getElementById('headset-setup-btn').style.display = 'flex';
   document.getElementById('step-counter-btn').style.display = 'flex';
   document.getElementById('direct-logout-btn').style.display = 'flex';
