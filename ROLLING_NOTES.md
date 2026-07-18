@@ -4435,3 +4435,45 @@ as "legacy" but Daisy wants them back.
 8. **QR token leak** — replace `api.qrserver.com` with local renderer (7 sites)
 
 ## Trial hours: server.js TRIAL_OPEN_HOUR=10, TRIAL_CLOSE_HOUR=16
+
+## ═══ 18 JULY 2026 — THE FULL DAY, CLOSING STATE ═══
+Live server confirmed running afb33e4 (checked via /api/version on device, boot 17:15).
+
+SHIPPED & LIVE TODAY (all verified, all on GitHub, all deployed):
+- Live Square terminal link, read-only (orders light tables red w/ drinks)
+- space_name fix — the real reason the floor plan was empty
+- Login-first boot: guard on the planner; every login path lands on YOUR tiles
+- The flow proof IS home, personalised per person from their real tile data
+  (_buildPersonalFlowTree); Home button no longer resets to Daisy's tree
+- Family-tree arrows; generated full-app tree from GRID_NAV_STRUCTURE
+- High-fire glaze both apps (customer app selectors widened to .tile/.cp-tab
+  — its glaze CSS was present but used by ZERO elements)
+- Cleo's floating character restored (was force-hidden) + glazed
+- Global loading bar; tap-to-open cues; table-colour ledger; Today line
+  above the Tomorrow strip
+- _safeRenderFlowGraph: no screen can render silently blank; boot-error
+  overlay: any boot failure paints the exact error + line on screen
+- The white-page fix: _tileGoToTab hides every .view (new home included)
+- ROLE-AWARE NUDGES finished end-to-end: engine (days-worked noise-proofed,
+  kind constraint widened by migration, tab_name column fix), 3 endpoints,
+  weekly cron, glazed tile w/ dismiss, 9 real nudges seeded
+- Figures audit: daily-progress table_name→table_number (the "N live"
+  figure had NEVER shown), 13 stale open sessions closed
+- EVERY-LOAD RESET REMOVED (completeAppReset ran on each open: wiped the
+  session — the forced re-logins — and re-showed splash over the app).
+  openTrialReset never called it; function left orphaned+documented.
+- Landscape unlocked; flow header safe-area + z-index over #api-status
+- Landmine documented: wireSplash calls renderElegantLineTable (0 defs);
+  disarmed only because #splash-table-demo isn't in the HTML.
+
+STILL OPEN (the honest list):
+- ON-DEVICE CONFIRMATION of: Jenny's Packing, tables populating live,
+  nudge tile, login-first order — all believed fixed as of afb33e4,
+  none yet eyeballed on a genuinely fresh load
+- iPad home-screen icons may pin old snapshots — delete & re-add
+- Square 403 INSUFFICIENT_SCOPES on team-members read (in Render logs)
+- Customise-home rail (pull-in/pull-off mini tiles) — storage exists, UI not built
+- Stock framework (HC name + Jenny's name + photo + dHash); laser stamps;
+  archive bulk import (pending the single-photo EXIF test)
+- Daisy's daily studio-manager digest; full calm-day logic rescan
+- Rotate the GitHub token (still in shell history); stale build-marker log line
