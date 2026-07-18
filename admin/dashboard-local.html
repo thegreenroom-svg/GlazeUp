@@ -6503,7 +6503,8 @@ function goToTab(tab, event) {
     // legacy dark children; showing it before render flashed black.
     loadFloorPlan().then(() => {
       const v = document.getElementById('floor-plan-view');
-      if (v && currentTab === 'floor-plan' && Date.now() > _homeGuardUntil) { _trace('floor REVEALED (load ok)'); v.style.display = 'flex'; }
+      const _gridUp = document.getElementById('grid-nav-view')?.style.display !== 'none';
+      if (v && currentTab === 'floor-plan' && Date.now() > _homeGuardUntil && !_gridUp) { _trace('floor REVEALED (load ok)'); v.style.display = 'flex'; }
     }).catch(() => {
       const v = document.getElementById('floor-plan-view');
       // ═══════════════════════════════════════════════════════════
@@ -6525,7 +6526,8 @@ function goToTab(tab, event) {
       // the server slept, the more reliably the landing page was eaten.
       // Every fix to the login paths was correct and made no difference,
       // because none of them were the thing doing it.
-      if (v && currentTab === 'floor-plan' && Date.now() > _homeGuardUntil) v.style.display = 'flex';
+      const _gridUp2 = document.getElementById('grid-nav-view')?.style.display !== 'none';
+      if (v && currentTab === 'floor-plan' && Date.now() > _homeGuardUntil && !_gridUp2) v.style.display = 'flex';
     });
   } else if (tab === 'staff') {
     showStaffSection('booking');
@@ -13498,7 +13500,42 @@ function renderFloorPlanElegant() {
   // you are. That rule has now been broken four separate ways in this
   // one file (applyShiftUI, checkShiftLogin, showFloorPlan, and here),
   // and this was the one that mattered.
-  if (currentTab === 'floor-plan') view.style.display = 'flex';
+  // ═══════════════════════════════════════════════════════════
+  // DEFENSE IN DEPTH: don't trust currentTab alone. 18 July.
+  // ═══════════════════════════════════════════════════════════
+  // Reported: floor plan reappeared after navigating to Dashboard, then
+  // to tiles. Traced applyShiftUI() (called from six places: both shift-
+  // login paths, Face ID login, PIN submit x2, and every tile sub-menu
+  // open) — it runs one immediate background refresh plus two recurring
+  // timers (30s, 5min) that call loadFloorPlan().then(_checkFloorPlanMode).
+  // That refresh is intentional and asked for by name: "I want all the
+  // booking live on the screen at all times with a background refresh."
+  // It is not the bug. It only re-renders CONTENT — it cannot reveal a
+  // hidden view on its own, because _checkFloorPlanMode() already checks
+  // floor-plan-view.style.display === 'flex' before doing anything.
+  //
+  // The bug, if currentTab itself is ever wrong at the moment one of
+  // these fires — and currentTab has been the single point of failure
+  // for the landing bug twice already tonight, from two different
+  // functions that each independently forgot to update it — is that
+  // this line trusted currentTab as the ONLY source of truth for "are
+  // you actually looking at the floor plan".
+  //
+  // Now it checks what's actually on screen too: if the tile grid is
+  // genuinely visible, that is stronger evidence than any variable, and
+  // wins regardless of what currentTab claims. This is not a fix for
+  // one race — it is the answer to "make sure this doesn't happen
+  // anywhere else": every caller of renderFloorPlanElegant(), present or
+  // future, direct or via _checkFloorPlanMode()'s background refresh,
+  // now shares one guard that cannot be fooled by stale state.
+  // Same rule now applied at every point in this file that reveals
+  // #floor-plan-view (goToTab's success/error paths, showFloorPlan's
+  // success/error paths, and here) — one shared, DOM-truth guard rather
+  // than five separate currentTab checks that could each individually
+  // go stale. "Make sure this doesn't happen anywhere else" — swept and
+  // fixed at every real reveal point in the file, not just this one.
+  const gridGenuinelyVisible = document.getElementById('grid-nav-view')?.style.display !== 'none';
+  if (currentTab === 'floor-plan' && !gridGenuinelyVisible) view.style.display = 'flex';
   const { rooms, bookingByTable, unseated, tomorrow } = _elegantRoomsData();
   const resting = Object.keys(rooms).length === 0;
 
@@ -13787,13 +13824,15 @@ function showFloorPlan() {
   const _tl = document.getElementById('floor-trace-loading');
   if (_tl) _tl.textContent = 'how I got here: ' + (window._navTrace || []).join(' → ');
   loadFloorPlan().then(() => {
-    if (v && currentTab === 'floor-plan') v.style.display = 'flex';
+    const _gridUp3 = document.getElementById('grid-nav-view')?.style.display !== 'none';
+    if (v && currentTab === 'floor-plan' && !_gridUp3) v.style.display = 'flex';
     toggleFloatingBackBtn();
   }).catch(() => {
     // The error path renders its own ivory screen into the same
     // container (fixed 15 July), so revealing it here is safe and
     // shows a readable message rather than the dark skeleton.
-    if (v && currentTab === 'floor-plan') v.style.display = 'flex';
+    const _gridUp4 = document.getElementById('grid-nav-view')?.style.display !== 'none';
+    if (v && currentTab === 'floor-plan' && !_gridUp4) v.style.display = 'flex';
     toggleFloatingBackBtn();
   });
 }
