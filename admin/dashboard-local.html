@@ -16281,6 +16281,18 @@ function _tileGoToTab(tabId, fnName) {
       // closes the whole bug class instead of naming a second id today
       // and a third one the next time a new home screen is built.
       document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+      // ─── AND SHOW THE STAGE. 18 July 2026, from Daisy's 19:40 blank. ───
+      // Hiding every view was right — but SOME fn-tiles (openMusic) set
+      // #floor-plan-view visible themselves and some (openPacking,
+      // openCollections) never did, because the old grid path always
+      // left it visible. So Packing rendered perfectly into a hidden
+      // box: header there, content there, display:none. Every fn-based
+      // tile renders into #floor-plan-view (the 17 July comment says so
+      // in as many words) — so the shared path now un-hides it, once,
+      // for all of them. flex, not block: the container's children are
+      // styled flex:1 and block layout was the old "black hole" bug.
+      const _fp = document.getElementById('floor-plan-view');
+      if (_fp) _fp.style.display = 'flex';
       f();
       return;
     }
