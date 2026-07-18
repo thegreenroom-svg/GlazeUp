@@ -496,20 +496,27 @@
         width: auto !important; border-radius: 22px !important;
         padding: 0 12px 0 8px !important; gap: 5px;
       }
-      #qt-find::after { content: 'Find piece'; font-size: 11px; font-weight: 700; }
-      /* 18 Jul, Daisy: "the icons are pretty ambiguous — wording of the
-         icons changing to be more descriptive." Same labelled-pill
-         pattern as Find piece, applied to the rest. */
-      #qt-tell {
+      /* 18 Jul, Daisy: descriptive wording on the ambiguous icons.
+         CAUGHT ON DEVICE 21:59: these label ::afters collided with
+         .glaze-tile::after (the diagonal sheen) — only `content` was
+         overridden, so per-property cascade left the label text
+         absolutely positioned, rotated 24deg and clipped: the "ai"/
+         "ece" fragments in Daisy's screenshot. Each label now fully
+         resets the sheen's geometry. */
+      #qt-find::after, #qt-tell::after, #a2hs-header-btn::after {
+        position: static !important; transform: none !important;
+        background: none !important; width: auto !important;
+        height: auto !important; top: auto !important; left: auto !important;
+        border-radius: 0 !important;
+        font-size: 11px; font-weight: 700;
+      }
+      #qt-find::after { content: 'Find piece'; }
+      #qt-tell::after { content: 'Tell Daisy'; }
+      #a2hs-header-btn::after { content: 'Install'; }
+      #qt-tell, #a2hs-header-btn {
         width: auto !important; border-radius: 22px !important;
         padding: 0 12px 0 8px !important; gap: 5px;
       }
-      #qt-tell::after { content: 'Tell Daisy'; font-size: 11px; font-weight: 700; }
-      #a2hs-header-btn {
-        width: auto !important; border-radius: 22px !important;
-        padding: 0 12px 0 8px !important; gap: 5px;
-      }
-      #a2hs-header-btn::after { content: 'Install'; font-size: 11px; font-weight: 700; }
     }
 
     /* Phone-only collapsed header — bundles bell/badge/headset into one row */
@@ -2773,7 +2780,7 @@
          missing, the device is showing you an old snapshot (delete the
          home icon and re-add it from Safari). Update this string with
          each significant deploy. -->
-    <div style="font-size:9px;color:#b8b0a4;letter-spacing:0.05em;margin-bottom:8px;">build 18 Jul · evening · nudges+boot-fix</div>
+    <div style="font-size:9px;color:#b8b0a4;letter-spacing:0.05em;margin-bottom:8px;">build 18 Jul · 22:1x · picker-watchdog</div>
 
     <!-- Screen 1: pick your name -->
     <div id="login-screen-picker">
@@ -12208,6 +12215,7 @@ async function checkShiftLogin() {
   document.getElementById('shift-login-modal').style.display = 'flex';
   showLoginScreen('picker');
   loadLoginNamePicker();
+  _pickerWatchdog();
 }
 
 const ROLE_COLORS_LOGIN = { 'Chief Taster':'#F4A9C0', 'Studio Manager':'#5E35B1', 'Studio Executive':'#1E88E5', 'Ceramic Technician':'#8D6E63', 'Studio Assistant':'#00897B', 'Barista':'#F4511E', 'CEO':'#F9A825', 'General Manager':'#B87946', 'Co-Director':'#B87946' };
@@ -12683,7 +12691,8 @@ async function loadLoginNamePicker() {
     const data = await res.json();
     team = data.team || [];
   } catch(e) {
-    console.error('Team loading error — falling back to demo staff:', e);
+    console.error('Team loading error:', e);
+    window._pickerLastErr = (e && e.message) || String(e);
     team = null;
   } finally {
     clearTimeout(_pickerTimer);
@@ -12703,6 +12712,7 @@ async function loadLoginNamePicker() {
         <div style="font-size:32px;margin-bottom:8px;">📡</div>
         <div style="font-family:'Caveat',cursive;font-size:20px;color:#2B2724;">Couldn't load the team</div>
         <div style="font-size:12px;color:#8a8175;margin-top:6px;">Check the connection and try again — never a placeholder team.</div>
+        ${window._pickerLastErr ? `<div style="font-size:10px;color:#b0a89e;margin-top:8px;font-family:monospace;">${window._pickerLastErr}</div>` : ''}
         <button class="glaze-tile" onclick="loadLoginNamePicker()" style="margin-top:14px;border:none;border-radius:12px;padding:11px 22px;
           font-size:13px;font-weight:800;background:#B87946;color:#fff;cursor:pointer;">Try again</button>
       </div>`;
@@ -12711,6 +12721,7 @@ async function loadLoginNamePicker() {
 
   window._loginTeamData = team;
 
+  try {
   grid.innerHTML = team.map((m, i) => {
       const color = ROLE_COLORS_LOGIN[m.role] || '#999';
       const avatarSvg = _staffAvatarSvg(m.name, color);
@@ -12739,6 +12750,35 @@ async function loadLoginNamePicker() {
           ${!m.hasPinSet ? '<div style="font-size:9px;color:var(--link-clay);margin-top:4px;font-weight:700;">● Set PIN first</div>' : ''}
         </button>`;
   }).join('');
+  } catch(renderErr) {
+    // 18 Jul 22:04, Daisy's screenshot: stuck on "Loading team…" with no
+    // overlay — meaning neither the retry path nor a visible throw. A
+    // render-throw here previously left the grid untouched forever.
+    // Now it confesses in place.
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:24px;">
+      <div style="font-size:13px;color:#c0392b;font-weight:700;">Couldn't draw the team</div>
+      <div style="font-size:10px;color:#8a8175;margin-top:6px;font-family:monospace;">${(renderErr && renderErr.message) || renderErr}</div>
+      <button class="glaze-tile" onclick="loadLoginNamePicker()" style="margin-top:12px;border:none;border-radius:12px;padding:10px 20px;font-size:12px;font-weight:800;background:#B87946;color:#fff;cursor:pointer;">Try again</button>
+    </div>`;
+  }
+}
+
+// 4. THE WATCHDOG. If, 8 seconds after the picker starts, the grid still
+// says "Loading team…", something hung in a way none of the paths
+// caught — force the honest retry state with whatever reason we have.
+// Nobody stares at a spinner again, whatever the failure mode.
+function _pickerWatchdog() {
+  setTimeout(() => {
+    const g = document.getElementById('login-name-grid');
+    if (g && /Loading team/i.test(g.textContent || '')) {
+      window._pickerLastErr = window._pickerLastErr || 'timed out with no response and no error — watchdog fired';
+      g.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:24px;">
+        <div style="font-family:'Caveat',cursive;font-size:20px;color:#2B2724;">Couldn't load the team</div>
+        <div style="font-size:10px;color:#8a8175;margin-top:8px;font-family:monospace;">${window._pickerLastErr}</div>
+        <button class="glaze-tile" onclick="loadLoginNamePicker();_pickerWatchdog();" style="margin-top:12px;border:none;border-radius:12px;padding:11px 22px;font-size:13px;font-weight:800;background:#B87946;color:#fff;cursor:pointer;">Try again</button>
+      </div>`;
+    }
+  }, 8000);
 }
 
 function selectLoginMember(member) {
