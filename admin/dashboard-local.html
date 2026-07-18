@@ -14054,9 +14054,30 @@ async function openTableDetail(bookingCode) {
     `${b.customer_name} · ${b.party_size || tableData.capacity || '?'} covers · ${tableData.room || ''}${typeLabel}`;
 
   document.getElementById('floor-table-detail').style.display = 'flex';
+  // ═══════════════════════════════════════════════════════════
+  // STALE SCROLL POSITION. 17 July 2026.
+  // ═══════════════════════════════════════════════════════════
+  // "it doesn't scroll down. It's not immediately on the page. I have
+  // to scroll down." — after tapping into a SECOND booking, not the
+  // first. This panel is one DOM element reused for every booking, and
+  // its scrollTop was never reset on open. #detail-checklist
+  // (max-height:44vh, its own overflow-y:auto) is the real scrolling
+  // region — scroll it down reading one booking's checklist, tap a
+  // different table, and the next booking opens already scrolled to
+  // wherever the last one was left. The name and covers at the top are
+  // still there; you just can't see them without scrolling back up.
+  //
+  // Both containers reset, since either could plausibly hold scroll
+  // depending on content height — cheap to reset both, expensive to
+  // guess wrong and leave one stale.
+  const panel = document.getElementById('floor-table-detail');
+  if (panel) panel.scrollTop = 0;
   _startDetailTimer();
   renderDetailCanvas();
   renderDetailChecklist();
+  const cl = document.getElementById('detail-checklist');
+  if (cl) cl.scrollTop = 0;
+  _glazeNow('floor-table-detail');   // glaze this panel on the frame it opens
 
   // Auto-assign current staff if unassigned
   if (currentShiftStaff && (b.assignments||[]).length === 0) {
@@ -15400,12 +15421,39 @@ async function openBookingAtRealStage(bookingCode, stage) {
   //
   // Reuses the screen's own loader rather than a second path to the same
   // data: fill the input it reads, call the function it calls.
+  //
+  // ═══════════════════════════════════════════════════════════
+  // STILL DIDN'T OPEN — BECAUSE IT LOADED SOMEWHERE HIDDEN. 17 July.
+  // ═══════════════════════════════════════════════════════════
+  // The guard above never fired, and that is precisely why nothing
+  // looked wrong: getElementById finds an element whether its section
+  // is visible or not — it is a DOM query, not a visibility check. So
+  // for a booking anywhere past its first stage, this genuinely filled
+  // #s1-booking-code, genuinely fetched, genuinely called
+  // displayBookingResult(). All of it succeeded. Silently, into a
+  // section nobody could see.
+  //
+  // Checked rather than assumed: #s1-booking-code AND every element
+  // displayBookingResult writes to — #s1-customer-display,
+  // #s1-party-display, #s1-returning-section — all live inside
+  // staff-section-booking ONLY. showStaffSection(section) above shows
+  // whichever section matches the booking's CURRENT stage — kiln,
+  // completion, engagement — correct for reading that stage's
+  // checklist, and exactly the wrong section for this search UI, which
+  // only ever existed in one place.
+  //
+  // So the section shown for "Open full booking" must always be the
+  // one that can display a result, not the one that matches the
+  // booking's stage. showStaffSection above stays as it was — someone
+  // tapping the Booking checklist tile still lands on the right stage
+  // — this corrects course specifically for the lookup, after it runs.
   if (!bookingCode) return;
   const input = document.getElementById('s1-booking-code');
   if (!input) { console.warn('openBookingAtRealStage: #s1-booking-code missing — cannot load the booking.'); return; }
   input.value = bookingCode;
   try {
     await lookupBookingSection1();
+    showStaffSection('booking');   // the only section that can show what just loaded
   } catch (e) {
     console.warn('openBookingAtRealStage: could not load', bookingCode, e);
   }
@@ -27459,10 +27507,27 @@ function _isTileShaped(el) {
 function _glazeSweep(root) {
   try {
     const scope = root && root.querySelectorAll ? root : document;
-    scope.querySelectorAll('button:not(.glaze-tile):not(.till-tile)').forEach(el => {
+    // Was buttons only. The booking checklist, the room panels and the
+    // table-detail view are built from a mix of <button> and <div>
+    // tiles, so a button-only sweep left half of every dynamic screen
+    // flat — which is exactly the area reported as unglazed. Now any
+    // element the shape test accepts is glazed, whatever its tag.
+    scope.querySelectorAll('button:not(.glaze-tile):not(.till-tile), [onclick]:not(.glaze-tile):not(.till-tile)').forEach(el => {
       if (_isTileShaped(el)) el.classList.add('glaze-tile');
     });
   } catch (e) { /* cosmetic — never worth breaking a screen over */ }
+}
+
+// Sweep one container immediately after it's rendered, rather than
+// waiting for the debounced observer to notice. The observer stays as a
+// safety net for anything that renders without calling this; the direct
+// call is what makes a freshly-opened panel glazed on the SAME frame it
+// appears, instead of a beat later or — if the observer races the
+// render — not at all. This is why the booking checklist looked flat:
+// the panel was shown and filled faster than the debounce fired.
+function _glazeNow(id) {
+  const el = document.getElementById(id);
+  if (el) _glazeSweep(el);
 }
 
 // On load, and on every change. Debounced: a render can fire hundreds of
