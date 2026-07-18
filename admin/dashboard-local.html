@@ -11684,7 +11684,26 @@ async function landOnHome() {
   if (currentShiftStaff) {
     try { await loadPersonalHomeScreen(); } catch(e) { /* grid fallback is fine */ }
   }
-  showGridNav();
+  // ─── THE FLOW PROOF IS HOME NOW. 18 July 2026. ───
+  // "The flow proof should be the home page for everybody, where there's
+  // an individual flow proof relevant to them ... that we used to have
+  // on the old home screens." _flowGraphEnter() builds this person's
+  // tree fresh from loadPersonalHomeScreen()'s data (just awaited above)
+  // via _buildPersonalFlowTree(). showGridNav() is untouched and one tap
+  // away via the header's "Grid" button — nothing removed.
+  //
+  // currentTab is deliberately 'home-flow', NOT 'floor-plan'. Checked
+  // first: every currentTab === 'floor-plan' comparison in this file
+  // (six of them) exists to reveal the REAL #floor-plan-view once its
+  // data has loaded — from a background loadFloorPlan().then() that can
+  // resolve at any time, including the heartbeat. Reusing 'floor-plan'
+  // here would let any of those fire while the FLOW view is on screen
+  // and pop the real floor plan open on top of it — the exact class of
+  // two-screens-at-once bug this file has been fixing all week. A
+  // distinct value makes that structurally impossible rather than
+  // relying on timing to avoid it.
+  currentTab = 'home-flow';
+  _flowGraphEnter();
   _homeGuardUntil = Date.now() + 1000;
 
   // ═══════════════════════════════════════════════════════════
@@ -16270,6 +16289,58 @@ function _buildFlowTreeFromNav() {
 // The tree the flow view walks. Generated from the real nav so it's
 // comprehensive; falls back to the hand-written one if generation ever
 // throws (it never should — GRID_NAV_STRUCTURE is a plain constant).
+// ═══════════════════════════════════════════════════════════
+// THE FLOW PROOF, PERSONALISED — THIS IS EVERYONE'S HOME NOW.
+// 18 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Daisy: "the flow proof should be the home page for everybody, where
+// there's an individual flow proof relevant to them that we used to
+// have on the old home screens."
+//
+// Built on _buildPersonalItems() — the SAME real per-person tile list
+// the old grid home used (role defaults via ROLE_HOME_DEFAULTS, or a
+// saved individual layout via _personalScreen). Not a second, separate
+// personalisation system that could drift from the first: this reads
+// the identical data, so Jenny's tree is Jenny's real tiles, Daisy's is
+// Daisy's, in their own priority order, exactly as the old home did —
+// just as a walkable tree with branch arrows instead of a flat grid.
+function _buildPersonalFlowTree() {
+  const items = (typeof _buildPersonalItems === 'function') ? _buildPersonalItems() : [];
+  if (!items.length) return FULL_FLOW_TREE;   // not logged in / no data yet -> full app tree, never blank
+
+  const children = items.map(item => {
+    if (item.type === 'sub') {
+      const s = item.sub;
+      return { id: s.tab, label: _cleanLabel(s.label), emoji: _leadingEmoji(s.label, '•'), desc: s.desc||'', fn: s.fn||null, size:'mid' };
+    }
+    // A whole group promoted to this person's home -> its own branch,
+    // built from the SAME group entry in GRID_NAV_STRUCTURE (not a
+    // re-lookup by a different key, so it can't silently diverge).
+    const g = item.group;
+    const kids = (g.items||[]).map(it => ({ id: it.tab, label:_cleanLabel(it.label), emoji:_leadingEmoji(it.label, _FLOW_GROUP_EMOJI[g.id]||'•'), desc: it.desc||'', fn: it.fn||null, size:'mid' }));
+    return { id: g.id+'-group', label:_cleanLabel(g.label), emoji:_FLOW_GROUP_EMOJI[g.id]||'•', desc:(g.items||[]).length+' options', size:'big', children: kids };
+  });
+
+  // Splice the real booking journey under whichever branch actually owns
+  // bookings for this person (their 'bookings' or 'staff' group if they
+  // have one) — same real stage functions as before, not duplicated.
+  const journeyHost = children.find(c => c.id === 'bookings-group' || c.id === 'staff') 
+                    || children.find(c => c.children);
+  if (journeyHost) {
+    (journeyHost.children = journeyHost.children || []).push({
+      id:'journey-booking', label:'The Journey', emoji:'🔄', desc:'Booking → Painting → Completion → Kiln', size:'mid', children:[
+        { id:'j-b-open', label:'1 · Booking',    emoji:'🪑', desc:'Set up · greet · drinks · pieces',  fn:'openStageBooking',    size:'big' },
+        { id:'j-e-open', label:'2 · Painting',   emoji:'🎨', desc:'Paints · check-in · drinks',        fn:'openStageEngagement', size:'big' },
+        { id:'j-c-open', label:'3 · Completion', emoji:'📷', desc:'Photos · extras · bill · clear',    fn:'openStageCompletion', size:'big' },
+        { id:'j-k-open', label:'4 · Kiln',       emoji:'🔥', desc:'Bag for kiln · print label',        fn:'openStageKiln',       size:'big' },
+      ],
+    });
+  }
+
+  const name = (typeof currentShiftStaff !== 'undefined' && currentShiftStaff?.name) ? currentShiftStaff.name.split(' ')[0] : 'Home';
+  return { id:'home-personal', label:name, emoji:'🏠', size:'hub', children };
+}
+
 let FULL_FLOW_TREE;
 try { FULL_FLOW_TREE = _buildFlowTreeFromNav(); }
 catch(e) { console.warn('flow-tree generation fell back to DAISY_FLOW_GRAPH:', e); FULL_FLOW_TREE = DAISY_FLOW_GRAPH; }
@@ -16398,7 +16469,9 @@ function _flowActivate(id) {
 // covers this view because it carries class="view".
 function _flowGraphEnter() {
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
-  _flowStack = [DAISY_FLOW_GRAPH];
+  let tree;
+  try { tree = _buildPersonalFlowTree(); } catch(e) { console.warn('personal flow tree fell back:', e); tree = FULL_FLOW_TREE; }
+  _flowStack = [tree];
   document.getElementById('daisy-flow-view').style.display = 'block';
   _renderFlowGraph();
   _flowLoadDayStat();
