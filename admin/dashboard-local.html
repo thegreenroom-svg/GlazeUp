@@ -8292,6 +8292,103 @@ async function _handleTrayPhoto(event, bookingCode) {
   }
 }
 
+// ─── THE KILN, MADE REACHABLE. 18 July 2026. "Use it again, simple
+// flow." Same approach as the tray-scan fix: real backend, zero UI,
+// so build the plainest possible screen that reaches all of it — no
+// wizard, three simple lists, one tap moves a piece to the next stage.
+function openKiln() {
+  const view = document.getElementById('floor-plan-view');
+  if (!view) return;
+  _floorViewMode = 'kiln';
+  view.innerHTML = `
+    <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+        <div>
+          <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">Kiln</div>
+          <div style="font-size:11px;color:#8a8175;">Dip → load → fire</div>
+        </div>
+        <button onclick="goToRealLandingPage()" class="glaze-tile"
+          style="border:none;padding:8px 12px;font-size:11px;font-weight:800;cursor:pointer;flex-shrink:0;">← Floor plan</button>
+      </div>
+      <div id="kiln-body"><div style="text-align:center;padding:40px;color:#8a8175;font-size:13px;">Loading…</div></div>
+    </div>`;
+  toggleFloatingBackBtn();
+  _instantPaint('klnk_cache_kiln','kiln-body');
+  _loadKilnBody();
+}
+async function _loadKilnBody() {
+  const el = document.getElementById('kiln-body');
+  if (!el) return;
+  try {
+    const [dipRes, dippedRes] = await Promise.all([
+      fetch(`${API_URL}/api/pieces/awaiting-dip?studioId=${studioId}`).then(r=>r.json()),
+      fetch(`${API_URL}/api/pieces/dipped?studioId=${studioId}`).then(r=>r.json()),
+    ]);
+    const awaitingDip = dipRes.pieces || [];
+    const dipped = dippedRes.pieces || [];
+    const label = p => `${p.piece_type||'Piece'}${p.booking_id?' · '+p.booking_id:''}`;
+
+    el.innerHTML = `
+      <!-- STAGE 1: ready for dip -->
+      <div class="glaze-tile" style="border-radius:14px;padding:14px;margin-bottom:12px;">
+        <div style="font-weight:800;font-size:14px;color:#2B2724;">🪣 Ready to dip — ${awaitingDip.length}</div>
+        ${awaitingDip.length ? `
+          <div style="max-height:180px;overflow-y:auto;margin-top:8px;">
+            ${awaitingDip.map(p => `<label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;border-bottom:1px solid rgba(43,39,36,0.06);">
+              <input type="checkbox" class="kiln-dip-check" value="${p.id}" style="width:18px;height:18px;">
+              ${label(p)}</label>`).join('')}
+          </div>
+          <button onclick="_kilnMarkDipped()" style="width:100%;margin-top:10px;border:none;border-radius:10px;padding:11px;
+            font-size:12px;font-weight:800;background:#00897B;color:#fff;cursor:pointer;">✓ Mark selected as dipped</button>
+        ` : `<div style="font-size:12px;color:#8a8175;margin-top:6px;">Nothing waiting.</div>`}
+      </div>
+      <!-- STAGE 2: dipped, waiting for a kiln load -->
+      <div class="glaze-tile" style="border-radius:14px;padding:14px;">
+        <div style="font-weight:800;font-size:14px;color:#2B2724;">🔥 Dipped, waiting to fire — ${dipped.length}</div>
+        ${dipped.length ? `
+          <div style="max-height:180px;overflow-y:auto;margin-top:8px;">
+            ${dipped.map(p => `<label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;border-bottom:1px solid rgba(43,39,36,0.06);">
+              <input type="checkbox" class="kiln-fire-check" value="${p.id}" style="width:18px;height:18px;">
+              ${label(p)}</label>`).join('')}
+          </div>
+          <button onclick="_kilnStartFiring()" style="width:100%;margin-top:10px;border:none;border-radius:10px;padding:11px;
+            font-size:12px;font-weight:800;background:#B87946;color:#fff;cursor:pointer;">🔥 Load kiln + fire selected</button>
+        ` : `<div style="font-size:12px;color:#8a8175;margin-top:6px;">Nothing waiting.</div>`}
+      </div>`;
+    _instantSave('klnk_cache_kiln','kiln-body');
+  } catch(e) {
+    console.warn('kiln load failed:', e);
+    if (!localStorage.getItem('klnk_cache_kiln')) {
+      el.innerHTML = `<div style="text-align:center;padding:30px;color:#e53935;font-size:13px;">Couldn't load the kiln — try again in a moment.</div>`;
+    }
+  }
+}
+async function _kilnMarkDipped() {
+  const ids = Array.from(document.querySelectorAll('.kiln-dip-check:checked')).map(c => c.value);
+  if (!ids.length) { alert('Tick at least one piece first.'); return; }
+  try {
+    await fetch(`${API_URL}/api/pieces/mark-dipped`, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ studioId, pieceIds: ids }) });
+    _loadKilnBody();
+  } catch(e) { alert("Couldn't mark those dipped — try again."); }
+}
+async function _kilnStartFiring() {
+  const ids = Array.from(document.querySelectorAll('.kiln-fire-check:checked')).map(c => c.value);
+  if (!ids.length) { alert('Tick at least one piece first.'); return; }
+  try {
+    const sRes = await fetch(`${API_URL}/api/kiln-sessions`, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ studioId, label: 'Firing ' + new Date().toLocaleDateString('en-GB') }) });
+    const sData = await sRes.json();
+    const sessionId = sData.session?.id;
+    if (!sessionId) throw new Error('Could not start a kiln session');
+    await fetch(`${API_URL}/api/kiln-sessions/${sessionId}/add-pieces`, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ studioId, pieceIds: ids }) });
+    await fetch(`${API_URL}/api/kiln-sessions/${sessionId}/fire`, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ studioId }) });
+    _loadKilnBody();
+  } catch(e) { alert("Couldn't start the firing — try again."); }
+}
+
 async function _loadPackingTiles() {
   const el = document.getElementById('packing-tiles');
   if (!el) return;
@@ -15294,14 +15391,14 @@ const ROLE_HOME_DEFAULTS = {
   'Studio Executive': {
     // Jenny: PACKING IS HER JOB. It goes first, every time.
     // Her journey: what's ready → photograph → AI says whose → label → packed
-    tileOrder: ['assistant', 'packing', 'stock', 'collections', 'floor-plan', 'labels', 'printqueue',
+    tileOrder: ['assistant', 'packing', 'kiln', 'stock', 'collections', 'floor-plan', 'labels', 'printqueue',
                 'piecematch', 'catalogue', 'music', 'training', 'health-safety'],
     promotedTiles: ['tell-daisy']
   },
 
   'Ceramic Technician': {
     // Lucy: bisque in, fired pieces out. Kiln is her world.
-    tileOrder: ['assistant', 'floor-plan', 'piecematch', 'packing', 'collections', 'shapes', 'catalogue',
+    tileOrder: ['assistant', 'floor-plan', 'kiln', 'piecematch', 'packing', 'collections', 'shapes', 'catalogue',
                 'stock', 'labels', 'training', 'health-safety'],
     promotedTiles: ['tell-daisy']
   },
@@ -15942,6 +16039,7 @@ const GRID_NAV_STRUCTURE = [
   { tab: 'tell-daisy', label: '💬 Tell Daisy', desc: 'Something good or bad happened', fn: 'openTellPicker' },
   { tab: 'health-safety', label: '🦺 Health & Safety', desc: 'Risk assessment, training, procedures', fn: 'openHealthSafety' },
   { tab: 'packing', label: '📦 Packing', desc: 'Fired pieces going home', fn: 'openPacking' },
+  { tab: 'kiln', label: '🔥 Kiln', desc: 'Dip → load → fire', fn: 'openKiln' },
   { tab: 'collections', label: '🏺 Collections', desc: 'Ready to collect · returns · find on shelf', fn: 'openCollections' },
   { tab: 'assistant', label: '💛 Ask Cleo', desc: 'She learns how you work · ask her anything', fn: 'openAssistant' },
   { tab: 'training', label: '🎓 My Training', desc: 'Read, tick, done', fn: 'openMyTraining' },
