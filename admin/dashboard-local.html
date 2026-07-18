@@ -8154,6 +8154,21 @@ function openPacking() {
       </div>
     </div>`;
   toggleFloatingBackBtn();
+  // ─── MINI-APPS STEP 2: PACKING HOLDS ITS OWN DATA. 18 July 2026. ───
+  // Daisy: "the app holds its own data some way... make it faster."
+  // The slowness is Render's free-tier wake-up, not the code — so the
+  // fix is to stop making Jenny WAIT for it: paint the last-known
+  // packing queue instantly from this device's own memory, clearly
+  // marked "updating…", while the real fetch runs and repaints with
+  // the truth. Honest by design: cached content is never silently
+  // passed off as current — the badge says so until fresh data lands.
+  try {
+    const cached = localStorage.getItem('klnk_cache_packing');
+    const el0 = document.getElementById('packing-tiles');
+    if (cached && el0) {
+      el0.innerHTML = '<div style="text-align:center;font-size:10px;color:#B87946;padding:4px;">↻ updating — showing last known</div>' + cached;
+    }
+  } catch(e) {}
   _loadPackingTiles();
 }
 
@@ -8224,9 +8239,16 @@ async function _loadPackingTiles() {
         border-radius:12px;padding:12px;font-size:12px;color:#8a8175;cursor:pointer;margin-top:8px;">
         ❓ How does this work?
       </button>`;
+    // Fresh render succeeded — remember it for next open's instant paint.
+    try { localStorage.setItem('klnk_cache_packing', el.innerHTML); } catch(e) {}
   } catch(e) {
-    el.innerHTML = `<div style="text-align:center;padding:30px;color:#e53935;font-size:13px;">
-      Couldn't load the packing queue. Try again in a moment.</div>`;
+    // Fetch failed. If we painted a cached copy above, LEAVE IT (with its
+    // honest "last known" badge) rather than replacing something useful
+    // with an error; only show the error when there's nothing at all.
+    if (!localStorage.getItem('klnk_cache_packing')) {
+      el.innerHTML = `<div style="text-align:center;padding:30px;color:#e53935;font-size:13px;">
+        Couldn't load the packing queue. Try again in a moment.</div>`;
+    }
   }
 }
 
