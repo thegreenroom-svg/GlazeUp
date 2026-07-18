@@ -5549,7 +5549,7 @@ app.get('/api/floor/active', async (req, res) => {
     try {
       const nowIso = new Date().toISOString();
       const { data, error } = await supabase.from('bookings')
-        .select('booking_code,customer_name,table_number,current_stage,session_start,session_end,party_size,status,booking_type')
+        .select('booking_code,customer_name,table_number,current_stage,session_start,session_end,party_size,status,booking_type,space_name')
         .eq('studio_id', studioId)
         .gte('session_start', today.toISOString())
         .lt('session_start', dayAfterTomorrow.toISOString())

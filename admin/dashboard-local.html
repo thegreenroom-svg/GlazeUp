@@ -13316,6 +13316,25 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
       ? `<line x1="${t.x + 8}" y1="${t.y + t.size.h - 5}" x2="${t.x + t.size.w - 8}" y2="${t.y + t.size.h - 5}"
            stroke="${accent}" stroke-width="3" stroke-linecap="round"/>` : '';
 
+    // ── "TAP TO OPEN THIS BOOKING" CUE. 18 July 2026. ──
+    // A red/green table works the booking when tapped, but nothing said
+    // so — it was just a coloured box. On the room page (where the table
+    // IS the tap target, not the whole room), a busy table now shows a
+    // small inviting cue. A LIVE one (red, happening now) gets a filled
+    // dot + "tap to open" in the stage colour — the clearest "this one
+    // needs you, touch it". An upcoming one gets a quieter hollow cue.
+    // Only when !tappable and not mid-seating, so it never clutters the
+    // home overview or fights the seat-a-guest flow.
+    const tapCue = (busy && !tappable && !_seatingBooking)
+      ? `<g opacity="${b.is_live ? '0.95' : '0.6'}">
+           <circle cx="${t.x + t.size.w/2 - 30}" cy="${t.y + t.size.h - 15}" r="3"
+             fill="${b.is_live ? accent : 'none'}" stroke="${accent}" stroke-width="1.2"/>
+           <text x="${t.x + t.size.w/2 + 4}" y="${t.y + t.size.h - 11}" text-anchor="middle"
+             font-family="'Architects Daughter',cursive" font-size="${tappable ? 7 : 9}"
+             fill="${accent}" font-weight="${b.is_live ? '700' : '400'}">tap to open</text>
+         </g>`
+      : '';
+
     // On the HOME screen (tappable), the whole room drills into the room —
     // so tables must NOT carry their own handler, or a tap on a busy table
     // would fire openTableDetail AND bubble up to showRoomElegant, opening
@@ -13368,7 +13387,7 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
     return `<g style="cursor:pointer" onclick="${tableClick}">
       ${chairs}
       ${_handRect(t.x, t.y, t.size.w, t.size.h, seed, busy ? 1.7 : 1.0, INK, busy ? _hexWithOpacity(accent, 0.18) : '#FFFDF9')}
-      ${stripe}${label}${demoMark}
+      ${stripe}${label}${tapCue}${demoMark}
     </g>`;
   }).join('');
 
