@@ -210,3 +210,14 @@ stock-name feature; laser framework; supplier-photo framework.
    to everything; backflow + cross-links between in-app systems; other
    people's workflows and their interactions; minimal instruction per
    tile. This is the deep pass, to do unhurried with on-device checks.
+
+## Jenny's idea, 18 July evening — captured for the calm session
+Package the big app as small apps within it: Jenny's page is "her app"
+(all her sequences inside — packing, stocking, piece matching), tied to
+the other apps, while the whole still functions as one. NOTE: the
+personalised flow-tree home already IS this shape — each person's root
+branch = their "mini app" built from their real tiles. The calm-session
+work is to make each branch feel self-contained (own header context,
+own back-home, sequences chained within the branch) WITHOUT changing
+the architecture underneath. Priority stated: seeing Jenny's Packing
+working comes first; restructure later.
