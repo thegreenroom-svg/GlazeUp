@@ -16965,13 +16965,22 @@ function applyShiftUI() {
   // Run once now so the first load has the freshest Square data
   _silentSquareSync();
 
+  // ─── BOTH TIMERS GUARDED. 18 July 2026. Same stomp class as the
+  // heartbeat fix: these repaint #floor-plan-view as the plan, wiping
+  // any sub-screen (Packing, Collections, Stock...) living in it. And
+  // Daisy's insight was right — this universal bug landed almost only
+  // on JENNY, because her role's workflow lives in those sub-screens
+  // while everyone else mostly sits on the plan itself. Refresh only
+  // when the plan is genuinely what's showing; the Square sync itself
+  // still runs regardless (data must stay fresh — only the REPAINT is
+  // conditional).
   window._squareSyncTimer = setInterval(async () => {
     await _silentSquareSync();
-    loadFloorPlan().then(() => _checkFloorPlanMode());
+    if (typeof _floorViewMode === 'undefined' || _floorViewMode === 'plan') loadFloorPlan().then(() => _checkFloorPlanMode());
   }, 5 * 60 * 1000);   // 5 minutes — respectful of Square's rate limits
 
   window._floorPlanTimer = setInterval(() => {
-    loadFloorPlan().then(() => _checkFloorPlanMode());
+    if (typeof _floorViewMode === 'undefined' || _floorViewMode === 'plan') loadFloorPlan().then(() => _checkFloorPlanMode());
   }, 30 * 1000);   // 30 seconds — fast enough to see a tap-to-seat land
   applyPlatformRevenueAccess();
 
