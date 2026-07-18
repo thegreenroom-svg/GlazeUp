@@ -16130,7 +16130,85 @@ const DAISY_FLOW_GRAPH = {
   ]
 };
 
-let _flowStack = [DAISY_FLOW_GRAPH];
+// ═══════════════════════════════════════════════════════════
+// THE WHOLE APP AS ONE GENERATED TILE-TREE. 18 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Daisy: "everything we know about on this app ... is a glazed tile
+// in a family tree with actual arrows ... where you are, where you can
+// go." The hand-written DAISY_FLOW_GRAPH above covered the main paths.
+// This GENERATES the full tree straight from GRID_NAV_STRUCTURE — the
+// real, single source of every group and route in the app — so the
+// tree covers EVERYTHING and can never drift from what the app can
+// actually do. Each leaf tile carries the route's real fn (or its tab),
+// so tapping it runs the exact same thing the grid would. The end
+// screens (forms, text entry, final buttons) stay as real screens —
+// per Daisy: "the end function ... you press a button or insert text
+// is the only thing that's not in a glazed tile."
+//
+// Emoji is pulled from the label if it already starts with one, else a
+// per-group default. Size steps down by depth so the tree reads as a
+// tree. The booking-journey (the one true multi-step workflow) is
+// spliced under the 'bookings' group so its stages still unfold.
+const _FLOW_GROUP_EMOJI = {
+  tables:'🪑', dashboard:'📈', bookings:'📋', menu:'☕', pieces:'🏺',
+  stock:'📦', team:'👥', community:'🌟', setup:'⚙️'
+};
+function _leadingEmoji(label, fallback) {
+  const m = (label||'').match(/^(\p{Extended_Pictographic})/u);
+  return m ? m[1] : (fallback || '•');
+}
+function _cleanLabel(label) {
+  return (label||'').replace(/^\p{Extended_Pictographic}\s*/u, '').trim();
+}
+function _buildFlowTreeFromNav() {
+  const children = (typeof GRID_NAV_STRUCTURE !== 'undefined' ? GRID_NAV_STRUCTURE : []).map(group => {
+    const groupEmoji = _FLOW_GROUP_EMOJI[group.id] || '•';
+    const kids = (group.items || []).map(it => ({
+      id: it.tab,
+      label: _cleanLabel(it.label),
+      emoji: _leadingEmoji(it.label, groupEmoji),
+      desc: it.desc || '',
+      fn: it.fn || null,          // real fn, or null -> _tileGoToTab falls back to goToTab(tab)
+      size: 'mid',
+    }));
+    // Single-item groups collapse to one tile (no needless branch).
+    if (kids.length === 1) {
+      return { ...kids[0], size: 'big' };
+    }
+    return {
+      id: group.id + '-group',
+      label: _cleanLabel(group.label),
+      emoji: groupEmoji,
+      desc: (group.items||[]).length + ' options',
+      size: 'big',
+      children: kids,
+    };
+  });
+
+  // Splice the real booking-journey stages under the bookings group, so
+  // the one genuine multi-step workflow still unfolds stage by stage.
+  const bookingsGroup = children.find(c => c.id === 'bookings-group');
+  if (bookingsGroup && bookingsGroup.children) {
+    bookingsGroup.children.push({
+      id:'journey-booking', label:'The Journey', emoji:'🔄', desc:'Booking → Painting → Completion → Kiln', size:'mid', children:[
+        { id:'j-b-open', label:'1 · Booking', emoji:'🪑', desc:'Set up · greet · drinks · pieces', fn:'openStageBooking', size:'big' },
+        { id:'j-e-open', label:'2 · Painting', emoji:'🎨', desc:'Paints · check-in · drinks', fn:'openStageEngagement', size:'big' },
+        { id:'j-c-open', label:'3 · Completion', emoji:'📷', desc:'Photos · extras · bill · clear', fn:'openStageCompletion', size:'big' },
+        { id:'j-k-open', label:'4 · Kiln', emoji:'🔥', desc:'Bag for kiln · print label — the endpoint', fn:'openStageKiln', size:'big' },
+      ],
+    });
+  }
+  return { id:'home-hub', label:'Home', emoji:'🏠', size:'hub', children };
+}
+
+// The tree the flow view walks. Generated from the real nav so it's
+// comprehensive; falls back to the hand-written one if generation ever
+// throws (it never should — GRID_NAV_STRUCTURE is a plain constant).
+let FULL_FLOW_TREE;
+try { FULL_FLOW_TREE = _buildFlowTreeFromNav(); }
+catch(e) { console.warn('flow-tree generation fell back to DAISY_FLOW_GRAPH:', e); FULL_FLOW_TREE = DAISY_FLOW_GRAPH; }
+
+let _flowStack = [FULL_FLOW_TREE];
 
 function _flowSizeStyle(size) {
   const S = {
@@ -16156,12 +16234,24 @@ function _renderFlowGraph() {
       border:none;border-radius:16px;color:#fff;padding:14px;text-align:left;cursor:pointer;
       background:linear-gradient(135deg,#B87946,#9A6435);">
       <div style="font-size:22px;">${_flowStack.length > 1 ? '↑' : '🏠'}</div>
-      <div style="font-weight:800;margin-top:4px;">${_flowStack.length > 1 ? 'Back to Daisy' : 'Daisy — General Manager'}</div>
+      <div style="font-weight:800;margin-top:4px;">${_flowStack.length > 1 ? 'Back' : 'Home — everything, one tap away'}</div>
     </button>
   </div>`;
 
   if (node.children && node.children.length) {
-    html += `<div style="text-align:center;color:rgba(184,121,70,0.5);font-size:20px;margin-bottom:10px;">↓</div>`;
+    // ── FAMILY-TREE BRANCH CONNECTOR ──
+    // A stem drops from where you are and splits out to each option
+    // below — the literal "arrows pointing down and separating off"
+    // Daisy asked for, so the page reads as a tree: here is where you
+    // are, here are the branches you can take next.
+    const _n = node.children.length;
+    html += `<div style="display:flex;flex-direction:column;align-items:center;margin-bottom:2px;">
+        <div style="width:2px;height:14px;background:rgba(184,121,70,0.4);"></div>
+        <div style="width:${_n>1?'70%':'0'};max-width:520px;height:2px;background:rgba(184,121,70,0.4);"></div>
+        <div style="display:flex;justify-content:space-between;width:${_n>1?'70%':'0'};max-width:520px;">
+          ${Array.from({length:_n}).map(()=>'<div style=\"width:2px;height:10px;background:rgba(184,121,70,0.4);\"></div>').join('')}
+        </div>
+      </div>`;
     html += `<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">`;
     node.children.forEach(child => {
       const hasKids = !!(child.children && child.children.length);
