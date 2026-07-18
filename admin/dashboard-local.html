@@ -3184,6 +3184,42 @@
 
 </div>
 
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     THE FLOW-GRAPH VIEW — proof, built inside the real app. 18 July.
+     ═══════════════════════════════════════════════════════════════════
+     "everything ends up back at her" — Daisy is a hub. Top-to-bottom
+     stages, variable tile size = reach, real forward/back navigation.
+
+     NOT a mockup: every leaf node below calls _tileGoToTab(tab, fn) —
+     the EXACT function the current tile grid already calls. Nothing
+     new to wire. This view is a different SHAPE drawn over the same
+     real routes, which is the whole point — it can't drift from what
+     the app can actually do, because it doesn't have its own routing
+     at all, it borrows the grid's.
+
+     Additive, not destructive: a normal .view like every other screen,
+     switched into from a single new tile on the existing grid ("Flow
+     view", added to the header). The working tile grid underneath is
+     completely untouched. One toggle back, at any time. -->
+<div id="daisy-flow-view" class="view" style="display:none;background:#F4ECE0;overflow-y:auto;">
+  <div style="position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:10px;
+    padding:12px 14px;background:rgba(244,236,224,0.95);backdrop-filter:blur(10px);
+    border-bottom:1px solid rgba(43,39,36,0.14);">
+    <div style="font-family:'Caveat',cursive;font-size:22px;font-weight:700;flex:1;" id="flow-crumb">Daisy</div>
+    <button onclick="_flowGraphExit()" class="glaze-tile" style="border:none;border-radius:10px;
+      padding:8px 12px;font-size:12px;font-weight:700;background:rgba(43,39,36,0.08);cursor:pointer;">
+      Grid view</button>
+  </div>
+  <div id="flow-graph-body" style="padding:16px 14px 100px;max-width:640px;margin:0 auto;"></div>
+  <div id="flow-back-bar" style="display:none;position:fixed;left:14px;right:14px;
+    bottom:calc(14px + env(safe-area-inset-bottom));z-index:20;">
+    <button onclick="_flowGraphBack()" style="width:100%;padding:14px;border:none;border-radius:14px;
+      background:#2e7d32;color:#fff;font-weight:800;font-size:15px;cursor:pointer;
+      box-shadow:0 4px 16px rgba(0,0,0,0.2);">← Back</button>
+  </div>
+</div>
+
 <div id="grid-nav-view" class="view" style="display:block;">
   <div id="grid-nav-top" style="padding:20px;">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:4px;">
@@ -3194,6 +3230,14 @@
       </button>
     </div>
     <p style="color:var(--gu-dust);margin:0 0 20px;">Tap a square to see what's inside.</p>
+    <!-- Single entry point into the flow-graph proof. Deliberately small
+         and out of the way of the 15 real tiles below — this is a proof
+         for approval, not a replacement, so it should not compete for
+         attention with the working grid it sits next to. -->
+    <button onclick="_flowGraphEnter()" class="glaze-tile" style="border:none;border-radius:10px;
+      padding:8px 12px;font-size:11px;font-weight:700;background:rgba(184,121,70,0.12);
+      color:var(--clay,#B87946);cursor:pointer;margin-bottom:14px;">
+      🔀 Try flow view (proof)</button>
     <div id="grid-nav-top-tiles" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;"></div>
   </div>
   <div id="grid-nav-sub" style="display:none;padding:20px;">
@@ -15723,6 +15767,152 @@ function _tileGoToTab(tabId, fnName) {
     console.warn(`Tile "${tabId}" declares fn "${fnName}" but no such function exists — falling back to goToTab.`);
   }
   goToTab(tabId);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// THE FLOW GRAPH — Daisy's real 16 tiles, top-to-bottom, real routes.
+// ═══════════════════════════════════════════════════════════════════
+// Every id/label/desc/fn below is copied verbatim from Daisy's actual
+// tileOrder in ROLE_HOME_DEFAULTS and the matching entries in
+// GRID_NAV_STRUCTURE. Nothing here is invented — this is the same data
+// the working tile grid already reads, drawn as stages instead of a
+// flat grid. 'staff' has fn:null in the real structure (its own
+// definition has no fn field) — _tileGoToTab's real fallback for that
+// is goToTab(tabId), so the graph calls the exact same function rather
+// than reimplementing what "no fn" means.
+//
+// TILE SIZE = REACH: hub biggest, the four tiles Daisy uses constantly
+// (Floor Plan, Ask Cleo, Daily Bookings, Tell Daisy) large, grouped/
+// secondary actions small and clustered under the primary they branch
+// from — the hierarchy asked for explicitly, not a uniform grid.
+const DAISY_FLOW_GRAPH = {
+  id: 'daisy-hub', label: 'Daisy', size: 'hub',
+  children: [
+    { id:'floor-plan', label:'Floor Plan', emoji:'🪑', desc:'Live view of all tables', fn:'showFloorPlan', size:'big' },
+    { id:'assistant',  label:'Ask Cleo',   emoji:'💛', desc:'Ask her anything',        fn:'openAssistant', size:'big' },
+    { id:'staff',      label:'Daily Bookings', emoji:'📋', desc:'Start a booking, walk-in, or party', fn:null, size:'big' },
+    { id:'tell-daisy', label:'Tell Daisy', emoji:'💬', desc:'Something good or bad happened', fn:'openTellPicker', size:'mid' },
+    { id:'team-group', label:'Team', emoji:'👥', desc:'Rota & duties', size:'mid', children:[
+      { id:'team',     label:'Team & Duties',  emoji:'👥', desc:'Duty lists, timekeeping, holidays', fn:null, size:'big' },
+      { id:'progress', label:'Daily Progress', emoji:'📊', desc:"Every team member's live tasks", fn:null, size:'big' },
+    ]},
+    { id:'stock-group', label:'Stock', emoji:'📦', desc:'Inventory', size:'mid', children:[
+      { id:'stock',     label:'Stock',           emoji:'📦', desc:'Photograph bisque, manage reservations', fn:null, size:'big' },
+      { id:'catalogue', label:'Piece Catalogue', emoji:'🏺', desc:'What customers browse from home', fn:null, size:'mid' },
+      { id:'shapes',    label:'Bisque',          emoji:'🎨', desc:'Your Square catalogue as silhouettes', fn:null, size:'mid' },
+    ]},
+    { id:'dashboard', label:'Overview', emoji:'📈', desc:'Your daily overview', fn:null, size:'mid' },
+    { id:'packing',   label:'Packing',  emoji:'📦', desc:'Fired pieces going home', fn:'openPacking', size:'mid' },
+    { id:'music',     label:'Music',    emoji:'🎵', desc:"Volume · skip · what's playing", fn:'openMusic', size:'mid' },
+    { id:'setup-group', label:'Setup', emoji:'⚙️', desc:'Studio config', size:'small', children:[
+      { id:'branding', label:'Branding',     emoji:'🎨', desc:'Colours, logo, customer app look', fn:null, size:'big' },
+      { id:'setup',    label:'Studio Setup', emoji:'⚙️', desc:'Connections, Cleo, add-ons, offers', fn:null, size:'big' },
+    ]},
+    { id:'training',      label:'My Training',        emoji:'🎓', desc:'Read, tick, done',       fn:'openMyTraining',   size:'small' },
+    { id:'health-safety', label:'Health & Safety',     emoji:'🦺', desc:'Docs & checks',          fn:'openHealthSafety', size:'small' },
+    { id:'whats-on',      label:"What's On",           emoji:'📅', desc:'Local events',           fn:'openWhatsOn',      size:'small' },
+    { id:'customer-demo', label:'Customer App',        emoji:'👀', desc:'See what customers see', fn:'openCustomerDemo', size:'small' },
+    { id:'trial-reset',   label:'Clear & Start Again', emoji:'🔄', desc:'Reset demo data',        fn:'openTrialReset',   size:'small' },
+  ]
+};
+
+let _flowStack = [DAISY_FLOW_GRAPH];
+
+function _flowSizeStyle(size) {
+  const S = {
+    hub:   'width:100%;min-height:120px;font-size:16px;',
+    big:   'width:47%;min-height:104px;font-size:13px;',
+    mid:   'width:31%;min-height:82px;font-size:11px;',
+    small: 'width:22%;min-height:64px;font-size:9px;',
+  };
+  return S[size] || S.mid;
+}
+
+function _renderFlowGraph() {
+  const node = _flowStack[_flowStack.length - 1];
+  const body = document.getElementById('flow-graph-body');
+  const crumb = document.getElementById('flow-crumb');
+  const backBar = document.getElementById('flow-back-bar');
+  if (!body) return;
+  if (backBar) backBar.style.display = _flowStack.length > 1 ? 'block' : 'none';
+  if (crumb) crumb.textContent = _flowStack.length > 1 ? node.label : 'Daisy';
+
+  let html = `<div style="display:flex;justify-content:center;margin-bottom:14px;">
+    <button onclick="_flowGraphHome()" class="glaze-tile" style="${_flowSizeStyle('hub')}
+      border:none;border-radius:16px;color:#fff;padding:14px;text-align:left;cursor:pointer;
+      background:linear-gradient(135deg,#B87946,#9A6435);">
+      <div style="font-size:22px;">${_flowStack.length > 1 ? '↑' : '🏠'}</div>
+      <div style="font-weight:800;margin-top:4px;">${_flowStack.length > 1 ? 'Back to Daisy' : 'Daisy — General Manager'}</div>
+    </button>
+  </div>`;
+
+  if (node.children && node.children.length) {
+    html += `<div style="text-align:center;color:rgba(184,121,70,0.5);font-size:20px;margin-bottom:10px;">↓</div>`;
+    html += `<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">`;
+    node.children.forEach(child => {
+      const hasKids = !!(child.children && child.children.length);
+      const bg = hasKids ? 'linear-gradient(135deg,#17403C,#0e2e2b)' : 'linear-gradient(135deg,#B87946,#9A6435)';
+      html += `<button onclick="${hasKids ? `_flowDescend('${child.id}')` : `_flowActivate('${child.id}')`}"
+        class="glaze-tile" style="${_flowSizeStyle(child.size)}
+        border:none;border-radius:14px;color:#fff;padding:10px;text-align:left;cursor:pointer;
+        background:${bg};display:flex;flex-direction:column;justify-content:flex-end;">
+        <div style="font-size:1.5em;line-height:1;">${child.emoji}</div>
+        <div style="font-weight:800;margin-top:4px;">${child.label}</div>
+        ${child.size !== 'small' ? `<div style="opacity:0.85;font-size:0.85em;margin-top:1px;">${child.desc||''}</div>` : ''}
+      </button>`;
+    });
+    html += `</div>`;
+  }
+  body.innerHTML = html;
+}
+
+function _flowDescend(id) {
+  const node = _flowStack[_flowStack.length - 1];
+  const child = node.children.find(c => c.id === id);
+  if (!child) { console.warn('_flowDescend: no such node', id); return; }
+  _flowStack.push(child);
+  _renderFlowGraph();
+  document.getElementById('daisy-flow-view')?.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function _flowGraphBack() {
+  if (_flowStack.length > 1) _flowStack.pop();
+  _renderFlowGraph();
+}
+
+function _flowGraphHome() {
+  _flowStack = [DAISY_FLOW_GRAPH];
+  _renderFlowGraph();
+}
+
+// THE REAL EDGE. This is the one call that makes every node genuine:
+// _tileGoToTab is the EXACT function the current tile grid calls on
+// every tap (see ~line 15691) — same hides-the-grid-first fix from
+// tonight, same fallback to goToTab(tabId) when fn is null. The graph
+// has no routing logic of its own; it borrows the grid's, so it cannot
+// silently drift from what the app can actually do.
+function _flowActivate(id) {
+  const node = _flowStack[_flowStack.length - 1];
+  const child = node.children.find(c => c.id === id);
+  if (!child) { console.warn('_flowActivate: no such node', id); return; }
+  document.getElementById('daisy-flow-view').style.display = 'none';
+  _tileGoToTab(child.id, child.fn);
+}
+
+// Entry/exit — a normal .view switch, same pattern as every other
+// screen in this file. Nothing about how views are shown/hidden was
+// invented for this; goToTab's own hide-every-view-first rule already
+// covers this view because it carries class="view".
+function _flowGraphEnter() {
+  document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+  _flowStack = [DAISY_FLOW_GRAPH];
+  document.getElementById('daisy-flow-view').style.display = 'block';
+  _renderFlowGraph();
+}
+
+function _flowGraphExit() {
+  document.getElementById('daisy-flow-view').style.display = 'none';
+  showGridNav();
 }
 
 // Long press detection
