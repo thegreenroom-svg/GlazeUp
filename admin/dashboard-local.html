@@ -592,6 +592,11 @@
 
     .admin-header {
       position: relative;
+      /* z-index 955: ABOVE the #api-status badge (950) which was
+         physically covering the avatar/menu buttons on iPhone Safari —
+         Daisy: "can't reach menu". The header's own buttons must always
+         outrank a diagnostic. Below 1000 so modals stay on top. 18 Jul. */
+      z-index: 955;
       background: linear-gradient(180deg, #ffffff 0%, #fdf9f6 100%);
       border-bottom: 1px solid var(--gu-border);
       /* The safe-area inset was on the LEFT only — the one edge that needed
