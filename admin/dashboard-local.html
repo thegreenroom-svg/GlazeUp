@@ -1990,6 +1990,42 @@
      Purpose (Daisy): remove the guesswork between "still loading" and
      "genuinely empty" — you can always see when the app is fetching.
      Purely visual; touches no data. -->
+<script>
+// ═══ BOOT ERROR OVERLAY. 18 July 2026. ═══
+// "After the splash screen it just goes to a blank page and hangs" — on
+// the LATEST deploy, so a real runtime failure, not caching. From here a
+// blank hang is undiagnosable; this makes the app confess instead.
+// Any uncaught error or unhandled promise rejection paints a readable
+// box with the actual message + line, and a reload button. First error
+// only (the first is the cause; the rest are dominoes). Registered
+// before every other script so nothing can fail ahead of it.
+(function(){
+  var shown = false;
+  function confess(title, detail) {
+    if (shown) return; shown = true;
+    try {
+      var d = document.createElement('div');
+      d.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#F4ECE0;padding:28px 20px;font-family:monospace;overflow:auto;';
+      d.innerHTML = '<div style="max-width:560px;margin:0 auto;">'
+        + '<div style="font-size:34px;">🏺</div>'
+        + '<div style="font-size:17px;font-weight:800;color:#c0392b;margin-top:8px;">The app hit an error while starting</div>'
+        + '<div style="font-size:12px;color:#5a5248;margin-top:12px;white-space:pre-wrap;word-break:break-word;background:rgba(192,57,43,0.07);border:1px solid rgba(192,57,43,0.25);border-radius:10px;padding:12px;">'
+        + String(title).replace(/</g,'&lt;') + '\n\n' + String(detail||'').replace(/</g,'&lt;') + '</div>'
+        + '<div style="font-size:11px;color:#8a8175;margin-top:10px;">Show this screen to Claude — it is the exact cause.</div>'
+        + '<button onclick="location.reload()" style="margin-top:14px;border:none;border-radius:10px;padding:12px 20px;font-weight:800;background:#B87946;color:#fff;font-size:13px;">Reload</button>'
+        + '</div>';
+      (document.body || document.documentElement).appendChild(d);
+    } catch(e) {}
+  }
+  window.addEventListener('error', function(ev){
+    confess(ev.message || 'Script error', (ev.filename||'') + (ev.lineno ? ' : line ' + ev.lineno : ''));
+  });
+  window.addEventListener('unhandledrejection', function(ev){
+    var r = ev.reason || {};
+    confess('Unhandled promise rejection: ' + (r.message || String(r)), r.stack ? String(r.stack).slice(0, 600) : '');
+  });
+})();
+</script>
 <div id="global-load-bar" style="position:fixed;top:0;left:0;height:3px;width:0;z-index:99999;
   background:linear-gradient(90deg,#B87946,#F9A825);box-shadow:0 0 6px rgba(184,121,70,0.5);
   transition:width .3s ease,opacity .4s ease;opacity:0;pointer-events:none;"></div>
@@ -6160,19 +6196,18 @@ function completeAppReset() {
   }, 100);
 }
 
-// Call reset on page load
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', completeAppReset);
-} else {
-  completeAppReset();
-}
-
-// Also reset if page is revisited (browser back button, etc)
-window.addEventListener('pageshow', function(e) {
-  if (e.persisted) {
-    completeAppReset();
-  }
-});
+// ─── ON-LOAD RESET REMOVED. 18 July 2026. ───
+// This ran completeAppReset() on EVERY page load and every bfcache
+// revisit: localStorage.clear() (wiping the shift session — why every
+// open forced a fresh login), then 100ms later hid every .view and
+// re-showed the splash — racing the real boot flow (login -> land on
+// your tiles) and able to blank the app from underneath it on slower
+// loads. "After the splash it just goes to a blank page and hangs."
+// A full reset is the Clear & Start Again tile's job — and checked
+// rather than assumed: openTrialReset has its OWN reset flow and never
+// called this function. So completeAppReset is now uncalled by
+// anything; left in place per the no-deletions instruction, documented
+// as orphaned rather than removed.
 
 
 // ═══════════════════════════════════════════════════════════
