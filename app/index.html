@@ -1109,34 +1109,80 @@
        change. New tiles are glazed the moment they exist, including ones
        nobody has written yet.
        ═══════════════════════════════════════════════════════════ */
-    .glaze-tile {
+    /* ═══ HIGH-FIRE GLAZE — maximum ceramic rendering. 18 July 2026. ═══
+       CUSTOMER APP: selectors widened to .tile and .cp-tab — the app's
+       own existing classes (21 tiles, 12 tabs) — because the glaze CSS
+       was present here but used by ZERO elements. Same GUI as the
+       dashboard by covering the real classes, not by editing hundreds
+       of elements one at a time (which would inevitably miss some).
+       The reduced-motion rule below is widened to match, so the
+       accessibility behaviour stays consistent for the new classes.
+       Per Daisy: "highly glazed tiles ... the highest rendering you can
+       get." Layered like a real gloss glaze on bisque:
+         1. a deep drop shadow lifting the tile off the page
+         2. a dark inset rim at the bottom edge (glaze pooling)
+         3. a bright inset rim at the top edge (fired gloss lip)
+         4. ::before — a large soft specular bloom (window reflection)
+         5. ::after  — a tight diagonal wet-sheen band across the surface
+       All CSS, no images, so it costs nothing and works offline. */
+    .glaze-tile, .tile, .cp-tab {
       position: relative;
       overflow: hidden;
       box-shadow:
-        0 2px 4px rgba(0,0,0,0.12),
-        0 8px 16px -4px rgba(0,0,0,0.18),
-        inset 0 1px 1px rgba(255,255,255,0.25);
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
+        0 3px 6px rgba(0,0,0,0.14),
+        0 12px 24px -6px rgba(0,0,0,0.22),
+        inset 0 2px 2px rgba(255,255,255,0.35),
+        inset 0 -3px 6px rgba(0,0,0,0.22),
+        inset 2px 0 3px rgba(255,255,255,0.08),
+        inset -2px 0 3px rgba(0,0,0,0.08);
+      transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+      filter: saturate(1.12);
     }
-    .glaze-tile::before {
+    .glaze-tile::before, .tile::before, .cp-tab::before {
       content: '';
       position: absolute;
-      top: -30%; left: -20%;
-      width: 70%; height: 70%;
-      background: radial-gradient(circle, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 70%);
+      top: -35%;
+      left: -25%;
+      width: 85%;
+      height: 85%;
+      background: radial-gradient(circle,
+        rgba(255,255,255,0.50) 0%,
+        rgba(255,255,255,0.18) 40%,
+        rgba(255,255,255,0) 70%);
       pointer-events: none;
       border-radius: 50%;
     }
-    .glaze-tile:active {
+    .glaze-tile::after, .tile::after, .cp-tab::after {
+      content: '';
+      position: absolute;
+      top: -60%;
+      left: -30%;
+      width: 55%;
+      height: 220%;
+      transform: rotate(24deg);
+      background: linear-gradient(90deg,
+        rgba(255,255,255,0) 0%,
+        rgba(255,255,255,0.16) 42%,
+        rgba(255,255,255,0.30) 50%,
+        rgba(255,255,255,0.16) 58%,
+        rgba(255,255,255,0) 100%);
+      pointer-events: none;
+    }
+    .glaze-tile:active, .tile:active, .cp-tab:active {
       transform: scale(0.96);
+      filter: saturate(1.05) brightness(0.97);
       box-shadow:
         0 1px 2px rgba(0,0,0,0.12),
-        0 3px 6px -2px rgba(0,0,0,0.15),
-        inset 0 1px 1px rgba(255,255,255,0.2);
+        0 4px 8px -2px rgba(0,0,0,0.16),
+        inset 0 2px 3px rgba(0,0,0,0.18),
+        inset 0 -1px 2px rgba(255,255,255,0.15);
     }
-    .glaze-tile > * { position: relative; z-index: 1; }
+    .glaze-tile > *, .tile > *, .cp-tab > * {
+      position: relative;
+      z-index: 1;
+    }
     @media (prefers-reduced-motion: reduce) {
-      .glaze-tile, .glaze-tile:active { transition: none; transform: none; }
+      .glaze-tile, .glaze-tile:active, .tile, .tile:active, .cp-tab, .cp-tab:active { transition: none; transform: none; }
     }
 
     input[type="range"] {
