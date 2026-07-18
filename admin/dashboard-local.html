@@ -490,6 +490,18 @@
         display: inline-block !important;
       }
       .api-status { font-size: 9px; padding: 5px 8px; }
+      /* ─── THE HEADER SAYS JENNY. 18 July 2026. ───
+         The name span was styled here (max-width 130px, ellipsis) but
+         its inline style="display:none" was never overridden — so the
+         pill only ever showed the initial. Daisy: "it should say Jenny."
+         Now it does, for whoever is logged in. And Find My Piece gets
+         its name next to the icon instead of being an anonymous circle. */
+      #shift-badge-name { display: inline !important; }
+      #qt-find {
+        width: auto !important; border-radius: 22px !important;
+        padding: 0 12px 0 8px !important; gap: 5px;
+      }
+      #qt-find::after { content: 'Find piece'; font-size: 11px; font-weight: 700; }
     }
 
     /* Phone-only collapsed header — bundles bell/badge/headset into one row */
