@@ -3275,7 +3275,20 @@
        battery sat on top of the studio name and the staff badge"). Same
        fix, same reason: max() keeps the normal 12px on devices with no
        notch, and gives real headroom on ones that have it. -->
-  <div style="position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:10px;
+  <!-- z-index raised 10 -> 960. 18 July 2026. Daisy: "the API connected
+       button hide stuff on my menu." Traced: #api-status is
+       position:fixed, top-right corner, z-index:950 (its own comment
+       claims it's "static... can never overlap" — that comment is
+       simply wrong; the CSS says fixed). This header's right-side
+       button cluster (search / Cleo / Grid) lives in that same
+       physical corner, so the diagnostic badge was painting on top of
+       real navigation. 960 sits in the one safe gap available: above
+       950 so the header wins, below 1000 (used elsewhere) so nothing
+       else's stacking is disturbed. The badge has pointer-events:none,
+       so taps were always reaching the real buttons underneath even
+       when covered — but "still tappable" isn't the same as "visible",
+       and Daisy was reporting what she could SEE. -->
+  <div style="position:sticky;top:0;z-index:960;display:flex;align-items:center;gap:10px;
     padding:max(12px, calc(env(safe-area-inset-top, 0px) + 10px)) 14px 12px 14px;
     background:rgba(244,236,224,0.95);backdrop-filter:blur(10px);
     border-bottom:1px solid rgba(43,39,36,0.14);">
@@ -16445,18 +16458,26 @@ function _flowDescend(id) {
   const child = node.children.find(c => c.id === id);
   if (!child) { console.warn('_flowDescend: no such node', id); return; }
   _flowStack.push(child);
-  _renderFlowGraph();
+  _safeRenderFlowGraph();
   document.getElementById('daisy-flow-view')?.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function _flowGraphBack() {
   if (_flowStack.length > 1) _flowStack.pop();
-  _renderFlowGraph();
+  _safeRenderFlowGraph();
 }
 
 function _flowGraphHome() {
-  _flowStack = [DAISY_FLOW_GRAPH];
-  _renderFlowGraph();
+  // ─── FIXED: was resetting to the hardcoded DAISY_FLOW_GRAPH. 18 July
+  // 2026. That meant tapping Home/Back-to-top from anywhere in the tree
+  // dropped whoever was using it — Jenny, anyone — into DAISY'S tiles,
+  // not their own, silently breaking the personalisation the moment
+  // they navigated past the first screen. _flowStack[0] is whatever
+  // root _flowGraphEnter() actually built for THIS person (their real
+  // personalised tree, or the full-app fallback) — collapsing back to
+  // it preserves who it belongs to instead of substituting a fixed one. ──
+  _flowStack = [_flowStack[0]];
+  _safeRenderFlowGraph();
 }
 
 // THE REAL EDGE. This is the one call that makes every node genuine:
@@ -16483,8 +16504,42 @@ function _flowGraphEnter() {
   try { tree = _buildPersonalFlowTree(); } catch(e) { console.warn('personal flow tree fell back:', e); tree = FULL_FLOW_TREE; }
   _flowStack = [tree];
   document.getElementById('daisy-flow-view').style.display = 'block';
-  _renderFlowGraph();
+  _safeRenderFlowGraph();
   _flowLoadDayStat();
+}
+
+// ─── NEVER A SILENT BLANK SCREEN. 18 July 2026. ───
+// Reported: after login, header shows, body is completely blank — no
+// error visible, no tiles, nothing to tap. _renderFlowGraph() was
+// called unprotected from more than one place (initial landing AND
+// branching deeper via _flowDescend); if it throws for ANY reason (a
+// malformed node, a future edit that breaks an assumption) it aborts
+// before body.innerHTML ever gets set — leaving the body exactly as
+// empty as its starting markup. Indistinguishable from nothing having
+// happened, on the screen everyone lands on first, every login.
+// One shared wrapper, used everywhere _renderFlowGraph() is called, so
+// this protection can't drift out of sync between callers the way nine
+// separate try/catches would. Any failure now shows a plain, honest
+// message with a real way out (Grid) and logs the real error to the
+// console — traceable next time, instead of a page that looks broken
+// with no clue why.
+function _safeRenderFlowGraph() {
+  try {
+    _renderFlowGraph();
+  } catch (e) {
+    console.error('_renderFlowGraph failed:', e);
+    const body = document.getElementById('flow-graph-body');
+    if (body) body.innerHTML = `
+      <div style="text-align:center;padding:60px 20px;">
+        <div style="font-size:40px;margin-bottom:12px;">🏺</div>
+        <div style="font-family:'Caveat',cursive;font-size:22px;color:#2B2724;">Home screen hit a snag</div>
+        <div style="font-size:13px;color:#8a8175;margin-top:8px;max-width:280px;margin-left:auto;margin-right:auto;">
+          Nothing's lost — tap below for the full grid while this gets fixed.</div>
+        <button onclick="_flowGraphExit()" class="glaze-tile" style="margin-top:18px;border:none;border-radius:12px;
+          padding:12px 22px;font-size:13px;font-weight:800;background:linear-gradient(135deg,#B87946,#9A6435);color:#fff;cursor:pointer;">
+          Open the Grid</button>
+      </div>`;
+  }
 }
 
 // Honest day-stat in the header: today's booking count, read live from
