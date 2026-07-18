@@ -28040,6 +28040,31 @@ function _glazeSoon() {
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', _glazeSoon);
   _glazeSoon();
+  // ═══════════════════════════════════════════════════════════
+  // SELF-HEALING FLOOR-PLAN REFRESH. 18 July 2026.
+  // ═══════════════════════════════════════════════════════════
+  // Reported: floor plan stuck at "20m ago", live bookings not showing.
+  // The 30s refresh (window._floorPlanTimer) is created ONLY in
+  // applyShiftUI but cleared in three places; if a clear fires after
+  // login and nothing recreates it, the plan freezes on a stale snapshot
+  // while sessions run — exactly what was seen, including a booking with
+  // a real table (Shannon → Table 1) not appearing.
+  //
+  // This heartbeat is independent of applyShiftUI: every 30s, if the
+  // floor plan is the visible view, it refreshes it. It cannot be left
+  // dead because nothing clears IT. loadFloorPlan is a pure read
+  // (GET /api/floor/active + /api/floor/tables off our own DB — no
+  // Square calls, no writes), so this honours read-only completely.
+  setInterval(() => {
+    try {
+      const fp = document.getElementById('floor-plan-view');
+      const visible = fp && getComputedStyle(fp).display !== 'none';
+      if (visible && typeof loadFloorPlan === 'function' && apiConnected) {
+        loadFloorPlan();
+      }
+    } catch (e) { /* never let the heartbeat throw */ }
+  }, 30 * 1000);
+
   try {
     new MutationObserver(_glazeSoon).observe(document.documentElement, { childList: true, subtree: true });
   } catch (e) { /* no observer, no sweep — the app still works */ }

@@ -96,3 +96,22 @@ mechanic to the whole app.
 ### Demo safety (still open)
 - 105/106 bookings have real-looking emails. Confirm seed vs real before
   any live demo. Demo-mode flag to force mock data + block live writes.
+
+## ═══ LIVE STUDIO DATA GAP — 18 July 2026 (next session) ═══
+Confirmed root cause of "floor plan doesn't show what's happening now":
+- Bookings sync from Square (who/when/which ROOM via space_name) — read
+  only, every 5 min. This works.
+- The LIVE layer does NOT sync: the table the girls set at the terminal,
+  and the drinks/orders they ring up. Those live in Square's ORDERS API,
+  which the app never reads. So "table 3 ordered coffees" / "these 6 are
+  at table 4" can't show — never fetched.
+- Also: staff often don't apportion a table at the terminal at all, so
+  the table frequently doesn't exist in Square either.
+NEXT (read-only, safe): build a read-only Square Orders sync. First step
+is to inspect the real shape of today's Square orders (do they carry any
+table/customer/booking reference?) before building the link. Must stay
+READ ONLY — never write to Square.
+Interim fix shipped 18 July: room-aware provisional placement (bookings
+show in their booked room) + self-healing floor-plan refresh heartbeat
+(was freezing at "20m ago" because the 30s poll could be cleared and not
+recreated).
