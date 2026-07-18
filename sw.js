@@ -3,7 +3,7 @@
  * Caches the app shell for offline use and fast loading.
  */
 
-const CACHE_VERSION = 'glazeup-v1';
+const CACHE_VERSION = 'glazeup-v2-2026-07-17';
 
 const SHELL_FILES = [
   '/',
@@ -34,33 +34,55 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Fetch — cache-first for shell, network-first for API
+// ═══════════════════════════════════════════════════════════
+// CACHE-FIRST WAS THE WHOLE PROBLEM. 17 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Reported: "nothing links" after a plain reload, on the night fifteen
+// separate fixes shipped. Every one had been confirmed byte-for-byte on
+// GitHub. The gap was never the code — it was this function.
+//
+// caches.match() FIRST meant: if a cached copy exists, return it and
+// NEVER TOUCH THE NETWORK. Correct for a shell that hasn't changed.
+// Exactly wrong for one that changed fifteen times in one evening,
+// because CACHE_VERSION was a hand-typed string nobody had reason to
+// bump mid-session. A reload asks the service worker before it ever
+// asks the network, and the service worker had no way to know anything
+// had shipped — from its perspective v1 was still v1.
+//
+// My first attempt at fixing this was ALSO wrong, and I want that on
+// the record rather than quietly corrected: I wrote CACHE_VERSION as
+// 'glazeup-__BUILD_TIME__', a placeholder that looks dynamic. Nothing
+// on this server substitutes that string. It would have shipped exactly
+// as static as v1 — a fix that does nothing while reading like one.
+// Caught before pushing, not after, by asking what actually replaces
+// the placeholder and finding the honest answer: nothing does.
+//
+// The real fix isn't a smarter version string that someone still has to
+// remember to change. It is not depending on versioning at all:
+// NETWORK FIRST for the shell, falling back to cache ONLY when the
+// network genuinely fails. That is what a service worker is actually
+// for — resilience when the studio's wifi drops mid-shift — not staying
+// stale indefinitely while online. A version bump can never be
+// forgotten again because nothing needs one.
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Skip non-GET
   if (event.request.method !== 'GET') return;
-
-  // Supabase API — network only
   if (url.hostname.includes('supabase')) return;
 
-  // App shell — cache first
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
-      return fetch(event.request).then(response => {
-        // Cache successful responses
-        if (response.ok && url.protocol === 'https:') {
-          const clone = response.clone();
-          caches.open(CACHE_VERSION).then(cache => cache.put(event.request, clone));
-        }
-        return response;
-      });
-    }).catch(() => {
-      // Offline fallback
-      if (event.request.mode === 'navigate') {
-        return caches.match('/index.html');
+    fetch(event.request).then(response => {
+      if (response.ok && url.protocol === 'https:') {
+        const clone = response.clone();
+        caches.open(CACHE_VERSION).then(cache => cache.put(event.request, clone));
       }
+      return response;
+    }).catch(() => {
+      // Network genuinely failed — THIS is when cache earns its keep.
+      return caches.match(event.request).then(cached => {
+        if (cached) return cached;
+        if (event.request.mode === 'navigate') return caches.match('/index.html');
+      });
     })
   );
 });
