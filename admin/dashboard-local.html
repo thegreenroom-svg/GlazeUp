@@ -3791,12 +3791,32 @@
             <details style="margin-bottom: 16px;">
               <summary style="cursor: pointer; font-size: 12px; color: var(--gu-dust); font-weight: bold;">+ Add custom item (not in Square catalog)</summary>
               <div style="display: grid; grid-template-columns: 1fr 2fr auto; gap: 8px; margin-top: 10px;">
-                <select id="s2-item-type" style="padding: 8px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px;">
-                  <option value="piece">Piece</option>
-                  <option value="drink">Drink</option>
-                  <option value="glaze">Extra Glaze</option>
-                  <option value="cake">Cake</option>
-                </select>
+                <!-- ═══════════════════════════════════════════════════════════
+                     A DROPDOWN OF 4, TAPPED EVERY EXTRA, WET HANDS. 18 July.
+                     ═══════════════════════════════════════════════════════════
+                     Flagged two nights ago and not yet done: "a dropdown is a
+                     tile grid wearing a disguise". Native <select> on a
+                     touchscreen means two taps and a scroll wheel for a
+                     four-item choice made constantly during a live booking.
+                     Four glazed tiles, one tap, no disguise. The hidden input
+                     keeps id="s2-item-type" and its .value in sync, so the
+                     one place that reads it (~line 23196) needed no change —
+                     the contract is the value, not the control that sets it. -->
+                <input type="hidden" id="s2-item-type" value="piece">
+                <div style="display:flex;gap:5px;">
+                  <button type="button" onclick="_pickItemType('piece')" data-item-type="piece" class="glaze-tile s2-type-tile"
+                    style="flex:1;min-height:44px;border:2px solid var(--gu-primary);border-radius:8px;background:var(--gu-primary);color:#fff;
+                    font-size:11px;font-weight:700;cursor:pointer;">🏺 Piece</button>
+                  <button type="button" onclick="_pickItemType('drink')" data-item-type="drink" class="glaze-tile s2-type-tile"
+                    style="flex:1;min-height:44px;border:2px solid var(--gu-border);border-radius:8px;background:#fff;color:var(--gu-ink);
+                    font-size:11px;font-weight:700;cursor:pointer;">☕ Drink</button>
+                  <button type="button" onclick="_pickItemType('glaze')" data-item-type="glaze" class="glaze-tile s2-type-tile"
+                    style="flex:1;min-height:44px;border:2px solid var(--gu-border);border-radius:8px;background:#fff;color:var(--gu-ink);
+                    font-size:11px;font-weight:700;cursor:pointer;">🎨 Glaze</button>
+                  <button type="button" onclick="_pickItemType('cake')" data-item-type="cake" class="glaze-tile s2-type-tile"
+                    style="flex:1;min-height:44px;border:2px solid var(--gu-border);border-radius:8px;background:#fff;color:var(--gu-ink);
+                    font-size:11px;font-weight:700;cursor:pointer;">🍰 Cake</button>
+                </div>
                 <input type="text" id="s2-item-name" placeholder="e.g. Ocean Blue glaze" style="padding: 8px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px;">
                 <button class="btn-connect" onclick="addTableOrder()">Add</button>
               </div>
@@ -14387,6 +14407,21 @@ function renderDetailChecklist() {
     </button>`;
 }
 
+// Picks one of the four item-type tiles. Keeps #s2-item-type.value as
+// the single source of truth (same contract the old <select> honoured)
+// and reflects the choice visually so it reads as a real selection, not
+// four identical buttons with no state.
+function _pickItemType(type) {
+  const hidden = document.getElementById('s2-item-type');
+  if (hidden) hidden.value = type;
+  document.querySelectorAll('.s2-type-tile').forEach(btn => {
+    const on = btn.dataset.itemType === type;
+    btn.style.background = on ? 'var(--gu-primary)' : '#fff';
+    btn.style.color = on ? '#fff' : 'var(--gu-ink)';
+    btn.style.borderColor = on ? 'var(--gu-primary)' : 'var(--gu-border)';
+  });
+}
+
 async function toggleFlowCheck(bookingCode, stage, checkKey, completed) {
   // ── PIECE PHOTOS INTERCEPT ──────────────────────────────
   // Tapping "📷 Piece photos taken" opens the camera flow rather than
@@ -20909,7 +20944,21 @@ function showModalTile(tileId) {
           <h3 style="margin:0;color:#F4ECE0;font-size:14px;">Edit party</h3>
           <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:rgba(184,121,70,0.7);">
             Party size
-            <input type="number" id="party-size-input" value="${b.party_size || 1}" min="1" max="12" style="padding:8px;border:1px solid rgba(184,121,70,0.3);border-radius:6px;background:#2B2124;color:#F4ECE0;font-size:12px;">
+            <!-- A typed number for a 1-12 range that gets adjusted at every
+             booking is exactly what a phone keyboard is worst at — tiny
+             target, wrong keyboard layout half the time, a swipe away from
+             the wrong field. min/max preserved as the stepper's own clamp,
+             not just documentation on an input nobody types into anymore. -->
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input type="hidden" id="party-size-input" value="${b.party_size || 1}">
+          <button type="button" onclick="_stepPartySize(-1)" class="glaze-tile"
+            style="width:36px;height:36px;border:1px solid rgba(184,121,70,0.3);border-radius:8px;
+            background:#2B2124;color:#F4ECE0;font-size:16px;font-weight:700;cursor:pointer;">−</button>
+          <div id="party-size-display" style="min-width:32px;text-align:center;color:#F4ECE0;font-size:15px;font-weight:700;">${b.party_size || 1}</div>
+          <button type="button" onclick="_stepPartySize(1)" class="glaze-tile"
+            style="width:36px;height:36px;border:1px solid rgba(184,121,70,0.3);border-radius:8px;
+            background:#2B2124;color:#F4ECE0;font-size:16px;font-weight:700;cursor:pointer;">+</button>
+        </div>
           </label>
           <button onclick="updatePartySize()" style="background:linear-gradient(135deg,#B87946,#9A6435);color:white;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;">Update</button>
         </div>
@@ -21043,6 +21092,19 @@ async function extendSession(minutes) {
 
 function earlyCheckout() {
   alert('Early checkout processed');
+}
+
+// +/- stepper for party size. Keeps #party-size-input.value as the
+// source of truth — updatePartySize() below still just reads it — and
+// clamps at 1/12, the same range the old number input's min/max declared
+// but never actually enforced on a phone keyboard.
+function _stepPartySize(delta) {
+  const hidden = document.getElementById('party-size-input');
+  const display = document.getElementById('party-size-display');
+  if (!hidden) return;
+  const next = Math.max(1, Math.min(12, (parseInt(hidden.value) || 1) + delta));
+  hidden.value = next;
+  if (display) display.textContent = next;
 }
 
 async function updatePartySize() {
