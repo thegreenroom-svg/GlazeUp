@@ -6314,20 +6314,21 @@ async function checkAPIConnection() {
 }
 
 async function loadDashboardData() {
-  try {
-    if (!apiConnected) {
-      throw new Error('API not connected');
-    }
-    
-    const res = await fetch(`${API_URL}/api/analytics/dashboard?studioId=${studioId}&staffMemberId=${currentShiftStaff?.id || ''}`);
-    if (!res.ok) throw new Error('Dashboard fetch failed');
-    
-    const data = await res.json();
-    return data;
-  } catch (err) {
-    console.log('Using mock data:', err.message);
-    return mockData;
-  }
+  // ─── REAL DATA, LIVE, ALWAYS. 18 July 2026. ───
+  // Daisy: "real data please across the whole app live at all time."
+  // This silently returned fabricated numbers (£1240 revenue, 47
+  // sessions — mockData, below) on ANY failure, not just a genuine
+  // outage — a slow Render cold-start would have triggered it exactly
+  // as easily as the API being properly down, with zero visual
+  // difference from the real figure. Worse: the caller's own label
+  // reads "X real transactions synced" even while showing this fake
+  // number. Now it throws honestly instead of masking the failure —
+  // the caller shows a plain "couldn't load" rather than a wrong
+  // number dressed as a real one.
+  if (!apiConnected) throw new Error('API not connected');
+  const res = await fetch(`${API_URL}/api/analytics/dashboard?studioId=${studioId}&staffMemberId=${currentShiftStaff?.id || ''}`);
+  if (!res.ok) throw new Error('Dashboard fetch failed');
+  return await res.json();
 }
 
 // Was missing — the branding tab previously had no way to load real
@@ -12418,11 +12419,24 @@ async function loadLoginNamePicker() {
     clearTimeout(_pickerTimer);
   }
 
-  // Never dead-end on a blank or broken team list. If Supabase is down,
-  // or the studio has nobody set up yet, show the demo team so the
-  // picker with avatars is always what you land on.
+  // ─── REAL DATA, ALWAYS. 18 July 2026. Daisy: "real data across the
+  // whole app, live, at all time." This used to substitute DEMO_STAFF
+  // on any failure — but its ids ('1','2'...) don't match real
+  // Supabase rows (any action taken while logged in via one would
+  // write to a staff member who doesn't exist), and Lucy's role in it
+  // is wrong (Studio Assistant, not her real Ceramic Technician) —
+  // she'd have landed on the wrong person's tiles entirely. Never a
+  // dead end, but never a fake person either: an honest retry state.
   if (!team || !team.length) {
-    team = DEMO_STAFF.map(s => ({ ...s, hasPinSet: true, isDemoFallback: true }));
+    if (grid) grid.innerHTML = `
+      <div style="text-align:center;padding:30px 16px;grid-column:1/-1;">
+        <div style="font-size:32px;margin-bottom:8px;">📡</div>
+        <div style="font-family:'Caveat',cursive;font-size:20px;color:#2B2724;">Couldn't load the team</div>
+        <div style="font-size:12px;color:#8a8175;margin-top:6px;">Check the connection and try again — never a placeholder team.</div>
+        <button onclick="loadLoginNamePicker()" style="margin-top:14px;border:none;border-radius:12px;padding:11px 22px;
+          font-size:13px;font-weight:800;background:#B87946;color:#fff;cursor:pointer;">Try again</button>
+      </div>`;
+    return;
   }
 
   window._loginTeamData = team;
@@ -19960,6 +19974,7 @@ async function refreshKilnCafeRevenueData() {
     
     // Update metrics
     document.getElementById('metric-revenue').textContent = '£' + (data.totalRevenue || 0).toFixed(2);
+    document.getElementById('metric-revenue').dataset.everLoaded = '1';
     document.getElementById('metric-revenue-mtd').textContent = '£' + (data.mtdRevenue || 0).toFixed(2);
     document.getElementById('metric-revenue-ytd').textContent = '£' + (data.ytdRevenue || 0).toFixed(2);
     document.getElementById('metric-revenue-alltime').textContent = '£' + (data.allTimeRevenue || 0).toFixed(2);
@@ -20012,6 +20027,10 @@ async function refreshKilnCafeRevenueData() {
     }
   } catch (err) {
     console.error('Error populating dashboard:', err);
+    // Honest failure, not silent staleness or a fabricated number —
+    // matches loadDashboardData's own no-mock-fallback fix above.
+    const revEl = document.getElementById('metric-revenue');
+    if (revEl && !revEl.dataset.everLoaded) revEl.textContent = 'Couldn\'t load';
   }
 }
 
@@ -27507,10 +27526,16 @@ function _isRestingState() {
   if (!_liveCovers) return true;
   return !Object.values(_liveCovers).some(room => Object.keys(room || {}).length);
 }
+// ─── REAL DATA, ALWAYS. 18 July 2026. Daisy: "real data across the
+// whole app, live, at all time." This used to fabricate example
+// customer names (Sarah+3, the Hendersons) onto real tables whenever
+// the plan was genuinely empty — labelled "Example layout", but still
+// a fake name sitting on a real table in the live app. The honest
+// state is simply empty. DEMO_COVERS is left defined (data, not code —
+// see ROLLING_NOTES) in case it's deliberately revived as its own
+// separate, clearly-marked screen; it is never consulted here again.
 function _coversFor(roomName) {
-  return _isRestingState()
-    ? (DEMO_COVERS[roomName] || {})
-    : ((_liveCovers || {})[roomName] || {});
+  return (_liveCovers || {})[roomName] || {};
 }
 
 // The pencil. A little turbulence displaces every stroke so the plan
@@ -27604,7 +27629,7 @@ function showHomeScreen() {
       background:rgba(249,168,37,0.12);border:1px solid rgba(249,168,37,0.4);
       border-radius:20px;padding:6px 14px;margin:0 auto 12px;width:fit-content;">
       <span style="width:7px;height:7px;border-radius:50%;background:#F9A825;"></span>
-      <span style="font-size:11px;font-weight:700;color:#8a6a12;">Example layout — no live bookings yet</span>
+      <span style="font-size:11px;font-weight:700;color:#8a6a12;">No live bookings right now</span>
     </div>
     <div style="max-width:560px;margin:0 auto 18px;text-align:center;
       font-family:'Caveat',cursive;font-size:19px;line-height:1.45;
