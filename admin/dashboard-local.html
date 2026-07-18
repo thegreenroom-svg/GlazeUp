@@ -16497,7 +16497,14 @@ function _renderFlowGraph() {
   const backBar = document.getElementById('flow-back-bar');
   if (!body) return;
   if (backBar) backBar.style.display = _flowStack.length > 1 ? 'block' : 'none';
-  if (crumb) crumb.textContent = _flowStack.length > 1 ? node.label : 'Daisy';
+  // ─── MINI-APPS STEP 1: the tree carries ITS OWNER'S name. 18 July.
+  // Daisy's screenshot: header read "Daisy" while Jenny was logged in —
+  // hardcoded from when the tree was Daisy's prototype. Each branch is
+  // that person's app; the root says WHOSE, every level deeper says
+  // WHERE (their name · the branch), so any glance answers "whose app,
+  // which room of it am I in".
+  const _owner = (typeof currentShiftStaff !== 'undefined' && currentShiftStaff?.name) ? currentShiftStaff.name.split(' ')[0] : 'Home';
+  if (crumb) crumb.textContent = _flowStack.length > 1 ? (_owner + ' · ' + node.label) : _owner;
 
   let html = `<div style="display:flex;justify-content:center;margin-bottom:14px;">
     <button onclick="_flowGraphHome()" class="glaze-tile" style="${_flowSizeStyle('hub')}
