@@ -12921,6 +12921,32 @@ function _elegantRoomsData() {
     .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
     .forEach(t => { (freeByRoom[_tableRoom(t) || '_null'] ||= []).push(t); });
 
+  // TODAY's live, unseated bookings first — they matter more than
+  // tomorrow's proposal. Same room-aware placement: a live Lounge or
+  // Vault or Main Studio booking with no table yet is shown provisionally
+  // in its own room so the planner reflects who is actually in during
+  // service, instead of leaving today's whole studio looking empty while
+  // real sessions are running. Staff still tap to confirm/move; this is
+  // the visible "they're here, roughly here" the shift needs.
+  const _stillUnseated = [];
+  unseated
+    .slice()
+    .sort((a, b) => String(a.session_start || '').localeCompare(String(b.session_start || '')))
+    .forEach((b) => {
+      const room = _roomOf(b);
+      const pool = room ? freeByRoom[room] : null;
+      if (!pool || !pool.length) { _stillUnseated.push(b); return; } // no room / no free table → stays an arrival
+      const t = pool.shift();
+      b.table_number = t.name;
+      b.is_provisional = true;
+      _assignBookingToTable(bookingByTable, b);
+    });
+  // Replace unseated with only the ones NOT placed — so a booking now
+  // shown on a table doesn't also appear in the arrivals row or get
+  // double-counted by the busy meter.
+  unseated.length = 0;
+  _stillUnseated.forEach(b => unseated.push(b));
+
   tomorrow
     .slice()
     .sort((a, b) => String(a.session_start || '').localeCompare(String(b.session_start || '')))
