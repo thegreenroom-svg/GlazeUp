@@ -13878,6 +13878,18 @@ let _currentRoomName = null;
 function renderFloorPlanElegant() {
   const view = document.getElementById('floor-plan-view');
   if (!view) return;
+  // ─── LATE PAINTS REFUSED. 18 July 2026. Jenny's exact glitch:
+  // "packing seems to go somewhere, then reverts to the table planner
+  // quickly." A floor-plan load started earlier (Render answers slowly)
+  // resolved AFTER she'd opened Packing, and this function painted the
+  // plan over her unconditionally. Now: if the container has since been
+  // claimed by a sub-screen (mode !== 'plan'), the stale resolve is
+  // dropped. Legit entries (showFloorPlan / landing) set mode='plan'
+  // BEFORE loading, so the wanted paint always passes.
+  if (typeof _floorViewMode !== 'undefined' && _floorViewMode && _floorViewMode !== 'plan') {
+    _trace('renderFloorPlanElegant refused — container is showing ' + _floorViewMode);
+    return;
+  }
   _trace('renderFloorPlanElegant()');
   // The whole function had no try/catch. If ANY of the helpers below
   // threw (toggleFloatingBackBtn, _elegantRoomsData, _renderArrivals,
@@ -14252,6 +14264,11 @@ function showFloorPlan() {
     _trace('showFloorPlan blocked — nobody logged in yet');
     return;
   }
+  // Declare intent NOW, before the slow network load: "the plan is what
+  // this container should show." If the user moves on to Packing etc
+  // before the load resolves, the mode changes and the late paint is
+  // refused below. 18 July 2026.
+  _floorViewMode = 'plan';
   // Never set currentTab, so the app's answer to "where am I" went stale
   // the moment this was used instead of goToTab — and the floor plan's
   // own race guard reads currentTab. A screen that moves you must say so.
