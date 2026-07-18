@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="screen-orientation" content="portrait">
   <title>The Kiln Cafe · Studio Admin</title>
   <meta name="version" content="1.1.0">
   <link rel="manifest" href="/admin/manifest.json">
@@ -1973,26 +1972,13 @@
       box-shadow: 0 6px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06);
     }
   </style>
-  <style>
-    /* Portrait nudge — gentle banner, doesn't block the app */
-    @media screen and (orientation: landscape) and (max-height: 500px) {
-      body::before {
-        content: '↺  Portrait works best';
-        position: fixed; top: 0; left: 0; right: 0; z-index: 99999;
-        background: rgba(43,39,36,0.85); color: #F4ECE0;
-        font-family: 'Architects Daughter', cursive;
-        font-size: 13px; text-align: center;
-        padding: 6px; pointer-events: none;
-      }
-    }
-  </style>
-  <script>
-    // Screen Orientation API — locks portrait where supported (Chrome Android,
-    // some iOS contexts). iOS Safari ignores it but the CSS overlay covers it.
-    if (screen.orientation && screen.orientation.lock) {
-      screen.orientation.lock('portrait').catch(() => {});
-    }
-  </script>
+  <!-- Portrait-only meta tag, "Portrait works best" banner, and the
+       screen.orientation.lock('portrait') call all REMOVED 18 July 2026.
+       Daisy: "when I turn it into landscape, it says portrait is best.
+       I don't want that. I want it to be visible in both." The app's
+       own layout already wraps to viewport width (documented at the
+       floor-plan render, ~13234: "works portrait and landscape") — this
+       was fighting that, not protecting it. -->
 </head>
 <body>
 <!-- ═══════════════════════════════════════════════════════════
@@ -3282,8 +3268,16 @@
      view", added to the header). The working tile grid underneath is
      completely untouched. One toggle back, at any time. -->
 <div id="daisy-flow-view" class="view" style="display:none;background:#F4ECE0;overflow-y:auto;">
+  <!-- SAFE-AREA FIX. 18 July 2026. This header is now everyone's home
+       page and was missing the notch/Dynamic-Island padding the OLD
+       header already had to learn the hard way (see the comment by
+       env(safe-area-inset-top) elsewhere in this file: "the clock and
+       battery sat on top of the studio name and the staff badge"). Same
+       fix, same reason: max() keeps the normal 12px on devices with no
+       notch, and gives real headroom on ones that have it. -->
   <div style="position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:10px;
-    padding:12px 14px;background:rgba(244,236,224,0.95);backdrop-filter:blur(10px);
+    padding:max(12px, calc(env(safe-area-inset-top, 0px) + 10px)) 14px 12px 14px;
+    background:rgba(244,236,224,0.95);backdrop-filter:blur(10px);
     border-bottom:1px solid rgba(43,39,36,0.14);">
     <div style="font-family:'Caveat',cursive;font-size:20px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="flow-crumb">Daisy</div>
     <!-- Persistent header — kept on every flow page, quick one-tap
