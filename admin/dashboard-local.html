@@ -12235,6 +12235,7 @@ async function confirmWelcomeBackLogin() {
     if (currentShiftId) localStorage.setItem('klnk_shift_id', currentShiftId);
     markSessionActive();
     document.getElementById('shift-login-modal').style.display = 'none';
+    await landOnHome(); // login first, then straight to your home tiles
     applyShiftUI();
   } catch (e) {
     showLoginScreen('pin'); // fall back rather than leaving them stuck
@@ -12390,7 +12391,7 @@ async function submitShiftPin() {
         if (d.shiftId) { currentShiftId = d.shiftId; localStorage.setItem('klnk_shift_id', d.shiftId); }
       } catch(e) { console.warn('shift start failed:', e.message); }
       document.getElementById('shift-login-modal').style.display = 'none';
-      showGridNav();
+      await landOnHome(); // your tiles, not the generic grid
       applyShiftUI();
       // _floorPlanLocked removed — set in two places, read in none.
 
@@ -12520,6 +12521,7 @@ async function submitNewPin() {
     if (currentShiftId) localStorage.setItem('klnk_shift_id', currentShiftId);
     markSessionActive();
     document.getElementById('shift-login-modal').style.display = 'none';
+    await landOnHome(); // login first, then straight to your home tiles
     applyShiftUI();
   } catch(e) {
     errorEl.textContent = 'Could not set PIN — try again.';
@@ -14055,6 +14057,18 @@ async function loadFloorPlan() {
 // Same order as goToTab now. One rule, both doors.
 function showFloorPlan() {
   _trace('showFloorPlan()');
+  // ─── LOGIN FIRST, ALWAYS. 18 July 2026. ───
+  // Reported: on opening the app, the table planner flashes and starts
+  // loading, and THEN the "who's using this?" login interjects over it.
+  // Wrong way round: the login decides who you are, then you land on
+  // your tiles (with the planner as the big first tile / the resting
+  // screensaver). Whatever path calls this before a shift exists —
+  // a stale timer, a restore, an early render — it must not win over
+  // the login. One guard at the door beats chasing every caller.
+  if (!currentShiftStaff) {
+    _trace('showFloorPlan blocked — nobody logged in yet');
+    return;
+  }
   // Never set currentTab, so the app's answer to "where am I" went stale
   // the moment this was used instead of goToTab — and the floor plan's
   // own race guard reads currentTab. A screen that moves you must say so.
@@ -28313,7 +28327,7 @@ if (typeof document !== 'undefined') {
     try {
       const fp = document.getElementById('floor-plan-view');
       const visible = fp && getComputedStyle(fp).display !== 'none';
-      if (visible && typeof loadFloorPlan === 'function' && apiConnected) {
+      if (visible && typeof loadFloorPlan === 'function' && apiConnected && currentShiftStaff) {
         loadFloorPlan();
       }
     } catch (e) { /* never let the heartbeat throw */ }
