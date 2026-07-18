@@ -4805,6 +4805,177 @@ app.get('/api/studio/learning/suggestions', async (req, res) => {
   res.json({ suggestions: data || [] });
 });
 
+// ═══════════════════════════════════════════════════════════
+// ROLE-AWARE NUDGES — praise + gentle improvements, per person.
+// 18 July 2026. Daisy: "offer suggestions to different staff members
+// depending on their roles... gentle nudges everywhere... praise and
+// other stuff." Finished per "just finish it."
+//
+// HONESTY RULES, in order of importance:
+// 1. Rule-based on REAL data (timesheets, bookings, task usage) — no
+//    OpenAI key exists on this server, so nothing here pretends to be
+//    smarter than arithmetic. Every nudge cites its evidence.
+// 2. Praise only when the numbers genuinely support it. No empty
+//    cheerleading — a nudge that isn't earned teaches people to
+//    ignore all of them.
+// 3. Deduped via dedupe_key so the same nudge can't pile up week
+//    after week; a dismissed nudge stays dismissed.
+// 4. Nothing applies itself. A nudge is words on a tile.
+// ═══════════════════════════════════════════════════════════
+async function generateStaffNudges(studioId) {
+  const out = [];
+  const weekAgo = new Date(Date.now() - 7*24*3600*1000).toISOString();
+
+  const { data: team } = await supabase.from('staff_team')
+    .select('id, name, role').eq('studio_id', studioId);
+  if (!team || !team.length) return out;
+
+  // Shifts worked this week, per person — the praise signal.
+  const { data: sheets } = await supabase.from('staff_timesheet')
+    .select('staff_member_id, clock_in, clock_out')
+    .eq('studio_id', studioId).gte('clock_in', weekAgo);
+
+  // Week-ahead booking load — the heads-up signal (everyone shares it,
+  // phrased per role).
+  const { count: weekBookings } = await supabase.from('bookings')
+    .select('*', { count: 'exact', head: true })
+    .eq('studio_id', studioId)
+    .gte('session_start', new Date().toISOString())
+    .lte('session_start', new Date(Date.now() + 7*24*3600*1000).toISOString());
+
+  // Which app areas each person has actually used — the gentle-tip signal.
+  // Column is tab_name, NOT tab_id — verified against the live schema
+  // after the seed insert failed on it. The engine would have silently
+  // matched nothing (undefined vs 'packing') and tipped everyone about
+  // features they use daily — the exact "noise teaches people to ignore
+  // nudges" failure the honesty rules exist to prevent.
+  const { data: usage } = await supabase.from('staff_task_usage')
+    .select('staff_member_id, tab_name').eq('studio_id', studioId);
+  const usedBy = {};
+  (usage || []).forEach(u => { (usedBy[u.staff_member_id] = usedBy[u.staff_member_id] || new Set()).add(u.tab_name); });
+
+  const ROLE_TIP_FEATURES = {
+    'Studio Executive':   [['packing','Packing'], ['collections','Collections'], ['piecematch','Piece Matching']],
+    'Ceramic Technician': [['piecematch','Piece Matching'], ['shapes','Bisque']],
+    'Studio Assistant':   [['collections','Collections'], ['packing','Packing']],
+    'General Manager':    [['progress','Daily Progress']],
+    'Co-Director':        [['progress','Daily Progress']],
+  };
+
+  for (const member of team) {
+    const worked = (sheets || []).filter(s => s.staff_member_id === member.id);
+    // DISTINCT DAYS, not raw rows. Checked against the live data before
+    // shipping: one member shows 287 timesheet rows in 7 days — session
+    // restores each writing a row, not 287 real shifts. "287 shifts this
+    // week!" as praise would be absurd and would teach everyone the
+    // nudges are noise. Days-worked is noise-proof: however many rows a
+    // day generates, it counts once.
+    const daysWorked = new Set(worked.map(s => (s.clock_in || '').slice(0,10))).size;
+    const hours = Math.min(60, worked.reduce((t,s) => {   // 60h cap: same noise-proofing for hours
+      if (!s.clock_out) return t;
+      return t + Math.max(0, (new Date(s.clock_out) - new Date(s.clock_in)) / 3600000);
+    }, 0));
+
+    // PRAISE — only when genuinely earned (3+ days or 12+ hours).
+    if (daysWorked >= 3 || hours >= 12) {
+      out.push({
+        studio_id: studioId, staff_member_id: member.id, kind: 'praise',
+        headline: `Solid week, ${member.name.split(' ')[0]} 🌟`,
+        detail: `${daysWorked} day${daysWorked===1?'':'s'} in${hours>=1 ? ` · ${Math.round(hours)} hours` : ''} this week. The studio runs because you turn up.`,
+        evidence: { days: daysWorked, hours: Math.round(hours*10)/10 },
+        confidence: 1.0, status: 'pending',
+        dedupe_key: `praise-week-${member.id}-${new Date().toISOString().slice(0,10)}`,
+      });
+    }
+
+    // HEADS-UP — a genuinely busy week ahead (shared signal, per-role phrasing).
+    if ((weekBookings || 0) >= 40) {
+      const roleLine = /Manager|Director/.test(member.role || '')
+        ? 'Worth a glance at the floor plan and rota now rather than Thursday morning.'
+        : 'Worth checking your duties list early this week.';
+      out.push({
+        studio_id: studioId, staff_member_id: member.id, kind: 'heads_up',
+        headline: `Busy week ahead — ${weekBookings} bookings 📈`,
+        detail: roleLine,
+        evidence: { bookings_next_7d: weekBookings },
+        confidence: 1.0, status: 'pending',
+        dedupe_key: `headsup-load-${member.id}-${new Date().toISOString().slice(0,10)}`,
+      });
+    }
+
+    // GENTLE TIP — a role-relevant app area they've never opened.
+    const tips = ROLE_TIP_FEATURES[member.role] || [];
+    const used = usedBy[member.id] || new Set();
+    const unTried = tips.find(([tab]) => !used.has(tab));
+    if (unTried) {
+      out.push({
+        studio_id: studioId, staff_member_id: member.id, kind: 'tip',
+        headline: `Have you tried ${unTried[1]}? 💡`,
+        detail: `It's on your home tiles and built for your role — might save you a few minutes each shift.`,
+        evidence: { feature: unTried[0], role: member.role },
+        confidence: 0.8, status: 'pending',
+        dedupe_key: `tip-${unTried[0]}-${member.id}`,
+      });
+    }
+  }
+  return out;
+}
+
+// POST /api/studio/nudges/generate — create this week's role-aware
+// nudges. Called by the weekly cron alongside the learning run; safe to
+// call by hand for testing. Upsert-on-dedupe_key so re-running a week
+// never duplicates, and never resurrects anything dismissed.
+app.post('/api/studio/nudges/generate', async (req, res) => {
+  const { studioId } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const nudges = await generateStaffNudges(studioId);
+    let inserted = 0;
+    for (const n of nudges) {
+      const { data: existing } = await supabase.from('studio_suggestions')
+        .select('id, status').eq('studio_id', studioId).eq('dedupe_key', n.dedupe_key).limit(1);
+      if (existing && existing.length) continue;   // already exists (any status) — never re-raise
+      const { error } = await supabase.from('studio_suggestions').insert(n);
+      if (!error) inserted++;
+    }
+    res.json({ generated: nudges.length, inserted, skippedAsDuplicates: nudges.length - inserted });
+  } catch (error) {
+    console.error('nudge generation failed:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/studio/nudges/mine — the pending nudges for ONE person, for
+// their home-screen tile. Small, fast, per-person.
+app.get('/api/studio/nudges/mine', async (req, res) => {
+  const { studioId, staffMemberId } = req.query;
+  if (!studioId || !staffMemberId) return res.status(400).json({ error: 'studioId and staffMemberId required' });
+  try {
+    const { data, error } = await supabase.from('studio_suggestions')
+      .select('id, kind, headline, detail, created_at')
+      .eq('studio_id', studioId).eq('staff_member_id', staffMemberId)
+      .eq('status', 'pending').order('created_at', { ascending: false }).limit(5);
+    if (error) throw error;
+    res.json({ nudges: data || [] });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/studio/nudges/dismiss — one tap, it's gone, stays gone.
+app.post('/api/studio/nudges/dismiss', async (req, res) => {
+  const { studioId, nudgeId } = req.body;
+  if (!studioId || !nudgeId) return res.status(400).json({ error: 'studioId and nudgeId required' });
+  try {
+    await supabase.from('studio_suggestions')
+      .update({ status: 'dismissed', resolved_at: new Date().toISOString() })
+      .eq('studio_id', studioId).eq('id', nudgeId);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Approve or dismiss. Dismissal counts — it is how the engine
 // learns it was wrong, and it is the only thing that silences it.
 app.post('/api/studio/learning/respond', async (req, res) => {
@@ -12048,6 +12219,18 @@ app.listen(port, async () => {
         });
       }
       console.log(`Learning engine: weekly run complete — ${(studios || []).length} studio(s).`);
+      // Role-aware nudges ride the same weekly rhythm — praise for the
+      // week worked, heads-up for the week coming.
+      for (const st of (studios || [])) {
+        try { 
+          const made = await generateStaffNudges(st.id);
+          for (const n of made) {
+            const { data: ex } = await supabase.from('studio_suggestions')
+              .select('id').eq('studio_id', st.id).eq('dedupe_key', n.dedupe_key).limit(1);
+            if (!ex || !ex.length) await supabase.from('studio_suggestions').insert(n);
+          }
+        } catch(e) { console.warn(`nudges failed for ${st.id}:`, e.message); }
+      }
     } catch (err) {
       console.error('Learning engine weekly run failed:', err.message);
     }

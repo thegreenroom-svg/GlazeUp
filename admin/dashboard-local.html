@@ -3307,7 +3307,8 @@
       padding:8px 10px;font-size:11px;font-weight:700;background:rgba(43,39,36,0.08);cursor:pointer;white-space:nowrap;">
       Grid</button>
   </div>
-  <div id="flow-graph-body" style="padding:16px 14px 100px;max-width:640px;margin:0 auto;"></div>
+  <div style="max-width:640px;margin:0 auto;padding:12px 14px 0;"><div id="flow-nudge-slot"></div></div>
+  <div id="flow-graph-body" style="padding:4px 14px 100px;max-width:640px;margin:0 auto;"></div>
   <div id="flow-back-bar" style="display:none;position:fixed;left:14px;right:14px;
     bottom:calc(14px + env(safe-area-inset-bottom));z-index:20;">
     <button onclick="_flowGraphBack()" style="width:100%;padding:14px;border:none;border-radius:14px;
@@ -16498,6 +16499,50 @@ function _flowActivate(id) {
 // screen in this file. Nothing about how views are shown/hidden was
 // invented for this; goToTab's own hide-every-view-first rule already
 // covers this view because it carries class="view".
+// ═══════════════════════════════════════════════════════════
+// PERSONAL NUDGES ON THE HOME TREE. 18 July 2026. "Gentle nudges
+// everywhere... praise and other stuff." Server generates role-aware
+// nudges weekly (rule-based on real timesheets/bookings/usage — see
+// generateStaffNudges in server.js for the honesty rules). This shows
+// YOUR pending ones as a warm glazed tile at the top of your home
+// tree, one at a time, dismissible with a tap. If there are none —
+// and for now there may genuinely be none until the weekly run — the
+// tile simply isn't there. An absent tile is honest; an empty "no
+// nudges yet!" tile is noise.
+async function _flowLoadNudges() {
+  const slot = document.getElementById('flow-nudge-slot');
+  if (!slot || !currentShiftStaff || !studioId) return;
+  try {
+    const res = await fetch(`${API_URL}/api/studio/nudges/mine?studioId=${studioId}&staffMemberId=${currentShiftStaff.id}`);
+    const data = await res.json();
+    const nudges = data.nudges || [];
+    if (!nudges.length) { slot.innerHTML = ''; return; }
+    const n = nudges[0];
+    const tone = n.kind === 'praise' ? 'linear-gradient(135deg,#F9A825,#f57c00)'
+               : n.kind === 'heads_up' ? 'linear-gradient(135deg,#5E35B1,#4527A0)'
+               : 'linear-gradient(135deg,#00897B,#00695C)';
+    slot.innerHTML = `
+      <div class="glaze-tile" style="border-radius:14px;color:#fff;padding:14px;margin-bottom:14px;
+        background:${tone};position:relative;">
+        <div style="font-weight:800;font-size:14px;padding-right:28px;">${n.headline}</div>
+        <div style="font-size:12px;opacity:0.9;margin-top:4px;">${n.detail}</div>
+        ${nudges.length > 1 ? `<div style="font-size:10px;opacity:0.7;margin-top:6px;">+${nudges.length-1} more after this</div>` : ''}
+        <button onclick="_dismissNudge('${n.id}')" style="position:absolute;top:8px;right:8px;border:none;
+          background:rgba(255,255,255,0.2);color:#fff;border-radius:8px;width:26px;height:26px;
+          font-size:13px;cursor:pointer;">✓</button>
+      </div>`;
+  } catch(e) { slot.innerHTML = ''; /* silent — nudges are a bonus, never a blocker */ }
+}
+async function _dismissNudge(nudgeId) {
+  try {
+    await fetch(`${API_URL}/api/studio/nudges/dismiss`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ studioId, nudgeId })
+    });
+  } catch(e) {}
+  _flowLoadNudges();   // shows the next one, or clears the slot
+}
+
 function _flowGraphEnter() {
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
   let tree;
@@ -16506,6 +16551,7 @@ function _flowGraphEnter() {
   document.getElementById('daisy-flow-view').style.display = 'block';
   _safeRenderFlowGraph();
   _flowLoadDayStat();
+  _flowLoadNudges();
 }
 
 // ─── NEVER A SILENT BLANK SCREEN. 18 July 2026. ───
