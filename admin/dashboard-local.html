@@ -1958,6 +1958,48 @@
   </script>
 </head>
 <body>
+<!-- ═══════════════════════════════════════════════════════════
+     GLOBAL LOADING BAR. 18 July 2026.
+     A thin bar pinned to the very top of the screen. Any data load
+     calls window._loadStart() when it begins and window._loadDone()
+     when it finishes (success OR failure). Multiple concurrent loads
+     are ref-counted so the bar only disappears when the LAST one ends.
+     Purpose (Daisy): remove the guesswork between "still loading" and
+     "genuinely empty" — you can always see when the app is fetching.
+     Purely visual; touches no data. -->
+<div id="global-load-bar" style="position:fixed;top:0;left:0;height:3px;width:0;z-index:99999;
+  background:linear-gradient(90deg,#B87946,#F9A825);box-shadow:0 0 6px rgba(184,121,70,0.5);
+  transition:width .3s ease,opacity .4s ease;opacity:0;pointer-events:none;"></div>
+<script>
+(function(){
+  var active = 0, timer = null, bar = null;
+  function el(){ return bar || (bar = document.getElementById('global-load-bar')); }
+  window._loadStart = function(){
+    active++;
+    var b = el(); if (!b) return;
+    b.style.opacity = '1';
+    // Ease toward 90% while loading; the finish snaps it to 100%.
+    var pct = 12;
+    b.style.width = pct + '%';
+    if (timer) clearInterval(timer);
+    timer = setInterval(function(){
+      pct += (90 - pct) * 0.18;           // decelerating crawl, never reaches 90 on its own
+      b.style.width = pct.toFixed(1) + '%';
+    }, 300);
+  };
+  window._loadDone = function(){
+    active = Math.max(0, active - 1);
+    if (active > 0) return;                // other loads still running
+    var b = el(); if (!b) return;
+    if (timer) { clearInterval(timer); timer = null; }
+    b.style.width = '100%';
+    setTimeout(function(){ b.style.opacity = '0'; setTimeout(function(){ b.style.width = '0'; }, 400); }, 200);
+  };
+  // Safety: if something forgets to call _loadDone, never leave the bar
+  // stuck — auto-clear after 15s of no new starts.
+  setInterval(function(){ if (active > 0) { active = 0; if (window._loadDone) window._loadDone(); } }, 15000);
+})();
+</script>
 
 <!-- ── Staff Walkthrough Tour — full screen immersive ────────────────
      Each step fills the whole screen. Top 58%: rich illustrated panel.
@@ -13849,6 +13891,7 @@ function showRoomElegant(roomName) {
 }
 
 async function loadFloorPlan() {
+  if (window._loadStart) window._loadStart();
   try {
     const [floorRes, tablesRes] = await Promise.all([
       fetch(`${API_URL}/api/floor/active?studioId=${studioId}`),
@@ -13873,7 +13916,9 @@ async function loadFloorPlan() {
       tables: tablesData.tables || []
     };
     renderFloorPlanElegant();
+    if (window._loadDone) window._loadDone();
   } catch(e) {
+    if (window._loadDone) window._loadDone();
     console.warn('Floor plan load failed:', e);
     // THE REAL BUG behind "the elegant screen keeps reverting" — found
     // 15 July 2026. renderFloorPlanElegant() replaces the WHOLE
