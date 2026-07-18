@@ -271,7 +271,11 @@ const port = process.env.PORT || 3000;
 // Genuine, deliberate, harmless marker — forces a real, full Render
 // rebuild (not just a static file refresh) to help resolve tonight's
 // deploy not picking up the latest grid-navigation change.
-console.log('Server build marker: hostbypost-glaze-tiles-thin-header');
+// The old hand-typed build marker read 'hostbypost-glaze-tiles-thin-header'
+// for weeks regardless of what was deployed — it misled a real debugging
+// session on 18 July ("is anything even deploying?"). Boot now announces
+// the actual commit Render built, so the logs can never lie about it again.
+console.log('Server build: ' + (process.env.RENDER_GIT_COMMIT ? process.env.RENDER_GIT_COMMIT.slice(0,7) : 'local') + ' — boot ' + new Date().toISOString());
 
 // ═══════════════════════════════════════════
 // UTILITIES
