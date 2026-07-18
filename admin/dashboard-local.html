@@ -3556,8 +3556,7 @@
           <div id="bookings-table-schematic" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;margin-bottom:14px;">
             <div style="grid-column:1/-1;color:var(--gu-dust);font-size:12px;padding:10px 0;">Loading table layout…</div>
           </div>
-          <div id="bookings-overview-list" style="max-height:220px;overflow-y:auto;">
-          </div>
+          <!-- booking list moved below the workflow tiles, 18 July: tiles grouped at top, list at bottom -->
         </div>
 
         <!-- Genuine real tile entry point for this screen's 4 actual
@@ -3587,6 +3586,10 @@
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">What's firing, real stock</span>
           </button>
         </div>
+
+        <!-- Booking list — now at the bottom, under the workflow tiles, so all tiles sit together at the top (per direct request: "put the tiles at the top and the other stuff at the bottom"). -->
+        <div id="bookings-overview-list" style="max-height:220px;overflow-y:auto;">
+          </div>
 
         <!-- ═══════════════════════════════════ -->
         <!-- SECTION 1: BOOKING DETAILS (arrival) -->
