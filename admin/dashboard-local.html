@@ -16356,12 +16356,27 @@ const _FLOW_GROUP_EMOJI = {
   tables:'🪑', dashboard:'📈', bookings:'📋', menu:'☕', pieces:'🏺',
   stock:'📦', team:'👥', community:'🌟', setup:'⚙️'
 };
+// ─── PARSE-TIME REGEX LITERALS REMOVED. 18 July 2026. ───
+// Timeline evidence: the app worked on Daisy's phone at 14:20 and every
+// report after ~15:00 is a dead boot — exactly when these two
+// \p{Extended_Pictographic} REGEX LITERALS landed. A literal is parsed
+// the moment the script block loads: if this iOS build's RegExp doesn't
+// support that Unicode property, the ENTIRE 20k-line block dies with a
+// SyntaxError before defining anything (dismissSplash included) —
+// matching both confession screens. Node and desktop Chrome accept it,
+// which is why every audit passed. Now built at RUNTIME inside
+// try/catch with a plain surrogate-range fallback: worst case is a
+// slightly duller emoji guess, never a dead app.
+let _EMOJI_RE = null;
+try { _EMOJI_RE = new RegExp('^(\\p{Extended_Pictographic})', 'u'); }
+catch(e) { try { _EMOJI_RE = new RegExp('^([\\uD800-\\uDBFF][\\uDC00-\\uDFFF])'); } catch(e2) { _EMOJI_RE = null; } }
 function _leadingEmoji(label, fallback) {
-  const m = (label||'').match(/^(\p{Extended_Pictographic})/u);
+  const m = _EMOJI_RE ? (label||'').match(_EMOJI_RE) : null;
   return m ? m[1] : (fallback || '•');
 }
 function _cleanLabel(label) {
-  return (label||'').replace(/^\p{Extended_Pictographic}\s*/u, '').trim();
+  const m = _EMOJI_RE ? (label||'').match(_EMOJI_RE) : null;
+  return m ? (label||'').slice(m[1].length).trim() : (label||'').trim();
 }
 function _buildFlowTreeFromNav() {
   const children = (typeof GRID_NAV_STRUCTURE !== 'undefined' ? GRID_NAV_STRUCTURE : []).map(group => {
