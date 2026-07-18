@@ -12817,6 +12817,54 @@ function _assignBookingToTable(map, b) {
 function _elegantRoomsData() {
   const tables = _floorData.tables || [];
   const bookings = _floorData.bookings || [];
+
+  // ═══════════════════════════════════════════════════════════
+  // RESOLVE A SQUARE ORDER'S TABLE FROM WHAT THE GIRLS TYPED.
+  // 18 July 2026.
+  // ═══════════════════════════════════════════════════════════
+  // Live Square orders arrive with a raw table_ref — whatever the girls
+  // rang the order against at the till ("Table 3", "3", "L2", "Lounge 2",
+  // "6a", "Vault"...). Jenny's naming varies, especially the Lounge L-
+  // prefix, so this matches leniently against the REAL table names we
+  // merged to (Table 1-8, Lounge 1-6, The Vault). Whatever it resolves to
+  // becomes b.table_number, so the existing seating/render path treats a
+  // live till order exactly like any seated booking — the table goes red.
+  // No match -> left unresolved (shows as an arrival to seat), never
+  // dumped on a wrong table. Learns nothing destructive; purely a read.
+  const _tableNames = (_floorData.tables || []).map(t => t.name);
+  const _resolveOrderTable = (ref) => {
+    if (!ref) return null;
+    const s = String(ref).toLowerCase();
+    if (s.includes('vault')) return _tableNames.find(n => /vault/i.test(n)) || null;
+    // Lounge: "lounge 2", "l2", "l 2" -> Lounge 2
+    let m = s.match(/(?:lounge|l)\s*0*([1-9]\d?)/);
+    if (m && (s.includes('lounge') || /\bl\s*\d/.test(s))) {
+      return _tableNames.find(n => new RegExp('lounge\\s*0*'+m[1]+'\\b','i').test(n)) || null;
+    }
+    // Main studio: "table 3", "3", "6a"/"6b" -> Table <n> (the letter is
+    // a half-seat the girls use; the merged whole table is just the number).
+    // GUARD: ignore anything that looks like a booking code / date /
+    // long id (e.g. "booking-20260718-xyz", "order-abc123") — those
+    // contain stray digits that must NOT be read as a table number.
+    // Explicit "table N" ALWAYS wins, even alongside a booking code.
+    m = s.match(/\btable\s*0*([1-8])\b/);
+    if (m) return _tableNames.find(n => new RegExp('^table\\s*0*'+m[1]+'$','i').test(n)) || null;
+    // A bare token that is JUST the number (optionally a/b) — but NOT a
+    // digit buried in a booking code / date / long id.
+    const looksLikeId = /(booking|order)[-_]/i.test(s) || /\d{4,}/.test(s);
+    if (!looksLikeId) {
+      m = s.match(/^\s*0*([1-8])\s*[ab]?\s*$/);
+      if (m) return _tableNames.find(n => new RegExp('^table\\s*0*'+m[1]+'$','i').test(n)) || null;
+    }
+    return null;
+  };
+  bookings.forEach(b => {
+    if (b.is_square_order && !b.table_number && b.table_ref) {
+      const t = _resolveOrderTable(b.table_ref);
+      if (t) b.table_number = t;
+    }
+  });
+
   const bookingByTable = {};
   // ARRIVALS — the bookings this line used to silently drop.
   // `if (b.table_number)` quietly binned every real Square booking, because

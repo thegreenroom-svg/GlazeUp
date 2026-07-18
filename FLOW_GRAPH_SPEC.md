@@ -115,3 +115,37 @@ Interim fix shipped 18 July: room-aware provisional placement (bookings
 show in their booked room) + self-healing floor-plan refresh heartbeat
 (was freezing at "20m ago" because the 30s poll could be cleared and not
 recreated).
+
+## ═══ STOCK + LASER + SUPPLIER-PHOTO SEED — 18 July 2026 (queued) ═══
+Three threads captured mid-session, to build in this order after the
+live terminal link:
+
+1. LIVE TERMINAL LINK (in progress). The girls ring orders/drinks/
+   supplementary glazes against a table at the Square terminal — that IS
+   the live signal, and it must reference back to the admin team. The
+   July 17 live-Square-orders read (commit 1aacc00) is NOT in this
+   branch — /api/floor/active currently reads ONLY our own bookings
+   table, zero Square reads. That is why nothing live shows. Rebuild the
+   read-only searchOrders merge (reuse existing pattern ~line 498:
+   listLocations, cursor paging, sort.sortField=CREATED_AT). An order
+   against a table -> table goes live (RED). READ ONLY, never writes to
+   Square. Order carries line items (drinks/glazes) + note/referenceId
+   (app-created orders already set referenceId=bookingCode, note). This
+   builds the full picture — orders, drinks, extra glazes — back to admin.
+
+2. STOCK NAME AMBIGUITY. Jenny names stock differently from the
+   supplier's catalogue name. Need an alternative-name layer: supplier's
+   real name AND Jenny's name recognised as the same item, with a choice
+   for both in the trial flow (the "AI learning list" applied to stock).
+
+3. LASER STAMP DESIGNER (framework only). Copy the existing AI transfer-
+   design feature into a parallel output aimed at a laser printer for
+   cutting stamps/sponges. Same design features, different output.
+   Printer details TBD by Daisy later — build up to the output stage.
+
+SEED SHORTCUT (for #1 recognition + #2 names): before photographing all
+stock from scratch, check whether SUPPLIERS (disk/pottery supplies cos)
+have product photos in their catalogues. Pull those in to seed the AI
+recognition library immediately — clean, consistent, already tied to the
+real supplier product name (which is exactly the "supplier name" side of
+#2). Then it refines as own photos come in via the stock-arrival flow.

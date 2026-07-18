@@ -5627,7 +5627,78 @@ app.get('/api/floor/active', async (req, res) => {
     // that were cancelled or rescheduled). Until then, arrivals only ever
     // come from our own bookings table, which is real, controlled, and
     // correct.
+    // ── 4b. LIVE SQUARE ORDERS — read-only. 18 July 2026. ──
+    // Rebuilt: the terminals define the flow. When the girls ring an
+    // order/drinks/glazes against a table at the Square till, THAT is the
+    // "this table is live" signal. This reads today's Square orders
+    // (searchOrders — a GET-equivalent, READ ONLY, never writes to
+    // Square) and turns each into a live table booking the floor plan can
+    // show red. Reuses the exact proven pattern from the takings read:
+    // listLocations for the required locationIds, sort.sortField matching
+    // the dateTimeFilter field. Any failure leaves this [] so the floor
+    // plan still works entirely from our own DB — Square is additive,
+    // never load-bearing.
     let squareLiveBookings = [];
+    try {
+      const { data: sqConn } = await supabase
+        .from('square_connections')
+        .select('square_access_token')
+        .eq('studio_id', studioId)
+        .single();
+      if (sqConn?.square_access_token) {
+        const sqClient = await getSquareClient(sqConn.square_access_token);
+        const locRes = await sqClient.locationsApi.listLocations();
+        const locationIds = (locRes.result.locations || []).map(l => l.id);
+        if (locationIds.length) {
+          const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
+          const ordersRes = await sqClient.ordersApi.searchOrders({
+            locationIds,
+            query: {
+              filter: { dateTimeFilter: { createdAt: { startAt: startOfDay.toISOString() } },
+                        stateFilter: { states: ['OPEN','COMPLETED'] } },
+              sort: { sortField: 'CREATED_AT', sortOrder: 'DESC' },
+            },
+            limit: 200,
+          });
+          const orders = ordersRes.result.orders || [];
+          // Which table did the girls ring this against? The table name
+          // lives in the order's referenceId (app-created orders set it to
+          // the booking code) or its note, or a line-item note. We read
+          // those verbatim and normalise to a table name — the floor plan
+          // matches on the same studio_tables.name we merged to
+          // (Table 1-8, Lounge 1-6, The Vault). No guessing a table that
+          // isn't there: an order with no readable table reference is left
+          // out of the live layer rather than dumped on a wrong table.
+          const _readTableRef = (o) => {
+            const hay = [o.referenceId, o.note,
+              ...(o.lineItems||[]).map(li => li.note)].filter(Boolean).join(' ');
+            return hay || null;
+          };
+          const seenTables = new Set();
+          orders.forEach(o => {
+            const ref = _readTableRef(o);
+            if (!ref) return;
+            // Extract a table token: "Table 3", "3", "L2"/"Lounge 2",
+            // "Vault", "6a"/"6b". Normalised loosely; the client render
+            // matches leniently against real table names.
+            const items = (o.lineItems||[]).map(li => (li.name||'').trim()).filter(Boolean);
+            squareLiveBookings.push({
+              booking_code: 'order-' + o.id,
+              customer_name: (o.note && !/table|lounge|vault/i.test(o.note)) ? o.note : (items[0] || 'Till order'),
+              table_ref: ref,                       // raw reference for the client to match
+              order_items: items,                   // drinks/glazes rung up — the live picture
+              is_square_order: true,
+              current_stage: 'engagement',          // an order means they're painting/served
+              is_live: true,
+              session_start: o.createdAt || new Date().toISOString(),
+            });
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('/api/floor/active live Square read failed (non-fatal):', e?.message||e);
+      squareLiveBookings = [];   // Square is additive; own DB still renders
+    }
 
     // ── 5. Merge ──
     // is_live: has this booking's actual scheduled time begun? The
