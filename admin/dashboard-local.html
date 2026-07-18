@@ -8960,7 +8960,6 @@ async function openCollections() {
       </div>
     </div>`;
   toggleFloatingBackBtn();
-  _instantPaint('klnk_cache_collections','collections-tiles');
   _loadCollectionsTiles();
 }
 
@@ -8972,14 +8971,49 @@ async function _loadCollectionsTiles() {
     const res = await fetch(`${API_URL}/api/pieces/ready-for-pickup?studioId=${studioId}`);
     const d = await res.json();
     readyCount = (d.pieces || d.bookings || []).length;
-      _instantSave('klnk_cache_collections','collections-tiles');
-  } catch(e) {
-    console.warn('collections load failed:', e);
-    if (!localStorage.getItem('klnk_cache_collections')) {
-      const _ce = document.getElementById('collections-tiles');
-      if (_ce) _ce.innerHTML = `<div style="text-align:center;padding:30px;color:#e53935;font-size:13px;">Couldn't load collections. Try again in a moment.</div>`;
-    }
-  }
+  } catch(e) { /* show zero */ }
+
+  el.innerHTML = `
+    <!-- READY TO COLLECT — the main one -->
+    <button onclick="_showReadyToCollect()" class="glaze-tile"
+      style="width:100%;border:none;border-radius:18px;padding:24px 20px;cursor:pointer;
+      background:linear-gradient(135deg,#00897B,#00695C);color:#fff;text-align:left;">
+      <div style="font-size:38px;font-weight:900;line-height:1;">${readyCount}</div>
+      <div style="font-family:'Caveat',cursive;font-size:22px;font-weight:700;margin-top:4px;">
+        ready to collect</div>
+      <div style="font-size:11px;opacity:0.9;margin-top:6px;line-height:1.4;">
+        Fired, labelled, on the shelf. Tap to see who's waiting.</div>
+    </button>
+
+    <!-- FIND ON THE SHELF — when it's jumbled -->
+    <button onclick="openFindMyPiece()" class="glaze-tile"
+      style="width:100%;border:none;border-radius:18px;padding:24px 20px;cursor:pointer;
+      background:linear-gradient(135deg,#5E35B1,#4527A0);color:#fff;text-align:left;">
+      <div style="font-size:32px;">🔍</div>
+      <div style="font-family:'Caveat',cursive;font-size:22px;font-weight:700;margin-top:6px;">
+        Find on the shelf</div>
+      <div style="font-size:11px;opacity:0.9;margin-top:6px;line-height:1.4;">
+        Customer's here but you can't find it? Photograph any piece and
+        I'll tell you whose it is. Works even when the shelf is a jumble.</div>
+    </button>
+
+    <!-- RETURNS — pieces coming back -->
+    <button onclick="openReturns()" class="glaze-tile"
+      style="width:100%;border:none;border-radius:18px;padding:24px 20px;cursor:pointer;
+      background:linear-gradient(135deg,#B87946,#9A6435);color:#fff;text-align:left;">
+      <div style="font-size:32px;">↩️</div>
+      <div style="font-family:'Caveat',cursive;font-size:22px;font-weight:700;margin-top:6px;">
+        Returns</div>
+      <div style="font-size:11px;opacity:0.9;margin-top:6px;line-height:1.4;">
+        Something coming back to us — a repair, a re-fire, a piece
+        they left behind.</div>
+    </button>
+
+    <button onclick="_showCollectionsHelp()" style="width:100%;background:none;
+      border:1px dashed rgba(43,39,36,0.2);border-radius:12px;padding:12px;
+      font-size:12px;color:#8a8175;cursor:pointer;margin-top:4px;">
+      ❓ How does this work?
+    </button>`;
 }
 
 function _showCollectionsHelp() {
