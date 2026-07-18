@@ -6410,6 +6410,18 @@ function updateAPIStatus(connected) {
   const status = document.getElementById('api-status');
   const stripStatus = document.getElementById('strip-api-status');
   const label = connected ? '✓ API Connected' : '✗ Using Mock Data';
+  // ─── SAY IT, THEN LEAVE. 18 July 2026. Daisy: "interfering at top."
+  // A permanent "everything's fine" badge parked over the header icons
+  // is clutter, not information. Connected: show for 4s, fade, gone.
+  // DISCONNECTED stays visible — that one genuinely matters.
+  clearTimeout(window._apiBadgeFade);
+  if (status) { status.style.transition = 'opacity 0.6s'; status.style.opacity = '1'; status.style.display = ''; }
+  if (connected && status) {
+    window._apiBadgeFade = setTimeout(() => {
+      status.style.opacity = '0';
+      setTimeout(() => { if (status.style.opacity === '0') status.style.display = 'none'; }, 700);
+    }, 4000);
+  }
 
   if (connected) {
     status.className = 'api-status connected';
