@@ -502,6 +502,19 @@
         padding: 0 12px 0 8px !important; gap: 5px;
       }
       #qt-find::after { content: 'Find piece'; font-size: 11px; font-weight: 700; }
+      /* 18 Jul, Daisy: "the icons are pretty ambiguous — wording of the
+         icons changing to be more descriptive." Same labelled-pill
+         pattern as Find piece, applied to the rest. */
+      #qt-tell {
+        width: auto !important; border-radius: 22px !important;
+        padding: 0 12px 0 8px !important; gap: 5px;
+      }
+      #qt-tell::after { content: 'Tell Daisy'; font-size: 11px; font-weight: 700; }
+      #a2hs-header-btn {
+        width: auto !important; border-radius: 22px !important;
+        padding: 0 12px 0 8px !important; gap: 5px;
+      }
+      #a2hs-header-btn::after { content: 'Install'; font-size: 11px; font-weight: 700; }
     }
 
     /* Phone-only collapsed header — bundles bell/badge/headset into one row */
@@ -4903,6 +4916,14 @@
           <button class="glaze-tile" onclick="addCataloguePiece()" style="width:100%;background:var(--gu-primary);color:white;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;">Add to catalogue</button>
         </div>
 
+        <button class="glaze-tile" onclick="_catalogueScanPiece()" style="width:100%;background:linear-gradient(135deg,#5E35B1,#4527A0);color:white;border:none;border-radius:14px;padding:18px;text-align:left;cursor:pointer;margin-bottom:16px;display:flex;align-items:center;gap:14px;">
+          <span style="font-size:26px;">📸</span>
+          <div>
+            <div style="font-size:15px;font-weight:800;">Scan a piece — find it in the catalogue</div>
+            <div style="font-size:11px;opacity:0.85;margin-top:2px;">Photograph any bisque shape. Free on-device match, instant.</div>
+          </div>
+        </button>
+        <div id="catalogue-ai-result"></div>
         <div class="chart-container">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
             <h3 style="margin:0;">Current catalogue</h3>
@@ -5070,10 +5091,18 @@
              request — the editor below genuinely depends on a real
              booking being loaded first, so this stays sequential
              rather than free-jumping tiles. -->
+        <button class="glaze-tile" onclick="_labelScanPiece()" style="width:100%;background:linear-gradient(135deg,#5E35B1,#4527A0);color:white;border:none;border-radius:14px;padding:20px;text-align:left;cursor:pointer;margin-bottom:12px;display:flex;align-items:center;gap:14px;">
+          <span style="font-size:28px;">📸</span>
+          <div>
+            <div style="font-size:16px;font-weight:800;">Scan a piece — AI finds the booking</div>
+            <div style="font-size:11px;opacity:0.85;margin-top:2px;">Photograph any piece. I'll tell you whose it is, where the rest of their pieces are, and load the label.</div>
+          </div>
+        </button>
+        <div id="label-ai-result"></div>
         <button class="glaze-tile" onclick="document.getElementById('label-booking-scan-input').focus()" style="width:100%;background:#B87946;color:white;border:none;border-radius:14px;padding:20px;text-align:left;cursor:pointer;margin-bottom:20px;display:flex;align-items:center;gap:14px;">
           <span style="font-size:28px;">🔍</span>
           <div>
-            <div style="font-size:16px;font-weight:800;">Find a booking</div>
+            <div style="font-size:16px;font-weight:800;">Or find by booking code</div>
             <div style="font-size:11px;opacity:0.85;margin-top:2px;">Scan or paste a booking code below</div>
           </div>
         </button>
@@ -8241,6 +8270,188 @@ function openPacking() {
 // orphaned code, unreachable by anyone. Rebuilt clean, reusing the same
 // proven endpoint: called from a real button on both Packing and
 // Collections, booking id already known so no manual code entry.
+// ─── LABELS + PHOTO AI. 18 July 2026. "The labelling should have the
+// Photo AI: pick up a piece, scan it, it tells you where the rest of
+// the group is, then print the label. You work out the workflow." The
+// workflow: photo -> find-by-photo (pHash first, free; AI fallback) ->
+// load that booking straight into the existing label editor -> list
+// the booking's other pieces with statuses so you know if the group
+// is complete before printing.
+// ─── CATALOGUE + PHOTO AI. 18 July 2026. "The piece catalogue should
+// also be linked in with a photo AI — you work out how it integrates."
+// Integration: the catalogue IS the stock shapes, so the free
+// on-device dHash identifier (identify-by-photo) is the right engine —
+// instant, no API cost, already proven in the stock workflow.
+function _catalogueScanPiece() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.onchange = _handleCatalogueScanPhoto;
+  input.click();
+}
+async function _handleCatalogueScanPhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const el = document.getElementById('catalogue-ai-result');
+  if (el) el.innerHTML = '<div style="padding:12px;font-size:12px;color:#8a8175;">Matching against the catalogue…</div>';
+  try {
+    const base64 = await new Promise((res, rej) => {
+      const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file);
+    });
+    const apiRes = await fetch(`${API_URL}/api/stock/identify-by-photo`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, photoBase64: base64 })
+    });
+    const data = await apiRes.json();
+    if (!apiRes.ok) throw new Error(data.error || 'Match failed');
+    const matches = data.matches || (data.match ? [data.match] : []);
+    if (!matches.length) {
+      if (el) el.innerHTML = '<div style="padding:12px;font-size:12px;color:#8a8175;background:rgba(43,39,36,0.05);border-radius:10px;margin-bottom:12px;">No confident match — it may not be in the catalogue yet. Add it below.</div>';
+      return;
+    }
+    if (el) el.innerHTML = `<div class="glaze-tile" style="padding:14px;border-radius:12px;margin-bottom:12px;background:rgba(94,53,177,0.08);">
+      <div style="font-size:12px;font-weight:800;color:#4527A0;margin-bottom:6px;">Closest matches:</div>
+      ${matches.slice(0,3).map(m => `<div style="font-size:12px;color:#2B2724;padding:4px 0;">🏺 <b>${m.name || m.shape_name || 'Unknown'}</b>${m.price ? ' — £' + (m.price/100).toFixed(2) : ''}${m.confidence ? ` <span style="color:#8a8175;font-size:10px;">(${Math.round(m.confidence*100)}%)</span>` : ''}</div>`).join('')}
+    </div>`;
+  } catch(e) {
+    if (el) el.innerHTML = `<div style="padding:12px;font-size:12px;color:#e53935;">${e.message}</div>`;
+  }
+}
+
+// ─── THE LEARNING SCREEN. 18 July 2026. Daisy's direction since
+// 14 July: "the app auto-learns from real usage and periodically
+// suggests changes." Entire backend existed (learning/run analyses
+// real staff_task_transitions; suggestions; respond) with zero client
+// presence — found in the orphan sweep. This is its door: see what
+// the app has noticed, approve or dismiss each suggestion, run a
+// fresh analysis on demand.
+function openLearning() {
+  const view = document.getElementById('floor-plan-view');
+  if (!view) return;
+  _floorViewMode = 'learning';
+  view.innerHTML = `
+    <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+        <div>
+          <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">What the app has noticed</div>
+          <div style="font-size:11px;color:#8a8175;">Learned from real usage — approve or dismiss</div>
+        </div>
+        <button onclick="goToRealLandingPage()" class="glaze-tile"
+          style="border:none;padding:8px 12px;font-size:11px;font-weight:800;cursor:pointer;flex-shrink:0;">← Done</button>
+      </div>
+      <button onclick="_learningRunNow(this)" class="glaze-tile"
+        style="width:100%;border:none;border-radius:14px;padding:14px;font-size:13px;font-weight:800;
+        background:linear-gradient(135deg,#F9A825,#f57c00);color:#fff;cursor:pointer;margin-bottom:14px;">
+        🔍 Look for new patterns now</button>
+      <div id="learning-list"><div style="text-align:center;padding:30px;color:#8a8175;font-size:13px;">Loading…</div></div>
+    </div>`;
+  toggleFloatingBackBtn();
+  _loadLearningSuggestions();
+}
+async function _loadLearningSuggestions() {
+  const el = document.getElementById('learning-list');
+  if (!el) return;
+  try {
+    const res = await fetch(`${API_URL}/api/studio/learning/suggestions?studioId=${studioId}`);
+    const data = await res.json();
+    const sugg = data.suggestions || [];
+    if (!sugg.length) {
+      el.innerHTML = `<div style="text-align:center;padding:40px 20px;">
+        <div style="font-size:40px;margin-bottom:8px;">🌱</div>
+        <div style="font-family:'Caveat',cursive;font-size:22px;color:#2B2724;">Nothing new yet</div>
+        <div style="font-size:12px;color:#8a8175;margin-top:4px;">The more the studio uses the app, the more it notices.</div>
+      </div>`;
+      return;
+    }
+    el.innerHTML = sugg.map(s => `
+      <div class="glaze-tile" style="border-radius:14px;padding:14px;margin-bottom:10px;background:#FFFDF9;">
+        <div style="font-size:13px;font-weight:700;color:#2B2724;line-height:1.4;">${s.title || s.suggestion || 'Suggestion'}</div>
+        ${s.detail ? `<div style="font-size:11px;color:#8a8175;margin-top:4px;line-height:1.4;">${s.detail}</div>` : ''}
+        ${s.confidence ? `<div style="font-size:10px;color:#8a8175;margin-top:4px;">Confidence: ${Math.round(s.confidence*100)}%</div>` : ''}
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button onclick="_learningRespond('${s.id}','approved')" class="glaze-tile"
+            style="flex:1;border:none;border-radius:10px;padding:9px;font-size:12px;font-weight:800;
+            background:#00897B;color:#fff;cursor:pointer;">✓ Yes, do it</button>
+          <button onclick="_learningRespond('${s.id}','dismissed')"
+            style="border:1px solid rgba(43,39,36,0.15);border-radius:10px;padding:9px 14px;font-size:12px;
+            background:none;color:#8a8175;cursor:pointer;">Not this</button>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    el.innerHTML = '<div style="text-align:center;padding:30px;color:#e53935;font-size:13px;">Couldn\'t load suggestions.</div>';
+  }
+}
+async function _learningRespond(id, decision) {
+  try {
+    await fetch(`${API_URL}/api/studio/learning/respond`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, suggestionId: id, decision })
+    });
+    _loadLearningSuggestions();
+  } catch(e) { alert("Couldn't save that — try again."); }
+}
+async function _learningRunNow(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Looking at real usage…'; }
+  try {
+    await fetch(`${API_URL}/api/studio/learning/run`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId })
+    });
+    _loadLearningSuggestions();
+  } catch(e) { /* list reload shows state either way */ }
+  if (btn) { btn.disabled = false; btn.textContent = '🔍 Look for new patterns now'; }
+}
+
+function _labelScanPiece() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.onchange = _handleLabelScanPhoto;
+  input.click();
+}
+async function _handleLabelScanPhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const el = document.getElementById('label-ai-result');
+  if (el) el.innerHTML = '<div style="padding:12px;font-size:12px;color:#8a8175;">Looking at the piece…</div>';
+  try {
+    const base64 = await new Promise((res, rej) => {
+      const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file);
+    });
+    const apiRes = await fetch(`${API_URL}/api/pieces/find-by-photo`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, photoBase64: base64 })
+    });
+    const data = await apiRes.json();
+    if (!apiRes.ok) throw new Error(data.error || 'Scan failed');
+    const match = data.match || (data.matches || [])[0];
+    if (!match || !match.booking_id) {
+      if (el) el.innerHTML = '<div style="padding:12px;font-size:12px;color:#8a8175;background:rgba(43,39,36,0.05);border-radius:10px;margin-bottom:12px;">Couldn\'t recognise that piece — try the booking code instead.</div>';
+      return;
+    }
+    // Load the booking straight into the existing label editor
+    const codeInput = document.getElementById('label-booking-scan-input');
+    if (codeInput) { codeInput.value = match.booking_id; }
+    if (typeof loadLabelBooking === 'function') loadLabelBooking();
+    // Show the rest of the group with statuses
+    let groupHtml = '';
+    try {
+      const gRes = await fetch(`${API_URL}/api/pieces/for-booking?studioId=${studioId}&bookingCode=${encodeURIComponent(match.booking_id)}`);
+      const gData = await gRes.json();
+      const group = gData.pieces || [];
+      if (group.length > 1) {
+        groupHtml = `<div style="font-size:11px;font-weight:800;color:#2B2724;margin:8px 0 4px;">The rest of the group — ${group.length} pieces total:</div>` +
+          group.map(p => `<div style="font-size:11px;color:#8a8175;padding:3px 0;">${p.piece_type || 'Piece'} — <b>${(p.status||'?').replace(/_/g,' ')}</b>${p.shelf ? ' · shelf ' + p.shelf : ''}</div>`).join('');
+      }
+    } catch(e) { /* group listing is a bonus, never a blocker */ }
+    if (el) el.innerHTML = `<div class="glaze-tile" style="padding:14px;border-radius:12px;margin-bottom:12px;background:rgba(94,53,177,0.08);">
+      <div style="font-size:13px;font-weight:800;color:#4527A0;">✓ ${match.customer_name || match.booking_id}</div>
+      <div style="font-size:11px;color:#8a8175;margin-top:2px;">Booking loaded below — check the group, then print.</div>
+      ${groupHtml}
+    </div>`;
+  } catch(e) {
+    if (el) el.innerHTML = `<div style="padding:12px;font-size:12px;color:#e53935;">${e.message}</div>`;
+  }
+}
+
 function _openTrayScan(bookingCode, customerName, pieceCount) {
   const m = document.createElement('div');
   m.id = 'tray-scan-modal';
@@ -16136,6 +16347,7 @@ const GRID_NAV_STRUCTURE = [
   { tab: 'health-safety', label: '🦺 Health & Safety', desc: 'Risk assessment, training, procedures', fn: 'openHealthSafety' },
   { tab: 'packing', label: '📦 Packing', desc: 'Fired pieces going home', fn: 'openPacking' },
   { tab: 'kiln', label: '🔥 Kiln', desc: 'Dip → load → fire', fn: 'openKiln' },
+  { tab: 'learning', label: '🌱 Learning', desc: 'What the app has noticed from real usage', fn: 'openLearning' },
   { tab: 'collections', label: '🏺 Collections', desc: 'Ready to collect · returns · find on shelf', fn: 'openCollections' },
   { tab: 'assistant', label: '💛 Ask Cleo', desc: 'She learns how you work · ask her anything', fn: 'openAssistant' },
   { tab: 'training', label: '🎓 My Training', desc: 'Read, tick, done', fn: 'openMyTraining' },
