@@ -15542,6 +15542,27 @@ const STAGE_TO_SECTION = {
 };
 
 async function openBookingAtRealStage(bookingCode, stage) {
+  // ═══════════════════════════════════════════════════════════
+  // "OPEN FULL BOOKING" DID NOTHING — BECAUSE THE PANEL COVERED IT.
+  // 18 July 2026.
+  // ═══════════════════════════════════════════════════════════
+  // The tap fired, goToTab('staff') ran, the booking loaded — all of it
+  // worked. But #floor-table-detail is a position:fixed, inset:0,
+  // z-index:6000 full-screen overlay, and nothing closed it. So the app
+  // navigated to the staff screen correctly and then drew it UNDERNEATH
+  // the booking panel, which was still covering the entire screen. Same
+  // family as every "it ran but you couldn't see it" bug tonight: the
+  // action succeeded into something invisible.
+  //
+  // Hidden directly rather than via closeTableDetail(), because that
+  // function also calls renderFloorPlanElegant() — which, if it ran here
+  // before goToTab set the tab, could flash the floor plan into the race.
+  // Just hide the overlay and drop its state; the staff nav does the rest.
+  const _panel = document.getElementById('floor-table-detail');
+  if (_panel) _panel.style.display = 'none';
+  if (typeof _detailTimerInterval !== 'undefined' && _detailTimerInterval) {
+    clearInterval(_detailTimerInterval); _detailTimerInterval = null;
+  }
   goToTab('staff');
   const section = STAGE_TO_SECTION[stage];
   if (!section) console.warn(`Unknown booking stage "${stage}" — opening at booking. Add it to STAGE_TO_SECTION.`);
