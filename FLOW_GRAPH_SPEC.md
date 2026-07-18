@@ -183,3 +183,30 @@ convert remaining plain buttons ("open customer app on this device",
 "show customer queue", etc) to glazed tiles; logical ordering pass on
 every page; in-app flow view to match the approved preview exactly;
 stock-name feature; laser framework; supplier-photo framework.
+
+## ═══ THE FINAL GUI LAW — dictated 18 July 2026 (afternoon) ═══
+1. TILES ONLY. Nothing on any screen but glazed tiles + the contextual
+   header bar. No stray writing unless absolutely necessary. End screens
+   (text entry / final button) are the only non-tile surfaces.
+2. HIGH-FIRE GLAZE. Tiles at maximum ceramic rendering (done: layered
+   specular bloom, wet-sheen band, glaze-pool rim, saturation lift).
+3. TILE SIZES. Big and small glazed tiles; use small ones to fit more
+   options; "back with options" as tiny glazed tiles.
+4. FAMILY-TREE PAGES. Tile at top, arrow stem branching down to the next
+   tiles. Colour = meaning: green branch / amber action / red live.
+   Legend on page. (Preview built + approved; in-app view generates
+   from real GRID_NAV_STRUCTURE.)
+5. CLEO ALWAYS PRESENT. Her floating character tappable on every screen
+   (restored from hidden 18 July; fab now glazed). Jenny's personalised
+   learning float is separate and specific to her tasking.
+6. FLOOR PLAN = SCREENSAVER + HUB. All three areas, live states, tap a
+   table -> action it DIRECTLY (cut the per-room middle step). Ledger on
+   the screensaver: red live / green coming / cream free / dashed
+   provisional (added 18 July).
+7. DAISY'S FEEDBACK LOOP. Everything important for the studio-manager
+   job reaches back to Daisy as a simple daily glazed-tile digest —
+   nothing corporate ("no Bob Mardman"), enhance the existing flows.
+8. FULL LOGIC RESCAN (queued for the calm session): most succinct route
+   to everything; backflow + cross-links between in-app systems; other
+   people's workflows and their interactions; minimal instruction per
+   tile. This is the deep pass, to do unhurried with on-device checks.

@@ -13844,6 +13844,21 @@ function renderFloorPlanElegant() {
         <span style="display:flex;align-items:center;gap:4px;">
           <span style="width:7px;height:7px;border-radius:50%;background:#e53935;"></span>needs you now</span>
       </div>
+      <!-- TABLE COLOUR LEDGER — Daisy: "we need a ledger on the
+           screensaver for what the tables mean." Small swatches shaped
+           like tables, matching the real fill colours the renderer uses:
+           red = happening now, green = booked & coming up, cream = free. -->
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px;
+        font-size:9px;color:#8a8175;font-family:'Architects Daughter',cursive;">
+        <span style="display:flex;align-items:center;gap:4px;">
+          <span style="width:14px;height:9px;border-radius:2px;border:1px solid #2B2724;background:rgba(192,57,43,0.35);"></span>live now</span>
+        <span style="display:flex;align-items:center;gap:4px;">
+          <span style="width:14px;height:9px;border-radius:2px;border:1px solid #2B2724;background:rgba(76,175,80,0.30);"></span>booking coming</span>
+        <span style="display:flex;align-items:center;gap:4px;">
+          <span style="width:14px;height:9px;border-radius:2px;border:1px solid #2B2724;background:#FFFDF9;"></span>free</span>
+        <span style="display:flex;align-items:center;gap:4px;">
+          <span style="width:14px;height:9px;border-radius:2px;border:1.5px dashed #8a8175;background:#FFFDF9;"></span>provisional — tap to confirm</span>
+      </div>
       <div style="display:flex;gap:8px;align-items:flex-start;width:100%;">
         <div style="flex:1;min-width:0;">
       ${resting ? `<div style="text-align:center;padding:40px 20px;color:#8a8175;font-size:13px;">
