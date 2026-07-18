@@ -28638,7 +28638,14 @@ if (typeof document !== 'undefined') {
     try {
       const fp = document.getElementById('floor-plan-view');
       const visible = fp && getComputedStyle(fp).display !== 'none';
-      if (visible && typeof loadFloorPlan === 'function' && apiConnected && currentShiftStaff) {
+      // ─── HEARTBEAT MUST NOT STOMP SUB-SCREENS. 18 July 2026. ───
+      // Daisy's screenshot: opened Packing, screen went blank. Packing,
+      // Collections, Music etc all render INSIDE #floor-plan-view; this
+      // 30s refresh called loadFloorPlan -> renderFloorPlanElegant,
+      // which repaints that container as the floor plan — wiping
+      // whatever sub-screen was living there. Only refresh when the
+      // container is actually showing the PLAN (_floorViewMode==='plan').
+      if (visible && typeof loadFloorPlan === 'function' && apiConnected && currentShiftStaff && (typeof _floorViewMode === 'undefined' || _floorViewMode === 'plan')) {
         loadFloorPlan();
       }
     } catch (e) { /* never let the heartbeat throw */ }
