@@ -13602,6 +13602,29 @@ function _renderArrivals(unseated) {
 // Tomorrow's tables still lay out in order and still show green. They
 // just cannot be re-placed from the floor plan yet.
 
+// ─── THE TODAY LINE. 18 July 2026. ───
+// Daisy saw the "Tomorrow · 14 bookings" strip at 2:20pm WHILE eleven
+// bookings were live in the room, and read it as an erroneous total.
+// The figure was correct — the placement was misleading: the floor plan
+// had NO summary of today at all, so tomorrow's strip stood alone and
+// read as the headline. Today now always speaks first. The figures come
+// from the same _floorData the tables themselves are drawn from, so
+// this line can never disagree with the picture below it.
+function _renderTodayLine() {
+  const bs = (_floorData?.bookings || []).filter(b => !b.is_tomorrow);
+  if (!bs.length) return '';
+  const live = bs.filter(b => b.is_live).length;
+  const covers = bs.reduce((n,b) => n + (b.party_size || 0), 0);
+  return `<div style="display:flex;align-items:center;gap:8px;justify-content:center;
+    padding:7px 12px;margin:0 auto 6px;background:rgba(76,175,80,0.08);
+    border:1px solid rgba(76,175,80,0.25);border-radius:20px;width:fit-content;">
+    <span style="font-size:13px;">🏺</span>
+    <span style="font-family:'Architects Daughter',cursive;font-size:11px;color:#5a5248;">
+      Today · ${bs.length} booking${bs.length===1?'':'s'}${covers?` · ${covers} covers`:''}${live?` · <b style="color:#c0392b;">${live} live now</b>`:''}
+    </span>
+  </div>`;
+}
+
 function _renderTomorrow(tomorrow) {
   if (!tomorrow || !tomorrow.length) return '';
   const first = tomorrow.map(b => b.session_start).filter(Boolean).sort()[0];
@@ -13855,6 +13878,7 @@ function renderFloorPlanElegant() {
         </button>
       </div>
       ${_renderArrivals(unseated)}
+      ${_renderTodayLine()}
       ${_renderTomorrow(tomorrow)}
       <div style="font-family:'Architects Daughter',cursive;font-size:9px;color:#B87946;
         background:rgba(184,121,70,0.09);border:1px dashed rgba(184,121,70,0.35);

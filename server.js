@@ -7648,7 +7648,7 @@ app.get('/api/staff/daily-progress', async (req, res) => {
     supabase.from('bookings').select('booking_code, customer_name, status, created_at')
       .eq('studio_id', studioId)
       .gte('session_start', today.toISOString()).lt('session_start', tomorrow.toISOString()),
-    supabase.from('table_sessions').select('booking_code, table_name, status, created_at')
+    supabase.from('table_sessions').select('booking_code, table_number, status, created_at')
       .eq('studio_id', studioId).gte('created_at', today.toISOString()),
     supabase.from('session_duties').select('booking_code, staff_name, duty_text, completed, status')
       .eq('studio_id', studioId).gte('created_at', today.toISOString()),
@@ -7672,7 +7672,7 @@ app.get('/api/staff/daily-progress', async (req, res) => {
     return {
       bookingCode: b.booking_code,
       customerName: b.customer_name,
-      table: session?.table_name || null,
+      table: session?.table_number || null,   // column is table_number — table_name silently failed the whole select (18 Jul)
       sessionStatus: session?.status || 'not started',
       bookingStatus: b.status,
       dutiesTotal: bookingDuties.length,
@@ -9479,7 +9479,7 @@ app.get('/api/studio/table-sessions/today', async (req, res) => {
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
   const today = new Date(); today.setHours(0,0,0,0);
   const { data } = await supabase.from('table_sessions')
-    .select('id, table_name, customer_name, num_places, status, created_at, booking_code')
+    .select('id, table_number, customer_name, num_places, status, created_at, booking_code')
     .eq('studio_id', studioId).gte('created_at', today.toISOString())
     .in('status', ['open', 'painting']).order('created_at', { ascending: true });
   res.json({ sessions: data || [] });
