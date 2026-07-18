@@ -12881,17 +12881,57 @@ function _elegantRoomsData() {
   // sort_order, skipping anything already taken. Same input, same
   // layout, every render. Nothing random, nothing remembered, nothing
   // written to the database until a person says so.
+  // ═══════════════════════════════════════════════════════════
+  // PLACE BOOKINGS IN THE ROOM THEY ACTUALLY BOOKED. 18 July 2026.
+  // ═══════════════════════════════════════════════════════════
+  // Square knows the ROOM (space_name: "The Vault...", "The Lounge...",
+  // "...Main Studio"), just not the table. The old placement ignored it
+  // and filled free tables in flat sort order — so a Vault party could
+  // land provisionally on a Main Studio table, and The Vault would show
+  // empty even with a party booked in. That is the exact thing reported.
+  //
+  // Now: match each booking's space_name to a room, and place it only on
+  // a FREE table IN THAT ROOM. Still provisional, still deterministic,
+  // still never written to the database until a human seats it — this
+  // only fixes WHICH free table the guess uses, so the guess lands in
+  // the right room instead of the wrong one. A booking whose room has no
+  // free table is left unplaced (shown as an arrival) rather than
+  // dumped somewhere wrong — saying nothing beats seating a Vault party
+  // at Table 3.
+  const _roomOf = (b) => {
+    const s = (b.space_name || '').toLowerCase();
+    if (s.includes('vault')) return 'vault';
+    if (s.includes('lounge')) return 'lounge';
+    if (s.includes('main studio') || s.includes('family')) return 'main';
+    return null;   // unknown space — don't guess a room
+  };
+  const _tableRoom = (t) => {
+    const r = (t.room || '').toLowerCase();
+    if (r.includes('vault')) return 'vault';
+    if (r.includes('lounge')) return 'lounge';
+    if (r.includes('main')) return 'main';
+    return null;
+  };
+
   const taken = new Set(Object.keys(bookingByTable));
-  const free = tables
+  // Free tables grouped by room, each still in the studio's own sort order.
+  const freeByRoom = { vault: [], lounge: [], main: [], _null: [] };
+  tables
     .filter(t => !taken.has(t.name))
-    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+    .forEach(t => { (freeByRoom[_tableRoom(t) || '_null'] ||= []).push(t); });
+
   tomorrow
     .slice()
     .sort((a, b) => String(a.session_start || '').localeCompare(String(b.session_start || '')))
-    .forEach((b, i) => {
+    .forEach((b) => {
       if (b.table_number) { _assignBookingToTable(bookingByTable, b); return; } // already placed by a human
-      const t = free[i];
-      if (!t) return;                   // more bookings than tables — say nothing rather than guess
+      const room = _roomOf(b);
+      // Only place in the booking's own room. No room match, or no free
+      // table left in it → leave unplaced (it shows as an arrival to seat).
+      const pool = room ? freeByRoom[room] : null;
+      if (!pool || !pool.length) return;
+      const t = pool.shift();           // take the next free table IN THAT ROOM
       b.table_number = t.name;
       b.is_provisional = true;
       _assignBookingToTable(bookingByTable, b);
