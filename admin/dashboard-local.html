@@ -3394,9 +3394,10 @@
       title="Find My Piece" style="border:none;border-radius:9px;width:34px;height:34px;font-size:15px;background:rgba(43,39,36,0.06);cursor:pointer;">🔍</button>
     <button class="glaze-tile" onclick="_flowAskCleo(_flowStack.length>1?_flowStack[_flowStack.length-1].label:'this home screen')"
       title="Ask Cleo" style="border:none;border-radius:9px;width:34px;height:34px;font-size:15px;background:rgba(249,168,37,0.15);cursor:pointer;">💛</button>
-    <button onclick="_flowGraphExit()" class="glaze-tile" style="border:none;border-radius:10px;
-      padding:8px 10px;font-size:11px;font-weight:700;background:rgba(43,39,36,0.08);cursor:pointer;white-space:nowrap;">
-      Grid</button>
+    <!-- Grid button removed 18 Jul, Daisy: "get rid of grid". Tiles-only
+         law, no dead end back to the old system. Verified first: every
+         real screen already sits in someone's tree. _flowGraphExit and
+         showGridNav left in place, orphaned — nothing left calls them. -->
     <button onclick="document.getElementById('daisy-flow-view').style.display='none';openCustomiseHome();" class="glaze-tile" style="border:none;border-radius:10px;
       padding:8px 10px;font-size:11px;font-weight:700;background:rgba(184,121,70,0.12);cursor:pointer;white-space:nowrap;">
       ✏️ Customise</button>
@@ -16422,7 +16423,7 @@ const GRID_NAV_STRUCTURE = [
   { id: 'community', label: 'Community', color: '#8e44ad', items: [
     { tab: 'community', label: 'Feature and moderate customer work', desc: '' },
   ]},
-  { id: 'setup', label: 'Setup', color: '#2B2724', items: [
+  { id: 'admin-tools', label: 'Admin Tools', color: '#2B2724', items: [
     { tab: 'branding', label: 'Branding', desc: 'Colours, logo, customer app look' },
     { tab: 'setup', label: 'Studio Setup', desc: 'Connections, Cleo, add-ons, offers' },
   ]},
@@ -17342,10 +17343,10 @@ function _safeRenderFlowGraph() {
         <div style="font-size:40px;margin-bottom:12px;">🏺</div>
         <div style="font-family:'Caveat',cursive;font-size:22px;color:#2B2724;">Home screen hit a snag</div>
         <div style="font-size:13px;color:#8a8175;margin-top:8px;max-width:280px;margin-left:auto;margin-right:auto;">
-          Nothing's lost — tap below for the full grid while this gets fixed.</div>
-        <button onclick="_flowGraphExit()" class="glaze-tile" style="margin-top:18px;border:none;border-radius:12px;
+          Nothing's lost — reload and it'll come right back.</div>
+        <button onclick="location.reload()" class="glaze-tile" style="margin-top:18px;border:none;border-radius:12px;
           padding:12px 22px;font-size:13px;font-weight:800;background:linear-gradient(135deg,#B87946,#9A6435);color:#fff;cursor:pointer;">
-          Open the Grid</button>
+          Reload</button>
       </div>`;
   }
 }
