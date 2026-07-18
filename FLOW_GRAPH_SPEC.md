@@ -149,3 +149,37 @@ have product photos in their catalogues. Pull those in to seed the AI
 recognition library immediately — clean, consistent, already tied to the
 real supplier product name (which is exactly the "supplier name" side of
 #2). Then it refines as own photos come in via the stock-arrival flow.
+
+## ═══ THE GUI LAW — final form, 18 July 2026 (Daisy, verbatim intent) ═══
+1. EVERYTHING on screen is a glazed tile — big or half-size — except:
+   - the persistent header bar (contextual, holds all in-house features:
+     photo recognition, breakages, alarms, day-stats, Find My Piece, Cleo)
+   - the END function of a flow (a real form/button/text input)
+2. NO other writing on screen. No prose, no labels outside tiles.
+3. Family-tree layout on every page: tile at top, arrow stem below it
+   branching to the next tiles. Colour = meaning, foolproof:
+   GREEN tile = branch (more options below) · AMBER = usable action now
+   · RED = live booking. Non-usable options NOT lit.
+4. Always a way back home — "back with options" as tiny glazed tiles,
+   same glaze as the big ones.
+5. Big + small tile sizes wherever they fit better.
+6. HIGH-FIRE GLAZE everywhere: the maximum ceramic rendering (layered
+   specular bloom, wet-sheen band, glaze-pool rim, fired gloss lip) —
+   shipped 18 July in .glaze-tile.
+7. Cleo's floating character ALWAYS present and tappable (restored 18
+   July — she'd been parked in a hidden-CSS list). Jenny gets her OWN
+   personalised learning float on her page (learning wakes with the
+   OPENAI_API_KEY).
+8. Floor plan / screensaver exception: the hand-drawn planner stays.
+   All three areas on ONE screen with live state; tapping a table
+   actions the booking DIRECTLY (the per-room middle hop is cut —
+   still to implement).
+9. Terminal defines live state: an order rung against a table = RED.
+   Fallow otherwise; GREEN if a booking is coming (session times per
+   thekilncafe.com).
+STILL TO DO against this law: cut the per-room hop (8); full-width
+"assign a table" row; back-home tiles on Daily Bookings + site-wide;
+convert remaining plain buttons ("open customer app on this device",
+"show customer queue", etc) to glazed tiles; logical ordering pass on
+every page; in-app flow view to match the approved preview exactly;
+stock-name feature; laser framework; supplier-photo framework.

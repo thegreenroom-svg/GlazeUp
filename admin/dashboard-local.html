@@ -89,8 +89,11 @@
        — pick a role, say what's needed, send. Same reversible
        pattern: nothing deleted, just hidden.
        ═══════════════════════════════════════════════════════════ */
-    #cleo-admin-floating-fab,
-    #cleo-admin-floating-bubble,
+    /* Cleo's floating character RESTORED 18 July 2026 — Daisy: "we need
+       her little character on the screen to tap at any time." She was
+       parked in this hidden list during an earlier cleanup; her fab and
+       bubble come back out, everything else stays hidden. Her existing
+       show/hide logic (applyShiftUI etc) takes over again. */
     #platform-revenue-strip,
     #team-tile-process,
     #team-section-process {
@@ -183,32 +186,66 @@
       input[type="range"]:active::-moz-range-thumb { transform: none; }
     }
 
+    /* ═══ HIGH-FIRE GLAZE — maximum ceramic rendering. 18 July 2026. ═══
+       Per Daisy: "highly glazed tiles ... the highest rendering you can
+       get." Layered like a real gloss glaze on bisque:
+         1. a deep drop shadow lifting the tile off the page
+         2. a dark inset rim at the bottom edge (glaze pooling)
+         3. a bright inset rim at the top edge (fired gloss lip)
+         4. ::before — a large soft specular bloom (window reflection)
+         5. ::after  — a tight diagonal wet-sheen band across the surface
+       All CSS, no images, so it costs nothing and works offline. */
     .glaze-tile {
       position: relative;
       overflow: hidden;
       box-shadow:
-        0 2px 4px rgba(0,0,0,0.12),
-        0 8px 16px -4px rgba(0,0,0,0.18),
-        inset 0 1px 1px rgba(255,255,255,0.25);
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
+        0 3px 6px rgba(0,0,0,0.14),
+        0 12px 24px -6px rgba(0,0,0,0.22),
+        inset 0 2px 2px rgba(255,255,255,0.35),
+        inset 0 -3px 6px rgba(0,0,0,0.22),
+        inset 2px 0 3px rgba(255,255,255,0.08),
+        inset -2px 0 3px rgba(0,0,0,0.08);
+      transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+      filter: saturate(1.12);
     }
     .glaze-tile::before {
       content: '';
       position: absolute;
-      top: -30%;
-      left: -20%;
-      width: 70%;
-      height: 70%;
-      background: radial-gradient(circle, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 70%);
+      top: -35%;
+      left: -25%;
+      width: 85%;
+      height: 85%;
+      background: radial-gradient(circle,
+        rgba(255,255,255,0.50) 0%,
+        rgba(255,255,255,0.18) 40%,
+        rgba(255,255,255,0) 70%);
       pointer-events: none;
       border-radius: 50%;
     }
+    .glaze-tile::after {
+      content: '';
+      position: absolute;
+      top: -60%;
+      left: -30%;
+      width: 55%;
+      height: 220%;
+      transform: rotate(24deg);
+      background: linear-gradient(90deg,
+        rgba(255,255,255,0) 0%,
+        rgba(255,255,255,0.16) 42%,
+        rgba(255,255,255,0.30) 50%,
+        rgba(255,255,255,0.16) 58%,
+        rgba(255,255,255,0) 100%);
+      pointer-events: none;
+    }
     .glaze-tile:active {
       transform: scale(0.96);
+      filter: saturate(1.05) brightness(0.97);
       box-shadow:
         0 1px 2px rgba(0,0,0,0.12),
-        0 3px 6px -2px rgba(0,0,0,0.15),
-        inset 0 1px 1px rgba(255,255,255,0.2);
+        0 4px 8px -2px rgba(0,0,0,0.16),
+        inset 0 2px 3px rgba(0,0,0,0.18),
+        inset 0 -1px 2px rgba(255,255,255,0.15);
     }
     .glaze-tile > * {
       position: relative;
@@ -2137,7 +2174,7 @@
 <!-- Cleo — genuinely always present on every admin page, not gated
      behind whether Cleo's Club is enabled for this studio. Rotating
      call-out bubble, stacked above Find My Piece. -->
-<button id="cleo-admin-floating-fab" onclick="handleCleoAdminFloatingTap()" style="display:none;position:fixed;bottom:248px;right:16px;z-index:9700;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#F9A825,#f57c00);border:none;box-shadow:0 6px 22px rgba(249,168,37,0.4);cursor:pointer;align-items:center;justify-content:center;padding:4px;">
+<button id="cleo-admin-floating-fab" class="glaze-tile" onclick="handleCleoAdminFloatingTap()" style="display:none;position:fixed;bottom:248px;right:16px;z-index:9700;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#F9A825,#f57c00);border:none;box-shadow:0 6px 22px rgba(249,168,37,0.4);cursor:pointer;align-items:center;justify-content:center;padding:4px;">
   <div id="cleo-admin-floating-mascot" style="width:100%;height:100%;"></div>
 </button>
 <div id="cleo-admin-floating-bubble" style="display:none;position:fixed;bottom:306px;right:16px;z-index:9699;background:white;border:1.5px solid var(--gu-border);border-radius:16px 16px 4px 16px;padding:9px 13px;font-size:11px;font-weight:600;color:var(--gu-text);box-shadow:0 4px 16px rgba(0,0,0,0.15);max-width:180px;cursor:pointer;text-align:right;" onclick="handleCleoAdminFloatingTap()">
