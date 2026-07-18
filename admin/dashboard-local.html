@@ -8255,7 +8255,7 @@ function openPacking() {
   // the truth. Honest by design: cached content is never silently
   // passed off as current — the badge says so until fresh data lands.
   try {
-    const cached = localStorage.getItem('klnk_cache_packing');
+    const cached = localStorage.getItem('klnk_cache_packing_v2');
     const el0 = document.getElementById('packing-tiles');
     if (cached && el0) {
       el0.innerHTML = '<div style="text-align:center;font-size:10px;color:#B87946;padding:4px;">↻ updating — showing last known</div>' + cached;
@@ -8687,6 +8687,12 @@ async function _loadPackingTiles() {
           <div style="font-size:14px;color:#2e7d32;font-weight:700;">
             ${_packingSession.done} piece${_packingSession.done===1?'':'s'} packed today</div>
         </div>` : ''}`;
+      // 18 Jul 22:30, Daisy's screenshot: David Green's ghost. This
+      // empty branch returned BEFORE the cache save below ever ran, so
+      // the instant-open cache could never learn the queue had emptied —
+      // it eternally replayed the last non-empty snapshot (the 21 demo
+      // pieces) under "updating — showing last known". Save empty too.
+      try { localStorage.setItem('klnk_cache_packing_v2', el.innerHTML); } catch(e) {}
       return;
     }
 
@@ -8740,12 +8746,12 @@ async function _loadPackingTiles() {
         ❓ How does this work?
       </button>`;
     // Fresh render succeeded — remember it for next open's instant paint.
-    try { localStorage.setItem('klnk_cache_packing', el.innerHTML); } catch(e) {}
+    try { localStorage.setItem('klnk_cache_packing_v2', el.innerHTML); } catch(e) {}
   } catch(e) {
     // Fetch failed. If we painted a cached copy above, LEAVE IT (with its
     // honest "last known" badge) rather than replacing something useful
     // with an error; only show the error when there's nothing at all.
-    if (!localStorage.getItem('klnk_cache_packing')) {
+    if (!localStorage.getItem('klnk_cache_packing_v2')) {
       el.innerHTML = `<div style="text-align:center;padding:30px;color:#e53935;font-size:13px;">
         Couldn't load the packing queue. Try again in a moment.</div>`;
     }
