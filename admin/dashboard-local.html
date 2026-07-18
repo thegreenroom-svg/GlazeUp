@@ -16136,8 +16136,24 @@ function _tileGoToTab(tabId, fnName) {
       // Fixed at the one place both paths already pass through, so nine
       // functions did not need nine individual edits and can't drift
       // out of sync with each other again.
-      const grid = document.getElementById('grid-nav-view');
-      if (grid) grid.style.display = 'none';
+      // ─── SAME BUG, NEW HOME. 18 July 2026. ───
+      // This only ever hid #grid-nav-view. Today's flow-tree home
+      // (#daisy-flow-view) didn't exist when this was written, so it
+      // was never added — meaning every fn-based tile (Packing, Health
+      // & Safety, Music, Collections...) tapped from the new home wrote
+      // its real content into #floor-plan-view correctly, then sat
+      // hidden UNDERNEATH the still-visible flow-tree home. Tap the
+      // tile, nothing appears to happen. Reported as "just going to
+      // white pages... not sure if they're even going anywhere" — this
+      // is why: it wasn't blank, it was covered.
+      //
+      // Fixed the way the 17 July version asked to be fixed, in its own
+      // words: "so nine functions did not need nine individual edits
+      // and can't drift out of sync with each other again." Hiding
+      // every .view (grid AND flow-tree AND anything added after this)
+      // closes the whole bug class instead of naming a second id today
+      // and a third one the next time a new home screen is built.
+      document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
       f();
       return;
     }
