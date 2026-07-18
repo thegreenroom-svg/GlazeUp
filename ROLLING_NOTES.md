@@ -4477,3 +4477,34 @@ STILL OPEN (the honest list):
   archive bulk import (pending the single-photo EXIF test)
 - Daisy's daily studio-manager digest; full calm-day logic rescan
 - Rotate the GitHub token (still in shell history); stale build-marker log line
+
+═══ 18 JULY, 22:2x — SESSION CLOSE: LIVE DATA THROUGHOUT ═══
+- DEMO DATA FULLY DELETED at Daisy's explicit instruction ("can be
+  deleted fully"): the 4 walkin-* bookings (David Green x3 variants,
+  Hattie Bush). Swept ALL 22 tables that reference booking codes:
+  21 pieces, 8 staff_alerts, 8 task_queue, 4 bookings, 3 table_sessions,
+  3 booking_photos removed; 16 tables had zero rows. Database change —
+  live instantly, no deploy involved.
+- PIPELINE VERIFIED GENUINELY EMPTY: zero pottery_pieces of any status
+  remain. All ~48 real bookings 16–19 July (Rachel Martin, Megan Cave,
+  Lindsay Moulin, ...) have 0 pieces each — no real piece has ever been
+  logged. Packing "All caught up" and Collections "0 ready" are the
+  TRUE state, not a bug. Queues fill the moment staff log the first
+  real piece at a session (photograph → dip → fire → pack/collect).
+- SQUARE CONFIRMED LIVE + READ-ONLY: only write path (_safeCreateOrder)
+  hard-blocked unless SQUARE_WRITES_ENABLED=true; app pulls bookings/
+  orders read-only. Exactly the guarantee Daisy asked for.
+- staff_home_screens TABLE CREATED (migration) — customise endpoints
+  existed but the table never did; saves had been silently 500ing.
+- On-device tonight: login fixed after avatar-removal crash (own boot
+  overlay named it); header pills fixed (label ::after vs glaze sheen
+  per-property collision); picker watchdog shipped so "Loading team…"
+  can never strand anyone; stamp now "22:1x · picker-watchdog".
+
+STILL OPEN (refreshed, honest):
+- Confirm on Daisy's device: pills render, watchdog stamp, first real
+  piece flowing end-to-end tomorrow
+- Internal staff-to-staff messaging (network_messages is studio-level)
+- Customise-home DRAG gesture (tap version is live); swipe nav untested
+- Stock framework; laser stamps; archive bulk import; daily digest
+- Square 403 INSUFFICIENT_SCOPES on team-members; ROTATE THE TOKEN
