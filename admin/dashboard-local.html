@@ -12719,20 +12719,28 @@ async function logOutOfShift() {
   if (_detailTimerInterval) { clearInterval(_detailTimerInterval); _detailTimerInterval = null; }
   document.getElementById('floor-plan-view').style.display = 'none';
 
-  // Automatic clock-out
-  if (currentShiftStaff && currentShiftStaff.id !== 'testing') {
+  // Automatic clock-out.
+  // ─── THE BOOT CRASH, from the confession screen. 18 July 2026. ───
+  // "null is not an object (evaluating 'currentShiftStaff.id')" at the
+  // setItem below. The guard above it was real — but this function
+  // AWAITS a network call mid-way, and during that await another path
+  // (boot's stale-session handling nulling the session) set
+  // currentShiftStaff = null; on resume, .id exploded and the rejection
+  // killed the boot chain. Exposed by removing the every-load reset,
+  // which used to wipe the session before this race could ever run.
+  // Fix: snapshot the person ONCE at entry — a const can't be nulled
+  // from outside, so the function finishes with the person it started
+  // with regardless of what happens during its awaits.
+  const staff = currentShiftStaff;
+  if (staff && staff.id !== 'testing') {
     try {
       await fetch(`${API_URL}/api/staff/clock-out`, {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ studioId, staffMemberId: currentShiftStaff.id, shiftId: currentShiftId })
+        body: JSON.stringify({ studioId, staffMemberId: staff.id, shiftId: currentShiftId })
       });
     } catch(e) { /* silent */ }
-    // Genuinely remember who was last on THIS device — same real
-    // welcome-back tracking used on the idle path, so a deliberate
-    // Clock Out (the far more common real case) also gets a warm
-    // welcome-back next time, not just the idle timeout.
-    localStorage.setItem('klnk_last_logged_in_id', currentShiftStaff.id);
-    localStorage.setItem('klnk_last_logged_in_name', currentShiftStaff.name);
+    localStorage.setItem('klnk_last_logged_in_id', staff.id);
+    localStorage.setItem('klnk_last_logged_in_name', staff.name);
   }
   currentShiftId = null;
   currentBreakId = null;
