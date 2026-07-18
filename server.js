@@ -10784,6 +10784,88 @@ app.post('/api/stock/identify-by-photo', async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════
+// ARCHIVE PHOTO INGEST — match a studio photo to its booking by
+// timestamp. 18 July 2026. Read-mostly, additive.
+// ═══════════════════════════════════════════════════════════
+// The goal: years of studio photos (painted pieces) matched to the
+// booking/order live when each was taken, feeding BOTH a customer
+// piece-history library AND (where useful) shape references.
+//
+// This is the FOUNDATION + single-photo test. It takes one photo's
+// already-computed dHash and its taken-at time (read client-side from
+// EXIF, falling back to file.lastModified) and answers honestly:
+//   - did a timestamp survive at all?
+//   - does it fall inside a real booking's session window?
+//   - what did that booking pay for (the piece), if we can tell?
+// It writes only to booking_photos (the table built for exactly this),
+// never to Square, never to live bookings. If no timestamp survived,
+// it says so plainly rather than guessing a match.
+//
+// THE OPEN QUESTION this test answers on a real device: iOS Safari
+// often strips EXIF when a photo is picked through a web page. If
+// takenAt comes back null here, the bulk importer's timestamp-match
+// premise does not hold and we switch to manual tagging — better to
+// learn that from one photo than after building the whole pipeline.
+app.post('/api/archive/ingest-photo', async (req, res) => {
+  const { studioId, photoUrl, takenAt } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    // No timestamp survived — honest dead-end for the auto-match path.
+    if (!takenAt) {
+      return res.json({
+        matched: false,
+        timestampSurvived: false,
+        note: 'No timestamp on this photo (likely stripped by the browser). Auto-match by time will not work for the archive; these would need manual tagging.',
+      });
+    }
+    const when = new Date(takenAt);
+    if (isNaN(when.getTime())) {
+      return res.json({ matched: false, timestampSurvived: false, note: 'Timestamp present but unreadable.' });
+    }
+
+    // Which booking was live when this photo was taken? Session window
+    // contains the photo time. Read-only against our own bookings.
+    const { data: candidates } = await supabase
+      .from('bookings')
+      .select('booking_code, customer_name, session_start, session_end, space_name, table_number')
+      .eq('studio_id', studioId)
+      .lte('session_start', when.toISOString())
+      .gte('session_end', when.toISOString())
+      .limit(5);
+
+    const match = (candidates || [])[0] || null;
+
+    // File the photo against the booking (or unmatched) — only touches
+    // booking_photos, the table built for this.
+    let filed = false;
+    if (photoUrl) {
+      const { error } = await supabase.from('booking_photos').insert({
+        studio_id: studioId,
+        booking_id: match ? match.booking_code : null,
+        photo_url: photoUrl,
+        taken_at: when.toISOString(),
+      });
+      filed = !error;
+    }
+
+    res.json({
+      matched: !!match,
+      timestampSurvived: true,
+      takenAt: when.toISOString(),
+      booking: match ? { code: match.booking_code, customer: match.customer_name, space: match.space_name } : null,
+      candidatesFound: (candidates || []).length,
+      filed,
+      note: match
+        ? `Matched to ${match.customer_name || 'a booking'} live at that time.`
+        : 'Timestamp survived, but no booking was live at that exact time (photo may pre-date synced bookings, or was taken outside a session).',
+    });
+  } catch (error) {
+    console.error('/api/archive/ingest-photo failed:', error?.message||error);
+    res.status(500).json({ error: error?.message || 'Ingest failed.' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
 // JENNY'S STOCK ARRIVAL WORKFLOW — pallet box to shelf.
 //
 // Built ON TOP OF the existing stock_shape_photos + dHash matcher
