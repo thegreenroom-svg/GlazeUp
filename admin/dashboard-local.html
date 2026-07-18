@@ -15795,6 +15795,20 @@ function showGridNavTop() {
 // stock view; showStockSection then opens the specific flow. Both are
 // the real, existing functions — this only sequences them, and defers
 // the section call so it runs after the tab's own render settles.
+// The booking-journey tree's "Open this stage" nodes. Each goes to the
+// real staff tab and shows the real stage section via showStaffSection —
+// the exact function the staff sub-tabs already call. 'booking',
+// 'engagement', 'completion', 'kiln' are the real section names
+// showStaffSection accepts (verified against its own definition).
+function _openStage(section) {
+  goToTab('staff');
+  setTimeout(() => { try { showStaffSection(section); } catch(e){ console.warn('_openStage:', e); } }, 60);
+}
+function openStageBooking()    { _openStage('booking'); }
+function openStageEngagement() { _openStage('engagement'); }
+function openStageCompletion() { _openStage('completion'); }
+function openStageKiln()       { _openStage('kiln'); }
+
 function openStockArrival() {
   goToTab('stock');
   setTimeout(() => { try { showStockSection('arrival'); } catch(e){ console.warn('openStockArrival:', e); } }, 60);
@@ -15862,7 +15876,21 @@ const DAISY_FLOW_GRAPH = {
   children: [
     { id:'floor-plan', label:'Floor Plan', emoji:'🪑', desc:'Live view of all tables', fn:'showFloorPlan', size:'big' },
     { id:'assistant',  label:'Ask Cleo',   emoji:'💛', desc:'Ask her anything',        fn:'openAssistant', size:'big' },
-    { id:'staff',      label:'Daily Bookings', emoji:'📋', desc:'Start a booking, walk-in, or party', fn:null, size:'big' },
+    { id:'staff-group', label:'Daily Bookings', emoji:'📋', desc:'The booking journey, start to kiln', size:'big', children:[
+      { id:'staff', label:'Open Bookings', emoji:'📋', desc:'Start a booking, walk-in, or party', fn:null, size:'big' },
+      { id:'journey-booking', label:'1 · Booking', emoji:'🪑', desc:'Set up · greet · drinks · pieces', size:'mid', children:[
+        { id:'j-b-open', label:'Open this stage', emoji:'📋', desc:'Live booking screen', fn:'openStageBooking', size:'big' },
+        { id:'journey-engagement', label:'2 · Painting →', emoji:'🎨', desc:'Paints · check-in · drinks', size:'mid', children:[
+          { id:'j-e-open', label:'Open this stage', emoji:'🎨', desc:'Live painting screen', fn:'openStageEngagement', size:'big' },
+          { id:'journey-completion', label:'3 · Completion →', emoji:'📷', desc:'Photos · extras · bill · clear', size:'mid', children:[
+            { id:'j-c-open', label:'Open this stage', emoji:'📷', desc:'Live completion screen', fn:'openStageCompletion', size:'big' },
+            { id:'journey-kiln', label:'4 · Kiln →', emoji:'🔥', desc:'Bag for kiln · print label', size:'mid', children:[
+              { id:'j-k-open', label:'Open this stage', emoji:'🔥', desc:'Live kiln screen — the endpoint', fn:'openStageKiln', size:'big' },
+            ]},
+          ]},
+        ]},
+      ]},
+    ]},
     { id:'tell-daisy', label:'Tell Daisy', emoji:'💬', desc:'Something good or bad happened', fn:'openTellPicker', size:'mid' },
     { id:'team-group', label:'Team', emoji:'👥', desc:'Rota & duties', size:'mid', children:[
       { id:'team',     label:'Team & Duties',  emoji:'👥', desc:'Duty lists, timekeeping, holidays', fn:null, size:'big' },
