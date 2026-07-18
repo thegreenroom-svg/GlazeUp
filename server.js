@@ -6445,10 +6445,33 @@ app.get('/api/spotify/connect', (req, res) => {
   res.redirect(url);
 });
 
+// ═══════════════════════════════════════════════════════════
+// "YOU JUST NEED TO GET BACK." 18 July 2026.
+// ═══════════════════════════════════════════════════════════
+// Every path off this callback — Spotify sending an error, a failed
+// token exchange, a thrown exception — dead-ended on a plain page with
+// no link, no button, nothing. Even the SUCCESS page just said "close
+// this and go back to the app", telling you to do it by hand rather
+// than doing it. On a phone, closing the tab often loses your place in
+// the app entirely rather than returning to it.
+//
+// One real link on every path, success or failure, straight back into
+// the Music screen specifically — not just the app's front door — so a
+// failed attempt costs one tap to try again, not a hunt through the
+// tile grid.
+const _spotifyReturnHTML = (heading, message, ok) => `<html><body style="font-family:system-ui;text-align:center;padding:60px 24px;background:#F4ECE0;">
+  <div style="font-size:52px;">${ok ? '🎵' : '⚠️'}</div>
+  <h2 style="color:#2B2724;margin-bottom:8px;">${heading}</h2>
+  <p style="color:#8a8175;margin-bottom:28px;">${message}</p>
+  <a href="/admin/dashboard-local.html?openMusic=1" style="display:inline-block;background:${ok ? '#2e7d32' : '#B87946'};
+    color:#fff;text-decoration:none;font-weight:700;padding:14px 28px;border-radius:12px;font-size:15px;">
+    ← Back to Music</a>
+</body></html>`;
+
 app.get('/api/spotify/callback', async (req, res) => {
   const { code, state: studioId, error } = req.query;
-  if (error) return res.send(`<html><body style="font-family:system-ui;text-align:center;padding:60px;background:#F4ECE0;"><h2>Not connected</h2><p>${error}</p></body></html>`);
-  if (!code || !studioId) return res.status(400).send('Missing code');
+  if (error) return res.send(_spotifyReturnHTML('Not connected', error, false));
+  if (!code || !studioId) return res.status(400).send(_spotifyReturnHTML('Not connected', 'Missing code — try Connect again.', false));
   try {
     const auth = Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64');
     const r = await fetch('https://accounts.spotify.com/api/token', {
@@ -6462,11 +6485,9 @@ app.get('/api/spotify/callback', async (req, res) => {
       studio_id: studioId, access_token: t.access_token, refresh_token: t.refresh_token,
       expires_at: new Date(Date.now() + (t.expires_in || 3600) * 1000).toISOString(),
     }, { onConflict: 'studio_id' });
-    res.send(`<html><body style="font-family:system-ui;text-align:center;padding:60px;background:#F4ECE0;">
-      <div style="font-size:52px;">🎵</div><h2 style="color:#2B2724;">Spotify connected</h2>
-      <p style="color:#8a8175;">Close this and go back to the app.</p></body></html>`);
+    res.send(_spotifyReturnHTML('Spotify connected', "You're all set — tap below to see it playing.", true));
   } catch(e) {
-    res.status(500).send(`<html><body style="font-family:system-ui;text-align:center;padding:60px;"><h2>Couldn't connect</h2><p>${e.message}</p></body></html>`);
+    res.status(500).send(_spotifyReturnHTML("Couldn't connect", e.message, false));
   }
 });
 

@@ -11594,6 +11594,25 @@ async function landOnHome() {
   }
   showGridNav();
   _homeGuardUntil = Date.now() + 1000;
+
+  // ═══════════════════════════════════════════════════════════
+  // THE SPOTIFY CALLBACK'S "← Back to Music" LINK. 18 July 2026.
+  // ═══════════════════════════════════════════════════════════
+  // "You just need to get back." The callback page now links to
+  // /admin/dashboard-local.html?openMusic=1 — but a query param nobody
+  // reads is a link to nowhere in particular. Checked here, once,
+  // right after a real login has landed on tiles — not sooner, so it
+  // can't fire into a half-built screen before shift setup finishes,
+  // and not via goToTab/showFloorPlan, which don't know this app has
+  // opinions about where you came from.
+  //
+  // Cleared from the URL after firing so a later manual reload of the
+  // same address (bookmarked, or re-opened from Safari's tab switcher)
+  // doesn't keep bouncing back to Music every time.
+  if (new URLSearchParams(location.search).get('openMusic') === '1') {
+    history.replaceState({}, '', location.pathname);
+    setTimeout(() => _tileGoToTab('music', 'openMusic'), 50);
+  }
 }
 
 function skipLoginUseSharedView() {
@@ -15771,6 +15790,20 @@ function showGridNavTop() {
 // didn't create these landmines, it armed them — twenty tiles appeared
 // and half of them detonated. Both bugs were real; one was hiding the
 // other.
+// Jump straight to a stock flow from anywhere (e.g. the flow-graph),
+// not just to the Stock tab's tile menu. goToTab('stock') shows the
+// stock view; showStockSection then opens the specific flow. Both are
+// the real, existing functions — this only sequences them, and defers
+// the section call so it runs after the tab's own render settles.
+function openStockArrival() {
+  goToTab('stock');
+  setTimeout(() => { try { showStockSection('arrival'); } catch(e){ console.warn('openStockArrival:', e); } }, 60);
+}
+function openShelfCheck() {
+  goToTab('stock');
+  setTimeout(() => { try { showStockSection('shelfcheck'); } catch(e){ console.warn('openShelfCheck:', e); } }, 60);
+}
+
 function _tileGoToTab(tabId, fnName) {
   _recordTabUsage(tabId);
   if (fnName) {
@@ -15835,10 +15868,12 @@ const DAISY_FLOW_GRAPH = {
       { id:'team',     label:'Team & Duties',  emoji:'👥', desc:'Duty lists, timekeeping, holidays', fn:null, size:'big' },
       { id:'progress', label:'Daily Progress', emoji:'📊', desc:"Every team member's live tasks", fn:null, size:'big' },
     ]},
-    { id:'stock-group', label:'Stock', emoji:'📦', desc:'Inventory', size:'mid', children:[
-      { id:'stock',     label:'Stock',           emoji:'📦', desc:'Photograph bisque, manage reservations', fn:null, size:'big' },
-      { id:'catalogue', label:'Piece Catalogue', emoji:'🏺', desc:'What customers browse from home', fn:null, size:'mid' },
-      { id:'shapes',    label:'Bisque',          emoji:'🎨', desc:'Your Square catalogue as silhouettes', fn:null, size:'mid' },
+    { id:'stock-group', label:'Stock', emoji:'📦', desc:'Inventory & counts', size:'mid', children:[
+      { id:'stock-arrival', label:'Stock Arrived', emoji:'📦', desc:"Photo a box or piece, I'll do the rest", fn:'openStockArrival', size:'big' },
+      { id:'shelf-check',   label:'Check a Shelf',  emoji:'🔍', desc:'Labels out, one photo, I count it', fn:'openShelfCheck', size:'big' },
+      { id:'stock',     label:'Manage Stock',     emoji:'📋', desc:'Reservations & levels', fn:null, size:'mid' },
+      { id:'catalogue', label:'Piece Catalogue',  emoji:'🏺', desc:'What customers browse from home', fn:null, size:'mid' },
+      { id:'shapes',    label:'Bisque',           emoji:'🎨', desc:'Your Square catalogue as silhouettes', fn:null, size:'mid' },
     ]},
     { id:'dashboard', label:'Overview', emoji:'📈', desc:'Your daily overview', fn:null, size:'mid' },
     { id:'packing',   label:'Packing',  emoji:'📦', desc:'Fired pieces going home', fn:'openPacking', size:'mid' },
