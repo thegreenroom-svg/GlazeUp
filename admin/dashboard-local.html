@@ -2017,6 +2017,24 @@
       (document.body || document.documentElement).appendChild(d);
     } catch(e) {}
   }
+  // ─── EARLY SAFETY STUBS. 18 July 2026, from the second confession
+  // screen: "Can't find variable: dismissSplash" AT TAP TIME. Meaning:
+  // the giant main script block (which defines it at ~27700) is dying
+  // during load on iOS specifically — something in it iOS Safari
+  // rejects that Node and desktop accept. Until that line is found,
+  // the splash must never be a dead end: this early stub hides the
+  // splash and shows the login on tap even if the main block died. If
+  // the main block loads fine, its real dismissSplash overrides this
+  // (later definition wins). Each reload now advances one step further
+  // and the overlay names the next real cause — we walk down the chain
+  // instead of standing at the door.
+  window.dismissSplash = window.dismissSplash || function(){
+    try {
+      var s = document.getElementById('splash-screen'); if (s) s.style.display = 'none';
+      var m = document.getElementById('shift-login-modal'); if (m) m.style.display = 'flex';
+    } catch(e) {}
+  };
+
   window.addEventListener('error', function(ev){
     confess(ev.message || 'Script error', (ev.filename||'') + (ev.lineno ? ' : line ' + ev.lineno : ''));
   });
