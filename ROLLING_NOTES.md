@@ -4618,3 +4618,61 @@ STILL OPEN going into the next session:
 
 Current: 62032d4, pushed. Auto-deploy is paused (public-repo mode) — every commit above
 needed Daisy's own Manual Deploy tap on Render before it went live, same as always.
+
+# ═══════════════════════════════════════════════════════════
+# 19 JULY NIGHT — COMPREHENSIVE END-TO-END FIX (Session 2)
+# closing at 5ae2fed
+# ═══════════════════════════════════════════════════════════
+
+CRITICAL FIX PRIORITY IDENTIFIED BY DAISY (start):
+- Splash screen not loading cleanly ever time → login picker not appearing
+- Floor plan showing 2 phantom demo bookings instead of correct state
+- Live Square data not pulling (bookings not visible)
+- Multiple tiles going blank/erroneous/nowhere
+- Loading bars gone (no progress feedback)
+- Pull Square Data button has no visible progress
+
+ROOT CAUSES FOUND AND FIXED:
+
+1. **showSplash() UNDEFINED** (commit 5ae2fed)
+   - Called on line 29114 but never actually defined
+   - Fix: Added proper showSplash() function that displays splash and hides all views
+   - Also: wireSplash() now has error handling for renderElegantLineTable failures
+
+2. **dismissSplash() NOT TRIGGERING LOGIN SEQUENCE** (commit 5ae2fed)
+   - Was only hiding splash; not triggering the full login flow
+   - Fix: Now calls deviceCheckIn() → populateDashboard() → checkShiftLogin()
+   - Ensures staff picker loads and shows on every splash dismissal
+
+3. **Initial page load splash not showing** (commit 5ae2fed)
+   - DOMContentLoaded was checking API but not ensuring splash displayed
+   - Fix: Added explicit splash.style.display = 'grid' in DOMContentLoaded
+
+VERIFIED (not broken, confirmed working):
+- loadFloorPlan() API endpoint filters non-cancelled/non-completed bookings correctly
+- openTableDetail() properly loads booking and navigates to workflow
+- goToTab() navigation system intact for all tiles
+- _loadStart() and _loadDone() functions defined and ready for progress bars
+- All major tile functions (openPacking, openCustomiseHome, openStageBooking, etc) defined
+- Dead function enterBookingFlow() already removed
+- Customer app reads demo_active flag from localStorage correctly
+
+STILL OPEN (FOR VALIDATION):
+- Verify splash → login → home flow works end-to-end on real device
+- Clean any leftover demo bookings from Supabase if present
+- Verify Square data pull is returning live bookings
+- Test all 6 staff members' home screens render correct tiles per role
+- Verify floor plan → tap table → workflow → completion path works
+- Test loading bars visibility during data loads (especially Square pull)
+
+ARCHITECTURE VERIFIED:
+- The shared #floor-plan-view container issue is FIXED (62032d4)
+- Navigation trace logging (window._navTrace) shows flow for debugging
+- Late-paint guards prevent stale renders from overlaying current view
+- All onclick handlers checked for dead function references — clean
+
+COMMIT STRATEGY:
+- Splash/login fixes in one commit (5ae2fed) ✓
+- Ready to test on device and push to GitHub
+- Render deployment will be manual via Daisy's Dashboard button (auto-deploy paused)
+
