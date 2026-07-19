@@ -8558,6 +8558,115 @@ function shareCleoLearning(role) {
   return insights;
 }
 
+function renderProgressBar(piece) {
+  const progress = getWorkflowProgress(piece);
+  const stage = piece.stage ? piece.stage.replace(/_/g, ' ') : 'unknown';
+  let html = '<div style="margin-bottom:12px;"><div style="font-size:11px;color:#999;margin-bottom:4px;font-weight:600;">' + (piece.type || 'Piece') + ' • ' + stage + '</div>';
+  html += '<div style="background:#E8E8E8;border-radius:12px;height:8px;overflow:hidden;"><div style="background:#B87946;height:100%;width:' + progress + '%;"></div></div>';
+  html += '<div style="font-size:9px;color:#999;margin-top:2px;">' + Math.round(progress) + '% complete</div></div>';
+  return html;
+}
+
+function showDashboardProgress() {
+  const recentPieces = DEMO_CONFIG.currentScenario?.pieces || [];
+  if (recentPieces.length === 0) return;
+  let html = '<div style="font-size:13px;font-weight:700;margin-bottom:12px;color:#2B2724;">Workflow Progress</div>';
+  recentPieces.slice(0, 3).forEach(p => { html += renderProgressBar(p); });
+  const el = document.querySelector('#dashboard-progress');
+  if (el) el.innerHTML = html;
+}
+
+
+// WORKFLOW PROGRESS TRACKER
+const WORKFLOW_STAGES = ['not_started', 'painting', 'painted', 'dipped', 'glazed', 'fired', 'ready_to_collect'];
+
+function getWorkflowProgress(piece) {
+  if (!piece || !piece.stage) return 0;
+  const stageIndex = WORKFLOW_STAGES.indexOf(piece.stage);
+  return ((stageIndex + 1) / WORKFLOW_STAGES.length) * 100;
+}
+
+function renderProgressBar(piece) {
+  const progress = getWorkflowProgress(piece);
+  const stage = piece.stage ? piece.stage.replace(/_/g, ' ') : 'unknown';
+  const type = piece.type || 'Piece';
+  
+  let html = '<div style="margin-bottom:12px;">';
+  html += '<div style="font-size:11px;color:#999;margin-bottom:4px;font-weight:600;">' + type + ' • ' + stage + '</div>';
+  html += '<div style="background:#E8E8E8;border-radius:12px;height:8px;overflow:hidden;">';
+  html += '<div style="background:#B87946;height:100%;width:' + progress + '%;transition:width 0.3s ease;"></div>';
+  html += '</div>';
+  html += '<div style="font-size:9px;color:#999;margin-top:2px;">' + Math.round(progress) + '% complete</div>';
+  html += '</div>';
+  return html;
+}
+
+function showDashboardProgress() {
+  const recentPieces = DEMO_CONFIG.currentScenario?.pieces || [];
+  if (recentPieces.length === 0) return;
+  
+  let progressHTML = '<div style="font-size:13px;font-weight:700;margin-bottom:12px;color:#2B2724;">Workflow Progress</div>';
+  
+  recentPieces.slice(0, 3).forEach(piece => {
+    progressHTML += renderProgressBar(piece);
+  });
+  
+  const progressContainer = document.querySelector('#dashboard-progress');
+  if (progressContainer) {
+    progressContainer.innerHTML = progressHTML;
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// WORKFLOW PROGRESS TRACKER
+// Shows piece progression through workflow stages
+// ═══════════════════════════════════════════════════════════════════
+const WORKFLOW_STAGES = ['not_started', 'painting', 'painted', 'dipped', 'glazed', 'fired', 'ready_to_collect'];
+
+function getWorkflowProgress(piece) {
+  if (!piece || !piece.stage) return 0;
+  const stageIndex = WORKFLOW_STAGES.indexOf(piece.stage);
+  return ((stageIndex + 1) / WORKFLOW_STAGES.length) * 100;
+}
+
+function renderProgressBar(piece) {
+  const progress = getWorkflowProgress(piece);
+  const stage = piece.stage ? piece.stage.replace(/_/g, ' ') : 'unknown';
+  
+  return \`
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px;color:#999;margin-bottom:4px;font-weight:600;">\${piece.type || 'Piece'} • \${stage}</div>
+      <div style="background:#E8E8E8;border-radius:12px;height:8px;overflow:hidden;">
+        <div style="background:#B87946;height:100%;width:\${progress}%;transition:width 0.3s ease;"></div>
+      </div>
+      <div style="font-size:9px;color:#999;margin-top:2px;">\${Math.round(progress)}% complete</div>
+    </div>
+  \`;
+}
+
+function showDashboardProgress() {
+  if (!LIVE_CACHE.transactions || LIVE_CACHE.transactions.length === 0) return;
+  
+  // Show progress for recent pieces
+  const recentPieces = DEMO_CONFIG.currentScenario?.pieces || [];
+  if (recentPieces.length === 0) return;
+  
+  let progressHTML = '<div style="margin-top:16px;"><div style="font-size:13px;font-weight:700;margin-bottom:12px;color:#2B2724;">Workflow Progress</div>';
+  
+  recentPieces.slice(0, 3).forEach(piece => {
+    progressHTML += renderProgressBar(piece);
+  });
+  
+  progressHTML += '</div>';
+  
+  const progressContainer = document.querySelector('#dashboard-progress');
+  if (progressContainer) {
+    progressContainer.innerHTML = progressHTML;
+  }
+}
+
+
 function openFaceByFace() {
   const bodyHTML = `
     <div style="padding:16px;">
