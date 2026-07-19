@@ -6410,50 +6410,9 @@ async function submitBranding(formData) {
   }
 }
 
-async function startSquareOAuth() {
-  try {
-    if (!apiConnected) {
-      alert('API not connected. Cannot start OAuth flow.\n\nMake sure backend is running: npm start');
-      return;
-    }
+// [stripped 18 Jul: dead fn startSquareOAuth removed — zero references, verified]
 
-    const res = await fetch(`${API_URL}/api/square/authorize?studioId=${studioId}`);
-    const { authUrl } = await res.json();
-    window.location.href = authUrl;
-  } catch (err) {
-    alert('Error connecting Square: ' + err.message);
-  }
-}
-
-async function setupBilling() {
-  const email = prompt('Enter your email for billing:');
-  if (!email) return;
-
-  try {
-    if (!apiConnected) {
-      alert('API not connected. Cannot set up billing.\n\nMake sure backend is running: npm start');
-      return;
-    }
-
-    const res = await fetch(`${API_URL}/api/stripe/subscribe`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        studioId,
-        plan: 'starter',
-        email
-      })
-    });
-
-    if (res.ok) {
-      alert('✓ Billing set up! Check your email for next steps.');
-    } else {
-      alert('Error: ' + res.statusText);
-    }
-  } catch (err) {
-    alert('Error setting up billing: ' + err.message);
-  }
-}
+// [stripped 18 Jul: dead fn setupBilling removed — zero references, verified]
 
 function updateAPIStatus(connected) {
   const status = document.getElementById('api-status');
@@ -7638,34 +7597,7 @@ function getCleoAdminPreferredVoice() {
   return resolveStudioVoice();
 }
 
-function _getCleoAdminPreferredVoice_LEGACY() {
-  const voices = window.speechSynthesis?.getVoices() || [];
-  if (!voices.length) return null;
-
-  // Use saved preference if valid
-  const saved = localStorage.getItem('klnk_cleo_admin_voice_name');
-  if (saved) {
-    const v = voices.find(v => v.name === saved);
-    if (v) return v;
-  }
-
-  // Priority: named high-quality British voices
-  for (const name of _SWT_VOICE_PRIORITY) {
-    const v = voices.find(v => v.name.includes(name));
-    if (v) return v;
-  }
-  // Any en-GB voice
-  const gb = voices.find(v => v.lang === 'en-GB');
-  if (gb) return gb;
-  // Any English female-sounding name
-  const enFemale = voices.find(v =>
-    v.lang.startsWith('en') &&
-    _SWT_VOICE_PRIORITY.some(n => v.name.includes(n))
-  );
-  if (enFemale) return enFemale;
-  // Any English
-  return voices.find(v => v.lang.startsWith('en')) || voices[0];
-}
+// [stripped 18 Jul: dead fn _getCleoAdminPreferredVoice_LEGACY removed — zero references, verified]
 
 // Expose for voice picker compatibility
 function testCleoAdminVoice(voiceName) {
@@ -7695,44 +7627,7 @@ function selectCleoAdminVoice(voiceName) {
 // ═══════════════════════════════════════════════════════════
 // WHATSAPP CONTACT TILE. 16 July 2026.
 // ═══════════════════════════════════════════════════════════
-async function openContactSheet() {
-  const sheet = document.createElement('div');
-  sheet.id = 'contact-sheet';
-  sheet.style.cssText = 'position:fixed;inset:0;z-index:9750;background:rgba(43,39,36,0.85);display:flex;align-items:flex-end;justify-content:center;';
-  sheet.onclick = e => { if (e.target===sheet) sheet.remove(); };
-  sheet.innerHTML = `<div style="background:#fff;width:100%;max-width:520px;border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));max-height:72vh;display:flex;flex-direction:column;">
-    <div style="font-family:'Caveat',cursive;font-size:26px;color:#2B2724;">Contact the team</div>
-    <div style="font-size:12px;color:#8a8175;margin-bottom:14px;">Opens WhatsApp with a message ready to send.</div>
-    <div id="contact-list" style="overflow-y:auto;flex:1;"><div style="text-align:center;padding:20px;color:#8a8175;font-size:13px;">Loading\u2026</div></div>
-    <button class="glaze-tile" onclick="document.getElementById('contact-sheet').remove()" style="margin-top:10px;width:100%;background:#2B2724;color:#fff;border:none;border-radius:12px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;">Done</button>
-  </div>`;
-  document.body.appendChild(sheet);
-  try {
-    const res = await fetch(`${API_URL}/api/staff/contact?studioId=${studioId}`);
-    const data = await res.json();
-    const list = document.getElementById('contact-list');
-    if (!data.staff || !data.staff.length) {
-      list.innerHTML = '<div style="text-align:center;padding:20px;color:#8a8175;font-size:13px;">No phone numbers saved yet. Add them in Setup \u2192 Team.</div>';
-      return;
-    }
-    const context = _detailBooking
-      ? 'Hi, it\'s about ' + (_detailBooking.customer_name||'a booking') + ' at ' + (_detailBooking.table_number||'a table') + '. '
-      : 'Hi, can you help at the studio? ';
-    list.innerHTML = data.staff.map(m => {
-      const num = m.whatsapp_number.replace(/[^0-9]/g,'');
-      const url = 'https://wa.me/' + num + '?text=' + encodeURIComponent(context);
-      const isOnShift = m.id === (currentShiftStaff && currentShiftStaff.id);
-      return '<a href="' + url + '" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;background:' + (isOnShift?'#F4ECE0':'none') + ';text-decoration:none;margin-bottom:6px;border:1px solid rgba(43,39,36,0.1);">'
-        + '<div style="width:36px;height:36px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">\uD83D\uDCAC</div>'
-        + '<div><div style="font-family:\'Caveat\',cursive;font-size:19px;color:#2B2724;">' + m.name + '</div>'
-        + '<div style="font-size:11px;color:#8a8175;">' + m.role + (isOnShift?' \xB7 on shift':'') + '</div></div>'
-        + '<div style="margin-left:auto;font-size:11px;font-weight:700;color:#25D366;">WhatsApp \u2192</div></a>';
-    }).join('');
-  } catch(e) {
-    const list = document.getElementById('contact-list');
-    if (list) list.innerHTML = '<div style="text-align:center;padding:20px;color:#e53935;font-size:13px;">Couldn\'t load contacts.</div>';
-  }
-}
+// [stripped 18 Jul: dead fn openContactSheet removed — zero references, verified]
 
 // ═══════════════════════════════════════════════════════════
 // PIECE CHECKOUT FLOW. 17 July 2026.
@@ -11156,24 +11051,7 @@ function updateClosingProgress() {
 // the closing checklist at all. If others are still on shift, Clock
 // Out proceeds normally, no closing checklist shown — it's honestly
 // only relevant for the real last person out.
-async function maybeShowClosingChecklist() {
-  if (!currentShiftStaff) { logOutOfShift(); return; }
-  try {
-    const excludeId = currentShiftStaff.id !== 'testing' ? currentShiftStaff.id : '';
-    const res = await fetch(`${API_URL}/api/staff/other-active-shifts?studioId=${studioId}&excludeStaffMemberId=${excludeId}`);
-    const data = await res.json();
-    if (data.othersStillClockedIn) {
-      // Genuinely not the last person — just clock out normally
-      logOutOfShift();
-      return;
-    }
-  } catch (e) {
-    // Real, honest fallback: if we can't check, err on the side of
-    // showing the checklist rather than silently skip it — same
-    // reasoning already used for the opening checklist.
-  }
-  showClosingChecklist();
-}
+// [stripped 18 Jul: dead fn maybeShowClosingChecklist removed — zero references, verified]
 
 function showClosingChecklist() {
   closingCheckState = {};
@@ -12320,6 +12198,7 @@ async function landOnHome() {
   currentTab = 'home-flow';
   _flowGraphEnter();
   _homeGuardUntil = Date.now() + 1000;
+  _homeScreenWatchdog();
 
   // ═══════════════════════════════════════════════════════════
   // THE SPOTIFY CALLBACK'S "← Back to Music" LINK. 18 July 2026.
@@ -12341,13 +12220,7 @@ async function landOnHome() {
   }
 }
 
-function skipLoginUseSharedView() {
-  currentShiftStaff = null;
-  const _ls = document.getElementById('login-screen'); if (_ls) _ls.style.display = 'none'; // guarded 18 Jul — id is login-screen-picker etc, plain login-screen never existed
-  document.getElementById('splash-screen').style.display = 'none';
-  document.querySelectorAll('[id*="swt"], [id*="onboarding"]').forEach(el => el.style.display = 'none');
-  landOnHome(); // home is your tiles — the screensaver is the floor plan
-}
+// [stripped 18 Jul: dead fn skipLoginUseSharedView removed — zero references, verified]
 
 function showLoginScreen(screen) {
   document.getElementById('login-screen-picker').style.display = screen === 'picker' ? 'block' : 'none';
@@ -12774,6 +12647,22 @@ async function loadLoginNamePicker() {
 // says "Loading team…", something hung in a way none of the paths
 // caught — force the honest retry state with whatever reason we have.
 // Nobody stares at a spinner again, whatever the failure mode.
+// Sibling to _pickerWatchdog, same reasoning: 5s after home lands, if
+// the tile body is still empty, something hung in a way nothing else
+// caught. Force the role-default tree directly rather than a retry
+// button — we already know exactly what should be there.
+function _homeScreenWatchdog() {
+  setTimeout(() => {
+    const body = document.getElementById('flow-graph-body');
+    if (body && (body.innerHTML || '').trim().length < 30 && currentShiftStaff) {
+      console.warn('[home watchdog] tile body still empty after 5s — forcing role defaults');
+      const role = currentShiftStaff.role || '';
+      const defaults = ROLE_HOME_DEFAULTS[role] || ROLE_HOME_DEFAULTS['Studio Assistant'];
+      _personalScreen = { tileOrder: defaults.tileOrder, promotedTiles: defaults.promotedTiles, hasPersonalScreen: false };
+      _flowGraphEnter();
+    }
+  }, 5000);
+}
 function _pickerWatchdog() {
   setTimeout(() => {
     const g = document.getElementById('login-name-grid');
@@ -13243,10 +13132,7 @@ async function submitPinReset() {
   }
 }
 
-function skipShiftLogin() {
-  document.getElementById('shift-login-modal').style.display = 'none';
-  currentShiftStaff = null;
-}
+// [stripped 18 Jul: dead fn skipShiftLogin removed — zero references, verified]
 
 // ── Breaks — pause the clock without ending the shift ──
 async function toggleBreak() {
@@ -15559,7 +15445,7 @@ function _checkFloorPlanMode() {
   if (floorVisible) renderFloorPlanElegant();
 }
 
-function showAllTablesView() { /* legacy — now built into main floor plan */ }
+// [stripped 18 Jul: dead fn showAllTablesView removed — zero references, verified]
 
 
 // ── Grid navigation history — back, forward, undo ────────────────────
@@ -15802,7 +15688,16 @@ async function loadPersonalHomeScreen() {
   // by first name any more.
 
   try {
-    const res = await fetch(`${API_URL}/api/staff/${currentShiftStaff.id}/home-screen?studioId=${studioId}`);
+    // 18 Jul, ~05:42: totally blank home — header fine, tile body
+    // empty, no error, one bar of signal in the screenshot. This
+    // fetch had no timeout; _flowGraphEnter() only runs after it
+    // resolves, so a hung connection left nothing to ever paint.
+    // Same 6s abort pattern already proven on the login picker.
+    const _homeAbort = new AbortController();
+    const _homeTimer = setTimeout(() => _homeAbort.abort(), 6000);
+    const res = await fetch(`${API_URL}/api/staff/${currentShiftStaff.id}/home-screen?studioId=${studioId}`,
+      { signal: _homeAbort.signal });
+    clearTimeout(_homeTimer);
     const data = await res.json();
 
     if (data.hasPersonalScreen) {
@@ -16050,12 +15945,7 @@ function _exitPersonalEdit() {
 }
 
 // Long press on personal screen enters edit mode
-function _personalLongPress(index) {
-  if (!_personalEditMode) {
-    _personalEditMode = true;
-    showPersonalHomeScreen();
-  }
-}
+// [stripped 18 Jul: dead fn _personalLongPress removed — zero references, verified]
 
 // Add tile sheet — shows everything not already on the personal screen
 function _showAddTileSheet() {
@@ -16124,30 +16014,10 @@ function _addPersonalTile(type, id) {
 
 // Drag reorder for personal screen
 let _pDragSrc = null;
-function _pDragStart(e, i) { _pDragSrc = i; e.currentTarget.classList.add('tile-dragging'); e.dataTransfer.effectAllowed = 'move'; }
-function _pDragOver(e, i) { e.preventDefault(); document.querySelectorAll('[data-pindex]').forEach(el => el.classList.remove('tile-drag-over')); e.currentTarget.classList.add('tile-drag-over'); }
-function _pDrop(e, dropIndex) {
-  e.preventDefault();
-  if (_pDragSrc === null || _pDragSrc === dropIndex) return;
-  _layoutSnapshot();
-  const items = _buildPersonalItems();
-  const moved = items.splice(_pDragSrc, 1)[0];
-  items.splice(dropIndex, 0, moved);
-  // Rebuild tileOrder from the new sequence
-  const newOrder = [];
-  items.forEach(item => {
-    const id = item.type === 'group' ? item.group.id : item.group.id;
-    if (!newOrder.includes(id)) newOrder.push(id);
-  });
-  _personalScreen.tileOrder = newOrder;
-  _pDragSrc = null;
-  savePersonalHomeScreen();
-  showPersonalHomeScreen();
-}
-function _pDragEnd(e) {
-  _pDragSrc = null;
-  document.querySelectorAll('[data-pindex]').forEach(el => el.classList.remove('tile-dragging', 'tile-drag-over'));
-}
+// [stripped 18 Jul: dead fn _pDragStart removed — zero references, verified]
+// [stripped 18 Jul: dead fn _pDragOver removed — zero references, verified]
+// [stripped 18 Jul: dead fn _pDrop removed — zero references, verified]
+// [stripped 18 Jul: dead fn _pDragEnd removed — zero references, verified]
 
 
 // ── Genuine real per-device tile layout system ──────────────────────
@@ -16443,14 +16313,7 @@ function goToRealLandingPage() {
   landOnHome();
   return;
 }
-function _oldGoToRealLandingPage() {
-  // "Just say go home, and it goes straight back to the table planner,
-  // everywhere." Home is the floor plan — for everyone, no name checks.
-  // This used to send David to barista-view and everyone else to the
-  // TILE GRID, which treated the tiles as home. They are not; they are
-  // where the floor plan sends you. Same inversion as applyShiftUI had.
-  showGridNav();   // HOME IS YOUR TILES. 17 July 2026.
-}
+// [stripped 18 Jul: dead fn _oldGoToRealLandingPage removed — zero references, verified]
 
 // ── Genuine real persistent booking strip, per direct request ──
 // Real stage labels/colours matching exactly the same real brightness
@@ -20543,13 +20406,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // Allow user to change API URL
-function changeAPIUrl() {
-  const newUrl = prompt('Enter API URL:', API_URL);
-  if (newUrl) {
-    localStorage.setItem('glazeup_api_url', newUrl);
-    location.reload();
-  }
-}
+// [stripped 18 Jul: dead fn changeAPIUrl removed — zero references, verified]
 
 // Save branding form
 function saveBrandingForm() {
@@ -20989,28 +20846,7 @@ async function captureStockShapePhoto(squareItemId) {
 
 // Called wherever staff have an unidentified blank in hand and want
 // to know which Square catalog item it is.
-async function identifyStockShape(onIdentified) {
-  const input = document.createElement('input');
-  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
-  input.onchange = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    const phash = await computePerceptualHash(file);
-    if (!phash) { alert('Could not read that photo — try again.'); return; }
-    try {
-      const res = await fetch(`${API_URL}/api/stock/identify-by-photo`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studioId, phash })
-      });
-      const data = await res.json();
-      if (data.matched) { onIdentified?.(data.squareItemId); }
-      else { alert(data.note || 'No confident match.'); }
-    } catch (e) {
-      alert('Could not reach the server — try again.');
-    }
-  };
-  input.click();
-}
+// [stripped 18 Jul: dead fn identifyStockShape removed — zero references, verified]
 
 async function preparePhotoForMatching(file) {
   try {
@@ -26200,14 +26036,7 @@ async function runTextPieceSearchFullScreen() {
 let _lostPieceCategory = 'unidentified';
 let _lostPiecePhotoBase64 = null;
 
-function openReportLostPiece() {
-  document.getElementById('report-lost-modal').style.display = 'flex';
-  document.getElementById('rlp-description').value = '';
-  document.getElementById('rlp-location').value = '';
-  document.getElementById('rlp-photo-preview').innerHTML = '';
-  _lostPiecePhotoBase64 = null;
-  setLostCategory('unidentified');
-}
+// [stripped 18 Jul: dead fn openReportLostPiece removed — zero references, verified]
 function closeReportLostPiece() {
   document.getElementById('report-lost-modal').style.display = 'none';
 }
@@ -27526,13 +27355,7 @@ async function savePiecesToDatabase(bookingCode, pieces, summaryText, customerNa
   }
 }
 
-function updateDashboardPieces(bookingId) {
-  const booking = mockBookings[bookingId];
-  
-  // Find and update the booking card on the dashboard
-  // For now, just show the summary - full integration comes next
-  console.log('Updated pieces for booking:', bookingId, pieceStates);
-}
+// [stripped 18 Jul: dead fn updateDashboardPieces removed — zero references, verified]
 
 // QR input listener (auto-load booking when QR is scanned)
 document.addEventListener('DOMContentLoaded', function() {
@@ -29080,13 +28903,7 @@ document.head.appendChild(alertStyle);
 // Start polling once the dashboard is loaded.
 // We delay the first poll so we can seed the seen IDs
 // without firing alerts for existing charges from before this session.
-function startExtrasPolling() {
-  // Seed on first load
-  pollExtrasForAlerts().then(() => {
-    // Then poll every 30 seconds
-    extrasAlertTimer = setInterval(pollExtrasForAlerts, 30 * 1000);
-  });
-}
+// [stripped 18 Jul: dead fn startExtrasPolling removed — zero references, verified]
 
 // Wire into populateDashboard — start polling when the dashboard loads
 function startExtrasPollingOnLoad() {
