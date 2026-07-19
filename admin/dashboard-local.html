@@ -13314,6 +13314,11 @@ function selectDemoStaff(idx) {
   if (!person) return;
   currentShiftStaff = { id: person.id, name: person.name, role: person.role, hasPinSet: true };
   localStorage.setItem('shift-staff', JSON.stringify(currentShiftStaff));
+  
+  // MUST hide the login modal before showing the flow
+  const modal = document.getElementById('shift-login-modal');
+  if (modal) modal.style.display = 'none';
+  
   _flowGraphEnter();
 }
 
