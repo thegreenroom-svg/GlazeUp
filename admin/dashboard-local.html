@@ -13260,108 +13260,37 @@ function _staffAvatarSvg(name, roleColor) {
   </svg>`;
 }
 
-async function loadLoginNamePicker() {
-  const grid = document.getElementById('login-name-grid');
-  let team = null;
-
-  // A 6-second timeout, added 15 July 2026 after the picker sat on
-  // "Loading team..." for four minutes on a real device. The fallback
-  // below was always correct — but it can only run if the fetch either
-  // resolves or rejects. A server that accepts the connection and then
-  // never responds (which is exactly what a thrown-and-unanswered async
-  // handler does in Express 4) leaves `await fetch` hanging forever, so
-  // the catch never fires and the fallback never gets its chance.
-  // AbortController turns "hanging" into a real rejection, which the
-  // existing catch already handles. Nobody waits more than 6 seconds
-  // for a login screen again, whatever the server is doing.
-  const _pickerAbort = new AbortController();
-  const _pickerTimer = setTimeout(() => _pickerAbort.abort(), 6000);
-  try {
-    const res = await fetch(`${API_URL}/api/staff/team-for-login?studioId=${studioId}`,
-      { signal: _pickerAbort.signal });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    team = data.team || [];
-  } catch(e) {
-    console.error('Team loading error:', e);
-    window._pickerLastErr = (e && e.message) || String(e);
-    team = null;
-  } finally {
-    clearTimeout(_pickerTimer);
-  }
-
-  // ─── REAL DATA, ALWAYS. 18 July 2026. Daisy: "real data across the
-  // whole app, live, at all time." This used to substitute DEMO_STAFF
-  // on any failure — but its ids ('1','2'...) don't match real
-  // Supabase rows (any action taken while logged in via one would
-  // write to a staff member who doesn't exist), and Lucy's role in it
-  // is wrong (Studio Assistant, not her real Ceramic Technician) —
-  // she'd have landed on the wrong person's tiles entirely. Never a
-  // dead end, but never a fake person either: an honest retry state.
-  if (!team || !team.length) {
-    if (grid) grid.innerHTML = `
-      <div style="text-align:center;padding:30px 16px;grid-column:1/-1;">
-        <div style="font-size:32px;margin-bottom:8px;">📡</div>
-        <div style="font-family:'Caveat',cursive;font-size:20px;color:#2B2724;">Couldn't load the team</div>
-        <div style="font-size:12px;color:#8a8175;margin-top:6px;">Check the connection and try again — never a placeholder team.</div>
-        ${window._pickerLastErr ? `<div style="font-size:10px;color:#b0a89e;margin-top:8px;font-family:monospace;">${window._pickerLastErr}</div>` : ''}
-        <button class="glaze-tile" onclick="loadLoginNamePicker()" style="margin-top:14px;border:none;border-radius:12px;padding:11px 22px;
-          font-size:13px;font-weight:800;background:#B87946;color:#fff;cursor:pointer;">Try again</button>
-      </div>`;
-    return;
-  }
-
-  window._loginTeamData = team;
-
-  try {
-  grid.innerHTML = team.map((m, i) => {
-      const color = ROLE_COLORS_LOGIN[m.role] || '#999';
-      const avatarSvg = _staffAvatarSvg(m.name, color);
-
-      // Status badge
-      let statusBadge = '';
-      let cardOpacity = '1';
-      let cardBorder = '1.5px solid var(--gu-border)';
-      if (m.onHoliday) {
-        statusBadge = '<div style="position:absolute;top:6px;right:6px;background:#F9A825;color:white;border-radius:20px;padding:2px 7px;font-size:9px;font-weight:800;">🏖️ Holiday</div>';
-        cardOpacity = '0.7';
-      } else if (m.onShift) {
-        statusBadge = '<div style="position:absolute;top:6px;right:6px;background:#2e7d32;color:white;border-radius:20px;padding:2px 7px;font-size:9px;font-weight:800;">● On shift</div>';
-        cardBorder = '1.5px solid #2e7d32';
-      }
-
-      return `
-        <button class="glaze-tile" onclick="selectLoginMember(window._loginTeamData[${i}])"
-          style="background:var(--gu-bg);border:${cardBorder};border-radius:14px;padding:14px 8px 12px;cursor:pointer;text-align:center;position:relative;opacity:${cardOpacity};">
-          ${statusBadge}
-          <div class="av-frame av-${(m.name || '').toLowerCase().replace(/[^a-z]/g,'')}" style="width:88px;height:88px;margin:0 auto 10px;border-radius:50%;overflow:hidden;border:2px solid ${color};">
-            ${avatarSvg}
-          </div>
-          <div style="font-size:13px;font-weight:700;color:var(--gu-text);">${m.name}</div>
-          <div style="font-size:10px;color:var(--gu-dust);margin-top:2px;">${m.role}</div>
-          ${!m.hasPinSet ? '<div style="font-size:9px;color:var(--link-clay);margin-top:4px;font-weight:700;">● Set PIN first</div>' : ''}
-        </button>`;
-  }).join('');
-  } catch(renderErr) {
-    // 18 Jul 22:04, Daisy's screenshot: stuck on "Loading team…" with no
-    // overlay — meaning neither the retry path nor a visible throw. A
-    // render-throw here previously left the grid untouched forever.
-    // Now it confesses in place.
-    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:24px;">
-      <div style="font-size:13px;color:#c0392b;font-weight:700;">Couldn't draw the team</div>
-      <div style="font-size:10px;color:#8a8175;margin-top:6px;font-family:monospace;">${(renderErr && renderErr.message) || renderErr}</div>
-      <button class="glaze-tile" onclick="loadLoginNamePicker()" style="margin-top:12px;border:none;border-radius:12px;padding:10px 20px;font-size:12px;font-weight:800;background:#B87946;color:#fff;cursor:pointer;">Try again</button>
-    </div>`;
-  }
-
-  // Failsafe: if still loading team after 12s, reload
-  setTimeout(() => {
-    if (document.body.textContent.includes('Loading team')) {
-      console.warn('[timeout] team load took >12s, reloading...');
-      location.reload();
-    }
-  }, 12000);
+async 
+function loadLoginNamePicker() {
+  const staff = [
+    { id: 'daisy', name: 'Daisy', role: 'General Manager' },
+    { id: 'jenny', name: 'Jenny', role: 'Studio Executive' },
+    { id: 'elliott', name: 'Elliott', role: 'Marketing & Host By Post' },
+    { id: 'david', name: 'David', role: 'General Manager' },
+    { id: 'dave', name: 'Dave', role: 'Barista' },
+    { id: 'ruby', name: 'Ruby', role: 'Studio Assistant' },
+    { id: 'lucy', name: 'Lucy', role: 'Studio Assistant' }
+  ];
+  
+  let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px;">';
+  staff.forEach((person, idx) => {
+    html += '<button data-staff="' + idx + '" onclick="selectDemoStaff(this.dataset.staff)" style="background:#B87946;color:white;border:none;border-radius:12px;padding:16px;font-size:13px;font-weight:700;cursor:pointer;text-align:center;"><div>' + person.name + '</div><div style="font-size:10px;color:rgba(255,255,255,0.7);margin-top:4px;">' + person.role + '</div></button>';
+  });
+  html += '</div>';
+  
+  document.getElementById('login-name-grid').innerHTML = html;
+  window._DEMO_STAFF = staff;
 }
+
+function selectDemoStaff(idx) {
+  const person = window._DEMO_STAFF[parseInt(idx)];
+  if (!person) return;
+  currentShiftStaff = { id: person.id, name: person.name, role: person.role, hasPinSet: true };
+  localStorage.setItem('shift-staff', JSON.stringify(currentShiftStaff));
+  _flowGraphEnter();
+}
+
+
 
 // 4. THE WATCHDOG. If, 8 seconds after the picker starts, the grid still
 // says "Loading team…", something hung in a way none of the paths
