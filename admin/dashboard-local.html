@@ -11033,7 +11033,7 @@ function _renderTellSheet(kinds, equipment, step) {
       padding:18px 16px calc(18px + env(safe-area-inset-bottom));max-height:80vh;display:flex;flex-direction:column;">
       <div style="font-family:'Caveat',cursive;font-size:26px;color:#2B2724;">What's happened?</div>
       <div style="font-size:12px;color:#8a8175;margin-bottom:14px;">
-        Tap one — it goes to whoever deals with it. Nothing to type.</div>
+        Tap one — it goes to whoever deals with it. Or write your own below.</div>
       <div style="overflow-y:auto;flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         ${kinds.map(k => `
           <button onclick="_tellTap(${JSON.stringify(k)}, ${JSON.stringify(equipment)})" class="glaze-tile"
@@ -11043,6 +11043,19 @@ function _renderTellSheet(kinds, equipment, step) {
             <div style="font-size:13px;font-weight:800;line-height:1.2;margin-top:4px;">${k.label}</div>
             <div style="font-size:10px;opacity:0.7;margin-top:3px;">→ ${k.nextRole}</div>
           </button>`).join('')}
+      </div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(43,39,36,0.1);">
+        <div style="display:flex;gap:8px;align-items:flex-end;">
+          <textarea id="tell-custom-message" placeholder="Something else? Type it here…" rows="1"
+            style="flex:1;padding:12px;border:1px solid var(--gu-border,#ddd);border-radius:12px;font-size:14px;
+            box-sizing:border-box;resize:none;font-family:inherit;max-height:100px;"></textarea>
+          <button class="glaze-tile" onclick="_tellVoiceInput()" title="Speak your message"
+            style="background:rgba(184,121,70,0.12);border:none;border-radius:12px;width:48px;height:48px;
+            font-size:20px;cursor:pointer;flex-shrink:0;">🎤</button>
+        </div>
+        <button class="glaze-tile" onclick="_sendCustomTell()"
+          style="width:100%;margin-top:8px;background:#2e7d32;color:#fff;border:none;border-radius:12px;
+          padding:13px;font-size:14px;font-weight:800;cursor:pointer;">Send message</button>
       </div>
       <button class="glaze-tile" onclick="document.getElementById('tell-picker').remove()"
         style="margin-top:10px;width:100%;background:#2B2724;color:#fff;border:none;border-radius:12px;
@@ -11068,6 +11081,41 @@ async function _tellTap(kind, equipment) {
     return _renderTellSheet(null, null, { title: 'Running low on what?', type: kind.type, key: 'item', options: items });
   }
   _sendTell(kind.type);
+}
+
+// Voice dictation for the custom message box — uses the browser's
+// built-in speech recognition, no external service. Falls back
+// gracefully if the device doesn't support it.
+function _tellVoiceInput() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const box = document.getElementById('tell-custom-message');
+  if (!SR) {
+    if (box) { box.focus(); }
+    toast('Voice not supported on this device — please type', 'error');
+    return;
+  }
+  const rec = new SR();
+  rec.lang = 'en-GB';
+  rec.interimResults = false;
+  rec.maxAlternatives = 1;
+  toast('Listening…', 'success');
+  rec.onresult = (e) => {
+    const text = e.results[0][0].transcript;
+    if (box) box.value = (box.value ? box.value + ' ' : '') + text;
+  };
+  rec.onerror = () => toast('Could not hear that — try again', 'error');
+  rec.start();
+}
+
+// Send a free-text/voice message through the same tell pipeline as
+// the preset buttons, so it reaches whoever's on shift.
+async function _sendCustomTell() {
+  const box = document.getElementById('tell-custom-message');
+  const msg = (box?.value || '').trim();
+  if (!msg) { toast('Type or speak a message first', 'error'); return; }
+  await _sendTell('custom_message', 'message', msg);
+  const picker = document.getElementById('tell-picker');
+  if (picker) picker.remove();
 }
 
 async function _sendTell(triggerType, extraKey, extraVal) {
