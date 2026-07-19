@@ -16338,6 +16338,10 @@ function demoteSubTile(tabId) {
 })();
 
 const GRID_NAV_STRUCTURE = [
+  { tab: 'navigation-help', label: 'Navigation Help', desc: 'How to use the app' },
+  
+  { tab: 'home', label: 'Home', desc: 'Back to your dashboard' },
+  
   { id: 'tables', label: 'Tables', color: '#00695c', items: [
     { tab: 'floor-plan', label: 'Floor Plan', desc: 'Live view of all tables', fn: 'showFloorPlan' },
   // Customer app demo — always visible so staff can see exactly what
@@ -17271,6 +17275,48 @@ function _flowGraphEnter() { _flowStack = []; // Clear any stale nav
   _flowLoadDayStat();
   _flowLoadNudges();
 }
+
+function openNavigationHelp() {
+  const helpContent = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;">
+      <div class="glaze-tile" style="background:#B87946;color:white;border-radius:14px;padding:14px;text-align:center;">
+        <div style="font-size:16px;margin-bottom:6px;">🏠</div>
+        <div style="font-size:13px;font-weight:700;">Home</div>
+        <div style="font-size:11px;margin-top:4px;opacity:0.9;">Return to your dashboard anytime</div>
+      </div>
+      <div class="glaze-tile" style="background:#B87946;color:white;border-radius:14px;padding:14px;text-align:center;">
+        <div style="font-size:16px;margin-bottom:6px;">💬</div>
+        <div style="font-size:13px;font-weight:700;">Tell Daisy</div>
+        <div style="font-size:11px;margin-top:4px;opacity:0.9;">Report an issue or ask for help</div>
+      </div>
+      <div class="glaze-tile" style="background:#B87946;color:white;border-radius:14px;padding:14px;text-align:center;">
+        <div style="font-size:16px;margin-bottom:6px;">🔍</div>
+        <div style="font-size:13px;font-weight:700;">Find Piece</div>
+        <div style="font-size:11px;margin-top:4px;opacity:0.9;">Search for any piece by photo or code</div>
+      </div>
+      <div class="glaze-tile" style="background:#B87946;color:white;border-radius:14px;padding:14px;text-align:center;">
+        <div style="font-size:16px;margin-bottom:6px;">🏡</div>
+        <div style="font-size:13px;font-weight:700;">My Tiles</div>
+        <div style="font-size:11px;margin-top:4px;opacity:0.9;">Customize your home screen layout</div>
+      </div>
+      <div class="glaze-tile" style="background:#B87946;color:white;border-radius:14px;padding:14px;text-align:center;">
+        <div style="font-size:16px;margin-bottom:6px;">❓</div>
+        <div style="font-size:13px;font-weight:700;">Ask Cleo</div>
+        <div style="font-size:11px;margin-top:4px;opacity:0.9;">Chat with your studio's AI voice</div>
+      </div>
+      <div class="glaze-tile" style="background:#2B2724;color:white;border-radius:14px;padding:14px;text-align:center;">
+        <div style="font-size:13px;font-weight:700;">Every tile on your home screen</div>
+        <div style="font-size:11px;margin-top:4px;opacity:0.9;">has a title explaining what it does</div>
+      </div>
+    </div>
+  `;
+  glazedModal({
+    title: 'Navigation Guide',
+    bodyHTML: helpContent,
+    closeLabel: 'Got it'
+  });
+}
+
 
 // ─── NEVER A SILENT BLANK SCREEN. 18 July 2026. ───
 // Reported: after login, header shows, body is completely blank — no
