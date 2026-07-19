@@ -2023,6 +2023,15 @@
      "genuinely empty" — you can always see when the app is fetching.
      Purely visual; touches no data. -->
 <script>
+
+function updateStaffName() {
+  if (currentShiftStaff && currentShiftStaff.name) {
+    const crumb = document.getElementById('flow-crumb');
+    if (crumb) crumb.textContent = currentShiftStaff.name;
+  }
+}
+
+
 // ═══ BOOT ERROR OVERLAY. 18 July 2026. ═══
 // "After the splash screen it just goes to a blank page and hangs" — on
 // the LATEST deploy, so a real runtime failure, not caching. From here a
@@ -3414,7 +3423,7 @@
     padding:max(12px, calc(env(safe-area-inset-top, 0px) + 10px)) 14px 12px 14px;
     background:rgba(244,236,224,0.95);backdrop-filter:blur(10px);
     border-bottom:1px solid rgba(43,39,36,0.14);">
-    <div style="font-family:'Caveat',cursive;font-size:20px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="flow-crumb">Daisy</div>
+    <div style="font-family:'Caveat',cursive;font-size:20px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="flow-crumb"></div>
     <!-- Persistent header — kept on every flow page, quick one-tap
          actions for a busy studio. Find My Piece and Cleo are the real
          functions; day-stats shows the real live figure or nothing at
@@ -13311,6 +13320,7 @@ function selectDemoStaff(idx) {
   
   // Show ONLY the dashboard-view (simplest, most stable tile grid)
   const dashboard = document.getElementById('dashboard-view');
+  updateStaffName();
   if (dashboard) {
     dashboard.style.display = 'block';
   }
