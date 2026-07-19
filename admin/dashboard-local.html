@@ -16069,7 +16069,7 @@ function showPersonalHomeScreen() {
   const suggestions = _getSuggestions();
   const groupsWithSuggestions = new Set();
   suggestions.forEach(tabId => {
-    const group = GRID_NAV_STRUCTURE.find(g => g.items.some(i => i.tab === tabId));
+    const group = GRID_NAV_STRUCTURE.find(g => g.items && g.items.some(i => i.tab === tabId));
     if (group) groupsWithSuggestions.add(group.id);
   });
 
@@ -16322,7 +16322,7 @@ function _addPersonalTile(type, id) {
     if (!_personalScreen.promotedTiles.includes(id)) {
       _personalScreen.promotedTiles.push(id);
       // Make sure the parent group is also on screen
-      const group = GRID_NAV_STRUCTURE.find(g => g.items.some(i => i.tab === id));
+      const group = GRID_NAV_STRUCTURE.find(g => g.items && g.items.some(i => i.tab === id));
       if (group && !_personalScreen.tileOrder.includes(group.id)) {
         _personalScreen.tileOrder.push(group.id);
       }
@@ -16928,7 +16928,7 @@ function showGridNavTop() {
   // Find which group IDs have suggestions pending
   const groupsWithSuggestions = new Set();
   suggestions.forEach(tabId => {
-    const group = GRID_NAV_STRUCTURE.find(g => g.items.some(i => i.tab === tabId));
+    const group = GRID_NAV_STRUCTURE.find(g => g.items && g.items.some(i => i.tab === tabId));
     if (group) groupsWithSuggestions.add(group.id);
   });
 
