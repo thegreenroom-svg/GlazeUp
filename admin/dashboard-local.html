@@ -13333,19 +13333,25 @@ function _staffAvatarSvg(name, roleColor) {
 }
 
 function loadLoginNamePicker() {
+  const ROLE_COLORS = { 'General Manager':'#B87946', 'Studio Executive':'#5E9DB6', 'Marketing & Host By Post':'#A88B5C', 'Studio Assistant':'#7BA89F', 'Barista':'#D9744E', 'Co-Director':'#B87946' };
+  
   const staff = [
     { id: 'daisy', name: 'Daisy', role: 'General Manager' },
     { id: 'jenny', name: 'Jenny', role: 'Studio Executive' },
     { id: 'elliott', name: 'Elliott', role: 'Marketing & Host By Post' },
     { id: 'david', name: 'David', role: 'General Manager' },
-    { id: 'dave', name: 'Dave', role: 'Barista' },
     { id: 'ruby', name: 'Ruby', role: 'Studio Assistant' },
     { id: 'lucy', name: 'Lucy', role: 'Studio Assistant' }
   ];
   
-  let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px;">';
+  let html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:16px;max-width:360px;margin:0 auto;">';
   staff.forEach((person, idx) => {
-    html += '<button data-staff="' + idx + '" onclick="selectDemoStaff(this.dataset.staff)" style="background:#B87946;color:white;border:none;border-radius:12px;padding:16px;font-size:13px;font-weight:700;cursor:pointer;text-align:center;"><div>' + person.name + '</div><div style="font-size:10px;color:rgba(255,255,255,0.7);margin-top:4px;">' + person.role + '</div></button>';
+    const color = ROLE_COLORS[person.role] || '#B87946';
+    const initials = person.name.split(' ').map(n => n.charAt(0).toUpperCase()).join('');
+    html += '<button data-staff="' + idx + '" onclick="selectDemoStaff(this.dataset.staff)" style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;aspect-ratio:1;background:none;border:none;cursor:pointer;border-radius:8px;padding:0;gap:8px;">'
+      + '<div style="width:100%;aspect-ratio:1;background:' + color + ';border-radius:8px;display:flex;align-items:center;justify-content:center;color:white;font-size:24px;font-weight:800;box-shadow:0 2px 8px rgba(0,0,0,0.12);">' + initials + '</div>'
+      + '<div style="font-size:11px;font-weight:700;color:var(--gu-text);text-align:center;line-height:1.2;">' + person.name + '</div>'
+      + '</button>';
   });
   html += '</div>';
   
@@ -13362,7 +13368,7 @@ function selectDemoStaff(idx) {
     { id: 'daisy', name: 'Daisy', role: 'General Manager' },
     { id: 'jenny', name: 'Jenny', role: 'Studio Executive' },
     { id: 'elliott', name: 'Elliott', role: 'Marketing & Host By Post' },
-    { id: 'david', name: 'David', role: 'General Manager - Barista - Maintenance' },
+    { id: 'david', name: 'David', role: 'General Manager' },
     { id: 'ruby', name: 'Ruby', role: 'Studio Assistant' },
     { id: 'lucy', name: 'Lucy', role: 'Studio Assistant' }
   ];
