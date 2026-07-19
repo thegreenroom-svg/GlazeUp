@@ -3193,7 +3193,12 @@
           width:26px;height:26px;font-size:11px;cursor:pointer;flex-shrink:0;
           align-items:center;justify-content:center;">🔍</button>
 
-        <!-- Alerts -->
+        <!-- My tiles — see/customise your home screen -->
+        <button class="glaze-tile" id="my-tiles-header-btn" onclick="showGridNav()" title="My tiles"
+          style="background:#2e7d32;color:white;border:none;border-radius:50%;
+          width:26px;height:26px;font-size:12px;cursor:pointer;flex-shrink:0;
+          align-items:center;justify-content:center;">🏡</button>
+                <!-- Alerts -->
         <button class="glaze-tile" id="alert-bell-btn" onclick="toggleAlertFeed()" title="Alerts"
           style="display:none;background:#2B2724;color:white;border:none;border-radius:50%;
           width:26px;height:26px;font-size:11px;cursor:pointer;flex-shrink:0;
@@ -17256,7 +17261,7 @@ async function _dismissNudge(nudgeId) {
   _flowLoadNudges();   // shows the next one, or clears the slot
 }
 
-function _flowGraphEnter() {
+function _flowGraphEnter() { _flowStack = []; // Clear any stale nav
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
   let tree;
   try { tree = _buildPersonalFlowTree(); } catch(e) { console.warn('personal flow tree fell back:', e); tree = FULL_FLOW_TREE; }
