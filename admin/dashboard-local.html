@@ -13313,12 +13313,8 @@ function selectDemoStaff(idx) {
   const person = staff[parseInt(idx)];
   if (!person) return;
   currentShiftStaff = { id: person.id, name: person.name, role: person.role, hasPinSet: true };
-  const crumb = document.getElementById('flow-crumb');
-  if (crumb) crumb.textContent = person.name;
-  document.getElementById('shift-login-modal').style.display = 'none';
-  document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
-  const dashboard = document.getElementById('dashboard-view');
-  if (dashboard) dashboard.style.display = 'block';
+  localStorage.setItem('shift-staff', JSON.stringify(currentShiftStaff));
+  _flowGraphEnter();
 }
 
 
