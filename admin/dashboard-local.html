@@ -13356,6 +13356,8 @@ function loadLoginNamePicker() {
     { id: 'd2463711-1176-4c27-ad58-ed35ffbb158c', name: 'Ruby', role: 'Studio Assistant' },
     { id: 'bb1e9973-b833-4ba5-93fd-818cb480b1a2', name: 'Lucy', role: 'Ceramic Technician' }
   ];
+  
+  let html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:16px;max-width:360px;margin:0 auto;">';
   staff.forEach((person, idx) => {
     const color = ROLE_COLORS[person.role] || '#B87946';
     const initials = person.name.split(' ').map(n => n.charAt(0).toUpperCase()).join('');
