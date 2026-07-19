@@ -9238,15 +9238,11 @@ async function openKiln() {
   _floorViewMode = 'kiln';
   view.innerHTML = `
     <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
-        <div>
-          <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">Kiln</div>
-          <div style="font-size:11px;color:#8a8175;">Dip → load → fire</div>
-        </div>
-        <button onclick="goToRealLandingPage()" class="glaze-tile"
-          style="border:none;padding:8px 12px;font-size:11px;font-weight:800;cursor:pointer;flex-shrink:0;">← Floor plan</button>
+      <div style="margin-bottom:16px;">
+        <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">Kiln</div>
+        <div style="font-size:11px;color:#8a8175;">Dip → load → fire</div>
       </div>
-      <div id="kiln-body"><div style="text-align:center;padding:40px;color:#8a8175;font-size:13px;">Loading…</div></div>
+      <div id="kiln-body" style="padding-bottom:100px;"><div style="text-align:center;padding:40px;color:#8a8175;font-size:13px;">Loading…</div></div>
     </div>`;
   toggleFloatingBackBtn();
   instantCache.paint('klnk_cache_kiln','kiln-body');
