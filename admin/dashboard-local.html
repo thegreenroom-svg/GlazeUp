@@ -13289,6 +13289,7 @@ function loadLoginNamePicker() {
 
 
 
+
 function selectDemoStaff(idx) {
   const staff = [
     { id: 'daisy', name: 'Daisy', role: 'General Manager' },
@@ -13304,18 +13305,18 @@ function selectDemoStaff(idx) {
   currentShiftStaff = { id: person.id, name: person.name, role: person.role, hasPinSet: true };
   localStorage.setItem('shift-staff', JSON.stringify(currentShiftStaff));
   
-  // Hide login modal
+  // Hide everything
+  document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
   document.getElementById('shift-login-modal').style.display = 'none';
   
-  // Hide all views
-  document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
-  
-  // Show the actual flow-graph (tiles home)
-  const flowGraph = document.getElementById('daisy-flow-view');
-  if (flowGraph) {
-    flowGraph.style.display = 'block';
+  // Show ONLY the dashboard-view (simplest, most stable tile grid)
+  const dashboard = document.getElementById('dashboard-view');
+  if (dashboard) {
+    dashboard.style.display = 'block';
   }
 }
+
+
 
 
 
