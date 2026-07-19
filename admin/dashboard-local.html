@@ -15445,6 +15445,50 @@ function showFloorPlan() {
   // something the instant it taps — and the renderer paints over the
   // placeholder when the data lands. No flash, no wait.
   const v = document.getElementById('floor-plan-view');
+  // ─── SELF-HEALING SKELETON. Root cause of "tap Floor Plan, see
+  // whatever screen I was on before" (Customise, Packing, Kiln,
+  // Collections, Learning, Training, Music, H&S — every one of them
+  // wipes #floor-plan-view's ENTIRE innerHTML when it opens, since
+  // they all render into this same shared container). Everything
+  // renderFloorPlanElegant() needs — #floor-plan-placeholder,
+  // #floor-main-studio, the lounge/vault indicators — lives INSIDE
+  // that container in the static HTML, so any of those wipes destroys
+  // all of it together. Every one of those lookups is written
+  // defensively (`if (mainGrid) ...`), which is correct in general but
+  // meant this failed SILENTLY: no placeholder to cover the old
+  // screen's stale content while loading, and even once the fetch
+  // succeeded, no #floor-main-studio to actually paint the tables into
+  // — so the ivory "Loading studio…" placeholder alone would have
+  // stayed up forever with nothing behind it. Rebuilding the whole
+  // skeleton fresh here, unconditionally, means Floor Plan no longer
+  // depends on any other screen having left this container intact. ───
+  if (v && !document.getElementById('floor-main-studio')) {
+    v.innerHTML = `
+      <div id="floor-plan-placeholder" style="position:absolute;inset:0;z-index:5;background:#F4ECE0;display:flex;align-items:center;justify-content:center;flex-direction:column;">
+        <div style="font-family:'Architects Daughter',cursive;font-size:14px;color:#c8bfb0;letter-spacing:0.06em;">Loading studio…</div>
+        <div id="floor-trace-loading" style="font-family:'Architects Daughter',cursive;font-size:9px;color:#B87946;opacity:0.8;margin-top:14px;text-align:center;max-width:90vw;line-height:1.5;word-break:break-word;"></div>
+      </div>
+      <div style="flex:1;display:flex;overflow:hidden;">
+        <div style="width:48px;flex-shrink:0;background:linear-gradient(180deg,#004D40 0%,#00251A 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:10px;border-right:1px solid rgba(0,105,92,0.4);position:relative;" onclick="openRoomPanel('Lounge')">
+          <div id="lounge-indicator" style="position:absolute;left:0;top:0;bottom:0;width:3px;background:#00BFA5;display:none;border-radius:0 3px 3px 0;"></div>
+          <div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:10px;font-weight:800;color:rgba(255,255,255,0.9);letter-spacing:0.1em;text-transform:uppercase;">Lounge</div>
+          <div id="lounge-active-count" style="display:none;background:#00BFA5;color:#003D35;border-radius:20px;padding:3px 7px;font-size:10px;font-weight:800;"></div>
+          <div style="font-size:14px;color:rgba(255,255,255,0.4);">›</div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;background:#1A1714;">
+          <div style="padding:8px 10px 6px;flex-shrink:0;border-bottom:1px solid rgba(184,121,70,0.15);">
+            <div style="font-size:9px;font-weight:700;color:rgba(184,121,70,0.6);text-transform:uppercase;letter-spacing:0.1em;">Main Studio · Tables 1–8</div>
+          </div>
+          <div id="floor-main-studio" style="flex:1;overflow-y:auto;padding:8px;display:grid;gap:7px;grid-template-columns:1fr 1fr;align-content:start;"></div>
+        </div>
+        <div style="width:48px;flex-shrink:0;background:linear-gradient(180deg,#1A0050 0%,#0D0030 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:10px;border-left:1px solid rgba(94,53,177,0.4);position:relative;" onclick="openRoomPanel('The Vault')">
+          <div id="vault-indicator" style="position:absolute;right:0;top:0;bottom:0;width:3px;background:#9575CD;display:none;border-radius:3px 0 0 3px;"></div>
+          <div style="writing-mode:vertical-rl;font-size:10px;font-weight:800;color:rgba(255,255,255,0.9);letter-spacing:0.1em;text-transform:uppercase;">The Vault</div>
+          <div id="vault-active-count" style="display:none;background:#9575CD;color:#1A0050;border-radius:20px;padding:3px 7px;font-size:10px;font-weight:800;"></div>
+          <div style="font-size:14px;color:rgba(255,255,255,0.4);">‹</div>
+        </div>
+      </div>`;
+  }
   const ph = document.getElementById('floor-plan-placeholder');
   if (ph) ph.style.display = 'flex';
   if (v) v.style.display = 'flex';
