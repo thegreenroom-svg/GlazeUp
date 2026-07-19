@@ -13287,6 +13287,7 @@ function loadLoginNamePicker() {
 }
 
 
+
 function selectDemoStaff(idx) {
   const staff = [
     { id: 'daisy', name: 'Daisy', role: 'General Manager' },
@@ -13298,10 +13299,19 @@ function selectDemoStaff(idx) {
   ];
   const person = staff[parseInt(idx)];
   if (!person) return;
+  
   currentShiftStaff = { id: person.id, name: person.name, role: person.role, hasPinSet: true };
   localStorage.setItem('shift-staff', JSON.stringify(currentShiftStaff));
-  _flowGraphEnter();
+  
+  // Hide login modal, show home
+  document.getElementById('shift-login-modal').style.display = 'none';
+  document.getElementById('flow-graph-body').style.display = 'grid';
+  
+  // Load tiles immediately without waiting for personalisation
+  goToTab('home');
 }
+
+
 
 
 
