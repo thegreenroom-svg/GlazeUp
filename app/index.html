@@ -1412,17 +1412,7 @@
   </button>
 
   <div id="splash-screen">
-    <div style="display:flex; align-items:baseline; justify-content:center; gap:0;">
-      <!-- "kiln" lowercase prefix — Instrument Sans, slightly smaller, animates in -->
-      <div class="splash-prefix">kiln</div>
-      <!-- LINK wordmark — existing letters, N has a vase silhouette inside the arch -->
-      <div class="splash-word">
-        <span class="splash-letter"><svg viewBox="0 0 58 80" aria-hidden="true"><path d="M4.00,76.00 L4.00,4.00 L19.41,4.00 L19.41,76.00 L4.00,76.00 Z M11.20,76.00 L11.20,64.20 L54.00,64.20 L54.00,76.00 L11.20,76.00 Z" fill="#fff"/></svg></span><span class="splash-letter"><svg viewBox="0 0 23.4 80" aria-hidden="true"><path d="M4.00,76.00 L4.00,4.00 L19.41,4.00 L19.41,76.00 L4.00,76.00 Z" fill="#fff"/></svg></span><span class="splash-letter"><svg viewBox="-10 -32 72 114" aria-hidden="true"><path d="M 4,72 L 10,72 L 10,30 C 10,10 18,2 28,2 C 38,2 46,10 46,30 L 46,72 L 52,72" fill="none" stroke="#B87946" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/><rect x="23" y="-10" width="9" height="13" rx="1.5" fill="#B87946"/><circle cx="28" cy="-15" r="3.4" fill="#B87946" opacity="0.6"/><circle cx="31" cy="-21" r="2.6" fill="#B87946" opacity="0.45"/><circle cx="29.5" cy="-27" r="1.9" fill="#B87946" opacity="0.3"/><!-- small vase silhouette inside the kiln arch --><path d="M23,65 L33,65 C36,65 40,58 40,50 C40,40 36,33 29,27 L29,21 L27,21 L27,27 C20,33 16,40 16,50 C16,58 20,65 23,65 Z" fill="#B87946" opacity="0.55"/></svg></span><span class="splash-letter"><svg viewBox="0 0 73.4 80" aria-hidden="true"><path d="M4.00,76.00 L4.00,4.00 L19.41,4.00 L19.41,76.00 L4.00,76.00 Z M14.50,38.59 L46.91,4.00 L67.41,4.00 L33.20,38.59 L14.50,38.59 Z M48.50,76.00 L14.30,38.59 L33.20,38.59 L69.41,76.00 L48.50,76.00 Z" fill="#fff"/></svg></span>
-      </div>
-    </div>
-    <div class="splash-strapline">Studio · Community · Ritual</div>
-    <div class="splash-tagline">Connect. Create. Belong.</div>
-    <div class="splash-endorsement">Built by The Kiln Cafe</div>
+    <img src="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png" style="width:80%;max-width:360px;opacity:0.95;filter:drop-shadow(0 12px 40px rgba(184,121,70,0.4));">
     <div class="splash-hint">Tap anywhere to continue</div>
     <button id="splash-faceid-btn" onclick="event.stopPropagation(); tryCustomerFaceIdLogin();" style="display:none;position:relative;z-index:10;margin-top:16px;background:rgba(255,255,255,0.12);border:1.5px solid rgba(255,255,255,0.3);color:white;border-radius:14px;padding:12px 20px;font-size:13px;font-weight:700;cursor:pointer;">
       🔓 Use Face ID / Touch ID
@@ -2380,6 +2370,28 @@ const instantCache = {
       }
 
       if (!bookingCode) {
+        // Demo mode, same-origin signal from the admin dashboard: admin's
+        // startDemo() writes demo_active to localStorage; nothing here was
+        // ever reading it, so opening the customer app during a demo always
+        // fell through to the real walk-in check-in form with no session —
+        // this is that missing read, reusing the exact renderSession() path
+        // already proven by preview=kid rather than a new rendering path.
+        let _demo = null;
+        try { _demo = JSON.parse(localStorage.getItem('demo_active') || 'null'); } catch(e) {}
+        if (_demo && _demo.customers && _demo.customers.length) {
+          const _c = _demo.customers[0];
+          const _myPieces = (_demo.pieces || []).filter(p => p.customerId === _c.id);
+          renderSession({
+            booking: { customerName: _c.name, homeAccessUnlocked: false },
+            customerHistory: {},
+            piecesReadyForPickup: _myPieces.filter(p => p.stage === 'kiln').map(p => ({ id: p.id, type: p.type })),
+            isDemoSession: true,
+          });
+          document.body.style.borderTop = '4px solid #F9A825'; // same demo-mode indicator as admin
+          showA2HSBanner();
+          return;
+        }
+
         root.innerHTML = `
           <div style="padding: 60px 24px 24px; text-align: center;">
             <h2 style="font-family: var(--gu-font-display); color: var(--gu-accent); margin-bottom: 8px;">Welcome to The Kiln Cafe</h2>

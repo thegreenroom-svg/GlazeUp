@@ -3426,6 +3426,12 @@ function updateStaffName() {
     background:rgba(244,236,224,0.95);backdrop-filter:blur(10px);
     border-bottom:1px solid rgba(43,39,36,0.14);">
     <div style="font-family:'Caveat',cursive;font-size:20px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="flow-crumb"></div>
+    <!-- Real Square pull button, on the actual home page per direct request —
+         the already-built triggerKilnCafeBackfill() (365-day real backfill)
+         lived only inside the Dashboard tab and was too buried to find.
+         Same function, same real endpoint — just a second, reachable trigger. -->
+    <button class="glaze-tile kiln-cafe-backfill-btn-home" onclick="triggerKilnCafeBackfill()"
+      title="Pull all real Square history" style="border:none;border-radius:9px;width:34px;height:34px;font-size:15px;background:rgba(46,125,50,0.15);cursor:pointer;flex-shrink:0;">📥</button>
     <!-- Persistent header — kept on every flow page, quick one-tap
          actions for a busy studio. Find My Piece and Cleo are the real
          functions; day-stats shows the real live figure or nothing at
@@ -21045,10 +21051,14 @@ async function populateDashboard() {
 // the real daily cron only keeps things current going forward from
 // whenever it starts, not retroactively.
 async function triggerKilnCafeBackfill() {
-  const btn = document.getElementById('kiln-cafe-backfill-btn');
-  const originalText = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = 'Pulling real Square data…';
+  // Two real trigger points now share this: the original one inside the
+  // Dashboard tab, and the one on the actual home page (added because the
+  // Dashboard one was too buried to find). Both must move in lockstep, so
+  // this updates every matching button rather than a single hardcoded id.
+  const btns = Array.from(document.querySelectorAll('#kiln-cafe-backfill-btn, .kiln-cafe-backfill-btn-home'));
+  if (!btns.length) return;
+  const originalTexts = btns.map(b => b.textContent);
+  btns.forEach(b => { b.disabled = true; b.textContent = 'Pulling real Square data…'; });
   try {
     const res = await fetch(`${API_URL}/api/square/backfill`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -21060,8 +21070,7 @@ async function triggerKilnCafeBackfill() {
     // connected") or 500 would silently be treated exactly like
     // success, with no honest way to ever know it had failed.
     if (!res.ok) {
-      btn.disabled = false;
-      btn.textContent = originalText;
+      btns.forEach((b, i) => { b.disabled = false; b.textContent = originalTexts[i]; });
       alert((data.error || 'Could not start the backfill — the server rejected the request.') + (data.realStackTop ? '\n\n' + data.realStackTop : ''));
       return;
     }
@@ -21071,13 +21080,10 @@ async function triggerKilnCafeBackfill() {
     // — not instant, but genuinely reflects real data once it lands.
     setTimeout(() => {
       refreshKilnCafeRevenueData();
-      btn.disabled = false;
-      btn.textContent = '✓ Done — figures updated';
-      setTimeout(() => { btn.textContent = originalText; }, 3000);
+      btns.forEach((b, i) => { b.disabled = false; b.textContent = '✓ Done — figures updated'; setTimeout(() => { b.textContent = originalTexts[i]; }, 3000); });
     }, 4000);
   } catch (e) {
-    btn.disabled = false;
-    btn.textContent = originalText;
+    btns.forEach((b, i) => { b.disabled = false; b.textContent = originalTexts[i]; });
     alert('Could not reach the server — try again.');
   }
 }
