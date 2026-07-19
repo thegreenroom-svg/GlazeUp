@@ -8887,6 +8887,14 @@ const instantCache = {
 };
 
 
+function openTakings() {
+  document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+  const dashboardView = document.getElementById('dashboard-view');
+  if (dashboardView) dashboardView.style.display = 'block';
+  showDashboardSection('takings');
+}
+
+
 function openPacking() {
   const view = document.getElementById('floor-plan-view');
   if (!view) return;
@@ -17972,7 +17980,7 @@ function _buildHomeTree() {
     children: [
       { id:'floor-plan', label:'Floor Plan', emoji:'🪑', desc:'Live view of all tables', fn:'showFloorPlan', size:'big' },
       { id:'staff', label:'Bookings', emoji:'📋', desc:'Start a booking, walk-in or party', fn:null, size:'big' },
-      { id:'dashboard', label:'Takings', emoji:'💷', desc:'Today, this month & this year — your live numbers', fn:null, size:'big' },
+      { id:'dashboard', label:'Takings', emoji:'💷', desc:'Today, this month & this year — your live numbers', fn:'openTakings', size:'big' },
       { id:'the-journey', label:'The Journey', emoji:'🔄', desc:'Booking → Painting → Completion → Kiln', size:'big', children:[
         { id:'j-b-open', label:'1 · Booking',    emoji:'🪑', desc:'Set up · greet · drinks · pieces', fn:'openStageBooking',    size:'big' },
         { id:'j-e-open', label:'2 · Painting',   emoji:'🎨', desc:'Paints · check-in · drinks',       fn:'openStageEngagement', size:'big' },
