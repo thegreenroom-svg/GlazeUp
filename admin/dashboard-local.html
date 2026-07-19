@@ -16550,6 +16550,8 @@ function demoteSubTile(tabId) {
 })();
 
 const GRID_NAV_STRUCTURE = [
+  { tab: 'learning-insights', label: 'Insights', desc: 'Studio workflow analytics' },
+  
   { tab: 'start-demo', label: 'Start Demo', desc: 'Studio simulation trainer' },
   
   { tab: 'navigation-help', label: 'Navigation Help', desc: 'How to use the app' },
@@ -17505,6 +17507,34 @@ function _flowGraphEnter() { _flowStack = []; // Clear any stale nav
 }
 
 
+
+
+function showLearningInsights() {
+  const insights = generateLearningInsights();
+  if (!insights) {
+    toast('Run more demos to generate insights', 'info');
+    return;
+  }
+  
+  const suggestionTiles = insights.suggestions.map(s => `
+    <div class="glaze-tile" style="background:#F9A825;color:#2B2724;border-radius:14px;padding:14px;margin-bottom:8px;">
+      <div style="font-size:12px;font-weight:700;">💡 ${s}</div>
+    </div>
+  `).join('');
+  
+  glazedModal({
+    title: 'Studio Insights',
+    bodyHTML: `
+      <div style="margin-bottom:16px;padding:12px;background:#E8F5E9;border-radius:10px;border-left:4px solid #2E7D32;">
+        <div style="font-size:12px;color:#1B5E20;"><strong>Runs Completed:</strong> ${insights.runsCompleted}</div>
+        <div style="font-size:12px;color:#1B5E20;margin-top:4px;"><strong>Avg Duration:</strong> ${Math.round(insights.avgDuration/1000)}s</div>
+      </div>
+      <div style="font-size:13px;font-weight:700;color:#2B2724;margin-bottom:8px;">Suggestions</div>
+      ${suggestionTiles}
+    `,
+    closeLabel: 'Got it'
+  });
+}
 
 function openColorPicker() {
   const glaze_colors = {
