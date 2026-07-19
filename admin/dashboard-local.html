@@ -8622,7 +8622,7 @@ function showDashboardProgress() {
 // WORKFLOW PROGRESS TRACKER
 // Shows piece progression through workflow stages
 // ═══════════════════════════════════════════════════════════════════
-const WORKFLOW_STAGES = ['not_started', 'painting', 'painted', 'dipped', 'glazed', 'fired', 'ready_to_collect'];
+
 
 function getWorkflowProgress(piece) {
   if (!piece || !piece.stage) return 0;
@@ -8667,66 +8667,9 @@ function showDashboardProgress() {
 }
 
 
-function openFaceByFace() {
-  const bodyHTML = `
-    <div style="padding:16px;">
-      <div style="font-size:13px;color:#2B2724;margin-bottom:16px;font-weight:700;">Create & Schedule Posts</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
-        <div class="glaze-tile" onclick="createFBFPost('tile');" style="background:#B87946;color:white;border-radius:14px;padding:14px;text-align:center;cursor:pointer;">
-          <div style="font-size:16px;margin-bottom:6px;">🎨</div>
-          <div style="font-size:12px;font-weight:700;">Tile Post</div>
-        </div>
-        <div class="glaze-tile" onclick="createFBFPost('piece');" style="background:#8D6E63;color:white;border-radius:14px;padding:14px;text-align:center;cursor:pointer;">
-          <div style="font-size:16px;margin-bottom:6px;">🏺</div>
-          <div style="font-size:12px;font-weight:700;">Piece Post</div>
-        </div>
-        <div class="glaze-tile" onclick="createFBFPost('print');" style="background:#5E35B1;color:white;border-radius:14px;padding:14px;text-align:center;cursor:pointer;">
-          <div style="font-size:16px;margin-bottom:6px;">📄</div>
-          <div style="font-size:12px;font-weight:700;">Print Post</div>
-        </div>
-        <div class="glaze-tile" onclick="createFBFPost('event');" style="background:#1E88E5;color:white;border-radius:14px;padding:14px;text-align:center;cursor:pointer;">
-          <div style="font-size:16px;margin-bottom:6px;">🎉</div>
-          <div style="font-size:12px;font-weight:700;">Event Post</div>
-        </div>
-      </div>
-      <div style="font-size:12px;color:#999;">Host By Post integration • Post to social • Schedule for later</div>
-    </div>
-  `;
-  
-  glazedModal({
-    title: '📱 Face by Face',
-    bodyHTML: bodyHTML,
-    closeLabel: 'Done'
-  });
-}
 
-function createFBFPost(type) {
-  const types = {
-    'tile': 'Post a new tile design',
-    'piece': 'Showcase a finished piece',
-    'print': 'Share print designs',
-    'event': 'Announce a studio event'
-  };
-  
-  toast('Creating ' + types[type] + '...', 'info');
-  
-  glazedModal({
-    title: 'New ' + type.charAt(0).toUpperCase() + type.slice(1) + ' Post',
-    bodyHTML: `
-      <div style="padding:16px;">
-        <textarea id="fbf-caption" placeholder="Caption..." style="width:100%;height:80px;padding:8px;border:1px solid #ddd;border-radius:8px;font-family:inherit;margin-bottom:12px;"></textarea>
-        <input type="text" id="fbf-hashtags" placeholder="#hashtags #glazedup" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;margin-bottom:12px;">
-        <div style="font-size:11px;color:#999;">Photo: Ready to upload on Host By Post</div>
-      </div>
-    `,
-    actions: [
-      { label: 'Schedule Post', primary: true, onClick: (modal) => {
-        toast('✓ Post scheduled', 'ok');
-        modal.closeModal();
-      }}
-    ]
-  });
-}
+
+
 
 
 
@@ -17032,7 +16975,7 @@ function demoteSubTile(tabId) {
 })();
 
 const GRID_NAV_STRUCTURE = [
-  { tab: 'face-by-face', label: 'Face by Face', desc: 'Social posts & content' },
+  
   
   { tab: 'learning-insights', label: 'Insights', desc: 'Studio workflow analytics' },
   
@@ -17062,6 +17005,8 @@ const GRID_NAV_STRUCTURE = [
   ]},
   { id: 'dashboard', label: 'Dashboard', color: '#B87946', items: [
     { tab: 'dashboard', label: 'Overview', desc: 'Your daily overview' },
+  { tab: 'host-by-post', label: 'Host By Post', desc: 'Postal kits & orders', icon: '📦' },
+  
   ]},
   { id: 'bookings', label: 'Bookings', color: '#2e7d32', items: [
     { tab: 'staff', label: 'Daily Bookings', desc: 'Start a booking, walk-in, or party' },
@@ -28824,42 +28769,254 @@ function _postResting() { return !(_liveOrders && _liveOrders.length); }
 // board a moment later — the exact shape of the showHomeScreen() bug from
 // 14 July, where an abandoned system silently overwrote the real one on a
 // timer. Show the container directly instead, and let the board own it.
+
+
+// ═══════════════════════════════════════════════════════════════════
+// HOST BY POST — Product Catalog & Orders
+// ═══════════════════════════════════════════════════════════════════
+const HBP_PRODUCTS = {
+  current: [
+    {
+      id: 'mug-kit-1',
+      name: 'Paint Your Own Mug Kit',
+      description: 'Single ceramic mug, paint palette, brushes, everything included',
+      price: 24.99,
+      currency: 'GBP',
+      image: '📦',
+      stock: 45,
+      returnPostage: 'included',
+      firingTime: '4-5 weeks'
+    }
+  ],
+  coming: [
+    { id: 'mug-kit-2', name: '2 Mug Kit', price: 39.99, image: '📦📦' },
+    { id: 'mug-kit-4', name: '4 Mug Kit', price: 74.99, image: '📦📦📦📦' },
+    { id: 'mug-kit-8', name: '8 Mug Kit', price: 129.99, image: '📦📦📦📦📦📦📦📦' },
+    { id: 'vase-kit', name: 'Paint Your Own Vase', price: 34.99, image: '🏺' },
+    { id: 'combo-vase-mug', name: 'Vase + Mug Combo', price: 49.99, image: '🏺📦' }
+  ]
+};
+
+
+
+// ═══════════════════════════════════════════════════════════════════
+// HOST BY POST — Real Pottery-by-Post Workflow
+// Order → Paint at home → Post back → Kiln fire → Delivered
+// ═══════════════════════════════════════════════════════════════════
+const HBP = {
+  products: {
+    trial: {
+      'mug-kit-2': {
+        name: 'Paint Your Own Mug Kit (2-Mug Trial)',
+        description: 'Two ceramic mugs, complete paint palette, brushes, everything needed',
+        price: 34.99,
+        currency: 'GBP',
+        stock: 25,
+        kiln_time: '4-5 weeks',
+        includes: ['2 ceramic mugs', 'water-based paints', 'brushes', 'palette', 'return postage (included)', 'professional kiln firing', 'food-safe + dishwasher friendly']
+      }
+    },
+    coming: {
+      'mug-kit-4': { name: '4 Mug Kit', price: 59.99 },
+      'mug-kit-8': { name: '8 Mug Kit', price: 109.99 },
+      'vase-kit': { name: 'Paint Your Own Vase', price: 44.99 },
+      'combo-vase-mug': { name: 'Vase + 2 Mug Combo', price: 64.99 }
+    }
+  },
+  
+  workflow_stages: [
+    { id: 'ordered', name: 'Order Placed', icon: '📦', desc: 'Kit coming your way' },
+    { id: 'shipped', name: 'Shipped', icon: '📮', desc: 'On its way to you' },
+    { id: 'painting', name: 'Ready to Paint', icon: '🎨', desc: 'Create your masterpiece' },
+    { id: 'awaiting_return', name: 'Awaiting Return', icon: '✉️', desc: 'Ready to post back' },
+    { id: 'in_kiln', name: 'Kiln Firing', icon: '🔥', desc: 'Professional firing in progress' },
+    { id: 'glazed', name: 'Glazed & Fired', icon: '✨', desc: 'Your piece is done' },
+    { id: 'shipped_back', name: 'On Its Way Back', icon: '📬', desc: 'Your finished mug' },
+    { id: 'delivered', name: 'Delivered', icon: '🏡', desc: 'Enjoy your creation!' }
+  ]
+};
+
 function openHostByPost() {
-  document.querySelectorAll('.view').forEach(v => { v.style.display = 'none'; v.classList.remove('fade-in'); });
-  const view = document.getElementById('floor-plan-view');
-  if (!view) return;
-  view.style.display = 'flex';
-  currentTab = 'hostbypost';
-  showPostBoard();
-  toggleFloatingBackBtn();
+  let html = '<div style="padding:16px;">';
+  html += '<div style="font-size:13px;color:#2B2724;margin-bottom:16px;font-weight:700;">Paint Your Own Pottery</div>';
+  
+  // Trial product
+  const trial = HBP.products.trial['mug-kit-2'];
+  html += '<div style="background:#F4ECE0;border-radius:14px;padding:16px;margin-bottom:12px;border-left:4px solid #B87946;">';
+  html += '<div style="font-size:14px;font-weight:700;color:#2B2724;margin-bottom:8px;">📦 ' + trial.name + '</div>';
+  html += '<div style="font-size:12px;color:#666;margin-bottom:10px;">' + trial.description + '</div>';
+  html += '<div style="font-size:16px;font-weight:700;color:#B87946;margin-bottom:12px;">£' + trial.price.toFixed(2) + '</div>';
+  html += '<div style="font-size:11px;color:#999;margin-bottom:12px;">';
+  trial.includes.forEach(item => { html += '✓ ' + item + '<br>'; });
+  html += '</div>';
+  html += '<button onclick="orderHBPKit('mug-kit-2');" style="background:#B87946;color:white;border:none;border-radius:8px;padding:10px 16px;font-size:12px;font-weight:700;cursor:pointer;width:100%;">Order Now</button>';
+  html += '</div>';
+  
+  // Coming soon
+  html += '<div style="margin-top:16px;padding-top:16px;border-top:1px solid #ddd;">';
+  html += '<div style="font-size:11px;color:#999;font-weight:700;margin-bottom:10px;">COMING SOON (after packaging trial)</div>';
+  Object.values(HBP.products.coming).forEach(product => {
+    html += '<div style="font-size:11px;color:#999;margin-bottom:6px;">📅 ' + product.name + ' (£' + product.price.toFixed(2) + ')</div>';
+  });
+  html += '</div>';
+  
+  html += '</div>';
+  
+  glazedModal({
+    title: '🎨 Host By Post — Paint @ Home',
+    bodyHTML: html,
+    closeLabel: 'Back'
+  });
 }
 
-function showPostBoard() {
-  // ═══════════════════════════════════════════════════════════
-  // HOST BY POST — TILES. 17 July 2026.
-  // ═══════════════════════════════════════════════════════════
-  // Daisy: "I want the tile system we have everywhere. I don't
-  // wanna see the orders until there's a button saying new order."
-  // Was a kanban list — every order visible at once. Now: stage
-  // tiles with counts, tap to drill in. Same grammar as everywhere.
-  _floorViewMode = 'post';
-  const view = document.getElementById('floor-plan-view');
-  if (!view) return;
-  const orders = _ordersNow();
+function orderHBPKit(productId) {
+  const product = HBP.products.trial[productId] || HBP.products.coming[productId];
+  if (!product) return;
+  
+  let timeline = '<div style="font-size:12px;color:#2B2724;line-height:1.8;">';
+  timeline += '<div style="margin-bottom:12px;"><strong>How it works:</strong></div>';
+  timeline += '<div style="background:#fff;border-radius:8px;padding:12px;margin-bottom:12px;">';
+  HBP.workflow_stages.forEach((stage, idx) => {
+    timeline += '<div style="display:flex;align-items:center;margin-bottom:8px;">';
+    timeline += '<div style="font-size:16px;margin-right:8px;">' + stage.icon + '</div>';
+    timeline += '<div><div style="font-weight:700;font-size:11px;">' + stage.name + '</div><div style="font-size:10px;color:#999;">' + stage.desc + '</div></div>';
+    if (idx < HBP.workflow_stages.length - 1) timeline += '<div style="margin-left:auto;font-size:11px;color:#ddd;">→</div>';
+    timeline += '</div>';
+  });
+  timeline += '</div>';
+  timeline += '<div style="font-size:11px;color:#666;padding:10px;background:#F9F9F9;border-radius:8px;"><strong>Timeline:</strong> 1-2 weeks to arrive + paint time + return postage + ' + product.kiln_time + ' kiln firing = finished mug!</div>';
+  timeline += '</div>';
+  
+  glazedModal({
+    title: 'Order ' + product.name,
+    bodyHTML: timeline,
+    actions: [
+      { label: 'Add to Cart', primary: true, onClick: (modal) => {
+        createHBPOrder(productId, product);
+        modal.closeModal();
+      }},
+      { label: 'Tell Me More', onClick: () => {
+        cleoSay('This kit has everything you need to paint a beautiful ceramic mug at home. Paint it however you like, mail it back, and we\'ll professionally fire it in our kiln. In 4 to 5 weeks, your finished, dishwasher-safe mug arrives at your door!');
+      }}
+    ]
+  });
+}
 
-  const stageTiles = POST_STAGES.map(st => {
-    const count = orders.filter(o => o.status === st.id).length;
-    const dim = count === 0;
-    return `<button onclick="showPostStage('${st.id}')" class="glaze-tile"
-      style="border:none;border-radius:16px;padding:18px 14px;cursor:pointer;
-      background:${dim ? 'rgba(43,39,36,0.06)' : st.colour};
-      color:${dim ? '#8a8175' : '#fff'};text-align:left;min-height:88px;
-      display:flex;flex-direction:column;justify-content:space-between;">
-      <div style="font-size:26px;font-weight:900;line-height:1;">${count}</div>
-      <div style="font-family:'Caveat',cursive;font-size:18px;font-weight:700;">${st.label}</div>
-      ${st.real ? '' : '<div style="font-size:9px;opacity:0.7;">not tracked yet</div>'}
-    </button>`;
-  }).join('');
+function createHBPOrder(productId, product) {
+  const order = {
+    id: 'HBP-' + Date.now(),
+    productId: productId,
+    productName: product.name,
+    price: product.price,
+    status: 'ordered',
+    currentStage: 0,
+    timeline: HBP.workflow_stages,
+    createdAt: new Date().toISOString(),
+    estimatedDelivery: new Date(Date.now() + 9 * 7 * 24 * 60 * 60 * 1000).toDateString() // ~9 weeks
+  };
+  
+  // Track in learning data
+  if (!CLEO.learningData.hbpOrders) CLEO.learningData.hbpOrders = [];
+  CLEO.learningData.hbpOrders.push(order);
+  
+  // Store order locally
+  localStorage.setItem('hbp_last_order', JSON.stringify(order));
+  
+  toast('✓ ' + product.name + ' added to cart (£' + product.price.toFixed(2) + ')', 'ok');
+}
+
+function trackHBPOrder(orderId) {
+  const order = JSON.parse(localStorage.getItem('hbp_last_order') || '{}');
+  if (!order.id) {
+    toast('No active orders', 'info');
+    return;
+  }
+  
+  let html = '<div style="padding:16px;"><div style="font-size:12px;margin-bottom:16px;color:#2B2724;">';
+  html += '<div style="font-weight:700;margin-bottom:12px;">Order: ' + order.id + '</div>';
+  html += '<div style="margin-bottom:12px;"><strong>' + order.productName + '</strong></div>';
+  
+  // Timeline progress
+  html += '<div style="margin-bottom:12px;">';
+  order.timeline.forEach((stage, idx) => {
+    const isCompleted = idx < order.currentStage;
+    const isCurrent = idx === order.currentStage;
+    html += '<div style="display:flex;align-items:center;margin-bottom:8px;opacity:' + (isCompleted || isCurrent ? '1' : '0.4') + ';">';
+    html += '<div style="font-size:16px;margin-right:8px;">' + stage.icon + '</div>';
+    html += '<div style="flex:1;">';
+    html += '<div style="font-weight:' + (isCurrent ? '700' : '400') + ';font-size:11px;">' + stage.name + '</div>';
+    html += '<div style="font-size:9px;color:#999;">' + stage.desc + '</div>';
+    html += '</div>';
+    if (isCompleted) html += '<div style="color:#2E7D32;font-size:12px;font-weight:700;">✓</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  
+  html += '<div style="padding:10px;background:#F9F9F9;border-radius:8px;font-size:10px;color:#666;">';
+  html += '<strong>Estimated delivery:</strong> ' + order.estimatedDelivery;
+  html += '</div></div>';
+  
+  glazedModal({
+    title: '📦 Order Tracking',
+    bodyHTML: html,
+    closeLabel: 'Close'
+  });
+}
+;
+  
+  productHTML += '<div style="margin-top:20px;padding-top:20px;border-top:1px solid #ddd;">';
+  productHTML += '<div style="font-size:11px;color:#999;margin-bottom:12px;">Coming Soon...</div>';
+  HBP_PRODUCTS.coming.forEach(product => {
+    productHTML += '<div style="font-size:11px;color:#999;margin-bottom:6px;">📅 ' + product.name + ' (£' + product.price.toFixed(2) + ')</div>';
+  });
+  productHTML += '</div></div>';
+  
+  glazedModal({
+    title: '📦 Host By Post — Postal Kits',
+    bodyHTML: productHTML,
+    closeLabel: 'Back'
+  });
+}
+
+function addHBPToCart(productId) {
+  const product = HBP_PRODUCTS.current.find(p => p.id === productId);
+  if (!product) return;
+  
+  glazedModal({
+    title: 'Order ' + product.name,
+    bodyHTML: '<div style="padding:16px;"><div style="font-size:12px;color:#2B2724;line-height:1.8;"><div style="margin-bottom:12px;"><strong>Product:</strong> ' + product.name + '</div><div style="margin-bottom:12px;"><strong>Price:</strong> £' + product.price.toFixed(2) + '</div><div style="margin-bottom:12px;"><strong>Includes:</strong> Ceramic piece, paint palette, brushes, return postage, professional kiln firing</div><div style="margin-bottom:12px;"><strong>Timeline:</strong> Paint at home → Post back → 4-5 weeks kiln firing → Delivered</div><div style="color:#666;font-size:11px;">Your finished piece will be food-safe, dishwasher-friendly, and one-of-a-kind.</div></div>',
+    actions: [
+      { label: 'Add to Cart', primary: true, onClick: (modal) => {
+        trackHBPOrder(productId);
+        modal.closeModal();
+      }},
+      { label: 'Learn More', onClick: (modal) => {
+        cleoSay('This kit includes everything you need to paint a ceramic mug at home. Just add water and creativity!');
+      }}
+    ]
+  });
+}
+
+function trackHBPOrder(productId) {
+  const product = HBP_PRODUCTS.current.find(p => p.id === productId);
+  const order = {
+    id: 'HBP-' + Date.now(),
+    productId: productId,
+    productName: product.name,
+    price: product.price,
+    timestamp: new Date().toISOString(),
+    status: 'cart'
+  };
+  
+  // Track in learning data
+  if (!CLEO.learningData.hbpOrders) {
+    CLEO.learningData.hbpOrders = [];
+  }
+  CLEO.learningData.hbpOrders.push(order);
+  
+  toast('✓ ' + product.name + ' added to cart (£' + product.price.toFixed(2) + ')', 'ok');
+}
+.join('');
 
   view.innerHTML = `
     <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
@@ -29651,8 +29808,6 @@ function showIdleAsk() {
 function resetReturnToFloorTimer() {
   clearTimeout(_askIdleTimer);
   // An interaction while the card is up answers it implicitly — they are
-  // clearly still here. Never nag twice without a real interaction
-  // between: a nag gets dismissed reflexively, which is worse than silence.
   if (document.getElementById('idle-ask-card') && Date.now() - _askShownAt > 400) _dismissIdleAsk(true);
   _askIdleTimer = setTimeout(showIdleAsk, ASK_IDLE_MS);
 }
