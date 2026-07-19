@@ -13349,15 +13349,13 @@ function loadLoginNamePicker() {
   const ROLE_COLORS = { 'General Manager':'#B87946', 'Studio Executive':'#5E9DB6', 'Marketing & Host By Post':'#A88B5C', 'Studio Assistant':'#7BA89F', 'Barista':'#D9744E', 'Co-Director':'#B87946' };
   
   const staff = [
-    { id: 'daisy', name: 'Daisy', role: 'General Manager' },
-    { id: 'jenny', name: 'Jenny', role: 'Studio Executive' },
-    { id: 'elliott', name: 'Elliott', role: 'Marketing & Host By Post' },
-    { id: 'david', name: 'David', role: 'General Manager' },
-    { id: 'ruby', name: 'Ruby', role: 'Studio Assistant' },
-    { id: 'lucy', name: 'Lucy', role: 'Studio Assistant' }
+    { id: '0799419e-243e-4337-9a4f-e480219fecdd', name: 'Daisy', role: 'General Manager' },
+    { id: '643f7882-743d-497b-8fce-fa207fb57f98', name: 'Jenny', role: 'Studio Executive' },
+    { id: '343e4523-7360-4274-bff7-5f542b942d6d', name: 'Elliott', role: 'Marketing & Host By Post' },
+    { id: 'ef2a2071-80e1-4fa6-a262-ad370c926e32', name: 'David', role: 'Co-Director' },
+    { id: 'd2463711-1176-4c27-ad58-ed35ffbb158c', name: 'Ruby', role: 'Studio Assistant' },
+    { id: 'bb1e9973-b833-4ba5-93fd-818cb480b1a2', name: 'Lucy', role: 'Ceramic Technician' }
   ];
-  
-  let html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:16px;max-width:360px;margin:0 auto;">';
   staff.forEach((person, idx) => {
     const color = ROLE_COLORS[person.role] || '#B87946';
     const initials = person.name.split(' ').map(n => n.charAt(0).toUpperCase()).join('');
@@ -13378,12 +13376,12 @@ function loadLoginNamePicker() {
 
 function selectDemoStaff(idx) {
   const staff = [
-    { id: 'daisy', name: 'Daisy', role: 'General Manager' },
-    { id: 'jenny', name: 'Jenny', role: 'Studio Executive' },
-    { id: 'elliott', name: 'Elliott', role: 'Marketing & Host By Post' },
-    { id: 'david', name: 'David', role: 'General Manager' },
-    { id: 'ruby', name: 'Ruby', role: 'Studio Assistant' },
-    { id: 'lucy', name: 'Lucy', role: 'Studio Assistant' }
+    { id: '0799419e-243e-4337-9a4f-e480219fecdd', name: 'Daisy', role: 'General Manager' },
+    { id: '643f7882-743d-497b-8fce-fa207fb57f98', name: 'Jenny', role: 'Studio Executive' },
+    { id: '343e4523-7360-4274-bff7-5f542b942d6d', name: 'Elliott', role: 'Marketing & Host By Post' },
+    { id: 'ef2a2071-80e1-4fa6-a262-ad370c926e32', name: 'David', role: 'Co-Director' },
+    { id: 'd2463711-1176-4c27-ad58-ed35ffbb158c', name: 'Ruby', role: 'Studio Assistant' },
+    { id: 'bb1e9973-b833-4ba5-93fd-818cb480b1a2', name: 'Lucy', role: 'Ceramic Technician' }
   ];
   const person = staff[parseInt(idx)];
   if (!person) return;
