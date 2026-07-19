@@ -2791,10 +2791,9 @@
         <button data-staff="0" onclick="selectDemoStaff(this.dataset.staff)" style="background:#B87946;color:white;border:none;border-radius:12px;padding:16px;font-size:13px;font-weight:700;cursor:pointer;text-align:center;"><div>Daisy</div><div style="font-size:10px;color:rgba(255,255,255,0.7);margin-top:4px;">General Manager</div></button>
     <button data-staff="1" onclick="selectDemoStaff(this.dataset.staff)" style="background:#B87946;color:white;border:none;border-radius:12px;padding:16px;font-size:13px;font-weight:700;cursor:pointer;text-align:center;"><div>Jenny</div><div style="font-size:10px;color:rgba(255,255,255,0.7);margin-top:4px;">Studio Executive</div></button>
     <button data-staff="2" onclick="selectDemoStaff(this.dataset.staff)" style="background:#B87946;color:white;border:none;border-radius:12px;padding:16px;font-size:13px;font-weight:700;cursor:pointer;text-align:center;"><div>Elliott</div><div style="font-size:10px;color:rgba(255,255,255,0.7);margin-top:4px;">Marketing & Host By Post</div></button>
-    <button data-staff="3" onclick="selectDemoStaff(this.dataset.staff)" style="background:#B87946;color:white;border:none;border-radius:12px;padding:16px;font-size:13px;font-weight:700;cursor:pointer;text-align:center;"><div>David</div><div style="font-size:10px;color:rgba(255,255,255,0.7);margin-top:4px;">General Manager</div></button>
-    <button data-staff="4" onclick="selectDemoStaff(this.dataset.staff)" style="background:#B87946;color:white;border:none;border-radius:12px;padding:16px;font-size:13px;font-weight:700;cursor:pointer;text-align:center;"><div>Dave</div><div style="font-size:10px;color:rgba(255,255,255,0.7);margin-top:4px;">Barista</div></button>
-    <button data-staff="5" onclick="selectDemoStaff(this.dataset.staff)" style="background:#B87946;color:white;border:none;border-radius:12px;padding:16px;font-size:13px;font-weight:700;cursor:pointer;text-align:center;"><div>Ruby</div><div style="font-size:10px;color:rgba(255,255,255,0.7);margin-top:4px;">Studio Assistant</div></button>
-    <button data-staff="6" onclick="selectDemoStaff(this.dataset.staff)" style="background:#B87946;color:white;border:none;border-radius:12px;padding:16px;font-size:13px;font-weight:700;cursor:pointer;text-align:center;"><div>Lucy</div><div style="font-size:10px;color:rgba(255,255,255,0.7);margin-top:4px;">Studio Assistant</div></button>
+    <button data-staff="3" onclick="selectDemoStaff(this.dataset.staff)" style="background:#B87946;color:white;border:none;border-radius:12px;padding:16px;font-size:13px;font-weight:700;cursor:pointer;text-align:center;"><div>David</div><div style="font-size:10px;color:rgba(255,255,255,0.7);margin-top:4px;">General Manager - Barista - Maintenance</div></button>
+    <button data-staff="4" onclick="selectDemoStaff(this.dataset.staff)" style="background:#B87946;color:white;border:none;border-radius:12px;padding:16px;font-size:13px;font-weight:700;cursor:pointer;text-align:center;"><div>Ruby</div><div style="font-size:10px;color:rgba(255,255,255,0.7);margin-top:4px;">Studio Assistant</div></button>
+    <button data-staff="5" onclick="selectDemoStaff(this.dataset.staff)" style="background:#B87946;color:white;border:none;border-radius:12px;padding:16px;font-size:13px;font-weight:700;cursor:pointer;text-align:center;"><div>Lucy</div><div style="font-size:10px;color:rgba(255,255,255,0.7);margin-top:4px;">Studio Assistant</div></button>
       </div>
     </div>
 
@@ -13287,13 +13286,24 @@ function loadLoginNamePicker() {
   window._DEMO_STAFF = staff;
 }
 
+
 function selectDemoStaff(idx) {
-  const person = window._DEMO_STAFF[parseInt(idx)];
+  const staff = [
+    { id: 'daisy', name: 'Daisy', role: 'General Manager' },
+    { id: 'jenny', name: 'Jenny', role: 'Studio Executive' },
+    { id: 'elliott', name: 'Elliott', role: 'Marketing & Host By Post' },
+    { id: 'david', name: 'David', role: 'General Manager - Barista - Maintenance' },
+    { id: 'ruby', name: 'Ruby', role: 'Studio Assistant' },
+    { id: 'lucy', name: 'Lucy', role: 'Studio Assistant' }
+  ];
+  const person = staff[parseInt(idx)];
   if (!person) return;
   currentShiftStaff = { id: person.id, name: person.name, role: person.role, hasPinSet: true };
   localStorage.setItem('shift-staff', JSON.stringify(currentShiftStaff));
   _flowGraphEnter();
 }
+
+
 
 
 
