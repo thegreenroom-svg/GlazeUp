@@ -3430,26 +3430,26 @@ function updateStaffName() {
     background:rgba(244,236,224,0.95);backdrop-filter:blur(10px);
     border-bottom:1px solid rgba(43,39,36,0.14);">
     <div style="font-family:'Caveat',cursive;font-size:20px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="flow-crumb"></div>
-    <!-- Real Square pull button, on the actual home page per direct request —
-         the already-built triggerKilnCafeBackfill() (365-day real backfill)
-         lived only inside the Dashboard tab and was too buried to find.
-         Same function, same real endpoint — just a second, reachable trigger. -->
-    <button class="glaze-tile kiln-cafe-backfill-btn-home" onclick="triggerKilnCafeBackfill()"
-      title="Pull all real Square history" style="border:none;border-radius:9px;width:34px;height:34px;font-size:15px;background:rgba(46,125,50,0.15);cursor:pointer;flex-shrink:0;">📥</button>
-    <!-- Persistent header — kept on every flow page, quick one-tap
-         actions for a busy studio. Find My Piece and Cleo are the real
-         functions; day-stats shows the real live figure or nothing at
-         all (never a fake number — an honest blank beats a wrong count
-         in a room where people act on it). -->
-    <span id="flow-daystat" style="font-size:11px;color:#8a8175;white-space:nowrap;"></span>
 
+    <!-- ═══ QUICK TOOLS — the persistent one-tap actions for a busy
+         studio, restored to the flow home header per direct request.
+         Every function here is the real, already-built one — Tell,
+         Find My Piece, Glaze Colours, View Customer App. ═══ -->
+    <button class="glaze-tile" onclick="openTellPicker()" title="Tell / report something"
+      style="border:none;border-radius:50%;width:34px;height:34px;font-size:15px;background:rgba(229,57,53,0.14);cursor:pointer;flex-shrink:0;">💬</button>
+    <button class="glaze-tile" onclick="openFindMyPiece()" title="Find a piece"
+      style="border:none;border-radius:50%;width:34px;height:34px;font-size:15px;background:rgba(94,53,177,0.14);cursor:pointer;flex-shrink:0;">🔍</button>
+    <button class="glaze-tile" onclick="openColorPicker()" title="Glaze colours"
+      style="border:none;border-radius:50%;width:34px;height:34px;font-size:15px;background:rgba(184,121,70,0.14);cursor:pointer;flex-shrink:0;">🎨</button>
+    <button class="glaze-tile" onclick="openAppSwitcher()" title="View customer app"
+      style="border:none;border-radius:50%;width:34px;height:34px;font-size:15px;background:rgba(94,53,177,0.14);cursor:pointer;flex-shrink:0;">👥</button>
 
     <!-- Grid button removed 18 Jul, Daisy: "get rid of grid". Tiles-only
          law, no dead end back to the old system. Verified first: every
          real screen already sits in someone's tree. _flowGraphExit and
          showGridNav left in place, orphaned — nothing left calls them. -->
     <button onclick="document.getElementById('daisy-flow-view').style.display='none';openCustomiseHome();" class="glaze-tile" style="border:none;border-radius:10px;
-      padding:8px 10px;font-size:11px;font-weight:700;background:rgba(184,121,70,0.12);cursor:pointer;white-space:nowrap;">
+      padding:8px 10px;font-size:11px;font-weight:700;background:rgba(184,121,70,0.12);cursor:pointer;white-space:nowrap;flex-shrink:0;">
       ✏️ Customise</button>
   </div>
   <div style="max-width:640px;margin:0 auto;padding:12px 14px 0;"><div id="flow-nudge-slot"></div></div>
