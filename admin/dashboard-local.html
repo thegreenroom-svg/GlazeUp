@@ -3425,24 +3425,28 @@ function updateStaffName() {
        so taps were always reaching the real buttons underneath even
        when covered — but "still tappable" isn't the same as "visible",
        and Daisy was reporting what she could SEE. -->
-  <div style="position:sticky;top:0;z-index:960;display:flex;align-items:center;gap:10px;
-    padding:max(12px, calc(env(safe-area-inset-top, 0px) + 10px)) 14px 12px 14px;
+  <div style="position:sticky;top:0;z-index:960;display:flex;align-items:center;gap:6px;
+    padding:max(12px, calc(env(safe-area-inset-top, 0px) + 10px)) 12px 12px 12px;
     background:rgba(244,236,224,0.95);backdrop-filter:blur(10px);
     border-bottom:1px solid rgba(43,39,36,0.14);">
-    <div style="font-family:'Caveat',cursive;font-size:20px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="flow-crumb"></div>
+    <div style="font-family:'Caveat',cursive;font-size:19px;font-weight:700;flex:1;min-width:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="flow-crumb"></div>
 
     <!-- ═══ QUICK TOOLS — the persistent one-tap actions for a busy
          studio, restored to the flow home header per direct request.
          Every function here is the real, already-built one — Tell,
          Find My Piece, Glaze Colours, View Customer App. ═══ -->
     <button class="glaze-tile" onclick="openTellPicker()" title="Tell / report something"
-      style="border:none;border-radius:50%;width:34px;height:34px;font-size:15px;background:rgba(229,57,53,0.14);cursor:pointer;flex-shrink:0;">💬</button>
+      style="border:none;border-radius:50%;width:30px;height:30px;font-size:14px;background:rgba(229,57,53,0.14);cursor:pointer;flex-shrink:0;">💬</button>
     <button class="glaze-tile" onclick="openFindMyPiece()" title="Find a piece"
-      style="border:none;border-radius:50%;width:34px;height:34px;font-size:15px;background:rgba(94,53,177,0.14);cursor:pointer;flex-shrink:0;">🔍</button>
+      style="border:none;border-radius:50%;width:30px;height:30px;font-size:14px;background:rgba(94,53,177,0.14);cursor:pointer;flex-shrink:0;">🔍</button>
     <button class="glaze-tile" onclick="openColorPicker()" title="Glaze colours"
-      style="border:none;border-radius:50%;width:34px;height:34px;font-size:15px;background:rgba(184,121,70,0.14);cursor:pointer;flex-shrink:0;">🎨</button>
+      style="border:none;border-radius:50%;width:30px;height:30px;font-size:14px;background:rgba(184,121,70,0.14);cursor:pointer;flex-shrink:0;">🎨</button>
     <button class="glaze-tile" onclick="openAppSwitcher()" title="View customer app"
-      style="border:none;border-radius:50%;width:34px;height:34px;font-size:15px;background:rgba(94,53,177,0.14);cursor:pointer;flex-shrink:0;">👥</button>
+      style="border:none;border-radius:50%;width:30px;height:30px;font-size:14px;background:rgba(94,53,177,0.14);cursor:pointer;flex-shrink:0;">👥</button>
+    <button class="glaze-tile" onclick="toggleAlertFeed()" title="Alerts"
+      style="position:relative;border:none;border-radius:50%;width:30px;height:30px;font-size:14px;background:rgba(43,39,36,0.10);cursor:pointer;flex-shrink:0;">🔔<span id="flow-alert-count" style="display:none;position:absolute;top:-2px;right:-2px;background:#e53935;color:white;border-radius:50%;min-width:15px;height:15px;font-size:8px;font-weight:800;align-items:center;justify-content:center;"></span></button>
+    <button class="glaze-tile" onclick="_flowGraphEnter()" title="Home"
+      style="border:none;border-radius:50%;width:30px;height:30px;font-size:14px;background:rgba(46,125,50,0.14);cursor:pointer;flex-shrink:0;">🏡</button>
 
     <!-- Grid button removed 18 Jul, Daisy: "get rid of grid". Tiles-only
          law, no dead end back to the old system. Verified first: every
