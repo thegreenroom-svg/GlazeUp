@@ -4508,3 +4508,21 @@ STILL OPEN (refreshed, honest):
 - Customise-home DRAG gesture (tap version is live); swipe nav untested
 - Stock framework; laser stamps; archive bulk import; daily digest
 - Square 403 INSUFFICIENT_SCOPES on team-members; ROTATE THE TOKEN
+
+═══ 19 JULY, MORNING — THE CLEAN BUILD BEGINS (Stage 1 shipped) ═══
+- The five shared helpers are LIVE IN BOTH APPS (admin + customer):
+  api() (timeout, JSON, honest errors) · toast() (glazed, no more
+  browser alerts) · glazedModal() · captureAndSend() (the whole
+  photo-AI path in one call) · instantCache (the remember-empty
+  lesson, once, for every screen). Added alongside old code — their
+  presence changes nothing; adoption is explicit per call site.
+- First Stage-2 adoption DONE: all nine of tonight's functions
+  (Kiln trio, Learning trio, the three AI photo handlers) now run on
+  api()/toast()/instantCache — zero raw fetches, zero alert() left
+  in any of them. Verified per-function-body.
+- Next gates (the 9 remaining raw sites, named): _showPieceIdentifying,
+  _identifyPackingPiece, handlePieceMatchPhotoFirst,
+  handleKilnUnloadPhoto, handleReturnPhoto, runFp1AutoMatch,
+  loadRefPhotoPieces, saPieceChosen, legacy handleWholeTrayCapture —
+  then the wider 300+ legacy fetches and 36 customer-app alerts,
+  screen by screen, an on-device screenshot per gate.
