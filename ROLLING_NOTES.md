@@ -4618,3 +4618,33 @@ STILL OPEN going into the next session:
 
 Current: 62032d4, pushed. Auto-deploy is paused (public-repo mode) — every commit above
 needed Daisy's own Manual Deploy tap on Render before it went live, same as always.
+
+★ SESSION 2026-07-19 (later, new chat — "complete what you were just up to"):
+Picked up the STILL OPEN list from the afternoon session. Two findings, one fix:
+
+1. THE "HALF A BOX / THREE QUARTERS OF A BOX" GLITCH — LOCATED (mechanism, not guessed):
+   Rendered the admin app headless at iPhone size (390px), logged in as Daisy, measured
+   every home tile's real geometry. The flow-tree home renders THREE tile size classes
+   (~153px "big", ~101px "medium", ~72px "small") into ONE flex-wrap container. Wherever
+   a size-class boundary falls mid-row, a wide tile shares a row with narrow ones (in this
+   render: Demo Studio at 101px beside Learning/Tell Daisy at 72px) — which reads exactly
+   as "boxes not all there / three quarters of a box". On Daisy's phone, with her real
+   tile set, the boundary lands near the Takings tile. NOT changed — the size tiering may
+   be deliberate. Decision for Daisy: (a) force each size class onto its own row(s), or
+   (b) make all tiles in a mixed row share the row's largest size, or (c) leave as is.
+   No horizontal overflow found (all tiles inside the viewport; no clipped scroll rails).
+
+2. FIXED — director-tile flash: the 3 "Directors only" Dashboard tiles (Revenue, Popular
+   Designs, Tool Usage) had BOTH display:none and display:flex in the same inline style —
+   the later flex won, so at every page load all three were visible to EVERYONE until the
+   access-check JS ran (and would have stayed visible on any path where it didn't run).
+   Removed the duplicate display:flex so display:none wins at load; the existing JS
+   (style.display='flex' on hasAccess/isDirector) still shows them with identical layout —
+   verified headless both ways (hidden at load; flex/column/center once shown).
+
+3. Host By Post logo — re-checked from this side: hostbypost.com's header mark is inline
+   SVG in the page markup and the fetcher strips it, so it genuinely can't be pulled
+   remotely. Still needs Daisy to send the file (or paste the <svg> from view-source).
+
+Carried over untouched: showHomeScreen-vs-showFloorPlan back button (needs Daisy's read),
+token rotation, Square 403 INSUFFICIENT_SCOPES, internal staff messaging, Stage 2+.
