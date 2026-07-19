@@ -3443,7 +3443,7 @@
   </div>
 </div>
 
-<div id="grid-nav-view" class="view" style="display:block;">
+<div id="grid-nav-view" class="view" style="display:none;">
   <div id="grid-nav-top" style="padding:20px;">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:4px;">
       <h2 style="margin:0;">The Kiln Cafe</h2>
@@ -13288,6 +13288,7 @@ function loadLoginNamePicker() {
 
 
 
+
 function selectDemoStaff(idx) {
   const staff = [
     { id: 'daisy', name: 'Daisy', role: 'General Manager' },
@@ -13303,13 +13304,20 @@ function selectDemoStaff(idx) {
   currentShiftStaff = { id: person.id, name: person.name, role: person.role, hasPinSet: true };
   localStorage.setItem('shift-staff', JSON.stringify(currentShiftStaff));
   
-  // Hide login modal, show home
+  // Hide login modal
   document.getElementById('shift-login-modal').style.display = 'none';
-  document.getElementById('flow-graph-body').style.display = 'grid';
   
-  // Load tiles immediately without waiting for personalisation
-  goToTab('home');
+  // Hide all views
+  document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+  
+  // Show the actual flow-graph (tiles home)
+  const flowGraph = document.getElementById('daisy-flow-view');
+  if (flowGraph) {
+    flowGraph.style.display = 'block';
+  }
 }
+
+
 
 
 
