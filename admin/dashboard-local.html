@@ -8278,15 +8278,26 @@ const DEMO_CONFIG = {
   learningData: []
 };
 
-function generateDemoScenario(difficulty) {
-  const config = DEMO_CONFIG.difficulties[difficulty];
+function generateDemoScenario(difficulty, holiday) {
+  const config = JSON.parse(JSON.stringify(DEMO_CONFIG.difficulties[difficulty]));
   if (!config) return null;
+  
+  // Apply holiday pressure if selected
+  if (holiday === 'Holiday Rush') {
+    config.customers = Math.ceil(config.customers * 1.4);
+    config.pieces = Math.ceil(config.pieces * 1.4);
+    config.intensity *= 1.3;
+  } else if (holiday === 'Event Day') {
+    config.customers = Math.ceil(config.customers * 1.2);
+    config.pieces = Math.ceil(config.pieces * 1.2);
+    config.intensity *= 1.2;
+  }
   
   const customers = [];
   const pieces = [];
   
   // Generate customers
-  for (let i = 0; i < config.customers; i++) {
+  const maxCustomers = Math.min(config.customers, 10); for (let i = 0; i < maxCustomers; i++) {
     const firstName = DEMO_CONFIG.firstNames[Math.floor(Math.random() * DEMO_CONFIG.firstNames.length)];
     const lastName = DEMO_CONFIG.lastNames[Math.floor(Math.random() * DEMO_CONFIG.lastNames.length)];
     customers.push({
@@ -8300,7 +8311,7 @@ function generateDemoScenario(difficulty) {
   // Generate pieces distributed across stages
   const stagesPerPiece = Math.floor(config.pieces / DEMO_CONFIG.stages.length) || 1;
   let pieceIdx = 0;
-  for (let s = 0; s < DEMO_CONFIG.stages.length && pieceIdx < config.pieces; s++) {
+  for (let s = 0; s < DEMO_CONFIG.stages.length && pieceIdx < Math.min(config.pieces, 10); s++) {
     for (let p = 0; p < stagesPerPiece && pieceIdx < config.pieces; p++) {
       const type = DEMO_CONFIG.pieceTypes[Math.floor(Math.random() * DEMO_CONFIG.pieceTypes.length)];
       const custIdx = Math.floor(Math.random() * customers.length);
