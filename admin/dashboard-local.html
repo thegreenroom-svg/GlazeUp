@@ -3734,7 +3734,17 @@ function updateStaffName() {
           </div>
         </div>
 
-
+        <!-- Loyalty Leaderboard -->
+        <div id="dashboard-section-loyalty" class="dashboard-section" style="display:none;">
+          <div class="chart-container">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <h3 style="margin:0;">🏆 Loyal Customers</h3>
+              <button onclick="loadLoyaltyLeaderboard()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
+            </div>
+            <div style="font-size:11px;color:var(--gu-dust);margin-bottom:12px;">Your top customers by loyalty tier and points. Tier is awarded automatically based on visit count or total spend.</div>
+            <div id="loyalty-leaderboard-list"><div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">Loading…</div></div>
+          </div>
+        </div>
 
         <!-- Device slots panel -->
         <div id="dashboard-section-devices" class="dashboard-section" style="display:none;">
