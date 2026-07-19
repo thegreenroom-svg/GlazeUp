@@ -3210,7 +3210,7 @@ function updateStaffName() {
           align-items:center;justify-content:center;">🔍</button>
 
         <!-- My tiles — see/customise your home screen -->
-        <button class="glaze-tile" id="my-tiles-header-btn" onclick="showGridNav()" title="My tiles"
+        <button class="glaze-tile" id="my-tiles-header-btn" onclick="_flowGraphEnter()" title="Home"
           style="background:#2e7d32;color:white;border:none;border-radius:50%;
           width:26px;height:26px;font-size:12px;cursor:pointer;flex-shrink:0;
           align-items:center;justify-content:center;">🏡</button>
@@ -8326,13 +8326,12 @@ let CURRENT_DATA_SOURCE = LIVE_CACHE; // Default to live
 let AUTO_SYNC_INTERVAL = null;
 
 async function syncLiveData() {
-  if (LIVE_CACHE.isConnected) {
-    toast('Already connected', 'info');
-    return;
-  }
-  
+  const wasConnected = LIVE_CACHE.isConnected;
+  const _btn = document.getElementById('sync-live-btn');
+  if (_btn) { _btn.disabled = true; _btn.style.opacity = '0.5'; }
   try {
-    // Pull real Square data
+    // Pull real Square data — every tap re-pulls the latest, so the
+    // top-bar button always fetches fresh numbers, not just the first time.
     const res = await api('/api/square/transactions?studioId=' + studioId);
     if (res && res.transactions) {
       LIVE_CACHE.transactions = res.transactions;
@@ -8343,9 +8342,9 @@ async function syncLiveData() {
       
       LIVE_CACHE.isConnected = true;
       CURRENT_DATA_SOURCE = LIVE_CACHE;
-      toast('✓ Live data connected', 'ok');
+      toast(wasConnected ? '✓ Data refreshed' : '✓ Live data connected', 'ok');
       
-      // Start auto-polling
+      // Start auto-polling (safe to call again; it clears any prior timer)
       startAutoSync();
       
       // Refresh the dashboard in place — a full reload drops back to login.
@@ -8355,6 +8354,8 @@ async function syncLiveData() {
     }
   } catch(e) {
     toast('Connection failed: ' + e.message, 'error');
+  } finally {
+    if (_btn) { _btn.disabled = false; _btn.style.opacity = '1'; }
   }
 }
 
@@ -17914,6 +17915,7 @@ function _buildHomeTree() {
     children: [
       { id:'floor-plan', label:'Floor Plan', emoji:'🪑', desc:'Live view of all tables', fn:'showFloorPlan', size:'big' },
       { id:'staff', label:'Bookings', emoji:'📋', desc:'Start a booking, walk-in or party', fn:null, size:'big' },
+      { id:'dashboard', label:'Takings', emoji:'💷', desc:'Today, this month & this year — your live numbers', fn:null, size:'big' },
       { id:'the-journey', label:'The Journey', emoji:'🔄', desc:'Booking → Painting → Completion → Kiln', size:'big', children:[
         { id:'j-b-open', label:'1 · Booking',    emoji:'🪑', desc:'Set up · greet · drinks · pieces', fn:'openStageBooking',    size:'big' },
         { id:'j-e-open', label:'2 · Painting',   emoji:'🎨', desc:'Paints · check-in · drinks',       fn:'openStageEngagement', size:'big' },
@@ -17934,7 +17936,6 @@ function _buildHomeTree() {
         { id:'team',     label:'Team & Duties',  emoji:'👥', desc:'Duty lists, timekeeping, holidays', fn:null, size:'big' },
         { id:'progress', label:'Daily Progress', emoji:'📊', desc:"Every team member's live tasks",     fn:null, size:'big' },
       ]},
-      { id:'dashboard', label:'Overview', emoji:'📈', desc:'Your daily takings & overview', fn:null, size:'mid' },
       { id:'assistant', label:'Ask Cleo', emoji:'💛', desc:'She learns how you work · ask her anything', fn:'openAssistant', size:'mid' },
       { id:'start-demo', label:'Demo Studio', emoji:'🎬', desc:'Practise a shift — pick how busy', fn:'openDemoSetup', size:'mid' },
       { id:'learning', label:'Learning', emoji:'🌱', desc:'What the app has noticed from real usage', fn:'openLearning', size:'small' },
@@ -18231,6 +18232,10 @@ function applyShiftUI() {
   document.getElementById('headset-setup-btn').style.display = 'flex';
   document.getElementById('step-counter-btn').style.display = 'flex';
   document.getElementById('direct-logout-btn').style.display = 'flex';
+  // Pull-data button lives in the top bar at all times (per direct request):
+  // one tap pulls the real Square history into the dashboard.
+  const _sync = document.getElementById('sync-live-btn');
+  if (_sync) { _sync.style.display = 'flex'; _sync.title = 'Pull latest data'; }
   // Quick tools — the things staff need in a hurry
   ['qt-tell', 'qt-find'].forEach(id => {
     const el = document.getElementById(id);
