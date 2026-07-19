@@ -2280,14 +2280,7 @@ function updateStaffName() {
      real onclick logic (openFindMyPiece), just relocated — see the
      header markup further down. -->
 
-<!-- Cleo — genuinely always present on every admin page, not gated
-     behind whether Cleo's Club is enabled for this studio. Rotating
-     call-out bubble, stacked above Find My Piece. -->
-<button id="cleo-admin-floating-fab" class="glaze-tile" onclick="handleCleoAdminFloatingTap()" style="display:none;position:fixed;bottom:248px;right:16px;z-index:9700;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#F9A825,#f57c00);border:none;box-shadow:0 6px 22px rgba(249,168,37,0.4);cursor:pointer;align-items:center;justify-content:center;padding:4px;">
-  <div id="cleo-admin-floating-mascot" style="width:100%;height:100%;"></div>
-</button>
-<div id="cleo-admin-floating-bubble" style="display:none;position:fixed;bottom:306px;right:16px;z-index:9699;background:white;border:1.5px solid var(--gu-border);border-radius:16px 16px 4px 16px;padding:9px 13px;font-size:11px;font-weight:600;color:var(--gu-text);box-shadow:0 4px 16px rgba(0,0,0,0.15);max-width:180px;cursor:pointer;text-align:right;" onclick="handleCleoAdminFloatingTap()">
-</div>
+
 
 <!-- ═══════════════════════════════════════════
      FIND MY PIECE — rebuilt as two genuine full screens, not a small
@@ -2308,22 +2301,7 @@ function updateStaffName() {
      a glance who's genuinely due a reward. Two real views in one
      modal: the list, and (when a name is tapped) that customer's
      actual visit history. -->
-<div id="loyalty-report-modal" style="display:none;position:fixed;inset:0;z-index:9980;background:rgba(43,39,36,0.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:16px;">
-  <div style="background:white;border-radius:20px;max-width:480px;width:100%;max-height:88vh;display:flex;flex-direction:column;">
-    <div style="padding:20px 20px 12px;display:flex;justify-content:space-between;align-items:start;">
-      <div>
-        <div id="loyalty-report-title" style="font-size:17px;font-weight:800;color:var(--gu-text);">🏆 Loyalty Report</div>
-        <div id="loyalty-report-subtitle" style="font-size:12px;color:var(--gu-dust);margin-top:2px;">Live — updates every real visit</div>
-      </div>
-      <button onclick="closeLoyaltyReportModal()" style="background:none;border:none;color:var(--gu-dust);font-size:20px;cursor:pointer;padding:4px;">✕</button>
-    </div>
-    <div style="padding:0 20px 8px;display:flex;gap:8px;">
-      <button class="glaze-tile" id="loyalty-report-top10-btn" onclick="setLoyaltyReportLimit(10)" style="flex:1;padding:8px;border-radius:8px;border:1.5px solid var(--gu-primary);background:var(--gu-primary);color:white;font-size:12px;font-weight:700;cursor:pointer;">Top 10</button>
-      <button class="glaze-tile" id="loyalty-report-top20-btn" onclick="setLoyaltyReportLimit(20)" style="flex:1;padding:8px;border-radius:8px;border:1.5px solid var(--gu-border);background:white;color:var(--gu-text);font-size:12px;font-weight:700;cursor:pointer;">Top 20</button>
-    </div>
-    <div style="overflow-y:auto;flex:1;padding:10px 20px 20px;" id="loyalty-report-body"></div>
-  </div>
-</div>
+
 
 <!-- Genuine real damage/loss report — covers both a customer's
      painted piece and raw unpainted stock. Alerts staff, removes the
@@ -3464,10 +3442,8 @@ function updateStaffName() {
          all (never a fake number — an honest blank beats a wrong count
          in a room where people act on it). -->
     <span id="flow-daystat" style="font-size:11px;color:#8a8175;white-space:nowrap;"></span>
-    <button class="glaze-tile" onclick="if(typeof openFindMyPiece==='function'){document.getElementById('daisy-flow-view').style.display='none';openFindMyPiece();}"
-      title="Find My Piece" style="border:none;border-radius:9px;width:34px;height:34px;font-size:15px;background:rgba(43,39,36,0.06);cursor:pointer;">🔍</button>
-    <button class="glaze-tile" onclick="_flowAskCleo(_flowStack.length>1?_flowStack[_flowStack.length-1].label:'this home screen')"
-      title="Ask Cleo" style="border:none;border-radius:9px;width:34px;height:34px;font-size:15px;background:rgba(249,168,37,0.15);cursor:pointer;">💛</button>
+
+
     <!-- Grid button removed 18 Jul, Daisy: "get rid of grid". Tiles-only
          law, no dead end back to the old system. Verified first: every
          real screen already sits in someone's tree. _flowGraphExit and
@@ -3758,20 +3734,7 @@ function updateStaffName() {
           </div>
         </div>
 
-        <!-- Loyalty Leaderboard -->
-        <div id="dashboard-section-loyalty" class="dashboard-section" style="display:none;">
-          <div class="chart-container">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-              <h3 style="margin:0;">🏆 Loyal Customers</h3>
-              <div style="display:flex;gap:10px;align-items:center;">
-                <button onclick="openLoyaltyReportModal()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;font-weight:700;">📋 Full Report</button>
-                <button onclick="loadLoyaltyLeaderboard()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
-              </div>
-            </div>
-            <div style="font-size:11px;color:var(--gu-dust);margin-bottom:12px;">Your top customers by loyalty tier and points. Tier is awarded automatically based on visit count or total spend.</div>
-            <div id="loyalty-leaderboard-list"><div style="padding:12px;text-align:center;color:var(--gu-dust);font-size:12px;">Loading…</div></div>
-          </div>
-        </div>
+
 
         <!-- Device slots panel -->
         <div id="dashboard-section-devices" class="dashboard-section" style="display:none;">
