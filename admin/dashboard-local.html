@@ -7734,12 +7734,9 @@ function _showPieceIdentifying(photoBase64) {
     </div>`;
 
   // Try AI identification
-  fetch(`${API_URL}/api/pieces/find-by-photo`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ studioId, photoBase64, bookingCode: _checkoutBookingCode,
-      searchedBy: currentShiftStaff?.id, autoAssign: false })
-  })
-  .then(r => r.json())
+  api('/api/pieces/find-by-photo', { method: 'POST', timeoutMs: 30000,
+    body: { studioId, photoBase64, bookingCode: _checkoutBookingCode,
+      searchedBy: currentShiftStaff?.id, autoAssign: false } })
   .then(data => {
     if (data.match || data.piece || data.suggested) {
       _showPieceConfirmTile(photoBase64, data.match || data.piece || data.suggested, data);
@@ -8813,11 +8810,8 @@ function _identifyPackingPiece(photo) {
       <div style="font-size:13px;color:#8a8175;">Checking every piece on file</div>
     </div>`;
 
-  fetch(`${API_URL}/api/pieces/find-by-photo`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ studioId, photoBase64: photo, searchedBy: currentShiftStaff?.id, autoAssign: false })
-  })
-  .then(r => r.json())
+  api('/api/pieces/find-by-photo', { method: 'POST', timeoutMs: 30000,
+    body: { studioId, photoBase64: photo, searchedBy: currentShiftStaff?.id, autoAssign: false } })
   .then(data => {
     const match = (data.matches || [])[0];
     if (match && data.noConfidentMatch !== true) _showPackingMatch(photo, match, data);
@@ -20981,11 +20975,8 @@ async function handlePieceMatchPhotoFirst(event) {
     if (matchResult) matchResult.innerHTML = '<div style="padding:14px;text-align:center;color:var(--gu-dust);font-size:13px;">🔍 Identifying piece…</div>';
     if (groupInfo) groupInfo.style.display = 'block';
     try {
-      const res = await fetch(`${API_URL}/api/pieces/find-by-photo`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studioId, photoBase64, phash, searchedBy: currentShiftStaff?.id || null, autoAssign: true })
-      });
-      const data = await res.json();
+      const data = await api('/api/pieces/find-by-photo', { method: 'POST', timeoutMs: 30000,
+        body: { studioId, photoBase64, phash, searchedBy: currentShiftStaff?.id || null, autoAssign: true } });
       if (data.autoAssigned) {
         // High confidence — show confirmation, hide fallback
         if (fallbackEl) fallbackEl.style.display = 'none';
@@ -21023,11 +21014,8 @@ async function handleKilnUnloadPhoto(event) {
     const fallbackEl = document.getElementById('kiln-unload-qr-fallback');
     if (resultEl) resultEl.innerHTML = '<div style="padding:10px;color:var(--gu-dust);font-size:12px;">🔍 Identifying piece…</div>';
     try {
-      const res = await fetch(`${API_URL}/api/pieces/find-by-photo`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studioId, photoBase64, phash, searchedBy: currentShiftStaff?.id || null, autoAssign: true })
-      });
-      const data = await res.json();
+      const data = await api('/api/pieces/find-by-photo', { method: 'POST', timeoutMs: 30000,
+        body: { studioId, photoBase64, phash, searchedBy: currentShiftStaff?.id || null, autoAssign: true } });
       if (data.autoAssigned) {
         // High confidence — mark it ready directly
         if (fallbackEl) fallbackEl.style.display = 'none';
@@ -23003,11 +22991,7 @@ async function saPieceChosen(ev) {
   if (!phash) return saCouldntRead();
 
   try {
-    const res = await fetch(`${API_URL}/api/stock/identify-by-photo`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studioId, phash })
-    });
-    const d = await res.json();
+    const d = await api('/api/stock/identify-by-photo', { method: 'POST', timeoutMs: 15000, body: { studioId, phash } });
     if (d.matched) { sa.squareItemId = d.squareItemId; sa.identifiedBy = 'phash'; return saKnown(d); }
     return saUnknown();
   } catch(e) { return saCouldntRead(); }
@@ -24912,8 +24896,7 @@ async function loadRefPhotoPieces(bookingCode) {
   if (!bookingCode) { listEl.innerHTML = ''; return; }
   listEl.innerHTML = '<div style="padding:10px;color:var(--gu-dust);font-size:12px;">Loading pieces…</div>';
   try {
-    const res = await fetch(`${API_URL}/api/pieces/for-booking?studioId=${studioId}&bookingCode=${encodeURIComponent(bookingCode)}`);
-    const data = await res.json();
+    const data = await api(`/api/pieces/for-booking?studioId=${studioId}&bookingCode=${encodeURIComponent(bookingCode)}`);
     const pieces = data.pieces || [];
     if (!pieces.length) {
       listEl.innerHTML = '<div style="padding:10px;color:var(--gu-dust);font-size:12px;">No pieces logged for this booking yet.</div>';
@@ -25483,17 +25466,13 @@ async function handleReturnPhoto(event) {
     document.getElementById('returns-step-identifying').style.display = 'block';
 
     try {
-      const res = await fetch(`${API_URL}/api/pieces/find-by-photo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const data = await api('/api/pieces/find-by-photo', { method: 'POST', timeoutMs: 30000,
+        body: {
           studioId,
           photoBase64,
           searchedBy: currentShiftStaff?.id || null,
           autoAssign: false // returns just identifies, doesn't change piece status
-        })
-      });
-      const data = await res.json();
+        } });
       document.getElementById('returns-step-identifying').style.display = 'none';
       document.getElementById('returns-step-result').style.display = 'block';
 
@@ -25863,19 +25842,8 @@ async function runFp1AutoMatch(photoDataUrl, phash = null) {
   resultEl.innerHTML = '<div style="padding:14px;text-align:center;color:#8a8175;font-size:13px;">🔍 Searching every real piece on file — this takes a few seconds…</div>';
 
   try {
-    const res = await fetch(`${API_URL}/api/pieces/find-by-photo`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studioId, photoBase64: photoDataUrl, phash, searchedBy: currentShiftStaff?.id || null, autoAssign: true })
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      resultEl.innerHTML = `
-        <div style="padding:14px;background:rgba(255,138,128,0.15);border-radius:10px;">
-          <div style="color:#ff8a80;font-size:13px;margin-bottom:10px;">${data.error || 'Could not run the search.'}</div>
-          <button class="glaze-tile" onclick="retryFp1AutoMatch()" style="width:100%;background:#5E35B1;color:white;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;">🔄 Try again with the same photo</button>
-        </div>`;
-      return;
-    }
+    const data = await api('/api/pieces/find-by-photo', { method: 'POST', timeoutMs: 30000,
+      body: { studioId, photoBase64: photoDataUrl, phash, searchedBy: currentShiftStaff?.id || null, autoAssign: true } });
 
     // Genuine auto-assignment happened — shown clearly, real undo option
     if (data.autoAssigned) {
@@ -25918,7 +25886,13 @@ async function runFp1AutoMatch(photoDataUrl, phash = null) {
       `).join('')}
     `;
   } catch (e) {
-    resultEl.innerHTML = '<div style="padding:14px;color:#ff8a80;font-size:13px;">Could not run the search — try again.</div>';
+    // Server and network errors land here now (api() throws on !ok) —
+    // the rich retry UI the old !ok branch had, message preserved.
+    resultEl.innerHTML = `
+      <div style="padding:14px;background:rgba(255,138,128,0.15);border-radius:10px;">
+        <div style="color:#ff8a80;font-size:13px;margin-bottom:10px;">${e.message || 'Could not run the search.'}</div>
+        <button class="glaze-tile" onclick="retryFp1AutoMatch()" style="width:100%;background:#5E35B1;color:white;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;">🔄 Try again with the same photo</button>
+      </div>`;
   }
 }
 
