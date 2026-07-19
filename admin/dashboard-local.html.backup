@@ -2071,37 +2071,11 @@ function updateStaffName() {
   // (later definition wins). Each reload now advances one step further
   // and the overlay names the next real cause — we walk down the chain
   // instead of standing at the door.
-  // FIXED: showSplash() was called but never defined — now defined early
-  window.showSplash = window.showSplash || function() {
-    try {
-      var s = document.getElementById('splash-screen');
-      if (s) {
-        s.style.display = 'grid';
-        s.style.zIndex = '5000';
-      }
-      // Hide all other views
-      document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
-    } catch(e) { console.error('showSplash error:', e); }
-  };
-
   window.dismissSplash = window.dismissSplash || function(){
     try {
-      var s = document.getElementById('splash-screen'); 
-      if (s) s.style.display = 'none';
-      // FIXED: Trigger the full login flow after splash dismissal
-      // Per the architecture: dismissSplash -> deviceCheckIn -> populateDashboard -> checkShiftLogin -> login picker
-      setTimeout(function() {
-        if (window.deviceCheckIn) {
-          window.deviceCheckIn().catch(function(e) { 
-            console.error('deviceCheckIn failed:', e);
-            // Fall back to login anyway if device check fails
-            if (window.checkShiftLogin) window.checkShiftLogin();
-          });
-        } else if (window.checkShiftLogin) {
-          window.checkShiftLogin();
-        }
-      }, 100);
-    } catch(e) { console.error('dismissSplash error:', e); }
+      var s = document.getElementById('splash-screen'); if (s) s.style.display = 'none';
+      var m = document.getElementById('shift-login-modal'); if (m) m.style.display = 'flex';
+    } catch(e) {}
   };
 
   window.addEventListener('error', function(ev){
@@ -21344,17 +21318,21 @@ function updateToolUsage(usage) {
 document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('studio-name').textContent = 'The Kiln Cafe';
   
-  // FIXED: Ensure splash shows immediately and is clickable
-  const splash = document.getElementById('splash-screen');
-  if (splash) {
-    splash.style.display = 'grid';
-    splash.style.zIndex = '5000';
-  }
-  
-  // Check API connection in background
+  // Check API connection
   await checkAPIConnection();
   
-  // Hide all views except splash
+  // Show the dashboard tab visually underneath the splash screen (splash
+  // sits on top of everything until tapped, so this is safe to prep in
+  // the background) — but WITHOUT running its full data bootstrap yet.
+  // Calling goToTab('dashboard') here used to also fire populateDashboard()
+  // (via the dispatcher), which itself calls checkShiftLogin() — and then
+  // deviceCheckIn() correctly fires populateDashboard() AGAIN once the
+  // splash is actually dismissed. That's two independent, uncoordinated
+  // checkShiftLogin() runs on every single page load, which is exactly
+  // what caused the opening checklist (and PIN login picker) to
+  // sometimes appear twice. Fixed by only switching the visible tab here,
+  // and letting deviceCheckIn() -> populateDashboard() be the ONE place
+  // the real bootstrap (including checkShiftLogin) actually runs.
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
   // grid-nav-view is now DISABLED completely - login shows dashboard only
   // showGridNavTop(); // REMOVED
@@ -28364,21 +28342,12 @@ let _splashTableDemo = 0;
 
 // Splash — fullscreen logo with auto-dismiss
 function wireSplash() {
-  try {
-    const demoEl = document.getElementById('splash-table-demo');
-    if (!demoEl) return;
-    // Check if renderElegantLineTable is defined
-    if (typeof renderElegantLineTable !== 'function') {
-      console.warn('renderElegantLineTable not yet defined for splash');
-      return;
-    }
-    const container = document.createElement('div');
-    container.style.cssText = 'width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;';
-    demoEl.appendChild(container);
-    renderElegantLineTable(container, 'large');
-  } catch (e) {
-    console.error('wireSplash error:', e);
-  }
+  const demoEl = document.getElementById('splash-table-demo');
+  if (!demoEl) return;
+  const container = document.createElement('div');
+  container.style.cssText = 'width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;';
+  demoEl.appendChild(container);
+  renderElegantLineTable(container, 'large');
 }
 
 
