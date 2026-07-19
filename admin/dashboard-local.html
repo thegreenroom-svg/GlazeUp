@@ -17887,11 +17887,61 @@ async function _dismissNudge(nudgeId) {
   }
 })();
 
+// ═══════════════════════════════════════════════════════════
+// THE ONE HOME TREE. Every staff member gets the same complete,
+// working set of tiles — no personalisation fetch, no "0 options"
+// empty groups, no API dependency. Every leaf routes to a function
+// that exists in this file (verified). The root shows whoever is
+// logged in. This is deliberately hardcoded and self-contained so
+// login → home → any tool works offline, first tap, every time.
+// ═══════════════════════════════════════════════════════════
+function _buildHomeTree() {
+  const name = (typeof currentShiftStaff !== 'undefined' && currentShiftStaff?.name)
+    ? currentShiftStaff.name.split(' ')[0] : 'Home';
+  return {
+    id: 'home', label: name, emoji: '🏠', size: 'hub',
+    children: [
+      { id:'floor-plan', label:'Floor Plan', emoji:'🪑', desc:'Live view of all tables', fn:'showFloorPlan', size:'big' },
+      { id:'staff', label:'Bookings', emoji:'📋', desc:'Start a booking, walk-in or party', fn:null, size:'big' },
+      { id:'the-journey', label:'The Journey', emoji:'🔄', desc:'Booking → Painting → Completion → Kiln', size:'big', children:[
+        { id:'j-b-open', label:'1 · Booking',    emoji:'🪑', desc:'Set up · greet · drinks · pieces', fn:'openStageBooking',    size:'big' },
+        { id:'j-e-open', label:'2 · Painting',   emoji:'🎨', desc:'Paints · check-in · drinks',       fn:'openStageEngagement', size:'big' },
+        { id:'j-c-open', label:'3 · Completion', emoji:'📷', desc:'Photos · extras · bill · clear',   fn:'openStageCompletion', size:'big' },
+        { id:'j-k-open', label:'4 · Kiln',       emoji:'🔥', desc:'Bag for kiln · print label',       fn:'openStageKiln',       size:'big' },
+      ]},
+      { id:'kiln', label:'Kiln', emoji:'🔥', desc:'Dip → load → fire', fn:'openKiln', size:'mid' },
+      { id:'packing', label:'Packing', emoji:'📦', desc:'Fired pieces going home', fn:'openPacking', size:'mid' },
+      { id:'collections', label:'Collections', emoji:'🏺', desc:'Ready to collect · returns · find on shelf', fn:'openCollections', size:'mid' },
+      { id:'stock-group', label:'Stock', emoji:'📦', desc:'Inventory & counts', size:'mid', children:[
+        { id:'stock-arrival', label:'Stock Arrived', emoji:'📦', desc:"Photo a box or piece, I'll do the rest", fn:'openStockArrival', size:'big' },
+        { id:'shelf-check',   label:'Check a Shelf',  emoji:'🔍', desc:'Labels out, one photo, I count it',    fn:'openShelfCheck',   size:'big' },
+        { id:'stock',     label:'Manage Stock',    emoji:'📋', desc:'Reservations & levels',            fn:null, size:'mid' },
+        { id:'catalogue', label:'Piece Catalogue', emoji:'🏺', desc:'What customers browse from home',  fn:null, size:'mid' },
+        { id:'shapes',    label:'Bisque',          emoji:'🎨', desc:'Your Square catalogue as silhouettes', fn:null, size:'mid' },
+      ]},
+      { id:'team-group', label:'Team', emoji:'👥', desc:'Rota, duties & progress', size:'mid', children:[
+        { id:'team',     label:'Team & Duties',  emoji:'👥', desc:'Duty lists, timekeeping, holidays', fn:null, size:'big' },
+        { id:'progress', label:'Daily Progress', emoji:'📊', desc:"Every team member's live tasks",     fn:null, size:'big' },
+      ]},
+      { id:'dashboard', label:'Overview', emoji:'📈', desc:'Your daily takings & overview', fn:null, size:'mid' },
+      { id:'assistant', label:'Ask Cleo', emoji:'💛', desc:'She learns how you work · ask her anything', fn:'openAssistant', size:'mid' },
+      { id:'start-demo', label:'Demo Studio', emoji:'🎬', desc:'Practise a shift — pick how busy', fn:'openDemoSetup', size:'mid' },
+      { id:'learning', label:'Learning', emoji:'🌱', desc:'What the app has noticed from real usage', fn:'openLearning', size:'small' },
+      { id:'tell-daisy', label:'Tell Daisy', emoji:'💬', desc:'Something good or bad happened', fn:'openTellPicker', size:'small' },
+      { id:'training', label:'My Training', emoji:'🎓', desc:'Read, tick, done', fn:'openMyTraining', size:'small' },
+      { id:'health-safety', label:'Health & Safety', emoji:'🦺', desc:'Docs & checks', fn:'openHealthSafety', size:'small' },
+      { id:'whats-on', label:"What's On", emoji:'📅', desc:'Local events & school holidays', fn:'openWhatsOn', size:'small' },
+      { id:'music', label:'Music', emoji:'🎵', desc:"Volume · skip · what's playing", fn:'openMusic', size:'small' },
+      { id:'customer-demo', label:'Customer App', emoji:'👀', desc:'See what customers see', fn:'openCustomerDemo', size:'small' },
+      { id:'setup', label:'Studio Setup', emoji:'⚙️', desc:'Connections, Host By Post, add-ons, offers', fn:null, size:'small' },
+      { id:'trial-reset', label:'Clear & Start Again', emoji:'🔄', desc:'Reset demo data for testing', fn:'openTrialReset', size:'small' },
+    ]
+  };
+}
+
 function _flowGraphEnter() { _flowStack = []; // Clear any stale nav
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
-  let tree;
-  try { tree = _buildPersonalFlowTree(); } catch(e) { console.warn('personal flow tree fell back:', e); tree = FULL_FLOW_TREE; }
-  _flowStack = [tree];
+  _flowStack = [_buildHomeTree()];
   document.getElementById('daisy-flow-view').style.display = 'block';
   _safeRenderFlowGraph();
   _flowLoadDayStat();
