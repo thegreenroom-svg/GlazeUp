@@ -19,6 +19,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Architects+Daughter&display=swap" rel="stylesheet">
   <style>
+#grid-nav-view { display: none !important; }
+
     .api-status {
       position: fixed;
       /* Was top: 0 — with viewport-fit=cover and a black-translucent
@@ -17194,6 +17196,7 @@ async function openBookingAtRealStage(bookingCode, stage) {
 }
 
 function showGridNav() {
+  return; // DISABLED - use dashboard only
   _trace('showGridNav()');
   // ─── AND THE OTHER HALF OF THE SAME RACE ───
   // This never touched currentTab, so after the screensaver had set it
@@ -17286,7 +17289,7 @@ async function _renderTodayStrip() {
   }
 }
 
-function showGridNavTop() {
+function showGridNavTop() { return; // DISABLED
   document.getElementById('grid-nav-top').style.display = 'block';
   document.getElementById('grid-nav-sub').style.display = 'none';
   const wrap = document.getElementById('grid-nav-top-tiles');
@@ -18126,7 +18129,7 @@ function _onDragEnd(e) {
 }
 
 
-function showGridNavSub(groupId, skipHistoryPush) {
+function showGridNavSub(groupId, skipHistoryPush) { return; // DISABLED
   const group = GRID_NAV_STRUCTURE.find(g => g.id === groupId);
   if (!group || !group.items) return;
 
