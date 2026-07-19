@@ -17069,7 +17069,6 @@ const GRID_NAV_STRUCTURE = [
   { tab: 'kiln', label: '🔥 Kiln', desc: 'Dip → load → fire', fn: 'openKiln' },
   { tab: 'learning', label: '🌱 Learning', desc: 'What the app has noticed from real usage', fn: 'openLearning' },
   { tab: 'collections', label: '🏺 Collections', desc: 'Ready to collect · returns · find on shelf', fn: 'openCollections' },
-  { tab: 'assistant', label: '💛 Ask Cleo', desc: 'She learns how you work · ask her anything', fn: 'openAssistant' },
   { tab: 'training', label: '🎓 My Training', desc: 'Read, tick, done', fn: 'openMyTraining' },
   { tab: 'trial-reset', label: '🔄 Clear & Start Again', desc: 'Reset today for testing', fn: 'openTrialReset' },
   { tab: 'music', label: '🎵 Music', desc: 'Volume · skip · what\'s playing', fn: 'openMusic' },
@@ -17613,7 +17612,6 @@ const DAISY_FLOW_GRAPH = {
   id: 'daisy-hub', label: 'Daisy', size: 'hub',
   children: [
     { id:'floor-plan', label:'Floor Plan', emoji:'🪑', desc:'Live view of all tables', fn:'showFloorPlan', size:'big' },
-    { id:'assistant',  label:'Ask Cleo',   emoji:'💛', desc:'Ask her anything',        fn:'openAssistant', size:'big' },
     { id:'staff-group', label:'Daily Bookings', emoji:'📋', desc:'The booking journey, start to kiln', size:'big', children:[
       { id:'staff', label:'Open Bookings', emoji:'📋', desc:'Start a booking, walk-in, or party', fn:null, size:'big' },
       { id:'journey-booking', label:'1 · Booking', emoji:'🪑', desc:'Set up · greet · drinks · pieces', size:'mid', children:[
@@ -18021,7 +18019,6 @@ function _buildHomeTree() {
         { id:'team',     label:'Team & Duties',  emoji:'👥', desc:'Duty lists, timekeeping, holidays', fn:null, size:'big' },
         { id:'progress', label:'Daily Progress', emoji:'📊', desc:"Every team member's live tasks",     fn:null, size:'big' },
       ]},
-      { id:'assistant', label:'Ask Cleo', emoji:'💛', desc:'She learns how you work · ask her anything', fn:'openAssistant', size:'mid' },
       { id:'start-demo', label:'Demo Studio', emoji:'🎬', desc:'Practise a shift — pick how busy', fn:'openDemoSetup', size:'mid' },
       { id:'learning', label:'Learning', emoji:'🌱', desc:'What the app has noticed from real usage', fn:'openLearning', size:'small' },
       { id:'tell-daisy', label:'Tell Daisy', emoji:'💬', desc:'Something good or bad happened', fn:'openTellPicker', size:'small' },
