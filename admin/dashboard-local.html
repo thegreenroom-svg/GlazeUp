@@ -16169,7 +16169,7 @@ function _buildPersonalItems() {
     const group = GRID_NAV_STRUCTURE.find(g => g.id === id);
     if (group) {
       items.push({ type: 'group', group });
-      group.items.forEach(sub => {
+      if (group.items) group.items.forEach(sub => {
         if (promotedTiles.includes(sub.tab) && !seen.has(sub.tab)) {
           seen.add(sub.tab);
           items.push({ type: 'sub', sub, group });
@@ -16249,7 +16249,7 @@ function _personalTileTap(index) {
   _layoutSnapshot(); // capture before change so undo can restore
   if (item.type === 'group') {
     _personalScreen.tileOrder = _personalScreen.tileOrder.filter(id => id !== item.group.id);
-    item.group.items.forEach(sub => {
+    if (item.group.items) item.group.items.forEach(sub => {
       _personalScreen.promotedTiles = _personalScreen.promotedTiles.filter(t => t !== sub.tab);
     });
   } else {
@@ -16281,7 +16281,7 @@ function _showAddTileSheet() {
     if (!onScreen.has(group.id)) {
       available.push({ type: 'group', group, label: group.label, color: group.color });
     }
-    group.items.forEach(sub => {
+    if (group.items) group.items.forEach(sub => {
       if (!onScreenSubs.has(sub.tab)) {
         available.push({ type: 'sub', sub, group, label: sub.label, color: group.color });
       }
@@ -16424,7 +16424,7 @@ function _buildTopLevelItems() {
   groups.forEach(group => {
     items.push({ type: 'group', group });
     // Add any promoted sub-tiles from this group immediately after it
-    group.items.forEach(item => {
+    if (group.items) group.items.forEach(item => {
       if (promoted.includes(item.tab)) {
         items.push({ type: 'promoted', item, group });
       }
