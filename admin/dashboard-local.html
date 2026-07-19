@@ -8022,14 +8022,10 @@ function openHealthSafety() {
     </button>`).join('');
 
   view.innerHTML = `
-    <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
-        <div>
-          <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">Health &amp; Safety</div>
-          <div style="font-size:11px;color:#8a8175;">Everything you need to work safely</div>
-        </div>
-        <button onclick="goToRealLandingPage()" class="glaze-tile"
-          style="border:none;padding:8px 12px;font-size:11px;font-weight:800;cursor:pointer;flex-shrink:0;">← Floor plan</button>
+    <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;padding-bottom:100px;">
+      <div style="margin-bottom:16px;">
+        <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">Health &amp; Safety</div>
+        <div style="font-size:11px;color:#8a8175;">Everything you need to work safely</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${tiles}</div>
       <div style="margin-top:20px;padding:14px;background:rgba(43,39,36,0.04);border-radius:12px;
@@ -8902,14 +8898,10 @@ function openPacking() {
   _packingSession.started = _packingSession.started || Date.now();
 
   view.innerHTML = `
-    <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
-        <div>
-          <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">Packing</div>
-          <div style="font-size:11px;color:#8a8175;">Fired pieces going home</div>
-        </div>
-        <button onclick="goToRealLandingPage()" class="glaze-tile"
-          style="border:none;padding:8px 12px;font-size:11px;font-weight:800;cursor:pointer;flex-shrink:0;">← Floor plan</button>
+    <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;padding-bottom:100px;">
+      <div style="margin-bottom:16px;">
+        <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">Packing</div>
+        <div style="font-size:11px;color:#8a8175;">Fired pieces going home</div>
       </div>
       <div id="packing-tiles" style="display:flex;flex-direction:column;gap:12px;">
         <div style="text-align:center;padding:40px;color:#8a8175;font-size:13px;">Loading…</div>
@@ -9770,15 +9762,11 @@ async function openMyTraining() {
   _floorViewMode = 'training';
   view.innerHTML = `
     <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
-        <div>
-          <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">
+      <div style="margin-bottom:16px;">
+        <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">
             ${(currentShiftStaff?.name || '').split(' ')[0]}'s Training</div>
           <div style="font-size:11px;color:#8a8175;">${currentShiftStaff?.role || ''} · read it, tick it, done</div>
         </div>
-        <button onclick="goToRealLandingPage()" class="glaze-tile"
-          style="border:none;padding:8px 12px;font-size:11px;font-weight:800;cursor:pointer;flex-shrink:0;">← Floor plan</button>
-      </div>
       <div id="training-tiles"><div style="text-align:center;padding:40px;color:#8a8175;font-size:13px;">Loading…</div></div>
     </div>`;
   toggleFloatingBackBtn();
