@@ -9023,7 +9023,7 @@ async function _loadLearningSuggestions() {
     }
     el.innerHTML = sugg.map(s => `
       <div class="glaze-tile" style="border-radius:14px;padding:14px;margin-bottom:10px;background:#FFFDF9;">
-        <div style="font-size:13px;font-weight:700;color:#2B2724;line-height:1.4;">${s.title || s.suggestion || 'Suggestion'}</div>
+        <div style="font-size:13px;font-weight:700;color:#2B2724;line-height:1.4;">${s.headline || s.title || s.suggestion || 'Suggestion'}</div>
         ${s.detail ? `<div style="font-size:11px;color:#8a8175;margin-top:4px;line-height:1.4;">${s.detail}</div>` : ''}
         ${s.confidence ? `<div style="font-size:10px;color:#8a8175;margin-top:4px;">Confidence: ${Math.round(s.confidence*100)}%</div>` : ''}
         <div style="display:flex;gap:8px;margin-top:10px;">
