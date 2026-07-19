@@ -16180,7 +16180,7 @@ function _buildPersonalItems() {
 
     // Not a group — it's a tab. Find whichever group owns it.
     for (const g of GRID_NAV_STRUCTURE) {
-      const sub = g.items.find(i => i.tab === id);
+      const sub = g.items ? g.items.find(i => i.tab === id) : null;
       if (sub) { items.push({ type: 'sub', sub, group: g }); return; }
     }
 
@@ -16194,7 +16194,7 @@ function _buildPersonalItems() {
   promotedTiles.forEach(tab => {
     if (seen.has(tab)) return;
     for (const g of GRID_NAV_STRUCTURE) {
-      const sub = g.items.find(i => i.tab === tab);
+      const sub = g.items ? g.items.find(i => i.tab === tab) : null;
       if (sub) { seen.add(tab); items.push({ type: 'sub', sub, group: g }); return; }
     }
   });
@@ -16459,7 +16459,7 @@ function _handleTileLongPress(index) {
   const group = item.group;
   const promoted = _getPromoted();
   const suggestions = _getSuggestions();
-  const available = group.items.filter(i => !promoted.includes(i.tab));
+  const available = group.items ? group.items.filter(i => !promoted.includes(i.tab)) : [];
   if (!available.length) return;
   _showPromoteSheet(group, available, suggestions);
 }
@@ -17764,7 +17764,7 @@ function showGridNavSub(groupId, skipHistoryPush) {
   // If this group only has one item and it's not been promoted,
   // go straight to that screen — no point showing a sub-grid of one.
   const promoted = _getPromoted();
-  const unpromoted = group.items.filter(i => !promoted.includes(i.tab));
+  const unpromoted = group.items ? group.items.filter(i => !promoted.includes(i.tab)) : [];
   if (unpromoted.length === 1) {
     const singleItem = unpromoted[0];
     if (singleItem.fn && window[singleItem.fn]) { window[singleItem.fn](); }
