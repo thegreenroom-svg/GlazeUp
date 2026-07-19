@@ -4526,3 +4526,95 @@ STILL OPEN (refreshed, honest):
   loadRefPhotoPieces, saPieceChosen, legacy handleWholeTrayCapture —
   then the wider 300+ legacy fetches and 36 customer-app alerts,
   screen by screen, an on-device screenshot per gate.
+
+═══ 19 JULY, AFTERNOON/EVENING — DEBUG ROUND: the shared-container bug class (closing at 62032d4) ═══
+Context: the morning's Stage 1 refactor (helpers) was paused; this session went back to the
+"finish everything" build from the previous close (demo system, live Square sync, Cleo,
+workflow bars, Host By Post tile — all built, commit ee3eb67) and put it through real
+on-device testing for the first time. Four rounds of bugs found and fixed, each one deeper
+than the last:
+
+Round 1 (c7851b8) — blank screen after picking a demo difficulty:
+- startDemo()/stopDemo()/live-data connect/disconnect all called location.reload() — which
+  drops back to the LOGIN picker on this app (no session persistence across reload), not
+  back to wherever you were. Looked exactly like "nothing happened." Fixed: all four now
+  update in place. Also fixed a display bug (would have shown [object Object] for customer/
+  piece counts — scenario.customers/.pieces are arrays, code used them raw instead of .length).
+
+Round 2 (95d46e4, ce68da5) — header + home-tree click audit:
+- Home button (🏡, top bar) called showGridNav() — disabled since 18 July, so it did nothing
+  for anyone, on every screen. Repointed to _flowGraphEnter().
+- "✏️ Customise" went to a genuinely blank screen: openCustomiseHome() writes into
+  #floor-plan-view but never sets that container's display, and its caller only hides the
+  flow-tree view without showing anything else. Fixed to show its own view like every other
+  fn-tile does.
+- Floor Plan → tap a table → all 5 "next step" buttons were dead: called an undefined
+  enterBookingFlow(), which threw and blocked the goToTab() that followed it in the same
+  onclick — and that goToTab was targeting 'bookings'/'pieces' tabs that don't exist as views
+  anyway (pre-dates the Journey stages). Rewired to call the real stage functions directly
+  (openStageBooking/Engagement/Completion/Kiln).
+- disconnect-live-btn (Square) was declared but nothing ever set it visible once connected —
+  a real dead half of the connect/disconnect pair. Fixed, now toggles live both ways.
+- Mechanical audit: extracted every onclick in the file, cross-referenced against defined
+  functions. 401 distinct calls, zero genuinely dead after the above fixes (two false-positive
+  matches on the regex, `catch`/`setTimeout`).
+
+Round 3 (4f070ed) — cross-app link audit, prompted directly by Daisy: "the whole thing, start
+to finish, cradle to grave... it's a big spider's web":
+- Ran the SAME mechanical onclick audit on app/index.html (customer app) — clean, zero dead
+  calls, same as admin.
+- Cross-referenced every localStorage key each app writes against what the OTHER app reads.
+  Found exactly one real gap out of ~25 keys: admin's startDemo() writes demo_active; the
+  customer app never read it, so opening the customer app during a demo always fell through
+  to the real walk-in check-in form — this was Daisy's "no session loaded" / "couldn't load
+  the demo" report. Fixed: customer app now checks demo_active on boot and renders it through
+  the EXISTING renderSession() path (same pattern already used for ?preview=kid), not a new
+  system. Same orange demo-mode border as admin.
+- "📥 Pull all real Square history" (triggerKilnCafeBackfill, the REAL 365-day Square backfill,
+  built 18 July per the analytics_cache fix) was still only reachable buried inside the
+  Dashboard tab — Daisy explicitly asked for it on the actual home page. Added a second
+  trigger button in the flow-tree home header; triggerKilnCafeBackfill() now updates whichever
+  button(s) are present instead of a single hardcoded id, so both stay in sync safely.
+- Customer app splash was still the OLD kilnLINK lettermark ("kiln" + LINK letters, "Studio ·
+  Community · Ritual" / "Connect. Create. Belong.") — admin's had already moved to the Kiln
+  Cafe wordmark image. Swapped to match; the re-splash-on-idle mechanism (showSplash(),
+  templated from the original DOM) picks up the change automatically, no JS touched.
+
+Round 4 (62032d4) — the actual root cause, found from "click Floor Plan, land on Customise":
+- THE BIG ONE. #floor-plan-view is a single shared container that Floor Plan, Customise,
+  Packing, Kiln, Collections, Learning, Training, Music, and Health & Safety ALL render into —
+  each one replacing its ENTIRE innerHTML on open. showFloorPlan()/renderFloorPlanElegant()
+  depend on specific static children of that container surviving (#floor-plan-placeholder,
+  #floor-main-studio, the lounge/vault indicators) — every lookup for them is defensively
+  guarded (`if (element) ...`), which is correct practice in general but meant the failure
+  was completely silent: whichever of those 8 other screens you'd visited LAST had destroyed
+  the children Floor Plan needs, so tapping Floor Plan showed nothing new (no placeholder to
+  cover the old screen while loading) and — even once the fetch succeeded — nowhere left to
+  paint the actual tables into.
+- Fixed at the root: showFloorPlan() now detects whether #floor-main-studio is missing and,
+  if so, rebuilds the COMPLETE original skeleton (placeholder + three-column layout + both
+  room indicators) from scratch before doing anything else. No longer depends on any other
+  screen having left the container intact — closes this for all 8 screens at once, not just
+  Customise.
+- Found but NOT changed, flagged for Daisy to check: the "← Floor plan" back button on the
+  table-detail screen calls a DIFFERENT function (showHomeScreen(), a "resting state" summary
+  screen with STUDIO_NOTES) rather than the real showFloorPlan(). Might be intentional
+  (a calmer idle view); might not be. Needs her eyes on that specific path before touching it.
+
+STILL OPEN going into the next session:
+- The showHomeScreen() vs showFloorPlan() question above — needs Daisy's read before any fix.
+- A reported "boxes not all there, three quarters of a box, half a box" layout somewhere
+  around the Dashboard/Takings tile ("the one with the speedometer") — checked the login
+  staff-picker grid (clean 2-column CSS grid, not the cause); have not yet located the actual
+  broken layout inside dashboard-view itself. Needs a screenshot or a more precise description
+  to chase further — the file has several grids and guessing blind risks another wrong-turn
+  detour like the loyalty-screen one earlier this session.
+- Host By Post's real logo — confirmed hostbypost.com is live and correct (matches the kit,
+  pricing, 4-5 week turnaround exactly) but its header mark is inline SVG, not a fetchable
+  image file, and image search didn't surface it either. Asked Daisy to send the file directly.
+- Token rotation (ghp_… still unrotated), Square 403 INSUFFICIENT_SCOPES on team-members,
+  internal staff messaging, Stage 2+ of the helper-refactor (paused this session in favour of
+  the live-testing debug rounds above) — all carried over unchanged.
+
+Current: 62032d4, pushed. Auto-deploy is paused (public-repo mode) — every commit above
+needed Daisy's own Manual Deploy tap on Render before it went live, same as always.
