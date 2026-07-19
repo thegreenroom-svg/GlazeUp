@@ -8887,7 +8887,7 @@ function openTakings() {
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
   const dashboardView = document.getElementById('dashboard-view');
   if (dashboardView) dashboardView.style.display = 'block';
-  showDashboardSection('takings');
+  showDashboardSection('revenue');
 }
 
 
@@ -24373,10 +24373,12 @@ function showSetupSection(section) {
 // No individual real load call needed per section — every real load
 // already fires automatically on tab-open via populateDashboard().
 function showDashboardSection(section) {
-  document.getElementById('dashboard-tile-menu').style.display = 'none';
+  const menu = document.getElementById('dashboard-tile-menu');
+  if (menu) menu.style.display = 'none';
   document.querySelectorAll('.dashboard-section').forEach(el => el.style.display = 'none');
   const target = section === 'revenue' ? 'kiln-cafe-revenue-section' : `dashboard-section-${section}`;
-  document.getElementById(target).style.display = 'block';
+  const targetEl = document.getElementById(target);
+  if (targetEl) targetEl.style.display = 'block';
 }
 
 // ── Genuine real Barista landing page, per direct request ──
