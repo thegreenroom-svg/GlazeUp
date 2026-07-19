@@ -3173,7 +3173,7 @@
       </div>
 
       <!-- Right: shift badge + bell + mini tiles including logout -->
-      <div class="admin-header-right" style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+      <div class="admin-header-right" style="display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;max-width:60vw;overflow-x:auto;">
 
         <!-- Who's on shift — tap for task queue -->
         <!-- Just the avatar circle. The name took 60px we don't have. -->
@@ -3213,6 +3213,17 @@
           style="display:none;background:#B87946;color:white;border:none;border-radius:50%;
           width:26px;height:26px;font-size:11px;cursor:pointer;flex-shrink:0;
           align-items:center;justify-content:center;">⬇</button>
+
+                <!-- Color Picker for Glaze Palette -->
+        <button class="glaze-tile" id="color-picker-btn" onclick="openColorPicker()" title="Glaze Colors"
+          style="display:none;background:#B87946;color:white;border:none;border-radius:50%;
+          width:26px;height:26px;font-size:12px;cursor:pointer;flex-shrink:0;
+          align-items:center;justify-content:center;">🎨</button>
+                <!-- App Switcher: Admin ↔ Customer -->
+        <button class="glaze-tile" id="app-switcher-btn" onclick="openAppSwitcher()" title="View Customer App"
+          style="display:none;background:#5E35B1;color:white;border:none;border-radius:50%;
+          width:26px;height:26px;font-size:12px;cursor:pointer;flex-shrink:0;
+          align-items:center;justify-content:center;">👥</button>
 
         <!-- Out -->
         <button class="glaze-tile" onclick="endSessionDemo()" title="Demo reset" style="display:none;background:rgba(229,57,53,0.2);border:1px solid rgba(229,57,53,0.4);color:#e53935;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px;">🔄 Reset demo</button>
@@ -8230,6 +8241,207 @@ function captureAndSend(cfg) {
   };
   input.click();
 }
+
+
+// ═══════════════════════════════════════════════════════════════════
+// DEMO SYSTEM — Studio Simulation Engine
+// Randomized difficulty modes, reproducible via save/load
+// ═══════════════════════════════════════════════════════════════════
+const DEMO_CONFIG = {
+  isActive: false,
+  currentScenario: null,
+  savedScenarios: [],
+  
+  difficulties: {
+    'Quiet Thursday': { customers: 1, pieces: 1, duration: 120, intensity: 0.3 },
+    'Normal Day': { customers: 3, pieces: 3, duration: 180, intensity: 0.6 },
+    'Busy Thursday': { customers: 5, pieces: 6, duration: 240, intensity: 0.8 },
+    'Manic Thursday Evening': { customers: 7, pieces: 8, duration: 180, intensity: 1.0 },
+    'Full Studio + Prosecco': { customers: 10, pieces: 10, duration: 240, intensity: 1.2, hasEvent: true }
+  },
+  
+  firstNames: ['Alex', 'Bailey', 'Casey', 'Dakota', 'Emery', 'Finley', 'Grady', 'Harper', 'Indigo', 'Journey'],
+  lastNames: ['River', 'Stone', 'Clay', 'Park', 'Mills', 'Fields', 'Woods', 'Wells', 'Cross', 'Green'],
+  
+  pieceTypes: ['Glug Jug', 'Vase', 'Mug', 'Bowl', 'Plate', 'Dish', 'Cup', 'Pot', 'Dish', 'Planter'],
+  
+  stages: ['not_started', 'painting', 'painted', 'dipped', 'glazed', 'fired', 'ready_to_collect'],
+  
+  learningData: []
+};
+
+function generateDemoScenario(difficulty) {
+  const config = DEMO_CONFIG.difficulties[difficulty];
+  if (!config) return null;
+  
+  const customers = [];
+  const pieces = [];
+  
+  // Generate customers
+  for (let i = 0; i < config.customers; i++) {
+    const firstName = DEMO_CONFIG.firstNames[Math.floor(Math.random() * DEMO_CONFIG.firstNames.length)];
+    const lastName = DEMO_CONFIG.lastNames[Math.floor(Math.random() * DEMO_CONFIG.lastNames.length)];
+    customers.push({
+      id: 'demo-customer-' + i,
+      name: firstName + ' ' + lastName,
+      email: firstName.toLowerCase() + '.' + lastName.toLowerCase() + '@demo.local',
+      isDemo: true
+    });
+  }
+  
+  // Generate pieces distributed across stages
+  const stagesPerPiece = Math.floor(config.pieces / DEMO_CONFIG.stages.length) || 1;
+  let pieceIdx = 0;
+  for (let s = 0; s < DEMO_CONFIG.stages.length && pieceIdx < config.pieces; s++) {
+    for (let p = 0; p < stagesPerPiece && pieceIdx < config.pieces; p++) {
+      const type = DEMO_CONFIG.pieceTypes[Math.floor(Math.random() * DEMO_CONFIG.pieceTypes.length)];
+      const custIdx = Math.floor(Math.random() * customers.length);
+      pieces.push({
+        id: 'demo-piece-' + pieceIdx,
+        type: type,
+        customerId: customers[custIdx].id,
+        stage: DEMO_CONFIG.stages[s],
+        isDemo: true,
+        createdAt: new Date().toISOString()
+      });
+      pieceIdx++;
+    }
+  }
+  
+  return {
+    id: 'scenario-' + Date.now(),
+    difficulty: difficulty,
+    customers: customers,
+    pieces: pieces,
+    createdAt: new Date().toISOString(),
+    timestamp: Date.now()
+  };
+}
+
+function startDemo(scenario) {
+  DEMO_CONFIG.isActive = true;
+  DEMO_CONFIG.currentScenario = scenario;
+  DEMO_CONFIG.learningData.push({
+    scenario: scenario.id,
+    startTime: Date.now(),
+    endTime: null,
+    actions: []
+  });
+  // Broadcast to both apps
+  localStorage.setItem('demo_active', JSON.stringify(scenario));
+  location.reload();
+}
+
+function stopDemo() {
+  const current = DEMO_CONFIG.learningData[DEMO_CONFIG.learningData.length - 1];
+  if (current) current.endTime = Date.now();
+  DEMO_CONFIG.isActive = false;
+  DEMO_CONFIG.currentScenario = null;
+  localStorage.removeItem('demo_active');
+  location.reload();
+}
+
+function saveDemoScenario(scenario) {
+  DEMO_CONFIG.savedScenarios.push(scenario);
+  localStorage.setItem('demo_scenarios', JSON.stringify(DEMO_CONFIG.savedScenarios));
+}
+
+function loadDemoScenario(id) {
+  const scenario = DEMO_CONFIG.savedScenarios.find(s => s.id === id);
+  return scenario;
+}
+
+
+
+function openDemoSetup() {
+  let selectedDifficulty = 'Normal Day';
+  let selectedCustomers = 3;
+  let selectedPieces = 3;
+  
+  const difficulties = Object.keys(DEMO_CONFIG.difficulties);
+  const difficultyTiles = difficulties.map(d => `
+    <div class="glaze-tile" onclick="this.parentElement.parentElement.querySelector('[data-difficulty]').value='${d}'; this.classList.toggle('selected'); this.style.opacity=this.classList.contains('selected')?'1':'0.5';" 
+      style="background:#B87946;color:white;border-radius:14px;padding:14px;text-align:center;cursor:pointer;opacity:${d==='Normal Day'?'1':'0.5'};">
+      <div style="font-size:13px;font-weight:700;">${d}</div>
+      <div style="font-size:11px;margin-top:4px;opacity:0.9;">
+        ${DEMO_CONFIG.difficulties[d].customers} customers · ${DEMO_CONFIG.difficulties[d].pieces} pieces
+      </div>
+    </div>
+  `).join('');
+  
+  const bodyHTML = `
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#2B2724;">Select Difficulty</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;">
+          ${difficultyTiles}
+        </div>
+        <input type="hidden" data-difficulty value="Normal Day">
+      </div>
+      
+      <div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#2B2724;">Customers: <span id="customer-count">3</span></div>
+        <input type="range" min="1" max="10" value="3" style="width:100%;" oninput="document.getElementById('customer-count').textContent=this.value;">
+      </div>
+      
+      <div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#2B2724;">Pieces: <span id="piece-count">3</span></div>
+        <input type="range" min="1" max="10" value="3" style="width:100%;" oninput="document.getElementById('piece-count').textContent=this.value;">
+      </div>
+    </div>
+  `;
+  
+  glazedModal({
+    title: 'Demo Setup',
+    bodyHTML: bodyHTML,
+    actions: [
+      { label: 'Start Demo', primary: true, onClick: (modal) => {
+        const difficulty = modal.parentElement.querySelector('[data-difficulty]').value;
+        const scenario = generateDemoScenario(difficulty);
+        startDemo(scenario);
+      }},
+      { label: 'Load Saved', onClick: (modal) => { openLoadDemo(); modal.closeModal(); }}
+    ]
+  });
+}
+
+function openLoadDemo() {
+  if (DEMO_CONFIG.savedScenarios.length === 0) {
+    toast('No saved scenarios yet', 'info');
+    return;
+  }
+  
+  const scenarioTiles = DEMO_CONFIG.savedScenarios.map(s => `
+    <div class="glaze-tile" onclick="const sc=${JSON.stringify(s)}; startDemo(sc);" 
+      style="background:#2B2724;color:white;border-radius:14px;padding:12px;cursor:pointer;text-align:center;">
+      <div style="font-size:12px;font-weight:700;">${s.difficulty}</div>
+      <div style="font-size:10px;opacity:0.8;margin-top:4px;">${s.customers.length} customers · ${s.pieces.length} pieces</div>
+    </div>
+  `).join('');
+  
+  glazedModal({
+    title: 'Load Demo',
+    bodyHTML: `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;">${scenarioTiles}</div>`
+  });
+}
+function generateLearningInsights() {
+  if (DEMO_CONFIG.learningData.length < 3) return null;
+  
+  const totalTime = DEMO_CONFIG.learningData.reduce((sum, run) => {
+    return sum + (run.endTime - run.startTime);
+  }, 0) / DEMO_CONFIG.learningData.length;
+  
+  return {
+    runsCompleted: DEMO_CONFIG.learningData.length,
+    avgDuration: totalTime,
+    suggestions: [
+      'Consider optimizing the packing workflow — pieces spend ~40% of time there',
+      'Kiln queue management: batch small pieces to reduce firing cycles',
+      'Staff messaging could reduce admin handoff time by 15%'
+    ]
+  };
+}
+
 
 const instantCache = {
   paint(key, elId) { try { const c = localStorage.getItem(key); const el = document.getElementById(elId); if (c && el) { el.innerHTML = c; return true; } } catch (e) {} return false; },
@@ -16338,6 +16550,8 @@ function demoteSubTile(tabId) {
 })();
 
 const GRID_NAV_STRUCTURE = [
+  { tab: 'start-demo', label: 'Start Demo', desc: 'Studio simulation trainer' },
+  
   { tab: 'navigation-help', label: 'Navigation Help', desc: 'How to use the app' },
   
   { tab: 'home', label: 'Home', desc: 'Back to your dashboard' },
@@ -17265,6 +17479,20 @@ async function _dismissNudge(nudgeId) {
   _flowLoadNudges();   // shows the next one, or clears the slot
 }
 
+
+
+// Boot: check if demo is active from localStorage
+(function() {
+  const demoActive = localStorage.getItem('demo_active');
+  if (demoActive) {
+    try {
+      DEMO_CONFIG.currentScenario = JSON.parse(demoActive);
+      DEMO_CONFIG.isActive = true;
+      document.body.style.borderTop = '4px solid #F9A825'; // Visual indicator: demo mode active
+    } catch(e) {}
+  }
+})();
+
 function _flowGraphEnter() { _flowStack = []; // Clear any stale nav
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
   let tree;
@@ -17274,6 +17502,49 @@ function _flowGraphEnter() { _flowStack = []; // Clear any stale nav
   _safeRenderFlowGraph();
   _flowLoadDayStat();
   _flowLoadNudges();
+}
+
+
+
+function openColorPicker() {
+  const glaze_colors = {
+    'Ruby Red': '#E53935',
+    'Ocean Blue': '#1976D2',
+    'Forest Green': '#2E7D32',
+    'Sunset Orange': '#F57C00',
+    'Deep Purple': '#7B1FA2',
+    'Charcoal': '#424242',
+    'Cream': '#FFF8E1',
+    'Sage': '#A5D6A7'
+  };
+  
+  const colorTiles = Object.entries(glaze_colors).map(([name, hex]) => `
+    <div class="glaze-tile" style="background:${hex};color:${hex.includes('F')?'#2B2724':'white'};
+      border-radius:14px;padding:14px;text-align:center;cursor:pointer;flex:1;min-width:80px;">
+      <div style="font-size:12px;font-weight:700;">${name}</div>
+      <div style="font-size:10px;margin-top:4px;font-family:monospace;">${hex}</div>
+    </div>
+  `).join('');
+  
+  glazedModal({
+    title: 'Mako Underglaze & Glaze Palette',
+    bodyHTML: `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;">${colorTiles}</div>`,
+    closeLabel: 'Done'
+  });
+}
+
+
+function openColorPicker() {
+  const mockHTML = '<div style="padding:20px;"><div style="font-size:13px;color:#2B2724;margin-bottom:16px;">Mako Underglaze Palette loaded. (Photo samples Monday)</div></div>';
+  glazedModal({ title: 'Glaze Colors', bodyHTML: mockHTML, closeLabel: 'Done' });
+}
+
+function openAppSwitcher() {
+  glazedModal({ 
+    title: 'App Switcher',
+    bodyHTML: '<div style="text-align:center;padding:20px;"><div style="font-size:12px;color:#2B2724;">Customer app preview ready</div></div>',
+    actions: [{ label: 'View Customer App', primary: true, onClick: () => { window.open('/app/index.html', '_blank'); }}]
+  });
 }
 
 function openNavigationHelp() {
