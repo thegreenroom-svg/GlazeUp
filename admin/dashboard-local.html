@@ -3224,6 +3224,16 @@
           style="display:none;background:#5E35B1;color:white;border:none;border-radius:50%;
           width:26px;height:26px;font-size:12px;cursor:pointer;flex-shrink:0;
           align-items:center;justify-content:center;">👥</button>
+                <!-- Live Data Sync -->
+        <button class="glaze-tile" id="sync-live-btn" onclick="syncLiveData()" title="Sync Live Data"
+          style="display:none;background:#2e7d32;color:white;border:none;border-radius:50%;
+          width:26px;height:26px;font-size:12px;cursor:pointer;flex-shrink:0;
+          align-items:center;justify-content:center;">📥</button>
+        
+        <button class="glaze-tile" id="disconnect-live-btn" onclick="disconnectLiveData()" title="Disconnect"
+          style="display:none;background:#c0392b;color:white;border:none;border-radius:50%;
+          width:26px;height:26px;font-size:12px;cursor:pointer;flex-shrink:0;
+          align-items:center;justify-content:center;">🔌</button>
 
         <!-- Out -->
         <button class="glaze-tile" onclick="endSessionDemo()" title="Demo reset" style="display:none;background:rgba(229,57,53,0.2);border:1px solid rgba(229,57,53,0.4);color:#e53935;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px;">🔄 Reset demo</button>
@@ -8276,7 +8286,289 @@ const DEMO_CONFIG = {
   stages: ['not_started', 'painting', 'painted', 'dipped', 'glazed', 'fired', 'ready_to_collect'],
   
   learningData: []
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LIVE DATA SYSTEM — Real-time Square sync + separate demo cache
+// ═══════════════════════════════════════════════════════════════════
+const LIVE_CACHE = {
+  isConnected: false,
+  lastSync: null,
+  transactions: [],
+  revenue: { ytd: 0, mtd: 0, today: 0, bestDay: 0 },
+  metadata: {}
 };
+
+const DEMO_CACHE = {
+  isActive: false,
+  transactions: [],
+  revenue: { ytd: 0, mtd: 0, today: 0 },
+  metadata: {}
+};
+
+let CURRENT_DATA_SOURCE = LIVE_CACHE; // Default to live
+let AUTO_SYNC_INTERVAL = null;
+
+async function syncLiveData() {
+  if (LIVE_CACHE.isConnected) {
+    toast('Already connected', 'info');
+    return;
+  }
+  
+  try {
+    // Pull real Square data
+    const res = await api('/api/square/transactions?studioId=' + studioId);
+    if (res && res.transactions) {
+      LIVE_CACHE.transactions = res.transactions;
+      LIVE_CACHE.lastSync = new Date();
+      
+      // Calculate metrics: YTD, MTD, Today, best day
+      calculateMetrics();
+      
+      LIVE_CACHE.isConnected = true;
+      CURRENT_DATA_SOURCE = LIVE_CACHE;
+      toast('✓ Live data connected', 'ok');
+      
+      // Start auto-polling
+      startAutoSync();
+      
+      // Update all displays
+      location.reload();
+    } else {
+      toast('No data received', 'error');
+    }
+  } catch(e) {
+    toast('Connection failed: ' + e.message, 'error');
+  }
+}
+
+async function disconnectLiveData() {
+  LIVE_CACHE.isConnected = false;
+  LIVE_CACHE.transactions = [];
+  LIVE_CACHE.revenue = { ytd: 0, mtd: 0, today: 0, bestDay: 0 };
+  CURRENT_DATA_SOURCE = LIVE_CACHE; // Still reads from live cache, just empty
+  
+  stopAutoSync();
+  toast('✓ Live data disconnected', 'ok');
+  location.reload();
+}
+
+function calculateMetrics() {
+  const now = new Date();
+  const thisYear = now.getFullYear();
+  const thisMonth = now.getMonth();
+  const today = now.getDate();
+  
+  let ytd = 0, mtd = 0, todayAmount = 0, bestDayAmount = 0;
+  const dayTotals = {};
+  
+  LIVE_CACHE.transactions.forEach(tx => {
+    const txDate = new Date(tx.created_at);
+    const amount = parseFloat(tx.amount_money?.amount || 0) / 100;
+    
+    // YTD
+    if (txDate.getFullYear() === thisYear) ytd += amount;
+    
+    // MTD
+    if (txDate.getFullYear() === thisYear && txDate.getMonth() === thisMonth) mtd += amount;
+    
+    // Today
+    if (txDate.getDate() === today && txDate.getMonth() === thisMonth && txDate.getFullYear() === thisYear) {
+      todayAmount += amount;
+    }
+    
+    // Best day (aggregate by day-of-month across all years)
+    const dayOfMonth = txDate.getDate();
+    dayTotals[dayOfMonth] = (dayTotals[dayOfMonth] || 0) + amount;
+  });
+  
+  bestDayAmount = Math.max(...Object.values(dayTotals), 0);
+  
+  LIVE_CACHE.revenue = {
+    ytd: ytd.toFixed(2),
+    mtd: mtd.toFixed(2),
+    today: todayAmount.toFixed(2),
+    bestDay: bestDayAmount.toFixed(2)
+  };
+}
+
+function startAutoSync() {
+  if (AUTO_SYNC_INTERVAL) return;
+  
+  AUTO_SYNC_INTERVAL = setInterval(async () => {
+    if (!LIVE_CACHE.isConnected) return;
+    
+    try {
+      const res = await api('/api/square/transactions?studioId=' + studioId);
+      if (res && res.transactions) {
+        LIVE_CACHE.transactions = res.transactions;
+        LIVE_CACHE.lastSync = new Date();
+        calculateMetrics();
+        // Update dashboard if visible
+        if (document.querySelector('#dashboard-revenue-ytd')) {
+          document.querySelector('#dashboard-revenue-ytd').textContent = '£' + LIVE_CACHE.revenue.ytd;
+          document.querySelector('#dashboard-revenue-mtd').textContent = '£' + LIVE_CACHE.revenue.mtd;
+          document.querySelector('#dashboard-revenue-today').textContent = '£' + LIVE_CACHE.revenue.today;
+        }
+      }
+    } catch(e) {
+      // Silent fail on auto-sync
+    }
+  }, 30000); // Poll every 30 seconds
+}
+
+function stopAutoSync() {
+  if (AUTO_SYNC_INTERVAL) {
+    clearInterval(AUTO_SYNC_INTERVAL);
+    AUTO_SYNC_INTERVAL = null;
+  }
+}
+
+// When demo starts, switch to demo cache
+function startDemoWithDataToggle(scenario) {
+  DEMO_CONFIG.isActive = true;
+  DEMO_CONFIG.currentScenario = scenario;
+  CURRENT_DATA_SOURCE = DEMO_CACHE; // Switch to demo cache
+  startDemo(scenario);
+}
+
+// When demo stops, switch back to live cache
+function stopDemoWithDataToggle() {
+  DEMO_CONFIG.isActive = false;
+  CURRENT_DATA_SOURCE = LIVE_CACHE; // Back to live cache
+  stopDemo();
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// CLEO — Intelligent Assistant
+// Appears on pages, offers walkthroughs, voice-ready
+// ═══════════════════════════════════════════════════════════════════
+const CLEO = {
+  isActive: true,
+  voice: 'female-gentle', // Standard Cleo voice
+  pageContexts: {
+    'home': 'Welcome to The Kiln Cafe! I can walk you through your tasks, or answer questions about your pieces.',
+    'dashboard': 'Your revenue dashboard. Want me to explain the metrics?',
+    'kiln': 'Kiln management. I can guide you through the firing process.',
+    'packing': 'Packing station. Need help organizing pieces for customers?',
+    'collections': 'Collections. I can show you who\'s ready to pick up.',
+    'learning': 'Learning suggestions for your next piece. Want tips?'
+  }
+};
+
+function showCleoWalkthrough(page) {
+  if (!CLEO.isActive) return;
+  
+  const message = CLEO.pageContexts[page] || 'How can I help you with this?';
+  
+  glazedModal({
+    title: '💡 Cleo',
+    bodyHTML: `
+      <div style="text-align:center;padding:20px;">
+        <div style="font-size:48px;margin-bottom:12px;">🎨</div>
+        <div style="font-size:14px;color:#2B2724;line-height:1.6;margin-bottom:16px;">${message}</div>
+      </div>
+    `,
+    actions: [
+      { label: 'Yes, walk me through it', primary: true, onClick: (modal) => {
+        showCleoTutorial(page);
+        modal.closeModal();
+      }},
+      { label: 'I\'ve got this', onClick: (modal) => { modal.closeModal(); }}
+    ]
+  });
+}
+
+function showCleoTutorial(page) {
+  const tutorials = {
+    'dashboard': 'Your dashboard shows real-time revenue. YTD is your yearly total, MTD is this month, and Today shows what you\'ve made so far. The best day equivalent shows your highest-earning day—aim for that every day!',
+    'kiln': 'Dip pieces in glaze, load them into the kiln, fire at the right temperature. I\'ll walk you through each step as you mark them ready.',
+    'packing': 'Pieces come here when they\'re fired and ready. Wrap them, label them, box them. Customers pick them up from collections.',
+    'home': 'Each tile is a task. Tap any one to get started. I\'m here to help anytime—just ask!'
+  };
+  
+  const tutorial = tutorials[page] || 'Let me know what you\'re working on.';
+  
+  glazedModal({
+    title: 'Cleo\'s Guide',
+    bodyHTML: `<div style="padding:16px;font-size:13px;color:#2B2724;line-height:1.8;">${tutorial}</div>`,
+    closeLabel: 'Got it'
+  });
+}
+
+// CLEO LEARNING — tracks studio workflow, improves guidance
+CLEO.learningData = {
+  interactions: [],
+  processFlows: {},
+  bottlenecks: [],
+  mostUsed: {}
+};
+
+function trackCleoInteraction(page, action, duration) {
+  CLEO.learningData.interactions.push({
+    page: page,
+    action: action,
+    duration: duration,
+    timestamp: new Date(),
+    user: currentShiftStaff?.id || 'unknown'
+  });
+  
+  // Update process flows
+  if (!CLEO.learningData.processFlows[page]) {
+    CLEO.learningData.processFlows[page] = { count: 0, avgTime: 0 };
+  }
+  CLEO.learningData.processFlows[page].count++;
+  
+  // Learn from patterns
+  if (duration > 300) { // 5+ minutes on one screen = bottleneck
+    CLEO.learningData.bottlenecks.push({ page, duration });
+  }
+  
+  // Store for Cleo's context
+  localStorage.setItem('cleo-learning', JSON.stringify(CLEO.learningData));
+}
+
+function getCleoAdaptiveHelp(page) {
+  // Cleo adapts help based on what she's learned
+  const flowData = CLEO.learningData.processFlows[page];
+  const isBottleneck = CLEO.learningData.bottlenecks.some(b => b.page === page);
+  
+  if (isBottleneck) {
+    return 'I\'ve noticed ' + page + ' takes longer than expected. Want me to walk you through a faster approach?';
+  }
+  
+  if (flowData && flowData.count > 5) {
+    return 'You\'ve done this several times now. Want a deeper dive into advanced options?';
+  }
+  
+  return CLEO.pageContexts[page] || 'How can I help?';
+}
+
+function shareCleoLearning(role) {
+  // Cleo shares what she\'s learned with the whole team
+  const insights = {
+    mostCommonFlow: Object.keys(CLEO.learningData.processFlows).sort(
+      (a, b) => CLEO.learningData.processFlows[b].count - CLEO.learningData.processFlows[a].count
+    )[0],
+    bottlenecks: CLEO.learningData.bottlenecks.slice(0, 3),
+    suggestion: 'Consider optimizing ' + (CLEO.learningData.bottlenecks[0]?.page || 'workflow')
+  };
+  
+  return insights;
+}
+
+
+function cleoSay(message) {
+  // Voice ready: if browser supports Web Speech API, Cleo speaks
+  if ('speechSynthesis' in window) {
+    const utterance = new SpeechSynthesisUtterance(message);
+    utterance.voice = speechSynthesis.getVoices().find(v => v.name.includes('Female')) || speechSynthesis.getVoices()[0];
+    speechSynthesis.speak(utterance);
+  }
+  toast(message, 'info');
+}
+;
 
 function generateDemoScenario(difficulty, holiday) {
   const config = JSON.parse(JSON.stringify(DEMO_CONFIG.difficulties[difficulty]));
