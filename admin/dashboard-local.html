@@ -8348,8 +8348,8 @@ async function syncLiveData() {
       // Start auto-polling
       startAutoSync();
       
-      // Update all displays
-      location.reload();
+      // Refresh the dashboard in place — a full reload drops back to login.
+      if (typeof populateDashboard === 'function') { try { populateDashboard(); } catch(e){} }
     } else {
       toast('No data received', 'error');
     }
@@ -8366,7 +8366,7 @@ async function disconnectLiveData() {
   
   stopAutoSync();
   toast('✓ Live data disconnected', 'ok');
-  location.reload();
+  if (typeof populateDashboard === 'function') { try { populateDashboard(); } catch(e){} }
 }
 
 function calculateMetrics() {
@@ -8686,8 +8686,9 @@ function cleoSay(message) {
 ;
 
 function generateDemoScenario(difficulty, holiday) {
-  const config = JSON.parse(JSON.stringify(DEMO_CONFIG.difficulties[difficulty]));
-  if (!config) return null;
+  const base = DEMO_CONFIG.difficulties[difficulty];
+  if (!base) return null;
+  const config = JSON.parse(JSON.stringify(base));
   
   // Apply holiday pressure if selected
   if (holiday === 'Holiday Rush') {
@@ -8745,6 +8746,7 @@ function generateDemoScenario(difficulty, holiday) {
 }
 
 function startDemo(scenario) {
+  if (!scenario) { toast('Could not build that demo — try again', 'error'); return; }
   DEMO_CONFIG.isActive = true;
   DEMO_CONFIG.currentScenario = scenario;
   DEMO_CONFIG.learningData.push({
@@ -8753,9 +8755,16 @@ function startDemo(scenario) {
     endTime: null,
     actions: []
   });
-  // Broadcast to both apps
   localStorage.setItem('demo_active', JSON.stringify(scenario));
-  location.reload();
+  document.body.style.borderTop = '4px solid #F9A825'; // demo-mode indicator
+  // Do NOT reload — a reload drops back to the login picker and looks blank.
+  // The modal's own action handler closes it; just confirm and drop straight
+  // onto the floor plan where the demo tables live.
+  document.querySelectorAll('.klnk-glazed-modal').forEach(m => m.remove());
+  toast(`Demo running · ${scenario.customers.length} customers · ${scenario.pieces.length} pieces`, 'success');
+  document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+  if (typeof showFloorPlan === 'function') { showFloorPlan(); }
+  else { _flowGraphEnter(); }
 }
 
 function stopDemo() {
@@ -8764,7 +8773,9 @@ function stopDemo() {
   DEMO_CONFIG.isActive = false;
   DEMO_CONFIG.currentScenario = null;
   localStorage.removeItem('demo_active');
-  location.reload();
+  document.body.style.borderTop = '';
+  toast('Demo ended', 'info');
+  _flowGraphEnter();
 }
 
 function saveDemoScenario(scenario) {
