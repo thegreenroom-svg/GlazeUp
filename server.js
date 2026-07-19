@@ -5830,12 +5830,18 @@ app.get('/api/floor/active', async (req, res) => {
             locationIds,
             query: {
               filter: { dateTimeFilter: { createdAt: { startAt: startOfDay.toISOString() } },
-                        stateFilter: { states: ['OPEN','COMPLETED'] } },
+                        stateFilter: { states: ['OPEN'] } },
               sort: { sortField: 'CREATED_AT', sortOrder: 'DESC' },
             },
             limit: 200,
           });
           const orders = ordersRes.result.orders || [];
+          // Only genuinely OPEN Square orders count as live on the floor.
+          // A COMPLETED order is a paid-up till transaction (a coffee, a
+          // finished session already settled) — NOT someone currently
+          // painting. Counting those as "live now" was inflating the
+          // floor count with orders that were done and dusted. An OPEN
+          // order is a tab still running: that's a live table.
           // Which table did the girls ring this against? The table name
           // lives in the order's referenceId (app-created orders set it to
           // the booking code) or its note, or a line-item note. We read
