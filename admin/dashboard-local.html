@@ -3193,7 +3193,7 @@ function updateStaffName() {
       </div>
 
       <!-- Right: shift badge + bell + mini tiles including logout -->
-      <div class="admin-header-right" style="display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;max-width:60vw;overflow-x:auto;">
+      <div id="admin-header-right-buttons" class="admin-header-right" style="display:none;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;max-width:60vw;overflow-x:auto;">
 
         <!-- Who's on shift — tap for task queue -->
         <!-- Just the avatar circle. The name took 60px we don't have. -->
@@ -13802,6 +13802,10 @@ function selectDemoStaff(idx) {
   const modal = document.getElementById('shift-login-modal');
   if (modal) modal.style.display = 'none';
   
+  // Show all header buttons now that user is logged in
+  const headerRight = document.getElementById('admin-header-right-buttons');
+  if (headerRight) headerRight.style.display = 'flex';
+  
   _flowGraphEnter();
 }
 
@@ -14450,6 +14454,11 @@ async function logOutOfShift() {
   // via the direct header button won't have opened it in the first place.
   const taskQueuePanel = document.getElementById('task-queue-panel');
   if (taskQueuePanel && taskQueuePanel.style.display === 'flex') toggleTaskQueue();
+  
+  // Hide header buttons — user is no longer logged in
+  const headerRight = document.getElementById('admin-header-right-buttons');
+  if (headerRight) headerRight.style.display = 'none';
+  
   if (SHIFT_PIN_LOGIN_ENABLED) {
     setTimeout(() => document.getElementById('shift-login-modal').style.display = 'flex', 300);
   } else {
