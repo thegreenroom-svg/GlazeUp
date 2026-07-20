@@ -9033,10 +9033,16 @@ const _walk = {
       <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
         <b>${this.name}</b> · step ${stepNo}/${total}${step.label?` · ${step.label}`:''}</div>
       ${done
-        ? `<button onclick="_walk.exit()" style="flex-shrink:0;background:#fff;color:#4527A0;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:800;cursor:pointer;">Done — exit</button>`
+        ? `<button onclick="_walk.restart()" style="flex-shrink:0;background:rgba(255,255,255,0.25);color:#fff;border:none;border-radius:8px;padding:7px 11px;font-size:12px;font-weight:800;cursor:pointer;">↻ Start again</button>
+           <button onclick="_walk.exit()" style="flex-shrink:0;background:#fff;color:#4527A0;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:800;cursor:pointer;">Done — exit</button>`
         : `<button onclick="_walk.next()" style="flex-shrink:0;background:rgba(255,255,255,0.25);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:800;cursor:pointer;">Next step →</button>
-           <button onclick="_walk.exit()" title="Exit walk-through" style="flex-shrink:0;background:none;border:1px solid rgba(255,255,255,0.5);color:#fff;border-radius:8px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;">Exit</button>`}
+           <button onclick="_walk.exit()" title="Cancel walk-through and go back" style="flex-shrink:0;background:none;border:1px solid rgba(255,255,255,0.5);color:#fff;border-radius:8px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;">Cancel</button>`}
     `;
+  },
+
+  restart() {
+    this.i = 0;
+    this._runStep();
   }
 };
 
@@ -23911,6 +23917,13 @@ function showNewBookingForm(tableName) {
 }
 
 async function createNewBooking(tableName) {
+  // WALK-THROUGH GUARD — if a walk-through is active, this is example
+  // data only. Never write to the database; simulate success and let
+  // the walk-through advance to the next stage instead.
+  if (window._walk && _walk.active) {
+    try { toast('Example booking — not saved. Tap "Next step" to carry on.', 'success'); } catch(e){}
+    return;
+  }
   const name = document.getElementById('new-name').value;
   const party = parseInt(document.getElementById('new-party').value);
   const type = document.getElementById('new-type').value;
