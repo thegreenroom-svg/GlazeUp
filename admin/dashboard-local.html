@@ -8896,6 +8896,52 @@ const instantCache = {
   clear(prefix)    { try { Object.keys(localStorage).forEach(k => { if (k.indexOf(prefix || 'klnk_cache_') === 0) localStorage.removeItem(k); }); } catch (e) {} }
 };
 
+// ─── EMPTY-STAGE PREVIEW ────────────────────────────────────────────
+// When a workflow stage has no real pieces waiting, staff still need to
+// see what the stage does and where the flow goes next — otherwise an
+// empty stage is a dead end you can't learn from. This renders, in
+// place of the plain "Nothing waiting":
+//   1. a clearly-labelled EXAMPLE item, tappable, so you can walk the
+//      stage's own action with dummy data (never mistaken for real —
+//      it carries an "Example" chip and a dashed border), and
+//   2. a "What happens next →" line naming the stage the piece moves
+//      to once this stage's action is done.
+// _emptyStagePreview(opts) returns an HTML string. opts:
+//   icon, exampleLabel, actionLabel, onExample (JS call string),
+//   nextLabel (where it goes next), nextEmoji.
+function _emptyStagePreview(opts) {
+  const o = opts || {};
+  const exampleLabel = o.exampleLabel || 'Example piece';
+  const actionLabel  = o.actionLabel  || 'See what happens';
+  const onExample    = o.onExample    || '';
+  const nextLabel    = o.nextLabel    || '';
+  const nextEmoji    = o.nextEmoji    || '→';
+  return `
+    <div style="margin-top:8px;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+        <span style="font-size:11px;color:#8a8175;">Nothing waiting right now.</span>
+      </div>
+      <!-- Clearly-labelled EXAMPLE — dashed border + chip, never real -->
+      <div style="border:1.5px dashed rgba(43,39,36,0.28);border-radius:12px;padding:12px;background:rgba(43,39,36,0.03);">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <span style="background:#B87946;color:#fff;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;padding:2px 7px;border-radius:20px;">Example</span>
+          <span style="font-size:12px;font-weight:700;color:#2B2724;">${exampleLabel}</span>
+        </div>
+        <button class="glaze-tile" onclick="${onExample}" style="width:100%;border:none;border-radius:10px;padding:11px;
+          font-size:12px;font-weight:800;background:#5E9DB6;color:#fff;cursor:pointer;">${actionLabel} →</button>
+        ${nextLabel ? `<div style="font-size:11px;color:#8a8175;margin-top:10px;text-align:center;">
+          What happens next: <b style="color:#2B2724;">${nextEmoji} ${nextLabel}</b></div>` : ''}
+      </div>
+    </div>`;
+}
+
+// Walk a preview of a stage's action with dummy data — a toast that
+// names what WOULD happen, then points at the next stage. No real data
+// is written; this is purely so staff can see the flow end to end.
+function _previewStageStep(what, nextLabel) {
+  try { toast(`Example only — ${what}. Next: ${nextLabel}`, 'success'); } catch(e) {}
+}
+
 
 function openTakings() {
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
@@ -9278,7 +9324,13 @@ async function _loadKilnBody() {
           </div>
           <button class="glaze-tile" onclick="_kilnMarkDipped()" style="width:100%;margin-top:10px;border:none;border-radius:10px;padding:11px;
             font-size:12px;font-weight:800;background:#00897B;color:#fff;cursor:pointer;">✓ Mark selected as dipped</button>
-        ` : `<div style="font-size:12px;color:#8a8175;margin-top:6px;">Nothing waiting.</div>`}
+        ` : _emptyStagePreview({
+            exampleLabel: 'A painted mug, ready for its glaze dip',
+            actionLabel: 'Mark as dipped',
+            onExample: `_previewStageStep('this piece would be marked dipped and move to the firing queue','Dipped, waiting to fire')`,
+            nextLabel: 'Dipped, waiting to fire',
+            nextEmoji: '🔥'
+          })}
       </div>
       <!-- STAGE 2: dipped, waiting for a kiln load -->
       <div class="glaze-tile" style="border-radius:14px;padding:14px;">
@@ -9291,7 +9343,13 @@ async function _loadKilnBody() {
           </div>
           <button class="glaze-tile" onclick="_kilnStartFiring()" style="width:100%;margin-top:10px;border:none;border-radius:10px;padding:11px;
             font-size:12px;font-weight:800;background:#B87946;color:#fff;cursor:pointer;">🔥 Load kiln + fire selected</button>
-        ` : `<div style="font-size:12px;color:#8a8175;margin-top:6px;">Nothing waiting.</div>`}
+        ` : _emptyStagePreview({
+            exampleLabel: 'A dipped bowl, ready to load into the kiln',
+            actionLabel: 'Load kiln + fire',
+            onExample: `_previewStageStep('this piece would be loaded into a kiln batch and fired','Packing — fired pieces going home')`,
+            nextLabel: 'Packing (once fired)',
+            nextEmoji: '📦'
+          })}
       </div>`;
     instantCache.save('klnk_cache_kiln','kiln-body');
   } catch(e) {
@@ -9333,10 +9391,19 @@ async function _loadPackingTiles() {
 
     if (!pieces.length) {
       el.innerHTML = `
-        <div style="text-align:center;padding:50px 20px;">
+        <div style="text-align:center;padding:36px 20px 16px;">
           <div style="font-size:48px;margin-bottom:12px;">✨</div>
           <div style="font-family:'Caveat',cursive;font-size:26px;color:#2B2724;">All caught up</div>
           <div style="font-size:13px;color:#8a8175;margin-top:6px;">Nothing waiting to be packed.</div>
+        </div>
+        <div style="max-width:420px;margin:0 auto;">
+          ${_emptyStagePreview({
+            exampleLabel: 'A fired mug, ready to bag and label for pickup',
+            actionLabel: 'Bag + print label',
+            onExample: `_previewStageStep('this piece would be bagged, labelled, and marked ready for collection','Collections — ready to collect')`,
+            nextLabel: 'Collections (ready to collect)',
+            nextEmoji: '🏺'
+          })}
         </div>
         ${_packingSession.done ? `<div style="text-align:center;margin-top:20px;padding:16px;
           background:rgba(76,175,80,0.1);border-radius:12px;">
@@ -10182,10 +10249,19 @@ async function _showReadyToCollect() {
     const items = d.pieces || d.bookings || [];
     const list = document.getElementById('ready-list');
     if (!items.length) {
-      list.innerHTML = `<div style="text-align:center;padding:40px 20px;">
+      list.innerHTML = `<div style="text-align:center;padding:28px 20px 12px;">
         <div style="font-size:40px;margin-bottom:8px;">✨</div>
         <div style="font-family:'Caveat',cursive;font-size:22px;color:#2B2724;">Nothing waiting</div>
         <div style="font-size:12px;color:#8a8175;margin-top:4px;">Everything's gone home.</div>
+      </div>
+      <div style="max-width:420px;margin:0 auto;">
+        ${_emptyStagePreview({
+          exampleLabel: 'A bagged mug on the collection shelf, customer due in',
+          actionLabel: 'Mark as collected',
+          onExample: `_previewStageStep('this piece would be marked collected and the journey completed','Done — journey complete')`,
+          nextLabel: 'Journey complete',
+          nextEmoji: '✅'
+        })}
       </div>`;
       return;
     }
