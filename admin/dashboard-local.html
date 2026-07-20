@@ -8392,10 +8392,16 @@ async function syncLiveData() {
   const wasConnected = LIVE_CACHE.isConnected;
   const _btn = document.getElementById('sync-live-btn');
   if (_btn) { _btn.disabled = true; _btn.style.opacity = '0.5'; }
+  
   try {
-    // Pull real Square data — every tap re-pulls the latest, so the
-    // top-bar button always fetches fresh numbers, not just the first time.
-    const res = await api('/api/square/transactions?studioId=' + studioId);
+    // Pull real Square data with 10-second timeout
+    // Every tap re-pulls the latest, so the top-bar button always fetches fresh numbers
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
+    const res = await api('/api/square/transactions?studioId=' + studioId, { signal: controller.signal });
+    clearTimeout(timeout);
+    
     if (res && res.transactions) {
       LIVE_CACHE.transactions = res.transactions;
       LIVE_CACHE.lastSync = new Date();
@@ -8418,7 +8424,11 @@ async function syncLiveData() {
       updateLiveDataStatus(false);
     }
   } catch(e) {
-    toast('Connection failed: ' + e.message, 'error');
+    if (e.name === 'AbortError') {
+      toast('Request timed out (10s) — server may be offline. Did you deploy to Render?', 'error');
+    } else {
+      toast('Connection failed: ' + e.message, 'error');
+    }
     updateLiveDataStatus(false);
   } finally {
     if (_btn) { _btn.disabled = false; _btn.style.opacity = '1'; }
