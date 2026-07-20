@@ -2746,7 +2746,7 @@ function updateStaffName() {
       color:white;font-size:11px;font-weight:800;padding:5px 10px;cursor:pointer;flex-shrink:0;">
       My page
     </button>
-    onclick="toggleAlertFeed()" style="background:none;border:none;color:rgba(255,255,255,0.7);font-size:18px;cursor:pointer;">✕</button>
+    <button class="glaze-tile" onclick="toggleAlertFeed()" style="background:none;border:none;color:rgba(255,255,255,0.7);font-size:18px;cursor:pointer;">✕</button>
   </div>
   <div style="padding:10px 14px;border-bottom:1px solid #f0ebe4;display:flex;gap:8px;">
     <button class="glaze-tile" onclick="goToTab('progress');toggleAlertFeed();" style="flex:1;background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;">📊 Daily Progress</button>
@@ -18489,7 +18489,7 @@ function openColorPicker() {
   `).join('');
   
   glazedModal({
-    title: 'Mako Underglaze & Glaze Palette',
+    title: 'Glaze & Underglaze Palette',
     bodyHTML: `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;">${colorTiles}</div>`,
     closeLabel: 'Done'
   });
@@ -18497,8 +18497,16 @@ function openColorPicker() {
 
 
 function openColorPicker() {
-  const mockHTML = '<div style="padding:20px;"><div style="font-size:13px;color:#2B2724;margin-bottom:16px;">Mako Underglaze Palette loaded. (Photo samples Monday)</div></div>';
-  glazedModal({ title: 'Glaze Colors', bodyHTML: mockHTML, closeLabel: 'Done' });
+  // The real colour-match tool lives in the customer app's Design
+  // Preview (the 💉 Match tool: photograph a piece, tap a colour, get
+  // the nearest stocked glaze + % match). From the staff app, point
+  // there rather than showing a placeholder. Brand-neutral copy.
+  glazedModal({
+    title: 'Glaze Colours',
+    bodyHTML: '<div style="padding:16px 4px;text-align:center;font-size:13px;color:#2B2724;line-height:1.6;">The colour-match tool is in the customer app under <b>Design Preview</b> — photograph a piece or any colour and it finds the nearest glaze we stock, with a % match.</div>',
+    actions: [{ label: 'Open Customer App', primary: true, onClick: () => { window.open('/app/index.html', '_blank'); } }],
+    closeLabel: 'Close'
+  });
 }
 
 function openAppSwitcher() {
