@@ -3198,18 +3198,18 @@ function updateStaffName() {
         <!-- Who's on shift — tap for task queue -->
         <!-- Just the avatar circle. The name took 60px we don't have. -->
         <!-- Name display only, avatar letter removed 18 July for cleaner header -->
-        <span id="shift-badge-name" style="font-size:13px;font-weight:700;color:#2B2724;display:none;"></span>
+        <span id="shift-badge-name" style="font-size:13px;font-weight:700;color:#2B2724;"></span>
 
         <!-- ═══ QUICK TOOLS — the things you need in a hurry ═══ -->
         <!-- Tell Daisy: broken piece, unhappy customer, running low -->
         <button class="glaze-tile" id="qt-tell" onclick="openTellPicker()" title="Tell Daisy"
-          style="display:none;background:#e53935;color:white;border:none;border-radius:50%;
+          style="display:flex;background:#e53935;color:white;border:none;border-radius:50%;
           width:26px;height:26px;font-size:11px;cursor:pointer;flex-shrink:0;
           align-items:center;justify-content:center;">💬</button>
 
         <!-- Find My Piece -->
         <button class="glaze-tile" id="qt-find" onclick="openFindMyPiece()" title="Find a piece"
-          style="display:none;background:#5E35B1;color:white;border:none;border-radius:50%;
+          style="display:flex;background:#5E35B1;color:white;border:none;border-radius:50%;
           width:26px;height:26px;font-size:11px;cursor:pointer;flex-shrink:0;
           align-items:center;justify-content:center;">🔍</button>
 
@@ -3220,28 +3220,28 @@ function updateStaffName() {
           align-items:center;justify-content:center;">🏡</button>
                 <!-- Alerts -->
         <button class="glaze-tile" id="alert-bell-btn" onclick="toggleAlertFeed()" title="Alerts"
-          style="display:none;background:#2B2724;color:white;border:none;border-radius:50%;
+          style="display:flex;background:#2B2724;color:white;border:none;border-radius:50%;
           width:26px;height:26px;font-size:11px;cursor:pointer;flex-shrink:0;
           align-items:center;justify-content:center;position:relative;">🔔
-          <span id="alert-bell-count" style="display:none;position:absolute;top:-2px;right:-2px;
+          <span id="alert-bell-count" style="display:flex;position:absolute;top:-2px;right:-2px;
             background:#e53935;color:white;border-radius:50%;min-width:14px;height:14px;
             font-size:8px;font-weight:800;align-items:center;justify-content:center;"></span>
         </button>
 
         <!-- Install to home screen — only in Safari -->
         <button class="glaze-tile" id="a2hs-header-btn" onclick="showAdminA2HSModal()" title="Add to Home Screen"
-          style="display:none;background:#B87946;color:white;border:none;border-radius:50%;
+          style="display:flex;background:#B87946;color:white;border:none;border-radius:50%;
           width:26px;height:26px;font-size:11px;cursor:pointer;flex-shrink:0;
           align-items:center;justify-content:center;">⬇</button>
 
                 <!-- Color Picker for Glaze Palette -->
         <button class="glaze-tile" id="color-picker-btn" onclick="openColorPicker()" title="Glaze Colors"
-          style="display:none;background:#B87946;color:white;border:none;border-radius:50%;
+          style="display:flex;background:#B87946;color:white;border:none;border-radius:50%;
           width:26px;height:26px;font-size:12px;cursor:pointer;flex-shrink:0;
           align-items:center;justify-content:center;">🎨</button>
                 <!-- App Switcher: Admin ↔ Customer -->
         <button class="glaze-tile" id="app-switcher-btn" onclick="openAppSwitcher()" title="View Customer App"
-          style="display:none;background:#5E35B1;color:white;border:none;border-radius:50%;
+          style="display:flex;background:#5E35B1;color:white;border:none;border-radius:50%;
           width:26px;height:26px;font-size:12px;cursor:pointer;flex-shrink:0;
           align-items:center;justify-content:center;">👥</button>
                 <!-- Live Data Sync -->
@@ -3253,14 +3253,14 @@ function updateStaffName() {
         </div>
         
         <button class="glaze-tile" id="disconnect-live-btn" onclick="disconnectLiveData()" title="Disconnect"
-          style="display:none;background:#c0392b;color:white;border:none;border-radius:50%;
+          style="display:flex;background:#c0392b;color:white;border:none;border-radius:50%;
           width:26px;height:26px;font-size:12px;cursor:pointer;flex-shrink:0;
           align-items:center;justify-content:center;">🔌</button>
 
         <!-- Out -->
-        <button class="glaze-tile" onclick="endSessionDemo()" title="Demo reset" style="display:none;background:rgba(229,57,53,0.2);border:1px solid rgba(229,57,53,0.4);color:#e53935;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px;">🔄 Reset demo</button>
+        <button class="glaze-tile" onclick="endSessionDemo()" title="Demo reset" style="display:flex;background:rgba(229,57,53,0.2);border:1px solid rgba(229,57,53,0.4);color:#e53935;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px;">🔄 Reset demo</button>
         <button class="glaze-tile" id="direct-logout-btn" onclick="confirmDirectLogout()" title="End shift"
-          style="display:none;background:#8B1A1A;color:white;border:none;border-radius:50%;
+          style="display:flex;background:#8B1A1A;color:white;border:none;border-radius:50%;
           width:26px;height:26px;font-size:11px;cursor:pointer;flex-shrink:0;
           align-items:center;justify-content:center;">🚪</button>
 
@@ -8445,8 +8445,6 @@ async function syncLiveData() {
       
       // Start auto-polling (safe to call again; it clears any prior timer)
       startAutoSync();
-      const _disc = document.getElementById('disconnect-live-btn');
-      if (_disc) _disc.style.display = 'flex';
       
       // Refresh the dashboard in place — a full reload drops back to login.
       if (typeof populateDashboard === 'function') { try { populateDashboard(); } catch(e){} }
@@ -8471,8 +8469,6 @@ async function disconnectLiveData() {
   stopAutoSync();
   updateLiveDataStatus(false);  // Update badge to show "⚠ Offline"
   toast('✓ Live data disconnected', 'ok');
-  const _disc = document.getElementById('disconnect-live-btn');
-  if (_disc) _disc.style.display = 'none';
   if (typeof populateDashboard === 'function') { try { populateDashboard(); } catch(e){} }
 }
 
@@ -18878,28 +18874,10 @@ function applyShiftUI() {
   // .style killed every login. My own boot overlay caught it,
   // naming this exact line. Name span only now.
   const nameEl = document.getElementById('shift-badge-name');
-  if (nameEl) { nameEl.textContent = currentShiftStaff.name; nameEl.style.display = 'inline'; }
-  document.getElementById('headset-setup-btn').style.display = 'flex';
-  document.getElementById('step-counter-btn').style.display = 'flex';
-  document.getElementById('direct-logout-btn').style.display = 'flex';
-  // Square pull-data button lives in the top bar at all times (per direct
-  // request): one tap pulls the latest Square history into the dashboard.
-  // Disconnect sits alongside it once actually connected — the two toggle
-  // together, same pattern as every other state-dependent header button.
-  const _sync = document.getElementById('sync-live-btn');
-  if (_sync) { _sync.style.display = 'flex'; _sync.title = 'Pull Square data'; }
-  const _disconnect = document.getElementById('disconnect-live-btn');
-  if (_disconnect) { _disconnect.style.display = (typeof LIVE_CACHE !== 'undefined' && LIVE_CACHE.isConnected) ? 'flex' : 'none'; }
-  // Quick tools — the things staff need in a hurry
-  ['qt-tell', 'qt-find'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = 'flex';
-  });
-  document.getElementById('direct-break-btn').style.display = 'none';
-  // find-piece-fab and returns-btn are legacy text buttons — now replaced
-  // by permanent glaze tiles in the header. Keep hidden always.
-  document.getElementById('find-piece-fab').style.display = 'none';
-  document.getElementById('returns-btn').style.display = 'none';
+  if (nameEl) { nameEl.textContent = currentShiftStaff.name; }
+  
+  // Header is completely static now — all buttons visible all the time
+  // Legacy break/find/returns buttons kept hidden (not in use)
   // Genuine real bug fix: the break button's visual state (Start vs
   // End) was never refreshed when a session resumed after the device
   // went idle/was put down — currentBreakId correctly restored in
