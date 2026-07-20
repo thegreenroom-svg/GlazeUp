@@ -253,6 +253,27 @@
       z-index: 1;
     }
 
+    /* Glazed header tiles — the one consistent quick-action set on the
+       home bar. Icon + short label, compact, wrapping onto neat rows.
+       Same glaze sheen as the home tiles (inherits .glaze-tile), just
+       small. 20 Jul: replaced the old jumble of mismatched circles and
+       pills per Daisy — "brand like the glazed tiles everywhere". */
+    .ghtile {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border: none;
+      border-radius: 11px;
+      color: #fff;
+      padding: 7px 11px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      line-height: 1;
+    }
+    .ghtile > span { position: relative; z-index: 1; }
+
     :root {
       /* ── LINK brand palette ── */
       --link-charcoal: #2B2724;
@@ -3437,39 +3458,30 @@ function updateStaffName() {
        so taps were always reaching the real buttons underneath even
        when covered — but "still tappable" isn't the same as "visible",
        and Daisy was reporting what she could SEE. -->
-  <div style="position:sticky;top:0;z-index:960;display:flex;align-items:center;gap:6px;
-    padding:max(12px, calc(env(safe-area-inset-top, 0px) + 10px)) 12px 12px 12px;
+  <div style="position:sticky;top:0;z-index:960;
+    padding:max(12px, calc(env(safe-area-inset-top, 0px) + 10px)) 12px 10px 12px;
     background:rgba(244,236,224,0.95);backdrop-filter:blur(10px);
     border-bottom:1px solid rgba(43,39,36,0.14);">
-    <div style="font-family:'Caveat',cursive;font-size:18px;font-weight:700;flex-shrink:1;min-width:0;max-width:38%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="flow-crumb"></div>
-    <div style="flex:1;display:flex;align-items:center;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:2px 0;justify-content:flex-end;">
-      <style>#flow-tools-row::-webkit-scrollbar{display:none;}</style>
-      <span id="flow-tools-row" style="display:contents;"></span>
-
-    <!-- ═══ QUICK TOOLS — the persistent one-tap actions for a busy
-         studio, restored to the flow home header per direct request.
-         Every function here is the real, already-built one — Tell,
-         Find My Piece, Glaze Colours, View Customer App. ═══ -->
-    <button class="glaze-tile" onclick="openTellPicker()" title="Tell / report something"
-      style="border:none;border-radius:50%;width:30px;height:30px;font-size:14px;background:rgba(229,57,53,0.14);cursor:pointer;flex-shrink:0;">💬</button>
-    <button class="glaze-tile" onclick="openFindMyPiece()" title="Find a piece"
-      style="border:none;border-radius:50%;width:30px;height:30px;font-size:14px;background:rgba(94,53,177,0.14);cursor:pointer;flex-shrink:0;">🔍</button>
-    <button class="glaze-tile" onclick="openColorPicker()" title="Glaze colours"
-      style="border:none;border-radius:50%;width:30px;height:30px;font-size:14px;background:rgba(184,121,70,0.14);cursor:pointer;flex-shrink:0;">🎨</button>
-    <button class="glaze-tile" onclick="openAppSwitcher()" title="View customer app"
-      style="border:none;border-radius:50%;width:30px;height:30px;font-size:14px;background:rgba(94,53,177,0.14);cursor:pointer;flex-shrink:0;">👥</button>
-    <button class="glaze-tile" onclick="toggleAlertFeed()" title="Alerts"
-      style="position:relative;border:none;border-radius:50%;width:30px;height:30px;font-size:14px;background:rgba(43,39,36,0.10);cursor:pointer;flex-shrink:0;">🔔<span id="flow-alert-count" style="display:none;position:absolute;top:-2px;right:-2px;background:#e53935;color:white;border-radius:50%;min-width:15px;height:15px;font-size:8px;font-weight:800;align-items:center;justify-content:center;"></span></button>
-    <button class="glaze-tile" onclick="_flowGraphEnter()" title="Home"
-      style="border:none;border-radius:50%;width:30px;height:30px;font-size:14px;background:rgba(46,125,50,0.14);cursor:pointer;flex-shrink:0;">🏡</button>
-
-    <!-- Grid button removed 18 Jul, Daisy: "get rid of grid". Tiles-only
-         law, no dead end back to the old system. Verified first: every
-         real screen already sits in someone's tree. _flowGraphExit and
-         showGridNav left in place, orphaned — nothing left calls them. -->
-    <button onclick="document.getElementById('daisy-flow-view').style.display='none';openCustomiseHome();" class="glaze-tile" style="border:none;border-radius:10px;
-      padding:8px 10px;font-size:11px;font-weight:700;background:rgba(184,121,70,0.12);cursor:pointer;white-space:nowrap;flex-shrink:0;">
-      ✏️ Customise</button>
+    <!-- Row 1: whose app you're in / where you are -->
+    <div style="display:flex;align-items:center;margin-bottom:8px;">
+      <div style="font-family:'Caveat',cursive;font-size:20px;font-weight:700;flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="flow-crumb"></div>
+    </div>
+    <!-- Row 2+: all quick actions as glazed tiles, wrapping onto neat rows.
+         One consistent set — icon + short label — matching the home tiles'
+         glaze styling. Rebuilt 20 Jul per Daisy: "brand like the glazed
+         tiles everywhere... one bar, not so big on the screen." -->
+    <div style="display:flex;flex-wrap:wrap;gap:6px;" id="flow-tools-row">
+      <button class="glaze-tile ghtile" onclick="openTellPicker()" style="background:linear-gradient(135deg,#e0655a,#c8483d);">💬<span>Tell Daisy</span></button>
+      <button class="glaze-tile ghtile" onclick="openFindMyPiece()" style="background:linear-gradient(135deg,#7e5bc4,#5e35b1);">🔍<span>Find</span></button>
+      <button class="glaze-tile ghtile" onclick="_flowGraphEnter()" style="background:linear-gradient(135deg,#4c9a58,#2e7d32);">🏡<span>Home</span></button>
+      <button class="glaze-tile ghtile" onclick="toggleAlertFeed()" style="position:relative;background:linear-gradient(135deg,#4a453f,#2B2724);">🔔<span>Alerts</span><span id="flow-alert-count" style="display:none;position:absolute;top:-3px;right:-3px;background:#e53935;color:white;border-radius:50%;min-width:15px;height:15px;font-size:8px;font-weight:800;align-items:center;justify-content:center;"></span></button>
+      <button class="glaze-tile ghtile" onclick="syncLiveData()" style="background:linear-gradient(135deg,#4c9a58,#2e7d32);">📥<span>Sync</span><span id="live-data-status" style="margin-left:2px;">🟢</span></button>
+      <button class="glaze-tile ghtile" onclick="openColorPicker()" style="background:linear-gradient(135deg,#c99165,#b87946);">🎨<span>Glazes</span></button>
+      <button class="glaze-tile ghtile" onclick="openAppSwitcher()" style="background:linear-gradient(135deg,#7e5bc4,#5e35b1);">👥<span>Customer app</span></button>
+      <button class="glaze-tile ghtile" onclick="showAdminA2HSModal()" style="background:linear-gradient(135deg,#c99165,#b87946);">⬇<span>Install</span></button>
+      <button class="glaze-tile ghtile" onclick="document.getElementById('daisy-flow-view').style.display='none';openCustomiseHome();" style="background:linear-gradient(135deg,#8a97b8,#5f6d8f);">✏️<span>Customise</span></button>
+      <button class="glaze-tile ghtile" onclick="endSessionDemo()" style="background:linear-gradient(135deg,#e0655a,#c0392b);">🔄<span>Reset demo</span></button>
+      <button class="glaze-tile ghtile" onclick="confirmDirectLogout()" style="background:linear-gradient(135deg,#a52a2a,#8B1A1A);">🚪<span>Logout</span></button>
     </div>
   </div>
   <div style="max-width:640px;margin:0 auto;padding:12px 14px 0;"><div id="flow-nudge-slot"></div></div>
@@ -6695,6 +6707,12 @@ function goToTab(tab, event) {
     console.error(`goToTab('${tab}') — there is no #${tab}-view. Not navigating. If this is meant to be an action rather than a tab, it needs an fn in GRID_NAV_STRUCTURE (see _tileGoToTab).`);
     return;
   }
+
+  // Leaving the home screen for a real tab — bring back the top header's
+  // quick-action buttons. They're hidden on home (the glazed home bar
+  // carries them there) but every other screen needs them in the header.
+  const _tb = document.getElementById('admin-header-right-buttons');
+  if (_tb && currentShiftStaff) _tb.style.display = 'flex';
 
   document.querySelectorAll('.view').forEach(v => { v.style.display = 'none'; v.classList.remove('fade-in'); });
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
@@ -18603,6 +18621,12 @@ function _flowGraphEnter() { _flowStack = []; // Clear any stale nav
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
   _flowStack = [_buildHomeTree()];
   document.getElementById('daisy-flow-view').style.display = 'block';
+  // On the home screen the new glazed home bar carries every quick
+  // action, so the top admin-header's own button row would just be a
+  // second copy of the same icons. Hide it here; it's restored whenever
+  // any other screen is opened (goToTab / stage screens show it again).
+  const _topBtns = document.getElementById('admin-header-right-buttons');
+  if (_topBtns) _topBtns.style.display = 'none';
   _safeRenderFlowGraph();
   _flowLoadDayStat();
   _flowLoadNudges();
