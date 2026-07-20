@@ -9120,6 +9120,22 @@ function openTakings() {
   if (slot && typeof _squareSyncPill === 'function') { slot.innerHTML = _squareSyncPill({ label:'Pull all real Square history' }); }
 }
 
+// ─── DIRECTOR ADMIN HUB — route to the real, existing sections ──────
+// Each admin sub-tile opens the genuine screen that already owns those
+// adjustable parameters — no duplicate UI, just a clear director-level
+// front door to them. Live data, read-only where it touches Square.
+function openAdminOffers() {
+  goToTab('setup');
+  setTimeout(() => { try { showSetupSection('cleosclub'); } catch(e){ console.warn('openAdminOffers:', e); } }, 60);
+}
+function openAdminStaff() {
+  goToTab('team');
+}
+function openAdminConfig() {
+  goToTab('setup');
+  setTimeout(() => { try { showSetupSection('addons'); } catch(e){ console.warn('openAdminConfig:', e); } }, 60);
+}
+
 
 function openPacking() {
   const view = document.getElementById('floor-plan-view');
@@ -18103,6 +18119,9 @@ const STUDIO_GLAZES = {
 // whether it has children (a "room", deeper teal) or is an action
 // (warm clay) — so nothing is ever colourless, even new tiles.
 const TILE_GLAZE = {
+  // Director admin
+  'admin-group':'plum', 'admin-offers':'pink', 'admin-staff':'purple',
+  'admin-hs':'coral', 'admin-loyalty':'yellow', 'admin-config':'brown', 'admin-revenue':'jadeColor',
   // The 5 top-level groups — each its own distinct glaze
   'foh-group':'blue', 'pieces-group':'red', 'studio-group':'jadeColor',
   'team-group':'purple', 'setup-group':'brown',
@@ -18317,9 +18336,26 @@ function _buildHomeTree() {
   // Grouped into 5 calm top-level tiles so the home screen isn't a wall
   // of buttons. Each opens to the real functions within. Common
   // day-to-day tasks (Floor Plan, Bookings) stay one tap from home.
+  //
+  // Directors (Daisy, Jenny, Elliott, David) also get an Admin tile at
+  // the very top — one clear view of every adjustable parameter in the
+  // studio (offers, staff, health & safety, config), each its own
+  // button. All on live data, read-only where it touches Square.
+  const _kids = [];
+  if (_isDirector()) {
+    _kids.push({ id:'admin-group', label:'Admin', emoji:'🗂️', desc:'Everything you can adjust — offers, staff, H&S, config', size:'big', children:[
+      { id:'admin-offers',   label:'Offers & Promotions', emoji:'🎁', desc:'Offer of the week, promotions history', fn:'openAdminOffers',   size:'big' },
+      { id:'admin-staff',    label:'Staff & Duties',      emoji:'👥', desc:'Team, PINs, rota, duties, holidays',  fn:'openAdminStaff',    size:'big' },
+      { id:'admin-hs',       label:'Health & Safety',     emoji:'🦺', desc:'Docs, checks, compliance',           fn:'openHealthSafety',  size:'mid' },
+      { id:'admin-loyalty',  label:'Loyalty',             emoji:'🏆', desc:'Loyal customers & tiers',            fn:'openTakings',       size:'mid' },
+      { id:'admin-config',   label:'Studio Config',       emoji:'⚙️', desc:'Connections, branding, add-ons',      fn:'openAdminConfig',   size:'mid' },
+      { id:'admin-revenue',  label:'Takings & Revenue',   emoji:'💷', desc:'Live figures — today, month, year',  fn:'openTakings',       size:'mid' },
+    ]});
+  }
   return {
     id: 'home', label: name, emoji: '🏠', size: 'hub',
     children: [
+      ..._kids,
       // ── 1. FRONT OF HOUSE — the busy, every-shift tasks ──
       { id:'foh-group', label:'Front of House', emoji:'🎨', desc:'Tables, bookings & the making journey', size:'big', children:[
         { id:'floor-plan', label:'Floor Plan', emoji:'🪑', desc:'Live view of all tables', fn:'showFloorPlan', size:'big' },
@@ -18938,6 +18974,16 @@ function confirmDirectLogout() {
 // enough while it's just the three of you, worth revisiting properly
 // before other studios are on the platform.
 const PLATFORM_REVENUE_ACCESS = ['David', 'Jenny', 'Daisy', 'Elliott'];  // WHO SEES THE MONEY, not who is a director. Elliott is Marketing & Host By Post Manager and sees what directors see. Must match his staff_team row exactly (two t's) or the check silently fails.
+
+// Is the person currently on shift a director-level user (sees admin
+// & money)? Daisy, Jenny, David + Elliott. First-name match against the
+// same access list, so there is one source of truth for "who sees the
+// admin of the whole studio".
+function _isDirector() {
+  const n = (typeof currentShiftStaff !== 'undefined' && currentShiftStaff?.name)
+    ? currentShiftStaff.name.split(' ')[0] : '';
+  return PLATFORM_REVENUE_ACCESS.includes(n);
+}
 
 // Measures the ACTUAL rendered heights of the platform revenue strip and
 // phone header, and sets .admin-wrapper's margin-top to match exactly —
