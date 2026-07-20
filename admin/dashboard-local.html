@@ -18220,7 +18220,15 @@ function _flowSizeStyle(size) {
     mid:   'width:calc(33.333% - 6px);min-height:82px;font-size:11px;',
     small: 'width:calc(25% - 6px);min-height:64px;font-size:9px;',
   };
-  return (S[size] || S.mid) + 'box-sizing:border-box;';
+  // min-width:0 + overflow-wrap: a flex item defaults to min-width:auto,
+  // which refuses to shrink below its longest unbreakable content. The
+  // Admin tile's description is the longest line on the page, so on a
+  // narrow phone that one tile pushes past its 50% and drags the whole
+  // row off the right edge — every other tile follows it out. Forcing
+  // min-width:0 lets the set width (calc(50% - 5px)) actually hold, and
+  // overflow-wrap:anywhere lets a long word break rather than demand
+  // width. This is the standard fix for "flex items overflow on mobile".
+  return (S[size] || S.mid) + 'box-sizing:border-box;min-width:0;overflow-wrap:anywhere;';
 }
 
 // ─── STUDIO GLAZE PALETTE ───────────────────────────────────────────
