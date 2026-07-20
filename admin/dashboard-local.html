@@ -2786,7 +2786,7 @@ function updateStaffName() {
 </div>
 
 <div id="shift-login-modal" style="display:none;position:fixed;inset:0;z-index:9800;background:rgba(43,39,36,0.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;">
-  <div style="background:white;border-radius:24px;max-width:400px;width:100%;max-height:90vh;overflow-y:auto;padding:32px 28px;text-align:center;box-shadow:0 24px 70px rgba(0,0,0,0.4);">
+  <div style="background:white;border-radius:24px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto;padding:32px 28px;text-align:center;box-shadow:0 24px 70px rgba(0,0,0,0.4);">
     <!-- VISIBLE BUILD STAMP. 18 July 2026. Daisy: "something's not
          pushing to my phone." Server verified current via /api/version,
          so the last suspect is the device serving itself an old copy.
@@ -2802,7 +2802,7 @@ function updateStaffName() {
       <div style="font-size:40px;margin-bottom:10px;">👋</div>
       <div style="font-size:18px;font-weight:800;color:var(--gu-text);margin-bottom:4px;">Who's on this tablet?</div>
       <div style="font-size:13px;color:var(--gu-dust);margin-bottom:20px;">Tap your name to start your shift.</div>
-      <div id="login-name-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+      <div id="login-name-grid" style="margin-bottom:16px;">
         <button data-staff="0" onclick="selectDemoStaff(this.dataset.staff)" style="background:#B87946;color:white;border:none;border-radius:12px;padding:16px;font-size:13px;font-weight:700;cursor:pointer;text-align:center;"><div>Daisy</div><div style="font-size:10px;color:rgba(255,255,255,0.7);margin-top:4px;">General Manager</div></button>
     <button data-staff="1" onclick="selectDemoStaff(this.dataset.staff)" style="background:#B87946;color:white;border:none;border-radius:12px;padding:16px;font-size:13px;font-weight:700;cursor:pointer;text-align:center;"><div>Jenny</div><div style="font-size:10px;color:rgba(255,255,255,0.7);margin-top:4px;">Studio Executive</div></button>
     <button data-staff="2" onclick="selectDemoStaff(this.dataset.staff)" style="background:#B87946;color:white;border:none;border-radius:12px;padding:16px;font-size:13px;font-weight:700;cursor:pointer;text-align:center;"><div>Elliott</div><div style="font-size:10px;color:rgba(255,255,255,0.7);margin-top:4px;">Marketing & Host By Post</div></button>
@@ -13544,7 +13544,7 @@ function loadLoginNamePicker() {
     { id: 'bb1e9973-b833-4ba5-93fd-818cb480b1a2', name: 'Lucy', role: 'Ceramic Technician' }
   ];
   
-  let html = '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:20px;padding:16px;max-width:340px;margin:0 auto;">';
+  let html = '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:24px;padding:20px;max-width:460px;margin:0 auto;">';
   staff.forEach((person, idx) => {
     const color = ROLE_COLORS[person.role] || '#B87946';
     // Real illustrated, animated avatar (the rigged SVG portraits) —
@@ -13553,9 +13553,9 @@ function loadLoginNamePicker() {
       ? _staffAvatarSvg(person.name, color)
       : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px;font-weight:800;">' + person.name.charAt(0) + '</div>';
     const avClass = 'av-' + person.name.toLowerCase();
-    html += '<button data-staff="' + idx + '" onclick="selectDemoStaff(this.dataset.staff)" style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;background:none;border:none;cursor:pointer;border-radius:8px;padding:0;gap:10px;">'
-      + '<div class="av-frame ' + avClass + '" style="width:100%;aspect-ratio:1;border-radius:16px;overflow:hidden;box-shadow:0 3px 12px rgba(0,0,0,0.15);">' + avatar + '</div>'
-      + '<div style="font-size:15px;font-weight:700;color:var(--gu-text);text-align:center;line-height:1.2;">' + person.name + '</div>'
+    html += '<button data-staff="' + idx + '" onclick="selectDemoStaff(this.dataset.staff)" style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;background:none;border:none;cursor:pointer;border-radius:8px;padding:0;gap:12px;">'
+      + '<div class="av-frame ' + avClass + '" style="width:100%;aspect-ratio:1;border-radius:22px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.18);">' + avatar + '</div>'
+      + '<div style="font-size:19px;font-weight:800;color:var(--gu-text);text-align:center;line-height:1.2;">' + person.name + '</div>'
       + '</button>';
   });
   html += '</div>';
