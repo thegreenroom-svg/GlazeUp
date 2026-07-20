@@ -8980,7 +8980,11 @@ const _walk = {
     if (!step) { this.exit(); return; }
     // Open the real screen for this step, if it names one.
     try { if (typeof step.open === 'function') step.open(); } catch(e) { console.warn('walk step open failed:', e); }
+    // The screen we just opened may have re-rendered the top of the
+    // page — re-ensure our bar is present and on top afterwards.
+    this._ensureBar();
     this._renderBar();
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e){}
     if (step.note) { try { toast(`Example — ${step.note}`, 'success'); } catch(e){} }
   },
 
@@ -9453,7 +9457,7 @@ async function _loadKilnBody() {
         ` : _emptyStagePreview({
             exampleLabel: 'A dipped bowl, ready to load into the kiln',
             actionLabel: 'Load kiln + fire',
-            onExample: `_previewStageStep('this piece would be loaded into a kiln batch and fired','Packing — fired pieces going home')`,
+            onExample: `_walkJourney()`,
             nextLabel: 'Packing (once fired)',
             nextEmoji: '📦'
           })}
@@ -9507,7 +9511,7 @@ async function _loadPackingTiles() {
           ${_emptyStagePreview({
             exampleLabel: 'A fired mug, ready to bag and label for pickup',
             actionLabel: 'Bag + print label',
-            onExample: `_previewStageStep('this piece would be bagged, labelled, and marked ready for collection','Collections — ready to collect')`,
+            onExample: `_walkJourney()`,
             nextLabel: 'Collections (ready to collect)',
             nextEmoji: '🏺'
           })}
@@ -10365,7 +10369,7 @@ async function _showReadyToCollect() {
         ${_emptyStagePreview({
           exampleLabel: 'A bagged mug on the collection shelf, customer due in',
           actionLabel: 'Mark as collected',
-          onExample: `_previewStageStep('this piece would be marked collected and the journey completed','Done — journey complete')`,
+          onExample: `_walkJourney()`,
           nextLabel: 'Journey complete',
           nextEmoji: '✅'
         })}
