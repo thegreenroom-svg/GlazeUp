@@ -13471,6 +13471,52 @@ async function landOnHome() {
     history.replaceState({}, '', location.pathname);
     setTimeout(() => _tileGoToTab('music', 'openMusic'), 50);
   }
+
+  // ═══════════════════════════════════════════════════════════
+  // AUTO-SYNC ON LOGIN. 20 July 2026, per Daisy: "you log in and it's
+  // calling and letting you know — you only touch something if you have
+  // to." Previously the Square booking sync only fired when the FLOOR
+  // PLAN was opened, and the revenue refresh only when the DASHBOARD tab
+  // was opened — so landing on the tiles home did neither, and staff had
+  // to go hunting/tapping to get live data. Now: the moment a real login
+  // lands, both kick off in the BACKGROUND (never blocking the home
+  // screen), and the header sync bar shows what's happening. Fire-and-
+  // forget with its own error handling — a slow/cold Render never delays
+  // the UI, and _autoSyncOnLanding surfaces status rather than staying
+  // silent. Guarded so it runs once per landing, not on every re-render.
+  if (currentShiftStaff && !window._autoSyncFired) {
+    window._autoSyncFired = true;
+    _autoSyncOnLanding();  // deliberately NOT awaited — background
+  }
+}
+
+// Background sync kicked off once on login landing. Syncs Square bookings
+// into our DB and refreshes revenue, updating the header sync bar so the
+// person can SEE it working without opening any particular screen. Any
+// failure is shown on the bar (amber), never thrown — the home screen is
+// already up and must stay responsive.
+async function _autoSyncOnLanding() {
+  const setBar = (state) => { try { if (typeof _setHeaderSyncState === 'function') _setHeaderSyncState(state); } catch(e){} };
+  setBar('syncing');
+  try {
+    // 1. Pull Square bookings into our DB (so the floor plan has data the
+    //    moment it's opened). Uses the same endpoint the floor plan does.
+    if (!apiConnected) { await checkAPIConnection(); }
+    if (apiConnected) {
+      await fetch(`${API_URL}/api/bookings/sync`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId }),
+      }).catch(()=>{});
+    }
+    // 2. Refresh revenue if this person may see it (director gate is
+    //    inside the function; harmless for others — it just no-ops).
+    if (typeof refreshKilnCafeRevenueData === 'function') {
+      try { await refreshKilnCafeRevenueData(); } catch(e){}
+    }
+    setBar('ok');
+  } catch (e) {
+    setBar('error');
+  }
 }
 
 // [stripped 18 Jul: dead fn skipLoginUseSharedView removed — zero references, verified]
@@ -18676,6 +18722,18 @@ function updateLiveDataStatus(connected) {
       badge.style.color = '#f57c00';
     }
   }
+}
+
+// Drives the same #live-data-status badge for the auto-sync-on-login flow,
+// adding a transient "syncing" state so the person SEES it working the
+// moment they log in — and a clear result — without opening any screen or
+// tapping Sync. Keeps one status indicator, not a competing second one.
+function _setHeaderSyncState(state) {
+  const badge = document.getElementById('live-data-status');
+  if (!badge) return;
+  if (state === 'syncing') { badge.innerHTML = '⏳ Syncing…'; badge.style.color = '#B87946'; }
+  else if (state === 'ok') { badge.innerHTML = '🟢 Live';     badge.style.color = '#2e7d32'; }
+  else if (state === 'error') { badge.innerHTML = '⚠ Offline'; badge.style.color = '#f57c00'; }
 }
 
 
