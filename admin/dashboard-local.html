@@ -13544,7 +13544,7 @@ function loadLoginNamePicker() {
     { id: 'bb1e9973-b833-4ba5-93fd-818cb480b1a2', name: 'Lucy', role: 'Ceramic Technician' }
   ];
   
-  let html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:16px;max-width:360px;margin:0 auto;">';
+  let html = '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:20px;padding:16px;max-width:340px;margin:0 auto;">';
   staff.forEach((person, idx) => {
     const color = ROLE_COLORS[person.role] || '#B87946';
     // Real illustrated, animated avatar (the rigged SVG portraits) —
@@ -13553,9 +13553,9 @@ function loadLoginNamePicker() {
       ? _staffAvatarSvg(person.name, color)
       : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px;font-weight:800;">' + person.name.charAt(0) + '</div>';
     const avClass = 'av-' + person.name.toLowerCase();
-    html += '<button data-staff="' + idx + '" onclick="selectDemoStaff(this.dataset.staff)" style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;background:none;border:none;cursor:pointer;border-radius:8px;padding:0;gap:8px;">'
-      + '<div class="av-frame ' + avClass + '" style="width:100%;aspect-ratio:1;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.12);">' + avatar + '</div>'
-      + '<div style="font-size:11px;font-weight:700;color:var(--gu-text);text-align:center;line-height:1.2;">' + person.name + '</div>'
+    html += '<button data-staff="' + idx + '" onclick="selectDemoStaff(this.dataset.staff)" style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;background:none;border:none;cursor:pointer;border-radius:8px;padding:0;gap:10px;">'
+      + '<div class="av-frame ' + avClass + '" style="width:100%;aspect-ratio:1;border-radius:16px;overflow:hidden;box-shadow:0 3px 12px rgba(0,0,0,0.15);">' + avatar + '</div>'
+      + '<div style="font-size:15px;font-weight:700;color:var(--gu-text);text-align:center;line-height:1.2;">' + person.name + '</div>'
       + '</button>';
   });
   html += '</div>';
