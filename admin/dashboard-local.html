@@ -4121,7 +4121,7 @@ function updateStaffName() {
             <div id="s2-running-total" style="text-align: right; font-weight: bold; padding: 10px 0; font-size: 14px; border-top: 1px solid var(--gu-border); margin-top: 8px;"></div>
             <div style="font-size: 11px; color: var(--gu-dust); text-align: right;">Not yet sent to Square — for internal reference only</div>
 
-            <!-- ── Mayco Specialist Glazes (stocked, £2 each) ── -->
+            <!-- ── Specialist Glazes We Stock (£2 each) ── -->
             <div id="mayco-glazes-panel" style="margin-top: 16px; border-top: 2px solid var(--gu-border); padding-top: 14px;">
               <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
                 <div style="font-size:13px; font-weight:700; color:var(--gu-accent);">✨ Specialist Glazes We Stock</div>
@@ -7122,8 +7122,8 @@ const SWT_STEPS = [
   {
     label: 'Step 2 — Painting',
     title: 'Track everything on the table',
-    body: "Add pieces, drinks, cakes, and glazes as you go. The floor plan updates live. Every Mayco glaze shows its real name so staff learn the colours naturally while they work.",
-    voice: "Step two is Painting. Add pottery pieces, drinks, and Mayco glazes to the session as you go. The floor plan updates live. Every glaze shows its real Mayco name, so new staff learn the colours just by working.",
+    body: "Add pieces, drinks, cakes, and glazes as you go. The floor plan updates live. Every glaze shows its real name so staff learn the colours naturally while they work.",
+    voice: "Step two is Painting. Add pottery pieces, drinks, and glazes to the session as you go. The floor plan updates live. Every glaze shows its real name, so new staff learn the colours just by working.",
     visual: 'painting',
   },
 
@@ -11828,7 +11828,7 @@ const OPENING_CHECKLIST = [
   { id:'o_water',        icon:'💧', text:'Water station stocked',                                  cat:'Tables' },
   // Stock & Glazes
   { id:'o_bisque',       icon:'🏺', text:'Bisque stock checked and displayed',                     cat:'Stock & Glazes' },
-  { id:'o_glazes',       icon:'🎨', text:'All Mayco glazes stocked, lids on, none running low',   cat:'Stock & Glazes' },
+  { id:'o_glazes',       icon:'🎨', text:'All glazes stocked, lids on, none running low',   cat:'Stock & Glazes' },
   { id:'o_specialist',   icon:'✨', text:'Specialist glazes (Jungle Gems etc) available and ready',cat:'Stock & Glazes' },
   // Cafe & Service
   { id:'o_drinks',       icon:'☕', text:'Drinks station stocked and ready — coffee machine on',   cat:'Café & Service' },
@@ -15039,7 +15039,7 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
 
   // Room names come from studio_tables.room — real data, so an apostrophe
   // ("Sophie's Room") is entirely possible. Escaped rather than interpolated
-  // raw: this is the same class of bug the Mayco colour names caused
+  // raw: this is the same class of bug the glaze colour names caused
   // ("Jack O'Lantern" broke the onclick handlers), fixed once already.
   const roomArg = String(roomName).replace(/'/g, "\\'");
 
@@ -18073,14 +18073,14 @@ function _flowSizeStyle(size) {
   return (S[size] || S.mid) + 'box-sizing:border-box;';
 }
 
-// ─── MAYCO GLAZE PALETTE ───────────────────────────────────────────
-// Real Mayco Stroke & Coat glaze colours — the glazes actually used in
+// ─── STUDIO GLAZE PALETTE ───────────────────────────────────────────
+// Real studio glaze colours — the glazes actually used in
 // the studio. Each home tile gets its own fixed glaze so the wall of
 // tiles reads like a glaze rack: consistent, calm, every tile its own
 // colour, never the jumbled brown-and-green mix. Fixed per tile id, so
 // a given tile is always the same colour — muscle memory, not a
 // shuffle. Colours are approximations of the fired low-fire tile.
-const MAYCO_GLAZES = {
+const STUDIO_GLAZES = {
   jadeColor:      { name:'SC-26 Green Thumb',   c1:'#4C8C5A', c2:'#3A6E46' },
   teal:           { name:'SC-27 Sour Apple',    c1:'#2F8F82', c2:'#236B61' },
   blue:           { name:'SC-11 Blue Yonder',   c1:'#3E6FA3', c2:'#2E547C' },
@@ -18116,10 +18116,10 @@ const TILE_GLAZE = {
 };
 function _tileGlaze(child) {
   const key = TILE_GLAZE[child.id];
-  if (key && MAYCO_GLAZES[key]) return MAYCO_GLAZES[key];
+  if (key && STUDIO_GLAZES[key]) return STUDIO_GLAZES[key];
   // Fallback — a room gets deep teal, an action gets warm clay.
   const hasKids = !!(child.children && child.children.length);
-  return hasKids ? MAYCO_GLAZES.tealDeep : MAYCO_GLAZES.clay;
+  return hasKids ? STUDIO_GLAZES.tealDeep : STUDIO_GLAZES.clay;
 }
 
 function _renderFlowGraph() {
@@ -18167,7 +18167,7 @@ function _renderFlowGraph() {
       const glaze = _tileGlaze(child);
       const bg = `linear-gradient(135deg,${glaze.c1},${glaze.c2})`;
       html += `<button onclick="${hasKids ? `_flowDescend('${child.id}')` : `_flowActivate('${child.id}')`}"
-        class="glaze-tile" title="${glaze.name}" style="${_flowSizeStyle(child.size)}
+        class="glaze-tile" style="${_flowSizeStyle(child.size)}
         border:none;border-radius:14px;color:#fff;padding:10px;text-align:left;cursor:pointer;
         background:${bg};display:flex;flex-direction:column;justify-content:flex-end;">
         <div style="font-size:1.5em;line-height:1;">${child.emoji}</div>
