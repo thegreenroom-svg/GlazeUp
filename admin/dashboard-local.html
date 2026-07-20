@@ -706,6 +706,7 @@
 
     @media (max-width: 480px) {
       .admin-content { padding: 16px 12px 32px; }
+      #flow-graph-body { padding: 4px 8px 100px !important; }
     }
 
     .view {
@@ -18335,7 +18336,7 @@ function _renderFlowGraph() {
           ${Array.from({length:_n}).map(()=>'<div style=\"width:2px;height:10px;background:rgba(184,121,70,0.4);\"></div>').join('')}
         </div>
       </div>`;
-    html += `<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;width:100%;box-sizing:border-box;">`;
+    html += `<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;width:100%;box-sizing:border-box;overflow:hidden;">`;
     node.children.forEach(child => {
       const hasKids = !!(child.children && child.children.length);
       const glazeKey = TILE_GLAZE[child.id];
