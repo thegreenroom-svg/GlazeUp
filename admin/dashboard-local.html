@@ -6617,9 +6617,93 @@ function toggleFloatingBackBtn() {
   if (label) label.textContent = '🏠 My tiles';
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// GLOBAL BACK / FORWARD NAV — one consistent control, every screen
+// ═══════════════════════════════════════════════════════════════════
+// Sitewide navigation so wherever you are, there's an obvious way back
+// (and forward). Rather than bolt a bar onto dozens of screens, this is
+// ONE floating control that records each real screen change centrally
+// (through goToTab, the flow-tree, and the stage screens) and drives
+// backward/forward through that history. Home is always one tap too.
+// The bar hides itself on the home tree (you're already home) and shows
+// the moment you go into any screen.
+const _screenHist = [];      // stack of {kind, arg, label}
+let _screenIdx = -1;
+let _screenNavInternal = false; // true while WE are applying a history move
+
+function _screenRecord(entry) {
+  if (_screenNavInternal) return;         // don't record our own back/forward
+  const cur = _screenHist[_screenIdx];
+  if (cur && cur.kind === entry.kind && cur.arg === entry.arg) return; // dedupe
+  if (_screenIdx < _screenHist.length - 1) _screenHist.splice(_screenIdx + 1);
+  _screenHist.push(entry);
+  _screenIdx = _screenHist.length - 1;
+  _renderScreenNav();
+}
+
+function _screenApply(entry) {
+  if (!entry) return;
+  _screenNavInternal = true;
+  try {
+    if (entry.kind === 'tab' && typeof goToTab === 'function') goToTab(entry.arg);
+    else if (entry.kind === 'stage' && typeof showStaffSection === 'function') { goToTab('staff'); setTimeout(()=>{try{showStaffSection(entry.arg);}catch(e){}},60); }
+    else if (entry.kind === 'home' && typeof _flowGraphEnter === 'function') _flowGraphEnter();
+    else if (entry.kind === 'fn' && typeof window[entry.arg] === 'function') window[entry.arg]();
+  } catch(e) { console.warn('_screenApply:', e); }
+  setTimeout(()=>{ _screenNavInternal = false; }, 120);
+}
+
+function _screenBack() {
+  if (_screenIdx <= 0) { if (typeof _flowGraphEnter==='function') _flowGraphEnter(); return; }
+  _screenIdx--;
+  _screenApply(_screenHist[_screenIdx]);
+  _renderScreenNav();
+}
+function _screenForward() {
+  if (_screenIdx >= _screenHist.length - 1) return;
+  _screenIdx++;
+  _screenApply(_screenHist[_screenIdx]);
+  _renderScreenNav();
+}
+function _screenHome() {
+  if (typeof _flowGraphEnter === 'function') _flowGraphEnter();
+}
+
+function _ensureScreenNav() {
+  if (document.getElementById('screen-nav-bar')) return;
+  const bar = document.createElement('div');
+  bar.id = 'screen-nav-bar';
+  // Sits above the full-width green "My tiles" home bar so the two
+  // don't overlap. Back + Forward only — the green bar already handles
+  // "home", so no duplicate home button here.
+  bar.style.cssText = 'position:fixed;left:12px;bottom:calc(80px + env(safe-area-inset-bottom));z-index:41;'
+    + 'display:flex;gap:8px;align-items:center;';
+  bar.innerHTML = `
+    <button id="snav-back" onclick="_screenBack()" title="Back" style="width:46px;height:46px;border-radius:50%;border:none;
+      background:#2B2724;color:#fff;font-size:19px;font-weight:800;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,0.28);">←</button>
+    <button id="snav-fwd" onclick="_screenForward()" title="Forward" style="width:46px;height:46px;border-radius:50%;border:none;
+      background:#2B2724;color:#fff;font-size:19px;font-weight:800;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,0.28);">→</button>`;
+  document.body.appendChild(bar);
+}
+
+function _renderScreenNav() {
+  _ensureScreenNav();
+  const bar = document.getElementById('screen-nav-bar');
+  if (!bar) return;
+  // On the home tree there's nothing to go back to — hide the bar.
+  const flowView = document.getElementById('daisy-flow-view');
+  const onHome = flowView && flowView.style.display !== 'none' && _flowStack && _flowStack.length <= 1;
+  bar.style.display = onHome ? 'none' : 'flex';
+  const back = document.getElementById('snav-back');
+  const fwd = document.getElementById('snav-fwd');
+  if (back) back.style.opacity = (_screenIdx > 0) ? '1' : '0.4';
+  if (fwd)  fwd.style.opacity  = (_screenIdx < _screenHist.length - 1) ? '1' : '0.4';
+}
+
 function goToTab(tab, event) {
   if (event) event.preventDefault();
   _trace(`goToTab('${tab}')`);
+  try { _screenRecord({ kind:'tab', arg:tab, label:tab }); } catch(e){}
 
   // ─── LOOK BEFORE YOU HIDE ───
   // This lookup used to sit AFTER the hide loop below, and nothing
@@ -17791,6 +17875,7 @@ function showGridNavTop() { return; // DISABLED
 // 'engagement', 'completion', 'kiln' are the real section names
 // showStaffSection accepts (verified against its own definition).
 function _openStage(section) {
+  try { _screenRecord({ kind:'stage', arg:section, label:section }); } catch(e){}
   goToTab('staff');
   setTimeout(() => { try { showStaffSection(section); } catch(e){ console.warn('_openStage:', e); } }, 60);
 }
@@ -18436,6 +18521,7 @@ function _flowGraphEnter() { _flowStack = []; // Clear any stale nav
   _safeRenderFlowGraph();
   _flowLoadDayStat();
   _flowLoadNudges();
+  try { _renderScreenNav(); } catch(e){}
 }
 
 
