@@ -23933,32 +23933,30 @@ async function createNewBooking(tableName) {
     return;
   }
 
-  const now = new Date();
-  const duration = type === 'all_day' ? 480 : 90; // minutes
-  const end = new Date(now.getTime() + duration * 60000);
-
-  const { data: booking, error } = await supabase.from('bookings')
-    .insert({
-      studio_id: studioId,
-      table_assignment: tableName,
-      customer_name: name,
-      party_size: party,
-      booking_type: type,
-      current_stage: 'booking',
-      session_start: now.toISOString(),
-      session_end: end.toISOString(),
-    })
-    .select()
-    .single();
-
-  if (error) {
-    alert('Error creating booking');
-    return;
+  // FIXED: was calling client-side `supabase` which does not exist in
+  // the browser — crashed every real booking with "Can't find supabase".
+  // Now goes through the real server endpoint that owns the DB write.
+  try {
+    const res = await fetch(`${API_URL}/api/bookings/manual`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studioId,
+        customerName: name,
+        tableAssignment: tableName,
+        partySize: party,
+        bookingType: type,
+      })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) { throw new Error(data.error || 'Booking failed'); }
+    try { toast('Booking created', 'success'); } catch(e){ alert('Booking created'); }
+    _currentBookingModal = data.booking;
+    if (typeof displayBookingModal === 'function') displayBookingModal();
+  } catch (e) {
+    console.error('createNewBooking failed:', e);
+    try { toast("Couldn't create the booking — try again", 'error'); } catch(err){ alert("Couldn't create the booking"); }
   }
-
-  alert('Booking created');
-  _currentBookingModal = booking;
-  displayBookingModal();
 }
 
 // Genuine real tile-section switcher for Table Cards, per direct
