@@ -704,14 +704,9 @@
       .admin-content { padding: 20px 18px 40px; }
     }
 
-    @media (max-width: 480px) {
-      .admin-content { padding: 16px 12px 32px; }
-    }
-
     .view {
       max-width: 960px;
       margin: 0 auto;
-      overflow-x: hidden;
     }
 
     .view.fade-in {
@@ -3465,7 +3460,7 @@ function updateStaffName() {
     </div>
   </div>
   <div style="max-width:640px;margin:0 auto;padding:12px 14px 0;"><div id="flow-nudge-slot"></div></div>
-  <div id="flow-graph-body" style="padding:4px 12px 100px;max-width:100%;margin:0 auto;"></div>
+  <div id="flow-graph-body" style="padding:4px 14px 100px;max-width:640px;margin:0 auto;"></div>
   <div id="flow-back-bar" style="display:none;position:fixed;left:14px;right:14px;
     bottom:calc(14px + env(safe-area-inset-bottom));z-index:20;">
     <button class="glaze-tile" onclick="_flowGraphBack()" style="width:100%;padding:14px;border:none;border-radius:14px;
@@ -18335,7 +18330,7 @@ function _renderFlowGraph() {
           ${Array.from({length:_n}).map(()=>'<div style=\"width:2px;height:10px;background:rgba(184,121,70,0.4);\"></div>').join('')}
         </div>
       </div>`;
-    html += `<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;width:100%;box-sizing:border-box;overflow:hidden;">`;
+    html += `<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;width:100%;box-sizing:border-box;">`;
     node.children.forEach(child => {
       const hasKids = !!(child.children && child.children.length);
       const glazeKey = TILE_GLAZE[child.id];
