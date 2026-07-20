@@ -9087,6 +9087,18 @@ const _walk = {
   },
 
   _renderExamplePanel() {
+    // The floating example panel was removed 20 Jul 2026. It was
+    // position:fixed with no height, so the real screen behind it showed
+    // through underneath — a confusing overlap ("the booking hides the
+    // scrolling page behind"). It only showed decorative randomised
+    // example details anyway; the walk-through already opens the REAL
+    // screen beneath, with the purple guide bar on top, which is clearer.
+    // Keep any stale panel cleared.
+    const stale = document.getElementById('walkthrough-example-panel');
+    if (stale) stale.remove();
+    return;
+  },
+  _renderExamplePanel_OLD_UNUSED() {
     if (!this.demoActive) return;
     
     let panel = document.getElementById('walkthrough-example-panel');
