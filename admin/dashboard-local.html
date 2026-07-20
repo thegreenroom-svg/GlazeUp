@@ -3429,7 +3429,10 @@ function updateStaffName() {
     padding:max(12px, calc(env(safe-area-inset-top, 0px) + 10px)) 12px 12px 12px;
     background:rgba(244,236,224,0.95);backdrop-filter:blur(10px);
     border-bottom:1px solid rgba(43,39,36,0.14);">
-    <div style="font-family:'Caveat',cursive;font-size:19px;font-weight:700;flex:1;min-width:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="flow-crumb"></div>
+    <div style="font-family:'Caveat',cursive;font-size:18px;font-weight:700;flex-shrink:1;min-width:0;max-width:38%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="flow-crumb"></div>
+    <div style="flex:1;display:flex;align-items:center;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:2px 0;justify-content:flex-end;">
+      <style>#flow-tools-row::-webkit-scrollbar{display:none;}</style>
+      <span id="flow-tools-row" style="display:contents;"></span>
 
     <!-- ═══ QUICK TOOLS — the persistent one-tap actions for a busy
          studio, restored to the flow home header per direct request.
@@ -3455,6 +3458,7 @@ function updateStaffName() {
     <button onclick="document.getElementById('daisy-flow-view').style.display='none';openCustomiseHome();" class="glaze-tile" style="border:none;border-radius:10px;
       padding:8px 10px;font-size:11px;font-weight:700;background:rgba(184,121,70,0.12);cursor:pointer;white-space:nowrap;flex-shrink:0;">
       ✏️ Customise</button>
+    </div>
   </div>
   <div style="max-width:640px;margin:0 auto;padding:12px 14px 0;"><div id="flow-nudge-slot"></div></div>
   <div id="flow-graph-body" style="padding:4px 14px 100px;max-width:640px;margin:0 auto;"></div>
@@ -17894,11 +17898,11 @@ let _flowStack = [FULL_FLOW_TREE];
 function _flowSizeStyle(size) {
   const S = {
     hub:   'width:100%;min-height:120px;font-size:16px;',
-    big:   'width:47%;min-height:104px;font-size:13px;',
-    mid:   'width:31%;min-height:82px;font-size:11px;',
-    small: 'width:22%;min-height:64px;font-size:9px;',
+    big:   'width:calc(50% - 5px);min-height:104px;font-size:13px;',
+    mid:   'width:calc(33.333% - 6px);min-height:82px;font-size:11px;',
+    small: 'width:calc(25% - 6px);min-height:64px;font-size:9px;',
   };
-  return S[size] || S.mid;
+  return (S[size] || S.mid) + 'box-sizing:border-box;';
 }
 
 // ─── MAYCO GLAZE PALETTE ───────────────────────────────────────────
@@ -17989,7 +17993,7 @@ function _renderFlowGraph() {
           ${Array.from({length:_n}).map(()=>'<div style=\"width:2px;height:10px;background:rgba(184,121,70,0.4);\"></div>').join('')}
         </div>
       </div>`;
-    html += `<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">`;
+    html += `<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;width:100%;box-sizing:border-box;">`;
     node.children.forEach(child => {
       const hasKids = !!(child.children && child.children.length);
       const glaze = _tileGlaze(child);
