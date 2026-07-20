@@ -5862,6 +5862,7 @@ app.get('/api/floor/active', async (req, res) => {
     // rows, so those fall back to session_start + 2h rather than being
     // silently dropped or shown forever.
     let ownBookings = [];
+    let showingDate = null;   // which day the floor plan is actually showing
     try {
       const nowIso = new Date().toISOString();
       const { data, error } = await supabase.from('bookings')
@@ -5876,6 +5877,46 @@ app.get('/api/floor/active', async (req, res) => {
           const end = b.session_end || new Date(new Date(b.session_start).getTime() + 2 * 60 * 60 * 1000).toISOString();
           return end >= nowIso; // still within its real booked window — not yet ended
         });
+      }
+
+      // ═══════════════════════════════════════════════════════════
+      // CLOSED-DAY LOOK-AHEAD. 20 July 2026, per Daisy.
+      // ═══════════════════════════════════════════════════════════
+      // The Kiln Cafe is shut Mon/Tue/Wed and open Thu-Sun — plus the
+      // occasional Thursday evening announced ad hoc on the website. On a
+      // closed day the query above is genuinely empty, so every table went
+      // cream and it looked broken ("no green for the bookings I KNOW we
+      // have"). The bookings weren't missing — they were on Thursday,
+      // outside a today→tomorrow window.
+      //
+      // Rather than hard-code opening days (which would break the ad-hoc
+      // Thursday evenings), this is BOOKING-DRIVEN: if today has nothing
+      // live, find the next day that actually has bookings and show that
+      // whole day. Works identically for the regular Thu-Sun rhythm and
+      // for any one-off evening session — because it asks the bookings,
+      // not a calendar. Nothing to maintain when hours change.
+      if (ownBookings.length === 0) {
+        const { data: nextRows } = await supabase.from('bookings')
+          .select('session_start')
+          .eq('studio_id', studioId)
+          .gte('session_start', nowIso)
+          .not('status', 'eq', 'cancelled')
+          .not('status', 'eq', 'completed')
+          .order('session_start', { ascending: true })
+          .limit(1);
+        if (nextRows && nextRows.length) {
+          const nextDay = new Date(nextRows[0].session_start); nextDay.setHours(0,0,0,0);
+          const nextDayEnd = new Date(nextDay); nextDayEnd.setDate(nextDayEnd.getDate()+1);
+          const { data: dayRows } = await supabase.from('bookings')
+            .select('booking_code,customer_name,table_number,current_stage,session_start,session_end,party_size,status,booking_type,space_name')
+            .eq('studio_id', studioId)
+            .gte('session_start', nextDay.toISOString())
+            .lt('session_start', nextDayEnd.toISOString())
+            .not('status', 'eq', 'cancelled')
+            .not('status', 'eq', 'completed');
+          ownBookings = dayRows || [];
+          showingDate = nextDay.toISOString().split('T')[0];  // e.g. "2026-07-23"
+        }
       }
     } catch(e) { console.warn('bookings query failed:', e.message); }
 
@@ -6060,11 +6101,16 @@ app.get('/api/floor/active', async (req, res) => {
       // would go looking for a customer who isn't due for a day. Told
       // explicitly rather than left to the client to infer from a
       // timestamp it may well parse in a different timezone to this.
-      is_tomorrow: b.session_start >= tomorrow.toISOString(),
+      // When we've rolled forward to a future open day (showingDate set),
+      // these bookings ARE the day on screen — they must colour the tables
+      // green, not be shunted into the 'tomorrow' preview list (which is
+      // for the second day of a normal today+tomorrow window). So is_tomorrow
+      // only applies in the normal same-day case.
+      is_tomorrow: showingDate ? false : (b.session_start >= tomorrow.toISOString()),
       assignments: assignMap[b.booking_code]||[],
       checks: checkMap[b.booking_code]||{}
     }));
-    res.json({ bookings: [...ownMapped, ...squareLiveBookings] });
+    res.json({ bookings: [...ownMapped, ...squareLiveBookings], showingDate });
 
   } catch(error) {
     console.error('/api/floor/active failed:', error?.message||error);

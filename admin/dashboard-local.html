@@ -15582,13 +15582,27 @@ function renderFloorPlanElegant() {
   const { rooms, bookingByTable, unseated, tomorrow } = _elegantRoomsData();
   const resting = Object.keys(rooms).length === 0;
 
+  // When the studio is closed today, the floor plan rolls forward to the
+  // next open day that has bookings (server sets _floorData.showingDate).
+  // Label it plainly so staff know they're seeing Thursday's tables, not
+  // an empty today — otherwise a full Thursday on a closed Monday looks
+  // like a broken empty plan.
+  let _studioViewLabel = 'Live studio view';
+  if (_floorData.showingDate) {
+    const _d = new Date(_floorData.showingDate + 'T00:00:00');
+    const _todayStr = new Date().toISOString().split('T')[0];
+    if (_floorData.showingDate !== _todayStr) {
+      _studioViewLabel = 'Showing ' + _d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+    }
+  }
+
   view.innerHTML = `
     <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
         <div>
           <div style="font-family:'Caveat',cursive;font-size:28px;font-weight:700;color:#2B2724;">The Kiln Cafe</div>
           <div style="display:flex;align-items:center;gap:6px;">
-            <div style="font-size:11px;color:#8a8175;">Live studio view</div>
+            <div style="font-size:11px;color:#8a8175;">${_studioViewLabel}</div>
             <!-- The tiny dot + last-sync time. Green = synced in the last 6min (within the 5min window).
                  Amber = stale. Tapping it triggers a sync + floor plan refresh immediately. -->
             <button id="floor-sync-btn" onclick="_manualFloorSync()" title="Tap to refresh now"
@@ -15784,7 +15798,8 @@ async function loadFloorPlan() {
     }
     _floorData = {
       bookings: floorData.bookings || [],
-      tables: tablesData.tables || []
+      tables: tablesData.tables || [],
+      showingDate: floorData.showingDate || null
     };
     renderFloorPlanElegant();
     if (window._loadDone) window._loadDone();
