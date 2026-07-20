@@ -26,6 +26,8 @@
     "jsdom": "^29.1.1",
     "node-cron": "^4.6.0",
     "node-fetch": "^3.3.2",
+    "playwright": "^1.61.1",
+    "puppeteer-core": "^25.3.0",
     "square": "^38.1.0",
     "stripe": "^13.11.0"
   },

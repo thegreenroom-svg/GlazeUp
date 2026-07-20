@@ -616,6 +616,16 @@
       flex-direction: column;
       height: 100%;
       min-height: 0;
+      /* min-width:0 is load-bearing on mobile. A flex child defaults to
+         min-width:auto, which refuses to shrink below its widest child's
+         intrinsic width. The static header button row is wide, so without
+         this admin-main grew to ~421px inside a 375px phone and dragged
+         every screen (including the home tiles) off the right edge. Found
+         by headless measurement 20 Jul after chasing it in the wrong
+         place repeatedly: the tiles were never the problem, this was.
+         max-width:100% keeps it inside the viewport. */
+      min-width: 0;
+      max-width: 100%;
       background: var(--gu-secondary);
     }
 
@@ -695,7 +705,10 @@
     .admin-content {
       flex: 1;
       min-height: 0;
+      min-width: 0;
+      max-width: 100%;
       overflow-y: auto;
+      overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
       padding: 28px 32px 40px;
     }
@@ -3460,7 +3473,7 @@ function updateStaffName() {
     </div>
   </div>
   <div style="max-width:640px;margin:0 auto;padding:12px 14px 0;"><div id="flow-nudge-slot"></div></div>
-  <div id="flow-graph-body" style="padding:4px 14px 100px;max-width:640px;margin:0 auto;"></div>
+  <div id="flow-graph-body" style="padding:4px 14px 100px;width:100%;max-width:640px;margin:0 auto;box-sizing:border-box;"></div>
   <div id="flow-back-bar" style="display:none;position:fixed;left:14px;right:14px;
     bottom:calc(14px + env(safe-area-inset-bottom));z-index:20;">
     <button class="glaze-tile" onclick="_flowGraphBack()" style="width:100%;padding:14px;border:none;border-radius:14px;
