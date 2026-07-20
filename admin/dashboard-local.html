@@ -23447,21 +23447,35 @@ async function loadBookingsOverview() {
 
     statsEl.innerHTML = `
       <span><strong style="color:var(--gu-text);">${data.totalBookingsToday}</strong> bookings today</span>
-      <span><strong style="color:#2e7d32;">${data.occupiedNow}</strong> tables occupied now</span>
+      <span><strong style="color:#2e7d32;">${data.occupiedNow}</strong> live now</span>
       <span><strong style="color:var(--gu-text);">${data.totalTables - data.occupiedNow}</strong> free</span>
     `;
 
+    // Compact by default: show only tables that need attention (live or
+    // upcoming), plus a single "See all tables" button that opens the
+    // full elegant floor plan — rather than a wall of 15 chunky tiles
+    // taking the whole screen. Everyone can still see what's happening
+    // at a glance; the detail is one tap away on the real floor plan.
     if (!tables.length) {
       schematicEl.innerHTML = '<div style="grid-column:1/-1;color:var(--gu-dust);font-size:12px;padding:10px 0;">No table layout set up yet — add tables in Setup.</div>';
     } else {
-      const STATUS_COLORS = { occupied: '#2e7d32', upcoming: '#F9A825', free: '#e0e0e0' };
-      const STATUS_TEXT_COLORS = { occupied: 'white', upcoming: '#2B2724', free: '#8a8175' };
-      schematicEl.innerHTML = tables.map((t, i) => `
-        <div style="background:${STATUS_COLORS[t.status]};color:${STATUS_TEXT_COLORS[t.status]};border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;" onclick="handleTableClick(${JSON.stringify(t).replace(/"/g, '&quot;')}, ${i + 1})">
-          <div style="font-size:16px;font-weight:800;">${i + 1}</div>
-          <div style="font-size:9px;font-weight:600;line-height:1.2;">${t.status === 'occupied' ? (t.current?.customerName || 'Occupied').split(' ')[0] : t.status === 'upcoming' ? 'Next: ' + (t.next?.customerName || '').split(' ')[0] : 'Free'}</div>
-        </div>
-      `).join('');
+      const active = tables.map((t, i) => ({ t, n: i + 1 })).filter(x => x.t.status === 'occupied' || x.t.status === 'upcoming');
+      const STATUS_COLORS = { occupied: '#2e7d32', upcoming: '#F9A825' };
+      const STATUS_TEXT = { occupied: 'white', upcoming: '#2B2724' };
+      if (!active.length) {
+        schematicEl.innerHTML = `
+          <div style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 0;">
+            <span style="font-size:12px;color:var(--gu-dust);">All ${tables.length} tables free right now.</span>
+            <button onclick="showFloorPlan()" class="glaze-tile" style="border:none;border-radius:10px;padding:9px 14px;font-size:12px;font-weight:700;background:rgba(94,157,182,0.15);color:#3a6e7d;cursor:pointer;white-space:nowrap;">🪑 See all tables →</button>
+          </div>`;
+      } else {
+        schematicEl.innerHTML = active.map(({ t, n }) => `
+          <div style="background:${STATUS_COLORS[t.status]};color:${STATUS_TEXT[t.status]};border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;" onclick="handleTableClick(${JSON.stringify(t).replace(/"/g, '&quot;')}, ${n})">
+            <div style="font-size:16px;font-weight:800;">${n}</div>
+            <div style="font-size:9px;font-weight:600;line-height:1.2;">${t.status === 'occupied' ? (t.current?.customerName || 'Live').split(' ')[0] : 'Next: ' + (t.next?.customerName || '').split(' ')[0]}</div>
+          </div>`).join('')
+          + `<div style="display:flex;align-items:center;justify-content:center;"><button onclick="showFloorPlan()" class="glaze-tile" style="border:none;border-radius:10px;padding:10px 8px;font-size:11px;font-weight:700;background:rgba(94,157,182,0.15);color:#3a6e7d;cursor:pointer;width:100%;height:100%;">🪑 All tables →</button></div>`;
+      }
     }
 
     // Compact upcoming bookings list underneath the schematic
