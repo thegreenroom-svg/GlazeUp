@@ -14439,14 +14439,14 @@ async function logOutOfShift() {
   localStorage.removeItem('klnk_last_active');
   currentShiftStaff = null;
   const _sbn = document.getElementById('shift-badge-name'); if (_sbn) _sbn.style.display = 'none'; // avatar button removed 18 Jul
-  document.getElementById('step-counter-btn').style.display = 'none';
-  document.getElementById('headset-setup-btn').style.display = 'none';
-  document.getElementById('direct-logout-btn').style.display = 'none';
-  document.getElementById('direct-break-btn').style.display = 'none';
-  document.getElementById('returns-btn').style.display = 'none';
-  document.getElementById('staff-assistant-panel').style.display = 'none';
-  document.getElementById('cleo-admin-floating-fab').style.display = 'none';
-  document.getElementById('cleo-admin-floating-bubble').style.display = 'none';
+  const _scb = document.getElementById('step-counter-btn'); if (_scb) _scb.style.display = 'none';
+  const _hsb = document.getElementById('headset-setup-btn'); if (_hsb) _hsb.style.display = 'none';
+  const _dlb = document.getElementById('direct-logout-btn'); if (_dlb) _dlb.style.display = 'none';
+  const _drb = document.getElementById('direct-break-btn'); if (_drb) _drb.style.display = 'none';
+  const _rb = document.getElementById('returns-btn'); if (_rb) _rb.style.display = 'none';
+  const _sap = document.getElementById('staff-assistant-panel'); if (_sap) _sap.style.display = 'none';
+  const _cleo_fab = document.getElementById('cleo-admin-floating-fab'); if (_cleo_fab) _cleo_fab.style.display = 'none';
+  const _cleo_bubble = document.getElementById('cleo-admin-floating-bubble'); if (_cleo_bubble) _cleo_bubble.style.display = 'none';
   clearInterval(_cleoAdminFloatingRotationTimer);
   staffAssistantOpen = false;
   staffAssistantMessages = []; // fresh conversation for whoever logs in next
