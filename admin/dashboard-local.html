@@ -704,6 +704,10 @@
       .admin-content { padding: 20px 18px 40px; }
     }
 
+    @media (max-width: 480px) {
+      .admin-content { padding: 16px 12px 32px; }
+    }
+
     .view {
       max-width: 960px;
       margin: 0 auto;
@@ -3193,7 +3197,7 @@ function updateStaffName() {
       </div>
 
       <!-- Right: shift badge + bell + mini tiles including logout -->
-      <div id="admin-header-right-buttons" class="admin-header-right" style="display:none;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;max-width:60vw;overflow-x:auto;">
+      <div id="admin-header-right-buttons" class="admin-header-right" style="display:none;align-items:center;gap:6px;flex-shrink:1;min-width:0;overflow-x:auto;overflow-y:hidden;">
 
         <!-- Who's on shift — tap for task queue -->
         <!-- Just the avatar circle. The name took 60px we don't have. -->
