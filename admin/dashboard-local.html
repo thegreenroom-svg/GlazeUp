@@ -8946,6 +8946,109 @@ function _previewStageStep(what, nextLabel) {
   try { toast(`Example only — ${what}. Next: ${nextLabel}`, 'success'); } catch(e) {}
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// WALK-THROUGH ENGINE — see the whole flow, end to end, with no data
+// ═══════════════════════════════════════════════════════════════════
+// One central engine used everywhere it's relevant, in both apps, so
+// staff can walk any workflow from an empty stage right through to its
+// final action WITHOUT any real pieces or bookings existing yet. Rules,
+// per direct request:
+//   • real screens with example data (not mockups)
+//   • the final action is SIMULATED — nothing is written to the database
+//   • a persistent "Exit walk-through" bar is shown the whole time, so
+//     you can back out cleanly to exactly where you started at any point
+// A walk-through is a named sequence of steps. Each step names the real
+// screen it opens and a one-line "what would happen". The engine drives
+// them in order, shows progress, and on the last step offers the
+// simulated final action then a clean exit.
+const _walk = {
+  active: false,
+  name: '',
+  steps: [],
+  i: 0,
+  returnTo: null,   // function to run on exit, to restore where we were
+
+  start(name, steps, returnTo) {
+    this.active = true; this.name = name; this.steps = steps; this.i = 0;
+    this.returnTo = returnTo || null;
+    this._ensureBar();
+    this._runStep();
+  },
+
+  _runStep() {
+    const step = this.steps[this.i];
+    if (!step) { this.exit(); return; }
+    // Open the real screen for this step, if it names one.
+    try { if (typeof step.open === 'function') step.open(); } catch(e) { console.warn('walk step open failed:', e); }
+    this._renderBar();
+    if (step.note) { try { toast(`Example — ${step.note}`, 'success'); } catch(e){} }
+  },
+
+  next() {
+    if (!this.active) return;
+    if (this.i >= this.steps.length - 1) { this._finalAction(); return; }
+    this.i++;
+    this._runStep();
+  },
+
+  _finalAction() {
+    const last = this.steps[this.steps.length - 1];
+    const what = (last && last.finalNote) || 'This is where the action would be saved';
+    // SIMULATED ONLY — nothing written. Make that explicit.
+    try { toast(`Example complete — ${what}. Nothing was saved.`, 'success'); } catch(e){}
+    this._renderBar(true);
+  },
+
+  exit() {
+    this.active = false;
+    const bar = document.getElementById('walkthrough-bar');
+    if (bar) bar.remove();
+    const fn = this.returnTo; this.returnTo = null;
+    try { if (typeof fn === 'function') fn(); else if (window._flowGraphEnter) window._flowGraphEnter(); } catch(e){}
+  },
+
+  _ensureBar() {
+    if (document.getElementById('walkthrough-bar')) return;
+    const bar = document.createElement('div');
+    bar.id = 'walkthrough-bar';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;'
+      + 'background:linear-gradient(135deg,#5E35B1,#4527A0);color:#fff;'
+      + 'padding:max(8px,env(safe-area-inset-top)) 12px 8px;box-shadow:0 2px 12px rgba(0,0,0,0.25);'
+      + 'display:flex;align-items:center;gap:10px;font-size:12px;';
+    document.body.appendChild(bar);
+  },
+
+  _renderBar(done) {
+    const bar = document.getElementById('walkthrough-bar');
+    if (!bar) return;
+    const total = this.steps.length;
+    const stepNo = Math.min(this.i + 1, total);
+    const step = this.steps[this.i] || {};
+    bar.innerHTML = `
+      <div style="flex-shrink:0;background:rgba(255,255,255,0.2);border-radius:20px;padding:3px 9px;font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;">Example walk-through</div>
+      <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+        <b>${this.name}</b> · step ${stepNo}/${total}${step.label?` · ${step.label}`:''}</div>
+      ${done
+        ? `<button onclick="_walk.exit()" style="flex-shrink:0;background:#fff;color:#4527A0;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:800;cursor:pointer;">Done — exit</button>`
+        : `<button onclick="_walk.next()" style="flex-shrink:0;background:rgba(255,255,255,0.25);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:800;cursor:pointer;">Next step →</button>
+           <button onclick="_walk.exit()" title="Exit walk-through" style="flex-shrink:0;background:none;border:1px solid rgba(255,255,255,0.5);color:#fff;border-radius:8px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;">Exit</button>`}
+    `;
+  }
+};
+
+// The Journey walk-through — Booking → Painting → Completion → Kiln,
+// each opening the real stage screen with example framing, ending in
+// the simulated "bagged for kiln" action.
+function _walkJourney() {
+  _walk.start('The Journey', [
+    { label:'Booking',    open:()=>{ try{openStageBooking();}catch(e){} },    note:'greet the customer, set them up, take drinks' },
+    { label:'Painting',   open:()=>{ try{openStageEngagement();}catch(e){} }, note:'check in while they paint, top up drinks' },
+    { label:'Completion', open:()=>{ try{openStageCompletion();}catch(e){} }, note:'photos, extras, settle the bill, clear the table' },
+    { label:'Kiln',       open:()=>{ try{openStageKiln();}catch(e){} },       note:'bag the pieces and print the kiln label',
+      finalNote:'the pieces would be bagged, labelled and sent to the kiln queue' },
+  ], ()=>{ if (window._flowGraphEnter) window._flowGraphEnter(); });
+}
+
 
 function openTakings() {
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
@@ -9330,8 +9433,8 @@ async function _loadKilnBody() {
             font-size:12px;font-weight:800;background:#00897B;color:#fff;cursor:pointer;">✓ Mark selected as dipped</button>
         ` : _emptyStagePreview({
             exampleLabel: 'A painted mug, ready for its glaze dip',
-            actionLabel: 'Mark as dipped',
-            onExample: `_previewStageStep('this piece would be marked dipped and move to the firing queue','Dipped, waiting to fire')`,
+            actionLabel: 'Walk through what happens',
+            onExample: `_walkJourney()`,
             nextLabel: 'Dipped, waiting to fire',
             nextEmoji: '🔥'
           })}
