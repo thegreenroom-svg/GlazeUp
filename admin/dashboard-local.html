@@ -11149,6 +11149,25 @@ async function _musicCheck() {
 
   if (setup.ready) return _musicPlayer();
 
+  // Defensive: the endpoint should return {ready, steps:[...]}, but a
+  // malformed or unexpected response (or a future API change) must not
+  // crash the whole Music screen. Without this, setup.steps.findIndex
+  // throws 'Cannot read properties of undefined' and Music dies on open.
+  // Caught by the 20 Jul headless walk-through.
+  if (!setup || !Array.isArray(setup.steps)) {
+    el.innerHTML = `
+      <div class="glaze-tile" style="border-radius:14px;padding:18px;border:2px solid #e53935;">
+        <div style="font-size:14px;font-weight:700;color:#2B2724;">Music setup unavailable</div>
+        <div style="font-size:12px;color:#2B2724;line-height:1.5;margin-top:8px;">
+          Couldn't read the music setup just now. Give it a moment and try again.</div>
+        <button class="glaze-tile" onclick="_musicCheck()" style="width:100%;background:#2B2724;color:#fff;border:none;
+          border-radius:12px;padding:14px;font-size:14px;font-weight:800;cursor:pointer;margin-top:12px;">
+          Try again
+        </button>
+      </div>`;
+    return;
+  }
+
   // Show the ladder — done, stuck, and not-yet-checked
   const blockedIdx = setup.steps.findIndex(s => !s.ok);
   el.innerHTML = `
