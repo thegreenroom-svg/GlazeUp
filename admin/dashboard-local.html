@@ -8386,6 +8386,12 @@ let CURRENT_DATA_SOURCE = LIVE_CACHE; // Default to live
 let AUTO_SYNC_INTERVAL = null;
 
 async function syncLiveData() {
+  // Safety: only sync if user is actually logged in
+  if (!currentShiftStaff) {
+    toast('Please log in first', 'info');
+    return;
+  }
+  
   const wasConnected = LIVE_CACHE.isConnected;
   const _btn = document.getElementById('sync-live-btn');
   if (_btn) { _btn.disabled = true; _btn.style.opacity = '0.5'; }
@@ -8414,8 +8420,14 @@ async function syncLiveData() {
       // Start auto-polling (safe to call again; it clears any prior timer)
       startAutoSync();
       
-      // Refresh the dashboard in place — a full reload drops back to login.
-      if (typeof populateDashboard === 'function') { try { populateDashboard(); } catch(e){} }
+      // Only refresh revenue display if dashboard is visible (not on login screen)
+      // Don't call full populateDashboard() — that calls checkShiftLogin() which causes a loop back to login
+      const dashboardView = document.getElementById('dashboard-view');
+      if (dashboardView && dashboardView.style.display !== 'none') {
+        if (typeof refreshKilnCafeRevenueData === 'function') { 
+          try { refreshKilnCafeRevenueData(); } catch(e){}
+        }
+      }
     } else {
       toast('No data received', 'error');
       updateLiveDataStatus(false);
