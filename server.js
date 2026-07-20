@@ -2380,6 +2380,7 @@ app.get('/api/customer/my-bookings', async (req, res) => {
 app.post('/api/bookings/sync', async (req, res) => {
   const { studioId } = req.body;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  console.log(`[bookings/sync] CALLED for studio=${studioId}`);
 
   try {
     // Get Square connection for this studio
@@ -2465,6 +2466,13 @@ app.post('/api/bookings/sync', async (req, res) => {
     const upcomingBookings = allBookings.filter(b =>
       activeStatuses.includes(b.status) && b.startAt
     );
+
+    // Diagnostic — one clear line so the Render logs answer the question
+    // "does Square actually hand over the appointments?" without guessing.
+    // Shows total returned, how many survive the active/upcoming filter,
+    // and the window used. If total is 0, Square returned nothing for this
+    // token/window (a Square-side setup or scope issue, not our code).
+    console.log(`[bookings/sync] studio=${studioId} window=${startMin}..${startMax} squareReturned=${allBookings.length} activeUpcoming=${upcomingBookings.length} statuses=${JSON.stringify([...new Set(allBookings.map(b=>b.status))])}`);
 
     // Resolve customer names by looking up each unique customerId via the Customers API
     const uniqueCustomerIds = [...new Set(upcomingBookings.map(b => b.customerId).filter(Boolean))];
@@ -2591,7 +2599,7 @@ app.post('/api/bookings/sync', async (req, res) => {
       }))
     });
   } catch (error) {
-    console.error('Booking sync error:', error);
+    console.error(`[bookings/sync] ERROR: ${error?.statusCode || ''} ${error?.errors?.[0]?.code || ''} ${error?.message || error}`);
     res.status(500).json({ error: error.message });
   }
 });
