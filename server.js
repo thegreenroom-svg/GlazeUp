@@ -693,7 +693,7 @@ app.get('/api/square/transactions', async (req, res) => {
       id: `day-${day.metric_date}`,
       created_at: day.metric_date + 'T00:00:00Z',  // Midnight on that date
       amount_money: {
-        amount: day.metric_value?.revenue_cents || 0  // Already in cents
+        amount: parseInt(day.metric_value) || 0  // metric_value is already in cents as integer
       }
     }));
 
