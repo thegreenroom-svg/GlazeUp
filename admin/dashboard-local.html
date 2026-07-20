@@ -3626,7 +3626,7 @@ function updateStaffName() {
               <button onclick="refreshKilnCafeRevenueData()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
             </div>
             <p style="font-size:11px;color:var(--gu-dust);margin-bottom:10px;">The studio's own real revenue and app usage — separate from Platform Revenue (worldwide SaaS income), and only visible to David, Jenny, and Daisy.</p>
-            <button class="glaze-tile" id="kiln-cafe-backfill-btn" onclick="triggerKilnCafeBackfill()" style="background:#2e7d32;color:white;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:16px;margin-right:100px;max-width:calc(100% - 100px);">📥 Pull all real Square history</button>
+            <div id="revenue-sync-pill-slot" style="margin-bottom:16px;"></div>
 
             <!-- Genuine real speedometer — today's actual revenue vs
                  a real recent daily average, reusing the exact same
@@ -9115,6 +9115,9 @@ function openTakings() {
   const dashboardView = document.getElementById('dashboard-view');
   if (dashboardView) dashboardView.style.display = 'block';
   showDashboardSection('revenue');
+  // Drop the clean Square-sync pill into its slot (replaces old messy button)
+  const slot = document.getElementById('revenue-sync-pill-slot');
+  if (slot && typeof _squareSyncPill === 'function') { slot.innerHTML = _squareSyncPill({ label:'Pull all real Square history' }); }
 }
 
 
@@ -21448,6 +21451,70 @@ async function populateDashboard() {
 // real days of Square sales into analytics_cache immediately, since
 // the real daily cron only keeps things current going forward from
 // whenever it starts, not retroactively.
+// ─── SQUARE SYNC PILL — the one clean control, used sitewide ─────────
+// A wide oval button with a progress toggle at the end, per direct
+// request, replacing the messy square icon-button. States, shown by the
+// toggle dot on the right:
+//   • grey  — idle, tap to pull
+//   • amber — pulling (spinner text)
+//   • green — connected & up to date
+//   • red   — not connected / failed
+// Drop `_squareSyncPill()` HTML anywhere; every copy stays in lockstep
+// because they share the .square-sync-pill class and _runSquareSync().
+function _squareSyncPill(opts) {
+  const o = opts || {};
+  const label = o.label || 'Update from Square';
+  return `<button class="square-sync-pill glaze-tile" onclick="_runSquareSync()"
+    style="display:inline-flex;align-items:center;gap:10px;border:none;border-radius:24px;
+    padding:9px 8px 9px 16px;font-size:13px;font-weight:700;cursor:pointer;
+    background:linear-gradient(135deg,#3E6FA3,#2E547C);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.12);">
+    <span class="ssp-label">📥 ${label}</span>
+    <span class="ssp-toggle" style="width:38px;height:22px;border-radius:22px;background:rgba(255,255,255,0.25);
+      position:relative;flex-shrink:0;transition:background .2s;">
+      <span class="ssp-dot" style="position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;
+        background:#cfd8dc;transition:transform .2s,background .2s;"></span>
+    </span>
+  </button>`;
+}
+
+function _setSquareSyncState(state) {
+  // state: 'idle' | 'pulling' | 'connected' | 'error'
+  const cfg = {
+    idle:      { dot:'#cfd8dc', track:'rgba(255,255,255,0.25)', x:'0',    label:'📥 Update from Square' },
+    pulling:   { dot:'#F9A825', track:'rgba(249,168,37,0.5)',   x:'8px',  label:'⏳ Pulling real Square data…' },
+    connected: { dot:'#2e7d32', track:'rgba(46,125,50,0.6)',    x:'16px', label:'✓ Up to date' },
+    error:     { dot:'#c0392b', track:'rgba(192,57,43,0.6)',    x:'0',    label:'⚠︎ Not connected — tap to retry' },
+  }[state] || {};
+  document.querySelectorAll('.square-sync-pill').forEach(btn => {
+    const lbl = btn.querySelector('.ssp-label');
+    const tog = btn.querySelector('.ssp-toggle');
+    const dot = btn.querySelector('.ssp-dot');
+    if (lbl && cfg.label) lbl.textContent = cfg.label;
+    if (tog && cfg.track) tog.style.background = cfg.track;
+    if (dot) { dot.style.background = cfg.dot; dot.style.transform = `translateX(${cfg.x})`; }
+    btn.disabled = (state === 'pulling');
+  });
+}
+
+async function _runSquareSync() {
+  _setSquareSyncState('pulling');
+  try {
+    const res = await fetch(`${API_URL}/api/square/backfill`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, daysBack: 365 }),
+    });
+    const data = await res.json();
+    if (!res.ok) { _setSquareSyncState('error'); return; }
+    setTimeout(() => {
+      try { if (typeof refreshKilnCafeRevenueData === 'function') refreshKilnCafeRevenueData(); } catch(e){}
+      _setSquareSyncState('connected');
+      setTimeout(() => _setSquareSyncState('idle'), 4000);
+    }, 4000);
+  } catch (e) {
+    _setSquareSyncState('error');
+  }
+}
+
 async function triggerKilnCafeBackfill() {
   // Two real trigger points now share this: the original one inside the
   // Dashboard tab, and the one on the actual home page (added because the
