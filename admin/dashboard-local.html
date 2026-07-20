@@ -15596,6 +15596,34 @@ function renderFloorPlanElegant() {
     }
   }
 
+  // ── Day-stepper ‹ › — flick between days that actually have bookings ──
+  // Uses the availableDays the server returns (real open days only, closed
+  // midweek days skipped). The current position is _floorData.showingDate
+  // (falls back to today). Arrows disable at the ends. A 'Today' chip
+  // returns to the live view. Only shown when there's more than one day to
+  // move between — no clutter on a single-day studio.
+  let _dayStepperHTML = '';
+  {
+    const days = _floorData.availableDays || [];
+    const cur = _floorData.showingDate || new Date().toISOString().split('T')[0];
+    const idx = days.indexOf(cur);
+    if (days.length > 1) {
+      const prevDay = idx > 0 ? days[idx - 1] : null;
+      const nextDay = (idx >= 0 && idx < days.length - 1) ? days[idx + 1] : null;
+      const _todayStr = new Date().toISOString().split('T')[0];
+      const showTodayChip = cur !== _todayStr;
+      const arrow = (day, glyph, label) => day
+        ? `<button onclick="_stepFloorDay('${day}')" title="${label}" style="background:#EFE7DA;border:1px solid #D9CDBB;color:#5a5148;border-radius:8px;width:30px;height:30px;font-size:16px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;">${glyph}</button>`
+        : `<span style="width:30px;height:30px;border-radius:8px;border:1px solid #E7DECF;color:#CBBFAE;display:flex;align-items:center;justify-content:center;font-size:16px;">${glyph}</span>`;
+      _dayStepperHTML = `
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+          ${arrow(prevDay, '‹', 'Previous day')}
+          ${arrow(nextDay, '›', 'Next day')}
+          ${showTodayChip ? `<button onclick="_stepFloorDay('')" style="background:#4c9a58;color:white;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;">Today</button>` : ''}
+        </div>`;
+    }
+  }
+
   view.innerHTML = `
     <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
@@ -15612,6 +15640,7 @@ function renderFloorPlanElegant() {
               <span id="floor-sync-label">–</span>
             </button>
           </div>
+          ${_dayStepperHTML}
         </div>
         <!-- This said "🏠 Home" and called goToRealLandingPage(). That was
              correct when the TILE GRID was home. It isn't any more — the
@@ -15775,11 +15804,29 @@ function showRoomElegant(roomName) {
   }
 }
 
-async function loadFloorPlan() {
+// Day-stepper handler — the floor plan ‹ › arrows and 'Today' chip call
+// this. Empty string = back to the live/today view (with its closed-day
+// look-ahead); a date string = show exactly that day. Just re-runs the
+// same loadFloorPlan the plan already uses, with the date threaded in.
+async function _stepFloorDay(dateStr) {
+  // Remember (or clear) the stepped-to day so the background 5-min
+  // refresh keeps showing it rather than snapping back to today.
+  window._floorViewDate = dateStr || null;
+  await loadFloorPlan(dateStr || undefined);
+}
+
+async function loadFloorPlan(dateOverride) {
+  // If no explicit date is passed (e.g. the background auto-refresh timer
+  // calls loadFloorPlan() bare), fall back to whichever day the person
+  // last stepped to, so a refresh doesn't yank them back to today.
+  if (dateOverride === undefined && window._floorViewDate) {
+    dateOverride = window._floorViewDate;
+  }
   if (window._loadStart) window._loadStart();
   try {
+    const _floorQ = dateOverride ? `&date=${dateOverride}` : '';
     const [floorRes, tablesRes] = await Promise.all([
-      fetch(`${API_URL}/api/floor/active?studioId=${studioId}`),
+      fetch(`${API_URL}/api/floor/active?studioId=${studioId}${_floorQ}`),
       fetch(`${API_URL}/api/floor/tables?studioId=${studioId}`)
     ]);
     // A failed request used to be swallowed here — console.warn only,
@@ -15799,7 +15846,8 @@ async function loadFloorPlan() {
     _floorData = {
       bookings: floorData.bookings || [],
       tables: tablesData.tables || [],
-      showingDate: floorData.showingDate || null
+      showingDate: floorData.showingDate || null,
+      availableDays: floorData.availableDays || []
     };
     renderFloorPlanElegant();
     if (window._loadDone) window._loadDone();

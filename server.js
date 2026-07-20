@@ -5816,7 +5816,7 @@ app.post('/api/hbp/orders/:orderId/return-label', async (req, res) => {
 // explicitly, and a real failure returns a normal 500 instead of taking
 // the server down.
 app.get('/api/floor/active', async (req, res) => {
-  const { studioId } = req.query;
+  const { studioId, date } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
   try {
     const today = new Date(); today.setHours(0,0,0,0);
@@ -5865,6 +5865,25 @@ app.get('/api/floor/active', async (req, res) => {
     let showingDate = null;   // which day the floor plan is actually showing
     try {
       const nowIso = new Date().toISOString();
+
+      // ── Day-stepper: a specific date was requested (‹ › arrows). ──
+      // Show exactly that whole day — every booking on it, regardless of
+      // whether it's already ended — because the person is deliberately
+      // looking at that day, not "what's live right now". Skips the
+      // today/look-ahead logic entirely.
+      if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        const dayStart = new Date(date + 'T00:00:00'); dayStart.setHours(0,0,0,0);
+        const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate()+1);
+        const { data: dayRows } = await supabase.from('bookings')
+          .select('booking_code,customer_name,table_number,current_stage,session_start,session_end,party_size,status,booking_type,space_name')
+          .eq('studio_id', studioId)
+          .gte('session_start', dayStart.toISOString())
+          .lt('session_start', dayEnd.toISOString())
+          .not('status', 'eq', 'cancelled')
+          .not('status', 'eq', 'completed');
+        ownBookings = dayRows || [];
+        showingDate = date;
+      } else {
       const { data, error } = await supabase.from('bookings')
         .select('booking_code,customer_name,table_number,current_stage,session_start,session_end,party_size,status,booking_type,space_name')
         .eq('studio_id', studioId)
@@ -5917,6 +5936,7 @@ app.get('/api/floor/active', async (req, res) => {
           ownBookings = dayRows || [];
           showingDate = nextDay.toISOString().split('T')[0];  // e.g. "2026-07-23"
         }
+      }
       }
     } catch(e) { console.warn('bookings query failed:', e.message); }
 
@@ -6110,7 +6130,23 @@ app.get('/api/floor/active', async (req, res) => {
       assignments: assignMap[b.booking_code]||[],
       checks: checkMap[b.booking_code]||{}
     }));
-    res.json({ bookings: [...ownMapped, ...squareLiveBookings], showingDate });
+    // The distinct days (today onward) that actually have bookings — so
+    // the floor plan's ‹ › day-stepper can jump between real open days and
+    // skip the closed ones, rather than stepping into empty midweek days.
+    let availableDays = [];
+    try {
+      const { data: dayList } = await supabase.from('bookings')
+        .select('session_start')
+        .eq('studio_id', studioId)
+        .gte('session_start', today.toISOString())
+        .not('status', 'eq', 'cancelled')
+        .not('status', 'eq', 'completed')
+        .order('session_start', { ascending: true });
+      availableDays = [...new Set((dayList || []).map(r =>
+        new Date(r.session_start).toISOString().split('T')[0]))];
+    } catch(e) { /* non-fatal — stepper just falls back to none */ }
+
+    res.json({ bookings: [...ownMapped, ...squareLiveBookings], showingDate, availableDays });
 
   } catch(error) {
     console.error('/api/floor/active failed:', error?.message||error);
