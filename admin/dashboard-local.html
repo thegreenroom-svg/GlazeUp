@@ -9031,13 +9031,24 @@ const _walk = {
 
   exit() {
     this.active = false;
+    this.demoActive = false;
     const bar = document.getElementById('walkthrough-bar');
     if (bar) bar.remove();
     const panel = document.getElementById('walkthrough-example-panel');
     if (panel) panel.remove();
-    const fn = this.returnTo;
     this.returnTo = null;
-    try { if (typeof fn === 'function') fn(); else if (window._flowGraphEnter) window._flowGraphEnter(); } catch(e){}
+    // Return to a genuinely clean home. Removing the bar alone left the
+    // walk-through's own screen (e.g. the green Journey stage tiles in
+    // #staff-view) sitting on view, so Cancel looked like it did nothing.
+    // Hide every .view explicitly, then land on home the same way a fresh
+    // login does — a full rebuild, not a layer over the last step's screen.
+    try { document.querySelectorAll('.view').forEach(v => v.style.display = 'none'); } catch(e){}
+    try {
+      if (typeof landOnHome === 'function') { landOnHome(); }
+      else if (window._flowGraphEnter) { window._flowGraphEnter(); }
+    } catch(e){
+      try { if (window._flowGraphEnter) window._flowGraphEnter(); } catch(_){}
+    }
   },
 
   _ensureBar() {
