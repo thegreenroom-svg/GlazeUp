@@ -16612,38 +16612,23 @@ function renderDetailChecklist() {
   if (!el) return;
 
   const stageColor = { booking:'#2e7d32', engagement:'#B87946', completion:'#c0392b', kiln:'#FF5722' }[stage] || '#2e7d32';
+  const editMode = !!window._detailChecklistEditMode;
 
   el.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
       <div style="font-size:10px;font-weight:700;color:${stageColor};text-transform:uppercase;letter-spacing:0.08em;">
         ${{ booking:'📋 Booking', engagement:'🎨 Painting', completion:'📷 Completion', kiln:'🔥 Kiln' }[stage]} checklist
       </div>
-      <div style="font-size:9px;color:rgba(255,255,255,0.3);">Tap ✎ to rename · ▲▼ to reorder</div>
+      <button onclick="window._detailChecklistEditMode = !window._detailChecklistEditMode; renderDetailChecklist();"
+        style="background:${editMode ? 'rgba(184,121,70,0.25)' : 'rgba(255,255,255,0.06)'};
+          border:1px solid ${editMode ? 'rgba(184,121,70,0.5)' : 'rgba(255,255,255,0.12)'};
+          color:${editMode ? '#B87946' : 'rgba(255,255,255,0.5)'};border-radius:8px;
+          padding:5px 10px;font-size:10px;font-weight:700;cursor:pointer;">
+        ${editMode ? '✓ Done editing' : '✎ Edit list'}
+      </button>
     </div>
     ${checks.map((c, i) => {
       const done = !!b.checks?.[`${stage}:${c.key}`];
-      // ═══════════════════════════════════════════════════════════
-      // TWO GENUINE CONSTRAINTS IN CONFLICT. 17 July 2026.
-      // ═══════════════════════════════════════════════════════════
-      // Three stacked buttons at a real 44px each need 132px of vertical
-      // space. A checklist row's own content needs about 48px. Stretching
-      // the row to fit the buttons inflated every item into a slab —
-      // "slow loading" was four items filling the whole screen, not a
-      // fetch. Shrinking the buttons back to fit the row undoes the tap
-      // fix entirely — I checked the arithmetic rather than assume it:
-      // 44px of column height split three ways with two 1px gaps is
-      // 14px each, WORSE than the 19px that caused the mis-tap in the
-      // first place. Stacking cannot give both at once; the two
-      // constraints are genuinely incompatible in that shape.
-      //
-      // So: horizontal instead of stacked. Width is the dimension a
-      // phone actually has to spare — this row is the full screen width
-      // minus one label button. Three 44px squares side by side fit
-      // comfortably and need no more vertical space than the row's own
-      // content already uses, because height is set by the tallest
-      // sibling and 44px is close to what the label button needs anyway.
-      // Order left to right: rename, then the two moves, so the one
-      // that was mis-hit into is no longer adjacent to either arrow.
       return `<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px;">
         <button class="glaze-tile" onclick="toggleFlowCheck('${b.booking_code}','${stage}','${c.key}',${!done})"
           style="width:100%;text-align:left;
@@ -16660,8 +16645,7 @@ function renderDetailChecklist() {
             ${c.description ? `<div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;">${c.description}</div>` : ''}
           </div>
         </button>
-        <!-- Explained above, where the row's own shape is decided —
-             this is the horizontal 44x44 strip that resolved it. -->
+        ${editMode ? `<!-- Edit controls only when the person opted into edit mode. -->
         <div style="display:flex;gap:4px;">
           <button class="glaze-tile" onclick="_editChecklistItem('${stage}','${c.key}')"
             style="width:44px;height:44px;border:none;border-radius:8px;background:rgba(184,121,70,0.15);
@@ -16675,7 +16659,7 @@ function renderDetailChecklist() {
             style="width:44px;height:44px;border:none;border-radius:8px;background:rgba(255,255,255,0.06);
               color:${i === checks.length - 1 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.6)'};font-size:14px;cursor:pointer;flex-shrink:0;
               display:flex;align-items:center;justify-content:center;">▼</button>
-        </div>
+        </div>` : ''}
       </div>`;
     }).join('')}
     <button class="glaze-tile" onclick="openBookingAtRealStage('${b.booking_code}','${stage}')"
@@ -30248,7 +30232,7 @@ if (typeof document !== 'undefined') {
      the floor plan opened, before loadFloorPlan() could render.
      Moved to body level where they belong. -->
 <div id="floor-table-detail" style="display:none;position:fixed;inset:0;z-index:6000;background:#1A1714;flex-direction:column;">
-    <div style="background:linear-gradient(135deg,#1C1814 0%,#2B2118 100%);padding:14px 16px;flex-shrink:0;border-bottom:1px solid rgba(184,121,70,0.3);">
+    <div style="background:linear-gradient(135deg,#1C1814 0%,#2B2118 100%);padding:max(14px,calc(env(safe-area-inset-top) + 8px)) 16px 14px;flex-shrink:0;border-bottom:1px solid rgba(184,121,70,0.3);">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
         <div id="detail-table-name" style="font-size:19px;font-weight:800;color:#F4ECE0;"></div>
         <button onclick="closeTableDetail()" class="glaze-tile"
