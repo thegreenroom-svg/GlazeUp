@@ -3245,10 +3245,12 @@ function updateStaffName() {
           width:26px;height:26px;font-size:12px;cursor:pointer;flex-shrink:0;
           align-items:center;justify-content:center;">👥</button>
                 <!-- Live Data Sync -->
-        <button class="glaze-tile" id="sync-live-btn" onclick="syncLiveData()" title="Sync Live Data"
-          style="display:none;background:#2e7d32;color:white;border:none;border-radius:50%;
-          width:26px;height:26px;font-size:12px;cursor:pointer;flex-shrink:0;
-          align-items:center;justify-content:center;">📥</button>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <span id="live-data-status" style="font-size:11px;font-weight:700;color:#2e7d32;display:flex;align-items:center;gap:3px;">🟢 Live</span>
+          <button class="glaze-tile" id="sync-live-btn" onclick="syncLiveData()" title="Sync Live Data — pull fresh Square data now"
+            style="background:#2e7d32;color:white;border:none;border-radius:50%;
+            width:26px;height:26px;font-size:12px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;">📥</button>
+        </div>
         
         <button class="glaze-tile" id="disconnect-live-btn" onclick="disconnectLiveData()" title="Disconnect"
           style="display:none;background:#c0392b;color:white;border:none;border-radius:50%;
@@ -8438,6 +8440,7 @@ async function syncLiveData() {
       
       LIVE_CACHE.isConnected = true;
       CURRENT_DATA_SOURCE = LIVE_CACHE;
+      updateLiveDataStatus(true);  // Update badge to show "🟢 Live"
       toast(wasConnected ? '✓ Data refreshed' : '✓ Live data connected', 'ok');
       
       // Start auto-polling (safe to call again; it clears any prior timer)
@@ -8449,9 +8452,11 @@ async function syncLiveData() {
       if (typeof populateDashboard === 'function') { try { populateDashboard(); } catch(e){} }
     } else {
       toast('No data received', 'error');
+      updateLiveDataStatus(false);
     }
   } catch(e) {
     toast('Connection failed: ' + e.message, 'error');
+    updateLiveDataStatus(false);
   } finally {
     if (_btn) { _btn.disabled = false; _btn.style.opacity = '1'; }
   }
@@ -8464,6 +8469,7 @@ async function disconnectLiveData() {
   CURRENT_DATA_SOURCE = LIVE_CACHE; // Still reads from live cache, just empty
   
   stopAutoSync();
+  updateLiveDataStatus(false);  // Update badge to show "⚠ Offline"
   toast('✓ Live data disconnected', 'ok');
   const _disc = document.getElementById('disconnect-live-btn');
   if (_disc) _disc.style.display = 'none';
@@ -18573,6 +18579,27 @@ function _flowGraphEnter() { _flowStack = []; // Clear any stale nav
   _flowLoadDayStat();
   _flowLoadNudges();
   try { _renderScreenNav(); } catch(e){}
+  
+  // Auto-sync live data when landing on home screen
+  setTimeout(() => {
+    if (typeof syncLiveData === 'function' && LIVE_CACHE.isConnected) {
+      syncLiveData();
+    }
+  }, 300);
+}
+
+// Update live data status badge
+function updateLiveDataStatus(connected) {
+  const badge = document.getElementById('live-data-status');
+  if (badge) {
+    if (connected) {
+      badge.innerHTML = '🟢 Live';
+      badge.style.color = '#2e7d32';
+    } else {
+      badge.innerHTML = '⚠ Offline';
+      badge.style.color = '#f57c00';
+    }
+  }
 }
 
 
