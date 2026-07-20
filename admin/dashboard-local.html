@@ -9059,6 +9059,56 @@ function _walkJourney() {
   ], ()=>{ if (window._flowGraphEnter) window._flowGraphEnter(); });
 }
 
+// ─── PROCESS MAP — every multi-step process staff can be "inside" ────
+// Entering any of these auto-shows the purple guide bar at the top, so
+// wherever you are, there's a Next → to tap through the whole path or
+// you can just navigate the tiles freely. The bar is a guide-rail, not
+// a cage: Cancel/exit is always right there. Each step opens the real
+// screen. Final steps are simulated only where a real save would need
+// data the studio hasn't captured yet (so nothing is ever written by
+// mistake while walking a path).
+const _PROCESSES = {
+  journey: {
+    name: 'The Journey',
+    steps: [
+      { label:'Booking',    open:()=>{ try{openStageBooking();}catch(e){} },    note:'greet the customer, set them up, take drinks' },
+      { label:'Painting',   open:()=>{ try{openStageEngagement();}catch(e){} }, note:'check in while they paint, top up drinks' },
+      { label:'Completion', open:()=>{ try{openStageCompletion();}catch(e){} }, note:'photos, extras, settle the bill, clear the table' },
+      { label:'Kiln',       open:()=>{ try{openStageKiln();}catch(e){} },       note:'bag the pieces and print the kiln label',
+        finalNote:'the pieces would be bagged, labelled and sent to the kiln queue' },
+    ]
+  },
+  kiln: {
+    name: 'Kiln',
+    steps: [
+      { label:'Ready to dip', open:()=>{ try{openKiln();}catch(e){} }, note:'glaze-dip the painted pieces' },
+      { label:'Load & fire',  open:()=>{ try{openKiln();}catch(e){} }, note:'load the dipped pieces and fire the kiln',
+        finalNote:'the batch would be marked fired and move to packing' },
+    ]
+  },
+  packing: {
+    name: 'Packing',
+    steps: [
+      { label:'Bag & label', open:()=>{ try{openPacking();}catch(e){} }, note:'bag each fired piece and print its label',
+        finalNote:'the piece would be marked packed and ready to collect' },
+    ]
+  },
+  collections: {
+    name: 'Collections',
+    steps: [
+      { label:'Hand over', open:()=>{ try{openCollections();}catch(e){} }, note:'find the piece on the shelf and hand it to the customer',
+        finalNote:'the piece would be marked collected and the journey complete' },
+    ]
+  },
+};
+
+// Enter a named process — opens it and auto-shows the guide bar.
+function _enterProcess(key) {
+  const p = _PROCESSES[key];
+  if (!p) { console.warn('_enterProcess: unknown process', key); return; }
+  _walk.start(p.name, p.steps, ()=>{ if (window._flowGraphEnter) window._flowGraphEnter(); });
+}
+
 
 function openTakings() {
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
