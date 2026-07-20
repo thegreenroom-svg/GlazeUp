@@ -18573,8 +18573,12 @@ function _flowGraphEnter() { _flowStack = []; // Clear any stale nav
   _flowLoadNudges();
   try { _renderScreenNav(); } catch(e){}
   
-  // Auto-sync live data when landing on home screen
+  // Force fresh data pull when landing on home screen
+  // This ensures real-time updates show green tables for Monday bookings
   setTimeout(() => {
+    if (typeof loadFloorPlan === 'function') {
+      try { loadFloorPlan(); } catch(e){}
+    }
     if (typeof syncLiveData === 'function' && LIVE_CACHE.isConnected) {
       syncLiveData();
     }
