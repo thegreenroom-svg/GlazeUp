@@ -2563,6 +2563,15 @@ app.post('/api/bookings/sync', async (req, res) => {
       });
     }
 
+    // NOTE: table placement is deliberately NOT done here. Square gives us
+    // the room (space_name) but never the table. The floor plan renderer
+    // (renderFloorPlanElegant, admin) does room-aware PROVISIONAL placement
+    // on the fly — dashed "tap to confirm" tables, never written to the DB —
+    // and a real table_number only lands when a human seats via
+    // /api/floor/seat, or when a Square ORDER rung up against a table
+    // arrives. Writing a guessed table here would present a guess as fact,
+    // which the design deliberately avoids. Leave table_number as synced.
+
     // Upsert (update if exists, insert if not)
     const { data: upserted, error: upsertError } = await supabase
       .from('bookings')
