@@ -666,6 +666,55 @@ app.post('/api/square/sync', async (req, res) => {
   res.json({ status: 'sync started' });
 });
 
+/**
+ * GET /api/square/transactions
+ * Returns synced Square transaction data from analytics cache.
+ * Used by admin dashboard auto-refresh (every 30 seconds).
+ * Returns data in Square transaction format so existing dashboard functions work.
+ */
+app.get('/api/square/transactions', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  try {
+    // Get all daily revenue data from analytics cache
+    const { data: dailyRevenue, error } = await supabase
+      .from('analytics_cache')
+      .select('metric_date, metric_value')
+      .eq('studio_id', studioId)
+      .eq('metric_type', 'daily_revenue')
+      .order('metric_date', { ascending: false });
+
+    if (error) throw error;
+
+    // Convert daily revenue into transaction-like format for dashboard
+    // Each day becomes one synthetic transaction at midnight for chart compatibility
+    const transactions = (dailyRevenue || []).map(day => ({
+      id: `day-${day.metric_date}`,
+      created_at: day.metric_date + 'T00:00:00Z',  // Midnight on that date
+      amount_money: {
+        amount: day.metric_value?.revenue_cents || 0  // Already in cents
+      }
+    }));
+
+    // Also get the connection status
+    const { data: connection } = await supabase
+      .from('square_connections')
+      .select('last_synced_at, sync_status')
+      .eq('studio_id', studioId)
+      .single();
+
+    res.json({
+      transactions,
+      connected: !!connection,
+      lastSyncedAt: connection?.last_synced_at,
+      syncStatus: connection?.sync_status || 'disconnected'
+    });
+  } catch (error) {
+    res.status(500).json({ error: `Failed to fetch transactions: ${error.message}` });
+  }
+});
+
 // POST /api/square/backfill — genuine real one-time historical pull
 // (default 30 real days), since the daily cron only ever keeps things
 // current GOING FORWARD from whenever it starts running. This is what
