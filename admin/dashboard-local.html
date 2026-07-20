@@ -8130,7 +8130,10 @@ function openHealthSafety() {
         <div style="font-size:11px;color:#8a8175;">Everything you need to work safely</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${tiles}</div>
-      <div style="margin-top:20px;padding:14px;background:rgba(43,39,36,0.04);border-radius:12px;
+      <div style="margin-top:16px;">
+        <button onclick="openAssistant()" class="glaze-tile" style="width:100%;border:none;border-radius:14px;padding:14px;font-size:13px;font-weight:800;background:linear-gradient(135deg,#5E35B1,#4527A0);color:#fff;cursor:pointer;margin-bottom:10px;">🏺 Ask Cleo about safety</button>
+      </div>
+      <div style="margin-top:20px;padding:14px;margin-top:16px;background:rgba(43,39,36,0.04);border-radius:12px;
         font-size:11px;color:#8a8175;line-height:1.5;">
         Documents open in Word. Fill in your details, sign, and give to Daisy.
         The Risk Assessment and Training Record are the two that must be completed.
@@ -9050,10 +9053,19 @@ const _walk = {
   name: '',
   steps: [],
   i: 0,
-  returnTo: null,   // function to run on exit, to restore where we were
+  returnTo: null,
+  partySize: 4,
+  demoActive: true,
+  exampleNames: ['Sarah', 'Tom', 'Emma', 'Alex', 'James', 'Lucy'],
+  exampleLastNames: ['Martin', 'Smith', 'Jones', 'Brown', 'Taylor', 'Wilson'],
 
   start(name, steps, returnTo) {
-    this.active = true; this.name = name; this.steps = steps; this.i = 0;
+    this.active = true;
+    this.name = name;
+    this.steps = steps;
+    this.i = 0;
+    this.partySize = 4;
+    this.demoActive = true;
     this.returnTo = returnTo || null;
     this._ensureBar();
     this._runStep();
@@ -9062,12 +9074,10 @@ const _walk = {
   _runStep() {
     const step = this.steps[this.i];
     if (!step) { this.exit(); return; }
-    // Open the real screen for this step, if it names one.
     try { if (typeof step.open === 'function') step.open(); } catch(e) { console.warn('walk step open failed:', e); }
-    // The screen we just opened may have re-rendered the top of the
-    // page — re-ensure our bar is present and on top afterwards.
     this._ensureBar();
     this._renderBar();
+    this._renderExamplePanel();
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(e){}
     if (step.note) { try { toast(`Example — ${step.note}`, 'success'); } catch(e){} }
   },
@@ -9079,10 +9089,15 @@ const _walk = {
     this._runStep();
   },
 
+  back() {
+    if (!this.active || this.i <= 0) return;
+    this.i--;
+    this._runStep();
+  },
+
   _finalAction() {
     const last = this.steps[this.steps.length - 1];
     const what = (last && last.finalNote) || 'This is where the action would be saved';
-    // SIMULATED ONLY — nothing written. Make that explicit.
     try { toast(`Example complete — ${what}. Nothing was saved.`, 'success'); } catch(e){}
     this._renderBar(true);
   },
@@ -9091,7 +9106,10 @@ const _walk = {
     this.active = false;
     const bar = document.getElementById('walkthrough-bar');
     if (bar) bar.remove();
-    const fn = this.returnTo; this.returnTo = null;
+    const panel = document.getElementById('walkthrough-example-panel');
+    if (panel) panel.remove();
+    const fn = this.returnTo;
+    this.returnTo = null;
     try { if (typeof fn === 'function') fn(); else if (window._flowGraphEnter) window._flowGraphEnter(); } catch(e){}
   },
 
@@ -9101,8 +9119,8 @@ const _walk = {
     bar.id = 'walkthrough-bar';
     bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;'
       + 'background:linear-gradient(135deg,#5E35B1,#4527A0);color:#fff;'
-      + 'padding:max(8px,env(safe-area-inset-top)) 12px 8px;box-shadow:0 2px 12px rgba(0,0,0,0.25);'
-      + 'display:flex;align-items:center;gap:10px;font-size:12px;';
+      + 'padding:max(12px,env(safe-area-inset-top)) 16px 12px;box-shadow:0 4px 16px rgba(0,0,0,0.3);'
+      + 'display:flex;flex-wrap:wrap;align-items:center;gap:12px;font-size:13px;';
     document.body.appendChild(bar);
   },
 
@@ -9112,16 +9130,47 @@ const _walk = {
     const total = this.steps.length;
     const stepNo = Math.min(this.i + 1, total);
     const step = this.steps[this.i] || {};
-    bar.innerHTML = `
-      <div style="flex-shrink:0;background:rgba(255,255,255,0.2);border-radius:20px;padding:3px 9px;font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;">Example walk-through</div>
-      <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-        <b>${this.name}</b> · step ${stepNo}/${total}${step.label?` · ${step.label}`:''}</div>
-      ${done
-        ? `<button onclick="_walk.restart()" style="flex-shrink:0;background:rgba(255,255,255,0.25);color:#fff;border:none;border-radius:8px;padding:7px 11px;font-size:12px;font-weight:800;cursor:pointer;">↻ Start again</button>
-           <button onclick="_walk.exit()" style="flex-shrink:0;background:#fff;color:#4527A0;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:800;cursor:pointer;">Done — exit</button>`
-        : `<button onclick="_walk.next()" style="flex-shrink:0;background:rgba(255,255,255,0.25);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:800;cursor:pointer;">Next step →</button>
-           <button onclick="_walk.exit()" title="Cancel walk-through and go back" style="flex-shrink:0;background:none;border:1px solid rgba(255,255,255,0.5);color:#fff;border-radius:8px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;">Cancel</button>`}
-    `;
+    
+    const backBtn = this.i > 0 
+      ? `<button onclick="_walk.back()" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.4);border-radius:8px;padding:8px 12px;font-size:12px;font-weight:800;cursor:pointer;">← Back</button>`
+      : `<button disabled style="opacity:0.5;background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.4);border-radius:8px;padding:8px 12px;font-size:12px;font-weight:800;cursor:not-allowed;">← Back</button>`;
+    
+    bar.innerHTML = `<div style="flex-shrink:0;background:rgba(255,255,255,0.2);border-radius:20px;padding:4px 10px;font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;">Example walk-through</div><div style="flex:1;min-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><b>${this.name}</b> · step ${stepNo}/${total}${step.label?` · ${step.label}`:''}</div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;"><input type="checkbox" id="walk-demo-toggle" ${this.demoActive?'checked':''} onchange="_walk.demoActive = this.checked; _walk._renderExamplePanel();" style="width:18px;height:18px;cursor:pointer;">Demo</label><div style="display:flex;align-items:center;gap:6px;font-size:11px;">People: <input type="range" id="walk-party-slider" min="1" max="20" value="${this.partySize}" onchange="_walk.partySize = parseInt(this.value); _walk._renderExamplePanel();" style="width:80px;height:6px;cursor:pointer;"><span id="walk-party-display">${this.partySize}</span></div></div><div style="flex-basis:100%;display:flex;gap:8px;justify-content:flex-end;">${done?`<button onclick="_walk.restart()" style="background:rgba(255,255,255,0.25);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;">↻ Start again</button><button onclick="_walk.exit()" style="background:#fff;color:#4527A0;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;">Done — exit</button>`:`${backBtn}<button onclick="_walk.next()" style="background:rgba(255,255,255,0.25);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:800;cursor:pointer;">Next step →</button><button onclick="_walk.exit()" style="background:none;border:1px solid rgba(255,255,255,0.5);color:#fff;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;">Cancel</button>`}</div>`;
+    
+    const slider = document.getElementById('walk-party-slider');
+    if (slider) {
+      slider.oninput = function() {
+        _walk.partySize = parseInt(this.value);
+        const display = document.getElementById('walk-party-display');
+        if (display) display.innerText = _walk.partySize;
+        _walk._renderExamplePanel();
+      };
+    }
+  },
+
+  _renderExamplePanel() {
+    if (!this.demoActive) return;
+    
+    let panel = document.getElementById('walkthrough-example-panel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'walkthrough-example-panel';
+      document.body.insertBefore(panel, document.body.firstChild);
+    }
+    
+    const nameIdx = Math.floor(Math.random() * this.exampleNames.length);
+    const firstName = this.exampleNames[nameIdx];
+    const lastName = this.exampleLastNames[Math.floor(Math.random() * this.exampleLastNames.length)];
+    const customerName = firstName + ' ' + lastName;
+    const tables = ['Main Studio 1', 'Main Studio 2', 'Lounge 1', 'Lounge 2', 'The Vault'];
+    const table = tables[Math.floor(Math.random() * tables.length)];
+    const duration = Math.random() > 0.5 ? '90 mins' : 'All day';
+    
+    const barHeight = 140;
+    
+    panel.style.cssText = 'position:fixed;top:' + barHeight + 'px;left:0;right:0;z-index:9998;background:#f7f4ee;border-bottom:2px solid #5E35B1;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.1);';
+    
+    panel.innerHTML = '<div style="max-width:600px;margin:0 auto;font-size:13px;line-height:1.6;"><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;"><div><div style="font-size:11px;color:#8a8175;text-transform:uppercase;font-weight:700;margin-bottom:4px;">Customer</div><div style="font-size:15px;font-weight:700;color:#2B2724;">' + customerName + '</div></div><div><div style="font-size:11px;color:#8a8175;text-transform:uppercase;font-weight:700;margin-bottom:4px;">Party size</div><div style="font-size:15px;font-weight:700;color:#B87946;">' + this.partySize + ' people</div></div><div><div style="font-size:11px;color:#8a8175;text-transform:uppercase;font-weight:700;margin-bottom:4px;">Table</div><div style="font-size:15px;font-weight:700;color:#2B2724;">' + table + '</div></div><div><div style="font-size:11px;color:#8a8175;text-transform:uppercase;font-weight:700;margin-bottom:4px;">Duration</div><div style="font-size:15px;font-weight:700;color:#2B2724;">' + duration + '</div></div></div><div style="margin-top:12px;font-size:11px;color:#8a8175;">All example data — nothing is saved. Cancel anytime to exit.</div></div>';
   },
 
   restart() {
@@ -9328,10 +9377,10 @@ function openLearning() {
         <button onclick="goToRealLandingPage()" class="glaze-tile"
           style="border:none;padding:8px 12px;font-size:11px;font-weight:800;cursor:pointer;flex-shrink:0;">← Done</button>
       </div>
-      <button onclick="_learningRunNow(this)" class="glaze-tile"
-        style="width:100%;border:none;border-radius:14px;padding:14px;font-size:13px;font-weight:800;
-        background:linear-gradient(135deg,#F9A825,#f57c00);color:#fff;cursor:pointer;margin-bottom:14px;">
-        🔍 Look for new patterns now</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+        <button onclick="_learningRunNow(this)" class="glaze-tile" style="border:none;border-radius:14px;padding:14px;font-size:13px;font-weight:800;background:linear-gradient(135deg,#F9A825,#f57c00);color:#fff;cursor:pointer;">🔍 Patterns</button>
+        <button onclick="openAssistant()" class="glaze-tile" style="border:none;border-radius:14px;padding:14px;font-size:13px;font-weight:800;background:linear-gradient(135deg,#5E35B1,#4527A0);color:#fff;cursor:pointer;">🏺 Ask Cleo</button>
+      </div>
       <div id="learning-list"><div style="text-align:center;padding:30px;color:#8a8175;font-size:13px;">Loading…</div></div>
     </div>`;
   toggleFloatingBackBtn();
@@ -10117,7 +10166,8 @@ async function openMyTraining() {
         <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">
             ${(currentShiftStaff?.name || '').split(' ')[0]}'s Training</div>
           <div style="font-size:11px;color:#8a8175;">${currentShiftStaff?.role || ''} · read it, tick it, done</div>
-        </div>
+        </div></div>
+      <button onclick="openAssistant()" class="glaze-tile" style="width:100%;border:none;border-radius:14px;padding:14px;font-size:13px;font-weight:800;background:linear-gradient(135deg,#5E35B1,#4527A0);color:#fff;cursor:pointer;margin-bottom:14px;">🏺 Ask Cleo to explain</button>
       <div id="training-tiles"><div style="text-align:center;padding:40px;color:#8a8175;font-size:13px;">Loading…</div></div>
     </div>`;
   toggleFloatingBackBtn();
@@ -11030,6 +11080,7 @@ async function openMusic() {
         <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">Music</div>
         <div style="font-size:11px;color:#8a8175;">Spotify · four speakers</div>
       </div>
+      <button onclick="openAssistant()" class="glaze-tile" style="width:100%;border:none;border-radius:14px;padding:14px;font-size:13px;font-weight:800;background:linear-gradient(135deg,#5E35B1,#4527A0);color:#fff;cursor:pointer;margin-bottom:14px;">🏺 Ask Cleo about the speakers</button>
       <div id="music-body">
         <div style="text-align:center;padding:40px;color:#8a8175;font-size:13px;">Checking…</div>
       </div>
