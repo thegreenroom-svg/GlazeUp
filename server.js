@@ -5856,9 +5856,34 @@ app.get('/api/floor/active', async (req, res) => {
             return hay || null;
           };
           const seenTables = new Set();
+          // A genuine live table is one the girls are working RIGHT NOW.
+          // An OPEN Square order can linger far longer than a real
+          // session: a pre-paid party's order opened days ahead, or a
+          // till tab someone never closed, both stay OPEN indefinitely
+          // and would otherwise show as a phantom "live" table forever
+          // (the erroneous "2 live now" Daisy spotted with an empty
+          // studio). A real painting session runs a few hours at most —
+          // so only an order opened within a sensible working window
+          // counts as live. Beyond that it's stale, not live: excluded
+          // here, so the floor plan only ever reddens a table that has
+          // genuine current activity. This is the "go live on the first
+          // real order, drop off when it's done" rule, made safe against
+          // orders that were opened long before today's actual trading.
+          const LIVE_WINDOW_HOURS = 6;
+          const liveCutoff = Date.now() - LIVE_WINDOW_HOURS * 60 * 60 * 1000;
           orders.forEach(o => {
             const ref = _readTableRef(o);
             if (!ref) return;
+            // Staleness guard: skip orders opened before the live window.
+            const openedAt = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+            if (openedAt && openedAt < liveCutoff) return;
+            // Extra safety: an order Square has already fully paid/closed
+            // is finished, not live — even if its state still reads OPEN
+            // for a moment. If Square reports a total paid that matches
+            // the order total, treat it as done.
+            const totalPaid = Number(o.totalMoney?.amount || 0);
+            const totalTendered = Number(o.netAmountDueMoney?.amount ?? -1);
+            if (totalTendered === 0 && totalPaid > 0) return; // nothing left due = paid up = not live
             // Extract a table token: "Table 3", "3", "L2"/"Lounge 2",
             // "Vault", "6a"/"6b". Normalised loosely; the client render
             // matches leniently against real table names.
