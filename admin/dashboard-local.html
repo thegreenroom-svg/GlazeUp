@@ -8436,59 +8436,42 @@ let CURRENT_DATA_SOURCE = LIVE_CACHE; // Default to live
 let AUTO_SYNC_INTERVAL = null;
 
 async function syncLiveData() {
-  // Safety: only sync if user is actually logged in
-  if (!currentShiftStaff) {
-    toast('Please log in first', 'info');
-    return;
-  }
-  
-  const wasConnected = LIVE_CACHE.isConnected;
+  // ═══════════════════════════════════════════════════════════
+  // ONE SOURCE OF TRUTH. 20 July 2026, per Daisy: revenue was being read
+  // from two competing systems (this one via /api/square/transactions +
+  // LIVE_CACHE/calculateMetrics, AND the real one via
+  // refreshKilnCafeRevenueData → /api/analytics/dashboard). They wrote
+  // different DOM elements and could disagree. This button now delegates
+  // to the SAME path as auto-sync-on-login: pull Square bookings into our
+  // DB, then refresh revenue via the one correct endpoint. The old
+  // LIVE_CACHE machinery is no longer the revenue source.
+  if (!currentShiftStaff) { toast('Please log in first', 'info'); return; }
   const _btn = document.getElementById('sync-live-btn');
   if (_btn) { _btn.disabled = true; _btn.style.opacity = '0.5'; }
-  
+  _setHeaderSyncState('syncing');
   try {
-    // Pull real Square data with 10-second timeout
-    // Every tap re-pulls the latest, so the top-bar button always fetches fresh numbers
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-    
-    const res = await api('/api/square/transactions?studioId=' + studioId, { signal: controller.signal });
-    clearTimeout(timeout);
-    
-    if (res && res.transactions) {
-      LIVE_CACHE.transactions = res.transactions;
-      LIVE_CACHE.lastSync = new Date();
-      
-      // Calculate metrics: YTD, MTD, Today, best day
-      calculateMetrics();
-      
-      LIVE_CACHE.isConnected = true;
-      CURRENT_DATA_SOURCE = LIVE_CACHE;
-      updateLiveDataStatus(true);  // Update badge to show "🟢 Live"
-      toast(wasConnected ? '✓ Data refreshed' : '✓ Live data connected', 'ok');
-      
-      // Start auto-polling (safe to call again; it clears any prior timer)
-      startAutoSync();
-      
-      // Only refresh revenue display if dashboard is visible (not on login screen)
-      // Don't call full populateDashboard() — that calls checkShiftLogin() which causes a loop back to login
-      const dashboardView = document.getElementById('dashboard-view');
-      if (dashboardView && dashboardView.style.display !== 'none') {
-        if (typeof refreshKilnCafeRevenueData === 'function') { 
-          try { refreshKilnCafeRevenueData(); } catch(e){}
-        }
-      }
-    } else {
-      toast('No data received', 'error');
-      updateLiveDataStatus(false);
+    if (!apiConnected) { await checkAPIConnection(); }
+    // 1. Bookings → our DB (so the floor plan has fresh data)
+    if (apiConnected) {
+      await fetch(`${API_URL}/api/bookings/sync`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId }),
+      }).catch(()=>{});
     }
-  } catch(e) {
-    if (e.name === 'AbortError') {
-      toast('Request timed out (10s) — server may be offline. Did you deploy to Render?', 'error');
-    } else {
-      toast('Connection failed: ' + e.message, 'error');
+    // 2. Revenue via the single correct path (director-gated inside)
+    if (typeof refreshKilnCafeRevenueData === 'function') {
+      await refreshKilnCafeRevenueData();
     }
-    updateLiveDataStatus(false);
+    // 3. If the floor plan is open, repaint it with the new bookings
+    if (typeof loadFloorPlan === 'function' &&
+        (typeof _floorViewMode === 'undefined' || _floorViewMode === 'plan')) {
+      try { await loadFloorPlan(); } catch(e){}
+    }
+    _setHeaderSyncState('ok');
+    toast('✓ Synced', 'ok');
+  } catch (e) {
+    _setHeaderSyncState('error');
+    toast('Sync failed: ' + (e.message || 'server may be waking up'), 'error');
   } finally {
     if (_btn) { _btn.disabled = false; _btn.style.opacity = '1'; }
   }
