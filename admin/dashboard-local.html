@@ -8713,99 +8713,9 @@ function shareCleoLearning(role) {
 
 
 
-function showDashboardProgress() {
-  const recentPieces = DEMO_CONFIG.currentScenario?.pieces || [];
-  if (recentPieces.length === 0) return;
-  let html = '<div style="font-size:13px;font-weight:700;margin-bottom:12px;color:#2B2724;">Workflow Progress</div>';
-  recentPieces.slice(0, 3).forEach(p => { html += renderProgressBar(p); });
-  const el = document.querySelector('#dashboard-progress');
-  if (el) el.innerHTML = html;
-}
-
-
-// WORKFLOW PROGRESS TRACKER
-const WORKFLOW_STAGES = ['not_started', 'painting', 'painted', 'dipped', 'glazed', 'fired', 'ready_to_collect'];
-
-function getWorkflowProgress(piece) {
-  if (!piece || !piece.stage) return 0;
-  const stageIndex = WORKFLOW_STAGES.indexOf(piece.stage);
-  return ((stageIndex + 1) / WORKFLOW_STAGES.length) * 100;
-}
-
-function renderProgressBar(piece) {
-  const progress = getWorkflowProgress(piece);
-  const stage = piece.stage ? piece.stage.replace(/_/g, ' ') : 'unknown';
-  const type = piece.type || 'Piece';
-  
-  let html = '<div style="margin-bottom:12px;">';
-  html += '<div style="font-size:11px;color:#999;margin-bottom:4px;font-weight:600;">' + type + ' • ' + stage + '</div>';
-  html += '<div style="background:#E8E8E8;border-radius:12px;height:8px;overflow:hidden;">';
-  html += '<div style="background:#B87946;height:100%;width:' + progress + '%;transition:width 0.3s ease;"></div>';
-  html += '</div>';
-  html += '<div style="font-size:9px;color:#999;margin-top:2px;">' + Math.round(progress) + '% complete</div>';
-  html += '</div>';
-  return html;
-}
-
-function showDashboardProgress() {
-  const recentPieces = DEMO_CONFIG.currentScenario?.pieces || [];
-  if (recentPieces.length === 0) return;
-  
-  let progressHTML = '<div style="font-size:13px;font-weight:700;margin-bottom:12px;color:#2B2724;">Workflow Progress</div>';
-  
-  recentPieces.slice(0, 3).forEach(piece => {
-    progressHTML += renderProgressBar(piece);
-  });
-  
-  const progressContainer = document.querySelector('#dashboard-progress');
-  if (progressContainer) {
-    progressContainer.innerHTML = progressHTML;
-  }
-}
-
-
-// ═══════════════════════════════════════════════════════════════════
-// WORKFLOW PROGRESS TRACKER
-// Shows piece progression through workflow stages
-// ═══════════════════════════════════════════════════════════════════
-
-
-function getWorkflowProgress(piece) {
-  if (!piece || !piece.stage) return 0;
-  const stageIndex = WORKFLOW_STAGES.indexOf(piece.stage);
-  return ((stageIndex + 1) / WORKFLOW_STAGES.length) * 100;
-}
-
-function renderProgressBar(piece) {
-  const progress = getWorkflowProgress(piece);
-  const stage = piece.stage ? piece.stage.replace(/_/g, ' ') : 'unknown';
-  
-  
-}
-
-function showDashboardProgress() {
-  if (!LIVE_CACHE.transactions || LIVE_CACHE.transactions.length === 0) return;
-  
-  // Show progress for recent pieces
-  const recentPieces = DEMO_CONFIG.currentScenario?.pieces || [];
-  if (recentPieces.length === 0) return;
-  
-  let progressHTML = '<div style="margin-top:16px;"><div style="font-size:13px;font-weight:700;margin-bottom:12px;color:#2B2724;">Workflow Progress</div>';
-  
-  recentPieces.slice(0, 3).forEach(piece => {
-    progressHTML += renderProgressBar(piece);
-  });
-  
-  progressHTML += '</div>';
-  
-  const progressContainer = document.querySelector('#dashboard-progress');
-  if (progressContainer) {
-    progressContainer.innerHTML = progressHTML;
-  }
-}
-
-
-
+// [Removed 20 Jul 2026: dead demo "workflow progress" block — 3× showDashboardProgress
+// (never called anywhere), 2× getWorkflowProgress, 2× renderProgressBar, WORKFLOW_STAGES.
+// All only referenced each other; nothing live called them. Leftover prototype clutter.]
 
 
 
@@ -18765,34 +18675,6 @@ function showLearningInsights() {
     closeLabel: 'Got it'
   });
 }
-
-function openColorPicker() {
-  const glaze_colors = {
-    'Ruby Red': '#E53935',
-    'Ocean Blue': '#1976D2',
-    'Forest Green': '#2E7D32',
-    'Sunset Orange': '#F57C00',
-    'Deep Purple': '#7B1FA2',
-    'Charcoal': '#424242',
-    'Cream': '#FFF8E1',
-    'Sage': '#A5D6A7'
-  };
-  
-  const colorTiles = Object.entries(glaze_colors).map(([name, hex]) => `
-    <div class="glaze-tile" style="background:${hex};color:${hex.includes('F')?'#2B2724':'white'};
-      border-radius:14px;padding:14px;text-align:center;cursor:pointer;flex:1;min-width:80px;">
-      <div style="font-size:12px;font-weight:700;">${name}</div>
-      <div style="font-size:10px;margin-top:4px;font-family:monospace;">${hex}</div>
-    </div>
-  `).join('');
-  
-  glazedModal({
-    title: 'Glaze & Underglaze Palette',
-    bodyHTML: `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;">${colorTiles}</div>`,
-    closeLabel: 'Done'
-  });
-}
-
 
 function openColorPicker() {
   // The real colour-match tool lives in the customer app's Design
