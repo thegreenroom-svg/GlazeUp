@@ -17928,10 +17928,13 @@ const MAYCO_GLAZES = {
 // whether it has children (a "room", deeper teal) or is an action
 // (warm clay) — so nothing is ever colourless, even new tiles.
 const TILE_GLAZE = {
+  // The 5 top-level groups — each its own distinct glaze
+  'foh-group':'blue', 'pieces-group':'red', 'studio-group':'jadeColor',
+  'team-group':'purple', 'setup-group':'brown',
   'floor-plan':'blue', 'staff-group':'teal', 'staff':'teal',
   'dashboard':'jadeColor', 'takings':'jadeColor',
-  'journey-group':'tealDeep', 'kiln':'red', 'packing':'orange',
-  'collections':'clay', 'stock-group':'brown', 'team-group':'purple',
+  'the-journey':'tealDeep', 'journey-group':'tealDeep', 'kiln':'red', 'packing':'orange',
+  'collections':'clay', 'stock-group':'brown',
   'start-demo':'navy', 'learning':'jadeColor', 'tell-daisy':'coral',
   'training':'yellow', 'health-safety':'coral', 'whats-on':'pink',
   'music':'plum', 'customer-demo':'navy', 'setup':'brown',
@@ -18130,42 +18133,64 @@ async function _dismissNudge(nudgeId) {
 function _buildHomeTree() {
   const name = (typeof currentShiftStaff !== 'undefined' && currentShiftStaff?.name)
     ? currentShiftStaff.name.split(' ')[0] : 'Home';
+  // ─── ONE APP, SAME FOR EVERYONE ───────────────────────────────────
+  // Every staff member sees the exact same tiles in the same places —
+  // no per-person layouts, no promoted tiles, no individual workflow.
+  // Simpler to learn, simpler to support, and muscle-memory works
+  // across the whole team. The name at the top is only a greeting.
+  //
+  // Grouped into 5 calm top-level tiles so the home screen isn't a wall
+  // of buttons. Each opens to the real functions within. Common
+  // day-to-day tasks (Floor Plan, Bookings) stay one tap from home.
   return {
     id: 'home', label: name, emoji: '🏠', size: 'hub',
     children: [
-      { id:'floor-plan', label:'Floor Plan', emoji:'🪑', desc:'Live view of all tables', fn:'showFloorPlan', size:'big' },
-      { id:'staff', label:'Bookings', emoji:'📋', desc:'Start a booking, walk-in or party', fn:null, size:'big' },
-      { id:'dashboard', label:'Takings', emoji:'💷', desc:'Today, this month & this year — your live numbers', fn:'openTakings', size:'big' },
-      { id:'the-journey', label:'The Journey', emoji:'🔄', desc:'Booking → Painting → Completion → Kiln', size:'big', children:[
-        { id:'j-b-open', label:'1 · Booking',    emoji:'🪑', desc:'Set up · greet · drinks · pieces', fn:'openStageBooking',    size:'big' },
-        { id:'j-e-open', label:'2 · Painting',   emoji:'🎨', desc:'Paints · check-in · drinks',       fn:'openStageEngagement', size:'big' },
-        { id:'j-c-open', label:'3 · Completion', emoji:'📷', desc:'Photos · extras · bill · clear',   fn:'openStageCompletion', size:'big' },
-        { id:'j-k-open', label:'4 · Kiln',       emoji:'🔥', desc:'Bag for kiln · print label',       fn:'openStageKiln',       size:'big' },
+      // ── 1. FRONT OF HOUSE — the busy, every-shift tasks ──
+      { id:'foh-group', label:'Front of House', emoji:'🎨', desc:'Tables, bookings & the making journey', size:'big', children:[
+        { id:'floor-plan', label:'Floor Plan', emoji:'🪑', desc:'Live view of all tables', fn:'showFloorPlan', size:'big' },
+        { id:'staff', label:'Bookings', emoji:'📋', desc:'Start a booking, walk-in or party', fn:null, size:'big' },
+        { id:'the-journey', label:'The Journey', emoji:'🔄', desc:'Booking → Painting → Completion → Kiln', size:'big', children:[
+          { id:'j-b-open', label:'1 · Booking',    emoji:'🪑', desc:'Set up · greet · drinks · pieces', fn:'openStageBooking',    size:'big' },
+          { id:'j-e-open', label:'2 · Painting',   emoji:'🎨', desc:'Paints · check-in · drinks',       fn:'openStageEngagement', size:'big' },
+          { id:'j-c-open', label:'3 · Completion', emoji:'📷', desc:'Photos · extras · bill · clear',   fn:'openStageCompletion', size:'big' },
+          { id:'j-k-open', label:'4 · Kiln',       emoji:'🔥', desc:'Bag for kiln · print label',       fn:'openStageKiln',       size:'big' },
+        ]},
       ]},
-      { id:'kiln', label:'Kiln', emoji:'🔥', desc:'Dip → load → fire', fn:'openKiln', size:'mid' },
-      { id:'packing', label:'Packing', emoji:'📦', desc:'Fired pieces going home', fn:'openPacking', size:'mid' },
-      { id:'collections', label:'Collections', emoji:'🏺', desc:'Ready to collect · returns · find on shelf', fn:'openCollections', size:'mid' },
-      { id:'stock-group', label:'Stock', emoji:'📦', desc:'Inventory & counts', size:'mid', children:[
-        { id:'stock-arrival', label:'Stock Arrived', emoji:'📦', desc:"Photo a box or piece, I'll do the rest", fn:'openStockArrival', size:'big' },
-        { id:'shelf-check',   label:'Check a Shelf',  emoji:'🔍', desc:'Labels out, one photo, I count it',    fn:'openShelfCheck',   size:'big' },
-        { id:'stock',     label:'Manage Stock',    emoji:'📋', desc:'Reservations & levels',            fn:null, size:'mid' },
-        { id:'catalogue', label:'Piece Catalogue', emoji:'🏺', desc:'What customers browse from home',  fn:null, size:'mid' },
-        { id:'shapes',    label:'Bisque',          emoji:'🎨', desc:'Your Square catalogue as silhouettes', fn:null, size:'mid' },
+      // ── 2. PIECES & KILN — the making workflow after painting ──
+      { id:'pieces-group', label:'Pieces & Kiln', emoji:'🔥', desc:'Dip, fire, pack & collect', size:'big', children:[
+        { id:'kiln', label:'Kiln', emoji:'🔥', desc:'Dip → load → fire', fn:'openKiln', size:'big' },
+        { id:'packing', label:'Packing', emoji:'📦', desc:'Fired pieces going home', fn:'openPacking', size:'big' },
+        { id:'collections', label:'Collections', emoji:'🏺', desc:'Ready to collect · returns · find on shelf', fn:'openCollections', size:'big' },
       ]},
-      { id:'team-group', label:'Team', emoji:'👥', desc:'Rota, duties & progress', size:'mid', children:[
+      // ── 3. STUDIO — the numbers, stock and the room's day-to-day ──
+      { id:'studio-group', label:'Studio', emoji:'💷', desc:'Takings, stock, music & what\'s on', size:'big', children:[
+        { id:'dashboard', label:'Takings', emoji:'💷', desc:'Today, this month & this year — live numbers', fn:'openTakings', size:'big' },
+        { id:'stock-group', label:'Stock', emoji:'📦', desc:'Inventory & counts', size:'mid', children:[
+          { id:'stock-arrival', label:'Stock Arrived', emoji:'📦', desc:"Photo a box or piece, I'll do the rest", fn:'openStockArrival', size:'big' },
+          { id:'shelf-check',   label:'Check a Shelf',  emoji:'🔍', desc:'Labels out, one photo, I count it',    fn:'openShelfCheck',   size:'big' },
+          { id:'stock',     label:'Manage Stock',    emoji:'📋', desc:'Reservations & levels',            fn:null, size:'mid' },
+          { id:'catalogue', label:'Piece Catalogue', emoji:'🏺', desc:'What customers browse from home',  fn:null, size:'mid' },
+          { id:'shapes',    label:'Bisque',          emoji:'🎨', desc:'Your Square catalogue as silhouettes', fn:null, size:'mid' },
+        ]},
+        { id:'music', label:'Music', emoji:'🎵', desc:"Volume · skip · what's playing", fn:'openMusic', size:'mid' },
+        { id:'whats-on', label:"What's On", emoji:'📅', desc:'Local events & school holidays', fn:'openWhatsOn', size:'mid' },
+      ]},
+      // ── 4. TEAM — people, duties, training & talking to each other ──
+      { id:'team-group', label:'Team', emoji:'👥', desc:'Rota, duties, progress & training', size:'big', children:[
         { id:'team',     label:'Team & Duties',  emoji:'👥', desc:'Duty lists, timekeeping, holidays', fn:null, size:'big' },
         { id:'progress', label:'Daily Progress', emoji:'📊', desc:"Every team member's live tasks",     fn:null, size:'big' },
+        { id:'tell-daisy', label:'Tell the team', emoji:'💬', desc:'Something good or bad happened', fn:'openTellPicker', size:'mid' },
+        { id:'training', label:'My Training', emoji:'🎓', desc:'Read, tick, done', fn:'openMyTraining', size:'mid' },
+        { id:'health-safety', label:'Health & Safety', emoji:'🦺', desc:'Docs & checks', fn:'openHealthSafety', size:'mid' },
       ]},
-      { id:'start-demo', label:'Demo Studio', emoji:'🎬', desc:'Practise a shift — pick how busy', fn:'openDemoSetup', size:'mid' },
-      { id:'learning', label:'Learning', emoji:'🌱', desc:'What the app has noticed from real usage', fn:'openLearning', size:'small' },
-      { id:'tell-daisy', label:'Tell Daisy', emoji:'💬', desc:'Something good or bad happened', fn:'openTellPicker', size:'small' },
-      { id:'training', label:'My Training', emoji:'🎓', desc:'Read, tick, done', fn:'openMyTraining', size:'small' },
-      { id:'health-safety', label:'Health & Safety', emoji:'🦺', desc:'Docs & checks', fn:'openHealthSafety', size:'small' },
-      { id:'whats-on', label:"What's On", emoji:'📅', desc:'Local events & school holidays', fn:'openWhatsOn', size:'small' },
-      { id:'music', label:'Music', emoji:'🎵', desc:"Volume · skip · what's playing", fn:'openMusic', size:'small' },
-      { id:'customer-demo', label:'Customer App', emoji:'👀', desc:'See what customers see', fn:'openCustomerDemo', size:'small' },
-      { id:'setup', label:'Studio Setup', emoji:'⚙️', desc:'Connections, Host By Post, add-ons, offers', fn:null, size:'small' },
-      { id:'trial-reset', label:'Clear & Start Again', emoji:'🔄', desc:'Reset demo data for testing', fn:'openTrialReset', size:'small' },
+      // ── 5. SETUP & TOOLS — the less-often, behind-the-scenes stuff ──
+      { id:'setup-group', label:'Setup & Tools', emoji:'⚙️', desc:'Config, customer app & practice', size:'big', children:[
+        { id:'setup', label:'Studio Setup', emoji:'⚙️', desc:'Connections, Host By Post, add-ons, offers', fn:null, size:'big' },
+        { id:'customer-demo', label:'Customer App', emoji:'👀', desc:'See what customers see', fn:'openCustomerDemo', size:'mid' },
+        { id:'learning', label:'Learning', emoji:'🌱', desc:'What the app has noticed from real usage', fn:'openLearning', size:'mid' },
+        { id:'start-demo', label:'Demo Studio', emoji:'🎬', desc:'Practise a shift — pick how busy', fn:'openDemoSetup', size:'mid' },
+        { id:'trial-reset', label:'Clear & Start Again', emoji:'🔄', desc:'Reset demo data for testing', fn:'openTrialReset', size:'mid' },
+      ]},
     ]
   };
 }
