@@ -6410,11 +6410,20 @@ async function loadDashboardData() {
   // flag is false, re-check health ONCE here before giving up.
   if (!apiConnected) {
     await checkAPIConnection();
-    if (!apiConnected) throw new Error('API not connected');
+    if (!apiConnected) { window._revDebug = 'API health check failed (server unreachable/asleep)'; throw new Error('API not connected'); }
   }
-  const res = await fetch(`${API_URL}/api/analytics/dashboard?studioId=${studioId}&staffMemberId=${currentShiftStaff?.id || ''}`);
-  if (!res.ok) throw new Error('Dashboard fetch failed');
-  return await res.json();
+  const _sid = currentShiftStaff?.id || '';
+  window._revDebug = `sending staffMemberId="${_sid}" name="${currentShiftStaff?.name||'?'}"`;
+  const res = await fetch(`${API_URL}/api/analytics/dashboard?studioId=${studioId}&staffMemberId=${_sid}`);
+  if (!res.ok) {
+    let body = '';
+    try { body = JSON.stringify(await res.json()); } catch(e) {}
+    window._revDebug = `HTTP ${res.status} for staffMemberId="${_sid}" (${currentShiftStaff?.name||'no name'}) → ${body}`;
+    throw new Error('Dashboard fetch failed: ' + res.status);
+  }
+  const _d = await res.json();
+  window._revDebug = `OK: totalRevenue=${_d.totalRevenue} allTime=${_d.allTimeRevenue}`;
+  return _d;
 }
 
 // Was missing — the branding tab previously had no way to load real
@@ -21908,6 +21917,10 @@ async function refreshKilnCafeRevenueData() {
     // matches loadDashboardData's own no-mock-fallback fix above.
     const revEl = document.getElementById('metric-revenue');
     if (revEl && !revEl.dataset.everLoaded) revEl.textContent = 'Couldn\'t load';
+    // Surface the EXACT reason on-screen (temporary diagnostic) so a £0 /
+    // "couldn't load" is explainable at a glance without devtools or logs.
+    const detailEl = document.getElementById('metric-revenue-alltime-detail');
+    if (detailEl && window._revDebug) detailEl.textContent = 'diag: ' + window._revDebug;
   }
 }
 
