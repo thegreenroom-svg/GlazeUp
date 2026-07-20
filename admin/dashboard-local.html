@@ -6400,7 +6400,18 @@ async function loadDashboardData() {
   // number. Now it throws honestly instead of masking the failure —
   // the caller shows a plain "couldn't load" rather than a wrong
   // number dressed as a real one.
-  if (!apiConnected) throw new Error('API not connected');
+  //
+  // 20 July: DON'T hard-fail on a stale boot-time flag. apiConnected is
+  // set ONCE at boot from a single /health check; a cold-start Render
+  // instance (free tier sleeps) can fail that one check, leaving the flag
+  // false for the whole session even after the server is up — so the
+  // revenue screen showed £0 while £18k of real data sat reachable in the
+  // DB, and the same flag silently blocked the bookings sync too. If the
+  // flag is false, re-check health ONCE here before giving up.
+  if (!apiConnected) {
+    await checkAPIConnection();
+    if (!apiConnected) throw new Error('API not connected');
+  }
   const res = await fetch(`${API_URL}/api/analytics/dashboard?studioId=${studioId}&staffMemberId=${currentShiftStaff?.id || ''}`);
   if (!res.ok) throw new Error('Dashboard fetch failed');
   return await res.json();
@@ -18976,7 +18987,9 @@ function applyShiftUI() {
 
   // Sync Square → our db (quietly, no spinner, no status update)
   async function _silentSquareSync() {
-    if (!apiConnected) return;
+    // Don't let a stale boot-time apiConnected flag silently skip the sync
+    // (same cold-start issue that showed revenue as £0). Re-check once.
+    if (!apiConnected) { await checkAPIConnection(); if (!apiConnected) return; }
     try {
       await fetch(`${API_URL}/api/bookings/sync`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
