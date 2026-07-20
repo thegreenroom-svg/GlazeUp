@@ -687,15 +687,26 @@ app.get('/api/square/transactions', async (req, res) => {
 
     if (error) throw error;
 
-    // Convert daily revenue into transaction-like format for dashboard
-    // Each day becomes one synthetic transaction at midnight for chart compatibility
-    const transactions = (dailyRevenue || []).map(day => ({
-      id: `day-${day.metric_date}`,
-      created_at: day.metric_date + 'T00:00:00Z',  // Midnight on that date
-      amount_money: {
-        amount: parseInt(day.metric_value) || 0  // metric_value is already in cents as integer
-      }
-    }));
+    // Convert daily revenue into transaction-like format for dashboard.
+    // metric_value is stored by syncSquareData as an OBJECT:
+    //   { revenue_cents: <int>, transaction_count: <int> }
+    // (see the analytics_cache upsert in syncSquareData). Reading it as a
+    // plain integer via parseInt() gave NaN → £0 on every day, which is
+    // exactly why revenue always showed £0 even though the sync itself
+    // succeeds (Render logs: "Synced 10000 Square orders"). Read the
+    // object's own fields. Kept tolerant of a bare-integer legacy row
+    // just in case an older sync wrote one.
+    const transactions = (dailyRevenue || []).map(day => {
+      const mv = day.metric_value;
+      const cents = (mv && typeof mv === 'object')
+        ? (parseInt(mv.revenue_cents) || 0)
+        : (parseInt(mv) || 0);
+      return {
+        id: `day-${day.metric_date}`,
+        created_at: day.metric_date + 'T00:00:00Z',  // Midnight on that date
+        amount_money: { amount: cents }
+      };
+    });
 
     // Also get the connection status
     const { data: connection } = await supabase
