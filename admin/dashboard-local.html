@@ -3818,33 +3818,10 @@ function updateStaffName() {
           <!-- booking list moved below the workflow tiles, 18 July: tiles grouped at top, list at bottom -->
         </div>
 
-        <!-- Genuine real tile entry point for this screen's 4 actual
-             steps, per direct request to unify the whole app with the
-             same tile visual language. Reuses the exact same, already-
-             working showStaffSection() function — real content and
-             logic underneath is completely untouched. -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px;">
-          <button class="flow-step active glaze-tile" id="staff-subtab-booking" onclick="showStaffSection('booking')" style="background:#2e7d32;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
-            <span style="font-size:24px;">📋</span>
-            <span style="font-size:14px;font-weight:800;margin-top:6px;">Booking Details</span>
-            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Look up, assign a table, open the session</span>
-          </button>
-          <button class="flow-step glaze-tile" id="staff-subtab-engagement" onclick="showStaffSection('engagement')" style="background:#2e7d32;filter:brightness(0.9);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
-            <span style="font-size:24px;">🎨</span>
-            <span style="font-size:14px;font-weight:800;margin-top:6px;">Customer Engagement</span>
-            <span style="font-size:10px;opacity:0.85;margin-top:4px;">While they're painting</span>
-          </button>
-          <button class="flow-step glaze-tile" id="staff-subtab-completion" onclick="showStaffSection('completion')" style="background:#2e7d32;filter:brightness(0.8);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
-            <span style="font-size:24px;">📷</span>
-            <span style="font-size:14px;font-weight:800;margin-top:6px;">Completion</span>
-            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Reference photos, finishing up</span>
-          </button>
-          <button class="flow-step glaze-tile" id="staff-subtab-kiln" onclick="showStaffSection('kiln')" style="background:#2e7d32;filter:brightness(0.7);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
-            <span style="font-size:24px;">🔥</span>
-            <span style="font-size:14px;font-weight:800;margin-top:6px;">Kiln &amp; Inventory</span>
-            <span style="font-size:10px;opacity:0.85;margin-top:4px;">What's firing, real stock</span>
-          </button>
-        </div>
+        <!-- 20 Jul, per Daisy: the 4 big stage tiles moved to the BOTTOM of
+             this screen (see below, just before #staff-view closes), so the
+             actual booking working-content sits up top where it's easier to
+             see. The tiles are still here, just relocated down. -->
 
         <!-- Booking list — now at the bottom, under the workflow tiles, so all tiles sit together at the top (per direct request: "put the tiles at the top and the other stuff at the bottom"). -->
         <div id="bookings-overview-list" style="max-height:220px;overflow-y:auto;">
@@ -4363,6 +4340,34 @@ function updateStaffName() {
               <button class="glaze-tile btn-connect" onclick="goToTab('stock', event)" style="white-space:nowrap;">Manage Stock →</button>
             </div>
           </div>
+        </div>
+
+        <!-- The 4 big stage tiles, relocated to the BOTTOM 20 Jul per Daisy
+             ("move the big green tiles to the bottom, booking stuff on top").
+             Same tiles, same showStaffSection() handlers — only the position
+             changed. A quick-jump between stages that sits under the content
+             rather than pushing it down. -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-top:24px;">
+          <button class="flow-step active glaze-tile" id="staff-subtab-booking" onclick="showStaffSection('booking')" style="background:#2e7d32;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">📋</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Booking Details</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Look up, assign a table, open the session</span>
+          </button>
+          <button class="flow-step glaze-tile" id="staff-subtab-engagement" onclick="showStaffSection('engagement')" style="background:#2e7d32;filter:brightness(0.9);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">🎨</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Customer Engagement</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">While they're painting</span>
+          </button>
+          <button class="flow-step glaze-tile" id="staff-subtab-completion" onclick="showStaffSection('completion')" style="background:#2e7d32;filter:brightness(0.8);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">📷</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Completion</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Reference photos, finishing up</span>
+          </button>
+          <button class="flow-step glaze-tile" id="staff-subtab-kiln" onclick="showStaffSection('kiln')" style="background:#2e7d32;filter:brightness(0.7);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">🔥</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Kiln &amp; Inventory</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">What's firing, real stock</span>
+          </button>
         </div>
 
       </div>
