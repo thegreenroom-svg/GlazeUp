@@ -23464,6 +23464,7 @@ async function openBookingModal(tableInfo, tableName) {
 
   // Fetch full booking details from Supabase
   try {
+    if (typeof supabase === 'undefined') { try{toast('This older screen isn’t wired up yet — use the main Journey stages instead','error');}catch(e){} return; }
     const { data: booking } = await supabase.from('bookings')
       .select('*')
       .eq('id', tableInfo.id)
@@ -23746,6 +23747,7 @@ function closeBookingModal() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 async function loadPaintingPieces(bookingId) {
+  if (typeof supabase === 'undefined') { try{toast('This older screen isn’t wired up yet — use the main Journey stages instead','error');}catch(e){} return; }
   const { data: pieces } = await supabase.from('paintings')
     .select('*')
     .eq('booking_id', bookingId);
@@ -23779,6 +23781,7 @@ async function assignToKiln() {
     return;
   }
 
+  if (typeof supabase === 'undefined') { try{toast('This older screen isn’t wired up yet — use the main Journey stages instead','error');}catch(e){} return; }
   const { error } = await supabase.from('bookings')
     .update({ current_stage: 'kiln' })
     .eq('id', _currentBookingModal.id);
@@ -23825,6 +23828,7 @@ function updateDrinksTotal() {
 
 async function saveNotes() {
   const notes = document.getElementById('notes-input').value;
+  if (typeof supabase === 'undefined') { try{toast('This older screen isn’t wired up yet — use the main Journey stages instead','error');}catch(e){} return; }
   const { error } = await supabase.from('bookings')
     .update({ notes })
     .eq('id', _currentBookingModal.id);
@@ -23841,6 +23845,7 @@ function processPayment() {
 
 async function extendSession(minutes) {
   const newEnd = new Date(new Date(_currentBookingModal.session_end).getTime() + minutes * 60000);
+  if (typeof supabase === 'undefined') { try{toast('This older screen isn’t wired up yet — use the main Journey stages instead','error');}catch(e){} return; }
   const { error } = await supabase.from('bookings')
     .update({ session_end: newEnd.toISOString() })
     .eq('id', _currentBookingModal.id);
@@ -23871,6 +23876,7 @@ function _stepPartySize(delta) {
 
 async function updatePartySize() {
   const newSize = parseInt(document.getElementById('party-size-input').value);
+  if (typeof supabase === 'undefined') { try{toast('This older screen isn’t wired up yet — use the main Journey stages instead','error');}catch(e){} return; }
   const { error } = await supabase.from('bookings')
     .update({ party_size: newSize })
     .eq('id', _currentBookingModal.id);
