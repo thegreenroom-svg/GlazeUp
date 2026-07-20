@@ -17825,6 +17825,52 @@ function _flowSizeStyle(size) {
   return S[size] || S.mid;
 }
 
+// ─── MAYCO GLAZE PALETTE ───────────────────────────────────────────
+// Real Mayco Stroke & Coat glaze colours — the glazes actually used in
+// the studio. Each home tile gets its own fixed glaze so the wall of
+// tiles reads like a glaze rack: consistent, calm, every tile its own
+// colour, never the jumbled brown-and-green mix. Fixed per tile id, so
+// a given tile is always the same colour — muscle memory, not a
+// shuffle. Colours are approximations of the fired low-fire tile.
+const MAYCO_GLAZES = {
+  jadeColor:      { name:'SC-26 Green Thumb',   c1:'#4C8C5A', c2:'#3A6E46' },
+  teal:           { name:'SC-27 Sour Apple',    c1:'#2F8F82', c2:'#236B61' },
+  blue:           { name:'SC-11 Blue Yonder',   c1:'#3E6FA3', c2:'#2E547C' },
+  navy:           { name:'SC-76 Cara-bein Blue',c1:'#2B4C6F', c2:'#1E3750' },
+  purple:         { name:'SC-13 Grapel',        c1:'#7C5AA6', c2:'#5E4380' },
+  plum:           { name:'SC-33 Fruit of Vine', c1:'#6B4172', c2:'#4E2F54' },
+  red:            { name:'SC-73 Candy Apple',   c1:'#C0392B', c2:'#992B20' },
+  coral:          { name:'SC-16 Cotton Tail',   c1:'#D9694E', c2:'#B24E37' },
+  orange:         { name:'SC-24 Dandelion',     c1:'#E08A3C', c2:'#BC6E29' },
+  yellow:         { name:'SC-05 Tiger Tail',    c1:'#E0A93C', c2:'#BC8829' },
+  pink:           { name:'SC-01 Pink-A-Boo',    c1:'#D46A8B', c2:'#B24E6E' },
+  tealDeep:       { name:'SC-28 Blue Isle',     c1:'#17403C', c2:'#0E2E2B' },
+  brown:          { name:'SC-15 Tuxedo',        c1:'#8A6244', c2:'#6B4A32' },
+  clay:           { name:'SC-88 Tp Toffee',     c1:'#B87946', c2:'#9A6435' },
+};
+// Which glaze each home tile wears. A tile not listed falls back by
+// whether it has children (a "room", deeper teal) or is an action
+// (warm clay) — so nothing is ever colourless, even new tiles.
+const TILE_GLAZE = {
+  'floor-plan':'blue', 'staff-group':'teal', 'staff':'teal',
+  'dashboard':'jadeColor', 'takings':'jadeColor',
+  'journey-group':'tealDeep', 'kiln':'red', 'packing':'orange',
+  'collections':'clay', 'stock-group':'brown', 'team-group':'purple',
+  'start-demo':'navy', 'learning':'jadeColor', 'tell-daisy':'coral',
+  'training':'yellow', 'health-safety':'coral', 'whats-on':'pink',
+  'music':'plum', 'customer-demo':'navy', 'setup':'brown',
+  'trial-reset':'clay', 'stock-arrival':'brown', 'shelf-check':'blue',
+  'stock':'brown', 'catalogue':'clay', 'shapes':'purple',
+  'team':'purple', 'progress':'teal', 'bookings':'teal',
+};
+function _tileGlaze(child) {
+  const key = TILE_GLAZE[child.id];
+  if (key && MAYCO_GLAZES[key]) return MAYCO_GLAZES[key];
+  // Fallback — a room gets deep teal, an action gets warm clay.
+  const hasKids = !!(child.children && child.children.length);
+  return hasKids ? MAYCO_GLAZES.tealDeep : MAYCO_GLAZES.clay;
+}
+
 function _renderFlowGraph() {
   const node = _flowStack[_flowStack.length - 1];
   const body = document.getElementById('flow-graph-body');
@@ -17867,9 +17913,10 @@ function _renderFlowGraph() {
     html += `<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">`;
     node.children.forEach(child => {
       const hasKids = !!(child.children && child.children.length);
-      const bg = hasKids ? 'linear-gradient(135deg,#17403C,#0e2e2b)' : 'linear-gradient(135deg,#B87946,#9A6435)';
+      const glaze = _tileGlaze(child);
+      const bg = `linear-gradient(135deg,${glaze.c1},${glaze.c2})`;
       html += `<button onclick="${hasKids ? `_flowDescend('${child.id}')` : `_flowActivate('${child.id}')`}"
-        class="glaze-tile" style="${_flowSizeStyle(child.size)}
+        class="glaze-tile" title="${glaze.name}" style="${_flowSizeStyle(child.size)}
         border:none;border-radius:14px;color:#fff;padding:10px;text-align:left;cursor:pointer;
         background:${bg};display:flex;flex-direction:column;justify-content:flex-end;">
         <div style="font-size:1.5em;line-height:1;">${child.emoji}</div>
