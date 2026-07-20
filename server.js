@@ -2604,6 +2604,70 @@ app.post('/api/bookings/sync', async (req, res) => {
   }
 });
 
+// GET /api/bookings/sync-check — DIAGNOSTIC. Runs the exact same Square
+// Bookings read the sync uses, and returns the raw result as JSON you can
+// open straight in a browser (a GET, so no tools needed). Answers the one
+// open question — "does Square hand over the appointments?" — without
+// digging through Render logs. Read-only: fetches from Square, writes
+// NOTHING. Safe to hit anytime.
+app.get('/api/bookings/sync-check', async (req, res) => {
+  const studioId = req.query.studioId || 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3';
+  try {
+    const { data: conn, error: connErr } = await supabase
+      .from('square_connections')
+      .select('square_access_token')
+      .eq('studio_id', studioId)
+      .single();
+    if (connErr || !conn) return res.json({ ok: false, step: 'connection', detail: 'No Square connection row for this studio' });
+
+    const squareClient = await getSquareClient(conn.square_access_token);
+    const startMin = new Date().toISOString();
+    const startMax = new Date(Date.now() + 28 * 24 * 60 * 60 * 1000).toISOString();
+
+    let listResult;
+    try {
+      const resp = await squareClient.bookingsApi.listBookings(
+        100, undefined, undefined, undefined, undefined, startMin, startMax
+      );
+      listResult = resp.result;
+    } catch (sqErr) {
+      return res.json({
+        ok: false,
+        step: 'listBookings',
+        squareStatus: sqErr?.statusCode || null,
+        squareCode: sqErr?.errors?.[0]?.code || null,
+        squareDetail: sqErr?.errors?.[0]?.detail || sqErr?.message || String(sqErr),
+        hint: 'Square refused or errored the Bookings read — usually a missing APPOINTMENTS_READ scope on the connected token, or Square Appointments not enabled for this location.'
+      });
+    }
+
+    const all = listResult.bookings || [];
+    const statuses = {};
+    all.forEach(b => { statuses[b.status] = (statuses[b.status] || 0) + 1; });
+    const active = all.filter(b => ['ACCEPTED', 'PENDING'].includes(b.status) && b.startAt);
+
+    res.json({
+      ok: true,
+      window: { startMin, startMax },
+      squareReturned: all.length,
+      statusBreakdown: statuses,
+      activeUpcoming: active.length,
+      sample: active.slice(0, 5).map(b => ({
+        id: b.id,
+        status: b.status,
+        startAt: b.startAt,
+        service: b.appointmentSegments?.[0]?.serviceVariationId || null,
+        customerId: b.customerId || null
+      })),
+      interpretation: all.length === 0
+        ? 'Square returned ZERO bookings in the next 28 days. Either there genuinely are none, or the token/location cannot see Appointments. Check that upcoming appointments exist in the Square dashboard for this location.'
+        : `Square returned ${all.length} booking(s); ${active.length} are active/upcoming and would sync in.`
+    });
+  } catch (error) {
+    res.json({ ok: false, step: 'unexpected', detail: error?.message || String(error) });
+  }
+});
+
 /**
  * GET /api/qr/booking
  * Generate QR code URL for a booking (returns link to print)
