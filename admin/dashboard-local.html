@@ -18115,6 +18115,22 @@ const STUDIO_GLAZES = {
   brown:          { name:'SC-15 Tuxedo',        c1:'#8A6244', c2:'#6B4A32' },
   clay:           { name:'SC-88 Tp Toffee',     c1:'#B87946', c2:'#9A6435' },
 };
+// SHOWCASE GLAZES — the premium, flowing "specialist" glazes the studio
+// sells, reserved for the top-of-page PARENT tiles (the ones you group
+// from). A richer 3-stop flowing gradient so a parent tile reads as
+// special and distinct from the plain-colour sub-tiles beneath it —
+// the visual "this is a heading you open" cue. Keyed by the same colour
+// families so a group and its children stay in the same colour story.
+const SHOWCASE_GLAZES = {
+  blue:     'linear-gradient(135deg,#5B8FBF 0%,#3E6FA3 45%,#24486E 100%)',
+  red:      'linear-gradient(135deg,#D9534A 0%,#C0392B 45%,#8E2318 100%)',
+  jadeColor:'linear-gradient(135deg,#63A876 0%,#4C8C5A 45%,#2F6B41 100%)',
+  purple:   'linear-gradient(135deg,#9670C0 0%,#7C5AA6 45%,#523A73 100%)',
+  plum:     'linear-gradient(135deg,#835089 0%,#6B4172 45%,#43284A 100%)',
+  brown:    'linear-gradient(135deg,#A6784F 0%,#8A6244 45%,#5E4230 100%)',
+  tealDeep: 'linear-gradient(135deg,#2A6560 0%,#17403C 55%,#0B2624 100%)',
+  clay:     'linear-gradient(135deg,#CC8A57 0%,#B87946 45%,#875328 100%)',
+};
 // Which glaze each home tile wears. A tile not listed falls back by
 // whether it has children (a "room", deeper teal) or is an action
 // (warm clay) — so nothing is ever colourless, even new tiles.
@@ -18186,11 +18202,18 @@ function _renderFlowGraph() {
     html += `<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;width:100%;box-sizing:border-box;">`;
     node.children.forEach(child => {
       const hasKids = !!(child.children && child.children.length);
+      const glazeKey = TILE_GLAZE[child.id];
       const glaze = _tileGlaze(child);
-      const bg = `linear-gradient(135deg,${glaze.c1},${glaze.c2})`;
+      // Parent tiles (those that open into sub-tiles) wear the premium
+      // showcase glaze — a richer flowing gradient — so a "heading you
+      // open" reads as special versus the plain-colour leaf tiles.
+      const bg = (hasKids && glazeKey && SHOWCASE_GLAZES[glazeKey])
+        ? SHOWCASE_GLAZES[glazeKey]
+        : (hasKids ? SHOWCASE_GLAZES.tealDeep : `linear-gradient(135deg,${glaze.c1},${glaze.c2})`);
+      const parentGlow = hasKids ? 'box-shadow:0 3px 14px rgba(0,0,0,0.16);' : '';
       html += `<button onclick="${hasKids ? `_flowDescend('${child.id}')` : `_flowActivate('${child.id}')`}"
         class="glaze-tile" style="${_flowSizeStyle(child.size)}
-        border:none;border-radius:14px;color:#fff;padding:10px;text-align:left;cursor:pointer;
+        border:none;border-radius:14px;color:#fff;padding:10px;text-align:left;cursor:pointer;${parentGlow}
         background:${bg};display:flex;flex-direction:column;justify-content:flex-end;">
         <div style="font-size:1.5em;line-height:1;">${child.emoji}</div>
         <div style="font-weight:800;margin-top:4px;">${child.label}</div>
