@@ -17008,18 +17008,33 @@ async function loadPersonalHomeScreen() {
   // removed from the team. David is the co-director. Nobody gets special-cased
   // by first name any more.
 
+  // One retry with a longer timeout before giving up — Render's
+  // free-tier cold-start can easily outlast a single 6s attempt, and
+  // this fetch often fires early in boot before the background
+  // checkAPIConnection() has necessarily woken the server up. Same
+  // "don't give up after one try" lesson already learned for the
+  // revenue fetch earlier tonight. If both attempts genuinely fail,
+  // the outer catch below still falls back safely to the full tree —
+  // this just makes that fallback less likely to be needed.
+  async function _tryLoadHomeScreen(timeoutMs) {
+    const _homeAbort = new AbortController();
+    const _homeTimer = setTimeout(() => _homeAbort.abort(), timeoutMs);
+    try {
+      const res = await fetch(`${API_URL}/api/staff/${currentShiftStaff.id}/home-screen?studioId=${studioId}`,
+        { signal: _homeAbort.signal });
+      return await res.json();
+    } finally { clearTimeout(_homeTimer); }
+  }
+
   try {
     // 18 Jul, ~05:42: totally blank home — header fine, tile body
     // empty, no error, one bar of signal in the screenshot. This
     // fetch had no timeout; _flowGraphEnter() only runs after it
     // resolves, so a hung connection left nothing to ever paint.
     // Same 6s abort pattern already proven on the login picker.
-    const _homeAbort = new AbortController();
-    const _homeTimer = setTimeout(() => _homeAbort.abort(), 6000);
-    const res = await fetch(`${API_URL}/api/staff/${currentShiftStaff.id}/home-screen?studioId=${studioId}`,
-      { signal: _homeAbort.signal });
-    clearTimeout(_homeTimer);
-    const data = await res.json();
+    let data;
+    try { data = await _tryLoadHomeScreen(6000); }
+    catch(e1) { data = await _tryLoadHomeScreen(12000); }
 
     // A layout saved BEFORE the V2 condensed nav (20 Jul) would keep the
     // person on the old ~14-tile home forever ("pushed but not
@@ -18258,11 +18273,18 @@ function _cleanLabel(label) {
 function _buildFlowTreeFromNav() {
   const children = (typeof GRID_NAV_STRUCTURE !== 'undefined' ? GRID_NAV_STRUCTURE : []).map(group => {
     // Top-level standalone item (a direct action surfaced at home, no
-    // group wrapper) — e.g. Home, Tell Daisy. Render as its own action
-    // tile rather than an empty branch.
+    // group wrapper) — e.g. Tell Daisy. 'home' itself is skipped: a
+    // "Home" tile on the home screen is meaningless (tapping it just
+    // re-renders where you already are) — it only ever showed up here
+    // because loadPersonalHomeScreen() falling back to this full tree
+    // (e.g. a slow/failed personalisation fetch) shouldn't look more
+    // cluttered than the normal personalised view. Sized 'mid' to match
+    // how promoted quick-actions look everywhere else, not 'big' —
+    // this tree is a safety-net fallback, not a second design.
     if (!group.items && group.tab) {
+      if (group.tab === 'home') return null;
       return { id: group.tab, label: _cleanLabel(group.label), emoji: _leadingEmoji(group.label, '•'),
-               desc: group.desc || '', fn: group.fn || null, size: 'big' };
+               desc: group.desc || '', fn: group.fn || null, size: 'mid' };
     }
     const groupEmoji = _FLOW_GROUP_EMOJI[group.id] || '•';
     const kids = (group.items || []).map(it => ({
@@ -18285,7 +18307,7 @@ function _buildFlowTreeFromNav() {
       size: 'big',
       children: kids,
     };
-  });
+  }).filter(Boolean); // drop the skipped 'home' entry (null) before anything reads .id off it
 
   // Splice the real booking-journey stages under the group that owns Daily
   // Bookings (now 'Today' → 'today-group'), so the one genuine multi-step
@@ -21690,7 +21712,13 @@ async function populateDashboard() {
   loadLoyaltyLeaderboard();
   loadDashboardAddonNudge();
   initTabSwipe(); // genuine one-time setup — the listeners stay dormant until focus mode is actually active, safe to attach regardless of login state
-  swtShowTrigger();
+  // swtShowTrigger() removed 21 Jul 2026 per Daisy: the persistent 🎯
+  // TOUR badge kept showing in every screenshot all night ("still
+  // there... get rid of"). This call fired on every login, both showing
+  // the floating trigger AND auto-launching the full immersive tour if
+  // swt_done was never set in localStorage. Not deleted — just no
+  // longer called, so the whole thing goes dormant without losing the
+  // code if it's ever wanted back.
   startExtrasPollingOnLoad();
   startAlertPolling();
   checkShiftLogin();
@@ -29594,7 +29622,8 @@ async function deviceCheckIn() {
 
   // All good — load the dashboard
   populateDashboard();
-  swtShowTrigger();
+  // swtShowTrigger() removed here too — see the note at the other call
+  // site in populateDashboard() above.
 }
 
 function showDeviceGate(data) {
