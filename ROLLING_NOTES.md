@@ -4930,3 +4930,5 @@ both still pass exactly as before: normal path fully visible, forced
 failure falls back to old tiles with the red banner, never blank.
 
 NEEDS RENDER DEPLOY. client-only, server.js untouched this stage.
+
+- 21:52: STAGE 3 CONFIRMED LIVE ON DAISY'S DEVICE (dark mode) — login screen showing Fraunces brick heading, Caveat subtitle, wave, avatars on dark paper. One flaw from her screenshot fixed same minute: admin header stayed light in dark mode ('The Kiln Cafe' nearly invisible) — dark-mode rule added matching header to dark card, verified computed bg rgb(42,37,33) / text rgb(244,236,224) via real server + emulated dark mode.

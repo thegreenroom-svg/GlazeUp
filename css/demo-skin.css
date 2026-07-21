@@ -497,3 +497,17 @@ html.demo-skin .view h1, html.demo-skin .view h2, html.demo-skin .view h3 {
   font-family: 'Fraunces', Georgia, serif !important; letter-spacing: 0 !important;
 }
 html.demo-skin .view { background: var(--kc-paper) !important; }
+
+/* Dark mode: the top header bar was still light cream, leaving "The
+   Kiln Cafe" nearly invisible white-on-white — Daisy's 21:52
+   screenshot. Match it to the dark paper, keep the wordmark legible. */
+@media (prefers-color-scheme: dark) {
+  html.demo-skin .admin-header {
+    background: var(--kc-card) !important;
+    border-bottom: 1px solid var(--kc-line) !important;
+    color: var(--kc-ink) !important;
+  }
+  html.demo-skin .admin-header * {
+    color: var(--kc-ink) !important;
+  }
+}
