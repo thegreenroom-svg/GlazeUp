@@ -302,6 +302,37 @@
     }
     .ghtile-mini:active { transform: translateY(1px); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
 
+    /* Small SQUARE glazed tile for the home quick-actions bar — icon over
+       a tiny label, glaze sheen, a fraction of the old fat-pill size. */
+    .ghtile-sq {
+      position: relative;
+      overflow: hidden;
+      width: 62px;
+      min-height: 50px;
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      padding: 6px 4px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.26);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .ghtile-sq::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.05) 45%, transparent 62%);
+      pointer-events: none;
+    }
+    .ghtile-sq .i { font-size: 17px; line-height: 1; position: relative; z-index: 1; }
+    .ghtile-sq .t { font-size: 9px; font-weight: 700; line-height: 1; position: relative; z-index: 1; white-space: nowrap; }
+    .ghtile-sq:active { transform: translateY(1px); }
+
     :root {
       /* ── LINK brand palette ── */
       --link-charcoal: #2B2724;
@@ -3462,20 +3493,19 @@ function updateStaffName() {
     <div style="display:flex;align-items:center;margin-bottom:8px;">
       <div style="font-family:'Caveat',cursive;font-size:20px;font-weight:700;flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="flow-crumb"></div>
     </div>
-    <!-- Row 2+: all quick actions as glazed tiles, wrapping onto neat rows.
-         One consistent set — icon + short label — matching the home tiles'
-         glaze styling. Rebuilt 20 Jul per Daisy: "brand like the glazed
-         tiles everywhere... one bar, not so big on the screen." -->
+    <!-- Row 2+: quick actions as TINY SQUARE glazed tiles (Daisy asked
+         for the little square tiles here). Icon + tiny label, a fraction
+         of the old fat-pill height. -->
     <div style="display:flex;flex-wrap:wrap;gap:6px;" id="flow-tools-row">
-      <button class="glaze-tile ghtile" onclick="openTellPicker()" style="background:linear-gradient(135deg,#e0655a,#c8483d);">💬<span>Tell Daisy</span></button>
-      <button class="glaze-tile ghtile" onclick="openFindMyPiece()" style="background:linear-gradient(135deg,#7e5bc4,#5e35b1);">🔍<span>Find</span></button>
-      <button class="glaze-tile ghtile" onclick="_flowGraphEnter()" style="background:linear-gradient(135deg,#4c9a58,#2e7d32);">🏡<span>Home</span></button>
-      <button class="glaze-tile ghtile" onclick="toggleAlertFeed()" style="position:relative;background:linear-gradient(135deg,#4a453f,#2B2724);">🔔<span>Alerts</span><span id="flow-alert-count" style="display:none;position:absolute;top:-3px;right:-3px;background:#e53935;color:white;border-radius:50%;min-width:15px;height:15px;font-size:8px;font-weight:800;align-items:center;justify-content:center;"></span></button>
-      <button class="glaze-tile ghtile" onclick="syncLiveData()" style="background:linear-gradient(135deg,#4c9a58,#2e7d32);">📥<span>Sync</span><span id="live-data-status" style="margin-left:2px;">🟢</span></button>
-      <button class="glaze-tile ghtile" onclick="openColorPicker()" style="background:linear-gradient(135deg,#c99165,#b87946);">🎨<span>Glazes</span></button>
-      <button class="glaze-tile ghtile" onclick="openAppSwitcher()" style="background:linear-gradient(135deg,#7e5bc4,#5e35b1);">👥<span>Customer app</span></button>
-      <button class="glaze-tile ghtile" onclick="document.getElementById('daisy-flow-view').style.display='none';openCustomiseHome();" style="background:linear-gradient(135deg,#8a97b8,#5f6d8f);">✏️<span>Customise</span></button>
-      <button class="glaze-tile ghtile" onclick="confirmDirectLogout()" style="background:linear-gradient(135deg,#a52a2a,#8B1A1A);">🚪<span>Logout</span></button>
+      <button class="ghtile-sq" onclick="openTellPicker()" style="background:linear-gradient(135deg,#e0655a,#c8483d);"><span class="i">💬</span><span class="t">Tell Daisy</span></button>
+      <button class="ghtile-sq" onclick="openFindMyPiece()" style="background:linear-gradient(135deg,#7e5bc4,#5e35b1);"><span class="i">🔍</span><span class="t">Find</span></button>
+      <button class="ghtile-sq" onclick="_flowGraphEnter()" style="background:linear-gradient(135deg,#4c9a58,#2e7d32);"><span class="i">🏡</span><span class="t">Home</span></button>
+      <button class="ghtile-sq" onclick="toggleAlertFeed()" style="position:relative;background:linear-gradient(135deg,#4a453f,#2B2724);"><span class="i">🔔</span><span class="t">Alerts</span><span id="flow-alert-count" style="display:none;position:absolute;top:-3px;right:-3px;background:#e53935;color:white;border-radius:50%;min-width:15px;height:15px;font-size:8px;font-weight:800;align-items:center;justify-content:center;"></span></button>
+      <button class="ghtile-sq" onclick="syncLiveData()" style="background:linear-gradient(135deg,#4c9a58,#2e7d32);"><span class="i">📥</span><span class="t">Sync</span><span id="live-data-status" style="position:absolute;top:2px;right:3px;font-size:8px;">🟢</span></button>
+      <button class="ghtile-sq" onclick="openColorPicker()" style="background:linear-gradient(135deg,#c99165,#b87946);"><span class="i">🎨</span><span class="t">Glazes</span></button>
+      <button class="ghtile-sq" onclick="openAppSwitcher()" style="background:linear-gradient(135deg,#7e5bc4,#5e35b1);"><span class="i">👥</span><span class="t">Customer</span></button>
+      <button class="ghtile-sq" onclick="document.getElementById('daisy-flow-view').style.display='none';openCustomiseHome();" style="background:linear-gradient(135deg,#8a97b8,#5f6d8f);"><span class="i">✏️</span><span class="t">Customise</span></button>
+      <button class="ghtile-sq" onclick="confirmDirectLogout()" style="background:linear-gradient(135deg,#a52a2a,#8B1A1A);"><span class="i">🚪</span><span class="t">Logout</span></button>
     </div>
   </div>
   <div style="max-width:640px;margin:0 auto;padding:12px 14px 0;"><div id="flow-nudge-slot"></div></div>
@@ -18420,48 +18450,31 @@ function _renderFlowGraph() {
   const _owner = (typeof currentShiftStaff !== 'undefined' && currentShiftStaff?.name) ? currentShiftStaff.name.split(' ')[0] : 'Home';
   if (crumb) crumb.textContent = _flowStack.length > 1 ? (_owner + ' · ' + node.label) : _owner;
 
-  let html = `<div style="display:flex;justify-content:center;margin-bottom:14px;">
-    <button onclick="_flowGraphHome()" class="glaze-tile" style="${_flowSizeStyle('hub')}
-      border:none;border-radius:16px;color:#fff;padding:14px;text-align:left;cursor:pointer;
-      background:linear-gradient(135deg,#B87946,#9A6435);">
-      <div style="font-size:22px;">${_flowStack.length > 1 ? '↑' : '🏠'}</div>
-      <div style="font-weight:800;margin-top:4px;">${_flowStack.length > 1 ? 'Back' : 'Home — everything, one tap away'}</div>
-    </button>
-  </div>`;
+  // Small back link only when deeper than the root. The giant full-width
+  // 'Back' slab is gone (Daisy: "get rid of the big back one") — a back
+  // control never needed to be half the screen. At the root there's no
+  // tile here at all; the crumb and the My-tiles bar already cover home.
+  let html = _flowStack.length > 1
+    ? `<div style="margin-bottom:12px;">
+         <button onclick="_flowGraphHome()" style="background:rgba(184,121,70,0.14);border:1px solid rgba(184,121,70,0.3);color:#8A6244;border-radius:9px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">‹ Back</button>
+       </div>`
+    : '';
 
   if (node.children && node.children.length) {
-    // ── FAMILY-TREE BRANCH CONNECTOR ──
-    // A stem drops from where you are and splits out to each option
-    // below — the literal "arrows pointing down and separating off"
-    // Daisy asked for, so the page reads as a tree: here is where you
-    // are, here are the branches you can take next.
-    const _n = node.children.length;
-    html += `<div style="display:flex;flex-direction:column;align-items:center;margin-bottom:2px;">
-        <div style="width:2px;height:14px;background:rgba(184,121,70,0.4);"></div>
-        <div style="width:${_n>1?'70%':'0'};max-width:520px;height:2px;background:rgba(184,121,70,0.4);"></div>
-        <div style="display:flex;justify-content:space-between;width:${_n>1?'70%':'0'};max-width:520px;">
-          ${Array.from({length:_n}).map(()=>'<div style=\"width:2px;height:10px;background:rgba(184,121,70,0.4);\"></div>').join('')}
-        </div>
-      </div>`;
-    html += `<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;width:100%;box-sizing:border-box;">`;
+    html += `<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-start;width:100%;box-sizing:border-box;">`;
     node.children.forEach(child => {
       const hasKids = !!(child.children && child.children.length);
-      const glazeKey = TILE_GLAZE[child.id];
       const glaze = _tileGlaze(child);
-      // Parent tiles (those that open into sub-tiles) wear the premium
-      // showcase glaze — a richer flowing gradient — so a "heading you
-      // open" reads as special versus the plain-colour leaf tiles.
-      const bg = (hasKids && glazeKey && SHOWCASE_GLAZES[glazeKey])
-        ? SHOWCASE_GLAZES[glazeKey]
-        : (hasKids ? SHOWCASE_GLAZES.tealDeep : `linear-gradient(135deg,${glaze.c1},${glaze.c2})`);
-      const parentGlow = hasKids ? 'box-shadow:0 3px 14px rgba(0,0,0,0.16);' : '';
+      const bg = `linear-gradient(135deg,${glaze.c1},${glaze.c2})`;
+      // Lighter, smaller tiles — a clean coloured chip with an icon and a
+      // label, no long description, no heavy gloss. Two per row.
       html += `<button onclick="${hasKids ? `_flowDescend('${child.id}')` : `_flowActivate('${child.id}')`}"
-        class="glaze-tile" style="${_flowSizeStyle(child.size)}
-        border:none;border-radius:14px;color:#fff;padding:10px;text-align:left;cursor:pointer;${parentGlow}
-        background:${bg};display:flex;flex-direction:column;justify-content:flex-end;">
-        <div style="font-size:1.5em;line-height:1;">${child.emoji}</div>
-        <div style="font-weight:800;margin-top:4px;">${child.label}</div>
-        ${child.size !== 'small' ? `<div style="opacity:0.85;font-size:0.85em;margin-top:1px;">${child.desc||''}</div>` : ''}
+        style="width:calc(50% - 4px);min-height:74px;box-sizing:border-box;
+        border:none;border-radius:13px;color:#fff;padding:12px 13px;text-align:left;cursor:pointer;
+        box-shadow:0 1px 4px rgba(0,0,0,0.12);
+        background:${bg};display:flex;flex-direction:column;justify-content:center;gap:3px;">
+        <div style="font-size:20px;line-height:1;">${child.emoji}</div>
+        <div style="font-weight:700;font-size:14px;line-height:1.15;">${child.label}</div>
       </button>`;
     });
     html += `</div>`;
