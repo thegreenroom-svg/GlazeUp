@@ -5437,9 +5437,10 @@ function updateStaffName() {
       <!-- ── Team & Duties ── -->
       <div id="team-view" class="view" style="display: none;">
         <h2 style="margin-top:0;">👥 Team &amp; Duties</h2>
-        <p style="font-size:13px;color:var(--gu-dust);margin-bottom:16px;line-height:1.5;">
+        <p style="font-size:13px;color:var(--gu-dust);margin-bottom:10px;line-height:1.5;">
           Manage your team, set default duties per role, and assign extra duties to any staff member. Duties get ticked off per session as staff work through their tables.
         </p>
+        <button class="glaze-tile btn-connect" onclick="goToTab('progress', event)" style="width:100%;margin-bottom:16px;background:linear-gradient(135deg,#00838f,#00636b);color:#fff;border:none;border-radius:12px;padding:12px;font-weight:700;cursor:pointer;">✅ Daily Progress — every team member's live tasks →</button>
 
         <!-- Genuine real tile entry point, per direct request, replacing
              the previous scroll-jump nav — real content within each
@@ -10154,7 +10155,8 @@ async function openMyTraining() {
             ${(currentShiftStaff?.name || '').split(' ')[0]}'s Training</div>
           <div style="font-size:11px;color:#8a8175;">${currentShiftStaff?.role || ''} · read it, tick it, done</div>
         </div></div>
-      <button onclick="openAssistant()" class="glaze-tile" style="width:100%;border:none;border-radius:14px;padding:14px;font-size:13px;font-weight:800;background:linear-gradient(135deg,#5E35B1,#4527A0);color:#fff;cursor:pointer;margin-bottom:14px;">🏺 Ask Cleo to explain</button>
+      <button onclick="openAssistant()" class="glaze-tile" style="width:100%;border:none;border-radius:14px;padding:14px;font-size:13px;font-weight:800;background:linear-gradient(135deg,#5E35B1,#4527A0);color:#fff;cursor:pointer;margin-bottom:10px;">🏺 Ask Cleo to explain</button>
+      <button onclick="_tileGoToTab('health-safety')" class="glaze-tile" style="width:100%;border:none;border-radius:14px;padding:14px;font-size:13px;font-weight:800;background:linear-gradient(135deg,#D9694E,#B24E37);color:#fff;cursor:pointer;margin-bottom:14px;">🦺 Health &amp; Safety — risk assessments, procedures</button>
       <div id="training-tiles"><div style="text-align:center;padding:40px;color:#8a8175;font-size:13px;">Loading…</div></div>
     </div>`;
   toggleFloatingBackBtn();
@@ -16936,53 +16938,52 @@ function _updateNavControls() {
 // screen exists yet. Sub-tile tab IDs can be included as promoted tiles.
 const ROLE_HOME_DEFAULTS = {
   // ═══════════════════════════════════════════════════════════
-  // THREE TILES (21 Jul 2026): every home is now just the 3 groups —
-  // The Floor, Pieces & Kiln, The Studio — ORDERED by that person's
-  // job (first = what they do most). Team + Setup folded into The
-  // Studio, so there is nothing else on the home screen.
+  // TWO TILES (21 Jul 2026): every home is just Today + The Studio.
+  // For the two roles whose whole job is the pieces/kiln half of
+  // "Today" (Jenny, Lucy), 'kiln' is additionally promoted so it still
+  // sits on their home as its own 1-tap tile — the merge cost them
+  // nothing, using the same promotedTiles mechanism every home already
+  // uses for Tell Daisy.
   // ═══════════════════════════════════════════════════════════
 
   'General Manager': {
-    tileOrder: ['floor', 'pieces', 'studio'],
+    tileOrder: ['today', 'studio'],
     promotedTiles: ['tell-daisy']
   },
 
   'Co-Director': {
-    tileOrder: ['floor', 'studio', 'pieces'],
+    tileOrder: ['today', 'studio'],
     promotedTiles: ['tell-daisy']
   },
 
   'Studio Executive': {
-    // Jenny: PACKING IS HER JOB — Pieces & Kiln first, every time.
-    tileOrder: ['pieces', 'floor', 'studio'],
-    promotedTiles: ['tell-daisy']
+    // Jenny: PACKING IS HER JOB — Kiln promoted to its own home tile.
+    tileOrder: ['today', 'studio'],
+    promotedTiles: ['tell-daisy', 'kiln']
   },
 
   'Ceramic Technician': {
-    // Lucy: bisque in, fired pieces out — kiln world first.
-    tileOrder: ['pieces', 'floor', 'studio'],
-    promotedTiles: ['tell-daisy']
+    // Lucy: bisque in, fired pieces out — Kiln promoted to its own home tile.
+    tileOrder: ['today', 'studio'],
+    promotedTiles: ['tell-daisy', 'kiln']
   },
 
   'Studio Assistant': {
-    // Ruby: the floor — seat people, take orders, then pieces.
-    tileOrder: ['floor', 'pieces', 'studio'],
+    tileOrder: ['today', 'studio'],
     promotedTiles: ['tell-daisy']
   },
 
   'Marketing & Host By Post Manager': {
-    // Elliott: customer-facing side first (Club Pages, catalogue, HBP live in Studio)
-    tileOrder: ['studio', 'floor', 'pieces'],
+    tileOrder: ['studio', 'today'],
     promotedTiles: ['tell-daisy']
   },
 
   'Barista': {
-    // Drinks (Daily Menu lives in The Floor) first.
-    tileOrder: ['floor', 'studio'],
+    tileOrder: ['today', 'studio'],
     promotedTiles: ['tell-daisy']
   },
   'Chief Taster': {
-    tileOrder: ['floor', 'studio'],
+    tileOrder: ['today', 'studio'],
     promotedTiles: []
   },
 };
@@ -17603,17 +17604,28 @@ const GRID_NAV_STRUCTURE = [
   // screen is still reachable. Same tabs/fns — only the shape changed.
   // ═══════════════════════════════════════════════════════════════
 
-  // 1. THE FLOOR — running the room right now
-  { id: 'floor', label: 'The Floor', color: '#3E6FA3', items: [
+  // ═══════════════════════════════════════════════════════════════
+  // TWO TILES — THE WHOLE APP. 21 Jul 2026, per Daisy: "condense,
+  // condense, condense — radical thinking, free reign." The Floor and
+  // Pieces & Kiln were never two different jobs — they're two halves of
+  // the SAME booking journey (seat → paint → fire → pack → collect).
+  // Splitting them was an artificial boundary the nav imposed; the app
+  // already models this as one continuous journey everywhere else.
+  // So: one tile for the whole operational day, one for the business
+  // behind it. Nothing else on the home screen.
+  //   1. Today      — the whole day, front to back (was Floor + Pieces)
+  //   2. The Studio  — the whole business: money, customers, team, setup
+  // ═══════════════════════════════════════════════════════════════
+
+  // 1. TODAY — the whole operational day, front-of-house through to kiln.
+  // Ordered as the day actually runs: seat & serve first, then the
+  // pieces coming back through the fire cycle from earlier visits.
+  { id: 'today', label: 'Today', color: '#3E6FA3', items: [
     { tab: 'floor-plan', label: '🪑 Floor Plan', desc: 'Live view of all tables', fn: 'showFloorPlan' },
     { tab: 'staff', label: '📋 Daily Bookings', desc: 'Start a booking, walk-in, or party' },
     { tab: 'tablecards', label: '🎫 Table Cards', desc: "Print a table's QR card" },
     { tab: 'menu', label: '🍰 Daily Menu', desc: "Today's specials" },
     { tab: 'music', label: '🎵 Music', desc: 'Volume · skip · what\'s playing', fn: 'openMusic' },
-  ]},
-
-  // 2. PIECES & KILN — everything after painting: fire, find, pack, send
-  { id: 'pieces', label: 'Pieces & Kiln', color: '#C0392B', items: [
     { tab: 'kiln', label: '🔥 Kiln', desc: 'Dip → load → fire', fn: 'openKiln' },
     { tab: 'piecematch', label: '🔍 Piece Matching', desc: 'AI-match fired pieces to photos' },
     { tab: 'collections', label: '🏺 Collections', desc: 'Ready to collect · returns · find on shelf', fn: 'openCollections' },
@@ -17621,21 +17633,19 @@ const GRID_NAV_STRUCTURE = [
     { tab: 'labels', label: '🏷️ Printing', desc: 'Collection & postal labels · transfer print queue' },
   ]},
 
-  // 3. THE STUDIO — the whole business. Money, stock, the customer side,
-  // the team, and all setup — folded into labelled sub-sections so it's
-  // one home tile, not four.
+  // 2. THE STUDIO — the whole business. Merged 21 Jul: Daily Progress
+  // folds into Team & Duties (team screen links across); Health & Safety
+  // folds into Training (training screen links across).
   { id: 'studio', label: 'The Studio', color: '#4C8C5A', items: [
     { tab: 'dashboard', label: '📊 Takings', desc: 'Your daily overview' },
     { tab: 'stock', label: '🫙 Stock & Bisque', desc: 'Bisque stock, silhouettes & reservations' },
-    { tab: 'team', label: '👥 Team & Duties', desc: 'Duty lists, timekeeping, holidays' },
-    { tab: 'progress', label: '✅ Daily Progress', desc: "Every team member's live tasks" },
+    { tab: 'team', label: '👥 Team & Duties', desc: 'Duty lists, timekeeping · everyone\'s live tasks' },
     { tab: 'catalogue', label: '🖼️ Piece Catalogue', desc: 'What customers browse from home' },
     { tab: 'customer-demo', label: '👀 Customer App', desc: 'See what customers see', fn: 'openCustomerDemo' },
     { tab: 'community', label: '🌍 Club Pages', desc: 'Feature and moderate customer work' },
     { tab: 'host-by-post', label: '📮 Host By Post', desc: 'Postal kits & orders' },
     { tab: 'whats-on', label: '📅 What\'s On', desc: 'Local events & school holidays', fn: 'openWhatsOn' },
-    { tab: 'training', label: '🎓 My Training', desc: 'Read, tick, done', fn: 'openMyTraining' },
-    { tab: 'health-safety', label: '🦺 Health & Safety', desc: 'Risk assessment, training, procedures', fn: 'openHealthSafety' },
+    { tab: 'training', label: '🎓 Training & Safety', desc: 'My training · health & safety', fn: 'openMyTraining' },
     { tab: 'learning', label: '🌱 Learning & Insights', desc: 'What the app has noticed · workflow analytics', fn: 'openLearning' },
     { tab: 'setup', label: '⚙️ Studio Setup', desc: 'Connections, branding, add-ons, offers' },
     { tab: 'navigation-help', label: '🧭 Help & Practice', desc: 'How to use the app · run a practice demo' },
@@ -18208,9 +18218,10 @@ const DAISY_FLOW_GRAPH = {
 // tree. The booking-journey (the one true multi-step workflow) is
 // spliced under the 'bookings' group so its stages still unfold.
 const _FLOW_GROUP_EMOJI = {
-  // 5 condensed groups (20 Jul)
-  floor:'🪑', pieces:'🔥', studio:'🎨', team:'👥', setup:'⚙️',
+  // 2 condensed groups (21 Jul)
+  today:'📋', studio:'🎨',
   // legacy keys kept as fallback
+  floor:'🪑', pieces:'🔥', team:'👥', setup:'⚙️',
   tables:'🪑', dashboard:'📈', bookings:'📋', menu:'☕', stock:'📦', community:'🌟'
 };
 // ─── PARSE-TIME REGEX LITERALS REMOVED. 18 July 2026. ───
@@ -18268,9 +18279,10 @@ function _buildFlowTreeFromNav() {
   });
 
   // Splice the real booking-journey stages under the group that owns Daily
-  // Bookings (now 'The Floor' → 'floor-group'), so the one genuine
-  // multi-step workflow still unfolds stage by stage.
-  const bookingsGroup = children.find(c => c.id === 'floor-group')
+  // Bookings (now 'Today' → 'today-group'), so the one genuine multi-step
+  // workflow still unfolds stage by stage.
+  const bookingsGroup = children.find(c => c.id === 'today-group')
+                     || children.find(c => c.id === 'floor-group')
                      || children.find(c => c.id === 'bookings-group');
   if (bookingsGroup && bookingsGroup.children) {
     bookingsGroup.children.push({
@@ -18323,7 +18335,7 @@ function _buildPersonalFlowTree() {
   // Splice the real booking journey under whichever branch actually owns
   // bookings for this person (their 'bookings' or 'staff' group if they
   // have one) — same real stage functions as before, not duplicated.
-  const journeyHost = children.find(c => c.id === 'floor-group' || c.id === 'bookings-group' || c.id === 'staff')
+  const journeyHost = children.find(c => c.id === 'today-group' || c.id === 'floor-group' || c.id === 'bookings-group' || c.id === 'staff')
                     || children.find(c => c.children);
   if (journeyHost) {
     (journeyHost.children = journeyHost.children || []).push({
@@ -18411,7 +18423,7 @@ const TILE_GLAZE = {
   'admin-group':'plum', 'admin-offers':'pink', 'admin-staff':'purple',
   'admin-hs':'coral', 'admin-loyalty':'yellow', 'admin-config':'brown', 'admin-revenue':'jadeColor',
   // The 5 condensed top-level groups (20 Jul) — each its own distinct glaze
-  'floor-group':'blue', 'pieces-group':'red', 'studio-group':'jadeColor',
+  'today-group':'blue', 'floor-group':'blue', 'pieces-group':'red', 'studio-group':'jadeColor',
   'team-group':'purple', 'setup-group':'brown',
   // legacy group ids kept mapped so nothing regresses if referenced
   'foh-group':'blue', 'bookings-group':'teal',
