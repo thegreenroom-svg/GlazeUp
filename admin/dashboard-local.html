@@ -6839,6 +6839,18 @@ function goToTab(tab, event) {
   // back button — hidden on Dashboard itself, otherwise re-evaluated
   // against the fresh (top-of-page) scroll position of the new tab.
   currentTab = tab;
+  // Stop the floor-plan heartbeat from repainting over this screen. The
+  // 30s + 5min timers repaint #floor-plan-view whenever _floorViewMode
+  // is 'plan'/undefined. In-container sub-screens (Packing, Kiln...) set
+  // their own _floorViewMode so they're safe, but goToTab screens live
+  // OUTSIDE that container and never did — so opening Team/Catalogue/
+  // Takings/Setup right after being on the floor plan left _floorViewMode
+  // as 'plan', and the timer stomped the floor plan on top ~30s later
+  // ("end up at floor plan from others"). 'away' means not-the-plan, so
+  // neither timer fires while you're on one of these tabs. The floor-plan
+  // tab itself sets _floorViewMode='plan' via its own render path.
+  if (tab !== 'floor-plan') { _floorViewMode = 'away'; }
+  else { _floorViewMode = 'plan'; }
   const contentEl = document.getElementById('admin-content');
   if (contentEl) contentEl.scrollTop = 0;
   toggleFloatingBackBtn();
@@ -13205,7 +13217,17 @@ document.addEventListener('visibilitychange', () => {
 // every navigation below from firing again on the many later calls.
 let _hasLanded = false;
 
-async function checkShiftLogin() {
+async function checkShiftLogin(fromNavigation) {
+  // fromNavigation=true means this was triggered by opening a tab
+  // (populateDashboard on the Dashboard/Takings tab), NOT by a genuine
+  // page-load login check. You cannot navigate within the app unless
+  // you're already logged in, so a navigation-triggered call must only
+  // ever refresh session UI — never clear the session, never show the
+  // picker. This is the definitive fix for "tap the money page, get
+  // bounced to the picker": it removes the bounce at the source for
+  // navigation, on top of the _hasLanded guard further down (which
+  // covers the page-load path).
+  if (fromNavigation && currentShiftStaff) { markSessionActive(); applyShiftUI(); return; }
   if (!SHIFT_PIN_LOGIN_ENABLED) {
     // PIN login disabled for tonight's presentation — auto-apply
     // David's real director identity directly (not a generic
@@ -21825,7 +21847,7 @@ async function populateDashboard() {
   // code if it's ever wanted back.
   startExtrasPollingOnLoad();
   startAlertPolling();
-  checkShiftLogin();
+  checkShiftLogin(true); // true = navigation-triggered: refresh session UI only, never bounce to the picker (you're already logged in if you're opening a tab)
   loadAlertSettings();
   // Opening checklist is shown once login has actually resolved (see
   // applyShiftUI / submitShiftPin / submitNewPin), not on a fixed timer —
