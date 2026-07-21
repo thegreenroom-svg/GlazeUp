@@ -4726,3 +4726,65 @@ consistent — no user-facing bug, leave as-is.
 
 DEPLOY: Daisy taps Manual Deploy for the digest endpoint. Client
 changes show after full close-and-reopen on iOS.
+
+# ═══════════════════════════════════════════════════════════
+# 21 JULY, LATE — THE POTTER'S DESK (radical stage 2)
+# Daisy: "total change, radically, go mad… get rid of tiles if
+# you like… don't want to see any original."
+# ═══════════════════════════════════════════════════════════
+
+THE TILE HOME IS GONE (while the flag is on). New files demo-skin.js +
+extended css/demo-skin.css, all still governed by the ONE switch in
+/demo-skin-flag.js — flag false = untouched original, proven pattern.
+
+THE DESK (replaces home entirely):
+- Masthead: wordmark + spaced-caps THE KILN CAFE / Langport · Somerset
+- Handwritten greeting ("Evening, Daisy.") in Caveat, brick, over the
+  wavy line; sign-off line at the foot in the site's cheeky voice
+- THREE LIVING FIGURES: taken today (directors, /api/analytics/
+  dashboard), bookings+covers on the floor (/api/floor/active), loads
+  in the kiln (/api/kiln-batches/active) — skeleton shimmer until real
+  data lands, honest em-dash on failure
+- THE DAY: bookings as a brick-dotted TIMELINE, not tiles; title
+  auto-rolls to "NEXT OPEN — THURSDAY 23 JUL" on closed days (same
+  booking-driven roll-forward as the floor plan); tap any slot -> real
+  floor plan
+- THE DESK index: typographic menu-card rows (Fraunces serif), the 6-7
+  things a shift actually reaches for, incl. Daily Digest for directors
+- DOCK: persistent bottom bar (Desk/Floor/Kiln/Money/Menu), custom
+  stroke icons, spring press physics; Money is director-gated
+- JUMP: floating brick FAB -> command sheet; type "kiln"/"stock"/
+  "table 6" and land on the real screen (searches the app's own
+  GRID_NAV_STRUCTURE, so it can never offer a screen that doesn't
+  exist)
+- MENU: full-screen typographic index of EVERYTHING (24 destinations),
+  springs up as a sheet
+- Dark mode: full palette swap via prefers-color-scheme
+- Typography: Fraunces 900 display serif + Caveat handwriting + the
+  existing Instrument Sans; deep screens inherit serif headings + cream
+  paper so nothing feels "original" even past the home
+
+ARCHITECTURE (why this is safe): demo-skin.js returns immediately if
+the flag is off — zero listeners, zero DOM. Navigation reuses the
+app's OWN router (_tileGoToTab / real fn names); data comes from the
+SAME endpoints the old screens trust; landOnHome is wrapped (after
+load) so every route home shows the Desk — the original landOnHome
+still runs first, untouched. Old home chrome (daisy-flow-view,
+My-tiles bar, flow-tools-row) hidden by CSS only.
+
+VERIFIED HEADLESS (real Chrome, 390px, zero page errors): canvas
+replaces home; original home + My-tiles bar computed hidden; greeting
+correct; £874.50/3 bookings/2 kiln all hydrate from stubbed real-shape
+data; day title rolls forward correctly; 3 timeline rows; menu opens
+with 24 real rows; JUMP "kiln" lands on the REAL kiln screen
+(_floorViewMode='kiln'); dock returns to Desk. Screenshot eyeballed.
+
+WHY DAISY SAW NO CHANGE AT 20:54: her phone runs what RENDER serves —
+and Render hasn't been Manual-Deployed since before tonight's commits.
+Client files are served by the same Express app, so EVERYTHING (digest,
+skin, Desk) appears only after her one Manual Deploy tap + full
+close-and-reopen.
+
+NEXT: customer-app Desk treatment, pull-to-refresh, swipe-back,
+per-screen deep reskins, predictive ordering of the Desk index by
+role/time, live tile-face data if any tiles return.

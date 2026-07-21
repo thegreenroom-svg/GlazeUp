@@ -160,3 +160,191 @@ html.demo-skin .app-header,
 html.demo-skin header {
   border-bottom: none;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   STAGE 2 — THE POTTER'S DESK. 21 Jul, per Daisy: "total change,
+   radically… get rid of tiles if you like… don't want to see any
+   original." The tile home is fully replaced by the Desk canvas
+   (demo-skin.js); everything below styles that new world. Still all
+   scoped under html.demo-skin — the one switch still reverts it all.
+   Typography: Fraunces (warm display serif with real character) over
+   Instrument Sans, Caveat for the studio's handwritten voice.
+   ═══════════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Caveat:wght@600&display=swap');
+
+html.demo-skin {
+  --kc-paper: #FFF9F0;
+  --kc-ink: #2B2724;
+  --kc-brick: #A32D21;
+  --kc-blush: #F7AFAD;
+  --kc-clay: #B87946;
+  --kc-line: rgba(43, 39, 36, 0.14);
+  --kc-card: #FFFDF9;
+}
+@media (prefers-color-scheme: dark) {
+  html.demo-skin {
+    --kc-paper: #201C1A;
+    --kc-ink: #F4ECE0;
+    --kc-brick: #D65445;
+    --kc-blush: #F7AFAD;
+    --kc-line: rgba(244, 236, 224, 0.16);
+    --kc-card: #2A2521;
+  }
+  html.demo-skin body { background: var(--kc-paper) !important; }
+}
+
+/* Hide the ENTIRE original home chrome — "don't want to see any
+   original". The old flow view, its tool bars, the green My-tiles
+   slab: gone while the flag is on. All still in the DOM, untouched. */
+html.demo-skin #daisy-flow-view,
+html.demo-skin #floating-back-btn,
+html.demo-skin #flow-tools-row { display: none !important; }
+
+/* ── THE CANVAS ── */
+html.demo-skin #kc-canvas {
+  position: fixed; inset: 0; z-index: 8000;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  background:
+    radial-gradient(120% 60% at 85% -8%, rgba(247, 175, 173, 0.20), transparent 60%),
+    radial-gradient(90% 50% at -10% 108%, rgba(184, 121, 70, 0.12), transparent 55%),
+    var(--kc-paper);
+  color: var(--kc-ink);
+  transition: opacity 0.28s ease, transform 0.34s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+html.demo-skin #kc-canvas.kc-away { opacity: 0; transform: translateY(14px) scale(0.985); pointer-events: none; }
+html.demo-skin .kc-paper { max-width: 640px; margin: 0 auto; padding: calc(14px + env(safe-area-inset-top)) 20px 130px; }
+
+/* staggered arrival — everything springs in, top to bottom */
+html.demo-skin .kc-in { animation: kcIn 0.55s cubic-bezier(0.34, 1.35, 0.64, 1) both; animation-delay: calc(var(--d) * 70ms); }
+@keyframes kcIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+
+html.demo-skin .kc-masthead { display: flex; align-items: center; gap: 12px; }
+html.demo-skin .kc-mark { width: 46px; height: 46px; object-fit: contain; border-radius: 10px; }
+html.demo-skin .kc-house { font-family: 'Fraunces', Georgia, serif; font-weight: 900; letter-spacing: 0.16em; font-size: 15px; }
+html.demo-skin .kc-house-sub { font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; opacity: 0.55; margin-top: 2px; }
+
+html.demo-skin .kc-hello { font-family: 'Caveat', cursive; font-size: 44px; line-height: 1; margin: 22px 0 2px; color: var(--kc-brick); }
+html.demo-skin .kc-wave-line {
+  height: 10px; margin: 6px 0 4px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='10' viewBox='0 0 48 10'%3E%3Cpath d='M0 5 Q 6 0, 12 5 T 24 5 T 36 5 T 48 5' fill='none' stroke='%23A32D21' stroke-width='2' stroke-linecap='round' opacity='0.55'/%3E%3Cpath d='M0 8 Q 6 3, 12 8 T 24 8 T 36 8 T 48 8' fill='none' stroke='%23F7AFAD' stroke-width='1.6' stroke-linecap='round' opacity='0.8'/%3E%3C/svg%3E");
+  background-repeat: repeat-x; background-size: 48px 10px;
+}
+
+/* the three living figures */
+html.demo-skin .kc-hero { display: flex; gap: 10px; margin: 18px 0 6px; }
+html.demo-skin .kc-fig {
+  flex: 1; background: var(--kc-card); border: 1.5px solid var(--kc-line);
+  border-radius: 16px; padding: 14px 12px 12px; min-width: 0;
+  box-shadow: 0 4px 14px rgba(43, 39, 36, 0.08);
+}
+html.demo-skin .kc-fig-n { font-family: 'Fraunces', Georgia, serif; font-weight: 900; font-size: 24px; line-height: 1; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.demo-skin .kc-fig-l { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.55; margin-top: 6px; }
+
+/* skeletons that shimmer until real data lands */
+html.demo-skin .kc-skel, html.demo-skin .kc-skel-t {
+  position: relative; overflow: hidden; border-radius: 8px;
+  background: linear-gradient(100deg, rgba(43,39,36,0.07) 40%, rgba(43,39,36,0.14) 50%, rgba(43,39,36,0.07) 60%);
+  background-size: 200% 100%; animation: kcShimmer 1.1s linear infinite; color: transparent !important;
+}
+html.demo-skin .kc-skel { height: 56px; margin-bottom: 10px; }
+@keyframes kcShimmer { to { background-position: -200% 0; } }
+
+html.demo-skin .kc-section { margin-top: 26px; }
+html.demo-skin .kc-sec-title { font-size: 11px; letter-spacing: 0.24em; font-weight: 800; opacity: 0.55; margin-bottom: 10px; }
+
+/* THE DAY — a timeline, not tiles */
+html.demo-skin .kc-slot {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  background: none; border: none; padding: 9px 2px; cursor: pointer;
+  text-align: left; color: var(--kc-ink); border-bottom: 1px dashed var(--kc-line);
+}
+html.demo-skin .kc-slot:active { transform: scale(0.985); }
+html.demo-skin .kc-slot-t { font-family: 'Fraunces', Georgia, serif; font-weight: 700; font-size: 15px; min-width: 46px; }
+html.demo-skin .kc-slot-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--kc-brick); box-shadow: 0 0 0 4px rgba(163, 45, 33, 0.14); flex-shrink: 0; }
+html.demo-skin .kc-slot-body { display: flex; flex-direction: column; min-width: 0; }
+html.demo-skin .kc-slot-body b { font-size: 14.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.demo-skin .kc-slot-body i { font-style: normal; font-size: 11.5px; opacity: 0.6; }
+html.demo-skin .kc-more, html.demo-skin .kc-empty { font-size: 12.5px; opacity: 0.6; padding: 12px 2px; }
+
+/* THE DESK / MENU index — a menu card, typographic rows */
+html.demo-skin .kc-row {
+  display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto;
+  width: 100%; background: none; border: none; cursor: pointer; text-align: left;
+  padding: 12px 2px; color: var(--kc-ink); border-bottom: 1px solid var(--kc-line);
+}
+html.demo-skin .kc-row:active { background: rgba(163, 45, 33, 0.06); }
+html.demo-skin .kc-row-t { font-family: 'Fraunces', Georgia, serif; font-weight: 700; font-size: 19px; grid-row: 1; }
+html.demo-skin .kc-row-d { font-size: 11.5px; opacity: 0.55; grid-row: 2; margin-top: 2px; }
+html.demo-skin .kc-row-a { grid-row: 1 / span 2; align-self: center; font-size: 18px; color: var(--kc-brick); padding-left: 10px; }
+
+html.demo-skin .kc-foot { font-family: 'Caveat', cursive; font-size: 22px; color: var(--kc-clay); margin-top: 30px; opacity: 0.85; }
+
+/* ── THE DOCK ── */
+html.demo-skin #kc-dock {
+  position: fixed; left: 14px; right: 14px; bottom: calc(10px + env(safe-area-inset-bottom));
+  z-index: 8500; display: flex; gap: 4px; padding: 8px 6px;
+  background: color-mix(in srgb, var(--kc-ink) 94%, transparent);
+  border-radius: 22px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.30);
+  backdrop-filter: blur(10px);
+}
+html.demo-skin .kc-dock-b {
+  flex: 1; background: none; border: none; color: var(--kc-paper); cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 5px 0;
+  border-radius: 14px; transition: transform 0.12s cubic-bezier(0.34, 1.6, 0.64, 1);
+}
+html.demo-skin .kc-dock-b:active { transform: scale(0.88); }
+html.demo-skin .kc-dock-b svg { width: 21px; height: 21px; }
+html.demo-skin .kc-dock-b span { font-size: 9.5px; letter-spacing: 0.06em; font-weight: 700; opacity: 0.85; }
+
+/* ── THE JUMP ── */
+html.demo-skin #kc-jump-fab {
+  position: fixed; right: 18px; bottom: calc(84px + env(safe-area-inset-bottom));
+  z-index: 8500; width: 52px; height: 52px; border-radius: 50%;
+  border: none; cursor: pointer; color: #fff; background: var(--kc-brick);
+  box-shadow: 0 8px 22px rgba(163, 45, 33, 0.45);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.14s cubic-bezier(0.34, 1.6, 0.64, 1);
+}
+html.demo-skin #kc-jump-fab:active { transform: scale(0.86); }
+html.demo-skin #kc-jump-fab svg { width: 22px; height: 22px; }
+html.demo-skin #kc-jump {
+  position: fixed; inset: 0; z-index: 9000; background: rgba(24, 20, 18, 0.5);
+  display: flex; align-items: flex-start; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
+}
+html.demo-skin #kc-jump.kc-open { opacity: 1; pointer-events: auto; }
+html.demo-skin .kc-jump-sheet {
+  margin-top: 12vh; width: min(560px, calc(100% - 32px));
+  background: var(--kc-card); border-radius: 18px; padding: 12px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  transform: translateY(-8px) scale(0.98); transition: transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+html.demo-skin #kc-jump.kc-open .kc-jump-sheet { transform: none; }
+html.demo-skin #kc-jump-in {
+  width: 100%; box-sizing: border-box; border: 1.5px solid var(--kc-line);
+  background: var(--kc-paper); color: var(--kc-ink); border-radius: 12px;
+  padding: 13px 14px; font-size: 16px; outline: none;
+}
+html.demo-skin #kc-jump-in:focus { border-color: var(--kc-brick); }
+html.demo-skin .kc-jump-hint { font-size: 12.5px; opacity: 0.55; padding: 12px 4px 4px; }
+html.demo-skin #kc-jump-out .kc-row { padding: 10px 4px; }
+
+/* ── THE MENU (full-screen menu card) ── */
+html.demo-skin #kc-menu {
+  position: fixed; inset: 0; z-index: 8800; background: var(--kc-paper); color: var(--kc-ink);
+  transform: translateY(100%); transition: transform 0.38s cubic-bezier(0.32, 1.25, 0.55, 1);
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+}
+html.demo-skin #kc-menu.kc-open { transform: none; }
+html.demo-skin .kc-menu-inner { max-width: 640px; margin: 0 auto; padding: calc(16px + env(safe-area-inset-top)) 20px 120px; }
+html.demo-skin .kc-menu-head { display: flex; align-items: center; justify-content: space-between; }
+html.demo-skin .kc-close { border: none; background: var(--kc-ink); color: var(--kc-paper); border-radius: 10px; padding: 8px 14px; font-weight: 700; font-size: 13px; cursor: pointer; }
+html.demo-skin .kc-menu-sec { margin-top: 22px; }
+
+/* ── the rest of the app inherits the new voice while the flag is
+      on: serif headings, cream paper, no stray white — so even the
+      deep screens stop looking "original". ── */
+html.demo-skin .view h1, html.demo-skin .view h2, html.demo-skin .view h3 {
+  font-family: 'Fraunces', Georgia, serif !important; letter-spacing: 0 !important;
+}
+html.demo-skin .view { background: var(--kc-paper) !important; }
