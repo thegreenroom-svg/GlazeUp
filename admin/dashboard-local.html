@@ -274,6 +274,34 @@
     }
     .ghtile > span { position: relative; z-index: 1; }
 
+    /* Tiny glazed tile for the top header bar — square, rounded, with the
+       same glaze sheen as the app's tiles, replacing the old flat circles. */
+    .ghtile-mini {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border: none;
+      border-radius: 9px;
+      color: #fff;
+      font-size: 13px;
+      cursor: pointer;
+      flex-shrink: 0;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.28);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .ghtile-mini::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.06) 42%, transparent 60%);
+      pointer-events: none;
+    }
+    .ghtile-mini:active { transform: translateY(1px); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+
     :root {
       /* ── LINK brand palette ── */
       --link-charcoal: #2B2724;
@@ -3226,76 +3254,44 @@ function updateStaffName() {
         <h1 id="studio-name" style="margin:0;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">The Kiln Cafe</h1>
       </div>
 
-      <!-- Right: shift badge + bell + mini tiles including logout -->
-      <div id="admin-header-right-buttons" class="admin-header-right" style="display:none;align-items:center;gap:6px;flex-shrink:1;min-width:0;overflow-x:auto;overflow-y:hidden;">
+      <!-- Right: shift badge + a few essential MINI GLAZED TILES.
+           20 Jul: was 10+ cramped round buttons duplicating the home
+           bar. Slimmed to the 4 you actually need while deep in a screen
+           (Home, Sync, Alerts, Out) and restyled as tiny glazed tiles to
+           match the app — glaze gradient + sheen, not flat circles.
+           Everything removed here still lives on the home tile bar. -->
+      <div id="admin-header-right-buttons" class="admin-header-right" style="display:none;align-items:center;gap:5px;flex-shrink:1;min-width:0;overflow-x:auto;overflow-y:hidden;">
 
-        <!-- Who's on shift — tap for task queue -->
-        <!-- Just the avatar circle. The name took 60px we don't have. -->
-        <!-- Name display only, avatar letter removed 18 July for cleaner header -->
-        <span id="shift-badge-name" style="font-size:13px;font-weight:700;color:#2B2724;"></span>
+        <span id="shift-badge-name" style="font-size:12px;font-weight:700;color:#2B2724;margin-right:2px;"></span>
 
-        <!-- ═══ QUICK TOOLS — the things you need in a hurry ═══ -->
-        <!-- Tell Daisy: broken piece, unhappy customer, running low -->
-        <button class="glaze-tile" id="qt-tell" onclick="openTellPicker()" title="Tell Daisy"
-          style="display:flex;background:#e53935;color:white;border:none;border-radius:50%;
-          width:26px;height:26px;font-size:11px;cursor:pointer;flex-shrink:0;
-          align-items:center;justify-content:center;">💬</button>
+        <!-- Home -->
+        <button class="glaze-tile ghtile-mini" id="my-tiles-header-btn" onclick="_flowGraphEnter()" title="Home"
+          style="background:linear-gradient(135deg,#4C8C5A,#3A6E46);">🏠</button>
 
-        <!-- Find My Piece -->
-        <button class="glaze-tile" id="qt-find" onclick="openFindMyPiece()" title="Find a piece"
-          style="display:flex;background:#5E35B1;color:white;border:none;border-radius:50%;
-          width:26px;height:26px;font-size:11px;cursor:pointer;flex-shrink:0;
-          align-items:center;justify-content:center;">🔍</button>
+        <!-- Sync + live status dot -->
+        <button class="glaze-tile ghtile-mini" id="sync-live-btn" onclick="syncLiveData()" title="Sync — pull fresh Square data now"
+          style="background:linear-gradient(135deg,#3E6FA3,#2E547C);">📥</button>
+        <span id="live-data-status" style="font-size:11px;font-weight:700;color:#2e7d32;display:flex;align-items:center;gap:3px;">🟢</span>
 
-        <!-- My tiles — see/customise your home screen -->
-        <button class="glaze-tile" id="my-tiles-header-btn" onclick="_flowGraphEnter()" title="Home"
-          style="background:#2e7d32;color:white;border:none;border-radius:50%;
-          width:26px;height:26px;font-size:12px;cursor:pointer;flex-shrink:0;
-          align-items:center;justify-content:center;">🏡</button>
-                <!-- Alerts -->
-        <button class="glaze-tile" id="alert-bell-btn" onclick="toggleAlertFeed()" title="Alerts"
-          style="display:flex;background:#2B2724;color:white;border:none;border-radius:50%;
-          width:26px;height:26px;font-size:11px;cursor:pointer;flex-shrink:0;
-          align-items:center;justify-content:center;position:relative;">🔔
-          <span id="alert-bell-count" style="display:flex;position:absolute;top:-2px;right:-2px;
+        <!-- Alerts -->
+        <button class="glaze-tile ghtile-mini" id="alert-bell-btn" onclick="toggleAlertFeed()" title="Alerts"
+          style="background:linear-gradient(135deg,#4a453f,#2B2724);position:relative;">🔔
+          <span id="alert-bell-count" style="display:flex;position:absolute;top:-3px;right:-3px;
             background:#e53935;color:white;border-radius:50%;min-width:14px;height:14px;
             font-size:8px;font-weight:800;align-items:center;justify-content:center;"></span>
         </button>
 
-        <!-- Install to home screen — only in Safari -->
-        <button class="glaze-tile" id="a2hs-header-btn" onclick="showAdminA2HSModal()" title="Add to Home Screen"
-          style="display:flex;background:#B87946;color:white;border:none;border-radius:50%;
-          width:26px;height:26px;font-size:11px;cursor:pointer;flex-shrink:0;
-          align-items:center;justify-content:center;">⬇</button>
-
-                <!-- Color Picker for Glaze Palette -->
-        <button class="glaze-tile" id="color-picker-btn" onclick="openColorPicker()" title="Glaze Colors"
-          style="display:flex;background:#B87946;color:white;border:none;border-radius:50%;
-          width:26px;height:26px;font-size:12px;cursor:pointer;flex-shrink:0;
-          align-items:center;justify-content:center;">🎨</button>
-                <!-- App Switcher: Admin ↔ Customer -->
-        <button class="glaze-tile" id="app-switcher-btn" onclick="openAppSwitcher()" title="View Customer App"
-          style="display:flex;background:#5E35B1;color:white;border:none;border-radius:50%;
-          width:26px;height:26px;font-size:12px;cursor:pointer;flex-shrink:0;
-          align-items:center;justify-content:center;">👥</button>
-                <!-- Live Data Sync — prominent, always accessible -->
-        <button class="glaze-tile" id="sync-live-btn" onclick="syncLiveData()" title="Sync Live Data — pull fresh Square data now"
-          style="background:#2e7d32;color:white;border:none;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;">📥 Sync</button>
-        <span id="live-data-status" style="font-size:11px;font-weight:700;color:#2e7d32;display:flex;align-items:center;gap:3px;">🟢</span>
-        
-        <button class="glaze-tile" id="disconnect-live-btn" onclick="disconnectLiveData()" title="Disconnect"
-          style="display:flex;background:#c0392b;color:white;border:none;border-radius:50%;
-          width:26px;height:26px;font-size:12px;cursor:pointer;flex-shrink:0;
-          align-items:center;justify-content:center;">🔌</button>
-
         <!-- Out -->
-        <button class="glaze-tile" onclick="endSessionDemo()" title="Demo reset" style="display:flex;background:rgba(229,57,53,0.2);border:1px solid rgba(229,57,53,0.4);color:#e53935;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-right:6px;">🔄 Reset demo</button>
-        <button class="glaze-tile" id="direct-logout-btn" onclick="confirmDirectLogout()" title="End shift"
-          style="display:flex;background:#8B1A1A;color:white;border:none;border-radius:50%;
-          width:26px;height:26px;font-size:11px;cursor:pointer;flex-shrink:0;
-          align-items:center;justify-content:center;">🚪</button>
+        <button class="glaze-tile ghtile-mini" id="direct-logout-btn" onclick="confirmDirectLogout()" title="End shift"
+          style="background:linear-gradient(135deg,#a52a2a,#8B1A1A);">🚪</button>
 
-        <!-- Hidden legacy — kept, never shown -->
+        <!-- Hidden legacy — kept so existing code that toggles them never errors, never shown -->
+        <button class="glaze-tile" id="qt-tell" onclick="openTellPicker()" style="display:none;">💬</button>
+        <button class="glaze-tile" id="qt-find" onclick="openFindMyPiece()" style="display:none;">🔍</button>
+        <button class="glaze-tile" id="a2hs-header-btn" onclick="showAdminA2HSModal()" style="display:none;">⬇</button>
+        <button class="glaze-tile" id="color-picker-btn" onclick="openColorPicker()" style="display:none;">🎨</button>
+        <button class="glaze-tile" id="app-switcher-btn" onclick="openAppSwitcher()" style="display:none;">👥</button>
+        <button class="glaze-tile" id="disconnect-live-btn" onclick="disconnectLiveData()" style="display:none;">🔌</button>
         <button class="glaze-tile" id="direct-break-btn" onclick="toggleBreak()" style="display:none;"></button>
         <button class="glaze-tile" id="find-piece-fab" style="display:none;"></button>
         <button class="glaze-tile" id="returns-btn" onclick="openReturns()" style="display:none;"></button>
@@ -4389,6 +4385,10 @@ function updateStaffName() {
              direct request — real content underneath every tile is
              completely untouched, only the entry point changes. -->
         <div id="setup-tile-menu" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:20px;">
+          <button onclick="goToTab('branding', event)" class="glaze-tile" style="background:#8A6244;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+            <span style="font-size:22px;">🎨</span>
+            <span style="font-size:12px;font-weight:800;margin-top:5px;">Branding</span>
+          </button>
           <button onclick="showSetupSection('preview')" class="glaze-tile" style="background:#2B2724;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
             <span style="font-size:22px;">👀</span>
             <span style="font-size:12px;font-weight:800;margin-top:5px;">Preview &amp; Testing</span>
@@ -5132,10 +5132,11 @@ function updateStaffName() {
            the printable label works on its own. -->
       <!-- ═════════════════════════════════════════════ -->
       <div id="labels-view" class="view" style="display: none;">
-        <h2 style="margin-top: 0;">🏷️ Labels</h2>
-        <p style="color: var(--gu-dust); font-size: 13px; margin-bottom: 20px; line-height: 1.5;">
+        <h2 style="margin-top: 0;">🏷️ Printing</h2>
+        <p style="color: var(--gu-dust); font-size: 13px; margin-bottom: 14px; line-height: 1.5;">
           Print a collection or postal label for any booking — customer name, booking reference, ready date, piece count, and any damage notes.
         </p>
+        <button class="glaze-tile btn-connect" onclick="goToTab('printqueue', event)" style="width:100%;margin-bottom:18px;background:linear-gradient(135deg,#8A6244,#6B4A32);color:#fff;border:none;border-radius:12px;padding:12px;font-weight:700;cursor:pointer;">🖨️ Transfer Print Queue — approve customer designs →</button>
 
         <!-- Genuine real tile styling for the entry step, per direct
              request — the editor below genuinely depends on a real
@@ -5221,8 +5222,9 @@ function updateStaffName() {
       <!-- STOCK TAB -->
       <!-- ═════════════════════════════════════════════ -->
       <div id="stock-view" class="view" style="display: none;">
-        <h2 style="margin-top: 0;">Studio Stock</h2>
-        <p style="color: var(--gu-dust); margin-bottom: 20px;">Photograph pieces and add them to the catalogue so customers can browse and design at home.</p>
+        <h2 style="margin-top: 0;">Stock &amp; Bisque</h2>
+        <p style="color: var(--gu-dust); margin-bottom: 14px;">Photograph pieces and add them to the catalogue so customers can browse and design at home.</p>
+        <button class="glaze-tile btn-connect" onclick="goToTab('shapes', event)" style="width:100%;margin-bottom:18px;background:linear-gradient(135deg,#7C5AA6,#5E4380);color:#fff;border:none;border-radius:12px;padding:12px;font-weight:700;cursor:pointer;">⚱️ Bisque silhouettes — your Square catalogue as shapes →</button>
 
         <!-- Genuine real tile entry point, per direct request — 3
              genuinely independent real sections, real content inside
@@ -9334,7 +9336,7 @@ function openLearning() {
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
         <button onclick="_learningRunNow(this)" class="glaze-tile" style="border:none;border-radius:14px;padding:14px;font-size:13px;font-weight:800;background:linear-gradient(135deg,#F9A825,#f57c00);color:#fff;cursor:pointer;">🔍 Patterns</button>
-        <button onclick="openAssistant()" class="glaze-tile" style="border:none;border-radius:14px;padding:14px;font-size:13px;font-weight:800;background:linear-gradient(135deg,#5E35B1,#4527A0);color:#fff;cursor:pointer;">🏺 Ask Cleo</button>
+        <button onclick="_tileGoToTab('learning-insights')" class="glaze-tile" style="border:none;border-radius:14px;padding:14px;font-size:13px;font-weight:800;background:linear-gradient(135deg,#3E6FA3,#2E547C);color:#fff;cursor:pointer;">📈 Insights</button>
       </div>
       <div id="learning-list"><div style="text-align:center;padding:30px;color:#8a8175;font-size:13px;">Loading…</div></div>
     </div>`;
@@ -16904,69 +16906,57 @@ function _updateNavControls() {
 // screen exists yet. Sub-tile tab IDs can be included as promoted tiles.
 const ROLE_HOME_DEFAULTS = {
   // ═══════════════════════════════════════════════════════════
-  // ORDERED BY THE JOURNEY, NOT BY WHEN IT WAS BUILT. 17 July 2026.
+  // V2 CONDENSED (20 Jul 2026): each home is now the 5 task groups,
+  // ORDERED by that person's job — first group = what you do most.
+  // Everything inside a group is 2 taps. Replaces the old ~14-tile
+  // walls. ('assistant' removed: it's not in GRID_NAV_STRUCTURE and
+  // never rendered — Cleo is the floating button.)
   // ═══════════════════════════════════════════════════════════
-  // Every role's tiles follow the actual path a piece takes through
-  // the studio, from that person's position in it. First tile = what
-  // you do most. Last tile = what you do rarely.
-  //
-  // Cross-role tiles (Health & Safety, Tell Daisy) sit at the end —
-  // always there, never in the way.
 
   'General Manager': {
-    // Daisy: the whole studio at a glance, then people, then money
-    tileOrder: ['assistant', 'floor-plan', 'progress', 'team', 'packing', 'dashboard', 'staff',
-                'stock', 'music', 'training', 'health-safety', 'whats-on', 'customer-demo', 'trial-reset', 'setup'],
+    // Daisy: the whole studio — floor first, then pieces, money/stock, people, setup
+    tileOrder: ['floor', 'pieces', 'studio', 'team', 'setup'],
     promotedTiles: ['tell-daisy']
   },
 
   'Co-Director': {
-    // David: same as Daisy — full visibility
-    tileOrder: ['assistant', 'floor-plan', 'progress', 'dashboard', 'team', 'packing', 'staff',
-                'stock', 'music', 'training', 'health-safety', 'whats-on', 'customer-demo', 'trial-reset', 'setup'],
+    // David: same reach as Daisy — full visibility
+    tileOrder: ['floor', 'studio', 'pieces', 'team', 'setup'],
     promotedTiles: ['tell-daisy']
   },
 
   'Studio Executive': {
-    // Jenny: PACKING IS HER JOB. It goes first, every time.
-    // Her journey: what's ready → photograph → AI says whose → label → packed
-    tileOrder: ['assistant', 'dashboard', 'packing', 'kiln', 'stock', 'collections', 'floor-plan', 'labels', 'printqueue',
-                'piecematch', 'catalogue', 'music', 'training', 'health-safety'],
+    // Jenny: PACKING IS HER JOB — Pieces & Kiln first, every time.
+    tileOrder: ['pieces', 'floor', 'studio', 'team'],
     promotedTiles: ['tell-daisy']
   },
 
   'Ceramic Technician': {
-    // Lucy: bisque in, fired pieces out. Kiln is her world.
-    tileOrder: ['assistant', 'floor-plan', 'kiln', 'piecematch', 'packing', 'collections', 'shapes', 'catalogue',
-                'stock', 'labels', 'training', 'health-safety'],
+    // Lucy: bisque in, fired pieces out — kiln world first.
+    tileOrder: ['pieces', 'floor', 'studio', 'team'],
     promotedTiles: ['tell-daisy']
   },
 
   'Studio Assistant': {
-    // Ruby: the floor. Seat people, take orders, photograph pieces.
-    tileOrder: ['assistant', 'floor-plan', 'staff', 'menu', 'tablecards',
-                'collections', 'packing', 'piecematch', 'training', 'health-safety'],
+    // Ruby: the floor — seat people, take orders, then pieces.
+    tileOrder: ['floor', 'pieces', 'team'],
     promotedTiles: ['tell-daisy']
   },
 
   'Marketing & Host By Post Manager': {
-    // Elliott: Host By Post and the customer-facing side
-    tileOrder: ['assistant', 'dashboard', 'floor-plan', 'community', 'branding', 'customer-demo',
-                'whats-on', 'health-safety'],
+    // Elliott: customer-facing side first (Club Pages, catalogue, HBP live in Studio)
+    tileOrder: ['studio', 'floor', 'team', 'setup'],
     promotedTiles: ['tell-daisy']
   },
 
   'Barista': {
-    // Dave — the one role with NO tile set until 18 July, so he fell
-    // back to the generic full-app tree while everyone else got their
-    // own mini-app. His day: drinks first, then the tables the drinks
-    // go to, then the same cross-role tiles as everyone.
-    tileOrder: ['menu', 'floor-plan', 'assistant', 'staff', 'training', 'health-safety'],
+    // Drinks (Daily Menu lives in The Floor), then people stuff.
+    tileOrder: ['floor', 'team'],
     promotedTiles: ['tell-daisy']
   },
   'Chief Taster': {
-    // Cleo: her club, her pages
-    tileOrder: ['assistant', 'floor-plan', 'community', 'menu'],
+    // Cleo: her club (Club Pages in Studio), the floor for the menu
+    tileOrder: ['floor', 'studio'],
     promotedTiles: []
   },
 };
@@ -17004,10 +16994,20 @@ async function loadPersonalHomeScreen() {
     clearTimeout(_homeTimer);
     const data = await res.json();
 
-    if (data.hasPersonalScreen) {
+    // A layout saved BEFORE the V2 condensed nav (20 Jul) would keep the
+    // person on the old ~14-tile home forever ("pushed but not
+    // different"). V2-era saves carry an explicit 'v2' sentinel inside
+    // tile_order (added by savePersonalHomeScreen; ignored by the tile
+    // builder) — chosen over detecting new group ids because 'team' and
+    // 'setup' existed in BOTH eras, so id-overlap can false-match an old
+    // layout. No sentinel = pre-V2 = superseded once by the new
+    // condensed role defaults; customise after that and it sticks.
+    const _savedIsV2 = Array.isArray(data.tileOrder) && data.tileOrder.includes('v2');
+
+    if (data.hasPersonalScreen && _savedIsV2) {
       _personalScreen = data;
     } else {
-      // First time — apply role defaults
+      // First time, or pre-V2 saved layout — apply the condensed role defaults
       const role = currentShiftStaff.role || '';
       const defaults = ROLE_HOME_DEFAULTS[role] || ROLE_HOME_DEFAULTS['Studio Assistant'];
       _personalScreen = {
@@ -17030,7 +17030,9 @@ async function savePersonalHomeScreen() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         studioId,
-        tileOrder: _personalScreen.tileOrder,
+        // 'v2' sentinel marks this as a V2-era layout (see the load-side
+        // gate in loadPersonalHomeScreen). The tile builder skips it.
+        tileOrder: ['v2', ..._personalScreen.tileOrder.filter(t => t !== 'v2')],
         promotedTiles: _personalScreen.promotedTiles
       })
     });
@@ -17146,6 +17148,7 @@ function _buildPersonalItems() {
   // behaviour exactly. Then fall back to resolving a tab inside a group,
   // which is what the other twenty always meant.
   tileOrder.forEach(id => {
+    if (id === 'v2') return;           // version sentinel, not a tile
     if (seen.has(id)) return;          // a duplicate would render twice
     seen.add(id);
 
@@ -17161,8 +17164,11 @@ function _buildPersonalItems() {
       return;
     }
 
-    // Not a group — it's a tab. Find whichever group owns it.
+    // Not a group — it's a tab. It may be a top-level standalone entry
+    // (e.g. Tell Daisy, a direct action since the V2 condense) or live
+    // inside a group; check both, or it silently vanishes.
     for (const g of GRID_NAV_STRUCTURE) {
+      if (g.tab === id) { items.push({ type: 'sub', sub: g, group: null }); return; }
       const sub = g.items ? g.items.find(i => i.tab === id) : null;
       if (sub) { items.push({ type: 'sub', sub, group: g }); return; }
     }
@@ -17174,9 +17180,11 @@ function _buildPersonalItems() {
 
   // Promoted tiles that don't sit under a group already in the order
   // (e.g. 'tell-daisy' for everyone) would otherwise never appear.
+  // Same standalone-or-in-group resolution as above.
   promotedTiles.forEach(tab => {
     if (seen.has(tab)) return;
     for (const g of GRID_NAV_STRUCTURE) {
+      if (g.tab === tab) { seen.add(tab); items.push({ type: 'sub', sub: g, group: null }); return; }
       const sub = g.items ? g.items.find(i => i.tab === tab) : null;
       if (sub) { seen.add(tab); items.push({ type: 'sub', sub, group: g }); return; }
     }
@@ -17576,44 +17584,49 @@ const GRID_NAV_STRUCTURE = [
     { tab: 'music', label: '🎵 Music', desc: 'Volume · skip · what\'s playing', fn: 'openMusic' },
   ]},
 
-  // 2. PIECES — everything after painting: fire, find, pack, send
+  // 2. PIECES — everything after painting: fire, find, pack, send.
+  // Merged 20 Jul: Labels + Print Queue → one "Printing" tile (both are
+  // printing; the Printing screen links to the Print Queue). Piece
+  // Matching kept separate — different person, different moment.
   { id: 'pieces', label: 'Pieces & Kiln', color: '#C0392B', items: [
     { tab: 'kiln', label: '🔥 Kiln', desc: 'Dip → load → fire', fn: 'openKiln' },
     { tab: 'piecematch', label: '🔍 Piece Matching', desc: 'AI-match fired pieces to photos' },
     { tab: 'collections', label: '🏺 Collections', desc: 'Ready to collect · returns · find on shelf', fn: 'openCollections' },
     { tab: 'packing', label: '📦 Packing', desc: 'Fired pieces going home', fn: 'openPacking' },
-    { tab: 'labels', label: '🏷️ Labels', desc: 'Print collection or postal labels' },
-    { tab: 'printqueue', label: '🖨️ Print Queue', desc: 'Approve customer transfer designs' },
+    { tab: 'labels', label: '🏷️ Printing', desc: 'Collection & postal labels · transfer print queue' },
   ]},
 
-  // 3. STUDIO — stock, catalogue, what customers see & post
+  // 3. STUDIO — stock, catalogue, what customers see & post.
+  // Merged 20 Jul: Bisque (silhouettes) folds into Stock — both are the
+  // bisque catalogue; the Stock screen links across to the silhouette view.
   { id: 'studio', label: 'Studio', color: '#4C8C5A', items: [
     { tab: 'dashboard', label: '📊 Takings', desc: 'Your daily overview' },
-    { tab: 'stock', label: '🫙 Stock', desc: 'Photograph bisque, manage reservations' },
+    { tab: 'stock', label: '🫙 Stock & Bisque', desc: 'Bisque stock, silhouettes & reservations' },
     { tab: 'catalogue', label: '🖼️ Piece Catalogue', desc: 'What customers browse from home' },
-    { tab: 'shapes', label: '⚱️ Bisque', desc: 'Your Square catalogue as silhouettes' },
     { tab: 'community', label: '🌍 Club Pages', desc: 'Feature and moderate customer work' },
     { tab: 'customer-demo', label: '👀 Customer App', desc: 'See what customers see', fn: 'openCustomerDemo' },
     { tab: 'host-by-post', label: '📮 Host By Post', desc: 'Postal kits & orders' },
     { tab: 'whats-on', label: '📅 What\'s On', desc: 'Local events & school holidays', fn: 'openWhatsOn' },
   ]},
 
-  // 4. TEAM — people, duties, training, what the app has learned
+  // 4. TEAM — people, duties, training, what the app has learned.
+  // Merged 20 Jul: Insights folds into Learning (both are "what the app
+  // noticed" — Learning screen links to the analytics view).
   { id: 'team', label: 'Team', color: '#7C5AA6', items: [
     { tab: 'team', label: '👥 Team & Duties', desc: 'Duty lists, timekeeping, holidays' },
     { tab: 'progress', label: '✅ Daily Progress', desc: "Every team member's live tasks" },
     { tab: 'training', label: '🎓 My Training', desc: 'Read, tick, done', fn: 'openMyTraining' },
     { tab: 'health-safety', label: '🦺 Health & Safety', desc: 'Risk assessment, training, procedures', fn: 'openHealthSafety' },
-    { tab: 'learning', label: '🌱 Learning', desc: 'What the app has noticed from real usage', fn: 'openLearning' },
-    { tab: 'learning-insights', label: '📈 Insights', desc: 'Studio workflow analytics' },
+    { tab: 'learning', label: '🌱 Learning & Insights', desc: 'What the app has noticed · workflow analytics', fn: 'openLearning' },
   ]},
 
-  // 5. SET UP — connections, branding, add-ons, testing tools
+  // 5. SET UP — connections, add-ons, testing tools.
+  // Merged 20 Jul: Branding folds into Setup (setup already covers the
+  // customer-app look); Navigation Help + Start Demo → one "Help &
+  // Practice" (both are learn/practise the app).
   { id: 'setup', label: 'Set Up & Tools', color: '#8A6244', items: [
-    { tab: 'setup', label: '⚙️ Studio Setup', desc: 'Connections, Cleo, add-ons, offers' },
-    { tab: 'branding', label: '🎨 Branding', desc: 'Colours, logo, customer app look' },
-    { tab: 'navigation-help', label: '🧭 Navigation Help', desc: 'How to use the app' },
-    { tab: 'start-demo', label: '🎬 Start Demo', desc: 'Studio simulation trainer' },
+    { tab: 'setup', label: '⚙️ Studio Setup', desc: 'Connections, branding, add-ons, offers' },
+    { tab: 'navigation-help', label: '🧭 Help & Practice', desc: 'How to use the app · run a practice demo' },
     { tab: 'trial-reset', label: '🔄 Clear & Start Again', desc: 'Reset today for testing', fn: 'openTrialReset' },
   ]},
 ];
@@ -18298,7 +18311,7 @@ function _buildPersonalFlowTree() {
   // Splice the real booking journey under whichever branch actually owns
   // bookings for this person (their 'bookings' or 'staff' group if they
   // have one) — same real stage functions as before, not duplicated.
-  const journeyHost = children.find(c => c.id === 'bookings-group' || c.id === 'staff') 
+  const journeyHost = children.find(c => c.id === 'floor-group' || c.id === 'bookings-group' || c.id === 'staff')
                     || children.find(c => c.children);
   if (journeyHost) {
     (journeyHost.children = journeyHost.children || []).push({
@@ -18815,6 +18828,7 @@ function openNavigationHelp() {
         <div style="font-size:11px;margin-top:4px;opacity:0.9;">has a title explaining what it does</div>
       </div>
     </div>
+    <button onclick="document.querySelectorAll('.glazed-modal,[data-glazed-modal]').forEach(m=>m.remove());if(window.openDemoSetup)openDemoSetup();else if(window.startDemo)startDemo();" class="glaze-tile" style="width:100%;margin-top:14px;background:linear-gradient(135deg,#2B4C6F,#1E3750);color:#fff;border:none;border-radius:12px;padding:14px;font-size:13px;font-weight:800;cursor:pointer;">🎬 Run a practice demo — rehearse a shift</button>
   `;
   glazedModal({
     title: 'Navigation Guide',
@@ -22076,8 +22090,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     splash.style.zIndex = '5000';
   }
   
-  // Check API connection in background
-  await checkAPIConnection();
+  // Check API connection in the BACKGROUND — do not block first paint on a
+  // /health round-trip. Render free-tier cold-starts can take several
+  // seconds; awaiting here left the splash frozen before anything showed.
+  // apiConnected is re-checked on demand where it matters (loadDashboardData,
+  // the sync paths), so the UI can come up now and connection can resolve a
+  // moment later.
+  checkAPIConnection().catch(()=>{});
   
   // Hide all views except splash
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
