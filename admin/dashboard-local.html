@@ -13434,6 +13434,18 @@ async function checkShiftLogin(fromNavigation) {
       // reflect state must not also decide where you are.
       if (!_hasLanded) { _hasLanded = true; await landOnHome(); }
       applyShiftUI();
+      // ── DESK ON RESUME. 21 Jul night. The session-resume path sets
+      // _hasLanded=true via markSessionActive() a few lines up, which
+      // then makes the guard above SKIP landOnHome() entirely — so the
+      // demo Desk (wrapped onto landOnHome/_flowGraphEnter) never fires
+      // on a reopened session, which is the single most common way the
+      // app is opened during an active shift. That's why the new look
+      // kept not appearing for a returning user even with the exact
+      // right commit deployed. Trigger it explicitly here, the one
+      // place that resumes home without going through either wrapped
+      // door. Guarded three ways so it can NEVER break resume: only
+      // when the flag is on, only if KC exists, and wrapped in try. ──
+      try { if (window.DEMO_SKIN && window.KC && typeof KC.showCanvas === 'function') KC.showCanvas(); } catch (e) { /* resume must survive any Desk error */ }
       // Was: window._floorPlanLocked, set here and at the Face ID path,
       // read NOWHERE in the file. Dead since the floor plan stopped
       // being the landing page. Removed rather than left to look load-

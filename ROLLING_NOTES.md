@@ -4973,3 +4973,57 @@ LESSON, same shape as 20 Jul's: when wrapping an app's own entry
 function to add new behaviour, find EVERY real caller of the
 underlying action, not just the one most obviously named for it —
 grep for what the actual user-facing control invokes, don't assume.
+
+# ═══════════════════════════════════════════════════════════
+# 21 JULY, ~22:15 — THE THIRD DOOR (resume path), FINALLY
+# ═══════════════════════════════════════════════════════════
+
+Daisy confirmed the EXACT right commit was live (buildId 1407751 on
+/api/version) and STILL saw tiles — ruling out deploy/cache entirely.
+Real bug, a THIRD home path neither wrap covered:
+
+The session-RESUME branch of checkShiftLogin() (fires on every reopen
+during an active shift — the single most common way the app opens for
+a returning user) calls markSessionActive() FIRST, which sets
+_hasLanded=true as a side effect. The very next line is
+`if (!_hasLanded) { await landOnHome(); }` — so with the flag already
+true, landOnHome() is SKIPPED. The Desk is wrapped onto landOnHome +
+_flowGraphEnter, so on resume neither fires → old tiles. This is why
+it kept failing for Daisy specifically: she's been reopening an
+existing session all night, never doing a cold fresh login (which is
+all my headless tests ever did — every test typed a fresh login AFTER
+page load, so this path was structurally invisible, same lesson as the
+first/second door).
+
+Considered wrapping applyShiftUI() (called on every home path) — but
+REJECTED it: applyShiftUI also fires on fromNavigation=true (tapping
+the Dashboard/Takings tab), and the file has explicit multi-warning
+comments that applyShiftUI must NEVER navigate, or it re-creates the
+"tap Takings, bounced home" bug they killed three times. Wrapping it
+would have forced the Desk over your tab navigation.
+
+CORRECT FIX: an explicit KC.showCanvas() call added to the resume
+branch ONLY (right after its applyShiftUI()), the one place that
+resumes home while bypassing both wrapped doors. Triple-guarded so it
+can never break resume: only if DEMO_SKIN on, only if KC exists,
+wrapped in try/catch.
+
+VERIFIED (real spawned server, real Chrome), 3 scenarios:
+1. RESUME (the broken one): Desk now shows, "Evening, Daisy.", zero
+   errors, no banner.
+2. FRESH LOGIN via the real name-picker click: still works.
+3. TAB NAV (checkShiftLogin(true), fromNavigation): Desk NOT forced
+   over the tab — the bounce-home regression stays dead.
+Plus the crash-safety pair (normal + forced KC.build throw) re-run:
+both still pass.
+
+LESSON, the third time tonight the same shape: an app can have MORE
+than two doors into a state. Before claiming a wrap is complete, grep
+every caller of the underlying UI action AND check for flags set as
+side effects that route AROUND the function you wrapped. Three doors
+here: landOnHome (buttons/most logins), _flowGraphEnter (name-picker
+tap), and the resume branch (which sets _hasLanded and skips the
+first).
+
+Latest commit after this: needs Manual Deploy. This is the one that
+should finally show the Desk on a reopened session.

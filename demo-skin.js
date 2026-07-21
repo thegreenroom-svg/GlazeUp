@@ -338,31 +338,51 @@
     try { document.getElementById('kc-canvas')?.classList.add('kc-away'); } catch (e3) {}
   };
 
-  window.addEventListener('load', () => {
-    // Two real doors lead "home" and the Desk must cover BOTH:
-    //   1. landOnHome() — Home buttons, session resume
-    //   2. _flowGraphEnter() — what selectDemoStaff() (the actual
-    //      name-picker login Daisy uses every time) calls DIRECTLY,
-    //      bypassing landOnHome entirely. Found from her 21:54
-    //      screenshot: fresh login showed the old tile tree because
-    //      only door 1 was wrapped — my earlier tests entered through
-    //      landOnHome and so could never catch it. Same lesson as the
-    //      f98d77f home-button bug: always test the REAL entry path
-    //      the person actually taps, not an equivalent-looking one.
+  // Wrap as EARLY as possible — NOT on window.load. Real bug found
+  // from Daisy's report after confirming the exact right commit was
+  // live (buildId proved it, ruling out deploy lag): for anyone with
+  // an EXISTING session (the common case — she's been testing all
+  // night), the app auto-resumes and calls landOnHome() from inside
+  // a DOMContentLoaded-era init path, which fires well before the
+  // 'load' event (load waits for every image/font/resource). My old
+  // wrap installed too late — the resume had already run the
+  // ORIGINAL landOnHome and painted tiles before my wrap ever
+  // existed. Every one of tonight's headless tests always started
+  // from a clean login typed in AFTER the page's own 'load' fired,
+  // so this gap was structurally invisible to them, same shape as
+  // every other "my test used a different door" bug tonight.
+  // demo-skin.js is loaded with `defer`, so this top-level code runs
+  // after the DOM is parsed (landOnHome/_flowGraphEnter already exist
+  // as globals by then — they're plain function declarations in an
+  // earlier synchronous inline <script>) but BEFORE DOMContentLoaded
+  // fires — which is before ANY DOMContentLoaded-triggered resume
+  // logic can run. This is as early as it is possible to be.
+  (function wrapHomeEntries() {
     const wrap = (name) => {
       try {
-        if (typeof window[name] !== 'function') return;
+        if (typeof window[name] !== 'function') return false;
         const orig = window[name];
         window[name] = function () {
           const r = orig.apply(this, arguments);
-          try {
-            if (typeof currentShiftStaff !== 'undefined' && currentShiftStaff) KC.showCanvas();
-          } catch (err) { KC._fail('showCanvas via ' + name, err); }
+          const after = () => {
+            try {
+              if (typeof currentShiftStaff !== 'undefined' && currentShiftStaff) KC.showCanvas();
+            } catch (err) { KC._fail('showCanvas via ' + name, err); }
+          };
+          // landOnHome is async (returns a promise); _flowGraphEnter
+          // is synchronous. Handle both correctly rather than
+          // assuming either shape.
+          if (r && typeof r.then === 'function') r.then(after); else after();
           return r;
         };
-      } catch (e) { console.warn('[desk] wrap failed for', name, e); }
+        return true;
+      } catch (e) { console.warn('[desk] wrap failed for', name, e); return false; }
     };
-    wrap('landOnHome');
-    wrap('_flowGraphEnter');
-  });
+    if (wrap('landOnHome') && wrap('_flowGraphEnter')) return;
+    // Landed here before the target functions existed (shouldn't
+    // happen given defer ordering, but never assume) — retry once
+    // DOMContentLoaded fires, still ahead of window.load as a
+    // fallback rather than silently never wrapping at all.
+    document.addEventListener('DOMContentLoaded', () => { wrap('landOnHome'); wrap('_flowGraphEnter'); });
+  })();
 })();
