@@ -4932,3 +4932,44 @@ failure falls back to old tiles with the red banner, never blank.
 NEEDS RENDER DEPLOY. client-only, server.js untouched this stage.
 
 - 21:52: STAGE 3 CONFIRMED LIVE ON DAISY'S DEVICE (dark mode) — login screen showing Fraunces brick heading, Caveat subtitle, wave, avatars on dark paper. One flaw from her screenshot fixed same minute: admin header stayed light in dark mode ('The Kiln Cafe' nearly invisible) — dark-mode rule added matching header to dark card, verified computed bg rgb(42,37,33) / text rgb(244,236,224) via real server + emulated dark mode.
+
+# ═══════════════════════════════════════════════════════════
+# 21 JULY, LATE NIGHT — THE SECOND DOOR
+# ═══════════════════════════════════════════════════════════
+
+Daisy's 21:54 screenshot showed the old tile tree again, fresh after
+login. Real bug, same FAMILY as the f98d77f home-button bug from the
+20 Jul session: there are TWO real entry paths to "home" —
+landOnHome() (Home button, session resume) and _flowGraphEnter()
+(what selectDemoStaff() — the actual name-picker tap Daisy uses every
+single login — calls DIRECTLY, bypassing landOnHome entirely). Only
+door 1 was wrapped. Every headless test up to now entered through
+landOnHome and so structurally could not catch this — passed
+perfectly while testing a door nobody actually uses to get in.
+
+FIX: wrap BOTH landOnHome and _flowGraphEnter with the same
+crash-safe KC.showCanvas() call. Verified this time through the ACTUAL
+tap sequence: open the real login modal, call the real
+loadLoginNamePicker(), click the real staff button element
+(#login-name-grid button[data-staff="0"]) — not a shortcut that sets
+currentShiftStaff and calls a function directly.
+
+FULL REGRESSION RUN (7 parts, real spawned server, real Chrome):
+1. Routes — all 200.
+2. THE REAL LOGIN PATH — Desk shows, old tree + My-tiles bar hidden,
+   greeting/figures/timeline populate, zero errors.
+3. Nav out (Kiln) and back (header Home route) — Desk correctly
+   leaves and returns.
+4. Non-director (Ruby) via the real path — Desk works, money figure
+   correctly absent.
+5. Crash fallback with BOTH doors wrapped — still holds: old tiles
+   visible, red banner names which door failed, never blank.
+6. Dark mode — header + login both correct.
+7. Flag OFF — full revert confirmed (skin class false, canvas never
+   created, old tree visible) — byte-identical fallback still intact
+   after every stage tonight.
+
+LESSON, same shape as 20 Jul's: when wrapping an app's own entry
+function to add new behaviour, find EVERY real caller of the
+underlying action, not just the one most obviously named for it —
+grep for what the actual user-facing control invokes, don't assume.

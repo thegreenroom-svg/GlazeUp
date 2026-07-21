@@ -339,16 +339,30 @@
   };
 
   window.addEventListener('load', () => {
-    try {
-      if (typeof window.landOnHome === 'function') {
-        const orig = window.landOnHome;
-        window.landOnHome = async function () {
-          await orig.apply(this, arguments);
+    // Two real doors lead "home" and the Desk must cover BOTH:
+    //   1. landOnHome() — Home buttons, session resume
+    //   2. _flowGraphEnter() — what selectDemoStaff() (the actual
+    //      name-picker login Daisy uses every time) calls DIRECTLY,
+    //      bypassing landOnHome entirely. Found from her 21:54
+    //      screenshot: fresh login showed the old tile tree because
+    //      only door 1 was wrapped — my earlier tests entered through
+    //      landOnHome and so could never catch it. Same lesson as the
+    //      f98d77f home-button bug: always test the REAL entry path
+    //      the person actually taps, not an equivalent-looking one.
+    const wrap = (name) => {
+      try {
+        if (typeof window[name] !== 'function') return;
+        const orig = window[name];
+        window[name] = function () {
+          const r = orig.apply(this, arguments);
           try {
             if (typeof currentShiftStaff !== 'undefined' && currentShiftStaff) KC.showCanvas();
-          } catch (err) { KC._fail('showCanvas', err); }
+          } catch (err) { KC._fail('showCanvas via ' + name, err); }
+          return r;
         };
-      }
-    } catch (e) { console.warn('[desk] home wrap failed', e); }
+      } catch (e) { console.warn('[desk] wrap failed for', name, e); }
+    };
+    wrap('landOnHome');
+    wrap('_flowGraphEnter');
   });
 })();
