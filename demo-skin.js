@@ -73,9 +73,16 @@
   KC.showCanvas = function () {
     KC.build();
     const c = $('kc-canvas');
+    if (!c) throw new Error('canvas element missing after build()');
     c.classList.remove('kc-away');
-    // every route home refreshes the live figures — the canvas is alive
-    KC.hydrate();
+    // Only now — canvas genuinely exists and is showing — is it safe
+    // for CSS to hide the old tile home. If we got this far, build()
+    // didn't throw, so this line only runs on real success.
+    document.documentElement.classList.add('kc-desk-ready');
+    // every route home refreshes the live figures — the canvas is
+    // alive. Wrapped separately: a hydrate failure (e.g. a bad fetch
+    // shape) must never undo a canvas that's already correctly shown.
+    try { KC.hydrate(); } catch (err) { KC._fail('hydrate', err); }
     // hide any app view left showing beneath us
     try { document.querySelectorAll('.view').forEach(v => v.style.display = 'none'); } catch (e) {}
     const fp = $('floor-table-detail'); if (fp) fp.style.display = 'none';
@@ -91,29 +98,29 @@
     c.id = 'kc-canvas';
     c.innerHTML = `
       <div class="kc-paper">
-        <div class="kc-masthead kc-in" style="--d:0">
+        <div class="kc-masthead kc-in">
           <img class="kc-mark" src="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png" alt="">
           <div class="kc-masthead-words">
             <div class="kc-house">THE KILN CAFE</div>
             <div class="kc-house-sub">Langport · Somerset</div>
           </div>
         </div>
-        <div class="kc-hello kc-in" style="--d:1"><span id="kc-hello-line"></span></div>
-        <div class="kc-wave-line kc-in" style="--d:1"></div>
+        <div class="kc-hello kc-in"><span id="kc-hello-line"></span></div>
+        <div class="kc-wave-line kc-in"></div>
 
-        <div class="kc-hero kc-in" style="--d:2" id="kc-hero"></div>
+        <div class="kc-hero kc-in" id="kc-hero"></div>
 
-        <div class="kc-section kc-in" style="--d:3">
+        <div class="kc-section kc-in">
           <div class="kc-sec-title" id="kc-day-title">THE DAY</div>
           <div class="kc-timeline" id="kc-timeline"><div class="kc-skel"></div><div class="kc-skel"></div><div class="kc-skel"></div></div>
         </div>
 
-        <div class="kc-section kc-in" style="--d:4">
+        <div class="kc-section kc-in">
           <div class="kc-sec-title">THE DESK</div>
           <div class="kc-index" id="kc-index"></div>
         </div>
 
-        <div class="kc-foot kc-in" style="--d:5">It's not all cheese and cider round here you know…</div>
+        <div class="kc-foot kc-in">It's not all cheese and cider round here you know…</div>
       </div>`;
     document.body.appendChild(c);
 
@@ -307,13 +314,39 @@
   /* ── take over Home: after the real landOnHome runs, the Desk
         covers it. One wrap, applied at load, only when the flag is
         on — flag off, this whole file already returned above. ──── */
+  /* ── crash safety net: if ANYTHING in the Desk throws, at real
+        Safari runtime and not just in a headless test, the app must
+        NEVER go blank — old tiles stay the fallback, always. Also
+        surfaces the real error on-screen (no dev tools needed) so a
+        screenshot tells us exactly what broke, same pattern the app
+        already uses elsewhere (the 911a7fc on-screen diagnostic). ── */
+  KC._fail = function (where, err) {
+    try { console.warn('[desk]', where, err); } catch (e) {}
+    try {
+      document.getElementById('kc-error-banner')?.remove();
+      const b = document.createElement('div');
+      b.id = 'kc-error-banner';
+      b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#7a1f16;color:#fff;font:12px/1.4 -apple-system,sans-serif;padding:10px 14px;padding-top:calc(10px + env(safe-area-inset-top));white-space:pre-wrap;';
+      b.textContent = '[Desk] ' + where + ': ' + (err && err.message ? err.message : String(err));
+      document.body.appendChild(b);
+      setTimeout(() => b.remove(), 12000);
+    } catch (e2) {}
+    // Whatever happened, make sure the ORIGINAL app is what's on
+    // screen — never leave the canvas half-built covering a blank
+    // page. kc-desk-ready is never added, so the CSS hiding the old
+    // tile home never engages either (see demo-skin.css).
+    try { document.getElementById('kc-canvas')?.classList.add('kc-away'); } catch (e3) {}
+  };
+
   window.addEventListener('load', () => {
     try {
       if (typeof window.landOnHome === 'function') {
         const orig = window.landOnHome;
         window.landOnHome = async function () {
           await orig.apply(this, arguments);
-          if (typeof currentShiftStaff !== 'undefined' && currentShiftStaff) KC.showCanvas();
+          try {
+            if (typeof currentShiftStaff !== 'undefined' && currentShiftStaff) KC.showCanvas();
+          } catch (err) { KC._fail('showCanvas', err); }
         };
       }
     } catch (e) { console.warn('[desk] home wrap failed', e); }

@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Caveat:wght@600&display=swap');
+
 /* ═══════════════════════════════════════════════════════════════════
    DEMO SKIN — the radical Kiln Cafe demo build. 21 Jul 2026.
 
@@ -170,7 +172,6 @@ html.demo-skin header {
    Typography: Fraunces (warm display serif with real character) over
    Instrument Sans, Caveat for the studio's handwritten voice.
    ═══════════════════════════════════════════════════════════════════ */
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Caveat:wght@600&display=swap');
 
 html.demo-skin {
   --kc-paper: #FFF9F0;
@@ -193,12 +194,17 @@ html.demo-skin {
   html.demo-skin body { background: var(--kc-paper) !important; }
 }
 
-/* Hide the ENTIRE original home chrome — "don't want to see any
-   original". The old flow view, its tool bars, the green My-tiles
-   slab: gone while the flag is on. All still in the DOM, untouched. */
-html.demo-skin #daisy-flow-view,
-html.demo-skin #floating-back-btn,
-html.demo-skin #flow-tools-row { display: none !important; }
+/* Hide the ORIGINAL home chrome — "don't want to see any original" —
+   but ONLY once the Desk has genuinely, successfully mounted
+   (html.kc-desk-ready, added by demo-skin.js AFTER build() succeeds
+   with no error). Gating on the flag alone was the 21 Jul bug: if
+   demo-skin.js threw for any reason, the flag-only rule hid the old
+   home while the new one never painted — a blank screen. Gating on
+   success means a Desk failure now falls back to the old tiles,
+   which still work, instead of falling back to nothing. */
+html.demo-skin.kc-desk-ready #daisy-flow-view,
+html.demo-skin.kc-desk-ready #floating-back-btn,
+html.demo-skin.kc-desk-ready #flow-tools-row { display: none !important; }
 
 /* ── THE CANVAS ── */
 html.demo-skin #kc-canvas {
@@ -214,8 +220,21 @@ html.demo-skin #kc-canvas {
 html.demo-skin #kc-canvas.kc-away { opacity: 0; transform: translateY(14px) scale(0.985); pointer-events: none; }
 html.demo-skin .kc-paper { max-width: 640px; margin: 0 auto; padding: calc(14px + env(safe-area-inset-top)) 20px 130px; }
 
-/* staggered arrival — everything springs in, top to bottom */
-html.demo-skin .kc-in { animation: kcIn 0.55s cubic-bezier(0.34, 1.35, 0.64, 1) both; animation-delay: calc(var(--d) * 70ms); }
+/* staggered arrival — plain nth-child delays, deliberately NOT using
+   calc(var(--custom-prop)) for animation-delay: that pattern is
+   known to behave inconsistently on real WebKit even when it parses
+   fine elsewhere, and a stuck opacity:0 on every element is exactly
+   how a real build turns into a blank cream screen. animation-delay
+   also has a plain 0.4s safety fallback below so even a browser that
+   mishandles nth-child specificity still finishes within a beat. */
+html.demo-skin .kc-in { animation: kcIn 0.55s cubic-bezier(0.34, 1.35, 0.64, 1) both; animation-delay: 0.4s; }
+html.demo-skin .kc-paper > .kc-in:nth-of-type(1) { animation-delay: 0s; }
+html.demo-skin .kc-paper > .kc-in:nth-of-type(2) { animation-delay: 0.07s; }
+html.demo-skin .kc-paper > .kc-in:nth-of-type(3) { animation-delay: 0.07s; }
+html.demo-skin .kc-paper > .kc-in:nth-of-type(4) { animation-delay: 0.14s; }
+html.demo-skin .kc-paper > .kc-in:nth-of-type(5) { animation-delay: 0.21s; }
+html.demo-skin .kc-paper > .kc-in:nth-of-type(6) { animation-delay: 0.28s; }
+html.demo-skin .kc-paper > .kc-in:nth-of-type(7) { animation-delay: 0.35s; }
 @keyframes kcIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 
 html.demo-skin .kc-masthead { display: flex; align-items: center; gap: 12px; }
@@ -283,6 +302,7 @@ html.demo-skin .kc-foot { font-family: 'Caveat', cursive; font-size: 22px; color
 html.demo-skin #kc-dock {
   position: fixed; left: 14px; right: 14px; bottom: calc(10px + env(safe-area-inset-bottom));
   z-index: 8500; display: flex; gap: 4px; padding: 8px 6px;
+  background: #201c1a;
   background: color-mix(in srgb, var(--kc-ink) 94%, transparent);
   border-radius: 22px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.30);
   backdrop-filter: blur(10px);

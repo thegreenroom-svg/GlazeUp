@@ -4825,3 +4825,55 @@ connecting (dummy creds only fail on real DB calls, not boot).
 
 NEEDS RENDER DEPLOY — server.js changed again. This is the one that
 actually makes tonight's work visible.
+
+# ═══════════════════════════════════════════════════════════
+# 21 JULY, NIGHT — CRASH SAFETY NET + REAL BLANK-SCREEN FIX
+# ═══════════════════════════════════════════════════════════
+
+After the route fix deployed, Daisy hit something WORSE: a genuinely
+blank screen (not tiles, not Desk — nothing but the header). Real bug,
+two compounding causes:
+
+1. CSS hid the original tile home the moment html.demo-skin was
+   present — regardless of whether the new Desk actually finished
+   building. If demo-skin.js failed for ANY reason on a real device,
+   old home was hidden AND new home never painted = blank. Fixed:
+   the hiding rule now requires html.demo-skin.kc-desk-ready, a class
+   only added by JS AFTER KC.build() completes with no error. A Desk
+   failure now correctly falls back to the working tile home instead
+   of nothing.
+2. The entrance animation used animation-delay: calc(var(--d)*70ms),
+   a custom-property-in-calc() pattern known to misbehave on real
+   WebKit even when it parses cleanly elsewhere — a stuck opacity:0
+   on every element is exactly what "just cream, nothing visible"
+   looks like. Removed entirely; replaced with plain nth-of-type
+   selectors, zero calc(var()) dependency, plus a flat 0.4s fallback
+   delay so even an unusual browser finishes within a beat.
+
+ALSO ADDED: KC._fail() — any error anywhere in the Desk now shows a
+small red on-screen banner with the real error text (no dev tools
+needed, same spirit as the existing 911a7fc on-screen diagnostic
+pattern) and guarantees the canvas gets marked away so old tiles are
+what's left showing. Wrapped the landOnHome patch's call into
+showCanvas so a synchronous throw there can't escape uncaught.
+
+VERIFIED PROPERLY — spawned the REAL server.js (not a shortcut
+server) and drove it with headless Chrome:
+- Normal path: kc-desk-ready set, canvas visible, masthead + hello
+  opacity=1 (animation completes, nothing stuck invisible), old home
+  hidden, zero error banner.
+- Sabotaged path (KC.build() forced to throw, simulating an unknown
+  real-device failure): kc-desk-ready never set, OLD TILES REMAIN
+  VISIBLE, red error banner shows the exact thrown message, page is
+  NOT blank, zero uncaught page errors (the throw is caught before it
+  escapes). Screenshotted both.
+
+This is the safety net that should have existed from the first
+radical commit. Going forward: any new demo-skin.js addition must
+stay inside this same crash boundary — never assume real Safari
+behaves like headless Chrome, and never gate hiding old UI on
+anything but confirmed new-UI success.
+
+NEEDS RENDER DEPLOY. If it's STILL not right after this one, the
+on-screen red banner (if any appears) is the fastest way back to a
+fix — screenshot it directly, no other diagnosis needed.
