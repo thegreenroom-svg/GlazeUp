@@ -2834,7 +2834,7 @@ function updateStaffName() {
 <div id="alert-feed-panel" style="display:none;position:fixed;top:0;right:0;bottom:0;padding-top:env(safe-area-inset-top, 0px);padding-bottom:env(safe-area-inset-bottom, 0px);box-sizing:border-box;width:340px;max-width:92vw;background:white;z-index:9200;box-shadow:-8px 0 32px rgba(0,0,0,0.2);flex-direction:column;">
   <div style="background:#2B2724;color:white;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;">
     <div style="font-size:15px;font-weight:700;">🔔 Handoff Alerts</div>
-    <button class="glaze-tile" id="my-page-btn" onclick="showGridNav()" title="My page"
+    <button class="glaze-tile" id="my-page-btn" onclick="goToRealLandingPage()" title="My page"
       style="display:none;background:rgba(255,255,255,0.12);border:none;border-radius:8px;
       color:white;font-size:11px;font-weight:800;padding:5px 10px;cursor:pointer;flex-shrink:0;">
       My page
@@ -3570,7 +3570,7 @@ function updateStaffName() {
       <span style="font-size:22px;">📦</span>
       <span style="font-size:12px;font-weight:800;margin-top:5px;">Stock Levels</span>
     </button>
-    <button onclick="showGridNav()" class="glaze-tile" style="background:#2B2724;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
+    <button onclick="goToRealLandingPage()" class="glaze-tile" style="background:#2B2724;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px;">
       <span style="font-size:22px;">⋯</span>
       <span style="font-size:12px;font-weight:800;margin-top:5px;">Everything Else</span>
     </button>
@@ -15301,7 +15301,7 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
       : (!tappable
           ? (busy
               ? `openTableDetail('${b.booking_code}')`
-              : `showGridNav()`)
+              : `goToRealLandingPage()`)
           : '');
     return `<g style="cursor:pointer" onclick="${tableClick}">
       ${chairs}
@@ -15760,40 +15760,15 @@ function renderFloorPlanElegant() {
           </div>
           ${_dayStepperHTML}
         </div>
-        <!-- This said "🏠 Home" and called goToRealLandingPage(). That was
-             correct when the TILE GRID was home. It isn't any more — the
-             floor plan is, as of 4b4e40a, and goToRealLandingPage() now
-             returns you to the floor plan. So on the floor plan this
-             button became a no-op: it took you to where you already were,
-             and left the tile grid reachable from nowhere at all.
-             A regression I introduced this afternoon, found because Daisy
-             asked to check it still clicks through to the tiles.
-             The floor plan is home; this is the way OUT of home. -->
-        <!-- ═══════════════════════════════════════════════════
-             MY TILES — a proper glazed tile, not a text link.
-             17 July 2026. Daisy: "there needs to be one of our
-             lovely glaze big tiles on that screen to take you
-             straight to your dashboard with the tiles. Not too
-             big, obviously. Nice inset."
-        -->
-        <button onclick="showGridNav()" class="glaze-tile"
-          style="border:none;border-radius:14px;padding:12px 16px;cursor:pointer;flex-shrink:0;
-          background:linear-gradient(135deg,#2B2724,#3d2e28);color:#fff;text-align:left;
-          box-shadow:0 2px 10px -2px rgba(43,39,36,0.4);">
-          <div style="font-size:17px;line-height:1;margin-bottom:3px;">▦</div>
-          <div style="font-family:'Caveat',cursive;font-size:16px;font-weight:700;
-            line-height:1;white-space:nowrap;">My tiles</div>
-        </button>
+        <!-- Black "My tiles" square removed 21 Jul 2026 (Daisy: persistent
+             black square top-right, old setup, went nowhere — it called the
+             long-dead showGridNav()). The floor plan already has the
+             full-width green "My tiles" bar pinned at the bottom, so this
+             top-right duplicate was both dead and redundant. -->
       </div>
       ${_renderArrivals(unseated)}
       ${_renderTodayLine()}
       ${_renderTomorrow(tomorrow)}
-      <div style="font-family:'Architects Daughter',cursive;font-size:9px;color:#B87946;
-        background:rgba(184,121,70,0.09);border:1px dashed rgba(184,121,70,0.35);
-        border-radius:8px;padding:5px 8px;margin:0 auto 8px;max-width:96%;text-align:center;
-        line-height:1.5;word-break:break-word;">
-        how I got here: ${(window._navTrace || []).join(' → ') || '(nothing recorded)'}
-      </div>
       <!-- The traffic light, explained. Small, always there, so nobody
            has to remember what amber means. -->
       <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px;
@@ -15888,8 +15863,8 @@ function showRoomElegant(roomName) {
           style="border:none;padding:7px 11px;min-height:44px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;
           display:flex;align-items:center;">
           ⊞ Arrange</button>
-        <!-- Same tile as the splash — one way to your tiles from anywhere -->
-        <button onclick="showGridNav()" class="glaze-tile"
+        <!-- One way to your tiles from anywhere (was dead showGridNav()) -->
+        <button onclick="goToRealLandingPage()" class="glaze-tile"
           style="border:none;border-radius:12px;padding:9px 13px;min-height:44px;cursor:pointer;flex-shrink:0;
           background:linear-gradient(135deg,#2B2724,#3d2e28);color:#fff;
           box-shadow:0 2px 8px -2px rgba(43,39,36,0.4);">
@@ -18794,16 +18769,100 @@ function showLearningInsights() {
   });
 }
 
+// The studio's real glaze palette — same 82 stocked colours the customer
+// app uses (kept in sync deliberately; both are the same physical glazes).
+const STUDIO_GLAZE_PALETTE = [
+  { hex: '#f5f0e6', name: 'Cotton Tail', code: 'SC-16' }, { hex: '#f0e6d2', name: 'Ivory Tower', code: 'SC-37' },
+  { hex: '#f5d020', name: 'Yella Bout It', code: 'SC-55' }, { hex: '#f7c948', name: 'Sunkissed', code: 'SC-6' },
+  { hex: '#f9e17a', name: 'Butter Me Up', code: 'SC-42' }, { hex: '#f9d423', name: 'Dandelion', code: 'SC-24' },
+  { hex: '#f4a13a', name: 'Cant-elope', code: 'SC-97' }, { hex: '#f6b98a', name: 'Just Peachy', code: 'SC-102' },
+  { hex: '#e8721f', name: "Jack O'Lantern", code: 'SC-23' }, { hex: '#eb7a1f', name: 'Orange-A-Peel', code: 'SC-75' },
+  { hex: '#f0862a', name: 'Orange Ya Happy', code: 'SC-50' }, { hex: '#f0836b', name: 'Melon-choly', code: 'SC-2' },
+  { hex: '#f27a63', name: 'Cutie Pie Coral', code: 'SC-89' }, { hex: '#e8437a', name: 'Tu Tu Tango', code: 'SC-88' },
+  { hex: '#c81e2c', name: 'Candy Apple Red', code: 'SC-73' }, { hex: '#d8331f', name: 'Hot Tamale', code: 'SC-74' },
+  { hex: '#a3162a', name: 'Ruby Slippers', code: 'SC-87' }, { hex: '#9c4a2e', name: 'Cinnamon Stix', code: 'SC-81' },
+  { hex: '#f2a8c0', name: 'Pink-A-Boo', code: 'SC-1' }, { hex: '#f0b8be', name: 'Makin Me Blush', code: 'SC-100' },
+  { hex: '#eb9fb8', name: 'Pink-A-Dot', code: 'SC-70' }, { hex: '#f3a9c4', name: 'Pinkie Swear', code: 'SC-95' },
+  { hex: '#e8799f', name: 'Cheeky Pinky', code: 'SC-17' }, { hex: '#d9738c', name: 'Rosey Posey', code: 'SC-18' },
+  { hex: '#5e1a2e', name: 'Wine About It', code: 'SC-3' }, { hex: '#2c4f9e', name: 'Blueberry Hill', code: 'SC-40' },
+  { hex: '#5b3a7a', name: 'Grapel', code: 'SC-13' }, { hex: '#9a5bb0', name: 'Orkid', code: 'SC-85' },
+  { hex: '#b39ddb', name: 'Lavendear', code: 'SC-103' }, { hex: '#6a3b96', name: 'Purple Haze', code: 'SC-53' },
+  { hex: '#4a2560', name: 'Grape Jelly', code: 'SC-72' }, { hex: '#7a3d99', name: 'Purple-Licious', code: 'SC-71' },
+  { hex: '#42225c', name: 'Fruit Of The Vine', code: 'SC-33' }, { hex: '#6e3f8f', name: 'Grape Expectations', code: 'SC-104' },
+  { hex: '#3a5fcd', name: 'Blue Bird', code: 'SC-77' }, { hex: '#4a90d9', name: 'Something Blue', code: 'SC-9' },
+  { hex: '#5dade2', name: 'Wanna Wedgewood', code: 'SC-11' }, { hex: '#85c1e9', name: 'Blue Yonder', code: 'SC-76' },
+  { hex: '#2e86c1', name: 'Blue-Nel', code: 'SC-32' }, { hex: '#1f6f8b', name: 'Deep Sea', code: 'SC-14' },
+  { hex: '#5eb3b3', name: 'Teal-y Dan', code: 'SC-31' }, { hex: '#48c9b0', name: 'Aqua-Rius', code: 'SC-84' },
+  { hex: '#76d7c4', name: 'Mint To Be', code: 'SC-101' }, { hex: '#1abc9c', name: 'Fern-tastic', code: 'SC-27' },
+  { hex: '#52be80', name: 'Grasshopper', code: 'SC-26' }, { hex: '#58d68d', name: 'Leapin Lizards', code: 'SC-46' },
+  { hex: '#2ecc71', name: 'Frog-tastic', code: 'SC-15' }, { hex: '#27ae60', name: 'Green Thumb', code: 'SC-28' },
+  { hex: '#1e8449', name: 'Envy Green', code: 'SC-30' }, { hex: '#7dcea0', name: 'Sage Advice', code: 'SC-94' },
+  { hex: '#a9dfbf', name: 'Sea Glass', code: 'SC-91' }, { hex: '#186a3b', name: 'Pine-ing', code: 'SC-29' },
+  { hex: '#d4e157', name: 'Lime Light', code: 'SC-56' }, { hex: '#c0ca33', name: 'Chartreuse', code: 'SC-57' },
+  { hex: '#aeb82a', name: 'Olive Branch', code: 'SC-58' }, { hex: '#7d8a1f', name: 'Pea Soup', code: 'SC-59' },
+  { hex: '#8a5a2b', name: 'Toffee', code: 'SC-80' }, { hex: '#a97142', name: 'Gingerbread', code: 'SC-82' },
+  { hex: '#c68642', name: 'Butterscotch', code: 'SC-79' }, { hex: '#5e3d24', name: 'Café Ole', code: 'SC-92' },
+  { hex: '#8a7d6e', name: 'Elephant Ears', code: 'SC-90' }, { hex: '#a89684', name: 'Tip Taupe', code: 'SC-83' },
+  { hex: '#a8adb0', name: 'Silver Lining', code: 'SC-60' }, { hex: '#7e8286', name: 'Gray Hare', code: 'SC-35' },
+  { hex: '#4a4a4a', name: 'Char-ming', code: 'SC-99' }, { hex: '#1a1a1a', name: 'Tuxedo', code: 'SC-98' },
+  { hex: '#f5f5f5', name: 'Snow Day', code: 'SC-96' }, { hex: '#e0d8c8', name: 'Sand Dollar', code: 'SC-36' },
+];
+
+// Perceptual-ish colour distance (weighted RGB — cheap, and closer to how
+// the eye judges "nearest" than plain Euclidean). Returns a match %.
+function _glazeMatchPct(hex1, hex2) {
+  const p = h => { const n = parseInt(h.replace('#',''),16); return [n>>16&255, n>>8&255, n&255]; };
+  const [r1,g1,b1] = p(hex1), [r2,g2,b2] = p(hex2);
+  const rm = (r1+r2)/2;
+  const dr = r1-r2, dg = g1-g2, db = b1-b2;
+  // weighted distance (bt.low-cost approximation of perceptual distance)
+  const dist = Math.sqrt((2+rm/256)*dr*dr + 4*dg*dg + (2+(255-rm)/256)*db*db);
+  const maxDist = Math.sqrt((2+255/256)*255*255 + 4*255*255 + (2+255/256)*255*255);
+  return Math.max(0, Math.round((1 - dist/maxDist) * 100));
+}
+
+function _renderGlazeMatches(hex) {
+  const ranked = STUDIO_GLAZE_PALETTE
+    .map(g => ({ ...g, pct: _glazeMatchPct(hex, g.hex) }))
+    .sort((a,b) => b.pct - a.pct)
+    .slice(0, 6);
+  return ranked.map((g,i) => `
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;
+      background:${i===0?'rgba(76,140,90,0.10)':'#F7F1E8'};margin-bottom:7px;${i===0?'border:1.5px solid rgba(76,140,90,0.35);':''}">
+      <div style="width:40px;height:40px;border-radius:9px;background:${g.hex};box-shadow:inset 0 0 0 1px rgba(0,0,0,0.1);flex-shrink:0;"></div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:800;font-size:14px;color:#2B2724;">${g.name} ${i===0?'<span style="font-size:10px;color:#4C8C5A;font-weight:700;">· closest</span>':''}</div>
+        <div style="font-size:11px;color:#8a8175;">${g.code}</div>
+      </div>
+      <div style="font-weight:900;font-size:16px;color:${g.pct>=85?'#4C8C5A':g.pct>=70?'#B87946':'#8a8175'};">${g.pct}%</div>
+    </div>`).join('');
+}
+
 function openColorPicker() {
-  // The real colour-match tool lives in the customer app's Design
-  // Preview (the 💉 Match tool: photograph a piece, tap a colour, get
-  // the nearest stocked glaze + % match). From the staff app, point
-  // there rather than showing a placeholder. Brand-neutral copy.
+  // Real, working staff colour-match tool (21 Jul 2026 — Daisy wanted the
+  // colour-matching tool genuinely present on the staff side as a fourth
+  // app, not a pointer to the customer app). Pick or type any colour, get
+  // the nearest stocked glazes ranked by match %. Same 82-glaze palette as
+  // the customer app.
+  const startHex = '#4a90d9';
   glazedModal({
-    title: 'Glaze Colours',
-    bodyHTML: '<div style="padding:16px 4px;text-align:center;font-size:13px;color:#2B2724;line-height:1.6;">The colour-match tool is in the customer app under <b>Design Preview</b> — photograph a piece or any colour and it finds the nearest glaze we stock, with a % match.</div>',
-    actions: [{ label: 'Open Customer App', primary: true, onClick: () => { window.open('/app/index.html', '_blank'); } }],
-    closeLabel: 'Close'
+    title: '🎨 Glaze Colour Match',
+    bodyHTML: `
+      <div style="padding:4px 2px;">
+        <div style="font-size:12px;color:#8a8175;margin-bottom:12px;line-height:1.5;">
+          Pick or paste any colour — a customer's photo, a swatch, a brand hex — and see the closest glazes you actually stock.
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+          <input type="color" id="glaze-match-input" value="${startHex}"
+            style="width:54px;height:54px;border:none;border-radius:12px;background:none;cursor:pointer;padding:0;flex-shrink:0;"
+            oninput="const v=this.value;document.getElementById('glaze-match-hex').value=v;document.getElementById('glaze-match-results').innerHTML=_renderGlazeMatches(v);">
+          <input type="text" id="glaze-match-hex" value="${startHex}" maxlength="7"
+            style="flex:1;padding:12px 14px;border:1px solid #D9CDBB;border-radius:10px;font-size:15px;font-family:monospace;text-transform:lowercase;"
+            oninput="let v=this.value.trim();if(!v.startsWith('#'))v='#'+v;if(/^#[0-9a-fA-F]{6}$/.test(v)){document.getElementById('glaze-match-input').value=v;document.getElementById('glaze-match-results').innerHTML=_renderGlazeMatches(v);}">
+        </div>
+        <div id="glaze-match-results" style="margin-top:14px;">${_renderGlazeMatches(startHex)}</div>
+      </div>`,
+    closeLabel: 'Done'
   });
 }
 
@@ -18915,8 +18974,11 @@ async function _flowLoadDayStat() {
 }
 
 function _flowGraphExit() {
-  document.getElementById('daisy-flow-view').style.display = 'none';
-  showGridNav();
+  // Had zero callers, but was a latent blank-screen trap: it hid the
+  // working home view then called the long-dead showGridNav() (a no-op),
+  // leaving nothing on screen. Routed to the real landing page so it's
+  // safe if anything ever calls it.
+  goToRealLandingPage();
 }
 
 // Long press detection
@@ -21867,7 +21929,12 @@ async function _runSquareSync() {
   try {
     const res = await fetch(`${API_URL}/api/square/backfill`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studioId, daysBack: 365 }),
+      // 4000 days (~11 years) = genuinely all-time. Was 365, which made
+      // the "all-time" revenue figure actually just the last year (Daisy:
+      // the figure was ambiguous, ~1000 entries — go back as far as
+      // possible). The server pages Square in full up to its 10k-order
+      // safety cap, so this pulls the studio's entire real history.
+      body: JSON.stringify({ studioId, daysBack: 4000 }),
     });
     const data = await res.json();
     if (!res.ok) { _setSquareSyncState('error'); return; }
@@ -21893,7 +21960,8 @@ async function triggerKilnCafeBackfill() {
   try {
     const res = await fetch(`${API_URL}/api/square/backfill`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studioId, daysBack: 365 }),
+      // 4000 days (~11 years) = genuinely all-time (was 365 = last year only).
+      body: JSON.stringify({ studioId, daysBack: 4000 }),
     });
     const data = await res.json();
     // Genuine real fix: this was previously never checking whether
@@ -21929,7 +21997,7 @@ async function refreshKilnCafeRevenueData() {
     document.getElementById('metric-revenue-mtd').textContent = '£' + (data.mtdRevenue || 0).toFixed(2);
     document.getElementById('metric-revenue-ytd').textContent = '£' + (data.ytdRevenue || 0).toFixed(2);
     document.getElementById('metric-revenue-alltime').textContent = '£' + (data.allTimeRevenue || 0).toFixed(2);
-    document.getElementById('metric-revenue-alltime-detail').textContent = `${data.allTimeTransactionCount || 0} real transactions synced`;
+    document.getElementById('metric-revenue-alltime-detail').textContent = `${(data.allTimeTransactionCount || 0).toLocaleString()} transactions across all time`;
     document.getElementById('metric-sessions').textContent = (data.appSessions || 0);
     
     const mostUsed = Object.entries(data.tabUsage || {})
@@ -29917,7 +29985,7 @@ function showIdleAsk() {
       style="width:100%;background:#F4ECE0;border:1px solid rgba(43,39,36,0.15);border-radius:12px;
       padding:13px;font-size:14px;font-weight:700;color:#2B2724;cursor:pointer;margin-bottom:7px;">
       Back to the floor plan</button>
-    <button onclick="_dismissIdleAsk(false); showGridNav();"
+    <button onclick="_dismissIdleAsk(false); goToRealLandingPage();"
       style="width:100%;background:none;border:1px solid rgba(43,39,36,0.15);border-radius:12px;
       padding:11px;font-size:13px;font-weight:600;color:#8a8175;cursor:pointer;">
       Somewhere else</button>`;

@@ -526,7 +526,7 @@ async function syncSquareData(studioId, accessToken, daysBack = 1) {
       orders = orders.concat(ordersRes.result.orders || []);
       cursor = ordersRes.result.cursor;
       pageCount++;
-    } while (cursor && pageCount < 20);
+    } while (cursor && pageCount < 100); // was 20 (10k orders) — raised to 100 (50k) so a genuine all-time backfill of a busy studio isn't silently truncated; still capped so an account issue can't loop forever
 
     recordsSynced = orders.length;
 
