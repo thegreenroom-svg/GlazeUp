@@ -194,6 +194,135 @@ html.demo-skin {
   html.demo-skin body { background: var(--kc-paper) !important; }
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   STAGE 3 — THE WHOLE THING. 21 Jul, per Daisy: "do the whole thing
+   like that... don't stop till you happy and pushed." Extends the
+   identity past the home screen into every deep screen — login, the
+   staff picker, Takings/Money, the lot — without touching any JS
+   behaviour anywhere. This entire stage is pure CSS: recolour and
+   retype only, zero new logic, zero new failure modes. The app's own
+   design system already routes almost everything through a small
+   set of CSS custom properties (--gu-primary, --gu-text, --gu-border,
+   --gu-font-display) — overriding those once, here, reskins login,
+   headers, borders and text across screens that were never touched
+   individually. Deliberately safer than Stage 2: no JS to crash, so
+   the worst case of a mistake here is a rule that doesn't apply, not
+   a blank screen.
+   ═══════════════════════════════════════════════════════════════════ */
+html.demo-skin {
+  --gu-primary: var(--kc-brick);
+  --gu-secondary: var(--kc-blush);
+  --gu-accent: var(--kc-ink);
+  --gu-text: var(--kc-ink);
+  --gu-border: var(--kc-line);
+  --gu-label: var(--kc-brick);
+  --gu-font-display: 'Fraunces', Georgia, serif;
+  --link-clay: var(--kc-brick);
+  --link-charcoal: var(--kc-ink);
+  --link-ivory: var(--kc-paper);
+}
+
+/* Every .glaze-tile everywhere (login staff cards, dashboard tiles,
+   every square tile in every deep screen) warms toward the brick
+   family in one uniform, non-destructive step — colour only, no
+   layout change, so nothing that currently works can break. Tuned
+   and screenshot-checked against real tiles, not guessed blind. */
+html.demo-skin .glaze-tile {
+  filter: saturate(1.15) sepia(0.22) hue-rotate(-14deg) brightness(0.97) !important;
+}
+
+/* THE LOGIN SCREEN — explicitly flagged by Daisy as needing the
+   same treatment. Pure recolour/retype of the existing modal; every
+   onclick, every input, every id is untouched, so the login mechanism
+   itself carries zero risk from this pass. */
+html.demo-skin #shift-login-modal > div {
+  background: var(--kc-paper) !important;
+  border-radius: 26px !important;
+}
+html.demo-skin #shift-login-modal #login-screen-picker > div:first-child {
+  font-size: 30px !important;
+}
+html.demo-skin #shift-login-modal #login-screen-picker > div:nth-child(2) {
+  font-family: 'Fraunces', Georgia, serif !important;
+  font-weight: 800 !important;
+  font-size: 22px !important;
+  color: var(--kc-brick) !important;
+}
+html.demo-skin #shift-login-modal #login-screen-picker > div:nth-child(3) {
+  font-family: 'Caveat', cursive !important;
+  font-size: 20px !important;
+  color: var(--kc-clay) !important;
+  margin-bottom: 6px !important;
+}
+html.demo-skin #shift-login-modal #login-screen-picker > div:nth-child(3)::after {
+  content: '';
+  display: block;
+  height: 10px;
+  margin: 8px auto 12px;
+  max-width: 140px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='10' viewBox='0 0 48 10'%3E%3Cpath d='M0 5 Q 6 0, 12 5 T 24 5 T 36 5 T 48 5' fill='none' stroke='%23A32D21' stroke-width='2' stroke-linecap='round' opacity='0.5'/%3E%3C/svg%3E");
+  background-repeat: repeat-x; background-size: 48px 10px;
+}
+html.demo-skin #shift-login-modal button[data-staff] {
+  border-radius: 16px !important;
+}
+html.demo-skin #shift-login-modal .av-frame {
+  border-radius: 24px !important;
+  box-shadow: 0 6px 18px rgba(163, 45, 33, 0.22) !important;
+}
+html.demo-skin #login-pin-avatar,
+html.demo-skin #setpin-avatar {
+  background: var(--kc-brick) !important;
+  border-radius: 22px !important;
+}
+html.demo-skin #shift-pin-input,
+html.demo-skin #new-pin-input,
+html.demo-skin #new-pin-confirm-input {
+  border-color: var(--kc-line) !important;
+  font-family: 'Fraunces', Georgia, serif !important;
+}
+html.demo-skin #shift-pin-submit-btn {
+  background: var(--kc-brick) !important;
+  border-radius: 16px !important;
+}
+html.demo-skin #demo-pin-notice {
+  background: rgba(247, 175, 173, 0.18) !important;
+  border-color: rgba(163, 45, 33, 0.25) !important;
+  color: var(--kc-brick) !important;
+}
+
+/* The trial welcome banner + any similar info-banner: swap the
+   generic gradient card for the same warm paper card language as
+   the Desk, wavy line underneath instead of a coloured strip. */
+html.demo-skin .info-banner {
+  background: var(--kc-card) !important;
+  border: 1.5px solid var(--kc-line) !important;
+  border-left: 4px solid var(--kc-brick) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 4px 14px rgba(43, 39, 36, 0.08) !important;
+}
+html.demo-skin .info-banner strong {
+  color: var(--kc-brick) !important;
+}
+  --kc-ink: #2B2724;
+  --kc-brick: #A32D21;
+  --kc-blush: #F7AFAD;
+  --kc-clay: #B87946;
+  --kc-line: rgba(43, 39, 36, 0.14);
+  --kc-card: #FFFDF9;
+}
+@media (prefers-color-scheme: dark) {
+  html.demo-skin {
+    --kc-paper: #201C1A;
+    --kc-ink: #F4ECE0;
+    --kc-brick: #D65445;
+    --kc-blush: #F7AFAD;
+    --kc-line: rgba(244, 236, 224, 0.16);
+    --kc-card: #2A2521;
+  }
+  html.demo-skin body { background: var(--kc-paper) !important; }
+}
+
 /* Hide the ORIGINAL home chrome — "don't want to see any original" —
    but ONLY once the Desk has genuinely, successfully mounted
    (html.kc-desk-ready, added by demo-skin.js AFTER build() succeeds

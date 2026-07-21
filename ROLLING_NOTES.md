@@ -4877,3 +4877,56 @@ anything but confirmed new-UI success.
 NEEDS RENDER DEPLOY. If it's STILL not right after this one, the
 on-screen red banner (if any appears) is the fastest way back to a
 fix — screenshot it directly, no other diagnosis needed.
+
+# ═══════════════════════════════════════════════════════════
+# 21 JULY, NIGHT — STAGE 3: THE WHOLE THING
+# Daisy: "do the whole thing like that it's great don't stop
+# till you happy and pushed."
+# ═══════════════════════════════════════════════════════════
+
+Extended the identity PAST the home screen into every deep screen —
+login/staff-picker, Takings/Money, and (by construction) every other
+screen that uses the app's own design tokens — without touching a
+single line of JS behaviour anywhere in this stage. Deliberately the
+safest stage yet: pure CSS, no new logic, so the worst case of a
+mistake is a rule not applying, never a blank screen.
+
+THE LEVER: the app already routes almost everything through a small
+set of CSS custom properties (--gu-primary, --gu-text, --gu-border,
+--gu-font-display, --link-clay, --link-charcoal, --link-ivory) defined
+once in :root. Overriding those under html.demo-skin reskins login,
+headers, borders and text across screens that were never touched
+individually — one small block, huge reach, zero JS risk.
+
+SPECIFIC WORK:
+- Login/staff-picker (#shift-login-modal): cream card instead of
+  plain white, Fraunces heading in brick, Caveat subtitle, a wavy
+  line divider under it, PIN screen inputs/avatar restyled. Every
+  onclick/input id left completely untouched — pure recolour.
+- .glaze-tile (used by EVERY square tile app-wide, including the
+  Takings/Money dashboard grid Daisy screenshotted): warmed toward
+  the brick family via one tuned CSS filter, uniform across both the
+  brown and green hardcoded variants, no markup changes.
+- .info-banner (the trial welcome card): matched to the Desk's card
+  language — cream, brick left-edge accent, soft shadow.
+
+REAL BUG CAUGHT AND FIXED MID-SESSION: an early version of this edit
+accidentally deleted the Stage 2 --kc-* variable block it was meant
+to sit alongside (a str_replace anchor mistake) — computed --kc-brick
+came back empty, which silently broke colour on affected elements
+(fell back to default black/transparent) rather than erroring, so it
+would NOT have shown as an obvious crash. Caught by directly checking
+computed custom-property values in a headless pass before shipping,
+not by assuming the diff was correct. Restored properly; verified
+computedBrick: "#A32D21" afterward.
+
+VERIFIED (real spawned server.js + headless Chrome): login heading
+computed Fraunces + rgb(163,45,33) (brick) on rgb(255,249,240) (cream)
+card; dashboard/Takings banner computed to the same cream card colour;
+zero page errors either screen. Also re-ran the full Stage-2 crash
+pair (normal success + forced KC.build() failure) against this new
+CSS to make sure nothing here reintroduced the blank-screen risk —
+both still pass exactly as before: normal path fully visible, forced
+failure falls back to old tiles with the red banner, never blank.
+
+NEEDS RENDER DEPLOY. client-only, server.js untouched this stage.
