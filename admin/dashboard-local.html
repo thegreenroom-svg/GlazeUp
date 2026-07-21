@@ -6785,8 +6785,6 @@ function goToTab(tab, event) {
     const ph = document.getElementById('floor-plan-placeholder');
     if (ph) ph.style.display = 'flex';
     targetView.style.display = 'flex';
-    const _tl2 = document.getElementById('floor-trace-loading');
-    if (_tl2) _tl2.textContent = 'how I got here: ' + (window._navTrace || []).join(' → ');
   } else {
     targetView.style.display = 'block';
   }
@@ -9268,6 +9266,16 @@ function openAdminStaff() {
 function openAdminConfig() {
   goToTab('setup');
   setTimeout(() => { try { showSetupSection('addons'); } catch(e){ console.warn('openAdminConfig:', e); } }, 60);
+}
+
+function openHostByPostSection() {
+  // Host By Post's UI lives inside Setup (#setup-section-hostbypost); its
+  // Studio tile had a bare tab with no view and no fn, so goToTab's guard
+  // refused to navigate — a genuinely dead tile, found by the full-audit
+  // static cross-check 21 Jul 2026. Same deep-link pattern as
+  // openAdminOffers/openAdminConfig above.
+  goToTab('setup');
+  setTimeout(() => { try { showSetupSection('hostbypost'); } catch(e){ console.warn('openHostByPostSection:', e); } }, 60);
 }
 
 
@@ -16122,8 +16130,6 @@ function showFloorPlan() {
   const ph = document.getElementById('floor-plan-placeholder');
   if (ph) ph.style.display = 'flex';
   if (v) v.style.display = 'flex';
-  const _tl = document.getElementById('floor-trace-loading');
-  if (_tl) _tl.textContent = 'how I got here: ' + (window._navTrace || []).join(' → ');
   loadFloorPlan().then(() => {
     const _gridUp3 = document.getElementById('grid-nav-view')?.style.display !== 'none';
     if (v && currentTab === 'floor-plan' && !_gridUp3) v.style.display = 'flex';
@@ -17706,12 +17712,12 @@ const GRID_NAV_STRUCTURE = [
     { tab: 'catalogue', label: '🖼️ Piece Catalogue', desc: 'What customers browse from home' },
     { tab: 'customer-demo', label: '👀 Customer App', desc: 'See what customers see', fn: 'openCustomerDemo' },
     { tab: 'community', label: '🌍 Club Pages', desc: 'Feature and moderate customer work' },
-    { tab: 'host-by-post', label: '📮 Host By Post', desc: 'Postal kits & orders' },
+    { tab: 'host-by-post', fn: 'openHostByPostSection', label: '📮 Host By Post', desc: 'Postal kits & orders' },
     { tab: 'whats-on', label: '📅 What\'s On', desc: 'Local events & school holidays', fn: 'openWhatsOn' },
     { tab: 'training', label: '🎓 Training & Safety', desc: 'My training · health & safety', fn: 'openMyTraining' },
     { tab: 'learning', label: '🌱 Learning & Insights', desc: 'What the app has noticed · workflow analytics', fn: 'openLearning' },
     { tab: 'setup', label: '⚙️ Studio Setup', desc: 'Connections, branding, add-ons, offers' },
-    { tab: 'navigation-help', label: '🧭 Help & Practice', desc: 'How to use the app · run a practice demo' },
+    { tab: 'navigation-help', fn: 'openNavigationHelp', label: '🧭 Help & Practice', desc: 'How to use the app · run a practice demo' },
     { tab: 'trial-reset', label: '🔄 Clear & Start Again', desc: 'Reset today for testing', fn: 'openTrialReset' },
   ]},
 ];
