@@ -5108,9 +5108,11 @@ function updateStaffName() {
       <!-- ═════════════════════════════════════════════ -->
       <div id="piecematch-view" class="view" style="display: none;">
         <h2 style="margin-top: 0;">🔍 Piece Matching</h2>
-        <p style="color: var(--gu-dust); font-size: 13px; margin-bottom: 20px; line-height: 1.5;">
+        <p style="color: var(--gu-dust); font-size: 13px; margin-bottom: 14px; line-height: 1.5;">
           Pick up a fired piece from the jumbled pile and photograph it — the AI will suggest which booking it belongs to based on shape and design. If it can't identify it confidently, you'll be offered a booking code or QR as a fallback.
         </p>
+        <button onclick="openPackingGuide()" style="width:100%;background:rgba(94,53,177,0.08);border:1.5px solid rgba(94,53,177,0.25);color:#4527A0;border-radius:12px;padding:12px 14px;font-size:12.5px;font-weight:700;cursor:pointer;margin-bottom:16px;text-align:left;display:flex;align-items:center;gap:10px;">
+          <span style="font-size:18px;">🧭</span> New to this? Walk through Match → Pack → Label, step by step</button>
 
         <button class="glaze-tile" onclick="document.getElementById('pm-photo-input').click()" style="width:100%;background:#c0392b;color:white;border:none;border-radius:14px;padding:20px;text-align:left;cursor:pointer;margin-bottom:12px;display:flex;align-items:center;gap:14px;">
           <span style="font-size:28px;">📷</span>
@@ -9279,6 +9281,120 @@ function openHostByPostSection() {
 }
 
 
+// ═══════════════════════════════════════════════════════════════
+// THE MATCH → PACK → LABEL GUIDE. 21 July 2026.
+// ═══════════════════════════════════════════════════════════════
+// Daisy: "make that the special piece for Jenny because she struggles
+// with technology... I want you to pretty much guide her steps on how
+// the AI works... tell her exactly what's going on, how it references,
+// and what it's gonna do... right through to the end of printing the
+// label." The existing _walk system shows its step notes as a toast —
+// a few words, gone in seconds. That's the right shape for "here's
+// which button to press next" and the wrong shape for genuinely
+// explaining how the AI matching works. So this is separate: a
+// persistent, readable, step-by-step guide anyone can open from the
+// Packing or Piece Match screen, and come back to as many times as
+// they need. Every claim in it is grounded directly in the real code
+// (handlePieceMatchPhotoFirst, runPieceMatchWithPhoto, openPacking,
+// _handleLabelScanPhoto) — nothing simplified into something that
+// won't match what's actually on screen.
+const JENNY_GUIDE_STEPS = [
+  { emoji:'🧭', title:'The whole journey, one piece at a time', body:`
+    <p>This walks through everything from a fired piece coming off the shelf to the finished label in your hand — <b>Match</b>, <b>Pack</b>, <b>Label</b>. Three stages, and the app genuinely helps at every one.</p>
+    <p>Nothing on this guide is real — no photo you take here is sent anywhere, nothing gets marked as done. Take as long as you like. It lives right here on the Packing screen, so you can always come back.</p>` },
+
+  { emoji:'🔥', title:'Why pieces need matching at all', body:`
+    <p>Once a piece comes out of the kiln, it can look completely different from when it went in — the glaze changes colour in the fire, sometimes dramatically. And there might be pieces from several different customers sitting on the same shelf together.</p>
+    <p>Piece Match is how the app helps you work out whose piece is whose — using photos, not memory.</p>` },
+
+  { emoji:'📷', title:'Just take the photo — often that\'s all it takes', body:`
+    <p>You don't need to look anything up first. Pick up the piece and photograph it straight away, the way you'd take any other photo — good light, the whole piece in frame.</p>
+    <p>Here's what happens behind the scenes: the app tries a <b>free, instant check first</b> — comparing the shape of your photo against known pieces, right there on the device, no AI needed, no cost. Only if that quick check isn't confident does it call on the full AI.</p>
+    <p>Either way, if it's confident, you'll see <b style="color:#2e7d32;">✓ Identified</b> straight away, with a short plain-English reason why — and that piece is done.</p>` },
+
+  { emoji:'🔎', title:'If it\'s not sure: the booking code', body:`
+    <p>Sometimes a photo alone isn't enough to be confident. When that happens, you'll be asked for the customer's <b>booking code</b> — type it in or scan it.</p>
+    <p>This narrows things right down: the app now only compares against <i>that one customer's</i> reference photos — the ones taken back when their pieces were first painted — instead of searching the whole studio. You'll then photograph the piece again for a second, more focused look.</p>` },
+
+  { emoji:'🤖', title:'Reading the AI\'s suggestions', body:`
+    <p>This time you'll see a ranked list of its best guesses, each one labelled:</p>
+    <div style="display:flex;gap:6px;margin:10px 0;flex-wrap:wrap;">
+      <span style="background:#2e7d32;color:#fff;font-size:10px;font-weight:800;padding:4px 10px;border-radius:20px;">HIGH</span>
+      <span style="background:#F9A825;color:#fff;font-size:10px;font-weight:800;padding:4px 10px;border-radius:20px;">MEDIUM</span>
+      <span style="background:#8a8175;color:#fff;font-size:10px;font-weight:800;padding:4px 10px;border-radius:20px;">LOW</span>
+    </div>
+    <p>Each one comes with a plain reason (like "same shape and glaze pattern") and the <b>original reference photo</b> right beside it, so you can compare with your own eyes before deciding — the app never asks you to just trust it blindly.</p>
+    <p>If the top one looks right, one tap on <b>"✓ This one"</b> confirms it. If none of them look right, "None of these" lets you compare manually instead — and if the app just couldn't find a confident match, that's not a failure on your part; it's sometimes just a slow connection, and trying the same photo again often works.</p>
+    <p style="background:rgba(76,175,80,0.08);border-radius:10px;padding:10px 12px;margin-top:10px;">Either tier — instant or AI — if something's ever auto-matched wrongly, there's always an <b>Undo</b> button right there. Nothing is locked in by mistake.</p>` },
+
+  { emoji:'📦', title:'Packing — your queue of what\'s ready to go home', body:`
+    <p>Once pieces are matched, Packing is simply a list — everything that's fired and waiting to go back to its customer, all in one place, so you always know what's left to do.</p>
+    <p>If a whole family's tray of pieces is sitting together, there's a shortcut: <b>scan the whole tray at once</b> instead of piece by piece, and it matches everything on it in one go.</p>` },
+
+  { emoji:'🏷️', title:'Labels — the fast way in, no typing needed', body:`
+    <p>When it's time to print, photograph <i>any one</i> piece from the order — the app works out which booking it belongs to and pulls up everything automatically: name, address if it's being posted, when it's ready.</p>
+    <p>Same honest approach as Piece Match: it checks the fast, free method first, and only calls on the AI if that quick check isn't confident.</p>` },
+
+  { emoji:'✅', title:'The last check, before anything goes home', body:`
+    <p>Right there on the label screen, you'll also see <b>every other piece</b> from that same order, and whether each one has been found yet.</p>
+    <p>This is your safety net — it means you never hand over, or post, an order that's secretly missing a piece. Once everything's accounted for, print the label. That's the whole job, start to finish.</p>` },
+
+  { emoji:'🎉', title:'That\'s the whole journey', body:`
+    <p><b>Match, Pack, Label.</b> Three stages, and the app is doing real work behind the scenes at every one — always showing you why, always leaving the final decision with you.</p>
+    <p>Come back to this guide any time from the Packing screen. Ready to see Piece Match for real?</p>` },
+];
+
+const _jg = { i: 0, active: false };
+
+function openPackingGuide() {
+  _jg.i = 0; _jg.active = true;
+  _jgRender();
+}
+
+function _jgRender() {
+  let m = document.getElementById('jg-overlay');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'jg-overlay';
+    m.style.cssText = 'position:fixed;inset:0;z-index:9800;background:rgba(43,39,36,0.94);display:flex;align-items:center;justify-content:center;padding:16px;';
+    document.body.appendChild(m);
+  }
+  const total = JENNY_GUIDE_STEPS.length;
+  const step = JENNY_GUIDE_STEPS[_jg.i];
+  const isLast = _jg.i === total - 1;
+  const dots = JENNY_GUIDE_STEPS.map((_, idx) =>
+    `<span style="width:${idx===_jg.i?16:6}px;height:6px;border-radius:3px;background:${idx===_jg.i?'#00897B':'rgba(43,39,36,0.15)'};display:inline-block;transition:width 0.2s;"></span>`
+  ).join('');
+
+  m.innerHTML = `
+    <div style="background:#F4ECE0;border-radius:20px;max-width:460px;width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">
+      <div style="padding:20px 22px 0;text-align:center;flex-shrink:0;">
+        <div style="font-size:11px;font-weight:800;color:#8a8175;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Match → Pack → Label · step ${_jg.i+1} of ${total}</div>
+        <div style="font-size:38px;">${step.emoji}</div>
+        <div style="font-family:'Caveat',cursive;font-size:24px;font-weight:700;color:#2B2724;margin-top:2px;">${step.title}</div>
+      </div>
+      <div style="padding:14px 22px;overflow-y:auto;flex:1;font-size:13.5px;line-height:1.6;color:#2B2724;">${step.body}</div>
+      <div style="padding:14px 22px;flex-shrink:0;border-top:1px solid rgba(43,39,36,0.08);">
+        <div style="display:flex;justify-content:center;gap:5px;margin-bottom:12px;">${dots}</div>
+        <div style="display:flex;gap:8px;">
+          ${_jg.i > 0 ? `<button onclick="_jgBack()" style="flex-shrink:0;background:none;border:1px solid rgba(43,39,36,0.2);color:#2B2724;border-radius:12px;padding:13px 18px;font-size:13px;font-weight:700;cursor:pointer;">← Back</button>` : ''}
+          ${isLast
+            ? `<button class="glaze-tile" onclick="_jgExit(); goToTab('piecematch');" style="flex:1;border:none;border-radius:12px;padding:13px;font-size:13.5px;font-weight:800;background:linear-gradient(135deg,#00897B,#00695C);color:#fff;cursor:pointer;">Take me to Piece Match →</button>`
+            : `<button class="glaze-tile" onclick="_jgNext()" style="flex:1;border:none;border-radius:12px;padding:13px;font-size:13.5px;font-weight:800;background:linear-gradient(135deg,#00897B,#00695C);color:#fff;cursor:pointer;">Next →</button>`}
+        </div>
+        <button onclick="_jgExit()" style="width:100%;background:none;border:none;color:#8a8175;font-size:12px;padding:10px 0 0;cursor:pointer;">${isLast ? 'Done for now' : 'Exit guide'}</button>
+      </div>
+    </div>`;
+}
+
+function _jgNext() { if (_jg.i < JENNY_GUIDE_STEPS.length - 1) { _jg.i++; _jgRender(); } }
+function _jgBack() { if (_jg.i > 0) { _jg.i--; _jgRender(); } }
+function _jgExit() {
+  _jg.active = false;
+  const m = document.getElementById('jg-overlay');
+  if (m) m.remove();
+}
+
 function openPacking() {
   const view = document.getElementById('floor-plan-view');
   if (!view) return;
@@ -9291,6 +9407,8 @@ function openPacking() {
         <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">Packing</div>
         <div style="font-size:11px;color:#8a8175;">Fired pieces going home</div>
       </div>
+      <button onclick="openPackingGuide()" style="width:100%;background:rgba(94,53,177,0.08);border:1.5px solid rgba(94,53,177,0.25);color:#4527A0;border-radius:12px;padding:12px 14px;font-size:12.5px;font-weight:700;cursor:pointer;margin-bottom:14px;text-align:left;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:18px;">🧭</span> New to this? Walk through Match → Pack → Label, step by step</button>
       <div id="packing-tiles" style="display:flex;flex-direction:column;gap:12px;">
         <div style="text-align:center;padding:40px;color:#8a8175;font-size:13px;">Loading…</div>
       </div>
