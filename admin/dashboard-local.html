@@ -13177,6 +13177,12 @@ window.addEventListener('beforeinstallprompt', (e) => {
 function markSessionActive() {
   if (currentShiftStaff && currentShiftStaff.id !== 'testing') {
     localStorage.setItem('klnk_last_active', Date.now().toString());
+    // A genuinely active session means a landing decision has been made
+    // this page-load — every login-success path (fresh PIN, biometric,
+    // resume) already calls this, so this is the one consistent place
+    // to set it, not just the resume branch below. See the guard this
+    // enables further down in checkShiftLogin().
+    _hasLanded = true;
   }
 }
 
@@ -13283,6 +13289,26 @@ async function checkShiftLogin() {
     } catch (e) { /* fall through to fresh login if the saved session is corrupt */ }
   }
   localStorage.removeItem('klnk_force_relogin');
+
+  // THE ACTUAL BUG (found live, 21 Jul, via 'tap Takings -> bounced to
+  // the login picker' / 'other tiles -> blank screen'): this whole tail
+  // — clear the session, show the picker — used to run unconditionally
+  // whenever checkShiftLogin() was reached with a "stale" verdict, and
+  // per the comment above applyShiftUI, THIS FUNCTION FIRES ON EVERY
+  // DASHBOARD/TAKINGS OPEN via populateDashboard(). So the idle-timer's
+  // forceRelogin flag — set once, quietly, after 15 real minutes of no
+  // touch (very plausible across a long session with gaps for reading
+  // replies) — sat there and got sprung on the NEXT completely
+  // unrelated tap, potentially long after the person had already
+  // resumed active use: mid-navigation, not at a genuine fresh load.
+  // Once a landing decision has genuinely been made this page-load
+  // (_hasLanded, now set from every login-success path via
+  // markSessionActive — see there), never disrupt an ordinary tap with
+  // this again. The splash itself (triggerIdleSplash's showSplash())
+  // still appears immediately at the real 15-minute mark, unaffected —
+  // this only stops the DEFERRED consequence from ambushing whatever
+  // the person taps next, sometimes minutes or hours later.
+  if (_hasLanded) { applyShiftUI(); return; }
 
   if (previousSession) {
     // Genuinely stale session (past the timeout, idle-flagged, or a
