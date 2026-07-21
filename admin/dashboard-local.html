@@ -4030,6 +4030,7 @@ function updateStaffName() {
                     </select>
                     <button class="glaze-tile" onclick="assignSessionDuties()" style="background:#5E35B1;color:white;border:none;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">+ Assign</button>
                   </div>
+                  <div id="s1-duty-preview" style="font-size:11px;color:var(--gu-dust);margin-bottom:8px;min-height:14px;"></div>
                   <div id="s1-assigned-duties-list"></div>
                 </div>
               </div>
@@ -12595,7 +12596,22 @@ async function populateDutyStaffSelect() {
 }
 
 function onDutyStaffChange() {
-  // Just used to enable/preview — actual assignment happens on button click
+  // Was completely empty ("just used to enable/preview — actual
+  // assignment happens on button click") despite firing on every
+  // change — a genuine do-nothing. Now shows what WOULD be assigned,
+  // same lookup assignSessionDuties() uses, so the preview can never
+  // drift out of sync with what actually happens on tap.
+  const preview = document.getElementById('s1-duty-preview');
+  if (!preview) return;
+  const select = document.getElementById('s1-duty-staff-select');
+  const opt = select?.options[select.selectedIndex];
+  if (!opt || !opt.value) { preview.textContent = ''; return; }
+  const role = opt.dataset.role;
+  const config = dutyConfig.find(d => d.role === role);
+  const duties = config ? config.duties : (DEFAULT_ROLE_DUTIES_CLIENT[role] || []);
+  preview.textContent = duties.length
+    ? `Will assign: ${duties.join(' · ')}`
+    : `No duties configured for ${role} yet — add some in Team & Duties first.`;
 }
 
 async function assignSessionDuties() {
