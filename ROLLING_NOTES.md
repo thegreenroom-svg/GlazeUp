@@ -4676,3 +4676,53 @@ COMMIT STRATEGY:
 - Ready to test on device and push to GitHub
 - Render deployment will be manual via Daisy's Dashboard button (auto-deploy paused)
 
+
+# ═══════════════════════════════════════════════════════════
+# 21 JULY — RADICAL DEMO BUILD, STAGE 1 (chat-surface session)
+# ═══════════════════════════════════════════════════════════
+
+STATE CHECK FIRST (live DB, not guesswork): bookings table now holds 98
+real Square appointments, 97 upcoming, last synced 17:44 today — the
+auto bookings sync IS firing. That brief item is DONE and live. Next
+booking Thu 23 Jul 09:00.
+
+SHIPPED THIS SESSION:
+1. DIRECTORS' DAILY DIGEST (29b7f6b) — GET /api/digest/daily (same
+   director gate as analytics), bottom sheet with 3 square glazed stat
+   tiles (yesterday / 7 days / next open day), focus-day booking list,
+   week-ahead square day-chips. Auto-opens once per UK day on first
+   landing (localStorage + page-load guard), own tile under The Studio.
+   Verified headless: auto-open, once-per-day guard, manual open,
+   non-director block, zero errors. NEEDS RENDER DEPLOY (server.js).
+
+2. DEMO_SKIN FOUNDATION — THE ONE SWITCH:
+   /demo-skin-flag.js -> window.DEMO_SKIN = true|false governs BOTH
+   apps. All skin rules live in /css/demo-skin.css scoped under
+   html.demo-skin. Flag flipped false = byte-identical old behaviour
+   (proven headless). Presentation only, zero logic behind the flag.
+
+3. TILE LAW ENFORCED, GEOMETRICALLY: real sampled brand colours from
+   the wordmark PNG itself — brick #A32D21 (41k px of the logo), blush
+   #F7AFAD — plus site cream #FFF9F0 and the wavy divider drawn as an
+   SVG data-URI (.kc-wave + auto under the crumb). Home flow tiles are
+   now true squares (aspect-ratio 1/1) in three size classes: tiles
+   1-2 at (100%-8px)/2, 3-5 at (100%-16px)/3, 6+ at (100%-24px)/4.
+   Size-class boundaries land exactly on row boundaries, so the
+   470888d "three quarters of a box" bug is impossible by construction.
+   MEASURED HEADLESS at 390px AND 375px, root + Today (11 tiles, all 3
+   classes): every row allSquare, uniformW, uniformH, fill error
+   0-0.01px, zero horizontal overflow, zero page errors.
+
+QUEUE FOR NEXT STAGE (the rest of the radical brief): bottom-sheet
+navigation everywhere (digest is the first, pattern established),
+spring transitions, skeleton loaders, pull-to-refresh, universal
+search/command bar, predictive home ordering, swipe-back, dark-mode
+glazes, live tiles (Takings figure / kiln load count on tile faces),
+customer-app skin depth, remove table icons, minimal move-a-chair,
+kiln-unload candidate filtering, verify the 3 duplicate functions.
+showHomeScreen question ANSWERED: it's the dormant legacy hand-drawn
+plan, unreachable in live flow (auto-run disabled 14 Jul), internally
+consistent — no user-facing bug, leave as-is.
+
+DEPLOY: Daisy taps Manual Deploy for the digest endpoint. Client
+changes show after full close-and-reopen on iOS.

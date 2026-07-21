@@ -1,0 +1,162 @@
+/* ═══════════════════════════════════════════════════════════════════
+   DEMO SKIN — the radical Kiln Cafe demo build. 21 Jul 2026.
+
+   EVERY rule in this file is scoped under html.demo-skin, which only
+   exists when window.DEMO_SKIN === true in /demo-skin-flag.js. Flip
+   that one line to false and both apps render exactly as before —
+   this file simply never matches. No JS behaviour, no business logic,
+   presentation only.
+
+   DESIGN LANGUAGE — thekilncafe.com, with real measured values:
+   · Brick   #A32D21 — the actual dominant colour of the Kiln Cafe
+             wordmark, pixel-sampled from
+             brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png
+             (41,161 px of it — this IS the logo colour)
+   · Blush   #F7AFAD — the second sampled colour from the same mark
+   · Cream   #FFF9F0 — the site's warm paper background family
+   · Charcoal #2B2724 and Clay #B87946 — the app's existing brand
+     spec, kept (the glazed tiles stay; the brief: site identity
+     "applied alongside the glazed tiles")
+   · The wavy divider — the site's flowing-line motif, drawn as an
+     inline SVG wave in brick + blush.
+   · Voice on the site is cheeky ("It's not all cheese and cider
+     round here you know...") — that lives in copy, not CSS.
+
+   THE TILE LAW (non-negotiable, from the brief):
+   Every tile is a SQUARE glazed tile. No oblongs, no text-only
+   tiles. Mixed sizes, largest at the top, getting smaller down the
+   page. Rows fill the width exactly at 390px AND 375px.
+
+   THE MATH — why this cannot produce the size-class bug:
+   Tiles are sized as exact fractions of the container so every row
+   fills any width perfectly, not just 390/375:
+     · tiles 1–2   -> 2 per row, each (100% − 1×8px gap) / 2
+     · tiles 3–5   -> 3 per row, each (100% − 2×8px gap) / 3
+     · tiles 6+    -> 4 per row, each (100% − 3×8px gap) / 4
+   Row capacity boundaries land exactly on size-class boundaries
+   (2 fills row one, 3 fills row two), so a wide tile can NEVER sit
+   beside narrow ones mid-row — the "three quarters of a box" bug
+   (located headless in the 470888d session) is geometrically
+   impossible here, not just patched. aspect-ratio:1/1 makes every
+   tile a true square, so every row is uniform height by
+   construction. Verified headless at 390px and 375px (see
+   ROLLING_NOTES 21 Jul).
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── The paper. Site-warm cream instead of flat white. ── */
+html.demo-skin body {
+  background: #FFF9F0 !important;
+}
+
+/* ── The wavy line — thekilncafe.com's flowing motif, in the real
+      sampled brick + blush. Reusable: put class="kc-wave" on any
+      element, and it auto-applies under the flow-view crumb. ── */
+html.demo-skin .kc-wave,
+html.demo-skin #flow-crumb::after {
+  content: '';
+  display: block;
+  height: 10px;
+  margin: 8px 0 2px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='10' viewBox='0 0 48 10'%3E%3Cpath d='M0 5 Q 6 0, 12 5 T 24 5 T 36 5 T 48 5' fill='none' stroke='%23A32D21' stroke-width='2' stroke-linecap='round' opacity='0.55'/%3E%3Cpath d='M0 8 Q 6 3, 12 8 T 24 8 T 36 8 T 48 8' fill='none' stroke='%23F7AFAD' stroke-width='1.6' stroke-linecap='round' opacity='0.8'/%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-size: 48px 10px;
+}
+
+/* ── Crumb becomes the site's display voice: bold, spaced caps,
+      charcoal — the "THE KILN CAFE" heading treatment. ── */
+html.demo-skin #flow-crumb {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 800;
+  color: #2B2724;
+}
+
+/* ═══ THE TILE LAW ═══
+   The home flow tiles are inline-styled buttons inside the flex
+   container in #flow-graph-body (see _renderFlowGraph). !important
+   is required and correct here: it lets the skin override inline
+   styles WITHOUT touching the renderer — which is exactly what
+   keeps the whole redesign one-switch revertible. */
+
+html.demo-skin #flow-graph-body > div[style*="flex-wrap"] {
+  gap: 8px !important;
+}
+
+/* Every tile: a true glazed SQUARE. */
+html.demo-skin #flow-graph-body > div[style*="flex-wrap"] > button {
+  aspect-ratio: 1 / 1 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  border-radius: 18px !important;
+  justify-content: flex-end !important;
+  align-items: flex-start !important;
+  padding: 10px 12px !important;
+  /* the glaze: keep each tile's own colour gradient (inline), add the
+     dipped-glaze sheen on top of it */
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.38),
+    inset 0 -10px 18px rgba(43, 39, 36, 0.14),
+    0 4px 10px rgba(43, 39, 36, 0.16) !important;
+}
+html.demo-skin #flow-graph-body > div[style*="flex-wrap"] > button:active {
+  transform: scale(0.96);
+  transition: transform 0.08s ease-out;
+}
+
+/* Size class 1 — tiles 1–2: the two biggest squares, top of the page. */
+html.demo-skin #flow-graph-body > div[style*="flex-wrap"] > button:nth-child(-n+2) {
+  flex: 0 0 calc((100% - 8px) / 2) !important;
+  width: calc((100% - 8px) / 2) !important;
+  max-width: calc((100% - 8px) / 2) !important;
+}
+html.demo-skin #flow-graph-body > div[style*="flex-wrap"] > button:nth-child(-n+2) > div:first-child {
+  font-size: 30px !important;
+}
+html.demo-skin #flow-graph-body > div[style*="flex-wrap"] > button:nth-child(-n+2) > div:last-child {
+  font-size: 15px !important;
+}
+
+/* Size class 2 — tiles 3–5: three smaller squares. */
+html.demo-skin #flow-graph-body > div[style*="flex-wrap"] > button:nth-child(n+3):nth-child(-n+5) {
+  flex: 0 0 calc((100% - 16px) / 3) !important;
+  width: calc((100% - 16px) / 3) !important;
+  max-width: calc((100% - 16px) / 3) !important;
+}
+html.demo-skin #flow-graph-body > div[style*="flex-wrap"] > button:nth-child(n+3):nth-child(-n+5) > div:first-child {
+  font-size: 22px !important;
+}
+html.demo-skin #flow-graph-body > div[style*="flex-wrap"] > button:nth-child(n+3):nth-child(-n+5) > div:last-child {
+  font-size: 12px !important;
+}
+
+/* Size class 3 — tiles 6 onward: four small squares per row, and the
+   page keeps getting smaller from here down, per the law. */
+html.demo-skin #flow-graph-body > div[style*="flex-wrap"] > button:nth-child(n+6) {
+  flex: 0 0 calc((100% - 24px) / 4) !important;
+  width: calc((100% - 24px) / 4) !important;
+  max-width: calc((100% - 24px) / 4) !important;
+  border-radius: 14px !important;
+  padding: 8px 9px !important;
+}
+html.demo-skin #flow-graph-body > div[style*="flex-wrap"] > button:nth-child(n+6) > div:first-child {
+  font-size: 18px !important;
+}
+html.demo-skin #flow-graph-body > div[style*="flex-wrap"] > button:nth-child(n+6) > div:last-child {
+  font-size: 9.5px !important;
+  font-weight: 800 !important;
+}
+
+/* Back link picks up the brick identity instead of clay. */
+html.demo-skin #flow-graph-body button[onclick="_flowGraphHome()"] {
+  background: rgba(163, 45, 33, 0.10) !important;
+  border: 1px solid rgba(163, 45, 33, 0.35) !important;
+  color: #A32D21 !important;
+}
+
+/* ── Customer app: same paper, same wave available via .kc-wave.
+      (Deeper customer-app treatment is the next stage of the demo
+      build — the switch already governs it.) ── */
+html.demo-skin .app-header,
+html.demo-skin header {
+  border-bottom: none;
+}
