@@ -13587,6 +13587,19 @@ async function landOnHome() {
   if (currentShiftStaff) {
     try { await loadPersonalHomeScreen(); } catch(e) { /* grid fallback is fine */ }
   }
+  // Directors' Daily Digest — auto-opens ONCE per UK day, on the first
+  // landing after login, and never again that day (localStorage marker +
+  // a per-page-load guard so a mid-shift Home tap can't re-trigger it).
+  // Deliberately fired on a delay AFTER the home tiles have painted so it
+  // slides over a finished screen, never blocks the landing itself.
+  if (typeof _isDirector === 'function' && _isDirector() && currentShiftStaff && !window._digestAutoShown) {
+    const digestKey = 'klnk_digest_seen_' + new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
+    if (!localStorage.getItem(digestKey)) {
+      window._digestAutoShown = true;
+      localStorage.setItem(digestKey, '1');
+      setTimeout(() => { try { openDailyDigest(true); } catch (e) { /* digest must never break landing */ } }, 900);
+    }
+  }
   // ─── THE FLOW PROOF IS HOME NOW. 18 July 2026. ───
   // "The flow proof should be the home page for everybody, where there's
   // an individual flow proof relevant to them ... that we used to have
@@ -17825,6 +17838,7 @@ const GRID_NAV_STRUCTURE = [
   // folds into Training (training screen links across).
   { id: 'studio', label: 'The Studio', color: '#4C8C5A', items: [
     { tab: 'dashboard', label: '📊 Takings', desc: 'Your daily overview' },
+    { tab: 'daily-digest', fn: 'openDailyDigest', label: '📰 Daily Digest', desc: "Yesterday's takings · today at a glance" },
     { tab: 'stock', label: '🫙 Stock & Bisque', desc: 'Bisque stock, silhouettes & reservations' },
     { tab: 'team', label: '👥 Team & Duties', desc: 'Duty lists, timekeeping · everyone\'s live tasks' },
     { tab: 'catalogue', label: '🖼️ Piece Catalogue', desc: 'What customers browse from home' },
@@ -19505,6 +19519,93 @@ function _isDirector() {
   const n = (typeof currentShiftStaff !== 'undefined' && currentShiftStaff?.name)
     ? currentShiftStaff.name.split(' ')[0] : '';
   return PLATFORM_REVENUE_ACCESS.includes(n);
+}
+
+// ─── DAILY DIGEST, per direct request: "implement the daily digest for
+// Daisy AND David AND Jenny." One bottom sheet: yesterday's takings, the
+// rolling week, and what's coming on the next open day — the three
+// questions a director asks before the doors open. Auto-opens once per
+// UK day on first login (see landOnHome), and lives as its own tile
+// under The Studio for any later look. Server enforces the director
+// gate (/api/digest/daily, same check as Takings) — the tile shows a
+// friendly note to non-directors instead of a bare 403.
+async function openDailyDigest(auto = false) {
+  if (!_isDirector()) {
+    if (!auto) toast('📰 The Daily Digest is for directors', 'info');
+    return;
+  }
+  document.getElementById('daily-digest-overlay')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'daily-digest-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9600;background:rgba(43,39,36,0.45);display:flex;align-items:flex-end;justify-content:center;';
+  ov.innerHTML = `
+    <div style="background:#FFFDF9;border-radius:18px 18px 0 0;max-width:640px;width:100%;max-height:86vh;overflow-y:auto;padding:20px 18px calc(24px + env(safe-area-inset-bottom));box-shadow:0 -8px 30px rgba(0,0,0,0.25);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+        <div style="font-size:22px;font-weight:800;color:#2B2724;">📰 Daily Digest</div>
+        <button onclick="document.getElementById('daily-digest-overlay').remove()"
+          style="border:none;background:#2B2724;color:#FFFDF9;border-radius:10px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;">Close</button>
+      </div>
+      <div style="font-size:12px;color:#8a8175;margin-bottom:14px;">
+        ${new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/London' })}
+      </div>
+      <div id="daily-digest-body" style="font-size:14px;color:#2B2724;">Loading your digest…</div>
+    </div>`;
+  ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+  document.body.appendChild(ov);
+  const body = document.getElementById('daily-digest-body');
+  try {
+    // Same cold-start guard as everywhere else: never let a stale boot
+    // flag turn a real request into silent nothing (the 1dd25bd lesson).
+    if (!apiConnected) { await checkAPIConnection(); }
+    const res = await fetch(`${API_URL}/api/digest/daily?studioId=${studioId}&staffMemberId=${currentShiftStaff?.id || ''}`);
+    const d = await res.json();
+    if (!res.ok) { body.innerHTML = `<div style="color:#b00020;">${d.error || 'Could not load the digest.'}</div>`; return; }
+    const money = v => '£' + (v || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const tm = s => new Date(s).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
+    const focusCovers = (d.focusBookings || []).reduce((s, b) => s + (b.party || 1), 0);
+    const focusLabel = d.focusDate
+      ? (d.focusIsToday ? 'Today' : new Date(d.focusDate + 'T12:00:00Z').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' }))
+      : 'No upcoming bookings';
+    // Tile law: squares. Three equal square glazed stat tiles, one row.
+    const stat = (bg, top, big, small) => `
+      <div style="flex:1;aspect-ratio:1/1;border-radius:14px;background:${bg};color:#FFFDF9;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+        box-shadow:inset 0 1px 0 rgba(255,255,255,0.35), 0 3px 8px rgba(43,39,36,0.18);padding:6px;">
+        <div style="font-size:11px;opacity:0.9;">${top}</div>
+        <div style="font-size:18px;font-weight:800;line-height:1.15;margin:3px 0;">${big}</div>
+        <div style="font-size:10px;opacity:0.85;">${small}</div>
+      </div>`;
+    body.innerHTML = `
+      <div style="display:flex;gap:10px;margin-bottom:16px;">
+        ${stat('linear-gradient(150deg,#4a7cb5,#3E6FA3 55%,#33587F)', 'Yesterday', money(d.yesterday.revenue), d.yesterday.transactions + ' transactions')}
+        ${stat('linear-gradient(150deg,#57a067,#4C8C5A 55%,#3B6E47)', 'Last 7 days', money(d.last7Days.revenue), d.last7Days.transactions + ' transactions')}
+        ${stat('linear-gradient(150deg,#c98a54,#B87946 55%,#96613A)', d.focusIsToday ? 'Today' : 'Next open day', (d.focusBookings || []).length + ' bookings', focusCovers + ' covers')}
+      </div>
+      <div style="font-size:14px;font-weight:800;color:#2B2724;margin-bottom:8px;">${focusLabel}</div>
+      ${(d.focusBookings || []).length ? `
+        <div style="border:1.5px solid rgba(43,39,36,0.12);border-radius:14px;overflow:hidden;margin-bottom:16px;">
+          ${(d.focusBookings || []).slice(0, 10).map((b, i) => `
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;${i ? 'border-top:1px solid rgba(43,39,36,0.08);' : ''}">
+              <div style="font-weight:800;font-size:13px;min-width:44px;">${tm(b.time)}</div>
+              <div style="flex:1;font-size:13px;">${b.name}</div>
+              <div style="font-size:12px;color:#8a8175;">${b.party} ${b.party === 1 ? 'cover' : 'covers'}${b.room ? ' · ' + b.room : ''}</div>
+            </div>`).join('')}
+          ${(d.focusBookings || []).length > 10 ? `<div style="padding:8px 12px;font-size:12px;color:#8a8175;border-top:1px solid rgba(43,39,36,0.08);">+ ${(d.focusBookings || []).length - 10} more on the floor plan</div>` : ''}
+        </div>` : `<div style="font-size:13px;color:#8a8175;margin-bottom:16px;">Nothing in the book yet.</div>`}
+      ${(d.daysAhead || []).length > 1 ? `
+        <div style="font-size:12px;font-weight:800;color:#8a8175;margin-bottom:6px;">THE WEEK AHEAD</div>
+        <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;">
+          ${d.daysAhead.map(day => `
+            <div style="min-width:74px;aspect-ratio:1/1;border-radius:12px;background:#F1EAE0;color:#2B2724;
+              display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;">
+              <div style="font-size:10px;color:#8a8175;">${new Date(day.date + 'T12:00:00Z').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' })}</div>
+              <div style="font-size:17px;font-weight:800;">${day.count}</div>
+              <div style="font-size:9px;color:#8a8175;">${day.covers} covers</div>
+            </div>`).join('')}
+        </div>` : ''}`;
+  } catch (e) {
+    body.innerHTML = 'Could not reach the server — give it a moment and tap the Daily Digest tile again.';
+  }
 }
 
 // Measures the ACTUAL rendered heights of the platform revenue strip and

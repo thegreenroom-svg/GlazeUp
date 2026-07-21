@@ -1442,6 +1442,103 @@ app.delete('/api/devices/:deviceId', async (req, res) => {
  * GET /api/analytics/dashboard
  * Get dashboard data for a studio
  */
+// GET /api/digest/daily — the directors' daily digest, per direct request
+// ("implement the daily digest for Daisy AND David AND Jenny"). One glance
+// that answers: how did yesterday go, what's coming today / the next open
+// day. Same director gate as /api/analytics/dashboard — identical data
+// sensitivity, identical check, one source of truth for who sees money.
+// All figures come from the same real sources the rest of the app already
+// trusts: analytics_cache (daily_revenue, written by the Square orders
+// sync) and the bookings table (written by /api/bookings/sync from Square
+// Appointments). Nothing is computed a second way — no System B.
+app.get('/api/digest/daily', async (req, res) => {
+  const { studioId, staffMemberId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studio_id required' });
+  if (!staffMemberId) return res.status(401).json({ error: 'Not authorised' });
+
+  const { data: staffMember } = await supabase.from('staff_team').select('name').eq('id', staffMemberId).single();
+  const firstName = (staffMember?.name || '').trim().split(' ')[0].toLowerCase();
+  if (!PLATFORM_REVENUE_ACCESS_NAMES.includes(firstName)) {
+    return res.status(403).json({ error: 'This data is restricted to directors.' });
+  }
+
+  try {
+    // Dates in the studio's own timezone, not the server's (Render runs
+    // UTC; a 00:30 BST transaction belongs to the UK day it happened in).
+    const ukDay = (d) => d.toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
+    const now = new Date();
+    const today = ukDay(now);
+    const yesterday = ukDay(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+    const sevenAgo = ukDay(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000));
+
+    // Revenue: yesterday + rolling 7 days, straight from analytics_cache.
+    // metric_value is JSONB {revenue_cents, transaction_count} — the shape
+    // lesson from 059f0e4: always read .revenue_cents, never parseInt.
+    const { data: recent } = await supabase
+      .from('analytics_cache')
+      .select('metric_date, metric_value')
+      .eq('studio_id', studioId)
+      .eq('metric_type', 'daily_revenue')
+      .gte('metric_date', sevenAgo)
+      .order('metric_date', { ascending: false });
+    const yRow = (recent || []).find(r => r.metric_date === yesterday);
+    const weekCents = (recent || []).reduce((s, r) => s + (r.metric_value?.revenue_cents || 0), 0);
+    const weekTxns = (recent || []).reduce((s, r) => s + (r.metric_value?.transaction_count || 0), 0);
+
+    // Bookings: everything upcoming (small table, real Square appointments
+    // only). Cancelled/completed filtered in JS rather than .neq chains so
+    // rows with a NULL status are kept — PostgREST .neq drops nulls.
+    const { data: upcoming } = await supabase
+      .from('bookings')
+      .select('customer_name, party_size, session_start, room, space_name, status')
+      .eq('studio_id', studioId)
+      .gte('session_start', new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString())
+      .order('session_start', { ascending: true })
+      .limit(300);
+    const live = (upcoming || []).filter(b => !['cancelled', 'completed'].includes((b.status || '').toLowerCase()));
+
+    const byDate = {};
+    live.forEach(b => {
+      if (!b.session_start) return;
+      const dt = ukDay(new Date(b.session_start));
+      (byDate[dt] = byDate[dt] || []).push(b);
+    });
+    const dates = Object.keys(byDate).sort();
+
+    // Focus day = today if the studio is open today, otherwise the next
+    // day that actually has bookings — the same booking-driven roll-forward
+    // the floor plan uses (closed Mon–Wed handled with zero hard-coding).
+    const focusDate = byDate[today] ? today : (dates[0] || null);
+    const focusBookings = focusDate ? byDate[focusDate].map(b => ({
+      time: b.session_start,
+      name: b.customer_name || 'Booking',
+      party: b.party_size || 1,
+      room: b.room || b.space_name || ''
+    })) : [];
+
+    const daysAhead = dates.slice(0, 7).map(dt => ({
+      date: dt,
+      count: byDate[dt].length,
+      covers: byDate[dt].reduce((s, b) => s + (b.party_size || 1), 0)
+    }));
+
+    res.json({
+      yesterday: {
+        date: yesterday,
+        revenue: (yRow?.metric_value?.revenue_cents || 0) / 100,
+        transactions: yRow?.metric_value?.transaction_count || 0
+      },
+      last7Days: { revenue: weekCents / 100, transactions: weekTxns },
+      focusDate,
+      focusIsToday: focusDate === today,
+      focusBookings,
+      daysAhead
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/analytics/dashboard — The Kiln Cafe's own real revenue and app
 // usage figures. Director-only (David/Jenny/Daisy), same access check as
 // Platform Revenue — this is genuinely sensitive financial data and the
