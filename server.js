@@ -239,6 +239,34 @@ const staticCacheOptions = {
 };
 app.use('/admin', express.static(path.join(__dirname, 'admin'), staticCacheOptions));
 app.use('/app', express.static(path.join(__dirname, 'app'), staticCacheOptions));
+// ═══════════════════════════════════════════════════════════════════
+// THE REAL "nothing changed" ROOT CAUSE, 21 Jul night. Both apps'
+// <head> reference /demo-skin-flag.js, /demo-skin.js and
+// /css/demo-skin.css — but NO route ever served the repo root or
+// /css, only /admin, /app, /brand-assets, /docs. Every request for
+// those three files 404'd, silently: window.DEMO_SKIN was never set,
+// so the inline `if (window.DEMO_SKIN)` check was always false, the
+// skin CSS never loaded, and demo-skin.js never ran — the whole
+// radical build was invisible however many times it deployed. My own
+// headless test never caught this because it served files with a
+// bare Node http server with no route restrictions, unlike Express
+// here — a real gap in the test method, not just the code.
+// Deliberately NOT mounting express.static on the repo root itself —
+// that would also serve server.js, the SQL schema files, and
+// ROLLING_NOTES.md to the public internet. Two narrow single-file
+// routes for the two JS files, plus a real /css mount (that
+// directory only ever holds stylesheets, safe to serve whole).
+app.get('/demo-skin-flag.js', (req, res) => {
+  res.type('application/javascript');
+  res.set('Cache-Control', 'no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, 'demo-skin-flag.js'));
+});
+app.get('/demo-skin.js', (req, res) => {
+  res.type('application/javascript');
+  res.set('Cache-Control', 'public, max-age=300, must-revalidate');
+  res.sendFile(path.join(__dirname, 'demo-skin.js'));
+});
+app.use('/css', express.static(path.join(__dirname, 'css'), staticCacheOptions));
 // Genuine real fix: /brand-assets was referenced directly in the real
 // HTML (apple-touch-icon, manifest icons) but never actually had a
 // real static route serving it — every real request for anything

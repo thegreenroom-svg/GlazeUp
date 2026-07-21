@@ -4788,3 +4788,40 @@ close-and-reopen.
 NEXT: customer-app Desk treatment, pull-to-refresh, swipe-back,
 per-screen deep reskins, predictive ordering of the Desk index by
 role/time, live tile-face data if any tiles return.
+
+# ═══════════════════════════════════════════════════════════
+# 21 JULY, LATER STILL — THE ACTUAL "nothing changed" ROOT CAUSE
+# ═══════════════════════════════════════════════════════════
+
+Daisy did everything right — confirmed commit 4f80c1b Live on Render,
+full close-and-reopen — and STILL saw the old tile grid. This ruled out
+every deploy/cache theory. The real bug: /demo-skin-flag.js,
+/demo-skin.js and /css/demo-skin.css were referenced by both apps'
+<head> but NO Express route ever served the repo root or /css —
+only /admin, /app, /brand-assets, /docs were mounted. All three
+requests 404'd, silently. window.DEMO_SKIN was never set, the inline
+`if (window.DEMO_SKIN)` check was always false, the whole radical
+build (digest tile aside, since that's server-side) was invisible no
+matter how many times it deployed.
+
+WHY MY OWN HEADLESS TESTS NEVER CAUGHT THIS: every dc4x/dc5x test
+served files with a bare Node http server with no route restrictions
+of its own (serves any file under repo root by path) — completely
+bypassing Express's actual routing. Passed every geometry/behaviour
+check while testing against a server that doesn't exist in
+production. Genuine gap in the test method, not just the code — next
+time a route-shaped bug is possible, spawn the REAL server.js (dummy
+Supabase env vars are enough to get past boot) and hit it with real
+HTTP requests, not a shortcut static server.
+
+FIX (this session): two narrow single-file routes for the two root
+JS files + a real app.use('/css', ...) mount. Deliberately did NOT
+mount express.static on the repo root — that would also serve
+server.js, the SQL schema files, and ROLLING_NOTES.md to the public
+internet. VERIFIED against the real spawned server.js process (not
+the test shortcut): all three now 200, correct content-type, correct
+byte length; admin HTML still 200; server boots clean with Supabase
+connecting (dummy creds only fail on real DB calls, not boot).
+
+NEEDS RENDER DEPLOY — server.js changed again. This is the one that
+actually makes tonight's work visible.
