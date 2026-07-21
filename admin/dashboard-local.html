@@ -17552,67 +17552,69 @@ function demoteSubTile(tabId) {
 })();
 
 const GRID_NAV_STRUCTURE = [
-  
-  
-  { tab: 'learning-insights', label: 'Insights', desc: 'Studio workflow analytics' },
-  
-  { tab: 'start-demo', label: 'Start Demo', desc: 'Studio simulation trainer' },
-  
-  { tab: 'navigation-help', label: 'Navigation Help', desc: 'How to use the app' },
-  
+
+  // Quick standalone actions (surface directly, no group tap needed)
   { tab: 'home', label: 'Home', desc: 'Back to your dashboard' },
-  
-  { id: 'tables', label: 'Tables', color: '#00695c', items: [
-    { tab: 'floor-plan', label: 'Floor Plan', desc: 'Live view of all tables', fn: 'showFloorPlan' },
-  // Customer app demo — always visible so staff can see exactly what
-  // customers see. Opens the real customer app in a new tab with a
-  // demo booking so it's fully functional, not a mockup.
-  { tab: 'customer-demo', label: '👀 Customer App', desc: 'See what customers see', fn: 'openCustomerDemo' },
-  { tab: 'whats-on', label: '📅 What\'s On', desc: 'Local events & school holidays', fn: 'openWhatsOn' },
   { tab: 'tell-daisy', label: '💬 Tell Daisy', desc: 'Something good or bad happened', fn: 'openTellPicker' },
-  { tab: 'health-safety', label: '🦺 Health & Safety', desc: 'Risk assessment, training, procedures', fn: 'openHealthSafety' },
-  { tab: 'packing', label: '📦 Packing', desc: 'Fired pieces going home', fn: 'openPacking' },
-  { tab: 'kiln', label: '🔥 Kiln', desc: 'Dip → load → fire', fn: 'openKiln' },
-  { tab: 'learning', label: '🌱 Learning', desc: 'What the app has noticed from real usage', fn: 'openLearning' },
-  { tab: 'collections', label: '🏺 Collections', desc: 'Ready to collect · returns · find on shelf', fn: 'openCollections' },
-  { tab: 'training', label: '🎓 My Training', desc: 'Read, tick, done', fn: 'openMyTraining' },
-  { tab: 'trial-reset', label: '🔄 Clear & Start Again', desc: 'Reset today for testing', fn: 'openTrialReset' },
-  { tab: 'music', label: '🎵 Music', desc: 'Volume · skip · what\'s playing', fn: 'openMusic' },
+
+  // ═══════════════════════════════════════════════════════════════
+  // CONDENSED NAV — 20 Jul 2026, per Daisy: "as few tiles as possible,
+  // more groupings, a few taps to anything." Was 11 groups incl. a
+  // 12-item 'Tables' junk drawer and four single-item groups (Menu,
+  // Community, Admin Tools, Setup) that each wasted a whole tap. Now 5
+  // task-based groups; every destination is 2 taps from home. Same
+  // tabs/fns/labels/desc — only the grouping changed, so every route
+  // and every screen underneath is identical.
+  // ═══════════════════════════════════════════════════════════════
+
+  // 1. THE FLOOR — running the room right now
+  { id: 'floor', label: 'The Floor', color: '#3E6FA3', items: [
+    { tab: 'floor-plan', label: '🪑 Floor Plan', desc: 'Live view of all tables', fn: 'showFloorPlan' },
+    { tab: 'staff', label: '📋 Daily Bookings', desc: 'Start a booking, walk-in, or party' },
+    { tab: 'tablecards', label: '🎫 Table Cards', desc: "Print a table's QR card" },
+    { tab: 'menu', label: '🍰 Daily Menu', desc: "Today's specials" },
+    { tab: 'music', label: '🎵 Music', desc: 'Volume · skip · what\'s playing', fn: 'openMusic' },
   ]},
-  { id: 'dashboard', label: 'Dashboard', color: '#B87946', items: [
-    { tab: 'dashboard', label: 'Overview', desc: 'Your daily overview' },
-  { tab: 'host-by-post', label: 'Host By Post', desc: 'Postal kits & orders', icon: '📦' },
-  
+
+  // 2. PIECES — everything after painting: fire, find, pack, send
+  { id: 'pieces', label: 'Pieces & Kiln', color: '#C0392B', items: [
+    { tab: 'kiln', label: '🔥 Kiln', desc: 'Dip → load → fire', fn: 'openKiln' },
+    { tab: 'piecematch', label: '🔍 Piece Matching', desc: 'AI-match fired pieces to photos' },
+    { tab: 'collections', label: '🏺 Collections', desc: 'Ready to collect · returns · find on shelf', fn: 'openCollections' },
+    { tab: 'packing', label: '📦 Packing', desc: 'Fired pieces going home', fn: 'openPacking' },
+    { tab: 'labels', label: '🏷️ Labels', desc: 'Print collection or postal labels' },
+    { tab: 'printqueue', label: '🖨️ Print Queue', desc: 'Approve customer transfer designs' },
   ]},
-  { id: 'bookings', label: 'Bookings', color: '#2e7d32', items: [
-    { tab: 'staff', label: 'Daily Bookings', desc: 'Start a booking, walk-in, or party' },
-    { tab: 'tablecards', label: 'Table Cards', desc: "Print a table's QR card" },
+
+  // 3. STUDIO — stock, catalogue, what customers see & post
+  { id: 'studio', label: 'Studio', color: '#4C8C5A', items: [
+    { tab: 'dashboard', label: '📊 Takings', desc: 'Your daily overview' },
+    { tab: 'stock', label: '🫙 Stock', desc: 'Photograph bisque, manage reservations' },
+    { tab: 'catalogue', label: '🖼️ Piece Catalogue', desc: 'What customers browse from home' },
+    { tab: 'shapes', label: '⚱️ Bisque', desc: 'Your Square catalogue as silhouettes' },
+    { tab: 'community', label: '🌍 Club Pages', desc: 'Feature and moderate customer work' },
+    { tab: 'customer-demo', label: '👀 Customer App', desc: 'See what customers see', fn: 'openCustomerDemo' },
+    { tab: 'host-by-post', label: '📮 Host By Post', desc: 'Postal kits & orders' },
+    { tab: 'whats-on', label: '📅 What\'s On', desc: 'Local events & school holidays', fn: 'openWhatsOn' },
   ]},
-  { id: 'menu', label: 'Menu', color: '#F9A825', items: [
-    { tab: 'menu', label: 'Daily Menu', desc: "Today's specials" },
+
+  // 4. TEAM — people, duties, training, what the app has learned
+  { id: 'team', label: 'Team', color: '#7C5AA6', items: [
+    { tab: 'team', label: '👥 Team & Duties', desc: 'Duty lists, timekeeping, holidays' },
+    { tab: 'progress', label: '✅ Daily Progress', desc: "Every team member's live tasks" },
+    { tab: 'training', label: '🎓 My Training', desc: 'Read, tick, done', fn: 'openMyTraining' },
+    { tab: 'health-safety', label: '🦺 Health & Safety', desc: 'Risk assessment, training, procedures', fn: 'openHealthSafety' },
+    { tab: 'learning', label: '🌱 Learning', desc: 'What the app has noticed from real usage', fn: 'openLearning' },
+    { tab: 'learning-insights', label: '📈 Insights', desc: 'Studio workflow analytics' },
   ]},
-  { id: 'pieces', label: 'Pieces', color: '#c0392b', items: [
-    { tab: 'piecematch', label: 'Piece Matching', desc: 'AI-match fired pieces to photos' },
-    { tab: 'labels', label: 'Labels', desc: 'Print collection or postal labels' },
-    { tab: 'printqueue', label: 'Print Queue', desc: 'Approve customer transfer designs' },
-  ]},
-  { id: 'stock', label: 'Stock', color: '#5E35B1', items: [
-    { tab: 'stock', label: 'Stock', desc: 'Photograph bisque, manage reservations' },
-    { tab: 'catalogue', label: 'Piece Catalogue', desc: 'What customers browse from home' },
-    { tab: 'shapes', label: 'Bisque', desc: 'Your Square catalogue as silhouettes' },
-  ]},
-  { id: 'team', label: 'Team', color: '#00838f', items: [
-    { tab: 'team', label: 'Team & Duties', desc: 'Duty lists, timekeeping, holidays' },
-    { tab: 'progress', label: 'Daily Progress', desc: "Every team member's live tasks" },
-  ]},
-  { id: 'community', label: 'Community', color: '#8e44ad', items: [
-    { tab: 'community', label: 'Feature and moderate customer work', desc: '' },
-  ]},
-  { id: 'admin-tools', label: 'Admin Tools', color: '#2B2724', items: [
-    { tab: 'branding', label: 'Branding', desc: 'Colours, logo, customer app look' },
-  ]},
-  { id: 'setup', label: 'Studio Setup', items: [
-    { tab: 'setup', label: 'Studio Setup', desc: 'Connections, Cleo, add-ons, offers' },
+
+  // 5. SET UP — connections, branding, add-ons, testing tools
+  { id: 'setup', label: 'Set Up & Tools', color: '#8A6244', items: [
+    { tab: 'setup', label: '⚙️ Studio Setup', desc: 'Connections, Cleo, add-ons, offers' },
+    { tab: 'branding', label: '🎨 Branding', desc: 'Colours, logo, customer app look' },
+    { tab: 'navigation-help', label: '🧭 Navigation Help', desc: 'How to use the app' },
+    { tab: 'start-demo', label: '🎬 Start Demo', desc: 'Studio simulation trainer' },
+    { tab: 'trial-reset', label: '🔄 Clear & Start Again', desc: 'Reset today for testing', fn: 'openTrialReset' },
   ]},
 ];
 
@@ -18181,8 +18183,10 @@ const DAISY_FLOW_GRAPH = {
 // tree. The booking-journey (the one true multi-step workflow) is
 // spliced under the 'bookings' group so its stages still unfold.
 const _FLOW_GROUP_EMOJI = {
-  tables:'🪑', dashboard:'📈', bookings:'📋', menu:'☕', pieces:'🏺',
-  stock:'📦', team:'👥', community:'🌟', setup:'⚙️'
+  // 5 condensed groups (20 Jul)
+  floor:'🪑', pieces:'🔥', studio:'🎨', team:'👥', setup:'⚙️',
+  // legacy keys kept as fallback
+  tables:'🪑', dashboard:'📈', bookings:'📋', menu:'☕', stock:'📦', community:'🌟'
 };
 // ─── PARSE-TIME REGEX LITERALS REMOVED. 18 July 2026. ───
 // Timeline evidence: the app worked on Daisy's phone at 14:20 and every
@@ -18208,6 +18212,13 @@ function _cleanLabel(label) {
 }
 function _buildFlowTreeFromNav() {
   const children = (typeof GRID_NAV_STRUCTURE !== 'undefined' ? GRID_NAV_STRUCTURE : []).map(group => {
+    // Top-level standalone item (a direct action surfaced at home, no
+    // group wrapper) — e.g. Home, Tell Daisy. Render as its own action
+    // tile rather than an empty branch.
+    if (!group.items && group.tab) {
+      return { id: group.tab, label: _cleanLabel(group.label), emoji: _leadingEmoji(group.label, '•'),
+               desc: group.desc || '', fn: group.fn || null, size: 'big' };
+    }
     const groupEmoji = _FLOW_GROUP_EMOJI[group.id] || '•';
     const kids = (group.items || []).map(it => ({
       id: it.tab,
@@ -18231,9 +18242,11 @@ function _buildFlowTreeFromNav() {
     };
   });
 
-  // Splice the real booking-journey stages under the bookings group, so
-  // the one genuine multi-step workflow still unfolds stage by stage.
-  const bookingsGroup = children.find(c => c.id === 'bookings-group');
+  // Splice the real booking-journey stages under the group that owns Daily
+  // Bookings (now 'The Floor' → 'floor-group'), so the one genuine
+  // multi-step workflow still unfolds stage by stage.
+  const bookingsGroup = children.find(c => c.id === 'floor-group')
+                     || children.find(c => c.id === 'bookings-group');
   if (bookingsGroup && bookingsGroup.children) {
     bookingsGroup.children.push({
       id:'journey-booking', label:'The Journey', emoji:'🔄', desc:'Booking → Painting → Completion → Kiln', size:'mid', children:[
@@ -18372,9 +18385,11 @@ const TILE_GLAZE = {
   // Director admin
   'admin-group':'plum', 'admin-offers':'pink', 'admin-staff':'purple',
   'admin-hs':'coral', 'admin-loyalty':'yellow', 'admin-config':'brown', 'admin-revenue':'jadeColor',
-  // The 5 top-level groups — each its own distinct glaze
-  'foh-group':'blue', 'pieces-group':'red', 'studio-group':'jadeColor',
+  // The 5 condensed top-level groups (20 Jul) — each its own distinct glaze
+  'floor-group':'blue', 'pieces-group':'red', 'studio-group':'jadeColor',
   'team-group':'purple', 'setup-group':'brown',
+  // legacy group ids kept mapped so nothing regresses if referenced
+  'foh-group':'blue', 'bookings-group':'teal',
   'floor-plan':'blue', 'staff-group':'teal', 'staff':'teal',
   'dashboard':'jadeColor', 'takings':'jadeColor',
   'the-journey':'tealDeep', 'journey-group':'tealDeep', 'kiln':'red', 'packing':'orange',
