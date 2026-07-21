@@ -17139,7 +17139,16 @@ function showPersonalHomeScreen() {
 
 function _buildPersonalItems() {
   if (!_personalScreen) return [];
-  const { tileOrder, promotedTiles } = _personalScreen;
+  // Defensive: a real saved record can come from an earlier schema era
+  // (pre-V2, or a partial save) where tileOrder/promotedTiles are
+  // missing or not arrays. This used to destructure straight off
+  // _personalScreen and call .forEach unguarded — if either field was
+  // ever not an array, that threw BEFORE _flowGraphEnter ever reached
+  // its render call, leaving the entire home screen blank with no
+  // error shown (the render's own try/catch never got a chance to
+  // run). Defaulting to [] here closes that whole class of bug.
+  const tileOrder = Array.isArray(_personalScreen.tileOrder) ? _personalScreen.tileOrder : [];
+  const promotedTiles = Array.isArray(_personalScreen.promotedTiles) ? _personalScreen.promotedTiles : [];
   const items = [];
   const seen = new Set();
 
@@ -18628,7 +18637,19 @@ function _flowGraphEnter() { _flowStack = []; // Clear any stale nav
   // That's the real reason nothing looked different: not stale cache,
   // wrong function. Now builds the real personalised tree (or the full
   // GRID_NAV_STRUCTURE tree as fallback if there's no personal data yet).
-  _flowStack = [ (typeof _buildPersonalFlowTree === 'function') ? _buildPersonalFlowTree() : FULL_FLOW_TREE ];
+  // Belt and braces on top of the data-defensiveness fix in
+  // _buildPersonalItems(): if anything still throws building the real
+  // tree, never leave the screen blank — fall back to the full
+  // GRID_NAV_STRUCTURE tree, which has no dependency on fetched data at
+  // all. This is the same "never a silent blank screen" guarantee the
+  // old _buildHomeTree() had by construction; now it applies to the
+  // correct tree instead of the stale one.
+  try {
+    _flowStack = [ (typeof _buildPersonalFlowTree === 'function') ? _buildPersonalFlowTree() : FULL_FLOW_TREE ];
+  } catch(e) {
+    console.error('_buildPersonalFlowTree failed, falling back to full tree:', e);
+    _flowStack = [ FULL_FLOW_TREE ];
+  }
   document.getElementById('daisy-flow-view').style.display = 'block';
   // On the home screen the new glazed home bar carries every quick
   // action, so the top admin-header's own button row would just be a
