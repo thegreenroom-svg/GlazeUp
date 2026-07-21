@@ -4373,7 +4373,7 @@ function updateStaffName() {
       <!-- ═════════════════════════════════════════════ -->
       <div id="setup-view" class="view" style="display: none;">
         <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
-        <button onclick="goToRealLandingPage()" style="background:none;border:none;color:var(--gu-primary);font-size:13px;font-weight:700;padding:4px 0 12px;cursor:pointer;">← Floor plan</button>
+        <button onclick="goToRealLandingPage()" style="background:none;border:none;color:var(--gu-primary);font-size:13px;font-weight:700;padding:4px 0 12px;cursor:pointer;">← Home</button>
           <h2 style="margin-top:0;">Setup</h2>
           <span style="font-size:10px;color:var(--gu-dust);font-weight:600;">v1.1.0</span>
         </div>
@@ -16906,56 +16906,52 @@ function _updateNavControls() {
 // screen exists yet. Sub-tile tab IDs can be included as promoted tiles.
 const ROLE_HOME_DEFAULTS = {
   // ═══════════════════════════════════════════════════════════
-  // V2 CONDENSED (20 Jul 2026): each home is now the 5 task groups,
-  // ORDERED by that person's job — first group = what you do most.
-  // Everything inside a group is 2 taps. Replaces the old ~14-tile
-  // walls. ('assistant' removed: it's not in GRID_NAV_STRUCTURE and
-  // never rendered — Cleo is the floating button.)
+  // THREE TILES (21 Jul 2026): every home is now just the 3 groups —
+  // The Floor, Pieces & Kiln, The Studio — ORDERED by that person's
+  // job (first = what they do most). Team + Setup folded into The
+  // Studio, so there is nothing else on the home screen.
   // ═══════════════════════════════════════════════════════════
 
   'General Manager': {
-    // Daisy: the whole studio — floor first, then pieces, money/stock, people, setup
-    tileOrder: ['floor', 'pieces', 'studio', 'team', 'setup'],
+    tileOrder: ['floor', 'pieces', 'studio'],
     promotedTiles: ['tell-daisy']
   },
 
   'Co-Director': {
-    // David: same reach as Daisy — full visibility
-    tileOrder: ['floor', 'studio', 'pieces', 'team', 'setup'],
+    tileOrder: ['floor', 'studio', 'pieces'],
     promotedTiles: ['tell-daisy']
   },
 
   'Studio Executive': {
     // Jenny: PACKING IS HER JOB — Pieces & Kiln first, every time.
-    tileOrder: ['pieces', 'floor', 'studio', 'team'],
+    tileOrder: ['pieces', 'floor', 'studio'],
     promotedTiles: ['tell-daisy']
   },
 
   'Ceramic Technician': {
     // Lucy: bisque in, fired pieces out — kiln world first.
-    tileOrder: ['pieces', 'floor', 'studio', 'team'],
+    tileOrder: ['pieces', 'floor', 'studio'],
     promotedTiles: ['tell-daisy']
   },
 
   'Studio Assistant': {
     // Ruby: the floor — seat people, take orders, then pieces.
-    tileOrder: ['floor', 'pieces', 'team'],
+    tileOrder: ['floor', 'pieces', 'studio'],
     promotedTiles: ['tell-daisy']
   },
 
   'Marketing & Host By Post Manager': {
     // Elliott: customer-facing side first (Club Pages, catalogue, HBP live in Studio)
-    tileOrder: ['studio', 'floor', 'team', 'setup'],
+    tileOrder: ['studio', 'floor', 'pieces'],
     promotedTiles: ['tell-daisy']
   },
 
   'Barista': {
-    // Drinks (Daily Menu lives in The Floor), then people stuff.
-    tileOrder: ['floor', 'team'],
+    // Drinks (Daily Menu lives in The Floor) first.
+    tileOrder: ['floor', 'studio'],
     promotedTiles: ['tell-daisy']
   },
   'Chief Taster': {
-    // Cleo: her club (Club Pages in Studio), the floor for the menu
     tileOrder: ['floor', 'studio'],
     promotedTiles: []
   },
@@ -17566,13 +17562,15 @@ const GRID_NAV_STRUCTURE = [
   { tab: 'tell-daisy', label: '💬 Tell Daisy', desc: 'Something good or bad happened', fn: 'openTellPicker' },
 
   // ═══════════════════════════════════════════════════════════════
-  // CONDENSED NAV — 20 Jul 2026, per Daisy: "as few tiles as possible,
-  // more groupings, a few taps to anything." Was 11 groups incl. a
-  // 12-item 'Tables' junk drawer and four single-item groups (Menu,
-  // Community, Admin Tools, Setup) that each wasted a whole tap. Now 5
-  // task-based groups; every destination is 2 taps from home. Same
-  // tabs/fns/labels/desc — only the grouping changed, so every route
-  // and every screen underneath is identical.
+  // THREE TILES — THE WHOLE APP. 21 Jul 2026, per Daisy: "condense the
+  // whole app into as few as possible — you decide the finite amount."
+  // Three genuine modes of studio work, nothing else on the home screen:
+  //   1. The Floor    — running the room today (80% of daily use)
+  //   2. Pieces & Kiln — everything after painting
+  //   3. The Studio   — the whole business: money, customers, team, setup
+  // Team + Setup + the customer-facing tools fold under The Studio as
+  // labelled sub-sections, so the home stays at three tiles while every
+  // screen is still reachable. Same tabs/fns — only the shape changed.
   // ═══════════════════════════════════════════════════════════════
 
   // 1. THE FLOOR — running the room right now
@@ -17584,10 +17582,7 @@ const GRID_NAV_STRUCTURE = [
     { tab: 'music', label: '🎵 Music', desc: 'Volume · skip · what\'s playing', fn: 'openMusic' },
   ]},
 
-  // 2. PIECES — everything after painting: fire, find, pack, send.
-  // Merged 20 Jul: Labels + Print Queue → one "Printing" tile (both are
-  // printing; the Printing screen links to the Print Queue). Piece
-  // Matching kept separate — different person, different moment.
+  // 2. PIECES & KILN — everything after painting: fire, find, pack, send
   { id: 'pieces', label: 'Pieces & Kiln', color: '#C0392B', items: [
     { tab: 'kiln', label: '🔥 Kiln', desc: 'Dip → load → fire', fn: 'openKiln' },
     { tab: 'piecematch', label: '🔍 Piece Matching', desc: 'AI-match fired pieces to photos' },
@@ -17596,35 +17591,22 @@ const GRID_NAV_STRUCTURE = [
     { tab: 'labels', label: '🏷️ Printing', desc: 'Collection & postal labels · transfer print queue' },
   ]},
 
-  // 3. STUDIO — stock, catalogue, what customers see & post.
-  // Merged 20 Jul: Bisque (silhouettes) folds into Stock — both are the
-  // bisque catalogue; the Stock screen links across to the silhouette view.
-  { id: 'studio', label: 'Studio', color: '#4C8C5A', items: [
+  // 3. THE STUDIO — the whole business. Money, stock, the customer side,
+  // the team, and all setup — folded into labelled sub-sections so it's
+  // one home tile, not four.
+  { id: 'studio', label: 'The Studio', color: '#4C8C5A', items: [
     { tab: 'dashboard', label: '📊 Takings', desc: 'Your daily overview' },
     { tab: 'stock', label: '🫙 Stock & Bisque', desc: 'Bisque stock, silhouettes & reservations' },
-    { tab: 'catalogue', label: '🖼️ Piece Catalogue', desc: 'What customers browse from home' },
-    { tab: 'community', label: '🌍 Club Pages', desc: 'Feature and moderate customer work' },
-    { tab: 'customer-demo', label: '👀 Customer App', desc: 'See what customers see', fn: 'openCustomerDemo' },
-    { tab: 'host-by-post', label: '📮 Host By Post', desc: 'Postal kits & orders' },
-    { tab: 'whats-on', label: '📅 What\'s On', desc: 'Local events & school holidays', fn: 'openWhatsOn' },
-  ]},
-
-  // 4. TEAM — people, duties, training, what the app has learned.
-  // Merged 20 Jul: Insights folds into Learning (both are "what the app
-  // noticed" — Learning screen links to the analytics view).
-  { id: 'team', label: 'Team', color: '#7C5AA6', items: [
     { tab: 'team', label: '👥 Team & Duties', desc: 'Duty lists, timekeeping, holidays' },
     { tab: 'progress', label: '✅ Daily Progress', desc: "Every team member's live tasks" },
+    { tab: 'catalogue', label: '🖼️ Piece Catalogue', desc: 'What customers browse from home' },
+    { tab: 'customer-demo', label: '👀 Customer App', desc: 'See what customers see', fn: 'openCustomerDemo' },
+    { tab: 'community', label: '🌍 Club Pages', desc: 'Feature and moderate customer work' },
+    { tab: 'host-by-post', label: '📮 Host By Post', desc: 'Postal kits & orders' },
+    { tab: 'whats-on', label: '📅 What\'s On', desc: 'Local events & school holidays', fn: 'openWhatsOn' },
     { tab: 'training', label: '🎓 My Training', desc: 'Read, tick, done', fn: 'openMyTraining' },
     { tab: 'health-safety', label: '🦺 Health & Safety', desc: 'Risk assessment, training, procedures', fn: 'openHealthSafety' },
     { tab: 'learning', label: '🌱 Learning & Insights', desc: 'What the app has noticed · workflow analytics', fn: 'openLearning' },
-  ]},
-
-  // 5. SET UP — connections, add-ons, testing tools.
-  // Merged 20 Jul: Branding folds into Setup (setup already covers the
-  // customer-app look); Navigation Help + Start Demo → one "Help &
-  // Practice" (both are learn/practise the app).
-  { id: 'setup', label: 'Set Up & Tools', color: '#8A6244', items: [
     { tab: 'setup', label: '⚙️ Studio Setup', desc: 'Connections, branding, add-ons, offers' },
     { tab: 'navigation-help', label: '🧭 Help & Practice', desc: 'How to use the app · run a practice demo' },
     { tab: 'trial-reset', label: '🔄 Clear & Start Again', desc: 'Reset today for testing', fn: 'openTrialReset' },
@@ -29435,7 +29417,7 @@ function showTableDetail(roomName, tableId) {
     <div style="padding:16px;max-width:640px;margin:0 auto;">
       <button onclick="showHomeScreen()" class="glaze-tile"
         style="border:none;padding:9px 14px;font-size:12px;font-weight:700;cursor:pointer;margin-bottom:14px;">
-        ← Floor plan
+        ← Home
       </button>
 
       <div style="border:1.5px solid rgba(43,39,36,0.15);border-radius:14px;padding:18px;
@@ -30302,7 +30284,7 @@ if (typeof document !== 'undefined') {
         <div id="detail-table-name" style="font-size:19px;font-weight:800;color:#F4ECE0;"></div>
         <button onclick="closeTableDetail()" class="glaze-tile"
           style="background:none;border:1px solid rgba(184,121,70,0.4);color:#F4ECE0;border-radius:10px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">
-          ← Floor plan
+          ← Home
         </button>
       </div>
       <div id="detail-booking-info" style="font-size:11px;color:rgba(184,121,70,0.85);margin-bottom:8px;"></div>
