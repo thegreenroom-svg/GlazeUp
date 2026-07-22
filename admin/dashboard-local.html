@@ -25910,7 +25910,18 @@ function renderMargins() {
           else if (price != null) roughCost = Math.round(it.priceCents * 0.55);
           else roughCost = 350;
         }
-        const effectiveCost = it.costCents != null ? it.costCents : roughCost;
+        const effectiveCostRaw = it.costCents != null ? it.costCents : roughCost;
+        // Cakes are bought whole (~12 slices) and traybakes by the batch, but
+        // sold by the slice/piece. If a matched cost is a whole/batch price,
+        // divide it down so the margin compares like with like (a £3.50 slice
+        // vs its real per-slice cost, not vs the £15 whole cake).
+        let effectiveCost = effectiveCostRaw;
+        if (it.costCents != null) {
+          const cn = (it.costName || it.name || '');
+          const batchM = cn.match(/batch of (\d+)/i);
+          if (/\(whole\)/i.test(cn)) effectiveCost = Math.round(it.costCents / 12);
+          else if (batchM) effectiveCost = Math.round(it.costCents / parseInt(batchM[1], 10));
+        }
         const margin = (price != null && effectiveCost != null && price > 0)
           ? Math.round(((price - effectiveCost) / price) * 100) : null;
         // Cost line: real cost if set, else a fuzzy suggestion to confirm,
