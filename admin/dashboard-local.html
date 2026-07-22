@@ -9293,7 +9293,19 @@ function openTakings() {
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
   const dashboardView = document.getElementById('dashboard-view');
   if (dashboardView) dashboardView.style.display = 'block';
+  // 22 Jul FIX: this is a second, direct door into Money that
+  // bypassed goToTab entirely, so the modern-skin grid-restore hook
+  // never ran here — same shape as the 21 Jul three-door bug.
+  // Reset first so re-entering doesn't stack a hidden grid.
+  const menu = document.getElementById('dashboard-tile-menu');
+  if (menu) menu.style.display = 'grid';
+  document.querySelectorAll('.dashboard-section').forEach(el => {
+    if (el.id !== 'kiln-cafe-revenue-section') el.style.display = 'none';
+  });
   showDashboardSection('revenue');
+  // Same reason: the modern-skin transform only ran from the dock
+  // hook, so entering via this door left the section unstyled.
+  if (window.KC_Money && typeof KC_Money.transform === 'function') KC_Money.transform();
   // Drop the clean Square-sync pill into its slot (replaces old messy button)
   const slot = document.getElementById('revenue-sync-pill-slot');
   if (slot && typeof _squareSyncPill === 'function') { slot.innerHTML = _squareSyncPill({ label:'Pull all real Square history' }); }
