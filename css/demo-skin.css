@@ -428,6 +428,29 @@ html.demo-skin .kc-day-today {
 }
 html.demo-skin .kc-day-today:active { filter: brightness(0.92); }
 
+/* Morning invoice nudge — a gentle once-a-day bar under the greeting. */
+html.demo-skin #kc-inv-nudge {
+  margin: 12px 0 4px;
+  animation: kcInvNudgeIn 0.4s ease both;
+}
+@keyframes kcInvNudgeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+html.demo-skin .kc-inv-nudge-inner {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(184,121,70,0.10); border: 1px solid rgba(184,121,70,0.30);
+  border-radius: 12px; padding: 10px 12px;
+}
+html.demo-skin .kc-inv-nudge-icon { font-size: 18px; flex-shrink: 0; }
+html.demo-skin .kc-inv-nudge-text { flex: 1; font-size: 13px; line-height: 1.35; color: var(--m-text, inherit); }
+html.demo-skin .kc-inv-nudge-go {
+  flex-shrink: 0; background: var(--m-accent, #B87946); color: #fff; border: none;
+  border-radius: 8px; padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+html.demo-skin .kc-inv-nudge-go:active { filter: brightness(0.92); }
+html.demo-skin .kc-inv-nudge-x {
+  flex-shrink: 0; background: none; border: none; color: var(--m-dust, #999);
+  font-size: 20px; line-height: 1; cursor: pointer; padding: 0 4px;
+}
+
 /* THE DAY — a timeline, not tiles */
 html.demo-skin .kc-slot {
   display: flex; align-items: center; gap: 12px; width: 100%;

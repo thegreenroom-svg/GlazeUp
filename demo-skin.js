@@ -305,8 +305,47 @@
   };
 
   /* ── live hydration: greeting, hero figures, the day timeline ── */
+  /* ── Morning invoice nudge: once per UK day, prompt to scan invoices ── */
+  KC._maybeShowInvoiceNudge = function () {
+    const todayKey = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
+    let seen = null;
+    try { seen = localStorage.getItem('kc_invoice_nudge_day'); } catch (e) {}
+    if (seen === todayKey) return;              // already shown today
+    if (document.getElementById('kc-inv-nudge')) return; // already on screen
+
+    // Only show if the app actually has the scanner (openInvoiceScanner).
+    if (typeof openInvoiceScanner !== 'function') return;
+
+    const bar = document.createElement('div');
+    bar.id = 'kc-inv-nudge';
+    bar.innerHTML = `
+      <div class="kc-inv-nudge-inner">
+        <span class="kc-inv-nudge-icon">🧾</span>
+        <span class="kc-inv-nudge-text">Any invoices arrived? Scan them to keep costs up to date.</span>
+        <button class="kc-inv-nudge-go">Scan</button>
+        <button class="kc-inv-nudge-x" aria-label="Not now">×</button>
+      </div>`;
+    const markSeen = () => { try { localStorage.setItem('kc_invoice_nudge_day', todayKey); } catch (e) {} };
+    bar.querySelector('.kc-inv-nudge-go').onclick = () => { markSeen(); bar.remove(); try { openInvoiceScanner(); } catch (e) {} };
+    bar.querySelector('.kc-inv-nudge-x').onclick = () => { markSeen(); bar.remove(); };
+
+    // Slot it just under the greeting line.
+    const anchor = $('kc-hello-line');
+    if (anchor && anchor.parentNode) {
+      anchor.parentNode.insertBefore(bar, anchor.nextSibling);
+    }
+  };
+
   KC.hydrate = async function () {
     $('kc-hello-line').textContent = `${greeting()}, ${firstName() || 'you'}.`;
+
+    /* Morning nudge: once per UK day, invite whoever's on to scan any
+       invoices that arrived — the habit that keeps costs current through the
+       trial without anyone having to remember. Shown to everyone (anyone can
+       scan their bit — coffee, Booker, cakes, bisque). Dismissable; only
+       reappears the next day. Uses localStorage so it's genuinely once/day
+       per device, not once per app-open. */
+    try { KC._maybeShowInvoiceNudge(); } catch (e) {}
 
     /* hero: three living figures (skeletons until real data lands) */
     const hero = $('kc-hero');
