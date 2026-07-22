@@ -15633,6 +15633,12 @@ function _gridLayoutRoom(list, roomWidth) {
   const COLS = 3;
   const cellW = Math.floor((roomWidth - _ELEGANT_PAD * 2 - _ELEGANT_GAP * (COLS - 1)) / COLS);
   const cellH = 62;
+  // Chairs stick out ~30px above and below each table (seat + legs at
+  // y:-17 / y:h+17). With rows only cellH+GAP apart, one row's top chairs
+  // collided into the row above — the "tumbled up, chairs don't match"
+  // look. Give each row extra vertical clearance so chairs sit clear.
+  const CHAIR_CLEARANCE = 34;
+  const rowStep = cellH + _ELEGANT_GAP + CHAIR_CLEARANCE;
 
   // Group by pair_id so halves stay together
   const cells = {};
@@ -15651,7 +15657,7 @@ function _gridLayoutRoom(list, roomWidth) {
   Object.entries(cells).forEach(([key, halves]) => {
     const [row, col] = key.split(',').map(Number);
     const cellX = _ELEGANT_PAD + col * (cellW + _ELEGANT_GAP);
-    const cellY = _ELEGANT_PAD + row * (cellH + _ELEGANT_GAP);
+    const cellY = _ELEGANT_PAD + CHAIR_CLEARANCE + row * rowStep;
 
     if (halves.length === 1) {
       // Not split — one table, whole cell
@@ -15673,7 +15679,7 @@ function _gridLayoutRoom(list, roomWidth) {
   });
 
   const maxRow = Math.max(...placed.map(p => p._row), 0);
-  return { placed, height: _ELEGANT_PAD * 2 + (maxRow + 1) * (cellH + _ELEGANT_GAP) + 20 };
+  return { placed, height: _ELEGANT_PAD * 2 + CHAIR_CLEARANCE * 2 + (maxRow + 1) * rowStep + 20 };
 }
 
 function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWidth) {
@@ -17075,6 +17081,14 @@ async function openTableDetail(bookingCode) {
     `${b.customer_name} · ${b.party_size || tableData.capacity || '?'} covers · ${tableData.room || ''}${typeLabel}`;
 
   document.getElementById('floor-table-detail').style.display = 'flex';
+  // If we came from the room panel overlay (z-9500), close it — the detail
+  // panel is z-6000 and would otherwise open hidden behind it. This is why
+  // tapping a table in the room planner "didn't click through": it opened,
+  // just underneath. Closing the room panel reveals the booking cleanly.
+  try {
+    const rp = document.getElementById('floor-room-panel');
+    if (rp && rp.style.display !== 'none') rp.style.display = 'none';
+  } catch (e) {}
   // ═══════════════════════════════════════════════════════════
   // STALE SCROLL POSITION. 17 July 2026.
   // ═══════════════════════════════════════════════════════════
@@ -32101,7 +32115,7 @@ if (typeof window !== 'undefined' && typeof window._manualFloorSync !== 'functio
 <div id="floor-table-detail" style="display:none;position:fixed;inset:0;z-index:6000;background:#1A1714;flex-direction:column;">
     <div style="background:linear-gradient(135deg,#1C1814 0%,#2B2118 100%);padding:max(14px,calc(env(safe-area-inset-top) + 8px)) 16px 14px;flex-shrink:0;border-bottom:1px solid rgba(184,121,70,0.3);">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-        <div id="detail-table-name" style="font-size:19px;font-weight:800;color:#F4ECE0;"></div>
+        <div id="detail-table-name" style="font-size:19px;font-weight:800;color:#F4ECE0;padding-left:52px;"></div>
         <button onclick="closeTableDetail()" class="glaze-tile"
           style="background:none;border:1px solid rgba(184,121,70,0.4);color:#F4ECE0;border-radius:10px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">
           ← Home
