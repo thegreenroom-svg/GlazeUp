@@ -2098,6 +2098,7 @@
         <div class="dp-tool-btn active" id="td-tool-draw" onclick="setTdMode('draw')"><span class="dp-tool-icon">✏️</span>Sketch</div>
         <div class="dp-tool-btn" id="td-tool-text" onclick="setTdMode('text')"><span class="dp-tool-icon">🔤</span>Add Text</div>
         <div class="dp-tool-btn" id="td-tool-motif" onclick="setTdMode('motif')"><span class="dp-tool-icon">✨</span>Add Motif</div>
+        <div class="dp-tool-btn" id="td-tool-trace" onclick="setTdMode('trace')"><span class="dp-tool-icon">🖊️</span>Trace</div>
         <div class="dp-tool-btn" id="td-tool-ai" onclick="setTdMode('ai')" style="display:none;"><span class="dp-tool-icon">🤖</span>AI Design</div>
       </div>
 
@@ -2126,6 +2127,31 @@
       </div>
 
       <div id="td-motif-row" style="display:none;"></div>
+
+      <!-- TRACE — 22 Jul. Turns the photo into a clean line-art outline you
+           can paint over. Runs entirely on the device (Sobel edge detection,
+           free, no AI, nothing leaves the app). Great for tracing a design
+           you've seen on a pot, a transfer you like, or any photo — snap it,
+           trace it, paint your own version over the lines on the iPad. -->
+      <div id="td-trace-controls" style="display:none;">
+        <div style="font-size:12px; color:rgba(255,255,255,0.65); line-height:1.5; margin-bottom:10px;">
+          Turn your photo into outlines to trace over. Snap or choose a design first, then pick how much detail.
+        </div>
+        <div class="dp-tool-row" style="margin-bottom:10px;">
+          <div class="dp-tool-btn" id="td-trace-light" onclick="setTraceStrength('light')" style="flex:1;"><span class="dp-tool-icon">◔</span>Simple</div>
+          <div class="dp-tool-btn active" id="td-trace-medium" onclick="setTraceStrength('medium')" style="flex:1;"><span class="dp-tool-icon">◑</span>Balanced</div>
+          <div class="dp-tool-btn" id="td-trace-strong" onclick="setTraceStrength('strong')" style="flex:1;"><span class="dp-tool-icon">●</span>Detailed</div>
+        </div>
+        <button onclick="applyTrace()" id="td-trace-apply-btn" style="width:100%; background:var(--glaze-oxblood-base); color:#fff; border:none; padding:12px; border-radius:10px; font-weight:700; font-size:13px; cursor:pointer; margin-bottom:8px;">
+          🖊️ Trace this photo
+        </button>
+        <div style="display:flex; gap:8px;">
+          <button onclick="setTraceOpacity(0.35)" style="flex:1; background:rgba(255,255,255,0.15); color:#fff; border:none; padding:9px; border-radius:9px; font-weight:600; font-size:12px; cursor:pointer;">Faded lines</button>
+          <button onclick="setTraceOpacity(1)" style="flex:1; background:rgba(255,255,255,0.15); color:#fff; border:none; padding:9px; border-radius:9px; font-weight:600; font-size:12px; cursor:pointer;">Bold lines</button>
+          <button onclick="clearTrace()" style="flex:1; background:rgba(255,255,255,0.15); color:#fff; border:none; padding:9px; border-radius:9px; font-weight:600; font-size:12px; cursor:pointer;">Photo back</button>
+        </div>
+        <div id="td-trace-status" style="text-align:center; font-size:11px; color:rgba(255,255,255,0.5); margin-top:8px; display:none;"></div>
+      </div>
 
       <!-- AI Design Generation -->
       <div id="td-ai-controls" style="display:none;">
@@ -5147,6 +5173,9 @@ const instantCache = {
     let tdDrawTool = 'brush';
     let tdBrushSize = 16;
     let tdBaseCtx, tdPaintCtx;
+    let _tdBaseImg = null;      // the original loaded photo, for the tracer
+    let _tdTraceStrength = 'medium'; // edge sensitivity
+    let _tdTraceApplied = false;
     let tdDrawing = false;
     let tdLastPoint = null;
     let tdUndoStack = [];
@@ -5911,6 +5940,7 @@ const instantCache = {
     }
 
     function setupTdCanvases(img) {
+      _tdBaseImg = img; // kept so the tracer can re-read the original photo
       const area = document.getElementById('td-canvas-area');
       const stack = document.getElementById('td-canvas-stack');
       const maxW = area.clientWidth;
@@ -6153,11 +6183,113 @@ const instantCache = {
       document.getElementById('td-tool-draw').classList.toggle('active', mode === 'draw');
       document.getElementById('td-tool-text').classList.toggle('active', mode === 'text');
       document.getElementById('td-tool-motif').classList.toggle('active', mode === 'motif');
+      const traceBtn = document.getElementById('td-tool-trace');
+      if (traceBtn) traceBtn.classList.toggle('active', mode === 'trace');
       document.getElementById('td-tool-ai').classList.toggle('active', mode === 'ai');
       document.getElementById('td-draw-controls').style.display = mode === 'draw' ? 'block' : 'none';
       document.getElementById('td-text-controls').style.display = mode === 'text' ? 'block' : 'none';
       document.getElementById('td-motif-row').style.display = mode === 'motif' ? 'flex' : 'none';
+      const traceCtrls = document.getElementById('td-trace-controls');
+      if (traceCtrls) traceCtrls.style.display = mode === 'trace' ? 'block' : 'none';
       document.getElementById('td-ai-controls').style.display = mode === 'ai' ? 'block' : 'none';
+    }
+
+    // ── TRACE: photo → clean line-art outline, on-device (Sobel edge
+    //    detection). Free, no AI. Draws the outline onto the base canvas so
+    //    the paint layer above stays yours to draw on. ──────────────────
+    function setTraceStrength(s) {
+      _tdTraceStrength = s;
+      ['light', 'medium', 'strong'].forEach(k =>
+        document.getElementById('td-trace-' + k).classList.toggle('active', k === s));
+    }
+    function applyTrace() {
+      if (!_tdBaseImg || !tdBaseCtx) {
+        alert('Take or choose a photo first, then trace it.');
+        return;
+      }
+      const status = document.getElementById('td-trace-status');
+      if (status) { status.style.display = 'block'; status.textContent = 'Tracing…'; }
+      // Let the status paint before the (brief) synchronous work.
+      setTimeout(() => {
+        try {
+          _runTrace();
+          _tdTraceApplied = true;
+          if (status) status.textContent = 'Traced — now paint over the lines on the paint layer.';
+        } catch (e) {
+          if (status) status.textContent = 'Could not trace that image — try another photo.';
+        }
+      }, 30);
+    }
+
+    // The actual edge detector. Greyscale → Sobel gradient → threshold →
+    // dark lines on white. Threshold varies with the chosen detail level.
+    function _runTrace() {
+      const w = tdBaseCtx.canvas.width, h = tdBaseCtx.canvas.height;
+      // Read the current base (the photo).
+      const src = tdBaseCtx.getImageData(0, 0, w, h);
+      const s = src.data;
+      // Greyscale buffer.
+      const grey = new Float32Array(w * h);
+      for (let i = 0; i < w * h; i++) {
+        grey[i] = 0.299 * s[i*4] + 0.587 * s[i*4+1] + 0.114 * s[i*4+2];
+      }
+      // Threshold by detail level (lower = more lines).
+      const thresh = _tdTraceStrength === 'light' ? 145 : _tdTraceStrength === 'strong' ? 70 : 100;
+      const out = tdBaseCtx.createImageData(w, h);
+      const o = out.data;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = y * w + x;
+          // On borders, force white (no edge).
+          if (x === 0 || y === 0 || x === w-1 || y === h-1) {
+            o[i*4] = o[i*4+1] = o[i*4+2] = 255; o[i*4+3] = 255; continue;
+          }
+          // Sobel kernels.
+          const tl=grey[i-w-1], tc=grey[i-w], tr=grey[i-w+1];
+          const ml=grey[i-1],                mr=grey[i+1];
+          const bl=grey[i+w-1], bc=grey[i+w], br=grey[i+w+1];
+          const gx = (tr + 2*mr + br) - (tl + 2*ml + bl);
+          const gy = (bl + 2*bc + br) - (tl + 2*tc + tr);
+          const mag = Math.sqrt(gx*gx + gy*gy);
+          const edge = mag > thresh;
+          const v = edge ? 30 : 255; // near-black line or white
+          o[i*4] = o[i*4+1] = o[i*4+2] = v;
+          o[i*4+3] = 255;
+        }
+      }
+      tdBaseCtx.putImageData(out, 0, 0);
+    }
+
+    // Re-draw the outline at a chosen opacity over white (faded = easier to
+    // paint over boldly; bold = clearer guide). Re-runs trace then fades.
+    function setTraceOpacity(alpha) {
+      if (!_tdBaseImg || !tdBaseCtx) { alert('Trace a photo first.'); return; }
+      if (!_tdTraceApplied) _runTrace();
+      const w = tdBaseCtx.canvas.width, h = tdBaseCtx.canvas.height;
+      // White wash, then the current (traced) content at alpha.
+      const traced = tdBaseCtx.getImageData(0, 0, w, h);
+      tdBaseCtx.fillStyle = '#ffffff';
+      tdBaseCtx.fillRect(0, 0, w, h);
+      tdBaseCtx.globalAlpha = alpha;
+      tdBaseCtx.putImageData(traced, 0, 0); // putImageData ignores globalAlpha…
+      // …so do the fade properly via a temp canvas.
+      const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h;
+      tmp.getContext('2d').putImageData(traced, 0, 0);
+      tdBaseCtx.fillStyle = '#ffffff'; tdBaseCtx.fillRect(0, 0, w, h);
+      tdBaseCtx.globalAlpha = alpha;
+      tdBaseCtx.drawImage(tmp, 0, 0);
+      tdBaseCtx.globalAlpha = 1;
+    }
+
+    // Put the original photo back (start over).
+    function clearTrace() {
+      if (!_tdBaseImg || !tdBaseCtx) return;
+      const w = tdBaseCtx.canvas.width, h = tdBaseCtx.canvas.height;
+      tdBaseCtx.clearRect(0, 0, w, h);
+      tdBaseCtx.drawImage(_tdBaseImg, 0, 0, w, h);
+      _tdTraceApplied = false;
+      const status = document.getElementById('td-trace-status');
+      if (status) { status.style.display = 'block'; status.textContent = 'Photo restored.'; }
     }
 
     function renderTdFonts() {
