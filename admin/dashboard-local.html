@@ -25672,24 +25672,45 @@ function renderMargins() {
   const order = [...MARGIN_GROUPS.map(g => g.key), 'other'];
   const labelFor = k => (MARGIN_GROUPS.find(g => g.key === k)?.label) || '📋 Other';
 
+  // If the fuzzy matcher found suggestions, offer a one-tap "confirm all"
+  // banner so the director isn't confirming dozens individually.
+  const suggestionCount = _marginsData.items.filter(i => i.costCents == null && i.costSuggested != null).length;
   let html = '';
+  if (suggestionCount > 0) {
+    html += `
+      <div style="background:rgba(184,121,70,0.08);border:1px solid rgba(184,121,70,0.3);border-radius:12px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="font-size:12px;color:#8B5A34;line-height:1.4;">
+          <strong>${suggestionCount} cost${suggestionCount > 1 ? 's' : ''} matched from your invoices</strong><br>
+          <span style="opacity:0.85;">Names didn't match exactly — check &amp; confirm.</span>
+        </div>
+        <button onclick="confirmAllSuggestions()" style="flex-shrink:0;background:#B87946;color:white;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;">Confirm all</button>
+      </div>`;
+  }
   order.forEach(key => {
     const items = buckets[key];
     if (!items || !items.length) return;
     const open = !!window._marginOpenGroups[key];
 
     // Group-level summary: how many items, how many still need a cost.
-    const noCost = items.filter(i => i.costCents == null).length;
-    const summary = noCost > 0
-      ? `${items.length} item${items.length > 1 ? 's' : ''} · ${noCost} need cost`
-      : `${items.length} item${items.length > 1 ? 's' : ''} · all costed`;
+    // Items with a fuzzy suggestion are counted as "suggested" not "need cost".
+    const noCost = items.filter(i => i.costCents == null && i.costSuggested == null).length;
+    const suggested = items.filter(i => i.costCents == null && i.costSuggested != null).length;
+    let summary;
+    if (suggested > 0) {
+      summary = `${items.length} item${items.length > 1 ? 's' : ''} · ${suggested} suggested`;
+    } else if (noCost > 0) {
+      summary = `${items.length} item${items.length > 1 ? 's' : ''} · ${noCost} need cost`;
+    } else {
+      summary = `${items.length} item${items.length > 1 ? 's' : ''} · all costed`;
+    }
+    const summaryColor = suggested > 0 ? '#B87946' : (noCost > 0 ? '#B87946' : '#2e7d32');
 
     html += `
       <div style="border:1px solid var(--gu-border);border-radius:12px;margin-bottom:8px;overflow:hidden;">
         <div onclick="toggleMarginGroup('${key}')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;background:${open ? 'rgba(184,121,70,0.06)' : 'transparent'};">
           <div style="font-size:14px;font-weight:800;">${labelFor(key)}</div>
           <div style="display:flex;align-items:center;gap:8px;">
-            <span style="font-size:11px;color:${noCost > 0 ? '#B87946' : '#2e7d32'};font-weight:600;">${summary}</span>
+            <span style="font-size:11px;color:${summaryColor};font-weight:600;">${summary}</span>
             <span style="font-size:12px;color:var(--gu-dust);transform:rotate(${open ? '90' : '0'}deg);transition:transform 0.15s;">▶</span>
           </div>
         </div>`;
@@ -25700,17 +25721,27 @@ function renderMargins() {
         const price = it.priceCents != null ? it.priceCents * (1 + uplift / 100) : null;
         const margin = (price != null && it.costCents != null && price > 0)
           ? Math.round(((price - it.costCents) / price) * 100) : null;
+        // Cost line: real cost if set, else a fuzzy suggestion to confirm,
+        // else "tap to set".
+        let costLine;
+        if (it.costCents != null) {
+          costLine = `cost <span onclick="editMarginCost('${it.variationId}')" style="text-decoration:underline;cursor:pointer;color:var(--gu-primary);">£${(it.costCents / 100).toFixed(2)}</span>`;
+        } else if (it.costSuggested != null) {
+          // Suggestion from the fuzzy matcher — tap to accept (which saves it
+          // against this variation id so it's exact next time).
+          costLine = `<span onclick="confirmSuggestedCost('${it.variationId}', ${it.costSuggested})" style="cursor:pointer;color:#B87946;font-weight:600;">≈ £${(it.costSuggested / 100).toFixed(2)} — tap to confirm</span> <span style="opacity:0.6;">(from "${(it.costSuggestedFrom||'').replace(/"/g,'')}")</span>`;
+        } else {
+          costLine = `cost <span onclick="editMarginCost('${it.variationId}')" style="text-decoration:underline;cursor:pointer;color:var(--gu-primary);">tap to set</span>`;
+        }
         html += `
           <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--gu-border);">
             <div style="flex:1;min-width:0;">
               <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${it.name}</div>
-              <div style="font-size:11px;color:var(--gu-dust);">
-                cost <span onclick="editMarginCost('${it.variationId}')" style="text-decoration:underline;cursor:pointer;color:var(--gu-primary);">${it.costCents != null ? '£' + (it.costCents / 100).toFixed(2) : 'tap to set'}</span>
-              </div>
+              <div style="font-size:11px;color:var(--gu-dust);">${costLine}</div>
             </div>
             <div style="text-align:right;flex-shrink:0;">
               <div style="font-size:13px;font-weight:700;">${price != null ? '£' + (price / 100).toFixed(2) : '—'}</div>
-              <div style="font-size:11px;font-weight:800;color:${_marginColor(margin)};">${margin != null ? margin + '%' : 'no cost yet'}</div>
+              <div style="font-size:11px;font-weight:800;color:${_marginColor(margin)};">${margin != null ? margin + '%' : (it.costSuggested != null ? 'suggested' : 'no cost yet')}</div>
             </div>
           </div>`;
       });
@@ -25745,6 +25776,7 @@ async function editMarginCost(variationId) {
   const costCents = Math.round(parseFloat(entered.replace(',', '.')) * 100);
   if (isNaN(costCents) || costCents < 0) return;
   it.costCents = costCents;
+  it.costSuggested = null;
   renderMargins();
   try {
     await fetch(`${API_URL}/api/margins/cost`, {
@@ -25752,6 +25784,45 @@ async function editMarginCost(variationId) {
       body: JSON.stringify({ studioId: studioId, variationId, name: it.name, costCents }),
     });
   } catch (e) { console.warn('cost save failed', e); }
+}
+
+// 22 Jul — accept a fuzzy-matched cost suggestion. Saving it WITH the
+// variation_id means next time it's an exact match (the app "learns" Jenny's
+// naming). One tap turns "≈ £X — tap to confirm" into a real, remembered cost.
+async function confirmSuggestedCost(variationId, costCents) {
+  const it = _marginsData.items.find(i => i.variationId === variationId);
+  if (!it) return;
+  it.costCents = costCents;
+  it.costSuggested = null;
+  renderMargins();
+  try {
+    await fetch(`${API_URL}/api/margins/cost`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId: studioId, variationId, name: it.name, costCents }),
+    });
+  } catch (e) { console.warn('suggestion confirm failed', e); }
+}
+
+// Bulk-accept every current suggestion in one go. Counts them first so the
+// director knows what they're confirming.
+async function confirmAllSuggestions() {
+  const suggested = _marginsData.items.filter(i => i.costCents == null && i.costSuggested != null);
+  if (!suggested.length) { alert('No suggestions to confirm right now.'); return; }
+  if (!confirm(`Confirm ${suggested.length} suggested cost${suggested.length > 1 ? 's' : ''}? You can still change any of them afterwards.`)) return;
+  for (const it of suggested) {
+    it.costCents = it.costSuggested;
+    it.costSuggested = null;
+  }
+  renderMargins();
+  // Save them all (fire in sequence so we don't hammer the endpoint).
+  for (const it of suggested) {
+    try {
+      await fetch(`${API_URL}/api/margins/cost`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId: studioId, variationId: it.variationId, name: it.name, costCents: it.costCents }),
+      });
+    } catch (e) { console.warn('bulk confirm save failed for', it.name, e); }
+  }
 }
 
 async function addOverheadLine() {

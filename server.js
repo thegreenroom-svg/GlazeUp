@@ -960,16 +960,71 @@ app.get('/api/margins', async (req, res) => {
     const costByVariation = {};
     const costByName = {};
     const overheads = [];
+    const costList = []; // non-overhead costs, for fuzzy matching
     (costs || []).forEach(c => {
       if (c.is_overhead) { overheads.push({ name: c.item_name, costCents: c.cost_cents, source: c.source }); return; }
       if (c.variation_id) costByVariation[c.variation_id] = c;
       costByName[(c.item_name || '').toLowerCase()] = c;
+      costList.push(c);
     });
 
+    // ── Fuzzy name matching (22 Jul) ────────────────────────────────
+    // Jenny names items in Square differently from the supplier invoices
+    // ("Perfect Mug" in Square vs "Perfect Mug 9.5cm" on the invoice). So an
+    // exact-name match misses most of the 84 real costs. This normalises both
+    // sides — lowercases, strips sizes (9.5cm, 19cm), bracketed notes
+    // ((large)/(small)), punctuation and filler words — then scores overlap
+    // of the remaining core words. A strong-but-not-exact match is returned
+    // as a SUGGESTION (costSuggested), never silently applied — the director
+    // confirms it, which then saves the variation_id for an exact match next
+    // time (the "learning").
+    function _normaliseName(s) {
+      return (s || '')
+        .toLowerCase()
+        .replace(/\d+(\.\d+)?\s*cm\b/g, ' ')      // sizes: 9.5cm, 19cm
+        .replace(/\([^)]*\)/g, ' ')                // (large), (small)
+        .replace(/\b(large|small|medium|lg|sm|med|mini|std|standard)\b/g, ' ')
+        .replace(/[^a-z0-9\s]/g, ' ')              // punctuation
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+    function _coreWords(s) {
+      const stop = new Set(['the','a','an','of','and','with','w','for','set','piece','pot']);
+      return _normaliseName(s).split(' ').filter(w => w.length > 1 && !stop.has(w));
+    }
+    // Jaccard-ish overlap: shared core words / the smaller word-set size.
+    function _similarity(aWords, bWords) {
+      if (!aWords.length || !bWords.length) return 0;
+      const bSet = new Set(bWords);
+      const shared = aWords.filter(w => bSet.has(w)).length;
+      return shared / Math.min(aWords.length, bWords.length);
+    }
+    // Pre-compute core words for every supplier cost once.
+    const costCores = costList.map(c => ({ c, words: _coreWords(c.item_name) }));
+
     items.forEach(it => {
-      const match = costByVariation[it.variationId] || costByName[it.name.toLowerCase()];
-      it.costCents = match ? match.cost_cents : null;
-      it.costSource = match ? match.source : null;
+      // 1. exact (variation id, then exact name) — unchanged, authoritative
+      const exact = costByVariation[it.variationId] || costByName[it.name.toLowerCase()];
+      if (exact) {
+        it.costCents = exact.cost_cents;
+        it.costSource = exact.source;
+        return;
+      }
+      // 2. fuzzy — best-scoring supplier cost above a confidence threshold
+      const itWords = _coreWords(it.name);
+      let best = null, bestScore = 0;
+      for (const { c, words } of costCores) {
+        const score = _similarity(itWords, words);
+        if (score > bestScore) { bestScore = score; best = c; }
+      }
+      it.costCents = null;
+      it.costSource = null;
+      // 0.6 = a solid majority of core words shared. Suggestion only.
+      if (best && bestScore >= 0.6) {
+        it.costSuggested = best.cost_cents;
+        it.costSuggestedFrom = best.item_name;
+        it.costSuggestedScore = Math.round(bestScore * 100);
+      }
     });
 
     res.json({ connected: true, items, overheads });
