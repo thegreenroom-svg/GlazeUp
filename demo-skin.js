@@ -105,7 +105,7 @@
             <div class="kc-house-sub">Langport · Somerset</div>
           </div>
           <button class="kc-hbp" onclick="KC.go('host-by-post','openHostByPostSection')" aria-label="Host By Post">
-            <img src="/brand-assets/kiln-cafe-logo-demo/hostbypost-mark-demo.svg" alt="Host By Post">
+            <img src="/brand-assets/kiln-cafe-logo-demo/hostbypost-box-demo.svg" alt="Host By Post">
           </button>
         </div>
         <div class="kc-hello kc-in"><span id="kc-hello-line"></span></div>

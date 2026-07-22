@@ -1,0 +1,11 @@
+<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+  <!-- Host By Post compact parcel mark — clay outline, ink ribbon. -->
+  <g transform="translate(30,28)">
+    <path d="M -20 -11 L 0 -19 L 20 -11 L 20 9 L 0 17 L -20 9 Z"
+      fill="none" stroke="#B87946" stroke-width="2.6" stroke-linejoin="round"/>
+    <path d="M -20 -11 L 0 -3 L 20 -11 M 0 -3 L 0 17"
+      fill="none" stroke="#B87946" stroke-width="2.6" stroke-linejoin="round"/>
+    <path d="M 0 -19 L 0 -3 M -10 -15 L -10 4 M 10 -15 L 10 4"
+      fill="none" stroke="#2B2724" stroke-width="2" stroke-linecap="round" opacity="0.55"/>
+  </g>
+</svg>
