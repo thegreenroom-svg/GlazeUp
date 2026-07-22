@@ -15,24 +15,24 @@
    ═══════════════════════════════════════════════════════════════════ */
 
 html.demo-skin {
-  --m-bg:        #F6F7F9;
+  --m-bg:        #F5F5F7;
   --m-surface:   #FFFFFF;
-  --m-surface-2: #F1F2F5;
-  --m-border:    rgba(17, 19, 24, 0.08);
-  --m-border-2:  rgba(17, 19, 24, 0.14);
-  --m-text:      #111318;
-  --m-muted:     #6B7280;
-  --m-faint:     #9CA3AF;
-  --m-accent:    #4F46E5;
-  --m-accent-soft: rgba(79, 70, 229, 0.10);
-  --m-accent-line: rgba(79, 70, 229, 0.35);
-  --m-green:     #059669;
+  --m-surface-2: #F2F2F7;
+  --m-border:    rgba(0, 0, 0, 0.08);
+  --m-border-2:  rgba(0, 0, 0, 0.14);
+  --m-text:      #1D1D1F;
+  --m-muted:     #6E6E73;
+  --m-faint:     #AEAEB2;
+  --m-accent:    #007AFF;
+  --m-accent-soft: rgba(0, 122, 255, 0.10);
+  --m-accent-line: rgba(0, 122, 255, 0.35);
+  --m-green:     #248A3D;
   --m-amber:     #D97706;
   --m-red:       #DC2626;
   --m-radius:    16px;
   --m-radius-sm: 10px;
-  --m-shadow:    0 1px 2px rgba(17,19,24,0.04), 0 8px 24px rgba(17,19,24,0.06);
-  --m-shadow-lift: 0 2px 4px rgba(17,19,24,0.06), 0 16px 40px rgba(17,19,24,0.12);
+  --m-shadow:    0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06);
+  --m-shadow-lift: 0 2px 4px rgba(0,0,0,0.06), 0 16px 40px rgba(0,0,0,0.12);
   --m-font:      'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 
   /* Re-point the app's own variables so everything inherits */
@@ -202,7 +202,7 @@ html.demo-skin .status-badge, html.demo-skin .kc-status-enhanced, html.demo-skin
   border: none !important;
 }
 html.demo-skin .status-badge.pending { background: rgba(217,119,6,.12) !important; color: var(--m-amber) !important; }
-html.demo-skin .status-badge.complete { background: rgba(5,150,105,.12) !important; color: var(--m-green) !important; }
+html.demo-skin .status-badge.complete { background: rgba(36,138,61,.12) !important; color: var(--m-green) !important; }
 
 /* ── THE DESK (home canvas) — restyled modern ── */
 html.demo-skin #kc-canvas {
@@ -258,7 +258,7 @@ html.demo-skin tr:hover td { background: var(--m-surface-2) !important; }
 
 /* ── SKELETONS ── */
 html.demo-skin .skeleton-line, html.demo-skin .kc-skel-t {
-  background: linear-gradient(90deg, var(--m-surface-2) 25%, #E9EAEE 50%, var(--m-surface-2) 75%) !important;
+  background: linear-gradient(90deg, var(--m-surface-2) 25%, #E5E5EA 50%, var(--m-surface-2) 75%) !important;
   background-size: 200% 100% !important;
   animation: kc-shimmer 1.4s infinite !important;
   border-radius: 6px !important;
@@ -273,17 +273,17 @@ html.demo-skin .skeleton-line, html.demo-skin .kc-skel-t {
 /* ── DARK MODE ── */
 @media (prefers-color-scheme: dark) {
   html.demo-skin {
-    --m-bg:        #0B0C0F;
-    --m-surface:   #16181D;
-    --m-surface-2: #1E2128;
+    --m-bg:        #000000;
+    --m-surface:   #1C1C1E;
+    --m-surface-2: #2C2C2E;
     --m-border:    rgba(255,255,255,0.08);
     --m-border-2:  rgba(255,255,255,0.14);
-    --m-text:      #F4F5F7;
-    --m-muted:     #9CA3AF;
-    --m-faint:     #6B7280;
-    --m-accent:    #818CF8;
-    --m-accent-soft: rgba(129,140,248,0.14);
-    --m-accent-line: rgba(129,140,248,0.4);
+    --m-text:      #F5F5F7;
+    --m-muted:     #AEAEB2;
+    --m-faint:     #6E6E73;
+    --m-accent:    #0A84FF;
+    --m-accent-soft: rgba(10, 132, 255,0.14);
+    --m-accent-line: rgba(10, 132, 255,0.4);
     --m-shadow:    0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.5);
     --m-shadow-lift: 0 2px 4px rgba(0,0,0,0.5), 0 16px 40px rgba(0,0,0,0.6);
   }
@@ -294,7 +294,7 @@ html.demo-skin .skeleton-line, html.demo-skin .kc-skel-t {
     background: rgba(22,24,29,0.78) !important;
   }
   html.demo-skin .skeleton-line, html.demo-skin .kc-skel-t {
-    background: linear-gradient(90deg, #1E2128 25%, #262A33 50%, #1E2128 75%) !important;
+    background: linear-gradient(90deg, #2C2C2E 25%, #3A3A3C 50%, #2C2C2E 75%) !important;
     background-size: 200% 100% !important;
   }
 }
@@ -341,3 +341,69 @@ html.demo-skin header * {
 
 /* Old wave motif backgrounds — clean them off */
 html.demo-skin .kc-wave { background-image: none !important; }
+
+/* ═══ MOTION LAYER — quiet, directional, Apple-like. 22 Jul ═══
+   Rules: no calc(var()) animation-delay (real-WebKit lesson from
+   21 Jul), plain nth-child staggers only, everything inside
+   no-preference so reduced-motion stays perfectly still. */
+@media (prefers-reduced-motion: no-preference) {
+
+  @keyframes kcViewIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @keyframes kcCardIn { from { opacity: 0; transform: translateY(10px) scale(0.985); } to { opacity: 1; transform: none; } }
+  @keyframes kcFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes kcNudge  { 0%,100% { transform: none; box-shadow: none; }
+                        40% { transform: scale(1.015); box-shadow: 0 6px 20px rgba(0,122,255,0.25); } }
+
+  /* Every screen breathes in when it appears */
+  html.demo-skin .view { animation: kcViewIn 320ms cubic-bezier(0.32,0.72,0,1) both; }
+
+  /* Its first blocks follow, one beat apart — plain nth-child, no vars */
+  html.demo-skin .view > *:nth-child(1) { animation: kcCardIn 360ms cubic-bezier(0.32,0.72,0,1) both; animation-delay: 30ms; }
+  html.demo-skin .view > *:nth-child(2) { animation: kcCardIn 360ms cubic-bezier(0.32,0.72,0,1) both; animation-delay: 70ms; }
+  html.demo-skin .view > *:nth-child(3) { animation: kcCardIn 360ms cubic-bezier(0.32,0.72,0,1) both; animation-delay: 110ms; }
+  html.demo-skin .view > *:nth-child(4) { animation: kcCardIn 360ms cubic-bezier(0.32,0.72,0,1) both; animation-delay: 150ms; }
+  html.demo-skin .view > *:nth-child(5) { animation: kcCardIn 360ms cubic-bezier(0.32,0.72,0,1) both; animation-delay: 190ms; }
+  html.demo-skin .view > *:nth-child(6) { animation: kcCardIn 360ms cubic-bezier(0.32,0.72,0,1) both; animation-delay: 230ms; }
+
+  /* The one thing to do next quietly asks for the eye — a single
+     late pulse on primary actions, never looping */
+  html.demo-skin .btn-connect,
+  html.demo-skin .kc-control-modern,
+  html.demo-skin .kc-kiln-control { animation: kcNudge 1100ms ease 900ms 1 both; }
+
+  /* Touch feedback everywhere — soft press, no bounce theatrics */
+  html.demo-skin button:active, html.demo-skin .glaze-tile:active,
+  html.demo-skin .kc-dock-b:active { transform: scale(0.97) !important; transition: transform 90ms ease !important; }
+
+  /* ── THE MATCH → PACK → LABEL GUIDE — Jenny's walkthrough ── */
+  html.demo-skin #jg-overlay { animation: kcFadeIn 240ms ease both; }
+  html.demo-skin #jg-overlay > div { animation: kcCardIn 380ms cubic-bezier(0.32,0.72,0,1) both; }
+  /* body content steps in line by line on every step change
+     (innerHTML re-render replays these automatically) */
+  html.demo-skin #jg-overlay > div > div:nth-child(1) { animation: kcCardIn 320ms ease both 60ms; }
+  html.demo-skin #jg-overlay > div > div:nth-child(2) { animation: kcCardIn 320ms ease both 130ms; }
+  html.demo-skin #jg-overlay > div > div:nth-child(3) { animation: kcCardIn 320ms ease both 200ms; }
+  /* the Next button asks once, gently, after the step settles */
+  html.demo-skin #jg-overlay button.glaze-tile { animation: kcNudge 1100ms ease 1300ms 1 both; }
+}
+
+/* ── GUIDE RESTYLE — Apple-clean, overrides its inline styles ── */
+html.demo-skin #jg-overlay { background: rgba(0,0,0,0.44) !important;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+html.demo-skin #jg-overlay > div {
+  background: var(--m-surface) !important;
+  border-radius: 22px !important;
+  box-shadow: var(--m-shadow-lift) !important;
+}
+html.demo-skin #jg-overlay [style*="Caveat"] {
+  font-family: var(--m-font) !important;
+  font-size: 21px !important; font-weight: 700 !important;
+  color: var(--m-text) !important; letter-spacing: -0.02em !important;
+}
+html.demo-skin #jg-overlay [style*="uppercase"] { color: var(--m-muted) !important; }
+html.demo-skin #jg-overlay button[style*="00897B"], 
+html.demo-skin #jg-overlay button[style*="linear-gradient"] {
+  background: var(--m-accent) !important; color: #fff !important;
+}
+html.demo-skin #jg-overlay span[style*="00897B"] { background: var(--m-accent) !important; }
+html.demo-skin #jg-overlay [style*="F4ECE0"] { background: var(--m-surface) !important; }

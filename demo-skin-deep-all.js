@@ -104,7 +104,7 @@ const KC_DeepScreens = {
       section.classList.add('kc-section-modern');
       section.style.cssText = `
         background: linear-gradient(135deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.4)) !important;
-        border: 1.5px solid rgba(79, 70, 229, 0.15) !important;
+        border: 1.5px solid rgba(0, 122, 255, 0.15) !important;
         border-radius: 14px !important;
         padding: 16px !important;
         margin-bottom: 16px !important;
@@ -122,7 +122,7 @@ const KC_DeepScreens = {
       
       card.style.cssText = `
         background: linear-gradient(135deg, var(--m-surface) 95%, rgba(255, 255, 255, 0.8)) !important;
-        border: 1.5px solid rgba(17, 19, 24, 0.25) !important;
+        border: 1.5px solid rgba(0, 0, 0, 0.25) !important;
         border-radius: 11px !important;
         padding: 12px !important;
         transition: all 0.2s ease !important;
@@ -131,13 +131,13 @@ const KC_DeepScreens = {
       
       // Add hover effect
       card.addEventListener('mouseenter', () => {
-        card.style.borderColor = 'rgba(79, 70, 229, 0.35)';
-        card.style.boxShadow = '0 4px 12px rgba(79, 70, 229, 0.1)';
+        card.style.borderColor = 'rgba(0, 122, 255, 0.35)';
+        card.style.boxShadow = '0 4px 12px rgba(0, 122, 255, 0.1)';
         card.style.transform = 'translateY(-1px)';
       }, { once: false });
       
       card.addEventListener('mouseleave', () => {
-        card.style.borderColor = 'rgba(17, 19, 24, 0.25)';
+        card.style.borderColor = 'rgba(0, 0, 0, 0.25)';
         card.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.04)';
         card.style.transform = 'translateY(0)';
       }, { once: false });
@@ -164,7 +164,7 @@ const KC_DeepScreens = {
       `;
       
       btn.addEventListener('mouseenter', () => {
-        btn.style.background = 'linear-gradient(135deg, var(--m-accent), rgba(79, 70, 229, 0.9))';
+        btn.style.background = 'linear-gradient(135deg, var(--m-accent), rgba(0, 122, 255, 0.9))';
         btn.style.color = 'var(--m-surface)';
         btn.style.transform = 'translateY(-1px)';
       });
@@ -185,7 +185,7 @@ const KC_DeepScreens = {
       input.classList.add('kc-input-modern');
       
       input.style.cssText = `
-        border: 1.5px solid rgba(17, 19, 24, 0.2) !important;
+        border: 1.5px solid rgba(0, 0, 0, 0.2) !important;
         border-radius: 8px !important;
         padding: 8px 10px !important;
         background: var(--m-surface) !important;
@@ -197,11 +197,11 @@ const KC_DeepScreens = {
       
       input.addEventListener('focus', () => {
         input.style.borderColor = 'var(--m-accent)';
-        input.style.boxShadow = '0 0 0 3px rgba(79, 70, 229, 0.1)';
+        input.style.boxShadow = '0 0 0 3px rgba(0, 122, 255, 0.1)';
       });
       
       input.addEventListener('blur', () => {
-        input.style.borderColor = 'rgba(17, 19, 24, 0.2)';
+        input.style.borderColor = 'rgba(0, 0, 0, 0.2)';
         input.style.boxShadow = 'none';
       });
     });

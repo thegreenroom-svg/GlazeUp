@@ -52,7 +52,7 @@ const KC_Floor = {
     wrapper.style.cssText = `
       margin: 0 0 8px 0;
       padding-bottom: 12px;
-      border-bottom: 2px solid rgba(79, 70, 229, 0.2);
+      border-bottom: 2px solid rgba(0, 122, 255, 0.2);
     `;
     
     const h2New = document.createElement('h2');
@@ -88,7 +88,7 @@ const KC_Floor = {
       
       container.style.cssText = `
         background: linear-gradient(135deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.5)) !important;
-        border: 2px solid rgba(79, 70, 229, 0.2) !important;
+        border: 2px solid rgba(0, 122, 255, 0.2) !important;
         border-radius: 16px !important;
         padding: 16px !important;
         margin-bottom: 20px !important;
@@ -128,11 +128,11 @@ const KC_Floor = {
             });
           } else {
             row.style.cssText = `
-              border-bottom: 1px solid rgba(79, 70, 229, 0.1) !important;
+              border-bottom: 1px solid rgba(0, 122, 255, 0.1) !important;
               transition: all 0.2s ease !important;
             `;
             row.addEventListener('mouseenter', () => {
-              row.style.backgroundColor = 'rgba(79, 70, 229, 0.05)';
+              row.style.backgroundColor = 'rgba(0, 122, 255, 0.05)';
             });
             row.addEventListener('mouseleave', () => {
               row.style.backgroundColor = '';
@@ -150,7 +150,7 @@ const KC_Floor = {
       btn.classList.add('kc-control-modern');
       
       btn.style.cssText = `
-        background: linear-gradient(135deg, var(--m-accent), rgba(79, 70, 229, 0.9)) !important;
+        background: linear-gradient(135deg, var(--m-accent), rgba(0, 122, 255, 0.9)) !important;
         color: var(--m-surface) !important;
         border: 1.5px solid var(--m-accent) !important;
         border-radius: 8px !important;
@@ -162,7 +162,7 @@ const KC_Floor = {
       
       btn.addEventListener('mouseenter', () => {
         btn.style.transform = 'translateY(-2px)';
-        btn.style.boxShadow = '0 8px 16px rgba(79, 70, 229, 0.2)';
+        btn.style.boxShadow = '0 8px 16px rgba(0, 122, 255, 0.2)';
       });
       
       btn.addEventListener('mouseleave', () => {

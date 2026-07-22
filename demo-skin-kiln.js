@@ -46,7 +46,7 @@ const KC_Kiln = {
     wrapper.style.cssText = `
       margin: 0 0 16px 0;
       padding-bottom: 12px;
-      border-bottom: 2px solid rgba(79, 70, 229, 0.2);
+      border-bottom: 2px solid rgba(0, 122, 255, 0.2);
     `;
     
     const h2New = document.createElement('h2');
@@ -83,7 +83,7 @@ const KC_Kiln = {
       
       load.style.cssText = `
         background: linear-gradient(135deg, var(--m-surface) 90%, rgba(255, 255, 255, 0.7)) !important;
-        border: 1.5px solid rgba(17, 19, 24, 0.3) !important;
+        border: 1.5px solid rgba(0, 0, 0, 0.3) !important;
         border-radius: 14px !important;
         padding: 16px !important;
         margin-bottom: 14px !important;
@@ -92,13 +92,13 @@ const KC_Kiln = {
       `;
       
       load.addEventListener('mouseenter', () => {
-        load.style.borderColor = 'rgba(79, 70, 229, 0.4)';
+        load.style.borderColor = 'rgba(0, 122, 255, 0.4)';
         load.style.transform = 'translateY(-1px)';
-        load.style.boxShadow = '0 6px 16px rgba(79, 70, 229, 0.12)';
+        load.style.boxShadow = '0 6px 16px rgba(0, 122, 255, 0.12)';
       });
       
       load.addEventListener('mouseleave', () => {
-        load.style.borderColor = 'rgba(17, 19, 24, 0.3)';
+        load.style.borderColor = 'rgba(0, 0, 0, 0.3)';
         load.style.transform = 'translateY(0)';
         load.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.05)';
       });
@@ -113,7 +113,7 @@ const KC_Kiln = {
       status.classList.add('kc-status-enhanced');
       
       const text = status.textContent.toLowerCase();
-      let bgColor = 'rgba(79, 70, 229, 0.1)';
+      let bgColor = 'rgba(0, 122, 255, 0.1)';
       let textColor = 'var(--m-accent)';
       
       if (text.includes('active') || text.includes('firing') || text.includes('loading')) {
@@ -121,7 +121,7 @@ const KC_Kiln = {
         textColor = '#D97706';
       } else if (text.includes('ready') || text.includes('complete')) {
         bgColor = 'rgba(76, 175, 80, 0.15)';
-        textColor = '#059669';
+        textColor = '#248A3D';
       } else if (text.includes('idle') || text.includes('empty')) {
         bgColor = 'rgba(158, 158, 158, 0.15)';
         textColor = '#424242';
@@ -130,7 +130,7 @@ const KC_Kiln = {
       status.style.cssText = `
         background: ${bgColor} !important;
         color: ${textColor} !important;
-        border: 1px solid rgba(79, 70, 229, 0.2) !important;
+        border: 1px solid rgba(0, 122, 255, 0.2) !important;
         border-radius: 6px !important;
         padding: 6px 10px !important;
         font-weight: 600 !important;
@@ -148,12 +148,12 @@ const KC_Kiln = {
       btn.classList.add('kc-kiln-control');
       
       const text = btn.textContent.toLowerCase();
-      let bgGradient = 'linear-gradient(135deg, var(--m-accent), rgba(79, 70, 229, 0.9))';
+      let bgGradient = 'linear-gradient(135deg, var(--m-accent), rgba(0, 122, 255, 0.9))';
       
       if (text.includes('unload') || text.includes('remove')) {
         bgGradient = 'linear-gradient(135deg, #D97706, rgba(217, 119, 6, 0.9))';
       } else if (text.includes('start') || text.includes('load')) {
-        bgGradient = 'linear-gradient(135deg, #059669, rgba(5, 150, 105, 0.9))';
+        bgGradient = 'linear-gradient(135deg, #248A3D, rgba(36, 138, 61, 0.9))';
       }
       
       btn.style.cssText = `
@@ -169,7 +169,7 @@ const KC_Kiln = {
       
       btn.addEventListener('mouseenter', () => {
         btn.style.transform = 'translateY(-2px)';
-        btn.style.boxShadow = '0 8px 16px rgba(79, 70, 229, 0.2)';
+        btn.style.boxShadow = '0 8px 16px rgba(0, 122, 255, 0.2)';
       });
       
       btn.addEventListener('mouseleave', () => {
@@ -190,7 +190,7 @@ const KC_Kiln = {
         width: 100% !important;
         height: 8px !important;
         border-radius: 4px !important;
-        background: rgba(17, 19, 24, 0.2) !important;
+        background: rgba(0, 0, 0, 0.2) !important;
         overflow: hidden !important;
         margin: 8px 0 !important;
       `;

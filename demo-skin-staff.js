@@ -45,7 +45,7 @@ const KC_Staff = {
     wrapper.style.cssText = `
       margin: 0 0 16px 0;
       padding-bottom: 12px;
-      border-bottom: 2px solid rgba(79, 70, 229, 0.2);
+      border-bottom: 2px solid rgba(0, 122, 255, 0.2);
     `;
     
     const h2New = document.createElement('h2');
@@ -82,7 +82,7 @@ const KC_Staff = {
       
       card.style.cssText = `
         background: linear-gradient(135deg, var(--m-surface) 90%, rgba(255, 255, 255, 0.7)) !important;
-        border: 1.5px solid rgba(17, 19, 24, 0.25) !important;
+        border: 1.5px solid rgba(0, 0, 0, 0.25) !important;
         border-radius: 12px !important;
         padding: 14px !important;
         margin-bottom: 12px !important;
@@ -93,13 +93,13 @@ const KC_Staff = {
       `;
       
       card.addEventListener('mouseenter', () => {
-        card.style.borderColor = 'rgba(79, 70, 229, 0.35)';
+        card.style.borderColor = 'rgba(0, 122, 255, 0.35)';
         card.style.transform = 'translateY(-2px)';
-        card.style.boxShadow = '0 6px 16px rgba(79, 70, 229, 0.12)';
+        card.style.boxShadow = '0 6px 16px rgba(0, 122, 255, 0.12)';
       });
       
       card.addEventListener('mouseleave', () => {
-        card.style.borderColor = 'rgba(17, 19, 24, 0.25)';
+        card.style.borderColor = 'rgba(0, 0, 0, 0.25)';
         card.style.transform = 'translateY(0)';
         card.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.04)';
       });
@@ -114,8 +114,8 @@ const KC_Staff = {
       tab.classList.add('kc-tab-modern');
       
       tab.style.cssText = `
-        background: linear-gradient(135deg, rgba(79, 70, 229, 0.15), rgba(17, 19, 24, 0.1)) !important;
-        border: 1px solid rgba(79, 70, 229, 0.25) !important;
+        background: linear-gradient(135deg, rgba(0, 122, 255, 0.15), rgba(0, 0, 0, 0.1)) !important;
+        border: 1px solid rgba(0, 122, 255, 0.25) !important;
         border-radius: 6px !important;
         padding: 6px 12px !important;
         font-weight: 600 !important;
@@ -138,7 +138,7 @@ const KC_Staff = {
         font-weight: 700 !important;
         color: var(--m-accent) !important;
         padding: 4px 8px !important;
-        background: rgba(79, 70, 229, 0.06) !important;
+        background: rgba(0, 122, 255, 0.06) !important;
         border-radius: 4px !important;
       `;
     });

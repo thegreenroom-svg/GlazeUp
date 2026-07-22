@@ -75,7 +75,7 @@ const KC_Money = {
     h2Wrapper.style.cssText = `
       margin: 0 0 8px 0;
       padding-bottom: 12px;
-      border-bottom: 2px solid rgba(79, 70, 229, 0.2);
+      border-bottom: 2px solid rgba(0, 122, 255, 0.2);
     `;
     
     const h2New = document.createElement('h2');
@@ -121,7 +121,7 @@ const KC_Money = {
       tile.style.cssText = `
         flex: 0 1 calc(50% - 5px) !important;
         background: linear-gradient(135deg, var(--m-surface) 85%, rgba(255, 255, 255, 0.6)) !important;
-        border: 1.5px solid rgba(79, 70, 229, 0.2) !important;
+        border: 1.5px solid rgba(0, 122, 255, 0.2) !important;
         border-radius: 10px !important;
         color: var(--m-text) !important;
         padding: 12px 14px !important;
@@ -138,12 +138,12 @@ const KC_Money = {
       
       // Add hover effect
       tile.addEventListener('mouseenter', () => {
-        tile.style.borderColor = 'rgba(79, 70, 229, 0.4)';
-        tile.style.boxShadow = '0 8px 24px rgba(79, 70, 229, 0.15)';
+        tile.style.borderColor = 'rgba(0, 122, 255, 0.4)';
+        tile.style.boxShadow = '0 8px 24px rgba(0, 122, 255, 0.15)';
       });
       
       tile.addEventListener('mouseleave', () => {
-        tile.style.borderColor = 'rgba(79, 70, 229, 0.2)';
+        tile.style.borderColor = 'rgba(0, 122, 255, 0.2)';
         tile.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.06)';
       });
       
@@ -177,7 +177,7 @@ const KC_Money = {
     sections.forEach(section => {
       section.style.cssText = `
         background: linear-gradient(135deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.6)) !important;
-        border: 1.5px solid rgba(79, 70, 229, 0.15) !important;
+        border: 1.5px solid rgba(0, 122, 255, 0.15) !important;
         border-radius: 16px !important;
         padding: 20px !important;
         margin-bottom: 24px !important;
@@ -221,7 +221,7 @@ const KC_Money = {
     cards.forEach(card => {
       card.style.cssText = `
         background: var(--m-surface) !important;
-        border: 1.5px solid rgba(17, 19, 24, 0.25) !important;
+        border: 1.5px solid rgba(0, 0, 0, 0.25) !important;
         border-radius: 12px !important;
         padding: 14px !important;
         text-align: center !important;
@@ -230,12 +230,12 @@ const KC_Money = {
       `;
       
       card.addEventListener('mouseenter', () => {
-        card.style.borderColor = 'rgba(79, 70, 229, 0.4)';
-        card.style.boxShadow = '0 4px 12px rgba(79, 70, 229, 0.1)';
+        card.style.borderColor = 'rgba(0, 122, 255, 0.4)';
+        card.style.boxShadow = '0 4px 12px rgba(0, 122, 255, 0.1)';
       });
       
       card.addEventListener('mouseleave', () => {
-        card.style.borderColor = 'rgba(17, 19, 24, 0.25)';
+        card.style.borderColor = 'rgba(0, 0, 0, 0.25)';
         card.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
       });
       
