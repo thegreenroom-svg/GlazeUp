@@ -64,14 +64,23 @@
     } catch (e) { console.warn('[desk] nav failed', id, e); }
   };
 
-  // Walk into the studio: open the floor plan (which loads its own live
-  // data and has the normal dock/back). We deliberately do NOT deep-link
-  // into a room panel from here — that panel reads floor data that hasn't
-  // loaded yet when arriving cold, so it opened empty and, being a fixed
-  // overlay, trapped the back button. The floor plan itself shows all three
-  // rooms anyway, so tapping any zone lands you on the live plan cleanly.
+  // Walk straight into the room's own page — no redundant stop on the
+  // combined floor plan. We open the floor plan (so the room panel has its
+  // data + a real screen behind it), then open that room's page once the
+  // floor data has actually loaded. Polls briefly for _floorData so it
+  // never opens empty on a cold arrival (the old trap); gives up quietly
+  // after a moment and just leaves you on the floor plan if data's slow.
   KC.goRoom = function (room) {
     KC.go('floor-plan', 'showFloorPlan');
+    let tries = 0;
+    const openWhenReady = () => {
+      tries++;
+      const ready = (typeof _floorData !== 'undefined') && _floorData
+        && Array.isArray(_floorData.tables) && _floorData.tables.length;
+      if (ready && typeof openRoomPanel === 'function') { openRoomPanel(room); return; }
+      if (tries < 40) setTimeout(openWhenReady, 150); // up to ~6s
+    };
+    setTimeout(openWhenReady, 200);
   };
 
   KC.hideCanvas = function () {
