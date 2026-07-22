@@ -4311,6 +4311,7 @@ function updateStaffName() {
                     <label style="font-size:12px;font-weight:600;color:var(--gu-dust);display:block;margin-bottom:6px;">Number of guests</label>
                     <input type="number" id="s1-num-places" placeholder="e.g. 2" min="1" style="width:100%;padding:9px 12px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;">
                   </div>
+                  <button onclick="kcSkipStep(1)" style="background:none;border:none;color:#B87946;font-size:12px;font-weight:700;cursor:pointer;padding:8px 0 0;display:block;margin-left:auto;">Skip this →</button>
                 </div>
               </div>
 
@@ -4328,6 +4329,7 @@ function updateStaffName() {
                     <input type="checkbox" id="s1-home-access" style="width: 18px; height: 18px; flex-shrink: 0;">
                     🏠 Home Access — all design tools, forever <span style="color: var(--link-clay); font-weight: 700; margin-left: auto;">+£5.00</span>
                   </label>
+                  <button onclick="kcSkipStep(2)" style="background:none;border:none;color:#B87946;font-size:12px;font-weight:700;cursor:pointer;padding:8px 0 0;display:block;margin-left:auto;">Skip this →</button>
                 </div>
               </div>
 
@@ -4345,6 +4347,7 @@ function updateStaffName() {
                   </div>
                   <div id="s1-duty-preview" style="font-size:11px;color:var(--gu-dust);margin-bottom:8px;min-height:14px;"></div>
                   <div id="s1-assigned-duties-list"></div>
+                  <button onclick="kcSkipStep(3)" style="background:none;border:none;color:#B87946;font-size:12px;font-weight:700;cursor:pointer;padding:8px 0 0;display:block;margin-left:auto;">Skip this →</button>
                 </div>
               </div>
 
@@ -4356,6 +4359,7 @@ function updateStaffName() {
                   <div class="flow-title">✅ Table Setup Checklist</div>
                   <div style="font-size:11px;color:var(--gu-dust);margin:4px 0 10px;" id="s1-checklist-count">0 of 12 complete</div>
                   <div id="s1-checklist-items"></div>
+                  <button onclick="kcSkipChecklist()" style="background:none;border:none;color:#B87946;font-size:12px;font-weight:700;cursor:pointer;padding:8px 0 0;display:block;margin-left:auto;">Skip this — mark rest N/A →</button>
                 </div>
               </div>
 
@@ -27218,6 +27222,25 @@ function scrollToFlowStep(stepIndex) {
   if (badges[stepIndex]) {
     badges[stepIndex].closest('.flow-step').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+}
+
+// ── SKIP THIS → on every flow step. 22 Jul, per Daisy: "a skip this
+//    button in each, in the flow, all over the app." Busy studio —
+//    not every step applies to every booking. Steps 1–3 skip by
+//    scrolling on. The checklist skips by marking every remaining
+//    item N/A — the app's own existing per-item mechanism — so the
+//    Ready button unlocks legitimately, no gate bypassed.
+function kcSkipStep(nextIndex) { scrollToFlowStep(nextIndex); }
+function kcSkipChecklist() {
+  try {
+    SETUP_CHECKLIST.forEach(item => {
+      const v = checklistState[item.id];
+      if (v !== 'done' && v !== 'na') checklistState[item.id] = 'na';
+    });
+    if (typeof renderChecklist === 'function') renderChecklist();
+    if (typeof updateChecklistProgress === 'function') updateChecklistProgress();
+  } catch (e) { console.warn('skip checklist', e); }
+  scrollToFlowStep(4);
 }
 
 async function startWalkIn(customerName) {
