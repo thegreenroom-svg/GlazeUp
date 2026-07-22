@@ -32108,6 +32108,56 @@ if (typeof window !== 'undefined' && typeof window._manualFloorSync !== 'functio
 </script>
 
 
+<!-- ═══ KC UNIFY — the one paper world, every screen. 22 Jul 2026. ═══
+     One CSS layer, zero JS: every screen already shares .view and
+     .chart-container (68 uses), so theming those + inputs + headers
+     reskins the whole app into the Desk's sketchbook world at once.
+     Engine untouched. Inline-styled elements keep their styles. -->
+<style id="kc-unify">
+  body, .view {
+    background: #FFF9F0 !important;
+    color: #2B2724;
+  }
+  .view .chart-container, .chart-container {
+    background: #FFFDF9 !important;
+    border: 1.5px solid rgba(43,39,36,0.14) !important;
+    border-radius: 18px !important;
+    box-shadow: 0 1px 3px rgba(43,39,36,0.05), 0 6px 18px rgba(43,39,36,0.06) !important;
+    color: #2B2724;
+  }
+  .chart-container h3 {
+    font-family: 'Architects Daughter', cursive !important;
+    color: #2B2724 !important;
+    font-weight: 700;
+  }
+  .view input[type="text"], .view input[type="number"], .view input[type="email"],
+  .view input[type="tel"], .view input[type="date"], .view input[type="time"],
+  .view select, .view textarea {
+    background: #FFFDF9;
+    border: 1.5px solid rgba(43,39,36,0.2);
+    border-radius: 10px;
+    color: #2B2724;
+  }
+  /* Section labels pick up the clay voice */
+  .view .section-label, .view .gu-label { color: #B87946; }
+  /* Non-functional helper stays out of the demo, whatever the JS flag says */
+  #cleo-admin-floating-fab, #cleo-admin-floating-bubble, [data-cleo-helper] { display: none !important; }
+  /* Night shift: the same book by lamplight */
+  @media (prefers-color-scheme: dark) {
+    body, .view { background: #201C1A !important; color: #F4ECE0; }
+    .view .chart-container, .chart-container {
+      background: #262220 !important;
+      border-color: rgba(244,236,224,0.14) !important;
+      color: #F4ECE0;
+    }
+    .chart-container h3 { color: #F4ECE0 !important; }
+    .view input[type="text"], .view input[type="number"], .view input[type="email"],
+    .view input[type="tel"], .view input[type="date"], .view input[type="time"],
+    .view select, .view textarea {
+      background: #262220; border-color: rgba(244,236,224,0.2); color: #F4ECE0;
+    }
+  }
+</style>
 <!-- ═══ MODALS MOVED OUT OF floor-plan-view (17 July 2026) ═══
      These are full-screen overlays, not floor plan children. Living
      inside #floor-plan-view meant they briefly flashed dark every time
