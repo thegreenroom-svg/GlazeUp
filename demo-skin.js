@@ -143,7 +143,13 @@
         <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Menu</span></button>`;
     document.body.appendChild(d);
     $('kc-dock-money').onclick = () => {
-      if (isDirector()) KC.go('dashboard', null);
+      // 22 Jul — Money now opens the Admin Hub (one clear door to everything
+      // money + admin), replacing the smaller header ⚡ which is being removed.
+      // Non-directors still get the gentle takings note.
+      if (isDirector()) {
+        if (typeof openAdminHub === 'function') { KC.hideCanvas && KC.hideCanvas(); openAdminHub(); }
+        else KC.go('dashboard', null);
+      }
       else if (typeof toast === 'function') toast('Takings are for directors', 'info');
     };
 

@@ -3333,10 +3333,6 @@ function updateStaffName() {
         <button class="glaze-tile ghtile-mini" id="my-tiles-header-btn" onclick="_flowGraphEnter()" title="Home"
           style="background:linear-gradient(135deg,#4C8C5A,#3A6E46);">🏠</button>
 
-        <!-- Admin Hub — directors only (22 Jul), shown/hidden by _syncAdminHubButton() -->
-        <button class="glaze-tile ghtile-mini" id="admin-hub-header-btn" onclick="openAdminHub()" title="Admin Hub — all director tools"
-          style="background:linear-gradient(135deg,#B87946,#8B5A34);display:none;">⚡</button>
-
         <!-- Sync + live status dot -->
         <button class="glaze-tile ghtile-mini" id="sync-live-btn" onclick="syncLiveData()" title="Sync — pull fresh Square data now"
           style="background:linear-gradient(135deg,#3E6FA3,#2E547C);">📥</button>
@@ -19921,10 +19917,8 @@ function applyPlatformRevenueAccess() {
   // which directors still get. Only the platform figures went away.
   window.assistantContext = hasAccess ? 'director' : 'staff';
 
-  // Admin Hub header button — 22 Jul. Same director access list. Shows the
-  // ⚡ button in the header for David/Jenny/Daisy/Elliott only.
-  const hubBtn = document.getElementById('admin-hub-header-btn');
-  if (hubBtn) hubBtn.style.display = hasAccess ? 'flex' : 'none';
+  // Admin Hub is now reached via the Money dock button (22 Jul) — the old
+  // ⚡ header button was removed. Nothing to toggle here anymore.
 
   const subtitle = document.getElementById('staff-assistant-subtitle');
   if (subtitle) {
