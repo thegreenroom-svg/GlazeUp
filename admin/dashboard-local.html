@@ -16505,6 +16505,31 @@ async function _stepFloorDay(dateStr) {
   await loadFloorPlan(dateStr || undefined);
 }
 
+// Silently load floor data (bookings + tables) without rendering.
+// Used by KC.goRoom to populate _floorData before opening a room panel overlay.
+async function _silentlyLoadFloorData() {
+  try {
+    const _floorQ = window._floorViewDate ? `&date=${window._floorViewDate}` : '';
+    const [floorRes, tablesRes] = await Promise.all([
+      fetch(`${API_URL}/api/floor/active?studioId=${studioId}${_floorQ}`),
+      fetch(`${API_URL}/api/floor/tables?studioId=${studioId}`)
+    ]);
+    if (!floorRes.ok || !tablesRes.ok) return false;
+    const floorData = await floorRes.json();
+    const tablesData = await tablesRes.json();
+    if (floorData.error || tablesData.error) return false;
+    _floorData = {
+      bookings: floorData.bookings || [],
+      tables: tablesData.tables || [],
+      showingDate: floorData.showingDate || null,
+      availableDays: floorData.availableDays || []
+    };
+    return true;
+  } catch(e) {
+    return false;
+  }
+}
+
 async function loadFloorPlan(dateOverride) {
   // If no explicit date is passed (e.g. the background auto-refresh timer
   // calls loadFloorPlan() bare), fall back to whichever day the person

@@ -64,19 +64,23 @@
     } catch (e) { console.warn('[desk] nav failed', id, e); }
   };
 
-  // Walk straight into the room — no tab navigation. The room panel opens
-  // as an overlay on top of the current view (Desk). When closed, you're
-  // back on the Desk. Polls for _floorData so the panel never opens empty.
+  // Walk straight into the room's elegant table planner — the room panel overlay
+  // showing just that room's beautiful hand-drawn tiles. First silently load the
+  // floor data (if not already loaded), then open the room panel. When closed (back),
+  // you're back on the Desk.
   KC.goRoom = function (room) {
-    let tries = 0;
-    const openWhenReady = () => {
-      tries++;
-      const ready = (typeof _floorData !== 'undefined') && _floorData
-        && Array.isArray(_floorData.tables) && _floorData.tables.length;
-      if (ready && typeof openRoomPanel === 'function') { openRoomPanel(room); return; }
-      if (tries < 40) setTimeout(openWhenReady, 150); // up to ~6s
-    };
-    setTimeout(openWhenReady, 200);
+    (async () => {
+      await _silentlyLoadFloorData();
+      let tries = 0;
+      const openWhenReady = () => {
+        tries++;
+        const ready = (typeof _floorData !== 'undefined') && _floorData
+          && Array.isArray(_floorData.tables) && _floorData.tables.length;
+        if (ready && typeof openRoomPanel === 'function') { openRoomPanel(room); return; }
+        if (tries < 40) setTimeout(openWhenReady, 150); // up to ~6s
+      };
+      setTimeout(openWhenReady, 50);
+    })();
   };
 
   KC.hideCanvas = function () {
