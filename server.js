@@ -11620,6 +11620,8 @@ app.post('/api/pieces/find-in-photo', async (req, res) => {
   if (!studioId || !targetPhotoBase64 || !scenePhotoBase64) {
     return res.status(400).json({ error: 'studioId, targetPhotoBase64, scenePhotoBase64 required' });
   }
+  // 22 Jul — paid GPT-4o vision; parked. Free on-device pHash matching is unaffected.
+  if (!AI_IMAGE_GEN_ENABLED) return res.status(503).json({ error: 'Photo search is switched off.' });
   if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'Photo search is not yet available.' });
 
   try {
@@ -12035,6 +12037,10 @@ app.post('/api/shelf/adjust', async (req, res) => {
 // not pretend to have read a label it never saw: a made-up SKU is worse
 // than an empty box, because it looks right.
 app.post('/api/stock/read-label', async (req, res) => {
+  // 22 Jul — paid vision; parked. App falls back to typing the name in.
+  if (!AI_IMAGE_GEN_ENABLED) {
+    return res.status(503).json({ error: 'Label reading is switched off.', fallback: 'manual' });
+  }
   if (!process.env.OPENAI_API_KEY) {
     return res.status(503).json({ error: 'Label reading is not switched on for this studio.', fallback: 'manual' });
   }
@@ -12312,6 +12318,13 @@ app.post('/api/pieces/find-by-photo', async (req, res) => {
     // unchanged AI-assisted search below. Needs a configured key;
     // if there isn't one, decline gracefully rather than crash on a
     // bad auth header.
+    // 22 Jul — the paid AI fallback is parked; the FREE on-device pHash
+    // match above still runs and answers most real searches. When AI is
+    // off and the local hash didn't find it, we decline gracefully (staff
+    // fall back to eyeballing), rather than spend on the vision call.
+    if (!AI_IMAGE_GEN_ENABLED) {
+      return res.json({ matches: [], noConfidentMatch: true, note: 'No on-device match found. (AI search is switched off.)' });
+    }
     if (!process.env.OPENAI_API_KEY) {
       return res.json({ matches: [], noConfidentMatch: true, note: 'No on-device match found, and AI search is not configured.' });
     }
@@ -12495,6 +12508,8 @@ app.post('/api/pieces/match-whole-tray', async (req, res) => {
   if (!studioId || !bookingCode || !trayPhotoBase64) {
     return res.status(400).json({ error: 'studioId, bookingCode, trayPhotoBase64 required' });
   }
+  // 22 Jul — paid vision; parked.
+  if (!AI_IMAGE_GEN_ENABLED) return res.status(503).json({ error: 'Whole-tray scanning is switched off.' });
   if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'Whole-tray scanning is not yet available.' });
 
   try {
@@ -12564,6 +12579,9 @@ app.post('/api/pieces/match', async (req, res) => {
   if (!studioId || !bookingCode || !queryPhotoBase64) {
     return res.status(400).json({ error: 'studioId, bookingCode, queryPhotoBase64 required' });
   }
+  // 22 Jul — paid GPT-4o vision fallback; parked. The free on-device pHash
+  // matcher (/api/pieces/find) is a separate endpoint and still works.
+  if (!AI_IMAGE_GEN_ENABLED) return res.status(503).json({ error: 'AI piece matching is switched off — use the on-device match.' });
   if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'Piece matching is not yet available.' });
 
   try {
