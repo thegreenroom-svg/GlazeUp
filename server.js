@@ -815,21 +815,22 @@ app.post('/api/square/backfill', async (req, res) => {
     return res.status(404).json({ error: 'Square is not connected for this studio yet — connect it in Setup first.' });
   }
 
-  // Genuine real fix: this used to fire syncSquareData() without
-  // awaiting it, meaning the endpoint always genuinely reported
-  // "started" instantly regardless of whether the actual sync went on
-  // to succeed or fail — no real, honest way to know which. Now
-  // genuinely waits for the real result before responding.
-  try {
-    const result = await syncSquareData(studioId, connection.square_access_token, daysBack || 30);
-    res.json({ status: 'complete', daysBack: daysBack || 30, ...result });
-  } catch (error) {
-    // Genuine real detailed logging — if this exact error recurs, the
-    // server logs (not just this alert) will show the real, exact
-    // line it's genuinely coming from, rather than guessing again.
-    console.error('REAL backfill error, full stack:', error.stack);
-    res.status(500).json({ error: `Backfill failed: ${error.message}`, realStackTop: (error.stack || '').split('\n').slice(0, 3).join(' | ') });
-  }
+  // 22 Jul genuine fix: Backfill can take 60+ seconds pulling years of orders
+  // from Square — browser fetch has a 30s timeout. Return immediately with
+  // "started: true" and fire the sync async in the background. Client polls
+  // the sync_logs table or watches refreshKilnCafeRevenueData() for updates.
+  res.json({ status: 'started', daysBack: daysBack || 30, message: 'Pulling Square data in background…' });
+  
+  // Fire the sync async — don't wait for it to complete
+  setImmediate(async () => {
+    try {
+      console.log(`[backfill] Started async backfill for studio ${studioId}, ${daysBack} days`);
+      const result = await syncSquareData(studioId, connection.square_access_token, daysBack || 30);
+      console.log(`[backfill] Complete: ${result.recordsSynced} orders synced`);
+    } catch (error) {
+      console.error('REAL backfill error, full stack:', error.stack);
+    }
+  });
 });
 
 /**
