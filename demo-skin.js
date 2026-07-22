@@ -376,18 +376,27 @@
       if (title && d.showingDate) {
         const dt = new Date(d.showingDate + 'T12:00:00Z');
         const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
+        // How many days from today is the shown date? (for tomorrow / weekday)
+        const msPerDay = 86400000;
+        const dayDiff = Math.round(
+          (new Date(d.showingDate + 'T12:00:00Z') - new Date(today + 'T12:00:00Z')) / msPerDay
+        );
+        const weekday = dt.toLocaleDateString('en-GB', { weekday: 'long' }).toUpperCase();
         const nice = dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' }).toUpperCase();
         if (d.showingDate === today) {
           title.textContent = "TODAY'S BOOKINGS";
+        } else if (dayDiff === 1) {
+          // The most common case when today is over/empty — tomorrow.
+          title.textContent = "TOMORROW'S BOOKINGS";
         } else if (d.showingDate < today) {
           // A past date the person navigated to — a record of what happened.
           title.textContent = nice;
-        } else if (KC._viewedDate) {
-          // A future date they deliberately picked.
-          title.textContent = nice;
+        } else if (dayDiff >= 2 && dayDiff <= 6) {
+          // Later this week — name the day ("THURSDAY'S BOOKINGS").
+          title.textContent = weekday + "'S BOOKINGS";
         } else {
-          // No date picked, today was empty, endpoint rolled to next open day.
-          title.textContent = 'NEXT BOOKINGS — ' + nice;
+          // Further out — show the full date.
+          title.textContent = (KC._viewedDate ? '' : 'NEXT BOOKINGS — ') + nice;
         }
       }
       const t = $('kc-timeline');
