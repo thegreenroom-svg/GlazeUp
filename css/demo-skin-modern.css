@@ -407,3 +407,86 @@ html.demo-skin #jg-overlay button[style*="linear-gradient"] {
 }
 html.demo-skin #jg-overlay span[style*="00897B"] { background: var(--m-accent) !important; }
 html.demo-skin #jg-overlay [style*="F4ECE0"] { background: var(--m-surface) !important; }
+
+/* ═══ APPLE LOGIN + FINAL POLISH — 22 Jul, per Daisy:
+   "everything like an Apple presentation… even the login. Get rid
+   of the avatars." All CSS — original markup and JS untouched,
+   flag-off still byte-identical. ═══ */
+
+/* Kill the remaining wave motifs everywhere (Desk greeting included) */
+html.demo-skin .kc-wave,
+html.demo-skin .kc-wave-line { background-image: none !important; height: 0 !important; }
+
+/* The login modal — dim, blur, plain */
+html.demo-skin #shift-login-modal {
+  background: rgba(0,0,0,0.4) !important;
+  -webkit-backdrop-filter: blur(14px) !important; backdrop-filter: blur(14px) !important;
+}
+html.demo-skin #shift-login-modal > div {
+  background: var(--m-surface) !important;
+  border-radius: 20px !important;
+  box-shadow: var(--m-shadow-lift) !important;
+  padding: 28px 20px !important;
+}
+/* the 👋 and the build stamp don't belong in a shipped product */
+html.demo-skin #login-screen-picker > div[style*="font-size:40px"] { display: none !important; }
+html.demo-skin #shift-login-modal div[style*="picker-watchdog"],
+html.demo-skin #shift-login-modal > div > div[style*="font-size:9px"] { display: none !important; }
+
+/* Title + subtitle, Apple-weighted */
+html.demo-skin #login-screen-picker > div[style*="font-size:18px"] {
+  font-size: 22px !important; font-weight: 700 !important;
+  letter-spacing: -0.02em !important; color: var(--m-text) !important;
+}
+html.demo-skin #login-screen-picker > div[style*="font-size:13px"] {
+  color: var(--m-muted) !important; margin-bottom: 16px !important;
+}
+
+/* THE PICKER — avatars gone, a clean settings-style list */
+html.demo-skin #login-name-grid .av-frame { display: none !important; }
+html.demo-skin #login-name-grid > div {
+  display: flex !important; flex-direction: column !important;
+  gap: 8px !important; padding: 0 !important; max-width: none !important;
+}
+html.demo-skin #login-name-grid button {
+  display: flex !important; flex-direction: row !important;
+  align-items: center !important; justify-content: space-between !important;
+  width: 100% !important; gap: 12px !important;
+  background: var(--m-surface-2) !important;
+  border: 1px solid var(--m-border) !important;
+  border-radius: 12px !important;
+  padding: 15px 16px !important;
+  cursor: pointer !important;
+  transition: background .12s ease !important;
+}
+html.demo-skin #login-name-grid button:active { background: #E8E8ED !important; }
+html.demo-skin #login-name-grid button > div {
+  font-size: 17px !important; font-weight: 600 !important;
+  color: var(--m-text) !important; text-align: left !important;
+  margin: 0 !important;
+}
+/* role line inside static fallback buttons */
+html.demo-skin #login-name-grid button > div > div {
+  font-size: 12px !important; font-weight: 500 !important;
+  color: var(--m-muted) !important; margin-top: 2px !important;
+}
+/* trailing chevron, the universal 'this is a row' cue */
+html.demo-skin #login-name-grid button::after {
+  content: '›'; font-size: 20px; color: var(--m-faint);
+  font-weight: 400; line-height: 1;
+}
+
+/* PIN screen — grey monogram, not a coloured badge */
+html.demo-skin #login-pin-avatar {
+  background: var(--m-surface-2) !important;
+  color: var(--m-text) !important;
+  font-weight: 700 !important;
+}
+
+/* Global button/type polish — presentation-grade consistency */
+html.demo-skin button { letter-spacing: -0.01em !important; }
+html.demo-skin .glaze-tile span { letter-spacing: -0.01em !important; }
+
+@media (prefers-color-scheme: dark) {
+  html.demo-skin #login-name-grid button:active { background: #3A3A3C !important; }
+}
