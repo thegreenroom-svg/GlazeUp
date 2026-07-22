@@ -75,17 +75,17 @@ const KC_Money = {
     h2Wrapper.style.cssText = `
       margin: 0 0 8px 0;
       padding-bottom: 12px;
-      border-bottom: 2px solid rgba(163, 45, 33, 0.2);
+      border-bottom: 2px solid rgba(79, 70, 229, 0.2);
     `;
     
     const h2New = document.createElement('h2');
-    h2New.textContent = '💰 The Studio';
+    h2New.textContent = 'The Studio';
     h2New.style.cssText = `
       margin: 0;
-      font-family: 'Fraunces', serif;
+      font-family: 'Inter', sans-serif;
       font-size: 32px;
       font-weight: 900;
-      color: #A32D21;
+      color: var(--m-accent);
       letter-spacing: -0.8px;
     `;
     
@@ -95,7 +95,7 @@ const KC_Money = {
       font-size: 13px;
       color: #888;
       margin-top: 4px;
-      font-style: italic;
+      font-weight: 500;
     `;
     
     h2Wrapper.appendChild(h2New);
@@ -120,10 +120,10 @@ const KC_Money = {
     tiles.forEach(tile => {
       tile.style.cssText = `
         flex: 0 1 calc(50% - 5px) !important;
-        background: linear-gradient(135deg, #FFF9F0 85%, rgba(255, 248, 240, 0.6)) !important;
-        border: 1.5px solid rgba(163, 45, 33, 0.2) !important;
+        background: linear-gradient(135deg, var(--m-surface) 85%, rgba(255, 255, 255, 0.6)) !important;
+        border: 1.5px solid rgba(79, 70, 229, 0.2) !important;
         border-radius: 10px !important;
-        color: #2B2724 !important;
+        color: var(--m-text) !important;
         padding: 12px 14px !important;
         height: auto !important;
         aspect-ratio: auto !important;
@@ -138,12 +138,12 @@ const KC_Money = {
       
       // Add hover effect
       tile.addEventListener('mouseenter', () => {
-        tile.style.borderColor = 'rgba(163, 45, 33, 0.4)';
-        tile.style.boxShadow = '0 8px 24px rgba(163, 45, 33, 0.15)';
+        tile.style.borderColor = 'rgba(79, 70, 229, 0.4)';
+        tile.style.boxShadow = '0 8px 24px rgba(79, 70, 229, 0.15)';
       });
       
       tile.addEventListener('mouseleave', () => {
-        tile.style.borderColor = 'rgba(163, 45, 33, 0.2)';
+        tile.style.borderColor = 'rgba(79, 70, 229, 0.2)';
         tile.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.06)';
       });
       
@@ -155,10 +155,10 @@ const KC_Money = {
       if (icon) icon.style.fontSize = '24px';
       if (title) {
         title.style.cssText = `
-          font-family: 'Fraunces', serif;
+          font-family: 'Inter', sans-serif;
           font-size: 14px;
           font-weight: 700;
-          color: #A32D21;
+          color: var(--m-accent);
           margin: 0;
         `;
       }
@@ -176,8 +176,8 @@ const KC_Money = {
     const sections = document.querySelectorAll('.dashboard-section, .chart-container');
     sections.forEach(section => {
       section.style.cssText = `
-        background: linear-gradient(135deg, rgba(243, 229, 245, 0.4), rgba(255, 248, 240, 0.6)) !important;
-        border: 1.5px solid rgba(163, 45, 33, 0.15) !important;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.6)) !important;
+        border: 1.5px solid rgba(79, 70, 229, 0.15) !important;
         border-radius: 16px !important;
         padding: 20px !important;
         margin-bottom: 24px !important;
@@ -188,10 +188,10 @@ const KC_Money = {
       const title = section.querySelector('h3');
       if (title) {
         title.style.cssText = `
-          font-family: 'Fraunces', serif !important;
+          font-family: 'Inter', sans-serif !important;
           font-size: 20px !important;
           font-weight: 700 !important;
-          color: #A32D21 !important;
+          color: var(--m-accent) !important;
           margin: 0 0 16px 0 !important;
           letter-spacing: -0.5px !important;
         `;
@@ -220,8 +220,8 @@ const KC_Money = {
     const cards = document.querySelectorAll('.metric-card');
     cards.forEach(card => {
       card.style.cssText = `
-        background: #FFF9F0 !important;
-        border: 1.5px solid rgba(184, 121, 70, 0.25) !important;
+        background: var(--m-surface) !important;
+        border: 1.5px solid rgba(17, 19, 24, 0.25) !important;
         border-radius: 12px !important;
         padding: 14px !important;
         text-align: center !important;
@@ -230,12 +230,12 @@ const KC_Money = {
       `;
       
       card.addEventListener('mouseenter', () => {
-        card.style.borderColor = 'rgba(163, 45, 33, 0.4)';
-        card.style.boxShadow = '0 4px 12px rgba(163, 45, 33, 0.1)';
+        card.style.borderColor = 'rgba(79, 70, 229, 0.4)';
+        card.style.boxShadow = '0 4px 12px rgba(79, 70, 229, 0.1)';
       });
       
       card.addEventListener('mouseleave', () => {
-        card.style.borderColor = 'rgba(184, 121, 70, 0.25)';
+        card.style.borderColor = 'rgba(17, 19, 24, 0.25)';
         card.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
       });
       
@@ -257,10 +257,10 @@ const KC_Money = {
       
       if (value) {
         value.style.cssText = `
-          font-family: 'Fraunces', serif !important;
+          font-family: 'Inter', sans-serif !important;
           font-size: 22px !important;
           font-weight: 900 !important;
-          color: #A32D21 !important;
+          color: var(--m-accent) !important;
           margin-bottom: 4px !important;
         `;
       }

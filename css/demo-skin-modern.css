@@ -1,0 +1,300 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+/* ═══════════════════════════════════════════════════════════════════
+   MODERN COMMERCIAL SKIN — 22 Jul 2026
+   Per Daisy: "very modern look, free rein, how a commercial app would
+   ship, ignore website branding, surprise me."
+
+   A clean 2026 SaaS design system: neutral surfaces, hairline borders,
+   one electric accent, Inter everywhere, tabular numerals for money,
+   frosted-glass dock, iOS-style large titles, soft layered shadows.
+
+   Loads LAST so it beats demo-skin.css and demo-skin-deep.css.
+   Still entirely scoped under html.demo-skin — the ONE flag still
+   reverts everything. Zero JS here.
+   ═══════════════════════════════════════════════════════════════════ */
+
+html.demo-skin {
+  --m-bg:        #F6F7F9;
+  --m-surface:   #FFFFFF;
+  --m-surface-2: #F1F2F5;
+  --m-border:    rgba(17, 19, 24, 0.08);
+  --m-border-2:  rgba(17, 19, 24, 0.14);
+  --m-text:      #111318;
+  --m-muted:     #6B7280;
+  --m-faint:     #9CA3AF;
+  --m-accent:    #4F46E5;
+  --m-accent-soft: rgba(79, 70, 229, 0.10);
+  --m-accent-line: rgba(79, 70, 229, 0.35);
+  --m-green:     #059669;
+  --m-amber:     #D97706;
+  --m-red:       #DC2626;
+  --m-radius:    16px;
+  --m-radius-sm: 10px;
+  --m-shadow:    0 1px 2px rgba(17,19,24,0.04), 0 8px 24px rgba(17,19,24,0.06);
+  --m-shadow-lift: 0 2px 4px rgba(17,19,24,0.06), 0 16px 40px rgba(17,19,24,0.12);
+  --m-font:      'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Re-point the app's own variables so everything inherits */
+  --gu-primary: var(--m-accent) !important;
+  --gu-text: var(--m-text) !important;
+  --gu-dust: var(--m-muted) !important;
+  --gu-border: var(--m-border-2) !important;
+  --gu-font-display: var(--m-font) !important;
+
+  /* Re-point the warm tokens the JS modules use, so their inline
+     styles resolve to the modern palette instead of brick/cream */
+  --kc-brick: var(--m-accent);
+  --kc-cream: var(--m-surface);
+}
+
+/* ── PAPER ── */
+html.demo-skin body {
+  background: var(--m-bg) !important;
+  color: var(--m-text) !important;
+  font-family: var(--m-font) !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── TYPE SYSTEM ── */
+html.demo-skin h1, html.demo-skin h2, html.demo-skin h3, html.demo-skin h4,
+html.demo-skin .kc-header-modern {
+  font-family: var(--m-font) !important;
+  color: var(--m-text) !important;
+  letter-spacing: -0.02em !important;
+}
+html.demo-skin .view h2 { font-size: 30px !important; font-weight: 800 !important; }
+html.demo-skin .view h3 { font-size: 17px !important; font-weight: 700 !important; color: var(--m-text) !important; }
+
+/* Money and figures: tabular, tight, confident */
+html.demo-skin .metric-card .value,
+html.demo-skin .kc-fig-n,
+html.demo-skin [id^="metric-"],
+html.demo-skin [id^="kc-fig-"] {
+  font-family: var(--m-font) !important;
+  font-variant-numeric: tabular-nums !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.03em !important;
+  color: var(--m-text) !important;
+}
+
+/* ── TOP HEADER BAR ── */
+html.demo-skin .admin-header,
+html.demo-skin header {
+  background: rgba(255,255,255,0.82) !important;
+  -webkit-backdrop-filter: saturate(180%) blur(18px) !important;
+  backdrop-filter: saturate(180%) blur(18px) !important;
+  border-bottom: 1px solid var(--m-border) !important;
+  box-shadow: none !important;
+}
+
+/* ── CARDS / SECTIONS / CONTAINERS ── */
+html.demo-skin .chart-container,
+html.demo-skin .dashboard-section,
+html.demo-skin .setup-section, html.demo-skin .stock-section,
+html.demo-skin .staff-section, html.demo-skin .setup-card,
+html.demo-skin .kc-section-modern,
+html.demo-skin .info-banner {
+  background: var(--m-surface) !important;
+  border: 1px solid var(--m-border) !important;
+  border-radius: var(--m-radius) !important;
+  box-shadow: var(--m-shadow) !important;
+  padding: 20px !important;
+}
+
+html.demo-skin .info-banner strong {
+  font-family: var(--m-font) !important;
+  color: var(--m-text) !important;
+  font-size: 17px !important;
+  font-weight: 700 !important;
+}
+html.demo-skin .info-banner span { color: var(--m-muted) !important; }
+
+/* Kill the old wavy dividers — modern is clean */
+html.demo-skin .kc-wavy-divider,
+html.demo-skin .dashboard-section::before,
+html.demo-skin .stock-section::before,
+html.demo-skin .staff-section::before { display: none !important; }
+
+/* ── METRIC CARDS ── */
+html.demo-skin .metric-card,
+html.demo-skin .kc-card-enhanced {
+  background: var(--m-surface) !important;
+  border: 1px solid var(--m-border) !important;
+  border-radius: var(--m-radius-sm) !important;
+  box-shadow: none !important;
+  padding: 16px !important;
+  text-align: left !important;
+  transition: border-color .15s ease, transform .15s ease !important;
+}
+html.demo-skin .metric-card:hover { border-color: var(--m-accent-line) !important; transform: none !important; }
+html.demo-skin .metric-card .label {
+  font-size: 12px !important; font-weight: 600 !important;
+  color: var(--m-muted) !important; text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+html.demo-skin .metric-card .value { font-size: 26px !important; }
+html.demo-skin .metric-card .detail { font-style: normal !important; color: var(--m-faint) !important; font-size: 11px !important; }
+
+/* ── TILES → clean list-cards ── */
+html.demo-skin .glaze-tile {
+  background: var(--m-surface) !important;
+  border: 1px solid var(--m-border) !important;
+  border-radius: var(--m-radius-sm) !important;
+  color: var(--m-text) !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transition: border-color .15s ease, background .15s ease !important;
+}
+html.demo-skin .glaze-tile:hover {
+  border-color: var(--m-accent-line) !important;
+  background: var(--m-accent-soft) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+html.demo-skin .glaze-tile span { font-family: var(--m-font) !important; }
+
+/* ── BUTTONS ── */
+html.demo-skin button, html.demo-skin .kc-btn-modern, html.demo-skin [role="button"] {
+  font-family: var(--m-font) !important;
+  border-radius: var(--m-radius-sm) !important;
+  font-weight: 600 !important;
+  transition: opacity .15s ease, transform .1s ease !important;
+}
+html.demo-skin button:active { transform: scale(0.98) !important; }
+
+/* Primary actions */
+html.demo-skin .btn-connect,
+html.demo-skin button[onclick*="refresh"],
+html.demo-skin .kc-control-modern,
+html.demo-skin .kc-kiln-control {
+  background: var(--m-accent) !important;
+  color: #fff !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+html.demo-skin .btn-connect:hover { opacity: .9 !important; transform: none !important; }
+
+/* ── INPUTS ── */
+html.demo-skin input[type="text"], html.demo-skin input[type="number"],
+html.demo-skin input[type="email"], html.demo-skin textarea, html.demo-skin select,
+html.demo-skin .kc-input-modern {
+  background: var(--m-surface-2) !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--m-radius-sm) !important;
+  color: var(--m-text) !important;
+  font-family: var(--m-font) !important;
+  padding: 10px 12px !important;
+}
+html.demo-skin input:focus, html.demo-skin textarea:focus, html.demo-skin select:focus {
+  background: var(--m-surface) !important;
+  border-color: var(--m-accent) !important;
+  box-shadow: 0 0 0 3px var(--m-accent-soft) !important;
+  outline: none !important;
+}
+
+/* ── STATUS BADGES ── */
+html.demo-skin .status-badge, html.demo-skin .kc-status-enhanced, html.demo-skin .kc-tab-modern {
+  border-radius: 999px !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  padding: 4px 10px !important;
+  border: none !important;
+}
+html.demo-skin .status-badge.pending { background: rgba(217,119,6,.12) !important; color: var(--m-amber) !important; }
+html.demo-skin .status-badge.complete { background: rgba(5,150,105,.12) !important; color: var(--m-green) !important; }
+
+/* ── THE DESK (home canvas) — restyled modern ── */
+html.demo-skin #kc-canvas {
+  background: var(--m-bg) !important;
+}
+html.demo-skin .kc-hello, html.demo-skin #kc-hello-line {
+  font-family: var(--m-font) !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.03em !important;
+  color: var(--m-text) !important;
+}
+html.demo-skin .kc-fig-l { color: var(--m-muted) !important; font-family: var(--m-font) !important; }
+html.demo-skin .kc-row {
+  font-family: var(--m-font) !important;
+  font-weight: 600 !important;
+  color: var(--m-text) !important;
+  border-bottom: 1px solid var(--m-border) !important;
+  background: transparent !important;
+}
+html.demo-skin .kc-row:hover { background: var(--m-accent-soft) !important; }
+
+/* ── THE DOCK — frosted glass pill ── */
+html.demo-skin .kc-dock, html.demo-skin [class*="kc-dock"]:not(.kc-dock-b) {
+  background: rgba(255,255,255,0.72) !important;
+  -webkit-backdrop-filter: saturate(180%) blur(20px) !important;
+  backdrop-filter: saturate(180%) blur(20px) !important;
+  border: 1px solid var(--m-border) !important;
+  border-radius: 999px !important;
+  box-shadow: var(--m-shadow-lift) !important;
+}
+html.demo-skin .kc-dock-b { color: var(--m-muted) !important; font-family: var(--m-font) !important; }
+html.demo-skin .kc-dock-b.active, html.demo-skin .kc-dock-b:active { color: var(--m-accent) !important; }
+html.demo-skin .kc-dock-b span { font-weight: 600 !important; font-size: 11px !important; }
+
+/* Jump FAB */
+html.demo-skin #kc-jump-fab, html.demo-skin [id*="jump"][class*="fab"], html.demo-skin .kc-fab {
+  background: var(--m-accent) !important;
+  box-shadow: 0 8px 24px rgba(79,70,229,0.35) !important;
+  border: none !important;
+}
+
+/* ── TABLES ── */
+html.demo-skin table { border: 1px solid var(--m-border) !important; border-radius: var(--m-radius-sm) !important; overflow: hidden !important; }
+html.demo-skin th {
+  background: var(--m-surface-2) !important;
+  color: var(--m-muted) !important;
+  font-family: var(--m-font) !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+}
+html.demo-skin td { border-bottom: 1px solid var(--m-border) !important; }
+html.demo-skin tr:hover td { background: var(--m-surface-2) !important; }
+
+/* ── SKELETONS ── */
+html.demo-skin .skeleton-line, html.demo-skin .kc-skel-t {
+  background: linear-gradient(90deg, var(--m-surface-2) 25%, #E9EAEE 50%, var(--m-surface-2) 75%) !important;
+  background-size: 200% 100% !important;
+  animation: kc-shimmer 1.4s infinite !important;
+  border-radius: 6px !important;
+}
+@keyframes kc-shimmer { to { background-position: -200% 0; } }
+
+/* ── MOTION RESPECT ── */
+@media (prefers-reduced-motion: reduce) {
+  html.demo-skin * { animation: none !important; transition: none !important; }
+}
+
+/* ── DARK MODE ── */
+@media (prefers-color-scheme: dark) {
+  html.demo-skin {
+    --m-bg:        #0B0C0F;
+    --m-surface:   #16181D;
+    --m-surface-2: #1E2128;
+    --m-border:    rgba(255,255,255,0.08);
+    --m-border-2:  rgba(255,255,255,0.14);
+    --m-text:      #F4F5F7;
+    --m-muted:     #9CA3AF;
+    --m-faint:     #6B7280;
+    --m-accent:    #818CF8;
+    --m-accent-soft: rgba(129,140,248,0.14);
+    --m-accent-line: rgba(129,140,248,0.4);
+    --m-shadow:    0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.5);
+    --m-shadow-lift: 0 2px 4px rgba(0,0,0,0.5), 0 16px 40px rgba(0,0,0,0.6);
+  }
+  html.demo-skin .admin-header, html.demo-skin header {
+    background: rgba(16,18,22,0.82) !important;
+  }
+  html.demo-skin .kc-dock, html.demo-skin [class*="kc-dock"]:not(.kc-dock-b) {
+    background: rgba(22,24,29,0.78) !important;
+  }
+  html.demo-skin .skeleton-line, html.demo-skin .kc-skel-t {
+    background: linear-gradient(90deg, #1E2128 25%, #262A33 50%, #1E2128 75%) !important;
+    background-size: 200% 100% !important;
+  }
+}

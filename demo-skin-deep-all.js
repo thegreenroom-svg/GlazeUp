@@ -82,8 +82,8 @@ const KC_DeepScreens = {
       h.classList.add('kc-header-modern');
       
       h.style.cssText = `
-        font-family: 'Fraunces', serif !important;
-        color: #A32D21 !important;
+        font-family: 'Inter', sans-serif !important;
+        color: var(--m-accent) !important;
         letter-spacing: -0.5px !important;
         font-weight: 700 !important;
         margin-top: 24px !important;
@@ -103,8 +103,8 @@ const KC_DeepScreens = {
       
       section.classList.add('kc-section-modern');
       section.style.cssText = `
-        background: linear-gradient(135deg, rgba(243, 229, 245, 0.3), rgba(255, 248, 240, 0.4)) !important;
-        border: 1.5px solid rgba(163, 45, 33, 0.15) !important;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.4)) !important;
+        border: 1.5px solid rgba(79, 70, 229, 0.15) !important;
         border-radius: 14px !important;
         padding: 16px !important;
         margin-bottom: 16px !important;
@@ -121,8 +121,8 @@ const KC_DeepScreens = {
       card.classList.add('kc-card-enhanced');
       
       card.style.cssText = `
-        background: linear-gradient(135deg, #FFF9F0 95%, rgba(255, 248, 240, 0.8)) !important;
-        border: 1.5px solid rgba(184, 121, 70, 0.25) !important;
+        background: linear-gradient(135deg, var(--m-surface) 95%, rgba(255, 255, 255, 0.8)) !important;
+        border: 1.5px solid rgba(17, 19, 24, 0.25) !important;
         border-radius: 11px !important;
         padding: 12px !important;
         transition: all 0.2s ease !important;
@@ -131,13 +131,13 @@ const KC_DeepScreens = {
       
       // Add hover effect
       card.addEventListener('mouseenter', () => {
-        card.style.borderColor = 'rgba(163, 45, 33, 0.35)';
-        card.style.boxShadow = '0 4px 12px rgba(163, 45, 33, 0.1)';
+        card.style.borderColor = 'rgba(79, 70, 229, 0.35)';
+        card.style.boxShadow = '0 4px 12px rgba(79, 70, 229, 0.1)';
         card.style.transform = 'translateY(-1px)';
       }, { once: false });
       
       card.addEventListener('mouseleave', () => {
-        card.style.borderColor = 'rgba(184, 121, 70, 0.25)';
+        card.style.borderColor = 'rgba(17, 19, 24, 0.25)';
         card.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.04)';
         card.style.transform = 'translateY(0)';
       }, { once: false });
@@ -155,23 +155,23 @@ const KC_DeepScreens = {
         font-family: 'Inter', sans-serif !important;
         border-radius: 8px !important;
         padding: 8px 14px !important;
-        border: 1.5px solid var(--gu-primary, #A32D21) !important;
-        background: linear-gradient(135deg, #FFF9F0, rgba(255, 248, 240, 0.8)) !important;
-        color: #A32D21 !important;
+        border: 1.5px solid var(--gu-primary, var(--m-accent)) !important;
+        background: linear-gradient(135deg, var(--m-surface), rgba(255, 255, 255, 0.8)) !important;
+        color: var(--m-accent) !important;
         font-weight: 600 !important;
         cursor: pointer !important;
         transition: all 0.2s ease !important;
       `;
       
       btn.addEventListener('mouseenter', () => {
-        btn.style.background = 'linear-gradient(135deg, #A32D21, rgba(163, 45, 33, 0.9))';
-        btn.style.color = '#FFF9F0';
+        btn.style.background = 'linear-gradient(135deg, var(--m-accent), rgba(79, 70, 229, 0.9))';
+        btn.style.color = 'var(--m-surface)';
         btn.style.transform = 'translateY(-1px)';
       });
       
       btn.addEventListener('mouseleave', () => {
-        btn.style.background = 'linear-gradient(135deg, #FFF9F0, rgba(255, 248, 240, 0.8))';
-        btn.style.color = '#A32D21';
+        btn.style.background = 'linear-gradient(135deg, var(--m-surface), rgba(255, 255, 255, 0.8))';
+        btn.style.color = 'var(--m-accent)';
         btn.style.transform = 'translateY(0)';
       });
     });
@@ -185,23 +185,23 @@ const KC_DeepScreens = {
       input.classList.add('kc-input-modern');
       
       input.style.cssText = `
-        border: 1.5px solid rgba(184, 121, 70, 0.2) !important;
+        border: 1.5px solid rgba(17, 19, 24, 0.2) !important;
         border-radius: 8px !important;
         padding: 8px 10px !important;
-        background: #FFF9F0 !important;
-        color: #2B2724 !important;
+        background: var(--m-surface) !important;
+        color: var(--m-text) !important;
         font-family: 'Inter', sans-serif !important;
         font-size: 14px !important;
         transition: all 0.2s ease !important;
       `;
       
       input.addEventListener('focus', () => {
-        input.style.borderColor = '#A32D21';
-        input.style.boxShadow = '0 0 0 3px rgba(163, 45, 33, 0.1)';
+        input.style.borderColor = 'var(--m-accent)';
+        input.style.boxShadow = '0 0 0 3px rgba(79, 70, 229, 0.1)';
       });
       
       input.addEventListener('blur', () => {
-        input.style.borderColor = 'rgba(184, 121, 70, 0.2)';
+        input.style.borderColor = 'rgba(17, 19, 24, 0.2)';
         input.style.boxShadow = 'none';
       });
     });
