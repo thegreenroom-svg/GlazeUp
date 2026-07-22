@@ -44,6 +44,28 @@ const { Client, Environment } = require('square');
 const SQUARE_WRITES_ENABLED = process.env.SQUARE_WRITES_ENABLED === 'true';
 
 // ═══════════════════════════════════════════════════════════
+// AI COST SWITCHES — 22 July 2026, Daisy's call.
+// ═══════════════════════════════════════════════════════════
+// Two OpenAI features are PARKED to stop them costing money, without
+// deleting any code (flip the flag back to re-enable instantly):
+//
+//   CLEO_ENABLED           — the staff chat assistant (gpt-4o-mini).
+//                            "Park her for now" — sweet but not free,
+//                            and not good enough self-hosted yet.
+//   AI_IMAGE_GEN_ENABLED   — DALL-E design generation from a prompt.
+//                            Parked in favour of the free in-house
+//                            tracing/line-art tools built this session.
+//
+// Both default OFF (parked). Set the env var to 'true' to bring either
+// back. Feed-screening and the on-device pHash piece-matcher are NOT
+// affected — screening is safety, and the matcher was always free.
+// Everything else in the app is untouched: parking these only makes the
+// specific endpoints return a friendly "not available" instead of
+// spending. Nothing that currently works stops working.
+const CLEO_ENABLED = process.env.CLEO_ENABLED === 'true';
+const AI_IMAGE_GEN_ENABLED = process.env.AI_IMAGE_GEN_ENABLED === 'true';
+
+// ═══════════════════════════════════════════════════════════
 // ROYAL MAIL — the same guard, added 16 July 2026.
 // ═══════════════════════════════════════════════════════════
 // Square got a safety switch on 15 July. Royal Mail did not, and it is
@@ -1055,6 +1077,165 @@ app.post('/api/margins/cost', async (req, res) => {
     res.json({ ok: true });
   } catch (error) {
     console.error('Error saving cost:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// GET /api/director/intelligence?studioId= — 22 Jul.
+// The Director Dashboard's data engine. Combines three real sources
+// the studio already has — live Square catalog + prices, the
+// supplier_costs table (with the same fuzzy matcher the Margins tool
+// uses), and revenue_category_breakdown — into decision-ready output:
+// overall margin health, deadstock candidates, and money-making
+// suggestions WITH guardrails (nothing silly, keep customers happy).
+// Read-only. Director-gated at the client. No AI, no external cost.
+// ═══════════════════════════════════════════════════════════════
+app.get('/api/director/intelligence', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const { data: connection } = await supabase
+      .from('square_connections').select('square_access_token')
+      .eq('studio_id', studioId).single();
+    if (!connection) return res.json({ connected: false });
+
+    const squareClient = await getSquareClient(connection.square_access_token);
+
+    // 1. Live catalog — item names, categories, sell prices.
+    const catsRes = await squareClient.catalogApi.listCatalog(undefined, 'CATEGORY');
+    const catName = {};
+    (catsRes.result.objects || []).forEach(c => { catName[c.id] = c.categoryData?.name || 'Other'; });
+
+    const items = [];
+    let cursor;
+    do {
+      const ir = await squareClient.catalogApi.listCatalog(cursor, 'ITEM');
+      (ir.result.objects || []).forEach(item => {
+        const d = item.itemData; if (!d) return;
+        const cid = d.categoryId || d.categories?.[0]?.id;
+        const category = catName[cid] || 'Other';
+        (d.variations || []).forEach(v => {
+          const vd = v.itemVariationData;
+          const priceCents = vd?.priceMoney?.amount ? Number(vd.priceMoney.amount) : null;
+          const varName = vd?.name && vd.name !== 'Regular' ? ` — ${vd.name}` : '';
+          items.push({ variationId: v.id, name: `${d.name}${varName}`, category, priceCents });
+        });
+      });
+      cursor = ir.result.cursor;
+    } while (cursor);
+
+    // 2. Costs (+ fuzzy match, same logic as /api/margins).
+    const { data: costs } = await supabase
+      .from('supplier_costs').select('variation_id, item_name, cost_cents, is_overhead')
+      .eq('studio_id', studioId);
+    const costByVar = {}, costByName = {}, costList = [];
+    (costs || []).forEach(c => {
+      if (c.is_overhead) return;
+      if (c.variation_id) costByVar[c.variation_id] = c;
+      costByName[(c.item_name || '').toLowerCase()] = c;
+      costList.push(c);
+    });
+    const norm = s => (s||'').toLowerCase().replace(/\d+(\.\d+)?\s*cm\b/g,' ').replace(/\([^)]*\)/g,' ')
+      .replace(/\b(large|small|medium|lg|sm|med|mini|std|standard)\b/g,' ').replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+    const stop = new Set(['the','a','an','of','and','with','w','for','set','piece','pot']);
+    const core = s => norm(s).split(' ').filter(w => w.length>1 && !stop.has(w));
+    const sim = (a,b) => { if(!a.length||!b.length) return 0; const bs=new Set(b); return a.filter(w=>bs.has(w)).length/Math.min(a.length,b.length); };
+    const costCores = costList.map(c => ({ c, words: core(c.item_name) }));
+    items.forEach(it => {
+      const exact = costByVar[it.variationId] || costByName[it.name.toLowerCase()];
+      if (exact) { it.costCents = exact.cost_cents; return; }
+      const iw = core(it.name); let best=null, bs=0;
+      for (const {c,words} of costCores) { const s=sim(iw,words); if(s>bs){bs=s;best=c;} }
+      it.costCents = (best && bs>=0.6) ? best.cost_cents : null;
+    });
+
+    // 3. Margin health across everything that has both a price and a cost.
+    const costed = items.filter(it => it.priceCents != null && it.costCents != null && it.priceCents > 0);
+    const marginPctOf = it => Math.round(((it.priceCents - it.costCents) / it.priceCents) * 100);
+    const avgMargin = costed.length
+      ? Math.round(costed.reduce((s,it)=>s+marginPctOf(it),0)/costed.length) : null;
+    const costedCount = costed.length;
+    const uncostedCount = items.filter(it => it.priceCents != null && it.costCents == null).length;
+
+    // 4. Category-level margin (average per category, costed items only).
+    const byCat = {};
+    costed.forEach(it => { (byCat[it.category]=byCat[it.category]||[]).push(marginPctOf(it)); });
+    const categoryMargins = Object.entries(byCat).map(([cat, arr]) => ({
+      category: cat, avgMargin: Math.round(arr.reduce((a,b)=>a+b,0)/arr.length), items: arr.length
+    })).sort((a,b)=>a.avgMargin-b.avgMargin);
+
+    // 5. Suggestions — with guardrails.
+    const suggestions = [];
+    // (a) Thin-margin items that sell: a small rise still below category avg.
+    const overallAvg = avgMargin || 55;
+    costed.forEach(it => {
+      const m = marginPctOf(it);
+      if (m < overallAvg - 15 && it.priceCents >= 200) {
+        // suggest a modest round-up that keeps it sensible
+        const suggestedPrice = Math.ceil((it.priceCents * 1.08) / 50) * 50; // +~8%, rounded to 50p
+        const newMargin = Math.round(((suggestedPrice - it.costCents)/suggestedPrice)*100);
+        suggestions.push({
+          kind: 'raise_price', item: it.name, category: it.category,
+          currentPrice: it.priceCents, suggestedPrice, currentMargin: m, newMargin,
+          reason: `Margin is ${m}% — below your ${overallAvg}% average. A rise to £${(suggestedPrice/100).toFixed(2)} still keeps it fair and lifts margin to ${newMargin}%.`
+        });
+      }
+    });
+    // Cap raise suggestions to the 6 biggest opportunities so it isn't noise.
+    suggestions.sort((a,b) => (a.currentMargin||0)-(b.currentMargin||0));
+    const raiseSuggestions = suggestions.slice(0, 6);
+
+    res.json({
+      connected: true,
+      generatedAt: new Date().toISOString(),
+      health: { avgMargin, costedCount, uncostedCount, totalItems: items.length },
+      categoryMargins,
+      suggestions: raiseSuggestions,
+      // deadstock is filled client-side from the existing stock-levels endpoint
+      // so we don't double-call Square inventory here.
+    });
+  } catch (error) {
+    console.error('director/intelligence error:', error);
+    res.status(500).json({ connected: false, error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// POST /api/invoices/save-scanned — 22 Jul.
+// The in-app invoice scanner sends its confirmed line items here.
+// Anyone on the team can scan an invoice (coffee, Booker, Cromartie,
+// Tesco…), the phone/iPad OCRs it on-device, they eyeball & confirm,
+// and the confirmed rows land here. Each becomes a supplier_cost.
+// The OCR + parse happen client-side (free, on-device) — this endpoint
+// just stores what a human already confirmed.
+// { studioId, supplier, lines: [{ name, costCents, isOverhead? }] }
+// ═══════════════════════════════════════════════════════════════
+app.post('/api/invoices/save-scanned', async (req, res) => {
+  const { studioId, supplier, lines } = req.body;
+  if (!studioId || !Array.isArray(lines) || !lines.length) {
+    return res.status(400).json({ error: 'studioId and at least one line required' });
+  }
+  const src = `invoice:${(supplier || 'scanned').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+  try {
+    let saved = 0;
+    for (const ln of lines) {
+      const name = (ln.name || '').trim();
+      const costCents = Math.round(Number(ln.costCents));
+      if (!name || isNaN(costCents) || costCents < 0) continue;
+      const { error } = await supabase.from('supplier_costs').upsert({
+        studio_id: studioId,
+        item_name: name,
+        cost_cents: costCents,
+        is_overhead: !!ln.isOverhead,
+        source: src,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'studio_id,item_name' });
+      if (!error) saved++;
+    }
+    res.json({ ok: true, saved, supplier: supplier || 'scanned' });
+  } catch (error) {
+    console.error('save-scanned error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -4835,6 +5016,8 @@ function _isCacheable(q, messages) {
 app.post('/api/assistant/chat', async (req, res) => {
   const { studioId, context, messages, bookingCode, staffMemberId, customerId } = req.body;
   if (!studioId || !context || !messages) return res.status(400).json({ error: 'studioId, context, messages required' });
+  // 22 Jul — Cleo parked to stop OpenAI cost. Flip CLEO_ENABLED=true to bring back.
+  if (!CLEO_ENABLED) return res.status(503).json({ error: 'The assistant is currently switched off.' });
   if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'The assistant is not yet available.' });
   if (!ASSISTANT_SYSTEM_PROMPTS[context]) return res.status(400).json({ error: 'Invalid context' });
 
@@ -5054,6 +5237,7 @@ app.post('/api/assistant/chat', async (req, res) => {
 // transcript dump, and explicitly told to say so if nothing durable
 // came up, rather than inventing something to justify the call.
 async function extractCustomerMemory(studioId, customerId, recentMessages) {
+  if (!CLEO_ENABLED) return; // 22 Jul — parked with Cleo (it's a follow-up to her chat)
   if (!process.env.OPENAI_API_KEY) return;
   const transcript = recentMessages.map(m => `${m.role}: ${m.content}`).join('\n');
   const prompt = `Below is a short real exchange between a customer and a pottery studio's chat assistant. Only extract something if it's a genuine, durable fact worth remembering about THIS customer for future visits — a stated preference, an occasion (birthday, wedding gift), a recurring detail. Do NOT extract one-off logistical questions (opening hours, pricing) or anything trivial. If nothing durable came up, say so honestly.
@@ -9316,6 +9500,9 @@ function isPromptBlocked(prompt) {
 app.post('/api/ai-design/generate', async (req, res) => {
   const { studioId, bookingCode, prompt } = req.body;
   if (!studioId || !prompt) return res.status(400).json({ error: 'studioId and prompt required' });
+  // 22 Jul — paid DALL-E generation parked in favour of the free in-house
+  // tracing tools. Flip AI_IMAGE_GEN_ENABLED=true to bring it back.
+  if (!AI_IMAGE_GEN_ENABLED) return res.status(503).json({ error: 'AI design generation is switched off — try the tracing tool instead.' });
   if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'AI design generation is not yet available for this studio.' });
 
   const trimmedPrompt = String(prompt).trim().slice(0, 300);
@@ -11290,6 +11477,9 @@ app.get('/api/bookings/:bookingCode/reference-photos', async (req, res) => {
 app.post('/api/pieces/suggest-type', async (req, res) => {
   const { studioId, photoBase64 } = req.body;
   if (!studioId || !photoBase64) return res.status(400).json({ error: 'studioId and photoBase64 required' });
+  // 22 Jul — this is a paid GPT-4o vision call; parked with the other paid AI.
+  // The free on-device pHash piece-matcher still works and is unaffected.
+  if (!AI_IMAGE_GEN_ENABLED) return res.json({ suggestions: [] });
   if (!process.env.OPENAI_API_KEY) return res.json({ suggestions: [] }); // fail quietly — this is a nice-to-have, not core
 
   try {

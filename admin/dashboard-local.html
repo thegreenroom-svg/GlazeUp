@@ -2278,6 +2278,77 @@ function updateStaffName() {
      Each step fills the whole screen. Top 58%: rich illustrated panel.
      Bottom 42%: title, description, navigation.
 ──────────────────────────────────────────────────────────────────── -->
+<!-- ═══════════════════════════════════════════════════════════════
+     INVOICE SCANNER — 22 Jul. Anyone on the team snaps/uploads an
+     invoice; the phone/iPad OCRs it on-device (Tesseract, free), parses
+     line items, shows them for review, and on confirm saves them as
+     supplier costs. The habit that keeps costs current — a 20-second job
+     when an invoice arrives, done by whoever's holding it.
+     ═══════════════════════════════════════════════════════════════ -->
+<div id="inv-scan-overlay" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(20,18,16,0.55);backdrop-filter:blur(4px);align-items:flex-end;justify-content:center;">
+  <div style="background:var(--gu-bg,#fff);width:100%;max-width:520px;max-height:92vh;border-radius:20px 20px 0 0;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,0.3);">
+    <!-- header -->
+    <div style="padding:16px 18px;border-bottom:1px solid var(--gu-border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:9px;">
+        <span style="font-size:20px;">🧾</span>
+        <strong style="font-size:16px;">Add an invoice</strong>
+      </div>
+      <button onclick="closeInvoiceScanner()" style="background:none;border:none;font-size:22px;color:var(--gu-dust);cursor:pointer;padding:2px 6px;">×</button>
+    </div>
+
+    <!-- scrolling body -->
+    <div id="inv-scan-body" style="padding:18px;overflow-y:auto;flex:1;">
+
+      <!-- STEP 1: capture -->
+      <div id="inv-step-capture">
+        <p style="font-size:13px;color:var(--gu-dust);line-height:1.5;margin:0 0 16px;">
+          Snap or upload any supplier invoice — coffee, Booker, Cromartie, Tesco, bisque. It reads on this device (nothing leaves the app), you check it, and the costs update. Anyone can do their bit.
+        </p>
+        <label for="inv-file-input" style="display:block;border:2px dashed var(--gu-border);border-radius:14px;padding:34px 20px;text-align:center;cursor:pointer;background:rgba(184,121,70,0.04);">
+          <div style="font-size:32px;margin-bottom:8px;">📸</div>
+          <div style="font-size:14px;font-weight:700;">Snap or upload the invoice</div>
+          <div style="font-size:11px;color:var(--gu-dust);margin-top:4px;">Photo, or a picture from your library</div>
+        </label>
+        <input id="inv-file-input" type="file" accept="image/*" capture="environment" style="display:none;" onchange="_invOnFile(event)">
+        <div style="margin-top:14px;">
+          <label style="font-size:11px;font-weight:700;color:var(--gu-dust);display:block;margin-bottom:5px;">Which supplier? (optional)</label>
+          <input id="inv-supplier" type="text" placeholder="e.g. Booker, Miles, Cromartie" style="width:100%;padding:10px 12px;border:1px solid var(--gu-border);border-radius:8px;font-size:14px;box-sizing:border-box;">
+        </div>
+      </div>
+
+      <!-- STEP 2: reading (OCR progress) -->
+      <div id="inv-step-reading" style="display:none;text-align:center;padding:30px 0;">
+        <div class="inv-spinner" style="width:34px;height:34px;border:3px solid var(--gu-border);border-top-color:#B87946;border-radius:50%;margin:0 auto 16px;animation:invspin 1s linear infinite;"></div>
+        <div style="font-size:14px;font-weight:700;">Reading the invoice…</div>
+        <div id="inv-reading-pct" style="font-size:12px;color:var(--gu-dust);margin-top:4px;">Warming up…</div>
+        <img id="inv-preview" style="max-width:100%;max-height:180px;margin-top:16px;border-radius:10px;display:none;" alt="">
+      </div>
+
+      <!-- STEP 3: review parsed lines -->
+      <div id="inv-step-review" style="display:none;">
+        <p style="font-size:13px;color:var(--gu-dust);line-height:1.5;margin:0 0 14px;">
+          Here's what it found. Fix anything that's off, untick what you don't want, then save. What you save becomes your supplier costs.
+        </p>
+        <div id="inv-review-list"></div>
+        <button onclick="_invAddLine()" style="margin-top:10px;width:100%;background:none;border:1px dashed var(--gu-border);color:var(--gu-dust);border-radius:10px;padding:9px;font-size:12px;cursor:pointer;">+ Add a line manually</button>
+      </div>
+
+      <!-- STEP 4: done -->
+      <div id="inv-step-done" style="display:none;text-align:center;padding:30px 0;">
+        <div style="font-size:40px;margin-bottom:10px;">✅</div>
+        <div id="inv-done-msg" style="font-size:15px;font-weight:700;"></div>
+        <div style="font-size:12px;color:var(--gu-dust);margin-top:6px;">They'll show in Margins and the dashboard.</div>
+      </div>
+    </div>
+
+    <!-- footer actions -->
+    <div id="inv-scan-footer" style="padding:14px 18px;border-top:1px solid var(--gu-border);flex-shrink:0;display:none;">
+      <button id="inv-save-btn" onclick="_invSave()" style="width:100%;background:#B87946;color:white;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;">Save these costs</button>
+    </div>
+  </div>
+</div>
+<style>@keyframes invspin { to { transform: rotate(360deg); } }</style>
+
 <div id="swt-overlay">
   <!-- Visual panel — illustrated per step -->
   <div id="swt-visual">
@@ -3651,6 +3722,9 @@ function updateStaffName() {
     <button onclick="goToTab('dashboard'); setTimeout(()=>{showDashboardSection('margins'); loadMargins();},60);" class="adminhub-card" style="background:#B87946;filter:brightness(0.92);">
       <span style="font-size:22px;">📈</span><span class="ahc-label">Margins</span><span class="ahc-sub">Costs &amp; drink estimator</span>
     </button>
+    <button onclick="openInvoiceScanner()" class="adminhub-card" style="background:#B87946;filter:brightness(0.84);">
+      <span style="font-size:22px;">🧾</span><span class="ahc-label">Add Invoice</span><span class="ahc-sub">Scan &amp; update costs</span>
+    </button>
     <button onclick="goToTab('dashboard'); setTimeout(()=>showDashboardSection('extras'),60);" class="adminhub-card" style="background:#2e7d32;">
       <span style="font-size:22px;">🧾</span><span class="ahc-label">Extra Charges</span><span class="ahc-sub">Today's tally</span>
     </button>
@@ -3886,7 +3960,10 @@ function updateStaffName() {
           <div class="chart-container">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
               <h3 style="margin:0;">📈 Margins <span style="font-size:11px;font-weight:500;color:var(--gu-dust);">(directors only)</span></h3>
-              <button onclick="loadMargins()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
+              <div style="display:flex;gap:6px;">
+                <button onclick="openInvoiceScanner()" style="background:none;border:none;cursor:pointer;color:#B87946;font-size:13px;padding:4px 8px;font-weight:700;">🧾 Add invoice</button>
+                <button onclick="loadMargins()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
+              </div>
             </div>
             <p style="font-size:11px;color:var(--gu-dust);margin-bottom:14px;line-height:1.5;">
               Sell prices come live from Square. Tap a cost to enter what you pay your supplier — margin appears instantly and is remembered. Coffee and anything you can't cost per-item sits under Overheads at the bottom.
@@ -6485,6 +6562,9 @@ function updateStaffName() {
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.0.3/qrcode.min.js"></script>
+<!-- Tesseract.js — free, on-device OCR for the in-app invoice scanner (22 Jul).
+     Runs entirely in the browser, no API cost. Loaded lazily only when the
+     scanner is first opened (see openInvoiceScanner) so it never slows normal use. -->
 <script>
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -25823,6 +25903,201 @@ async function confirmAllSuggestions() {
       });
     } catch (e) { console.warn('bulk confirm save failed for', it.name, e); }
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INVOICE SCANNER — 22 Jul. On-device OCR (Tesseract, free), parse,
+// review, save as costs, and optionally hand off to Dext.
+// ═══════════════════════════════════════════════════════════════
+let _invLines = [];        // parsed/confirmed line items
+let _invImageDataUrl = null; // the captured photo, kept for the Dext hand-off
+let _invTesseractLoaded = false;
+
+function openInvoiceScanner() {
+  document.getElementById('inv-scan-overlay').style.display = 'flex';
+  _invShowStep('capture');
+  _invLines = [];
+  _invImageDataUrl = null;
+  const sup = document.getElementById('inv-supplier'); if (sup) sup.value = '';
+}
+function closeInvoiceScanner() {
+  document.getElementById('inv-scan-overlay').style.display = 'none';
+}
+function _invShowStep(step) {
+  ['capture', 'reading', 'review', 'done'].forEach(s => {
+    const el = document.getElementById('inv-step-' + s);
+    if (el) el.style.display = (s === step) ? 'block' : 'none';
+  });
+  // footer (save button) only on review
+  const footer = document.getElementById('inv-scan-footer');
+  if (footer) footer.style.display = (step === 'review') ? 'block' : 'none';
+  if (step === 'reading') { const r = document.getElementById('inv-step-reading'); if (r) r.style.display = 'block'; }
+}
+
+// Lazy-load Tesseract only when first needed.
+function _invLoadTesseract() {
+  return new Promise((resolve, reject) => {
+    if (_invTesseractLoaded && window.Tesseract) return resolve();
+    if (window.Tesseract) { _invTesseractLoaded = true; return resolve(); }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js';
+    s.onload = () => { _invTesseractLoaded = true; resolve(); };
+    s.onerror = () => reject(new Error('Could not load the reader. Check your connection.'));
+    document.head.appendChild(s);
+  });
+}
+
+async function _invOnFile(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  // Read the image to a data URL — used for OCR preview AND the Dext hand-off.
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    _invImageDataUrl = e.target.result;
+    _invShowStep('reading');
+    const prev = document.getElementById('inv-preview');
+    if (prev) { prev.src = _invImageDataUrl; prev.style.display = 'block'; }
+    try {
+      await _invLoadTesseract();
+      const pctEl = document.getElementById('inv-reading-pct');
+      const { data } = await window.Tesseract.recognize(_invImageDataUrl, 'eng', {
+        logger: m => {
+          if (m.status === 'recognizing text' && pctEl) pctEl.textContent = `Reading… ${Math.round(m.progress * 100)}%`;
+          else if (pctEl) pctEl.textContent = m.status;
+        }
+      });
+      _invLines = _invParseInvoiceText(data.text || '');
+      _invRenderReview();
+      _invShowStep('review');
+    } catch (err) {
+      alert(err.message || 'Could not read that image — try a clearer photo, or add the lines manually.');
+      _invLines = [];
+      _invRenderReview();
+      _invShowStep('review');
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+// Parse OCR text into { name, costCents } line items. Invoices vary wildly,
+// so this is deliberately forgiving: it looks for lines that contain a
+// price-like number (12.34, £12.34, GBP 12.34) and treats the text before
+// it as the item name. The human reviews everything after, so over-catching
+// is fine — better to surface a line to untick than to miss it.
+function _invParseInvoiceText(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const out = [];
+  const priceRe = /(?:£|gbp\s*)?(\d{1,4}[.,]\d{2})\b/i;
+  const skipWords = /(total|vat|subtotal|delivery|shipping|balance|amount paid|payment|invoice|order no|order number|date|tel|email|www|thank|address)/i;
+  for (const ln of lines) {
+    if (skipWords.test(ln)) continue;
+    const m = ln.match(priceRe);
+    if (!m) continue;
+    const costCents = Math.round(parseFloat(m[1].replace(',', '.')) * 100);
+    if (isNaN(costCents) || costCents <= 0 || costCents > 100000) continue; // sane bounds
+    // name = the line with the price (and any trailing qty noise) stripped
+    let name = ln.slice(0, m.index).replace(/[-–—:]+$/, '').trim();
+    // strip a leading quantity like "2 x " or "3 "
+    name = name.replace(/^\d+\s*x?\s*/i, '').trim();
+    if (name.length < 2) continue;
+    out.push({ name, costCents, keep: true });
+  }
+  return out;
+}
+
+function _invRenderReview() {
+  const list = document.getElementById('inv-review-list');
+  if (!list) return;
+  if (!_invLines.length) {
+    list.innerHTML = '<div style="font-size:13px;color:var(--gu-dust);padding:10px 0;text-align:center;">Nothing read automatically — add lines manually below.</div>';
+    return;
+  }
+  list.innerHTML = _invLines.map((ln, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--gu-border);">
+      <input type="checkbox" ${ln.keep ? 'checked' : ''} onchange="_invLines[${i}].keep=this.checked" style="width:18px;height:18px;flex-shrink:0;">
+      <input type="text" value="${(ln.name || '').replace(/"/g, '&quot;')}" onchange="_invLines[${i}].name=this.value" style="flex:1;min-width:0;padding:7px 9px;border:1px solid var(--gu-border);border-radius:7px;font-size:13px;">
+      <div style="display:flex;align-items:center;gap:2px;flex-shrink:0;">
+        <span style="font-size:13px;color:var(--gu-dust);">£</span>
+        <input type="text" value="${(ln.costCents / 100).toFixed(2)}" onchange="_invLines[${i}].costCents=Math.round(parseFloat(this.value.replace(',','.'))*100)||0" style="width:62px;padding:7px 6px;border:1px solid var(--gu-border);border-radius:7px;font-size:13px;text-align:right;">
+      </div>
+    </div>`).join('');
+}
+
+function _invAddLine() {
+  _invLines.push({ name: '', costCents: 0, keep: true });
+  _invRenderReview();
+}
+
+async function _invSave() {
+  const supplier = (document.getElementById('inv-supplier')?.value || '').trim();
+  const keep = _invLines.filter(l => l.keep && (l.name || '').trim() && l.costCents > 0);
+  if (!keep.length) { alert('Nothing ticked to save. Add or tick at least one line.'); return; }
+  const btn = document.getElementById('inv-save-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    const res = await fetch(`${API_URL}/api/invoices/save-scanned`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, supplier, lines: keep.map(l => ({ name: l.name.trim(), costCents: l.costCents })) }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Save failed');
+    document.getElementById('inv-done-msg').textContent = `${data.saved} cost${data.saved === 1 ? '' : 's'} saved.`;
+    _invShowStep('done');
+    // Offer the Dext hand-off — keeps the accounts record in step.
+    _invOfferDext(supplier);
+    // Refresh margins if that screen is loaded.
+    if (typeof loadMargins === 'function' && _marginsData) { try { loadMargins(); } catch (e) {} }
+  } catch (e) {
+    alert(e.message || 'Could not save. Try again.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Save these costs'; }
+  }
+}
+
+// After saving, offer to also send the invoice photo to Dext, so the
+// accounts record stays in step — the "don't forget Dext" safety net.
+// Uses the device's own mail (mailto with the photo) — the app never
+// silently emails on your behalf; you press send, keeping the books
+// auditable and in your control.
+function _invOfferDext(supplier) {
+  const doneStep = document.getElementById('inv-step-done');
+  if (!doneStep) return;
+  // Avoid stacking buttons on repeat saves.
+  if (document.getElementById('inv-dext-btn')) return;
+  const wrap = document.createElement('div');
+  wrap.style.marginTop = '18px';
+  wrap.innerHTML = `
+    <button id="inv-dext-btn" style="width:100%;background:#2B2724;color:white;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;">📤 Also send to Dext</button>
+    <div style="font-size:11px;color:var(--gu-dust);margin-top:8px;line-height:1.4;">Keeps your accountant's record in step. Opens your mail with the photo attached and Dext's address filled in — just press send.</div>
+    <button onclick="closeInvoiceScanner()" style="width:100%;background:none;border:none;color:var(--gu-dust);font-size:13px;margin-top:12px;cursor:pointer;padding:8px;">Done — skip Dext</button>`;
+  doneStep.appendChild(wrap);
+  document.getElementById('inv-dext-btn').onclick = () => _invSendToDext(supplier);
+}
+
+// The Dext hand-off. mailto can't attach a photo reliably across devices,
+// so we use the Web Share API (which CAN attach the image file on iOS/Android)
+// when available, falling back to a plain mailto with instructions.
+async function _invSendToDext(supplier) {
+  const DEXT_ADDRESS = 'thekilncafe1@dext.cc';
+  const subject = `Invoice${supplier ? ' — ' + supplier : ''} (via Kiln Cafe app)`;
+  // Preferred path: Web Share with the actual image file attached.
+  try {
+    if (_invImageDataUrl && navigator.canShare) {
+      const blob = await (await fetch(_invImageDataUrl)).blob();
+      const file = new File([blob], `invoice-${Date.now()}.jpg`, { type: blob.type || 'image/jpeg' });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: subject,
+          text: `To Dext: ${DEXT_ADDRESS}`,
+        });
+        return;
+      }
+    }
+  } catch (e) { /* fall through to mailto */ }
+  // Fallback: open mail to Dext (user attaches the photo from their library).
+  const body = encodeURIComponent(`Invoice attached for Dext.\n\n(If the photo isn't attached, add it from your library — it's the one you just scanned.)`);
+  window.location.href = `mailto:${DEXT_ADDRESS}?subject=${encodeURIComponent(subject)}&body=${body}`;
 }
 
 async function addOverheadLine() {
