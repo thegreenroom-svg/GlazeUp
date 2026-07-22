@@ -4213,6 +4213,24 @@ function updateStaffName() {
               <button class="glaze-tile btn-connect glaze-ocean" style="padding: 6px 14px; font-size: 11px;" onclick="syncBookingsFromSquare()">🔄 Sync from Square</button>
             </div>
 
+            <!-- SCAN FIRST — the fast path. Scan the customer's booking QR or a
+                 piece label and land straight on the booking. Everything below
+                 is the fallback for when there's no code to scan. -->
+            <button class="glaze-tile" onclick="scanBookingCode()" style="width:100%;background:#2e7d32;color:white;border:none;border-radius:14px;padding:18px;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:6px;">
+              <span style="font-size:22px;">📷</span> Scan booking or piece
+            </button>
+            <div style="text-align:center;font-size:11px;color:var(--gu-dust);margin-bottom:14px;">Scan the customer's QR code or a piece label</div>
+            <div id="s1-scan-status" style="font-size:12px;text-align:center;margin-bottom:10px;"></div>
+
+            <div style="display: flex; align-items: center; gap: 10px; margin: 4px 0 14px;">
+              <div style="flex: 1; height: 1px; background: var(--gu-border);"></div>
+              <span style="font-size: 11px; color: var(--gu-dust);">NO CODE? FIND IT BELOW</span>
+              <div style="flex: 1; height: 1px; background: var(--gu-border);"></div>
+            </div>
+
+            <input type="text" id="s1-booking-code" placeholder="Type a booking code" style="width: 100%; padding: 12px; border: 1.5px solid var(--gu-border); border-radius: 10px; font-size: 14px; margin-bottom: 12px; box-sizing: border-box;">
+            <button class="glaze-tile btn-connect" style="width: 100%; margin-bottom:18px;" onclick="lookupBookingSection1()">Look Up Booking</button>
+
             <div style="display: flex; gap: 6px; margin-bottom: 12px;">
               <button id="s1-view-today" class="glaze-tile staff-subtab-btn active" style="padding: 6px 12px; font-size: 12px;" onclick="switchBookingsView('today')">Today</button>
               <button id="s1-view-upcoming" class="glaze-tile staff-subtab-btn" style="padding: 6px 12px; font-size: 12px;" onclick="switchBookingsView('upcoming')">Next 7 days</button>
@@ -4220,14 +4238,6 @@ function updateStaffName() {
             <div id="s1-today-bookings">
               <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">Tap "Sync from Square" to load bookings.</div>
             </div>
-
-            <div style="display: flex; align-items: center; gap: 10px; margin: 18px 0;">
-              <div style="flex: 1; height: 1px; background: var(--gu-border);"></div>
-              <span style="font-size: 11px; color: var(--gu-dust);">OR LOOK UP BY CODE</span>
-              <div style="flex: 1; height: 1px; background: var(--gu-border);"></div>
-            </div>
-            <input type="text" id="s1-booking-code" placeholder="Booking code / QR scan" style="width: 100%; padding: 12px; border: 1.5px solid var(--gu-border); border-radius: 10px; font-size: 14px; margin-bottom: 12px; box-sizing: border-box;">
-            <button class="glaze-tile btn-connect" style="width: 100%;" onclick="lookupBookingSection1()">Look Up Booking</button>
           </div>
 
           <!-- STEP C: result — customer found/created, assign table, open session -->
@@ -30516,6 +30526,97 @@ document.addEventListener('DOMContentLoaded', function() {
     this.value = '';
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// SCAN A BOOKING — the fast path for a busy counter (22 July 2026).
+// Open the camera, read a QR/barcode with the device's native
+// BarcodeDetector, pull the booking code out of it, and run the same
+// lookup as typing it. No library needed — BarcodeDetector ships in
+// iOS Safari 17+ and Chrome. If it's not available, we fall back to the
+// phone's native camera capture so scanning still does *something*
+// useful rather than dead-ending. The parse mirrors the qr-input
+// listener above (handles a full URL, "booking-…", or a bare code).
+// ═══════════════════════════════════════════════════════════════════
+function _extractBookingCode(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  const m = s.match(/booking-[\w\d-]+/i);
+  return m ? m[0] : s;
+}
+
+async function scanBookingCode() {
+  const status = document.getElementById('s1-scan-status');
+  const setStatus = (t, c) => { if (status) { status.textContent = t; status.style.color = c || 'var(--gu-dust)'; } };
+
+  // No BarcodeDetector? Fall back to a native camera photo — better than
+  // nothing, and the user can still type the code if it can't be read.
+  if (!('BarcodeDetector' in window)) {
+    setStatus('Live scan not supported on this device — type the code below.', '#B8860B');
+    const inp = document.getElementById('s1-booking-code');
+    if (inp) inp.focus();
+    return;
+  }
+
+  // Build a lightweight full-screen camera overlay.
+  let overlay = document.getElementById('scan-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'scan-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9800;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+      <video id="scan-video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;"></video>
+      <div style="position:absolute;top:0;left:0;right:0;padding:calc(14px + env(safe-area-inset-top)) 16px 14px;background:linear-gradient(#000a,transparent);color:#fff;display:flex;align-items:center;justify-content:space-between;z-index:2;">
+        <span style="font-size:15px;font-weight:700;">Point at the QR code</span>
+        <button onclick="closeScanOverlay()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:20px;padding:8px 16px;font-size:14px;font-weight:700;cursor:pointer;">Cancel</button>
+      </div>
+      <div style="position:absolute;width:220px;height:220px;border:3px solid #fff;border-radius:20px;box-shadow:0 0 0 100vmax rgba(0,0,0,0.45);z-index:1;"></div>`;
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display = 'flex';
+
+  const video = document.getElementById('scan-video');
+  let stream = null;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = stream;
+    window._scanStream = stream;
+  } catch (e) {
+    setStatus('Camera not available — type the code below.', '#c62828');
+    closeScanOverlay();
+    return;
+  }
+
+  const detector = new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13', 'data_matrix'] });
+  window._scanActive = true;
+
+  async function tick() {
+    if (!window._scanActive) return;
+    try {
+      const codes = await detector.detect(video);
+      if (codes && codes.length) {
+        const code = _extractBookingCode(codes[0].rawValue);
+        if (code) {
+          closeScanOverlay();
+          const inp = document.getElementById('s1-booking-code');
+          if (inp) inp.value = code;
+          setStatus('Found ' + code + ' — loading…', '#2e7d32');
+          if (typeof lookupBookingSection1 === 'function') lookupBookingSection1();
+          return;
+        }
+      }
+    } catch (e) { /* keep scanning */ }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+function closeScanOverlay() {
+  window._scanActive = false;
+  try { window._scanStream && window._scanStream.getTracks().forEach(t => t.stop()); } catch (e) {}
+  window._scanStream = null;
+  const o = document.getElementById('scan-overlay');
+  if (o) o.style.display = 'none';
+}
 
 // ── Splash / resting screen: shown on open, and again whenever the app
 // goes idle — so a shared studio iPad settles back to the branded moment
