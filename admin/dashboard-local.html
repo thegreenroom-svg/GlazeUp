@@ -25891,20 +25891,27 @@ function renderMargins() {
       html += `<div style="padding:0 14px 6px;">`;
       items.forEach(it => {
         const price = it.priceCents != null ? it.priceCents * (1 + uplift / 100) : null;
-        // A rough fallback so drinks/cakes aren't blank until real costs land.
-        // Daisy: "if you can't find anything, just put in roughly £3.50 per
-        // piece." Applied ONLY to drink/cake groups, ONLY when there's no real
-        // cost and no fuzzy suggestion — shown clearly as a rough estimate,
-        // tap to correct. Uses a real cost if set; never overrides one.
+        // A rough fallback so NOTHING sits blank until real costs land.
+        // Daisy: "populate what you can, mark it fuzzy." Every uncosted item
+        // (no real cost, no fuzzy suggestion) gets a rough estimate, shown
+        // clearly with a * and tap-to-correct — never overrides a real cost.
+        // Drinks/cakes default to ~£3.50 (Daisy's figure); everything else
+        // to a rough 55% of its sell price (a sane pottery-trade placeholder)
+        // so the margin isn't wildly off while it waits for a real invoice.
         const g = _marginGroupFor(it.name);
-        const roughGroups = ['coffee', 'tea', 'hotchoc', 'cold', 'cakes'];
-        const useRough = it.costCents == null && it.costSuggested == null && roughGroups.includes(g);
-        const roughCost = useRough ? 350 : null;
+        const drinkCakeGroups = ['coffee', 'tea', 'hotchoc', 'cold', 'cakes'];
+        const useRough = it.costCents == null && it.costSuggested == null;
+        let roughCost = null;
+        if (useRough) {
+          if (drinkCakeGroups.includes(g)) roughCost = 350;
+          else if (price != null) roughCost = Math.round(it.priceCents * 0.55);
+          else roughCost = 350;
+        }
         const effectiveCost = it.costCents != null ? it.costCents : roughCost;
         const margin = (price != null && effectiveCost != null && price > 0)
           ? Math.round(((price - effectiveCost) / price) * 100) : null;
         // Cost line: real cost if set, else a fuzzy suggestion to confirm,
-        // else a rough estimate for drinks/cakes, else "tap to set".
+        // else a rough estimate (marked), else "tap to set".
         let costLine;
         if (it.costCents != null) {
           costLine = `cost <span onclick="editMarginCost('${it.variationId}')" style="text-decoration:underline;cursor:pointer;color:var(--gu-primary);">£${(it.costCents / 100).toFixed(2)}</span>`;
@@ -25913,7 +25920,7 @@ function renderMargins() {
           // against this variation id so it's exact next time).
           costLine = `<span onclick="confirmSuggestedCost('${it.variationId}', ${it.costSuggested})" style="cursor:pointer;color:#B87946;font-weight:600;">≈ £${(it.costSuggested / 100).toFixed(2)} — tap to confirm</span> <span style="opacity:0.6;">(from "${(it.costSuggestedFrom||'').replace(/"/g,'')}")</span>`;
         } else if (useRough) {
-          costLine = `<span onclick="editMarginCost('${it.variationId}')" style="cursor:pointer;color:var(--gu-dust);font-style:italic;">~£3.50 rough — tap to set real cost</span>`;
+          costLine = `<span onclick="editMarginCost('${it.variationId}')" style="cursor:pointer;color:var(--gu-dust);font-style:italic;">~£${(roughCost / 100).toFixed(2)} rough* — tap to set real cost</span>`;
         } else {
           costLine = `cost <span onclick="editMarginCost('${it.variationId}')" style="text-decoration:underline;cursor:pointer;color:var(--gu-primary);">tap to set</span>`;
         }
@@ -25934,7 +25941,8 @@ function renderMargins() {
     html += `</div>`;
   });
 
-  listEl.innerHTML = html || '<div style="padding:10px;color:var(--gu-dust);font-size:12px;">No items found in the Square catalog.</div>';
+  listEl.innerHTML = (html || '<div style="padding:10px;color:var(--gu-dust);font-size:12px;">No items found in the Square catalog.</div>')
+    + '<div style="font-size:10px;color:var(--gu-dust);padding:10px 4px 2px;line-height:1.4;font-style:italic;">* rough estimate until a real cost is entered — tap any to set the true figure, or scan an invoice with Add Invoice. Drinks &amp; cakes default to ~£3.50; other items to ~55% of sell price.</div>';
 
   const ovEl = document.getElementById('margins-overheads');
   if (ovEl) {
