@@ -113,22 +113,18 @@
           <img class="kc-mark" src="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png" alt="">
           <div class="kc-masthead-words">
             <div class="kc-house">THE KILN CAFE</div>
-            <div class="kc-house-sub">Langport · Somerset</div>
+            <div class="kc-house-sub" id="kc-hello-line">Langport · Somerset</div>
           </div>
           <button class="kc-hbp" onclick="KC.go('host-by-post','openHostByPostSection')" aria-label="Host By Post">
             <img src="/brand-assets/kiln-cafe-logo-demo/hostbypost-box-demo.svg" alt="Host By Post">
           </button>
         </div>
-        <div class="kc-hello kc-in"><span id="kc-hello-line"></span></div>
-        <div class="kc-wave-line kc-in"></div>
 
-        <div class="kc-hero kc-in" id="kc-hero"></div>
+        <!-- Thin status strip — a glance, not a billboard. -->
+        <div class="kc-strip kc-in" id="kc-hero"></div>
 
-        <!-- The floor plan, as the heart of the Desk. The three studio
-             spaces in their own colours (matching the real floor plan) —
-             tap a space to walk straight into it. Live counts fill in. -->
+        <!-- The three studio spaces — the heart of the Desk. -->
         <div class="kc-section kc-in">
-          <div class="kc-sec-title">THE STUDIO</div>
           <div class="kc-floor" id="kc-floor">
             <button class="kc-room kc-room-lounge" onclick="KC.goRoom('Lounge')">
               <span class="kc-room-name">The Lounge</span>
@@ -146,15 +142,12 @@
               <span class="kc-room-count" id="kc-room-vault-n"></span>
             </button>
           </div>
-          <button class="kc-floor-all" onclick="KC.go('floor-plan','showFloorPlan')">Open the full floor plan ›</button>
         </div>
 
-        <div class="kc-section kc-in">
-          <div class="kc-sec-title">THE DESK</div>
+        <!-- The springboard: the actions as squares. -->
+        <div class="kc-section kc-in kc-section-grow">
           <div class="kc-index" id="kc-index"></div>
         </div>
-
-        <div class="kc-foot kc-in">It's not all cheese and cider round here you know…</div>
       </div>`;
     document.body.appendChild(c);
 
@@ -356,8 +349,8 @@
     bar.querySelector('.kc-inv-nudge-go').onclick = () => { markSeen(); bar.remove(); try { openInvoiceScanner(); } catch (e) {} };
     bar.querySelector('.kc-inv-nudge-x').onclick = () => { markSeen(); bar.remove(); };
 
-    // Slot it just under the greeting line.
-    const anchor = $('kc-hello-line');
+    // Slot it just under the status strip (not inside the masthead).
+    const anchor = $('kc-hero');
     if (anchor && anchor.parentNode) {
       anchor.parentNode.insertBefore(bar, anchor.nextSibling);
     }
@@ -374,13 +367,13 @@
        per device, not once per app-open. */
     try { KC._maybeShowInvoiceNudge(); } catch (e) {}
 
-    /* hero: three living figures (skeletons until real data lands) */
+    /* status strip: three living figures, inline — a glance not a billboard */
     const hero = $('kc-hero');
     const dir = isDirector();
     hero.innerHTML = `
-      ${dir ? `<div class="kc-fig"><div class="kc-fig-n kc-skel-t" id="kc-fig-money">&nbsp;</div><div class="kc-fig-l">taken today</div></div>` : ''}
-      <div class="kc-fig"><div class="kc-fig-n kc-skel-t" id="kc-fig-floor">&nbsp;</div><div class="kc-fig-l" id="kc-fig-floor-l">on the floor</div></div>
-      <div class="kc-fig"><div class="kc-fig-n kc-skel-t" id="kc-fig-kiln">&nbsp;</div><div class="kc-fig-l">in the kiln</div></div>`;
+      ${dir ? `<span class="kc-stat"><b class="kc-skel-t" id="kc-fig-money">&nbsp;</b> today</span>` : ''}
+      <span class="kc-stat"><b class="kc-skel-t" id="kc-fig-floor">&nbsp;</b> <span id="kc-fig-floor-l">on the floor</span></span>
+      <span class="kc-stat"><b class="kc-skel-t" id="kc-fig-kiln">&nbsp;</b> in the kiln</span>`;
 
     try { if (typeof apiConnected !== 'undefined' && !apiConnected && typeof checkAPIConnection === 'function') await checkAPIConnection(); } catch (e) {}
     const base = (typeof API_URL !== 'undefined') ? API_URL : '';
@@ -396,7 +389,7 @@
       const f = $('kc-fig-floor');
       if (f) { f.classList.remove('kc-skel-t'); f.textContent = bs.length; }
       const fl = $('kc-fig-floor-l');
-      if (fl) fl.textContent = bs.length === 1 ? 'booking · ' + covers + ' covers' : 'bookings · ' + covers + ' covers';
+      if (fl) fl.textContent = 'on the floor';
 
       // Live per-room tallies for the three studio-space zones. Match each
       // booking's space to a zone; blanks/"Main"/"Family" fall to Main Studio.

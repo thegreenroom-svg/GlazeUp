@@ -338,7 +338,7 @@ html.demo-skin.kc-desk-ready #flow-tools-row { display: none !important; }
 /* ── THE CANVAS ── */
 html.demo-skin #kc-canvas {
   position: fixed; inset: 0; z-index: 8000;
-  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  overflow: hidden; -webkit-overflow-scrolling: touch;
   background:
     radial-gradient(120% 60% at 85% -8%, rgba(247, 175, 173, 0.20), transparent 60%),
     radial-gradient(90% 50% at -10% 108%, rgba(184, 121, 70, 0.12), transparent 55%),
@@ -347,7 +347,24 @@ html.demo-skin #kc-canvas {
   transition: opacity 0.28s ease, transform 0.34s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 html.demo-skin #kc-canvas.kc-away { opacity: 0; transform: translateY(14px) scale(0.985); pointer-events: none; }
-html.demo-skin .kc-paper { max-width: 640px; margin: 0 auto; padding: calc(14px + env(safe-area-inset-top)) 20px 130px; }
+/* Fit-to-screen: the home never scrolls. Masthead + strip + zones take
+   their natural height; the squares section grows to fill the rest. */
+html.demo-skin .kc-paper {
+  max-width: 640px; margin: 0 auto;
+  padding: calc(12px + env(safe-area-inset-top)) 18px calc(96px + env(safe-area-inset-bottom));
+  height: 100dvh; box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 12px;
+}
+html.demo-skin .kc-section-grow { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+html.demo-skin .kc-section-grow .kc-index { flex: 1; align-content: center; }
+
+/* Thin status strip — inline figures, a glance not a billboard. */
+html.demo-skin .kc-strip {
+  display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap;
+  padding: 2px 2px 0;
+}
+html.demo-skin .kc-stat { font-size: 12px; color: var(--kc-ink); opacity: 0.7; }
+html.demo-skin .kc-stat b { font-size: 17px; font-weight: 800; opacity: 1; margin-right: 3px; }
 
 /* staggered arrival — plain nth-child delays, deliberately NOT using
    calc(var(--custom-prop)) for animation-delay: that pattern is
@@ -397,6 +414,7 @@ html.demo-skin .kc-skel, html.demo-skin .kc-skel-t {
 html.demo-skin .kc-skel { height: 56px; margin-bottom: 10px; }
 @keyframes kcShimmer { to { background-position: -200% 0; } }
 
+html.demo-skin .kc-paper > .kc-section { margin-top: 0; }
 html.demo-skin .kc-section { margin-top: 26px; }
 html.demo-skin .kc-sec-title { font-size: 11px; letter-spacing: 0.24em; font-weight: 800; opacity: 0.55; margin-bottom: 10px; }
 
@@ -405,7 +423,7 @@ html.demo-skin .kc-sec-title { font-size: 11px; letter-spacing: 0.24em; font-wei
    the Desk: tap a space to walk into it. */
 html.demo-skin .kc-floor {
   display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 8px;
-  height: 132px;
+  height: 108px;
 }
 html.demo-skin .kc-room {
   border: none; border-radius: 16px; cursor: pointer; overflow: hidden;
@@ -440,6 +458,12 @@ html.demo-skin .kc-floor-all:active { opacity: 0.6; }
 html.demo-skin .kc-index {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
 }
+/* On the fit-to-screen home, tiles fill the rows available rather than
+   forcing a square that could overflow — they stay tidy and on-screen. */
+html.demo-skin .kc-section-grow .kc-index {
+  grid-auto-rows: 1fr; height: 100%;
+}
+html.demo-skin .kc-section-grow .kc-tile { aspect-ratio: auto; min-height: 0; }
 html.demo-skin .kc-tile {
   aspect-ratio: 1 / 1; border: 1px solid var(--m-border, #ece7e0); border-radius: 20px; cursor: pointer;
   background: var(--m-surface, #fff);
