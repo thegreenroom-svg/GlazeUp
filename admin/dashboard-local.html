@@ -22389,12 +22389,12 @@ function updateRevenueChart(data) {
     const height = maxRevenue > 0 ? (revenue / maxRevenue) * 100 : 0;
     const dateStr = day.metric_date || day.date;
     const date = new Date(dateStr);
-    const label = date.getDate();
+    const label = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
     
     return `
       <div class="chart-bar" style="height: ${height}%;">
         <div class="chart-bar-value">£${revenue.toFixed(0)}</div>
-        <div class="chart-bar-label">Jul ${label}</div>
+        <div class="chart-bar-label">${label}</div>
       </div>
     `;
   }).join('');
