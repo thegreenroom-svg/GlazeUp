@@ -115,23 +115,6 @@
         <div class="kc-hero kc-in" id="kc-hero"></div>
 
         <div class="kc-section kc-in">
-          <div class="kc-day-head">
-            <div class="kc-sec-title" id="kc-day-title">TODAY'S BOOKINGS</div>
-            <div class="kc-day-nav">
-              <button class="kc-day-arrow" id="kc-day-prev" aria-label="Previous day">‹</button>
-              <button class="kc-day-cal" id="kc-day-cal" aria-label="Pick a date">
-                <svg viewBox="0 0 24 24" width="16" height="16"><rect x="3.5" y="5" width="17" height="15" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 9.5h17M8 3v4M16 3v4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-              </button>
-              <button class="kc-day-arrow" id="kc-day-next" aria-label="Next day">›</button>
-              <button class="kc-day-today" id="kc-day-today" aria-label="Jump to today">Today</button>
-            </div>
-          </div>
-          <!-- hidden native date input, opened by the calendar button -->
-          <input type="date" id="kc-day-date-input" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;">
-          <div class="kc-timeline" id="kc-timeline"><div class="kc-skel"></div><div class="kc-skel"></div><div class="kc-skel"></div></div>
-        </div>
-
-        <div class="kc-section kc-in">
           <div class="kc-sec-title">THE DESK</div>
           <div class="kc-index" id="kc-index"></div>
         </div>
