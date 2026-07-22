@@ -4263,8 +4263,8 @@ function updateStaffName() {
                 <div class="flow-connector"></div>
                 <div class="flow-content">
                   <div class="flow-title">🪑 Assign a Table</div>
-                  <div id="s1-table-picker" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;margin-top:10px;">
-                    <div style="color:var(--gu-dust);font-size:12px;padding:8px;">Loading tables…</div>
+                  <div id="s1-table-picker" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px;">
+                    <div style="grid-column:1/-1;color:var(--gu-dust);font-size:12px;padding:8px;">Loading tables…</div>
                   </div>
                   <input type="hidden" id="s1-table-number" value="">
                   <div style="margin-top:12px;">
@@ -4352,7 +4352,7 @@ function updateStaffName() {
           }
           .flow-step { position:relative; }
           .flow-step .flow-connector { position:absolute; left:17px; top:36px; bottom:-4px; width:2px; }
-          .flow-content { flex:1; min-width:0; padding-bottom:24px; }
+          .flow-content { flex:1; min-width:0; padding-bottom:16px; }
           .flow-title { font-size:14px; font-weight:700; color:var(--gu-text); }
         </style>
 
@@ -12465,21 +12465,21 @@ async function loadTablePicker() {
   picker.innerHTML = rooms.map(room => {
     const tables = studioTables.filter(t => (t.room || 'Main Studio') === room);
     return `
-      ${rooms.length > 1 ? `<div style="grid-column:1/-1;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--gu-dust);margin-top:4px;">${room}</div>` : ''}
+      ${rooms.length > 1 ? `<div style="grid-column:1/-1;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--gu-dust);margin:3px 0 1px;">${room}</div>` : ''}
       ${tables.map(t => {
         const occupied = occupiedTables.has(t.name);
         const session = todaySessions.find(s => s.table_name === t.name);
         const isSelected = selectedTable === t.name;
         return `<button class="glaze-tile" onclick="selectTable('${t.name}')"
-          style="padding:10px 8px;border-radius:10px;border:2px solid ${isSelected?'var(--gu-primary)':occupied?'#ffcdd2':'var(--gu-border)'};
+          style="padding:7px 4px;border-radius:9px;border:2px solid ${isSelected?'var(--gu-primary)':occupied?'#ffcdd2':'var(--gu-border)'};
             background:${isSelected?'var(--gu-primary)':occupied?'#fff9f9':'white'};
             color:${isSelected?'white':occupied?'#c62828':'var(--gu-text)'};
-            cursor:${occupied?'not-allowed':'pointer'};font-size:12px;font-weight:700;
-            opacity:${occupied?'0.7':'1'};text-align:center;transition:all .15s;"
+            cursor:${occupied?'not-allowed':'pointer'};font-size:11px;font-weight:700;
+            opacity:${occupied?'0.7':'1'};text-align:center;transition:all .15s;line-height:1.25;"
           ${occupied?'disabled':''}>
-          <div style="font-size:16px;margin-bottom:2px;">${occupied?'🔴':'🟢'}</div>
+          <div style="font-size:13px;">${occupied?'🔴':'🟢'}</div>
           <div>${t.name}</div>
-          <div style="font-size:10px;font-weight:400;margin-top:2px;opacity:.7;">
+          <div style="font-size:9px;font-weight:400;opacity:.7;">
             ${occupied ? (session?.customer_name?.split(' ')[0] || 'Occupied') : `${t.capacity} seats`}
           </div>
         </button>`;
@@ -12868,8 +12868,8 @@ function renderChecklist() {
   container.innerHTML = categories.map(cat => {
     const items = SETUP_CHECKLIST.filter(i => i.category === cat);
     return `
-      <div style="margin-bottom:14px;">
-        <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gu-dust);margin-bottom:8px;">${catIcons[cat]||''} ${cat}</div>
+      <div style="margin-bottom:10px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--gu-dust);margin-bottom:5px;">${catIcons[cat]||''} ${cat}</div>
         ${items.map(item => {
           const state = checklistState[item.id];
           const isDone = state === 'done';
@@ -12877,35 +12877,30 @@ function renderChecklist() {
           const isComplete = isDone || isNA;
 
           const hint = (item.id === 'name_card' && tableSelected && !isComplete)
-            ? `<div style="font-size:11px;color:var(--link-clay);margin-top:3px;font-weight:600;">Table: ${tableSelected} — write this name</div>`
+            ? `<div style="font-size:10.5px;color:var(--link-clay);font-weight:600;margin-top:1px;">Table: ${tableSelected} — write this name</div>`
             : '';
 
+          // Compact single-row item: tap the row to mark Done (one tap,
+          // no scrolling through a big button pair). N/A is a small
+          // secondary chip beside it for the few items that don't apply —
+          // still one tap, just doesn't take the row's full width.
           return `
-            <div style="border-radius:12px;margin-bottom:8px;overflow:hidden;
+            <div onclick="setChecklistItem('${item.id}','done')"
+              style="display:flex;align-items:center;gap:9px;padding:9px 10px;margin-bottom:5px;border-radius:10px;cursor:pointer;
               background:${isDone?'#e8f5e9':isNA?'#f5f5f5':'white'};
               border:1.5px solid ${isDone?'#a5d6a7':isNA?'#e0e0e0':'var(--gu-border)'};">
-              <div style="display:flex;align-items:center;gap:10px;padding:12px 14px 8px;">
-                <span style="font-size:18px;flex-shrink:0;">${item.icon}</span>
-                <div style="flex:1;min-width:0;">
-                  <div style="font-size:13.5px;font-weight:500;color:${isDone?'#2e7d32':isNA?'#9e9e9e':'var(--gu-text)'};
-                    text-decoration:${isComplete?'line-through':''};line-height:1.4;">${item.text}</div>
-                  ${hint}
-                </div>
+              <span style="font-size:16px;flex-shrink:0;">${item.icon}</span>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;font-weight:500;color:${isDone?'#2e7d32':isNA?'#9e9e9e':'var(--gu-text)'};
+                  text-decoration:${isComplete?'line-through':''};line-height:1.35;">${item.text}</div>
+                ${hint}
               </div>
-              <div style="display:flex;gap:8px;padding:0 14px 12px;">
-                <button class="glaze-tile" onclick="setChecklistItem('${item.id}','done')"
-                  style="flex:1;padding:11px;border-radius:9px;border:none;
-                    background:${isDone?'#2e7d32':'#f0f0f0'};color:${isDone?'white':'#555'};
-                    font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;">
-                  ✓ Done
-                </button>
-                <button class="glaze-tile" onclick="setChecklistItem('${item.id}','na')"
-                  style="flex:1;padding:11px;border-radius:9px;border:none;
-                    background:${isNA?'#9e9e9e':'#f0f0f0'};color:${isNA?'white':'#888'};
-                    font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;">
-                  N/A
-                </button>
-              </div>
+              <button class="glaze-tile" onclick="event.stopPropagation();setChecklistItem('${item.id}','na')"
+                style="flex-shrink:0;padding:6px 10px;border-radius:7px;border:none;
+                  background:${isNA?'#9e9e9e':'#eee'};color:${isNA?'white':'#999'};
+                  font-size:11px;font-weight:700;cursor:pointer;">N/A</button>
+              <span style="flex-shrink:0;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+                background:${isDone?'#2e7d32':'transparent'};border:2px solid ${isDone?'#2e7d32':'#ccc'};color:white;font-size:13px;font-weight:800;">${isDone?'✓':''}</span>
             </div>`;
         }).join('')}
       </div>`;
