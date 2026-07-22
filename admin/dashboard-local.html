@@ -3656,6 +3656,11 @@ function updateStaffName() {
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Tool Usage</span>
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">Directors only</span>
           </button>
+          <button id="dashboard-tile-margins" onclick="showDashboardSection('margins'); loadMargins();" class="glaze-tile" style="display:none;background:#B87946;filter:brightness(0.7);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
+            <span style="font-size:24px;">📈</span>
+            <span style="font-size:14px;font-weight:800;margin-top:6px;">Margins</span>
+            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Directors only</span>
+          </button>
           <button onclick="showDashboardSection('extras')" class="glaze-tile" style="background:#2e7d32;color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
             <span style="font-size:24px;">💷</span>
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Extra Charges</span>
@@ -3767,6 +3772,34 @@ function updateStaffName() {
         <!-- Most Popular Designs — director-only, per direct request,
              genuinely its own real switchable section now, was
              previously bundled inside kiln-cafe-revenue-section. -->
+        <div id="dashboard-section-margins" class="dashboard-section" style="display:none;">
+          <div class="chart-container">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <h3 style="margin:0;">📈 Margins <span style="font-size:11px;font-weight:500;color:var(--gu-dust);">(directors only)</span></h3>
+              <button onclick="loadMargins()" style="background:none;border:none;cursor:pointer;color:var(--gu-primary);font-size:13px;padding:4px 8px;font-weight:700;">🔄 Refresh</button>
+            </div>
+            <p style="font-size:11px;color:var(--gu-dust);margin-bottom:14px;line-height:1.5;">
+              Sell prices come live from Square. Tap a cost to enter what you pay your supplier — margin appears instantly and is remembered. Coffee and anything you can't cost per-item sits under Overheads at the bottom.
+            </p>
+
+            <!-- What-if price modeller -->
+            <div style="background:var(--gu-secondary,#f5f5f7);border-radius:12px;padding:12px 14px;margin-bottom:14px;">
+              <div style="display:flex;justify-content:space-between;align-items:baseline;">
+                <span style="font-size:12px;font-weight:700;">What if prices went up…</span>
+                <span style="font-size:15px;font-weight:800;" id="margins-whatif-label">+0%</span>
+              </div>
+              <input type="range" id="margins-whatif" min="0" max="25" value="0" step="1"
+                oninput="renderMargins()" style="width:100%;margin-top:6px;accent-color:var(--gu-primary);">
+            </div>
+
+            <div id="margins-list"><div style="padding:10px;color:var(--gu-dust);font-size:12px;">Loading…</div></div>
+
+            <h3 style="margin:18px 0 8px;font-size:15px;">Overheads <span style="font-size:10px;font-weight:500;color:var(--gu-dust);">(monthly lump sums — coffee supplies etc.)</span></h3>
+            <div id="margins-overheads"></div>
+            <button onclick="addOverheadLine()" style="margin-top:8px;background:none;border:1px dashed var(--gu-border);color:var(--gu-dust);border-radius:10px;padding:9px 12px;font-size:12px;cursor:pointer;width:100%;">+ Add an overhead line</button>
+          </div>
+        </div>
+
         <div id="dashboard-section-designs" class="dashboard-section" style="display:none;">
           <div class="chart-container">
             <h3>Most Popular Designs</h3>
@@ -19737,7 +19770,7 @@ function applyPlatformRevenueAccess() {
     // director-only Dashboard tiles (Revenue, Popular Designs, Tool
     // Usage) correctly show/hide using this same, existing, unchanged
     // access check, rather than a genuinely separate, parallel one.
-    ['dashboard-tile-revenue', 'dashboard-tile-designs', 'dashboard-tile-tools'].forEach(id => {
+    ['dashboard-tile-revenue', 'dashboard-tile-designs', 'dashboard-tile-tools', 'dashboard-tile-margins'].forEach(id => {
       const tile = document.getElementById(id);
       if (tile) tile.style.display = hasAccess ? 'flex' : 'none';
     });
@@ -22115,7 +22148,7 @@ async function populateDashboard() {
   // Genuine real tile visibility, per direct request — same director
   // check as above, correctly kept in sync across both real places
   // this access logic runs.
-  ['dashboard-tile-revenue', 'dashboard-tile-designs', 'dashboard-tile-tools'].forEach(id => {
+  ['dashboard-tile-revenue', 'dashboard-tile-designs', 'dashboard-tile-tools', 'dashboard-tile-margins'].forEach(id => {
     const tile = document.getElementById(id);
     if (tile) tile.style.display = isDirector ? 'flex' : 'none';
   });
@@ -25386,6 +25419,110 @@ function showDashboardSection(section) {
   const target = section === 'revenue' ? 'kiln-cafe-revenue-section' : `dashboard-section-${section}`;
   const targetEl = document.getElementById(target);
   if (targetEl) targetEl.style.display = 'block';
+}
+
+// ── MARGINS — supplier cost vs live Square price, per item. 22 Jul.
+let _marginsData = { items: [], overheads: [] };
+
+async function loadMargins() {
+  const listEl = document.getElementById('margins-list');
+  if (listEl) listEl.innerHTML = '<div style="padding:10px;color:var(--gu-dust);font-size:12px;">Loading live prices from Square…</div>';
+  try {
+    const res = await fetch(`${API_URL}/api/margins?studioId=${studioId}`);
+    const data = await res.json();
+    if (!data.connected) { listEl.innerHTML = '<div style="padding:10px;color:var(--gu-dust);font-size:12px;">Square isn\'t connected.</div>'; return; }
+    _marginsData = data;
+    renderMargins();
+  } catch (e) {
+    if (listEl) listEl.innerHTML = '<div style="padding:10px;color:#c62828;font-size:12px;">Couldn\'t load margins — try Refresh.</div>';
+  }
+}
+
+function _marginColor(pct) {
+  if (pct == null) return 'var(--gu-dust)';
+  if (pct >= 65) return '#2e7d32';
+  if (pct >= 40) return '#B87946';
+  return '#c62828';
+}
+
+function renderMargins() {
+  const uplift = Number(document.getElementById('margins-whatif')?.value || 0);
+  const lbl = document.getElementById('margins-whatif-label');
+  if (lbl) lbl.textContent = `+${uplift}%`;
+
+  const listEl = document.getElementById('margins-list');
+  if (!listEl) return;
+  const byCat = {};
+  _marginsData.items.forEach(it => { (byCat[it.category] = byCat[it.category] || []).push(it); });
+
+  let html = '';
+  Object.keys(byCat).sort().forEach(cat => {
+    html += `<div style="font-size:11px;font-weight:800;color:var(--gu-dust);text-transform:uppercase;letter-spacing:0.04em;margin:14px 0 6px;">${cat}</div>`;
+    byCat[cat].forEach(it => {
+      const price = it.priceCents != null ? it.priceCents * (1 + uplift / 100) : null;
+      const margin = (price != null && it.costCents != null && price > 0)
+        ? Math.round(((price - it.costCents) / price) * 100) : null;
+      html += `
+        <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--gu-border);">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${it.name}</div>
+            <div style="font-size:11px;color:var(--gu-dust);">
+              cost <span onclick="editMarginCost('${it.variationId}')" style="text-decoration:underline;cursor:pointer;color:var(--gu-primary);">${it.costCents != null ? '£' + (it.costCents / 100).toFixed(2) : 'tap to set'}</span>
+            </div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-size:13px;font-weight:700;">${price != null ? '£' + (price / 100).toFixed(2) : '—'}</div>
+            <div style="font-size:11px;font-weight:800;color:${_marginColor(margin)};">${margin != null ? margin + '%' : 'no cost yet'}</div>
+          </div>
+        </div>`;
+    });
+  });
+  listEl.innerHTML = html || '<div style="padding:10px;color:var(--gu-dust);font-size:12px;">No items found in the Square catalog.</div>';
+
+  const ovEl = document.getElementById('margins-overheads');
+  if (ovEl) {
+    ovEl.innerHTML = (_marginsData.overheads || []).map(o => `
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--gu-border);font-size:13px;">
+        <span>${o.name}</span>
+        <span style="font-weight:700;">£${(o.costCents / 100).toFixed(2)}/mo</span>
+      </div>`).join('')
+      || '<div style="font-size:12px;color:var(--gu-dust);padding:6px 0;">Nothing here yet — add coffee supplies below.</div>';
+  }
+}
+
+async function editMarginCost(variationId) {
+  const it = _marginsData.items.find(i => i.variationId === variationId);
+  if (!it) return;
+  const current = it.costCents != null ? (it.costCents / 100).toFixed(2) : '';
+  const entered = prompt(`What does "${it.name}" cost you? (£)`, current);
+  if (entered == null || entered.trim() === '') return;
+  const costCents = Math.round(parseFloat(entered.replace(',', '.')) * 100);
+  if (isNaN(costCents) || costCents < 0) return;
+  it.costCents = costCents;
+  renderMargins();
+  try {
+    await fetch(`${API_URL}/api/margins/cost`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId: studioId, variationId, name: it.name, costCents }),
+    });
+  } catch (e) { console.warn('cost save failed', e); }
+}
+
+async function addOverheadLine() {
+  const name = prompt('Overhead name (e.g. Coffee & drink supplies)');
+  if (!name) return;
+  const entered = prompt(`Monthly cost for "${name}"? (£)`);
+  if (entered == null) return;
+  const costCents = Math.round(parseFloat(entered.replace(',', '.')) * 100);
+  if (isNaN(costCents) || costCents < 0) return;
+  _marginsData.overheads.push({ name, costCents });
+  renderMargins();
+  try {
+    await fetch(`${API_URL}/api/margins/cost`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId: studioId, name, costCents, isOverhead: true }),
+    });
+  } catch (e) { console.warn('overhead save failed', e); }
 }
 
 // ── Genuine real Barista landing page, per direct request ──

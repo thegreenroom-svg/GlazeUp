@@ -578,6 +578,39 @@ async function syncSquareData(studioId, accessToken, daysBack = 1) {
       return 'Other';
     }
 
+    // THE PROPER FIX (22 Jul, Daisy's option 2): use Square's OWN
+    // catalog categories — exactly as specific as the till is. Built
+    // as variationId → category name (line items carry the variation
+    // id in catalogObjectId). Guarded: if the catalog read fails
+    // (scope/network), the keyword matcher above still works alone.
+    const variationCategory = {};
+    const itemCategory = {};
+    try {
+      const catRes = await client.catalogApi.listCatalog(undefined, 'CATEGORY');
+      const catName = {};
+      (catRes.result.objects || []).forEach(c => { catName[c.id] = c.categoryData?.name; });
+      let catCursor;
+      do {
+        const ir = await client.catalogApi.listCatalog(catCursor, 'ITEM');
+        (ir.result.objects || []).forEach(it => {
+          const cid = it.itemData?.categoryId || it.itemData?.categories?.[0]?.id;
+          const nm = catName[cid];
+          if (!nm) return;
+          itemCategory[it.id] = nm;
+          (it.itemData?.variations || []).forEach(v => { variationCategory[v.id] = nm; });
+        });
+        catCursor = ir.result.cursor;
+      } while (catCursor);
+      console.log(`[sync] Square catalog categories: ${Object.keys(variationCategory).length} variations mapped`);
+    } catch (e) {
+      console.warn('[sync] catalog categories unavailable, keyword fallback only:', e?.message);
+    }
+    function categorizeLineItem(item) {
+      return variationCategory[item.catalogObjectId]
+        || itemCategory[item.catalogObjectId]
+        || categorizeItemName(item.name);
+    }
+
     // Aggregate into daily analytics
     const dailyRevenue = {};
     const dailyCategoryBreakdown = {}; // { date: { category: { revenue_cents, item_count } } }
@@ -595,7 +628,7 @@ async function syncSquareData(studioId, accessToken, daysBack = 1) {
       // Real, genuine per-item category breakdown, per direct request
       if (!dailyCategoryBreakdown[date]) dailyCategoryBreakdown[date] = {};
       (order.lineItems || []).forEach(item => {
-        const category = categorizeItemName(item.name);
+        const category = categorizeLineItem(item);
         const itemTotal = item.totalMoney?.amount ? Number(item.totalMoney.amount) : 0;
         if (!dailyCategoryBreakdown[date][category]) dailyCategoryBreakdown[date][category] = { revenue_cents: 0, item_count: 0 };
         dailyCategoryBreakdown[date][category].revenue_cents += itemTotal;
@@ -603,7 +636,15 @@ async function syncSquareData(studioId, accessToken, daysBack = 1) {
       });
     });
 
-    // Store the real, genuine category breakdown
+    // Store the real, genuine category breakdown.
+    // Recategorising history (catalog fix, 22 Jul) means old rows for
+    // the same dates may sit under different category names — delete
+    // each synced date's rows first or Other would double-count.
+    const syncedDates = Object.keys(dailyCategoryBreakdown);
+    if (syncedDates.length) {
+      await supabase.from('revenue_category_breakdown')
+        .delete().eq('studio_id', studioId).in('metric_date', syncedDates);
+    }
     for (const [date, categories] of Object.entries(dailyCategoryBreakdown)) {
       for (const [category, { revenue_cents, item_count }] of Object.entries(categories)) {
         await supabase.from('revenue_category_breakdown').upsert({
@@ -853,6 +894,112 @@ app.get('/api/square/catalog', async (req, res) => {
   } catch (error) {
     console.error('Error fetching Square catalog:', error);
     res.status(500).json({ connected: false, error: error.message, categories: [] });
+  }
+});
+
+// ═══════════════════════════════════════════
+// MARGINS — supplier cost vs sell price, per item. 22 Jul.
+// Sell prices come live from the Square catalog (never stored, never
+// stale). Costs live in supplier_costs — entered by directors in the
+// Margins tool, or seeded from supplier order confirmations. Coffee
+// and anything un-costable per-item sits as overhead lines instead
+// (per Daisy: "for coffee just put the leftovers — coffee supplies").
+// READ-ONLY against Square, same as everything else.
+// ═══════════════════════════════════════════
+
+// GET /api/margins?studioId= — every catalog item+variation with its
+// live price, matched to any known cost, plus overhead lines.
+app.get('/api/margins', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const { data: connection } = await supabase
+      .from('square_connections')
+      .select('square_access_token')
+      .eq('studio_id', studioId)
+      .single();
+    if (!connection) return res.json({ connected: false, items: [], overheads: [] });
+
+    const squareClient = await getSquareClient(connection.square_access_token);
+    const categoriesRes = await squareClient.catalogApi.listCatalog(undefined, 'CATEGORY');
+    const categoryNameById = {};
+    (categoriesRes.result.objects || []).forEach(cat => {
+      categoryNameById[cat.id] = cat.categoryData?.name || 'Other';
+    });
+
+    const items = [];
+    let cursor;
+    do {
+      const itemsRes = await squareClient.catalogApi.listCatalog(cursor, 'ITEM');
+      (itemsRes.result.objects || []).forEach(item => {
+        const itemData = item.itemData;
+        if (!itemData) return;
+        const categoryId = itemData.categoryId || itemData.categories?.[0]?.id;
+        const categoryName = categoryNameById[categoryId] || 'Other';
+        (itemData.variations || []).forEach(v => {
+          const vd = v.itemVariationData;
+          const priceCents = vd?.priceMoney?.amount ? Number(vd.priceMoney.amount) : null;
+          const varName = vd?.name && vd.name !== 'Regular' ? ` — ${vd.name}` : '';
+          items.push({
+            variationId: v.id,
+            name: `${itemData.name}${varName}`,
+            category: categoryName,
+            priceCents,
+          });
+        });
+      });
+      cursor = itemsRes.result.cursor;
+    } while (cursor);
+
+    const { data: costs } = await supabase
+      .from('supplier_costs')
+      .select('variation_id, item_name, cost_cents, is_overhead, source')
+      .eq('studio_id', studioId);
+
+    const costByVariation = {};
+    const costByName = {};
+    const overheads = [];
+    (costs || []).forEach(c => {
+      if (c.is_overhead) { overheads.push({ name: c.item_name, costCents: c.cost_cents, source: c.source }); return; }
+      if (c.variation_id) costByVariation[c.variation_id] = c;
+      costByName[(c.item_name || '').toLowerCase()] = c;
+    });
+
+    items.forEach(it => {
+      const match = costByVariation[it.variationId] || costByName[it.name.toLowerCase()];
+      it.costCents = match ? match.cost_cents : null;
+      it.costSource = match ? match.source : null;
+    });
+
+    res.json({ connected: true, items, overheads });
+  } catch (error) {
+    console.error('Error building margins:', error);
+    res.status(500).json({ connected: false, error: error.message, items: [], overheads: [] });
+  }
+});
+
+// POST /api/margins/cost — a director sets or corrects a cost.
+// { studioId, variationId?, name, costCents, isOverhead? }
+app.post('/api/margins/cost', async (req, res) => {
+  const { studioId, variationId, name, costCents, isOverhead } = req.body;
+  if (!studioId || !name || costCents == null) {
+    return res.status(400).json({ error: 'studioId, name, costCents required' });
+  }
+  try {
+    const { error } = await supabase.from('supplier_costs').upsert({
+      studio_id: studioId,
+      variation_id: variationId || null,
+      item_name: name,
+      cost_cents: Math.round(Number(costCents)),
+      is_overhead: !!isOverhead,
+      source: 'manual',
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'studio_id,item_name' });
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Error saving cost:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
