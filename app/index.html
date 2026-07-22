@@ -2308,6 +2308,33 @@ const instantCache = {
     // The Kiln Cafe studio id (pilot). White-label studios would inject their own.
     const STUDIO_ID = 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3';
 
+    // Demo session: if one is running (started from the admin app on this
+    // device — the localStorage key is shared per origin), auto-tag the
+    // customer-side creates (e.g. a stylus-rental / Print-as-Transfer charge)
+    // so "End & clear" removes them too. Real use with no session is untouched.
+    (function _wireCustomerDemoInjection() {
+      if (window._kcDemoFetchWrapped) return;
+      window._kcDemoFetchWrapped = true;
+      const TRACKED = ['/api/extras/charge', '/api/bookings/manual', '/api/bookings/self-checkin'];
+      const _origFetch = window.fetch.bind(window);
+      window.fetch = function (input, init) {
+        try {
+          const url = (typeof input === 'string') ? input : (input && input.url) || '';
+          let sid = null;
+          try { sid = localStorage.getItem('kc_demo_session_id'); } catch (e) {}
+          if (sid && init && init.method && init.method.toUpperCase() === 'POST'
+              && typeof init.body === 'string' && TRACKED.some(t => url.includes(t))) {
+            const body = JSON.parse(init.body);
+            if (body && body.demoSessionId == null) {
+              body.demoSessionId = sid;
+              init = Object.assign({}, init, { body: JSON.stringify(body) });
+            }
+          }
+        } catch (e) { /* fall through to a normal fetch */ }
+        return _origFetch(input, init);
+      };
+    })();
+
     function getParam(name) {
       return new URLSearchParams(window.location.search).get(name);
     }

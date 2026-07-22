@@ -26074,6 +26074,33 @@ const KCDemo = {
 // Bring the banner back after a refresh if a demo session is still open.
 try { KCDemo._restore(); } catch (e) {}
 
+// When a demo session is active, auto-tag creates so End & clear can remove
+// them — without having to touch every call site. We wrap fetch once and, for
+// the specific create endpoints that support it, inject demoSessionId into the
+// POST body. Real (non-demo) use is completely unaffected: with no active
+// session, nothing is added and the original request goes through untouched.
+(function _wireDemoFetchInjection() {
+  if (window._kcDemoFetchWrapped) return;
+  window._kcDemoFetchWrapped = true;
+  const TRACKED = ['/api/bookings/manual', '/api/bookings/party', '/api/extras/charge', '/api/invoices/save-scanned'];
+  const _origFetch = window.fetch.bind(window);
+  window.fetch = function (input, init) {
+    try {
+      const url = (typeof input === 'string') ? input : (input && input.url) || '';
+      const sid = (typeof KCDemo !== 'undefined' && KCDemo.active) ? KCDemo.sessionId : null;
+      if (sid && init && init.method && init.method.toUpperCase() === 'POST'
+          && typeof init.body === 'string' && TRACKED.some(t => url.includes(t))) {
+        const body = JSON.parse(init.body);
+        if (body && body.demoSessionId == null) {
+          body.demoSessionId = sid;
+          init = Object.assign({}, init, { body: JSON.stringify(body) });
+        }
+      }
+    } catch (e) { /* if anything goes wrong, fall through to a normal fetch */ }
+    return _origFetch(input, init);
+  };
+})();
+
 // Bulk-accept every current suggestion in one go. Counts them first so the
 // director knows what they're confirming.
 async function confirmAllSuggestions() {

@@ -1284,9 +1284,9 @@ app.post('/api/invoices/save-scanned', async (req, res) => {
 // Only these tables may ever be touched by the demo cleanup — a hard
 // allow-list so a bad/spoofed table name can never delete anything else.
 const DEMO_CLEANABLE_TABLES = new Set([
-  'bookings', 'booking_assignments', 'pottery_pieces', 'extra_charges',
-  'table_session_items', 'community_posts', 'piece_match_attempts',
-  'supplier_costs', 'daily_specials', 'stock_reservations',
+  'bookings', 'booking_assignments', 'pottery_pieces',
+  'app_extra_charges', 'table_session_items', 'community_posts',
+  'piece_match_attempts', 'supplier_costs', 'daily_specials', 'stock_reservations',
 ]);
 
 app.post('/api/demo-session/log', async (req, res) => {
@@ -1341,6 +1341,18 @@ app.post('/api/demo-session/end', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// Small helper: if a create call carries a demoSessionId, record the new row
+// so "End & clear" can remove it. Best-effort — never blocks the real create.
+async function _demoTrack(demoSessionId, studioId, table, rowId) {
+  if (!demoSessionId || !studioId || !rowId) return;
+  if (!DEMO_CLEANABLE_TABLES.has(table)) return;
+  try {
+    await supabase.from('demo_session_log').insert({
+      studio_id: studioId, session_id: demoSessionId, table_name: table, row_id: String(rowId),
+    });
+  } catch (e) { /* best-effort */ }
+}
 
 // ═══════════════════════════════════════════
 // SQUARE KDS — Customer food & drink orders
@@ -2384,7 +2396,7 @@ async function findOrCreateCustomer(studioId, customerName, customerEmail, custo
  * resolves — a code that only exists in browser memory can never be scanned into.
  */
 app.post('/api/bookings/manual', async (req, res) => {
-  const { studioId, customerName } = req.body;
+  const { studioId, customerName, demoSessionId } = req.body;
   if (!studioId || !customerName) {
     return res.status(400).json({ error: 'studioId and customerName required' });
   }
@@ -2405,6 +2417,7 @@ app.post('/api/bookings/manual', async (req, res) => {
       .single();
 
     if (error) throw error;
+    await _demoTrack(demoSessionId, studioId, 'bookings', booking.id);
     res.json({ status: 'created', booking });
   } catch (error) {
     console.error('Error creating manual booking:', error);
@@ -2428,7 +2441,7 @@ app.post('/api/bookings/manual', async (req, res) => {
 // everything real comes through the website, phone, or email, so this
 // is genuinely a staff tool for logging what's already been arranged.
 app.post('/api/bookings/party', async (req, res) => {
-  const { studioId, customerName, customerEmail, customerPhone, space, sessionStart, sessionEnd, partySize, notes, createdBy } = req.body;
+  const { studioId, customerName, customerEmail, customerPhone, space, sessionStart, sessionEnd, partySize, notes, createdBy, demoSessionId } = req.body;
   if (!studioId || !customerName || !space || !sessionStart) {
     return res.status(400).json({ error: 'studioId, customerName, space, sessionStart required' });
   }
@@ -2453,6 +2466,7 @@ app.post('/api/bookings/party', async (req, res) => {
     }).select().single();
 
     if (error) throw error;
+    await _demoTrack(demoSessionId, studioId, 'bookings', booking.id);
     res.json({ status: 'created', booking, isPremium: space === 'The Vault' });
   } catch (error) {
     console.error('Error creating party booking:', error);
@@ -2461,7 +2475,7 @@ app.post('/api/bookings/party', async (req, res) => {
 });
 
 app.post('/api/bookings/self-checkin', async (req, res) => {
-  const { studioId, customerName, partySize, tableNumber } = req.body;
+  const { studioId, customerName, partySize, tableNumber, demoSessionId } = req.body;
   if (!studioId || !customerName) {
     return res.status(400).json({ error: 'studioId and customerName required' });
   }
@@ -2484,6 +2498,7 @@ app.post('/api/bookings/self-checkin', async (req, res) => {
       .single();
 
     if (error) throw error;
+    await _demoTrack(demoSessionId, studioId, 'bookings', booking.id);
     res.json({ status: 'created', booking });
   } catch (error) {
     console.error('Error creating self-checkin booking:', error);
@@ -4370,7 +4385,7 @@ app.get('/api/extras/unlocked', async (req, res) => {
 
 // POST /api/extras/charge — record a £1 (or whatever) charge against this booking
 app.post('/api/extras/charge', async (req, res) => {
-  const { studioId, bookingCode, itemName, amountCents } = req.body;
+  const { studioId, bookingCode, itemName, amountCents, demoSessionId } = req.body;
   if (!studioId || !bookingCode || !itemName) {
     return res.status(400).json({ error: 'studioId, bookingCode and itemName required' });
   }
@@ -4388,6 +4403,7 @@ app.post('/api/extras/charge', async (req, res) => {
       .single();
 
     if (error) throw error;
+    await _demoTrack(demoSessionId, studioId, 'app_extra_charges', charge.id);
     res.json({ status: 'charged', charge });
   } catch (error) {
     console.error('Error recording extra charge:', error);
