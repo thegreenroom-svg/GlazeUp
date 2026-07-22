@@ -3713,6 +3713,25 @@ function updateStaffName() {
   <h2 style="margin-top:0;">Admin Hub <span style="font-size:12px;font-weight:500;color:var(--gu-dust);">— everything in one place</span></h2>
   <p id="adminhub-greeting" style="font-size:13px;color:var(--gu-dust);margin-bottom:18px;"></p>
 
+  <!-- LIVE INTELLIGENCE STRIP — 22 Jul. The dashboard-at-a-glance: margin
+       health, deadstock, and the top money-making suggestion, pulled live
+       from /api/director/intelligence + stock levels. A clear freshness
+       indicator replaces the old dodgy refresh — you always know if it's
+       live or stale. -->
+  <div id="adminhub-intel" style="margin-bottom:22px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-size:11px;font-weight:800;color:var(--gu-dust);text-transform:uppercase;letter-spacing:0.05em;">📊 Live picture</div>
+      <button onclick="loadDirectorIntel(true)" id="adminhub-intel-refresh" style="display:flex;align-items:center;gap:5px;background:none;border:1px solid var(--gu-border);border-radius:20px;padding:5px 11px;font-size:11px;font-weight:700;color:var(--gu-dust);cursor:pointer;">
+        <span id="adminhub-intel-dot" style="width:7px;height:7px;border-radius:50%;background:#ccc;"></span>
+        <span id="adminhub-intel-status">Tap to load</span>
+      </button>
+    </div>
+    <div id="adminhub-intel-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;">
+      <div style="grid-column:1/-1;padding:16px;text-align:center;color:var(--gu-dust);font-size:12px;background:rgba(0,0,0,0.02);border-radius:12px;">Loading your live picture…</div>
+    </div>
+    <div id="adminhub-intel-suggestions" style="margin-top:12px;"></div>
+  </div>
+
   <!-- MONEY -->
   <div style="font-size:11px;font-weight:800;color:var(--gu-dust);text-transform:uppercase;letter-spacing:0.05em;margin:6px 0 8px;">💷 Money</div>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:20px;">
@@ -9546,6 +9565,79 @@ function openAdminHub() {
   // (same access list, but hide the card so it's not a dead tap).
   const prCard = document.getElementById('adminhub-platformrev');
   if (prCard) prCard.style.display = (typeof _isDirector === 'function' && _isDirector()) ? '' : 'none';
+
+  // Load the live intelligence strip (margin health, deadstock, suggestions).
+  try { loadDirectorIntel(false); } catch (e) {}
+}
+
+// ── Director intelligence strip (the dashboard-at-a-glance) ──────────
+// Pulls /api/director/intelligence (margins health + suggestions) and the
+// existing stock-levels endpoint (deadstock). A clear freshness dot means
+// you always know if what you're seeing is live or stale.
+let _intelData = null;
+let _intelLoadedAt = 0;
+async function loadDirectorIntel(force) {
+  const statusEl = document.getElementById('adminhub-intel-status');
+  const dotEl = document.getElementById('adminhub-intel-dot');
+  // Don't re-hammer if loaded < 60s ago unless forced.
+  if (!force && _intelData && (Date.now() - _intelLoadedAt) < 60000) { _renderDirectorIntel(); return; }
+  if (statusEl) statusEl.textContent = 'Loading…';
+  if (dotEl) dotEl.style.background = '#F9A825';
+  try {
+    const res = await fetch(`${API_URL}/api/director/intelligence?studioId=${studioId}`);
+    const data = await res.json();
+    if (!data.connected) {
+      if (statusEl) statusEl.textContent = 'Square not connected';
+      if (dotEl) dotEl.style.background = '#c62828';
+      return;
+    }
+    _intelData = data;
+    _intelLoadedAt = Date.now();
+    _renderDirectorIntel();
+    if (statusEl) statusEl.textContent = 'Live · just now';
+    if (dotEl) dotEl.style.background = '#2e7d32';
+  } catch (e) {
+    if (statusEl) statusEl.textContent = 'Could not load — tap to retry';
+    if (dotEl) dotEl.style.background = '#c62828';
+  }
+}
+
+function _renderDirectorIntel() {
+  if (!_intelData) return;
+  const h = _intelData.health || {};
+  const cards = document.getElementById('adminhub-intel-cards');
+  if (cards) {
+    const marginColor = h.avgMargin == null ? '#999' : (h.avgMargin >= 60 ? '#2e7d32' : h.avgMargin >= 45 ? '#B87946' : '#c62828');
+    cards.innerHTML = `
+      <div style="background:rgba(0,0,0,0.02);border-radius:12px;padding:14px;">
+        <div style="font-size:26px;font-weight:800;color:${marginColor};">${h.avgMargin != null ? h.avgMargin + '%' : '—'}</div>
+        <div style="font-size:11px;color:var(--gu-dust);margin-top:2px;">avg margin</div>
+      </div>
+      <div style="background:rgba(0,0,0,0.02);border-radius:12px;padding:14px;">
+        <div style="font-size:26px;font-weight:800;">${h.costedCount || 0}</div>
+        <div style="font-size:11px;color:var(--gu-dust);margin-top:2px;">items costed</div>
+      </div>
+      <div style="background:rgba(0,0,0,0.02);border-radius:12px;padding:14px;">
+        <div style="font-size:26px;font-weight:800;color:${(h.uncostedCount||0) > 0 ? '#B87946' : '#2e7d32'};">${h.uncostedCount || 0}</div>
+        <div style="font-size:11px;color:var(--gu-dust);margin-top:2px;">still need cost</div>
+      </div>`;
+  }
+  // Suggestions
+  const sg = document.getElementById('adminhub-intel-suggestions');
+  if (sg) {
+    const s = _intelData.suggestions || [];
+    if (!s.length) {
+      sg.innerHTML = '';
+    } else {
+      sg.innerHTML = `
+        <div style="font-size:11px;font-weight:800;color:var(--gu-dust);text-transform:uppercase;letter-spacing:0.05em;margin:6px 0 8px;">💡 Money-making ideas</div>
+        ${s.map(sug => `
+          <div style="background:rgba(184,121,70,0.06);border:1px solid rgba(184,121,70,0.22);border-radius:12px;padding:12px 14px;margin-bottom:8px;">
+            <div style="font-size:13px;font-weight:700;margin-bottom:3px;">${sug.item}</div>
+            <div style="font-size:12px;color:var(--gu-dust);line-height:1.45;">${sug.reason}</div>
+          </div>`).join('')}`;
+    }
+  }
 }
 
 // ─── DIRECTOR ADMIN HUB SUB-ROUTES — route to the real, existing sections ──
