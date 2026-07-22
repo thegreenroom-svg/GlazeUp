@@ -836,13 +836,25 @@
       margin: 0 auto;
     }
 
+    /* Every screen enters the same way — sliding in from the right, like
+       one consistent app. This applies to every .view because they all
+       run through goToTab, which adds .fade-in on show. */
     .view.fade-in {
-      animation: viewFadeIn 0.28s ease;
+      animation: viewSlideIn 0.30s cubic-bezier(0.32, 0.72, 0, 1);
     }
 
-    @keyframes viewFadeIn {
-      from { opacity: 0; transform: translateY(6px); }
-      to { opacity: 1; transform: translateY(0); }
+    @keyframes viewSlideIn {
+      from { opacity: 0.4; transform: translateX(28px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    /* When we're going BACK, slide in from the left instead — set by the
+       swipe/back layer just before the screen shows. */
+    .view.nav-back.fade-in {
+      animation: viewSlideBack 0.30s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    @keyframes viewSlideBack {
+      from { opacity: 0.4; transform: translateX(-28px); }
+      to { opacity: 1; transform: translateX(0); }
     }
 
     /* Genuine real tile-landing animation, per direct request — tiles
@@ -7068,6 +7080,11 @@ function goToTab(tab, event) {
   }
   // Trigger reflow so the animation replays every time, not just on first show
   void targetView.offsetWidth;
+  // Springboard shell: if this navigation is a "back", slide from the
+  // left instead of the right (the flag is set by _shellBack). Cleared
+  // straight after so only this one transition is reversed.
+  if (window._navGoingBack) { targetView.classList.add('nav-back'); window._navGoingBack = false; }
+  else { targetView.classList.remove('nav-back'); }
   targetView.classList.add('fade-in');
   // Genuine real safety fix — the sidebar (and its nav-link elements)
   // is being removed entirely, per direct request, so this lookup can
@@ -31797,6 +31814,102 @@ if (typeof document !== 'undefined') {
     new MutationObserver(_glazeSoon).observe(document.documentElement, { childList: true, subtree: true });
   } catch (e) { /* no observer, no sweep — the app still works */ }
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// SPRINGBOARD SHELL — one consistent navigation feel on EVERY screen.
+// (22 July 2026, per direct request: "make it all look the same".)
+// A self-contained layer, added at the very end so it sits OVER the app
+// without editing any individual screen. Two things, applied globally:
+//   1. Edge-swipe from the left → go back (like every iOS app).
+//   2. A back-direction flag so screens slide the right way (the CSS
+//      .view.nav-back reverses the slide when we're going backwards).
+// It drives the app's EXISTING history (_screenBack / _flowGraphEnter),
+// so it never invents navigation — just gives a consistent gesture to
+// the back that already works. Fully guarded: if anything's missing it
+// silently no-ops and the app behaves exactly as before.
+// ═══════════════════════════════════════════════════════════════════
+(function _springboardShell() {
+  // Mark the next screen-show as a "back" so the slide reverses. goToTab
+  // clears it after applying, so only the one intended transition flips.
+  window._navGoingBack = false;
+  window._navMarkBack = function () { window._navGoingBack = true; };
+
+  // The one true "go back" — prefer the app's screen history, fall back
+  // to the flow-graph home, so there's always somewhere to land.
+  function _shellBack() {
+    window._navMarkBack();
+    try {
+      if (typeof _screenBack === 'function') { _screenBack(); return; }
+      if (typeof _flowGraphEnter === 'function') { _flowGraphEnter(); return; }
+    } catch (e) { console.warn('[shell] back failed', e); }
+  }
+  window._shellBack = _shellBack;
+
+  // ── Edge-swipe back — start the touch within 30px of the left edge,
+  //    drag right past a real threshold, and it counts as "back". Kept
+  //    strict so normal taps, vertical scrolls and in-content swipes
+  //    (like the floor plan) never trigger it by accident. ──
+  let _sx = 0, _sy = 0, _edge = false;
+  document.addEventListener('touchstart', function (e) {
+    const t = e.touches[0];
+    _sx = t.clientX; _sy = t.clientY;
+    _edge = t.clientX <= 30;             // only from the very left edge
+  }, { passive: true });
+
+  document.addEventListener('touchend', function (e) {
+    if (!_edge) return;
+    _edge = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - _sx, dy = t.clientY - _sy;
+    // Clearly horizontal, clearly rightward, past a real distance.
+    if (dx > 70 && Math.abs(dx) > Math.abs(dy) * 1.6) _shellBack();
+  }, { passive: true });
+
+  // ── A consistent back chevron, top-left, on every screen except the
+  //    home tree. It mirrors the app's own back so wherever you are, the
+  //    same control is in the same place. Refreshed on every tab change
+  //    via a light polling hook (cheap, and avoids threading through
+  //    dozens of call sites). ──
+  function _ensureShellBack() {
+    if (document.getElementById('shell-back-btn')) return;
+    const b = document.createElement('button');
+    b.id = 'shell-back-btn';
+    b.setAttribute('aria-label', 'Back');
+    b.innerHTML = '‹';
+    b.onclick = _shellBack;
+    b.style.cssText = [
+      'position:fixed', 'top:calc(10px + env(safe-area-inset-top))', 'left:12px', 'z-index:9600',
+      'width:38px', 'height:38px', 'border-radius:50%', 'border:none', 'cursor:pointer',
+      'background:rgba(43,39,36,0.9)', 'color:#fff', 'font-size:24px', 'font-weight:800',
+      'line-height:1', 'display:none', 'align-items:center', 'justify-content:center',
+      'box-shadow:0 2px 10px rgba(0,0,0,0.25)', 'backdrop-filter:blur(4px)', 'padding-bottom:2px',
+    ].join(';');
+    document.body.appendChild(b);
+  }
+
+  function _syncShellBack() {
+    _ensureShellBack();
+    const b = document.getElementById('shell-back-btn');
+    if (!b) return;
+    // Hidden on the two home surfaces (the Desk canvas and the flow-home
+    // tree) — you're already home there. Shown on every real screen.
+    let onHome = false;
+    try {
+      const canvas = document.getElementById('kc-canvas');
+      const canvasUp = canvas && !canvas.classList.contains('kc-away');
+      const flow = document.getElementById('daisy-flow-view');
+      const flowHome = flow && flow.style.display !== 'none'
+        && (typeof _flowStack === 'undefined' || !_flowStack || _flowStack.length <= 1);
+      onHome = canvasUp || flowHome;
+    } catch (e) {}
+    b.style.display = onHome ? 'none' : 'flex';
+  }
+  // Light, cheap sync — every 400ms is plenty for a nav control and
+  // avoids editing every navigation call site in the app.
+  setInterval(_syncShellBack, 400);
+  document.addEventListener('DOMContentLoaded', _syncShellBack);
+  _syncShellBack();
+})();
 
 </script>
 
