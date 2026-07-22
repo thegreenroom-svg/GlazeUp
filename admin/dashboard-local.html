@@ -32011,6 +32011,23 @@ if (typeof document !== 'undefined') {
   // to the flow-graph home, so there's always somewhere to land.
   function _shellBack() {
     window._navMarkBack();
+    // Close any open full-screen overlay FIRST — otherwise it sits on top
+    // (fixed, inset:0) and back appears to do nothing = trapped. The room
+    // panel is the common one; add siblings here if new overlays appear.
+    try {
+      const roomPanel = document.getElementById('floor-room-panel');
+      if (roomPanel && roomPanel.style.display !== 'none' && getComputedStyle(roomPanel).display !== 'none') {
+        if (typeof closeRoomPanel === 'function') closeRoomPanel();
+        else roomPanel.style.display = 'none';
+        return;
+      }
+      const scan = document.getElementById('scan-overlay');
+      if (scan && scan.style.display !== 'none' && getComputedStyle(scan).display !== 'none') {
+        if (typeof closeScanOverlay === 'function') closeScanOverlay();
+        else scan.style.display = 'none';
+        return;
+      }
+    } catch (e) {}
     try {
       if (typeof _screenBack === 'function') { _screenBack(); return; }
       if (typeof _flowGraphEnter === 'function') { _flowGraphEnter(); return; }
@@ -32177,7 +32194,7 @@ if (typeof window !== 'undefined' && typeof window._manualFloorSync !== 'functio
     </div>
   </div>
 <div id="floor-room-panel" style="display:none;position:fixed;inset:0;z-index:9500;flex-direction:column;">
-    <div id="floor-room-panel-header" style="background:linear-gradient(135deg,#1C1814,#2B2118);padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;border-bottom:1px solid rgba(184,121,70,0.2);">
+    <div id="floor-room-panel-header" style="background:linear-gradient(135deg,#1C1814,#2B2118);padding:calc(14px + env(safe-area-inset-top)) 16px 14px;display:flex;align-items:center;gap:12px;flex-shrink:0;border-bottom:1px solid rgba(184,121,70,0.2);">
       <button onclick="closeRoomPanel()" class="glaze-tile"
         style="background:linear-gradient(135deg,#B87946,#9A6435);color:white;border:none;border-radius:12px;padding:8px 14px;font-size:13px;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(184,121,70,0.3);">
         ← Back
