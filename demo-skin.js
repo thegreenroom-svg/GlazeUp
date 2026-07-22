@@ -64,14 +64,10 @@
     } catch (e) { console.warn('[desk] nav failed', id, e); }
   };
 
-  // Walk straight into the room's own page — no redundant stop on the
-  // combined floor plan. We open the floor plan (so the room panel has its
-  // data + a real screen behind it), then open that room's page once the
-  // floor data has actually loaded. Polls briefly for _floorData so it
-  // never opens empty on a cold arrival (the old trap); gives up quietly
-  // after a moment and just leaves you on the floor plan if data's slow.
+  // Walk straight into the room — no tab navigation. The room panel opens
+  // as an overlay on top of the current view (Desk). When closed, you're
+  // back on the Desk. Polls for _floorData so the panel never opens empty.
   KC.goRoom = function (room) {
-    KC.go('floor-plan', 'showFloorPlan');
     let tries = 0;
     const openWhenReady = () => {
       tries++;
