@@ -6298,9 +6298,6 @@ function updateStaffName() {
 
       <div id="community-view" class="view" style="display: none;">
         <h2 style="margin-top: 0;">Community</h2>
-        <p style="color: var(--gu-dust); margin-bottom: 20px;">
-          Connect your studio to the wider LINK community — moderate what your customers share, tell other studios who you are, and see who else is on LINK worldwide.
-        </p>
 
         <!-- Kids' Club Pages preview — a genuine, direct way to see
              exactly what customers (and kids) see, not a description
@@ -32165,6 +32162,10 @@ if (typeof window !== 'undefined' && typeof window._manualFloorSync !== 'functio
   .view .section-label, .view .gu-label { color: #B87946; }
   /* Non-functional helper stays out of the demo, whatever the JS flag says */
   #cleo-admin-floating-fab, #cleo-admin-floating-bubble, [data-cleo-helper] { display: none !important; }
+  /* Tools, not tutorials (Daisy, 22 Jul): staff know their own processes.
+     Tile sub-captions explain what each tool is — icon + name is enough.
+     One rule silences all 32 explainer lines under tile names. */
+  span[style*="font-size:10px;opacity:0.85"] { display: none !important; }
   /* Night shift: the same book by lamplight */
   @media (prefers-color-scheme: dark) {
     body, .view { background: #201C1A !important; color: #F4ECE0; }
