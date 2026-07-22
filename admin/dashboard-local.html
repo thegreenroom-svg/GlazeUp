@@ -836,6 +836,27 @@
       margin: 0 auto;
     }
 
+    /* ═══ ONE CONSISTENT PAGE FRAME, EVERY SCREEN (22 Jul 2026) ═══
+       Applied through the shared .view / .chart-container hooks so every
+       screen in the app reads the same — Apple-style: roomy top padding
+       that clears the fixed back chevron, generous side gutters, soft
+       rounded cards, calm spacing. No per-screen edits: every screen is
+       a .view and nearly all content sits in .chart-container. */
+    .view {
+      padding: calc(58px + env(safe-area-inset-top)) 16px calc(96px + env(safe-area-inset-bottom));
+      box-sizing: border-box;
+    }
+    /* The floor plan is its own full-bleed canvas — it manages its own
+       chrome, so don't pad it like a document screen. */
+    #floor-plan-view { padding: 0 !important; }
+    /* A consistent screen title look wherever a screen leads with an h2. */
+    .view > h2:first-child,
+    .view > .chart-container:first-child > h2:first-child {
+      font-family: var(--gu-font-display, inherit);
+      font-size: 24px; font-weight: 800; letter-spacing: -0.02em;
+      margin: 0 0 14px; color: var(--gu-text, #2B2724);
+    }
+
     /* Every screen enters the same way — sliding in from the right, like
        one consistent app. This applies to every .view because they all
        run through goToTab, which adds .fade-in on show. */
@@ -961,24 +982,21 @@
     }
 
     .chart-container {
-      /* Genuinely simplified per direct request — same flat, plain,
-         honest visual language as the new grid navigation (flat
-         colour blocks, minimal shadow, bold simple headers), carried
-         through to every real screen that uses this shared class.
-         Real content underneath (lists, forms, live data) is
-         untouched — this only restyles the container look. */
+      /* One consistent card, every screen — soft iOS radius, calm shadow,
+         generous padding. Restyles the container only; content untouched. */
       background: white;
-      border-radius: 14px;
+      border-radius: 18px;
       border: none;
       padding: 18px;
-      margin-bottom: 14px;
-      box-shadow: 0 2px 8px rgba(43,39,36,0.08);
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(43,39,36,0.05), 0 10px 24px -14px rgba(43,39,36,0.22);
     }
 
     .chart-container h3 {
       font-family: var(--gu-font-display);
       font-size: 16px;
-      font-weight: 700;
+      font-weight: 800;
+      letter-spacing: -0.01em;
       color: var(--gu-accent);
       margin: 0 0 16px;
     }
@@ -3674,7 +3692,7 @@ function updateStaffName() {
      levels, which correctly say so plainly if inventory tracking
      isn't actually enabled on the Square account, rather than
      inventing numbers. -->
-<div id="barista-view" class="view" style="display:none;padding:20px;">
+<div id="barista-view" class="view" style="display:none;">
   <h2 style="margin:0 0 4px;">☕ Morning, David</h2>
   <p style="color:var(--gu-dust);margin:0 0 20px;">Today's real drinks orders and stock, straight from Square.</p>
 
