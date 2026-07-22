@@ -15,6 +15,10 @@ const KC_Floor = {
     if (originalGoToTab) {
       window.goToTab = (tab, ...args) => {
         if (tab === 'floor' || tab === 'floor-plan') {
+          const view = document.getElementById('floor-plan-view');
+          if (view) view.style.display = 'block';
+          const canvas = document.getElementById('kc-canvas');
+          if (canvas) canvas.classList.add('kc-away');
           setTimeout(() => this.transform(), 100);
         }
         return originalGoToTab.call(window, tab, ...args);

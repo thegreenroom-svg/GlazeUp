@@ -52,8 +52,9 @@ const KC_DeepScreens = {
     // Find the currently visible view
     const views = document.querySelectorAll('[id$="-view"]');
     for (const view of views) {
-      const style = window.getComputedStyle(view);
-      if (style.display !== 'none') {
+      const display = view.style.display;
+      // Check if view should be visible
+      if (display !== 'none' && view.offsetParent !== null) {
         this.transformScreen(view);
         break;
       }

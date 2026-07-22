@@ -15,6 +15,10 @@ const KC_Staff = {
     if (originalGoToTab) {
       window.goToTab = (tab, ...args) => {
         if (tab === 'staff') {
+          const view = document.getElementById('staff-view');
+          if (view) view.style.display = 'block';
+          const canvas = document.getElementById('kc-canvas');
+          if (canvas) canvas.classList.add('kc-away');
           setTimeout(() => this.transform(), 100);
         }
         return originalGoToTab.call(window, tab, ...args);

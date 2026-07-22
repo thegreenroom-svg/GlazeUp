@@ -15,6 +15,10 @@ const KC_Kiln = {
     if (originalGoToTab) {
       window.goToTab = (tab, ...args) => {
         if (tab === 'kiln') {
+          const view = document.getElementById('kiln-view');
+          if (view) view.style.display = 'block';
+          const canvas = document.getElementById('kc-canvas');
+          if (canvas) canvas.classList.add('kc-away');
           setTimeout(() => this.transform(), 100);
         }
         return originalGoToTab.call(window, tab, ...args);
