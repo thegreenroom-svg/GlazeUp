@@ -3806,6 +3806,9 @@ function updateStaffName() {
     <button onclick="goToTab('catalogue')" class="adminhub-card" style="background:#4a453f;filter:brightness(0.8);">
       <span style="font-size:22px;">🗂️</span><span class="ahc-label">Catalogue</span><span class="ahc-sub">Products &amp; prices</span>
     </button>
+    <button onclick="KCDemo.active ? KCDemo.end() : KCDemo.start()" class="adminhub-card" style="background:#8B5A00;">
+      <span style="font-size:22px;">🧪</span><span class="ahc-label">Demo Session</span><span class="ahc-sub">Play, then clear it</span>
+    </button>
   </div>
 </div>
 
@@ -25995,6 +25998,82 @@ async function confirmSuggestedCost(variationId, costCents) {
   } catch (e) { console.warn('suggestion confirm failed', e); }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// DEMO SESSION — "live but demoing" (22 Jul).
+// Start a session → muck around (test bookings, stylus rentals, practice
+// invoices) → End it → only the play-data is wiped, real data untouched.
+// Every demo row the app creates is registered with KCDemo.track() which
+// logs it server-side; End replays that log as deletes. A bright banner
+// makes it obvious a demo is running so nobody mistakes play for real.
+// ═══════════════════════════════════════════════════════════════
+const KCDemo = {
+  get sessionId() { return localStorage.getItem('kc_demo_session_id') || null; },
+  get active() { return !!this.sessionId; },
+
+  start() {
+    if (this.active) { toast('A demo session is already running', 'info'); return; }
+    const id = 'demo-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    localStorage.setItem('kc_demo_session_id', id);
+    this._renderBanner();
+    toast('Demo session started — play away, then End to clear it', 'success');
+  },
+
+  // Register a row the app just created so End can remove it. Fire-and-forget.
+  // table must be on the server's DEMO_CLEANABLE_TABLES allow-list.
+  async track(table, rowId) {
+    if (!this.active || !rowId) return;
+    try {
+      await fetch(`${API_URL}/api/demo-session/log`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId, sessionId: this.sessionId, table, rowId }),
+      });
+    } catch (e) { /* best-effort; End also clears the log */ }
+  },
+
+  async end() {
+    if (!this.active) { toast('No demo session running', 'info'); return; }
+    let count = 0;
+    try {
+      const r = await fetch(`${API_URL}/api/demo-session/status?studioId=${studioId}&sessionId=${encodeURIComponent(this.sessionId)}`);
+      count = (await r.json()).count || 0;
+    } catch (e) {}
+    const msg = count > 0
+      ? `End demo session and remove ${count} test item${count === 1 ? '' : 's'}? Your real data is not touched.`
+      : `End demo session? (Nothing was added, so nothing gets removed.) Your real data is not touched.`;
+    if (!confirm(msg)) return;
+    try {
+      const r = await fetch(`${API_URL}/api/demo-session/end`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId, sessionId: this.sessionId }),
+      });
+      const d = await r.json();
+      localStorage.removeItem('kc_demo_session_id');
+      this._removeBanner();
+      toast(`Demo ended — ${d.deleted || 0} test item${(d.deleted || 0) === 1 ? '' : 's'} cleared. Real data untouched.`, 'success');
+    } catch (e) {
+      toast('Could not end cleanly — try again', 'error');
+    }
+  },
+
+  _renderBanner() {
+    if (document.getElementById('kc-demo-banner')) return;
+    const b = document.createElement('div');
+    b.id = 'kc-demo-banner';
+    b.innerHTML = `
+      <span style="font-weight:800;letter-spacing:0.04em;">● DEMO SESSION</span>
+      <span style="opacity:0.85;font-size:12px;">Anything you add now is test data — End to clear it.</span>
+      <button onclick="KCDemo.end()" style="margin-left:auto;background:#fff;color:#8B5A00;border:none;border-radius:7px;padding:6px 12px;font-size:12px;font-weight:800;cursor:pointer;">End &amp; clear</button>`;
+    b.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:9500;background:#F9A825;color:#3a2a00;display:flex;align-items:center;gap:12px;padding:10px 16px;font-size:13px;box-shadow:0 -3px 16px rgba(0,0,0,0.18);';
+    document.body.appendChild(b);
+  },
+  _removeBanner() { const b = document.getElementById('kc-demo-banner'); if (b) b.remove(); },
+
+  // Restore the banner on any page load if a session is still open.
+  _restore() { if (this.active) this._renderBanner(); },
+};
+// Bring the banner back after a refresh if a demo session is still open.
+try { KCDemo._restore(); } catch (e) {}
+
 // Bulk-accept every current suggestion in one go. Counts them first so the
 // director knows what they're confirming.
 async function confirmAllSuggestions() {
@@ -26149,11 +26228,17 @@ async function _invSave() {
   try {
     const res = await fetch(`${API_URL}/api/invoices/save-scanned`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studioId, supplier, lines: keep.map(l => ({ name: l.name.trim(), costCents: l.costCents })) }),
+      body: JSON.stringify({ studioId, supplier, lines: keep.map(l => ({ name: l.name.trim(), costCents: l.costCents })), demoSessionId: (typeof KCDemo !== 'undefined' && KCDemo.active) ? KCDemo.sessionId : null }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Save failed');
-    document.getElementById('inv-done-msg').textContent = `${data.saved} cost${data.saved === 1 ? '' : 's'} saved.`;
+    let doneMsg = `${data.saved} cost${data.saved === 1 ? '' : 's'} saved.`;
+    if (data.skippedDuplicates > 0) {
+      // The duplicate-guard Daisy asked for: real items already in the system
+      // aren't re-added during a demo — flagged instead.
+      doneMsg += ` ${data.skippedDuplicates} already in the system — left as they were.`;
+    }
+    document.getElementById('inv-done-msg').textContent = doneMsg;
     _invShowStep('done');
     // Offer the Dext hand-off — keeps the accounts record in step.
     _invOfferDext(supplier);

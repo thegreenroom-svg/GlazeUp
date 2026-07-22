@@ -1212,31 +1212,133 @@ app.get('/api/director/intelligence', async (req, res) => {
 // { studioId, supplier, lines: [{ name, costCents, isOverhead? }] }
 // ═══════════════════════════════════════════════════════════════
 app.post('/api/invoices/save-scanned', async (req, res) => {
-  const { studioId, supplier, lines } = req.body;
+  const { studioId, supplier, lines, demoSessionId } = req.body;
   if (!studioId || !Array.isArray(lines) || !lines.length) {
     return res.status(400).json({ error: 'studioId and at least one line required' });
   }
   const src = `invoice:${(supplier || 'scanned').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
   try {
-    let saved = 0;
+    // Pull existing costs once so we can flag real duplicates rather than
+    // silently overwriting during a demo — "already in the system, move on."
+    const { data: existing } = await supabase.from('supplier_costs')
+      .select('item_name').eq('studio_id', studioId);
+    const existingNames = new Set((existing || []).map(e => (e.item_name || '').toLowerCase().trim()));
+
+    let saved = 0, skippedDuplicates = 0;
     for (const ln of lines) {
       const name = (ln.name || '').trim();
       const costCents = Math.round(Number(ln.costCents));
       if (!name || isNaN(costCents) || costCents < 0) continue;
-      const { error } = await supabase.from('supplier_costs').upsert({
+      // In a demo session, if this item is already costed for real, don't
+      // duplicate it — flag it and move on.
+      if (demoSessionId && existingNames.has(name.toLowerCase())) {
+        skippedDuplicates++;
+        continue;
+      }
+      const isNew = !existingNames.has(name.toLowerCase());
+      const { data: up, error } = await supabase.from('supplier_costs').upsert({
         studio_id: studioId,
         item_name: name,
         cost_cents: costCents,
         is_overhead: !!ln.isOverhead,
-        source: src,
+        source: demoSessionId ? `${src}|demo` : src,
         updated_at: new Date().toISOString(),
-      }, { onConflict: 'studio_id,item_name' });
-      if (!error) saved++;
+      }, { onConflict: 'studio_id,item_name' }).select('id').single();
+      if (!error) {
+        saved++;
+        // Demo-session write of a genuinely new item → log it for cleanup.
+        if (demoSessionId && up?.id && isNew) {
+          await supabase.from('demo_session_log').insert({
+            studio_id: studioId, session_id: demoSessionId,
+            table_name: 'supplier_costs', row_id: String(up.id),
+          });
+        }
+      }
     }
-    res.json({ ok: true, saved, supplier: supplier || 'scanned' });
+    res.json({ ok: true, saved, skippedDuplicates, supplier: supplier || 'scanned' });
   } catch (error) {
     console.error('save-scanned error:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// DEMO SESSION — "live but demoing" (22 Jul, Daisy).
+// ═══════════════════════════════════════════════════════════════
+// The trial runs on the REAL live app, so staff need to muck around —
+// add a test booking, "rent a stylus", scan a practice invoice — and
+// then wipe ONLY that play-data, leaving everything genuinely real
+// untouched. The safe design: every row created during a demo session
+// is recorded in demo_session_log (a receipt of what to undo). Ending
+// the session deletes exactly those recorded rows and nothing else —
+// real data is never flagged, so it's structurally impossible to wipe.
+//
+// POST /api/demo-session/log  { studioId, sessionId, table, rowId }
+//   — called by the app right after it creates any demo row.
+// POST /api/demo-session/end  { studioId, sessionId }
+//   — deletes every logged row for that session, then clears the log.
+// GET  /api/demo-session/status?studioId=&sessionId=
+//   — how many rows are parked for cleanup (for the confirm dialog).
+// ═══════════════════════════════════════════════════════════════
+
+// Only these tables may ever be touched by the demo cleanup — a hard
+// allow-list so a bad/spoofed table name can never delete anything else.
+const DEMO_CLEANABLE_TABLES = new Set([
+  'bookings', 'booking_assignments', 'pottery_pieces', 'extra_charges',
+  'table_session_items', 'community_posts', 'piece_match_attempts',
+  'supplier_costs', 'daily_specials', 'stock_reservations',
+]);
+
+app.post('/api/demo-session/log', async (req, res) => {
+  const { studioId, sessionId, table, rowId } = req.body;
+  if (!studioId || !sessionId || !table || rowId == null) {
+    return res.status(400).json({ error: 'studioId, sessionId, table, rowId required' });
+  }
+  if (!DEMO_CLEANABLE_TABLES.has(table)) {
+    return res.status(400).json({ error: 'That table is not demo-cleanable.' });
+  }
+  try {
+    await supabase.from('demo_session_log').insert({
+      studio_id: studioId, session_id: sessionId, table_name: table, row_id: String(rowId),
+    });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/demo-session/status', async (req, res) => {
+  const { studioId, sessionId } = req.query;
+  if (!studioId || !sessionId) return res.status(400).json({ error: 'studioId and sessionId required' });
+  try {
+    const { data } = await supabase.from('demo_session_log')
+      .select('table_name').eq('studio_id', studioId).eq('session_id', sessionId);
+    res.json({ count: (data || []).length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/demo-session/end', async (req, res) => {
+  const { studioId, sessionId } = req.body;
+  if (!studioId || !sessionId) return res.status(400).json({ error: 'studioId and sessionId required' });
+  try {
+    const { data: rows } = await supabase.from('demo_session_log')
+      .select('id, table_name, row_id').eq('studio_id', studioId).eq('session_id', sessionId);
+    let deleted = 0;
+    for (const r of (rows || [])) {
+      if (!DEMO_CLEANABLE_TABLES.has(r.table_name)) continue; // belt-and-braces
+      // Scope every delete to the studio too — never a bare id delete.
+      const { error } = await supabase.from(r.table_name)
+        .delete().eq('id', r.row_id).eq('studio_id', studioId);
+      if (!error) deleted++;
+    }
+    // Clear the log for this session whether or not every row still existed.
+    await supabase.from('demo_session_log')
+      .delete().eq('studio_id', studioId).eq('session_id', sessionId);
+    res.json({ ok: true, deleted });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
