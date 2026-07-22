@@ -9297,30 +9297,14 @@ const instantCache = {
 // _emptyStagePreview(opts) returns an HTML string. opts:
 //   icon, exampleLabel, actionLabel, onExample (JS call string),
 //   nextLabel (where it goes next), nextEmoji.
+// ─── EMPTY-STAGE PREVIEW — RETIRED (Daisy, 22 Jul: tools not
+// tutorials; staff know the process). Was: EXAMPLE card + "What
+// happens next:" line on every empty stage (Packing, Kiln, etc).
+// Now returns nothing — an empty stage just shows its clean
+// "All caught up" state. Kept as a stub because callers across
+// several stages concatenate its return value.
 function _emptyStagePreview(opts) {
-  const o = opts || {};
-  const exampleLabel = o.exampleLabel || 'Example piece';
-  const actionLabel  = o.actionLabel  || 'See what happens';
-  const onExample    = o.onExample    || '';
-  const nextLabel    = o.nextLabel    || '';
-  const nextEmoji    = o.nextEmoji    || '→';
-  return `
-    <div style="margin-top:8px;">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
-        <span style="font-size:11px;color:#8a8175;">Nothing waiting right now.</span>
-      </div>
-      <!-- Clearly-labelled EXAMPLE — dashed border + chip, never real -->
-      <div style="border:1.5px dashed rgba(43,39,36,0.28);border-radius:12px;padding:12px;background:rgba(43,39,36,0.03);">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-          <span style="background:#B87946;color:#fff;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;padding:2px 7px;border-radius:20px;">Example</span>
-          <span style="font-size:12px;font-weight:700;color:#2B2724;">${exampleLabel}</span>
-        </div>
-        <button class="glaze-tile" onclick="${onExample}" style="width:100%;border:none;border-radius:10px;padding:11px;
-          font-size:12px;font-weight:800;background:#5E9DB6;color:#fff;cursor:pointer;">${actionLabel} →</button>
-        ${nextLabel ? `<div style="font-size:11px;color:#8a8175;margin-top:10px;text-align:center;">
-          What happens next: <b style="color:#2B2724;">${nextEmoji} ${nextLabel}</b></div>` : ''}
-      </div>
-    </div>`;
+  return '';
 }
 
 // Walk a preview of a stage's action with dummy data — a toast that
