@@ -24,6 +24,17 @@ const KC_Money = {
           const canvas = document.getElementById('kc-canvas');
           if (canvas) canvas.classList.add('kc-away');
           
+          // FIX 22 Jul: showDashboardSection hides the tile menu and
+          // nothing ever restored it — returning to Money later showed
+          // sections with no grid (Daisy: "Margins tab where?"). Every
+          // Money open now brings the grid back and closes drill-down
+          // sections; the director revenue section keeps its own state.
+          const menu = document.getElementById('dashboard-tile-menu');
+          if (menu) menu.style.display = 'grid';
+          document.querySelectorAll('.dashboard-section').forEach(el => {
+            if (el.id !== 'kiln-cafe-revenue-section') el.style.display = 'none';
+          });
+          
           setTimeout(() => this.transform(), 50);
         }
         return originalGoToTab.call(window, tab, ...args);
