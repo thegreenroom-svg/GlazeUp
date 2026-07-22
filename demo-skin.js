@@ -64,14 +64,14 @@
     } catch (e) { console.warn('[desk] nav failed', id, e); }
   };
 
-  // Walk straight into one studio space: open the floor plan, then its room
-  // panel. Falls back to just the floor plan if the room opener isn't there.
+  // Walk into the studio: open the floor plan (which loads its own live
+  // data and has the normal dock/back). We deliberately do NOT deep-link
+  // into a room panel from here — that panel reads floor data that hasn't
+  // loaded yet when arriving cold, so it opened empty and, being a fixed
+  // overlay, trapped the back button. The floor plan itself shows all three
+  // rooms anyway, so tapping any zone lands you on the live plan cleanly.
   KC.goRoom = function (room) {
     KC.go('floor-plan', 'showFloorPlan');
-    setTimeout(() => {
-      try { if (typeof openRoomPanel === 'function') openRoomPanel(room); }
-      catch (e) { console.warn('[desk] room open failed', room, e); }
-    }, 260);
   };
 
   KC.hideCanvas = function () {

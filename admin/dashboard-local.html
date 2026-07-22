@@ -16728,6 +16728,18 @@ function openRoomPanel(room) {
   const grid = document.getElementById('floor-room-panel-grid');
   if (!panel || !grid) return;
 
+  // Safety net: make the phone's back button / swipe close this overlay
+  // instead of getting stuck on it. We push a history entry when opening
+  // and pop it (closing the panel) on back.
+  try {
+    history.pushState({ roomPanel: true }, '');
+    window.addEventListener('popstate', function _closeOnBack() {
+      const p = document.getElementById('floor-room-panel');
+      if (p) p.style.display = 'none';
+      window.removeEventListener('popstate', _closeOnBack);
+    });
+  } catch (e) {}
+
   const roomColor = room === 'Lounge' ? '#00BFA5' : '#9575CD';
   const roomCapacity = room === 'Lounge' ? 'Modular seating · up to 12' : 'Private room · up to 14';
   title.textContent = room;
