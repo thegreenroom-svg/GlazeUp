@@ -25861,11 +25861,27 @@ function renderMargins() {
         <button onclick="confirmAllSuggestions()" style="flex-shrink:0;background:#B87946;color:white;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer;">Confirm all</button>
       </div>`;
   }
+
+  // "Needs checking" filter — everything without a confirmed real cost
+  // (rough estimates, suggestions, blanks). Lets staff show just those and
+  // pop real costs in as they go.
+  const checkCount = _marginsData.items.filter(i => i.costCents == null).length;
+  if (checkCount > 0) {
+    const on = !!window._marginCheckOnly;
+    html += `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;">
+        <div style="font-size:12px;color:var(--gu-dust);"><strong style="color:#8B5A00;">${checkCount}</strong> item${checkCount > 1 ? 's' : ''} to check (estimated or unconfirmed)</div>
+        <button onclick="window._marginCheckOnly=!window._marginCheckOnly;renderMargins();" style="flex-shrink:0;background:${on ? '#8B5A00' : 'transparent'};color:${on ? '#fff' : '#8B5A00'};border:1px solid #8B5A00;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;">${on ? 'Showing to-check ✓' : 'Show only to check'}</button>
+      </div>`;
+  }
   order.forEach(key => {
     const items = buckets[key];
     if (!items || !items.length) return;
-    const open = !!window._marginOpenGroups[key];
-
+    // When "show only to check" is on, drop items that already have a
+    // confirmed real cost, and skip the whole group if none remain.
+    const groupItems = window._marginCheckOnly ? items.filter(i => i.costCents == null) : items;
+    if (!groupItems.length) return;
+    const open = window._marginCheckOnly ? true : !!window._marginOpenGroups[key];
     // Group-level summary: how many items, how many still need a cost.
     // Items with a fuzzy suggestion are counted as "suggested" not "need cost".
     const noCost = items.filter(i => i.costCents == null && i.costSuggested == null).length;
@@ -25892,7 +25908,7 @@ function renderMargins() {
 
     if (open) {
       html += `<div style="padding:0 14px 6px;">`;
-      items.forEach(it => {
+      groupItems.forEach(it => {
         const price = it.priceCents != null ? it.priceCents * (1 + uplift / 100) : null;
         // A rough fallback so NOTHING sits blank until real costs land.
         // Daisy: "populate what you can, mark it fuzzy." Every uncosted item
@@ -25924,6 +25940,10 @@ function renderMargins() {
         }
         const margin = (price != null && effectiveCost != null && price > 0)
           ? Math.round(((price - effectiveCost) / price) * 100) : null;
+        // "Needs checking" = any cost that isn't a confirmed real figure:
+        // a rough estimate, a fuzzy suggestion, or nothing yet. These get a
+        // flag so staff can filter to just them and confirm as they go.
+        const needsCheck = (it.costCents == null); // no confirmed real cost
         // Cost line: real cost if set, else a fuzzy suggestion to confirm,
         // else a rough estimate (marked), else "tap to set".
         let costLine;
@@ -25934,15 +25954,24 @@ function renderMargins() {
           // against this variation id so it's exact next time).
           costLine = `<span onclick="confirmSuggestedCost('${it.variationId}', ${it.costSuggested})" style="cursor:pointer;color:#B87946;font-weight:600;">≈ £${(it.costSuggested / 100).toFixed(2)} — tap to confirm</span> <span style="opacity:0.6;">(from "${(it.costSuggestedFrom||'').replace(/"/g,'')}")</span>`;
         } else if (useRough) {
-          costLine = `<span onclick="editMarginCost('${it.variationId}')" style="cursor:pointer;color:var(--gu-dust);font-style:italic;">~£${(roughCost / 100).toFixed(2)} rough* — tap to set real cost</span>`;
+          costLine = `<span style="color:var(--gu-dust);font-style:italic;">~£${(roughCost / 100).toFixed(2)} rough*</span>`;
         } else {
-          costLine = `cost <span onclick="editMarginCost('${it.variationId}')" style="text-decoration:underline;cursor:pointer;color:var(--gu-primary);">tap to set</span>`;
+          costLine = `<span style="color:var(--gu-dust);">no cost yet</span>`;
         }
+        // The inline "input as you go" field — always available so anyone can
+        // pop the real cost in on the spot. Enter or tab-away saves it.
+        const inlineInput = `<input type="number" inputmode="decimal" step="0.01" min="0" placeholder="£ cost"
+          onkeydown="if(event.key==='Enter'){this.blur();}"
+          onblur="saveMarginCostInline('${it.variationId}', this)"
+          style="width:64px;font-size:11px;padding:3px 5px;border:1px solid var(--gu-border);border-radius:6px;background:var(--gu-surface,#fff);color:inherit;" />`;
+        const checkFlag = needsCheck
+          ? `<span title="Needs checking" style="display:inline-block;font-size:9px;font-weight:800;color:#8B5A00;background:rgba(249,168,37,0.18);border-radius:5px;padding:1px 5px;margin-left:6px;">CHECK</span>`
+          : '';
         html += `
-          <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--gu-border);">
+          <div class="kc-margin-row" data-needscheck="${needsCheck ? '1' : '0'}" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--gu-border);">
             <div style="flex:1;min-width:0;">
-              <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${it.name}</div>
-              <div style="font-size:11px;color:var(--gu-dust);">${costLine}</div>
+              <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${it.name}${checkFlag}</div>
+              <div style="font-size:11px;color:var(--gu-dust);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">${costLine} ${inlineInput}</div>
             </div>
             <div style="text-align:right;flex-shrink:0;">
               <div style="font-size:13px;font-weight:700;">${price != null ? '£' + (price / 100).toFixed(2) : '—'}</div>
@@ -25971,6 +26000,28 @@ function renderMargins() {
       </div>`).join('')
       || '<div style="font-size:12px;color:var(--gu-dust);padding:6px 0;">Nothing here yet — add coffee supplies below.</div>';
   }
+}
+
+// 22 Jul — inline "input as you go": a small £ field on each row. Anyone can
+// type a real cost and it saves on Enter or blur, no modal. Same save path as
+// editMarginCost so it learns the variation_id too.
+async function saveMarginCostInline(variationId, inputEl) {
+  const it = _marginsData.items.find(i => i.variationId === variationId);
+  if (!it) return;
+  const raw = (inputEl.value || '').trim();
+  if (raw === '') return;
+  const costCents = Math.round(parseFloat(raw.replace(',', '.')) * 100);
+  if (isNaN(costCents) || costCents < 0) { inputEl.value = ''; return; }
+  it.costCents = costCents;
+  it.costSuggested = null;
+  it.needsCheck = false; // a typed-in real cost is confirmed, no longer flagged
+  renderMargins();
+  try {
+    await fetch(`${API_URL}/api/margins/cost`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId: studioId, variationId, name: it.name, costCents }),
+    });
+  } catch (e) { console.warn('inline cost save failed', e); }
 }
 
 async function editMarginCost(variationId) {
