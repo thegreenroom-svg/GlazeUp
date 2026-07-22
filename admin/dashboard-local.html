@@ -16814,11 +16814,21 @@ function openRoomPanel(room) {
   });
 
   const tables = _floorData.tables.filter(t => t.room === room);
-  // Render the full elegant floor plan for this room (not tiles)
+  // Render the elegant floor plan for this room, SHRUNK TO FIT the panel —
+  // no scrolling. The SVG scales down so all tables are visible on one screen.
   const roomWidth = _measureFloorPlanWidth && typeof _measureFloorPlanWidth === 'function' ? _measureFloorPlanWidth() : 320;
-  grid.innerHTML = tables.length
-    ? _renderElegantRoomSVG(room, tables, bookingByTable, true, roomWidth)
-    : `<div style="padding:20px;text-align:center;color:var(--gu-dust);font-size:13px;">No tables in ${room} yet.</div>`;
+  if (tables.length) {
+    // tappable=false so the room heading isn't a drill-through; individual
+    // tables stay clickable (they carry their own onclick to open bookings).
+    const svgHtml = _renderElegantRoomSVG(room, tables, bookingByTable, false, roomWidth);
+    // Wrap so the SVG scales to fit the panel height — object-fit style: the
+    // inner block is sized to contain, centered, never taller than the panel.
+    grid.innerHTML = `<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;width:100%;overflow:hidden;">
+      <div style="width:100%;max-height:100%;display:flex;align-items:center;justify-content:center;" class="kc-room-fit">${svgHtml}</div>
+    </div>`;
+  } else {
+    grid.innerHTML = `<div style="padding:20px;text-align:center;color:var(--gu-dust);font-size:13px;">No tables in ${room} yet.</div>`;
+  }
 
   panel.style.display = 'flex';
 }
@@ -32158,6 +32168,15 @@ if (typeof window !== 'undefined' && typeof window._manualFloorSync !== 'functio
       </button>
     </div>
   </div>
+<style>
+  /* Room panel: elegant floor plan scaled to fit one screen, no scroll.
+     The inner SVG is width:100% height:auto by default (grows tall with
+     many tables). Here we cap it to the panel height so all tables show
+     at once — the SVG keeps its aspect ratio and shrinks to fit. */
+  #floor-room-panel-grid .kc-room-fit { max-height: 100%; overflow: hidden; }
+  #floor-room-panel-grid .kc-room-fit > div { max-height: 100%; margin-bottom: 0 !important; display: flex; flex-direction: column; }
+  #floor-room-panel-grid .kc-room-fit svg { max-height: calc(100vh - 160px); height: auto; width: auto; max-width: 100%; object-fit: contain; }
+</style>
 <div id="floor-room-panel" style="display:none;position:fixed;inset:0;z-index:9500;flex-direction:column;">
     <div id="floor-room-panel-header" style="background:linear-gradient(135deg,#1C1814,#2B2118);padding:calc(14px + env(safe-area-inset-top)) 16px 14px;display:flex;align-items:center;gap:12px;flex-shrink:0;border-bottom:1px solid rgba(184,121,70,0.2);">
       <button onclick="closeRoomPanel()" class="glaze-tile"
@@ -32169,7 +32188,7 @@ if (typeof window !== 'undefined' && typeof window._manualFloorSync !== 'functio
         <div style="font-size:11px;color:rgba(184,121,70,0.7);" id="floor-room-panel-sub"></div>
       </div>
     </div>
-    <div id="floor-room-panel-grid" style="flex:1;overflow-x:auto;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:16px;background:#1A1714;-webkit-overflow-scrolling:touch;"></div>
+    <div id="floor-room-panel-grid" style="flex:1;min-height:0;overflow:hidden;padding:10px;display:flex;flex-direction:column;background:#1A1714;"></div>
   </div>
 <div id="booking-modal" style="display:none;position:fixed;right:0;top:0;bottom:0;z-index:9500;width:min(100%,480px);padding-top:env(safe-area-inset-top, 0px);padding-bottom:env(safe-area-inset-bottom, 0px);box-sizing:border-box;background:linear-gradient(180deg,#1C1814,#1A1714);border-left:1px solid rgba(184,121,70,0.2);flex-direction:column;box-shadow:-12px 0 40px rgba(0,0,0,0.6);animation:slide-in-right 0.3s ease;">
     
