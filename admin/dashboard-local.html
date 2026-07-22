@@ -16806,12 +16806,12 @@ function openRoomPanel(room) {
   const sub = document.getElementById('floor-room-panel-sub');
   if (sub) sub.textContent = roomCapacity;
 
-  const now = new Date();
-  const bookingByTable = {};
-  (_floorData.bookings || []).forEach(b => {
-    const start = b.session_start ? new Date(b.session_start) : null;
-    if (start && start <= now && b.table_number) _assignBookingToTable(bookingByTable, b);
-  });
+  // Use the SAME booking-to-table mapping the main floor plan uses, so
+  // tomorrow's green bookings, provisionals and live orders all show here
+  // exactly as they do on the full plan (our old local map only caught
+  // already-started bookings, so tomorrow's greens were invisible).
+  const roomsData = _elegantRoomsData();
+  const bookingByTable = roomsData.bookingByTable || {};
 
   const tables = _floorData.tables.filter(t => t.room === room);
   // Render the elegant floor plan for this room, SHRUNK TO FIT the panel —
@@ -16821,8 +16821,6 @@ function openRoomPanel(room) {
     // tappable=false so the room heading isn't a drill-through; individual
     // tables stay clickable (they carry their own onclick to open bookings).
     const svgHtml = _renderElegantRoomSVG(room, tables, bookingByTable, false, roomWidth);
-    // Wrap so the SVG scales to fit the panel height — object-fit style: the
-    // inner block is sized to contain, centered, never taller than the panel.
     grid.innerHTML = `<div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;width:100%;overflow:hidden;">
       <div style="width:100%;max-height:100%;display:flex;align-items:center;justify-content:center;" class="kc-room-fit">${svgHtml}</div>
     </div>`;
@@ -32190,7 +32188,7 @@ if (typeof window !== 'undefined' && typeof window._manualFloorSync !== 'functio
     </div>
     <div id="floor-room-panel-grid" style="flex:1;min-height:0;overflow:hidden;padding:10px;display:flex;flex-direction:column;background:#1A1714;"></div>
   </div>
-<div id="booking-modal" style="display:none;position:fixed;right:0;top:0;bottom:0;z-index:9500;width:min(100%,480px);padding-top:env(safe-area-inset-top, 0px);padding-bottom:env(safe-area-inset-bottom, 0px);box-sizing:border-box;background:linear-gradient(180deg,#1C1814,#1A1714);border-left:1px solid rgba(184,121,70,0.2);flex-direction:column;box-shadow:-12px 0 40px rgba(0,0,0,0.6);animation:slide-in-right 0.3s ease;">
+<div id="booking-modal" style="display:none;position:fixed;right:0;top:0;bottom:0;z-index:9700;width:min(100%,480px);padding-top:env(safe-area-inset-top, 0px);padding-bottom:env(safe-area-inset-bottom, 0px);box-sizing:border-box;background:linear-gradient(180deg,#1C1814,#1A1714);border-left:1px solid rgba(184,121,70,0.2);flex-direction:column;box-shadow:-12px 0 40px rgba(0,0,0,0.6);animation:slide-in-right 0.3s ease;">
     
     <!-- Header -->
     <div style="background:linear-gradient(135deg,#2B2118,#1C1814);padding:14px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;border-bottom:1px solid rgba(184,121,70,0.2);">
