@@ -6147,13 +6147,23 @@ app.get('/api/floor/active', async (req, res) => {
       if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
         const dayStart = new Date(date + 'T00:00:00'); dayStart.setHours(0,0,0,0);
         const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate()+1);
-        const { data: dayRows } = await supabase.from('bookings')
+        // When a specific date is picked, show the WHOLE day as it happened
+        // — including completed bookings (past days are a record of what
+        // happened), but still hiding cancellations. Only the live "today"
+        // path below hides completed/cancelled, because there "active" means
+        // right now. Here the person deliberately chose this date.
+        const isPast = dayEnd <= new Date();
+        let q = supabase.from('bookings')
           .select('booking_code,customer_name,table_number,current_stage,session_start,session_end,party_size,status,booking_type,space_name')
           .eq('studio_id', studioId)
           .gte('session_start', dayStart.toISOString())
           .lt('session_start', dayEnd.toISOString())
-          .not('status', 'eq', 'cancelled')
-          .not('status', 'eq', 'completed');
+          .not('status', 'eq', 'cancelled');
+        // For today or future dates keep hiding completed (a session marked
+        // done shouldn't clutter the live view); for a past date, show them —
+        // that's the whole point of looking back.
+        if (!isPast) q = q.not('status', 'eq', 'completed');
+        const { data: dayRows } = await q;
         ownBookings = dayRows || [];
         showingDate = date;
       } else {

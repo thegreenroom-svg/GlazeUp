@@ -83,6 +83,7 @@
     // alive. Wrapped separately: a hydrate failure (e.g. a bad fetch
     // shape) must never undo a canvas that's already correctly shown.
     try { KC.hydrate(); } catch (err) { KC._fail('hydrate', err); }
+    try { KC._wireDayNav && KC._wireDayNav(); } catch (e) {}
     // hide any app view left showing beneath us
     try { document.querySelectorAll('.view').forEach(v => v.style.display = 'none'); } catch (e) {}
     const fp = $('floor-table-detail'); if (fp) fp.style.display = 'none';
@@ -114,7 +115,19 @@
         <div class="kc-hero kc-in" id="kc-hero"></div>
 
         <div class="kc-section kc-in">
-          <div class="kc-sec-title" id="kc-day-title">THE DAY</div>
+          <div class="kc-day-head">
+            <div class="kc-sec-title" id="kc-day-title">TODAY'S BOOKINGS</div>
+            <div class="kc-day-nav">
+              <button class="kc-day-arrow" id="kc-day-prev" aria-label="Previous day">‹</button>
+              <button class="kc-day-cal" id="kc-day-cal" aria-label="Pick a date">
+                <svg viewBox="0 0 24 24" width="16" height="16"><rect x="3.5" y="5" width="17" height="15" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 9.5h17M8 3v4M16 3v4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              </button>
+              <button class="kc-day-arrow" id="kc-day-next" aria-label="Next day">›</button>
+              <button class="kc-day-today" id="kc-day-today" aria-label="Jump to today">Today</button>
+            </div>
+          </div>
+          <!-- hidden native date input, opened by the calendar button -->
+          <input type="date" id="kc-day-date-input" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none;">
           <div class="kc-timeline" id="kc-timeline"><div class="kc-skel"></div><div class="kc-skel"></div><div class="kc-skel"></div></div>
         </div>
 
@@ -251,6 +264,46 @@
       : '<div class="kc-jump-hint">Nothing matches — try one word, like “stock”.</div>';
   };
 
+  /* ── day navigation: arrows + calendar to view any date ──────── */
+  KC._wireDayNav = function () {
+    const prev = $('kc-day-prev'), next = $('kc-day-next'),
+          cal = $('kc-day-cal'), todayBtn = $('kc-day-today'),
+          input = $('kc-day-date-input');
+    if (!prev || prev._wired) return; // wire once
+    prev._wired = true;
+
+    const todayStr = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
+    // The day currently on screen — the one the endpoint told us it showed,
+    // or the explicitly-viewed date. Arrows step from here.
+    const baseDate = () => KC._viewedDate || KC._shownDate || todayStr();
+    const step = (days) => {
+      const dt = new Date(baseDate() + 'T12:00:00');
+      dt.setDate(dt.getDate() + days);
+      KC._viewedDate = dt.toLocaleDateString('en-CA');
+      _refreshDay();
+    };
+    // Re-run just the timeline hydration (not the whole Desk) for snappy steps.
+    const _refreshDay = () => { try { KC.hydrate(); } catch (e) {} _syncTodayBtn(); };
+    const _syncTodayBtn = () => {
+      // "Today" button only matters when we're NOT on today.
+      const onToday = !KC._viewedDate || KC._viewedDate === todayStr();
+      if (todayBtn) todayBtn.style.visibility = onToday ? 'hidden' : 'visible';
+    };
+
+    prev.onclick = () => step(-1);
+    next.onclick = () => step(1);
+    todayBtn.onclick = () => { KC._viewedDate = null; _refreshDay(); };
+    cal.onclick = () => {
+      input.value = baseDate();
+      // showPicker() where supported (iOS/Chrome), else focus falls back.
+      try { input.showPicker ? input.showPicker() : input.focus(); } catch (e) { input.focus(); }
+    };
+    input.onchange = () => {
+      if (input.value) { KC._viewedDate = input.value; _refreshDay(); }
+    };
+    _syncTodayBtn();
+  };
+
   /* ── live hydration: greeting, hero figures, the day timeline ── */
   KC.hydrate = async function () {
     $('kc-hello-line').textContent = `${greeting()}, ${firstName() || 'you'}.`;
@@ -267,19 +320,36 @@
     const base = (typeof API_URL !== 'undefined') ? API_URL : '';
     const sid = (typeof studioId !== 'undefined') ? studioId : '';
 
-    /* the day — same endpoint the floor plan trusts */
-    fetch(`${base}/api/floor/active?studioId=${sid}`).then(r => r.json()).then(d => {
+    /* the day — same endpoint the floor plan trusts. When _viewedDate is
+       set (via the calendar / arrows) we ask for that exact day; otherwise
+       the endpoint decides (today, or the next open day if today is empty). */
+    const dateParam = KC._viewedDate ? `&date=${KC._viewedDate}` : '';
+    fetch(`${base}/api/floor/active?studioId=${sid}${dateParam}`).then(r => r.json()).then(d => {
       const bs = (d.bookings || []).slice().sort((a, b) => new Date(a.session_start) - new Date(b.session_start));
       const covers = bs.reduce((s, b) => s + (b.party_size || 1), 0);
       const f = $('kc-fig-floor');
       if (f) { f.classList.remove('kc-skel-t'); f.textContent = bs.length; }
       const fl = $('kc-fig-floor-l');
       if (fl) fl.textContent = bs.length === 1 ? 'booking · ' + covers + ' covers' : 'bookings · ' + covers + ' covers';
+      // Remember which day is actually on screen so the arrows step from it.
+      if (d.showingDate) KC._shownDate = d.showingDate;
       const title = $('kc-day-title');
       if (title && d.showingDate) {
         const dt = new Date(d.showingDate + 'T12:00:00Z');
         const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
-        title.textContent = d.showingDate === today ? 'THE DAY' : 'NEXT OPEN — ' + dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' }).toUpperCase();
+        const nice = dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' }).toUpperCase();
+        if (d.showingDate === today) {
+          title.textContent = "TODAY'S BOOKINGS";
+        } else if (d.showingDate < today) {
+          // A past date the person navigated to — a record of what happened.
+          title.textContent = nice;
+        } else if (KC._viewedDate) {
+          // A future date they deliberately picked.
+          title.textContent = nice;
+        } else {
+          // No date picked, today was empty, endpoint rolled to next open day.
+          title.textContent = 'NEXT BOOKINGS — ' + nice;
+        }
       }
       const t = $('kc-timeline');
       if (!t) return;
@@ -289,7 +359,7 @@
           <span class="kc-slot-dot"></span>
           <span class="kc-slot-body"><b>${b.customer_name || 'Booking'}</b><i>${b.party_size || 1} ${(b.party_size || 1) === 1 ? 'cover' : 'covers'}${b.room ? ' · ' + b.room : (b.space_name ? ' · ' + b.space_name : '')}</i></span>
         </button>`).join('') + (bs.length > 14 ? `<div class="kc-more">+ ${bs.length - 14} more on the floor plan</div>` : '')
-        : `<div class="kc-empty">A quiet book. Perfect day to tidy the glaze shelf.</div>`;
+        : `<div class="kc-empty">${KC._viewedDate ? 'No bookings on this day.' : 'A quiet book. Perfect day to tidy the glaze shelf.'}</div>`;
     }).catch(() => { const t = $('kc-timeline'); if (t) t.innerHTML = '<div class="kc-empty">Waking the server… pull back to the Desk in a moment.</div>'; });
 
     /* the kiln — same endpoint the kiln screen trusts */
