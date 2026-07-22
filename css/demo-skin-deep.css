@@ -1,0 +1,303 @@
+/* ═══════════════════════════════════════════════════════════════════
+   DEEP SCREENS — Modern Kiln Cafe identity applied systematically
+   across all 19 deep screens (Money, Floor, Kiln, Staff, Stock, etc.)
+   
+   Strategy: transform the shared UI blocks (headers, cards, sections,
+   tiles, grids) via CSS only — zero business logic changes, pure
+   presentation inherited by all screens at once.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── HEADERS & TITLES ── */
+html.demo-skin .view h2,
+html.demo-skin .view h3,
+html.demo-skin .dashboard-section h3,
+html.demo-skin .stock-section h3,
+html.demo-skin .staff-section h3,
+html.demo-skin .setup-section h3 {
+  font-family: 'Fraunces', serif !important;
+  font-size: 28px !important;
+  font-weight: 700 !important;
+  color: #A32D21 !important;
+  margin-bottom: 16px !important;
+  letter-spacing: -0.5px !important;
+}
+
+html.demo-skin .view h3,
+html.demo-skin .dashboard-section h3 {
+  font-size: 22px !important;
+  margin-top: 24px !important;
+}
+
+/* ── SECTION CONTAINERS ── */
+html.demo-skin .dashboard-section,
+html.demo-skin .stock-section,
+html.demo-skin .staff-section,
+html.demo-skin .setup-section {
+  background: linear-gradient(135deg, rgba(243, 229, 245, 0.4), rgba(255, 248, 240, 0.6)) !important;
+  border: 1.5px solid rgba(163, 45, 33, 0.15) !important;
+  border-radius: 16px !important;
+  padding: 20px !important;
+  margin-bottom: 24px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* ── WAVE DIVIDER between major sections ── */
+html.demo-skin .dashboard-section:not(:first-of-type)::before,
+html.demo-skin .stock-section:not(:first-of-type)::before,
+html.demo-skin .staff-section:not(:first-of-type)::before {
+  content: '';
+  display: block;
+  height: 2px;
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 10"><path d="M0,5 Q50,0 100,5 T200,5 T300,5 T400,5" stroke="%23A32D21" stroke-width="1.5" fill="none" opacity="0.3"/></svg>') repeat-x;
+  background-size: 100px 2px;
+  margin-bottom: 20px !important;
+}
+
+/* ── METRIC CARDS ── */
+html.demo-skin .metric-card {
+  background: #FFF9F0 !important;
+  border: 1.5px solid rgba(184, 121, 70, 0.25) !important;
+  border-radius: 12px !important;
+  padding: 14px !important;
+  text-align: center !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+  transition: all 0.2s ease !important;
+}
+
+html.demo-skin .metric-card:hover {
+  border-color: rgba(163, 45, 33, 0.4) !important;
+  box-shadow: 0 4px 12px rgba(163, 45, 33, 0.1) !important;
+}
+
+html.demo-skin .metric-card .label {
+  font-size: 11px !important;
+  color: #666 !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  margin-bottom: 8px !important;
+}
+
+html.demo-skin .metric-card .value {
+  font-family: 'Fraunces', serif !important;
+  font-size: 22px !important;
+  font-weight: 900 !important;
+  color: #A32D21 !important;
+  margin-bottom: 4px !important;
+}
+
+html.demo-skin .metric-card .detail {
+  font-size: 10px !important;
+  color: #999 !important;
+  font-style: italic !important;
+}
+
+/* ── SETUP CARDS ── */
+html.demo-skin .setup-card {
+  background: linear-gradient(135deg, #FFF9F0, rgba(255, 248, 240, 0.8)) !important;
+  border: 1.5px solid rgba(184, 121, 70, 0.2) !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+  margin-bottom: 12px !important;
+}
+
+html.demo-skin .setup-card h4 {
+  font-family: 'Fraunces', serif !important;
+  color: #A32D21 !important;
+  font-size: 16px !important;
+  margin: 0 0 8px 0 !important;
+}
+
+/* ── BUTTONS & INTERACTIVE ── */
+html.demo-skin .view button,
+html.demo-skin .glaze-tile[onclick],
+html.demo-skin input[type="button"],
+html.demo-skin input[type="submit"] {
+  font-family: 'Inter', sans-serif !important;
+  border-radius: 10px !important;
+  transition: all 0.2s ease !important;
+  border: 1.5px solid var(--gu-primary, #A32D21) !important;
+}
+
+html.demo-skin .view button:active,
+html.demo-skin .glaze-tile[onclick]:active {
+  transform: scale(0.98) !important;
+}
+
+/* ── DASHBOARD GRID (3-column metric layout) ── */
+html.demo-skin .dashboard-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) !important;
+  gap: 12px !important;
+  margin-top: 16px !important;
+}
+
+/* ── CHART CONTAINERS ── */
+html.demo-skin .chart-container {
+  background: linear-gradient(135deg, rgba(243, 229, 245, 0.2), rgba(255, 248, 240, 0.4)) !important;
+  border: 1.5px solid rgba(163, 45, 33, 0.15) !important;
+  border-radius: 14px !important;
+  padding: 16px !important;
+  margin-bottom: 20px !important;
+}
+
+html.demo-skin .chart-container h3 {
+  font-family: 'Fraunces', serif !important;
+  color: #A32D21 !important;
+  font-size: 18px !important;
+  margin: 0 0 12px 0 !important;
+}
+
+/* ── GLAZE TILE TRANSFORMATION (old tile grid → modern card grid) ── */
+html.demo-skin .glaze-tile {
+  background: linear-gradient(135deg, #FFF9F0 85%, rgba(255, 248, 240, 0.6)) !important;
+  border: 1.5px solid rgba(163, 45, 33, 0.2) !important;
+  border-radius: 12px !important;
+  color: #2B2724 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+html.demo-skin .glaze-tile:hover {
+  border-color: rgba(163, 45, 33, 0.4) !important;
+  box-shadow: 0 8px 24px rgba(163, 45, 33, 0.15) !important;
+  transform: translateY(-2px) !important;
+}
+
+html.demo-skin .glaze-tile:active {
+  transform: translateY(0) !important;
+}
+
+/* Tile text styling */
+html.demo-skin .glaze-tile span[style*="font-size"] {
+  font-family: 'Fraunces', serif !important;
+  font-weight: 700 !important;
+}
+
+/* ── INFO BANNER (welcome/notice sections) ── */
+html.demo-skin .info-banner {
+  background: linear-gradient(135deg, rgba(163, 45, 33, 0.08), rgba(184, 121, 70, 0.06)) !important;
+  border: 1.5px solid rgba(163, 45, 33, 0.25) !important;
+  border-radius: 14px !important;
+  padding: 16px 18px !important;
+  margin-bottom: 20px !important;
+}
+
+html.demo-skin .info-banner strong {
+  font-family: 'Fraunces', serif !important;
+  color: #A32D21 !important;
+  font-size: 18px !important;
+  display: block !important;
+  margin-bottom: 8px !important;
+}
+
+html.demo-skin .info-banner span {
+  color: #666 !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+
+/* ── FLOOR PLAN & TABLE VIEWS ── */
+html.demo-skin #floor-plan-view .chart-container {
+  background: linear-gradient(135deg, rgba(243, 229, 245, 0.3), rgba(255, 248, 240, 0.5)) !important;
+}
+
+html.demo-skin .table-section {
+  background: linear-gradient(135deg, #FFF9F0, rgba(255, 248, 240, 0.85)) !important;
+  border: 1.5px solid rgba(184, 121, 70, 0.2) !important;
+  border-radius: 12px !important;
+  padding: 14px !important;
+  margin-bottom: 10px !important;
+}
+
+/* ── STAFF & TEAM VIEWS ── */
+html.demo-skin .staff-subtab-btn,
+html.demo-skin .team-section {
+  background: linear-gradient(135deg, rgba(243, 229, 245, 0.3), rgba(255, 248, 240, 0.4)) !important;
+  border: 1.5px solid rgba(163, 45, 33, 0.15) !important;
+  border-radius: 11px !important;
+  padding: 12px !important;
+}
+
+/* ── STATUS BADGES ── */
+html.demo-skin .status-badge {
+  border-radius: 6px !important;
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  padding: 4px 10px !important;
+}
+
+html.demo-skin .status-badge.pending {
+  background: rgba(255, 193, 7, 0.15) !important;
+  color: #F57F17 !important;
+  border: 1px solid rgba(255, 193, 7, 0.3) !important;
+}
+
+html.demo-skin .status-badge.complete {
+  background: rgba(76, 175, 80, 0.15) !important;
+  color: #2E7D32 !important;
+  border: 1px solid rgba(76, 175, 80, 0.3) !important;
+}
+
+/* ── FORM ELEMENTS ── */
+html.demo-skin input[type="text"],
+html.demo-skin input[type="number"],
+html.demo-skin textarea,
+html.demo-skin select {
+  border: 1.5px solid rgba(184, 121, 70, 0.2) !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  background: #FFF9F0 !important;
+  color: #2B2724 !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+html.demo-skin input[type="text"]:focus,
+html.demo-skin input[type="number"]:focus,
+html.demo-skin textarea:focus,
+html.demo-skin select:focus {
+  outline: none !important;
+  border-color: #A32D21 !important;
+  box-shadow: 0 0 0 3px rgba(163, 45, 33, 0.1) !important;
+}
+
+/* ── DARK MODE ── */
+@media (prefers-color-scheme: dark) {
+  html.demo-skin .view,
+  html.demo-skin .dashboard-section,
+  html.demo-skin .stock-section,
+  html.demo-skin .setup-section {
+    background: linear-gradient(135deg, rgba(30, 20, 15, 0.8), rgba(20, 15, 10, 0.9)) !important;
+    color: #F5E6D3 !important;
+  }
+
+  html.demo-skin .metric-card {
+    background: rgba(40, 25, 20, 0.6) !important;
+    color: #F5E6D3 !important;
+  }
+
+  html.demo-skin .metric-card .label {
+    color: #B8A89A !important;
+  }
+
+  html.demo-skin .metric-card .value {
+    color: #F7AFAD !important;
+  }
+
+  html.demo-skin .glaze-tile {
+    background: linear-gradient(135deg, rgba(40, 25, 20, 0.7), rgba(30, 20, 15, 0.8)) !important;
+    color: #F5E6D3 !important;
+  }
+
+  html.demo-skin .info-banner {
+    background: linear-gradient(135deg, rgba(163, 45, 33, 0.2), rgba(184, 121, 70, 0.15)) !important;
+  }
+
+  html.demo-skin input[type="text"],
+  html.demo-skin input[type="number"],
+  html.demo-skin textarea,
+  html.demo-skin select {
+    background: rgba(40, 25, 20, 0.6) !important;
+    color: #F5E6D3 !important;
+  }
+}
