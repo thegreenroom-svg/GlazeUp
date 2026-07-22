@@ -16842,7 +16842,7 @@ function _renderEmptyTile(table) {
   return `
     <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:11px;text-align:center;">
       <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.25);margin-bottom:5px;">${table.name}</div>
-      <div style="margin:4px auto;opacity:0.4;">${_miniTableSvg(table.capacity || 4, true, table.name, 'rgba(184,121,70,0.55)')}</div>
+      <div style="margin:4px auto;">${_miniTableSvg(table.capacity || 4, true, table.name, 'rgba(184,121,70,1)')}</div>
       <div style="font-size:9px;color:rgba(255,255,255,0.12);margin-top:3px;text-transform:uppercase;letter-spacing:0.06em;">Empty</div>
     </div>`;
 }
