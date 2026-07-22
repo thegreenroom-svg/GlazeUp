@@ -16814,12 +16814,11 @@ function openRoomPanel(room) {
   });
 
   const tables = _floorData.tables.filter(t => t.room === room);
+  // Render the full elegant floor plan for this room (not tiles)
+  const roomWidth = _measureFloorPlanWidth && typeof _measureFloorPlanWidth === 'function' ? _measureFloorPlanWidth() : 320;
   grid.innerHTML = tables.length
-    ? tables.map(t => {
-        const b = bookingByTable[t.name];
-        return b ? _renderOccupiedTile(t, b, now) : _renderEmptyTile(t);
-      }).join('')
-    : `<div style="grid-column:1/-1;padding:20px;text-align:center;color:var(--gu-dust);font-size:13px;">No tables in ${room} yet.</div>`;
+    ? _renderElegantRoomSVG(room, tables, bookingByTable, true, roomWidth)
+    : `<div style="padding:20px;text-align:center;color:var(--gu-dust);font-size:13px;">No tables in ${room} yet.</div>`;
 
   panel.style.display = 'flex';
 }
@@ -32170,7 +32169,7 @@ if (typeof window !== 'undefined' && typeof window._manualFloorSync !== 'functio
         <div style="font-size:11px;color:rgba(184,121,70,0.7);" id="floor-room-panel-sub"></div>
       </div>
     </div>
-    <div id="floor-room-panel-grid" style="flex:1;overflow-y:auto;padding:10px;display:grid;gap:8px;grid-template-columns:1fr 1fr;align-content:start;background:#1A1714;"></div>
+    <div id="floor-room-panel-grid" style="flex:1;overflow-x:auto;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:16px;background:#1A1714;-webkit-overflow-scrolling:touch;"></div>
   </div>
 <div id="booking-modal" style="display:none;position:fixed;right:0;top:0;bottom:0;z-index:9500;width:min(100%,480px);padding-top:env(safe-area-inset-top, 0px);padding-bottom:env(safe-area-inset-bottom, 0px);box-sizing:border-box;background:linear-gradient(180deg,#1C1814,#1A1714);border-left:1px solid rgba(184,121,70,0.2);flex-direction:column;box-shadow:-12px 0 40px rgba(0,0,0,0.6);animation:slide-in-right 0.3s ease;">
     
