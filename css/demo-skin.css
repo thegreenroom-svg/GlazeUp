@@ -435,6 +435,29 @@ html.demo-skin .kc-floor-all {
 }
 html.demo-skin .kc-floor-all:active { opacity: 0.6; }
 
+/* THE DESK — the shortcuts as Apple-home squares. Tap one, its screen
+   slides in. A clean 3-across grid of rounded tiles. */
+html.demo-skin .kc-index {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+}
+html.demo-skin .kc-tile {
+  aspect-ratio: 1 / 1; border: 1px solid var(--m-border, #ece7e0); border-radius: 20px; cursor: pointer;
+  background: var(--m-surface, #fff);
+  box-shadow: var(--m-shadow, 0 8px 20px -12px rgba(0,0,0,0.22));
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; padding: 10px; text-align: center;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+html.demo-skin .kc-tile:active {
+  transform: scale(0.95);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+html.demo-skin .kc-tile-i { font-size: 30px; line-height: 1; }
+html.demo-skin .kc-tile-l {
+  font-size: 12px; font-weight: 700; color: var(--m-text, #2B2724);
+  line-height: 1.15; letter-spacing: -0.01em;
+}
+
 /* Day navigation header — arrows + calendar + today, right-aligned. */
 html.demo-skin .kc-day-head {
   display: flex; align-items: center; justify-content: space-between;

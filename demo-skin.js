@@ -246,18 +246,27 @@
         ${s.items.map(indexRow).join('')}
       </div>`).join('') || '<div class="kc-empty">Nothing here yet.</div>';
   };
+  // A single Apple-style square tile: big icon, short label. Tap opens
+  // its screen. Used for THE DESK grid on the landing.
+  function indexTile(item) {
+    return `<button class="kc-tile" onclick="KC.go('${item.id}', ${item.fn ? `'${item.fn}'` : 'null'})">
+      <span class="kc-tile-i">${item.icon || '◻︎'}</span>
+      <span class="kc-tile-l">${item.label}</span>
+    </button>`;
+  }
   KC._renderIndex = function () {
-    // The desk index: the six things a shift actually reaches for.
+    // The desk index: the things a shift actually reaches for, as a grid
+    // of squares — tap one, its screen slides in. Apple-home feel.
     const picks = [
-      { id: 'staff', fn: null, label: 'Bookings', desc: 'Start, walk-in, party' },
-      { id: 'collections', fn: 'openCollections', label: 'Collections', desc: 'Ready to go home' },
-      { id: 'packing', fn: 'openPacking', label: 'Packing', desc: 'Wrap the fired pieces' },
-      { id: 'piecematch', fn: null, label: 'Piece matching', desc: 'Photo to booking' },
-      { id: 'team', fn: null, label: 'Team & duties', desc: 'Who does what today' },
-      { id: 'tell-daisy', fn: 'openTellPicker', label: 'Tell Daisy', desc: 'Good or bad, say it' },
+      { id: 'staff', fn: null, label: 'Bookings', icon: '🪑', desc: 'Start, walk-in, party' },
+      { id: 'collections', fn: 'openCollections', label: 'Collections', icon: '📦', desc: 'Ready to go home' },
+      { id: 'packing', fn: 'openPacking', label: 'Packing', icon: '🎁', desc: 'Wrap the fired pieces' },
+      { id: 'piecematch', fn: null, label: 'Piece matching', icon: '🔍', desc: 'Photo to booking' },
+      { id: 'team', fn: null, label: 'Team & duties', icon: '👥', desc: 'Who does what today' },
+      { id: 'tell-daisy', fn: 'openTellPicker', label: 'Tell Daisy', icon: '💬', desc: 'Good or bad, say it' },
     ];
-    if (isDirector()) picks.push({ id: 'daily-digest', fn: 'openDailyDigest', label: 'Daily digest', desc: 'Yesterday · the week · what’s next' });
-    $('kc-index').innerHTML = picks.map(indexRow).join('');
+    if (isDirector()) picks.push({ id: 'daily-digest', fn: 'openDailyDigest', label: 'Daily digest', icon: '📊', desc: 'Yesterday · the week · what’s next' });
+    $('kc-index').innerHTML = picks.map(indexTile).join('');
   };
 
   /* ── jump search over the real nav + real tables ─────────────── */
