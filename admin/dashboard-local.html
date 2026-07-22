@@ -16775,8 +16775,8 @@ function openRoomPanel(room) {
     });
   } catch (e) {}
 
-  const roomColor = room === 'Lounge' ? '#00BFA5' : '#9575CD';
-  const roomCapacity = room === 'Lounge' ? 'Modular seating · up to 12' : 'Private room · up to 14';
+  const roomColor = room === 'Lounge' ? '#00BFA5' : (room === 'The Vault' ? '#9575CD' : '#D4A574');
+  const roomCapacity = room === 'Lounge' ? 'Modular seating · up to 12' : (room === 'The Vault' ? 'Private room · up to 14' : 'Tables 1–8 · up to 20');
   title.textContent = room;
   const sub = document.getElementById('floor-room-panel-sub');
   if (sub) sub.textContent = roomCapacity;
