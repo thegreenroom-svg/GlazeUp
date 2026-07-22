@@ -16781,81 +16781,22 @@ function openRoomPanel(room) {
   const sub = document.getElementById('floor-room-panel-sub');
   if (sub) sub.textContent = roomCapacity;
 
-  // One clean page: for each table in this room, who's booked NEXT and when.
-  // Tap a table to open its booking / next step. Live seated sessions show
-  // as "in now"; everything else shows the next upcoming booking or "free".
   const now = new Date();
-  const tables = _floorData.tables.filter(t => t.room === room);
-
-  // Bucket bookings by table: the earliest still-relevant one per table
-  // (currently seated, or the next one coming up today/tomorrow).
-  const nextByTable = {};
+  const bookingByTable = {};
   (_floorData.bookings || []).forEach(b => {
-    if (!b.table_number) return;
     const start = b.session_start ? new Date(b.session_start) : null;
-    if (!start) return;
-    const key = b.table_number;
-    const cur = nextByTable[key];
-    // Keep the currently-seated one, else the soonest upcoming.
-    const isLive = start <= now;
-    if (!cur) { nextByTable[key] = { b, start, isLive }; return; }
-    if (isLive && !cur.isLive) { nextByTable[key] = { b, start, isLive }; return; }
-    if (isLive === cur.isLive && start < cur.start) nextByTable[key] = { b, start, isLive };
+    if (start && start <= now && b.table_number) _assignBookingToTable(bookingByTable, b);
   });
 
-  const fmtWhen = (d) => {
-    const today = new Date(); today.setHours(0,0,0,0);
-    const day = new Date(d); day.setHours(0,0,0,0);
-    const t = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-    const diff = Math.round((day - today) / 86400000);
-    if (diff === 0) return t;
-    if (diff === 1) return 'tmw ' + t;
-    return d.toLocaleDateString('en-GB', { weekday: 'short' }) + ' ' + t;
-  };
-
+  const tables = _floorData.tables.filter(t => t.room === room);
   grid.innerHTML = tables.length
     ? tables.map(t => {
-        const nx = nextByTable[t.name];
-        const live = nx && nx.isLive;
-        const name = nx ? (nx.b.customer_name || 'Booking') : null;
-        const when = nx ? fmtWhen(nx.start) : null;
-        const accent = live ? '#2e7d32' : (nx ? '#B87946' : '#c8c2b8');
-        const status = live ? 'In now' : (nx ? 'Next up' : 'Free');
-        const codeAttr = nx && nx.b.booking_code ? nx.b.booking_code : '';
-        return `<button onclick="${nx ? `_openRoomBooking('${codeAttr}','${(name||'').replace(/'/g,'')}')` : 'void 0'}"
-          style="text-align:left;border:none;border-radius:16px;padding:16px;cursor:${nx?'pointer':'default'};
-            background:${live?'rgba(46,125,50,0.10)':nx?'rgba(184,121,70,0.08)':'rgba(255,255,255,0.5)'};
-            border-left:4px solid ${accent};display:flex;flex-direction:column;gap:4px;">
-          <div style="font-size:10px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:${accent};">${t.name} · ${status}</div>
-          ${nx
-            ? `<div style="font-size:17px;font-weight:800;color:#F4ECE0;">${name}</div>
-               <div style="font-size:12px;color:rgba(244,236,224,0.7);">${live ? 'painting now' : when}</div>`
-            : `<div style="font-size:14px;color:rgba(244,236,224,0.5);">Nothing booked</div>`}
-        </button>`;
+        const b = bookingByTable[t.name];
+        return b ? _renderOccupiedTile(t, b, now) : _renderEmptyTile(t);
       }).join('')
     : `<div style="grid-column:1/-1;padding:20px;text-align:center;color:var(--gu-dust);font-size:13px;">No tables in ${room} yet.</div>`;
 
   panel.style.display = 'flex';
-}
-
-// Tap a table on the room page → open that booking (the next page in the
-// flow). Uses the same lookup the booking screen uses; falls back to the
-// bookings screen if we don't have a code to jump straight in.
-function _openRoomBooking(code, name) {
-  try { closeRoomPanel(); } catch (e) {}
-  if (code && typeof goToTab === 'function') {
-    goToTab('staff');
-    setTimeout(() => {
-      try {
-        if (typeof s1ChooseExisting === 'function') s1ChooseExisting();
-        const inp = document.getElementById('s1-booking-code');
-        if (inp) { inp.value = code; }
-        if (typeof lookupBookingSection1 === 'function') lookupBookingSection1();
-      } catch (e) { console.warn('open room booking', e); }
-    }, 80);
-  } else if (typeof goToTab === 'function') {
-    goToTab('staff');
-  }
 }
 
 function closeRoomPanel() {

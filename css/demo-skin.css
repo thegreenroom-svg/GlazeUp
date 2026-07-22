@@ -570,13 +570,13 @@ html.demo-skin #kc-dock {
   backdrop-filter: blur(10px);
 }
 html.demo-skin .kc-dock-b {
-  flex: 1; background: none; border: none; color: var(--kc-paper); cursor: pointer;
+  flex: 1; background: none; border: none; color: #F4F1ED; cursor: pointer;
   display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 5px 0;
   border-radius: 14px; transition: transform 0.12s cubic-bezier(0.34, 1.6, 0.64, 1);
 }
 html.demo-skin .kc-dock-b:active { transform: scale(0.88); }
-html.demo-skin .kc-dock-b svg { width: 21px; height: 21px; }
-html.demo-skin .kc-dock-b span { font-size: 9.5px; letter-spacing: 0.06em; font-weight: 700; opacity: 0.85; }
+html.demo-skin .kc-dock-b svg { width: 21px; height: 21px; color: #F4F1ED; }
+html.demo-skin .kc-dock-b span { font-size: 9.5px; letter-spacing: 0.06em; font-weight: 700; opacity: 1; color: #F4F1ED; }
 
 /* ── THE JUMP ── */
 html.demo-skin #kc-jump-fab {
