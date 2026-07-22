@@ -19672,9 +19672,9 @@ function applyShiftUI() {
   // tapping it would incorrectly try to START a new break instead of
   // ending the real one already in progress — precisely backwards.
   updateBreakUI();
-  initCleoAdminFloatingWidget();
-  startTaskPolling();
-  loadActiveBookingsStrip();
+  try { initCleoAdminFloatingWidget(); } catch (e) { console.warn('applyShiftUI: cleo widget', e); }
+  try { startTaskPolling(); } catch (e) { console.warn('applyShiftUI: task polling', e); }
+  try { loadActiveBookingsStrip(); } catch (e) { console.warn('applyShiftUI: bookings strip', e); }
   clearInterval(window._activeBookingsStripTimer);
   window._activeBookingsStripTimer = setInterval(loadActiveBookingsStrip, 30 * 1000);
   // Load floor plan and check if it should be the home screen
@@ -19696,7 +19696,7 @@ function applyShiftUI() {
   //
   // 5 min for the sync (Square rate limits aggressive polling),
   // 30s for the floor plan (so a tap-to-seat updates everyone's screen).
-  loadFloorPlan().then(() => _checkFloorPlanMode());
+  try { loadFloorPlan().then(() => _checkFloorPlanMode()).catch(() => {}); } catch (e) { console.warn('applyShiftUI: floor plan', e); }
   clearInterval(window._floorPlanTimer);
   clearInterval(window._squareSyncTimer);
 
@@ -31910,6 +31910,22 @@ if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', _syncShellBack);
   _syncShellBack();
 })();
+
+// Guaranteed top-level definition of _manualFloorSync. The real one is
+// assigned inside applyShiftUI() (it closes over that scope's sync
+// helpers) and only exists AFTER a shift is active. But the floor-sync
+// button's onclick references it, and any startup path that touches it
+// before a shift begins — or any earlier throw inside applyShiftUI that
+// prevents its assignment — surfaced as "Can't find variable:
+// _manualFloorSync" and took the whole app down at boot. Defining a safe
+// no-op-ish fallback here at top level means the reference ALWAYS
+// resolves; applyShiftUI overwrites it with the full version once live.
+if (typeof window !== 'undefined' && typeof window._manualFloorSync !== 'function') {
+  window._manualFloorSync = async function () {
+    try { if (typeof loadFloorPlan === 'function') await loadFloorPlan(); }
+    catch (e) { console.warn('_manualFloorSync fallback:', e); }
+  };
+}
 
 </script>
 
