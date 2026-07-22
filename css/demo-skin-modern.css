@@ -298,3 +298,46 @@ html.demo-skin .skeleton-line, html.demo-skin .kc-skel-t {
     background-size: 200% 100% !important;
   }
 }
+
+/* ═══ SPECIFICITY PATCH — beat the warm skin's stronger selectors ═══ */
+
+/* Re-point every remaining warm token so old rules resolve modern */
+html.demo-skin {
+  --gu-secondary: var(--m-bg) !important;   /* was blush pink page bg */
+  --kc-paper: var(--m-bg);                  /* was cream */
+  --kc-blush: var(--m-accent-soft);
+}
+
+/* The page column itself — grey paper, not cream */
+html.demo-skin .view { background: var(--m-bg) !important; }
+
+/* Deep.css declared these at higher specificity — match and win */
+html.demo-skin .view h2,
+html.demo-skin .view h3,
+html.demo-skin .dashboard-section h3,
+html.demo-skin .stock-section h3,
+html.demo-skin .staff-section h3,
+html.demo-skin .setup-section h3,
+html.demo-skin .chart-container h3,
+html.demo-skin .setup-card h4 {
+  font-family: var(--m-font) !important;
+  color: var(--m-text) !important;
+  letter-spacing: -0.02em !important;
+}
+html.demo-skin .view h2 { font-size: 28px !important; font-weight: 800 !important; }
+
+/* Tile labels — kill the serif at its exact selector */
+html.demo-skin .glaze-tile span[style*="font-size"] {
+  font-family: var(--m-font) !important;
+  font-weight: 600 !important;
+}
+
+/* App header wordmark + all header text */
+html.demo-skin .admin-header,
+html.demo-skin .admin-header * ,
+html.demo-skin header * {
+  font-family: var(--m-font) !important;
+}
+
+/* Old wave motif backgrounds — clean them off */
+html.demo-skin .kc-wave { background-image: none !important; }
