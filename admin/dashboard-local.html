@@ -15825,7 +15825,7 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
            fill="${INK}">${(b.customer_name || '').split(' ')[0]}</text>
          ${bTime ? `<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 + 15}"
            text-anchor="middle" font-family="'Architects Daughter',cursive"
-           font-size="${tappable ? 8 : 10}" fill="${accent}">${bTime}</text>`
+           font-size="${tappable ? 8 : 10}" fill="${accent}">${bTime}${(!tappable && !_seatingBooking) ? ' · tap to open' : ''}</text>`
           : `<text x="${t.x + t.size.w / 2}" y="${t.y + t.size.h / 2 + 15}"
            text-anchor="middle" font-family="'Architects Daughter',cursive"
            font-size="${tappable ? 7 : 9}" fill="${accent}" fill-opacity="0.9">${
@@ -15847,7 +15847,7 @@ function _renderElegantRoomSVG(roomName, list, bookingByTable, tappable, roomWid
     // needs you, touch it". An upcoming one gets a quieter hollow cue.
     // Only when !tappable and not mid-seating, so it never clutters the
     // home overview or fights the seat-a-guest flow.
-    const tapCue = (busy && !tappable && !_seatingBooking)
+    const tapCue = (busy && !tappable && !_seatingBooking && !bTime)
       ? `<g opacity="${b.is_live ? '0.95' : '0.6'}">
            <circle cx="${t.x + t.size.w/2 - 30}" cy="${t.y + t.size.h - 15}" r="3"
              fill="${b.is_live ? accent : 'none'}" stroke="${accent}" stroke-width="1.2"/>
@@ -17355,29 +17355,30 @@ function renderDetailChecklist() {
         ${{ booking:'📋 Booking', engagement:'🎨 Painting', completion:'📷 Completion', kiln:'🔥 Kiln' }[stage]} checklist
       </div>
       <button onclick="window._detailChecklistEditMode = !window._detailChecklistEditMode; renderDetailChecklist();"
-        style="background:${editMode ? 'rgba(184,121,70,0.25)' : 'rgba(255,255,255,0.06)'};
-          border:1px solid ${editMode ? 'rgba(184,121,70,0.5)' : 'rgba(255,255,255,0.12)'};
-          color:${editMode ? '#B87946' : 'rgba(255,255,255,0.5)'};border-radius:8px;
+        style="background:${editMode ? 'rgba(184,121,70,0.15)' : 'transparent'};
+          border:1.5px solid ${editMode ? '#B87946' : 'rgba(43,39,36,0.2)'};
+          color:${editMode ? '#B87946' : 'rgba(43,39,36,0.55)'};border-radius:8px;
           padding:5px 10px;font-size:10px;font-weight:700;cursor:pointer;">
         ${editMode ? '✓ Done editing' : '✎ Edit list'}
       </button>
     </div>
     ${checks.map((c, i) => {
       const done = !!b.checks?.[`${stage}:${c.key}`];
-      return `<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px;">
+      return `<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px;">
         <button class="glaze-tile" onclick="toggleFlowCheck('${b.booking_code}','${stage}','${c.key}',${!done})"
           style="width:100%;text-align:left;
-            background:${done ? 'rgba(76,175,80,0.1)' : 'rgba(255,255,255,0.04)'};
-            border:1px solid ${done ? 'rgba(76,175,80,0.35)' : 'rgba(255,255,255,0.1)'};
-            border-radius:10px;padding:10px 12px;cursor:pointer;
-            display:flex;align-items:center;gap:10px;">
-          <span style="font-size:18px;">${done ? '✅' : '⬜'}</span>
+            background:${done ? 'rgba(46,125,50,0.08)' : '#FFFDF9'};
+            border:1.5px solid ${done ? 'rgba(46,125,50,0.45)' : 'rgba(43,39,36,0.16)'};
+            border-radius:12px;padding:12px 14px;cursor:pointer;
+            box-shadow:0 1px 4px rgba(43,39,36,0.05);
+            display:flex;align-items:center;gap:12px;">
+          <span style="font-size:17px;width:24px;text-align:center;color:${done ? '#2e7d32' : '#B87946'};font-weight:700;">${done ? '✓' : '○'}</span>
           <div>
-            <div style="font-size:13px;font-weight:600;
-              color:${done ? '#4CAF50' : '#F4ECE0'};
+            <div style="font-size:14px;font-weight:600;
+              color:${done ? '#2e7d32' : '#2B2724'};
               text-decoration:${done ? 'line-through' : 'none'};
-              opacity:${done ? 0.6 : 1};">${c.label}</div>
-            ${c.description ? `<div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;">${c.description}</div>` : ''}
+              opacity:${done ? 0.55 : 1};">${c.label}</div>
+            ${c.description ? `<div style="font-size:10px;color:rgba(43,39,36,0.5);margin-top:2px;">${c.description}</div>` : ''}
           </div>
         </button>
         ${editMode ? `<!-- Edit controls only when the person opted into edit mode. -->
@@ -17397,7 +17398,7 @@ function renderDetailChecklist() {
         </div>` : ''}
       </div>`;
     }).join('')}
-    <button class="glaze-tile" onclick="openBookingAtRealStage('${b.booking_code}','${stage}')"
+    <button class="glaze-tile" onclick="document.getElementById('floor-table-detail').style.display='none'; if(window.KC&&KC.hideCanvas)KC.hideCanvas(); openBookingAtRealStage('${b.booking_code}','${stage}')"
       style="width:100%;background:linear-gradient(135deg,${stageColor},${stageColor}cc);
         color:white;border:none;border-radius:12px;padding:12px;
         font-size:13px;font-weight:800;cursor:pointer;margin-top:4px;
@@ -32112,20 +32113,20 @@ if (typeof window !== 'undefined' && typeof window._manualFloorSync !== 'functio
      inside #floor-plan-view meant they briefly flashed dark every time
      the floor plan opened, before loadFloorPlan() could render.
      Moved to body level where they belong. -->
-<div id="floor-table-detail" style="display:none;position:fixed;inset:0;z-index:6000;background:#1A1714;flex-direction:column;">
-    <div style="background:linear-gradient(135deg,#1C1814 0%,#2B2118 100%);padding:max(14px,calc(env(safe-area-inset-top) + 8px)) 16px 14px;flex-shrink:0;border-bottom:1px solid rgba(184,121,70,0.3);">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-        <div id="detail-table-name" style="font-size:19px;font-weight:800;color:#F4ECE0;padding-left:52px;"></div>
+<div id="floor-table-detail" style="display:none;position:fixed;inset:0;z-index:9550;background:#FFF9F0;flex-direction:column;">
+    <div style="background:#FFF9F0;padding:max(14px,calc(env(safe-area-inset-top) + 8px)) 16px 12px;flex-shrink:0;border-bottom:1.5px solid rgba(43,39,36,0.14);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <div id="detail-table-name" style="font-family:'Architects Daughter',cursive;font-size:22px;font-weight:700;color:#2B2724;padding-left:52px;"></div>
         <button onclick="closeTableDetail()" class="glaze-tile"
-          style="background:none;border:1px solid rgba(184,121,70,0.4);color:#F4ECE0;border-radius:10px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">
+          style="background:#2B2724;border:none;color:#FFF9F0;border-radius:12px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;">
           ← Home
         </button>
       </div>
-      <div id="detail-booking-info" style="font-size:11px;color:rgba(184,121,70,0.85);margin-bottom:8px;"></div>
-      <div style="height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;">
+      <div id="detail-booking-info" style="font-size:12px;color:#B87946;font-weight:600;margin-bottom:8px;padding-left:52px;"></div>
+      <div style="height:4px;background:rgba(43,39,36,0.08);border-radius:2px;overflow:hidden;">
         <div id="detail-progress-bar" style="height:100%;width:0%;background:#B87946;transition:width 1s linear;"></div>
       </div>
-      <div id="detail-time-remaining" style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:4px;"></div>
+      <div id="detail-time-remaining" style="font-size:10px;color:rgba(43,39,36,0.45);margin-top:4px;"></div>
     </div>
 
     <div style="flex:0 0 auto;display:flex;flex-direction:column;overflow:hidden;">
@@ -32153,7 +32154,7 @@ if (typeof window !== 'undefined' && typeof window._manualFloorSync !== 'functio
       <div id="detail-canvas-wrap" style="display:none;position:relative;flex:1;min-height:260px;overflow:hidden;"></div>
       <!-- Stage checklist + "Open full booking" into the real tile system -->
       <div id="detail-checklist" style="flex:1 1 auto;overflow-y:auto;padding:14px 16px;
-        background:linear-gradient(0deg,#1C1814 0%,#1A1714 100%);border-top:1px solid rgba(184,121,70,0.2);"></div>
+        background:#FFF9F0;"></div>
     </div>
   </div>
 <div id="seed-table-choice-modal" style="display:none;position:fixed;inset:0;z-index:6100;
