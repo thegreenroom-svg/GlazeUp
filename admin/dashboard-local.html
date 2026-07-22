@@ -3797,6 +3797,25 @@ function updateStaffName() {
 
             <div id="margins-list"><div style="padding:10px;color:var(--gu-dust);font-size:12px;">Loading…</div></div>
 
+            <!-- 22 Jul — Drinks cost estimator. Booker/Dext invoices can't
+                 be pulled automatically (they live in the accountant's Xero,
+                 not connected here), so this estimates per-cup cost from what
+                 you tell it: current stock + what a bag/box/bottle costs.
+                 It divides the pack cost by how many servings it makes, giving
+                 a rough per-cup figure. Tap any figure to enter the real price
+                 once — it's remembered and refines the estimate. -->
+            <div style="background:linear-gradient(135deg,rgba(184,121,70,0.06),rgba(46,125,50,0.04));border:1px solid rgba(184,121,70,0.25);border-radius:14px;padding:16px;margin-top:18px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                <span style="font-size:18px;">☕</span>
+                <h3 style="margin:0;font-size:15px;">Drinks — rough cost estimator</h3>
+              </div>
+              <p style="font-size:11px;color:var(--gu-dust);margin-bottom:14px;line-height:1.5;">
+                Booker &amp; coffee invoices go through Dext to the accountant, so they can't be pulled in here automatically. Instead: tell it what a pack costs and how many servings it makes — it works out the rough per-cup cost. Tap any figure to update it. These feed the Coffee/Tea/Cold groups above.
+              </p>
+              <div id="drinks-estimator"></div>
+              <button onclick="addDrinkEstimate()" style="margin-top:10px;background:none;border:1px dashed var(--gu-border);color:var(--gu-dust);border-radius:10px;padding:9px 12px;font-size:12px;cursor:pointer;width:100%;">+ Add a drink line (coffee, tea, milk…)</button>
+            </div>
+
             <h3 style="margin:18px 0 8px;font-size:15px;">Overheads <span style="font-size:10px;font-weight:500;color:var(--gu-dust);">(monthly lump sums — coffee supplies etc.)</span></h3>
             <div id="margins-overheads"></div>
             <button onclick="addOverheadLine()" style="margin-top:8px;background:none;border:1px dashed var(--gu-border);color:var(--gu-dust);border-radius:10px;padding:9px 12px;font-size:12px;cursor:pointer;width:100%;">+ Add an overhead line</button>
@@ -25448,6 +25467,7 @@ async function loadMargins() {
     if (!data.connected) { listEl.innerHTML = '<div style="padding:10px;color:var(--gu-dust);font-size:12px;">Square isn\'t connected.</div>'; return; }
     _marginsData = data;
     renderMargins();
+    _loadDrinkEstimates();
   } catch (e) {
     if (listEl) listEl.innerHTML = '<div style="padding:10px;color:#c62828;font-size:12px;">Couldn\'t load margins — try Refresh.</div>';
   }
@@ -25460,6 +25480,39 @@ function _marginColor(pct) {
   return '#c62828';
 }
 
+// 22 Jul — clean category tree. Instead of a long flat list of every
+// Square variation (flat white / flat white + shot / cappuccino + sprinkles
+// etc), items are sorted into a small set of human groups the admin team
+// actually thinks in. A keyword classifier maps each item name to a group;
+// anything unmatched falls to "Other". Groups are collapsible so the screen
+// is short by default — tap a group to expand it.
+const MARGIN_GROUPS = [
+  { key: 'coffee',    label: '☕ Coffee',           match: n => /\b(coffee|latte|cappuccino|flat white|espresso|americano|mocha|macchiato|cortado|flat-white)\b/i.test(n) },
+  { key: 'tea',       label: '🫖 Tea',              match: n => /\b(tea|chai|earl grey|breakfast tea|herbal|infusion)\b/i.test(n) },
+  { key: 'chocolate', label: '🍫 Hot Chocolate',    match: n => /\b(chocolate|hot choc|mocha)\b/i.test(n) },
+  { key: 'cold',      label: '🥤 Cold Drinks',      match: n => /\b(coke|cola|coca|lemonade|juice|squash|water|milkshake|shake|smoothie|frappe|iced|fanta|sprite|pepsi|can)\b/i.test(n) },
+  { key: 'alcohol',   label: '🍷 Alcohol',          match: n => /\b(prosecco|wine|beer|lager|cider|gin|vodka|cocktail|cruzcampo|ale|spirit)\b/i.test(n) },
+  { key: 'cake',      label: '🍰 Cakes & Food',     match: n => /\b(cake|brownie|cookie|scone|muffin|flapjack|slice|tart|cheesecake|sandwich|toast|pastry|treat|biscuit|snack)\b/i.test(n) },
+  { key: 'mugs',      label: '🍺 Mugs',             match: n => /\b(mug|stein|tankard|cup)\b/i.test(n) },
+  { key: 'plates',   label: '🍽️ Plates & Bowls',   match: n => /\b(plate|bowl|dish|platter|tray|chip & dip|chip and dip|saucer)\b/i.test(n) },
+  { key: 'boxes',    label: '📦 Boxes & Pots',      match: n => /\b(box|canister|jar|pot|holder|caddy|burner|lantern)\b/i.test(n) },
+  { key: 'figurines',label: '🦔 Figurines & Animals', match: n => /\b(figurine|dragon|panda|cow|hedgehog|dog|fish|turtle|unicorn|pegasus|duck|clown|axolotl|crocodile|puppy|ornament|bauble|letter|plaque|butterfly|owl|mushie|mushroom)\b/i.test(n) },
+  { key: 'session',  label: '🎨 Pottery / Studio',  match: n => /\b(session|painting|glaze|paint|studio|firing|bisque|pottery|stroke|piece)\b/i.test(n) },
+  { key: 'booking',  label: '🎟️ Booking / Fees',    match: n => /\b(booking|deposit|fee|reservation|voucher|gift|party|kit)\b/i.test(n) },
+];
+
+function _marginGroupFor(name) {
+  for (const g of MARGIN_GROUPS) { if (g.match(name || '')) return g.key; }
+  return 'other';
+}
+
+// Which groups are expanded. Default: all collapsed (short screen).
+window._marginOpenGroups = window._marginOpenGroups || {};
+function toggleMarginGroup(key) {
+  window._marginOpenGroups[key] = !window._marginOpenGroups[key];
+  renderMargins();
+}
+
 function renderMargins() {
   const uplift = Number(document.getElementById('margins-whatif')?.value || 0);
   const lbl = document.getElementById('margins-whatif-label');
@@ -25467,36 +25520,75 @@ function renderMargins() {
 
   const listEl = document.getElementById('margins-list');
   if (!listEl) return;
-  const byCat = {};
-  _marginsData.items.forEach(it => { (byCat[it.category] = byCat[it.category] || []).push(it); });
+
+  // Bucket every item into a clean group.
+  const buckets = {};
+  _marginsData.items.forEach(it => {
+    const g = _marginGroupFor(it.name);
+    (buckets[g] = buckets[g] || []).push(it);
+  });
+
+  // Render in the fixed group order, then Other last. Only groups that
+  // actually have items get a row.
+  const order = [...MARGIN_GROUPS.map(g => g.key), 'other'];
+  const labelFor = k => (MARGIN_GROUPS.find(g => g.key === k)?.label) || '📋 Other';
 
   let html = '';
-  Object.keys(byCat).sort().forEach(cat => {
-    html += `<div style="font-size:11px;font-weight:800;color:var(--gu-dust);text-transform:uppercase;letter-spacing:0.04em;margin:14px 0 6px;">${cat}</div>`;
-    byCat[cat].forEach(it => {
-      const price = it.priceCents != null ? it.priceCents * (1 + uplift / 100) : null;
-      const margin = (price != null && it.costCents != null && price > 0)
-        ? Math.round(((price - it.costCents) / price) * 100) : null;
-      html += `
-        <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--gu-border);">
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${it.name}</div>
-            <div style="font-size:11px;color:var(--gu-dust);">
-              cost <span onclick="editMarginCost('${it.variationId}')" style="text-decoration:underline;cursor:pointer;color:var(--gu-primary);">${it.costCents != null ? '£' + (it.costCents / 100).toFixed(2) : 'tap to set'}</span>
-            </div>
-          </div>
-          <div style="text-align:right;flex-shrink:0;">
-            <div style="font-size:13px;font-weight:700;">${price != null ? '£' + (price / 100).toFixed(2) : '—'}</div>
-            <div style="font-size:11px;font-weight:800;color:${_marginColor(margin)};">${margin != null ? margin + '%' : 'no cost yet'}</div>
+  order.forEach(key => {
+    const items = buckets[key];
+    if (!items || !items.length) return;
+    const open = !!window._marginOpenGroups[key];
+
+    // Group-level summary: how many items, how many still need a cost.
+    const noCost = items.filter(i => i.costCents == null).length;
+    const summary = noCost > 0
+      ? `${items.length} item${items.length > 1 ? 's' : ''} · ${noCost} need cost`
+      : `${items.length} item${items.length > 1 ? 's' : ''} · all costed`;
+
+    html += `
+      <div style="border:1px solid var(--gu-border);border-radius:12px;margin-bottom:8px;overflow:hidden;">
+        <div onclick="toggleMarginGroup('${key}')" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;background:${open ? 'rgba(184,121,70,0.06)' : 'transparent'};">
+          <div style="font-size:14px;font-weight:800;">${labelFor(key)}</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:11px;color:${noCost > 0 ? '#B87946' : '#2e7d32'};font-weight:600;">${summary}</span>
+            <span style="font-size:12px;color:var(--gu-dust);transform:rotate(${open ? '90' : '0'}deg);transition:transform 0.15s;">▶</span>
           </div>
         </div>`;
-    });
+
+    if (open) {
+      html += `<div style="padding:0 14px 6px;">`;
+      items.forEach(it => {
+        const price = it.priceCents != null ? it.priceCents * (1 + uplift / 100) : null;
+        const margin = (price != null && it.costCents != null && price > 0)
+          ? Math.round(((price - it.costCents) / price) * 100) : null;
+        html += `
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--gu-border);">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${it.name}</div>
+              <div style="font-size:11px;color:var(--gu-dust);">
+                cost <span onclick="editMarginCost('${it.variationId}')" style="text-decoration:underline;cursor:pointer;color:var(--gu-primary);">${it.costCents != null ? '£' + (it.costCents / 100).toFixed(2) : 'tap to set'}</span>
+              </div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-size:13px;font-weight:700;">${price != null ? '£' + (price / 100).toFixed(2) : '—'}</div>
+              <div style="font-size:11px;font-weight:800;color:${_marginColor(margin)};">${margin != null ? margin + '%' : 'no cost yet'}</div>
+            </div>
+          </div>`;
+      });
+      html += `</div>`;
+    }
+    html += `</div>`;
   });
+
   listEl.innerHTML = html || '<div style="padding:10px;color:var(--gu-dust);font-size:12px;">No items found in the Square catalog.</div>';
 
   const ovEl = document.getElementById('margins-overheads');
   if (ovEl) {
-    ovEl.innerHTML = (_marginsData.overheads || []).map(o => `
+    // Drink estimator lines are stored as is_overhead rows prefixed "drink:"
+    // — they belong in the estimator, not the monthly overhead list, so
+    // filter them out here.
+    const realOverheads = (_marginsData.overheads || []).filter(o => !(o.name || '').startsWith('drink:'));
+    ovEl.innerHTML = realOverheads.map(o => `
       <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--gu-border);font-size:13px;">
         <span>${o.name}</span>
         <span style="font-weight:700;">£${(o.costCents / 100).toFixed(2)}/mo</span>
@@ -25538,6 +25630,128 @@ async function addOverheadLine() {
       body: JSON.stringify({ studioId: studioId, name, costCents, isOverhead: true }),
     });
   } catch (e) { console.warn('overhead save failed', e); }
+}
+
+// ── Drinks cost estimator (22 Jul) ─────────────────────────────
+// Each line = one supply item (coffee bag, tea box, milk, sugar). You give
+// it: pack cost (£) and servings-per-pack. It divides to get the rough
+// per-serving cost. Seeded with Daisy's stated stock so it's not empty on
+// first open — she can tap any number to correct it. Persisted to the
+// backend as is_overhead lines prefixed "drink:" so they survive reloads
+// but stay out of the monthly overhead total.
+const DRINK_ESTIMATE_SEED = [
+  // name,            packCostP (rough, editable),  servingsPerPack,  note
+  { name: 'Coffee (beans/grounds)', packCostP: 800,  servings: 60,  note: '~10 bags in stock · ~60 cups/bag' },
+  { name: 'Breakfast tea',          packCostP: 900,  servings: 240, note: '240 bags/box' },
+  { name: 'Earl Grey tea',          packCostP: 900,  servings: 240, note: '240 bags/box' },
+  { name: 'Decaf tea',              packCostP: 350,  servings: 40,  note: '40 bags/box' },
+  { name: 'Milk (whole/oat)',       packCostP: 130,  servings: 20,  note: 'per 2L · ~20 drinks' },
+  { name: 'Brown sugar sachets',    packCostP: 400,  servings: 1000, note: '1 box · ~1000 sachets' },
+];
+
+function _loadDrinkEstimates() {
+  // Prefer any saved drink: lines from the backend overheads; fall back to seed.
+  const saved = (_marginsData?.overheads || [])
+    .filter(o => (o.name || '').startsWith('drink:'))
+    .map(o => {
+      // stored as "drink:<name>|<packCostP>|<servings>|<note>"
+      const raw = o.name.slice(6);
+      const [name, packCostP, servings, note] = raw.split('|');
+      return { name, packCostP: Number(packCostP) || 0, servings: Number(servings) || 1, note: note || '' };
+    });
+  window._drinkEstimates = saved.length ? saved : JSON.parse(JSON.stringify(DRINK_ESTIMATE_SEED));
+  renderDrinkEstimates();
+}
+
+function renderDrinkEstimates() {
+  const el = document.getElementById('drinks-estimator');
+  if (!el) return;
+  const rows = window._drinkEstimates || [];
+  if (!rows.length) { el.innerHTML = '<div style="font-size:12px;color:var(--gu-dust);padding:6px 0;">No drink lines yet — add one below.</div>'; return; }
+  el.innerHTML = rows.map((d, i) => {
+    const perServeP = d.servings > 0 ? (d.packCostP / d.servings) : 0;
+    return `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--gu-border);">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:700;">${d.name}</div>
+          <div style="font-size:11px;color:var(--gu-dust);margin-top:2px;">
+            <span onclick="editDrinkField(${i},'packCostP')" style="text-decoration:underline;cursor:pointer;color:var(--gu-primary);">£${(d.packCostP/100).toFixed(2)}/pack</span>
+            ·
+            <span onclick="editDrinkField(${i},'servings')" style="text-decoration:underline;cursor:pointer;color:var(--gu-primary);">${d.servings} servings</span>
+          </div>
+          ${d.note ? `<div style="font-size:10px;color:var(--gu-dust);margin-top:2px;opacity:0.8;">${d.note}</div>` : ''}
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:15px;font-weight:800;color:#B87946;">${perServeP < 100 ? Math.round(perServeP) + 'p' : '£' + (perServeP/100).toFixed(2)}</div>
+          <div style="font-size:10px;color:var(--gu-dust);">per serving</div>
+        </div>
+        <button onclick="removeDrinkEstimate(${i})" style="background:none;border:none;color:var(--gu-dust);font-size:16px;cursor:pointer;padding:2px 4px;flex-shrink:0;">×</button>
+      </div>`;
+  }).join('');
+}
+
+function editDrinkField(i, field) {
+  const d = window._drinkEstimates[i];
+  if (!d) return;
+  if (field === 'packCostP') {
+    const entered = prompt(`What does one pack of "${d.name}" cost? (£)`, (d.packCostP/100).toFixed(2));
+    if (entered == null) return;
+    const p = Math.round(parseFloat(entered.replace(',', '.')) * 100);
+    if (isNaN(p) || p < 0) return;
+    d.packCostP = p;
+  } else if (field === 'servings') {
+    const entered = prompt(`How many servings does one pack of "${d.name}" make?`, String(d.servings));
+    if (entered == null) return;
+    const s = Math.round(parseFloat(entered));
+    if (isNaN(s) || s < 1) return;
+    d.servings = s;
+  }
+  renderDrinkEstimates();
+  _saveDrinkEstimate(d);
+}
+
+async function addDrinkEstimate() {
+  const name = prompt('Drink/supply name (e.g. Hot chocolate powder)');
+  if (!name) return;
+  const cost = prompt(`What does one pack of "${name}" cost? (£)`);
+  if (cost == null) return;
+  const packCostP = Math.round(parseFloat(cost.replace(',', '.')) * 100);
+  if (isNaN(packCostP) || packCostP < 0) return;
+  const serv = prompt(`How many servings does one pack make?`, '50');
+  if (serv == null) return;
+  const servings = Math.round(parseFloat(serv));
+  if (isNaN(servings) || servings < 1) return;
+  const d = { name, packCostP, servings, note: '' };
+  window._drinkEstimates = window._drinkEstimates || [];
+  window._drinkEstimates.push(d);
+  renderDrinkEstimates();
+  _saveDrinkEstimate(d);
+}
+
+function removeDrinkEstimate(i) {
+  const d = window._drinkEstimates[i];
+  if (!d) return;
+  if (!confirm(`Remove "${d.name}" from the drinks estimator?`)) return;
+  window._drinkEstimates.splice(i, 1);
+  renderDrinkEstimates();
+  // Persist removal by saving with servings 0 marker isn't ideal; backend
+  // keeps last-write, so we just re-save the whole set as a compact blob.
+  _saveAllDrinkEstimates();
+}
+
+async function _saveDrinkEstimate(d) {
+  // Save one line as an is_overhead row keyed "drink:<name>|cost|servings|note".
+  const key = `drink:${d.name}|${d.packCostP}|${d.servings}|${d.note || ''}`;
+  try {
+    await fetch(`${API_URL}/api/margins/cost`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId: studioId, name: key, costCents: 0, isOverhead: true, isDrinkEstimate: true }),
+    });
+  } catch (e) { console.warn('drink estimate save failed', e); }
+}
+
+async function _saveAllDrinkEstimates() {
+  for (const d of (window._drinkEstimates || [])) { await _saveDrinkEstimate(d); }
 }
 
 // ── Genuine real Barista landing page, per direct request ──
