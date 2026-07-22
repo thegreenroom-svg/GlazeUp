@@ -208,6 +208,28 @@
          4. ::before — a large soft specular bloom (window reflection)
          5. ::after  — a tight diagonal wet-sheen band across the surface
        All CSS, no images, so it costs nothing and works offline. */
+    /* Admin Hub cards — 22 Jul. Consistent tappable card for the
+       director hub. Each is a coloured tile with icon + label + sub. */
+    .adminhub-card {
+      color: #fff;
+      border: none;
+      border-radius: 14px;
+      padding: 16px 12px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      text-align: left;
+      min-height: 96px;
+      justify-content: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+    .adminhub-card:active { transform: scale(0.97); box-shadow: 0 1px 3px rgba(0,0,0,0.18); }
+    .adminhub-card .ahc-label { font-size: 14px; font-weight: 800; margin-top: 2px; }
+    .adminhub-card .ahc-sub { font-size: 10.5px; opacity: 0.82; font-weight: 500; }
+
     .glaze-tile {
       position: relative;
       overflow: hidden;
@@ -3311,6 +3333,10 @@ function updateStaffName() {
         <button class="glaze-tile ghtile-mini" id="my-tiles-header-btn" onclick="_flowGraphEnter()" title="Home"
           style="background:linear-gradient(135deg,#4C8C5A,#3A6E46);">🏠</button>
 
+        <!-- Admin Hub — directors only (22 Jul), shown/hidden by _syncAdminHubButton() -->
+        <button class="glaze-tile ghtile-mini" id="admin-hub-header-btn" onclick="openAdminHub()" title="Admin Hub — all director tools"
+          style="background:linear-gradient(135deg,#B87946,#8B5A34);display:none;">⚡</button>
+
         <!-- Sync + live status dot -->
         <button class="glaze-tile ghtile-mini" id="sync-live-btn" onclick="syncLiveData()" title="Sync — pull fresh Square data now"
           style="background:linear-gradient(135deg,#3E6FA3,#2E547C);">📥</button>
@@ -3606,6 +3632,91 @@ function updateStaffName() {
       </div>
       <div id="barista-stock-list"><div style="padding:16px;text-align:center;color:var(--gu-dust);font-size:13px;">Loading…</div></div>
     </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     ADMIN HUB — 22 Jul. One screen gathering every director tool in
+     one place, per direct request. Gated to David/Jenny/Daisy/Elliott
+     (PLATFORM_REVENUE_ACCESS). Each card deep-links to the real screen
+     that already owns that function — no duplicate UI, just a single
+     front door. Elliott sees everything (full access per direct request).
+     ═══════════════════════════════════════════════════════════════ -->
+<div id="adminhub-view" class="view" style="display:none;">
+  <h2 style="margin-top:0;">Admin Hub <span style="font-size:12px;font-weight:500;color:var(--gu-dust);">— everything in one place</span></h2>
+  <p id="adminhub-greeting" style="font-size:13px;color:var(--gu-dust);margin-bottom:18px;"></p>
+
+  <!-- MONEY -->
+  <div style="font-size:11px;font-weight:800;color:var(--gu-dust);text-transform:uppercase;letter-spacing:0.05em;margin:6px 0 8px;">💷 Money</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:20px;">
+    <button onclick="openTakings()" class="adminhub-card" style="background:#B87946;">
+      <span style="font-size:22px;">💷</span><span class="ahc-label">Revenue &amp; Takings</span><span class="ahc-sub">Live Square figures</span>
+    </button>
+    <button onclick="goToTab('dashboard'); setTimeout(()=>{showDashboardSection('margins'); loadMargins();},60);" class="adminhub-card" style="background:#B87946;filter:brightness(0.92);">
+      <span style="font-size:22px;">📈</span><span class="ahc-label">Margins</span><span class="ahc-sub">Costs &amp; drink estimator</span>
+    </button>
+    <button onclick="goToTab('dashboard'); setTimeout(()=>showDashboardSection('extras'),60);" class="adminhub-card" style="background:#2e7d32;">
+      <span style="font-size:22px;">🧾</span><span class="ahc-label">Extra Charges</span><span class="ahc-sub">Today's tally</span>
+    </button>
+    <button onclick="goToTab('platformrev')" id="adminhub-platformrev" class="adminhub-card" style="background:#F9A825;color:#2B2724;">
+      <span style="font-size:22px;">🌍</span><span class="ahc-label">Platform Revenue</span><span class="ahc-sub">Worldwide SaaS income</span>
+    </button>
+  </div>
+
+  <!-- INSIGHTS -->
+  <div style="font-size:11px;font-weight:800;color:var(--gu-dust);text-transform:uppercase;letter-spacing:0.05em;margin:6px 0 8px;">📊 Insights</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:20px;">
+    <button onclick="goToTab('dashboard'); setTimeout(()=>showDashboardSection('designs'),60);" class="adminhub-card" style="background:#5E35B1;">
+      <span style="font-size:22px;">🎨</span><span class="ahc-label">Popular Designs</span><span class="ahc-sub">What's selling</span>
+    </button>
+    <button onclick="goToTab('dashboard'); setTimeout(()=>showDashboardSection('tools'),60);" class="adminhub-card" style="background:#5E35B1;filter:brightness(0.9);">
+      <span style="font-size:22px;">🔧</span><span class="ahc-label">Tool Usage</span><span class="ahc-sub">App engagement</span>
+    </button>
+    <button onclick="goToTab('dashboard'); setTimeout(()=>showDashboardSection('loyalty'),60);" class="adminhub-card" style="background:#5E35B1;filter:brightness(0.8);">
+      <span style="font-size:22px;">🏆</span><span class="ahc-label">Loyal Customers</span><span class="ahc-sub">Top by tier</span>
+    </button>
+    <button onclick="openDailyDigest()" class="adminhub-card" style="background:#5E35B1;filter:brightness(0.7);">
+      <span style="font-size:22px;">📰</span><span class="ahc-label">Daily Digest</span><span class="ahc-sub">Yesterday &amp; ahead</span>
+    </button>
+  </div>
+
+  <!-- TEAM & STUDIO -->
+  <div style="font-size:11px;font-weight:800;color:var(--gu-dust);text-transform:uppercase;letter-spacing:0.05em;margin:6px 0 8px;">👥 Team &amp; Studio</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:20px;">
+    <button onclick="goToTab('team')" class="adminhub-card" style="background:#3E6FA3;">
+      <span style="font-size:22px;">👥</span><span class="ahc-label">Team</span><span class="ahc-sub">Staff &amp; onboarding</span>
+    </button>
+    <button onclick="goToTab('staff')" class="adminhub-card" style="background:#3E6FA3;filter:brightness(0.9);">
+      <span style="font-size:22px;">📋</span><span class="ahc-label">Rotas &amp; Shifts</span><span class="ahc-sub">Who's on</span>
+    </button>
+    <button onclick="goToTab('stock')" class="adminhub-card" style="background:#3E6FA3;filter:brightness(0.8);">
+      <span style="font-size:22px;">📦</span><span class="ahc-label">Stock</span><span class="ahc-sub">Inventory levels</span>
+    </button>
+    <button onclick="goToTab('community')" class="adminhub-card" style="background:#3E6FA3;filter:brightness(0.7);">
+      <span style="font-size:22px;">🌐</span><span class="ahc-label">Community</span><span class="ahc-sub">Studio network</span>
+    </button>
+  </div>
+
+  <!-- HOST BY POST -->
+  <div style="font-size:11px;font-weight:800;color:var(--gu-dust);text-transform:uppercase;letter-spacing:0.05em;margin:6px 0 8px;">📮 Host By Post</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:20px;">
+    <button onclick="openHostByPostSection()" class="adminhub-card" style="background:#B87946;filter:brightness(1.05);">
+      <span style="font-size:22px;">📮</span><span class="ahc-label">Host By Post</span><span class="ahc-sub">Postal kits &amp; orders</span>
+    </button>
+  </div>
+
+  <!-- SETUP -->
+  <div style="font-size:11px;font-weight:800;color:var(--gu-dust);text-transform:uppercase;letter-spacing:0.05em;margin:6px 0 8px;">⚙️ Setup</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:20px;">
+    <button onclick="goToTab('setup')" class="adminhub-card" style="background:#4a453f;">
+      <span style="font-size:22px;">⚙️</span><span class="ahc-label">Studio Setup</span><span class="ahc-sub">All settings</span>
+    </button>
+    <button onclick="goToTab('branding')" class="adminhub-card" style="background:#4a453f;filter:brightness(0.9);">
+      <span style="font-size:22px;">🎨</span><span class="ahc-label">Branding</span><span class="ahc-sub">Look &amp; feel</span>
+    </button>
+    <button onclick="goToTab('catalogue')" class="adminhub-card" style="background:#4a453f;filter:brightness(0.8);">
+      <span style="font-size:22px;">🗂️</span><span class="ahc-label">Catalogue</span><span class="ahc-sub">Products &amp; prices</span>
+    </button>
   </div>
 </div>
 
@@ -9333,7 +9444,35 @@ function openTakings() {
   if (slot && typeof _squareSyncPill === 'function') { slot.innerHTML = _squareSyncPill({ label:'Pull all real Square history' }); }
 }
 
-// ─── DIRECTOR ADMIN HUB — route to the real, existing sections ──────
+// ─── ADMIN HUB — 22 Jul. Single director front-door screen. ─────────
+// Gated to David/Jenny/Daisy/Elliott (PLATFORM_REVENUE_ACCESS). Anyone
+// else gets bounced to the normal dashboard with a gentle note. Elliott
+// has full access per direct request (already in the access list).
+function openAdminHub() {
+  // Gate: directors only.
+  if (typeof _isDirector === 'function' && !_isDirector()) {
+    goToTab('dashboard');
+    return;
+  }
+  document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+  const view = document.getElementById('adminhub-view');
+  if (view) view.style.display = 'block';
+
+  // Personal greeting.
+  const greetEl = document.getElementById('adminhub-greeting');
+  if (greetEl) {
+    const first = (typeof currentShiftStaff !== 'undefined' && currentShiftStaff?.name)
+      ? currentShiftStaff.name.split(' ')[0] : 'there';
+    greetEl.textContent = `Welcome, ${first} — every studio tool, one tap away.`;
+  }
+
+  // Platform Revenue card only for those who see the worldwide money
+  // (same access list, but hide the card so it's not a dead tap).
+  const prCard = document.getElementById('adminhub-platformrev');
+  if (prCard) prCard.style.display = (typeof _isDirector === 'function' && _isDirector()) ? '' : 'none';
+}
+
+// ─── DIRECTOR ADMIN HUB SUB-ROUTES — route to the real, existing sections ──
 // Each admin sub-tile opens the genuine screen that already owns those
 // adjustable parameters — no duplicate UI, just a clear director-level
 // front door to them. Live data, read-only where it touches Square.
@@ -19781,6 +19920,12 @@ function applyPlatformRevenueAccess() {
   // Unchanged by the park: this is about The Kiln Cafe's own real data,
   // which directors still get. Only the platform figures went away.
   window.assistantContext = hasAccess ? 'director' : 'staff';
+
+  // Admin Hub header button — 22 Jul. Same director access list. Shows the
+  // ⚡ button in the header for David/Jenny/Daisy/Elliott only.
+  const hubBtn = document.getElementById('admin-hub-header-btn');
+  if (hubBtn) hubBtn.style.display = hasAccess ? 'flex' : 'none';
+
   const subtitle = document.getElementById('staff-assistant-subtitle');
   if (subtitle) {
     subtitle.textContent = hasAccess
