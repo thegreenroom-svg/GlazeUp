@@ -400,6 +400,41 @@ html.demo-skin .kc-skel { height: 56px; margin-bottom: 10px; }
 html.demo-skin .kc-section { margin-top: 26px; }
 html.demo-skin .kc-sec-title { font-size: 11px; letter-spacing: 0.24em; font-weight: 800; opacity: 0.55; margin-bottom: 10px; }
 
+/* THE STUDIO — the three spaces as tappable zones, in the same colours as
+   the real floor plan (Lounge teal, Main dark, Vault purple). The heart of
+   the Desk: tap a space to walk into it. */
+html.demo-skin .kc-floor {
+  display: grid; grid-template-columns: 1fr 1.4fr 1fr; gap: 8px;
+  height: 132px;
+}
+html.demo-skin .kc-room {
+  border: none; border-radius: 16px; cursor: pointer; overflow: hidden;
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end;
+  padding: 12px; text-align: left; position: relative; color: #fff;
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+html.demo-skin .kc-room:active { transform: scale(0.98); filter: brightness(1.08); }
+html.demo-skin .kc-room-lounge { background: linear-gradient(160deg, #004D40 0%, #00251A 100%); }
+html.demo-skin .kc-room-main   { background: linear-gradient(160deg, #2A2420 0%, #1A1714 100%); box-shadow: inset 0 0 0 1px rgba(184,121,70,0.22); }
+html.demo-skin .kc-room-vault  { background: linear-gradient(160deg, #1A0050 0%, #0D0030 100%); }
+html.demo-skin .kc-room-name { font-size: 14px; font-weight: 800; line-height: 1.1; letter-spacing: 0.01em; }
+html.demo-skin .kc-room-sub { font-size: 10px; font-weight: 600; opacity: 0.6; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.06em; }
+html.demo-skin .kc-room-count {
+  position: absolute; top: 10px; right: 10px;
+  font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 20px;
+  background: rgba(255,255,255,0.18); backdrop-filter: blur(2px);
+}
+html.demo-skin .kc-room-count:empty { display: none; }
+html.demo-skin .kc-room-lounge .kc-room-name { color: #7FFFE4; }
+html.demo-skin .kc-room-vault .kc-room-name { color: #C6ADFF; }
+html.demo-skin .kc-room-main .kc-room-name { color: #E8C39E; }
+html.demo-skin .kc-floor-all {
+  width: 100%; margin-top: 10px; background: transparent; border: none;
+  color: var(--m-accent, #B87946); font-size: 12px; font-weight: 700;
+  padding: 6px; cursor: pointer; text-align: center;
+}
+html.demo-skin .kc-floor-all:active { opacity: 0.6; }
+
 /* Day navigation header — arrows + calendar + today, right-aligned. */
 html.demo-skin .kc-day-head {
   display: flex; align-items: center; justify-content: space-between;

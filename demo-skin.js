@@ -64,6 +64,16 @@
     } catch (e) { console.warn('[desk] nav failed', id, e); }
   };
 
+  // Walk straight into one studio space: open the floor plan, then its room
+  // panel. Falls back to just the floor plan if the room opener isn't there.
+  KC.goRoom = function (room) {
+    KC.go('floor-plan', 'showFloorPlan');
+    setTimeout(() => {
+      try { if (typeof openRoomPanel === 'function') openRoomPanel(room); }
+      catch (e) { console.warn('[desk] room open failed', room, e); }
+    }, 260);
+  };
+
   KC.hideCanvas = function () {
     const c = $('kc-canvas'); if (c) c.classList.add('kc-away');
     const m = $('kc-menu'); if (m) m.classList.remove('kc-open');
@@ -113,6 +123,31 @@
         <div class="kc-wave-line kc-in"></div>
 
         <div class="kc-hero kc-in" id="kc-hero"></div>
+
+        <!-- The floor plan, as the heart of the Desk. The three studio
+             spaces in their own colours (matching the real floor plan) —
+             tap a space to walk straight into it. Live counts fill in. -->
+        <div class="kc-section kc-in">
+          <div class="kc-sec-title">THE STUDIO</div>
+          <div class="kc-floor" id="kc-floor">
+            <button class="kc-room kc-room-lounge" onclick="KC.goRoom('Lounge')">
+              <span class="kc-room-name">The Lounge</span>
+              <span class="kc-room-sub" id="kc-room-lounge-sub">adults · quiet</span>
+              <span class="kc-room-count" id="kc-room-lounge-n"></span>
+            </button>
+            <button class="kc-room kc-room-main" onclick="KC.goRoom('Main Studio')">
+              <span class="kc-room-name">Main Studio</span>
+              <span class="kc-room-sub" id="kc-room-main-sub">tables 1–8</span>
+              <span class="kc-room-count" id="kc-room-main-n"></span>
+            </button>
+            <button class="kc-room kc-room-vault" onclick="KC.goRoom('The Vault')">
+              <span class="kc-room-name">The Vault</span>
+              <span class="kc-room-sub" id="kc-room-vault-sub">private · premium</span>
+              <span class="kc-room-count" id="kc-room-vault-n"></span>
+            </button>
+          </div>
+          <button class="kc-floor-all" onclick="KC.go('floor-plan','showFloorPlan')">Open the full floor plan ›</button>
+        </div>
 
         <div class="kc-section kc-in">
           <div class="kc-sec-title">THE DESK</div>
@@ -353,6 +388,25 @@
       if (f) { f.classList.remove('kc-skel-t'); f.textContent = bs.length; }
       const fl = $('kc-fig-floor-l');
       if (fl) fl.textContent = bs.length === 1 ? 'booking · ' + covers + ' covers' : 'bookings · ' + covers + ' covers';
+
+      // Live per-room tallies for the three studio-space zones. Match each
+      // booking's space to a zone; blanks/"Main"/"Family" fall to Main Studio.
+      const roomCount = { lounge: 0, main: 0, vault: 0 };
+      bs.forEach(b => {
+        const sp = (b.room || b.space_name || '').toLowerCase();
+        const n = b.party_size || 1;
+        if (sp.includes('lounge')) roomCount.lounge += n;
+        else if (sp.includes('vault')) roomCount.vault += n;
+        else roomCount.main += n; // Main / Family / unspecified
+      });
+      const setRoom = (id, n) => {
+        const el = $(id);
+        if (el) el.textContent = n > 0 ? (n + (n === 1 ? ' in' : ' in')) : '';
+      };
+      setRoom('kc-room-lounge-n', roomCount.lounge);
+      setRoom('kc-room-main-n', roomCount.main);
+      setRoom('kc-room-vault-n', roomCount.vault);
+
       // Remember which day is actually on screen so the arrows step from it.
       if (d.showingDate) KC._shownDate = d.showingDate;
       const title = $('kc-day-title');
