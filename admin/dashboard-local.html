@@ -10997,10 +10997,16 @@ async function _kcFindOnShelves(bookingId) {
   modal.innerHTML = `<div style="flex:1;display:flex;align-items:center;justify-content:center;color:#8a8175;">Loading this booking's pieces…</div>`;
 
   try {
-    const res = await fetch(`${API_URL}/api/packing/queue?studioId=${studioId}`);
+    // Ask for the WHOLE order, including pieces already ticked off.
+    // A piece marked packed is still sitting on the shelf until it's
+    // physically in the bag — excluding it meant the sweep quietly
+    // stopped looking for pieces staff had ticked, then reported
+    // "found 4 of 4" while ignoring the fifth entirely.
+    const res = await fetch(`${API_URL}/api/packing/queue?studioId=${studioId}`
+      + `&bookingId=${encodeURIComponent(bookingId)}&includeDone=1`);
     const data = await res.json();
     _shelfPieces = (data.pieces || []).filter(p =>
-      p.booking_id === bookingId && p.photo_phash && !KC_DONE_STATUSES.includes(p.status));
+      p.booking_id === bookingId && p.photo_phash);
   } catch (e) { _shelfPieces = []; }
 
   // Pieces photographed before the histogram existed carry only the
@@ -11108,8 +11114,25 @@ async function _kcSweepShelf(photoUrl) {
   const sizes = [0.16, 0.22, 0.30, 0.40, 0.52].map(f => Math.round(short * f));
   const hits = [];
   let closest = null;
-  const SURE = 14;     // ring it green
-  const MAYBE = 26;    // worth a look — ring it amber, ask for a close-up
+  // ── HOW SURE IS SURE? ────────────────────────────────────────────
+  // A fixed cut-off cannot work here. On a warm wooden table every
+  // patch scores about the same against every piece, so an absolute
+  // threshold of "14" just picks whichever noise dips lowest — which
+  // is how rings ended up on chairs, the floor and a wine bottle.
+  //
+  // Measured on a real shelf photo: when the app genuinely has a good
+  // reference photo of an object, the winning patch beats the typical
+  // score across that photo by 15 to 28 points. When it is guessing,
+  // the winner beats it by 5 or 6. That separation is enormous and it
+  // is the actual signal.
+  //
+  // So each piece is now judged against THIS photo's own background
+  // rather than a number decided in advance. Busy shelf or bare one,
+  // bright or dim, it calibrates itself.
+  const CLEAR_SURE = 12;   // stands well clear of the background
+  const CLEAR_MAYBE = 8;   // stands out, but not decisively
+  const SANITY = 34;       // nothing this poor is a match, however it ranks
+  const allScores = {};    // piece id -> every score across the photo
 
   let done = 0;
   const total = sizes.reduce((acc, side) => {
@@ -11126,8 +11149,11 @@ async function _kcSweepShelf(photoUrl) {
         for (const piece of _shelfPieces) {
           const d = _kcSweepDistance(fp, piece.photo_phash);
           if (!closest || d < closest.d) closest = { d, piece };
-          if (d <= MAYBE) {
-            hits.push({ x: x + side/2, y: y + side/2, r: side/2, d, piece, sure: d <= SURE });
+          (allScores[piece.id] || (allScores[piece.id] = [])).push(d);
+          // Keep the best few candidates per piece and decide later,
+          // once we know what this photo's background actually scores.
+          if (d <= SANITY) {
+            hits.push({ x: x + side/2, y: y + side/2, r: side/2, d, piece });
           }
         }
         done++;
@@ -11139,40 +11165,46 @@ async function _kcSweepShelf(photoUrl) {
   }
   workBmp.close?.();
 
-  // ── DAISY'S TWO EXTRA CLUES ──────────────────────────────────────
-  // (1) We know how many pieces this booking has. If some are found
-  //     confidently, the rest are very likely on the same shelf, so
-  //     it's reasonable to accept weaker evidence for the remainder
-  //     rather than stopping at the first pass.
-  // (2) A booking's pieces are nearly always stored together. So a
-  //     weak candidate sitting close to a confident hit is far more
-  //     likely to be genuine than the same score out on its own.
-  //     Proximity to the confident cluster earns a real score bonus.
-  const sureHits = hits.filter(h => h.sure);
-  let cluster = null;
-  if (sureHits.length) {
-    cluster = {
-      x: sureHits.reduce((a, h) => a + h.x, 0) / sureHits.length,
-      y: sureHits.reduce((a, h) => a + h.y, 0) / sureHits.length,
-    };
-    const reach = Math.min(W, H) * 0.55; // "on the same part of the shelf"
-    hits.forEach(h => {
-      const dist = Math.hypot(h.x - cluster.x, h.y - cluster.y);
-      if (dist < reach) {
-        // up to a 25% improvement for sitting with its own booking
-        h.d = h.d * (1 - 0.25 * (1 - dist / reach));
-        if (h.d <= SURE) h.sure = true;
-      }
-    });
+  // ── WHAT DOES BACKGROUND LOOK LIKE, IN THIS PHOTO? ───────────────
+  // For each piece, the typical score across the whole photo IS the
+  // background: the table, the floor, the wall, everything that isn't
+  // the piece. A genuine find has to beat that by a clear margin.
+  const baseline = {};
+  for (const id in allScores) {
+    const s = allScores[id].slice().sort((a, b) => a - b);
+    baseline[id] = s[Math.floor(s.length / 2)]; // median
   }
+  hits.forEach(h => { h.margin = (baseline[h.piece.id] || 0) - h.d; });
 
-  // keep the single best hit per piece, so one piece = one ring
+  // keep the single best candidate per piece — one piece, one ring
   const best = {};
   hits.forEach(h => {
     const k = h.piece.id;
-    if (!best[k] || h.d < best[k].d) best[k] = h;
+    if (!best[k] || h.margin > best[k].margin) best[k] = h;
   });
-  _renderShelfResult(photoUrl, Object.values(best), W, H, closest, _shelfPieces.length);
+  let rings = Object.values(best);
+
+  // ── DAISY'S TWO CLUES, NOW APPLIED TO THE MARGIN ─────────────────
+  // A booking's pieces sit together, so a weaker candidate sitting
+  // near a confident one is likelier to be genuine. That bonus now
+  // adjusts how far a piece stands out, not its raw score — the raw
+  // score was never the thing that decided anything.
+  const anchors = rings.filter(r => r.margin >= CLEAR_SURE);
+  if (anchors.length) {
+    const cx = anchors.reduce((a, h) => a + h.x, 0) / anchors.length;
+    const cy = anchors.reduce((a, h) => a + h.y, 0) / anchors.length;
+    const reach = Math.min(W, H) * 0.55;
+    rings.forEach(h => {
+      const dist = Math.hypot(h.x - cx, h.y - cy);
+      if (dist < reach) h.margin += (CLEAR_SURE - CLEAR_MAYBE) * (1 - dist / reach) * 0.6;
+    });
+  }
+
+  // Decide, and throw away anything that never stood out at all.
+  rings.forEach(h => { h.sure = h.margin >= CLEAR_SURE && h.d <= SANITY; });
+  rings = rings.filter(h => h.margin >= CLEAR_MAYBE && h.d <= SANITY);
+
+  _renderShelfResult(photoUrl, rings, W, H, closest, _shelfPieces.length);
 }
 
 function _renderShelfResult(photoUrl, rings, W, H, closest, expected) {
@@ -11213,7 +11245,7 @@ function _renderShelfResult(photoUrl, rings, W, H, closest, expected) {
         ${sure.map(r => `<div style="display:flex;align-items:center;gap:10px;color:#F4ECE0;font-size:13px;">
           <span style="width:11px;height:11px;border-radius:50%;border:2px solid #4CAF50;flex-shrink:0;"></span>
           ${r.piece.piece_type || 'Piece'}
-          <span style="color:#8a8175;font-size:11px;">${r.d.toFixed(0)}</span></div>`).join('')}
+          <span style="color:#8a8175;font-size:11px;">stands out by ${r.margin.toFixed(0)}</span></div>`).join('')}
       </div>` : ''}
 
       ${maybe.length ? `
@@ -11231,9 +11263,11 @@ function _renderShelfResult(photoUrl, rings, W, H, closest, expected) {
       </div>` : ''}
 
       ${!rings.length ? `<div style="margin-top:16px;font-size:12px;color:#8a8175;line-height:1.6;text-align:center;">
-          Nothing from this booking showed up.
-          ${closest ? `<br><br><span style="color:#B87946;">Closest was <b>${closest.piece.piece_type}</b> at ${closest.d.toFixed(1)}.</span>` : ''}
-          <br>Try a straighter shot of the shelf, or photograph a piece directly to identify it.
+          Nothing here stood out clearly enough from the background to ring.
+          ${closest ? `<br><br><span style="color:#B87946;">Closest was <b>${closest.piece.piece_type}</b>, but not clear of the shelf itself.</span>` : ''}
+          <br><br>The usual reason is that a piece's reference photo shows the whole
+          table rather than that one piece. Photograph pieces individually at packing
+          and this gets sharply better.
         </div>` : ''}
     </div>
     <div style="padding:14px 16px max(14px,env(safe-area-inset-bottom));flex-shrink:0;display:flex;gap:10px;">
