@@ -11120,25 +11120,83 @@ function _kcCaptureShelf() {
 //    The pattern doesn't move in the kiln, only the colour does.
 //
 // Runs entirely on the device. No API, no cost, nothing leaves the phone.
+// Where the engine comes from. jsDelivr and unpkg send the CORS headers
+// that let us download with a PROGRESS READOUT rather than a silent
+// 10MB script tag that either works or doesn't. Compressed in transit
+// it's roughly 3.5MB, and the browser caches it, so this is a one-time
+// cost — but on a studio phone with one bar you deserve to SEE it
+// happening rather than watch a spinner and get "check your connection".
 let _cvLoading = null;
 let _kcEngineError = null;
+const KC_CV_SOURCES = [
+  'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js',
+  'https://unpkg.com/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js',
+  'https://docs.opencv.org/4.10.0/opencv.js',
+];
+
+// The build can hand back either a ready module, a promise, or a module
+// that fires a callback when its WebAssembly has started.
+async function _kcCVReady() {
+  const m = window.cv;
+  if (!m) throw new Error('engine did not register');
+  if (typeof m.then === 'function') { window.cv = await m; return; }
+  if (m.Mat) return;
+  await new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('engine did not start')), 90000);
+    m.onRuntimeInitialized = () => { clearTimeout(t); resolve(); };
+  });
+  if (!window.cv || !window.cv.Mat) throw new Error('engine started but is incomplete');
+}
+
 function _kcLoadCV(onProgress) {
   if (window.cv && window.cv.Mat) return Promise.resolve();
   if (_cvLoading) return _cvLoading;
-  _cvLoading = new Promise((resolve, reject) => {
-    if (onProgress) onProgress('Loading the matching engine…');
-    const s = document.createElement('script');
-    s.src = 'https://docs.opencv.org/4.10.0/opencv.js';
-    s.async = true;
-    s.onload = () => {
-      const ready = () => resolve();
-      if (window.cv && window.cv.Mat) return ready();
-      if (window.cv) { window.cv.onRuntimeInitialized = ready; return; }
-      reject(new Error('engine failed to start'));
-    };
-    s.onerror = () => { _cvLoading = null; reject(new Error('Could not load the matching engine. Check your connection.')); };
-    document.head.appendChild(s);
-  });
+  _cvLoading = (async () => {
+    let lastErr = null;
+    for (const url of KC_CV_SOURCES) {
+      let blobUrl = null;
+      try {
+        onProgress && onProgress('downloading the matching engine…');
+        // Download by hand so the size can be reported. If the host
+        // won't allow it, fall straight back to a plain script tag.
+        try {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const total = Number(res.headers.get('content-length') || 0);
+          const reader = res.body.getReader();
+          const chunks = []; let got = 0;
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value); got += value.length;
+            const mb = (got / 1048576).toFixed(1);
+            onProgress && onProgress(total
+              ? `downloading engine — ${mb} of ${(total / 1048576).toFixed(1)} MB`
+              : `downloading engine — ${mb} MB`);
+          }
+          blobUrl = URL.createObjectURL(new Blob(chunks, { type: 'text/javascript' }));
+        } catch (e) { blobUrl = null; }
+
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = blobUrl || url;
+          s.async = true;
+          s.onload = resolve;
+          s.onerror = () => reject(new Error('could not reach ' + url.split('/')[2]));
+          document.head.appendChild(s);
+        });
+        onProgress && onProgress('starting the engine…');
+        await _kcCVReady();
+        if (blobUrl) URL.revokeObjectURL(blobUrl);
+        return;
+      } catch (e) {
+        if (blobUrl) URL.revokeObjectURL(blobUrl);
+        lastErr = e;
+      }
+    }
+    _cvLoading = null;
+    throw lastErr || new Error('could not load the matching engine');
+  })();
   return _cvLoading;
 }
 
