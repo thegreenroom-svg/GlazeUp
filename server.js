@@ -8001,7 +8001,7 @@ app.post('/api/pieces/confirm-ready-by-scan', async (req, res) => {
 // GET /api/packing/queue — pieces that are fired but not yet packed,
 // for whoever's doing the packing (currently Jenny)
 app.get('/api/packing/queue', async (req, res) => {
-  const { studioId } = req.query;
+  const { studioId, bookingId, includeDone } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
 
   try {
@@ -8011,13 +8011,20 @@ app.get('/api/packing/queue', async (req, res) => {
     // it lists every piece still in the studio (not yet packed or gone
     // home). Dip/fire statuses remain valid data if they're ever set,
     // they're simply not a gate any more.
-    const { data: pieces, error } = await supabase
+    //
+    // bookingId + includeDone: opening ONE booking's card should show
+    // its WHOLE order, packed pieces included and ticked, so they can
+    // be un-ticked without leaving the screen. Without this a packed
+    // piece vanished from the card entirely and there was no way back
+    // to it in the app.
+    let q = supabase
       .from('pottery_pieces')
       .select('*')
       .eq('studio_id', studioId)
-      .not('status', 'in', '(packed,picked_up,collected)')
-      .not('damaged', 'is', true)
-      .order('updated_at', { ascending: true });
+      .not('damaged', 'is', true);
+    if (bookingId) q = q.eq('booking_id', bookingId);
+    if (!includeDone) q = q.not('status', 'in', '(packed,picked_up,collected)');
+    const { data: pieces, error } = await q.order('updated_at', { ascending: true });
     if (error) throw error;
 
     const enriched = await enrichPiecesWithCustomerName(studioId, pieces || []);

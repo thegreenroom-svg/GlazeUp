@@ -10412,13 +10412,14 @@ async function _renderBookingPackCard() {
   if (!modal || !_packCardBookingId) return;
   let pieces = [];
   try {
-    const res = await fetch(`${API_URL}/api/packing/queue?studioId=${studioId}`);
+    // Ask for this booking's WHOLE order, packed pieces included, so a
+    // piece that's been ticked is still here to be un-ticked.
+    const res = await fetch(`${API_URL}/api/packing/queue?studioId=${studioId}`
+      + `&bookingId=${encodeURIComponent(_packCardBookingId)}&includeDone=1`);
     const data = await res.json();
-    pieces = (data.pieces || []).filter(p => p.booking_id === _packCardBookingId);
+    pieces = data.pieces || [];
   } catch (e) {}
   if (!pieces.length) {
-    // Everything in this booking has moved past the packing queue
-    // (all packed/posted/collected) — nothing left to show here.
     _closeBookingPackCard();
     return;
   }
