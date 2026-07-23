@@ -11887,7 +11887,7 @@ app.post('/api/stock/identify-by-photo', async (req, res) => {
 
     let best = null;
     for (const s of shapes || []) {
-      const dist = _hammingDistanceHex(phash, s.photo_phash);
+      const dist = _fingerprintDistance(phash, s.photo_phash);
       if (!best || dist < best.dist) best = { dist, shape: s };
     }
     if (best && best.dist <= PHASH_CONFIDENT_DISTANCE) {
@@ -12389,6 +12389,39 @@ function _hammingDistanceHex(a, b) {
   }
   return dist;
 }
+
+// ─── COMPOUND FINGERPRINT COMPARE (v2) ──────────────────────────────
+// A fingerprint is now "<coarse>|<fine>|<colour>" (see the client's
+// computePerceptualHash). Old stored hashes are just "<coarse>" and
+// still work — the extra signals are only used when BOTH sides have
+// them. Returns a distance on the SAME 0-64 scale the rest of the
+// code already reasons about, so every existing threshold holds.
+//   coarse  — the original 64-bit light/dark signature
+//   fine    — 256-bit shape/pattern detail, scaled back to /64
+//   colour  — 4x4 average RGB; mean per-channel difference, scaled
+// Weighting favours shape over colour, because glaze firing shifts
+// colour far more than it shifts form.
+function _fingerprintDistance(a, b) {
+  if (!a || !b) return 64;
+  const pa = String(a).split('|'), pb = String(b).split('|');
+  const coarse = _hammingDistanceHex(pa[0], pb[0]);
+  if (pa.length < 3 || pb.length < 3) return coarse; // one side is a v1 hash
+
+  const fine = (_hammingDistanceHex(pa[1], pb[1]) / 256) * 64;
+
+  let colourDiff = 0, n = 0;
+  const ca = pa[2], cb = pb[2];
+  if (ca && cb && ca.length === cb.length) {
+    for (let i = 0; i < ca.length; i++) {
+      colourDiff += Math.abs(parseInt(ca[i], 16) - parseInt(cb[i], 16));
+      n++;
+    }
+  }
+  const colour = n ? (colourDiff / n / 15) * 64 : 0;
+
+  // shape carries the weight; colour is a supporting signal only
+  return (coarse * 0.30) + (fine * 0.50) + (colour * 0.20);
+}
 // ≤10 of 64 bits differing is a well-established strong dHash match.
 const PHASH_CONFIDENT_DISTANCE = 10;
 
@@ -12434,7 +12467,7 @@ app.post('/api/pieces/find-by-photo', async (req, res) => {
       let best = null;
       for (const c of candidates || []) {
         if (!c.photo_phash) continue;
-        const dist = _hammingDistanceHex(phash, c.photo_phash);
+        const dist = _fingerprintDistance(phash, c.photo_phash);
         if (!best || dist < best.dist) best = { dist, candidate: c };
       }
       if (best && best.dist <= PHASH_CONFIDENT_DISTANCE) {

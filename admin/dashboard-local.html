@@ -10612,18 +10612,18 @@ async function _reviewAreaScan() {
     <div style="flex:1;overflow-y:auto;padding:16px;">
       ${matches.length ? `<div style="font-size:12px;color:#4CAF50;font-weight:700;margin-bottom:12px;">
         Found ${matches.length} match${matches.length===1?'':'es'} — check the highlighted area${matches.length===1?'':'s'}.</div>`
-        : aiTried ? `<div style="font-size:12px;color:#8a8175;margin-bottom:12px;">No confident match — have a look through the areas below by eye.</div>`
-        : `<div style="font-size:12px;color:#8a8175;margin-bottom:12px;">Automatic matching isn't switched on — scan by eye across the areas below.</div>`}
+        : aiTried ? `<div style="font-size:12px;color:#8a8175;margin-bottom:12px;">No automatic match — tap any piece below and I'll identify it.</div>`
+        : `<div style="font-size:12px;color:#8a8175;margin-bottom:12px;">Tap any piece in these photos and I'll tell you whose it is.</div>`}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         ${_areaScanPhotos.map((p, i) => {
           const hit = matches.find(m => m.areaIndex === i);
           return `<div style="position:relative;border-radius:12px;overflow:hidden;aspect-ratio:1;
             border:${hit ? '3px solid #4CAF50' : '1px solid rgba(184,121,70,0.2)'};">
-            <img src="${p}" style="width:100%;height:100%;object-fit:cover;">
+            <img src="${p}" onclick="_kcTapToMatch(this, event)" style="width:100%;height:100%;object-fit:cover;cursor:crosshair;">
             <div style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,0.6);color:#fff;
-              font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;">Area ${i+1}</div>
+              font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;pointer-events:none;">Area ${i+1}</div>
             ${hit ? `<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(76,175,80,0.9);
-              color:#fff;font-size:10px;font-weight:700;padding:4px 8px;">${hit.piece.piece_type}</div>` : ''}
+              color:#fff;font-size:10px;font-weight:700;padding:4px 8px;pointer-events:none;">${hit.piece.piece_type}</div>` : ''}
           </div>`;
         }).join('')}
       </div>
@@ -10652,6 +10652,73 @@ function _kcOpenLightbox(url) {
       color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;
       font-size:18px;">✕</div>`;
   modal.style.display = 'flex';
+}
+
+// ─── TAP TO IDENTIFY ────────────────────────────────────────────────
+// The in-house answer to "whose is this?" on a jumbled tray. Our
+// fingerprint compares whole images, so a tray of eight pieces is
+// meaningless to it — but a CROP of one piece isn't. Staff tap the
+// piece; we cut a square out around the tap, fingerprint just that,
+// and match it against every reference photo on file. No AI, no API,
+// no cost — the tap supplies the one thing the engine can't do for
+// itself (knowing where the piece is), and the engine does the rest.
+async function _kcTapToMatch(imgEl, ev) {
+  try {
+    const rect = imgEl.getBoundingClientRect();
+    const x = (ev.clientX - rect.left) / rect.width;   // 0-1 across
+    const y = (ev.clientY - rect.top) / rect.height;   // 0-1 down
+
+    const bmp = await createImageBitmap(await (await fetch(imgEl.src)).blob());
+    const side = Math.round(Math.min(bmp.width, bmp.height) * 0.34); // crop window
+    const cx = Math.max(0, Math.min(bmp.width  - side, Math.round(x * bmp.width  - side / 2)));
+    const cy = Math.max(0, Math.min(bmp.height - side, Math.round(y * bmp.height - side / 2)));
+
+    const c = document.createElement('canvas');
+    c.width = side; c.height = side;
+    c.getContext('2d').drawImage(bmp, cx, cy, side, side, 0, 0, side, side);
+    bmp.close?.();
+
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85));
+    const cropUrl = c.toDataURL('image/jpeg', 0.85);
+    toast('Looking…', 'info');
+
+    const phash = await computePerceptualHash(blob);
+    const data = await api('/api/pieces/find-by-photo', { method: 'POST', timeoutMs: 30000,
+      body: { studioId, photoBase64: cropUrl, phash, searchedBy: currentShiftStaff?.id, autoAssign: false } });
+
+    const m = (data.matches || [])[0];
+    _kcShowTapResult(cropUrl, (m && data.noConfidentMatch !== true) ? m : null);
+  } catch (e) {
+    toast("Couldn't read that spot — try tapping the piece itself", 'error');
+  }
+}
+
+function _kcShowTapResult(cropUrl, match) {
+  const d = document.getElementById('kc-tap-result') || (() => {
+    const el = document.createElement('div');
+    el.id = 'kc-tap-result';
+    el.style.cssText = 'display:none;position:fixed;inset:0;z-index:9820;background:rgba(20,17,15,0.95);align-items:center;justify-content:center;padding:20px;';
+    document.body.appendChild(el);
+    return el;
+  })();
+  const name = match ? (match.customerName || match.customer_name || match.booking_id || 'Unknown') : null;
+  d.innerHTML = `
+    <div style="max-width:340px;width:100%;text-align:center;">
+      <img src="${cropUrl}" style="width:150px;height:150px;object-fit:cover;border-radius:14px;
+        border:3px solid ${match ? '#4CAF50' : 'rgba(244,236,224,0.3)'};margin-bottom:16px;">
+      ${match
+        ? `<div style="font-family:'Caveat',cursive;font-size:30px;color:#F4ECE0;line-height:1.1;">${name}</div>
+           ${match.pieceType ? `<div style="font-size:13px;color:#8a8175;margin-top:4px;">${match.pieceType}</div>` : ''}
+           ${match.confidence ? `<div style="font-size:11px;color:#8a8175;margin-top:6px;">${match.confidence} confidence</div>` : ''}`
+        : `<div style="font-family:'Caveat',cursive;font-size:26px;color:#F4ECE0;">No confident match</div>
+           <div style="font-size:12px;color:#8a8175;margin-top:8px;line-height:1.5;">
+             Either this piece has no photo on file yet, or the crop caught the background.
+             Try tapping right on the piece.</div>`}
+      <button onclick="document.getElementById('kc-tap-result').style.display='none'"
+        style="width:100%;margin-top:20px;background:rgba(255,255,255,0.12);color:#F4ECE0;border:none;
+        border-radius:12px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;">Done</button>
+    </div>`;
+  d.style.display = 'flex';
 }
 
 function _kcPhotoPiece(pieceId) {
@@ -23667,31 +23734,62 @@ const PHOTO_QUALITY = 0.82;
 // AFTER this shipped — there is no way to retroactively hash old
 // photos from the browser. Both are why the OpenAI path is kept
 // fully intact as a fallback, not replaced.
+// ─── THE FINGERPRINT, v2 ────────────────────────────────────────────
+// The original engine squashed a photo to 9x8 GREYSCALE and recorded
+// 64 light/dark comparisons. Brilliant and free, but it threw away
+// two things that matter for pottery: fine shape detail, and colour
+// entirely (a pink gingham tray and a blue circus jar could hash
+// alike). This returns a COMPOUND fingerprint:
+//     <coarse16hex>|<fine64hex>|<colour48hex>
+// The first part is byte-identical to the old format, so every hash
+// already stored keeps working and old/new can still be compared.
+// Parts 2 and 3 are only used when BOTH sides have them.
+//   fine   — 17x16 dHash, 256 bits: real shape/pattern detail
+//   colour — 4x4 grid of average R,G,B: the tones and shades
 async function computePerceptualHash(file) {
   try {
     const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
     const canvas = document.createElement('canvas');
-    canvas.width = 9; canvas.height = 8; // dHash needs one extra column
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(bitmap, 0, 0, 9, 8);
-    bitmap.close?.();
-    const { data } = ctx.getImageData(0, 0, 9, 8);
+    const grey = px => 0.299 * px[0] + 0.587 * px[1] + 0.114 * px[2];
 
-    const grey = [];
-    for (let i = 0; i < data.length; i += 4) {
-      grey.push(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
-    }
+    // ── part 1: the original coarse hash (unchanged, 9x8) ──
+    canvas.width = 9; canvas.height = 8;
+    ctx.drawImage(bitmap, 0, 0, 9, 8);
+    let d = ctx.getImageData(0, 0, 9, 8).data;
+    let g = [];
+    for (let i = 0; i < d.length; i += 4) g.push(grey([d[i], d[i+1], d[i+2]]));
     let bits = '';
-    for (let row = 0; row < 8; row++) {
-      for (let col = 0; col < 8; col++) {
-        const left = grey[row * 9 + col], right = grey[row * 9 + col + 1];
-        bits += left > right ? '1' : '0';
-      }
+    for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++)
+      bits += g[r * 9 + c] > g[r * 9 + c + 1] ? '1' : '0';
+    let coarse = '';
+    for (let i = 0; i < 64; i += 4) coarse += parseInt(bits.slice(i, i + 4), 2).toString(16);
+
+    // ── part 2: fine detail, 17x16 -> 256 bits ──
+    canvas.width = 17; canvas.height = 16;
+    ctx.drawImage(bitmap, 0, 0, 17, 16);
+    d = ctx.getImageData(0, 0, 17, 16).data;
+    g = [];
+    for (let i = 0; i < d.length; i += 4) g.push(grey([d[i], d[i+1], d[i+2]]));
+    bits = '';
+    for (let r = 0; r < 16; r++) for (let c = 0; c < 16; c++)
+      bits += g[r * 17 + c] > g[r * 17 + c + 1] ? '1' : '0';
+    let fine = '';
+    for (let i = 0; i < 256; i += 4) fine += parseInt(bits.slice(i, i + 4), 2).toString(16);
+
+    // ── part 3: colour — 4x4 grid, average R,G,B per cell ──
+    canvas.width = 4; canvas.height = 4;
+    ctx.drawImage(bitmap, 0, 0, 4, 4);
+    d = ctx.getImageData(0, 0, 4, 4).data;
+    let colour = '';
+    for (let i = 0; i < d.length; i += 4) {
+      colour += Math.round(d[i] / 17).toString(16)
+              + Math.round(d[i+1] / 17).toString(16)
+              + Math.round(d[i+2] / 17).toString(16);
     }
-    // Store as hex — 64 bits -> 16 hex chars, compact for a TEXT column.
-    let hex = '';
-    for (let i = 0; i < 64; i += 4) hex += parseInt(bits.slice(i, i + 4), 2).toString(16);
-    return hex;
+
+    bitmap.close?.();
+    return `${coarse}|${fine}|${colour}`;
   } catch (e) {
     console.warn('Perceptual hash failed — falls back to AI matching only:', e);
     return null;
@@ -32341,6 +32439,10 @@ if (typeof document !== 'undefined') {
     // (fixed, inset:0) and back appears to do nothing = trapped. The room
     // panel is the common one; add siblings here if new overlays appear.
     try {
+      const tapRes = document.getElementById('kc-tap-result');
+      if (tapRes && tapRes.style.display !== 'none' && getComputedStyle(tapRes).display !== 'none') {
+        tapRes.style.display = 'none'; return;
+      }
       const lightbox = document.getElementById('kc-lightbox');
       if (lightbox && lightbox.style.display !== 'none' && getComputedStyle(lightbox).display !== 'none') {
         lightbox.style.display = 'none'; return;
