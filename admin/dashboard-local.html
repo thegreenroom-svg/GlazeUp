@@ -10461,10 +10461,23 @@ async function _renderBookingPackCard() {
       ${photos.length ? `
         <div style="display:grid;grid-template-columns:repeat(${photos.length === 1 ? 1 : photos.length === 2 ? 2 : 3},1fr);
           gap:8px;margin-bottom:16px;">
-          ${photos.map(p => `
-            <img src="${p.reference_photo_url}" onclick="_kcOpenLightbox('${p.reference_photo_url}')"
-              style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:14px;
-              border:1.5px solid rgba(43,39,36,0.12);cursor:zoom-in;">`).join('')}
+          ${photos.map(p => {
+            const done = KC_DONE_STATUSES.includes(p.status);
+            return `
+            <div onclick="_kcTogglePieceFound('${p.id}','${p.status}')" style="position:relative;cursor:pointer;">
+              <img src="${p.reference_photo_url}"
+                style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:14px;
+                border:2.5px solid ${done ? '#4CAF50' : 'rgba(43,39,36,0.12)'};
+                opacity:${done ? '0.55' : '1'};display:block;">
+              ${done ? `<div style="position:absolute;top:6px;left:6px;background:#4CAF50;color:#fff;
+                width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+                font-size:13px;font-weight:800;">✓</div>` : ''}
+              <span onclick="event.stopPropagation();_kcOpenLightbox('${p.reference_photo_url}')"
+                style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.55);color:#fff;
+                width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+                font-size:13px;">🔍</span>
+            </div>`;
+          }).join('')}
         </div>`
         : `<div style="width:100%;aspect-ratio:4/3;max-height:220px;border-radius:16px;margin-bottom:16px;
         border:1.5px dashed rgba(43,39,36,0.22);display:flex;flex-direction:column;align-items:center;
