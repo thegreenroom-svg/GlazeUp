@@ -8005,11 +8005,18 @@ app.get('/api/packing/queue', async (req, res) => {
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
 
   try {
+    // 23 Jul — Daisy: the studio KNOWS when to dip and when to fire;
+    // watching pieces through the kiln only interfered in the middle.
+    // So Packing no longer waits on anyone marking a piece 'fired' —
+    // it lists every piece still in the studio (not yet packed or gone
+    // home). Dip/fire statuses remain valid data if they're ever set,
+    // they're simply not a gate any more.
     const { data: pieces, error } = await supabase
       .from('pottery_pieces')
       .select('*')
       .eq('studio_id', studioId)
-      .eq('status', 'fired')
+      .not('status', 'in', '(packed,picked_up,collected)')
+      .not('damaged', 'is', true)
       .order('updated_at', { ascending: true });
     if (error) throw error;
 

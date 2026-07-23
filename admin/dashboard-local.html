@@ -9821,7 +9821,7 @@ function openPacking() {
     <div style="flex:1;min-height:0;overflow-y:auto;background:#F4ECE0;padding:16px;padding-bottom:100px;">
       <div style="margin-bottom:16px;">
         <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:#2B2724;">Packing</div>
-        <div style="font-size:11px;color:#8a8175;">Fired pieces going home</div>
+        <div style="font-size:11px;color:#8a8175;">Pieces going home</div>
       </div>
       <div id="packing-tiles" style="display:flex;flex-direction:column;gap:12px;">
         <div style="text-align:center;padding:40px;color:#8a8175;font-size:13px;">Loading…</div>
@@ -18352,10 +18352,9 @@ const GRID_NAV_STRUCTURE = [
     { tab: 'tablecards', label: '🎫 Table Cards', desc: "Print a table's QR card" },
     { tab: 'menu', label: '🍰 Daily Menu', desc: "Today's specials" },
     { tab: 'music', label: '🎵 Music', desc: 'Volume · skip · what\'s playing', fn: 'openMusic' },
-    { tab: 'kiln', label: '🔥 Kiln', desc: 'Dip → load → fire', fn: 'openKiln' },
     { tab: 'piecematch', label: '🔍 Piece Matching', desc: 'AI-match fired pieces to photos' },
     { tab: 'collections', label: '🏺 Collections', desc: 'Ready to collect · returns · find on shelf', fn: 'openCollections' },
-    { tab: 'packing', label: '📦 Packing', desc: 'Fired pieces going home', fn: 'openPacking' },
+    { tab: 'packing', label: '📦 Packing', desc: 'Pieces going home', fn: 'openPacking' },
     { tab: 'labels', label: '🏷️ Printing', desc: 'Collection & postal labels · transfer print queue' },
   ]},
 
@@ -18911,7 +18910,7 @@ const DAISY_FLOW_GRAPH = {
       { id:'shapes',    label:'Bisque',           emoji:'🎨', desc:'Your Square catalogue as silhouettes', fn:null, size:'mid' },
     ]},
     { id:'dashboard', label:'Overview', emoji:'📈', desc:'Your daily overview', fn:null, size:'mid' },
-    { id:'packing',   label:'Packing',  emoji:'📦', desc:'Fired pieces going home', fn:'openPacking', size:'mid' },
+    { id:'packing',   label:'Packing',  emoji:'📦', desc:'Pieces going home', fn:'openPacking', size:'mid' },
     { id:'music',     label:'Music',    emoji:'🎵', desc:"Volume · skip · what's playing", fn:'openMusic', size:'mid' },
     { id:'setup-group', label:'Setup', emoji:'⚙️', desc:'Studio config', size:'small', children:[
       { id:'branding', label:'Branding',     emoji:'🎨', desc:'Colours, logo, customer app look', fn:null, size:'big' },
