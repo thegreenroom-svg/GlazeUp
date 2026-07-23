@@ -17612,8 +17612,8 @@ function showRoomElegant(roomName) {
           <div style="font-size:12px;color:#8a8175;margin-bottom:14px;max-width:340px;">
             ${(renderErr && renderErr.message ? renderErr.message : String(renderErr)).replace(/</g,'&lt;')}
           </div>
-          <button onclick="renderFloorPlanElegant()" class="glaze-tile"
-            style="border:none;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;">← Back to floor plan</button>
+          <button onclick="if(typeof KC!=='undefined'&&KC.showCanvas)KC.showCanvas();else goToTab('staff');" class="glaze-tile"
+            style="border:none;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;">← Back to Home</button>
         </div>`;
     } catch (_ignore) {}
   }
