@@ -10436,7 +10436,7 @@ async function _renderBookingPackCard() {
     return;
   }
   const customer = pieces[0].customer_name || _packCardBookingId;
-  const photo = (pieces.find(p => p.reference_photo_url) || {}).reference_photo_url;
+  const photos = pieces.filter(p => p.reference_photo_url);
   const statuses = pieces.map(p => p.status);
   const rawSame = statuses.every(s => s === statuses[0]) ? statuses[0] : 'fired';
   // Any waiting state that isn't in the cycle (ready_for_dip, dipped)
@@ -10458,8 +10458,14 @@ async function _renderBookingPackCard() {
         border-radius:12px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;">← Home</button>
     </div>
     <div style="flex:1;overflow-y:auto;padding:16px;">
-      ${photo ? `<img src="${photo}" onclick="_kcOpenLightbox('${photo}')" style="width:100%;border-radius:16px;margin-bottom:16px;
-        border:1.5px solid rgba(43,39,36,0.12);object-fit:cover;max-height:340px;cursor:pointer;">`
+      ${photos.length ? `
+        <div style="display:grid;grid-template-columns:repeat(${photos.length === 1 ? 1 : photos.length === 2 ? 2 : 3},1fr);
+          gap:8px;margin-bottom:16px;">
+          ${photos.map(p => `
+            <img src="${p.reference_photo_url}" onclick="_kcOpenLightbox('${p.reference_photo_url}')"
+              style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:14px;
+              border:1.5px solid rgba(43,39,36,0.12);cursor:zoom-in;">`).join('')}
+        </div>`
         : `<div style="width:100%;aspect-ratio:4/3;max-height:220px;border-radius:16px;margin-bottom:16px;
         border:1.5px dashed rgba(43,39,36,0.22);display:flex;flex-direction:column;align-items:center;
         justify-content:center;gap:8px;color:#8a8175;">
