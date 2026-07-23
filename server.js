@@ -8158,6 +8158,54 @@ app.get('/api/pieces/bookings', async (req, res) => {
   }
 });
 
+// POST /api/pieces/find-on-shelf — "where are this booking's pieces in
+// this photo of the shelves?"
+//
+// The matching moved here on 23 Jul after it repeatedly failed to run
+// on a studio phone: the engine needs OpenCV, which in a browser is a
+// 10MB WebAssembly download, and on one bar of signal it either never
+// arrived or never finished starting. Uploading a photo works fine on
+// one bar. Same algorithm, no client download.
+//
+// The engine is loaded lazily inside the matcher, so a server that is
+// only ever taking bookings never pays for it.
+app.post('/api/pieces/find-on-shelf', async (req, res) => {
+  const { studioId, bookingId, photoBase64 } = req.body;
+  if (!studioId || !bookingId || !photoBase64) {
+    return res.status(400).json({ error: 'studioId, bookingId and photoBase64 required' });
+  }
+  try {
+    // The WHOLE order, including pieces already ticked off — a piece
+    // marked packed is still on the shelf until it is physically bagged.
+    const { data: pieces, error } = await supabase.from('pottery_pieces')
+      .select('id, piece_type, reference_photo_url, status')
+      .eq('studio_id', studioId)
+      .eq('booking_id', bookingId)
+      .not('damaged', 'is', true);
+    if (error) throw error;
+
+    const withPhotos = (pieces || []).filter(p => p.reference_photo_url);
+    if (!withPhotos.length) {
+      return res.json({
+        status: 'no-references', engine: null, results: [],
+        total: (pieces || []).length,
+        message: 'None of this booking\'s pieces has a reference photo yet, so there is nothing to search for.',
+      });
+    }
+
+    const buffer = Buffer.from(String(photoBase64).replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    const { findOnShelf } = require('./shelf-matcher');
+    const out = await findOnShelf(buffer, withPhotos);
+
+    res.json({ status: 'ok', total: withPhotos.length, ...out });
+  } catch (err) {
+    // A failure here must never take the app with it — the client falls
+    // back to its own on-device matcher.
+    console.error('find-on-shelf error:', err && err.message);
+    res.status(500).json({ error: (err && err.message) || 'shelf search failed' });
+  }
+});
+
 app.post('/api/pieces/set-booking-status', async (req, res) => {
   const { studioId, bookingId, status, by } = req.body;
   if (!studioId || !bookingId || !status) {
