@@ -10311,11 +10311,11 @@ async function _loadPackingTiles() {
           <button onclick="_openBookingPackCard('${id.replace(/'/g,"\\'")}')" style="width:100%;border:none;background:none;
             padding:14px;cursor:pointer;text-align:left;display:flex;gap:12px;align-items:center;">
             ${photo
-              ? `<img src="${photo}" style="width:56px;height:56px;object-fit:cover;border-radius:12px;
-                   flex-shrink:0;border:1.5px solid rgba(43,39,36,0.12);">`
-              : `<div style="width:56px;height:56px;border-radius:12px;flex-shrink:0;
+              ? `<img src="${photo}" onclick="event.stopPropagation();_kcOpenLightbox('${photo}')" style="width:72px;height:72px;object-fit:cover;border-radius:14px;
+                   flex-shrink:0;border:1.5px solid rgba(43,39,36,0.12);cursor:zoom-in;">`
+              : `<div style="width:72px;height:72px;border-radius:14px;flex-shrink:0;
                    border:1.5px dashed rgba(43,39,36,0.22);display:flex;align-items:center;
-                   justify-content:center;font-size:22px;opacity:0.35;">🏺</div>`}
+                   justify-content:center;font-size:28px;opacity:0.35;">🏺</div>`}
             <div style="flex:1;min-width:0;">
               <div style="font-family:'Caveat',cursive;font-size:19px;font-weight:700;color:#2B2724;">${g.customer}</div>
               <div style="font-size:11px;color:#8a8175;">${g.pieces.length} piece${g.pieces.length===1?'':'s'} · ${label}</div>
@@ -10423,8 +10423,14 @@ async function _renderBookingPackCard() {
         border-radius:12px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;">← Home</button>
     </div>
     <div style="flex:1;overflow-y:auto;padding:16px;">
-      ${photo ? `<img src="${photo}" style="width:100%;border-radius:16px;margin-bottom:16px;
-        border:1.5px solid rgba(43,39,36,0.12);object-fit:cover;max-height:280px;">` : ''}
+      ${photo ? `<img src="${photo}" onclick="_kcOpenLightbox('${photo}')" style="width:100%;border-radius:16px;margin-bottom:16px;
+        border:1.5px solid rgba(43,39,36,0.12);object-fit:cover;max-height:340px;cursor:pointer;">`
+        : `<div style="width:100%;aspect-ratio:4/3;max-height:220px;border-radius:16px;margin-bottom:16px;
+        border:1.5px dashed rgba(43,39,36,0.22);display:flex;flex-direction:column;align-items:center;
+        justify-content:center;gap:8px;color:#8a8175;">
+          <span style="font-size:32px;opacity:0.4;">🏺</span>
+          <span style="font-size:12px;">No photo yet — tap 📷 on a piece below</span>
+        </div>`}
       <div style="display:flex;flex-direction:column;gap:8px;">
         ${pieces.map(p => {
           const done = p.status !== 'fired';
@@ -10432,15 +10438,20 @@ async function _renderBookingPackCard() {
           <button onclick="_kcTogglePieceFound('${p.id}','${p.status}')" style="width:100%;text-align:left;
             background:${done ? 'rgba(46,125,50,0.08)' : '#FFFDF9'};
             border:1.5px solid ${done ? 'rgba(46,125,50,0.4)' : 'rgba(43,39,36,0.15)'};
-            border-radius:12px;padding:11px 13px;cursor:pointer;display:flex;align-items:center;gap:10px;">
-            <span style="font-size:16px;color:${done ? '#2e7d32' : '#B87946'};">${done ? '✓' : '○'}</span>
-            ${p.reference_photo_url ? `<img src="${p.reference_photo_url}" style="width:32px;height:32px;
-              object-fit:cover;border-radius:7px;flex-shrink:0;">` : ''}
+            border-radius:12px;padding:11px 13px;cursor:pointer;display:flex;align-items:center;gap:12px;">
+            <span style="font-size:16px;color:${done ? '#2e7d32' : '#B87946'};flex-shrink:0;">${done ? '✓' : '○'}</span>
+            ${p.reference_photo_url
+              ? `<img src="${p.reference_photo_url}" onclick="event.stopPropagation();_kcOpenLightbox('${p.reference_photo_url}')"
+                  style="width:56px;height:56px;object-fit:cover;border-radius:10px;flex-shrink:0;
+                  border:1.5px solid rgba(43,39,36,0.15);cursor:zoom-in;">`
+              : `<div style="width:56px;height:56px;border-radius:10px;flex-shrink:0;background:rgba(43,39,36,0.04);
+                  border:1.5px dashed rgba(43,39,36,0.2);display:flex;align-items:center;justify-content:center;
+                  font-size:20px;opacity:0.35;">🏺</div>`}
             <div style="flex:1;">
-              <div style="font-size:13px;font-weight:600;color:#2B2724;">${p.piece_type || 'Piece'}</div>
+              <div style="font-size:14px;font-weight:600;color:#2B2724;">${p.piece_type || 'Piece'}</div>
               ${p.notes && p.notes.includes('NOT PAID') ? `<div style="font-size:10px;color:#A32D21;font-weight:700;">⚠ NOT PAID — charge at collection</div>` : ''}
             </div>
-            <span onclick="event.stopPropagation();_kcPhotoPiece('${p.id}')" style="font-size:16px;padding:4px;">📷</span>
+            <span onclick="event.stopPropagation();_kcPhotoPiece('${p.id}')" style="font-size:20px;padding:6px;flex-shrink:0;">📷</span>
           </button>`;
         }).join('')}
       </div>
@@ -10623,6 +10634,24 @@ async function _reviewAreaScan() {
         Back to booking
       </button>
     </div>`;
+}
+
+// ─── PHOTO LIGHTBOX — tap any packing photo, see it full screen ────
+function _kcOpenLightbox(url) {
+  if (!url) return;
+  const modal = document.getElementById('kc-lightbox') || (() => {
+    const d = document.createElement('div');
+    d.id = 'kc-lightbox';
+    d.style.cssText = 'display:none;position:fixed;inset:0;z-index:9800;background:rgba(20,17,15,0.95);align-items:center;justify-content:center;padding:16px;';
+    d.onclick = () => { d.style.display = 'none'; };
+    document.body.appendChild(d);
+    return d;
+  })();
+  modal.innerHTML = `<img src="${url}" style="max-width:100%;max-height:100%;border-radius:12px;object-fit:contain;">
+    <div style="position:fixed;top:max(16px,env(safe-area-inset-top));right:16px;background:rgba(0,0,0,0.5);
+      color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+      font-size:18px;">✕</div>`;
+  modal.style.display = 'flex';
 }
 
 function _kcPhotoPiece(pieceId) {
@@ -32312,6 +32341,10 @@ if (typeof document !== 'undefined') {
     // (fixed, inset:0) and back appears to do nothing = trapped. The room
     // panel is the common one; add siblings here if new overlays appear.
     try {
+      const lightbox = document.getElementById('kc-lightbox');
+      if (lightbox && lightbox.style.display !== 'none' && getComputedStyle(lightbox).display !== 'none') {
+        lightbox.style.display = 'none'; return;
+      }
       const areaScan = document.getElementById('area-scan-overlay');
       if (areaScan && areaScan.style.display !== 'none' && getComputedStyle(areaScan).display !== 'none') {
         _closeAreaScan(); return;
