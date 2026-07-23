@@ -11134,33 +11134,64 @@ const KC_CV_SOURCES = [
   'https://docs.opencv.org/4.10.0/opencv.js',
 ];
 
+// The engine gets a strict budget. A big WebAssembly module can take a
+// long time to compile on a phone — and a screen that sits on "starting
+// the engine" in front of a client is indistinguishable from a crash.
+// So: hard ceilings, and if it fails or times out we remember that and
+// stop trying for a while rather than making every search wait again.
+const KC_CV_BUDGET_MS = 22000;   // per source, download AND start
+const KC_CV_SNOOZE_MS = 6 * 60 * 60 * 1000;
+
+function _kcCVSnoozed() {
+  try {
+    const t = Number(localStorage.getItem('kc_cv_failed_at') || 0);
+    return t && (Date.now() - t) < KC_CV_SNOOZE_MS;
+  } catch (e) { return false; }
+}
+function _kcCVSnooze() {
+  try { localStorage.setItem('kc_cv_failed_at', String(Date.now())); } catch (e) {}
+}
+function _kcCVUnsnooze() {
+  try { localStorage.removeItem('kc_cv_failed_at'); } catch (e) {}
+}
+
 // The build can hand back either a ready module, a promise, or a module
 // that fires a callback when its WebAssembly has started.
 async function _kcCVReady() {
   const m = window.cv;
   if (!m) throw new Error('engine did not register');
-  if (typeof m.then === 'function') { window.cv = await m; return; }
-  if (m.Mat) return;
-  await new Promise((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error('engine did not start')), 90000);
-    m.onRuntimeInitialized = () => { clearTimeout(t); resolve(); };
-  });
+  if (typeof m.then === 'function') { window.cv = await m; }
+  else if (!m.Mat) {
+    await new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('engine did not start in time')), 12000);
+      m.onRuntimeInitialized = () => { clearTimeout(t); resolve(); };
+      // Guard against the classic race: if it had already started
+      // before the handler was attached, the callback never fires.
+      const poll = setInterval(() => {
+        if (window.cv && window.cv.Mat) { clearInterval(poll); clearTimeout(t); resolve(); }
+      }, 200);
+      setTimeout(() => clearInterval(poll), 12000);
+    });
+  }
   if (!window.cv || !window.cv.Mat) throw new Error('engine started but is incomplete');
 }
 
 function _kcLoadCV(onProgress) {
   if (window.cv && window.cv.Mat) return Promise.resolve();
   if (_cvLoading) return _cvLoading;
+  if (_kcCVSnoozed()) return Promise.reject(new Error('pattern engine unavailable on this device'));
   _cvLoading = (async () => {
     let lastErr = null;
     for (const url of KC_CV_SOURCES) {
       let blobUrl = null;
+      const started = Date.now();
+      const left = () => KC_CV_BUDGET_MS - (Date.now() - started);
       try {
         onProgress && onProgress('downloading the matching engine…');
-        // Download by hand so the size can be reported. If the host
-        // won't allow it, fall straight back to a plain script tag.
         try {
-          const res = await fetch(url);
+          const ctrl = new AbortController();
+          const killer = setTimeout(() => ctrl.abort(), left());
+          const res = await fetch(url, { signal: ctrl.signal });
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const total = Number(res.headers.get('content-length') || 0);
           const reader = res.body.getReader();
@@ -11174,20 +11205,30 @@ function _kcLoadCV(onProgress) {
               ? `downloading engine — ${mb} of ${(total / 1048576).toFixed(1)} MB`
               : `downloading engine — ${mb} MB`);
           }
+          clearTimeout(killer);
           blobUrl = URL.createObjectURL(new Blob(chunks, { type: 'text/javascript' }));
         } catch (e) { blobUrl = null; }
 
-        await new Promise((resolve, reject) => {
-          const s = document.createElement('script');
-          s.src = blobUrl || url;
-          s.async = true;
-          s.onload = resolve;
-          s.onerror = () => reject(new Error('could not reach ' + url.split('/')[2]));
-          document.head.appendChild(s);
-        });
-        onProgress && onProgress('starting the engine…');
-        await _kcCVReady();
+        if (left() <= 0) throw new Error('took too long to download');
+
+        await Promise.race([
+          (async () => {
+            await new Promise((resolve, reject) => {
+              const s = document.createElement('script');
+              s.src = blobUrl || url;
+              s.async = true;
+              s.onload = resolve;
+              s.onerror = () => reject(new Error('could not reach ' + url.split('/')[2]));
+              document.head.appendChild(s);
+            });
+            onProgress && onProgress('starting the engine…');
+            await _kcCVReady();
+          })(),
+          new Promise((_, rej) => setTimeout(
+            () => rej(new Error('engine too slow to start on this device')), Math.max(3000, left()))),
+        ]);
         if (blobUrl) URL.revokeObjectURL(blobUrl);
+        _kcCVUnsnooze();
         return;
       } catch (e) {
         if (blobUrl) URL.revokeObjectURL(blobUrl);
@@ -11195,6 +11236,7 @@ function _kcLoadCV(onProgress) {
       }
     }
     _cvLoading = null;
+    _kcCVSnooze();   // don't make the next search wait through this again
     throw lastErr || new Error('could not load the matching engine');
   })();
   return _cvLoading;
@@ -11728,10 +11770,11 @@ function _kcShowTapResult(cropUrl, match) {
         : `<div style="font-family:'Caveat',cursive;font-size:26px;color:#F4ECE0;">No confident match</div>
            <div style="font-size:12px;color:#8a8175;margin-top:8px;line-height:1.5;">
              ${window._kcLastNear
-               ? `Closest was <b style="color:#B87946;">${window._kcLastNear.p.piece_type}</b>
-                  (${window._kcLastNear.p.booking_id}) at ${window._kcLastNear.d.toFixed(1)} —
-                  too far off to call it.<br><br>
-                  Shots taken close, square-on and in similar light score best.`
+               ? `Nearest on file is <b style="color:#B87946;">${window._kcLastNear.p.piece_type}</b>
+                  (${window._kcLastNear.p.booking_id}), but not close enough to call it —
+                  treat that as a lead, not an answer.<br><br>
+                  Shots taken close, square-on and in similar light score best. A piece
+                  with no reference photo of its own can't be found this way at all.`
                : `Either this piece has no photo on file yet, or the shot caught mostly background.
                   Try again closer in on the piece.`}
            </div>`}
@@ -11840,8 +11883,13 @@ function _kcIdentifyPiece() {
         if (!best || d < best.d) best = { d, p };
       }
 
-      // Honest bands rather than one strict yes/no.
-      const conf = best.d <= 12 ? 'high' : best.d <= 20 ? 'fair' : best.d <= 30 ? 'low' : null;
+      // Honest bands. A weak score is NOT an identification: the King
+      // Charles mug came back as "Plate — low, 29" with a green ring and
+      // a big Open this booking button, which is a guess wearing the
+      // clothes of an answer. Only a genuinely close match now names a
+      // booking; anything weaker is shown as "I don't know this one",
+      // with the nearest offered as a lead rather than a conclusion.
+      const conf = best.d <= 12 ? 'high' : best.d <= 20 ? 'fair' : null;
       window._kcLastNear = best;
       _kcShowTapResult(photoBase64, conf ? {
         customerName: best.p.customer_name || best.p.booking_id,
