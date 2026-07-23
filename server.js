@@ -8169,11 +8169,23 @@ app.get('/api/pieces/bookings', async (req, res) => {
 //
 // The engine is loaded lazily inside the matcher, so a server that is
 // only ever taking bookings never pays for it.
+// Only one shelf search runs at a time. This is a single small server
+// doing a genuinely heavy computation — two staff searching at once
+// would double the memory spike measured in testing (up to ~300MB for
+// ONE search). A second request while one is running gets a same-day
+// answer to try again, not a pile-up.
+let _shelfSearchBusy = false;
+
 app.post('/api/pieces/find-on-shelf', async (req, res) => {
   const { studioId, bookingId, photoBase64 } = req.body;
   if (!studioId || !bookingId || !photoBase64) {
     return res.status(400).json({ error: 'studioId, bookingId and photoBase64 required' });
   }
+  if (_shelfSearchBusy) {
+    return res.status(503).json({ error: 'busy', message: 'Another search is running — try again in a few seconds.' });
+  }
+  _shelfSearchBusy = true;
+  const busyTimeout = setTimeout(() => { _shelfSearchBusy = false; }, 40000); // never stuck forever, whatever happens below
   try {
     // The WHOLE order, including pieces already ticked off — a piece
     // marked packed is still on the shelf until it is physically bagged.
@@ -8195,7 +8207,12 @@ app.post('/api/pieces/find-on-shelf', async (req, res) => {
 
     const buffer = Buffer.from(String(photoBase64).replace(/^data:image\/\w+;base64,/, ''), 'base64');
     const { findOnShelf } = require('./shelf-matcher');
-    const out = await findOnShelf(buffer, withPhotos);
+    // Outer ceiling on top of the matcher's own internal budgets — belt
+    // and braces, so a request can never sit open indefinitely.
+    const out = await Promise.race([
+      findOnShelf(buffer, withPhotos),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('shelf search took too long')), 35000)),
+    ]);
 
     res.json({ status: 'ok', total: withPhotos.length, ...out });
   } catch (err) {
@@ -8203,6 +8220,9 @@ app.post('/api/pieces/find-on-shelf', async (req, res) => {
     // back to its own on-device matcher.
     console.error('find-on-shelf error:', err && err.message);
     res.status(500).json({ error: (err && err.message) || 'shelf search failed' });
+  } finally {
+    clearTimeout(busyTimeout);
+    _shelfSearchBusy = false;
   }
 });
 

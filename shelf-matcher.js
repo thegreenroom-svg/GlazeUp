@@ -43,12 +43,25 @@ let _cvLoading = null;
 // the module costs real memory, and most requests to this server never
 // need it, so it must not be part of normal start-up.
 function loadCV() {
-  if (_cv) return Promise.resolve(_cv);
+  // Same thenable trap as below: _cv is the module object and HAS its
+  // own .then, so Promise.resolve(_cv) would hang on every request after
+  // the first. Wrap it. (Caught by a 5-piece timing test where the cold
+  // run passed and the warm run silently never returned.)
+  if (_cv) return Promise.resolve({ cv: _cv });
   if (_cvLoading) return _cvLoading;
   _cvLoading = new Promise((resolve, reject) => {
     try {
       const cv = require('@techstark/opencv-js');
-      const done = () => { _cv = cv; resolve(cv); };
+      // GENUINE BUG, found by a hang that would not reproduce anywhere
+      // except through this exact module: the object this package
+      // exports has its OWN 'then' method (a leftover of its UMD/module
+      // wrapper). Passing it straight to resolve() makes the JS engine
+      // treat it as a thenable and wait on cv.then() instead of settling
+      // our promise -- which never calls back, so the promise hangs
+      // forever. Confirmed with a minimal reproduction outside this file
+      // before touching this code. Fix: never resolve with the module
+      // object directly -- wrap it in something with no 'then' property.
+      const done = () => { _cv = cv; resolve({ cv }); };
       if (cv.Mat) return done();
       cv.onRuntimeInitialized = done;
       // Belt and braces: if the runtime finished before the handler was
@@ -85,11 +98,13 @@ async function greyMat(cv, input, maxSide) {
 }
 
 function makeDetector(cv) {
-  // Measured on real photos against the alternatives available here:
-  // BRISK separated the right object from five wrong ones 19 to 8,
-  // where ORB managed 14 to 9 and AKAZE was muddy at 25 to 22.
+  // Measured end-to-end (not just component benchmarks) on Daisy's own
+  // photos: scene 1400px, threshold 30 finds both a fish jug and a
+  // cottage dish correctly, in 3.5s total, at ~283MB RSS. Higher
+  // thresholds are faster but lose the weaker of the two objects —
+  // this is the point where both come through.
   if (cv.BRISK) {
-    try { return { d: new cv.BRISK(20, 4, 1.0), norm: cv.NORM_HAMMING, name: 'BRISK' }; } catch (e) {}
+    try { return { d: new cv.BRISK(30, 4, 1.0), norm: cv.NORM_HAMMING, name: 'BRISK' }; } catch (e) {}
     try { return { d: new cv.BRISK(), norm: cv.NORM_HAMMING, name: 'BRISK' }; } catch (e) {}
   }
   if (cv.ORB) { try { return { d: new cv.ORB(2500), norm: cv.NORM_HAMMING, name: 'ORB' }; } catch (e) {} }
@@ -145,13 +160,20 @@ function matchOne(cv, det, refDesc, refKp, sceneDesc, sceneKp) {
  * @returns {Promise<{engine, sceneW, sceneH, results:[{pieceId, pieceType, inliers, x, y, r}]}>}
  */
 async function findOnShelf(shelfBuffer, pieces) {
-  const cv = await loadCV();
+  const { cv } = await loadCV();
   const det = makeDetector(cv);
 
   // Scene resolution is a real trade: more detail finds more pieces but
-  // costs time and memory. 1800 measured as the sweet spot.
-  const SCENE_PX = 1800;
-  const REF_SIZES = [260, 400];
+  // costs time and memory. 1400 measured as fast (~2s to detect) while
+  // still finding a genuinely small object on a cluttered shelf.
+  const SCENE_PX = 1400;
+  const REF_SIZES = [260, 380];
+  // Measured full run: ~1.8s per piece at this setting. This budget is
+  // generous headroom, not the expected time — it exists so one bad
+  // reference photo (huge file, corrupt image) cannot hang the server.
+  const PER_PIECE_BUDGET_MS = 8000;
+  const started = Date.now();
+  const OVERALL_BUDGET_MS = 30000;
 
   const scene = await greyMat(cv, shelfBuffer, SCENE_PX);
   const sceneKp = new cv.KeyPointVector();
@@ -161,10 +183,16 @@ async function findOnShelf(shelfBuffer, pieces) {
     det.d.detectAndCompute(scene.mat, new cv.Mat(), sceneKp, sceneDesc);
 
     for (const piece of pieces) {
+      if (Date.now() - started > OVERALL_BUDGET_MS) {
+        results.push({ pieceId: piece.id, pieceType: piece.piece_type, inliers: 0,
+                       note: 'ran out of time before reaching this piece' });
+        continue;
+      }
       if (!piece.reference_photo_url) {
         results.push({ pieceId: piece.id, pieceType: piece.piece_type, inliers: 0 });
         continue;
       }
+      const pieceStarted = Date.now();
       let best = { inliers: 0, pts: [] };
       let refBuf = null;
       try {
@@ -180,6 +208,7 @@ async function findOnShelf(shelfBuffer, pieces) {
       // appears on the shelf. Measured: at one size the jug matched the
       // wrong object, at another it landed correctly.
       for (const px of REF_SIZES) {
+        if (Date.now() - pieceStarted > PER_PIECE_BUDGET_MS) break;
         let ref = null; const refKp = new cv.KeyPointVector(); const refDesc = new cv.Mat();
         try {
           ref = await greyMat(cv, refBuf, px);

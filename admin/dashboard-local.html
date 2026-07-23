@@ -11419,7 +11419,60 @@ async function _kcSweepShelf(photoUrl) {
   };
   say('Searching the shelf…', 'starting');
 
-  // ── the keypoint engine, if it will load ─────────────────────────
+  // ── TRY THE SERVER ENGINE FIRST ───────────────────────────────────
+  // Moved server-side because the on-device engine needs a 10MB
+  // WebAssembly download that failed twice on the studio phone — once
+  // it never arrived, once it downloaded and never finished starting.
+  // Uploading a photo works on one bar; the server does the heavy work.
+  //
+  // This is a STRICT ADDITION, not a replacement: an 8 second ceiling,
+  // and ANY failure — timeout, network, server error, no reference
+  // photos — falls straight through to the on-device engine below,
+  // unchanged. Nothing here can make a search worse than it already was.
+  try {
+    say('Searching the shelf…', 'sent to the studio server — this can take up to half a minute');
+    const ctrl = new AbortController();
+    // Measured on a real 5-piece booking: about 10 seconds once the
+    // engine is warm, 15 on the first search of the day while it loads.
+    // The old 8 second ceiling here would have aborted every genuine
+    // search before it finished.
+    const killer = setTimeout(() => ctrl.abort(), 45000);
+    const res = await fetch(`${API_URL}/api/pieces/find-on-shelf`, {
+      method: 'POST', signal: ctrl.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, bookingId: _shelfBookingId, photoBase64: photoUrl }),
+    });
+    clearTimeout(killer);
+    if (!res.ok) throw new Error('server engine unavailable');
+    const data = await res.json();
+    if (data.status === 'ok' && Array.isArray(data.results)) {
+      const CONFIDENT = 10, POSSIBLE = 6;
+      const rings = data.results
+        .filter(r => r.inliers >= POSSIBLE && r.x != null)
+        .map(r => ({
+          x: r.x, y: r.y, r: r.r || 50,
+          piece: _shelfPieces.find(p => p.id === r.pieceId) || { piece_type: r.pieceType },
+          edge: r.inliers, sure: r.inliers >= CONFIDENT,
+        }));
+      const best = data.results.slice().sort((a, b) => (b.inliers || 0) - (a.inliers || 0))[0];
+      _renderShelfResult(photoUrl, rings, data.sceneW, data.sceneH,
+        best && best.inliers ? { d: best.inliers, piece: _shelfPieces.find(p => p.id === best.pieceId) || { piece_type: best.pieceType } } : null,
+        _shelfPieces.length, 'points', 'server · ' + (data.engine || 'BRISK'));
+      return;
+    }
+    // no-references or an empty result is a legitimate, honest answer —
+    // not a fault — so it is shown as-is rather than falling through.
+    if (data.status === 'no-references') {
+      _renderShelfResult(photoUrl, [], 0, 0, null, _shelfPieces.length, 'points', 'server');
+      return;
+    }
+    throw new Error(data.error || 'server engine returned nothing usable');
+  } catch (e) {
+    _kcEngineError = 'server: ' + ((e && e.message) || e);
+    // falls through to the on-device engine below, exactly as before
+  }
+
+  // ── THE ON-DEVICE KEYPOINT ENGINE, if it will load ────────────────
   try {
     await _kcLoadCV(m => say('Searching the shelf…', m));
     const cv = window.cv;
