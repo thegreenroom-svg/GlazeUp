@@ -10373,7 +10373,9 @@ function _kcPhotoPiece(pieceId) {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/*';
-  input.capture = 'environment';
+  // No `capture` attribute: iOS then offers Photo Library OR Take Photo,
+  // so staff can attach an existing table photo (e.g. this morning's
+  // iPad shots) as well as snapping the piece in hand.
   input.style.display = 'none';
   document.body.appendChild(input);
   input.onchange = async () => {
