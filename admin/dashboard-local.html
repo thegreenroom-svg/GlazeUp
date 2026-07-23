@@ -10301,43 +10301,31 @@ async function _loadPackingTiles() {
       <!-- What's waiting, grouped by family -->
       <div style="font-size:10px;color:#8a8175;font-family:'Architects Daughter',cursive;
         letter-spacing:0.06em;margin-top:8px;">Waiting · ${groups.length} booking${groups.length===1?'':'s'}</div>
-      ${groups.map(([id, g]) => `
-        <div class="glaze-tile" style="border-radius:14px;padding:14px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div>
+      ${groups.map(([id, g]) => {
+        const photo = (g.pieces.find(p => p.reference_photo_url) || {}).reference_photo_url;
+        const statuses = g.pieces.map(p => p.status);
+        const allSame = statuses.every(s => s === statuses[0]) ? statuses[0] : null;
+        const label = { fired: 'Ready to pack', packed: '✓ Packed', ready_for_pickup: '✓ On shelf', collected: '✓ Collected', posted: '✓ Posted' }[allSame] || 'Mixed';
+        return `
+        <div class="glaze-tile" style="border-radius:14px;padding:0;overflow:hidden;">
+          <button onclick="_openBookingPackCard('${id.replace(/'/g,"\\'")}')" style="width:100%;border:none;background:none;
+            padding:14px;cursor:pointer;text-align:left;display:flex;gap:12px;align-items:center;">
+            ${photo
+              ? `<img src="${photo}" style="width:56px;height:56px;object-fit:cover;border-radius:12px;
+                   flex-shrink:0;border:1.5px solid rgba(43,39,36,0.12);">`
+              : `<div style="width:56px;height:56px;border-radius:12px;flex-shrink:0;
+                   border:1.5px dashed rgba(43,39,36,0.22);display:flex;align-items:center;
+                   justify-content:center;font-size:22px;opacity:0.35;">🏺</div>`}
+            <div style="flex:1;min-width:0;">
               <div style="font-family:'Caveat',cursive;font-size:19px;font-weight:700;color:#2B2724;">${g.customer}</div>
-              <div style="font-size:11px;color:#8a8175;">${g.pieces.length} piece${g.pieces.length===1?'':'s'}</div>
+              <div style="font-size:11px;color:#8a8175;">${g.pieces.length} piece${g.pieces.length===1?'':'s'} · ${label}</div>
             </div>
-          </div>
-          <!-- Each piece, named, with its own photo. A piece with a photo
-               on file can be found by camera; one without can't. -->
-          <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">
-            ${g.pieces.map(p => `
-              <div style="display:flex;align-items:center;gap:10px;padding:7px 0;
-                border-top:1px solid rgba(43,39,36,0.07);">
-                ${p.reference_photo_url
-                  ? `<img src="${p.reference_photo_url}" style="width:40px;height:40px;object-fit:cover;
-                       border-radius:9px;flex-shrink:0;border:1.5px solid rgba(43,39,36,0.12);">`
-                  : `<div style="width:40px;height:40px;border-radius:9px;flex-shrink:0;
-                       border:1.5px dashed rgba(43,39,36,0.22);display:flex;align-items:center;
-                       justify-content:center;font-size:15px;opacity:0.4;">🏺</div>`}
-                <div style="flex:1;min-width:0;">
-                  <div style="font-size:13px;font-weight:700;color:#2B2724;">${p.piece_type || 'Piece'}</div>
-                  <div style="font-size:10px;color:${p.reference_photo_url ? '#00695C' : '#8a8175'};">
-                    ${p.reference_photo_url ? 'Photo on file' : 'No photo yet'}</div>
-                </div>
-                <button class="glaze-tile" onclick="_kcPhotoPiece('${p.id}')"
-                  style="border:1.5px solid rgba(0,137,123,0.4);border-radius:10px;padding:8px 12px;
-                  font-size:12px;font-weight:700;color:#00695C;background:rgba(0,137,123,0.06);
-                  cursor:pointer;flex-shrink:0;">📷 ${p.reference_photo_url ? 'Retake' : 'Photo'}</button>
-              </div>`).join('')}
-          </div>
-          ${g.pieces.length>1 ? `<button class="glaze-tile" onclick="_openTrayScan('${id}','${(g.customer||'').replace(/'/g,"\\'")}',${g.pieces.length})"
-            style="width:100%;margin-top:10px;border:1px dashed rgba(0,137,123,0.4);border-radius:10px;
-            padding:8px;font-size:11px;font-weight:700;color:#00695C;background:rgba(0,137,123,0.06);cursor:pointer;">
-            📸 Scan whole tray — all ${g.pieces.length} at once</button>` : ''}
-        </div>`).join('')}
-
+            <span style="font-size:18px;color:rgba(43,39,36,0.3);">›</span>
+          </button>
+        </div>`;
+      }).join('')}
+      <!-- LEGACY (per-piece list retained inline, hidden version kept via card tap-in above) -->
+      ${''}
       `;
     // Fresh render succeeded — remember it for next open's instant paint.
     try { localStorage.setItem('klnk_cache_packing_v2', el.innerHTML); } catch(e) {}
@@ -10369,6 +10357,274 @@ function _showPackingHelp() {
 // by camera, only by label. Uses the phone's own camera, computes the
 // perceptual hash on-device (free, no AI, nothing sent anywhere but
 // the photo itself), and saves both against the piece.
+// ─── BOOKING PACK CARD — tap a booking, see everything, finish it ───
+// Big real photo (the actual table shot, or a piece photo), every piece
+// as a tickable row, and one button that cycles the whole booking
+// through Packed -> On shelf -> Posted. Also the fallback: if the
+// piece can't be found by eye or by camera match, scan the packing
+// areas and get a photo wall to search by hand — a real, honest
+// fail-safe, not an AI guess.
+let _packCardBookingId = null;
+let _packCardStatusOrder = ['fired', 'packed', 'ready_for_pickup', 'posted'];
+let _packCardStatusLabel = { fired: 'Mark packed', packed: 'Mark on shelf', ready_for_pickup: 'Mark posted', posted: 'Posted', collected: 'Collected' };
+
+async function _openBookingPackCard(bookingId) {
+  _packCardBookingId = bookingId;
+  const modal = document.getElementById('booking-pack-card') || (() => {
+    const d = document.createElement('div');
+    d.id = 'booking-pack-card';
+    d.style.cssText = 'display:none;position:fixed;inset:0;z-index:9560;background:#FFF9F0;flex-direction:column;';
+    document.body.appendChild(d);
+    return d;
+  })();
+  modal.style.display = 'flex';
+  modal.innerHTML = `<div style="padding:40px 20px;text-align:center;color:#8a8175;">Loading…</div>`;
+  await _renderBookingPackCard();
+}
+
+function _closeBookingPackCard() {
+  const modal = document.getElementById('booking-pack-card');
+  if (modal) modal.style.display = 'none';
+  _packCardBookingId = null;
+  if (typeof _loadPackingTiles === 'function') _loadPackingTiles();
+}
+
+async function _renderBookingPackCard() {
+  const modal = document.getElementById('booking-pack-card');
+  if (!modal || !_packCardBookingId) return;
+  let pieces = [];
+  try {
+    const res = await fetch(`${API_URL}/api/packing/queue?studioId=${studioId}`);
+    const data = await res.json();
+    pieces = (data.pieces || []).filter(p => p.booking_id === _packCardBookingId);
+  } catch (e) {}
+  if (!pieces.length) {
+    // Everything in this booking has moved past the packing queue
+    // (all packed/posted/collected) — nothing left to show here.
+    _closeBookingPackCard();
+    return;
+  }
+  const customer = pieces[0].customer_name || _packCardBookingId;
+  const photo = (pieces.find(p => p.reference_photo_url) || {}).reference_photo_url;
+  const statuses = pieces.map(p => p.status);
+  const allSame = statuses.every(s => s === statuses[0]) ? statuses[0] : 'fired';
+  const nextIdx = Math.min(_packCardStatusOrder.indexOf(allSame) + 1, _packCardStatusOrder.length - 1);
+  const nextStatus = _packCardStatusOrder[nextIdx];
+  const isDone = allSame === 'posted' || allSame === 'collected';
+
+  modal.innerHTML = `
+    <div style="padding:max(14px,calc(env(safe-area-inset-top) + 8px)) 16px 12px;flex-shrink:0;
+      border-bottom:1.5px solid rgba(43,39,36,0.14);display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-family:'Architects Daughter',cursive;font-size:20px;font-weight:700;color:#2B2724;">${customer}</div>
+        <div style="font-size:11px;color:#8a8175;">${pieces.length} piece${pieces.length===1?'':'s'}</div>
+      </div>
+      <button onclick="_closeBookingPackCard()" style="background:#2B2724;border:none;color:#FFF9F0;
+        border-radius:12px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;">← Home</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px;">
+      ${photo ? `<img src="${photo}" style="width:100%;border-radius:16px;margin-bottom:16px;
+        border:1.5px solid rgba(43,39,36,0.12);object-fit:cover;max-height:280px;">` : ''}
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${pieces.map(p => {
+          const done = p.status !== 'fired';
+          return `
+          <button onclick="_kcTogglePieceFound('${p.id}','${p.status}')" style="width:100%;text-align:left;
+            background:${done ? 'rgba(46,125,50,0.08)' : '#FFFDF9'};
+            border:1.5px solid ${done ? 'rgba(46,125,50,0.4)' : 'rgba(43,39,36,0.15)'};
+            border-radius:12px;padding:11px 13px;cursor:pointer;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:16px;color:${done ? '#2e7d32' : '#B87946'};">${done ? '✓' : '○'}</span>
+            ${p.reference_photo_url ? `<img src="${p.reference_photo_url}" style="width:32px;height:32px;
+              object-fit:cover;border-radius:7px;flex-shrink:0;">` : ''}
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:600;color:#2B2724;">${p.piece_type || 'Piece'}</div>
+              ${p.notes && p.notes.includes('NOT PAID') ? `<div style="font-size:10px;color:#A32D21;font-weight:700;">⚠ NOT PAID — charge at collection</div>` : ''}
+            </div>
+            <span onclick="event.stopPropagation();_kcPhotoPiece('${p.id}')" style="font-size:16px;padding:4px;">📷</span>
+          </button>`;
+        }).join('')}
+      </div>
+      <button onclick="_openAreaScan('${_packCardBookingId.replace(/'/g,"\\'")}')"
+        style="width:100%;margin-top:16px;background:none;border:1.5px dashed rgba(43,39,36,0.25);
+        border-radius:12px;padding:12px;font-size:12px;font-weight:700;color:#8a8175;cursor:pointer;">
+        Can't find one? Scan the packing areas
+      </button>
+    </div>
+    <div style="padding:14px 16px max(14px,env(safe-area-inset-bottom));border-top:1.5px solid rgba(43,39,36,0.1);flex-shrink:0;">
+      <button onclick="${isDone ? '' : `_kcCycleBookingStatus('${nextStatus}')`}" ${isDone ? 'disabled' : ''}
+        style="width:100%;background:${isDone ? 'rgba(46,125,50,0.15)' : 'linear-gradient(135deg,#00897B,#00695C)'};
+        color:${isDone ? '#2e7d32' : '#fff'};border:none;border-radius:14px;padding:16px;
+        font-size:15px;font-weight:800;cursor:${isDone ? 'default' : 'pointer'};">
+        ${isDone ? '✓ ' + _packCardStatusLabel[allSame] : _packCardStatusLabel[allSame] || 'Mark packed'}
+      </button>
+    </div>`;
+}
+
+async function _kcTogglePieceFound(pieceId, currentStatus) {
+  const newStatus = currentStatus === 'fired' ? 'packed' : 'fired';
+  try {
+    await api(`/api/pieces/${pieceId}/status`, { method: 'POST', body: { studioId, status: newStatus } });
+  } catch (e) { toast("Couldn't update that piece", 'error'); }
+  _renderBookingPackCard();
+}
+
+async function _kcCycleBookingStatus(status) {
+  try {
+    await api('/api/pieces/set-booking-status', {
+      method: 'POST', body: { studioId, bookingId: _packCardBookingId, status, by: currentShiftStaff?.id }
+    });
+    toast(_packCardStatusLabel[status] || 'Updated', 'success');
+  } catch (e) { toast("Couldn't update — try again", 'error'); }
+  _renderBookingPackCard();
+}
+
+// ─── SCAN THE PACKING AREAS — the honest fail-safe ───────────────
+// Up to 10 photos of shelves/trays/boxes, laid out as a grid so a
+// packer can scan by eye across every area at once instead of
+// wandering the room. If AI matching is switched on, it also tries to
+// spot the booking's pieces in each photo and marks them — but the
+// grid itself, real photos side by side, is useful with or without
+// that: the honest "plan B" Daisy asked for.
+let _areaScanBookingId = null;
+let _areaScanPhotos = [];
+
+function _openAreaScan(bookingId) {
+  _areaScanBookingId = bookingId;
+  _areaScanPhotos = [];
+  const modal = document.getElementById('area-scan-overlay') || (() => {
+    const d = document.createElement('div');
+    d.id = 'area-scan-overlay';
+    d.style.cssText = 'display:none;position:fixed;inset:0;z-index:9600;background:#1A1714;flex-direction:column;';
+    document.body.appendChild(d);
+    return d;
+  })();
+  modal.style.display = 'flex';
+  _renderAreaScan();
+}
+
+function _closeAreaScan() {
+  const modal = document.getElementById('area-scan-overlay');
+  if (modal) modal.style.display = 'none';
+  _areaScanPhotos = [];
+}
+
+function _renderAreaScan() {
+  const modal = document.getElementById('area-scan-overlay');
+  if (!modal) return;
+  const n = _areaScanPhotos.length;
+  modal.innerHTML = `
+    <div style="padding:max(14px,calc(env(safe-area-inset-top) + 8px)) 16px 12px;display:flex;
+      align-items:center;justify-content:space-between;border-bottom:1px solid rgba(184,121,70,0.25);">
+      <div style="font-family:'Caveat',cursive;font-size:22px;color:#F4ECE0;">Scan packing areas</div>
+      <button onclick="_closeAreaScan()" style="background:none;border:1px solid rgba(184,121,70,0.4);
+        color:#F4ECE0;border-radius:10px;padding:7px 14px;font-size:12px;cursor:pointer;">Close</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px;">
+      <div style="font-size:12px;color:#8a8175;margin-bottom:14px;">
+        Photograph each shelf, tray or box — up to 10. ${n} taken so far.
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        ${_areaScanPhotos.map((p, i) => `
+          <div style="position:relative;border-radius:12px;overflow:hidden;aspect-ratio:1;">
+            <img src="${p}" style="width:100%;height:100%;object-fit:cover;">
+            <div style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,0.6);color:#fff;
+              font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;">Area ${i+1}</div>
+          </div>`).join('')}
+        ${n < 10 ? `<button onclick="_captureAreaPhoto()" style="aspect-ratio:1;border-radius:12px;
+          border:1.5px dashed rgba(184,121,70,0.5);background:none;color:#B87946;font-size:28px;cursor:pointer;">+</button>` : ''}
+      </div>
+    </div>
+    ${n > 0 ? `<div style="padding:14px 16px max(14px,env(safe-area-inset-bottom));flex-shrink:0;">
+      <button onclick="_reviewAreaScan()" style="width:100%;background:linear-gradient(135deg,#00897B,#00695C);
+        color:#fff;border:none;border-radius:14px;padding:16px;font-size:15px;font-weight:800;cursor:pointer;">
+        Done — review ${n} area${n===1?'':'s'}
+      </button>
+    </div>` : ''}`;
+}
+
+function _captureAreaPhoto() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.onchange = () => {
+    const file = input.files && input.files[0];
+    input.remove();
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { _areaScanPhotos.push(reader.result); _renderAreaScan(); };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+// The review step: shows the grid as a searchable wall (the fail-safe
+// itself — a packer scans it by eye) and, ONLY if paid AI matching is
+// actually switched on server-side, also tries to spot each of this
+// booking's still-missing pieces across the photos. If AI isn't on,
+// it says so plainly rather than pretending to have searched.
+async function _reviewAreaScan() {
+  const modal = document.getElementById('area-scan-overlay');
+  if (!modal) return;
+  modal.innerHTML = `<div style="flex:1;display:flex;align-items:center;justify-content:center;
+    color:#8a8175;font-family:'Caveat',cursive;font-size:22px;">Checking against this booking's pieces…</div>`;
+
+  let pieces = [];
+  try {
+    const res = await fetch(`${API_URL}/api/packing/queue?studioId=${studioId}`);
+    const data = await res.json();
+    pieces = (data.pieces || []).filter(p => p.booking_id === _areaScanBookingId && p.status === 'fired' && p.reference_photo_url);
+  } catch (e) {}
+
+  let matches = [];
+  let aiTried = false;
+  if (pieces.length && _areaScanPhotos.length) {
+    aiTried = true;
+    for (const piece of pieces.slice(0, 6)) {
+      for (let i = 0; i < _areaScanPhotos.length; i++) {
+        try {
+          const r = await api('/api/pieces/find-in-photo', { method: 'POST', timeoutMs: 25000,
+            body: { studioId, targetPhotoBase64: piece.reference_photo_url, scenePhotoBase64: _areaScanPhotos[i], searchedBy: currentShiftStaff?.id }});
+          if (r && r.found) { matches.push({ piece, areaIndex: i, confidence: r.confidence }); break; }
+        } catch (e) { /* AI off or failed — grid-only fallback below */ }
+      }
+    }
+  }
+
+  modal.innerHTML = `
+    <div style="padding:max(14px,calc(env(safe-area-inset-top) + 8px)) 16px 12px;display:flex;
+      align-items:center;justify-content:space-between;border-bottom:1px solid rgba(184,121,70,0.25);">
+      <div style="font-family:'Caveat',cursive;font-size:22px;color:#F4ECE0;">Packing areas</div>
+      <button onclick="_closeAreaScan()" style="background:none;border:1px solid rgba(184,121,70,0.4);
+        color:#F4ECE0;border-radius:10px;padding:7px 14px;font-size:12px;cursor:pointer;">Close</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px;">
+      ${matches.length ? `<div style="font-size:12px;color:#4CAF50;font-weight:700;margin-bottom:12px;">
+        Found ${matches.length} match${matches.length===1?'':'es'} — check the highlighted area${matches.length===1?'':'s'}.</div>`
+        : aiTried ? `<div style="font-size:12px;color:#8a8175;margin-bottom:12px;">No confident match — have a look through the areas below by eye.</div>`
+        : `<div style="font-size:12px;color:#8a8175;margin-bottom:12px;">Automatic matching isn't switched on — scan by eye across the areas below.</div>`}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        ${_areaScanPhotos.map((p, i) => {
+          const hit = matches.find(m => m.areaIndex === i);
+          return `<div style="position:relative;border-radius:12px;overflow:hidden;aspect-ratio:1;
+            border:${hit ? '3px solid #4CAF50' : '1px solid rgba(184,121,70,0.2)'};">
+            <img src="${p}" style="width:100%;height:100%;object-fit:cover;">
+            <div style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,0.6);color:#fff;
+              font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;">Area ${i+1}</div>
+            ${hit ? `<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(76,175,80,0.9);
+              color:#fff;font-size:10px;font-weight:700;padding:4px 8px;">${hit.piece.piece_type}</div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+    <div style="padding:14px 16px max(14px,env(safe-area-inset-bottom));flex-shrink:0;">
+      <button onclick="_closeAreaScan();_renderBookingPackCard();" style="width:100%;background:linear-gradient(135deg,#00897B,#00695C);
+        color:#fff;border:none;border-radius:14px;padding:16px;font-size:15px;font-weight:800;cursor:pointer;">
+        Back to booking
+      </button>
+    </div>`;
+}
+
 function _kcPhotoPiece(pieceId) {
   const input = document.createElement('input');
   input.type = 'file';
@@ -10396,7 +10652,9 @@ function _kcPhotoPiece(pieceId) {
         body: { studioId, photoBase64, phash }
       });
       toast('Photo saved', 'success');
-      if (typeof openPacking === 'function') openPacking();
+      const cardOpen = document.getElementById('booking-pack-card')?.style.display === 'flex';
+      if (cardOpen) { await _renderBookingPackCard(); }
+      else if (typeof openPacking === 'function') openPacking();
     } catch (e) {
       toast('Could not save that photo', 'error');
     }
@@ -32054,6 +32312,14 @@ if (typeof document !== 'undefined') {
     // (fixed, inset:0) and back appears to do nothing = trapped. The room
     // panel is the common one; add siblings here if new overlays appear.
     try {
+      const areaScan = document.getElementById('area-scan-overlay');
+      if (areaScan && areaScan.style.display !== 'none' && getComputedStyle(areaScan).display !== 'none') {
+        _closeAreaScan(); return;
+      }
+      const packCard = document.getElementById('booking-pack-card');
+      if (packCard && packCard.style.display !== 'none' && getComputedStyle(packCard).display !== 'none') {
+        _closeBookingPackCard(); return;
+      }
       const roomPanel = document.getElementById('floor-room-panel');
       if (roomPanel && roomPanel.style.display !== 'none' && getComputedStyle(roomPanel).display !== 'none') {
         if (typeof closeRoomPanel === 'function') closeRoomPanel();

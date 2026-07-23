@@ -8032,6 +8032,38 @@ app.get('/api/packing/queue', async (req, res) => {
 // referencing at least one QR/booking code from the batch as proof of
 // what was packed and when. This is the "complete" action for the
 // person doing the packing.
+// POST /api/pieces/set-booking-status — moves every not-yet-collected
+// piece for one booking to a new status in one tap. Deliberately
+// separate from /api/packing/complete (which demands a QR/booking-code
+// audit trail for the formal pack event) — this is the quick status
+// cycle on the booking card: Packed -> On shelf -> Posted/Collected.
+// A booking here may be identified by name (tag-read pieces have no
+// real Square booking code), so this matches on booking_id directly.
+app.post('/api/pieces/set-booking-status', async (req, res) => {
+  const { studioId, bookingId, status, by } = req.body;
+  if (!studioId || !bookingId || !status) {
+    return res.status(400).json({ error: 'studioId, bookingId and status required' });
+  }
+  if (!PIECE_STATUSES.includes(status)) {
+    return res.status(400).json({ error: `status must be one of: ${PIECE_STATUSES.join(', ')}` });
+  }
+  try {
+    const timestampField = status === 'packed' ? { packed_at: new Date().toISOString() } : {};
+    const { data: updated, error } = await supabase
+      .from('pottery_pieces')
+      .update({ status, updated_at: new Date().toISOString(), ...timestampField })
+      .eq('studio_id', studioId)
+      .eq('booking_id', bookingId)
+      .not('status', 'in', '(collected,posted,picked_up)')
+      .select('id, piece_type, status');
+    if (error) throw error;
+    res.json({ status, piecesUpdated: (updated || []).length, pieces: updated || [] });
+  } catch (error) {
+    console.error('Error setting booking status:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/packing/complete', async (req, res) => {
   const { studioId, pieceIds, referenceBookingCode, packedBy, batchCode, firedDate, pullDate } = req.body;
   if (!studioId || !pieceIds || !Array.isArray(pieceIds) || !pieceIds.length) {
@@ -8102,7 +8134,7 @@ app.get('/api/packing/log', async (req, res) => {
 // write the same column. Status is validated against the values the
 // app genuinely uses, so a typo at a call site fails loudly here
 // instead of writing nonsense into a piece's history.
-const PIECE_STATUSES = ['awaiting_dip','dipped','in_kiln','fired','ready_for_pickup','collected','picked_up','damaged'];
+const PIECE_STATUSES = ['awaiting_dip','dipped','in_kiln','fired','packed','ready_for_pickup','collected','posted','picked_up','damaged'];
 
 app.post('/api/pieces/:pieceId/status', async (req, res) => {
   const { studioId, status } = req.body;
