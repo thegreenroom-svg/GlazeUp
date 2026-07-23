@@ -10482,9 +10482,16 @@ async function _renderBookingPackCard() {
               <div style="font-size:14px;font-weight:600;color:#2B2724;">${p.piece_type || 'Piece'}</div>
               ${p.notes && p.notes.includes('NOT PAID') ? `<div style="font-size:10px;color:#A32D21;font-weight:700;">⚠ NOT PAID — charge at collection</div>` : ''}
             </div>
+            <span onclick="event.stopPropagation();_kcMovePiece('${p.id}','${(p.piece_type||'Piece').replace(/'/g,"\\'")}')"
+              style="font-size:15px;padding:6px;flex-shrink:0;opacity:0.5;" title="Move to another booking">↔</span>
             <span onclick="event.stopPropagation();_kcPhotoPiece('${p.id}')" style="font-size:20px;padding:6px;flex-shrink:0;">📷</span>
           </button>`;
         }).join('')}
+        <button onclick="_kcAddPiece()" style="width:100%;background:none;
+          border:1.5px dashed rgba(43,39,36,0.25);border-radius:12px;padding:11px;
+          font-size:12px;font-weight:700;color:#8a8175;cursor:pointer;">
+          + Add another piece to this booking
+        </button>
       </div>
       <button onclick="_kcFindOnShelves('${_packCardBookingId.replace(/'/g,"\\'")}')"
         style="width:100%;margin-top:16px;background:linear-gradient(135deg,#B87946,#8f5a33);
@@ -10509,6 +10516,40 @@ async function _renderBookingPackCard() {
 
 // Tick or clear every piece in the booking at once — for when the
 // whole order comes off the shelf together, which is most of the time.
+// Add another piece to this booking, and move a piece to a different
+// one. Orders genuinely change at the packing bench — extras turn up,
+// and families who painted together often want to collect separately.
+async function _kcAddPiece() {
+  const what = prompt('What is it? (e.g. Mug, Bowl, Plate)');
+  if (!what || !what.trim()) return;
+  try {
+    await api('/api/pieces/add', { method: 'POST',
+      body: { studioId, bookingId: _packCardBookingId, pieceType: what.trim(), notes: 'Added at packing' } });
+    toast('Added', 'success');
+  } catch (e) { toast("Couldn't add that", 'error'); }
+  _renderBookingPackCard();
+}
+
+async function _kcMovePiece(pieceId, pieceName) {
+  let names = [];
+  try {
+    const r = await fetch(`${API_URL}/api/pieces/bookings?studioId=${studioId}`);
+    names = (await r.json()).bookings || [];
+  } catch (e) {}
+  const others = names.filter(n => n !== _packCardBookingId);
+  const to = prompt(
+    `Move "${pieceName}" to which booking?\n\n` +
+    (others.length ? `Existing: ${others.join(', ')}\n\n` : '') +
+    `Type a name — a new one is fine.`, others[0] || '');
+  if (!to || !to.trim() || to.trim() === _packCardBookingId) return;
+  try {
+    await api(`/api/pieces/${pieceId}/move`, { method: 'POST',
+      body: { studioId, toBookingId: to.trim() } });
+    toast(`Moved to ${to.trim()}`, 'success');
+  } catch (e) { toast("Couldn't move that", 'error'); }
+  _renderBookingPackCard();
+}
+
 async function _kcTickAll(tickThem) {
   try {
     await api('/api/pieces/set-booking-status', {

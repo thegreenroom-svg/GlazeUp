@@ -8046,6 +8046,69 @@ app.get('/api/packing/queue', async (req, res) => {
 // cycle on the booking card: Packed -> On shelf -> Posted/Collected.
 // A booking here may be identified by name (tag-read pieces have no
 // real Square booking code), so this matches on booking_id directly.
+// POST /api/pieces/add — put another piece on a booking. Real studios
+// discover extras at the packing bench ("there's another mug of hers
+// in the back"), so the order has to be editable at that moment, not
+// frozen at booking time.
+app.post('/api/pieces/add', async (req, res) => {
+  const { studioId, bookingId, pieceType, notes } = req.body;
+  if (!studioId || !bookingId || !pieceType) {
+    return res.status(400).json({ error: 'studioId, bookingId and pieceType required' });
+  }
+  try {
+    const { data, error } = await supabase.from('pottery_pieces').insert({
+      studio_id: studioId, booking_id: bookingId, piece_type: pieceType,
+      status: 'fired', is_complete: true, notes: notes || null,
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }).select().single();
+    if (error) throw error;
+    res.json({ status: 'added', piece: data });
+  } catch (error) {
+    console.error('Add piece error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/pieces/:pieceId/move — reassign a piece to another booking.
+// The other half of the same real-world problem: two families painted
+// together on one booking but want to collect separately, so a piece
+// has to be able to walk from one order to another.
+app.post('/api/pieces/:pieceId/move', async (req, res) => {
+  const { studioId, toBookingId } = req.body;
+  const { pieceId } = req.params;
+  if (!studioId || !toBookingId) {
+    return res.status(400).json({ error: 'studioId and toBookingId required' });
+  }
+  try {
+    const { data, error } = await supabase.from('pottery_pieces')
+      .update({ booking_id: toBookingId, updated_at: new Date().toISOString() })
+      .eq('studio_id', studioId).eq('id', pieceId)
+      .select().maybeSingle();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: 'No such piece for this studio.' });
+    res.json({ status: 'moved', piece: data });
+  } catch (error) {
+    console.error('Move piece error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/pieces/bookings — the studio's current booking names, for
+// the "move to…" picker.
+app.get('/api/pieces/bookings', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const { data, error } = await supabase.from('pottery_pieces')
+      .select('booking_id').eq('studio_id', studioId).not('booking_id', 'is', null);
+    if (error) throw error;
+    const names = [...new Set((data || []).map(p => p.booking_id))].sort();
+    res.json({ bookings: names });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/pieces/set-booking-status', async (req, res) => {
   const { studioId, bookingId, status, by } = req.body;
   if (!studioId || !bookingId || !status) {
