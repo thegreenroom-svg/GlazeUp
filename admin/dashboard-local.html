@@ -33210,6 +33210,29 @@ if (typeof window !== 'undefined' && typeof window._manualFloorSync !== 'functio
      Tile sub-captions explain what each tool is — icon + name is enough.
      One rule silences all 32 explainer lines under tile names. */
   span[style*="font-size:10px;opacity:0.85"] { display: none !important; }
+  /* The staff picker was styled on 22 Jul and never caught up with the
+     paper world — it's the first screen anyone sees, so it shouldn't
+     look a generation behind the rest. Theme it here rather than
+     touching its markup. */
+  #shift-login-modal > div {
+    background: #FFF9F0 !important;
+    border: 1.5px solid rgba(43,39,36,0.12);
+    border-radius: 22px !important;
+    box-shadow: 0 8px 40px rgba(43,39,36,0.25);
+  }
+  #shift-login-modal [style*="build 18 Jul"] { display: none !important; }
+  #login-screen-picker > div:nth-of-type(2) {
+    font-family: 'Architects Daughter', cursive !important;
+    font-size: 22px !important;
+    color: #2B2724 !important;
+  }
+  #login-name-grid button {
+    background: #FFFDF9 !important;
+    border: 1.5px solid rgba(43,39,36,0.14) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 1px 3px rgba(43,39,36,0.05);
+  }
+  #login-name-grid button div { color: #2B2724 !important; }
   /* Night shift: the same book by lamplight */
   @media (prefers-color-scheme: dark) {
     body, .view { background: #201C1A !important; color: #F4ECE0; }
