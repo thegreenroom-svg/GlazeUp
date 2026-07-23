@@ -11221,8 +11221,14 @@ function _kcShowTapResult(cropUrl, match) {
              From there you can sweep the shelves for the rest of their pieces.</div>` : ''}`
         : `<div style="font-family:'Caveat',cursive;font-size:26px;color:#F4ECE0;">No confident match</div>
            <div style="font-size:12px;color:#8a8175;margin-top:8px;line-height:1.5;">
-             Either this piece has no photo on file yet, or the shot caught mostly background.
-             Try again closer in on the piece.</div>`}
+             ${window._kcLastNear
+               ? `Closest was <b style="color:#B87946;">${window._kcLastNear.p.piece_type}</b>
+                  (${window._kcLastNear.p.booking_id}) at ${window._kcLastNear.d.toFixed(1)} —
+                  too far off to call it.<br><br>
+                  Shots taken close, square-on and in similar light score best.`
+               : `Either this piece has no photo on file yet, or the shot caught mostly background.
+                  Try again closer in on the piece.`}
+           </div>`}
       <button onclick="document.getElementById('kc-tap-result').style.display='none'"
         style="width:100%;margin-top:${match && match.bookingId ? '10' : '20'}px;background:rgba(255,255,255,0.12);color:#F4ECE0;border:none;
         border-radius:12px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;">Done</button>
@@ -11236,6 +11242,11 @@ function _kcShowTapResult(cropUrl, match) {
 // and from there sweep the shelves for the rest of their pieces. This
 // is the natural start of a pack: one piece in hand leads to the whole
 // order. Free, on-device fingerprint match, no AI.
+// Identify runs the match ON THE PHONE against every piece with a
+// photo, using the colour-led scoring rather than the server's older
+// shape-led comparison and its very strict cut-off. Same engine as
+// the shelf sweep, so behaviour is consistent — and it can be honest
+// about a fair-but-not-certain match instead of silently refusing.
 function _kcIdentifyPiece() {
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
@@ -11247,17 +11258,62 @@ function _kcIdentifyPiece() {
     if (!file) return;
     try {
       toast('Looking…', 'info');
-      const phash = await computePerceptualHash(file);
       const photoBase64 = await new Promise((res, rej) => {
         const r = new FileReader();
         r.onload = () => res(r.result);
         r.onerror = () => rej(new Error('read failed'));
         r.readAsDataURL(file);
       });
-      const data = await api('/api/pieces/find-by-photo', { method: 'POST', timeoutMs: 30000,
-        body: { studioId, photoBase64, phash, searchedBy: currentShiftStaff?.id, autoAssign: false } });
-      const m = (data.matches || [])[0];
-      _kcShowTapResult(photoBase64, (m && data.noConfidentMatch !== true) ? m : null);
+
+      // fingerprint the query photo, histogram and all
+      const base = await computePerceptualHash(file);
+      const qbmp = await createImageBitmap(file);
+      const qs = Math.min(qbmp.width, qbmp.height);
+      const queryFp = `${base}|${_kcColourHistogram(qbmp,
+        Math.round((qbmp.width - qs) / 2), Math.round((qbmp.height - qs) / 2), qs)}`;
+      qbmp.close?.();
+
+      // every piece in the studio that has a photo on file
+      let candidates = [];
+      try {
+        const res = await fetch(`${API_URL}/api/packing/queue?studioId=${studioId}`);
+        const data = await res.json();
+        candidates = (data.pieces || []).filter(p => p.photo_phash && p.reference_photo_url);
+      } catch (e) {}
+
+      if (!candidates.length) {
+        _kcShowTapResult(photoBase64, null);
+        return;
+      }
+
+      // backfill histograms for anything photographed before they existed
+      for (const p of candidates) {
+        if (p.photo_phash.split('|').length < 4) {
+          try {
+            const b = await createImageBitmap(await (await fetch(p.reference_photo_url)).blob());
+            const s = Math.min(b.width, b.height);
+            p.photo_phash = `${p.photo_phash}|${_kcColourHistogram(b,
+              Math.round((b.width - s) / 2), Math.round((b.height - s) / 2), s)}`;
+            b.close?.();
+          } catch (e) {}
+        }
+      }
+
+      let best = null;
+      for (const p of candidates) {
+        const d = _kcSweepDistance(queryFp, p.photo_phash);
+        if (!best || d < best.d) best = { d, p };
+      }
+
+      // Honest bands rather than one strict yes/no.
+      const conf = best.d <= 12 ? 'high' : best.d <= 20 ? 'fair' : best.d <= 30 ? 'low' : null;
+      window._kcLastNear = best;
+      _kcShowTapResult(photoBase64, conf ? {
+        customerName: best.p.customer_name || best.p.booking_id,
+        pieceType: best.p.piece_type,
+        bookingId: best.p.booking_id,
+        confidence: `${conf} · ${best.d.toFixed(0)}`
+      } : null);
     } catch (e) {
       toast("Couldn't identify that one", 'error');
     }
