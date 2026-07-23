@@ -11160,19 +11160,31 @@ function _kcCVUnsnooze() {
 async function _kcCVReady() {
   const m = window.cv;
   if (!m) throw new Error('engine did not register');
-  if (typeof m.then === 'function') { window.cv = await m; }
-  else if (!m.Mat) {
-    await new Promise((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error('engine did not start in time')), 12000);
-      m.onRuntimeInitialized = () => { clearTimeout(t); resolve(); };
-      // Guard against the classic race: if it had already started
-      // before the handler was attached, the callback never fires.
-      const poll = setInterval(() => {
-        if (window.cv && window.cv.Mat) { clearInterval(poll); clearTimeout(t); resolve(); }
-      }, 200);
-      setTimeout(() => clearInterval(poll), 12000);
-    });
-  }
+  if (m.Mat) return;
+  // NEVER `await` the module object, even though it looks like a promise.
+  // This build exports an object carrying its OWN `then` method (a
+  // leftover of its module wrapper). Awaiting it makes JavaScript wait
+  // on that `then` to call back — and it never does, so the await hangs
+  // forever with no error and no timeout. Exactly this bug hung the
+  // server version; it was here too and this is what left the phone
+  // sitting on "starting the engine…".
+  //
+  // So: don't await it. Just watch for the runtime to become usable,
+  // with a hard ceiling, and treat not-ready-in-time as a failure.
+  await new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (ok, err) => {
+      if (settled) return;
+      settled = true;
+      clearInterval(poll); clearTimeout(ceiling);
+      ok ? resolve() : reject(err);
+    };
+    const ceiling = setTimeout(() => finish(false, new Error('engine did not start in time')), 12000);
+    const poll = setInterval(() => {
+      if (window.cv && window.cv.Mat) finish(true);
+    }, 150);
+    try { m.onRuntimeInitialized = () => { if (window.cv && window.cv.Mat) finish(true); }; } catch (e) {}
+  });
   if (!window.cv || !window.cv.Mat) throw new Error('engine started but is incomplete');
 }
 
@@ -11474,7 +11486,15 @@ async function _kcSweepShelf(photoUrl) {
 
   // ── THE ON-DEVICE KEYPOINT ENGINE, if it will load ────────────────
   try {
-    await _kcLoadCV(m => say('Searching the shelf…', m));
+    // Absolute ceiling on the whole on-device attempt. Every internal
+    // stage already has its own timeout, but this exists so that even a
+    // bug I have not thought of cannot leave a member of staff staring
+    // at a spinner — which has now happened twice in one evening.
+    await Promise.race([
+      _kcLoadCV(m => say('Searching the shelf…', m)),
+      new Promise((_, rej) => setTimeout(
+        () => rej(new Error('engine took too long on this device')), 40000)),
+    ]);
     const cv = window.cv;
     const det = _kcDetector();
     say('Searching the shelf…', 'reading the photo');
