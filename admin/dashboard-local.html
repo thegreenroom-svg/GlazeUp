@@ -10763,6 +10763,8 @@ function _kcColourHistogram(bmp, sx, sy, side) {
   ctx.drawImage(bmp, sx, sy, side, side, 0, 0, N, N);
   const d = ctx.getImageData(0, 0, N, N).data;
   const bins = new Array(12 * 3 * 3).fill(0);
+  const hueBins = new Array(12).fill(0);
+  let hueWeight = 0;
   let counted = 0;
   for (let i = 0; i < d.length; i += 4) {
     const r = d[i] / 255, g = d[i+1] / 255, b = d[i+2] / 255;
@@ -10780,29 +10782,62 @@ function _kcColourHistogram(bmp, sx, sy, side) {
     const sb = Math.min(2, Math.floor(s * 3));
     const vb = Math.min(2, Math.floor(v * 3));
     bins[hb * 9 + sb * 3 + vb]++;
+    // A pixel votes for its hue in proportion to how colourful it is —
+    // a vivid red counts fully, a near-white barely at all. That keeps
+    // the signal on the glaze rather than the shelf.
+    const wgt = s * v;
+    hueBins[hb] += wgt;
+    hueWeight += wgt;
     counted++;
   }
-  // normalise to 0-255 per bin and store as hex pairs
+  // Full histogram: hue AND intensity. Precise, but intensity changes
+  // dramatically in the kiln, so this alone can't match unfired to fired.
   let hex = '';
   for (let i = 0; i < bins.length; i++) {
     const val = Math.min(255, Math.round((bins[i] / Math.max(1, counted)) * 255 * 6));
     hex += val.toString(16).padStart(2, '0');
   }
-  return hex;
+  // Hue-only histogram: WHICH colours are present, ignoring how pale or
+  // vivid they are. This is the firing-proof signal — an unfired piece is
+  // washy and pastel, the same piece fired is bright and saturated, but a
+  // red is still a red. Weighted by saturation so near-grey pixels (glaze
+  // whites, shadows, the shelf itself) don't drown out the real colour.
+  let hueHex = '';
+  for (let i = 0; i < 12; i++) {
+    const val = Math.min(255, Math.round((hueBins[i] / Math.max(0.0001, hueWeight)) * 255 * 3));
+    hueHex += val.toString(16).padStart(2, '0');
+  }
+  return `${hex}~${hueHex}`;
 }
 
 // Histogram intersection, expressed on the same 0-64 scale as the
-// other signals so it can sit alongside them.
+// other signals so it can sit alongside them. Handles the compound
+// "<full>~<hueOnly>" form: it scores BOTH and takes the better, so a
+// piece photographed unfired (pale, washy) can still match itself
+// fired (bright, saturated) — the hue survives even when intensity
+// changes completely, which is the whole problem with kiln colour.
 function _kcHistDistance(a, b) {
-  if (!a || !b || a.length !== b.length) return 64;
-  let inter = 0, total = 0;
-  for (let i = 0; i < a.length; i += 2) {
-    const x = parseInt(a.substr(i, 2), 16), y = parseInt(b.substr(i, 2), 16);
-    inter += Math.min(x, y);
-    total += Math.max(x, y);
-  }
-  if (!total) return 64;
-  return (1 - inter / total) * 64;
+  if (!a || !b) return 64;
+  const [fa, ha] = String(a).split('~');
+  const [fb, hb] = String(b).split('~');
+  const inter = (x, y) => {
+    if (!x || !y || x.length !== y.length) return null;
+    let i = 0, t = 0;
+    for (let k = 0; k < x.length; k += 2) {
+      const p = parseInt(x.substr(k, 2), 16), q = parseInt(y.substr(k, 2), 16);
+      i += Math.min(p, q); t += Math.max(p, q);
+    }
+    return t ? (1 - i / t) * 64 : 64;
+  };
+  const full = inter(fa, fb);
+  const hue = (ha && hb) ? inter(ha, hb) : null;
+  if (full === null && hue === null) return 64;
+  if (hue === null) return full;
+  if (full === null) return hue;
+  // Whichever agrees more is the more trustworthy read. Hue carries a
+  // small penalty because it's the looser test — it says "same colours"
+  // not "same picture" — but it's what makes fired/unfired possible.
+  return Math.min(full, hue + 2);
 }
 
 // Scoring for the SWEEP specifically — colour-led, as Daisy called it.
