@@ -12498,6 +12498,7 @@ app.post('/api/pieces/find-by-photo', async (req, res) => {
         });  // no .catch — builder is a thenable, chaining .catch throws
         return res.json({
           matches: [{ id: best.candidate.id, source: 'piece', label: best.candidate.piece_type,
+            pieceType: best.candidate.piece_type, bookingId: best.candidate.booking_id,
             confidence: 'high', reason }],
           noConfidentMatch: false, autoAssigned, viaLocalHash: true
         });

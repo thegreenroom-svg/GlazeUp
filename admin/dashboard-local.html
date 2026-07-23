@@ -10298,6 +10298,17 @@ async function _loadPackingTiles() {
           piece${pieces.length===1?'':'s'} to pack</div>
       </button>
 
+      <!-- The other way in: a piece in hand, work out whose it is -->
+      <button onclick="_kcIdentifyPiece()" class="glaze-tile"
+        style="width:100%;border:1.5px solid rgba(43,39,36,0.15);border-radius:16px;padding:16px 20px;
+        cursor:pointer;margin-top:8px;background:#FFFDF9;text-align:left;display:flex;align-items:center;gap:14px;">
+        <span style="font-size:26px;flex-shrink:0;">📷</span>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:#2B2724;">Identify a piece</div>
+          <div style="font-size:11px;color:#8a8175;margin-top:2px;">Photograph one — I'll find whose it is</div>
+        </div>
+      </button>
+
       <!-- What's waiting, grouped by family -->
       <div style="font-size:10px;color:#8a8175;font-family:'Architects Daughter',cursive;
         letter-spacing:0.06em;margin-top:8px;">Waiting · ${groups.length} booking${groups.length===1?'':'s'}</div>
@@ -10963,16 +10974,65 @@ function _kcShowTapResult(cropUrl, match) {
       ${match
         ? `<div style="font-family:'Caveat',cursive;font-size:30px;color:#F4ECE0;line-height:1.1;">${name}</div>
            ${match.pieceType ? `<div style="font-size:13px;color:#8a8175;margin-top:4px;">${match.pieceType}</div>` : ''}
-           ${match.confidence ? `<div style="font-size:11px;color:#8a8175;margin-top:6px;">${match.confidence} confidence</div>` : ''}`
+           ${match.confidence ? `<div style="font-size:11px;color:#8a8175;margin-top:6px;">${match.confidence} confidence</div>` : ''}
+           ${match.bookingId ? `<button onclick="_kcOpenBookingFromMatch('${String(match.bookingId).replace(/'/g,"\\'")}')"
+             style="width:100%;margin-top:18px;background:linear-gradient(135deg,#00897B,#00695C);color:#fff;
+             border:none;border-radius:14px;padding:16px;font-size:15px;font-weight:800;cursor:pointer;">
+             Open this booking →</button>
+           <div style="font-size:11px;color:#8a8175;margin-top:8px;line-height:1.5;">
+             From there you can sweep the shelves for the rest of their pieces.</div>` : ''}`
         : `<div style="font-family:'Caveat',cursive;font-size:26px;color:#F4ECE0;">No confident match</div>
            <div style="font-size:12px;color:#8a8175;margin-top:8px;line-height:1.5;">
-             Either this piece has no photo on file yet, or the crop caught the background.
-             Try tapping right on the piece.</div>`}
+             Either this piece has no photo on file yet, or the shot caught mostly background.
+             Try again closer in on the piece.</div>`}
       <button onclick="document.getElementById('kc-tap-result').style.display='none'"
-        style="width:100%;margin-top:20px;background:rgba(255,255,255,0.12);color:#F4ECE0;border:none;
+        style="width:100%;margin-top:${match && match.bookingId ? '10' : '20'}px;background:rgba(255,255,255,0.12);color:#F4ECE0;border:none;
         border-radius:12px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;">Done</button>
     </div>`;
   d.style.display = 'flex';
+}
+
+// ─── IDENTIFY A PIECE — the "I'm holding this, whose is it?" way in ──
+// Pick up any piece anywhere, photograph it, and the engine names the
+// booking. From the result you can open that booking straight away —
+// and from there sweep the shelves for the rest of their pieces. This
+// is the natural start of a pack: one piece in hand leads to the whole
+// order. Free, on-device fingerprint match, no AI.
+function _kcIdentifyPiece() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.onchange = async () => {
+    const file = input.files && input.files[0];
+    input.remove();
+    if (!file) return;
+    try {
+      toast('Looking…', 'info');
+      const phash = await computePerceptualHash(file);
+      const photoBase64 = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result);
+        r.onerror = () => rej(new Error('read failed'));
+        r.readAsDataURL(file);
+      });
+      const data = await api('/api/pieces/find-by-photo', { method: 'POST', timeoutMs: 30000,
+        body: { studioId, photoBase64, phash, searchedBy: currentShiftStaff?.id, autoAssign: false } });
+      const m = (data.matches || [])[0];
+      _kcShowTapResult(photoBase64, (m && data.noConfidentMatch !== true) ? m : null);
+    } catch (e) {
+      toast("Couldn't identify that one", 'error');
+    }
+  };
+  input.click();
+}
+
+async function _kcOpenBookingFromMatch(bookingId) {
+  const d = document.getElementById('kc-tap-result');
+  if (d) d.style.display = 'none';
+  _kcCloseShelfScan();
+  try { _closeAreaScan(); } catch (e) {}
+  await _openBookingPackCard(bookingId);
 }
 
 function _kcPhotoPiece(pieceId) {
