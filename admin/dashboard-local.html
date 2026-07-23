@@ -11121,6 +11121,7 @@ function _kcCaptureShelf() {
 //
 // Runs entirely on the device. No API, no cost, nothing leaves the phone.
 let _cvLoading = null;
+let _kcEngineError = null;
 function _kcLoadCV(onProgress) {
   if (window.cv && window.cv.Mat) return Promise.resolve();
   if (_cvLoading) return _cvLoading;
@@ -11141,46 +11142,64 @@ function _kcLoadCV(onProgress) {
   return _cvLoading;
 }
 
-// Best available detector. SIFT is markedly the strongest here —
-// measured against the alternatives on a real pair of photos, SIFT
-// separated the right object 16 to 6 where AKAZE managed 4 to 3 and
-// ORB 6 to 2. Falls back gracefully if a build lacks it.
+// Best available detector. IMPORTANT, learned the hard way: the
+// browser build of OpenCV does NOT include SIFT, which is what won on
+// the desktop test — so it cannot be shipped, however good it was.
+// Re-tested using only what the browser actually provides, on Daisy's
+// own two photos (right object vs five wrong ones):
+//     BRISK  19 vs 8   <- clear winner
+//     ORB    14 vs 9
+//     AKAZE  25 vs 22  (muddy)
+//     KAZE   32 vs 41  (worse than useless — wrong objects scored higher)
 function _kcDetector() {
   const cv = window.cv;
-  if (cv.SIFT_create) return { d: new cv.SIFT(1200, 3, 0.02), norm: cv.NORM_L2, name: 'SIFT' };
-  if (cv.SIFT) { try { return { d: new cv.SIFT(1200, 3, 0.02), norm: cv.NORM_L2, name: 'SIFT' }; } catch (e) {} }
+  if (cv.BRISK) {
+    try { return { d: new cv.BRISK(15, 4, 1.0), norm: cv.NORM_HAMMING, name: 'BRISK' }; } catch (e) {}
+    try { return { d: new cv.BRISK(), norm: cv.NORM_HAMMING, name: 'BRISK' }; } catch (e) {}
+  }
+  if (cv.ORB) { try { return { d: new cv.ORB(2500), norm: cv.NORM_HAMMING, name: 'ORB' }; } catch (e) {} }
   if (cv.AKAZE) { try { return { d: new cv.AKAZE(), norm: cv.NORM_HAMMING, name: 'AKAZE' }; } catch (e) {} }
-  return { d: new cv.ORB(1500), norm: cv.NORM_HAMMING, name: 'ORB' };
+  throw new Error('no feature detector available');
 }
 
-// Load an image into a greyscale, contrast-equalised Mat. Equalising
-// is what makes a piece photographed in window light match the same
-// piece under the studio strip light.
-async function _kcCVGrey(url, maxSide) {
+async function _kcCVBitmap(url) {
+  return await createImageBitmap(await (await fetch(url)).blob());
+}
+
+function _kcCVGreyFromBmp(bmp, maxSide) {
   const cv = window.cv;
-  const bmp = await createImageBitmap(await (await fetch(url)).blob());
-  const f = Math.min(1, (maxSide || 1400) / Math.max(bmp.width, bmp.height));
+  const f = Math.min(4, maxSide / Math.max(bmp.width, bmp.height));
   const W = Math.max(1, Math.round(bmp.width * f)), H = Math.max(1, Math.round(bmp.height * f));
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
   c.getContext('2d').drawImage(bmp, 0, 0, W, H);
-  bmp.close?.();
   const src = cv.imread(c);
   const grey = new cv.Mat();
   cv.cvtColor(src, grey, cv.COLOR_RGBA2GRAY);
   src.delete();
-  const eq = new cv.Mat();
-  cv.createCLAHE(2.5, new cv.Size(8, 8)).apply(grey, eq);
-  grey.delete();
-  return { mat: eq, W, H };
+  let out = grey;
+  try {
+    const eq = new cv.Mat();
+    cv.createCLAHE(2.5, new cv.Size(8, 8)).apply(grey, eq);
+    grey.delete();
+    out = eq;
+  } catch (e) { /* equalising unavailable — the raw greyscale still works */ }
+  return { mat: out, W, H };
+}
+
+async function _kcCVGrey(url, maxSide) {
+  const bmp = await _kcCVBitmap(url);
+  const r = _kcCVGreyFromBmp(bmp, maxSide || 1400);
+  bmp.close?.();
+  return r;
 }
 
 // Match one reference against the scene and ask the only question that
 // matters: do the matched points agree on where the object is?
 function _kcCVMatch(det, refDesc, refKp, sceneDesc, sceneKp) {
   const cv = window.cv;
-  const RATIO = 0.70;      // tuned on real photos — 0.85 let wrong objects through
-  const REPROJ = 4;        // how tightly the points must agree
+  const RATIO = 0.78;      // tuned on real photos
+  const REPROJ = 5;
   if (!refDesc.rows || !sceneDesc.rows) return { inliers: 0, pts: [] };
   const matcher = new cv.BFMatcher(det.norm);
   const knn = new cv.DMatchVectorVector();
@@ -11193,7 +11212,7 @@ function _kcCVMatch(det, refDesc, refKp, sceneDesc, sceneKp) {
     if (m.distance < RATIO * n.distance) good.push(m);
   }
   knn.delete(); matcher.delete();
-  if (good.length < 4) return { inliers: good.length ? 1 : 0, pts: [] };
+  if (good.length < 4) return { inliers: 0, pts: [] };
 
   const src = cv.matFromArray(good.length, 1, cv.CV_32FC2,
     good.flatMap(m => { const p = refKp.get(m.queryIdx).pt; return [p.x, p.y]; }));
@@ -11201,8 +11220,12 @@ function _kcCVMatch(det, refDesc, refKp, sceneDesc, sceneKp) {
     good.flatMap(m => { const p = sceneKp.get(m.trainIdx).pt; return [p.x, p.y]; }));
   const mask = new cv.Mat();
   let inliers = 0; const pts = [];
+  let M = null;
   try {
-    const M = cv.estimateAffinePartial2D(src, dst, mask, cv.RANSAC, REPROJ, 4000, 0.995, 10);
+    // NOTE: estimateAffinePartial2D is NOT in the browser build — calling
+    // it threw and silently dropped the whole engine back to the old
+    // square matcher. findHomography is available and tested better here.
+    M = cv.findHomography(src, dst, cv.RANSAC, REPROJ, mask, 4000, 0.995);
     for (let i = 0; i < mask.rows; i++) {
       if (mask.data[i]) {
         inliers++;
@@ -11210,9 +11233,19 @@ function _kcCVMatch(det, refDesc, refKp, sceneDesc, sceneKp) {
         pts.push({ x: p.x, y: p.y });
       }
     }
-    M.delete();
-  } catch (e) { /* no consistent placement found */ }
-  src.delete(); dst.delete(); mask.delete();
+  } catch (e) {
+    try {
+      M = cv.estimateAffine2D(src, dst, mask, cv.RANSAC, REPROJ, 4000, 0.995, 10);
+      for (let i = 0; i < mask.rows; i++) {
+        if (mask.data[i]) {
+          inliers++;
+          const p = sceneKp.get(good[i].trainIdx).pt;
+          pts.push({ x: p.x, y: p.y });
+        }
+      }
+    } catch (e2) { /* no consistent placement */ }
+  }
+  M?.delete?.(); src.delete(); dst.delete(); mask.delete();
   return { inliers, pts };
 }
 
@@ -11293,61 +11326,73 @@ async function _kcSweepShelf(photoUrl) {
     const det = _kcDetector();
     say('Searching the shelf…', 'reading the photo');
 
-    const scene = await _kcCVGrey(photoUrl, 1500);
+    // The scene is worked at a good size so a piece that occupies a
+    // tenth of the frame still carries real detail.
+    const scene = await _kcCVGrey(photoUrl, 2200);
     const sceneKp = new cv.KeyPointVector();
     const sceneDesc = new cv.Mat();
     det.d.detectAndCompute(scene.mat, new cv.Mat(), sceneKp, sceneDesc);
 
+    // A reference photo shows the piece filling the frame; on the shelf
+    // it might be a tenth of the width. Tested: at one reference size
+    // the jug matched the cottage dish, at another it landed correctly.
+    // So each reference is tried at several sizes and the best kept.
+    const REF_SIZES = [180, 260, 360, 500];
     const found = [];
     for (let i = 0; i < _shelfPieces.length; i++) {
       const piece = _shelfPieces[i];
-      if (!piece.reference_photo_url) continue;
+      if (!piece.reference_photo_url) { found.push({ piece, inliers: 0, r: 0 }); continue; }
       say('Searching the shelf…', `piece ${i + 1} of ${_shelfPieces.length}`);
       await new Promise(r => setTimeout(r, 0));
-      let ref = null, refKp = null, refDesc = null;
+      let bmp = null, best = { inliers: 0, pts: [] };
       try {
-        ref = await _kcCVGrey(piece.reference_photo_url, 900);
-        refKp = new cv.KeyPointVector();
-        refDesc = new cv.Mat();
-        det.d.detectAndCompute(ref.mat, new cv.Mat(), refKp, refDesc);
-        const r = _kcCVMatch(det, refDesc, refKp, sceneDesc, sceneKp);
-        if (r.pts.length) {
-          const cx = r.pts.reduce((a, p) => a + p.x, 0) / r.pts.length;
-          const cy = r.pts.reduce((a, p) => a + p.y, 0) / r.pts.length;
-          const spread = Math.max(40, 1.6 * Math.sqrt(
-            r.pts.reduce((a, p) => a + (p.x - cx) ** 2 + (p.y - cy) ** 2, 0) / r.pts.length));
-          found.push({ piece, inliers: r.inliers, x: cx, y: cy, r: spread });
-        } else {
-          found.push({ piece, inliers: r.inliers, x: 0, y: 0, r: 0 });
+        bmp = await _kcCVBitmap(piece.reference_photo_url);
+        for (const px of REF_SIZES) {
+          const ref = _kcCVGreyFromBmp(bmp, px);
+          const refKp = new cv.KeyPointVector();
+          const refDesc = new cv.Mat();
+          try {
+            det.d.detectAndCompute(ref.mat, new cv.Mat(), refKp, refDesc);
+            const r = _kcCVMatch(det, refDesc, refKp, sceneDesc, sceneKp);
+            if (r.inliers > best.inliers) best = r;
+          } catch (e) { /* this scale yielded nothing */ }
+          refKp.delete(); refDesc.delete(); ref.mat.delete();
+          await new Promise(r => setTimeout(r, 0));
         }
-      } catch (e) {
-        found.push({ piece, inliers: 0, x: 0, y: 0, r: 0 });
+      } catch (e) { /* reference photo unreadable */ }
+      bmp?.close?.();
+      if (best.pts.length) {
+        const cx = best.pts.reduce((a, p) => a + p.x, 0) / best.pts.length;
+        const cy = best.pts.reduce((a, p) => a + p.y, 0) / best.pts.length;
+        const spread = Math.max(45, 1.7 * Math.sqrt(
+          best.pts.reduce((a, p) => a + (p.x - cx) ** 2 + (p.y - cy) ** 2, 0) / best.pts.length));
+        found.push({ piece, inliers: best.inliers, x: cx, y: cy, r: spread });
+      } else {
+        found.push({ piece, inliers: best.inliers, x: 0, y: 0, r: 0 });
       }
-      refKp?.delete(); refDesc?.delete(); ref?.mat.delete();
     }
     sceneKp.delete(); sceneDesc.delete(); scene.mat.delete();
 
-    // How sure is sure? Measured on real photos: the right object
-    // reached 16 consistent points where the best wrong object managed
-    // 6. So a find must clear a floor AND beat its rivals.
-    const CONFIDENT = 10, POSSIBLE = 6;
+    // Measured on real photos: the right object reached 19-20 agreeing
+    // points where the best wrong object managed 7-8.
+    const CONFIDENT = 12, POSSIBLE = 8;
     const ranked = found.slice().sort((a, b) => b.inliers - a.inliers);
-    const runnerUp = ranked.length > 1 ? ranked[1].inliers : 0;
     const rings = found
       .filter(f => f.inliers >= POSSIBLE && f.r > 0)
-      .map(f => ({
-        x: f.x, y: f.y, r: f.r, piece: f.piece, edge: f.inliers,
-        sure: f.inliers >= CONFIDENT && f.inliers >= Math.max(runnerUp * 0.6, POSSIBLE + 2),
-      }));
+      .map(f => ({ x: f.x, y: f.y, r: f.r, piece: f.piece, edge: f.inliers,
+                   sure: f.inliers >= CONFIDENT }));
     const best = ranked[0];
     _renderShelfResult(photoUrl, rings, scene.W, scene.H,
       best && best.inliers ? { d: best.inliers, piece: best.piece } : null,
-      _shelfPieces.length, 'points');
+      _shelfPieces.length, 'points', det.name);
     return;
   } catch (e) {
-    // fall through to the older window sweep below
-    say('Searching the shelf…', 'using the basic matcher');
-    await new Promise(r => setTimeout(r, 300));
+    // Never fail silently again. The first version swallowed this and
+    // dropped to the old square matcher with no sign it had done so,
+    // which cost a whole test round to spot.
+    _kcEngineError = (e && e.message) ? e.message : String(e);
+    say('Searching the shelf…', 'pattern engine unavailable — using the basic matcher');
+    await new Promise(r => setTimeout(r, 400));
   }
 
   const bmp = await createImageBitmap(await (await fetch(photoUrl)).blob());
@@ -11462,7 +11507,7 @@ async function _kcSweepShelf(photoUrl) {
   _renderShelfResult(photoUrl, rings, W, H, closest, _shelfPieces.length);
 }
 
-function _renderShelfResult(photoUrl, rings, W, H, closest, expected, unit) {
+function _renderShelfResult(photoUrl, rings, W, H, closest, expected, unit, engine) {
 
   const modal = document.getElementById('shelf-scan');
   if (!modal) return;
@@ -11476,6 +11521,7 @@ function _renderShelfResult(photoUrl, rings, W, H, closest, expected, unit) {
         <div style="font-family:'Caveat',cursive;font-size:22px;color:#F4ECE0;">
           ${sure.length ? `Found ${sure.length} of ${expected}` : maybe.length ? 'Possible matches' : 'Nothing found here'}</div>
         ${maybe.length ? `<div style="font-size:11px;color:#F9A825;">${maybe.length} more worth a look</div>` : ''}
+        <div style="font-size:10px;color:#6f675e;margin-top:3px;">${engine ? 'pattern matching \u00b7 ' + engine : 'basic matcher' + (_kcEngineError ? ' \u00b7 ' + _kcEngineError : '')}</div>
       </div>
       <button onclick="_kcCloseShelfScan()" style="background:none;border:1px solid rgba(184,121,70,0.4);
         color:#F4ECE0;border-radius:10px;padding:7px 14px;font-size:12px;cursor:pointer;">Close</button>
