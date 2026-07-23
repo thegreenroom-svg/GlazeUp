@@ -8095,6 +8095,55 @@ app.post('/api/pieces/:pieceId/move', async (req, res) => {
 
 // GET /api/pieces/bookings — the studio's current booking names, for
 // the "move to…" picker.
+// GET /api/pieces/ready-for-email — every booking that's packed/on the
+// shelf, with a real customer email if one exists on the matching
+// Square booking. Feeds the batch-email button: Daisy reviews and
+// sends via her own Gmail when she has a batch, rather than the app
+// sending anything itself.
+app.get('/api/pieces/ready-for-email', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const { data: pieces, error } = await supabase.from('pottery_pieces')
+      .select('booking_id, piece_type, status')
+      .eq('studio_id', studioId)
+      .in('status', ['packed', 'ready_for_pickup']);
+    if (error) throw error;
+
+    const byBooking = {};
+    (pieces || []).forEach(p => {
+      if (!byBooking[p.booking_id]) byBooking[p.booking_id] = 0;
+      byBooking[p.booking_id]++;
+    });
+    const names = Object.keys(byBooking);
+    if (!names.length) return res.json({ ready: [] });
+
+    // Match against real Square bookings by name — booking_id here is
+    // sometimes a real booking_code, sometimes just a customer name
+    // (tag-sourced pieces), so try both.
+    const { data: matches } = await supabase.from('bookings')
+      .select('booking_code, customer_name, customer_email')
+      .eq('studio_id', studioId)
+      .not('customer_email', 'is', null)
+      .or(names.map(n => `booking_code.eq.${n},customer_name.ilike.${n}`).join(','));
+
+    const emailByName = {};
+    (matches || []).forEach(m => {
+      emailByName[m.booking_code] = m.customer_email;
+      emailByName[(m.customer_name || '').toLowerCase()] = m.customer_email;
+    });
+
+    const ready = names.map(n => ({
+      bookingId: n, pieceCount: byBooking[n],
+      email: emailByName[n] || emailByName[n.toLowerCase()] || null,
+    }));
+    res.json({ ready });
+  } catch (error) {
+    console.error('ready-for-email error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/pieces/bookings', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });

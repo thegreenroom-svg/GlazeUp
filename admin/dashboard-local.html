@@ -10309,6 +10309,18 @@ async function _loadPackingTiles() {
         </div>
       </button>
 
+      <!-- Batch email: Daisy reviews and sends via her own Gmail, the
+           app never sends anything itself -->
+      <button onclick="_kcEmailReady()" class="glaze-tile"
+        style="width:100%;border:1.5px solid rgba(43,39,36,0.15);border-radius:16px;padding:16px 20px;
+        cursor:pointer;margin-top:8px;background:#FFFDF9;text-align:left;display:flex;align-items:center;gap:14px;">
+        <span style="font-size:26px;flex-shrink:0;">✉️</span>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:#2B2724;">Email everyone ready</div>
+          <div style="font-size:11px;color:#8a8175;margin-top:2px;">Opens a batch email in your mail app to review and send</div>
+        </div>
+      </button>
+
       <!-- What's waiting, grouped by family -->
       <div style="font-size:10px;color:#8a8175;font-family:'Architects Daughter',cursive;
         letter-spacing:0.06em;margin-top:8px;">Waiting · ${groups.length} booking${groups.length===1?'':'s'}</div>
@@ -11324,6 +11336,35 @@ function _kcShowTapResult(cropUrl, match) {
 // shape-led comparison and its very strict cut-off. Same engine as
 // the shelf sweep, so behaviour is consistent — and it can be honest
 // about a fair-but-not-certain match instead of silently refusing.
+// Batch email for everyone whose order is packed/on the shelf. The
+// APP NEVER SENDS ANYTHING — this opens a mailto: with every real
+// email BCC'd and a plain draft body, so Daisy reviews it in her own
+// Gmail and sends when she has a batch, exactly as she asked.
+async function _kcEmailReady() {
+  let ready = [];
+  try {
+    const res = await fetch(`${API_URL}/api/pieces/ready-for-email?studioId=${studioId}`);
+    ready = (await res.json()).ready || [];
+  } catch (e) { toast("Couldn't check who's ready", 'error'); return; }
+
+  const withEmail = ready.filter(r => r.email);
+  if (!withEmail.length) {
+    toast(ready.length
+      ? `${ready.length} ready, but none have an email on file yet`
+      : 'Nobody is packed and ready yet', 'info');
+    return;
+  }
+
+  const bcc = withEmail.map(r => r.email).join(',');
+  const subject = encodeURIComponent('Your pottery is ready to collect — The Kiln Cafe');
+  const body = encodeURIComponent(
+    `Hi,\n\nGreat news — your piece${withEmail.length === 1 ? ' is' : 's are'} fired, packed and ready ` +
+    `to collect from The Kiln Cafe whenever suits you.\n\nSee you soon!\n\nThe Kiln Cafe`
+  );
+  window.location.href = `mailto:?bcc=${bcc}&subject=${subject}&body=${body}`;
+  toast(`Opening email for ${withEmail.length} ready to collect`, 'success');
+}
+
 function _kcIdentifyPiece() {
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
