@@ -10883,6 +10883,7 @@ async function _kcSweepShelf(photoUrl) {
   const short = Math.min(W, H);
   const sizes = [short * 0.22, short * 0.32, short * 0.45].map(Math.round);
   const hits = [];
+  let closest = null;   // best score seen even if it never passed
   const THRESHOLD = 13; // a touch looser than the single-photo threshold
 
   let done = 0;
@@ -10899,6 +10900,7 @@ async function _kcSweepShelf(photoUrl) {
         const fp = _kcHashRegion(workBmp, x, y, side);
         for (const piece of _shelfPieces) {
           const d = _kcFpDistance(fp, piece.photo_phash);
+          if (!closest || d < closest.d) closest = { d, piece };
           if (d <= THRESHOLD) {
             hits.push({ x: x + side/2, y: y + side/2, r: side/2, d, piece });
           }
@@ -10918,10 +10920,10 @@ async function _kcSweepShelf(photoUrl) {
     const k = h.piece.id;
     if (!best[k] || h.d < best[k].d) best[k] = h;
   });
-  _renderShelfResult(photoUrl, Object.values(best), W, H);
+  _renderShelfResult(photoUrl, Object.values(best), W, H, closest);
 }
 
-function _renderShelfResult(photoUrl, rings, W, H) {
+function _renderShelfResult(photoUrl, rings, W, H, closest) {
   const modal = document.getElementById('shelf-scan');
   if (!modal) return;
   modal.innerHTML = `
@@ -10950,8 +10952,12 @@ function _renderShelfResult(photoUrl, rings, W, H) {
           ${r.piece.piece_type || 'Piece'}</div>`).join('')}
       </div>`
       : `<div style="margin-top:16px;font-size:12px;color:#8a8175;line-height:1.6;text-align:center;">
-          None of this booking's pieces turned up on this shelf. Try another shelf,
-          or tap a piece directly to check it.</div>`}
+          None of this booking's pieces turned up on this shelf.
+          ${closest ? `<br><br><span style="color:#B87946;">Closest was <b>${closest.piece.piece_type}</b> at ${closest.d.toFixed(1)} —
+          it needs to be under 13 to count.</span><br>
+          A tighter shot, with the piece filling more of the frame and lit like its
+          original photo, scores far better.` : ''}
+        </div>`}
     </div>
     <div style="padding:14px 16px max(14px,env(safe-area-inset-bottom));flex-shrink:0;display:flex;gap:10px;">
       <button onclick="_kcCaptureShelf()" style="flex:1;background:rgba(255,255,255,0.1);color:#F4ECE0;

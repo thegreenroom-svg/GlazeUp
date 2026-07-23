@@ -8048,10 +8048,12 @@ app.post('/api/pieces/set-booking-status', async (req, res) => {
     return res.status(400).json({ error: `status must be one of: ${PIECE_STATUSES.join(', ')}` });
   }
   try {
-    const timestampField = status === 'packed' ? { packed_at: new Date().toISOString() } : {};
+    // NB: pottery_pieces has NO packed_at / packed_by columns — writing
+    // them fails the whole update (this is what broke "Select all").
+    // status + updated_at is all this table actually carries.
     const { data: updated, error } = await supabase
       .from('pottery_pieces')
-      .update({ status, updated_at: new Date().toISOString(), ...timestampField })
+      .update({ status, updated_at: new Date().toISOString() })
       .eq('studio_id', studioId)
       .eq('booking_id', bookingId)
       .not('status', 'in', '(collected,posted,picked_up)')
