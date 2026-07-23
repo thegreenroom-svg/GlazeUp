@@ -10316,7 +10316,8 @@ async function _loadPackingTiles() {
         const photo = (g.pieces.find(p => p.reference_photo_url) || {}).reference_photo_url;
         const statuses = g.pieces.map(p => p.status);
         const allSame = statuses.every(s => s === statuses[0]) ? statuses[0] : null;
-        const label = { fired: 'Ready to pack', packed: '✓ Packed', ready_for_pickup: '✓ On shelf', collected: '✓ Collected', posted: '✓ Posted' }[allSame] || 'Mixed';
+        const label = { packed: '✓ Packed', ready_for_pickup: '✓ On shelf', collected: '✓ Collected', posted: '✓ Posted' }[allSame]
+          || (statuses.every(s => !['packed','ready_for_pickup','collected','posted','picked_up'].includes(s)) ? 'Ready to pack' : 'Part packed');
         return `
         <div class="glaze-tile" style="border-radius:14px;padding:0;overflow:hidden;">
           <button onclick="_openBookingPackCard('${id.replace(/'/g,"\\'")}')" style="width:100%;border:none;background:none;
@@ -10400,6 +10401,12 @@ function _closeBookingPackCard() {
   if (typeof _loadPackingTiles === 'function') _loadPackingTiles();
 }
 
+// A piece is "done" when it's genuinely on its way home — NOT merely
+// "not fired". Since the kiln stages were retired, a piece can sit at
+// ready_for_dip or dipped and still be waiting to pack, so testing
+// !== 'fired' wrongly ticked everything.
+const KC_DONE_STATUSES = ['packed', 'ready_for_pickup', 'collected', 'posted', 'picked_up'];
+
 async function _renderBookingPackCard() {
   const modal = document.getElementById('booking-pack-card');
   if (!modal || !_packCardBookingId) return;
@@ -10418,7 +10425,11 @@ async function _renderBookingPackCard() {
   const customer = pieces[0].customer_name || _packCardBookingId;
   const photo = (pieces.find(p => p.reference_photo_url) || {}).reference_photo_url;
   const statuses = pieces.map(p => p.status);
-  const allSame = statuses.every(s => s === statuses[0]) ? statuses[0] : 'fired';
+  const rawSame = statuses.every(s => s === statuses[0]) ? statuses[0] : 'fired';
+  // Any waiting state that isn't in the cycle (ready_for_dip, dipped)
+  // counts as the start of it — otherwise indexOf returns -1 and the
+  // finish button would step backwards instead of forwards.
+  const allSame = _packCardStatusOrder.includes(rawSame) ? rawSame : 'fired';
   const nextIdx = Math.min(_packCardStatusOrder.indexOf(allSame) + 1, _packCardStatusOrder.length - 1);
   const nextStatus = _packCardStatusOrder[nextIdx];
   const isDone = allSame === 'posted' || allSame === 'collected';
@@ -10442,9 +10453,17 @@ async function _renderBookingPackCard() {
           <span style="font-size:32px;opacity:0.4;">🏺</span>
           <span style="font-size:12px;">No photo yet — tap 📷 on a piece below</span>
         </div>`}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:11px;color:#8a8175;font-family:'Architects Daughter',cursive;letter-spacing:0.05em;">
+          ${pieces.filter(p => KC_DONE_STATUSES.includes(p.status)).length} of ${pieces.length} ticked</div>
+        <button onclick="_kcTickAll(${pieces.every(p => KC_DONE_STATUSES.includes(p.status)) ? 'false' : 'true'})"
+          style="background:none;border:1.5px solid rgba(0,137,123,0.4);border-radius:9px;padding:6px 12px;
+          font-size:11px;font-weight:700;color:#00695C;cursor:pointer;">
+          ${pieces.every(p => KC_DONE_STATUSES.includes(p.status)) ? 'Clear all' : 'Select all'}</button>
+      </div>
       <div style="display:flex;flex-direction:column;gap:8px;">
         ${pieces.map(p => {
-          const done = p.status !== 'fired';
+          const done = KC_DONE_STATUSES.includes(p.status);
           return `
           <button onclick="_kcTogglePieceFound('${p.id}','${p.status}')" style="width:100%;text-align:left;
             background:${done ? 'rgba(46,125,50,0.08)' : '#FFFDF9'};
@@ -10487,8 +10506,23 @@ async function _renderBookingPackCard() {
     </div>`;
 }
 
+// Tick or clear every piece in the booking at once — for when the
+// whole order comes off the shelf together, which is most of the time.
+async function _kcTickAll(tickThem) {
+  try {
+    await api('/api/pieces/set-booking-status', {
+      method: 'POST',
+      body: { studioId, bookingId: _packCardBookingId, status: tickThem ? 'packed' : 'fired', by: currentShiftStaff?.id }
+    });
+  } catch (e) { toast("Couldn't update those", 'error'); }
+  _renderBookingPackCard();
+}
+
 async function _kcTogglePieceFound(pieceId, currentStatus) {
-  const newStatus = currentStatus === 'fired' ? 'packed' : 'fired';
+  // Ticking = packed. Un-ticking returns it to the waiting pile as
+  // 'fired' (the neutral "ready to pack" state) — the dip/fire stages
+  // are retired, so nothing downstream depends on the old value.
+  const newStatus = KC_DONE_STATUSES.includes(currentStatus) ? 'fired' : 'packed';
   try {
     await api(`/api/pieces/${pieceId}/status`, { method: 'POST', body: { studioId, status: newStatus } });
   } catch (e) { toast("Couldn't update that piece", 'error'); }
@@ -10600,7 +10634,7 @@ async function _reviewAreaScan() {
   try {
     const res = await fetch(`${API_URL}/api/packing/queue?studioId=${studioId}`);
     const data = await res.json();
-    pieces = (data.pieces || []).filter(p => p.booking_id === _areaScanBookingId && p.status === 'fired' && p.reference_photo_url);
+    pieces = (data.pieces || []).filter(p => p.booking_id === _areaScanBookingId && !KC_DONE_STATUSES.includes(p.status) && p.reference_photo_url);
   } catch (e) {}
 
   let matches = [];
@@ -10760,7 +10794,7 @@ async function _kcFindOnShelves(bookingId) {
     const res = await fetch(`${API_URL}/api/packing/queue?studioId=${studioId}`);
     const data = await res.json();
     _shelfPieces = (data.pieces || []).filter(p =>
-      p.booking_id === bookingId && p.photo_phash && p.status === 'fired');
+      p.booking_id === bookingId && p.photo_phash && !KC_DONE_STATUSES.includes(p.status));
   } catch (e) { _shelfPieces = []; }
 
   if (!_shelfPieces.length) {
