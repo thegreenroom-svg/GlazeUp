@@ -10446,6 +10446,10 @@ async function _renderBookingPackCard() {
   const nextIdx = Math.min(_packCardStatusOrder.indexOf(allSame) + 1, _packCardStatusOrder.length - 1);
   const nextStatus = _packCardStatusOrder[nextIdx];
   const isDone = allSame === 'posted' || allSame === 'collected';
+  // Daisy: the finish button was too easy to tap by accident straight
+  // off — it should sit at the natural END of ticking things off, not
+  // float there active from the moment the card opens.
+  const anyTicked = pieces.some(p => KC_DONE_STATUSES.includes(p.status));
 
   modal.innerHTML = `
     <div style="padding:max(14px,calc(env(safe-area-inset-top) + 8px)) 16px 12px;flex-shrink:0;
@@ -10536,11 +10540,11 @@ async function _renderBookingPackCard() {
       </button>
     </div>
     <div style="padding:14px 16px max(14px,env(safe-area-inset-bottom));border-top:1.5px solid rgba(43,39,36,0.1);flex-shrink:0;">
-      <button onclick="${isDone ? '' : `_kcCycleBookingStatus('${nextStatus}')`}" ${isDone ? 'disabled' : ''}
-        style="width:100%;background:${isDone ? 'rgba(46,125,50,0.15)' : 'linear-gradient(135deg,#00897B,#00695C)'};
-        color:${isDone ? '#2e7d32' : '#fff'};border:none;border-radius:14px;padding:16px;
-        font-size:15px;font-weight:800;cursor:${isDone ? 'default' : 'pointer'};">
-        ${isDone ? '✓ ' + _packCardStatusLabel[allSame] : _packCardStatusLabel[allSame] || 'Mark packed'}
+      <button onclick="${(isDone || !anyTicked) ? '' : `_kcCycleBookingStatus('${nextStatus}')`}" ${(isDone || !anyTicked) ? 'disabled' : ''}
+        style="width:100%;background:${isDone ? 'rgba(46,125,50,0.15)' : anyTicked ? 'linear-gradient(135deg,#00897B,#00695C)' : 'rgba(43,39,36,0.06)'};
+        color:${isDone ? '#2e7d32' : anyTicked ? '#fff' : 'rgba(43,39,36,0.35)'};border:none;border-radius:14px;padding:16px;
+        font-size:15px;font-weight:800;cursor:${(isDone || !anyTicked) ? 'default' : 'pointer'};">
+        ${isDone ? '✓ ' + _packCardStatusLabel[allSame] : anyTicked ? _packCardStatusLabel[allSame] || 'Mark packed' : 'Tick a piece to continue'}
       </button>
     </div>`;
 }

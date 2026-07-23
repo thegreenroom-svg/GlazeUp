@@ -380,7 +380,7 @@
     const hero = $('kc-hero');
     const dir = isDirector();
     hero.innerHTML = `
-      ${dir ? `<span class="kc-stat"><b class="kc-skel-t" id="kc-fig-money">&nbsp;</b> today</span>` : ''}
+      ${dir ? `<span class="kc-stat"><b class="kc-skel-t" id="kc-fig-money">&nbsp;</b> <span id="kc-fig-money-l">today</span></span>` : ''}
       <span class="kc-stat"><b class="kc-skel-t" id="kc-fig-floor">&nbsp;</b> <span id="kc-fig-floor-l">on the floor</span></span>
       <span class="kc-stat"><b class="kc-skel-t" id="kc-fig-kiln">&nbsp;</b> to pack</span>`;
 
@@ -479,8 +479,14 @@
           const m = $('kc-fig-money');
           if (m) {
             m.classList.remove('kc-skel-t');
-            if (todayV !== null) m.textContent = money(todayV);
-            else { m.textContent = money(d.totalRevenue || 0); const l = m.nextElementSibling; if (l) l.textContent = 'last 30 days'; }
+            // FIX, 23 Jul: this used to fall back to the 30-day TOTAL
+            // whenever today had no synced row yet, but the label text
+            // "today" isn't a real DOM element — it's plain text — so
+            // nextElementSibling silently found nothing, the relabel
+            // never happened, and a £18k+ historical figure sat under
+            // "today" looking like today's takings. Now: no row for
+            // today genuinely means £0.00 so far, which is the truth.
+            m.textContent = money(todayV || 0);
           }
         }).catch(() => { const m = $('kc-fig-money'); if (m) { m.classList.remove('kc-skel-t'); m.textContent = '—'; } });
     }
