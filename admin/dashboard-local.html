@@ -10746,6 +10746,100 @@ function _kcFpDistance(a, b) {
 
 // Fingerprint one square region of an already-loaded bitmap, in the
 // exact same three-part format computePerceptualHash produces.
+// ─── COLOUR HISTOGRAM — the signal that survives a change of angle ──
+// A dHash asks "is this the same picture". A histogram asks "is this
+// the same STUFF" — it counts how much of each colour is present and
+// throws away where it sits. That makes it largely indifferent to
+// angle, rotation and framing, which is exactly what defeats the
+// dHash when a piece is photographed on a shelf instead of on the
+// table it was catalogued on. Hue is binned finely (12), saturation
+// and value coarsely (3 each) so a glaze reads by its colour family
+// rather than by how the light happened to fall.
+function _kcColourHistogram(bmp, sx, sy, side) {
+  const N = 48; // sample grid — plenty for a stable distribution
+  const c = document.createElement('canvas');
+  c.width = N; c.height = N;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(bmp, sx, sy, side, side, 0, 0, N, N);
+  const d = ctx.getImageData(0, 0, N, N).data;
+  const bins = new Array(12 * 3 * 3).fill(0);
+  let counted = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i] / 255, g = d[i+1] / 255, b = d[i+2] / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), delta = max - min;
+    let h = 0;
+    if (delta > 0.0001) {
+      if (max === r) h = ((g - b) / delta) % 6;
+      else if (max === g) h = (b - r) / delta + 2;
+      else h = (r - g) / delta + 4;
+      h *= 60; if (h < 0) h += 360;
+    }
+    const s = max === 0 ? 0 : delta / max;
+    const v = max;
+    const hb = Math.min(11, Math.floor(h / 30));
+    const sb = Math.min(2, Math.floor(s * 3));
+    const vb = Math.min(2, Math.floor(v * 3));
+    bins[hb * 9 + sb * 3 + vb]++;
+    counted++;
+  }
+  // normalise to 0-255 per bin and store as hex pairs
+  let hex = '';
+  for (let i = 0; i < bins.length; i++) {
+    const val = Math.min(255, Math.round((bins[i] / Math.max(1, counted)) * 255 * 6));
+    hex += val.toString(16).padStart(2, '0');
+  }
+  return hex;
+}
+
+// Histogram intersection, expressed on the same 0-64 scale as the
+// other signals so it can sit alongside them.
+function _kcHistDistance(a, b) {
+  if (!a || !b || a.length !== b.length) return 64;
+  let inter = 0, total = 0;
+  for (let i = 0; i < a.length; i += 2) {
+    const x = parseInt(a.substr(i, 2), 16), y = parseInt(b.substr(i, 2), 16);
+    inter += Math.min(x, y);
+    total += Math.max(x, y);
+  }
+  if (!total) return 64;
+  return (1 - inter / total) * 64;
+}
+
+// Scoring for the SWEEP specifically — colour-led, as Daisy called it.
+// Cross-angle object matching is a different problem from near-
+// duplicate detection: the histogram is the reliable signal, the
+// structure hashes are corroboration. So here colour leads and shape
+// supports, the reverse of the single-photo comparison.
+function _kcSweepDistance(a, b) {
+  if (!a || !b) return 64;
+  const pa = String(a).split('|'), pb = String(b).split('|');
+  const ham = (x, y) => {
+    if (!x || !y || x.length !== y.length) return null;
+    let d = 0;
+    for (let i = 0; i < x.length; i++) {
+      let v = parseInt(x[i], 16) ^ parseInt(y[i], 16);
+      while (v) { d += v & 1; v >>= 1; }
+    }
+    return d;
+  };
+  const hist = (pa[3] && pb[3]) ? _kcHistDistance(pa[3], pb[3]) : null;
+  const fineRaw = ham(pa[1], pb[1]);
+  const fine = fineRaw === null ? null : (fineRaw / 256) * 64;
+  let grid = null;
+  if (pa[2] && pb[2] && pa[2].length === pb[2].length) {
+    let cd = 0, n = 0;
+    for (let i = 0; i < pa[2].length; i++) { cd += Math.abs(parseInt(pa[2][i],16) - parseInt(pb[2][i],16)); n++; }
+    grid = (cd / n / 15) * 64;
+  }
+  if (hist === null) return _kcFpDistance(a, b); // old fingerprint, old rules
+  // colour histogram leads; shape and colour-layout corroborate
+  let score = hist * 0.60;
+  let w = 0.60;
+  if (grid !== null) { score += grid * 0.20; w += 0.20; }
+  if (fine !== null) { score += fine * 0.20; w += 0.20; }
+  return score / w;
+}
+
 function _kcHashRegion(bmp, sx, sy, side) {
   const c = document.createElement('canvas');
   const ctx = c.getContext('2d', { willReadFrequently: true });
@@ -10772,7 +10866,7 @@ function _kcHashRegion(bmp, sx, sy, side) {
   for (let i = 0; i < cd.length; i += 4) {
     colour += Math.round(cd[i]/17).toString(16) + Math.round(cd[i+1]/17).toString(16) + Math.round(cd[i+2]/17).toString(16);
   }
-  return `${coarse}|${fine}|${colour}`;
+  return `${coarse}|${fine}|${colour}|${_kcColourHistogram(bmp, sx, sy, side)}`;
 }
 
 let _shelfBookingId = null;
@@ -10796,6 +10890,22 @@ async function _kcFindOnShelves(bookingId) {
     _shelfPieces = (data.pieces || []).filter(p =>
       p.booking_id === bookingId && p.photo_phash && !KC_DONE_STATUSES.includes(p.status));
   } catch (e) { _shelfPieces = []; }
+
+  // Pieces photographed before the histogram existed carry only the
+  // older fingerprint. Rather than make anyone re-photograph, compute
+  // the missing histogram here from the reference photo we already
+  // hold, so every piece is searchable on colour immediately.
+  for (const p of _shelfPieces) {
+    if (p.photo_phash && p.photo_phash.split('|').length < 4 && p.reference_photo_url) {
+      try {
+        const bmp = await createImageBitmap(await (await fetch(p.reference_photo_url)).blob());
+        const side = Math.min(bmp.width, bmp.height);
+        const sx = Math.round((bmp.width - side) / 2), sy = Math.round((bmp.height - side) / 2);
+        p.photo_phash = `${p.photo_phash}|${_kcColourHistogram(bmp, sx, sy, side)}`;
+        bmp.close?.();
+      } catch (e) { /* leave it on the old fingerprint */ }
+    }
+  }
 
   if (!_shelfPieces.length) {
     modal.innerHTML = `
@@ -10871,8 +10981,8 @@ async function _kcSweepShelf(photoUrl) {
     <div id="sweep-progress" style="font-size:12px;margin-top:8px;">0%</div></div>`;
 
   const bmp = await createImageBitmap(await (await fetch(photoUrl)).blob());
-  // work at a sane size — big enough for detail, small enough to be quick
-  const scale = Math.min(1, 1000 / Math.max(bmp.width, bmp.height));
+  // Higher working resolution than before — more detail to match on.
+  const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
   const W = Math.round(bmp.width * scale), H = Math.round(bmp.height * scale);
   const work = document.createElement('canvas');
   work.width = W; work.height = H;
@@ -10881,28 +10991,31 @@ async function _kcSweepShelf(photoUrl) {
   const workBmp = await createImageBitmap(work);
 
   const short = Math.min(W, H);
-  const sizes = [short * 0.22, short * 0.32, short * 0.45].map(Math.round);
+  // More window sizes and a finer step, so a piece is far more likely
+  // to land well-framed inside at least one window.
+  const sizes = [0.16, 0.22, 0.30, 0.40, 0.52].map(f => Math.round(short * f));
   const hits = [];
-  let closest = null;   // best score seen even if it never passed
-  const THRESHOLD = 13; // a touch looser than the single-photo threshold
+  let closest = null;
+  const SURE = 14;     // ring it green
+  const MAYBE = 26;    // worth a look — ring it amber, ask for a close-up
 
   let done = 0;
   const total = sizes.reduce((acc, side) => {
-    const step = Math.max(1, Math.round(side * 0.5));
+    const step = Math.max(1, Math.round(side * 0.4));
     return acc + Math.ceil((W - side) / step + 1) * Math.ceil((H - side) / step + 1);
   }, 0);
 
   for (const side of sizes) {
     if (side < 24 || side > short) continue;
-    const step = Math.max(1, Math.round(side * 0.5));
+    const step = Math.max(1, Math.round(side * 0.4));
     for (let y = 0; y + side <= H; y += step) {
       for (let x = 0; x + side <= W; x += step) {
         const fp = _kcHashRegion(workBmp, x, y, side);
         for (const piece of _shelfPieces) {
-          const d = _kcFpDistance(fp, piece.photo_phash);
+          const d = _kcSweepDistance(fp, piece.photo_phash);
           if (!closest || d < closest.d) closest = { d, piece };
-          if (d <= THRESHOLD) {
-            hits.push({ x: x + side/2, y: y + side/2, r: side/2, d, piece });
+          if (d <= MAYBE) {
+            hits.push({ x: x + side/2, y: y + side/2, r: side/2, d, piece, sure: d <= SURE });
           }
         }
         done++;
@@ -10914,23 +11027,56 @@ async function _kcSweepShelf(photoUrl) {
   }
   workBmp.close?.();
 
+  // ── DAISY'S TWO EXTRA CLUES ──────────────────────────────────────
+  // (1) We know how many pieces this booking has. If some are found
+  //     confidently, the rest are very likely on the same shelf, so
+  //     it's reasonable to accept weaker evidence for the remainder
+  //     rather than stopping at the first pass.
+  // (2) A booking's pieces are nearly always stored together. So a
+  //     weak candidate sitting close to a confident hit is far more
+  //     likely to be genuine than the same score out on its own.
+  //     Proximity to the confident cluster earns a real score bonus.
+  const sureHits = hits.filter(h => h.sure);
+  let cluster = null;
+  if (sureHits.length) {
+    cluster = {
+      x: sureHits.reduce((a, h) => a + h.x, 0) / sureHits.length,
+      y: sureHits.reduce((a, h) => a + h.y, 0) / sureHits.length,
+    };
+    const reach = Math.min(W, H) * 0.55; // "on the same part of the shelf"
+    hits.forEach(h => {
+      const dist = Math.hypot(h.x - cluster.x, h.y - cluster.y);
+      if (dist < reach) {
+        // up to a 25% improvement for sitting with its own booking
+        h.d = h.d * (1 - 0.25 * (1 - dist / reach));
+        if (h.d <= SURE) h.sure = true;
+      }
+    });
+  }
+
   // keep the single best hit per piece, so one piece = one ring
   const best = {};
   hits.forEach(h => {
     const k = h.piece.id;
     if (!best[k] || h.d < best[k].d) best[k] = h;
   });
-  _renderShelfResult(photoUrl, Object.values(best), W, H, closest);
+  _renderShelfResult(photoUrl, Object.values(best), W, H, closest, _shelfPieces.length);
 }
 
-function _renderShelfResult(photoUrl, rings, W, H, closest) {
+function _renderShelfResult(photoUrl, rings, W, H, closest, expected) {
   const modal = document.getElementById('shelf-scan');
   if (!modal) return;
+  const sure = rings.filter(r => r.sure);
+  const maybe = rings.filter(r => !r.sure);
+  window._kcShelfPhoto = photoUrl;
   modal.innerHTML = `
     <div style="padding:max(14px,calc(env(safe-area-inset-top) + 8px)) 16px 12px;display:flex;
       align-items:center;justify-content:space-between;border-bottom:1px solid rgba(184,121,70,0.25);">
-      <div style="font-family:'Caveat',cursive;font-size:22px;color:#F4ECE0;">
-        ${rings.length ? `Found ${rings.length}` : 'Nothing found here'}</div>
+      <div>
+        <div style="font-family:'Caveat',cursive;font-size:22px;color:#F4ECE0;">
+          ${sure.length ? `Found ${sure.length} of ${expected}` : maybe.length ? 'Possible matches' : 'Nothing found here'}</div>
+        ${maybe.length ? `<div style="font-size:11px;color:#F9A825;">${maybe.length} more worth a look</div>` : ''}
+      </div>
       <button onclick="_kcCloseShelfScan()" style="background:none;border:1px solid rgba(184,121,70,0.4);
         color:#F4ECE0;border-radius:10px;padding:7px 14px;font-size:12px;cursor:pointer;">Close</button>
     </div>
@@ -10939,25 +11085,44 @@ function _renderShelfResult(photoUrl, rings, W, H, closest) {
         <img src="${photoUrl}" style="width:100%;border-radius:12px;display:block;">
         <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"
           style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;">
-          ${rings.map(r => `
-            <circle cx="${r.x}" cy="${r.y}" r="${r.r}" fill="none"
-              stroke="#4CAF50" stroke-width="${Math.max(4, W * 0.012)}" opacity="0.95"/>
-            <circle cx="${r.x}" cy="${r.y}" r="${r.r}" fill="none"
-              stroke="#fff" stroke-width="${Math.max(1.5, W * 0.004)}" opacity="0.9"/>`).join('')}
+          ${rings.map(r => {
+            const col = r.sure ? '#4CAF50' : '#F9A825';
+            return `
+            <circle cx="${r.x}" cy="${r.y}" r="${r.r}" fill="none" stroke="${col}"
+              stroke-width="${Math.max(5, W * 0.013)}" opacity="0.95"
+              ${r.sure ? '' : `stroke-dasharray="${W*0.03},${W*0.02}"`}/>
+            <circle cx="${r.x}" cy="${r.y}" r="${r.r}" fill="none" stroke="#fff"
+              stroke-width="${Math.max(1.5, W * 0.004)}" opacity="0.85"/>`;
+          }).join('')}
         </svg>
       </div>
-      ${rings.length ? `<div style="margin-top:14px;display:flex;flex-direction:column;gap:6px;">
-        ${rings.map(r => `<div style="display:flex;align-items:center;gap:10px;color:#F4ECE0;font-size:13px;">
-          <span style="width:10px;height:10px;border-radius:50%;border:2px solid #4CAF50;flex-shrink:0;"></span>
-          ${r.piece.piece_type || 'Piece'}</div>`).join('')}
-      </div>`
-      : `<div style="margin-top:16px;font-size:12px;color:#8a8175;line-height:1.6;text-align:center;">
-          None of this booking's pieces turned up on this shelf.
-          ${closest ? `<br><br><span style="color:#B87946;">Closest was <b>${closest.piece.piece_type}</b> at ${closest.d.toFixed(1)} —
-          it needs to be under 13 to count.</span><br>
-          A tighter shot, with the piece filling more of the frame and lit like its
-          original photo, scores far better.` : ''}
-        </div>`}
+
+      ${sure.length ? `<div style="margin-top:14px;display:flex;flex-direction:column;gap:6px;">
+        ${sure.map(r => `<div style="display:flex;align-items:center;gap:10px;color:#F4ECE0;font-size:13px;">
+          <span style="width:11px;height:11px;border-radius:50%;border:2px solid #4CAF50;flex-shrink:0;"></span>
+          ${r.piece.piece_type || 'Piece'}
+          <span style="color:#8a8175;font-size:11px;">${r.d.toFixed(0)}</span></div>`).join('')}
+      </div>` : ''}
+
+      ${maybe.length ? `
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(184,121,70,0.2);">
+        <div style="font-size:11px;color:#F9A825;font-weight:700;margin-bottom:8px;">
+          Not sure about these — pick one up and photograph it close to confirm</div>
+        ${maybe.map(r => `
+          <button onclick="_kcConfirmMaybe('${r.piece.id}')" style="width:100%;text-align:left;
+            background:rgba(249,168,37,0.1);border:1.5px dashed rgba(249,168,37,0.5);border-radius:10px;
+            padding:11px 13px;margin-bottom:6px;cursor:pointer;display:flex;align-items:center;gap:10px;">
+            <span style="width:11px;height:11px;border-radius:50%;border:2px dashed #F9A825;flex-shrink:0;"></span>
+            <span style="flex:1;color:#F4ECE0;font-size:13px;">${r.piece.piece_type || 'Piece'}</span>
+            <span style="color:#8a8175;font-size:11px;">${r.d.toFixed(0)} · 📷 confirm</span>
+          </button>`).join('')}
+      </div>` : ''}
+
+      ${!rings.length ? `<div style="margin-top:16px;font-size:12px;color:#8a8175;line-height:1.6;text-align:center;">
+          Nothing from this booking showed up.
+          ${closest ? `<br><br><span style="color:#B87946;">Closest was <b>${closest.piece.piece_type}</b> at ${closest.d.toFixed(1)}.</span>` : ''}
+          <br>Try a straighter shot of the shelf, or photograph a piece directly to identify it.
+        </div>` : ''}
     </div>
     <div style="padding:14px 16px max(14px,env(safe-area-inset-bottom));flex-shrink:0;display:flex;gap:10px;">
       <button onclick="_kcCaptureShelf()" style="flex:1;background:rgba(255,255,255,0.1);color:#F4ECE0;
@@ -10965,6 +11130,39 @@ function _renderShelfResult(photoUrl, rings, W, H, closest) {
       <button onclick="_kcCloseShelfScan()" style="flex:1;background:linear-gradient(135deg,#00897B,#00695C);
         color:#fff;border:none;border-radius:14px;padding:15px;font-size:14px;font-weight:800;cursor:pointer;">Done</button>
     </div>`;
+}
+
+// Confirm a fuzzy candidate the honest way: pick the piece up and
+// photograph it properly. That's near-duplicate territory, where the
+// engine is strong — so a close-up either confirms it firmly or
+// rules it out, and either answer is worth having.
+function _kcConfirmMaybe(pieceId) {
+  const piece = _shelfPieces.find(p => p.id === pieceId);
+  if (!piece) return;
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.onchange = async () => {
+    const file = input.files && input.files[0];
+    input.remove();
+    if (!file) return;
+    try {
+      toast('Checking…', 'info');
+      const fp = await computePerceptualHash(file);
+      const bmp = await createImageBitmap(file);
+      const side = Math.min(bmp.width, bmp.height);
+      const full = `${fp}|${_kcColourHistogram(bmp, Math.round((bmp.width-side)/2), Math.round((bmp.height-side)/2), side)}`;
+      bmp.close?.();
+      const d = _kcSweepDistance(full, piece.photo_phash);
+      const cropUrl = await new Promise(r => { const rd = new FileReader(); rd.onload = () => r(rd.result); rd.readAsDataURL(file); });
+      _kcShowTapResult(cropUrl, d <= 18
+        ? { customerName: _shelfBookingId, pieceType: piece.piece_type, bookingId: _shelfBookingId,
+            confidence: d <= 10 ? 'high' : 'fair' }
+        : null);
+    } catch (e) { toast("Couldn't check that one", 'error'); }
+  };
+  input.click();
 }
 
 async function _kcTapToMatch(imgEl, ev) {
