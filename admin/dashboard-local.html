@@ -10455,8 +10455,13 @@ async function _renderBookingPackCard() {
           </button>`;
         }).join('')}
       </div>
+      <button onclick="_kcFindOnShelves('${_packCardBookingId.replace(/'/g,"\\'")}')"
+        style="width:100%;margin-top:16px;background:linear-gradient(135deg,#B87946,#8f5a33);
+        border:none;border-radius:12px;padding:14px;font-size:13px;font-weight:800;color:#fff;cursor:pointer;">
+        🔍 Find these on the shelves
+      </button>
       <button onclick="_openAreaScan('${_packCardBookingId.replace(/'/g,"\\'")}')"
-        style="width:100%;margin-top:16px;background:none;border:1.5px dashed rgba(43,39,36,0.25);
+        style="width:100%;margin-top:8px;background:none;border:1.5px dashed rgba(43,39,36,0.25);
         border-radius:12px;padding:12px;font-size:12px;font-weight:700;color:#8a8175;cursor:pointer;">
         Can't find one? Scan the packing areas
       </button>
@@ -10662,6 +10667,255 @@ function _kcOpenLightbox(url) {
 // and match it against every reference photo on file. No AI, no API,
 // no cost — the tap supplies the one thing the engine can't do for
 // itself (knowing where the piece is), and the engine does the rest.
+// ─── FIND ON THE SHELVES ────────────────────────────────────────────
+// Pick a booking, photograph the shelves, and every piece belonging to
+// that booking gets a big bold ring drawn round it. Entirely in-house:
+// we slide a window across the photo at three sizes, fingerprint each
+// patch, and compare it against the fingerprints of THIS booking's
+// pieces only (a tiny, focused search — that's why it's fast and why
+// it beats a general "what is this" hunt). No AI, no API, no cost.
+function _kcFpDistance(a, b) {
+  if (!a || !b) return 64;
+  const pa = String(a).split('|'), pb = String(b).split('|');
+  const ham = (x, y) => {
+    if (!x || !y || x.length !== y.length) return null;
+    let d = 0;
+    for (let i = 0; i < x.length; i++) {
+      let v = parseInt(x[i], 16) ^ parseInt(y[i], 16);
+      while (v) { d += v & 1; v >>= 1; }
+    }
+    return d;
+  };
+  const coarse = ham(pa[0], pb[0]);
+  if (coarse === null) return 64;
+  if (pa.length < 3 || pb.length < 3) return coarse;
+  const fineRaw = ham(pa[1], pb[1]);
+  const fine = fineRaw === null ? 64 : (fineRaw / 256) * 64;
+  let cd = 0, n = 0;
+  if (pa[2] && pb[2] && pa[2].length === pb[2].length) {
+    for (let i = 0; i < pa[2].length; i++) { cd += Math.abs(parseInt(pa[2][i],16) - parseInt(pb[2][i],16)); n++; }
+  }
+  const colour = n ? (cd / n / 15) * 64 : 0;
+  return (coarse * 0.30) + (fine * 0.50) + (colour * 0.20);
+}
+
+// Fingerprint one square region of an already-loaded bitmap, in the
+// exact same three-part format computePerceptualHash produces.
+function _kcHashRegion(bmp, sx, sy, side) {
+  const c = document.createElement('canvas');
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  const grey = (d, i) => 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
+  const dHash = (w, h) => {
+    c.width = w; c.height = h;
+    ctx.drawImage(bmp, sx, sy, side, side, 0, 0, w, h);
+    const d = ctx.getImageData(0, 0, w, h).data;
+    const g = [];
+    for (let i = 0; i < d.length; i += 4) g.push(grey(d, i));
+    let bits = '';
+    for (let r = 0; r < h; r++) for (let col = 0; col < w - 1; col++)
+      bits += g[r * w + col] > g[r * w + col + 1] ? '1' : '0';
+    let hex = '';
+    for (let i = 0; i < bits.length; i += 4) hex += parseInt(bits.slice(i, i + 4), 2).toString(16);
+    return hex;
+  };
+  const coarse = dHash(9, 8);
+  const fine = dHash(17, 16);
+  c.width = 4; c.height = 4;
+  ctx.drawImage(bmp, sx, sy, side, side, 0, 0, 4, 4);
+  const cd = ctx.getImageData(0, 0, 4, 4).data;
+  let colour = '';
+  for (let i = 0; i < cd.length; i += 4) {
+    colour += Math.round(cd[i]/17).toString(16) + Math.round(cd[i+1]/17).toString(16) + Math.round(cd[i+2]/17).toString(16);
+  }
+  return `${coarse}|${fine}|${colour}`;
+}
+
+let _shelfBookingId = null;
+let _shelfPieces = [];
+
+async function _kcFindOnShelves(bookingId) {
+  _shelfBookingId = bookingId;
+  const modal = document.getElementById('shelf-scan') || (() => {
+    const d = document.createElement('div');
+    d.id = 'shelf-scan';
+    d.style.cssText = 'display:none;position:fixed;inset:0;z-index:9620;background:#1A1714;flex-direction:column;';
+    document.body.appendChild(d);
+    return d;
+  })();
+  modal.style.display = 'flex';
+  modal.innerHTML = `<div style="flex:1;display:flex;align-items:center;justify-content:center;color:#8a8175;">Loading this booking's pieces…</div>`;
+
+  try {
+    const res = await fetch(`${API_URL}/api/packing/queue?studioId=${studioId}`);
+    const data = await res.json();
+    _shelfPieces = (data.pieces || []).filter(p =>
+      p.booking_id === bookingId && p.photo_phash && p.status === 'fired');
+  } catch (e) { _shelfPieces = []; }
+
+  if (!_shelfPieces.length) {
+    modal.innerHTML = `
+      <div style="padding:max(14px,calc(env(safe-area-inset-top) + 8px)) 16px;display:flex;justify-content:flex-end;">
+        <button onclick="_kcCloseShelfScan()" style="background:none;border:1px solid rgba(184,121,70,0.4);
+          color:#F4ECE0;border-radius:10px;padding:7px 14px;font-size:12px;cursor:pointer;">Close</button>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;text-align:center;">
+        <div style="font-size:40px;opacity:0.4;margin-bottom:14px;">🏺</div>
+        <div style="font-family:'Caveat',cursive;font-size:24px;color:#F4ECE0;">Nothing to search for yet</div>
+        <div style="font-size:12px;color:#8a8175;margin-top:10px;line-height:1.6;max-width:280px;">
+          None of this booking's pieces has its own photo on file yet. Photograph each piece once
+          (the camera icon on the piece) and from then on I can find it on any shelf.</div>
+      </div>`;
+    return;
+  }
+  _renderShelfCapture();
+}
+
+function _kcCloseShelfScan() {
+  const m = document.getElementById('shelf-scan');
+  if (m) m.style.display = 'none';
+  _shelfPieces = [];
+}
+
+function _renderShelfCapture() {
+  const modal = document.getElementById('shelf-scan');
+  if (!modal) return;
+  modal.innerHTML = `
+    <div style="padding:max(14px,calc(env(safe-area-inset-top) + 8px)) 16px 12px;display:flex;
+      align-items:center;justify-content:space-between;border-bottom:1px solid rgba(184,121,70,0.25);">
+      <div style="font-family:'Caveat',cursive;font-size:22px;color:#F4ECE0;">Find on the shelves</div>
+      <button onclick="_kcCloseShelfScan()" style="background:none;border:1px solid rgba(184,121,70,0.4);
+        color:#F4ECE0;border-radius:10px;padding:7px 14px;font-size:12px;cursor:pointer;">Close</button>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;text-align:center;">
+      <div style="font-size:44px;margin-bottom:16px;">📷</div>
+      <div style="font-size:13px;color:#8a8175;line-height:1.6;max-width:290px;margin-bottom:24px;">
+        Photograph a shelf. I'll ring anything belonging to this booking —
+        searching ${_shelfPieces.length} piece${_shelfPieces.length===1?'':'s'} with a photo on file.</div>
+      <button onclick="_kcCaptureShelf()" style="background:linear-gradient(135deg,#00897B,#00695C);
+        color:#fff;border:none;border-radius:16px;padding:18px 34px;font-size:16px;font-weight:800;cursor:pointer;">
+        Photograph a shelf</button>
+    </div>`;
+}
+
+function _kcCaptureShelf() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.onchange = () => {
+    const file = input.files && input.files[0];
+    input.remove();
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = () => _kcSweepShelf(r.result);
+    r.readAsDataURL(file);
+  };
+  input.click();
+}
+
+// The sweep itself. Slides a window over the photo at three sizes and
+// scores every patch against this booking's pieces. Deliberately
+// honest about confidence: only rings a patch when it genuinely beats
+// the threshold, and says plainly when it finds nothing.
+async function _kcSweepShelf(photoUrl) {
+  const modal = document.getElementById('shelf-scan');
+  if (!modal) return;
+  modal.innerHTML = `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#8a8175;">
+    <div style="font-size:40px;margin-bottom:14px;">🔍</div>
+    <div style="font-family:'Caveat',cursive;font-size:24px;color:#F4ECE0;">Searching the shelf…</div>
+    <div id="sweep-progress" style="font-size:12px;margin-top:8px;">0%</div></div>`;
+
+  const bmp = await createImageBitmap(await (await fetch(photoUrl)).blob());
+  // work at a sane size — big enough for detail, small enough to be quick
+  const scale = Math.min(1, 1000 / Math.max(bmp.width, bmp.height));
+  const W = Math.round(bmp.width * scale), H = Math.round(bmp.height * scale);
+  const work = document.createElement('canvas');
+  work.width = W; work.height = H;
+  work.getContext('2d').drawImage(bmp, 0, 0, W, H);
+  bmp.close?.();
+  const workBmp = await createImageBitmap(work);
+
+  const short = Math.min(W, H);
+  const sizes = [short * 0.22, short * 0.32, short * 0.45].map(Math.round);
+  const hits = [];
+  const THRESHOLD = 13; // a touch looser than the single-photo threshold
+
+  let done = 0;
+  const total = sizes.reduce((acc, side) => {
+    const step = Math.max(1, Math.round(side * 0.5));
+    return acc + Math.ceil((W - side) / step + 1) * Math.ceil((H - side) / step + 1);
+  }, 0);
+
+  for (const side of sizes) {
+    if (side < 24 || side > short) continue;
+    const step = Math.max(1, Math.round(side * 0.5));
+    for (let y = 0; y + side <= H; y += step) {
+      for (let x = 0; x + side <= W; x += step) {
+        const fp = _kcHashRegion(workBmp, x, y, side);
+        for (const piece of _shelfPieces) {
+          const d = _kcFpDistance(fp, piece.photo_phash);
+          if (d <= THRESHOLD) {
+            hits.push({ x: x + side/2, y: y + side/2, r: side/2, d, piece });
+          }
+        }
+        done++;
+      }
+      const el = document.getElementById('sweep-progress');
+      if (el) el.textContent = Math.min(99, Math.round((done / total) * 100)) + '%';
+      await new Promise(r => setTimeout(r, 0)); // keep the phone responsive
+    }
+  }
+  workBmp.close?.();
+
+  // keep the single best hit per piece, so one piece = one ring
+  const best = {};
+  hits.forEach(h => {
+    const k = h.piece.id;
+    if (!best[k] || h.d < best[k].d) best[k] = h;
+  });
+  _renderShelfResult(photoUrl, Object.values(best), W, H);
+}
+
+function _renderShelfResult(photoUrl, rings, W, H) {
+  const modal = document.getElementById('shelf-scan');
+  if (!modal) return;
+  modal.innerHTML = `
+    <div style="padding:max(14px,calc(env(safe-area-inset-top) + 8px)) 16px 12px;display:flex;
+      align-items:center;justify-content:space-between;border-bottom:1px solid rgba(184,121,70,0.25);">
+      <div style="font-family:'Caveat',cursive;font-size:22px;color:#F4ECE0;">
+        ${rings.length ? `Found ${rings.length}` : 'Nothing found here'}</div>
+      <button onclick="_kcCloseShelfScan()" style="background:none;border:1px solid rgba(184,121,70,0.4);
+        color:#F4ECE0;border-radius:10px;padding:7px 14px;font-size:12px;cursor:pointer;">Close</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:16px;">
+      <div style="position:relative;width:100%;">
+        <img src="${photoUrl}" style="width:100%;border-radius:12px;display:block;">
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"
+          style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;">
+          ${rings.map(r => `
+            <circle cx="${r.x}" cy="${r.y}" r="${r.r}" fill="none"
+              stroke="#4CAF50" stroke-width="${Math.max(4, W * 0.012)}" opacity="0.95"/>
+            <circle cx="${r.x}" cy="${r.y}" r="${r.r}" fill="none"
+              stroke="#fff" stroke-width="${Math.max(1.5, W * 0.004)}" opacity="0.9"/>`).join('')}
+        </svg>
+      </div>
+      ${rings.length ? `<div style="margin-top:14px;display:flex;flex-direction:column;gap:6px;">
+        ${rings.map(r => `<div style="display:flex;align-items:center;gap:10px;color:#F4ECE0;font-size:13px;">
+          <span style="width:10px;height:10px;border-radius:50%;border:2px solid #4CAF50;flex-shrink:0;"></span>
+          ${r.piece.piece_type || 'Piece'}</div>`).join('')}
+      </div>`
+      : `<div style="margin-top:16px;font-size:12px;color:#8a8175;line-height:1.6;text-align:center;">
+          None of this booking's pieces turned up on this shelf. Try another shelf,
+          or tap a piece directly to check it.</div>`}
+    </div>
+    <div style="padding:14px 16px max(14px,env(safe-area-inset-bottom));flex-shrink:0;display:flex;gap:10px;">
+      <button onclick="_kcCaptureShelf()" style="flex:1;background:rgba(255,255,255,0.1);color:#F4ECE0;
+        border:none;border-radius:14px;padding:15px;font-size:14px;font-weight:700;cursor:pointer;">Next shelf</button>
+      <button onclick="_kcCloseShelfScan()" style="flex:1;background:linear-gradient(135deg,#00897B,#00695C);
+        color:#fff;border:none;border-radius:14px;padding:15px;font-size:14px;font-weight:800;cursor:pointer;">Done</button>
+    </div>`;
+}
+
 async function _kcTapToMatch(imgEl, ev) {
   try {
     const rect = imgEl.getBoundingClientRect();
@@ -32439,6 +32693,10 @@ if (typeof document !== 'undefined') {
     // (fixed, inset:0) and back appears to do nothing = trapped. The room
     // panel is the common one; add siblings here if new overlays appear.
     try {
+      const shelf = document.getElementById('shelf-scan');
+      if (shelf && shelf.style.display !== 'none' && getComputedStyle(shelf).display !== 'none') {
+        _kcCloseShelfScan(); return;
+      }
       const tapRes = document.getElementById('kc-tap-result');
       if (tapRes && tapRes.style.display !== 'none' && getComputedStyle(tapRes).display !== 'none') {
         tapRes.style.display = 'none'; return;
