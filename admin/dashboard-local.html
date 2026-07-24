@@ -12546,33 +12546,26 @@ async function _kcOfferGroupAngles(pieces) {
   if (!modal) return;
   for (let i = 0; i < pieces.length; i++) {
     const p = pieces[i];
-    const proceed = await new Promise((resolve) => {
+    await new Promise((resolve) => {
       modal.innerHTML = `
         <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;">
           <div style="font-family:'Caveat',cursive;font-size:22px;color:#F4ECE0;margin-bottom:6px;">
             ${p.type} — ${i + 1} of ${pieces.length}</div>
           <div style="font-size:12px;color:#8a8175;margin-bottom:18px;line-height:1.5;max-width:300px;">
-            Two more angles finds this piece far more reliably later —
-            about 20 seconds while it's still in hand.</div>
+            Two more angles finds this piece far more reliably later.
+            One tap — take or pick up to 2 more photos in the same picker.</div>
           <div style="display:flex;gap:10px;width:100%;max-width:320px;">
             <button id="kc-ga-yes" style="flex:1;background:#3E7C6A;border:none;color:#fff;
-              border-radius:12px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;">📷 Add them</button>
+              border-radius:12px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;">📷 Add angles</button>
             <button id="kc-ga-skip" style="flex:1;background:none;border:1px solid rgba(244,236,224,0.3);
               color:#F4ECE0;border-radius:12px;padding:13px;font-size:14px;cursor:pointer;">Skip</button>
           </div>
         </div>`;
-      document.getElementById('kc-ga-skip').onclick = () => resolve(false);
-      document.getElementById('kc-ga-yes').onclick = () => resolve(true);
+      document.getElementById('kc-ga-skip').onclick = () => resolve();
+      document.getElementById('kc-ga-yes').onclick = () => {
+        _tcCaptureAngles(p.id, ['angled', 'detail']).then(resolve);
+      };
     });
-    if (proceed) {
-      const wait = (msg) => { modal.innerHTML = `<div style="flex:1;display:flex;
-        align-items:center;justify-content:center;color:#8a8175;font-size:14px;
-        text-align:center;padding:20px;">${msg}</div>`; };
-      wait('At about 45° — the way it sits on a shelf…');
-      await _tcCaptureAngle(p.id, 'angled');
-      wait('Now the most distinctive detail…');
-      await _tcCaptureAngle(p.id, 'detail');
-    }
   }
   _kcCloseAddGroup();
 }
@@ -30523,30 +30516,43 @@ function captureRefPhoto(pieceId) {
 // version (_kcAngleShot) — this runs in a different screen with a
 // different completion step, and keeping them independent means a
 // change to one can't quietly break the other.
-function _tcCaptureAngle(pieceId, angleKey) {
+// One tap, one native picker, up to `labels.length` photos chosen or
+// taken in that SAME session. Replaces an earlier version that opened
+// a fresh camera picker per angle, auto-chained after each one saved —
+// which hung on the second shot, because iOS silently refuses to open
+// a file picker unless it's triggered by its own direct tap, and
+// there's no clean way to insert a fresh tap into an automatic
+// sequence without it becoming the very "extra steps" this was meant
+// to avoid. No `capture` attribute here deliberately: that's what
+// lets iOS's picker offer camera-or-library and multiple shots in one
+// visit, rather than forcing a single photo per launch.
+function _tcCaptureAngles(pieceId, labels) {
   return new Promise((resolve) => {
     const input = document.createElement('input');
-    input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+    input.type = 'file'; input.accept = 'image/*'; input.multiple = true;
     input.style.display = 'none';
     document.body.appendChild(input);
     input.onchange = async () => {
-      const file = input.files && input.files[0];
+      const files = Array.from(input.files || []).slice(0, labels.length);
       input.remove();
-      if (!file) { resolve(false); return; }
-      try {
-        const phash = await computePerceptualHash(file);
-        const photoBase64 = await new Promise((res, rej) => {
-          const r = new FileReader();
-          r.onload = () => res(r.result);
-          r.onerror = () => rej(new Error('read failed'));
-          r.readAsDataURL(file);
-        });
-        await fetch(`${API_URL}/api/pieces/${pieceId}/photos`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ studioId, photoBase64, phash, angle: angleKey }),
-        });
-        resolve(true);
-      } catch (e) { resolve(false); }
+      let saved = 0;
+      for (let i = 0; i < files.length; i++) {
+        try {
+          const phash = await computePerceptualHash(files[i]);
+          const photoBase64 = await new Promise((res, rej) => {
+            const r = new FileReader();
+            r.onload = () => res(r.result);
+            r.onerror = () => rej(new Error('read failed'));
+            r.readAsDataURL(files[i]);
+          });
+          await fetch(`${API_URL}/api/pieces/${pieceId}/photos`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ studioId, photoBase64, phash, angle: labels[i] || `angle-${i + 2}` }),
+          });
+          saved++;
+        } catch (e) { /* keep going — one bad file shouldn't lose the rest picked */ }
+      }
+      resolve(saved);
     };
     input.click();
   });
@@ -30565,7 +30571,7 @@ function _offerExtraAngles(pieceId) {
     <div style="font-weight:700;margin-bottom:6px;">Two more angles finds this piece far more reliably later.</div>
     <div style="display:flex;gap:8px;">
       <button id="tc-angle-yes" style="flex:1;background:var(--gu-primary);color:white;border:none;
-        border-radius:8px;padding:9px;font-weight:700;font-size:12px;">📷 Add them — 20 sec</button>
+        border-radius:8px;padding:9px;font-weight:700;font-size:12px;">📷 Add angles</button>
       <button id="tc-angle-skip" style="background:none;border:1px solid rgba(0,0,0,0.15);
         border-radius:8px;padding:9px 12px;font-size:12px;">Skip</button>
     </div>`;
@@ -30573,13 +30579,8 @@ function _offerExtraAngles(pieceId) {
 
   return new Promise((resolve) => {
     document.getElementById('tc-angle-skip').onclick = () => { banner.remove(); resolve(); };
-    document.getElementById('tc-angle-yes').onclick = async () => {
-      banner.innerHTML = '<div style="text-align:center;padding:8px;color:var(--gu-dust);">At about 45° — the way it sits on a shelf…</div>';
-      await _tcCaptureAngle(pieceId, 'angled');
-      banner.innerHTML = '<div style="text-align:center;padding:8px;color:var(--gu-dust);">Now the most distinctive detail…</div>';
-      await _tcCaptureAngle(pieceId, 'detail');
-      banner.remove();
-      resolve();
+    document.getElementById('tc-angle-yes').onclick = () => {
+      _tcCaptureAngles(pieceId, ['angled', 'detail']).then(() => { banner.remove(); resolve(); });
     };
   });
 }
