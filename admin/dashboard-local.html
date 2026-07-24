@@ -10298,6 +10298,26 @@ async function _loadPackingTiles() {
           piece${pieces.length===1?'':'s'} to pack</div>
       </button>
 
+      <!-- The unified packing session (24 Jul). The three separate
+           finders below — identify a piece, find on shelves, read the
+           base codes — each held their own state and none knew what the
+           others had found. This opens the single session that asks one
+           photograph about every outstanding booking at once, simplest
+           first. Linked from here because a page reachable only by
+           typing its address may as well not exist: Daisy landed back
+           on the old shelf sweep twice while the new one sat unlinked. -->
+      <button onclick="window.location.href='/admin/packing.html?studio=' + encodeURIComponent(studioId)"
+        class="glaze-tile"
+        style="width:100%;border:none;border-radius:16px;padding:16px 20px;cursor:pointer;margin-top:8px;
+        background:linear-gradient(135deg,#3E7C6A,#2f5f52);text-align:left;display:flex;align-items:center;gap:14px;">
+        <span style="font-size:26px;flex-shrink:0;">📦</span>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:#fff;">Pack a whole session</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.85);margin-top:2px;">
+            Every outstanding booking at once, simplest first</div>
+        </div>
+      </button>
+
       <!-- The other way in: a piece in hand, work out whose it is -->
       <button onclick="_kcIdentifyPiece()" class="glaze-tile"
         style="width:100%;border:1.5px solid rgba(43,39,36,0.15);border-radius:16px;padding:16px 20px;
