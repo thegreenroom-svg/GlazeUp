@@ -11487,7 +11487,7 @@ async function _kcSweepShelf(photoUrl) {
       const best = data.results.slice().sort((a, b) => (b.inliers || 0) - (a.inliers || 0))[0];
       _renderShelfResult(photoUrl, rings, data.sceneW, data.sceneH,
         best && best.inliers ? { d: best.inliers, piece: _shelfPieces.find(p => p.id === best.pieceId) || { piece_type: best.pieceType } } : null,
-        _shelfPieces.length, 'points', 'server · ' + (data.engine || 'BRISK'));
+        _shelfPieces.length, 'points', 'server · ' + (data.engine || 'BRISK'), data.results);
       return;
     }
     // no-references or an empty result is a legitimate, honest answer —
@@ -11698,7 +11698,7 @@ async function _kcSweepShelf(photoUrl) {
   _renderShelfResult(photoUrl, rings, W, H, closest, _shelfPieces.length);
 }
 
-function _renderShelfResult(photoUrl, rings, W, H, closest, expected, unit, engine) {
+function _renderShelfResult(photoUrl, rings, W, H, closest, expected, unit, engine, scores) {
 
   const modal = document.getElementById('shelf-scan');
   if (!modal) return;
@@ -11756,11 +11756,20 @@ function _renderShelfResult(photoUrl, rings, W, H, closest, expected, unit, engi
       </div>` : ''}
 
       ${!rings.length ? `<div style="margin-top:16px;font-size:12px;color:#8a8175;line-height:1.6;text-align:center;">
-          Nothing here stood out clearly enough from the background to ring.
-          ${closest ? `<br><br><span style="color:#B87946;">Closest was <b>${closest.piece.piece_type}</b>, but not clearly enough to ring.</span>` : ''}
-          <br><br>The usual reason is that a piece's reference photo shows the whole
-          table rather than that one piece. Photograph pieces individually at packing
-          and this gets sharply better.
+          Nothing here cleared the bar.
+          ${Array.isArray(scores) && scores.length ? `<br><br>
+            <div style="text-align:left;background:rgba(255,255,255,0.05);border-radius:10px;padding:10px 12px;">
+              <div style="font-size:11px;color:#B87946;font-weight:700;margin-bottom:6px;">
+                What each piece actually scored (needs 10 to ring, 6 to flag):</div>
+              ${scores.slice().sort((a,b)=>(b.inliers||0)-(a.inliers||0)).map(r =>
+                `<div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:2px 0;">
+                   <span>${r.pieceType || 'Piece'}</span>
+                   <span style="color:${(r.inliers||0) >= 6 ? '#F9A825' : '#8a8175'};">${r.inliers || 0}${r.note ? ' · ' + r.note : ''}</span>
+                 </div>`).join('')}
+            </div>` : (closest ? `<br><br><span style="color:#B87946;">Closest was <b>${closest.piece.piece_type}</b>.</span>` : '')}
+          <br>All zeros usually means the reference photos don't show these
+          objects. Low-but-not-zero means they do, but too small or too plain
+          in the shot to pin down — get closer, or fill more of the frame.
         </div>` : ''}
     </div>
     <div style="padding:14px 16px max(14px,env(safe-area-inset-bottom));flex-shrink:0;display:flex;gap:10px;">
@@ -12112,17 +12121,53 @@ function _kcAddUndoMark() {
   _kcRedrawMarks(document.getElementById('kc-add-img'));
 }
 
+// How big a crop should each tap take? Fixed 34% of the short side was
+// far too big for small things: tapping a rubber duck cut a square
+// mostly full of table, which is precisely the "reference photo is
+// mostly background" fault that made everything unmatchable before.
+//
+// Nobody wants to fiddle with a size slider at the bench, so it is
+// inferred instead: pieces tapped close together are small, pieces
+// tapped far apart are big. The crop is a little over half the typical
+// gap between neighbouring taps, clamped to something sensible.
+function _kcCropSideFrac(imgEl) {
+  const W = (imgEl && imgEl.naturalWidth) || 1, H = (imgEl && imgEl.naturalHeight) || 1;
+  const short = Math.min(W, H);
+  const ax = W / short, ay = H / short;       // work in short-side units
+  if (_kcAddMarks.length < 2) return 0.26;    // one piece: a middling crop
+  const nn = _kcAddMarks.map((m, i) => {
+    let best = Infinity;
+    _kcAddMarks.forEach((o, j) => {
+      if (i === j) return;
+      const d = Math.hypot((m.x - o.x) * ax, (m.y - o.y) * ay);
+      if (d < best) best = d;
+    });
+    return best;
+  }).filter(d => isFinite(d)).sort((a, b) => a - b);
+  if (!nn.length) return 0.26;
+  const median = nn[Math.floor(nn.length / 2)];
+  return Math.max(0.10, Math.min(0.34, median * 0.55));
+}
+
 function _kcRedrawMarks(imgEl) {
   const svg = document.getElementById('kc-add-marks');
   if (!svg || !imgEl) return;
   const r = imgEl.getBoundingClientRect();
   const p = svg.parentElement.getBoundingClientRect();
   const ox = r.left - p.left, oy = r.top - p.top;
+  // Draw the ACTUAL crop each tap will take, so what you see is what
+  // gets saved — a ring of arbitrary size would tell you nothing.
+  const frac = _kcCropSideFrac(imgEl);
+  const shortOnScreen = Math.min(r.width, r.height);
+  const box = frac * shortOnScreen;
   svg.innerHTML = _kcAddMarks.map((m, i) => {
     const cx = ox + m.x * r.width, cy = oy + m.y * r.height;
-    return `<circle cx="${cx}" cy="${cy}" r="22" fill="none" stroke="#4CAF50" stroke-width="3"/>
-      <circle cx="${cx}" cy="${cy}" r="22" fill="none" stroke="#fff" stroke-width="1"/>
-      <text x="${cx}" y="${cy + 5}" text-anchor="middle" fill="#fff" font-size="14" font-weight="800">${i + 1}</text>`;
+    return `<rect x="${cx - box/2}" y="${cy - box/2}" width="${box}" height="${box}" rx="6"
+              fill="none" stroke="#4CAF50" stroke-width="3"/>
+      <rect x="${cx - box/2}" y="${cy - box/2}" width="${box}" height="${box}" rx="6"
+              fill="none" stroke="#fff" stroke-width="1"/>
+      <circle cx="${cx}" cy="${cy - box/2}" r="11" fill="#4CAF50"/>
+      <text x="${cx}" y="${cy - box/2 + 4}" text-anchor="middle" fill="#fff" font-size="12" font-weight="800">${i + 1}</text>`;
   }).join('');
   const btn = document.getElementById('kc-add-save');
   if (btn) btn.textContent = `Save ${_kcAddMarks.length} piece${_kcAddMarks.length === 1 ? '' : 's'}`;
@@ -12139,7 +12184,10 @@ async function _kcSaveAddGroup() {
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   try {
     const bmp = await createImageBitmap(await (await fetch(_kcAddPhoto)).blob());
-    const side = Math.round(Math.min(bmp.width, bmp.height) * 0.34);
+    // Same size the green squares showed on screen — what you saw is
+    // exactly what gets saved.
+    const side = Math.round(Math.min(bmp.width, bmp.height)
+      * _kcCropSideFrac(document.getElementById('kc-add-img')));
     let saved = 0;
     for (let i = 0; i < _kcAddMarks.length; i++) {
       const m = _kcAddMarks[i];
