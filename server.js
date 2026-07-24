@@ -8021,7 +8021,8 @@ app.get('/api/packing/queue', async (req, res) => {
       .from('pottery_pieces')
       .select('*')
       .eq('studio_id', studioId)
-      .not('damaged', 'is', true);
+      .not('damaged', 'is', true)
+      .not('archived', 'is', true);   // taken out of a group, but never deleted — see /api/pieces/:id/archive
     if (bookingId) q = q.eq('booking_id', bookingId);
     if (!includeDone) q = q.not('status', 'in', '(packed,picked_up,collected)');
     const { data: pieces, error } = await q.order('updated_at', { ascending: true });
@@ -8078,7 +8079,7 @@ app.post('/api/pieces/mark-code', async (req, res) => {
   try {
     const { data: mine, error: e1 } = await supabase.from('pottery_pieces')
       .select('mark_code').eq('studio_id', studioId).eq('booking_id', bookingId)
-      .not('mark_code', 'is', null).limit(1);
+      .not('mark_code', 'is', null).not('archived', 'is', true).limit(1);
     if (e1) throw e1;
     if (mine && mine.length && mine[0].mark_code) {
       return res.json({ code: mine[0].mark_code, existing: true });
@@ -8113,7 +8114,7 @@ app.get('/api/pieces/by-code', async (req, res) => {
     const list = String(codes).split(',').map(c => c.trim()).filter(Boolean);
     const { data, error } = await supabase.from('pottery_pieces')
       .select('id, booking_id, piece_type, status, mark_code')
-      .eq('studio_id', studioId).in('mark_code', list);
+      .eq('studio_id', studioId).in('mark_code', list).not('archived', 'is', true);
     if (error) throw error;
     const byCode = {};
     (data || []).forEach(p => {
@@ -8138,7 +8139,7 @@ app.post('/api/pieces/add', async (req, res) => {
     try {
       const { data: sib } = await supabase.from('pottery_pieces')
         .select('mark_code').eq('studio_id', studioId).eq('booking_id', bookingId)
-        .not('mark_code', 'is', null).limit(1);
+        .not('mark_code', 'is', null).not('archived', 'is', true).limit(1);
       if (sib && sib.length) inheritedCode = sib[0].mark_code;
     } catch (e) { /* inheriting is best-effort */ }
     const { data, error } = await supabase.from('pottery_pieces').insert({
@@ -8175,6 +8176,34 @@ app.post('/api/pieces/:pieceId/move', async (req, res) => {
     res.json({ status: 'moved', piece: data });
   } catch (error) {
     console.error('Move piece error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/pieces/:pieceId/archive — take a piece OUT of its group
+// without deleting it. [Daisy, 24 Jul, after finding a stray piece from
+// an earlier bug in her group card]: "there should be a delete item
+// button as well, so we can ungroup or take items out, but leave it on
+// the system." That is not a delete — it is exactly what archiving
+// means here: gone from packing, gone from the group's count, still in
+// the database, still reachable, nothing thrown away.
+//
+// {archived:true} to remove it from view, {archived:false} to bring it
+// back — same endpoint, so undoing a mistake is one call, not a rebuild.
+app.post('/api/pieces/:pieceId/archive', async (req, res) => {
+  const { studioId, archived } = req.body;
+  const { pieceId } = req.params;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const { data, error } = await supabase.from('pottery_pieces')
+      .update({ archived: archived !== false, updated_at: new Date().toISOString() })
+      .eq('studio_id', studioId).eq('id', pieceId)
+      .select().maybeSingle();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: 'No such piece for this studio.' });
+    res.json({ status: data.archived ? 'archived' : 'restored', piece: data });
+  } catch (error) {
+    console.error('Archive piece error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -8279,7 +8308,8 @@ app.post('/api/pieces/find-on-shelf', async (req, res) => {
       .select('id, piece_type, reference_photo_url, status')
       .eq('studio_id', studioId)
       .eq('booking_id', bookingId)
-      .not('damaged', 'is', true);
+      .not('damaged', 'is', true)
+      .not('archived', 'is', true);   // taken out of the group shouldn't still turn up on a sweep
     if (error) throw error;
 
     const withPhotos = (pieces || []).filter(p => p.reference_photo_url);

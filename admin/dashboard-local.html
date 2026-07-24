@@ -10547,6 +10547,8 @@ async function _renderBookingPackCard() {
             </div>
             <span onclick="event.stopPropagation();_kcMovePiece('${p.id}','${(p.piece_type||'Piece').replace(/'/g,"\\'")}')"
               style="font-size:15px;padding:6px;flex-shrink:0;opacity:0.5;" title="Move to another booking">↔</span>
+            <span onclick="event.stopPropagation();_kcRemovePiece('${p.id}','${(p.piece_type||'Piece').replace(/'/g,"\\'")}')"
+              style="font-size:15px;padding:6px;flex-shrink:0;opacity:0.5;" title="Take out of this group">✕</span>
             <span onclick="event.stopPropagation();_kcPhotoPiece('${p.id}')" style="font-size:20px;padding:6px;flex-shrink:0;">📷</span>
           </button>`;
         }).join('')}
@@ -10616,6 +10618,42 @@ async function _kcMovePiece(pieceId, pieceName) {
     toast(`Moved to ${to.trim()}`, 'success');
   } catch (e) { toast("Couldn't move that", 'error'); }
   _renderBookingPackCard();
+}
+
+// Take a piece OUT of a group without deleting it. [Daisy, 24 Jul, after
+// a stray piece from an earlier bug turned up in her group]: "there
+// should be a delete item button as well, so we can ungroup or take
+// items out, but leave it on the system." Archiving is exactly that —
+// the piece leaves this group's count and every packing list, but the
+// row and its photo are still there, one tap from coming back.
+async function _kcRemovePiece(pieceId, pieceName) {
+  if (!confirm(`Take "${pieceName}" out of this group?\n\nIt stays on file — this doesn't delete it.`)) return;
+  try {
+    await api(`/api/pieces/${pieceId}/archive`, { method: 'POST', body: { studioId, archived: true } });
+    toast(`${pieceName} taken out of the group`, 'success');
+    _kcOfferUndoRemove(pieceId, pieceName);
+  } catch (e) { toast("Couldn't take that out", 'error'); return; }
+  _renderBookingPackCard();
+}
+
+function _kcOfferUndoRemove(pieceId, pieceName) {
+  const bar = document.createElement('div');
+  bar.style.cssText = 'position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));'
+    + 'z-index:9900;background:#2B2724;color:#F4ECE0;border-radius:14px;padding:12px 16px;'
+    + 'display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 8px 24px rgba(0,0,0,0.3);';
+  bar.innerHTML = `<span style="font-size:13px;">${pieceName} removed</span>
+    <button style="background:none;border:1px solid rgba(244,236,224,0.35);color:#F4ECE0;
+      border-radius:10px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;">Undo</button>`;
+  bar.querySelector('button').onclick = async () => {
+    bar.remove();
+    try {
+      await api(`/api/pieces/${pieceId}/archive`, { method: 'POST', body: { studioId, archived: false } });
+      toast(`${pieceName} back in the group`, 'success');
+    } catch (e) { toast("Couldn't undo that", 'error'); }
+    _renderBookingPackCard();
+  };
+  document.body.appendChild(bar);
+  setTimeout(() => bar.remove(), 6000);
 }
 
 async function _kcTickAll(tickThem) {
