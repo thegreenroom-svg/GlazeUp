@@ -12332,6 +12332,81 @@ async function _kcRunBaseCodes(photoUrl) {
 }
 
 function _kcAddPieceHere() {
+  _kcChooseBookingForAdd();
+}
+
+// Asked FIRST, not buried as a text field after the photo's already
+// taken. Daisy's own point: at this stage there needs to be a booking
+// — choose an existing one or add a new one — before the camera even
+// opens, not a freeform field to fill in afterwards.
+let _kcAddBookingId = null;
+
+async function _kcChooseBookingForAdd() {
+  let modal = document.getElementById('kc-choose-booking');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'kc-choose-booking';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9660;background:#201C1A;display:none;'
+      + 'flex-direction:column;padding:calc(14px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));box-sizing:border-box;';
+    document.body.appendChild(modal);
+  }
+  modal.style.display = 'flex';
+  modal.innerHTML = `<div style="flex:1;display:flex;align-items:center;justify-content:center;
+    color:#8a8175;font-size:13px;">Loading bookings…</div>`;
+
+  let groups = [];
+  try {
+    const res = await fetch(`${API_URL}/api/pieces/bookings?studioId=${studioId}`);
+    const d = await res.json();
+    groups = (d.bookings || d || []).map(b => (typeof b === 'string' ? b : b.booking_id)).filter(Boolean);
+  } catch (e) { groups = []; }
+  const last = (() => { try { return localStorage.getItem('kc_last_add_booking') || ''; } catch (e) { return ''; } })();
+
+  modal.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <div style="font-family:'Caveat',cursive;font-size:23px;color:#F4ECE0;">Whose group is this?</div>
+      <button onclick="_kcCloseChooseBooking()" style="background:none;border:1px solid rgba(244,236,224,0.3);
+        color:#F4ECE0;border-radius:10px;padding:7px 14px;font-size:13px;cursor:pointer;">Close</button>
+    </div>
+    <div style="font-size:11px;color:#8a8175;margin-bottom:14px;">
+      Choose an existing booking, or add a new one — then the photo.</div>
+
+    <div style="margin-bottom:14px;">
+      <input id="kc-cb-new" placeholder="New booking name or label"
+        style="width:100%;box-sizing:border-box;padding:11px 12px;border-radius:11px;border:1px solid rgba(244,236,224,0.25);
+        background:#2B2724;color:#F4ECE0;font-size:15px;margin-bottom:8px;">
+      <button onclick="_kcConfirmAddBooking()" style="width:100%;background:#3E7C6A;border:none;
+        color:#fff;border-radius:12px;padding:12px;font-size:14px;font-weight:800;cursor:pointer;">
+        + Add new booking</button>
+    </div>
+
+    ${groups.length ? `
+      <div style="font-size:11px;color:#8a8175;margin-bottom:6px;">Or choose an existing one</div>
+      <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">
+        ${groups.map(g => `
+          <button onclick="_kcConfirmAddBooking('${String(g).replace(/'/g, "\\'")}')"
+            style="text-align:left;background:#2B2724;border:1px solid rgba(244,236,224,0.15);
+            color:#F4ECE0;border-radius:11px;padding:12px 14px;font-size:14px;cursor:pointer;">
+            ${g}${g === last ? ' <span style="color:#8a8175;font-size:11px;">· last used</span>' : ''}
+          </button>`).join('')}
+      </div>` : ''}`;
+}
+
+function _kcCloseChooseBooking() {
+  const m = document.getElementById('kc-choose-booking');
+  if (m) m.style.display = 'none';
+}
+
+function _kcConfirmAddBooking(existingId) {
+  const bookingId = existingId || (document.getElementById('kc-cb-new')?.value || '').trim();
+  if (!bookingId) { toast('Give the booking a name first', 'error'); return; }
+  _kcAddBookingId = bookingId;
+  try { localStorage.setItem('kc_last_add_booking', bookingId); } catch (e) {}
+  _kcCloseChooseBooking();
+  _kcLaunchGroupPhoto();
+}
+
+function _kcLaunchGroupPhoto() {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = 'image/*';
@@ -12362,37 +12437,24 @@ async function _kcOpenAddGroup(photoUrl) {
       + 'flex-direction:column;padding:calc(14px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));box-sizing:border-box;';
     document.body.appendChild(modal);
   }
-  // Existing group names, so a split order can be put straight back
-  // alongside the rest of its group rather than retyped.
-  let groups = [];
-  try {
-    const res = await fetch(`${API_URL}/api/pieces/bookings?studioId=${studioId}`);
-    const d = await res.json();
-    groups = (d.bookings || d || []).map(b => (typeof b === 'string' ? b : b.booking_id)).filter(Boolean);
-  } catch (e) { groups = []; }
-  const last = (() => { try { return localStorage.getItem('kc_last_add_booking') || ''; } catch (e) { return ''; } })();
 
   modal.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
       <div style="font-family:'Caveat',cursive;font-size:23px;color:#F4ECE0;">Tap each piece</div>
       <button onclick="_kcCloseAddGroup()" style="background:none;border:1px solid rgba(244,236,224,0.3);
         color:#F4ECE0;border-radius:10px;padding:7px 14px;font-size:13px;cursor:pointer;">Close</button>
     </div>
-    <div style="font-size:11px;color:#8a8175;margin-bottom:8px;">
-      One tap per piece. Each gets its own close-up from this photo.</div>
+    <div style="font-size:12px;color:#8a8175;margin-bottom:8px;">
+      Adding to <span style="color:#F4ECE0;font-weight:700;">${(_kcAddBookingId || 'this booking').replace(/</g, '&lt;')}</span>
+      · <a onclick="_kcChooseBookingForAdd()" style="color:#B87946;text-decoration:underline;cursor:pointer;">change</a>
+      — one tap per piece, each gets its own close-up.</div>
     <div style="position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;">
       <img id="kc-add-img" src="${photoUrl}" onclick="_kcAddMark(this, event)"
         style="max-width:100%;max-height:100%;object-fit:contain;border-radius:12px;cursor:crosshair;">
       <svg id="kc-add-marks" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;"></svg>
     </div>
     <div style="margin-top:10px;">
-      <div style="font-size:11px;color:#8a8175;margin-bottom:4px;">Whose group is this?</div>
-      <input id="kc-add-group-name" list="kc-add-group-list" value="${last.replace(/"/g,'&quot;')}"
-        placeholder="a name, or any label"
-        style="width:100%;box-sizing:border-box;padding:11px 12px;border-radius:11px;border:1px solid rgba(244,236,224,0.25);
-        background:#2B2724;color:#F4ECE0;font-size:15px;">
-      <datalist id="kc-add-group-list">${groups.map(g => `<option value="${String(g).replace(/"/g,'&quot;')}">`).join('')}</datalist>
-      <div style="display:flex;gap:8px;margin-top:10px;">
+      <div style="display:flex;gap:8px;">
         <button onclick="_kcAddUndoMark()" style="flex:1;background:#2B2724;border:1px solid rgba(244,236,224,0.25);
           color:#F4ECE0;border-radius:12px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;">Undo tap</button>
         <button id="kc-add-save" onclick="_kcSaveAddGroup()" style="flex:2;background:#3E7C6A;border:none;
@@ -12405,7 +12467,7 @@ async function _kcOpenAddGroup(photoUrl) {
 function _kcCloseAddGroup() {
   const m = document.getElementById('kc-add-group');
   if (m) m.style.display = 'none';
-  _kcAddMarks = []; _kcAddPhoto = null;
+  _kcAddMarks = []; _kcAddPhoto = null; _kcAddBookingId = null;
 }
 
 function _kcAddMark(imgEl, ev) {
@@ -12475,11 +12537,9 @@ function _kcRedrawMarks(imgEl) {
 }
 
 async function _kcSaveAddGroup() {
-  const nameEl = document.getElementById('kc-add-group-name');
-  const bookingId = (nameEl && nameEl.value || '').trim();
-  if (!bookingId) { toast('Give the group a name first', 'error'); return; }
+  const bookingId = _kcAddBookingId;
+  if (!bookingId) { toast('Choose a booking first', 'error'); return; }
   if (!_kcAddMarks.length) { toast('Tap each piece in the photo first', 'error'); return; }
-  try { localStorage.setItem('kc_last_add_booking', bookingId); } catch (e) {}
 
   const btn = document.getElementById('kc-add-save');
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
@@ -34602,6 +34662,10 @@ if (typeof document !== 'undefined') {
       if (kilnCode && getComputedStyle(kilnCode).display !== 'none') { kilnCode.style.display = 'none'; return; }
       const codeRes = document.getElementById('kc-code-result');
       if (codeRes && getComputedStyle(codeRes).display !== 'none') { codeRes.style.display = 'none'; return; }
+      const chooseBooking = document.getElementById('kc-choose-booking');
+      if (chooseBooking && getComputedStyle(chooseBooking).display !== 'none') {
+        _kcCloseChooseBooking(); return;
+      }
       const addGroup = document.getElementById('kc-add-group');
       if (addGroup && addGroup.style.display !== 'none' && getComputedStyle(addGroup).display !== 'none') {
         _kcCloseAddGroup(); return;
