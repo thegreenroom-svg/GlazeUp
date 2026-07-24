@@ -33274,22 +33274,32 @@ function showIdleAsk() {
     <button onclick="_dismissIdleAsk(true)" class="glaze-tile"
       style="width:100%;border:none;border-radius:12px;padding:13px;font-size:14px;font-weight:800;
       cursor:pointer;margin-bottom:7px;">Yes — I'm still on this</button>
-    <button class="glaze-tile" onclick="_dismissIdleAsk(false); goToTab('floor-plan');"
+    <button class="glaze-tile" onclick="_dismissIdleAsk(false); goToRealLandingPage();"
       style="width:100%;background:#F4ECE0;border:1px solid rgba(43,39,36,0.15);border-radius:12px;
       padding:13px;font-size:14px;font-weight:700;color:#2B2724;cursor:pointer;margin-bottom:7px;">
-      Back to the floor plan</button>
+      Back to the studio home</button>
     <button onclick="_dismissIdleAsk(false); goToRealLandingPage();"
       style="width:100%;background:none;border:1px solid rgba(43,39,36,0.15);border-radius:12px;
       padding:11px;font-size:13px;font-weight:600;color:#8a8175;cursor:pointer;">
       Somewhere else</button>`;
   document.body.appendChild(card);
 
-  // If nobody answers, the iPad was put down — so it rests on the floor
-  // plan, which IS the screensaver. Note this deliberately no longer
-  // says "go home": home is now your tiles (see landOnHome), and an
-  // unattended iPad should show the room, not somebody's private tile
-  // order. Same line, different reason — worth saying so.
-  _askGraceTimer = setTimeout(() => { _dismissIdleAsk(false); goToTab('floor-plan'); }, ASK_GRACE_MS);
+  // If nobody answers, rest on the studio home rather than the combined
+  // three-zone floor plan.
+  //
+  // WHY THIS CHANGED (24 Jul): Daisy hit home, put the phone down, and
+  // two minutes later found herself on the three-zone planner — the
+  // exact screen the room-page work set out to retire ("this page is
+  // redundant... should take you to the room's landing page"). Nothing
+  // she pressed took her there; THIS line did, silently, on a timer.
+  //
+  // The old reasoning was sound for a shared studio iPad: an unattended
+  // device should show the room, not somebody's private tile order. But
+  // it was written before the Desk existed. The Desk IS the room view
+  // now — live zones, who's in, what needs doing — so it satisfies the
+  // original intent without resurrecting a screen we deliberately
+  // stopped routing to everywhere else.
+  _askGraceTimer = setTimeout(() => { _dismissIdleAsk(false); goToRealLandingPage(); }, ASK_GRACE_MS);
 }
 
 function resetReturnToFloorTimer() {
