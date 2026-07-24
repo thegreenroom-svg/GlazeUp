@@ -50,6 +50,30 @@
   .bar i{display:block; height:100%; border-radius:2px}
   .note{font-size:12px; color:var(--mute); line-height:1.55; margin-top:12px}
   .prog{color:var(--mute); font-size:13px; text-align:center; padding:10px 0}
+
+  #cropper{display:none; position:fixed; inset:0; z-index:50; background:#141110;
+    flex-direction:column; padding:max(12px,env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom))}
+  #cropper.on{display:flex}
+  .crophead{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:10px}
+  .cropstage{position:relative; flex:1; min-height:0; display:flex; align-items:center; justify-content:center;
+    touch-action:none; overflow:hidden}
+  .cropstage img{max-width:100%; max-height:100%; object-fit:contain; border-radius:10px; display:block}
+  #cropBox{position:absolute; border:2px solid #4CAF50; border-radius:4px; pointer-events:none;
+    box-shadow:0 0 0 9999px rgba(0,0,0,.55); display:none}
+  .cropfoot{padding-top:12px; display:flex; flex-direction:column; gap:10px}
+  .cropfoot input[type=range]{width:100%; accent-color:var(--go)}
+
+  #cropper{display:none; position:fixed; inset:0; z-index:50; background:var(--bg);
+    flex-direction:column; padding:max(12px,env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom))}
+  #cropper.on{display:flex}
+  .crophead{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:10px}
+  .cropstage{position:relative; flex:1; min-height:0; display:flex; align-items:center;
+    justify-content:center; overflow:hidden; touch-action:manipulation}
+  .cropstage img{max-width:100%; max-height:100%; object-fit:contain; border-radius:10px; display:block}
+  #cropBox{position:absolute; border:2px solid #4CAF50; border-radius:4px; pointer-events:none;
+    box-shadow:0 0 0 9999px rgba(0,0,0,.55); display:none}
+  .cropfoot{padding-top:12px; display:flex; flex-direction:column; gap:10px}
+  #cropSize{width:100%; accent-color:var(--go)}
 </style>
 </head>
 <body>
@@ -61,8 +85,26 @@
 <div class="card">
   <div class="lbl">Things to find</div>
   <div class="items" id="items"></div>
-  <div class="empty" id="itemsEmpty">Nothing added yet. Fill the frame with one object.</div>
+  <div class="empty" id="itemsEmpty">Nothing added yet.</div>
   <button class="wide" id="addBtn">Add a thing</button>
+</div>
+
+<div id="cropper">
+  <div class="crophead">
+    <div>
+      <div style="font-family:Caveat,serif;font-size:24px">Which thing?</div>
+      <div style="font-size:12px;color:var(--mute)">Tap it, then size the box to fit it</div>
+    </div>
+    <button id="cropCancel">Cancel</button>
+  </div>
+  <div class="cropstage" id="cropStage">
+    <img id="cropImg" alt="">
+    <div id="cropBox"></div>
+  </div>
+  <div class="cropfoot">
+    <input type="range" id="cropSize" min="6" max="70" value="26">
+    <button class="primary" id="cropOk">Use this</button>
+  </div>
 </div>
 
 <div class="card">
@@ -271,18 +313,95 @@ async function bitmapFrom(dataUrl, maxSide) {
   return await createImageBitmap(c);
 }
 
+// The single most important step in the whole bench. A reference
+// photographed from arm's length fingerprints "a wooden table with
+// clutter on it" — and then gets searched against a photo of a wooden
+// table with clutter on it, so every spot scores the same and nothing
+// can be located. Measured: the fish jug scored 23.6 and stood out
+// from elsewhere by 0.3, which is no discrimination at all.
+//
+// Pointing at the thing fixes that at the source, and is less work
+// than asking someone to go back and reshoot everything closer.
+let cropBmp = null, cropOnDone = null;
+let cropCx = 0.5, cropCy = 0.5;      // centre, as a fraction of the image
+
+function openCropper(bmp, onDone) {
+  cropBmp = bmp; cropOnDone = onDone;
+  cropCx = 0.5; cropCy = 0.5;
+  const c = document.createElement('canvas');
+  c.width = bmp.width; c.height = bmp.height;
+  c.getContext('2d').drawImage(bmp, 0, 0);
+  $('cropImg').src = c.toDataURL('image/jpeg', 0.9);
+  $('cropper').classList.add('on');
+  $('cropImg').onload = drawCropBox;
+  setTimeout(drawCropBox, 40);
+}
+
+function cropGeometry() {
+  const img = $('cropImg');
+  const r = img.getBoundingClientRect();
+  const stage = $('cropStage').getBoundingClientRect();
+  const frac = parseInt($('cropSize').value, 10) / 100;
+  // Square in IMAGE space, so the fingerprint region is square too.
+  const sideImg = Math.round(Math.min(cropBmp.width, cropBmp.height) * frac);
+  const scale = r.width / cropBmp.width;
+  const sideScreen = sideImg * scale;
+  let cx = cropCx * cropBmp.width, cy = cropCy * cropBmp.height;
+  // Keep the box wholly inside the picture.
+  cx = Math.max(sideImg/2, Math.min(cropBmp.width - sideImg/2, cx));
+  cy = Math.max(sideImg/2, Math.min(cropBmp.height - sideImg/2, cy));
+  cropCx = cx / cropBmp.width; cropCy = cy / cropBmp.height;
+  return {
+    sx: Math.round(cx - sideImg/2), sy: Math.round(cy - sideImg/2), side: sideImg,
+    left: (r.left - stage.left) + (cx * scale) - sideScreen/2,
+    top:  (r.top  - stage.top)  + (cy * scale) - sideScreen/2,
+    px: sideScreen,
+  };
+}
+
+function drawCropBox() {
+  if (!cropBmp) return;
+  const g = cropGeometry();
+  const box = $('cropBox');
+  box.style.display = 'block';
+  box.style.left = g.left + 'px';
+  box.style.top = g.top + 'px';
+  box.style.width = g.px + 'px';
+  box.style.height = g.px + 'px';
+}
+
+function placeCrop(ev) {
+  const img = $('cropImg');
+  const r = img.getBoundingClientRect();
+  const t = ev.touches ? ev.touches[0] : ev;
+  cropCx = Math.max(0, Math.min(1, (t.clientX - r.left) / r.width));
+  cropCy = Math.max(0, Math.min(1, (t.clientY - r.top) / r.height));
+  drawCropBox();
+}
+
+$('cropStage').addEventListener('pointerdown', placeCrop);
+$('cropStage').addEventListener('pointermove', (e) => { if (e.buttons) placeCrop(e); });
+$('cropSize').addEventListener('input', drawCropBox);
+$('cropCancel').onclick = () => { $('cropper').classList.remove('on'); cropBmp = null; };
+$('cropOk').onclick = () => {
+  const g = cropGeometry();
+  const bmp = cropBmp, done = cropOnDone;
+  $('cropper').classList.remove('on');
+  cropBmp = null; cropOnDone = null;
+  done(bmp, g.sx, g.sy, g.side);
+};
+
 $('addBtn').onclick = () => pickImage(async (url) => {
-  const bmp = await bitmapFrom(url, 900);
-  // Centre square: the object is expected to fill the frame.
-  const side = Math.min(bmp.width, bmp.height);
-  const sx = Math.round((bmp.width - side)/2), sy = Math.round((bmp.height - side)/2);
-  const fp = hashRegion(bmp, sx, sy, side);
-  const t = document.createElement('canvas');
-  t.width = t.height = 148;
-  t.getContext('2d').drawImage(bmp, sx, sy, side, side, 0, 0, 148, 148);
-  bmp.close && bmp.close();
-  items.push({ name: 'Thing ' + (items.length + 1), url, fp, thumb: t.toDataURL('image/jpeg', 0.85) });
-  renderItems();
+  const bmp = await bitmapFrom(url, 1100);
+  openCropper(bmp, (b, sx, sy, side) => {
+    const fp = hashRegion(b, sx, sy, side);
+    const t = document.createElement('canvas');
+    t.width = t.height = 148;
+    t.getContext('2d').drawImage(b, sx, sy, side, side, 0, 0, 148, 148);
+    b.close && b.close();
+    items.push({ name: 'Thing ' + (items.length + 1), url, fp, thumb: t.toDataURL('image/jpeg', 0.85) });
+    renderItems();
+  });
 });
 
 function renderItems() {
