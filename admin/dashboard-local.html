@@ -10584,15 +10584,10 @@ async function _renderBookingPackCard() {
         cursor:pointer;margin-bottom:8px;background:#FFF9F0;color:#2B2724;font-size:14px;font-weight:800;text-align:left;">
         Nº&nbsp; Kiln code for this group <span style="font-weight:400;color:#8a8175;font-size:12px;">— stamp before dipping</span>
       </button>
-      <button onclick="_kcFindOnShelves('${_packCardBookingId.replace(/'/g,"\\'")}')"
-        style="width:100%;margin-top:16px;background:linear-gradient(135deg,#B87946,#8f5a33);
+      <button onclick="window.location.href='/admin/packing.html?studio=' + encodeURIComponent(studioId)"
+        style="width:100%;margin-top:16px;background:linear-gradient(135deg,#3E7C6A,#2f5f52);
         border:none;border-radius:12px;padding:14px;font-size:13px;font-weight:800;color:#fff;cursor:pointer;">
-        🔍 Find these on the shelves
-      </button>
-      <button onclick="_openAreaScan('${_packCardBookingId.replace(/'/g,"\\'")}')"
-        style="width:100%;margin-top:8px;background:none;border:1.5px dashed rgba(43,39,36,0.25);
-        border-radius:12px;padding:12px;font-size:12px;font-weight:700;color:#8a8175;cursor:pointer;">
-        Can't find one? Scan the packing areas
+        📦 Find these — packing session
       </button>
     </div>
     <div style="padding:14px 16px max(14px,env(safe-area-inset-bottom));border-top:1.5px solid rgba(43,39,36,0.1);flex-shrink:0;">
@@ -12685,16 +12680,14 @@ async function _kcSaveAddGroup() {
       : `${saved} of ${_kcAddMarks.length} saved — try the rest again`,
       saved ? 'success' : 'error');
 
-    // This is the actual moment identified earlier: the group is still
-    // physically together, right here, about to go to the kiln room.
-    // The angle screen in the pack card is too late — by then the
-    // pieces are jumbled. So the offer happens in THIS modal, before
-    // it closes, one piece at a time, while everything is still in hand.
-    if (savedPieces.length) {
-      await _kcOfferGroupAngles(savedPieces);
-    } else {
-      _kcCloseAddGroup();
-    }
+    // Angle prompts removed (24 Jul evening, Daisy's call). They were
+    // built to feed BRISK, which needs multiple viewpoints because it
+    // matches fine texture. The colour-and-shape matcher the packing
+    // session now uses worked from single references from the start —
+    // so the prompts were pure friction in the capture flow. The
+    // per-piece crop from the tap IS the reference. One photo, tap the
+    // pieces, done.
+    _kcCloseAddGroup();
     if (typeof openPacking === 'function') openPacking();
   } catch (e) {
     toast('Could not save those pieces', 'error');
@@ -30848,13 +30841,9 @@ async function handleRefPhotoCapture(event) {
       // it's slow or comes back empty.
       suggestStockTypeForPiece(_capturingPieceId, photoBase64);
 
-      // The two extra angles happen HERE, now, while the piece is still
-      // in hand — not as a separate screen someone has to remember to
-      // visit later. That was the actual gap: the angle-capture screen
-      // existed but nothing in the real table-clearing flow ever led to
-      // it, so it was never used. A step that depends on being
-      // remembered doesn't happen — same lesson as the kiln-stamp idea.
-      await _offerExtraAngles(_capturingPieceId, bookingCode);
+      // Angle prompts removed (24 Jul evening, Daisy's call) — they fed
+      // BRISK, which the packing session no longer uses. One photo per
+      // piece is the flow again.
       loadRefPhotoPieces(bookingCode);
     } catch (e) {
       alert('Could not save the photo — try again.');
