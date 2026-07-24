@@ -11682,7 +11682,7 @@ async function _kcSweepShelf(photoUrl) {
           }
         }
       } catch (e) { /* angles endpoint unreachable too — main photo alone still tried */ }
-      if (photos.length > 4) photos = photos.slice(0, 4);
+      if (photos.length > 6) photos = photos.slice(photos.length - 6);
 
       if (!photos.length) {
         found.push({ piece, inliers: 0, r: 0, tried: [], note: 'no reference photo yet' });
@@ -11725,7 +11725,14 @@ async function _kcSweepShelf(photoUrl) {
         const cy = best.pts.reduce((a, p) => a + p.y, 0) / best.pts.length;
         const spread = Math.max(45, 1.7 * Math.sqrt(
           best.pts.reduce((a, p) => a + (p.x - cx) ** 2 + (p.y - cy) ** 2, 0) / best.pts.length));
-        found.push({ piece, inliers: best.inliers, x: cx, y: cy, r: spread, wonWith, tried });
+        // Same sprawl check as the server engine: points spread across
+        // half the frame describe repeating texture, not one object.
+        if (spread > 0.22 * Math.min(scene.W, scene.H)) {
+          found.push({ piece, inliers: best.inliers, x: 0, y: 0, r: 0, wonWith, tried,
+                       note: 'points scattered across the frame — not one object' });
+        } else {
+          found.push({ piece, inliers: best.inliers, x: cx, y: cy, r: spread, wonWith, tried });
+        }
       } else {
         found.push({ piece, inliers: best.inliers, x: 0, y: 0, r: 0, wonWith, tried });
       }
@@ -12677,26 +12684,40 @@ async function _kcOfferGroupAngles(pieces) {
   if (!modal) return;
   for (let i = 0; i < pieces.length; i++) {
     const p = pieces[i];
-    await new Promise((resolve) => {
-      modal.innerHTML = `
-        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;">
-          <div style="font-family:'Caveat',cursive;font-size:22px;color:#F4ECE0;margin-bottom:6px;">
-            ${p.type} — ${i + 1} of ${pieces.length}</div>
-          <div style="font-size:12px;color:#8a8175;margin-bottom:18px;line-height:1.5;max-width:300px;">
-            Two more angles finds this piece far more reliably later.
-            One tap — take or pick up to 2 more photos in the same picker.</div>
-          <div style="display:flex;gap:10px;width:100%;max-width:320px;">
-            <button id="kc-ga-yes" style="flex:1;background:#3E7C6A;border:none;color:#fff;
-              border-radius:12px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;">📷 Add angles</button>
-            <button id="kc-ga-skip" style="flex:1;background:none;border:1px solid rgba(244,236,224,0.3);
-              color:#F4ECE0;border-radius:12px;padding:13px;font-size:14px;cursor:pointer;">Skip</button>
-          </div>
-        </div>`;
-      document.getElementById('kc-ga-skip').onclick = () => resolve();
-      document.getElementById('kc-ga-yes').onclick = () => {
-        _tcCaptureAngles(p.id, 4).then(resolve);
-      };
-    });
+    // Keep going until she's happy, rather than a fixed number. Each
+    // shot sits behind its own explicit tap — that's not friction for
+    // its own sake, it's the iOS rule: a photo picker only opens from a
+    // direct user gesture, which is exactly why the original
+    // auto-advancing version silently hung on the second shot.
+    let saved = 0;
+    for (;;) {
+      const again = await new Promise((resolve) => {
+        modal.innerHTML = `
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;">
+            <div style="font-family:'Caveat',cursive;font-size:22px;color:#F4ECE0;margin-bottom:6px;">
+              ${p.type} — ${i + 1} of ${pieces.length}</div>
+            <div style="font-size:12px;color:#8a8175;margin-bottom:6px;line-height:1.5;max-width:300px;">
+              ${saved
+                ? 'Keep going for as many angles as you want — each one is another chance to find this piece later.'
+                : 'More angles finds this piece far more reliably later. Turn it as you go: upright, on its side, the most distinctive detail.'}
+            </div>
+            <div style="font-size:12px;color:${saved ? '#7BAE9E' : 'transparent'};margin-bottom:16px;min-height:18px;">
+              ${saved ? `${saved} extra angle${saved === 1 ? '' : 's'} saved` : '·'}</div>
+            <div style="display:flex;gap:10px;width:100%;max-width:320px;">
+              <button id="kc-ga-yes" style="flex:1;background:#3E7C6A;border:none;color:#fff;
+                border-radius:12px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;">
+                ${saved ? '📷 Take another' : '📷 Add angles'}</button>
+              <button id="kc-ga-skip" style="flex:1;background:none;border:1px solid rgba(244,236,224,0.3);
+                color:#F4ECE0;border-radius:12px;padding:13px;font-size:14px;cursor:pointer;">
+                ${saved ? 'Done' : 'Skip'}</button>
+            </div>
+          </div>`;
+        document.getElementById('kc-ga-skip').onclick = () => resolve(false);
+        document.getElementById('kc-ga-yes').onclick = () => resolve(true);
+      });
+      if (!again) break;
+      saved += await _tcCaptureAngles(p.id, 6);
+    }
   }
   _kcCloseAddGroup();
 }
@@ -30708,27 +30729,38 @@ function _tcCaptureAngles(pieceId, maxExtra) {
 // still in hand, not a button to remember later. Skip is one tap for
 // a plain piece where a second angle won't add much; the default is
 // still to ask, because asking every time is what makes it a habit.
-function _offerExtraAngles(pieceId) {
+async function _offerExtraAngles(pieceId) {
   const listEl = document.getElementById('ref-photo-pieces-list');
-  if (!listEl) return Promise.resolve();
+  if (!listEl) return;
   const banner = document.createElement('div');
   banner.style.cssText = 'background:#fff9f0;border:1.5px solid var(--link-clay,#B87946);border-radius:10px;padding:12px;margin-bottom:8px;font-size:12px;';
-  banner.innerHTML = `
-    <div style="font-weight:700;margin-bottom:6px;">Two more angles finds this piece far more reliably later.</div>
-    <div style="display:flex;gap:8px;">
-      <button id="tc-angle-yes" style="flex:1;background:var(--gu-primary);color:white;border:none;
-        border-radius:8px;padding:9px;font-weight:700;font-size:12px;">📷 Add angles</button>
-      <button id="tc-angle-skip" style="background:none;border:1px solid rgba(0,0,0,0.15);
-        border-radius:8px;padding:9px 12px;font-size:12px;">Skip</button>
-    </div>`;
   listEl.prepend(banner);
 
-  return new Promise((resolve) => {
-    document.getElementById('tc-angle-skip').onclick = () => { banner.remove(); resolve(); };
-    document.getElementById('tc-angle-yes').onclick = () => {
-      _tcCaptureAngles(pieceId, 4).then(() => { banner.remove(); resolve(); });
-    };
-  });
+  // Same keep-going loop as the add-pieces flow, and for the same
+  // reason: each shot behind its own tap is what iOS requires for a
+  // picker to open at all.
+  let saved = 0;
+  for (;;) {
+    const again = await new Promise((resolve) => {
+      banner.innerHTML = `
+        <div style="font-weight:700;margin-bottom:4px;">
+          ${saved ? 'Keep going for as many angles as you want.'
+                  : 'More angles finds this piece far more reliably later.'}</div>
+        ${saved ? `<div style="color:#2e7d32;margin-bottom:6px;">${saved} extra angle${saved === 1 ? '' : 's'} saved</div>` : ''}
+        <div style="display:flex;gap:8px;">
+          <button id="tc-angle-yes" style="flex:1;background:var(--gu-primary);color:white;border:none;
+            border-radius:8px;padding:9px;font-weight:700;font-size:12px;">
+            ${saved ? '📷 Take another' : '📷 Add angles'}</button>
+          <button id="tc-angle-skip" style="background:none;border:1px solid rgba(0,0,0,0.15);
+            border-radius:8px;padding:9px 12px;font-size:12px;">${saved ? 'Done' : 'Skip'}</button>
+        </div>`;
+      document.getElementById('tc-angle-skip').onclick = () => resolve(false);
+      document.getElementById('tc-angle-yes').onclick = () => resolve(true);
+    });
+    if (!again) break;
+    saved += await _tcCaptureAngles(pieceId, 6);
+  }
+  banner.remove();
 }
 
 async function handleRefPhotoCapture(event) {

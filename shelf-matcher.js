@@ -257,7 +257,10 @@ async function findOnShelf(shelfBuffer, pieces) {
       const seenUrls = new Set();
       photos = photos.filter(p => p && p.url && !seenUrls.has(p.url) && seenUrls.add(p.url));
       // More than four angles is diminishing returns against real time.
-      if (photos.length > 4) photos = photos.slice(0, 4);
+      // Keep the newest — if she reshot a piece because the first
+      // angles were poor, the later ones are the ones she was happy
+      // with. Six is where added coverage stops paying for its time.
+      if (photos.length > 6) photos = photos.slice(photos.length - 6);
 
       if (Date.now() - started > OVERALL_BUDGET_MS) {
         results.push({ pieceId: piece.id, pieceType: piece.piece_type, inliers: 0,
@@ -329,9 +332,23 @@ async function findOnShelf(shelfBuffer, pieces) {
         const cy = best.pts.reduce((a, p) => a + p.y, 0) / best.pts.length;
         const spread = Math.max(45, 1.7 * Math.sqrt(
           best.pts.reduce((a, p) => a + (p.x - cx) ** 2 + (p.y - cy) ** 2, 0) / best.pts.length));
-        results.push({ pieceId: piece.id, pieceType: piece.piece_type,
-                       inliers: best.inliers, x: cx, y: cy, r: spread,
-                       wonWith, tried, angles: photos.length });
+        // A piece on a shelf occupies a modest part of the frame. If the
+        // agreeing points are sprayed across half the photo they are not
+        // describing one object — that is repeating texture (wood grain,
+        // basketwork) finding a self-consistent but meaningless mapping.
+        // Seen for real: a ring covering half a table, over bare wood.
+        // The score is still reported honestly; it just doesn't get a
+        // ring, because drawing one asserts a location we don't have.
+        const sprawlLimit = 0.22 * Math.min(scene.W, scene.H);
+        if (spread > sprawlLimit) {
+          results.push({ pieceId: piece.id, pieceType: piece.piece_type,
+                         inliers: best.inliers, wonWith, tried, angles: photos.length,
+                         note: 'points scattered across the frame — not one object' });
+        } else {
+          results.push({ pieceId: piece.id, pieceType: piece.piece_type,
+                         inliers: best.inliers, x: cx, y: cy, r: spread,
+                         wonWith, tried, angles: photos.length });
+        }
       } else {
         results.push({ pieceId: piece.id, pieceType: piece.piece_type, inliers: 0,
                        wonWith: null, tried, angles: photos.length });
