@@ -10322,8 +10322,8 @@ async function _loadPackingTiles() {
         cursor:pointer;margin-top:8px;background:#FFFDF9;text-align:left;display:flex;align-items:center;gap:14px;">
         <span style="font-size:26px;flex-shrink:0;">➕</span>
         <div>
-          <div style="font-size:15px;font-weight:800;color:#2B2724;">Add a piece</div>
-          <div style="font-size:11px;color:#8a8175;margin-top:2px;">Name it, photograph it, it's on the shelf</div>
+          <div style="font-size:15px;font-weight:800;color:#2B2724;">Add pieces</div>
+          <div style="font-size:11px;color:#8a8175;margin-top:2px;">Photograph a group, tap each piece</div>
         </div>
       </button>
 
@@ -12003,37 +12003,176 @@ async function _kcOpenBookingFromMatch(bookingId) {
   await _openBookingPackCard(bookingId);
 }
 
-// ── ADD A PIECE, AND PHOTOGRAPH IT NOW ───────────────────────────────
-// Built 24 Jul, after the 'Studio shelf' pieces were found to be seeded
-// demo rows whose reference photos belonged to invented items — so the
-// shelf search was comparing a real green jug against a photo of
-// something else entirely, and no amount of engine tuning could ever
-// have fixed that.
+// ── ADD PIECES: ONE, OR A WHOLE GROUP ────────────────────────────────
+// Rebuilt 24 Jul for two reasons, both real faults found in use.
 //
-// The lesson is that a reference photo must be created AT THE SAME
-// MOMENT as the piece it describes. So this does both in one go: name
-// it, photograph it, done. A piece added this way cannot end up
-// pointing at the wrong picture.
+// 1. THE CAMERA NEVER OPENED. A file picker only opens on iOS while a
+//    real tap is still "live". The previous version asked two questions
+//    and made a network call BEFORE reaching the camera, by which point
+//    the tap had expired and iOS silently refused. So the camera now
+//    opens on the tap itself, and every question is asked afterwards.
+//
+// 2. ORDERS SPLIT AND NEW GROUPS FORM. [stated] Daisy: pieces arrive in
+//    groups, orders get split, new groups appear. Adding one piece at a
+//    time does not match how the studio actually works.
+//
+// So: photograph the GROUP once, then tap each piece in the photo. Each
+// tap creates a piece whose reference photo is a CROP OF THAT PIECE —
+// group speed, per-piece accuracy. That crop matters: attaching one
+// group photo to every piece is exactly the mistake that made the
+// 'Studio shelf' tests unmatchable, and cropping avoids repeating it.
 function _kcAddPieceHere() {
-  const lastBooking = (() => { try { return localStorage.getItem('kc_last_add_booking') || ''; } catch (e) { return ''; } })();
-  const bookingId = prompt('Whose is it? (a name, or any label for the shelf)', lastBooking || 'Studio shelf');
-  if (!bookingId || !bookingId.trim()) return;
-  const pieceType = prompt('What is it? (e.g. Fish jug, Owl jug, Cottage dish)');
-  if (!pieceType || !pieceType.trim()) return;
-  try { localStorage.setItem('kc_last_add_booking', bookingId.trim()); } catch (e) {}
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.onchange = () => {
+    const file = input.files && input.files[0];
+    input.remove();
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = () => _kcOpenAddGroup(r.result);
+    r.readAsDataURL(file);
+  };
+  input.click();   // still inside the tap — this is the bit that matters
+}
 
-  fetch(`${API_URL}/api/pieces/add`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ studioId, bookingId: bookingId.trim(), pieceType: pieceType.trim() }),
-  })
-    .then(r => r.json())
-    .then(data => {
-      if (!data.piece || !data.piece.id) throw new Error(data.error || 'could not add it');
-      // Straight into the camera for THIS piece — the photo and the
-      // record are created together, which is the whole point.
-      _kcPhotoPiece(data.piece.id);
-    })
-    .catch(e => alert('Could not add that piece: ' + ((e && e.message) || e)));
+let _kcAddMarks = [];
+let _kcAddPhoto = null;
+
+async function _kcOpenAddGroup(photoUrl) {
+  _kcAddPhoto = photoUrl;
+  _kcAddMarks = [];
+  let modal = document.getElementById('kc-add-group');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'kc-add-group';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9660;background:#201C1A;display:none;'
+      + 'flex-direction:column;padding:calc(14px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));box-sizing:border-box;';
+    document.body.appendChild(modal);
+  }
+  // Existing group names, so a split order can be put straight back
+  // alongside the rest of its group rather than retyped.
+  let groups = [];
+  try {
+    const res = await fetch(`${API_URL}/api/pieces/bookings?studioId=${studioId}`);
+    const d = await res.json();
+    groups = (d.bookings || d || []).map(b => (typeof b === 'string' ? b : b.booking_id)).filter(Boolean);
+  } catch (e) { groups = []; }
+  const last = (() => { try { return localStorage.getItem('kc_last_add_booking') || ''; } catch (e) { return ''; } })();
+
+  modal.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <div style="font-family:'Caveat',cursive;font-size:23px;color:#F4ECE0;">Tap each piece</div>
+      <button onclick="_kcCloseAddGroup()" style="background:none;border:1px solid rgba(244,236,224,0.3);
+        color:#F4ECE0;border-radius:10px;padding:7px 14px;font-size:13px;cursor:pointer;">Close</button>
+    </div>
+    <div style="font-size:11px;color:#8a8175;margin-bottom:8px;">
+      One tap per piece. Each gets its own close-up from this photo.</div>
+    <div style="position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;">
+      <img id="kc-add-img" src="${photoUrl}" onclick="_kcAddMark(this, event)"
+        style="max-width:100%;max-height:100%;object-fit:contain;border-radius:12px;cursor:crosshair;">
+      <svg id="kc-add-marks" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;"></svg>
+    </div>
+    <div style="margin-top:10px;">
+      <div style="font-size:11px;color:#8a8175;margin-bottom:4px;">Whose group is this?</div>
+      <input id="kc-add-group-name" list="kc-add-group-list" value="${last.replace(/"/g,'&quot;')}"
+        placeholder="a name, or any label"
+        style="width:100%;box-sizing:border-box;padding:11px 12px;border-radius:11px;border:1px solid rgba(244,236,224,0.25);
+        background:#2B2724;color:#F4ECE0;font-size:15px;">
+      <datalist id="kc-add-group-list">${groups.map(g => `<option value="${String(g).replace(/"/g,'&quot;')}">`).join('')}</datalist>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button onclick="_kcAddUndoMark()" style="flex:1;background:#2B2724;border:1px solid rgba(244,236,224,0.25);
+          color:#F4ECE0;border-radius:12px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;">Undo tap</button>
+        <button id="kc-add-save" onclick="_kcSaveAddGroup()" style="flex:2;background:#3E7C6A;border:none;
+          color:#fff;border-radius:12px;padding:13px;font-size:15px;font-weight:800;cursor:pointer;">Save 0 pieces</button>
+      </div>
+    </div>`;
+  modal.style.display = 'flex';
+}
+
+function _kcCloseAddGroup() {
+  const m = document.getElementById('kc-add-group');
+  if (m) m.style.display = 'none';
+  _kcAddMarks = []; _kcAddPhoto = null;
+}
+
+function _kcAddMark(imgEl, ev) {
+  const rect = imgEl.getBoundingClientRect();
+  _kcAddMarks.push({
+    x: (ev.clientX - rect.left) / rect.width,
+    y: (ev.clientY - rect.top) / rect.height,
+  });
+  _kcRedrawMarks(imgEl);
+}
+
+function _kcAddUndoMark() {
+  _kcAddMarks.pop();
+  _kcRedrawMarks(document.getElementById('kc-add-img'));
+}
+
+function _kcRedrawMarks(imgEl) {
+  const svg = document.getElementById('kc-add-marks');
+  if (!svg || !imgEl) return;
+  const r = imgEl.getBoundingClientRect();
+  const p = svg.parentElement.getBoundingClientRect();
+  const ox = r.left - p.left, oy = r.top - p.top;
+  svg.innerHTML = _kcAddMarks.map((m, i) => {
+    const cx = ox + m.x * r.width, cy = oy + m.y * r.height;
+    return `<circle cx="${cx}" cy="${cy}" r="22" fill="none" stroke="#4CAF50" stroke-width="3"/>
+      <circle cx="${cx}" cy="${cy}" r="22" fill="none" stroke="#fff" stroke-width="1"/>
+      <text x="${cx}" y="${cy + 5}" text-anchor="middle" fill="#fff" font-size="14" font-weight="800">${i + 1}</text>`;
+  }).join('');
+  const btn = document.getElementById('kc-add-save');
+  if (btn) btn.textContent = `Save ${_kcAddMarks.length} piece${_kcAddMarks.length === 1 ? '' : 's'}`;
+}
+
+async function _kcSaveAddGroup() {
+  const nameEl = document.getElementById('kc-add-group-name');
+  const bookingId = (nameEl && nameEl.value || '').trim();
+  if (!bookingId) { toast('Give the group a name first', 'error'); return; }
+  if (!_kcAddMarks.length) { toast('Tap each piece in the photo first', 'error'); return; }
+  try { localStorage.setItem('kc_last_add_booking', bookingId); } catch (e) {}
+
+  const btn = document.getElementById('kc-add-save');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    const bmp = await createImageBitmap(await (await fetch(_kcAddPhoto)).blob());
+    const side = Math.round(Math.min(bmp.width, bmp.height) * 0.34);
+    let saved = 0;
+    for (let i = 0; i < _kcAddMarks.length; i++) {
+      const m = _kcAddMarks[i];
+      if (btn) btn.textContent = `Saving ${i + 1} of ${_kcAddMarks.length}…`;
+      const cx = Math.max(0, Math.min(bmp.width - side, Math.round(m.x * bmp.width - side / 2)));
+      const cy = Math.max(0, Math.min(bmp.height - side, Math.round(m.y * bmp.height - side / 2)));
+      const c = document.createElement('canvas');
+      c.width = side; c.height = side;
+      c.getContext('2d').drawImage(bmp, cx, cy, side, side, 0, 0, side, side);
+      const cropUrl = c.toDataURL('image/jpeg', 0.85);
+      const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85));
+      try {
+        const added = await api('/api/pieces/add', { method: 'POST', timeoutMs: 20000,
+          body: { studioId, bookingId, pieceType: `Piece ${i + 1}` } });
+        const pieceId = added && added.piece && added.piece.id;
+        if (!pieceId) throw new Error('not created');
+        const phash = await computePerceptualHash(blob);
+        await api(`/api/pieces/${pieceId}/reference-photo`, { method: 'POST', timeoutMs: 30000,
+          body: { studioId, photoBase64: cropUrl, phash } });
+        saved++;
+      } catch (e) { /* keep going — one bad crop shouldn't lose the rest */ }
+    }
+    bmp.close?.();
+    _kcCloseAddGroup();
+    toast(saved === _kcAddMarks.length
+      ? `${saved} piece${saved === 1 ? '' : 's'} added to ${bookingId}`
+      : `${saved} of ${_kcAddMarks.length} saved — try the rest again`,
+      saved ? 'success' : 'error');
+    if (typeof openPacking === 'function') openPacking();
+  } catch (e) {
+    toast('Could not save those pieces', 'error');
+    if (btn) { btn.disabled = false; _kcRedrawMarks(document.getElementById('kc-add-img')); }
+  }
 }
 
 function _kcPhotoPiece(pieceId) {
@@ -33767,6 +33906,10 @@ if (typeof document !== 'undefined') {
       const shelf = document.getElementById('shelf-scan');
       if (shelf && shelf.style.display !== 'none' && getComputedStyle(shelf).display !== 'none') {
         _kcCloseShelfScan(); return;
+      }
+      const addGroup = document.getElementById('kc-add-group');
+      if (addGroup && addGroup.style.display !== 'none' && getComputedStyle(addGroup).display !== 'none') {
+        _kcCloseAddGroup(); return;
       }
       const tapRes = document.getElementById('kc-tap-result');
       if (tapRes && tapRes.style.display !== 'none' && getComputedStyle(tapRes).display !== 'none') {
