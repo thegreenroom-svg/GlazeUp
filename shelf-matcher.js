@@ -179,6 +179,13 @@ function matchOne(cv, det, refDesc, refKp, sceneDesc, sceneKp) {
  *            {pieceId, pieceType, inliers, x, y, r, wonWith, tried:[{angle,inliers}]}]}>}
  */
 async function findOnShelf(shelfBuffer, pieces) {
+  // Started here, before the engine loads — not after. A cold engine
+  // load can itself take up to 30s (its own startup ceiling), and that
+  // cost belongs to this search's budget, not outside it. Getting this
+  // wrong once already produced a real failure: on a fresh deploy the
+  // engine load alone nearly filled the server's outer timeout before
+  // any matching had begun.
+  const started = Date.now();
   const { cv } = await loadCV();
   const det = makeDetector(cv);
 
@@ -190,8 +197,11 @@ async function findOnShelf(shelfBuffer, pieces) {
   // below are headroom against a bad photo hanging the server, not the
   // expected time.
   const PER_PIECE_BUDGET_MS = 14000;
-  const started = Date.now();
-  const OVERALL_BUDGET_MS = 45000;
+  // Comfortably above a worst-case cold engine load (30s) plus real
+  // matching time, so THIS budget is what gracefully cuts a search
+  // short — with honest partial results — rather than the server's
+  // outer safety-net race killing it abruptly with nothing to show.
+  const OVERALL_BUDGET_MS = 55000;
 
   const scene = await greyMat(cv, shelfBuffer, SCENE_PX);
   const sceneKp = new cv.KeyPointVector();

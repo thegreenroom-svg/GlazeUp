@@ -8311,7 +8311,10 @@ app.post('/api/pieces/find-on-shelf', async (req, res) => {
     return res.status(503).json({ error: 'busy', message: 'Another search is running — try again in a few seconds.' });
   }
   _shelfSearchBusy = true;
-  const busyTimeout = setTimeout(() => { _shelfSearchBusy = false; }, 40000); // never stuck forever, whatever happens below
+  // Above the outer race below (60s) with real margin — this exists so
+  // the busy flag can never resettle to false while a legitimate search
+  // is still genuinely in flight.
+  const busyTimeout = setTimeout(() => { _shelfSearchBusy = false; }, 65000);
   try {
     // The WHOLE order, including pieces already ticked off — a piece
     // marked packed is still on the shelf until it is physically bagged.
@@ -8354,11 +8357,16 @@ app.post('/api/pieces/find-on-shelf', async (req, res) => {
 
     const buffer = Buffer.from(String(photoBase64).replace(/^data:image\/\w+;base64,/, ''), 'base64');
     const { findOnShelf } = require('./shelf-matcher');
-    // Outer ceiling on top of the matcher's own internal budgets — belt
-    // and braces, so a request can never sit open indefinitely.
+    // Outer ceiling on top of the matcher's own internal budget (55s) —
+    // pure insurance, so this should essentially never fire in practice.
+    // Getting the ordering backwards here once already caused a real
+    // failure: this was 35s while the matcher's own budget was 45s, so
+    // this always won first and killed the search abruptly, before the
+    // matcher's own graceful "ran out of time" handling ever got a
+    // chance to return honest partial results.
     const out = await Promise.race([
       findOnShelf(buffer, withPhotos),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('shelf search took too long')), 35000)),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('shelf search took too long')), 60000)),
     ]);
 
     res.json({ status: 'ok', total: withPhotos.length, ...out });
@@ -13543,6 +13551,22 @@ app.listen(port, async () => {
   console.log(`  Square OAuth: ${process.env.SQUARE_CLIENT_ID ? '✓' : '✗'}`);
   console.log(`  Stripe: ${process.env.STRIPE_SECRET_KEY ? '✓' : '✗'}`);
   console.log(`  Supabase: ${process.env.SUPABASE_URL ? '✓' : '✗'}`);
+
+  // Warm the shelf-matcher's WASM engine now, not on someone's first
+  // real search. Loading it cold can itself take up to 30s (measured:
+  // the engine's own startup ceiling) — on a fresh deploy that alone
+  // ate nearly the entire search budget before any matching had even
+  // begun, which is exactly what produced 'shelf search took too long'
+  // on the very first sweep after a deploy. Fire-and-forget: a request
+  // arriving before this finishes just waits on the same in-flight
+  // load (loadCV dedupes), so there's no downside to starting early.
+  try {
+    const { loadCV } = require('./shelf-matcher');
+    loadCV().then(
+      () => console.log('✓ Shelf-matcher engine warmed'),
+      (e) => console.log('Shelf-matcher warmup failed (will retry on first real search):', e.message)
+    );
+  } catch (e) { console.log('Shelf-matcher warmup skipped:', e.message); }
 
   // Clear all device sessions on startup (device registration disabled)
   try {
