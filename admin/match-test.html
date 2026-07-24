@@ -356,19 +356,51 @@ async function sweep() {
     found.push({ it, win: pinned[0], pinned });
   }
 
-  // stage 3 — must beat the OTHER things, or it's just a patch that
-  // suits everything equally, which is background.
+  // stage 3 — the margin. Two independent questions, and a real find
+  // has to answer both.
+  //
+  // The first version of this bench only asked whether the winning
+  // patch beat the OTHER things being looked for. With a single thing
+  // added there were no others, so it quietly substituted a passing
+  // score and declared 'found' for whatever patch happened to score
+  // best — which is how a Marmite jar got reported as a green fish jug
+  // with a margin that had never been measured. A test bench that
+  // can't fail is worthless.
+  //
+  // The honest question, and the one that works no matter how many
+  // things are added: does this patch beat the next-best patch
+  // SOMEWHERE ELSE in the photo? If the best place scores 21 and a
+  // different place scores 22, nothing has been located — the score
+  // just reflects what the photo is generally made of. A real lock
+  // stands clearly apart from every other spot.
   for (const f of found) {
     if (!f.win) continue;
-    let edge = 64;
+    const w = f.win.p;
+    const apart = (p) => {
+      const dx = (p.x + p.side/2) - (w.x + w.side/2);
+      const dy = (p.y + p.side/2) - (w.y + w.side/2);
+      return Math.hypot(dx, dy) > Math.max(w.side, p.side) * 0.7;
+    };
+    const rival = f.pinned.find(o => apart(o.p));
+    f.placeEdge = rival ? rival.d - f.win.d : null;
+
+    // Second question, only asked when there IS competition: does it
+    // beat the other things being looked for at this same spot?
+    let itemEdge = null;
     for (const other of items) {
       if (other === f.it) continue;
-      edge = Math.min(edge, pinDown(f.win.p.fp, other.fp) - f.win.d);
+      const e = pinDown(w.fp, other.fp) - f.win.d;
+      itemEdge = itemEdge === null ? e : Math.min(itemEdge, e);
     }
-    if (items.length < 2) edge = EDGE_SURE;
-    f.edge = edge;
-    f.sure = edge >= EDGE_SURE && f.win.d <= SANITY;
-    f.maybe = !f.sure && edge >= EDGE_MAYBE && f.win.d <= SANITY;
+    f.itemEdge = itemEdge;
+
+    const placeOk = f.placeEdge === null ? false : f.placeEdge >= EDGE_SURE;
+    const placeMaybe = f.placeEdge === null ? false : f.placeEdge >= EDGE_MAYBE;
+    const itemOk = itemEdge === null || itemEdge >= EDGE_SURE;
+    const itemMaybe = itemEdge === null || itemEdge >= EDGE_MAYBE;
+
+    f.sure = placeOk && itemOk && f.win.d <= SANITY;
+    f.maybe = !f.sure && placeMaybe && itemMaybe && f.win.d <= SANITY;
   }
 
   $('prog').style.display = 'none';
@@ -418,6 +450,12 @@ function draw(found, T) {
     // 0 is a perfect match and 64 is nothing alike, so the bar is
     // inverted to read as confidence rather than distance.
     const pct = Math.max(0, Math.min(100, Math.round((1 - f.win.d/48) * 100)));
+    const place = f.placeEdge === null
+      ? 'nowhere else to compare against'
+      : `stands out from elsewhere by ${f.placeEdge.toFixed(1)}`;
+    const vs = f.itemEdge === null
+      ? 'only thing added, so nothing to be confused with'
+      : `beats the other things by ${f.itemEdge.toFixed(1)}`;
     return `<div class="row">
       <div class="thumbs">
         <img src="${f.it.thumb}" alt="reference">
@@ -427,7 +465,8 @@ function draw(found, T) {
       <div class="meta">
         <div class="name">${f.it.name}</div>
         <div class="verdict" style="color:${verdict[1]}">${verdict[0]}</div>
-        <div class="score">match ${f.win.d.toFixed(1)} · beat the others by ${f.edge.toFixed(1)}</div>
+        <div class="score">match ${f.win.d.toFixed(1)} · ${place}</div>
+        <div class="score">${vs}</div>
         <div class="bar"><i style="width:${pct}%;background:${verdict[1]}"></i></div>
       </div>
     </div>`;
@@ -437,9 +476,11 @@ function draw(found, T) {
   const maybes = found.filter(f => f.maybe).length;
   $('resultsNote').innerHTML =
     `<b>${hits} of ${items.length} found</b>${maybes ? ', ' + maybes + ' possible' : ''}.
-     Lower match is better — under ${T.SANITY} is plausible, and it also has to beat
-     every other thing by ${T.EDGE_SURE} to count as found. If the right-hand crop
-     is the wrong object, the numbers next to it show how close the near-miss was.`;
+     Lower match is better — under ${T.SANITY} is plausible. But the score alone
+     proves nothing: to count as found, the winning spot also has to beat the
+     next-best spot ELSEWHERE in the photo by ${T.EDGE_SURE}. If every spot scores
+     about the same, nothing has been located. Always check the right-hand crop
+     against your reference — that's the real answer.`;
   $('resultsCard').style.display = 'block';
   $('resultsCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
