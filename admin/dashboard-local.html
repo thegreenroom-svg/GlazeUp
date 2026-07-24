@@ -11381,6 +11381,37 @@ async function _kcCVGrey(url, maxSide) {
 
 // Match one reference against the scene and ask the only question that
 // matters: do the matched points agree on where the object is?
+// Same fix as the server engine, same reason: a reference crop is
+// centred on where the piece was tapped, not segmented to it, so its
+// edges are disproportionately background table. Wood grain especially
+// is periodic texture — a known blind spot for keypoint matching, since
+// a repeating grain pattern can find a self-consistent but meaningless
+// match against a repeating grain pattern anywhere else. Confirmed on a
+// real search: 31 confident-looking points landed on bare table with
+// no piece near it. Dropping edge keypoints before matching removes
+// that risk rather than trying to catch it afterwards.
+function _kcKeepCentralKeypoints(refMat, kp, desc, keepFrac) {
+  const cv = window.cv;
+  const w = refMat.cols, h = refMat.rows;
+  const cx = w / 2, cy = h / 2;
+  const rx = (w * keepFrac) / 2, ry = (h * keepFrac) / 2;
+  const keepIdx = [];
+  const n = kp.size();
+  for (let i = 0; i < n; i++) {
+    const p = kp.get(i).pt;
+    const dx = (p.x - cx) / rx, dy = (p.y - cy) / ry;
+    if (dx * dx + dy * dy <= 1) keepIdx.push(i);
+  }
+  if (!keepIdx.length || keepIdx.length === n) return { kp, desc, owned: false };
+  const newKp = new cv.KeyPointVector();
+  const newDesc = new cv.Mat(keepIdx.length, desc.cols, desc.type());
+  keepIdx.forEach((srcI, dstI) => {
+    newKp.push_back(kp.get(srcI));
+    desc.row(srcI).copyTo(newDesc.row(dstI));
+  });
+  return { kp: newKp, desc: newDesc, owned: true };
+}
+
 function _kcCVMatch(det, refDesc, refKp, sceneDesc, sceneKp) {
   const cv = window.cv;
   const RATIO = 0.78;      // tuned on real photos
@@ -11641,7 +11672,9 @@ async function _kcSweepShelf(photoUrl) {
             const refDesc = new cv.Mat();
             try {
               det.d.detectAndCompute(ref.mat, new cv.Mat(), refKp, refDesc);
-              const r = _kcCVMatch(det, refDesc, refKp, sceneDesc, sceneKp);
+              const central = _kcKeepCentralKeypoints(ref.mat, refKp, refDesc, 0.65);
+              const r = _kcCVMatch(det, central.desc, central.kp, sceneDesc, sceneKp);
+              if (central.owned) { central.kp.delete(); central.desc.delete(); }
               if (r.inliers > bestForPhoto.inliers) bestForPhoto = r;
             } catch (e) { /* this scale yielded nothing */ }
             refKp.delete(); refDesc.delete(); ref.mat.delete();
@@ -12497,7 +12530,11 @@ function _kcCropSideFrac(imgEl) {
   const W = (imgEl && imgEl.naturalWidth) || 1, H = (imgEl && imgEl.naturalHeight) || 1;
   const short = Math.min(W, H);
   const ax = W / short, ay = H / short;       // work in short-side units
-  if (_kcAddMarks.length < 2) return 0.26;    // one piece: a middling crop
+  // Tightened 24 Jul: the central-keypoint filter in the matcher now
+  // catches most background leakage, but less background captured in
+  // the first place is still better than more filtered out later —
+  // belt and braces, not a replacement for that fix.
+  if (_kcAddMarks.length < 2) return 0.20;    // one piece: a tighter middling crop
   const nn = _kcAddMarks.map((m, i) => {
     let best = Infinity;
     _kcAddMarks.forEach((o, j) => {
@@ -12507,9 +12544,9 @@ function _kcCropSideFrac(imgEl) {
     });
     return best;
   }).filter(d => isFinite(d)).sort((a, b) => a - b);
-  if (!nn.length) return 0.26;
+  if (!nn.length) return 0.20;
   const median = nn[Math.floor(nn.length / 2)];
-  return Math.max(0.10, Math.min(0.34, median * 0.55));
+  return Math.max(0.10, Math.min(0.24, median * 0.55));
 }
 
 function _kcRedrawMarks(imgEl) {

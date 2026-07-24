@@ -111,6 +111,42 @@ function makeDetector(cv) {
   throw new Error('no feature detector available');
 }
 
+// A reference crop is centred on where staff tapped, not segmented to
+// the piece — so its edges are disproportionately likely to be
+// surrounding table, not the object itself. That matters more than it
+// sounds: wood grain is PERIODIC texture, and periodic patterns are a
+// known blind spot for keypoint+RANSAC matching — a repeating grain in
+// one photo can find a self-consistent but entirely meaningless planar
+// match against a repeating grain in a totally different photo,
+// producing a confident, wrong result. Confirmed on a real search: 31
+// inlying points landed on bare table with no piece anywhere near it.
+// Dropping keypoints found outside the central ellipse of a reference
+// photo removes that risk at the source, before matching ever runs,
+// rather than trying to catch it after the fact.
+function keepCentralKeypoints(cv, refMat, kp, desc, keepFrac) {
+  const w = refMat.cols, h = refMat.rows;
+  const cx = w / 2, cy = h / 2;
+  const rx = (w * keepFrac) / 2, ry = (h * keepFrac) / 2;
+  const keepIdx = [];
+  const n = kp.size();
+  for (let i = 0; i < n; i++) {
+    const p = kp.get(i).pt;
+    const dx = (p.x - cx) / rx, dy = (p.y - cy) / ry;
+    if (dx * dx + dy * dy <= 1) keepIdx.push(i);
+  }
+  // Nothing to filter, or filtering would remove everything (a very
+  // sparse piece) — matching on the unfiltered set is safer than
+  // matching on nothing.
+  if (!keepIdx.length || keepIdx.length === n) return { kp, desc, owned: false };
+  const newKp = new cv.KeyPointVector();
+  const newDesc = new cv.Mat(keepIdx.length, desc.cols, desc.type());
+  keepIdx.forEach((srcI, dstI) => {
+    newKp.push_back(kp.get(srcI));
+    desc.row(srcI).copyTo(newDesc.row(dstI));
+  });
+  return { kp: newKp, desc: newDesc, owned: true };
+}
+
 function matchOne(cv, det, refDesc, refKp, sceneDesc, sceneKp) {
   const RATIO = 0.80;   // a match must clearly beat its runner up
   const REPROJ = 6;     // how tightly the points must agree on placement
@@ -270,7 +306,12 @@ async function findOnShelf(shelfBuffer, pieces) {
           try {
             ref = await greyMat(cv, refBuf, px);
             det.d.detectAndCompute(ref.mat, new cv.Mat(), refKp, refDesc);
-            const m = matchOne(cv, det, refDesc, refKp, sceneDesc, sceneKp);
+            // Keep the central 65% — generous enough not to lose a
+            // piece that fills most of its own crop, tight enough to
+            // drop the table corners most crops still carry.
+            const central = keepCentralKeypoints(cv, ref.mat, refKp, refDesc, 0.65);
+            const m = matchOne(cv, det, central.desc, central.kp, sceneDesc, sceneKp);
+            if (central.owned) { central.kp.delete(); central.desc.delete(); }
             if (m.inliers > bestForPhoto.inliers) bestForPhoto = m;
           } catch (e) { /* this size yielded nothing */ }
           finally { refKp.delete(); refDesc.delete(); if (ref) ref.mat.delete(); }
