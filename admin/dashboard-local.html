@@ -10549,7 +10549,8 @@ async function _renderBookingPackCard() {
               style="font-size:15px;padding:6px;flex-shrink:0;opacity:0.5;" title="Move to another booking">↔</span>
             <span onclick="event.stopPropagation();_kcRemovePiece('${p.id}','${(p.piece_type||'Piece').replace(/'/g,"\\'")}')"
               style="font-size:15px;padding:6px;flex-shrink:0;opacity:0.5;" title="Take out of this group">✕</span>
-            <span onclick="event.stopPropagation();_kcPhotoPiece('${p.id}')" style="font-size:20px;padding:6px;flex-shrink:0;">📷</span>
+            <span onclick="event.stopPropagation();_kcPieceAngles('${p.id}','${(p.piece_type||'Piece').replace(/'/g,"\\'")}')"
+              style="font-size:20px;padding:6px;flex-shrink:0;" title="Reference angles">📷</span>
           </button>`;
         }).join('')}
         <button onclick="_kcAddPiece()" style="width:100%;background:none;
@@ -11054,6 +11055,7 @@ function _kcHashRegion(bmp, sx, sy, side) {
 
 let _shelfBookingId = null;
 let _shelfPieces = [];
+let _shelfLastMs = null;   // server-reported search time, shown in the report
 
 async function _kcFindOnShelves(bookingId) {
   _shelfBookingId = bookingId;
@@ -11529,6 +11531,9 @@ async function _kcSweepShelf(photoUrl) {
     if (!res.ok) throw new Error('server engine unavailable');
     const data = await res.json();
     if (data.status === 'ok' && Array.isArray(data.results)) {
+      // Real measured time, shown in the report — the trial needs numbers,
+      // not an impression of whether it "felt slow".
+      _shelfLastMs = typeof data.ms === 'number' ? data.ms : null;
       const CONFIDENT = 10, POSSIBLE = 6;
       const rings = data.results
         .filter(r => r.inliers >= POSSIBLE && r.x != null)
@@ -11810,20 +11815,66 @@ function _renderShelfResult(photoUrl, rings, W, H, closest, expected, unit, engi
 
       ${!rings.length ? `<div style="margin-top:16px;font-size:12px;color:#8a8175;line-height:1.6;text-align:center;">
           Nothing here cleared the bar.
-          ${Array.isArray(scores) && scores.length ? `<br><br>
-            <div style="text-align:left;background:rgba(255,255,255,0.05);border-radius:10px;padding:10px 12px;">
-              <div style="font-size:11px;color:#B87946;font-weight:700;margin-bottom:6px;">
-                What each piece actually scored (needs 10 to ring, 6 to flag):</div>
-              ${scores.slice().sort((a,b)=>(b.inliers||0)-(a.inliers||0)).map(r =>
-                `<div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:2px 0;">
-                   <span>${r.pieceType || 'Piece'}</span>
-                   <span style="color:${(r.inliers||0) >= 6 ? '#F9A825' : '#8a8175'};">${r.inliers || 0}${r.note ? ' · ' + r.note : ''}</span>
-                 </div>`).join('')}
-            </div>` : (closest ? `<br><br><span style="color:#B87946;">Closest was <b>${closest.piece.piece_type}</b>.</span>` : '')}
+          ${!(Array.isArray(scores) && scores.length) && closest
+            ? `<br><br><span style="color:#B87946;">Closest was <b>${closest.piece.piece_type}</b>.</span>` : ''}
           <br>All zeros usually means the reference photos don't show these
           objects. Low-but-not-zero means they do, but too small or too plain
           in the shot to pin down — get closer, or fill more of the frame.
         </div>` : ''}
+
+      ${Array.isArray(scores) && scores.length ? `
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid rgba(184,121,70,0.2);">
+        <div style="font-size:11px;color:#B87946;font-weight:700;margin-bottom:2px;">
+          What every angle scored</div>
+        <div style="font-size:10px;color:#8a8175;margin-bottom:10px;">
+          Needs 10 to ring, 6 to flag. This is the raw number the engine
+          produced — not a judgement about the piece.</div>
+        ${scores.slice().sort((a,b)=>(b.inliers||0)-(a.inliers||0)).map(r => {
+          const top = r.inliers || 0;
+          const colour = top >= 10 ? '#4CAF50' : top >= 6 ? '#F9A825' : '#8a8175';
+          const tried = Array.isArray(r.tried) ? r.tried : [];
+          return `
+          <div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:9px 11px;margin-bottom:6px;">
+            <div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;">
+              <span style="color:#F4ECE0;font-weight:600;">${r.pieceType || 'Piece'}</span>
+              <span style="color:${colour};font-weight:700;">${top}${r.note ? ' · ' + r.note : ''}</span>
+            </div>
+            ${tried.length ? `
+              <div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:5px;">
+                ${tried.map(t => `
+                  <span style="font-size:10px;padding:2px 7px;border-radius:6px;
+                    background:${t.angle === r.wonWith ? 'rgba(184,121,70,0.3)' : 'rgba(255,255,255,0.06)'};
+                    color:${t.angle === r.wonWith ? '#F4ECE0' : '#8a8175'};">
+                    ${t.angle}${t.inliers == null ? ' · ' + (t.note || 'skipped') : ' ' + t.inliers}
+                  </span>`).join('')}
+              </div>
+              ${(() => {
+                // Angles of the SAME object should broadly agree. One angle
+                // scoring high while its siblings score near zero usually
+                // means that photo is of a different piece — and a
+                // mis-attached photo doesn't degrade gently, it produces a
+                // confident wrong answer. Measured in testing: a piece
+                // carrying one wrong photo went from correctly scoring 5 to
+                // confidently scoring 169.
+                const nums = tried.filter(t => typeof t.inliers === 'number').map(t => t.inliers);
+                if (nums.length < 2) return '';
+                const hi = Math.max(...nums), lo = Math.min(...nums);
+                if (hi >= 40 && lo <= hi * 0.1) {
+                  return `<div style="margin-top:5px;font-size:10px;color:#F9A825;line-height:1.4;">
+                    ⚠ These angles disagree sharply. Either this piece is only
+                    visible from one side on this shelf, or one of its photos is
+                    of a different piece — worth checking.</div>`;
+                }
+                return '';
+              })()}` : `
+              <div style="margin-top:4px;font-size:10px;color:#8a8175;">
+                One photo only — extra angles usually help most here.</div>`}
+          </div>`;
+        }).join('')}
+        ${typeof _shelfLastMs === 'number' ? `
+          <div style="font-size:10px;color:#8a8175;text-align:right;margin-top:4px;">
+            ${(_shelfLastMs / 1000).toFixed(1)}s on the server</div>` : ''}
+      </div>` : ''}
     </div>
     <div style="padding:14px 16px max(14px,env(safe-area-inset-bottom));flex-shrink:0;display:flex;gap:10px;">
       <button onclick="_kcCaptureShelf()" style="flex:1;background:rgba(255,255,255,0.1);color:#F4ECE0;
@@ -12455,6 +12506,167 @@ function _kcPhotoPiece(pieceId) {
     }
   };
   input.click();
+}
+
+// ═══ EXTRA ANGLES ══════════════════════════════════════════════════
+// [24 Jul] The single biggest limit on finding a piece on a shelf is
+// that it only has ONE reference photo. The engine matches distinctive
+// points, and those points are view-dependent: the spout and handle
+// that identify a jug head-on are simply not there from above. A piece
+// lying on its side on a shelf can share almost nothing with one
+// overhead shot.
+//
+// Three named angles, taken at table-clearing while the group is still
+// together, is the cheapest real improvement available — no new engine,
+// no AI, no cost. Whether it PAYS is what the trial measures.
+const KC_ANGLES = [
+  { key: 'overhead', label: 'Overhead',  hint: 'Straight down, whole piece in frame' },
+  { key: 'angled',   label: 'At 45°',    hint: 'The way it sits on a shelf' },
+  { key: 'detail',   label: 'Detail',    hint: 'The most distinctive part — a pattern, a face, a handle' },
+];
+
+let _anglePieceId = null;
+let _anglePieceType = '';
+
+async function _kcPieceAngles(pieceId, pieceType) {
+  _anglePieceId = pieceId;
+  _anglePieceType = pieceType || 'Piece';
+  let el = document.getElementById('kc-piece-angles');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'kc-piece-angles';
+    el.style.cssText = 'position:fixed;inset:0;z-index:9680;background:#FFF9F0;display:none;flex-direction:column;';
+    document.body.appendChild(el);
+  }
+  el.style.display = 'flex';
+  el.innerHTML = `<div style="padding:calc(16px + env(safe-area-inset-top)) 16px 12px;">
+    <div style="font-size:13px;color:#8a8175;">Loading angles…</div></div>`;
+  await _kcRenderPieceAngles();
+}
+
+async function _kcRenderPieceAngles() {
+  const el = document.getElementById('kc-piece-angles');
+  if (!el || !_anglePieceId) return;
+
+  let photos = [];
+  try {
+    const r = await api(`/api/pieces/${_anglePieceId}/photos`);
+    photos = (r && r.photos) || [];
+  } catch (e) { /* show the slots anyway — an empty list is still usable */ }
+
+  const byAngle = {};
+  for (const p of photos) if (p.angle) byAngle[p.angle] = p;
+  const filled = KC_ANGLES.filter(a => byAngle[a.key]).length;
+
+  el.innerHTML = `
+    <div style="padding:calc(14px + env(safe-area-inset-top)) 16px 12px;border-bottom:1.5px solid rgba(43,39,36,0.1);flex-shrink:0;">
+      <button onclick="_kcCloseAngles()" style="background:none;border:none;font-size:22px;color:#2B2724;
+        padding:0 0 6px;cursor:pointer;">‹</button>
+      <div style="font-family:'Architects Daughter',cursive;font-size:22px;color:#2B2724;">${_anglePieceType}</div>
+      <div style="font-size:12px;color:#8a8175;margin-top:2px;">
+        ${filled} of ${KC_ANGLES.length} angles on file</div>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:14px 16px max(20px,env(safe-area-inset-bottom));">
+      <div style="font-size:12px;color:#8a8175;line-height:1.5;margin-bottom:14px;">
+        Each angle is another chance to find this piece on a shelf. Take them
+        at table-clearing, while the group is still together.
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        ${KC_ANGLES.map(a => {
+          const got = byAngle[a.key];
+          return `
+          <div style="display:flex;align-items:center;gap:12px;background:#FFFDF9;
+            border:1.5px solid ${got ? 'rgba(46,125,50,0.35)' : 'rgba(43,39,36,0.15)'};
+            border-radius:14px;padding:11px 13px;">
+            ${got
+              ? `<img src="${got.photo_url}" onclick="_kcOpenLightbox('${got.photo_url}')"
+                  style="width:64px;height:64px;object-fit:cover;border-radius:11px;flex-shrink:0;
+                  border:1.5px solid rgba(43,39,36,0.15);cursor:zoom-in;">`
+              : `<div style="width:64px;height:64px;border-radius:11px;flex-shrink:0;
+                  background:rgba(43,39,36,0.04);border:1.5px dashed rgba(43,39,36,0.2);
+                  display:flex;align-items:center;justify-content:center;font-size:22px;opacity:0.3;">📷</div>`}
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:14px;font-weight:700;color:#2B2724;">${a.label}</div>
+              <div style="font-size:11px;color:#8a8175;line-height:1.35;">${a.hint}</div>
+            </div>
+            ${got
+              ? `<button onclick="_kcDeleteAngle('${got.id}')" title="Remove this angle"
+                  style="background:none;border:none;font-size:15px;color:#8a8175;padding:8px;cursor:pointer;">✕</button>`
+              : ''}
+            <button onclick="_kcAngleShot('${a.key}')"
+              style="background:${got ? 'none' : 'linear-gradient(135deg,#B87946,#8f5a33)'};
+              border:${got ? '1.5px solid rgba(43,39,36,0.2)' : 'none'};border-radius:11px;
+              padding:10px 13px;font-size:12px;font-weight:800;flex-shrink:0;
+              color:${got ? '#2B2724' : '#fff'};cursor:pointer;">
+              ${got ? 'Retake' : 'Take'}</button>
+          </div>`;
+        }).join('')}
+      </div>
+      ${photos.filter(p => !p.angle || !KC_ANGLES.some(a => a.key === p.angle)).length ? `
+        <div style="margin-top:16px;font-size:11px;color:#8a8175;">
+          Plus ${photos.filter(p => !p.angle || !KC_ANGLES.some(a => a.key === p.angle)).length}
+          other photo(s) on file — these are searched too.</div>` : ''}
+      <div style="margin-top:18px;font-size:11px;color:#8a8175;line-height:1.5;
+        border-top:1.5px solid rgba(43,39,36,0.08);padding-top:14px;">
+        A blurred or half-cropped angle is worse than no angle — it costs search
+        time and can win with a wrong score. Remove any that aren't clear.
+      </div>
+    </div>`;
+}
+
+function _kcCloseAngles() {
+  const el = document.getElementById('kc-piece-angles');
+  if (el) el.style.display = 'none';
+  _anglePieceId = null;
+  // The pack card sits underneath and shows the angle count.
+  if (document.getElementById('booking-pack-card')?.style.display === 'flex') {
+    if (typeof _renderBookingPackCard === 'function') _renderBookingPackCard();
+  }
+}
+
+function _kcAngleShot(angleKey) {
+  const pieceId = _anglePieceId;
+  if (!pieceId) return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  // No `capture` attribute — iOS then offers Photo Library as well, so an
+  // existing iPad shot can be attached as an angle.
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.onchange = async () => {
+    const file = input.files && input.files[0];
+    input.remove();
+    if (!file) return;
+    try {
+      toast('Saving angle…', 'info');
+      const phash = await computePerceptualHash(file);
+      const photoBase64 = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.onerror = () => reject(new Error('Could not read the photo'));
+        r.readAsDataURL(file);
+      });
+      await api(`/api/pieces/${pieceId}/photos`, {
+        method: 'POST', timeoutMs: 30000,
+        body: { studioId, photoBase64, phash, angle: angleKey }
+      });
+      toast('Angle saved', 'success');
+      await _kcRenderPieceAngles();
+    } catch (e) {
+      toast('Could not save that angle', 'error');
+    }
+  };
+  input.click();
+}
+
+async function _kcDeleteAngle(photoId) {
+  try {
+    await api(`/api/pieces/photos/${photoId}`, { method: 'DELETE' });
+    await _kcRenderPieceAngles();
+  } catch (e) {
+    toast('Could not remove that angle', 'error');
+  }
 }
 
 async function _startPackingPiece() {
@@ -34197,6 +34409,10 @@ if (typeof document !== 'undefined') {
       const shelf = document.getElementById('shelf-scan');
       if (shelf && shelf.style.display !== 'none' && getComputedStyle(shelf).display !== 'none') {
         _kcCloseShelfScan(); return;
+      }
+      const angles = document.getElementById('kc-piece-angles');
+      if (angles && angles.style.display !== 'none' && getComputedStyle(angles).display !== 'none') {
+        _kcCloseAngles(); return;
       }
       const kilnCode = document.getElementById('kc-kiln-code');
       if (kilnCode && getComputedStyle(kilnCode).display !== 'none') { kilnCode.style.display = 'none'; return; }

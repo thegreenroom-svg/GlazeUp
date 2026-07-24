@@ -8312,7 +8312,27 @@ app.post('/api/pieces/find-on-shelf', async (req, res) => {
       .not('archived', 'is', true);   // taken out of the group shouldn't still turn up on a sweep
     if (error) throw error;
 
-    const withPhotos = (pieces || []).filter(p => p.reference_photo_url);
+    // Every angle on file, not just the display photo. A piece
+    // photographed from three sides gets three chances to be found.
+    const ids = (pieces || []).map(p => p.id);
+    let extraByPiece = {};
+    if (ids.length) {
+      const { data: extra } = await supabase.from('piece_photos')
+        .select('piece_id, photo_url, angle')
+        .in('piece_id', ids);
+      for (const row of (extra || [])) {
+        (extraByPiece[row.piece_id] = extraByPiece[row.piece_id] || [])
+          .push({ url: row.photo_url, angle: row.angle || 'angle' });
+      }
+    }
+
+    const withPhotos = (pieces || []).map(p => {
+      const photos = [];
+      if (p.reference_photo_url) photos.push({ url: p.reference_photo_url, angle: 'main' });
+      for (const a of (extraByPiece[p.id] || [])) photos.push(a);
+      return { ...p, photos };
+    }).filter(p => p.photos.length);
+
     if (!withPhotos.length) {
       return res.json({
         status: 'no-references', engine: null, results: [],
@@ -11898,6 +11918,86 @@ app.post('/api/pieces/:pieceId/reference-photo', async (req, res) => {
     res.json({ status: 'saved', piece });
   } catch (error) {
     console.error('Reference photo upload error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ═══ EXTRA ANGLES ══════════════════════════════════════════════════
+// [24 Jul] One photo per piece is the real ceiling on shelf searching.
+// Keypoint matching is view-dependent — a handle that carries half the
+// distinctive points from one side is invisible from another, and a
+// piece lying on its side on a shelf may share almost nothing with a
+// single overhead shot. These endpoints let a piece carry several
+// angles. The piece's own reference_photo_url stays as its display
+// photo, so every screen that already reads it is untouched.
+
+// POST /api/pieces/:pieceId/photos — add one more angle
+app.post('/api/pieces/:pieceId/photos', async (req, res) => {
+  const { pieceId } = req.params;
+  const { studioId, photoBase64, phash, angle } = req.body;
+  if (!studioId || !photoBase64) return res.status(400).json({ error: 'studioId and photoBase64 required' });
+
+  try {
+    const buffer = Buffer.from(String(photoBase64).replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    const fileName = `${studioId}/piece-refs/${pieceId}-${Date.now()}-${(angle || 'angle').replace(/[^a-z0-9]/gi, '')}.jpg`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('booking-photos')
+      .upload(fileName, buffer, { contentType: 'image/jpeg' });
+    if (uploadError) throw uploadError;
+
+    const { data: urlData } = supabase.storage.from('booking-photos').getPublicUrl(fileName);
+
+    const { data: row, error } = await supabase.from('piece_photos')
+      .insert({ studio_id: studioId, piece_id: pieceId,
+                photo_url: urlData.publicUrl, phash: phash || null,
+                angle: angle || null })
+      .select().single();
+    if (error) throw error;
+
+    // If this piece had no display photo at all, the first angle becomes
+    // it — otherwise the piece would stay blank on every packing screen
+    // while quietly holding photos.
+    const { data: piece } = await supabase.from('pottery_pieces')
+      .select('reference_photo_url').eq('id', pieceId).single();
+    if (piece && !piece.reference_photo_url) {
+      await supabase.from('pottery_pieces')
+        .update({ reference_photo_url: urlData.publicUrl,
+                  reference_photo_taken_at: new Date().toISOString(),
+                  ...(phash ? { photo_phash: phash } : {}) })
+        .eq('id', pieceId);
+    }
+
+    res.json({ status: 'saved', photo: row });
+  } catch (error) {
+    console.error('Piece angle upload error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/pieces/:pieceId/photos — every angle on file for this piece
+app.get('/api/pieces/:pieceId/photos', async (req, res) => {
+  const { pieceId } = req.params;
+  try {
+    const { data, error } = await supabase.from('piece_photos')
+      .select('id, photo_url, angle, phash, created_at')
+      .eq('piece_id', pieceId).order('created_at', { ascending: true });
+    if (error) throw error;
+    res.json({ photos: data || [] });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/pieces/photos/:photoId — a bad angle is worse than none;
+// it costs search time and can win with a wrong score.
+app.delete('/api/pieces/photos/:photoId', async (req, res) => {
+  try {
+    const { error } = await supabase.from('piece_photos')
+      .delete().eq('id', req.params.photoId);
+    if (error) throw error;
+    res.json({ status: 'deleted' });
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });

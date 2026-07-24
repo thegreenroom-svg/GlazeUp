@@ -155,9 +155,28 @@ function matchOne(cv, det, refDesc, refKp, sceneDesc, sceneKp) {
 }
 
 /**
+ * MULTIPLE ANGLES PER PIECE (24 Jul)
+ *
+ * Keypoint matching is view-dependent. The spout of a jug photographed
+ * head-on is a different set of points from the same jug at 45°, and a
+ * piece lying on its side on a shelf may share almost nothing with a
+ * single overhead reference. One photo gives the engine one chance.
+ *
+ * So every reference angle is tried and the BEST one wins. Every angle
+ * also reports what it scored, because the point of the trial is to
+ * learn which angles actually earn their keep — not to take the
+ * engine's word for it.
+ *
+ * Work is capped, not multiplied: a piece with three angles is tried at
+ * one reference size each rather than two, so three angles costs about
+ * what two sizes used to. Angle diversity buys more than size diversity
+ * — BRISK is already multi-scale.
+ *
  * @param {Buffer} shelfBuffer  the photo of the shelves
- * @param {Array}  pieces       [{ id, piece_type, reference_photo_url }]
- * @returns {Promise<{engine, sceneW, sceneH, results:[{pieceId, pieceType, inliers, x, y, r}]}>}
+ * @param {Array}  pieces       [{ id, piece_type, photos:[{url, angle}] }]
+ *                              (a bare reference_photo_url is still accepted)
+ * @returns {Promise<{engine, sceneW, sceneH, ms, results:[
+ *            {pieceId, pieceType, inliers, x, y, r, wonWith, tried:[{angle,inliers}]}]}>}
  */
 async function findOnShelf(shelfBuffer, pieces) {
   const { cv } = await loadCV();
@@ -167,13 +186,12 @@ async function findOnShelf(shelfBuffer, pieces) {
   // costs time and memory. 1400 measured as fast (~2s to detect) while
   // still finding a genuinely small object on a cluttered shelf.
   const SCENE_PX = 1400;
-  const REF_SIZES = [260, 380];
-  // Measured full run: ~1.8s per piece at this setting. This budget is
-  // generous headroom, not the expected time — it exists so one bad
-  // reference photo (huge file, corrupt image) cannot hang the server.
-  const PER_PIECE_BUDGET_MS = 8000;
+  // Measured ~0.9s per reference-detection at this scale. The budgets
+  // below are headroom against a bad photo hanging the server, not the
+  // expected time.
+  const PER_PIECE_BUDGET_MS = 14000;
   const started = Date.now();
-  const OVERALL_BUDGET_MS = 30000;
+  const OVERALL_BUDGET_MS = 45000;
 
   const scene = await greyMat(cv, shelfBuffer, SCENE_PX);
   const sceneKp = new cv.KeyPointVector();
@@ -183,40 +201,76 @@ async function findOnShelf(shelfBuffer, pieces) {
     det.d.detectAndCompute(scene.mat, new cv.Mat(), sceneKp, sceneDesc);
 
     for (const piece of pieces) {
+      // Accept either shape so nothing that already calls this breaks.
+      let photos = Array.isArray(piece.photos) && piece.photos.length
+        ? piece.photos.slice()
+        : (piece.reference_photo_url
+            ? [{ url: piece.reference_photo_url, angle: 'reference' }]
+            : []);
+      // De-duplicate: the display photo is usually also the first angle.
+      const seenUrls = new Set();
+      photos = photos.filter(p => p && p.url && !seenUrls.has(p.url) && seenUrls.add(p.url));
+      // More than four angles is diminishing returns against real time.
+      if (photos.length > 4) photos = photos.slice(0, 4);
+
       if (Date.now() - started > OVERALL_BUDGET_MS) {
         results.push({ pieceId: piece.id, pieceType: piece.piece_type, inliers: 0,
-                       note: 'ran out of time before reaching this piece' });
+                       tried: [], note: 'ran out of time before reaching this piece' });
         continue;
       }
-      if (!piece.reference_photo_url) {
-        results.push({ pieceId: piece.id, pieceType: piece.piece_type, inliers: 0 });
+      if (!photos.length) {
+        results.push({ pieceId: piece.id, pieceType: piece.piece_type, inliers: 0,
+                       tried: [], note: 'no reference photo yet' });
         continue;
       }
+
+      // Several sizes only when there is little angle diversity to lean
+      // on. Measured: at one size the jug matched the wrong object, at
+      // another it landed correctly — so a lone photo still gets two.
+      const refSizes = photos.length >= 3 ? [320]
+                     : photos.length === 2 ? [280, 400]
+                     : [260, 380];
+
       const pieceStarted = Date.now();
       let best = { inliers: 0, pts: [] };
-      let refBuf = null;
-      try {
-        const r = await fetch(piece.reference_photo_url);
-        if (!r.ok) throw new Error('reference photo unreachable');
-        refBuf = Buffer.from(await r.arrayBuffer());
-      } catch (e) {
-        results.push({ pieceId: piece.id, pieceType: piece.piece_type, inliers: 0,
-                       note: 'reference photo could not be read' });
-        continue;
-      }
-      // Several sizes, because we cannot know how large the piece
-      // appears on the shelf. Measured: at one size the jug matched the
-      // wrong object, at another it landed correctly.
-      for (const px of REF_SIZES) {
-        if (Date.now() - pieceStarted > PER_PIECE_BUDGET_MS) break;
-        let ref = null; const refKp = new cv.KeyPointVector(); const refDesc = new cv.Mat();
+      let wonWith = null;
+      const tried = [];
+
+      for (const photo of photos) {
+        if (Date.now() - pieceStarted > PER_PIECE_BUDGET_MS) {
+          tried.push({ angle: photo.angle || 'reference', inliers: null,
+                       note: 'skipped — out of time' });
+          continue;
+        }
+        let refBuf = null;
         try {
-          ref = await greyMat(cv, refBuf, px);
-          det.d.detectAndCompute(ref.mat, new cv.Mat(), refKp, refDesc);
-          const m = matchOne(cv, det, refDesc, refKp, sceneDesc, sceneKp);
-          if (m.inliers > best.inliers) best = m;
-        } catch (e) { /* this size yielded nothing */ }
-        finally { refKp.delete(); refDesc.delete(); if (ref) ref.mat.delete(); }
+          const r = await fetch(photo.url);
+          if (!r.ok) throw new Error('unreachable');
+          refBuf = Buffer.from(await r.arrayBuffer());
+        } catch (e) {
+          tried.push({ angle: photo.angle || 'reference', inliers: null,
+                       note: 'photo could not be read' });
+          continue;
+        }
+
+        let bestForPhoto = { inliers: 0, pts: [] };
+        for (const px of refSizes) {
+          if (Date.now() - pieceStarted > PER_PIECE_BUDGET_MS) break;
+          let ref = null; const refKp = new cv.KeyPointVector(); const refDesc = new cv.Mat();
+          try {
+            ref = await greyMat(cv, refBuf, px);
+            det.d.detectAndCompute(ref.mat, new cv.Mat(), refKp, refDesc);
+            const m = matchOne(cv, det, refDesc, refKp, sceneDesc, sceneKp);
+            if (m.inliers > bestForPhoto.inliers) bestForPhoto = m;
+          } catch (e) { /* this size yielded nothing */ }
+          finally { refKp.delete(); refDesc.delete(); if (ref) ref.mat.delete(); }
+        }
+
+        tried.push({ angle: photo.angle || 'reference', inliers: bestForPhoto.inliers });
+        if (bestForPhoto.inliers > best.inliers) {
+          best = bestForPhoto;
+          wonWith = photo.angle || 'reference';
+        }
       }
 
       if (best.pts.length) {
@@ -225,9 +279,11 @@ async function findOnShelf(shelfBuffer, pieces) {
         const spread = Math.max(45, 1.7 * Math.sqrt(
           best.pts.reduce((a, p) => a + (p.x - cx) ** 2 + (p.y - cy) ** 2, 0) / best.pts.length));
         results.push({ pieceId: piece.id, pieceType: piece.piece_type,
-                       inliers: best.inliers, x: cx, y: cy, r: spread });
+                       inliers: best.inliers, x: cx, y: cy, r: spread,
+                       wonWith, tried, angles: photos.length });
       } else {
-        results.push({ pieceId: piece.id, pieceType: piece.piece_type, inliers: 0 });
+        results.push({ pieceId: piece.id, pieceType: piece.piece_type, inliers: 0,
+                       wonWith: null, tried, angles: photos.length });
       }
     }
   } finally {
@@ -235,7 +291,8 @@ async function findOnShelf(shelfBuffer, pieces) {
     try { det.d.delete(); } catch (e) {}
   }
 
-  return { engine: det.name, sceneW: scene.W, sceneH: scene.H, results };
+  return { engine: det.name, sceneW: scene.W, sceneH: scene.H,
+           ms: Date.now() - started, results };
 }
 
 module.exports = { findOnShelf, loadCV };
