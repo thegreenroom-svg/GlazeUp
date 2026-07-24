@@ -8138,6 +8138,124 @@ app.get('/api/pieces/by-code', async (req, res) => {
   }
 });
 
+
+// ═══ DESCRIBE ══════════════════════════════════════════════════════
+// [24 Jul, evening] Words instead of pixels.
+//
+// A full day of image matching established three failures that no
+// amount of tuning fixes, because they are inherent to comparing
+// pictures:
+//   1. VIEWPOINT — a jar lid photographed from above and the same jar
+//      standing side-on are unrelated images of one object.
+//   2. INVISIBLE PIECES — a beige fabric heart on a pine table has
+//      neither colour contrast nor pattern. Nothing to grip.
+//   3. THE KILN — chalky pastel goes glossy and saturated, so the
+//      reference stops resembling the thing it refers to.
+//
+// "Small green fish-shaped jug" is true from every angle, before and
+// after firing, in any light. Text survives everything that breaks
+// pixels, and comparing text is cheap and solved.
+//
+// One call per PHOTO, not per piece and not per angle.
+
+const DESCRIBE_MODEL = 'gpt-4o-mini';
+
+async function describeImage(photoBase64, prompt) {
+  if (!process.env.OPENAI_API_KEY) throw new Error('no vision key configured');
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: DESCRIBE_MODEL,
+      max_tokens: 700,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          { type: 'image_url', image_url: { url: photoBase64, detail: 'high' } },
+        ],
+      }],
+    }),
+  });
+  if (!r.ok) throw new Error(`vision call failed (${r.status})`);
+  const d = await r.json();
+  let text = (d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '';
+  text = text.replace(/```json|```/g, '').trim();
+  return JSON.parse(text);
+}
+
+// Pottery only. A studio table always has a phone, a paint pot and
+// somebody's coffee on it, and describing those would poison every
+// later match.
+const POTTERY_ONLY = `You are looking at pottery in a paint-your-own studio.
+ONLY describe unfired or fired ceramic pieces that a customer has painted or will paint.
+IGNORE everything else completely: phones, keys, glasses, food, packaging, paint pots,
+brushes, water jars, cloths, furniture, bags, toys, bottles.`;
+
+const DESCRIBE_STYLE = `Describe each piece the way a member of staff would call it across
+the room to a colleague: its form first, then its colours and any obvious decoration.
+Keep it under twelve words. Be concrete and plain.
+Good: "green fish-shaped jug, glossy"; "white mug, blue stripes, yellow star";
+"cottage-shaped butter dish, cream roof".
+Bad: "a beautiful ceramic item"; "pottery piece"; "handmade artisan vessel".`;
+
+// POST /api/pieces/describe-group — one photo of a table, back come
+// descriptions for each piece on it.
+app.post('/api/pieces/describe-group', async (req, res) => {
+  const { photoBase64 } = req.body;
+  if (!photoBase64) return res.status(400).json({ error: 'photoBase64 required' });
+  try {
+    const out = await describeImage(photoBase64,
+      `${POTTERY_ONLY}\n\n${DESCRIBE_STYLE}\n\nList every distinct piece you can see.\n` +
+      `Reply with ONLY a JSON array, no prose and no markdown:\n` +
+      `[{"description":"green fish-shaped jug, glossy"},{"description":"white mug, blue stripes"}]\n` +
+      `If there is no pottery at all, reply []`);
+    const pieces = Array.isArray(out) ? out : (out.pieces || []);
+    res.json({ pieces: pieces.filter(p => p && p.description).slice(0, 40) });
+  } catch (e) {
+    console.error('describe-group:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/pieces/describe-shelf — one photo of a shelf or tray, back
+// comes what's on it, with rough positions so hits can be pointed at.
+app.post('/api/pieces/describe-shelf', async (req, res) => {
+  const { photoBase64 } = req.body;
+  if (!photoBase64) return res.status(400).json({ error: 'photoBase64 required' });
+  try {
+    const out = await describeImage(photoBase64,
+      `${POTTERY_ONLY}\n\n${DESCRIBE_STYLE}\n\nList every distinct piece you can see, ` +
+      `with its rough position in the frame as fractions from 0 to 1 ` +
+      `(x from left, y from top).\n` +
+      `Reply with ONLY a JSON array, no prose and no markdown:\n` +
+      `[{"description":"green fish-shaped jug, glossy","x":0.42,"y":0.61}]\n` +
+      `If there is no pottery at all, reply []`);
+    const pieces = Array.isArray(out) ? out : (out.pieces || []);
+    res.json({ pieces: pieces.filter(p => p && p.description).slice(0, 60) });
+  } catch (e) {
+    console.error('describe-shelf:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/pieces/save-descriptions — [{pieceId, description}]
+app.post('/api/pieces/save-descriptions', async (req, res) => {
+  const { studioId, items } = req.body;
+  if (!studioId || !Array.isArray(items)) return res.status(400).json({ error: 'studioId and items required' });
+  try {
+    for (const it of items) {
+      if (!it || !it.pieceId) continue;
+      await supabase.from('pottery_pieces')
+        .update({ description: it.description || null, described_at: new Date().toISOString() })
+        .eq('id', it.pieceId).eq('studio_id', studioId);
+    }
+    res.json({ status: 'saved', count: items.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post('/api/pieces/add', async (req, res) => {
   const { studioId, bookingId, pieceType, notes } = req.body;
   if (!studioId || !bookingId || !pieceType) {

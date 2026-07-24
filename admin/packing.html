@@ -9,8 +9,8 @@
 <style>
   :root{
     --bg:#1A1714; --panel:#231F1C; --panel2:#2B2724; --line:rgba(244,236,224,.14);
-    --ink:#F4ECE0; --mute:#8F877C;
-    --go:#3E7C6A; --clay:#B87946; --warn:#F9A825; --done:#4CAF50;
+    --ink:#F4ECE0; --mute:#8F877C; --go:#3E7C6A; --clay:#B87946;
+    --warn:#F9A825; --done:#4CAF50;
   }
   *{box-sizing:border-box}
   body{margin:0; background:var(--bg); color:var(--ink);
@@ -18,54 +18,64 @@
     padding:max(14px,env(safe-area-inset-top)) 13px calc(30px + env(safe-area-inset-bottom));
     -webkit-text-size-adjust:100%}
   h1{font-family:Caveat,serif; font-size:31px; font-weight:600; margin:0}
-  .sub{color:var(--mute); font-size:12.5px; margin:1px 0 16px}
+  .sub{color:var(--mute); font-size:12.5px; margin:1px 0 4px}
+  a.back{color:var(--mute); font-size:12.5px; text-decoration:none; display:inline-block; margin-bottom:14px}
   .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:13px; margin-bottom:11px}
   .lbl{font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--clay); font-weight:700; margin-bottom:10px}
   button{font:inherit; cursor:pointer; border-radius:11px; border:1px solid var(--line);
-    background:var(--panel2); color:var(--ink); padding:12px 14px}
+    background:var(--panel2); color:var(--ink); padding:12px 14px; text-align:center}
   button.primary{background:var(--go); border-color:transparent; color:#fff; font-weight:800; width:100%; font-size:15px}
   button.primary:disabled{background:var(--panel2); color:var(--mute); font-weight:600}
   button.wide{width:100%}
+  button .d{font-size:11px; font-weight:400; color:var(--mute); margin-top:2px}
+  button.primary .d{color:rgba(255,255,255,.85)}
   .stack{display:flex; flex-direction:column; gap:8px}
 
   .bk{border:1px solid var(--line); border-radius:12px; padding:11px 12px; margin-bottom:7px; background:var(--panel2)}
   .bk.done{border-color:rgba(76,175,80,.5)}
+  .bk.hit{border-color:rgba(249,168,37,.55)}
   .bk-top{display:flex; justify-content:space-between; align-items:baseline; gap:10px}
   .bk-name{font-weight:700; font-size:14.5px}
   .bk-count{font-size:12px; color:var(--mute); font-variant-numeric:tabular-nums; white-space:nowrap}
+  .pc{display:flex; align-items:flex-start; gap:8px; padding:5px 0; font-size:13px}
+  .tick{width:17px; flex-shrink:0; text-align:center; line-height:1.35}
+  .pc .txt{flex:1; min-width:0}
+  .pc.found .txt{color:var(--done)}
+  .pc .where{font-size:11px; color:var(--mute)}
+  .pc button.mini{padding:3px 8px; font-size:11px; border-radius:7px; flex-shrink:0}
   .bar{height:5px; border-radius:3px; background:rgba(244,236,224,.1); margin-top:8px; overflow:hidden}
   .bar i{display:block; height:100%; border-radius:3px; background:var(--go); transition:width .35s}
-  .missing{font-size:11.5px; color:var(--mute); margin-top:6px}
-  .pill{display:inline-block; font-size:11px; padding:2px 8px; border-radius:20px;
-    background:rgba(76,175,80,.16); color:var(--done); margin-left:6px}
-
+  .empty{color:var(--mute); font-size:13px}
+  .prog{color:var(--mute); font-size:13px; text-align:center; padding:12px 0}
+  .note{font-size:12.5px; color:var(--mute); line-height:1.55; margin-top:10px}
   #shot{position:relative; margin-bottom:10px; display:none}
   #shot canvas{width:100%; border-radius:12px; display:block}
-  .prog{color:var(--mute); font-size:13px; text-align:center; padding:12px 0}
-  .note{font-size:12px; color:var(--mute); line-height:1.55; margin-top:10px}
-  .empty{color:var(--mute); font-size:13px}
 
-  #cropper{display:none; position:fixed; inset:0; z-index:50; background:#141110;
-    flex-direction:column; padding:max(12px,env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom))}
-  #cropper.on{display:flex}
-  .crophead{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:10px}
-  .cropstage{position:relative; flex:1; min-height:0; display:flex; align-items:center; justify-content:center;
-    touch-action:none; overflow:hidden}
-  .cropstage img{max-width:100%; max-height:100%; object-fit:contain; border-radius:10px; display:block}
-  #cropBox{position:absolute; border:2px solid var(--done); border-radius:4px; pointer-events:none;
-    box-shadow:0 0 0 9999px rgba(0,0,0,.55); display:none}
-  .cropfoot{padding-top:12px; display:flex; flex-direction:column; gap:10px}
-  .cropfoot input[type=range]{width:100%; accent-color:var(--go)}
+  .tb-row{display:flex; gap:9px; align-items:center; padding:8px 0; border-top:1px solid var(--line); font-size:13px}
+  .tb-row:first-of-type{border-top:0}
+  .tb-row .g{flex:1; min-width:0}
+  .tb-score{font-variant-numeric:tabular-nums; font-size:12px; color:var(--mute)}
+
+  #sheet{display:none; position:fixed; inset:0; z-index:60; background:#141110;
+    flex-direction:column; padding:max(12px,env(safe-area-inset-top)) 13px calc(13px + env(safe-area-inset-bottom))}
+  #sheet.on{display:flex}
+  .sheethead{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:6px}
+  .sheetbody{flex:1; overflow-y:auto; padding:6px 0}
+  .row{display:flex; gap:9px; align-items:center; padding:8px 0; border-top:1px solid var(--line)}
+  .row:first-child{border-top:0}
+  .row input[type=text]{flex:1; min-width:0; background:var(--panel2); border:1px solid var(--line);
+    color:var(--ink); border-radius:9px; padding:10px 11px; font:inherit; font-size:14px}
+  .row button.del{padding:9px 11px; font-size:13px}
+  .sheetfoot{padding-top:11px; display:flex; flex-direction:column; gap:8px}
+  .sheetfoot input[type=text]{background:var(--panel2); border:1px solid var(--line); color:var(--ink);
+    border-radius:11px; padding:12px; font:inherit; font-size:15px; width:100%}
 </style>
 </head>
 <body>
 
 <h1>Packing</h1>
-<div class="sub" id="sub">Loading what's outstanding…</div>
-<div style="margin:-8px 0 16px">
-  <a id="backLink" href="/admin/dashboard-local.html"
-    style="color:var(--mute);font-size:12.5px;text-decoration:none">‹ back to the dashboard</a>
-</div>
+<div class="sub" id="sub">Loading…</div>
+<a class="back" href="/admin/dashboard-local.html">‹ back to the dashboard</a>
 
 <div class="card">
   <div class="lbl">Still to find</div>
@@ -78,199 +88,233 @@
   <div class="prog" id="prog" style="display:none"></div>
   <div class="stack">
     <button class="primary" id="sweepBtn">Photograph a surface
-      <div style="font-size:11px;font-weight:400;color:rgba(255,255,255,.8);margin-top:2px">
-        Table, shelf or box — finds every outstanding piece in shot</div></button>
-    <button class="wide" id="identifyBtn">What is this one piece?
-      <div style="font-size:11px;color:var(--mute);margin-top:2px">
-        A stray in your hand — photograph it, I'll say whose it is</div></button>
-    <button class="wide" id="addPieceBtn">Add a piece to a booking
-      <div style="font-size:11px;color:var(--mute);margin-top:2px">
-        Photograph it, box it, name the booking — registered on the spot</div></button>
+      <div class="d">Table, shelf or box — ticks off whatever it recognises</div></button>
+    <button class="wide" id="addBtn">Add pieces to a booking
+      <div class="d">Photograph a group — it writes the list for you</div></button>
   </div>
   <div class="note" id="note"></div>
 </div>
 
-<div id="cropper">
-  <div class="crophead">
+<div class="card">
+  <div class="lbl">Test bed</div>
+  <div style="font-size:12.5px;color:var(--mute);line-height:1.55;margin-bottom:11px">
+    Try it on real pottery without touching a booking. Photograph some pieces,
+    then photograph them again jumbled up somewhere else — it shows you every
+    score, so you can see what it got right and how close the misses were.
+  </div>
+  <div id="tbList"></div>
+  <div class="stack" style="margin-top:9px">
+    <button class="wide" id="tbAdd">Photograph the pieces
+      <div class="d">Whatever it spots becomes the list to find</div></button>
+    <button class="wide" id="tbFind" disabled>Now find them
+      <div class="d">Photograph them jumbled, hidden, at another angle</div></button>
+  </div>
+  <div class="note" id="tbNote"></div>
+</div>
+
+<div id="sheet">
+  <div class="sheethead">
     <div>
-      <div style="font-family:Caveat,serif;font-size:24px">Which piece?</div>
-      <div style="font-size:12px;color:var(--mute)">Tap it, then size the box to fit it</div>
+      <div style="font-family:Caveat,serif;font-size:24px" id="sheetTitle">What's on the table</div>
+      <div style="font-size:12px;color:var(--mute)" id="sheetHint">Fix anything wrong, delete anything that isn't pottery</div>
     </div>
-    <button id="cropCancel">Cancel</button>
+    <button id="sheetCancel">Cancel</button>
   </div>
-  <div class="cropstage" id="cropStage">
-    <img id="cropImg" alt="">
-    <div id="cropBox"></div>
-  </div>
-  <div class="cropfoot">
-    <input type="range" id="cropSize" min="6" max="70" value="26">
-    <button class="primary" id="cropOk">Use this</button>
+  <div class="sheetbody" id="sheetBody"></div>
+  <div class="sheetfoot" id="sheetFoot">
+    <input type="text" id="sheetBooking" placeholder="Booking name" autocapitalize="words">
+    <button class="primary" id="sheetSave">Save to booking</button>
   </div>
 </div>
 
 <script>
 // ─────────────────────────────────────────────────────────────────────
-// PACKING — one flow, replacing three separate piece-finders.
+// PACKING — words, not pixels.
 //
-// The app had grown three tools that all did versions of the same job:
-// "identify a piece" (photo -> which booking), "find on shelves"
-// (booking -> where are its pieces), and "read the Nº on the bases"
-// (OCR -> which booking). Each held its own state, each had to be
-// found in a different place, and none of them knew what the others
-// had already worked out. Packing is not three tasks — it's one
-// session with a single question running through it: what's still
-// outstanding, and where is it?
+// A full day of image matching established three failures that no
+// amount of tuning fixes, because they are inherent to comparing
+// pictures rather than accidents of implementation:
 //
-// So this is a session, not a tool. It holds every outstanding booking
-// at once, and every photograph is asked about ALL of them together.
+//   VIEWPOINT   a jar lid shot from above and the same jar standing
+//               side-on are unrelated images of one object.
+//   INVISIBLE   a beige fabric heart on a pine table has no colour
+//               contrast and no pattern. Nothing to grip.
+//   THE KILN    chalky pastel fires glossy and saturated, so the
+//               reference stops resembling the thing it refers to.
 //
-// Simplest bookings first, which Daisy called for and which turns out
-// to be more than a convenience: a one-piece booking that completes
-// early is removed from the running, so it can no longer be confused
-// with anything in a later photo. The search genuinely gets easier as
-// it goes.
+// "Small green fish-shaped jug" is true from every angle, before and
+// after firing, in any light. So: describe once in words, then match
+// words to words — cheap, robust, and legible to a human.
+//
+// Two decisions that matter more than the matching itself:
+//
+//   MATCH BOOKINGS, NOT PIECES. One white mug is ambiguous among
+//   fifty. "Striped mug + green fish jug + cottage butter dish" is
+//   almost certainly unique. Sets are far more distinctive than their
+//   members, and the booking is all anyone actually needs.
+//
+//   FAIL INTO SOMETHING USEFUL. When the old system failed you got a
+//   blank screen. When this fails you still have "Still to find for
+//   Georgina: small green fish jug, white mug with blue stripes" — a
+//   packing list a person reads and acts on. Recognition sits on top
+//   of a working list rather than being the whole product.
 // ─────────────────────────────────────────────────────────────────────
 
 const API = location.origin;
 const studioId = new URLSearchParams(location.search).get('studio')
   || 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3';
 const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[<>&"]/g, c =>
+  ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
 
-let bookings = [];          // [{ id, pieces:[{id, type, fp, found}] }]
-let surfaceCount = 0;
+let bookings = [];
+let surfaces = 0;
 
-// ── matching (same three-stage engine as the test bench) ─────────────
-// Kept as a copy rather than imported: this page must keep working
-// even while the main dashboard is being changed, and today proved how
-// easily a shared edit breaks something a screen away.
+// ── text matching ────────────────────────────────────────────────────
 
-function colourHistogram(bmp, sx, sy, side) {
-  const N = 48, c = document.createElement('canvas');
-  c.width = N; c.height = N;
-  const ctx = c.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(bmp, sx, sy, side, side, 0, 0, N, N);
-  const d = ctx.getImageData(0,0,N,N).data;
-  const bins = new Array(108).fill(0), hueBins = new Array(12).fill(0);
-  let hueWeight = 0, counted = 0;
-  for (let i = 0; i < d.length; i += 4) {
-    const r = d[i]/255, g = d[i+1]/255, b = d[i+2]/255;
-    const max = Math.max(r,g,b), min = Math.min(r,g,b), delta = max - min;
-    let h = 0;
-    if (delta > 0.0001) {
-      if (max === r) h = ((g-b)/delta) % 6;
-      else if (max === g) h = (b-r)/delta + 2;
-      else h = (r-g)/delta + 4;
-      h *= 60; if (h < 0) h += 360;
-    }
-    const s = max === 0 ? 0 : delta/max, v = max;
-    bins[Math.min(11,Math.floor(h/30))*9 + Math.min(2,Math.floor(s*3))*3 + Math.min(2,Math.floor(v*3))]++;
-    const wgt = s*v;
-    hueBins[Math.min(11,Math.floor(h/30))] += wgt;
-    hueWeight += wgt; counted++;
+// Words appearing on half the pieces in a studio carry no information:
+// "mug" cannot separate one booking from another when everyone paints
+// mugs. Distinctiveness is measured from YOUR outstanding pieces rather
+// than assumed, so it adapts to whatever is on the shelves this week.
+const STOP = new Set(['a','an','the','and','with','on','of','in','it','its','some','small','large',
+  'piece','pottery','ceramic','glazed','unglazed','painted','plain','pale','light','dark','very','shaped']);
+
+function words(s) {
+  return String(s || '').toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !STOP.has(w));
+}
+
+let idf = {}, idfDocs = 2;
+function buildIdf(extraDocs) {
+  const docs = [];
+  for (const b of bookings) for (const p of b.pieces) if (p.description) docs.push(words(p.description));
+  for (const d of (extraDocs || [])) docs.push(words(d));
+  idfDocs = Math.max(2, docs.length);
+  const seen = {};
+  for (const d of docs) for (const w of new Set(d)) seen[w] = (seen[w] || 0) + 1;
+  idf = {};
+  for (const w in seen) idf[w] = Math.log(1 + idfDocs / seen[w]);
+}
+const weight = w => (idf[w] !== undefined ? idf[w] : Math.log(1 + idfDocs));
+
+// Weighted overlap, 0 to 1, scored against the reference's own words so
+// a terse description still matches a chattier sighting of the same
+// thing. Near-misses on word stems count partially: "stripes" and
+// "striped" are the same observation.
+function similarity(ref, seenText) {
+  const A = new Set(words(ref)), B = new Set(words(seenText));
+  if (!A.size || !B.size) return 0;
+  let hit = 0, total = 0;
+  for (const w of A) {
+    const wt = weight(w);
+    total += wt;
+    if (B.has(w)) hit += wt;
+    else if ([...B].some(x => x.slice(0, 4) === w.slice(0, 4))) hit += wt * 0.6;
   }
-  let hex = '';
-  for (const b of bins) hex += Math.min(255, Math.round((b/Math.max(1,counted))*255*6)).toString(16).padStart(2,'0');
-  let hueHex = '';
-  for (const b of hueBins) hueHex += Math.min(255, Math.round((b/Math.max(0.0001,hueWeight))*255*3)).toString(16).padStart(2,'0');
-  return hex + '~' + hueHex;
+  return total ? hit / total : 0;
 }
 
-// Hue survives the kiln; intensity does not. An unfired piece is
-// chalky and pale, the same piece fired is glossy and vivid, but a
-// blue is still a blue — so both histograms are scored and the better
-// agreement wins, with a small penalty on the hue-only read because
-// it's the looser test.
-function histDistance(a, b) {
-  if (!a || !b) return 64;
-  const [fa, ha] = String(a).split('~'), [fb, hb] = String(b).split('~');
-  const inter = (x, y) => {
-    if (!x || !y || x.length !== y.length) return null;
-    let i = 0, t = 0;
-    for (let k = 0; k < x.length; k += 2) {
-      const p = parseInt(x.substr(k,2),16), q = parseInt(y.substr(k,2),16);
-      i += Math.min(p,q); t += Math.max(p,q);
-    }
-    return t ? (1 - i/t)*64 : 64;
-  };
-  const full = inter(fa, fb), hue = (ha && hb) ? inter(ha, hb) : null;
-  if (full === null && hue === null) return 64;
-  if (hue === null) return full;
-  if (full === null) return hue;
-  return Math.min(full, hue + 2);
-}
+// ── loading ──────────────────────────────────────────────────────────
 
-function hashRegion(bmp, sx, sy, side) {
-  const c = document.createElement('canvas');
-  const ctx = c.getContext('2d', { willReadFrequently: true });
-  const grey = (d,i) => 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
-  const dHash = (w,h) => {
-    c.width = w; c.height = h;
-    ctx.drawImage(bmp, sx, sy, side, side, 0, 0, w, h);
-    const d = ctx.getImageData(0,0,w,h).data, g = [];
-    for (let i = 0; i < d.length; i += 4) g.push(grey(d,i));
-    let bits = '';
-    for (let r = 0; r < h; r++) for (let col = 0; col < w-1; col++)
-      bits += g[r*w+col] > g[r*w+col+1] ? '1' : '0';
-    let hex = '';
-    for (let i = 0; i < bits.length; i += 4) hex += parseInt(bits.slice(i,i+4),2).toString(16);
-    return hex;
-  };
-  const coarse = dHash(9,8), fine = dHash(17,16);
-  c.width = 4; c.height = 4;
-  ctx.drawImage(bmp, sx, sy, side, side, 0, 0, 4, 4);
-  const cd = ctx.getImageData(0,0,4,4).data;
-  let colour = '';
-  for (let i = 0; i < cd.length; i += 4)
-    colour += Math.round(cd[i]/17).toString(16) + Math.round(cd[i+1]/17).toString(16) + Math.round(cd[i+2]/17).toString(16);
-  return coarse + '|' + fine + '|' + colour + '|' + colourHistogram(bmp, sx, sy, side);
-}
-
-const colourOnly = (a,b) => {
-  const pa = String(a).split('|'), pb = String(b).split('|');
-  return (pa.length < 4 || pb.length < 4) ? 64 : histDistance(pa[3], pb[3]);
-};
-
-function pinDown(a, b) {
-  const pa = String(a).split('|'), pb = String(b).split('|');
-  const ham = (x,y) => {
-    if (!x || !y || x.length !== y.length) return null;
-    let d = 0;
-    for (let i = 0; i < x.length; i++) {
-      let v = parseInt(x[i],16) ^ parseInt(y[i],16);
-      while (v) { d += v & 1; v >>= 1; }
-    }
-    return d;
-  };
-  const fineRaw = ham(pa[1], pb[1]);
-  const fine = fineRaw === null ? 64 : (fineRaw/256)*64;
-  let grid = 64;
-  if (pa[2] && pb[2] && pa[2].length === pb[2].length) {
-    let cd = 0;
-    for (let i = 0; i < pa[2].length; i++) cd += Math.abs(parseInt(pa[2][i],16) - parseInt(pb[2][i],16));
-    grid = (cd/pa[2].length/15)*64;
+async function load() {
+  let pieces = [];
+  try {
+    const r = await fetch(`${API}/api/packing/queue?studioId=${studioId}`);
+    pieces = (await r.json()).pieces || [];
+  } catch (e) {
+    $('sub').textContent = 'Could not reach the studio server.';
+    $('bookings').innerHTML = '<div class="empty">No connection — try again in a moment.</div>';
+    return;
   }
-  return fine*0.55 + grid*0.25 + colourOnly(a,b)*0.20;
-}
-
-function patchStructure(bmp, x, y, side) {
-  const c = document.createElement('canvas');
-  c.width = 24; c.height = 24;
-  const ctx = c.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(bmp, x, y, side, side, 0, 0, 24, 24);
-  const d = ctx.getImageData(0,0,24,24).data, g = [];
-  for (let i = 0; i < d.length; i += 4) g.push(0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2]);
-  let e = 0, n = 0;
-  for (let r = 0; r < 24; r++) for (let col = 0; col < 23; col++) {
-    e += Math.abs(g[r*24+col] - g[r*24+col+1]); n++;
-    if (r < 23) { e += Math.abs(g[r*24+col] - g[(r+1)*24+col]); n++; }
+  const by = {};
+  for (const p of pieces) (by[p.booking_id] = by[p.booking_id] || []).push(p);
+  bookings = Object.keys(by).map(id => ({
+    id,
+    pieces: by[id].map(p => ({
+      id: p.id,
+      description: p.description || '',
+      type: p.piece_type || 'Piece',
+      found: null,
+    })),
+  }));
+  bookings.sort((a, b) => a.pieces.length - b.pieces.length || a.id.localeCompare(b.id));
+  buildIdf();
+  $('sub').textContent = bookings.length
+    ? `${bookings.length} booking${bookings.length === 1 ? '' : 's'} outstanding · simplest first`
+    : 'Nothing outstanding.';
+  const undescribed = bookings.reduce((n, b) => n + b.pieces.filter(p => !p.description).length, 0);
+  if (undescribed) {
+    $('note').innerHTML = `${undescribed} piece${undescribed === 1 ? ' has' : 's have'} no description yet, so
+      ${undescribed === 1 ? 'it cannot' : 'they cannot'} be recognised — tap <b>write</b> to add one, or use
+      <b>Add pieces</b> next time and it writes them for you.`;
   }
-  return n ? e/n : 0;
+  render();
 }
 
-// ── plumbing ─────────────────────────────────────────────────────────
+// ── the list ─────────────────────────────────────────────────────────
+
+function render() {
+  if (!bookings.length) { $('bookings').innerHTML = '<div class="empty">Nothing outstanding.</div>'; return; }
+  $('bookings').innerHTML = bookings.map((b, bi) => {
+    const found = b.pieces.filter(p => p.found).length;
+    const complete = found === b.pieces.length;
+    const fresh = b.pieces.some(p => p.found && p.found.surface === surfaces);
+    return `<div class="bk ${complete ? 'done' : fresh ? 'hit' : ''}">
+      <div class="bk-top">
+        <div class="bk-name">${esc(b.id)}</div>
+        <div class="bk-count">${found} of ${b.pieces.length}</div>
+      </div>
+      ${b.pieces.map((p, pi) => `
+        <div class="pc ${p.found ? 'found' : ''}">
+          <div class="tick">${p.found ? '✓' : '○'}</div>
+          <div class="txt">
+            ${p.description ? esc(p.description)
+              : `<span style="color:var(--warn)">${esc(p.type)} — no description</span>`}
+            ${p.found && p.found.where ? `<div class="where">${esc(p.found.where)}</div>` : ''}
+          </div>
+          <button class="mini" onclick="editPiece(${bi},${pi})">${p.description ? 'edit' : 'write'}</button>
+        </div>`).join('')}
+      <div class="bar"><i style="width:${Math.round(found / b.pieces.length * 100)}%;
+        background:${complete ? 'var(--done)' : 'var(--go)'}"></i></div>
+      ${complete ? `<div style="margin-top:9px"><button style="width:100%;font-size:13px;padding:9px"
+        onclick="markPacked(${bi})">Mark packed</button></div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function editPiece(bi, pi) {
+  const p = bookings[bi].pieces[pi];
+  const v = prompt('Describe this piece — form first, then colours.\ne.g. "green fish-shaped jug, glossy"',
+    p.description || '');
+  if (v === null) return;
+  p.description = v.trim();
+  fetch(`${API}/api/pieces/save-descriptions`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ studioId, items: [{ pieceId: p.id, description: p.description }] }),
+  }).catch(() => {});
+  buildIdf();
+  render();
+}
+
+async function markPacked(bi) {
+  const b = bookings[bi];
+  try {
+    await fetch(`${API}/api/pieces/set-booking-status`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, bookingId: b.id, status: 'packed', by: 'packing session' }),
+    });
+    bookings.splice(bi, 1);
+    buildIdf();
+    render();
+  } catch (e) { alert('Could not update that booking.'); }
+}
+
+// ── capture ──────────────────────────────────────────────────────────
 
 function pickImage(onPicked) {
-  // Opened inside the tap. Any await before .click() loses the gesture
+  // Opened inside the tap: any await before .click() loses the gesture
   // and iOS silently declines to open the picker.
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*';
@@ -284,391 +328,257 @@ function pickImage(onPicked) {
   input.click();
 }
 
-async function bitmapFrom(src, maxSide) {
-  const blob = await (await fetch(src)).blob();
-  const bmp = await createImageBitmap(blob);
-  const scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
-  if (scale >= 1) return bmp;
-  const c = document.createElement('canvas');
-  c.width = Math.round(bmp.width*scale); c.height = Math.round(bmp.height*scale);
-  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
-  bmp.close && bmp.close();
-  return await createImageBitmap(c);
-}
-
-// ── load what's outstanding ──────────────────────────────────────────
-
-async function load() {
-  let pieces = [];
-  try {
-    const r = await fetch(`${API}/api/packing/queue?studioId=${studioId}`);
-    pieces = (await r.json()).pieces || [];
-  } catch (e) {
-    $('sub').textContent = 'Could not reach the studio server.';
-    $('bookings').innerHTML = '<div class="empty">No connection — try again in a moment.</div>';
-    return;
-  }
-
-  const byBooking = {};
-  for (const p of pieces) {
-    if (!p.reference_photo_url) continue;   // nothing to search for
-    (byBooking[p.booking_id] = byBooking[p.booking_id] || []).push(p);
-  }
-
-  bookings = Object.keys(byBooking).map(id => ({
-    id,
-    pieces: byBooking[id].map(p => ({
-      id: p.id, type: p.piece_type || 'Piece', url: p.reference_photo_url, fp: null, found: null,
-    })),
-  }));
-
-  // Simplest first. A short booking finishes early and drops out of
-  // the running, so it can't be confused with anything later.
-  bookings.sort((a, b) => a.pieces.length - b.pieces.length || a.id.localeCompare(b.id));
-
-  render();
-  $('sub').textContent = bookings.length
-    ? `${bookings.length} booking${bookings.length === 1 ? '' : 's'} outstanding · simplest first`
-    : 'Nothing outstanding.';
-
-  // Fingerprint every reference here rather than trusting whatever was
-  // stored at capture time — one function, one format, no drift.
-  let done = 0;
-  const total = bookings.reduce((n, b) => n + b.pieces.length, 0);
-  for (const b of bookings) {
-    for (const p of b.pieces) {
-      try {
-        const bmp = await bitmapFrom(p.url, 700);
-        const side = Math.min(bmp.width, bmp.height);
-        const sx = Math.round((bmp.width-side)/2), sy = Math.round((bmp.height-side)/2);
-        p.fp = hashRegion(bmp, sx, sy, side);
-        // The thumbnail is cut from the SAME region as the fingerprint,
-        // so the card shows literally what the matcher is looking for —
-        // a wide table shot is visible as a wide table shot.
-        const t = document.createElement('canvas');
-        t.width = t.height = 120;
-        t.getContext('2d').drawImage(bmp, sx, sy, side, side, 0, 0, 120, 120);
-        p.refThumb = t.toDataURL('image/jpeg', 0.85);
-        bmp.close && bmp.close();
-      } catch (e) { p.fp = null; }
-      done++;
-      if (done % 3 === 0) { $('sub').textContent = `Reading references… ${done} of ${total}`; await new Promise(r => setTimeout(r, 0)); }
-    }
-  }
-  $('sub').textContent = `${bookings.length} booking${bookings.length === 1 ? '' : 's'} outstanding · simplest first`;
-  $('sweepBtn').disabled = false;
-  render();
-}
-
-// ── the session view ─────────────────────────────────────────────────
-
-function render() {
-  if (!bookings.length) { $('bookings').innerHTML = '<div class="empty">Nothing outstanding.</div>'; return; }
-  $('bookings').innerHTML = bookings.map(b => {
-    const found = b.pieces.filter(p => p.found).length;
-    const complete = found === b.pieces.length;
-    const missing = b.pieces.filter(p => !p.found).map(p => p.type);
-    // The reference crops are shown deliberately: they are EXACTLY what
-    // the matcher is looking for. If a thumbnail shows a whole table
-    // rather than the piece, that piece cannot be found no matter what
-    // — and now that's visible at a glance instead of a mystery. Tap a
-    // thumbnail to fix it by pointing at the piece.
-    return `<div class="bk ${complete ? 'done' : ''}">
-      <div class="bk-top">
-        <div class="bk-name">${b.id}${complete ? '<span class="pill">all found</span>' : ''}</div>
-        <div class="bk-count">${found} of ${b.pieces.length}</div>
-      </div>
-      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-        ${b.pieces.map((p, i) => `
-          <div style="text-align:center">
-            <img src="${p.refThumb || ''}" alt="" onclick="refixRef('${b.id.replace(/'/g,"\\'")}',${i})"
-              style="width:52px;height:52px;object-fit:cover;border-radius:9px;display:block;cursor:pointer;
-              border:2px solid ${p.found ? 'var(--done)' : 'var(--line)'};
-              ${p.refThumb ? '' : 'background:rgba(244,236,224,.06)'}">
-            <div style="font-size:9.5px;color:var(--mute);max-width:52px;overflow:hidden;
-              text-overflow:ellipsis;white-space:nowrap">${p.type}</div>
-          </div>`).join('')}
-      </div>
-      <div class="bar"><i style="width:${Math.round(found/b.pieces.length*100)}%;
-        background:${complete ? 'var(--done)' : 'var(--go)'}"></i></div>
-      ${!complete && surfaceCount
-        ? `<div class="missing">still missing: ${missing.slice(0,4).join(', ')}${missing.length > 4 ? ` +${missing.length-4}` : ''}</div>`
-        : ''}
-      ${complete ? `<div style="margin-top:9px"><button onclick="markPacked('${b.id.replace(/'/g,"\\'")}')"
-        style="width:100%;font-size:13px;padding:9px">Mark this booking packed</button></div>` : ''}
-    </div>`;
-  }).join('');
-}
-
-// Tap a reference thumbnail -> crop the piece out of its own stored
-// photo. The fingerprint is recomputed from the crop on the spot, so a
-// reference that was a wide table shot becomes a usable one without
-// re-photographing anything.
-function refixRef(bookingId, idx) {
-  const b = bookings.find(x => x.id === bookingId);
-  const p = b && b.pieces[idx];
-  if (!p || !p.url) return;
-  bitmapFrom(p.url, 1100).then(bmp => {
-    openCropper(bmp, (bm, sx, sy, side) => {
-      p.fp = hashRegion(bm, sx, sy, side);
-      const t = document.createElement('canvas');
-      t.width = t.height = 120;
-      t.getContext('2d').drawImage(bm, sx, sy, side, side, 0, 0, 120, 120);
-      p.refThumb = t.toDataURL('image/jpeg', 0.85);
-      bm.close && bm.close();
-      p.found = null;   // the old answer was based on the old fingerprint
-      render();
-    });
-  }).catch(() => alert('Could not load that reference photo.'));
-}
-
-async function markPacked(id) {
-  try {
-    await fetch(`${API}/api/pieces/set-booking-status`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studioId, bookingId: id, status: 'packed', by: 'packing session' }),
-    });
-    bookings = bookings.filter(b => b.id !== id);
-    render();
-  } catch (e) { alert('Could not update that booking — try again.'); }
-}
-
-// ── sweep a surface ──────────────────────────────────────────────────
-
-$('sweepBtn').disabled = true;
-$('sweepBtn').onclick = () => pickImage(async (url) => {
-  $('prog').style.display = 'block';
-  $('prog').textContent = 'Reading the photo…';
-  await new Promise(r => setTimeout(r, 30));
-  const bmp = await bitmapFrom(url, 1600);
-  await sweep(bmp);
-});
-
-async function sweep(bmp) {
-  const W = bmp.width, H = bmp.height, short = Math.min(W, H);
-  const sizes = [0.09, 0.12, 0.16, 0.21, 0.28, 0.37, 0.48].map(f => Math.round(short*f));
-  const SHORTLIST = 50, EDGE = 4, SANITY = 30;
-
-  const patches = [];
-  for (const side of sizes) {
-    if (side < 24 || side > short) continue;
-    const step = Math.max(1, Math.round(side*0.4));
-    for (let y = 0; y + side <= H; y += step)
-      for (let x = 0; x + side <= W; x += step)
-        patches.push({ x, y, side, e: patchStructure(bmp, x, y, side) });
-  }
-  const es = patches.map(p => p.e).sort((a,b) => a-b);
-  const gate = es.length ? es[Math.floor(es.length/2)] : 0;
-  const live = patches.filter(p => p.e >= gate);
-
-  for (let i = 0; i < live.length; i++) {
-    live[i].fp = hashRegion(bmp, live[i].x, live[i].y, live[i].side);
-    if (i % 10 === 0) {
-      $('prog').textContent = 'Looking… ' + Math.round((i/live.length)*100) + '%';
-      await new Promise(r => setTimeout(r, 0));
-    }
-  }
-
-  // Every outstanding piece, across every booking, against this one
-  // photo. Candidates are pooled and then assigned best-first, so a
-  // patch can only ever belong to one piece — the thing three separate
-  // tools could never do, because none of them knew about the others.
-  const outstanding = [];
-  for (const b of bookings) for (const p of b.pieces) if (!p.found && p.fp) outstanding.push({ b, p });
-
-  const cands = [];
-  for (const { b, p } of outstanding) {
-    const shortlist = live.map(q => ({ q, c: colourOnly(q.fp, p.fp) }))
-      .sort((a,z) => a.c - z.c).slice(0, SHORTLIST);
-    const pinned = shortlist.map(({q}) => ({ q, d: pinDown(q.fp, p.fp) })).sort((a,z) => a.d - z.d);
-    if (!pinned.length) continue;
-    const w = pinned[0];
-    // Must stand apart from the next-best place SOMEWHERE ELSE, or
-    // nothing has been located — the score is just describing what the
-    // photo is generally made of.
-    const rival = pinned.find(o => {
-      const dx = (o.q.x + o.q.side/2) - (w.q.x + w.q.side/2);
-      const dy = (o.q.y + o.q.side/2) - (w.q.y + w.q.side/2);
-      return Math.hypot(dx, dy) > Math.max(w.q.side, o.q.side)*0.7;
-    });
-    const edge = rival ? rival.d - w.d : 0;
-    if (w.d <= SANITY && edge >= EDGE) cands.push({ b, p, q: w.q, d: w.d, edge });
-  }
-
-  cands.sort((a, z) => a.d - z.d);
-  const taken = [];
-  let newly = 0;
-  for (const c of cands) {
-    if (c.p.found) continue;
-    const clash = taken.some(t => {
-      const dx = (t.x + t.side/2) - (c.q.x + c.q.side/2);
-      const dy = (t.y + t.side/2) - (c.q.y + c.q.side/2);
-      return Math.hypot(dx, dy) < Math.max(t.side, c.q.side)*0.6;
-    });
-    if (clash) continue;
-    c.p.found = { x: c.q.x, y: c.q.y, side: c.q.side, d: c.d, surface: surfaceCount + 1 };
-    taken.push(c.q);
-    newly++;
-  }
-
-  surfaceCount++;
-  draw(bmp, outstanding.filter(o => o.p.found && o.p.found.surface === surfaceCount));
-  $('prog').style.display = 'none';
-  render();
-
-  const left = bookings.reduce((n, b) => n + b.pieces.filter(p => !p.found).length, 0);
-  $('note').innerHTML = newly
-    ? `<b>Found ${newly} here.</b> ${left ? left + ' still to find — photograph somewhere else and it carries on from here.' : 'That\'s everything.'}`
-    : `<b>Nothing here.</b> ${left} still to find. Try another surface, or move things apart if they're stacked.`;
-  $('sweepBtn').textContent = 'Photograph somewhere else';
-}
-
-function draw(bmp, hits) {
-  const cv = $('canvas');
-  cv.width = bmp.width; cv.height = bmp.height;
-  const ctx = cv.getContext('2d');
-  ctx.drawImage(bmp, 0, 0);
-  ctx.lineWidth = Math.max(3, Math.round(bmp.width/250));
-  ctx.font = '600 ' + Math.max(15, Math.round(bmp.width/46)) + 'px ui-sans-serif,system-ui,sans-serif';
-  for (const { b, p } of hits) {
-    const f = p.found;
-    ctx.strokeStyle = '#4CAF50';
-    ctx.beginPath();
-    ctx.arc(f.x + f.side/2, f.y + f.side/2, f.side*0.62, 0, Math.PI*2);
-    ctx.stroke();
-    ctx.fillStyle = '#4CAF50';
-    ctx.fillText(b.id, f.x, Math.max(18, f.y - 8));
-  }
-  $('shot').style.display = 'block';
-}
-
-// ── ad hoc: what is this one piece? ──────────────────────────────────
-// Kept, because it answers the opposite question and staff genuinely
-// need it: a stray piece in the hand, no idea whose it is.
-
-let cropBmp = null, cropOnDone = null, cropCx = .5, cropCy = .5;
-
-function openCropper(bmp, onDone) {
-  cropBmp = bmp; cropOnDone = onDone; cropCx = .5; cropCy = .5;
-  const c = document.createElement('canvas');
-  c.width = bmp.width; c.height = bmp.height;
-  c.getContext('2d').drawImage(bmp, 0, 0);
-  $('cropImg').src = c.toDataURL('image/jpeg', .9);
-  $('cropper').classList.add('on');
-  setTimeout(drawCropBox, 60);
-}
-function cropGeometry() {
-  const img = $('cropImg'), r = img.getBoundingClientRect();
-  const stage = $('cropStage').getBoundingClientRect();
-  const frac = parseInt($('cropSize').value, 10)/100;
-  const sideImg = Math.round(Math.min(cropBmp.width, cropBmp.height)*frac);
-  const scale = r.width / cropBmp.width, sideScreen = sideImg*scale;
-  let cx = cropCx*cropBmp.width, cy = cropCy*cropBmp.height;
-  cx = Math.max(sideImg/2, Math.min(cropBmp.width - sideImg/2, cx));
-  cy = Math.max(sideImg/2, Math.min(cropBmp.height - sideImg/2, cy));
-  cropCx = cx/cropBmp.width; cropCy = cy/cropBmp.height;
-  return { sx: Math.round(cx - sideImg/2), sy: Math.round(cy - sideImg/2), side: sideImg,
-    left: (r.left - stage.left) + cx*scale - sideScreen/2,
-    top: (r.top - stage.top) + cy*scale - sideScreen/2, px: sideScreen };
-}
-function drawCropBox() {
-  if (!cropBmp) return;
-  const g = cropGeometry(), box = $('cropBox');
-  box.style.display = 'block';
-  box.style.left = g.left+'px'; box.style.top = g.top+'px';
-  box.style.width = g.px+'px'; box.style.height = g.px+'px';
-}
-function placeCrop(ev) {
-  const r = $('cropImg').getBoundingClientRect();
-  cropCx = Math.max(0, Math.min(1, (ev.clientX - r.left)/r.width));
-  cropCy = Math.max(0, Math.min(1, (ev.clientY - r.top)/r.height));
-  drawCropBox();
-}
-// The box follows the finger for the WHOLE drag. Checking e.buttons
-// dropped out mid-gesture on iOS, so the box landed at first touch and
-// then stuck — a tracked down/up flag is reliable where buttons isn't.
-let _cropDragging = false;
-$('cropStage').addEventListener('pointerdown', e => { _cropDragging = true; placeCrop(e); });
-$('cropStage').addEventListener('pointermove', e => { if (_cropDragging) { e.preventDefault(); placeCrop(e); } });
-window.addEventListener('pointerup', () => { _cropDragging = false; });
-window.addEventListener('pointercancel', () => { _cropDragging = false; });
-$('cropSize').addEventListener('input', drawCropBox);
-$('cropCancel').onclick = () => { $('cropper').classList.remove('on'); cropBmp = null; };
-$('cropOk').onclick = () => {
-  const g = cropGeometry(), bmp = cropBmp, done = cropOnDone;
-  $('cropper').classList.remove('on'); cropBmp = null; cropOnDone = null;
-  done(bmp, g.sx, g.sy, g.side);
-};
-
-$('identifyBtn').onclick = () => pickImage(async (url) => {
-  const bmp = await bitmapFrom(url, 1100);
-  openCropper(bmp, (b, sx, sy, side) => {
-    const fp = hashRegion(b, sx, sy, side);
-    b.close && b.close();
-    const scored = [];
-    for (const bk of bookings) for (const p of bk.pieces) {
-      if (!p.fp) continue;
-      scored.push({ bk, p, d: pinDown(fp, p.fp) });
-    }
-    scored.sort((a, z) => a.d - z.d);
-    if (!scored.length) { $('note').textContent = 'Nothing outstanding to compare against.'; return; }
-    const best = scored[0], next = scored.find(s => s.bk.id !== best.bk.id);
-    const edge = next ? next.d - best.d : null;
-    // A nearest match is not an answer. Without daylight between the
-    // top two it's a guess, and saying so is more use than a name.
-    $('note').innerHTML = (best.d <= 30 && edge !== null && edge >= 4)
-      ? `Looks like <b>${best.bk.id}</b> — ${best.p.type} (match ${best.d.toFixed(1)}, clear of the next by ${edge.toFixed(1)}).`
-      : `Not sure. Closest is <b>${best.bk.id}</b> (${best.p.type}, match ${best.d.toFixed(1)}${edge !== null ? `, only ${edge.toFixed(1)} ahead of the next booking` : ''}) — too close to call, so treat it as a guess.`;
+// The model doesn't need twelve megapixels, and on a studio connection
+// the upload is otherwise the slowest part of the whole operation.
+function shrink(dataUrl, maxSide) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+      if (scale >= 1) return resolve(dataUrl);
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      resolve(c.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
   });
+}
+
+async function describe(kind, rawPhoto) {
+  const photoBase64 = await shrink(rawPhoto, 1400);
+  const r = await fetch(`${API}/api/pieces/describe-${kind}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ photoBase64 }),
+  });
+  if (!r.ok) {
+    let msg = 'could not read that photo';
+    try { msg = (await r.json()).error || msg; } catch (e) {}
+    throw new Error(msg);
+  }
+  return (await r.json()).pieces || [];
+}
+
+// ── add pieces: photograph a group, it writes the list ───────────────
+
+let sheetItems = [];
+
+$('addBtn').onclick = () => pickImage(async (raw) => {
+  $('prog').style.display = 'block';
+  $('prog').textContent = 'Reading the table…';
+  try {
+    const seen = await describe('group', raw);
+    $('prog').style.display = 'none';
+    if (!seen.length) { $('note').textContent = 'No pottery spotted in that photo — try again, closer in.'; return; }
+    sheetItems = seen.map(p => p.description);
+    renderSheet();
+    $('sheet').classList.add('on');
+  } catch (e) {
+    $('prog').style.display = 'none';
+    $('note').textContent = 'Could not read that photo — ' + e.message;
+  }
 });
 
-// ── add a piece from here ────────────────────────────────────────────
-// The session is where missing references become obvious, so it's also
-// where fixing them must be possible — bouncing back to another screen
-// to register a test piece is exactly the friction this page replaces.
-$('addPieceBtn').onclick = () => pickImage(async (url) => {
-  const bmp = await bitmapFrom(url, 1100);
-  openCropper(bmp, async (b, sx, sy, side) => {
-    const name = (prompt('Which booking? (existing or new name)') || '').trim();
-    if (!name) { b.close && b.close(); return; }
-    const c = document.createElement('canvas');
-    const out = Math.min(800, side);
-    c.width = out; c.height = out;
-    c.getContext('2d').drawImage(b, sx, sy, side, side, 0, 0, out, out);
-    const cropUrl = c.toDataURL('image/jpeg', 0.85);
-    const fp = hashRegion(b, sx, sy, side);
-    const t = document.createElement('canvas');
-    t.width = t.height = 120;
-    t.getContext('2d').drawImage(b, sx, sy, side, side, 0, 0, 120, 120);
-    const thumb = t.toDataURL('image/jpeg', 0.85);
-    b.close && b.close();
-    $('note').textContent = 'Saving…';
-    try {
+function renderSheet() {
+  $('sheetBody').innerHTML = sheetItems.map((t, i) => `
+    <div class="row">
+      <input type="text" value="${esc(t)}" oninput="sheetItems[${i}]=this.value">
+      <button class="del" onclick="sheetItems.splice(${i},1);renderSheet()">✕</button>
+    </div>`).join('')
+    + `<div class="row"><button class="wide" onclick="sheetItems.push('');renderSheet()">+ add another piece</button></div>`;
+}
+$('sheetCancel').onclick = () => $('sheet').classList.remove('on');
+
+$('sheetSave').onclick = async () => {
+  const name = ($('sheetBooking').value || '').trim();
+  if (!name) { alert('Which booking is this?'); return; }
+  const list = sheetItems.map(s => s.trim()).filter(Boolean);
+  if (!list.length) { alert('Nothing to save.'); return; }
+  $('sheetSave').disabled = true; $('sheetSave').textContent = 'Saving…';
+  try {
+    let bk = bookings.find(b => b.id === name);
+    if (!bk) { bk = { id: name, pieces: [] }; bookings.push(bk); }
+    for (const description of list) {
       const r = await fetch(`${API}/api/pieces/add`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studioId, bookingId: name, pieceType: 'Piece' }),
+        body: JSON.stringify({ studioId, bookingId: name, pieceType: description.slice(0, 40) }),
       });
       const added = await r.json();
       const pieceId = added && added.piece && added.piece.id;
-      if (!pieceId) throw new Error('not created');
-      await fetch(`${API}/api/pieces/${pieceId}/reference-photo`, {
+      if (!pieceId) continue;
+      await fetch(`${API}/api/pieces/save-descriptions`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studioId, photoBase64: cropUrl }),
+        body: JSON.stringify({ studioId, items: [{ pieceId, description }] }),
       });
-      // Straight into the running session — no reload, ready to sweep.
-      let bk = bookings.find(x => x.id === name);
-      if (!bk) { bk = { id: name, pieces: [] }; bookings.push(bk); }
-      bk.pieces.push({ id: pieceId, type: 'Piece', url: cropUrl, fp, found: null, refThumb: thumb });
-      bookings.sort((a, z) => a.pieces.length - z.pieces.length || a.id.localeCompare(z.id));
-      render();
-      $('note').innerHTML = `Added to <b>${name}</b> — reference is the box you drew.`;
-      $('sweepBtn').disabled = false;
-    } catch (e) {
-      $('note').textContent = 'Could not save that piece — try again.';
+      bk.pieces.push({ id: pieceId, description, type: description.slice(0, 40), found: null });
     }
-  });
+    bookings.sort((a, b) => a.pieces.length - b.pieces.length || a.id.localeCompare(b.id));
+    buildIdf(); render();
+    $('sheet').classList.remove('on');
+    $('sheetBooking').value = '';
+    $('note').innerHTML = `Added ${list.length} piece${list.length === 1 ? '' : 's'} to <b>${esc(name)}</b>.`;
+  } catch (e) {
+    alert('Could not save those pieces.');
+  } finally {
+    $('sheetSave').disabled = false; $('sheetSave').textContent = 'Save to booking';
+  }
+};
+
+// ── sweep a surface ──────────────────────────────────────────────────
+
+$('sweepBtn').onclick = () => pickImage(async (raw) => {
+  $('prog').style.display = 'block';
+  $('prog').textContent = 'Looking…';
+  try {
+    const seen = await describe('shelf', raw);
+    $('prog').style.display = 'none';
+    matchSeen(seen, raw);
+  } catch (e) {
+    $('prog').style.display = 'none';
+    $('note').textContent = 'Could not read that photo — ' + e.message;
+  }
 });
 
+// Pooled and assigned best-first, so one sighting can never be claimed
+// by two pieces and the strongest claim wins.
+function assign(refs, seen, MIN, EDGE) {
+  const pairs = [];
+  for (const ref of refs)
+    for (const s of seen)
+      pairs.push({ ref, s, score: similarity(ref.description, s.description) });
+  pairs.sort((a, z) => z.score - a.score);
+  const usedSighting = new Set(), usedRef = new Set(), out = [];
+  for (const c of pairs) {
+    if (usedRef.has(c.ref) || usedSighting.has(c.s) || c.score < MIN) continue;
+    // Must be clearly the best claim on this sighting, or it's a guess.
+    const rival = pairs.find(o => o !== c && o.s === c.s && !usedRef.has(o.ref) && o.score > c.score - EDGE);
+    if (rival) continue;
+    usedRef.add(c.ref); usedSighting.add(c.s);
+    out.push(c);
+  }
+  return { assigned: out, pairs, usedSighting };
+}
+
+const MIN_SCORE = 0.42;   // below this it's a coincidence of common words
+const EDGE = 0.10;        // and it must be clearly ahead of the runner-up
+
+function matchSeen(seen, rawPhoto) {
+  surfaces++;
+  const refs = [];
+  for (const b of bookings) for (const p of b.pieces)
+    if (!p.found && p.description) refs.push({ b, p, description: p.description });
+
+  const { assigned, usedSighting } = assign(refs, seen, MIN_SCORE, EDGE);
+  for (const c of assigned) {
+    c.ref.p.found = {
+      surface: surfaces,
+      where: `seen as "${c.s.description}"`,
+      x: typeof c.s.x === 'number' ? c.s.x : null,
+      y: typeof c.s.y === 'number' ? c.s.y : null,
+    };
+  }
+
+  drawShot(rawPhoto);
+  render();
+
+  const left = bookings.reduce((n, b) => n + b.pieces.filter(p => !p.found).length, 0);
+  const spare = seen.length - usedSighting.size;
+  $('note').innerHTML = assigned.length
+    ? `<b>Ticked off ${assigned.length}.</b> ${left ? left + ' still to find — photograph somewhere else and it carries on.' : "That's everything."}`
+      + (spare ? ` ${spare} other piece${spare === 1 ? '' : 's'} here didn't belong to anything outstanding.` : '')
+    : `<b>Nothing matched here.</b> It saw: ${seen.length ? esc(seen.map(s => s.description).join('; ')) : 'no pottery at all'}.
+       ${left} still to find.`;
+  $('sweepBtn').innerHTML = 'Photograph somewhere else<div class="d">Carries on from where you are</div>';
+}
+
+function drawShot(rawPhoto) {
+  const img = new Image();
+  img.onload = () => {
+    const cv = $('canvas');
+    cv.width = img.width; cv.height = img.height;
+    const ctx = cv.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    ctx.lineWidth = Math.max(3, Math.round(img.width / 250));
+    ctx.font = '600 ' + Math.max(15, Math.round(img.width / 46)) + 'px ui-sans-serif,system-ui,sans-serif';
+    for (const b of bookings) for (const p of b.pieces) {
+      const f = p.found;
+      if (!f || f.surface !== surfaces || f.x === null) continue;
+      const x = f.x * img.width, y = f.y * img.height;
+      const r = Math.max(28, img.width * 0.07);
+      ctx.strokeStyle = '#4CAF50';
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#4CAF50';
+      ctx.fillText(b.id, x - r, Math.max(18, y - r - 8));
+    }
+    $('shot').style.display = 'block';
+  };
+  img.src = rawPhoto;
+}
+
+// ── test bed ─────────────────────────────────────────────────────────
+// Real pottery, no booking, nothing saved. It shows every score rather
+// than only the verdict, because "it didn't work" is not useful and
+// "the fish scored 0.71 but the jug scored 0.68 so neither was clear
+// enough" tells you exactly what to change.
+
+let tb = [];   // [{ description, found, best, bestText }]
+
+$('tbAdd').onclick = () => pickImage(async (raw) => {
+  $('tbNote').textContent = 'Reading the pieces…';
+  try {
+    const seen = await describe('group', raw);
+    if (!seen.length) { $('tbNote').textContent = 'No pottery spotted — try again, closer in.'; return; }
+    tb = seen.map(s => ({ description: s.description, found: false, best: null, bestText: '' }));
+    buildIdf(tb.map(t => t.description));
+    renderTb();
+    $('tbFind').disabled = false;
+    $('tbNote').innerHTML = `<b>${tb.length} piece${tb.length === 1 ? '' : 's'} to find.</b>
+      Now move them, jumble them, half-hide them — then photograph again.`;
+  } catch (e) {
+    $('tbNote').textContent = 'Could not read that photo — ' + e.message;
+  }
+});
+
+$('tbFind').onclick = () => pickImage(async (raw) => {
+  $('tbNote').textContent = 'Looking…';
+  try {
+    const seen = await describe('shelf', raw);
+    const refs = tb.map(t => ({ t, description: t.description }));
+    const { assigned, pairs } = assign(refs, seen, MIN_SCORE, EDGE);
+    for (const t of tb) { t.found = false; t.best = null; t.bestText = ''; }
+    // Every reference records its best score whether or not it won, so
+    // a near miss is visible as a near miss.
+    for (const p of pairs) {
+      const t = p.ref.t;
+      if (t.best === null || p.score > t.best) { t.best = p.score; t.bestText = p.s.description; }
+    }
+    for (const c of assigned) c.ref.t.found = true;
+    renderTb();
+    const hits = tb.filter(t => t.found).length;
+    $('tbNote').innerHTML = `<b>${hits} of ${tb.length} found.</b>
+      It saw: ${seen.length ? esc(seen.map(s => s.description).join('; ')) : 'no pottery at all'}.
+      <br>A tick needs ${MIN_SCORE} or better AND a clear ${EDGE} lead over the runner-up —
+      a close second is shown as a near miss rather than counted.`;
+  } catch (e) {
+    $('tbNote').textContent = 'Could not read that photo — ' + e.message;
+  }
+});
+
+function renderTb() {
+  if (!tb.length) { $('tbList').innerHTML = '<div class="empty">Nothing loaded yet.</div>'; return; }
+  $('tbList').innerHTML = tb.map(t => `
+    <div class="tb-row">
+      <div class="tick" style="color:${t.found ? 'var(--done)' : t.best !== null ? 'var(--warn)' : 'var(--mute)'}">
+        ${t.found ? '✓' : t.best !== null ? '~' : '○'}</div>
+      <div class="g">
+        <div>${esc(t.description)}</div>
+        ${t.best !== null ? `<div class="tb-score">best ${t.best.toFixed(2)} — matched against "${esc(t.bestText)}"</div>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+renderTb();
 load();
 </script>
 </body>
