@@ -11528,7 +11528,14 @@ async function _kcSweepShelf(photoUrl) {
       body: JSON.stringify({ studioId, bookingId: _shelfBookingId, photoBase64: photoUrl }),
     });
     clearTimeout(killer);
-    if (!res.ok) throw new Error('server engine unavailable');
+    if (!res.ok) {
+      // The generic message here was hiding the real reason (busy? a
+      // real 500? a bad request?) — every prior failure looked identical
+      // to a cold start with no way to tell them apart from the screen.
+      let detail = '';
+      try { const body = await res.json(); detail = body && body.error; } catch (e) {}
+      throw new Error(`server returned ${res.status}${detail ? ' — ' + detail : ''}`);
+    }
     const data = await res.json();
     if (data.status === 'ok' && Array.isArray(data.results)) {
       // Real measured time, shown in the report — the trial needs numbers,
@@ -11556,7 +11563,12 @@ async function _kcSweepShelf(photoUrl) {
     }
     throw new Error(data.error || 'server engine returned nothing usable');
   } catch (e) {
-    _kcEngineError = 'server: ' + ((e && e.message) || e);
+    // AbortError specifically means the 45s ceiling was hit — worth
+    // saying plainly, since it points at a cold start rather than a bug.
+    const isTimeout = e && (e.name === 'AbortError' || /aborted/i.test(e.message || ''));
+    _kcEngineError = isTimeout
+      ? 'server took too long to respond (likely still starting up)'
+      : 'server: ' + ((e && e.message) || e);
     // falls through to the on-device engine below, exactly as before
   }
 
