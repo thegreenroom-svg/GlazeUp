@@ -8050,15 +8050,101 @@ app.get('/api/packing/queue', async (req, res) => {
 // discover extras at the packing bench ("there's another mug of hers
 // in the back"), so the order has to be editable at that moment, not
 // frozen at booking time.
+// ═══ KILN CODES — the parallel route ═══════════════════════════════
+// [Daisy, 24 Jul] The studio has started branding bases with the kiln
+// stamp, and the insight from the French RFID till translates: a piece
+// that CARRIES its identity doesn't need recognising. An underglaze
+// pencil mark on the foot survives firing, so a short code written at
+// the dip/glaze stage — the one moment every piece is already in
+// someone's hand — turns packing from "recognise this object" (hard,
+// fuzzy) into "read this number" (easy, solved, Tesseract already ships
+// in this app for invoices).
+//
+// ONE CODE PER BOOKING, not per piece. That answers the group problem:
+// no per-piece buttons, no workflow ceremony — the app shows one number
+// and the whole group gets it written on before dipping. Digits only,
+// three of them, because digits are what OCR reads reliably and three
+// is quick to write on a small foot.
+//
+// This is a PARALLEL route, deliberately: photos keep working for
+// everything already on the shelves; codes take over piece-finding for
+// every batch marked from now on.
+
+// POST /api/pieces/mark-code — get (or assign) this booking's kiln code.
+// Idempotent: returns the existing code if one is already assigned.
+app.post('/api/pieces/mark-code', async (req, res) => {
+  const { studioId, bookingId } = req.body;
+  if (!studioId || !bookingId) return res.status(400).json({ error: 'studioId and bookingId required' });
+  try {
+    const { data: mine, error: e1 } = await supabase.from('pottery_pieces')
+      .select('mark_code').eq('studio_id', studioId).eq('booking_id', bookingId)
+      .not('mark_code', 'is', null).limit(1);
+    if (e1) throw e1;
+    if (mine && mine.length && mine[0].mark_code) {
+      return res.json({ code: mine[0].mark_code, existing: true });
+    }
+    // Assign the lowest free 3-digit code. Small studio, small numbers —
+    // and low numbers are quicker to write with a pencil.
+    const { data: used, error: e2 } = await supabase.from('pottery_pieces')
+      .select('mark_code').eq('studio_id', studioId).not('mark_code', 'is', null);
+    if (e2) throw e2;
+    const taken = new Set((used || []).map(r => r.mark_code));
+    let code = null;
+    for (let n = 101; n <= 999; n++) {
+      if (!taken.has(String(n))) { code = String(n); break; }
+    }
+    if (!code) return res.status(500).json({ error: 'no free codes — clear some old bookings' });
+    const { error: e3 } = await supabase.from('pottery_pieces')
+      .update({ mark_code: code, updated_at: new Date().toISOString() })
+      .eq('studio_id', studioId).eq('booking_id', bookingId);
+    if (e3) throw e3;
+    res.json({ code, existing: false });
+  } catch (error) {
+    console.error('mark-code error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/pieces/by-code?studioId=&codes=214,307 — whose are these?
+app.get('/api/pieces/by-code', async (req, res) => {
+  const { studioId, codes } = req.query;
+  if (!studioId || !codes) return res.status(400).json({ error: 'studioId and codes required' });
+  try {
+    const list = String(codes).split(',').map(c => c.trim()).filter(Boolean);
+    const { data, error } = await supabase.from('pottery_pieces')
+      .select('id, booking_id, piece_type, status, mark_code')
+      .eq('studio_id', studioId).in('mark_code', list);
+    if (error) throw error;
+    const byCode = {};
+    (data || []).forEach(p => {
+      (byCode[p.mark_code] = byCode[p.mark_code] || { code: p.mark_code, bookingId: p.booking_id, pieces: [] })
+        .pieces.push({ id: p.id, pieceType: p.piece_type, status: p.status });
+    });
+    res.json({ found: Object.values(byCode) });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/pieces/add', async (req, res) => {
   const { studioId, bookingId, pieceType, notes } = req.body;
   if (!studioId || !bookingId || !pieceType) {
     return res.status(400).json({ error: 'studioId, bookingId and pieceType required' });
   }
   try {
+    // A piece added to a booking that already has a kiln code inherits
+    // it, so a late extra never becomes the one unmarked piece.
+    let inheritedCode = null;
+    try {
+      const { data: sib } = await supabase.from('pottery_pieces')
+        .select('mark_code').eq('studio_id', studioId).eq('booking_id', bookingId)
+        .not('mark_code', 'is', null).limit(1);
+      if (sib && sib.length) inheritedCode = sib[0].mark_code;
+    } catch (e) { /* inheriting is best-effort */ }
     const { data, error } = await supabase.from('pottery_pieces').insert({
       studio_id: studioId, booking_id: bookingId, piece_type: pieceType,
       status: 'fired', is_complete: true, notes: notes || null,
+      mark_code: inheritedCode,
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }).select().single();
     if (error) throw error;

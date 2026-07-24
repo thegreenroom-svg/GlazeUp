@@ -10317,6 +10317,16 @@ async function _loadPackingTiles() {
            against a photo of something else entirely. Nothing could
            have matched. Adding and photographing in one step makes
            that class of mistake impossible. -->
+      <button onclick="_kcReadBaseCodes()" class="glaze-tile"
+        style="width:100%;border:1.5px solid rgba(43,39,36,0.15);border-radius:16px;padding:16px 20px;
+        cursor:pointer;margin-top:8px;background:#FFFDF9;text-align:left;display:flex;align-items:center;gap:14px;">
+        <span style="font-size:26px;flex-shrink:0;">🔢</span>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:#2B2724;">Read the Nº on the bases</div>
+          <div style="font-size:11px;color:#8a8175;margin-top:2px;">For stamped batches — turn them over, one photo</div>
+        </div>
+      </button>
+
       <button onclick="_kcAddPieceHere()" class="glaze-tile"
         style="width:100%;border:1.5px solid rgba(43,39,36,0.15);border-radius:16px;padding:16px 20px;
         cursor:pointer;margin-top:8px;background:#FFFDF9;text-align:left;display:flex;align-items:center;gap:14px;">
@@ -10546,6 +10556,11 @@ async function _renderBookingPackCard() {
           + Add another piece to this booking
         </button>
       </div>
+      <button onclick="_kcKilnCode(_shelfBookingId || _packCardBookingId)"
+        style="width:100%;border:1.5px solid rgba(43,39,36,0.2);border-radius:14px;padding:13px 16px;
+        cursor:pointer;margin-bottom:8px;background:#FFF9F0;color:#2B2724;font-size:14px;font-weight:800;text-align:left;">
+        Nº&nbsp; Kiln code for this group <span style="font-weight:400;color:#8a8175;font-size:12px;">— stamp before dipping</span>
+      </button>
       <button onclick="_kcFindOnShelves('${_packCardBookingId.replace(/'/g,"\\'")}')"
         style="width:100%;margin-top:16px;background:linear-gradient(135deg,#B87946,#8f5a33);
         border:none;border-radius:12px;padding:14px;font-size:13px;font-weight:800;color:#fff;cursor:pointer;">
@@ -12030,6 +12045,150 @@ async function _kcOpenBookingFromMatch(bookingId) {
 // group speed, per-piece accuracy. That crop matters: attaching one
 // group photo to every piece is exactly the mistake that made the
 // 'Studio shelf' tests unmatchable, and cropping avoids repeating it.
+// ═══ KILN CODES — Nº on the base, the parallel route ═════════════════
+// [Daisy, 24 Jul] Requirements as she set them: marking must be MINIMAL
+// (a scrawled admin code on a customer's piece is unacceptable — the
+// base is part of the brand), and it must not become a physical pinch
+// point at the bench. Her instinct about time-coding at the terminal is
+// folded in below.
+//
+// THE AESTHETIC ANSWER came from pottery itself: number the piece like
+// an EDITION. "Nº 214" stamped small and straight next to the kiln
+// mark doesn't read as admin — it reads as provenance, the same way a
+// print run or a potter's edition number does. Customers don't
+// tolerate it; they rather like it.
+//
+// THE SPEED ANSWER is a rotating-band number stamp (the library-desk
+// kind) inked from the SAME underglaze pad the kiln stamp already
+// uses. Set the bands to the booking's number once, then it's one
+// press per piece — faster than writing, identical every time. And
+// identical marks in a consistent typeface are exactly what the
+// reader loves: stamped digits OCR far better than handwriting ever
+// will.
+//
+// ON TIME-CODING: the timestamp can't ride invisibly on the piece —
+// something must physically carry the identity, which is what the
+// stamp is for. But the codes ARE assigned in sequence, so the number
+// effectively encodes when the booking entered the system; the
+// created_at timestamp does the precise grouping server-side.
+async function _kcKilnCode(bookingId) {
+  let code = null, existing = false;
+  try {
+    const d = await api('/api/pieces/mark-code', { method: 'POST', timeoutMs: 15000,
+      body: { studioId, bookingId } });
+    code = d.code; existing = !!d.existing;
+  } catch (e) { toast('Could not get a kiln code — try again', 'error'); return; }
+  let card = document.getElementById('kc-kiln-code');
+  if (!card) {
+    card = document.createElement('div');
+    card.id = 'kc-kiln-code';
+    card.style.cssText = 'position:fixed;inset:0;z-index:9670;background:#FFF9F0;display:none;'
+      + 'flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;';
+    document.body.appendChild(card);
+  }
+  card.innerHTML = `
+    <div style="font-family:'Caveat',cursive;font-size:26px;color:#2B2724;">${bookingId}</div>
+    <div style="font-size:104px;font-weight:900;color:#2B2724;letter-spacing:2px;margin:6px 0 2px;">Nº ${code}</div>
+    ${existing ? '<div style="font-size:12px;color:#8a8175;">already assigned to this booking</div>' : ''}
+    <div style="max-width:340px;font-size:14px;color:#2B2724;line-height:1.6;margin-top:18px;">
+      Set the band stamp to <b>${code}</b>, ink it on the kiln pad, and press once on
+      the base of <b>every piece in this group</b>, next to the kiln mark — before dipping.
+    </div>
+    <div style="font-size:12px;color:#8a8175;margin-top:10px;">One number for the whole group. A piece added later inherits it automatically.</div>
+    <button onclick="document.getElementById('kc-kiln-code').style.display='none'"
+      style="margin-top:26px;background:#2B2724;color:#FFF9F0;border:none;border-radius:14px;
+      padding:15px 44px;font-size:16px;font-weight:800;cursor:pointer;">Done</button>`;
+  card.style.display = 'flex';
+}
+
+// Read the bases: turn pieces over, one photo, every Nº reads at once.
+// This is the French-till moment, in-house: the pieces announce
+// themselves because they carry their identity.
+function _kcReadBaseCodes() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.onchange = () => {
+    const file = input.files && input.files[0];
+    input.remove();
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = () => _kcRunBaseCodes(r.result);
+    r.readAsDataURL(file);
+  };
+  input.click();   // inside the tap — the iOS rule
+}
+
+async function _kcRunBaseCodes(photoUrl) {
+  let card = document.getElementById('kc-code-result');
+  if (!card) {
+    card = document.createElement('div');
+    card.id = 'kc-code-result';
+    card.style.cssText = 'position:fixed;inset:0;z-index:9670;background:#201C1A;display:none;'
+      + 'flex-direction:column;padding:calc(14px + env(safe-area-inset-top)) 16px calc(14px + env(safe-area-inset-bottom));box-sizing:border-box;overflow:auto;';
+    document.body.appendChild(card);
+  }
+  card.style.display = 'flex';
+  card.innerHTML = `<div style="margin:auto;text-align:center;color:#8a8175;">
+    <div style="font-size:38px;">🔢</div>
+    <div style="font-family:'Caveat',cursive;font-size:24px;color:#F4ECE0;">Reading the numbers…</div>
+    <div id="kc-code-pct" style="font-size:12px;margin-top:6px;">loading the reader</div></div>`;
+  try {
+    await _invLoadTesseract();
+    const pct = document.getElementById('kc-code-pct');
+    const { data } = await window.Tesseract.recognize(photoUrl, 'eng', {
+      tessedit_char_whitelist: '0123456789N°º ',
+      logger: m => { if (m.status === 'recognizing text' && pct) pct.textContent = `reading… ${Math.round(m.progress * 100)}%`; },
+    });
+    // Every distinct 3-digit number in shot is a candidate code.
+    const codes = [...new Set((String(data.text || '').match(/\b\d{3}\b/g) || []))];
+    if (!codes.length) {
+      card.innerHTML = `<div style="margin:auto;text-align:center;color:#8a8175;max-width:320px;">
+        <div style="font-size:38px;">🔢</div>
+        <div style="font-family:'Caveat',cursive;font-size:24px;color:#F4ECE0;">No numbers read</div>
+        <div style="font-size:13px;line-height:1.6;margin-top:10px;">Bases upright, numbers facing the camera,
+          close enough that each Nº is bigger than a coin on screen.</div>
+        <button onclick="document.getElementById('kc-code-result').style.display='none'"
+          style="margin-top:20px;background:#F4ECE0;color:#2B2724;border:none;border-radius:12px;
+          padding:13px 34px;font-size:15px;font-weight:800;cursor:pointer;">Close</button></div>`;
+      return;
+    }
+    const found = await api(`/api/pieces/by-code?studioId=${studioId}&codes=${codes.join(',')}`, { timeoutMs: 15000 });
+    const groups = (found && found.found) || [];
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-family:'Caveat',cursive;font-size:24px;color:#F4ECE0;">
+          ${groups.length ? `Found ${groups.length} booking${groups.length===1?'':'s'}` : 'Numbers read, nobody matched'}</div>
+        <button onclick="document.getElementById('kc-code-result').style.display='none'"
+          style="background:none;border:1px solid rgba(244,236,224,0.3);color:#F4ECE0;border-radius:10px;
+          padding:7px 14px;font-size:13px;cursor:pointer;">Close</button>
+      </div>
+      <div style="font-size:11px;color:#8a8175;margin-bottom:10px;">Read off the bases: ${codes.map(c=>'Nº '+c).join(' · ')}</div>
+      ${groups.map(g => `
+        <button onclick="document.getElementById('kc-code-result').style.display='none';_openBookingPackCard('${String(g.bookingId).replace(/'/g,"\\'")}')"
+          style="width:100%;text-align:left;background:#2B2724;border:1px solid rgba(244,236,224,0.15);
+          border-radius:14px;padding:14px 16px;margin-bottom:8px;cursor:pointer;color:#F4ECE0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:16px;font-weight:800;">${g.bookingId}</div>
+              <div style="font-size:12px;color:#8a8175;margin-top:2px;">${g.pieces.length} piece${g.pieces.length===1?'':'s'} on this Nº</div>
+            </div>
+            <div style="font-size:20px;font-weight:900;color:#B87946;">Nº ${g.code}</div>
+          </div>
+        </button>`).join('')}
+      ${!groups.length ? `<div style="font-size:13px;color:#8a8175;line-height:1.6;">These numbers aren't assigned
+        to any booking yet — codes only exist for groups given one at the dip stage.</div>` : ''}`;
+  } catch (e) {
+    card.innerHTML = `<div style="margin:auto;text-align:center;color:#8a8175;">
+      <div style="font-family:'Caveat',cursive;font-size:24px;color:#F4ECE0;">Could not read that</div>
+      <button onclick="document.getElementById('kc-code-result').style.display='none'"
+        style="margin-top:18px;background:#F4ECE0;color:#2B2724;border:none;border-radius:12px;
+        padding:13px 34px;font-size:15px;font-weight:800;cursor:pointer;">Close</button></div>`;
+  }
+}
+
 function _kcAddPieceHere() {
   const input = document.createElement('input');
   input.type = 'file';
@@ -34001,6 +34160,10 @@ if (typeof document !== 'undefined') {
       if (shelf && shelf.style.display !== 'none' && getComputedStyle(shelf).display !== 'none') {
         _kcCloseShelfScan(); return;
       }
+      const kilnCode = document.getElementById('kc-kiln-code');
+      if (kilnCode && getComputedStyle(kilnCode).display !== 'none') { kilnCode.style.display = 'none'; return; }
+      const codeRes = document.getElementById('kc-code-result');
+      if (codeRes && getComputedStyle(codeRes).display !== 'none') { codeRes.style.display = 'none'; return; }
       const addGroup = document.getElementById('kc-add-group');
       if (addGroup && addGroup.style.display !== 'none' && getComputedStyle(addGroup).display !== 'none') {
         _kcCloseAddGroup(); return;
