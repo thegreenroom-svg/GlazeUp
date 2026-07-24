@@ -30442,7 +30442,10 @@ async function loadRefPhotoPieces(bookingCode) {
         </div>
         <div style="flex:1;">
           <div style="font-size:13px;font-weight:700;">${p.piece_type || 'Piece'}</div>
-          <div style="font-size:10px;color:${p.reference_photo_url ? '#2e7d32' : 'var(--gu-dust)'};">${p.reference_photo_url ? '✓ Photographed' : 'Not photographed yet'}</div>
+          <div style="font-size:10px;color:${p.reference_photo_url ? '#2e7d32' : 'var(--gu-dust)'};">
+            ${p.reference_photo_url ? '✓ Photographed' : 'Not photographed yet'}
+            ${p.angle_count ? ` · ${p.angle_count} more angle${p.angle_count === 1 ? '' : 's'}` : ''}
+          </div>
         </div>
         <button class="glaze-tile" onclick="captureRefPhoto('${p.id}')" style="background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:8px 12px;font-size:11px;font-weight:700;cursor:pointer;">${p.reference_photo_url ? '🔄 Retake' : '📷 Photograph'}</button>
       </div>
@@ -30461,6 +30464,72 @@ function captureRefPhoto(pieceId) {
   input.click();
 }
 
+// One more photo of the same piece, tagged with an angle, saved
+// alongside the main one. Standalone rather than reusing the pack-card
+// version (_kcAngleShot) — this runs in a different screen with a
+// different completion step, and keeping them independent means a
+// change to one can't quietly break the other.
+function _tcCaptureAngle(pieceId, angleKey) {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+    input.onchange = async () => {
+      const file = input.files && input.files[0];
+      input.remove();
+      if (!file) { resolve(false); return; }
+      try {
+        const phash = await computePerceptualHash(file);
+        const photoBase64 = await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result);
+          r.onerror = () => rej(new Error('read failed'));
+          r.readAsDataURL(file);
+        });
+        await fetch(`${API_URL}/api/pieces/${pieceId}/photos`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studioId, photoBase64, phash, angle: angleKey }),
+        });
+        resolve(true);
+      } catch (e) { resolve(false); }
+    };
+    input.click();
+  });
+}
+
+// Shown right after the main photo saves — the moment the piece is
+// still in hand, not a button to remember later. Skip is one tap for
+// a plain piece where a second angle won't add much; the default is
+// still to ask, because asking every time is what makes it a habit.
+function _offerExtraAngles(pieceId) {
+  const listEl = document.getElementById('ref-photo-pieces-list');
+  if (!listEl) return Promise.resolve();
+  const banner = document.createElement('div');
+  banner.style.cssText = 'background:#fff9f0;border:1.5px solid var(--link-clay,#B87946);border-radius:10px;padding:12px;margin-bottom:8px;font-size:12px;';
+  banner.innerHTML = `
+    <div style="font-weight:700;margin-bottom:6px;">Two more angles finds this piece far more reliably later.</div>
+    <div style="display:flex;gap:8px;">
+      <button id="tc-angle-yes" style="flex:1;background:var(--gu-primary);color:white;border:none;
+        border-radius:8px;padding:9px;font-weight:700;font-size:12px;">📷 Add them — 20 sec</button>
+      <button id="tc-angle-skip" style="background:none;border:1px solid rgba(0,0,0,0.15);
+        border-radius:8px;padding:9px 12px;font-size:12px;">Skip</button>
+    </div>`;
+  listEl.prepend(banner);
+
+  return new Promise((resolve) => {
+    document.getElementById('tc-angle-skip').onclick = () => { banner.remove(); resolve(); };
+    document.getElementById('tc-angle-yes').onclick = async () => {
+      banner.innerHTML = '<div style="text-align:center;padding:8px;color:var(--gu-dust);">At about 45° — the way it sits on a shelf…</div>';
+      await _tcCaptureAngle(pieceId, 'angled');
+      banner.innerHTML = '<div style="text-align:center;padding:8px;color:var(--gu-dust);">Now the most distinctive detail…</div>';
+      await _tcCaptureAngle(pieceId, 'detail');
+      banner.remove();
+      resolve();
+    };
+  });
+}
+
 async function handleRefPhotoCapture(event) {
   const file = event.target.files[0];
   if (!file || !_capturingPieceId) return;
@@ -30477,13 +30546,21 @@ async function handleRefPhotoCapture(event) {
       });
       if (!res.ok) { alert('Could not save the photo — try again.'); return; }
       const bookingCode = document.getElementById('ref-photo-booking-select').value;
-      loadRefPhotoPieces(bookingCode);
 
       // Suggest a piece type from the studio's own stock list, based on
       // the photo just taken — genuinely AI-assisted, staff confirms.
       // Runs quietly in the background; doesn't block the main flow if
       // it's slow or comes back empty.
       suggestStockTypeForPiece(_capturingPieceId, reader.result);
+
+      // The two extra angles happen HERE, now, while the piece is still
+      // in hand — not as a separate screen someone has to remember to
+      // visit later. That was the actual gap: the angle-capture screen
+      // existed but nothing in the real table-clearing flow ever led to
+      // it, so it was never used. A step that depends on being
+      // remembered doesn't happen — same lesson as the kiln-stamp idea.
+      await _offerExtraAngles(_capturingPieceId, bookingCode);
+      loadRefPhotoPieces(bookingCode);
     } catch (e) {
       alert('Could not save the photo — try again.');
     }

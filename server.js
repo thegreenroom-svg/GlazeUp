@@ -5980,7 +5980,18 @@ app.get('/api/pieces/for-booking', async (req, res) => {
     .select('id, piece_type, status, reference_photo_url')
     .eq('studio_id', studioId).eq('booking_id', bookingCode);
   if (error) return res.status(500).json({ error: error.message });
-  res.json({ pieces: pieces || [] });
+
+  // One extra query, not one per piece — the count is shown so the
+  // table-clearing screen can say "2 angles" instead of leaving staff
+  // to guess whether the offer was actually completed for a piece.
+  const ids = (pieces || []).map(p => p.id);
+  let counts = {};
+  if (ids.length) {
+    const { data: rows } = await supabase.from('piece_photos')
+      .select('piece_id').in('piece_id', ids);
+    for (const r of (rows || [])) counts[r.piece_id] = (counts[r.piece_id] || 0) + 1;
+  }
+  res.json({ pieces: (pieces || []).map(p => ({ ...p, angle_count: counts[p.id] || 0 })) });
 });
 
 // ═══════════════════════════════════════════
