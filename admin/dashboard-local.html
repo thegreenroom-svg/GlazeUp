@@ -11582,42 +11582,72 @@ async function _kcSweepShelf(photoUrl) {
     const sceneDesc = new cv.Mat();
     det.d.detectAndCompute(scene.mat, new cv.Mat(), sceneKp, sceneDesc);
 
-    // A reference photo shows the piece filling the frame; on the shelf
-    // it might be a tenth of the width. Tested: at one reference size
-    // the jug matched the cottage dish, at another it landed correctly.
-    // So each reference is tried at several sizes and the best kept.
+    // Same coverage as the server engine (24 Jul): every angle on file
+    // for a piece, not just the display photo. Fetched here rather than
+    // carried from the caller because this path only runs when the
+    // server was unreachable — it cannot assume the server already
+    // gathered them.
     const REF_SIZES = [180, 260, 360, 500];
     const found = [];
     for (let i = 0; i < _shelfPieces.length; i++) {
       const piece = _shelfPieces[i];
-      if (!piece.reference_photo_url) { found.push({ piece, inliers: 0, r: 0 }); continue; }
-      say('Searching the shelf…', `piece ${i + 1} of ${_shelfPieces.length}`);
+      say('Searching the shelf…', `piece ${i + 1} of ${_shelfPieces.length} (on-device)`);
       await new Promise(r => setTimeout(r, 0));
-      let bmp = null, best = { inliers: 0, pts: [] };
+
+      let photos = [];
+      if (piece.reference_photo_url) photos.push({ url: piece.reference_photo_url, angle: 'main' });
       try {
-        bmp = await _kcCVBitmap(piece.reference_photo_url);
-        for (const px of REF_SIZES) {
-          const ref = _kcCVGreyFromBmp(bmp, px);
-          const refKp = new cv.KeyPointVector();
-          const refDesc = new cv.Mat();
-          try {
-            det.d.detectAndCompute(ref.mat, new cv.Mat(), refKp, refDesc);
-            const r = _kcCVMatch(det, refDesc, refKp, sceneDesc, sceneKp);
-            if (r.inliers > best.inliers) best = r;
-          } catch (e) { /* this scale yielded nothing */ }
-          refKp.delete(); refDesc.delete(); ref.mat.delete();
-          await new Promise(r => setTimeout(r, 0));
+        const r = await api(`/api/pieces/${piece.id}/photos`);
+        for (const p of ((r && r.photos) || [])) {
+          if (p.angle && p.photo_url && p.photo_url !== piece.reference_photo_url) {
+            photos.push({ url: p.photo_url, angle: p.angle });
+          }
         }
-      } catch (e) { /* reference photo unreadable */ }
-      bmp?.close?.();
+      } catch (e) { /* angles endpoint unreachable too — main photo alone still tried */ }
+      if (photos.length > 4) photos = photos.slice(0, 4);
+
+      if (!photos.length) {
+        found.push({ piece, inliers: 0, r: 0, tried: [], note: 'no reference photo yet' });
+        continue;
+      }
+
+      let best = { inliers: 0, pts: [] };
+      let wonWith = null;
+      const tried = [];
+      // Fewer sizes per angle than the single-photo era, same trade the
+      // server makes: several angles beats several sizes of one angle.
+      const sizes = photos.length >= 3 ? [260, 400] : REF_SIZES;
+
+      for (const photo of photos) {
+        let bmp = null, bestForPhoto = { inliers: 0, pts: [] };
+        try {
+          bmp = await _kcCVBitmap(photo.url);
+          for (const px of sizes) {
+            const ref = _kcCVGreyFromBmp(bmp, px);
+            const refKp = new cv.KeyPointVector();
+            const refDesc = new cv.Mat();
+            try {
+              det.d.detectAndCompute(ref.mat, new cv.Mat(), refKp, refDesc);
+              const r = _kcCVMatch(det, refDesc, refKp, sceneDesc, sceneKp);
+              if (r.inliers > bestForPhoto.inliers) bestForPhoto = r;
+            } catch (e) { /* this scale yielded nothing */ }
+            refKp.delete(); refDesc.delete(); ref.mat.delete();
+            await new Promise(r => setTimeout(r, 0));
+          }
+        } catch (e) { tried.push({ angle: photo.angle, inliers: null, note: 'unreadable' }); continue; }
+        finally { bmp?.close?.(); }
+        tried.push({ angle: photo.angle, inliers: bestForPhoto.inliers });
+        if (bestForPhoto.inliers > best.inliers) { best = bestForPhoto; wonWith = photo.angle; }
+      }
+
       if (best.pts.length) {
         const cx = best.pts.reduce((a, p) => a + p.x, 0) / best.pts.length;
         const cy = best.pts.reduce((a, p) => a + p.y, 0) / best.pts.length;
         const spread = Math.max(45, 1.7 * Math.sqrt(
           best.pts.reduce((a, p) => a + (p.x - cx) ** 2 + (p.y - cy) ** 2, 0) / best.pts.length));
-        found.push({ piece, inliers: best.inliers, x: cx, y: cy, r: spread });
+        found.push({ piece, inliers: best.inliers, x: cx, y: cy, r: spread, wonWith, tried });
       } else {
-        found.push({ piece, inliers: best.inliers, x: 0, y: 0, r: 0 });
+        found.push({ piece, inliers: best.inliers, x: 0, y: 0, r: 0, wonWith, tried });
       }
     }
     sceneKp.delete(); sceneDesc.delete(); scene.mat.delete();
@@ -11631,9 +11661,13 @@ async function _kcSweepShelf(photoUrl) {
       .map(f => ({ x: f.x, y: f.y, r: f.r, piece: f.piece, edge: f.inliers,
                    sure: f.inliers >= CONFIDENT }));
     const best = ranked[0];
+    const scoresOut = found.map(f => ({
+      pieceId: f.piece.id, pieceType: f.piece.piece_type,
+      inliers: f.inliers, wonWith: f.wonWith, tried: f.tried, note: f.note,
+    }));
     _renderShelfResult(photoUrl, rings, scene.W, scene.H,
       best && best.inliers ? { d: best.inliers, piece: best.piece } : null,
-      _shelfPieces.length, 'points', det.name);
+      _shelfPieces.length, 'points', det.name + ' · on-device', scoresOut);
     return;
   } catch (e) {
     // Never fail silently again. The first version swallowed this and
@@ -11770,7 +11804,13 @@ function _renderShelfResult(photoUrl, rings, W, H, closest, expected, unit, engi
         <div style="font-family:'Caveat',cursive;font-size:22px;color:#F4ECE0;">
           ${sure.length ? `Found ${sure.length} of ${expected}` : maybe.length ? 'Possible matches' : 'Nothing found here'}</div>
         ${maybe.length ? `<div style="font-size:11px;color:#F9A825;">${maybe.length} more worth a look</div>` : ''}
-        <div style="font-size:10px;color:#6f675e;margin-top:3px;">${engine ? 'pattern matching \u00b7 ' + engine : 'basic matcher' + (_kcEngineError ? ' \u00b7 ' + _kcEngineError : '')}</div>
+        <div style="font-size:10px;color:${engine && engine.includes('on-device') ? '#F9A825' : '#6f675e'};margin-top:3px;">
+          ${engine
+            ? (engine.includes('on-device')
+                ? `⚠ server unreachable — ran on this device instead \u00b7 ${engine}${_kcEngineError ? ' \u00b7 ' + _kcEngineError : ''}`
+                : 'pattern matching \u00b7 ' + engine)
+            : 'basic matcher' + (_kcEngineError ? ' \u00b7 ' + _kcEngineError : '')}
+        </div>
       </div>
       <button onclick="_kcCloseShelfScan()" style="background:none;border:1px solid rgba(184,121,70,0.4);
         color:#F4ECE0;border-radius:10px;padding:7px 14px;font-size:12px;cursor:pointer;">Close</button>
