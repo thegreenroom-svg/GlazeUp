@@ -77,8 +77,15 @@
   <div id="shot"><canvas id="canvas"></canvas></div>
   <div class="prog" id="prog" style="display:none"></div>
   <div class="stack">
-    <button class="primary" id="sweepBtn">Photograph a surface</button>
-    <button class="wide" id="identifyBtn">What is this one piece?</button>
+    <button class="primary" id="sweepBtn">Photograph a surface
+      <div style="font-size:11px;font-weight:400;color:rgba(255,255,255,.8);margin-top:2px">
+        Table, shelf or box — finds every outstanding piece in shot</div></button>
+    <button class="wide" id="identifyBtn">What is this one piece?
+      <div style="font-size:11px;color:var(--mute);margin-top:2px">
+        A stray in your hand — photograph it, I'll say whose it is</div></button>
+    <button class="wide" id="addPieceBtn">Add a piece to a booking
+      <div style="font-size:11px;color:var(--mute);margin-top:2px">
+        Photograph it, box it, name the booking — registered on the spot</div></button>
   </div>
   <div class="note" id="note"></div>
 </div>
@@ -606,6 +613,53 @@ $('identifyBtn').onclick = () => pickImage(async (url) => {
     $('note').innerHTML = (best.d <= 30 && edge !== null && edge >= 4)
       ? `Looks like <b>${best.bk.id}</b> — ${best.p.type} (match ${best.d.toFixed(1)}, clear of the next by ${edge.toFixed(1)}).`
       : `Not sure. Closest is <b>${best.bk.id}</b> (${best.p.type}, match ${best.d.toFixed(1)}${edge !== null ? `, only ${edge.toFixed(1)} ahead of the next booking` : ''}) — too close to call, so treat it as a guess.`;
+  });
+});
+
+// ── add a piece from here ────────────────────────────────────────────
+// The session is where missing references become obvious, so it's also
+// where fixing them must be possible — bouncing back to another screen
+// to register a test piece is exactly the friction this page replaces.
+$('addPieceBtn').onclick = () => pickImage(async (url) => {
+  const bmp = await bitmapFrom(url, 1100);
+  openCropper(bmp, async (b, sx, sy, side) => {
+    const name = (prompt('Which booking? (existing or new name)') || '').trim();
+    if (!name) { b.close && b.close(); return; }
+    const c = document.createElement('canvas');
+    const out = Math.min(800, side);
+    c.width = out; c.height = out;
+    c.getContext('2d').drawImage(b, sx, sy, side, side, 0, 0, out, out);
+    const cropUrl = c.toDataURL('image/jpeg', 0.85);
+    const fp = hashRegion(b, sx, sy, side);
+    const t = document.createElement('canvas');
+    t.width = t.height = 120;
+    t.getContext('2d').drawImage(b, sx, sy, side, side, 0, 0, 120, 120);
+    const thumb = t.toDataURL('image/jpeg', 0.85);
+    b.close && b.close();
+    $('note').textContent = 'Saving…';
+    try {
+      const r = await fetch(`${API}/api/pieces/add`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId, bookingId: name, pieceType: 'Piece' }),
+      });
+      const added = await r.json();
+      const pieceId = added && added.piece && added.piece.id;
+      if (!pieceId) throw new Error('not created');
+      await fetch(`${API}/api/pieces/${pieceId}/reference-photo`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studioId, photoBase64: cropUrl }),
+      });
+      // Straight into the running session — no reload, ready to sweep.
+      let bk = bookings.find(x => x.id === name);
+      if (!bk) { bk = { id: name, pieces: [] }; bookings.push(bk); }
+      bk.pieces.push({ id: pieceId, type: 'Piece', url: cropUrl, fp, found: null, refThumb: thumb });
+      bookings.sort((a, z) => a.pieces.length - z.pieces.length || a.id.localeCompare(z.id));
+      render();
+      $('note').innerHTML = `Added to <b>${name}</b> — reference is the box you drew.`;
+      $('sweepBtn').disabled = false;
+    } catch (e) {
+      $('note').textContent = 'Could not save that piece — try again.';
+    }
   });
 });
 
