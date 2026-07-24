@@ -10309,6 +10309,24 @@ async function _loadPackingTiles() {
         </div>
       </button>
 
+      <!-- Build up a shelf as you go: add a piece, photograph it there
+           and then. Added 24 Jul after the 'Studio shelf' test pieces
+           turned out to be seeded demo rows ("Tom's cereal bowl",
+           "Megan's spotty mug") whose reference photos belonged to
+           invented pieces — so every search was comparing a real jug
+           against a photo of something else entirely. Nothing could
+           have matched. Adding and photographing in one step makes
+           that class of mistake impossible. -->
+      <button onclick="_kcAddPieceHere()" class="glaze-tile"
+        style="width:100%;border:1.5px solid rgba(43,39,36,0.15);border-radius:16px;padding:16px 20px;
+        cursor:pointer;margin-top:8px;background:#FFFDF9;text-align:left;display:flex;align-items:center;gap:14px;">
+        <span style="font-size:26px;flex-shrink:0;">➕</span>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:#2B2724;">Add a piece</div>
+          <div style="font-size:11px;color:#8a8175;margin-top:2px;">Name it, photograph it, it's on the shelf</div>
+        </div>
+      </button>
+
       <!-- Batch email: Daisy reviews and sends via her own Gmail, the
            app never sends anything itself -->
       <button onclick="_kcEmailReady()" class="glaze-tile"
@@ -11983,6 +12001,39 @@ async function _kcOpenBookingFromMatch(bookingId) {
   _kcCloseShelfScan();
   try { _closeAreaScan(); } catch (e) {}
   await _openBookingPackCard(bookingId);
+}
+
+// ── ADD A PIECE, AND PHOTOGRAPH IT NOW ───────────────────────────────
+// Built 24 Jul, after the 'Studio shelf' pieces were found to be seeded
+// demo rows whose reference photos belonged to invented items — so the
+// shelf search was comparing a real green jug against a photo of
+// something else entirely, and no amount of engine tuning could ever
+// have fixed that.
+//
+// The lesson is that a reference photo must be created AT THE SAME
+// MOMENT as the piece it describes. So this does both in one go: name
+// it, photograph it, done. A piece added this way cannot end up
+// pointing at the wrong picture.
+function _kcAddPieceHere() {
+  const lastBooking = (() => { try { return localStorage.getItem('kc_last_add_booking') || ''; } catch (e) { return ''; } })();
+  const bookingId = prompt('Whose is it? (a name, or any label for the shelf)', lastBooking || 'Studio shelf');
+  if (!bookingId || !bookingId.trim()) return;
+  const pieceType = prompt('What is it? (e.g. Fish jug, Owl jug, Cottage dish)');
+  if (!pieceType || !pieceType.trim()) return;
+  try { localStorage.setItem('kc_last_add_booking', bookingId.trim()); } catch (e) {}
+
+  fetch(`${API_URL}/api/pieces/add`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ studioId, bookingId: bookingId.trim(), pieceType: pieceType.trim() }),
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (!data.piece || !data.piece.id) throw new Error(data.error || 'could not add it');
+      // Straight into the camera for THIS piece — the photo and the
+      // record are created together, which is the whole point.
+      _kcPhotoPiece(data.piece.id);
+    })
+    .catch(e => alert('Could not add that piece: ' + ((e && e.message) || e)));
 }
 
 function _kcPhotoPiece(pieceId) {
