@@ -33438,6 +33438,30 @@ function showIdleAsk() {
   // Checked by real visibility, not a hand-maintained list that would rot
   // the first time a modal was added.
   if ([...document.querySelectorAll('[id*="modal"]')].some(m => m.offsetParent !== null)) return;
+  // Nor anyone inside a full-screen working overlay — the pack card, a
+  // shelf sweep, the add-pieces screen, a lightbox, the room panel. None
+  // of those have "modal" in their id, so the check above missed every
+  // one of them, and being pulled out of a half-finished pack card is
+  // far worse than being asked nothing at all.
+  //
+  // Detected by what they ARE rather than by name: anything fixed,
+  // visible, and covering most of the screen. A list of ids would rot
+  // the first time another overlay was added.
+  try {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const covering = [...document.body.children].some(el => {
+      if (!(el instanceof HTMLElement) || el.offsetParent === null) {
+        // offsetParent is null for position:fixed too, so check display
+        if (!(el instanceof HTMLElement)) return false;
+        if (getComputedStyle(el).display === 'none') return false;
+      }
+      const cs = getComputedStyle(el);
+      if (cs.position !== 'fixed' || cs.display === 'none' || cs.visibility === 'hidden') return false;
+      const r = el.getBoundingClientRect();
+      return r.width > vw * 0.7 && r.height > vh * 0.6;
+    });
+    if (covering) return;
+  } catch (e) { /* if this check fails, fall through to the old behaviour */ }
   // Never while typing — an input focused means they are working.
   const ae = document.activeElement;
   if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;
@@ -33501,6 +33525,28 @@ function resetReturnToFloorTimer() {
 ['touchstart', 'mousedown', 'keydown', 'scroll'].forEach(evt => {
   document.addEventListener(evt, resetReturnToFloorTimer, { passive: true });
 });
+
+// ── USING THE CAMERA IS NOT WALKING AWAY ─────────────────────────────
+// Those four events only fire on THIS page. The moment the native camera
+// or photo picker opens, the page is hidden and receives none of them —
+// so photographing a piece looked exactly like an abandoned iPad. After
+// two minutes it asked "still there?", got no answer because the answer
+// was on the camera screen, and forty-five seconds later navigated away.
+// Staff came back from taking a photo to find the app had moved.
+//
+// Same for taking a phone call, replying to a message, or the screen
+// simply locking. The clock now stops whenever the page is hidden and
+// starts afresh on return, so time spent away never counts against you.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    clearTimeout(_askIdleTimer);
+    clearTimeout(_askGraceTimer);
+    _dismissIdleAsk(false);       // never leave the card up behind a camera
+  } else {
+    resetReturnToFloorTimer();    // back on the page = a fresh two minutes
+  }
+});
+
 resetReturnToFloorTimer();
 
 // ═══════════════════════════════════════════════════════
