@@ -11143,6 +11143,37 @@ function _renderShelfCapture() {
     </div>`;
 }
 
+// Downscale before uploading. The server resizes a shelf photo to
+// 1400px and reference photos to 260-400px before doing anything with
+// them, so sending a full-resolution 12MP iPhone photo uploads roughly
+// 6MB of base64 to use a fraction of it. On a studio connection that
+// upload IS the request time — it's what produced 'server took too
+// long' and 'Load failed' while the server itself was demonstrably
+// healthy and its engine warmed in 3.3 seconds.
+//
+// Attached to window so it resolves from any script block in this file.
+window._kcDownscaleDataUrl = function (dataUrl, maxSide, quality) {
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+          // Already small enough — re-encoding would only lose detail.
+          if (scale >= 1) return resolve(dataUrl);
+          const c = document.createElement('canvas');
+          c.width = Math.round(img.width * scale);
+          c.height = Math.round(img.height * scale);
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          resolve(c.toDataURL('image/jpeg', quality || 0.82));
+        } catch (e) { resolve(dataUrl); }   // never block a capture over this
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    } catch (e) { resolve(dataUrl); }
+  });
+};
+
 function _kcCaptureShelf() {
   const input = document.createElement('input');
   input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment';
@@ -11153,7 +11184,10 @@ function _kcCaptureShelf() {
     input.remove();
     if (!file) return;
     const r = new FileReader();
-    r.onload = () => _kcSweepShelf(r.result);
+    // 1800px keeps real headroom over the server's 1400px working size
+    // and the on-device engine's 2200px ceiling, while cutting the
+    // payload from megabytes to a few hundred KB.
+    r.onload = () => _kcDownscaleDataUrl(r.result, 1800, 0.82).then(_kcSweepShelf);
     r.readAsDataURL(file);
   };
   input.click();
@@ -12660,7 +12694,7 @@ async function _kcOfferGroupAngles(pieces) {
         </div>`;
       document.getElementById('kc-ga-skip').onclick = () => resolve();
       document.getElementById('kc-ga-yes').onclick = () => {
-        _tcCaptureAngles(p.id, ['angled', 'detail']).then(resolve);
+        _tcCaptureAngles(p.id, 4).then(resolve);
       };
     });
   }
@@ -30613,42 +30647,57 @@ function captureRefPhoto(pieceId) {
 // version (_kcAngleShot) — this runs in a different screen with a
 // different completion step, and keeping them independent means a
 // change to one can't quietly break the other.
-// One tap, one native picker, up to `labels.length` photos chosen or
-// taken in that SAME session. Replaces an earlier version that opened
-// a fresh camera picker per angle, auto-chained after each one saved —
-// which hung on the second shot, because iOS silently refuses to open
-// a file picker unless it's triggered by its own direct tap, and
-// there's no clean way to insert a fresh tap into an automatic
-// sequence without it becoming the very "extra steps" this was meant
-// to avoid. No `capture` attribute here deliberately: that's what
-// lets iOS's picker offer camera-or-library and multiple shots in one
-// visit, rather than forcing a single photo per launch.
-function _tcCaptureAngles(pieceId, labels) {
+// One tap, one native picker, however many photos get taken or picked
+// in that session — all of them are kept. Replaces an earlier version
+// that opened a fresh camera picker per angle, auto-chained after each
+// one saved, which hung on the second shot: iOS silently refuses to
+// open a file picker unless it's triggered by its own direct tap.
+//
+// Deliberately NOT fixed at two named angles. Daisy's point: in
+// practice you snap three or four in quick succession and want all of
+// them used, rather than the app deciding which two count. Labels are
+// just positional (angle-2, angle-3...) since the report only needs to
+// say which one won, not what it was supposed to be a picture of.
+//
+// No `capture` attribute here on purpose: that's what lets iOS offer
+// camera-or-library and multi-select in one visit. Multi-select from
+// the library is the practical path for rapid-fire — snap several in
+// the Camera app, then pick them all here at once.
+function _tcCaptureAngles(pieceId, maxExtra) {
+  const CAP = maxExtra || 4;
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file'; input.accept = 'image/*'; input.multiple = true;
     input.style.display = 'none';
     document.body.appendChild(input);
     input.onchange = async () => {
-      const files = Array.from(input.files || []).slice(0, labels.length);
+      // Keep the LAST few rather than the first, so re-shooting to
+      // correct a bad frame works the way it looks like it should.
+      const picked = Array.from(input.files || []);
+      const files = picked.slice(Math.max(0, picked.length - CAP));
       input.remove();
       let saved = 0;
       for (let i = 0; i < files.length; i++) {
         try {
           const phash = await computePerceptualHash(files[i]);
-          const photoBase64 = await new Promise((res, rej) => {
+          const raw = await new Promise((res, rej) => {
             const r = new FileReader();
             r.onload = () => res(r.result);
             r.onerror = () => rej(new Error('read failed'));
             r.readAsDataURL(files[i]);
           });
+          // The matcher works these at 260-400px, so 1200 is generous.
+          // Full-resolution uploads here were slow enough to look like
+          // the app had stalled.
+          const photoBase64 = await _kcDownscaleDataUrl(raw, 1200, 0.85);
           await fetch(`${API_URL}/api/pieces/${pieceId}/photos`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ studioId, photoBase64, phash, angle: labels[i] || `angle-${i + 2}` }),
+            body: JSON.stringify({ studioId, photoBase64, phash, angle: `angle-${i + 2}` }),
           });
           saved++;
         } catch (e) { /* keep going — one bad file shouldn't lose the rest picked */ }
       }
+      if (saved) toast(`${saved} more angle${saved === 1 ? '' : 's'} saved`, 'success');
       resolve(saved);
     };
     input.click();
@@ -30677,7 +30726,7 @@ function _offerExtraAngles(pieceId) {
   return new Promise((resolve) => {
     document.getElementById('tc-angle-skip').onclick = () => { banner.remove(); resolve(); };
     document.getElementById('tc-angle-yes').onclick = () => {
-      _tcCaptureAngles(pieceId, ['angled', 'detail']).then(() => { banner.remove(); resolve(); });
+      _tcCaptureAngles(pieceId, 4).then(() => { banner.remove(); resolve(); });
     };
   });
 }
@@ -30692,9 +30741,13 @@ async function handleRefPhotoCapture(event) {
   const reader = new FileReader();
   reader.onload = async () => {
     try {
+      // Same reason as the shelf photo and the angles: the matcher
+      // works reference photos at 260-400px, so a full-resolution
+      // upload is several megabytes spent to use a fraction of it.
+      const photoBase64 = await _kcDownscaleDataUrl(reader.result, 1200, 0.85);
       const res = await fetch(`${API_URL}/api/pieces/${_capturingPieceId}/reference-photo`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studioId, photoBase64: reader.result, phash })
+        body: JSON.stringify({ studioId, photoBase64, phash })
       });
       if (!res.ok) { alert('Could not save the photo — try again.'); return; }
       const bookingCode = document.getElementById('ref-photo-booking-select').value;
@@ -30703,7 +30756,7 @@ async function handleRefPhotoCapture(event) {
       // the photo just taken — genuinely AI-assisted, staff confirms.
       // Runs quietly in the background; doesn't block the main flow if
       // it's slow or comes back empty.
-      suggestStockTypeForPiece(_capturingPieceId, reader.result);
+      suggestStockTypeForPiece(_capturingPieceId, photoBase64);
 
       // The two extra angles happen HERE, now, while the piece is still
       // in hand — not as a separate screen someone has to remember to
