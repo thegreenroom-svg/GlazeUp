@@ -8291,18 +8291,28 @@ app.post('/api/pieces/find-in-photo', async (req, res) => {
       `Judge by what you can see — form, colour, decoration — not by whether the wording ` +
       `matches how you would have described it yourself. The same piece can reasonably be ` +
       `described in different words.\n\n` +
-      `Only include a piece if you are genuinely confident it is there. It is far better to ` +
-      `miss one than to claim one that isn't present. If none of them are there, reply [].\n\n` +
-      `For each piece you find, give its index from the list, its rough position in the frame ` +
-      `as fractions from 0 to 1 (x from left, y from top), how sure you are from 0 to 1, and ` +
-      `a few words on what you actually see there.\n` +
-      `Reply with ONLY a JSON array, no prose and no markdown:\n` +
-      `[{"i":0,"x":0.42,"y":0.61,"confidence":0.9,"saw":"green fish jug at the back"}]`);
+      `Also list every piece of pottery you can see, whether or not it is on the list — ` +
+      `that tells me whether a miss is because the piece isn't there or because the wording ` +
+      `differs.\n\n` +
+      `For each listed piece you find, give its index, its rough position as fractions from ` +
+      `0 to 1 (x from left, y from top), how sure you are from 0 to 1, and a few words on ` +
+      `what you see there.\n` +
+      `Reply with ONLY this JSON, no prose and no markdown:\n` +
+      `{"found":[{"i":0,"x":0.42,"y":0.61,"confidence":0.9,"saw":"green fish jug on the tray"}],` +
+      `"allPottery":["green fish-shaped jug","cottage butter dish"]}`);
     const cost = await logUsage(studioId, 'find-in-photo', usage);
     const arr = Array.isArray(data) ? data : (data.found || []);
+    // Everything it saw, listed or not. A bare "0 of 2" says nothing
+    // about WHY — this distinguishes "the pieces aren't in the photo"
+    // from "they are, and the matching failed", which are opposite
+    // problems with opposite fixes.
+    const allPottery = Array.isArray(data && data.allPottery) ? data.allPottery : [];
+    // 0.4 rather than 0.55: the model is already told to be careful, so
+    // a second conservative filter on top was rejecting real sightings
+    // twice over. Anything under 0.8 is shown with a '?' anyway.
     const found = arr
       .filter(f => f && typeof f.i === 'number' && wanted[f.i])
-      .filter(f => (f.confidence === undefined || f.confidence >= 0.55))
+      .filter(f => (f.confidence === undefined || f.confidence >= 0.4))
       .map(f => ({
         id: wanted[f.i].id,
         description: wanted[f.i].description,
@@ -8311,7 +8321,7 @@ app.post('/api/pieces/find-in-photo', async (req, res) => {
         confidence: f.confidence === undefined ? null : f.confidence,
         saw: f.saw || '',
       }));
-    res.json({ found, cost });
+    res.json({ found, allPottery, cost });
   } catch (e) {
     console.error('find-in-photo:', e.message);
     res.status(500).json({ error: e.message });

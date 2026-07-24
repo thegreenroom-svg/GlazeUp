@@ -324,8 +324,10 @@ async function findInPhoto(rawPhoto, wanted) {
   }
   const out = await r.json();
   loadCost();
+  lastAllPottery = out.allPottery || [];
   return out.found || [];
 }
+let lastAllPottery = [];
 
 async function describe(kind, rawPhoto) {
   const photoBase64 = await shrink(rawPhoto, 1400);
@@ -497,7 +499,8 @@ function applyFound(found, wanted, raw) {
     }).filter(Boolean))].join(', ');
     say(`<b>Found ${found.length} — ${esc(who)}.</b> ${left ? left + ' still out there.' : "That's everything."}`);
   } else {
-    say(`<b>None of them are here.</b> <em>Looked for ${wanted.length} piece${wanted.length === 1 ? '' : 's'}.</em>`);
+    say(`<b>None of them matched.</b> <em>It saw: ${lastAllPottery.length
+      ? esc(lastAllPottery.join('; ')) : 'no pottery at all'}.</em>`);
   }
 }
 
@@ -631,7 +634,10 @@ $('tbFind').onclick = () => pickImage(async raw => {
     // sheet reveals it rather than hiding the answer behind a panel.
     lastPhoto = raw; drawPhoto(raw, rings);
     const hits = tb.filter(t => t.found).length;
-    say(`<b>Test: ${hits} of ${tb.length} found.</b> <em>Close this panel to see them circled.</em>`);
+    say(hits
+      ? `<b>Test: ${hits} of ${tb.length} found.</b> <em>Close this panel to see them circled.</em>`
+      : `<b>Test: none matched.</b> <em>It saw: ${lastAllPottery.length
+          ? esc(lastAllPottery.join('; ')) : 'no pottery at all'}.</em>`);
     closeSheet('tbSheet');
   } catch (e) { $('tbBody').innerHTML = `<div class="mut">Could not read that — ${esc(e.message)}</div>`; }
 });
@@ -652,7 +658,9 @@ function renderTb(ran) {
       </div>
     </div>`).join('')
     + (ran ? `<div class="mut" style="padding-top:10px">
-        Close this panel to see them circled on the photo.</div>` : '');
+        <b>It saw in that photo:</b> ${lastAllPottery.length ? esc(lastAllPottery.join('; ')) : 'no pottery at all'}.
+        <br>If a piece is in that list but not ticked above, the matching is at fault, not the camera.
+        <br>Close this panel to see the circles.</div>` : '');
 }
 
 $('infoBtn').onclick = (e) => { e.preventDefault(); loadCost(); $('infoSheet').classList.add('on'); };
