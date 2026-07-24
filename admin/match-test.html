@@ -379,8 +379,14 @@ function placeCrop(ev) {
   drawCropBox();
 }
 
-$('cropStage').addEventListener('pointerdown', placeCrop);
-$('cropStage').addEventListener('pointermove', (e) => { if (e.buttons) placeCrop(e); });
+// The box follows the finger for the WHOLE drag. Checking e.buttons
+// dropped out mid-gesture on iOS, so the box landed at first touch and
+// then stuck — a tracked down/up flag is reliable where buttons isn't.
+let _cropDragging = false;
+$('cropStage').addEventListener('pointerdown', e => { _cropDragging = true; placeCrop(e); });
+$('cropStage').addEventListener('pointermove', e => { if (_cropDragging) { e.preventDefault(); placeCrop(e); } });
+window.addEventListener('pointerup', () => { _cropDragging = false; });
+window.addEventListener('pointercancel', () => { _cropDragging = false; });
 $('cropSize').addEventListener('input', drawCropBox);
 $('cropCancel').onclick = () => { $('cropper').classList.remove('on'); cropBmp = null; };
 $('cropOk').onclick = () => {
