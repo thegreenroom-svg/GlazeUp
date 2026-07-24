@@ -11607,16 +11607,14 @@ async function _kcSweepShelf(photoUrl) {
       // Real measured time, shown in the report — the trial needs numbers,
       // not an impression of whether it "felt slow".
       _shelfLastMs = typeof data.ms === 'number' ? data.ms : null;
-      // Raised 24 Jul after a real false positive: a bathroom
-      // windowsill containing none of the booking's pieces still
-      // produced a 'possible match' on an abalone shell. The old
-      // POSSIBLE of 6 sat inside the noise band — measured on real
-      // photos, a WRONG object reaches 7-8 agreeing points while the
-      // right one reaches 19-20. A tier that flags something on every
-      // photo regardless of content is worse than no tier at all,
-      // because it teaches staff to ignore it. 11 clears the noise;
-      // 16 is comfortably under a genuine hit.
-      const CONFIDENT = 16, POSSIBLE = 11;
+      // NOTE (24 Jul): briefly raised to 16/11 on the assumption that a
+      // windowsill scene contained none of the booking's pieces and was
+      // therefore a false positive. That assumption was wrong — the
+      // objects in it WERE the registered test pieces, so the flagged
+      // match was a genuine hit and raising the bar would have hidden
+      // it. Reverted. These thresholds should be set from the per-angle
+      // score report on real shelves, not inferred from a screenshot.
+      const CONFIDENT = 10, POSSIBLE = 6;
       const rings = data.results
         .filter(r => r.inliers >= POSSIBLE && r.x != null)
         .map(r => ({
@@ -11748,8 +11746,10 @@ async function _kcSweepShelf(photoUrl) {
     }
     sceneKp.delete(); sceneDesc.delete(); scene.mat.delete();
 
-    // Same raise as the server path above, same reason.
-    const CONFIDENT = 16, POSSIBLE = 11;
+    // Measured on real photos: the right object reached 19-20 agreeing
+    // points where the best wrong object managed 7-8. See the note on
+    // the server path above about the reverted 16/11 experiment.
+    const CONFIDENT = 12, POSSIBLE = 8;
     const ranked = found.slice().sort((a, b) => b.inliers - a.inliers);
     const rings = found
       .filter(f => f.inliers >= POSSIBLE && f.r > 0)
@@ -11962,11 +11962,11 @@ function _renderShelfResult(photoUrl, rings, W, H, closest, expected, unit, engi
         <div style="font-size:11px;color:#B87946;font-weight:700;margin-bottom:2px;">
           What every angle scored</div>
         <div style="font-size:10px;color:#8a8175;margin-bottom:10px;">
-          Needs 16 to ring, 11 to flag. This is the raw number the engine
+          Needs 10 to ring, 6 to flag. This is the raw number the engine
           produced — not a judgement about the piece.</div>
         ${scores.slice().sort((a,b)=>(b.inliers||0)-(a.inliers||0)).map(r => {
           const top = r.inliers || 0;
-          const colour = top >= 16 ? '#4CAF50' : top >= 11 ? '#F9A825' : '#8a8175';
+          const colour = top >= 10 ? '#4CAF50' : top >= 6 ? '#F9A825' : '#8a8175';
           const tried = Array.isArray(r.tried) ? r.tried : [];
           return `
           <div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:9px 11px;margin-bottom:6px;">
