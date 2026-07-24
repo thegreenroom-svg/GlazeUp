@@ -118,6 +118,9 @@
     <button class="wide" id="tbFind" disabled>Now find them
       <div class="d">Photograph them jumbled, hidden, at another angle</div></button>
   </div>
+  <div id="tbShot" style="position:relative;margin-top:10px;display:none">
+    <canvas id="tbCanvas" style="width:100%;border-radius:12px;display:block"></canvas>
+  </div>
   <div class="note" id="tbNote"></div>
 </div>
 
@@ -571,14 +574,22 @@ $('tbFind').onclick = () => pickImage(async (raw) => {
     const seen = await describe('shelf', raw);
     const refs = tb.map(t => ({ t, description: t.description }));
     const { assigned, pairs } = assign(refs, seen, MIN_SCORE, EDGE);
-    for (const t of tb) { t.found = false; t.best = null; t.bestText = ''; }
+    for (const t of tb) { t.found = false; t.best = null; t.bestText = ''; t.at = null; }
     // Every reference records its best score whether or not it won, so
     // a near miss is visible as a near miss.
     for (const p of pairs) {
       const t = p.ref.t;
       if (t.best === null || p.score > t.best) { t.best = p.score; t.bestText = p.s.description; }
     }
-    for (const c of assigned) c.ref.t.found = true;
+    for (const c of assigned) {
+      c.ref.t.found = true;
+      // Position comes from the model's own reading of the photo, so a
+      // circle can only be drawn where it actually reported seeing
+      // something — never a guess dressed up as a location.
+      c.ref.t.at = (typeof c.s.x === 'number' && typeof c.s.y === 'number')
+        ? { x: c.s.x, y: c.s.y } : null;
+    }
+    drawTb(raw);
     renderTb();
     const hits = tb.filter(t => t.found).length;
     $('tbNote').innerHTML = `<b>${hits} of ${tb.length} found.</b>
@@ -589,6 +600,39 @@ $('tbFind').onclick = () => pickImage(async (raw) => {
     $('tbNote').textContent = 'Could not read that photo — ' + e.message;
   }
 });
+
+function drawTb(rawPhoto) {
+  const img = new Image();
+  img.onload = () => {
+    const cv = $('tbCanvas');
+    cv.width = img.width; cv.height = img.height;
+    const ctx = cv.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const found = tb.filter(t => t.found && t.at);
+    ctx.lineWidth = Math.max(3, Math.round(img.width / 220));
+    const fs = Math.max(15, Math.round(img.width / 40));
+    ctx.font = '700 ' + fs + 'px ui-sans-serif,system-ui,sans-serif';
+    for (const t of found) {
+      const x = t.at.x * img.width, y = t.at.y * img.height;
+      const r = Math.max(30, img.width * 0.08);
+      ctx.strokeStyle = '#4CAF50';
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+      // Short label — the full description is in the list underneath,
+      // and a long one across a photo is unreadable anyway.
+      const label = t.description.split(/[,]/)[0].slice(0, 22);
+      const w = ctx.measureText(label).width;
+      const ly = Math.max(fs + 6, y - r - 8);
+      ctx.fillStyle = 'rgba(0,0,0,.6)';
+      ctx.fillRect(x - w / 2 - 6, ly - fs, w + 12, fs + 8);
+      ctx.fillStyle = '#4CAF50';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, x, ly);
+      ctx.textAlign = 'left';
+    }
+    $('tbShot').style.display = found.length ? 'block' : 'none';
+  };
+  img.src = rawPhoto;
+}
 
 function renderTb() {
   if (!tb.length) { $('tbList').innerHTML = '<div class="empty">Nothing loaded yet.</div>'; return; }
