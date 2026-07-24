@@ -12551,6 +12551,11 @@ async function _kcOpenAddGroup(photoUrl) {
       <svg id="kc-add-marks" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;"></svg>
     </div>
     <div style="margin-top:10px;">
+      <div style="margin-bottom:8px;">
+        <div style="font-size:11px;color:#8a8175;margin-bottom:3px;">Box size — tap a box, then slide to fit it</div>
+        <input id="kc-add-size" type="range" min="6" max="60" value="20"
+          oninput="_kcResizeMark(this.value)" style="width:100%;accent-color:#3E7C6A;">
+      </div>
       <div style="display:flex;gap:8px;">
         <button onclick="_kcAddUndoMark()" style="flex:1;background:#2B2724;border:1px solid rgba(244,236,224,0.25);
           color:#F4ECE0;border-radius:12px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;">Undo tap</button>
@@ -12567,30 +12572,55 @@ function _kcCloseAddGroup() {
   _kcAddMarks = []; _kcAddPhoto = null; _kcAddBookingId = null;
 }
 
+let _kcSelMark = -1;
+
 function _kcAddMark(imgEl, ev) {
   const rect = imgEl.getBoundingClientRect();
-  _kcAddMarks.push({
-    x: (ev.clientX - rect.left) / rect.width,
-    y: (ev.clientY - rect.top) / rect.height,
-  });
+  const x = (ev.clientX - rect.left) / rect.width;
+  const y = (ev.clientY - rect.top) / rect.height;
+
+  // Tapping inside an existing box selects it for resizing rather than
+  // stacking a second box on top of it.
+  const short = Math.min(rect.width, rect.height);
+  for (let i = _kcAddMarks.length - 1; i >= 0; i--) {
+    const m = _kcAddMarks[i];
+    const half = (m.s * short / 2) / rect.width;
+    const halfY = (m.s * short / 2) / rect.height;
+    if (Math.abs(x - m.x) <= half && Math.abs(y - m.y) <= halfY) {
+      _kcSelMark = i;
+      const slider = document.getElementById('kc-add-size');
+      if (slider) slider.value = Math.round(m.s * 100);
+      _kcRedrawMarks(imgEl);
+      return;
+    }
+  }
+
+  _kcAddMarks.push({ x, y, s: _kcDefaultSideFrac(imgEl) });
+  _kcSelMark = _kcAddMarks.length - 1;
+  const slider = document.getElementById('kc-add-size');
+  if (slider) slider.value = Math.round(_kcAddMarks[_kcSelMark].s * 100);
   _kcRedrawMarks(imgEl);
+}
+
+function _kcResizeMark(v) {
+  if (_kcSelMark < 0 || !_kcAddMarks[_kcSelMark]) return;
+  _kcAddMarks[_kcSelMark].s = Math.max(0.06, Math.min(0.6, parseInt(v, 10) / 100));
+  _kcRedrawMarks(document.getElementById('kc-add-img'));
 }
 
 function _kcAddUndoMark() {
   _kcAddMarks.pop();
+  _kcSelMark = _kcAddMarks.length - 1;
   _kcRedrawMarks(document.getElementById('kc-add-img'));
 }
 
-// How big a crop should each tap take? Fixed 34% of the short side was
-// far too big for small things: tapping a rubber duck cut a square
-// mostly full of table, which is precisely the "reference photo is
-// mostly background" fault that made everything unmatchable before.
-//
-// Nobody wants to fiddle with a size slider at the bench, so it is
-// inferred instead: pieces tapped close together are small, pieces
-// tapped far apart are big. The crop is a little over half the typical
-// gap between neighbouring taps, clamped to something sensible.
-function _kcCropSideFrac(imgEl) {
+// The DEFAULT size for a newly tapped box, inferred from tap spacing:
+// pieces tapped close together are small, far apart are big. It's only
+// a starting point now — Daisy's observation was that no single guess
+// fits both a jug and an eggcup ("sometimes bigger than the piece,
+// sometimes smaller"), so each box carries its own size and the slider
+// adjusts whichever box was tapped last. What you see is what's saved.
+function _kcDefaultSideFrac(imgEl) {
   const W = (imgEl && imgEl.naturalWidth) || 1, H = (imgEl && imgEl.naturalHeight) || 1;
   const short = Math.min(W, H);
   const ax = W / short, ay = H / short;       // work in short-side units
@@ -12621,13 +12651,12 @@ function _kcRedrawMarks(imgEl) {
   const ox = r.left - p.left, oy = r.top - p.top;
   // Draw the ACTUAL crop each tap will take, so what you see is what
   // gets saved — a ring of arbitrary size would tell you nothing.
-  const frac = _kcCropSideFrac(imgEl);
   const shortOnScreen = Math.min(r.width, r.height);
-  const box = frac * shortOnScreen;
   svg.innerHTML = _kcAddMarks.map((m, i) => {
+    const box = (m.s || 0.2) * shortOnScreen;
     const cx = ox + m.x * r.width, cy = oy + m.y * r.height;
     return `<rect x="${cx - box/2}" y="${cy - box/2}" width="${box}" height="${box}" rx="6"
-              fill="none" stroke="#4CAF50" stroke-width="3"/>
+              fill="none" stroke="${i === _kcSelMark ? '#F9A825' : '#4CAF50'}" stroke-width="3"/>
       <rect x="${cx - box/2}" y="${cy - box/2}" width="${box}" height="${box}" rx="6"
               fill="none" stroke="#fff" stroke-width="1"/>
       <circle cx="${cx}" cy="${cy - box/2}" r="11" fill="#4CAF50"/>
@@ -12647,13 +12676,11 @@ async function _kcSaveAddGroup() {
   const savedPieces = [];
   try {
     const bmp = await createImageBitmap(await (await fetch(_kcAddPhoto)).blob());
-    // Same size the green squares showed on screen — what you saw is
-    // exactly what gets saved.
-    const side = Math.round(Math.min(bmp.width, bmp.height)
-      * _kcCropSideFrac(document.getElementById('kc-add-img')));
     let saved = 0;
     for (let i = 0; i < _kcAddMarks.length; i++) {
       const m = _kcAddMarks[i];
+      // Each box saved at exactly the size it showed on screen.
+      const side = Math.round(Math.min(bmp.width, bmp.height) * (m.s || 0.2));
       if (btn) btn.textContent = `Saving ${i + 1} of ${_kcAddMarks.length}…`;
       const cx = Math.max(0, Math.min(bmp.width - side, Math.round(m.x * bmp.width - side / 2)));
       const cy = Math.max(0, Math.min(bmp.height - side, Math.round(m.y * bmp.height - side / 2)));
