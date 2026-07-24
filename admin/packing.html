@@ -8,168 +8,205 @@
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#1A1714; --panel:#231F1C; --panel2:#2B2724; --line:rgba(244,236,224,.14);
+    --bg:#151211; --panel:#211D1B; --panel2:#2B2724; --line:rgba(244,236,224,.15);
     --ink:#F4ECE0; --mute:#8F877C; --go:#3E7C6A; --clay:#B87946;
     --warn:#F9A825; --done:#4CAF50;
   }
-  *{box-sizing:border-box}
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{height:100%; overflow:hidden}          /* one screen, never scrolls */
   body{margin:0; background:var(--bg); color:var(--ink);
-    font:15px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
-    padding:max(14px,env(safe-area-inset-top)) 13px calc(30px + env(safe-area-inset-bottom));
+    font:15px/1.4 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    display:flex; flex-direction:column;
+    padding:max(8px,env(safe-area-inset-top)) 10px calc(8px + env(safe-area-inset-bottom));
     -webkit-text-size-adjust:100%}
-  h1{font-family:Caveat,serif; font-size:31px; font-weight:600; margin:0}
-  .sub{color:var(--mute); font-size:12.5px; margin:1px 0 4px}
-  a.back{color:var(--mute); font-size:12.5px; text-decoration:none; display:inline-block; margin-bottom:14px}
-  .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:13px; margin-bottom:11px}
-  .lbl{font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--clay); font-weight:700; margin-bottom:10px}
-  button{font:inherit; cursor:pointer; border-radius:11px; border:1px solid var(--line);
-    background:var(--panel2); color:var(--ink); padding:12px 14px; text-align:center}
-  button.primary{background:var(--go); border-color:transparent; color:#fff; font-weight:800; width:100%; font-size:15px}
-  button.primary:disabled{background:var(--panel2); color:var(--mute); font-weight:600}
-  button.wide{width:100%}
-  button .d{font-size:11px; font-weight:400; color:var(--mute); margin-top:2px}
+
+  /* ── header: one line, never more ───────────────────────────── */
+  .top{display:flex; align-items:center; gap:10px; flex-shrink:0; padding:2px 2px 8px}
+  .top h1{font-family:Caveat,serif; font-size:26px; font-weight:600; margin:0; line-height:1}
+  .top .n{font-size:12px; color:var(--mute); flex:1; min-width:0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .top a{color:var(--mute); font-size:19px; text-decoration:none; padding:2px 6px}
+
+  /* ── the photo IS the page ──────────────────────────────────── */
+  .stage{flex:1; min-height:0; position:relative; border-radius:14px; overflow:hidden;
+    background:var(--panel); border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center}
+  .stage canvas{max-width:100%; max-height:100%; display:block}
+  .stage .hint{position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:6px; text-align:center; padding:22px;
+    color:var(--mute); font-size:13.5px; line-height:1.5}
+  .stage .hint b{color:var(--ink); font-size:16px; font-weight:700}
+  .stage.busy::after{content:''; position:absolute; inset:0; background:rgba(0,0,0,.55)}
+  .stage .working{position:absolute; z-index:2; font-size:14px; color:var(--ink);
+    display:none; align-items:center; gap:8px}
+  .stage.busy .working{display:flex}
+  .spin{width:15px;height:15px;border:2px solid rgba(244,236,224,.3);border-top-color:var(--ink);
+    border-radius:50%; animation:sp .7s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  /* result line, sits over the bottom of the photo */
+  .said{position:absolute; left:0; right:0; bottom:0; z-index:3;
+    background:linear-gradient(transparent,rgba(0,0,0,.82) 38%);
+    padding:26px 12px 10px; font-size:12.5px; line-height:1.45; color:var(--ink);
+    display:none}
+  .said.on{display:block}
+  .said em{color:var(--mute); font-style:normal}
+
+  /* ── bookings: one horizontal row of chips, no vertical list ── */
+  .chips{flex-shrink:0; display:flex; gap:7px; overflow-x:auto; padding:9px 2px 3px;
+    scrollbar-width:none}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex-shrink:0; border:1px solid var(--line); background:var(--panel2);
+    border-radius:11px; padding:7px 11px; font-size:12.5px; cursor:pointer;
+    display:flex; flex-direction:column; gap:1px; min-width:74px; line-height:1.25}
+  .chip .nm{font-weight:700; white-space:nowrap; max-width:132px;
+    overflow:hidden; text-overflow:ellipsis}
+  .chip .ct{font-size:11px; color:var(--mute); font-variant-numeric:tabular-nums}
+  .chip.hit{border-color:var(--warn); background:rgba(249,168,37,.13)}
+  .chip.done{border-color:var(--done); background:rgba(76,175,80,.13)}
+  .chip.sel{outline:2px solid var(--clay); outline-offset:-2px}
+  .chip.gap .ct{color:var(--warn)}
+
+  /* ── actions: two thumbs, always in the same place ──────────── */
+  .acts{flex-shrink:0; display:flex; gap:7px; padding-top:8px}
+  button{font:inherit; cursor:pointer; border-radius:12px; border:1px solid var(--line);
+    background:var(--panel2); color:var(--ink); padding:13px 10px; text-align:center;
+    line-height:1.2}
+  button.primary{background:var(--go); border-color:transparent; color:#fff; font-weight:800}
+  button .d{display:block; font-size:10.5px; font-weight:400; color:var(--mute); margin-top:2px}
   button.primary .d{color:rgba(255,255,255,.85)}
-  .stack{display:flex; flex-direction:column; gap:8px}
+  .acts button{flex:1; min-width:0}
 
-  .bk{border:1px solid var(--line); border-radius:12px; padding:11px 12px; margin-bottom:7px; background:var(--panel2)}
-  .bk.done{border-color:rgba(76,175,80,.5)}
-  .bk.hit{border-color:rgba(249,168,37,.55)}
-  .bk-top{display:flex; justify-content:space-between; align-items:baseline; gap:10px}
-  .bk-name{font-weight:700; font-size:14.5px}
-  .bk-count{font-size:12px; color:var(--mute); font-variant-numeric:tabular-nums; white-space:nowrap}
-  .pc{display:flex; align-items:flex-start; gap:8px; padding:5px 0; font-size:13px}
-  .tick{width:17px; flex-shrink:0; text-align:center; line-height:1.35}
-  .pc .txt{flex:1; min-width:0}
-  .pc.found .txt{color:var(--done)}
-  .pc .where{font-size:11px; color:var(--mute)}
-  .pc button.mini{padding:3px 8px; font-size:11px; border-radius:7px; flex-shrink:0}
-  .bar{height:5px; border-radius:3px; background:rgba(244,236,224,.1); margin-top:8px; overflow:hidden}
-  .bar i{display:block; height:100%; border-radius:3px; background:var(--go); transition:width .35s}
-  .empty{color:var(--mute); font-size:13px}
-  .prog{color:var(--mute); font-size:13px; text-align:center; padding:12px 0}
-  .note{font-size:12.5px; color:var(--mute); line-height:1.55; margin-top:10px}
-  #shot{position:relative; margin-bottom:10px; display:none}
-  #shot canvas{width:100%; border-radius:12px; display:block}
-
-  .tb-row{display:flex; gap:9px; align-items:center; padding:8px 0; border-top:1px solid var(--line); font-size:13px}
-  .tb-row:first-of-type{border-top:0}
-  .tb-row .g{flex:1; min-width:0}
-  .tb-score{font-variant-numeric:tabular-nums; font-size:12px; color:var(--mute)}
-
-  #sheet{display:none; position:fixed; inset:0; z-index:60; background:#141110;
+  /* ── overlays ───────────────────────────────────────────────── */
+  .sheet{display:none; position:fixed; inset:0; z-index:60; background:#141110;
     flex-direction:column; padding:max(12px,env(safe-area-inset-top)) 13px calc(13px + env(safe-area-inset-bottom))}
-  #sheet.on{display:flex}
-  .sheethead{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:6px}
-  .sheetbody{flex:1; overflow-y:auto; padding:6px 0}
-  .row{display:flex; gap:9px; align-items:center; padding:8px 0; border-top:1px solid var(--line)}
+  .sheet.on{display:flex}
+  .sheethead{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:8px}
+  .sheethead .t{font-family:Caveat,serif; font-size:23px}
+  .sheethead .h{font-size:12px; color:var(--mute)}
+  .sheetbody{flex:1; overflow-y:auto; padding:4px 0}
+  .row{display:flex; gap:8px; align-items:center; padding:7px 0; border-top:1px solid var(--line)}
   .row:first-child{border-top:0}
   .row input[type=text]{flex:1; min-width:0; background:var(--panel2); border:1px solid var(--line);
     color:var(--ink); border-radius:9px; padding:10px 11px; font:inherit; font-size:14px}
-  .row button.del{padding:9px 11px; font-size:13px}
-  .sheetfoot{padding-top:11px; display:flex; flex-direction:column; gap:8px}
+  .row .tick{width:18px; text-align:center; flex-shrink:0}
+  .row .sc{font-size:11px; color:var(--mute); font-variant-numeric:tabular-nums; flex-shrink:0}
+  .sheetfoot{padding-top:10px; display:flex; flex-direction:column; gap:8px}
   .sheetfoot input[type=text]{background:var(--panel2); border:1px solid var(--line); color:var(--ink);
     border-radius:11px; padding:12px; font:inherit; font-size:15px; width:100%}
+  .mut{font-size:11.5px; color:var(--mute); line-height:1.5}
 </style>
 </head>
 <body>
 
-<h1>Packing</h1>
-<div class="sub" id="sub">Loading…</div>
-<a class="back" href="/admin/dashboard-local.html">‹ back to the dashboard</a>
-
-<div class="card">
-  <div class="lbl">Still to find</div>
-  <div id="bookings"><div class="empty">Loading…</div></div>
+<div class="top">
+  <h1>Packing</h1>
+  <div class="n" id="hdr">Loading…</div>
+  <a href="#" id="infoBtn" title="Costs and settings">ⓘ</a>
+  <a href="/admin/dashboard-local.html" title="Back">✕</a>
 </div>
 
-<div class="card">
-  <div class="lbl">Where you're looking</div>
-  <div id="shot"><canvas id="canvas"></canvas></div>
-  <div class="prog" id="prog" style="display:none"></div>
-  <div class="stack">
-    <button class="primary" id="sweepBtn">Photograph a surface
-      <div class="d">Table, shelf or box — ticks off whatever it recognises</div></button>
-    <button class="wide" id="addBtn">Add pieces to a booking
-      <div class="d">Photograph a group — it writes the list for you</div></button>
+<div class="stage" id="stage">
+  <canvas id="canvas" style="display:none"></canvas>
+  <div class="hint" id="hint">
+    <b>Photograph a surface</b>
+    A table, a shelf, a box — whatever it recognises gets ticked off.
   </div>
-  <div class="note" id="note"></div>
+  <div class="working"><div class="spin"></div><span id="workingText">Looking…</span></div>
+  <div class="said" id="said"></div>
 </div>
 
-<div class="card">
-  <div class="lbl">What it costs</div>
-  <div id="cost" style="font-size:13px;color:var(--mute)">No calls yet.</div>
-  <div style="font-size:11.5px;color:var(--mute);margin-top:6px;line-height:1.5">
-    Measured from each reply, not estimated. Descriptions are written once per
-    piece; only the sweeps repeat.
-  </div>
+<div class="chips" id="chips"></div>
+
+<div class="acts">
+  <button class="primary" id="sweepBtn">Photograph<span class="d">find pieces</span></button>
+  <button id="addBtn">Add<span class="d">new group</span></button>
+  <button id="testBtn">Test<span class="d">try it out</span></button>
 </div>
 
-<div class="card">
-  <div class="lbl">Test bed</div>
-  <div style="font-size:12.5px;color:var(--mute);line-height:1.55;margin-bottom:11px">
-    Try it on real pottery without touching a booking. Photograph some pieces,
-    then photograph them again jumbled up somewhere else — it shows you every
-    score, so you can see what it got right and how close the misses were.
-  </div>
-  <div id="tbList"></div>
-  <div class="stack" style="margin-top:9px">
-    <button class="wide" id="tbAdd">Photograph the pieces
-      <div class="d">Whatever it spots becomes the list to find</div></button>
-    <button class="wide" id="tbFind" disabled>Now find them
-      <div class="d">Photograph them jumbled, hidden, at another angle</div></button>
-  </div>
-  <div id="tbShot" style="position:relative;margin-top:10px;display:none">
-    <canvas id="tbCanvas" style="width:100%;border-radius:12px;display:block"></canvas>
-  </div>
-  <div class="note" id="tbNote"></div>
-</div>
-
-<div id="sheet">
+<!-- booking detail -->
+<div class="sheet" id="bkSheet">
   <div class="sheethead">
-    <div>
-      <div style="font-family:Caveat,serif;font-size:24px" id="sheetTitle">What's on the table</div>
-      <div style="font-size:12px;color:var(--mute)" id="sheetHint">Fix anything wrong, delete anything that isn't pottery</div>
-    </div>
-    <button id="sheetCancel">Cancel</button>
+    <div><div class="t" id="bkName">Booking</div><div class="h" id="bkSub"></div></div>
+    <button onclick="closeSheet('bkSheet')">Close</button>
   </div>
-  <div class="sheetbody" id="sheetBody"></div>
-  <div class="sheetfoot" id="sheetFoot">
-    <input type="text" id="sheetBooking" placeholder="Booking name" autocapitalize="words">
-    <button class="primary" id="sheetSave">Save to booking</button>
+  <div class="sheetbody" id="bkBody"></div>
+  <div class="sheetfoot">
+    <button class="primary" id="bkPacked">Mark packed</button>
+  </div>
+</div>
+
+<!-- confirm a new group -->
+<div class="sheet" id="addSheet">
+  <div class="sheethead">
+    <div><div class="t">What's on the table</div>
+      <div class="h">Fix anything wrong, delete anything that isn't pottery</div></div>
+    <button onclick="closeSheet('addSheet')">Cancel</button>
+  </div>
+  <div class="sheetbody" id="addBody"></div>
+  <div class="sheetfoot">
+    <input type="text" id="addBooking" placeholder="Booking name" autocapitalize="words">
+    <button class="primary" id="addSave">Save to booking</button>
+  </div>
+</div>
+
+<!-- test bed -->
+<div class="sheet" id="tbSheet">
+  <div class="sheethead">
+    <div><div class="t">Test bed</div>
+      <div class="h">Real pottery, no booking touched, nothing saved</div></div>
+    <button onclick="closeSheet('tbSheet')">Close</button>
+  </div>
+  <div class="sheetbody" id="tbBody"><div class="mut">
+    Photograph some pieces, then move them and photograph again.
+    Every score is shown, so a near miss reads as a near miss.</div></div>
+  <div class="sheetfoot">
+    <button id="tbAdd">Photograph the pieces<span class="d">whatever it spots becomes the list</span></button>
+    <button class="primary" id="tbFind" disabled>Now find them<span class="d">jumbled, hidden, another angle</span></button>
+  </div>
+</div>
+
+<!-- costs -->
+<div class="sheet" id="infoSheet">
+  <div class="sheethead">
+    <div><div class="t">What it costs</div><div class="h">Measured, not estimated</div></div>
+    <button onclick="closeSheet('infoSheet')">Close</button>
+  </div>
+  <div class="sheetbody">
+    <div id="cost" style="font-size:15px;margin-bottom:10px">No calls yet.</div>
+    <div class="mut">Token counts come from each reply, so this is what has actually
+      been spent rather than an estimate. Descriptions are written once per piece;
+      only the sweeps repeat.</div>
   </div>
 </div>
 
 <script>
 // ─────────────────────────────────────────────────────────────────────
-// PACKING — words, not pixels.
+// PACKING — one screen, camera first.
 //
-// A full day of image matching established three failures that no
-// amount of tuning fixes, because they are inherent to comparing
-// pictures rather than accidents of implementation:
-//
-//   VIEWPOINT   a jar lid shot from above and the same jar standing
-//               side-on are unrelated images of one object.
-//   INVISIBLE   a beige fabric heart on a pine table has no colour
-//               contrast and no pattern. Nothing to grip.
+// WORDS NOT PIXELS. A full day of image matching established three
+// failures inherent to comparing pictures, not accidents of
+// implementation:
+//   VIEWPOINT   a jar lid from above and the same jar side-on are
+//               unrelated images of one object.
+//   INVISIBLE   a beige heart on a pine table has no colour contrast
+//               and no pattern. Nothing to grip.
 //   THE KILN    chalky pastel fires glossy and saturated, so the
-//               reference stops resembling the thing it refers to.
+//               reference stops resembling the thing.
+// "Green fish-shaped jug" survives all three. Proven in the studio:
+// registered as "vase, glossy", found as "figure, matte" — different
+// noun, opposite finish, still matched.
 //
-// "Small green fish-shaped jug" is true from every angle, before and
-// after firing, in any light. So: describe once in words, then match
-// words to words — cheap, robust, and legible to a human.
+// ONE SCREEN. This is a busy studio and the phone is held in one hand
+// with a piece of pottery in the other. Nothing scrolls: the photo
+// fills the screen because the photo IS the answer, bookings are a
+// single row of chips rather than a list to scroll past, and the three
+// actions never move. Detail opens over the top and closes again.
 //
-// Two decisions that matter more than the matching itself:
-//
-//   MATCH BOOKINGS, NOT PIECES. One white mug is ambiguous among
-//   fifty. "Striped mug + green fish jug + cottage butter dish" is
-//   almost certainly unique. Sets are far more distinctive than their
-//   members, and the booking is all anyone actually needs.
-//
-//   FAIL INTO SOMETHING USEFUL. When the old system failed you got a
-//   blank screen. When this fails you still have "Still to find for
-//   Georgina: small green fish jug, white mug with blue stripes" — a
-//   packing list a person reads and acts on. Recognition sits on top
-//   of a working list rather than being the whole product.
+// FAIL INTO SOMETHING USEFUL. When recognition finds nothing you still
+// have a booking chip showing 2 of 3 and a tap away, the two words that
+// say what the missing one looks like. The list works without the
+// recognition; the recognition is what saves the walk.
 // ─────────────────────────────────────────────────────────────────────
 
 const API = location.origin;
@@ -179,30 +216,23 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[<>&"]/g, c =>
   ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
 
-let bookings = [];
-let surfaces = 0;
+let bookings = [], surfaces = 0, selected = null, lastPhoto = null;
 
 // ── text matching ────────────────────────────────────────────────────
-
 // Words appearing on half the pieces in a studio carry no information:
 // "mug" cannot separate one booking from another when everyone paints
-// mugs. Distinctiveness is measured from YOUR outstanding pieces rather
-// than assumed, so it adapts to whatever is on the shelves this week.
+// mugs. Distinctiveness is measured from the studio's own outstanding
+// pieces, so it adapts to whatever is on the shelves this week.
 const STOP = new Set(['a','an','the','and','with','on','of','in','it','its','some','small','large',
   'piece','pottery','ceramic','glazed','unglazed','painted','plain','pale','light','dark','very','shaped']);
-
-function words(s) {
-  return String(s || '').toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, ' ')
-    .split(/\s+/)
-    .filter(w => w.length > 2 && !STOP.has(w));
-}
+const words = s => String(s || '').toLowerCase().replace(/[^a-z0-9\s-]/g, ' ')
+  .split(/\s+/).filter(w => w.length > 2 && !STOP.has(w));
 
 let idf = {}, idfDocs = 2;
-function buildIdf(extraDocs) {
+function buildIdf(extra) {
   const docs = [];
   for (const b of bookings) for (const p of b.pieces) if (p.description) docs.push(words(p.description));
-  for (const d of (extraDocs || [])) docs.push(words(d));
+  for (const d of (extra || [])) docs.push(words(d));
   idfDocs = Math.max(2, docs.length);
   const seen = {};
   for (const d of docs) for (const w of new Set(d)) seen[w] = (seen[w] || 0) + 1;
@@ -211,90 +241,171 @@ function buildIdf(extraDocs) {
 }
 const weight = w => (idf[w] !== undefined ? idf[w] : Math.log(1 + idfDocs));
 
-// Weighted overlap, 0 to 1, scored against the reference's own words so
-// a terse description still matches a chattier sighting of the same
-// thing. Near-misses on word stems count partially: "stripes" and
-// "striped" are the same observation.
 function similarity(ref, seenText) {
   const A = new Set(words(ref)), B = new Set(words(seenText));
   if (!A.size || !B.size) return 0;
   let hit = 0, total = 0;
   for (const w of A) {
-    const wt = weight(w);
-    total += wt;
+    const wt = weight(w); total += wt;
     if (B.has(w)) hit += wt;
     else if ([...B].some(x => x.slice(0, 4) === w.slice(0, 4))) hit += wt * 0.6;
   }
   return total ? hit / total : 0;
 }
 
-// ── loading ──────────────────────────────────────────────────────────
+const MIN_SCORE = 0.42, EDGE = 0.10;
 
+// Pooled and assigned best-first, so one sighting can never be claimed
+// twice and a claim must clearly lead the runner-up or it is refused.
+function assign(refs, seen) {
+  const pairs = [];
+  for (const ref of refs) for (const s of seen)
+    pairs.push({ ref, s, score: similarity(ref.description, s.description) });
+  pairs.sort((a, z) => z.score - a.score);
+  const uS = new Set(), uR = new Set(), out = [];
+  for (const c of pairs) {
+    if (uR.has(c.ref) || uS.has(c.s) || c.score < MIN_SCORE) continue;
+    if (pairs.find(o => o !== c && o.s === c.s && !uR.has(o.ref) && o.score > c.score - EDGE)) continue;
+    uR.add(c.ref); uS.add(c.s); out.push(c);
+  }
+  return { assigned: out, pairs, usedSighting: uS };
+}
+
+// ── plumbing ─────────────────────────────────────────────────────────
+function pickImage(onPicked) {
+  // Opened inside the tap — any await before .click() loses the gesture
+  // and iOS silently declines to open the picker.
+  const i = document.createElement('input');
+  i.type = 'file'; i.accept = 'image/*'; i.style.display = 'none';
+  document.body.appendChild(i);
+  i.onchange = () => {
+    const f = i.files && i.files[0]; i.remove();
+    if (f) { const r = new FileReader(); r.onload = () => onPicked(r.result); r.readAsDataURL(f); }
+  };
+  i.click();
+}
+
+function shrink(dataUrl, maxSide) {
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => {
+      const sc = Math.min(1, maxSide / Math.max(img.width, img.height));
+      if (sc >= 1) return res(dataUrl);
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      res(c.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => res(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+function busy(on, text) {
+  $('stage').classList.toggle('busy', !!on);
+  if (text) $('workingText').textContent = text;
+}
+
+async function describe(kind, rawPhoto) {
+  const photoBase64 = await shrink(rawPhoto, 1400);
+  const r = await fetch(`${API}/api/pieces/describe-${kind}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ photoBase64, studioId }),
+  });
+  if (!r.ok) {
+    let m = 'could not read that photo';
+    try { m = (await r.json()).error || m; } catch (e) {}
+    throw new Error(m);
+  }
+  const out = await r.json();
+  loadCost();
+  return out.pieces || [];
+}
+
+async function loadCost() {
+  try {
+    const r = await fetch(`${API}/api/ai-usage?studioId=${studioId}`);
+    if (!r.ok) return;
+    const u = await r.json();
+    const p = n => '£' + (n * 0.79).toFixed(2);
+    $('cost').innerHTML = `Today <b>${p(u.today)}</b> · ${u.callsToday} photo${u.callsToday === 1 ? '' : 's'}
+      <br>Last 30 days <b>${p(u.month)}</b> · ${u.callsMonth} photos`;
+  } catch (e) {}
+}
+
+// ── load ─────────────────────────────────────────────────────────────
 async function load() {
   let pieces = [];
   try {
     const r = await fetch(`${API}/api/packing/queue?studioId=${studioId}`);
     pieces = (await r.json()).pieces || [];
-  } catch (e) {
-    $('sub').textContent = 'Could not reach the studio server.';
-    $('bookings').innerHTML = '<div class="empty">No connection — try again in a moment.</div>';
-    return;
-  }
+  } catch (e) { $('hdr').textContent = 'No connection'; return; }
   const by = {};
   for (const p of pieces) (by[p.booking_id] = by[p.booking_id] || []).push(p);
   bookings = Object.keys(by).map(id => ({
     id,
-    pieces: by[id].map(p => ({
-      id: p.id,
-      description: p.description || '',
-      type: p.piece_type || 'Piece',
-      found: null,
-    })),
+    pieces: by[id].map(p => ({ id: p.id, description: p.description || '',
+      type: p.piece_type || 'Piece', found: null })),
   }));
-  bookings.sort((a, b) => a.pieces.length - b.pieces.length || a.id.localeCompare(b.id));
+  sortBookings();
   buildIdf();
-  $('sub').textContent = bookings.length
-    ? `${bookings.length} booking${bookings.length === 1 ? '' : 's'} outstanding · simplest first`
-    : 'Nothing outstanding.';
-  const undescribed = bookings.reduce((n, b) => n + b.pieces.filter(p => !p.description).length, 0);
-  if (undescribed) {
-    $('note').innerHTML = `${undescribed} piece${undescribed === 1 ? ' has' : 's have'} no description yet, so
-      ${undescribed === 1 ? 'it cannot' : 'they cannot'} be recognised — tap <b>write</b> to add one, or use
-      <b>Add pieces</b> next time and it writes them for you.`;
-  }
-  render();
+  paint();
 }
 
-// ── the list ─────────────────────────────────────────────────────────
+// Simplest first: a short booking finishes early and drops out of the
+// running, so it can no longer be confused with anything later.
+function sortBookings() {
+  bookings.sort((a, b) => a.pieces.length - b.pieces.length || a.id.localeCompare(b.id));
+}
 
-function render() {
-  if (!bookings.length) { $('bookings').innerHTML = '<div class="empty">Nothing outstanding.</div>'; return; }
-  $('bookings').innerHTML = bookings.map((b, bi) => {
-    const found = b.pieces.filter(p => p.found).length;
-    const complete = found === b.pieces.length;
+const gapsOf = b => b.pieces.filter(p => !p.description).length;
+
+function paint() {
+  const total = bookings.reduce((n, b) => n + b.pieces.length, 0);
+  const found = bookings.reduce((n, b) => n + b.pieces.filter(p => p.found).length, 0);
+  const gaps = bookings.reduce((n, b) => n + gapsOf(b), 0);
+  $('hdr').innerHTML = bookings.length
+    ? `${found} of ${total} found · ${bookings.length} booking${bookings.length === 1 ? '' : 's'}`
+      + (gaps ? ` · <span style="color:var(--warn)">${gaps} undescribed</span>` : '')
+    : 'Nothing outstanding';
+
+  $('chips').innerHTML = bookings.map((b, i) => {
+    const f = b.pieces.filter(p => p.found).length;
+    const done = f === b.pieces.length;
     const fresh = b.pieces.some(p => p.found && p.found.surface === surfaces);
-    return `<div class="bk ${complete ? 'done' : fresh ? 'hit' : ''}">
-      <div class="bk-top">
-        <div class="bk-name">${esc(b.id)}</div>
-        <div class="bk-count">${found} of ${b.pieces.length}</div>
-      </div>
-      ${b.pieces.map((p, pi) => `
-        <div class="pc ${p.found ? 'found' : ''}">
-          <div class="tick">${p.found ? '✓' : '○'}</div>
-          <div class="txt">
-            ${p.description ? esc(p.description)
-              : `<span style="color:var(--warn)">${esc(p.type)} — no description</span>`}
-            ${p.found && p.found.where ? `<div class="where">${esc(p.found.where)}</div>` : ''}
-          </div>
-          <button class="mini" onclick="editPiece(${bi},${pi})">${p.description ? 'edit' : 'write'}</button>
-        </div>`).join('')}
-      <div class="bar"><i style="width:${Math.round(found / b.pieces.length * 100)}%;
-        background:${complete ? 'var(--done)' : 'var(--go)'}"></i></div>
-      ${complete ? `<div style="margin-top:9px"><button style="width:100%;font-size:13px;padding:9px"
-        onclick="markPacked(${bi})">Mark packed</button></div>` : ''}
+    const gap = gapsOf(b);
+    return `<div class="chip ${done ? 'done' : fresh ? 'hit' : ''} ${gap ? 'gap' : ''} ${selected === i ? 'sel' : ''}"
+      onclick="openBooking(${i})">
+      <div class="nm">${esc(b.id)}</div>
+      <div class="ct">${gap ? gap + ' to describe' : f + ' of ' + b.pieces.length}</div>
     </div>`;
-  }).join('');
+  }).join('') || '<div class="mut" style="padding:6px 4px">Nothing outstanding.</div>';
 }
+
+// ── booking detail ───────────────────────────────────────────────────
+function openBooking(i) {
+  selected = i; paint();
+  const b = bookings[i];
+  $('bkName').textContent = b.id;
+  const f = b.pieces.filter(p => p.found).length;
+  $('bkSub').textContent = `${f} of ${b.pieces.length} found`;
+  $('bkBody').innerHTML = b.pieces.map((p, pi) => `
+    <div class="row">
+      <div class="tick" style="color:${p.found ? 'var(--done)' : 'var(--mute)'}">${p.found ? '✓' : '○'}</div>
+      <div style="flex:1;min-width:0">
+        <div style="${p.description ? '' : 'color:var(--warn)'}">
+          ${p.description ? esc(p.description) : esc(p.type) + ' — needs describing'}</div>
+        ${p.found && p.found.where ? `<div class="mut">${esc(p.found.where)}</div>` : ''}
+      </div>
+      <button onclick="editPiece(${i},${pi})" style="padding:7px 10px;font-size:12px">
+        ${p.description ? 'edit' : 'write'}</button>
+    </div>`).join('');
+  $('bkPacked').disabled = f !== b.pieces.length;
+  $('bkPacked').textContent = f === b.pieces.length ? 'Mark packed' : `${b.pieces.length - f} still to find`;
+  $('bkPacked').onclick = () => markPacked(i);
+  $('bkSheet').classList.add('on');
+}
+function closeSheet(id) { $(id).classList.remove('on'); }
 
 function editPiece(bi, pi) {
   const p = bookings[bi].pieces[pi];
@@ -306,124 +417,135 @@ function editPiece(bi, pi) {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ studioId, items: [{ pieceId: p.id, description: p.description }] }),
   }).catch(() => {});
-  buildIdf();
-  render();
+  buildIdf(); paint(); openBooking(bi);
 }
 
-async function markPacked(bi) {
-  const b = bookings[bi];
+async function markPacked(i) {
+  const b = bookings[i];
   try {
     await fetch(`${API}/api/pieces/set-booking-status`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ studioId, bookingId: b.id, status: 'packed', by: 'packing session' }),
     });
-    bookings.splice(bi, 1);
-    buildIdf();
-    render();
+    bookings.splice(i, 1); selected = null;
+    buildIdf(); paint(); closeSheet('bkSheet');
   } catch (e) { alert('Could not update that booking.'); }
 }
 
-// ── capture ──────────────────────────────────────────────────────────
-
-function pickImage(onPicked) {
-  // Opened inside the tap: any await before .click() loses the gesture
-  // and iOS silently declines to open the picker.
-  const input = document.createElement('input');
-  input.type = 'file'; input.accept = 'image/*';
-  input.style.display = 'none';
-  document.body.appendChild(input);
-  input.onchange = () => {
-    const f = input.files && input.files[0];
-    input.remove();
-    if (f) { const r = new FileReader(); r.onload = () => onPicked(r.result); r.readAsDataURL(f); }
-  };
-  input.click();
-}
-
-// The model doesn't need twelve megapixels, and on a studio connection
-// the upload is otherwise the slowest part of the whole operation.
-function shrink(dataUrl, maxSide) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
-      if (scale >= 1) return resolve(dataUrl);
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      resolve(c.toDataURL('image/jpeg', 0.85));
-    };
-    img.onerror = () => resolve(dataUrl);
-    img.src = dataUrl;
-  });
-}
-
-async function describe(kind, rawPhoto) {
-  const photoBase64 = await shrink(rawPhoto, 1400);
-  const r = await fetch(`${API}/api/pieces/describe-${kind}`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ photoBase64, studioId }),
-  });
-  if (!r.ok) {
-    let msg = 'could not read that photo';
-    try { msg = (await r.json()).error || msg; } catch (e) {}
-    throw new Error(msg);
-  }
-  const out = await r.json();
-  loadCost();               // refresh the running total after every call
-  return out.pieces || [];
-}
-
-// Measured, not estimated. Token counts come from the API's own reply,
-// so this is what it has actually cost rather than my arithmetic about
-// how images are tokenised.
-async function loadCost() {
+// ── sweep ────────────────────────────────────────────────────────────
+$('sweepBtn').onclick = () => pickImage(async raw => {
+  lastPhoto = raw;
+  drawPhoto(raw, []);
+  busy(true, 'Looking…');
+  $('said').classList.remove('on');
   try {
-    const r = await fetch(`${API}/api/ai-usage?studioId=${studioId}`);
-    if (!r.ok) return;
-    const u = await r.json();
-    const p = n => '£' + (n * 0.79).toFixed(2);     // rough USD->GBP
-    $('cost').innerHTML = `Today ${p(u.today)} (${u.callsToday} photo${u.callsToday === 1 ? '' : 's'})
-      · last 30 days ${p(u.month)} (${u.callsMonth})`;
-  } catch (e) { /* cost display is never worth breaking the page over */ }
-}
-
-// ── add pieces: photograph a group, it writes the list ───────────────
-
-let sheetItems = [];
-
-$('addBtn').onclick = () => pickImage(async (raw) => {
-  $('prog').style.display = 'block';
-  $('prog').textContent = 'Reading the table…';
-  try {
-    const seen = await describe('group', raw);
-    $('prog').style.display = 'none';
-    if (!seen.length) { $('note').textContent = 'No pottery spotted in that photo — try again, closer in.'; return; }
-    sheetItems = seen.map(p => p.description);
-    renderSheet();
-    $('sheet').classList.add('on');
+    const seen = await describe('shelf', raw);
+    busy(false);
+    matchSeen(seen, raw);
   } catch (e) {
-    $('prog').style.display = 'none';
-    $('note').textContent = 'Could not read that photo — ' + e.message;
+    busy(false);
+    say(`<b>Could not read that photo.</b> <em>${esc(e.message)}</em>`);
   }
 });
 
-function renderSheet() {
-  $('sheetBody').innerHTML = sheetItems.map((t, i) => `
-    <div class="row">
-      <input type="text" value="${esc(t)}" oninput="sheetItems[${i}]=this.value">
-      <button class="del" onclick="sheetItems.splice(${i},1);renderSheet()">✕</button>
-    </div>`).join('')
-    + `<div class="row"><button class="wide" onclick="sheetItems.push('');renderSheet()">+ add another piece</button></div>`;
-}
-$('sheetCancel').onclick = () => $('sheet').classList.remove('on');
+function matchSeen(seen, raw) {
+  surfaces++;
+  const refs = [];
+  for (const b of bookings) for (const p of b.pieces)
+    if (!p.found && p.description) refs.push({ b, p, description: p.description });
 
-$('sheetSave').onclick = async () => {
-  const name = ($('sheetBooking').value || '').trim();
+  const { assigned, usedSighting } = assign(refs, seen);
+  const rings = [];
+  for (const c of assigned) {
+    c.ref.p.found = { surface: surfaces, where: `seen as "${c.s.description}"` };
+    if (typeof c.s.x === 'number' && typeof c.s.y === 'number')
+      rings.push({ x: c.s.x, y: c.s.y, label: c.ref.b.id, sub: c.ref.p.description });
+  }
+  drawPhoto(raw, rings);
+  paint();
+
+  const left = bookings.reduce((n, b) => n + b.pieces.filter(p => !p.found).length, 0);
+  const spare = seen.length - usedSighting.size;
+  if (assigned.length) {
+    const who = [...new Set(assigned.map(c => c.ref.b.id))].join(', ');
+    say(`<b>Found ${assigned.length} — ${esc(who)}.</b> ${left ? left + ' still out there.' : "That's everything."}`
+      + (spare ? ` <em>${spare} other piece${spare === 1 ? '' : 's'} here belong to nobody outstanding.</em>` : ''));
+  } else {
+    say(`<b>Nothing matched.</b> <em>Saw: ${seen.length ? esc(seen.map(s => s.description).join('; ')) : 'no pottery at all'}.</em>`);
+  }
+}
+
+function say(html) { $('said').innerHTML = html; $('said').classList.add('on'); }
+
+// Rings are drawn only where the model actually reported seeing
+// something. A piece matched without a position is still ticked, but
+// never given an invented location.
+function drawPhoto(raw, rings) {
+  const img = new Image();
+  img.onload = () => {
+    const cv = $('canvas');
+    cv.width = img.width; cv.height = img.height;
+    const ctx = cv.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    ctx.lineWidth = Math.max(3, Math.round(img.width / 200));
+    const fs = Math.max(16, Math.round(img.width / 34));
+    ctx.font = '700 ' + fs + 'px ui-sans-serif,system-ui,sans-serif';
+    ctx.textAlign = 'center';
+    for (const r of rings) {
+      const x = r.x * img.width, y = r.y * img.height;
+      const rad = Math.max(30, img.width * 0.085);
+      ctx.strokeStyle = '#4CAF50';
+      ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2); ctx.stroke();
+      const label = String(r.label).slice(0, 20);
+      const w = ctx.measureText(label).width;
+      const ly = Math.max(fs + 8, y - rad - 10);
+      ctx.fillStyle = 'rgba(0,0,0,.68)';
+      ctx.fillRect(x - w / 2 - 8, ly - fs, w + 16, fs + 9);
+      ctx.fillStyle = '#4CAF50';
+      ctx.fillText(label, x, ly);
+    }
+    ctx.textAlign = 'left';
+    cv.style.display = 'block';
+    $('hint').style.display = 'none';
+  };
+  img.src = raw;
+}
+
+// ── add a group ──────────────────────────────────────────────────────
+let addItems = [];
+$('addBtn').onclick = () => pickImage(async raw => {
+  lastPhoto = raw;
+  drawPhoto(raw, []);
+  busy(true, 'Reading the table…');
+  try {
+    const seen = await describe('group', raw);
+    busy(false);
+    if (!seen.length) { say('<b>No pottery spotted.</b> <em>Try again, closer in.</em>'); return; }
+    addItems = seen.map(s => s.description);
+    renderAdd();
+    $('addSheet').classList.add('on');
+  } catch (e) {
+    busy(false);
+    say(`<b>Could not read that photo.</b> <em>${esc(e.message)}</em>`);
+  }
+});
+
+function renderAdd() {
+  $('addBody').innerHTML = addItems.map((t, i) => `
+    <div class="row">
+      <input type="text" value="${esc(t)}" oninput="addItems[${i}]=this.value">
+      <button onclick="addItems.splice(${i},1);renderAdd()" style="padding:9px 11px">✕</button>
+    </div>`).join('')
+    + `<div class="row"><button style="width:100%"
+         onclick="addItems.push('');renderAdd()">+ another piece</button></div>`;
+}
+
+$('addSave').onclick = async () => {
+  const name = ($('addBooking').value || '').trim();
   if (!name) { alert('Which booking is this?'); return; }
-  const list = sheetItems.map(s => s.trim()).filter(Boolean);
+  const list = addItems.map(s => s.trim()).filter(Boolean);
   if (!list.length) { alert('Nothing to save.'); return; }
-  $('sheetSave').disabled = true; $('sheetSave').textContent = 'Saving…';
+  $('addSave').disabled = true; $('addSave').textContent = 'Saving…';
   try {
     let bk = bookings.find(b => b.id === name);
     if (!bk) { bk = { id: name, pieces: [] }; bookings.push(bk); }
@@ -441,213 +563,77 @@ $('sheetSave').onclick = async () => {
       });
       bk.pieces.push({ id: pieceId, description, type: description.slice(0, 40), found: null });
     }
-    bookings.sort((a, b) => a.pieces.length - b.pieces.length || a.id.localeCompare(b.id));
-    buildIdf(); render();
-    $('sheet').classList.remove('on');
-    $('sheetBooking').value = '';
-    $('note').innerHTML = `Added ${list.length} piece${list.length === 1 ? '' : 's'} to <b>${esc(name)}</b>.`;
-  } catch (e) {
-    alert('Could not save those pieces.');
-  } finally {
-    $('sheetSave').disabled = false; $('sheetSave').textContent = 'Save to booking';
-  }
+    sortBookings(); buildIdf(); paint();
+    closeSheet('addSheet'); $('addBooking').value = '';
+    say(`<b>Added ${list.length} piece${list.length === 1 ? '' : 's'} to ${esc(name)}.</b>`);
+  } catch (e) { alert('Could not save those pieces.'); }
+  finally { $('addSave').disabled = false; $('addSave').textContent = 'Save to booking'; }
 };
 
-// ── sweep a surface ──────────────────────────────────────────────────
-
-$('sweepBtn').onclick = () => pickImage(async (raw) => {
-  $('prog').style.display = 'block';
-  $('prog').textContent = 'Looking…';
-  try {
-    const seen = await describe('shelf', raw);
-    $('prog').style.display = 'none';
-    matchSeen(seen, raw);
-  } catch (e) {
-    $('prog').style.display = 'none';
-    $('note').textContent = 'Could not read that photo — ' + e.message;
-  }
-});
-
-// Pooled and assigned best-first, so one sighting can never be claimed
-// by two pieces and the strongest claim wins.
-function assign(refs, seen, MIN, EDGE) {
-  const pairs = [];
-  for (const ref of refs)
-    for (const s of seen)
-      pairs.push({ ref, s, score: similarity(ref.description, s.description) });
-  pairs.sort((a, z) => z.score - a.score);
-  const usedSighting = new Set(), usedRef = new Set(), out = [];
-  for (const c of pairs) {
-    if (usedRef.has(c.ref) || usedSighting.has(c.s) || c.score < MIN) continue;
-    // Must be clearly the best claim on this sighting, or it's a guess.
-    const rival = pairs.find(o => o !== c && o.s === c.s && !usedRef.has(o.ref) && o.score > c.score - EDGE);
-    if (rival) continue;
-    usedRef.add(c.ref); usedSighting.add(c.s);
-    out.push(c);
-  }
-  return { assigned: out, pairs, usedSighting };
-}
-
-const MIN_SCORE = 0.42;   // below this it's a coincidence of common words
-const EDGE = 0.10;        // and it must be clearly ahead of the runner-up
-
-function matchSeen(seen, rawPhoto) {
-  surfaces++;
-  const refs = [];
-  for (const b of bookings) for (const p of b.pieces)
-    if (!p.found && p.description) refs.push({ b, p, description: p.description });
-
-  const { assigned, usedSighting } = assign(refs, seen, MIN_SCORE, EDGE);
-  for (const c of assigned) {
-    c.ref.p.found = {
-      surface: surfaces,
-      where: `seen as "${c.s.description}"`,
-      x: typeof c.s.x === 'number' ? c.s.x : null,
-      y: typeof c.s.y === 'number' ? c.s.y : null,
-    };
-  }
-
-  drawShot(rawPhoto);
-  render();
-
-  const left = bookings.reduce((n, b) => n + b.pieces.filter(p => !p.found).length, 0);
-  const spare = seen.length - usedSighting.size;
-  $('note').innerHTML = assigned.length
-    ? `<b>Ticked off ${assigned.length}.</b> ${left ? left + ' still to find — photograph somewhere else and it carries on.' : "That's everything."}`
-      + (spare ? ` ${spare} other piece${spare === 1 ? '' : 's'} here didn't belong to anything outstanding.` : '')
-    : `<b>Nothing matched here.</b> It saw: ${seen.length ? esc(seen.map(s => s.description).join('; ')) : 'no pottery at all'}.
-       ${left} still to find.`;
-  $('sweepBtn').innerHTML = 'Photograph somewhere else<div class="d">Carries on from where you are</div>';
-}
-
-function drawShot(rawPhoto) {
-  const img = new Image();
-  img.onload = () => {
-    const cv = $('canvas');
-    cv.width = img.width; cv.height = img.height;
-    const ctx = cv.getContext('2d');
-    ctx.drawImage(img, 0, 0);
-    ctx.lineWidth = Math.max(3, Math.round(img.width / 250));
-    ctx.font = '600 ' + Math.max(15, Math.round(img.width / 46)) + 'px ui-sans-serif,system-ui,sans-serif';
-    for (const b of bookings) for (const p of b.pieces) {
-      const f = p.found;
-      if (!f || f.surface !== surfaces || f.x === null) continue;
-      const x = f.x * img.width, y = f.y * img.height;
-      const r = Math.max(28, img.width * 0.07);
-      ctx.strokeStyle = '#4CAF50';
-      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = '#4CAF50';
-      ctx.fillText(b.id, x - r, Math.max(18, y - r - 8));
-    }
-    $('shot').style.display = 'block';
-  };
-  img.src = rawPhoto;
-}
-
 // ── test bed ─────────────────────────────────────────────────────────
-// Real pottery, no booking, nothing saved. It shows every score rather
-// than only the verdict, because "it didn't work" is not useful and
-// "the fish scored 0.71 but the jug scored 0.68 so neither was clear
-// enough" tells you exactly what to change.
+let tb = [];
+$('testBtn').onclick = () => { renderTb(); $('tbSheet').classList.add('on'); };
 
-let tb = [];   // [{ description, found, best, bestText }]
-
-$('tbAdd').onclick = () => pickImage(async (raw) => {
-  $('tbNote').textContent = 'Reading the pieces…';
+$('tbAdd').onclick = () => pickImage(async raw => {
+  $('tbBody').innerHTML = '<div class="mut">Reading the pieces…</div>';
   try {
     const seen = await describe('group', raw);
-    if (!seen.length) { $('tbNote').textContent = 'No pottery spotted — try again, closer in.'; return; }
-    tb = seen.map(s => ({ description: s.description, found: false, best: null, bestText: '' }));
+    if (!seen.length) { $('tbBody').innerHTML = '<div class="mut">No pottery spotted — try closer in.</div>'; return; }
+    tb = seen.map(s => ({ description: s.description, found: false, best: null, bestText: '', at: null }));
     buildIdf(tb.map(t => t.description));
-    renderTb();
-    $('tbFind').disabled = false;
-    $('tbNote').innerHTML = `<b>${tb.length} piece${tb.length === 1 ? '' : 's'} to find.</b>
-      Now move them, jumble them, half-hide them — then photograph again.`;
-  } catch (e) {
-    $('tbNote').textContent = 'Could not read that photo — ' + e.message;
-  }
+    renderTb(); $('tbFind').disabled = false;
+  } catch (e) { $('tbBody').innerHTML = `<div class="mut">Could not read that — ${esc(e.message)}</div>`; }
 });
 
-$('tbFind').onclick = () => pickImage(async (raw) => {
-  $('tbNote').textContent = 'Looking…';
+$('tbFind').onclick = () => pickImage(async raw => {
+  $('tbBody').innerHTML = '<div class="mut">Looking…</div>';
   try {
     const seen = await describe('shelf', raw);
     const refs = tb.map(t => ({ t, description: t.description }));
-    const { assigned, pairs } = assign(refs, seen, MIN_SCORE, EDGE);
+    const { assigned, pairs } = assign(refs, seen);
     for (const t of tb) { t.found = false; t.best = null; t.bestText = ''; t.at = null; }
-    // Every reference records its best score whether or not it won, so
-    // a near miss is visible as a near miss.
+    // Every reference keeps its best score whether or not it won, so a
+    // near miss reads as a near miss rather than a blank.
     for (const p of pairs) {
       const t = p.ref.t;
       if (t.best === null || p.score > t.best) { t.best = p.score; t.bestText = p.s.description; }
     }
+    const rings = [];
     for (const c of assigned) {
       c.ref.t.found = true;
-      // Position comes from the model's own reading of the photo, so a
-      // circle can only be drawn where it actually reported seeing
-      // something — never a guess dressed up as a location.
-      c.ref.t.at = (typeof c.s.x === 'number' && typeof c.s.y === 'number')
-        ? { x: c.s.x, y: c.s.y } : null;
+      if (typeof c.s.x === 'number' && typeof c.s.y === 'number')
+        rings.push({ x: c.s.x, y: c.s.y, label: c.ref.t.description.split(',')[0] });
     }
-    drawTb(raw);
-    renderTb();
+    renderTb(seen);
+    // The circled photo goes to the main screen, which is where a
+    // photograph belongs — the sheet is for the numbers.
+    lastPhoto = raw; drawPhoto(raw, rings);
     const hits = tb.filter(t => t.found).length;
-    $('tbNote').innerHTML = `<b>${hits} of ${tb.length} found.</b>
-      It saw: ${seen.length ? esc(seen.map(s => s.description).join('; ')) : 'no pottery at all'}.
-      <br>A tick needs ${MIN_SCORE} or better AND a clear ${EDGE} lead over the runner-up —
-      a close second is shown as a near miss rather than counted.`;
-  } catch (e) {
-    $('tbNote').textContent = 'Could not read that photo — ' + e.message;
-  }
+    say(`<b>Test: ${hits} of ${tb.length} found.</b>`);
+  } catch (e) { $('tbBody').innerHTML = `<div class="mut">Could not read that — ${esc(e.message)}</div>`; }
 });
 
-function drawTb(rawPhoto) {
-  const img = new Image();
-  img.onload = () => {
-    const cv = $('tbCanvas');
-    cv.width = img.width; cv.height = img.height;
-    const ctx = cv.getContext('2d');
-    ctx.drawImage(img, 0, 0);
-    const found = tb.filter(t => t.found && t.at);
-    ctx.lineWidth = Math.max(3, Math.round(img.width / 220));
-    const fs = Math.max(15, Math.round(img.width / 40));
-    ctx.font = '700 ' + fs + 'px ui-sans-serif,system-ui,sans-serif';
-    for (const t of found) {
-      const x = t.at.x * img.width, y = t.at.y * img.height;
-      const r = Math.max(30, img.width * 0.08);
-      ctx.strokeStyle = '#4CAF50';
-      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
-      // Short label — the full description is in the list underneath,
-      // and a long one across a photo is unreadable anyway.
-      const label = t.description.split(/[,]/)[0].slice(0, 22);
-      const w = ctx.measureText(label).width;
-      const ly = Math.max(fs + 6, y - r - 8);
-      ctx.fillStyle = 'rgba(0,0,0,.6)';
-      ctx.fillRect(x - w / 2 - 6, ly - fs, w + 12, fs + 8);
-      ctx.fillStyle = '#4CAF50';
-      ctx.textAlign = 'center';
-      ctx.fillText(label, x, ly);
-      ctx.textAlign = 'left';
-    }
-    $('tbShot').style.display = found.length ? 'block' : 'none';
-  };
-  img.src = rawPhoto;
-}
-
-function renderTb() {
-  if (!tb.length) { $('tbList').innerHTML = '<div class="empty">Nothing loaded yet.</div>'; return; }
-  $('tbList').innerHTML = tb.map(t => `
-    <div class="tb-row">
+function renderTb(seen) {
+  if (!tb.length) {
+    $('tbBody').innerHTML = `<div class="mut">Photograph some pieces, then move them and
+      photograph again. Every score is shown, so a near miss reads as a near miss.</div>`;
+    return;
+  }
+  $('tbBody').innerHTML = tb.map(t => `
+    <div class="row">
       <div class="tick" style="color:${t.found ? 'var(--done)' : t.best !== null ? 'var(--warn)' : 'var(--mute)'}">
         ${t.found ? '✓' : t.best !== null ? '~' : '○'}</div>
-      <div class="g">
+      <div style="flex:1;min-width:0">
         <div>${esc(t.description)}</div>
-        ${t.best !== null ? `<div class="tb-score">best ${t.best.toFixed(2)} — matched against "${esc(t.bestText)}"</div>` : ''}
+        ${t.best !== null ? `<div class="mut">best ${t.best.toFixed(2)} — against "${esc(t.bestText)}"</div>` : ''}
       </div>
-    </div>`).join('');
+    </div>`).join('')
+    + (seen ? `<div class="mut" style="padding-top:10px">Saw: ${esc(seen.map(s => s.description).join('; ')) || 'nothing'}.
+        <br>A tick needs ${MIN_SCORE} and a clear ${EDGE} lead over the runner-up.</div>` : '');
 }
 
-renderTb();
+$('infoBtn').onclick = (e) => { e.preventDefault(); loadCost(); $('infoSheet').classList.add('on'); };
+
 loadCost();
 load();
 </script>
