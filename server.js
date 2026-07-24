@@ -8181,7 +8181,26 @@ async function describeImage(photoBase64, prompt) {
   const d = await r.json();
   let text = (d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '';
   text = text.replace(/```json|```/g, '').trim();
-  return JSON.parse(text);
+  return { data: JSON.parse(text), usage: d.usage || null };
+}
+
+// Token counts come from the API response, so the cost recorded is
+// measured rather than estimated — image tokenisation is not something
+// worth guessing at when the answer is right there in the reply.
+const PRICE_PER_M = { 'gpt-4o-mini': { in: 0.15, out: 0.60 } };
+
+async function logUsage(studioId, kind, usage) {
+  if (!usage) return;
+  const p = PRICE_PER_M[DESCRIBE_MODEL] || { in: 0, out: 0 };
+  const inTok = usage.prompt_tokens || 0, outTok = usage.completion_tokens || 0;
+  const cost = (inTok / 1e6) * p.in + (outTok / 1e6) * p.out;
+  try {
+    await supabase.from('ai_usage').insert({
+      studio_id: studioId || null, kind, model: DESCRIBE_MODEL,
+      input_tokens: inTok, output_tokens: outTok, cost_usd: cost,
+    });
+  } catch (e) { /* never let bookkeeping break the actual job */ }
+  return cost;
 }
 
 // Pottery only. A studio table always has a phone, a paint pot and
@@ -8205,13 +8224,14 @@ app.post('/api/pieces/describe-group', async (req, res) => {
   const { photoBase64 } = req.body;
   if (!photoBase64) return res.status(400).json({ error: 'photoBase64 required' });
   try {
-    const out = await describeImage(photoBase64,
+    const { data: out, usage } = await describeImage(photoBase64,
       `${POTTERY_ONLY}\n\n${DESCRIBE_STYLE}\n\nList every distinct piece you can see.\n` +
       `Reply with ONLY a JSON array, no prose and no markdown:\n` +
       `[{"description":"green fish-shaped jug, glossy"},{"description":"white mug, blue stripes"}]\n` +
       `If there is no pottery at all, reply []`);
+    const cost = await logUsage(req.body.studioId, 'describe-group', usage);
     const pieces = Array.isArray(out) ? out : (out.pieces || []);
-    res.json({ pieces: pieces.filter(p => p && p.description).slice(0, 40) });
+    res.json({ pieces: pieces.filter(p => p && p.description).slice(0, 40), cost });
   } catch (e) {
     console.error('describe-group:', e.message);
     res.status(500).json({ error: e.message });
@@ -8224,17 +8244,40 @@ app.post('/api/pieces/describe-shelf', async (req, res) => {
   const { photoBase64 } = req.body;
   if (!photoBase64) return res.status(400).json({ error: 'photoBase64 required' });
   try {
-    const out = await describeImage(photoBase64,
+    const { data: out, usage } = await describeImage(photoBase64,
       `${POTTERY_ONLY}\n\n${DESCRIBE_STYLE}\n\nList every distinct piece you can see, ` +
       `with its rough position in the frame as fractions from 0 to 1 ` +
       `(x from left, y from top).\n` +
       `Reply with ONLY a JSON array, no prose and no markdown:\n` +
       `[{"description":"green fish-shaped jug, glossy","x":0.42,"y":0.61}]\n` +
       `If there is no pottery at all, reply []`);
+    const cost = await logUsage(req.body.studioId, 'describe-shelf', usage);
     const pieces = Array.isArray(out) ? out : (out.pieces || []);
-    res.json({ pieces: pieces.filter(p => p && p.description).slice(0, 60) });
+    res.json({ pieces: pieces.filter(p => p && p.description).slice(0, 60), cost });
   } catch (e) {
     console.error('describe-shelf:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/ai-usage — what this has actually cost, measured.
+app.get('/api/ai-usage', async (req, res) => {
+  const { studioId } = req.query;
+  try {
+    const since = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+    let q = supabase.from('ai_usage').select('kind, cost_usd, created_at').gte('created_at', since);
+    if (studioId) q = q.eq('studio_id', studioId);
+    const { data, error } = await q;
+    if (error) throw error;
+    const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+    let today = 0, month = 0, callsToday = 0, callsMonth = 0;
+    for (const r of (data || [])) {
+      const c = Number(r.cost_usd) || 0;
+      month += c; callsMonth++;
+      if (new Date(r.created_at) >= startOfToday) { today += c; callsToday++; }
+    }
+    res.json({ today, month, callsToday, callsMonth, model: DESCRIBE_MODEL });
+  } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });

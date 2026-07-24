@@ -96,6 +96,15 @@
 </div>
 
 <div class="card">
+  <div class="lbl">What it costs</div>
+  <div id="cost" style="font-size:13px;color:var(--mute)">No calls yet.</div>
+  <div style="font-size:11.5px;color:var(--mute);margin-top:6px;line-height:1.5">
+    Measured from each reply, not estimated. Descriptions are written once per
+    piece; only the sweeps repeat.
+  </div>
+</div>
+
+<div class="card">
   <div class="lbl">Test bed</div>
   <div style="font-size:12.5px;color:var(--mute);line-height:1.55;margin-bottom:11px">
     Try it on real pottery without touching a booking. Photograph some pieces,
@@ -350,14 +359,30 @@ async function describe(kind, rawPhoto) {
   const photoBase64 = await shrink(rawPhoto, 1400);
   const r = await fetch(`${API}/api/pieces/describe-${kind}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ photoBase64 }),
+    body: JSON.stringify({ photoBase64, studioId }),
   });
   if (!r.ok) {
     let msg = 'could not read that photo';
     try { msg = (await r.json()).error || msg; } catch (e) {}
     throw new Error(msg);
   }
-  return (await r.json()).pieces || [];
+  const out = await r.json();
+  loadCost();               // refresh the running total after every call
+  return out.pieces || [];
+}
+
+// Measured, not estimated. Token counts come from the API's own reply,
+// so this is what it has actually cost rather than my arithmetic about
+// how images are tokenised.
+async function loadCost() {
+  try {
+    const r = await fetch(`${API}/api/ai-usage?studioId=${studioId}`);
+    if (!r.ok) return;
+    const u = await r.json();
+    const p = n => '£' + (n * 0.79).toFixed(2);     // rough USD->GBP
+    $('cost').innerHTML = `Today ${p(u.today)} (${u.callsToday} photo${u.callsToday === 1 ? '' : 's'})
+      · last 30 days ${p(u.month)} (${u.callsMonth})`;
+  } catch (e) { /* cost display is never worth breaking the page over */ }
 }
 
 // ── add pieces: photograph a group, it writes the list ───────────────
@@ -579,6 +604,7 @@ function renderTb() {
 }
 
 renderTb();
+loadCost();
 load();
 </script>
 </body>
