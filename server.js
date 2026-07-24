@@ -8260,6 +8260,64 @@ app.post('/api/pieces/describe-shelf', async (req, res) => {
   }
 });
 
+
+// POST /api/pieces/find-in-photo — the photo AND the list, one call.
+//
+// [24 Jul, late] Matching description-to-description turned out to be
+// comparing two independent guesses. Measured in the studio: the same
+// physical objects were registered as "green boot-shaped planter" and
+// "white jug, floral accents", then seen in the second photo as "green
+// fish-shaped jug" and "brown owl-shaped jug". Both readings are
+// defensible; they simply don't share words, so text overlap scored
+// 0.27 and 0.16 and found nothing. The one piece that matched (1.00)
+// did so only because both descriptions happened to come out identical.
+//
+// The model doesn't have that problem — shown the list, it can look at
+// a green fish jug and recognise it as "green fish-shaped jug" even
+// where, unprompted, it would have called it a boot. So the matching
+// moves to where the eyes are, and this code stops trying to bridge two
+// vocabularies with word overlap.
+app.post('/api/pieces/find-in-photo', async (req, res) => {
+  const { photoBase64, wanted, studioId } = req.body;
+  if (!photoBase64 || !Array.isArray(wanted)) {
+    return res.status(400).json({ error: 'photoBase64 and wanted required' });
+  }
+  if (!wanted.length) return res.json({ found: [] });
+  try {
+    const list = wanted.map((w, i) => `${i}: ${w.description}`).join('\n');
+    const { data, usage } = await describeImage(photoBase64,
+      `${POTTERY_ONLY}\n\nHere is a list of pottery pieces I am looking for:\n${list}\n\n` +
+      `Look at the photo and decide which of these listed pieces are actually present. ` +
+      `Judge by what you can see — form, colour, decoration — not by whether the wording ` +
+      `matches how you would have described it yourself. The same piece can reasonably be ` +
+      `described in different words.\n\n` +
+      `Only include a piece if you are genuinely confident it is there. It is far better to ` +
+      `miss one than to claim one that isn't present. If none of them are there, reply [].\n\n` +
+      `For each piece you find, give its index from the list, its rough position in the frame ` +
+      `as fractions from 0 to 1 (x from left, y from top), how sure you are from 0 to 1, and ` +
+      `a few words on what you actually see there.\n` +
+      `Reply with ONLY a JSON array, no prose and no markdown:\n` +
+      `[{"i":0,"x":0.42,"y":0.61,"confidence":0.9,"saw":"green fish jug at the back"}]`);
+    const cost = await logUsage(studioId, 'find-in-photo', usage);
+    const arr = Array.isArray(data) ? data : (data.found || []);
+    const found = arr
+      .filter(f => f && typeof f.i === 'number' && wanted[f.i])
+      .filter(f => (f.confidence === undefined || f.confidence >= 0.55))
+      .map(f => ({
+        id: wanted[f.i].id,
+        description: wanted[f.i].description,
+        x: typeof f.x === 'number' ? f.x : null,
+        y: typeof f.y === 'number' ? f.y : null,
+        confidence: f.confidence === undefined ? null : f.confidence,
+        saw: f.saw || '',
+      }));
+    res.json({ found, cost });
+  } catch (e) {
+    console.error('find-in-photo:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/ai-usage — what this has actually cost, measured.
 app.get('/api/ai-usage', async (req, res) => {
   const { studioId } = req.query;

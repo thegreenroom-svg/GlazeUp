@@ -306,6 +306,27 @@ function busy(on, text) {
   if (text) $('workingText').textContent = text;
 }
 
+// The photo AND the list, one call. Replaces matching two independent
+// descriptions against each other, which failed for a reason no
+// threshold could fix: the same objects came back as "green
+// boot-shaped planter" and later "green fish-shaped jug", so the words
+// never met. The model, shown the list, matches on what it can see.
+async function findInPhoto(rawPhoto, wanted) {
+  const photoBase64 = await shrink(rawPhoto, 1400);
+  const r = await fetch(`${API}/api/pieces/find-in-photo`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ photoBase64, wanted, studioId }),
+  });
+  if (!r.ok) {
+    let m = 'could not read that photo';
+    try { m = (await r.json()).error || m; } catch (e) {}
+    throw new Error(m);
+  }
+  const out = await r.json();
+  loadCost();
+  return out.found || [];
+}
+
 async function describe(kind, rawPhoto) {
   const photoBase64 = await shrink(rawPhoto, 1400);
   const r = await fetch(`${API}/api/pieces/describe-${kind}`, {
@@ -439,39 +460,44 @@ $('sweepBtn').onclick = () => pickImage(async raw => {
   busy(true, 'Looking…');
   $('said').classList.remove('on');
   try {
-    const seen = await describe('shelf', raw);
+    const wanted = [];
+    for (const b of bookings) for (const p of b.pieces)
+      if (!p.found && p.description) wanted.push({ id: p.id, description: p.description, b, p });
+    if (!wanted.length) {
+      busy(false);
+      say('<b>Nothing to look for.</b> <em>Every outstanding piece still needs describing — use Add.</em>');
+      return;
+    }
+    const found = await findInPhoto(raw, wanted.map(w => ({ id: w.id, description: w.description })));
     busy(false);
-    matchSeen(seen, raw);
+    applyFound(found, wanted, raw);
   } catch (e) {
     busy(false);
     say(`<b>Could not read that photo.</b> <em>${esc(e.message)}</em>`);
   }
 });
 
-function matchSeen(seen, raw) {
+function applyFound(found, wanted, raw) {
   surfaces++;
-  const refs = [];
-  for (const b of bookings) for (const p of b.pieces)
-    if (!p.found && p.description) refs.push({ b, p, description: p.description });
-
-  const { assigned, usedSighting } = assign(refs, seen);
   const rings = [];
-  for (const c of assigned) {
-    c.ref.p.found = { surface: surfaces, where: `seen as "${c.s.description}"` };
-    if (typeof c.s.x === 'number' && typeof c.s.y === 'number')
-      rings.push({ x: c.s.x, y: c.s.y, label: c.ref.b.id, sub: c.ref.p.description });
+  for (const f of found) {
+    const w = wanted.find(x => x.id === f.id);
+    if (!w || w.p.found) continue;
+    w.p.found = { surface: surfaces, where: f.saw ? `seen: ${f.saw}` : '' };
+    if (f.x !== null && f.y !== null)
+      rings.push({ x: f.x, y: f.y, label: w.b.id, conf: f.confidence });
   }
   drawPhoto(raw, rings);
   paint();
 
   const left = bookings.reduce((n, b) => n + b.pieces.filter(p => !p.found).length, 0);
-  const spare = seen.length - usedSighting.size;
-  if (assigned.length) {
-    const who = [...new Set(assigned.map(c => c.ref.b.id))].join(', ');
-    say(`<b>Found ${assigned.length} — ${esc(who)}.</b> ${left ? left + ' still out there.' : "That's everything."}`
-      + (spare ? ` <em>${spare} other piece${spare === 1 ? '' : 's'} here belong to nobody outstanding.</em>` : ''));
+  if (found.length) {
+    const who = [...new Set(found.map(f => {
+      const w = wanted.find(x => x.id === f.id); return w ? w.b.id : '';
+    }).filter(Boolean))].join(', ');
+    say(`<b>Found ${found.length} — ${esc(who)}.</b> ${left ? left + ' still out there.' : "That's everything."}`);
   } else {
-    say(`<b>Nothing matched.</b> <em>Saw: ${seen.length ? esc(seen.map(s => s.description).join('; ')) : 'no pottery at all'}.</em>`);
+    say(`<b>None of them are here.</b> <em>Looked for ${wanted.length} piece${wanted.length === 1 ? '' : 's'}.</em>`);
   }
 }
 
@@ -496,7 +522,8 @@ function drawPhoto(raw, rings) {
       const rad = Math.max(30, img.width * 0.085);
       ctx.strokeStyle = '#4CAF50';
       ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2); ctx.stroke();
-      const label = String(r.label).slice(0, 20);
+      const label = String(r.label).slice(0, 20)
+        + (r.conf && r.conf < 0.8 ? ' ?' : '');
       const w = ctx.measureText(label).width;
       const ly = Math.max(fs + 8, y - rad - 10);
       ctx.fillStyle = 'rgba(0,0,0,.68)';
@@ -588,32 +615,28 @@ $('tbAdd').onclick = () => pickImage(async raw => {
 $('tbFind').onclick = () => pickImage(async raw => {
   $('tbBody').innerHTML = '<div class="mut">Looking…</div>';
   try {
-    const seen = await describe('shelf', raw);
-    const refs = tb.map(t => ({ t, description: t.description }));
-    const { assigned, pairs } = assign(refs, seen);
-    for (const t of tb) { t.found = false; t.best = null; t.bestText = ''; t.at = null; }
-    // Every reference keeps its best score whether or not it won, so a
-    // near miss reads as a near miss rather than a blank.
-    for (const p of pairs) {
-      const t = p.ref.t;
-      if (t.best === null || p.score > t.best) { t.best = p.score; t.bestText = p.s.description; }
-    }
+    const found = await findInPhoto(raw, tb.map((t, i) => ({ id: String(i), description: t.description })));
+    for (const t of tb) { t.found = false; t.saw = ''; t.conf = null; }
     const rings = [];
-    for (const c of assigned) {
-      c.ref.t.found = true;
-      if (typeof c.s.x === 'number' && typeof c.s.y === 'number')
-        rings.push({ x: c.s.x, y: c.s.y, label: c.ref.t.description.split(',')[0] });
+    for (const f of found) {
+      const t = tb[Number(f.id)];
+      if (!t) continue;
+      t.found = true; t.saw = f.saw; t.conf = f.confidence;
+      if (f.x !== null && f.y !== null)
+        rings.push({ x: f.x, y: f.y, label: t.description.split(',')[0], conf: f.confidence });
     }
-    renderTb(seen);
-    // The circled photo goes to the main screen, which is where a
-    // photograph belongs — the sheet is for the numbers.
+    renderTb(true);
+    // The circled photo goes to the main screen — a photograph belongs
+    // on the screen, the sheet is only for the numbers. Closing the
+    // sheet reveals it rather than hiding the answer behind a panel.
     lastPhoto = raw; drawPhoto(raw, rings);
     const hits = tb.filter(t => t.found).length;
-    say(`<b>Test: ${hits} of ${tb.length} found.</b>`);
+    say(`<b>Test: ${hits} of ${tb.length} found.</b> <em>Close this panel to see them circled.</em>`);
+    closeSheet('tbSheet');
   } catch (e) { $('tbBody').innerHTML = `<div class="mut">Could not read that — ${esc(e.message)}</div>`; }
 });
 
-function renderTb(seen) {
+function renderTb(ran) {
   if (!tb.length) {
     $('tbBody').innerHTML = `<div class="mut">Photograph some pieces, then move them and
       photograph again. Every score is shown, so a near miss reads as a near miss.</div>`;
@@ -621,15 +644,15 @@ function renderTb(seen) {
   }
   $('tbBody').innerHTML = tb.map(t => `
     <div class="row">
-      <div class="tick" style="color:${t.found ? 'var(--done)' : t.best !== null ? 'var(--warn)' : 'var(--mute)'}">
-        ${t.found ? '✓' : t.best !== null ? '~' : '○'}</div>
+      <div class="tick" style="color:${t.found ? 'var(--done)' : 'var(--mute)'}">${t.found ? '✓' : '○'}</div>
       <div style="flex:1;min-width:0">
         <div>${esc(t.description)}</div>
-        ${t.best !== null ? `<div class="mut">best ${t.best.toFixed(2)} — against "${esc(t.bestText)}"</div>` : ''}
+        ${t.found && t.saw ? `<div class="mut">saw: ${esc(t.saw)}${t.conf ? ` · ${Math.round(t.conf * 100)}% sure` : ''}</div>`
+          : ran ? '<div class="mut">not in that photo</div>' : ''}
       </div>
     </div>`).join('')
-    + (seen ? `<div class="mut" style="padding-top:10px">Saw: ${esc(seen.map(s => s.description).join('; ')) || 'nothing'}.
-        <br>A tick needs ${MIN_SCORE} and a clear ${EDGE} lead over the runner-up.</div>` : '');
+    + (ran ? `<div class="mut" style="padding-top:10px">
+        Close this panel to see them circled on the photo.</div>` : '');
 }
 
 $('infoBtn').onclick = (e) => { e.preventDefault(); loadCost(); $('infoSheet').classList.add('on'); };
