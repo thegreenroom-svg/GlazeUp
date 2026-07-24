@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Match test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#1A1714; --panel:#231F1C; --line:rgba(244,236,224,.14);
+    --ink:#F4ECE0; --mute:#8F877C;
+    --go:#3E7C6A; --clay:#B87946; --warn:#F9A825; --bad:#C1584B;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    padding:max(14px,env(safe-area-inset-top)) 14px calc(24px + env(safe-area-inset-bottom));
+    -webkit-text-size-adjust:100%;
+  }
+  h1{font-family:Caveat,ui-serif,serif; font-size:30px; font-weight:600; margin:0 0 2px}
+  .sub{color:var(--mute); font-size:12.5px; margin-bottom:18px}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px}
+  .lbl{font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--clay); font-weight:700; margin-bottom:9px}
+  button{font:inherit; cursor:pointer; border-radius:11px; border:1px solid var(--line);
+    background:#2B2724; color:var(--ink); padding:12px 14px}
+  button.primary{background:var(--go); border-color:transparent; color:#fff; font-weight:800; width:100%}
+  button.primary:disabled{background:#2B2724; color:var(--mute); font-weight:600}
+  button.wide{width:100%}
+  .items{display:flex; flex-wrap:wrap; gap:9px; margin-bottom:11px}
+  .item{position:relative; width:74px}
+  .item img{width:74px; height:74px; object-fit:cover; border-radius:10px; border:1px solid var(--line); display:block}
+  .item .x{position:absolute; top:-6px; right:-6px; width:23px; height:23px; border-radius:50%;
+    background:#000; color:#fff; border:1px solid var(--line); font-size:13px; line-height:1; padding:0}
+  .item .n{font-size:10.5px; color:var(--mute); text-align:center; margin-top:3px}
+  .empty{color:var(--mute); font-size:13px; padding:8px 0 12px}
+  #sceneWrap{position:relative; margin-bottom:12px; display:none}
+  #sceneWrap canvas{width:100%; border-radius:12px; display:block}
+  .row{display:flex; gap:11px; align-items:center; padding:11px 0; border-top:1px solid var(--line)}
+  .row:first-of-type{border-top:0}
+  .thumbs{display:flex; gap:5px; flex-shrink:0}
+  .thumbs img{width:52px; height:52px; object-fit:cover; border-radius:8px; border:1px solid var(--line); display:block}
+  .thumbs .arrow{align-self:center; color:var(--mute); font-size:14px}
+  .meta{flex:1; min-width:0}
+  .name{font-weight:700; font-size:14px}
+  .verdict{font-size:12px; margin-top:1px}
+  .score{font-variant-numeric:tabular-nums; font-size:12px; color:var(--mute); margin-top:2px}
+  .bar{height:4px; border-radius:2px; background:rgba(244,236,224,.1); margin-top:6px; overflow:hidden}
+  .bar i{display:block; height:100%; border-radius:2px}
+  .note{font-size:12px; color:var(--mute); line-height:1.55; margin-top:12px}
+  .prog{color:var(--mute); font-size:13px; text-align:center; padding:10px 0}
+</style>
+</head>
+<body>
+
+<h1>Match test</h1>
+<div class="sub">Photograph a few things, then photograph the pile they're in.
+  Nothing is saved and nothing is sent anywhere.</div>
+
+<div class="card">
+  <div class="lbl">Things to find</div>
+  <div class="items" id="items"></div>
+  <div class="empty" id="itemsEmpty">Nothing added yet. Fill the frame with one object.</div>
+  <button class="wide" id="addBtn">Add a thing</button>
+</div>
+
+<div class="card">
+  <div class="lbl">The pile</div>
+  <div id="sceneWrap"><canvas id="scene"></canvas></div>
+  <button class="primary" id="sceneBtn" disabled>Photograph the pile</button>
+  <div class="prog" id="prog" style="display:none"></div>
+</div>
+
+<div class="card" id="resultsCard" style="display:none">
+  <div class="lbl">What it found</div>
+  <div id="results"></div>
+  <div class="note" id="resultsNote"></div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────
+// A test bench for the matcher, with everything else stripped out.
+//
+// No server, no database, no bookings, no angles, no uploads, no
+// OpenCV. Every failure of the last few hours was in that plumbing
+// rather than in the matching itself, so none of it is here. What
+// remains is the original three-stage colour-and-shape matcher, which
+// is the right tool for this material: keypoint matching needs fine
+// texture, and a smooth pastel-glazed pot has very little, while a
+// wooden table has a great deal — which is why keypoints kept landing
+// on the table.
+//
+// The functions below are ports of the ones already proven in the app,
+// deliberately unchanged in behaviour.
+// ─────────────────────────────────────────────────────────────────────
+
+const $ = id => document.getElementById(id);
+const items = [];          // { name, url, fp, thumb }
+let sceneBmp = null, sceneW = 0, sceneH = 0;
+
+// ── fingerprints ─────────────────────────────────────────────────────
+
+// Hue survives the kiln. An unfired piece is chalky and pale; the same
+// piece fired is glossy and vivid — the intensity changes completely
+// but a blue is still a blue. So this records BOTH a full
+// hue/saturation/value histogram and a hue-only one, each pixel voting
+// for its hue in proportion to how colourful it is, so near-greys
+// (glaze white, shadow, the shelf itself) don't drown out real colour.
+function colourHistogram(bmp, sx, sy, side) {
+  const N = 48;
+  const c = document.createElement('canvas');
+  c.width = N; c.height = N;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(bmp, sx, sy, side, side, 0, 0, N, N);
+  const d = ctx.getImageData(0, 0, N, N).data;
+  const bins = new Array(12 * 3 * 3).fill(0);
+  const hueBins = new Array(12).fill(0);
+  let hueWeight = 0, counted = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i]/255, g = d[i+1]/255, b = d[i+2]/255;
+    const max = Math.max(r,g,b), min = Math.min(r,g,b), delta = max - min;
+    let h = 0;
+    if (delta > 0.0001) {
+      if (max === r) h = ((g - b)/delta) % 6;
+      else if (max === g) h = (b - r)/delta + 2;
+      else h = (r - g)/delta + 4;
+      h *= 60; if (h < 0) h += 360;
+    }
+    const s = max === 0 ? 0 : delta/max, v = max;
+    bins[Math.min(11,Math.floor(h/30))*9 + Math.min(2,Math.floor(s*3))*3 + Math.min(2,Math.floor(v*3))]++;
+    const wgt = s * v;
+    hueBins[Math.min(11,Math.floor(h/30))] += wgt;
+    hueWeight += wgt; counted++;
+  }
+  let hex = '';
+  for (const b of bins) hex += Math.min(255, Math.round((b/Math.max(1,counted))*255*6)).toString(16).padStart(2,'0');
+  let hueHex = '';
+  for (const b of hueBins) hueHex += Math.min(255, Math.round((b/Math.max(0.0001,hueWeight))*255*3)).toString(16).padStart(2,'0');
+  return hex + '~' + hueHex;
+}
+
+// Scores both histograms and takes whichever agrees more, so an
+// unfired reference can still match its fired self. Hue carries a
+// small penalty because it's the looser test: it says "same colours",
+// not "same picture".
+function histDistance(a, b) {
+  if (!a || !b) return 64;
+  const [fa, ha] = String(a).split('~'), [fb, hb] = String(b).split('~');
+  const inter = (x, y) => {
+    if (!x || !y || x.length !== y.length) return null;
+    let i = 0, t = 0;
+    for (let k = 0; k < x.length; k += 2) {
+      const p = parseInt(x.substr(k,2),16), q = parseInt(y.substr(k,2),16);
+      i += Math.min(p,q); t += Math.max(p,q);
+    }
+    return t ? (1 - i/t) * 64 : 64;
+  };
+  const full = inter(fa, fb), hue = (ha && hb) ? inter(ha, hb) : null;
+  if (full === null && hue === null) return 64;
+  if (hue === null) return full;
+  if (full === null) return hue;
+  return Math.min(full, hue + 2);
+}
+
+function hashRegion(bmp, sx, sy, side) {
+  const c = document.createElement('canvas');
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  const grey = (d,i) => 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+  const dHash = (w,h) => {
+    c.width = w; c.height = h;
+    ctx.drawImage(bmp, sx, sy, side, side, 0, 0, w, h);
+    const d = ctx.getImageData(0,0,w,h).data, g = [];
+    for (let i = 0; i < d.length; i += 4) g.push(grey(d,i));
+    let bits = '';
+    for (let r = 0; r < h; r++) for (let col = 0; col < w-1; col++)
+      bits += g[r*w+col] > g[r*w+col+1] ? '1' : '0';
+    let hex = '';
+    for (let i = 0; i < bits.length; i += 4) hex += parseInt(bits.slice(i,i+4),2).toString(16);
+    return hex;
+  };
+  const coarse = dHash(9,8), fine = dHash(17,16);
+  c.width = 4; c.height = 4;
+  ctx.drawImage(bmp, sx, sy, side, side, 0, 0, 4, 4);
+  const cd = ctx.getImageData(0,0,4,4).data;
+  let colour = '';
+  for (let i = 0; i < cd.length; i += 4)
+    colour += Math.round(cd[i]/17).toString(16) + Math.round(cd[i+1]/17).toString(16) + Math.round(cd[i+2]/17).toString(16);
+  return coarse + '|' + fine + '|' + colour + '|' + colourHistogram(bmp, sx, sy, side);
+}
+
+// Stage 1 signal: casts a wide net, decides nothing.
+function colourOnly(a, b) {
+  const pa = String(a).split('|'), pb = String(b).split('|');
+  if (pa.length < 4 || pb.length < 4) return 64;
+  return histDistance(pa[3], pb[3]);
+}
+
+// Stage 2 signal: form and pattern lead, colour merely agrees. The
+// reverse weighting of stage 1 — that reversal is the whole point,
+// because a single blended score let colour outvote shape and every
+// brown thing matched every other brown thing.
+function pinDown(a, b) {
+  const pa = String(a).split('|'), pb = String(b).split('|');
+  const ham = (x,y) => {
+    if (!x || !y || x.length !== y.length) return null;
+    let d = 0;
+    for (let i = 0; i < x.length; i++) {
+      let v = parseInt(x[i],16) ^ parseInt(y[i],16);
+      while (v) { d += v & 1; v >>= 1; }
+    }
+    return d;
+  };
+  const fineRaw = ham(pa[1], pb[1]);
+  const fine = fineRaw === null ? 64 : (fineRaw/256)*64;
+  let grid = 64;
+  if (pa[2] && pb[2] && pa[2].length === pb[2].length) {
+    let cd = 0;
+    for (let i = 0; i < pa[2].length; i++) cd += Math.abs(parseInt(pa[2][i],16) - parseInt(pb[2][i],16));
+    grid = (cd/pa[2].length/15)*64;
+  }
+  return fine*0.55 + grid*0.25 + colourOnly(a,b)*0.20;
+}
+
+// Stage 0: is this patch even an object? Bare table and plain wall have
+// almost no edges, and were scoring well simply because a smooth patch
+// resembles anything smooth. Judged against the photo's own median so a
+// cluttered pile and a sparse one both work.
+function patchStructure(bmp, x, y, side) {
+  const c = document.createElement('canvas');
+  c.width = 24; c.height = 24;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(bmp, x, y, side, side, 0, 0, 24, 24);
+  const d = ctx.getImageData(0,0,24,24).data, g = [];
+  for (let i = 0; i < d.length; i += 4) g.push(0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2]);
+  let e = 0, n = 0;
+  for (let r = 0; r < 24; r++) for (let col = 0; col < 23; col++) {
+    e += Math.abs(g[r*24+col] - g[r*24+col+1]); n++;
+    if (r < 23) { e += Math.abs(g[r*24+col] - g[(r+1)*24+col]); n++; }
+  }
+  return n ? e/n : 0;
+}
+
+// ── capture ──────────────────────────────────────────────────────────
+
+// The picker must be opened from inside the tap handler. Any await
+// between the tap and .click() loses the gesture and iOS silently
+// refuses to open it — a lesson learned the hard way.
+function pickImage(onPicked) {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.onchange = () => {
+    const f = input.files && input.files[0];
+    input.remove();
+    if (f) { const r = new FileReader(); r.onload = () => onPicked(r.result); r.readAsDataURL(f); }
+  };
+  input.click();
+}
+
+async function bitmapFrom(dataUrl, maxSide) {
+  const bmp = await createImageBitmap(await (await fetch(dataUrl)).blob());
+  const scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+  if (scale >= 1) return bmp;
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * scale);
+  c.height = Math.round(bmp.height * scale);
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  bmp.close && bmp.close();
+  return await createImageBitmap(c);
+}
+
+$('addBtn').onclick = () => pickImage(async (url) => {
+  const bmp = await bitmapFrom(url, 900);
+  // Centre square: the object is expected to fill the frame.
+  const side = Math.min(bmp.width, bmp.height);
+  const sx = Math.round((bmp.width - side)/2), sy = Math.round((bmp.height - side)/2);
+  const fp = hashRegion(bmp, sx, sy, side);
+  const t = document.createElement('canvas');
+  t.width = t.height = 148;
+  t.getContext('2d').drawImage(bmp, sx, sy, side, side, 0, 0, 148, 148);
+  bmp.close && bmp.close();
+  items.push({ name: 'Thing ' + (items.length + 1), url, fp, thumb: t.toDataURL('image/jpeg', 0.85) });
+  renderItems();
+});
+
+function renderItems() {
+  $('items').innerHTML = items.map((it, i) => `
+    <div class="item">
+      <img src="${it.thumb}" alt="">
+      <button class="x" onclick="removeItem(${i})" aria-label="Remove">×</button>
+      <div class="n">${it.name}</div>
+    </div>`).join('');
+  $('itemsEmpty').style.display = items.length ? 'none' : 'block';
+  $('sceneBtn').disabled = !items.length;
+}
+function removeItem(i) {
+  items.splice(i, 1);
+  items.forEach((it, n) => it.name = 'Thing ' + (n + 1));
+  renderItems();
+}
+
+$('sceneBtn').onclick = () => pickImage(async (url) => {
+  $('prog').style.display = 'block';
+  $('prog').textContent = 'Reading the photo…';
+  $('resultsCard').style.display = 'none';
+  await new Promise(r => setTimeout(r, 30));
+  sceneBmp = await bitmapFrom(url, 1600);
+  sceneW = sceneBmp.width; sceneH = sceneBmp.height;
+  await sweep();
+});
+
+// ── the sweep ────────────────────────────────────────────────────────
+
+async function sweep() {
+  const short = Math.min(sceneW, sceneH);
+  // Smaller windows than the app uses, because the interesting test is
+  // a small object partly hidden among larger ones.
+  const sizes = [0.09, 0.12, 0.16, 0.21, 0.28, 0.37, 0.48].map(f => Math.round(short * f));
+
+  const SHORTLIST = 60;   // places colour thinks are worth pinning down
+  const EDGE_SURE = 4;    // must beat the next-best thing by this much
+  const EDGE_MAYBE = 2;
+  const SANITY = 34;      // beyond this the best match is still a bad one
+
+  // stage 0 — structure gate
+  const patches = [];
+  for (const side of sizes) {
+    if (side < 24 || side > short) continue;
+    const step = Math.max(1, Math.round(side * 0.4));
+    for (let y = 0; y + side <= sceneH; y += step)
+      for (let x = 0; x + side <= sceneW; x += step)
+        patches.push({ x, y, side, e: patchStructure(sceneBmp, x, y, side) });
+  }
+  const energies = patches.map(p => p.e).sort((a,b) => a-b);
+  const gate = energies.length ? energies[Math.floor(energies.length/2)] : 0;
+  const live = patches.filter(p => p.e >= gate);
+
+  for (let i = 0; i < live.length; i++) {
+    live[i].fp = hashRegion(sceneBmp, live[i].x, live[i].y, live[i].side);
+    if (i % 10 === 0) {
+      $('prog').textContent = 'Looking… ' + Math.round((i/live.length)*100) + '%';
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+
+  // stages 1-3, per thing
+  const found = [];
+  for (const it of items) {
+    const shortlist = live
+      .map(p => ({ p, c: colourOnly(p.fp, it.fp) }))
+      .sort((a,b) => a.c - b.c).slice(0, SHORTLIST);
+    if (!shortlist.length) { found.push({ it, win: null }); continue; }
+    const pinned = shortlist.map(({p}) => ({ p, d: pinDown(p.fp, it.fp) })).sort((a,b) => a.d - b.d);
+    found.push({ it, win: pinned[0], pinned });
+  }
+
+  // stage 3 — must beat the OTHER things, or it's just a patch that
+  // suits everything equally, which is background.
+  for (const f of found) {
+    if (!f.win) continue;
+    let edge = 64;
+    for (const other of items) {
+      if (other === f.it) continue;
+      edge = Math.min(edge, pinDown(f.win.p.fp, other.fp) - f.win.d);
+    }
+    if (items.length < 2) edge = EDGE_SURE;
+    f.edge = edge;
+    f.sure = edge >= EDGE_SURE && f.win.d <= SANITY;
+    f.maybe = !f.sure && edge >= EDGE_MAYBE && f.win.d <= SANITY;
+  }
+
+  $('prog').style.display = 'none';
+  draw(found, { EDGE_SURE, EDGE_MAYBE, SANITY });
+}
+
+// ── results ──────────────────────────────────────────────────────────
+
+function cropOf(p, px) {
+  const c = document.createElement('canvas');
+  c.width = c.height = px;
+  c.getContext('2d').drawImage(sceneBmp, p.x, p.y, p.side, p.side, 0, 0, px, px);
+  return c.toDataURL('image/jpeg', 0.85);
+}
+
+function draw(found, T) {
+  const cv = $('scene');
+  cv.width = sceneW; cv.height = sceneH;
+  const ctx = cv.getContext('2d');
+  ctx.drawImage(sceneBmp, 0, 0);
+  ctx.lineWidth = Math.max(3, Math.round(sceneW/260));
+  ctx.font = '600 ' + Math.max(15, Math.round(sceneW/45)) + 'px ui-sans-serif,system-ui,sans-serif';
+  for (const f of found) {
+    if (!f.win || (!f.sure && !f.maybe)) continue;
+    const p = f.win.p;
+    ctx.strokeStyle = f.sure ? '#4CAF50' : '#F9A825';
+    ctx.setLineDash(f.sure ? [] : [ctx.lineWidth*3, ctx.lineWidth*2]);
+    ctx.strokeRect(p.x, p.y, p.side, p.side);
+    ctx.setLineDash([]);
+    ctx.fillStyle = f.sure ? '#4CAF50' : '#F9A825';
+    ctx.fillText(f.it.name, p.x + 4, Math.max(18, p.y - 6));
+  }
+  $('sceneWrap').style.display = 'block';
+
+  // Side by side is the whole point: the reference next to the patch it
+  // actually chose. A ring alone tells you something was found; this
+  // tells you at a glance whether it found the right thing.
+  const sorted = found.slice().sort((a,b) => (a.win ? a.win.d : 99) - (b.win ? b.win.d : 99));
+  $('results').innerHTML = sorted.map(f => {
+    if (!f.win) return `<div class="row">
+      <div class="thumbs"><img src="${f.it.thumb}" alt=""></div>
+      <div class="meta"><div class="name">${f.it.name}</div>
+        <div class="verdict" style="color:var(--mute)">nothing to compare against</div></div></div>`;
+    const verdict = f.sure ? ['found', '#4CAF50']
+                  : f.maybe ? ['possible — check it', '#F9A825']
+                  : ['not found', '#8F877C'];
+    // 0 is a perfect match and 64 is nothing alike, so the bar is
+    // inverted to read as confidence rather than distance.
+    const pct = Math.max(0, Math.min(100, Math.round((1 - f.win.d/48) * 100)));
+    return `<div class="row">
+      <div class="thumbs">
+        <img src="${f.it.thumb}" alt="reference">
+        <span class="arrow">→</span>
+        <img src="${cropOf(f.win.p, 104)}" alt="what it picked">
+      </div>
+      <div class="meta">
+        <div class="name">${f.it.name}</div>
+        <div class="verdict" style="color:${verdict[1]}">${verdict[0]}</div>
+        <div class="score">match ${f.win.d.toFixed(1)} · beat the others by ${f.edge.toFixed(1)}</div>
+        <div class="bar"><i style="width:${pct}%;background:${verdict[1]}"></i></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const hits = found.filter(f => f.sure).length;
+  const maybes = found.filter(f => f.maybe).length;
+  $('resultsNote').innerHTML =
+    `<b>${hits} of ${items.length} found</b>${maybes ? ', ' + maybes + ' possible' : ''}.
+     Lower match is better — under ${T.SANITY} is plausible, and it also has to beat
+     every other thing by ${T.EDGE_SURE} to count as found. If the right-hand crop
+     is the wrong object, the numbers next to it show how close the near-miss was.`;
+  $('resultsCard').style.display = 'block';
+  $('resultsCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+renderItems();
+</script>
+</body>
+</html>
