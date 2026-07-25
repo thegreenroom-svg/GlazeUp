@@ -122,7 +122,7 @@
 <div class="acts">
   <button class="primary" id="sweepBtn">Photograph<span class="d">a shelf, or one stray</span></button>
   <button id="addBtn">Add<span class="d">new group</span></button>
-  <button id="testBtn">Test<span class="d">try it out</span></button>
+  <button id="testBtn">Test bed<span class="d">no booking</span></button>
 </div>
 
 <!-- booking detail -->
@@ -155,7 +155,7 @@
 <div class="sheet" id="tbSheet">
   <div class="sheethead">
     <div><div class="t">Test bed</div>
-      <div class="h">Real pottery, no booking touched, nothing saved</div></div>
+      <div class="h" id="tbHead">Real pottery, no booking touched, nothing saved</div></div>
     <button onclick="closeSheet('tbSheet')">Close</button>
   </div>
   <div class="sheetbody" id="tbBody"><div class="mut">
@@ -644,6 +644,10 @@ $('tbFind').onclick = () => pickImage(async raw => {
 });
 
 function renderTb(ran) {
+  const h = $('tbHead');
+  if (h) h.textContent = tb.length
+    ? `${tb.length} piece${tb.length === 1 ? '' : 's'} loaded — photograph another pile to test again`
+    : 'Real pottery, no booking touched, nothing saved';
   if (!tb.length) {
     $('tbBody').innerHTML = `<div class="mut">Photograph some pieces, then move them and
       photograph again. Every score is shown, so a near miss reads as a near miss.</div>`;
