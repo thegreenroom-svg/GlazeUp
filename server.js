@@ -8261,7 +8261,15 @@ app.post('/api/pieces/describe-shelf', async (req, res) => {
 });
 
 
-// POST /api/pieces/find-in-photo — the photo AND the list, one call.
+// POST /api/packing/find-listed — the photo AND the list, one call.
+//
+// NB the path. This was briefly registered as /api/pieces/find-in-photo,
+// which silently hijacked the existing Find My Piece flow: Express
+// matches the first route registered, so a screen sending
+// targetPhotoBase64/scenePhotoBase64 hit this handler instead and got
+// 'photoBase64 and wanted required'. Two handlers, one path, no
+// warning. Named under /api/packing/ so it cannot collide with the
+// per-piece endpoints again.
 //
 // [24 Jul, late] Matching description-to-description turned out to be
 // comparing two independent guesses. Measured in the studio: the same
@@ -8277,7 +8285,7 @@ app.post('/api/pieces/describe-shelf', async (req, res) => {
 // where, unprompted, it would have called it a boot. So the matching
 // moves to where the eyes are, and this code stops trying to bridge two
 // vocabularies with word overlap.
-app.post('/api/pieces/find-in-photo', async (req, res) => {
+app.post('/api/packing/find-listed', async (req, res) => {
   const { photoBase64, wanted, studioId } = req.body;
   if (!photoBase64 || !Array.isArray(wanted)) {
     return res.status(400).json({ error: 'photoBase64 and wanted required' });

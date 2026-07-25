@@ -313,7 +313,7 @@ function busy(on, text) {
 // never met. The model, shown the list, matches on what it can see.
 async function findInPhoto(rawPhoto, wanted) {
   const photoBase64 = await shrink(rawPhoto, 1400);
-  const r = await fetch(`${API}/api/pieces/find-in-photo`, {
+  const r = await fetch(`${API}/api/packing/find-listed`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ photoBase64, wanted, studioId }),
   });
