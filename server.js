@@ -931,7 +931,7 @@ app.post('/api/square/backfill', async (req, res) => {
   setImmediate(async () => {
     try {
       console.log(`[backfill] Started async backfill for studio ${studioId}, ${daysBack} days`);
-      const result = await syncSquareData(studioId, connection.square_access_token, daysBack || 30);
+      const result = await chunkedBackfill(studioId, connection.square_access_token, daysBack || 30);
       console.log(`[backfill] Complete: ${result.recordsSynced} orders synced`);
     } catch (error) {
       console.error('REAL backfill error, full stack:', error.stack);
