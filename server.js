@@ -8474,6 +8474,35 @@ app.post('/api/packing/find-listed', async (req, res) => {
         confidence: f.confidence === undefined ? null : f.confidence,
         saw: f.saw || '',
       }));
+    // IF NO CELLS CAME BACK, ASK AGAIN FOR JUST THE CELLS.
+    // Four rounds were lost to the cell field being quietly omitted
+    // from a six-field reply. Rather than hoping a firmer prompt fixes
+    // it, this asks a second, much smaller question — one job, one
+    // field — and only when the first attempt actually failed to
+    // provide them. Costs a second call on a minority of searches and
+    // nothing at all when the first reply is complete.
+    if (found.length && !found.some(f => f.cell)) {
+      try {
+        const askList = found.map((f, n) => `${n}: ${f.description}`).join('\n');
+        const { data: cellData } = await describeImage(photoBase64,
+          `A magenta grid is drawn over this photo. Columns are lettered A to E from ` +
+          `the left, rows numbered 1 to 5 from the top, and every cell is labelled in ` +
+          `its top-left corner.\n\n` +
+          `These pieces are in the photo:\n${askList}\n\n` +
+          `For each one, read off which grid cell it sits in. Nothing else.\n` +
+          `Reply with ONLY: [{"n":0,"cell":"C3"}]`);
+        const cells = Array.isArray(cellData) ? cellData : (cellData.cells || []);
+        for (const c of cells) {
+          if (c && typeof c.n === 'number' && found[c.n] && typeof c.cell === 'string') {
+            found[c.n].cell = c.cell.trim().toUpperCase();
+          }
+        }
+        console.log(`find-listed: second pass recovered ${found.filter(f => f.cell).length}/${found.length} cells`);
+      } catch (e) {
+        console.log('find-listed: cell retry failed —', e.message);
+      }
+    }
+
     // Say plainly whether the model gave cells. Four rounds of "no
     // circles" were spent guessing between "not deployed", "grid not
     // visible" and "field omitted" — this distinguishes them from the
