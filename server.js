@@ -907,6 +907,40 @@ app.get('/api/takings/history', async (req, res) => {
 // actually gets real, existing Square sales history into
 // analytics_cache immediately, rather than waiting 30 real days for
 // the daily job to slowly build it up from scratch.
+// Walks backwards in 90-day windows, pausing between them. Memory
+// stays flat because each window is fetched, aggregated and discarded
+// before the next begins — where a single 1,667-day call held every
+// order at once and restarted the process on a 512MB instance.
+//
+// [25 Jul] This definition was lost once already: the scripted edit
+// that should have added it asserted and failed, while a second edit
+// that switched the caller over succeeded. The result was a call with
+// no function — 'chunkedBackfill is not defined' — shipped and run
+// against the live server. Same shape as the earlier 'backed' bug.
+async function chunkedBackfill(studioId, token, daysBack, windowDays = 90) {
+  const today = new Date();
+  let windows = 0, orders = 0;
+  for (let offset = 0; offset < daysBack; offset += windowDays) {
+    const until = new Date(today);
+    until.setDate(until.getDate() - offset);
+    const span = Math.min(windowDays, daysBack - offset);
+    const untilStr = until.toISOString().slice(0, 10);
+    try {
+      const r = await syncSquareData(studioId, token, offset + span, untilStr);
+      orders += (r && r.recordsSynced) || 0;
+      windows++;
+      console.log(`[backfill] window to ${untilStr} (${span}d) — ${(r && r.recordsSynced) || 0} orders`);
+    } catch (e) {
+      console.error(`[backfill] window to ${untilStr} failed:`, e.message);
+    }
+    // Breathe: lets the event loop serve real requests, and gives the
+    // heap a chance to be collected between windows.
+    await new Promise(r => setTimeout(r, 2500));
+  }
+  console.log(`[backfill] finished — ${windows} windows, ${orders} orders`);
+  return { windows, orders, recordsSynced: orders };
+}
+
 app.post('/api/square/backfill', async (req, res) => {
   const { studioId, daysBack } = req.body;
   if (!studioId) return res.status(400).json({ error: 'studio_id required' });

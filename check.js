@@ -56,6 +56,9 @@ setTimeout setInterval clearTimeout clearInterval requestAnimationFrame cancelAn
 alert confirm prompt localStorage sessionStorage encodeURIComponent decodeURIComponent
 parseInt parseFloat isNaN isFinite URL URLSearchParams AbortController MutationObserver
 createImageBitmap devicePixelRatio getComputedStyle IntersectionObserver ResizeObserver
+setImmediate queueMicrotask ArrayBuffer Uint8Array Uint8ClampedArray Int8Array Float32Array
+BigInt Proxy Reflect TextEncoder TextDecoder AbortSignal Response Request Headers
+async await atob btoa performance crypto
 require module exports process Buffer __dirname __filename global structuredClone
 undefined null true false NaN Infinity this arguments cv Tesseract THREE
 `.trim().split(/\s+/));
@@ -105,27 +108,41 @@ function calledNames(code) {
   const stripped = code
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+    // Regex literals: /\bthere(?:'ll| will)/ read as a call to there().
+    // Matched only where a regex can legally start, so division isn't
+    // mistaken for one.
+    .replace(/(^|[=(,:;&|!?{}\[\]\n]\s*)\/(?![*\/])(?:[^\/\\\n]|\\.)+\/[gimsuy]*/g, '$1/RE/')
     .replace(/`(?:[^`\\]|\\.)*`/g, '``')
     .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
     .replace(/"(?:[^"\\\n]|\\.)*"/g, '""');
   for (const m of stripped.matchAll(/(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(/g)) {
     const n = m[1];
     if (BUILTIN.has(n)) continue;
-    if (/^(if|for|while|switch|catch|return|typeof|new|function|await|else|do|throw|delete|void|in|of|case)$/.test(n)) continue;
+    if (/^(if|for|while|switch|catch|return|typeof|new|function|await|async|else|do|throw|delete|void|in|of|case|yield)$/.test(n)) continue;
     c.set(n, (c.get(n) || 0) + 1);
   }
   return c;
 }
 
-function checkNames(name, code) {
+// Node files get NO name filter: there are few ambient globals, so
+// anything called and not defined is worth reporting. Browser files
+// keep a prefix filter, otherwise every DOM and library global would
+// be reported.
+//
+// [25 Jul] This filter is why 'chunkedBackfill is not defined' reached
+// the live server minutes after the checker was written to catch
+// exactly that. The name did not match the prefix list, so it was
+// skipped. A checker that only looks where it expects trouble is not a
+// checker.
+const BROWSER_PREFIX = /^(_|kc|tb|open|load|render|draw|say|show|close|paint|assign|find|describe|shrink|gridded|cell|pick|money|nice|esc|words|weight|similarity|build|sort|gaps|edit|mark|zoom|sweep|match|apply|check|sync|chunk|handle|update|get|set|is|has|to|fmt|format)/i;
+
+function checkNames(name, code, isNode) {
   const def = definedNames(code);
   const missing = [];
   for (const [n, count] of calledNames(code)) {
     if (def.has(n)) continue;
     if (BUILTIN.has(n)) continue;
-    // Only our own naming conventions, to stay quiet about globals.
-    if (/^(_|kc|tb|open|load|render|draw|say|show|close|paint|assign|find|describe|shrink|gridded|cell|pick|money|nice|esc|words|weight|similarity|build|sort|gaps|edit|mark|zoom|sweep|match|apply)/i.test(n))
-      missing.push(`${n}() ×${count}`);
+    if (isNode || BROWSER_PREFIX.test(n)) missing.push(`${n}() ×${count}`);
   }
   if (missing.length) fail(`${name}: called but never defined — ${missing.join(', ')}`);
 }
@@ -222,7 +239,7 @@ for (const f of JS) {
   if (!code) { warn(`${f}: not found`); continue; }
   checked++;
   syntax(f, code);
-  checkNames(f, f === 'demo-skin.js' ? code + '\n;\n' + dashJs : code);
+  checkNames(f, f === 'demo-skin.js' ? code + '\n;\n' + dashJs : code, f === 'server.js' || f === 'shelf-matcher.js');
   if (f !== 'server.js') checkEndpoints(f, code, routes);
 }
 
