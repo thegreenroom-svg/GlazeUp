@@ -34804,6 +34804,220 @@ if (typeof document !== 'undefined') {
 // the back that already works. Fully guarded: if anything's missing it
 // silently no-ops and the app behaves exactly as before.
 // ═══════════════════════════════════════════════════════════════════
+
+// ── NO-SCROLL PAGINATOR ────────────────────────────────────────────
+// [25 Jul] The original brief, restated: "never scroll up/down to see a
+// whole page — fits the screen, overflow paginates sideways or nests."
+// It has been open since the 22nd because I recorded fit-to-screen as
+// per-screen content work. That was wrong. The screens share one
+// structure — a .view holding .chart-container cards — so the overflow
+// can be paged sideways by a single global layer, exactly as the
+// springboard shell handled motion globally.
+//
+// What it does: measures the cards in the visible .view, packs them
+// into screen-sized pages, and shows one page at a time with dots and
+// a swipe. Nothing is hidden — it moves sideways instead of down.
+//
+// Deliberately defensive. If anything here fails or a single card is
+// genuinely taller than the screen, the view falls back to ordinary
+// scrolling: a page that scrolls is worse than the brief, but a page
+// that swallows its own content is worse than either.
+
+// ── TYPE TO NARROW ─────────────────────────────────────────────────
+// [25 Jul] Daisy: "we're just scrolling down through bloody page after
+// page of bookings if it's really busy." A Find Booking screen already
+// existed, but it was a small text link on one screen — so the actual
+// behaviour was still scrolling. The fix isn't another search page,
+// it's making the list in front of you shrink as you type.
+//
+// Auto-attaches to any list that has grown long enough to be a
+// nuisance. No per-screen wiring, so it covers lists that don't exist
+// yet.
+(function _kcListFilter() {
+  const MIN_ROWS = 8;          // below this, scanning by eye is faster
+  const MARK = 'kcFiltered';
+
+  function rowsOf(el) {
+    return Array.from(el.children).filter(c =>
+      !c.classList.contains('kc-filterbar') && c.nodeType === 1);
+  }
+
+  function attach(list) {
+    if (list.dataset[MARK]) return;
+    const rows = rowsOf(list);
+    if (rows.length < MIN_ROWS) return;
+    list.dataset[MARK] = '1';
+
+    const bar = document.createElement('div');
+    bar.className = 'kc-filterbar';
+    bar.innerHTML = `<input type="search" placeholder="Type a name to narrow this list"
+      autocapitalize="off" autocorrect="off" spellcheck="false">
+      <span class="kc-fcount"></span>`;
+    list.parentNode.insertBefore(bar, list);
+
+    const input = bar.querySelector('input');
+    const count = bar.querySelector('.kc-fcount');
+
+    const run = () => {
+      const q = input.value.trim().toLowerCase();
+      let shown = 0;
+      for (const r of rowsOf(list)) {
+        const hit = !q || (r.textContent || '').toLowerCase().includes(q);
+        r.style.display = hit ? '' : 'none';
+        if (hit) shown++;
+      }
+      count.textContent = q ? `${shown} of ${rowsOf(list).length}` : '';
+      // The paginator re-packs whatever is now visible, so filtering
+      // and paging cooperate instead of fighting.
+      if (window._kcRepage) window._kcRepage();
+    };
+    input.addEventListener('input', run);
+    input.addEventListener('search', run);
+  }
+
+  function scan() {
+    // Any container whose id or class suggests it holds a list of rows.
+    document.querySelectorAll('[id$="-list"], [id$="-bookings"], .kc-list')
+      .forEach(el => { try { attach(el); } catch (e) {} });
+  }
+
+  let t = null;
+  const later = () => { clearTimeout(t); t = setTimeout(scan, 250); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', later);
+  else later();
+  new MutationObserver(later).observe(document.body, { childList: true, subtree: true });
+})();
+
+(function _noScrollPager() {
+  const SKIP = new Set(['floor-plan-view']);   // draws its own fitted SVG
+  let raf = null, io = null;
+
+  function activeView() {
+    const vs = document.querySelectorAll('.view');
+    for (const v of vs) {
+      if (SKIP.has(v.id)) continue;
+      const st = getComputedStyle(v);
+      if (st.display !== 'none' && v.offsetParent !== null) return v;
+    }
+    return null;
+  }
+
+  function cardsOf(view) {
+    // Direct children only: nested cards belong to their parent card.
+    return Array.from(view.children).filter(el => {
+      if (el.classList.contains('kc-pagebar')) return false;
+      const st = getComputedStyle(el);
+      return st.display !== 'none' && st.position !== 'fixed' && st.position !== 'absolute';
+    });
+  }
+
+  function clear(view) {
+    view.classList.remove('kc-paged');
+    view.style.removeProperty('overflow-y');
+    for (const el of view.children) el.style.removeProperty('display');
+    const bar = view.querySelector(':scope > .kc-pagebar');
+    if (bar) bar.remove();
+  }
+
+  function layout() {
+    const view = activeView();
+    if (!view) return;
+    clear(view);
+
+    const cards = cardsOf(view);
+    if (cards.length < 2) return;                 // nothing to page
+
+    const budget = view.clientHeight;
+    if (!budget) return;
+
+    // Measure once, with everything visible.
+    const heights = cards.map(c => c.getBoundingClientRect().height +
+      parseFloat(getComputedStyle(c).marginTop || 0) +
+      parseFloat(getComputedStyle(c).marginBottom || 0));
+    const total = heights.reduce((a, b) => a + b, 0);
+    const BAR = 34;                               // room for the dots
+    if (total <= budget) return;                  // already fits, leave alone
+
+    // Any single card taller than the screen can't be paged. Let the
+    // view scroll rather than hiding half of it.
+    if (heights.some(h => h > budget - BAR)) { view.style.overflowY = 'auto'; return; }
+
+    const pages = [];
+    let cur = [], used = 0;
+    cards.forEach((c, i) => {
+      if (used + heights[i] > budget - BAR && cur.length) { pages.push(cur); cur = []; used = 0; }
+      cur.push(c); used += heights[i];
+    });
+    if (cur.length) pages.push(cur);
+    if (pages.length < 2) return;
+
+    view.classList.add('kc-paged');
+    let at = 0;
+    const bar = document.createElement('div');
+    bar.className = 'kc-pagebar';
+
+    const show = (n) => {
+      at = Math.max(0, Math.min(pages.length - 1, n));
+      cards.forEach(c => { c.style.display = 'none'; });
+      pages[at].forEach(c => { c.style.removeProperty('display'); });
+      bar.querySelectorAll('.kc-dot').forEach((d, i) => d.classList.toggle('on', i === at));
+      const prev = bar.querySelector('.kc-pv'), next = bar.querySelector('.kc-nx');
+      if (prev) prev.disabled = at === 0;
+      if (next) next.disabled = at === pages.length - 1;
+    };
+
+    bar.innerHTML = `<button class="kc-pv" aria-label="Previous">‹</button>`
+      + pages.map((_, i) => `<span class="kc-dot" data-i="${i}"></span>`).join('')
+      + `<button class="kc-nx" aria-label="Next">›</button>`;
+    view.appendChild(bar);
+    bar.querySelector('.kc-pv').onclick = () => show(at - 1);
+    bar.querySelector('.kc-nx').onclick = () => show(at + 1);
+    bar.querySelectorAll('.kc-dot').forEach(d => d.onclick = () => show(+d.dataset.i));
+
+    // Swipe between pages. Horizontal only, and never at the very left
+    // edge — that gesture already means "back" in this app.
+    let x0 = null, y0 = null;
+    view.addEventListener('touchstart', e => {
+      const t = e.touches[0];
+      x0 = t.clientX < 28 ? null : t.clientX; y0 = t.clientY;
+    }, { passive: true });
+    view.addEventListener('touchend', e => {
+      if (x0 === null) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - x0, dy = t.clientY - y0;
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) show(at + (dx < 0 ? 1 : -1));
+      x0 = null;
+    }, { passive: true });
+
+    show(0);
+  }
+
+  const relayout = () => {
+    if (raf) cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => setTimeout(layout, 60));
+  };
+
+  // Re-page whenever a screen changes, its content loads, or the phone
+  // turns. Debounced so a burst of DOM writes costs one pass.
+  window.addEventListener('resize', relayout);
+  window.addEventListener('orientationchange', relayout);
+  document.addEventListener('visibilitychange', relayout);
+
+  function watch() {
+    if (io) io.disconnect();
+    io = new MutationObserver(() => relayout());
+    document.querySelectorAll('.view').forEach(v => {
+      if (!SKIP.has(v.id)) io.observe(v, { childList: true, subtree: true });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => { watch(); relayout(); });
+  } else { watch(); relayout(); }
+
+  window._kcRepage = relayout;   // for anything that rebuilds a screen
+})();
+
 (function _springboardShell() {
   // Mark the next screen-show as a "back" so the slide reverses. goToTab
   // clears it after applying, so only the one intended transition flips.
@@ -34964,6 +35178,75 @@ if (typeof window !== 'undefined' && typeof window._manualFloorSync !== 'functio
      .chart-container (68 uses), so theming those + inputs + headers
      reskins the whole app into the Desk's sketchbook world at once.
      Engine untouched. Inline-styled elements keep their styles. -->
+<style id="kc-filter">
+.kc-filterbar{display:flex;align-items:center;gap:8px;margin:0 0 9px}
+.kc-filterbar input{
+  flex:1;min-width:0;font:inherit;font-size:14px;
+  padding:9px 12px;border-radius:10px;
+  border:1.5px solid rgba(43,39,36,.15);
+  background:#FFFDF9;color:#2B2724;-webkit-appearance:none;
+}
+.kc-filterbar input:focus{outline:none;border-color:var(--link-clay,#B87946)}
+.kc-fcount{font-size:11px;color:var(--gu-dust);white-space:nowrap;font-variant-numeric:tabular-nums}
+@media (prefers-color-scheme:dark){
+  .kc-filterbar input{background:#2B2724;color:#F4ECE0;border-color:rgba(244,236,224,.2)}
+}
+</style>
+<style id="kc-ink">
+/* [25 Jul] The handwritten text reads washed out against paper —
+   #8a8175 dust is right for a caption but too pale for a heading
+   someone is meant to read across a busy studio at arm's length.
+   Darkened one step, not to full ink, so the sketchbook feel survives. */
+:root{ --gu-dust:#6f665b; }
+h1,h2,h3,h4,
+[style*="Caveat"],[style*="Architects Daughter"]{
+  color:#2B2724;
+}
+/* The pale-on-pale captions specifically. */
+[style*="color:#c8bfb0"]{ color:#9c9184 !important; }
+[style*="color:#8a8175"]{ color:#6f665b !important; }
+@media (prefers-color-scheme:dark){
+  :root{ --gu-dust:#a49a8d; }
+  h1,h2,h3,h4,[style*="Caveat"],[style*="Architects Daughter"]{ color:#F4ECE0; }
+  [style*="color:#8a8175"]{ color:#a49a8d !important; }
+  [style*="color:#c8bfb0"]{ color:#b8ad9e !important; }
+}
+</style>
+<style id="kc-nopage">
+/* [25 Jul] The brief: a page fits the screen, overflow goes sideways.
+   Views are bounded to the viewport so the paginator has a real height
+   to measure against; it then packs the cards into pages. dvh rather
+   than vh so the iOS toolbar appearing doesn't crop the last card. */
+.view{
+  height:100dvh;
+  max-height:100dvh;
+  overflow:hidden;
+  box-sizing:border-box;
+}
+/* Draws its own fitted SVG and manages its own space. */
+#floor-plan-view{height:auto;max-height:none;overflow:visible}
+
+/* The page control. Deliberately quiet — it should read as "there is
+   more this way", not as a piece of chrome competing with the work. */
+.kc-pagebar{
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  padding:7px 0 2px; margin-top:auto;
+}
+.kc-pagebar button{
+  background:none; border:none; font-size:20px; line-height:1;
+  color:var(--gu-dust,#8a8175); padding:2px 10px; cursor:pointer;
+}
+.kc-pagebar button:disabled{opacity:.25}
+.kc-dot{
+  width:7px; height:7px; border-radius:50%;
+  background:rgba(43,39,36,.22); cursor:pointer; transition:background .2s,transform .2s;
+}
+.kc-dot.on{background:var(--link-clay,#B87946); transform:scale(1.25)}
+.view.kc-paged{display:flex; flex-direction:column}
+@media (prefers-color-scheme:dark){
+  .kc-dot{background:rgba(244,236,224,.22)}
+}
+</style>
 <style id="kc-unify">
   body, .view {
     background: #FFF9F0 !important;
