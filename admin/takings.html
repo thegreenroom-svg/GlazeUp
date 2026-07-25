@@ -42,6 +42,16 @@
   .pill{font-size:11.5px; background:rgba(184,121,70,.1); border:1px solid rgba(184,121,70,.28);
     border-radius:20px; padding:4px 10px; font-variant-numeric:tabular-nums}
 
+
+  /* Dock, matching the main app. These pages are separate HTML files
+     so they never inherited it — you could reach them but not move on
+     from them, which is why Daisy said "can't move around". */
+  .dock{flex-shrink:0; display:flex; gap:2px; justify-content:space-around;
+    background:#2B2724; border-radius:16px; padding:7px 4px; margin-top:9px}
+  .dock a{flex:1; text-align:center; text-decoration:none; color:#8F877C;
+    font-size:10px; padding:5px 2px; border-radius:11px; line-height:1.35}
+  .dock a .i{display:block; font-size:16px; line-height:1}
+  .dock a.on{color:#F4ECE0; background:rgba(244,236,224,.1)}
   .acts{flex-shrink:0; display:flex; gap:7px; padding-top:9px}
   button{font:inherit; cursor:pointer; border-radius:12px; border:1.5px solid var(--line);
     background:var(--panel); color:var(--ink); padding:12px 10px; flex:1; line-height:1.2}
@@ -57,7 +67,7 @@
   <h1>Takings</h1>
   <div class="n" id="range">Loading…</div>
   <a href="/admin/packing.html" id="packBtn" title="Packing">📦</a>
-  <a href="/admin/dashboard-local.html" title="Back">✕</a>
+  <a href="/admin/dashboard-local.html?go=home" title="Back to the Desk">✕</a>
 </div>
 
 <div class="body">
@@ -67,6 +77,14 @@
     <canvas id="chart"></canvas>
     <div class="rows" id="weekdays"></div>
   </div>
+</div>
+
+<div class="dock" id="dock">
+  <a href="/admin/dashboard-local.html?go=home"><span class="i">⌂</span>Desk</a>
+  <a href="/admin/dashboard-local.html?go=floor"><span class="i">◉</span>Floor</a>
+  <a href="/admin/packing.html" data-here="packing"><span class="i">◍</span>Pieces</a>
+  <a href="/admin/takings.html" data-here="takings"><span class="i">£</span>Money</a>
+  <a href="/admin/dashboard-local.html?go=menu"><span class="i">☰</span>Menu</a>
 </div>
 
 <div class="acts">
@@ -219,6 +237,18 @@ $('backfillBtn').onclick = async () => {
     $('backfillBtn').disabled = false;
   }
 };
+
+
+// Carry the studio through every dock link, and mark where we are.
+(function dock() {
+  const here = location.pathname.includes('takings') ? 'takings' : 'packing';
+  document.querySelectorAll('#dock a').forEach(a => {
+    const u = new URL(a.getAttribute('href'), location.origin);
+    u.searchParams.set('studio', studioId);
+    a.setAttribute('href', u.pathname + u.search);
+    if (a.dataset.here === here) a.classList.add('on');
+  });
+})();
 
 load();
 </script>

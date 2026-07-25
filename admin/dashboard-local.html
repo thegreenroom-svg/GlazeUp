@@ -16639,6 +16639,31 @@ async function landOnHome() {
   // Cleared from the URL after firing so a later manual reload of the
   // same address (bookmarked, or re-opened from Safari's tab switcher)
   // doesn't keep bouncing back to Music every time.
+  // [25 Jul] ?go=home — an explicit, unambiguous "put me on the Desk".
+  // Daisy: "I keep getting sent to the floor plan instead of home."
+  // Leaving Packing or Takings reloads this page, and the landing logic
+  // has several routes through it (personal home, flow graph, shift
+  // login, demo Desk) any of which can leave you somewhere else. Rather
+  // than untangle that tonight, the standalone pages now ask for home
+  // in as many words and this honours it after everything else settles.
+  const _go = new URLSearchParams(location.search).get('go');
+  if (_go) {
+    history.replaceState({}, '', location.pathname);
+    setTimeout(() => {
+      try {
+        if (_go === 'home') {
+          if (window.KC && typeof KC.showCanvas === 'function') KC.showCanvas();
+          else if (typeof goToRealLandingPage === 'function') goToRealLandingPage();
+        } else if (_go === 'floor') {
+          if (typeof loadFloorPlan === 'function') loadFloorPlan();
+        } else if (_go === 'menu') {
+          if (typeof showGridNav === 'function') showGridNav();
+          else if (typeof _flowGraphEnter === 'function') _flowGraphEnter();
+        }
+      } catch (e) { console.warn('[go] failed', _go, e); }
+    }, 400);
+  }
+
   if (new URLSearchParams(location.search).get('openMusic') === '1') {
     history.replaceState({}, '', location.pathname);
     setTimeout(() => _tileGoToTab('music', 'openMusic'), 50);
