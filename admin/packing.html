@@ -525,8 +525,18 @@ function drawPhoto(raw, marks) {
     // it put two jugs on a butter dish — so the honest display is the
     // area it can actually vouch for. Coarse and true beats precise
     // and wrong: a wrong ring sends someone to the wrong shelf.
-    const COL = { left: 0, centre: 1, center: 1, right: 2 };
-    const ROW = { top: 0, middle: 1, bottom: 2 };
+    // Tolerant on purpose. Strict 'middle-left' parsing rejected
+    // perfectly good answers three times over — 'middle left',
+    // 'centre-left', 'Middle-Left', 'left-middle' are all the same
+    // place, and refusing them showed nothing while the message
+    // claimed something was shaded. Read the words, not the format.
+    const zoneToCell = (z) => {
+      const t = String(z || '').toLowerCase();
+      const row = /top|upper|back/.test(t) ? 0 : /bottom|lower|front/.test(t) ? 2 : 1;
+      const col = /left/.test(t) ? 0 : /right/.test(t) ? 2 : 1;
+      if (!/top|upper|back|bottom|lower|front|left|right|middle|centre|center/.test(t)) return null;
+      return [row, col];
+    };
     const fs = Math.max(17, Math.round(img.width / 32));
     ctx.font = '700 ' + fs + 'px ui-sans-serif,system-ui,sans-serif';
     ctx.textAlign = 'center';
@@ -534,10 +544,9 @@ function drawPhoto(raw, marks) {
     // Several pieces can share a zone; stack their labels.
     const perZone = {};
     for (const m of marks) {
-      if (!m.zone) continue;
-      const [r, c] = String(m.zone).split('-');
-      if (!(r in ROW) || !(c in COL)) continue;
-      const key = ROW[r] + ',' + COL[c];
+      const cell = zoneToCell(m.zone);
+      if (!cell) continue;
+      const key = cell[0] + ',' + cell[1];
       (perZone[key] = perZone[key] || []).push(m);
     }
 
@@ -664,7 +673,9 @@ $('tbFind').onclick = () => pickImage(async raw => {
     // instructions for a step that had already happened. And when no
     // zone comes back nothing gets shaded — which looked identical to
     // a failure. Say which of those it is.
-    const placed = rings.length;
+    // Count what will actually be drawn, not what was returned — the
+    // message promised shading three times while drawing nothing.
+    const placed = rings.filter(r => r.zone).length;
     say(hits
       ? `<b>Test: ${hits} of ${tb.length} found.</b> `
         + (placed
