@@ -7969,7 +7969,15 @@ app.post('/api/floor/items/:bookingCode', async (req, res) => {
 });
 
 // POST /api/floor/layout — save chair layout for a table
-app.post('/api/floor/layout', async (req, res) => {
+// POST /api/floor/chairs — per-table chair layout.
+//
+// [25 Jul] Renamed from /api/floor/layout, which it shared with the
+// table-positions handler registered ~700 lines earlier. Express
+// matches the FIRST registration, so this one has never been reached:
+// any call landed on the positions handler and was rejected with
+// 'studioId and positions array required'. Nothing calls it today, so
+// nothing breaks by moving it — and it now works if anything ever does.
+app.post('/api/floor/chairs', async (req, res) => {
   const { studioId, tableName, chairs, splitPosition, isSplit } = req.body;
   const { error } = await supabase.from('table_chair_layouts').upsert({
     studio_id: studioId, table_name: tableName,

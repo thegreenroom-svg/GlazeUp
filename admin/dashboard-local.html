@@ -30223,7 +30223,12 @@ async function loadStaffCommunityFeed() {
 async function featureCommunityPost(postId) {
   try {
     await fetch(`${API_URL}/api/community/posts/${postId}/feature`, { method: 'POST' });
-    loadCommunityFeed();
+    // Was loadCommunityFeed() — no such function. Featuring a post
+    // threw a ReferenceError caught by the catch below, so it reported
+    // 'Could not feature post: loadCommunityFeed is not defined' even
+    // though the post HAD been featured. The real name is
+    // loadStaffCommunityFeed.
+    loadStaffCommunityFeed();
   } catch (err) {
     alert('Could not feature post: ' + err.message);
   }

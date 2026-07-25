@@ -395,9 +395,10 @@ async function findInPhoto(rawPhoto, wanted) {
   const out = await r.json();
   loadCost();
   lastAllPottery = out.allPottery || [];
+  lastDiag = out.diag || null;
   return out.found || [];
 }
-let lastAllPottery = [];
+let lastAllPottery = [], lastDiag = null;
 
 async function describe(kind, rawPhoto) {
   const photoBase64 = await shrink(rawPhoto, 1400);
@@ -793,8 +794,18 @@ async function tbFindWith(raw) {
       const t = tb[Number(f.id)];
       if (!t) continue;
       t.found = true; t.saw = f.saw; t.conf = f.confidence;
-      if (f.x !== null && f.y !== null)
-        rings.push({ x: f.x, y: f.y, label: t.description.split(',')[0], conf: f.confidence });
+      // Push regardless of whether a cell came back: a found piece must
+      // still be named even when it cannot be placed. drawPhoto sorts
+      // placed from unplaced itself.
+      {
+        // Was still pushing x/y from the abandoned coordinate version,
+        // so drawPhoto had no cell to place and every test bed run fell
+        // through to 'somewhere here'. The sweep path was updated when
+        // the grid landed; this one was missed, and the test bed is
+        // what was actually being used.
+        rings.push({ label: t.description.split(',')[0], conf: f.confidence,
+                     cell: f.cell, size: f.size });
+      }
     }
     renderTb(true);
     // The circled photo goes to the main screen — a photograph belongs
@@ -803,15 +814,28 @@ async function tbFindWith(raw) {
     lastPhoto = raw; drawPhoto(raw, rings);
     const hits = tb.filter(t => t.found).length;
     // The panel closes itself, so telling someone to close it was
-    // instructions for a step that had already happened. And when no
-    // a failure. Say which of those it is.
-    // Count what will actually be drawn, not what was returned — the
-    // message promised shading three times while drawing nothing.
+    // instructing a step that had already happened.
+    //
+    // The cell diagnostic below was written in 4429e70 and then
+    // silently deleted by my own 'try another angle' edit two commits
+    // later, which rewrote this same say() call. Four rounds of "still
+    // no circles" followed, with the one message that would have
+    // explained them missing from the build. Both belong here: the
+    // retry action AND the reason.
     const missed = tb.length - hits;
+    const placed = rings.filter(r => r.cell).length;
+    let tail;
+    if (missed) {
+      tail = `<em>${missed} not spotted — another angle may catch ${missed === 1 ? 'it' : 'them'}.</em>`;
+    } else if (placed) {
+      tail = `<em>Circled.</em>`;
+    } else {
+      tail = `<em>Found, but no grid cell came back`
+        + (lastDiag ? ` — it replied ${esc(lastDiag.sample || '(nothing)')}` : '')
+        + `.</em>`;
+    }
     say(hits
-      ? `<b>Test: ${hits} of ${tb.length} found.</b> `
-        + (missed ? `<em>${missed} not spotted — another angle may catch ${missed === 1 ? 'it' : 'them'}.</em>`
-                  : `<em>Named on the photo.</em>`)
+      ? `<b>Test: ${hits} of ${tb.length} found.</b> ` + tail
       : `<b>Test: none matched.</b> <em>It saw: ${lastAllPottery.length
           ? esc(lastAllPottery.join('; ')) : 'no pottery at all'}.</em>`,
       missed ? { label: '📷 Try another angle', run: tbRunFind } : null);
