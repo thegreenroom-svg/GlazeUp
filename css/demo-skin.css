@@ -363,7 +363,10 @@ html.demo-skin .kc-strip {
   display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap;
   padding: 2px 2px 0;
 }
-html.demo-skin .kc-stat { font-size: 12px; color: var(--kc-ink); opacity: 0.7; }
+/* [25 Jul] Was opacity .7 — read washed out at arm's length across a
+   busy studio. Lifted to .85; the label still sits behind the figure
+   because .kc-stat b carries opacity 1 and the heavier weight. */
+html.demo-skin .kc-stat { font-size: 12px; color: var(--kc-ink); opacity: 0.85; }
 html.demo-skin .kc-stat b { font-size: 17px; font-weight: 800; opacity: 1; margin-right: 3px; }
 
 /* staggered arrival — plain nth-child delays, deliberately NOT using
@@ -386,7 +389,9 @@ html.demo-skin .kc-paper > .kc-in:nth-of-type(7) { animation-delay: 0.35s; }
 html.demo-skin .kc-masthead { display: flex; align-items: center; gap: 12px; }
 html.demo-skin .kc-mark { width: 46px; height: 46px; object-fit: contain; border-radius: 10px; }
 html.demo-skin .kc-house { font-family: 'Fraunces', Georgia, serif; font-weight: 900; letter-spacing: 0.16em; font-size: 15px; }
-html.demo-skin .kc-house-sub { font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; opacity: 0.55; margin-top: 2px; }
+/* [25 Jul] Secondary text lifted 0.55->0.72 and 0.6->0.75 throughout:
+   legible at arm's length without losing the hierarchy. */
+html.demo-skin .kc-house-sub { font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; opacity: 0.72; margin-top: 2px; }
 
 html.demo-skin .kc-hello { font-family: 'Caveat', cursive; font-size: 44px; line-height: 1; margin: 22px 0 2px; color: var(--kc-brick); }
 html.demo-skin .kc-wave-line {
@@ -403,7 +408,7 @@ html.demo-skin .kc-fig {
   box-shadow: 0 4px 14px rgba(43, 39, 36, 0.08);
 }
 html.demo-skin .kc-fig-n { font-family: 'Fraunces', Georgia, serif; font-weight: 900; font-size: 24px; line-height: 1; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-html.demo-skin .kc-fig-l { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.55; margin-top: 6px; }
+html.demo-skin .kc-fig-l { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.72; margin-top: 6px; }
 
 /* skeletons that shimmer until real data lands */
 html.demo-skin .kc-skel, html.demo-skin .kc-skel-t {
@@ -416,7 +421,7 @@ html.demo-skin .kc-skel { height: 56px; margin-bottom: 10px; }
 
 html.demo-skin .kc-paper > .kc-section { margin-top: 0; }
 html.demo-skin .kc-section { margin-top: 26px; }
-html.demo-skin .kc-sec-title { font-size: 11px; letter-spacing: 0.24em; font-weight: 800; opacity: 0.55; margin-bottom: 10px; }
+html.demo-skin .kc-sec-title { font-size: 11px; letter-spacing: 0.24em; font-weight: 800; opacity: 0.72; margin-bottom: 10px; }
 
 /* THE STUDIO — the three spaces as tappable zones, in the same colours as
    the real floor plan (Lounge teal, Main dark, Vault purple). The heart of
@@ -436,7 +441,7 @@ html.demo-skin .kc-room-lounge { background: linear-gradient(160deg, #004D40 0%,
 html.demo-skin .kc-room-main   { background: linear-gradient(160deg, #2A2420 0%, #1A1714 100%); box-shadow: inset 0 0 0 1px rgba(184,121,70,0.22); }
 html.demo-skin .kc-room-vault  { background: linear-gradient(160deg, #1A0050 0%, #0D0030 100%); }
 html.demo-skin .kc-room-name { font-size: 14px; font-weight: 800; line-height: 1.1; letter-spacing: 0.01em; }
-html.demo-skin .kc-room-sub { font-size: 10px; font-weight: 600; opacity: 0.6; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.06em; }
+html.demo-skin .kc-room-sub { font-size: 10px; font-weight: 600; opacity: 0.75; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.06em; }
 html.demo-skin .kc-room-count {
   position: absolute; top: 10px; right: 10px;
   font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 20px;
@@ -451,7 +456,7 @@ html.demo-skin .kc-floor-all {
   color: var(--m-accent, #B87946); font-size: 12px; font-weight: 700;
   padding: 6px; cursor: pointer; text-align: center;
 }
-html.demo-skin .kc-floor-all:active { opacity: 0.6; }
+html.demo-skin .kc-floor-all:active { opacity: 0.75; }
 
 /* THE DESK — the shortcuts as Apple-home squares. Tap one, its screen
    slides in. A clean 3-across grid of rounded tiles. */
@@ -544,8 +549,8 @@ html.demo-skin .kc-slot-t { font-family: 'Fraunces', Georgia, serif; font-weight
 html.demo-skin .kc-slot-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--kc-brick); box-shadow: 0 0 0 4px rgba(163, 45, 33, 0.14); flex-shrink: 0; }
 html.demo-skin .kc-slot-body { display: flex; flex-direction: column; min-width: 0; }
 html.demo-skin .kc-slot-body b { font-size: 14.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-html.demo-skin .kc-slot-body i { font-style: normal; font-size: 11.5px; opacity: 0.6; }
-html.demo-skin .kc-more, html.demo-skin .kc-empty { font-size: 12.5px; opacity: 0.6; padding: 12px 2px; }
+html.demo-skin .kc-slot-body i { font-style: normal; font-size: 11.5px; opacity: 0.75; }
+html.demo-skin .kc-more, html.demo-skin .kc-empty { font-size: 12.5px; opacity: 0.75; padding: 12px 2px; }
 
 /* THE DESK / MENU index — a menu card, typographic rows */
 html.demo-skin .kc-row {
@@ -555,7 +560,7 @@ html.demo-skin .kc-row {
 }
 html.demo-skin .kc-row:active { background: rgba(163, 45, 33, 0.06); }
 html.demo-skin .kc-row-t { font-family: 'Fraunces', Georgia, serif; font-weight: 700; font-size: 19px; grid-row: 1; }
-html.demo-skin .kc-row-d { font-size: 11.5px; opacity: 0.55; grid-row: 2; margin-top: 2px; }
+html.demo-skin .kc-row-d { font-size: 11.5px; opacity: 0.72; grid-row: 2; margin-top: 2px; }
 html.demo-skin .kc-row-a { grid-row: 1 / span 2; align-self: center; font-size: 18px; color: var(--kc-brick); padding-left: 10px; }
 
 html.demo-skin .kc-foot { font-family: 'Caveat', cursive; font-size: 22px; color: var(--kc-clay); margin-top: 30px; opacity: 0.85; }
@@ -608,7 +613,7 @@ html.demo-skin #kc-jump-in {
   padding: 13px 14px; font-size: 16px; outline: none;
 }
 html.demo-skin #kc-jump-in:focus { border-color: var(--kc-brick); }
-html.demo-skin .kc-jump-hint { font-size: 12.5px; opacity: 0.55; padding: 12px 4px 4px; }
+html.demo-skin .kc-jump-hint { font-size: 12.5px; opacity: 0.72; padding: 12px 4px 4px; }
 html.demo-skin #kc-jump-out .kc-row { padding: 10px 4px; }
 
 /* ── THE MENU (full-screen menu card) ── */

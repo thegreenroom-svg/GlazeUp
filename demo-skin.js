@@ -168,7 +168,7 @@
         <svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5M5.5 10v9h13v-9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Desk</span></button>
       <button class="kc-dock-b" onclick="KC.go('floor-plan','showFloorPlan')" aria-label="Floor">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.4" fill="currentColor"/></svg><span>Floor</span></button>
-      <button class="kc-dock-b" onclick="KC.go('packing','openPacking')" aria-label="Pieces">
+      <button class="kc-dock-b" onclick="openPackingSession()" aria-label="Pieces">
         <svg viewBox="0 0 24 24"><path d="M12 3c3 3.5 6 5.6 6 9.4A6 6 0 0 1 6 12.4C6 8.6 9 6.5 12 3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span>Pieces</span></button>
       <button class="kc-dock-b" id="kc-dock-money" aria-label="Money">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9.5 15V9.2h3a2 2 0 0 1 0 4H9.5m0 0H14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Money</span></button>
@@ -262,8 +262,10 @@
     const picks = [
       { id: 'staff', fn: null, label: 'Bookings', icon: '🪑', desc: 'Start, walk-in, party' },
       { id: 'collections', fn: 'openCollections', label: 'Collections', icon: '📦', desc: 'Ready to go home' },
-      { id: 'packing', fn: 'openPacking', label: 'Packing', icon: '🎁', desc: 'Wrap the fired pieces' },
-      { id: 'piecematch', fn: null, label: 'Piece matching', icon: '🔍', desc: 'Photo to booking' },
+      // [25 Jul] Packing absorbed Piece matching: that tile opened the
+      // pixel matcher, which the packing session replaced with the
+      // engine that works. One door to finding a piece, not two.
+      { id: 'packing', fn: 'openPackingSession', label: 'Packing', icon: '🎁', desc: 'Find, pack, send home' },
       { id: 'team', fn: null, label: 'Team & duties', icon: '👥', desc: 'Who does what today' },
       { id: 'tell-daisy', fn: 'openTellPicker', label: 'Tell Daisy', icon: '💬', desc: 'Good or bad, say it' },
     ];

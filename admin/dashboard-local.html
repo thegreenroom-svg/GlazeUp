@@ -31587,6 +31587,15 @@ async function confirmReturnMatch(pieceId, bookingId) {
   if (bookingId) openBookingFromReturn(bookingId);
 }
 
+// [25 Jul] The single door to anything piece-related: find, add,
+// identify, test. Top-level rather than inside applyShiftUI — the
+// durable lesson from the startup crash is that anything referenced
+// from a tile or the dock must exist before those render.
+function openPackingSession() {
+  window.location.href = '/admin/packing.html?studio=' + encodeURIComponent(studioId);
+}
+window.openPackingSession = openPackingSession;
+
 function openFindMyPiece() {
   // [25 Jul] Every 'Find' button in the app now opens the packing
   // session. The old two-screen flow beneath this line ran the pixel
