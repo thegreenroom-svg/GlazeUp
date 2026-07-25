@@ -499,7 +499,8 @@ function applyFound(found, wanted, raw) {
     const who = [...new Set(found.map(f => {
       const w = wanted.find(x => x.id === f.id); return w ? w.b.id : '';
     }).filter(Boolean))].join(', ');
-    say(`<b>Found ${found.length} — ${esc(who)}.</b> ${left ? left + ' still out there.' : "That's everything."}`);
+    say(`<b>Found ${found.length} — ${esc(who)}.</b> ${left ? left + ' still out there.' : "That's everything."}`
+      + (rings.length ? '' : ' <em>Position not given for these.</em>'));
   } else {
     say(`<b>None of them matched.</b> <em>It saw: ${lastAllPottery.length
       ? esc(lastAllPottery.join('; ')) : 'no pottery at all'}.</em>`);
@@ -659,8 +660,16 @@ $('tbFind').onclick = () => pickImage(async raw => {
     // sheet reveals it rather than hiding the answer behind a panel.
     lastPhoto = raw; drawPhoto(raw, rings);
     const hits = tb.filter(t => t.found).length;
+    // The panel closes itself, so telling someone to close it was
+    // instructions for a step that had already happened. And when no
+    // zone comes back nothing gets shaded — which looked identical to
+    // a failure. Say which of those it is.
+    const placed = rings.length;
     say(hits
-      ? `<b>Test: ${hits} of ${tb.length} found.</b> <em>Close this panel to see them circled.</em>`
+      ? `<b>Test: ${hits} of ${tb.length} found.</b> `
+        + (placed
+            ? `<em>Shaded areas show roughly where.</em>`
+            : `<em>Found, but it didn't say where — the list below names them.</em>`)
       : `<b>Test: none matched.</b> <em>It saw: ${lastAllPottery.length
           ? esc(lastAllPottery.join('; ')) : 'no pottery at all'}.</em>`);
     closeSheet('tbSheet');
@@ -688,8 +697,7 @@ function renderTb(ran) {
     </div>`).join('')
     + (ran ? `<div class="mut" style="padding-top:10px">
         <b>It saw in that photo:</b> ${lastAllPottery.length ? esc(lastAllPottery.join('; ')) : 'no pottery at all'}.
-        <br>If a piece is in that list but not ticked above, the matching is at fault, not the camera.
-        <br>Close this panel to see the circles.</div>` : '');
+        <br>If a piece is in that list but not ticked above, the matching is at fault, not the camera.</div>` : '');
 }
 
 // What is ACTUALLY deployed. 'I pushed but nothing changed' has cost
