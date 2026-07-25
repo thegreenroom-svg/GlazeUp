@@ -8368,7 +8368,6 @@ app.post('/api/packing/find-listed', async (req, res) => {
     const found = arr
       .filter(f => f && typeof f.i === 'number' && wanted[f.i])
       .filter(f => (f.confidence === undefined || f.confidence >= 0.4))
-      .filter(f => backed(wanted[f.i].description))
       .map(f => ({
         id: wanted[f.i].id,
         description: wanted[f.i].description,
@@ -8377,8 +8376,13 @@ app.post('/api/packing/find-listed', async (req, res) => {
       }));
     res.json({ found, allPottery, cost });
   } catch (e) {
-    console.error('find-in-photo:', e.message);
-    res.status(500).json({ error: e.message });
+    // Surface enough to act on. 'backed is not defined' told Daisy
+    // nothing except that something broke — it was a reference I left
+    // behind when removing a filter, and node --check cannot catch an
+    // undefined name at parse time. Naming the stage makes the next
+    // one diagnosable from the phone.
+    console.error('find-listed failed:', e && e.stack || e);
+    res.status(500).json({ error: 'search failed on the server — ' + (e && e.message || 'unknown') });
   }
 });
 
