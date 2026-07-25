@@ -400,7 +400,37 @@
       const f = $('kc-fig-floor');
       if (f) { f.classList.remove('kc-skel-t'); f.textContent = bs.length; }
       const fl = $('kc-fig-floor-l');
-      if (fl) fl.textContent = 'on the floor';
+      if (fl) {
+        // [25 Jul, Daisy] 'I don't wanna see eight on the floor because
+        // it's confusing.' At six in the evening those eight have been
+        // and gone, or the endpoint has quietly rolled to the next open
+        // day and the label is describing the wrong one either way.
+        // Say WHICH day, and when it starts — that is the thing worth
+        // knowing when you are locking up.
+        const first = bs.length ? new Date(bs[0].session_start) : null;
+        const startOf = (d) => { const x = new Date(d); x.setHours(0,0,0,0); return x.getTime(); };
+        const today = startOf(new Date());
+        const day = first ? startOf(first) : today;
+        const dayDiff = Math.round((day - today) / 86400000);
+        const at = first
+          ? first.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit' }).replace(':00', '')
+          : null;
+
+        let label;
+        if (!bs.length) label = 'booked in';
+        else if (dayDiff > 0) {
+          // A future day: name it, and say when the first one arrives.
+          const when = dayDiff === 1 ? 'tomorrow'
+            : first.toLocaleDateString('en-GB', { weekday: 'long' });
+          label = `in ${when}, from ${at}`;
+        } else {
+          // Today. Once the last session has started, 'on the floor' is
+          // past tense — say so rather than implying a full studio.
+          const lastStart = new Date(bs[bs.length - 1].session_start);
+          label = (lastStart < new Date()) ? 'in today' : 'on the floor';
+        }
+        fl.textContent = label;
+      }
 
       // Live per-room tallies for the three studio-space zones. Match each
       // booking's space to a zone; blanks/"Main"/"Family" fall to Main Studio.
@@ -487,8 +517,23 @@
             // nextElementSibling silently found nothing, the relabel
             // never happened, and a £18k+ historical figure sat under
             // "today" looking like today's takings. Now: no row for
-            // today genuinely means £0.00 so far, which is the truth.
-            m.textContent = money(todayV || 0);
+            // CORRECTED 25 Jul. The note above said "no row for today
+            // genuinely means £0.00 so far, which is the truth". It
+            // isn't. There are two very different situations and this
+            // showed the same thing for both: takings of zero, and
+            // Square not having synced yet. Checked live — the last
+            // synced day was yesterday at £1,208.60 and there was no
+            // row for today at all, so the Desk was showing a
+            // confident £0.00 on a day the studio had plainly been
+            // trading. A figure nobody can trust is worse than an
+            // honest gap.
+            if (todayV === null) {
+              m.textContent = '—';
+              const ml = $('kc-fig-money-l');
+              if (ml) ml.textContent = 'today · not synced yet';
+            } else {
+              m.textContent = money(todayV);
+            }
           }
         }).catch(() => { const m = $('kc-fig-money'); if (m) { m.classList.remove('kc-skel-t'); m.textContent = '—'; } });
     }
