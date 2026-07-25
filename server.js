@@ -8211,12 +8211,31 @@ ONLY describe unfired or fired ceramic pieces that a customer has painted or wil
 IGNORE everything else completely: phones, keys, glasses, food, packaging, paint pots,
 brushes, water jars, cloths, furniture, bags, toys, bottles.`;
 
-const DESCRIBE_STYLE = `Describe each piece the way a member of staff would call it across
-the room to a colleague: its form first, then its colours and any obvious decoration.
-Keep it under twelve words. Be concrete and plain.
-Good: "green fish-shaped jug, glossy"; "white mug, blue stripes, yellow star";
-"cottage-shaped butter dish, cream roof".
-Bad: "a beautiful ceramic item"; "pottery piece"; "handmade artisan vessel".`;
+// [25 Jul, Daisy] "Our shelves may well be stacked with ten different
+// painted mugs, but they're all the same mug — shape, size, everything."
+// That reframes the whole problem. The FORM carries almost no
+// information in a paint-your-own studio: the blanks are bought in, so
+// a shelf holds many identical shapes. What makes a piece findable is
+// what the customer PAINTED on it — the colours, the pattern, where
+// the colour sits. Describing form first was describing the one
+// attribute guaranteed not to distinguish anything.
+const DESCRIBE_STYLE = `These are blank ceramic shapes that customers have painted, so MANY PIECES
+SHARE THE SAME SHAPE. The shape is rarely what tells them apart — the PAINTING is.
+
+Lead with the decoration: the colours, the pattern, and where the colour sits.
+Then, briefly, the shape. Do not agonise over what the object is called; if you
+are unsure whether it is a jug or a vase, say either — it does not matter.
+
+Say colours plainly and specifically (pale blue, dark green, orange, cream, unpainted
+white) and say how they are arranged (stripes, spots, flowers, a face, one solid
+colour, rim only, patchy, mostly white with a little colour).
+
+Keep it under fifteen words.
+Good: "blue and yellow stripes with a star, on a mug";
+      "dark green all over, glossy, fish-shaped";
+      "cream with orange flowers, small jug";
+      "mostly unpainted white, pink spots round the rim, small bowl".
+Bad: "a mug"; "ceramic piece"; "beautifully hand-painted item"; "white pottery".`;
 
 // POST /api/pieces/describe-group — one photo of a table, back come
 // descriptions for each piece on it.
@@ -8307,10 +8326,14 @@ app.post('/api/packing/find-listed', async (req, res) => {
       `every distinct piece of pottery you can actually see in it. Describe only what is ` +
       `visibly there. Do not include anything you cannot see, however plausible.\n\n` +
       `STEP 2. Only now, read this list of pieces someone is looking for:\n${list}\n\n` +
-      `Decide which of them appear in YOUR STEP 1 LIST. Judge by what you can see — form, ` +
-      `colour, decoration — not by whether the wording matches how you described it. The ` +
-      `same piece can reasonably be described in different words. If a listed piece is not ` +
-      `in your step 1 list, it is not there.\n\n` +
+      `Decide which of them appear in YOUR STEP 1 LIST.\n\n` +
+      `MATCH ON THE PAINTING, NOT THE WORDS. These are bought-in blanks, so several pieces ` +
+      `on a shelf may be the identical shape — the shape is usually the LEAST useful clue. ` +
+      `What identifies a piece is its colours, its pattern, and where the colour sits. ` +
+      `A "mug" and a "cup", or a "jug" and a "vase", may well be the same object described ` +
+      `differently; if the painting matches, it is the same piece. If the painting is ` +
+      `clearly different, it is not, however similar the shape.\n\n` +
+      `If a listed piece is not in your step 1 list, it is not there.\n\n` +
       // POSITION REMOVED ENTIRELY, 25 Jul, after four failed attempts:
       // rings on the wrong objects, then no rings, then a message
       // promising shading that never appeared, then zones the model
@@ -8333,21 +8356,15 @@ app.post('/api/packing/find-listed', async (req, res) => {
     // 0.4 rather than 0.55: the model is already told to be careful, so
     // a second conservative filter on top was rejecting real sightings
     // twice over. Anything under 0.8 is shown with a '?' anyway.
-    // A claim has to be backed by the model's own inventory. If it
-    // says it found piece 3 but nothing in its step-1 list resembles
-    // it, that is the contamination reasserting itself and the claim
-    // is dropped. Cheap, and it fails toward missing rather than
-    // inventing — the right direction when the cost of a false tick is
-    // someone hunting a shelf for a piece that was never there.
-    const invWords = new Set(
-      allPottery.join(' ').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean));
-    const backed = (desc) => {
-      if (!allPottery.length) return true;   // nothing to check against
-      const w = String(desc).toLowerCase().replace(/[^a-z0-9\s]/g, ' ')
-        .split(/\s+/).filter(x => x.length > 3);
-      if (!w.length) return true;
-      return w.some(x => invWords.has(x));
-    };
+    // REMOVED 25 Jul: a cross-check requiring the wanted description
+    // and the model's own inventory to share an exact word. It threw
+    // away correct matches wholesale — 'gray cup' against a seen 'grey
+    // mug' shares no word, so a piece the model had correctly found was
+    // silently discarded by my own filter. It was word-overlap matching
+    // reintroduced as a safety net, which is precisely the approach
+    // this design moved away from. The two-step prompt (inventory
+    // written before the list is read) already prevents the
+    // contamination this was guarding against.
     const found = arr
       .filter(f => f && typeof f.i === 'number' && wanted[f.i])
       .filter(f => (f.confidence === undefined || f.confidence >= 0.4))
