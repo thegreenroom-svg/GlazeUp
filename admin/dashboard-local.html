@@ -10298,62 +10298,22 @@ async function _loadPackingTiles() {
           piece${pieces.length===1?'':'s'} to pack</div>
       </button>
 
-      <!-- The unified packing session (24 Jul). The three separate
-           finders below — identify a piece, find on shelves, read the
-           base codes — each held their own state and none knew what the
-           others had found. This opens the single session that asks one
-           photograph about every outstanding booking at once, simplest
-           first. Linked from here because a page reachable only by
-           typing its address may as well not exist: Daisy landed back
-           on the old shelf sweep twice while the new one sat unlinked. -->
+      <!-- [25 Jul] ONE packing screen. This tile used to sit above four
+           others that all did versions of the same job — identify a
+           piece, read the base codes, add pieces, and a shelf sweep on
+           the pack card. Each held its own state, none knew what the
+           others had found, and Daisy kept landing back on the old
+           engine simply because it was the button under her thumb.
+           Packing is one session, so it gets one door. -->
       <button onclick="window.location.href='/admin/packing.html?studio=' + encodeURIComponent(studioId)"
         class="glaze-tile"
-        style="width:100%;border:none;border-radius:16px;padding:16px 20px;cursor:pointer;margin-top:8px;
+        style="width:100%;border:none;border-radius:16px;padding:18px 20px;cursor:pointer;margin-top:8px;
         background:linear-gradient(135deg,#3E7C6A,#2f5f52);text-align:left;display:flex;align-items:center;gap:14px;">
-        <span style="font-size:26px;flex-shrink:0;">📦</span>
+        <span style="font-size:28px;flex-shrink:0;">📦</span>
         <div>
-          <div style="font-size:15px;font-weight:800;color:#fff;">Pack a whole session</div>
-          <div style="font-size:11px;color:rgba(255,255,255,0.85);margin-top:2px;">
-            Every outstanding booking at once, simplest first</div>
-        </div>
-      </button>
-
-      <!-- The other way in: a piece in hand, work out whose it is -->
-      <button onclick="_kcIdentifyPiece()" class="glaze-tile"
-        style="width:100%;border:1.5px solid rgba(43,39,36,0.15);border-radius:16px;padding:16px 20px;
-        cursor:pointer;margin-top:8px;background:#FFFDF9;text-align:left;display:flex;align-items:center;gap:14px;">
-        <span style="font-size:26px;flex-shrink:0;">📷</span>
-        <div>
-          <div style="font-size:15px;font-weight:800;color:#2B2724;">Identify a piece</div>
-          <div style="font-size:11px;color:#8a8175;margin-top:2px;">Photograph one — I'll find whose it is</div>
-        </div>
-      </button>
-
-      <!-- Build up a shelf as you go: add a piece, photograph it there
-           and then. Added 24 Jul after the 'Studio shelf' test pieces
-           turned out to be seeded demo rows ("Tom's cereal bowl",
-           "Megan's spotty mug") whose reference photos belonged to
-           invented pieces — so every search was comparing a real jug
-           against a photo of something else entirely. Nothing could
-           have matched. Adding and photographing in one step makes
-           that class of mistake impossible. -->
-      <button onclick="_kcReadBaseCodes()" class="glaze-tile"
-        style="width:100%;border:1.5px solid rgba(43,39,36,0.15);border-radius:16px;padding:16px 20px;
-        cursor:pointer;margin-top:8px;background:#FFFDF9;text-align:left;display:flex;align-items:center;gap:14px;">
-        <span style="font-size:26px;flex-shrink:0;">🔢</span>
-        <div>
-          <div style="font-size:15px;font-weight:800;color:#2B2724;">Read the Nº on the bases</div>
-          <div style="font-size:11px;color:#8a8175;margin-top:2px;">For stamped batches — turn them over, one photo</div>
-        </div>
-      </button>
-
-      <button onclick="_kcAddPieceHere()" class="glaze-tile"
-        style="width:100%;border:1.5px solid rgba(43,39,36,0.15);border-radius:16px;padding:16px 20px;
-        cursor:pointer;margin-top:8px;background:#FFFDF9;text-align:left;display:flex;align-items:center;gap:14px;">
-        <span style="font-size:26px;flex-shrink:0;">➕</span>
-        <div>
-          <div style="font-size:15px;font-weight:800;color:#2B2724;">Add pieces</div>
-          <div style="font-size:11px;color:#8a8175;margin-top:2px;">Photograph a group, tap each piece</div>
+          <div style="font-size:16px;font-weight:800;color:#fff;">Packing</div>
+          <div style="font-size:11.5px;color:rgba(255,255,255,0.85);margin-top:2px;">
+            Photograph a surface · add a group · find a stray piece</div>
         </div>
       </button>
 
@@ -31628,7 +31588,19 @@ async function confirmReturnMatch(pieceId, bookingId) {
 }
 
 function openFindMyPiece() {
-  // Reset everything to a clean state each time it's opened
+  // [25 Jul] Every 'Find' button in the app now opens the packing
+  // session. The old two-screen flow beneath this line ran the pixel
+  // matcher, which a full day of testing showed cannot survive
+  // viewpoint changes, plain pieces on wooden surfaces, or the kiln
+  // altering colour — and the session answers the same question with
+  // the engine that works. Photographing a single piece there matches
+  // it against every outstanding booking, which IS 'whose is this?'.
+  // The old flow is left below rather than deleted, unreachable, until
+  // the session has earned a week in the studio.
+  window.location.href = '/admin/packing.html?studio=' + encodeURIComponent(studioId);
+  return;
+
+  // eslint-disable-next-line no-unreachable
   _fp1TargetPhotoBase64 = null;
   window._fp2LastScenePhoto = null;
   document.getElementById('fp1-preview-img').style.display = 'none';
