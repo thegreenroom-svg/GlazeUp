@@ -489,8 +489,7 @@ function applyFound(found, wanted, raw) {
     const w = wanted.find(x => x.id === f.id);
     if (!w || w.p.found) continue;
     w.p.found = { surface: surfaces, where: f.saw ? `seen: ${f.saw}` : '' };
-    if (f.x !== null && f.y !== null)
-      rings.push({ x: f.x, y: f.y, label: w.b.id, conf: f.confidence });
+    if (f.zone) rings.push({ zone: f.zone, label: w.b.id, conf: f.confidence });
   }
   drawPhoto(raw, rings);
   paint();
@@ -512,30 +511,53 @@ function say(html) { $('said').innerHTML = html; $('said').classList.add('on'); 
 // Rings are drawn only where the model actually reported seeing
 // something. A piece matched without a position is still ticked, but
 // never given an invented location.
-function drawPhoto(raw, rings) {
+function drawPhoto(raw, marks) {
   const img = new Image();
   img.onload = () => {
     const cv = $('canvas');
     cv.width = img.width; cv.height = img.height;
     const ctx = cv.getContext('2d');
     ctx.drawImage(img, 0, 0);
-    ctx.lineWidth = Math.max(3, Math.round(img.width / 200));
-    const fs = Math.max(16, Math.round(img.width / 34));
+
+    // A shaded third of the photo, not a ring on one object. The model
+    // knows WHAT it saw far better than WHERE it was — measured, after
+    // it put two jugs on a butter dish — so the honest display is the
+    // area it can actually vouch for. Coarse and true beats precise
+    // and wrong: a wrong ring sends someone to the wrong shelf.
+    const COL = { left: 0, centre: 1, center: 1, right: 2 };
+    const ROW = { top: 0, middle: 1, bottom: 2 };
+    const fs = Math.max(17, Math.round(img.width / 32));
     ctx.font = '700 ' + fs + 'px ui-sans-serif,system-ui,sans-serif';
     ctx.textAlign = 'center';
-    for (const r of rings) {
-      const x = r.x * img.width, y = r.y * img.height;
-      const rad = Math.max(30, img.width * 0.085);
+
+    // Several pieces can share a zone; stack their labels.
+    const perZone = {};
+    for (const m of marks) {
+      if (!m.zone) continue;
+      const [r, c] = String(m.zone).split('-');
+      if (!(r in ROW) || !(c in COL)) continue;
+      const key = ROW[r] + ',' + COL[c];
+      (perZone[key] = perZone[key] || []).push(m);
+    }
+
+    const w = img.width / 3, h = img.height / 3;
+    for (const key in perZone) {
+      const [r, c] = key.split(',').map(Number);
+      const x = c * w, y = r * h;
+      ctx.fillStyle = 'rgba(76,175,80,.17)';
+      ctx.fillRect(x, y, w, h);
       ctx.strokeStyle = '#4CAF50';
-      ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2); ctx.stroke();
-      const label = String(r.label).slice(0, 20)
-        + (r.conf && r.conf < 0.8 ? ' ?' : '');
-      const w = ctx.measureText(label).width;
-      const ly = Math.max(fs + 8, y - rad - 10);
-      ctx.fillStyle = 'rgba(0,0,0,.68)';
-      ctx.fillRect(x - w / 2 - 8, ly - fs, w + 16, fs + 9);
-      ctx.fillStyle = '#4CAF50';
-      ctx.fillText(label, x, ly);
+      ctx.lineWidth = Math.max(3, Math.round(img.width / 260));
+      ctx.strokeRect(x + 2, y + 2, w - 4, h - 4);
+      perZone[key].forEach((m, i) => {
+        const label = String(m.label).slice(0, 22) + (m.conf && m.conf < 0.8 ? ' ?' : '');
+        const ly = y + h / 2 + (i - (perZone[key].length - 1) / 2) * (fs + 10);
+        const tw = ctx.measureText(label).width;
+        ctx.fillStyle = 'rgba(0,0,0,.72)';
+        ctx.fillRect(x + w / 2 - tw / 2 - 9, ly - fs, tw + 18, fs + 9);
+        ctx.fillStyle = '#4CAF50';
+        ctx.fillText(label, x + w / 2, ly);
+      });
     }
     ctx.textAlign = 'left';
     cv.style.display = 'block';
@@ -627,7 +649,7 @@ $('tbFind').onclick = () => pickImage(async raw => {
     for (const f of found) {
       const t = tb[Number(f.id)];
       if (!t) continue;
-      t.found = true; t.saw = f.saw; t.conf = f.confidence;
+      t.found = true; t.saw = f.saw; t.conf = f.confidence; t.zone = f.zone;
       if (f.x !== null && f.y !== null)
         rings.push({ x: f.x, y: f.y, label: t.description.split(',')[0], conf: f.confidence });
     }
@@ -660,7 +682,7 @@ function renderTb(ran) {
       <div class="tick" style="color:${t.found ? 'var(--done)' : 'var(--mute)'}">${t.found ? '✓' : '○'}</div>
       <div style="flex:1;min-width:0">
         <div>${esc(t.description)}</div>
-        ${t.found && t.saw ? `<div class="mut">saw: ${esc(t.saw)}${t.conf ? ` · ${Math.round(t.conf * 100)}% sure` : ''}</div>`
+        ${t.found && t.saw ? `<div class="mut">saw: ${esc(t.saw)}${t.zone ? ` · ${esc(t.zone.replace('-', ' '))}` : ''}${t.conf ? ` · ${Math.round(t.conf * 100)}% sure` : ''}</div>`
           : ran ? '<div class="mut">not in that photo</div>' : ''}
       </div>
     </div>`).join('')
