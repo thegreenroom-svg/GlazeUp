@@ -502,11 +502,26 @@
       fetch(`${base}/api/analytics/dashboard?studioId=${sid}&staffMemberId=${(typeof currentShiftStaff !== 'undefined' && currentShiftStaff?.id) || ''}`)
         .then(r => r.json()).then(d => {
           const days = d.revenueByDay || d.dailyRevenue || null;
-          let todayV = null;
-          const todayKey = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
-          if (Array.isArray(days)) {
-            const row = days.find(x => (x.metric_date || x.date) === todayKey);
-            if (row) todayV = (row.metric_value?.revenue_cents ?? row.revenue_cents ?? 0) / 100;
+          const dayKey = (offset) => {
+            const dt = new Date();
+            dt.setDate(dt.getDate() + offset);
+            return dt.toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
+          };
+          const valueFor = (key) => {
+            if (!Array.isArray(days)) return null;
+            const row = days.find(x => (x.metric_date || x.date) === key);
+            return row ? (row.metric_value?.revenue_cents ?? row.revenue_cents ?? 0) / 100 : null;
+          };
+          // Today first; yesterday if today hasn't synced. The Daily
+          // Digest already showed 'Yesterday £1,208.60' correctly while
+          // the Desk showed £0.00 for the same studio on the same
+          // screen — two figures, one true, and no way to tell which.
+          // A real number under an honest label beats a dash.
+          let todayV = valueFor(dayKey(0));
+          let usedYesterday = false;
+          if (todayV === null) {
+            todayV = valueFor(dayKey(-1));
+            usedYesterday = todayV !== null;
           }
           const m = $('kc-fig-money');
           if (m) {
@@ -527,12 +542,13 @@
             // confident £0.00 on a day the studio had plainly been
             // trading. A figure nobody can trust is worse than an
             // honest gap.
+            const ml = $('kc-fig-money-l');
             if (todayV === null) {
               m.textContent = '—';
-              const ml = $('kc-fig-money-l');
-              if (ml) ml.textContent = 'today · not synced yet';
+              if (ml) ml.textContent = 'not synced yet';
             } else {
               m.textContent = money(todayV);
+              if (ml) ml.textContent = usedYesterday ? 'yesterday' : 'today';
             }
           }
         }).catch(() => { const m = $('kc-fig-money'); if (m) { m.classList.remove('kc-skel-t'); m.textContent = '—'; } });
