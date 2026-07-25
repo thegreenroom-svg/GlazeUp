@@ -8429,14 +8429,20 @@ app.post('/api/packing/find-listed', async (req, res) => {
       // a different task, and one it is reliably good at. Magenta
       // because nothing in a glaze range is that colour, so the grid
       // can never be mistaken for decoration.
-      `The photo has a magenta grid drawn over it, with cells labelled A1 to E5 ` +
-      `(letter = column from the left, number = row from the top).\n` +
-      `For each piece you find, give the label of the cell its CENTRE sits in, and ` +
-      `roughly how much of that cell's width the piece takes up (0.3 = small, 1 = fills it, ` +
-      `2 = spills into neighbours).\n\n` +
-      `Reply with ONLY this JSON, no prose and no markdown, and write "seen" first:\n` +
-      `{"seen":["what you actually saw, one entry per piece"],` +
-      `"found":[{"i":0,"cell":"C3","size":1.2,"confidence":0.9,"saw":"which of your seen items this is"}]}`);
+      // ASK FOR LESS. The previous version wanted seen, index, cell,
+      // size, confidence and a note in one reply, and the cell — the
+      // only field that was actually new — came back missing every
+      // time. Dropping size and the note leaves three fields, with
+      // cell mandatory and stated as such.
+      `A magenta grid is drawn over the photo. Columns are lettered A to E from the ` +
+      `left; rows are numbered 1 to 5 from the top. Every cell is labelled in its ` +
+      `top-left corner, so read the labels off the image.\n\n` +
+      `For each piece you find you MUST give "cell" — the label of the cell the piece ` +
+      `sits in, like "C3". Never omit it. If a piece straddles two cells, pick the one ` +
+      `holding most of it.\n\n` +
+      `Reply with ONLY this JSON, no prose and no markdown:\n` +
+      `{"seen":["what you actually saw, one per piece"],` +
+      `"found":[{"i":0,"cell":"C3","confidence":0.9}]}`);
     const cost = await logUsage(studioId, 'find-in-photo', usage);
     const arr = Array.isArray(data) ? data : (data.found || []);
     // Everything it saw, listed or not. A bare "0 of 2" says nothing
@@ -8468,7 +8474,16 @@ app.post('/api/packing/find-listed', async (req, res) => {
         confidence: f.confidence === undefined ? null : f.confidence,
         saw: f.saw || '',
       }));
-    res.json({ found, allPottery, cost });
+    // Say plainly whether the model gave cells. Four rounds of "no
+    // circles" were spent guessing between "not deployed", "grid not
+    // visible" and "field omitted" — this distinguishes them from the
+    // phone without needing the server logs.
+    const withCell = found.filter(f => f.cell).length;
+    res.json({
+      found, allPottery, cost,
+      diag: { returned: arr.length, kept: found.length, withCell,
+              sample: arr.length ? JSON.stringify(arr[0]).slice(0, 120) : null },
+    });
   } catch (e) {
     // Surface enough to act on. 'backed is not defined' told Daisy
     // nothing except that something broke — it was a reference I left

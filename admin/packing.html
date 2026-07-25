@@ -333,21 +333,28 @@ function gridded(dataUrl, maxSide) {
       const ctx = c.getContext('2d');
       ctx.drawImage(img, 0, 0, c.width, c.height);
       const cw = c.width / GRID_COLS, ch = c.height / GRID_ROWS;
-      ctx.lineWidth = Math.max(1, Math.round(c.width / 500));
-      ctx.strokeStyle = 'rgba(255,0,255,.75)';       // magenta: never a glaze colour
-      const fs = Math.max(13, Math.round(c.width / 42));
-      ctx.font = '700 ' + fs + 'px ui-sans-serif,system-ui,sans-serif';
+      // Bolder than before. A thin line on a cluttered wooden table is
+      // easy to overlook, and the cell label was coming back missing —
+      // if the grid is worth drawing it is worth drawing unmissably.
+      ctx.lineWidth = Math.max(3, Math.round(c.width / 260));
+      ctx.strokeStyle = 'rgba(255,0,255,.95)';       // magenta: never a glaze colour
+      const fs = Math.max(20, Math.round(c.width / 26));
+      ctx.font = '800 ' + fs + 'px ui-sans-serif,system-ui,sans-serif';
+      ctx.textBaseline = 'top';
       for (let r = 0; r < GRID_ROWS; r++) {
         for (let col = 0; col < GRID_COLS; col++) {
           const x = col * cw, y = r * ch;
           ctx.strokeRect(x, y, cw, ch);
           const label = COL_LETTERS[col] + (r + 1);
-          ctx.fillStyle = 'rgba(255,0,255,.9)';
-          ctx.fillRect(x + 2, y + 2, ctx.measureText(label).width + 8, fs + 5);
-          ctx.fillStyle = '#fff';
-          ctx.fillText(label, x + 6, y + fs + 3);
+          const tw = ctx.measureText(label).width;
+          // White plate under magenta text: legible over anything.
+          ctx.fillStyle = 'rgba(255,255,255,.95)';
+          ctx.fillRect(x + 4, y + 4, tw + 14, fs + 10);
+          ctx.fillStyle = '#FF00FF';
+          ctx.fillText(label, x + 11, y + 9);
         }
       }
+      ctx.textBaseline = 'alphabetic';
       resolve(c.toDataURL('image/jpeg', 0.85));
     };
     img.onerror = () => resolve(dataUrl);
