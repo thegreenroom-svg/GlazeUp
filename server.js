@@ -8342,9 +8342,21 @@ app.post('/api/packing/find-listed', async (req, res) => {
       // attempt to dress that up cost a round of debugging while the
       // part that WORKS (which pieces are here, and whose) sat behind
       // it looking broken. What a packer actually needs is the name.
+      // POSITION BY READING, NOT ESTIMATING. Four attempts at coordinates
+      // failed because this model localises poorly. A magenta grid is
+      // drawn onto the image before it is sent, so naming the cell a
+      // piece sits in is READING a label that is physically there —
+      // a different task, and one it is reliably good at. Magenta
+      // because nothing in a glaze range is that colour, so the grid
+      // can never be mistaken for decoration.
+      `The photo has a magenta grid drawn over it, with cells labelled A1 to E5 ` +
+      `(letter = column from the left, number = row from the top).\n` +
+      `For each piece you find, give the label of the cell its CENTRE sits in, and ` +
+      `roughly how much of that cell's width the piece takes up (0.3 = small, 1 = fills it, ` +
+      `2 = spills into neighbours).\n\n` +
       `Reply with ONLY this JSON, no prose and no markdown, and write "seen" first:\n` +
       `{"seen":["what you actually saw, one entry per piece"],` +
-      `"found":[{"i":0,"confidence":0.9,"saw":"which of your seen items this is"}]}`);
+      `"found":[{"i":0,"cell":"C3","size":1.2,"confidence":0.9,"saw":"which of your seen items this is"}]}`);
     const cost = await logUsage(studioId, 'find-in-photo', usage);
     const arr = Array.isArray(data) ? data : (data.found || []);
     // Everything it saw, listed or not. A bare "0 of 2" says nothing
@@ -8371,6 +8383,8 @@ app.post('/api/packing/find-listed', async (req, res) => {
       .map(f => ({
         id: wanted[f.i].id,
         description: wanted[f.i].description,
+        cell: typeof f.cell === 'string' ? f.cell.trim().toUpperCase() : null,
+        size: typeof f.size === 'number' ? Math.max(0.2, Math.min(3, f.size)) : 1,
         confidence: f.confidence === undefined ? null : f.confidence,
         saw: f.saw || '',
       }));

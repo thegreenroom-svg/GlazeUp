@@ -314,8 +314,58 @@ function busy(on, text) {
 // threshold could fix: the same objects came back as "green
 // boot-shaped planter" and later "green fish-shaped jug", so the words
 // never met. The model, shown the list, matches on what it can see.
+// ── GRID OVERLAY ────────────────────────────────────────────────────
+// Asking for coordinates failed four times: this model identifies well
+// and estimates position badly. But reading a label that is physically
+// drawn on the image is a different task altogether — it's looking,
+// not guessing. So a labelled grid is burned into the copy that gets
+// sent, and the answer comes back as a cell reference.
+const GRID_COLS = 5, GRID_ROWS = 5;
+const COL_LETTERS = ['A', 'B', 'C', 'D', 'E'];
+
+function gridded(dataUrl, maxSide) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const sc = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
+      const ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      const cw = c.width / GRID_COLS, ch = c.height / GRID_ROWS;
+      ctx.lineWidth = Math.max(1, Math.round(c.width / 500));
+      ctx.strokeStyle = 'rgba(255,0,255,.75)';       // magenta: never a glaze colour
+      const fs = Math.max(13, Math.round(c.width / 42));
+      ctx.font = '700 ' + fs + 'px ui-sans-serif,system-ui,sans-serif';
+      for (let r = 0; r < GRID_ROWS; r++) {
+        for (let col = 0; col < GRID_COLS; col++) {
+          const x = col * cw, y = r * ch;
+          ctx.strokeRect(x, y, cw, ch);
+          const label = COL_LETTERS[col] + (r + 1);
+          ctx.fillStyle = 'rgba(255,0,255,.9)';
+          ctx.fillRect(x + 2, y + 2, ctx.measureText(label).width + 8, fs + 5);
+          ctx.fillStyle = '#fff';
+          ctx.fillText(label, x + 6, y + fs + 3);
+        }
+      }
+      resolve(c.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+// Cell reference -> centre of that cell, as fractions of the image.
+function cellToPoint(ref) {
+  const m = String(ref || '').trim().toUpperCase().match(/^([A-E])\s*([1-5])$/);
+  if (!m) return null;
+  const col = COL_LETTERS.indexOf(m[1]), row = parseInt(m[2], 10) - 1;
+  if (col < 0 || row < 0) return null;
+  return { x: (col + 0.5) / GRID_COLS, y: (row + 0.5) / GRID_ROWS };
+}
+
 async function findInPhoto(rawPhoto, wanted) {
-  const photoBase64 = await shrink(rawPhoto, 1400);
+  const photoBase64 = await gridded(rawPhoto, 1400);
   const r = await fetch(`${API}/api/packing/find-listed`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ photoBase64, wanted, studioId }),
@@ -489,7 +539,7 @@ function applyFound(found, wanted, raw) {
     const w = wanted.find(x => x.id === f.id);
     if (!w || w.p.found) continue;
     w.p.found = { surface: surfaces, where: f.saw ? `seen: ${f.saw}` : '' };
-    rings.push({ label: w.b.id, conf: f.confidence });
+    rings.push({ label: w.b.id, conf: f.confidence, cell: f.cell, size: f.size });
   }
   drawPhoto(raw, rings);
   paint();
@@ -532,18 +582,47 @@ function drawPhoto(raw, marks) {
     const ctx = cv.getContext('2d');
     ctx.drawImage(img, 0, 0);
 
-    // Names on the photo, no position claimed. Four attempts at
-    // showing WHERE all failed the same way, because this tool
-    // identifies well and localises badly. So it says what it found
-    // and stops — which is the part a packer actually needs, and the
-    // part that has worked every single time.
-    if (marks.length) {
+    // A circle on the piece, sized to it. Position comes from the grid
+    // cell the model READ off the image rather than a coordinate it
+    // guessed, and the radius from how much of that cell it said the
+    // piece fills — so the ring is drawn to the object, not to a fixed
+    // size. Anything without a cell still gets named in the corner
+    // rather than being given an invented location.
+    const placed = [], unplaced = [];
+    for (const m of marks) (cellToPoint(m.cell) ? placed : unplaced).push(m);
+
+    const cellW = img.width / GRID_COLS;
+    const fs = Math.max(17, Math.round(img.width / 34));
+    ctx.font = '700 ' + fs + 'px ui-sans-serif,system-ui,sans-serif';
+    ctx.textAlign = 'center';
+
+    for (const m of placed) {
+      const p = cellToPoint(m.cell);
+      const x = p.x * img.width, y = p.y * img.height;
+      const r = Math.max(cellW * 0.22, (m.size || 1) * cellW * 0.5);
+      ctx.lineWidth = Math.max(4, Math.round(img.width / 190));
+      // White under green so the ring reads on a dark piece as well as
+      // a pale shelf.
+      ctx.strokeStyle = 'rgba(255,255,255,.85)';
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = '#4CAF50';
+      ctx.lineWidth = Math.max(2, Math.round(img.width / 320));
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+
+      const label = String(m.label).slice(0, 24) + (m.conf && m.conf < 0.8 ? ' ?' : '');
+      const tw = ctx.measureText(label).width;
+      const ly = Math.max(fs + 6, y - r - 10);
+      ctx.fillStyle = 'rgba(0,0,0,.72)';
+      ctx.fillRect(x - tw / 2 - 8, ly - fs, tw + 16, fs + 9);
+      ctx.fillStyle = '#4CAF50';
+      ctx.fillText(label, x, ly);
+    }
+
+    if (unplaced.length) {
+      ctx.textAlign = 'left';
       const pad = Math.round(img.width * 0.03);
-      const fs = Math.max(20, Math.round(img.width / 26));
       const lh = fs + Math.round(fs * 0.5);
-      ctx.font = '700 ' + fs + 'px ui-sans-serif,system-ui,sans-serif';
-      const lines = marks.map(m => '✓ ' + String(m.label)
-        + (m.conf && m.conf < 0.8 ? ' ?' : ''));
+      const lines = unplaced.map(m => '✓ ' + String(m.label) + ' — somewhere here');
       const boxH = lines.length * lh + pad;
       const y0 = img.height - boxH - pad;
       const wMax = Math.max(...lines.map(l => ctx.measureText(l).width));
@@ -552,6 +631,7 @@ function drawPhoto(raw, marks) {
       ctx.fillStyle = '#4CAF50';
       lines.forEach((l, i) => ctx.fillText(l, pad * 2, y0 + pad * 0.7 + (i + 1) * lh - lh * 0.28));
     }
+    ctx.textAlign = 'left';
     cv.style.display = 'block';
     $('hint').style.display = 'none';
   };
