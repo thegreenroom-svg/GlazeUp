@@ -56,6 +56,7 @@
 <div class="top">
   <h1>Takings</h1>
   <div class="n" id="range">Loading…</div>
+  <a href="/admin/packing.html" id="packBtn" title="Packing">📦</a>
   <a href="/admin/dashboard-local.html" title="Back">✕</a>
 </div>
 
@@ -103,6 +104,10 @@ const niceMonth = m => new Date(m + '-01T12:00:00').toLocaleDateString('en-GB',
   { month: 'long', year: 'numeric' });
 
 let data = null;
+(function linkStudio() {
+  const a = document.getElementById('packBtn');
+  if (a) a.href += '?studio=' + encodeURIComponent(studioId);
+})();
 
 async function load() {
   try {

@@ -111,6 +111,7 @@
 <div class="top">
   <h1>Packing</h1>
   <div class="n" id="hdr">Loading…</div>
+  <a href="/admin/takings.html" id="takingsBtn" title="Takings history">£</a>
   <a href="#" id="infoBtn" title="Costs and settings">ⓘ</a>
   <a href="/admin/dashboard-local.html" title="Back">✕</a>
 </div>
@@ -230,6 +231,15 @@ const esc = s => String(s == null ? '' : s).replace(/[<>&"]/g, c =>
   ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
 
 let bookings = [], surfaces = 0, selected = null, lastPhoto = null;
+
+// Studio id follows every internal link, so history is one tap from
+// anywhere rather than only reachable via the Desk tile.
+(function linkStudio() {
+  for (const id of ['takingsBtn']) {
+    const a = document.getElementById(id);
+    if (a) a.href += '?studio=' + encodeURIComponent(studioId);
+  }
+})();
 
 // ── text matching ────────────────────────────────────────────────────
 // Words appearing on half the pieces in a studio carry no information:
@@ -498,9 +508,58 @@ function openBooking(i) {
   $('bkPacked').disabled = f !== b.pieces.length;
   $('bkPacked').textContent = f === b.pieces.length ? 'Mark packed' : `${b.pieces.length - f} still to find`;
   $('bkPacked').onclick = () => markPacked(i);
-  $('bkSheet').classList.add('on');
+  openSheet('bkSheet');
 }
-function closeSheet(id) { $(id).classList.remove('on'); }
+// ── ALWAYS A WAY OUT ────────────────────────────────────────────────
+// [25 Jul] Daisy: "no way out". Every sheet had a Close button, but
+// the phone's back gesture left the whole page instead of closing the
+// panel in front of you — so the natural way out of an overlay threw
+// you out of the app. Now: back closes the top sheet, tapping the
+// dimmed area outside closes it, and Escape closes it. Only when
+// nothing is open does back leave the page.
+function openSheet(id) {
+  $(id).classList.add('on');
+  try { history.pushState({ sheet: id }, ''); } catch (e) {}
+}
+
+function closeSheet(id) {
+  $(id).classList.remove('on');
+  // Consume the history entry we pushed, without re-triggering.
+  try {
+    if (history.state && history.state.sheet === id) { _skipPop = true; history.back(); }
+  } catch (e) {}
+}
+
+let _skipPop = false;
+function topSheet() {
+  const ids = ['infoSheet', 'tbSheet', 'addSheet', 'bkSheet'];
+  for (const id of ids) {
+    const el = $(id);
+    if (el && el.classList.contains('on')) return id;
+  }
+  return null;
+}
+
+window.addEventListener('popstate', () => {
+  if (_skipPop) { _skipPop = false; return; }
+  const top = topSheet();
+  if (top) {
+    $(top).classList.remove('on');
+    // Keep a state entry so the NEXT back press has something to eat
+    // rather than leaving the page immediately.
+    try { history.pushState({}, ''); } catch (e) {}
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { const t = topSheet(); if (t) closeSheet(t); }
+});
+
+// Tap the dark area outside a sheet's content to close it.
+['bkSheet', 'addSheet', 'tbSheet', 'infoSheet'].forEach(id => {
+  const el = $(id);
+  if (el) el.addEventListener('click', (e) => { if (e.target === el) closeSheet(id); });
+});
 
 function editPiece(bi, pi) {
   const p = bookings[bi].pieces[pi];
@@ -725,7 +784,7 @@ $('addBtn').onclick = () => pickImage(async raw => {
     addPhoto = raw;                 // kept so packing can show what to look for
     addItems = seen.map(s => s.description);
     renderAdd();
-    $('addSheet').classList.add('on');
+    openSheet('addSheet');
   } catch (e) {
     busy(false);
     say(`<b>Could not read that photo.</b> <em>${esc(e.message)}</em>`);
@@ -787,7 +846,7 @@ $('addSave').onclick = async () => {
 
 // ── test bed ─────────────────────────────────────────────────────────
 let tb = [];
-$('testBtn').onclick = () => { renderTb(); $('tbSheet').classList.add('on'); };
+$('testBtn').onclick = () => { renderTb(); openSheet('tbSheet'); };
 
 $('tbAdd').onclick = () => pickImage(async raw => {
   $('tbBody').innerHTML = '<div class="mut">Reading the pieces…</div>';
@@ -903,7 +962,7 @@ async function loadBuild() {
   }
 }
 
-$('infoBtn').onclick = (e) => { e.preventDefault(); loadCost(); loadBuild(); $('infoSheet').classList.add('on'); };
+$('infoBtn').onclick = (e) => { e.preventDefault(); loadCost(); loadBuild(); openSheet('infoSheet'); };
 
 loadCost();
 load();
