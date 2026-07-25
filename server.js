@@ -8452,9 +8452,19 @@ app.post('/api/packing/find-listed', async (req, res) => {
       `For each piece you find you MUST give "cell" — the label of the cell the piece ` +
       `sits in, like "C3". Never omit it. If a piece straddles two cells, pick the one ` +
       `holding most of it.\n\n` +
+      // Check the answer against the label actually printed there.
+      // Measured: a cream jug with orange leaves sitting bottom-left
+      // was reported two cells away, on a butter dish. Naming the
+      // neighbours forces the cell to be read off the image rather
+      // than estimated from a sense of where things are.
+      `Before answering, look again at the cell you chose and read the label printed in ` +
+      `its top-left corner. Confirm that label is the one you are about to give, and that ` +
+      `the piece really is inside that cell's lines — not in the one above, below or ` +
+      `beside it. Also give "near": what else is in that same cell, so the choice can be ` +
+      `checked.\n\n` +
       `Reply with ONLY this JSON, no prose and no markdown:\n` +
       `{"seen":["what you actually saw, one per piece"],` +
-      `"found":[{"i":0,"cell":"C3","confidence":0.9}]}`);
+      `"found":[{"i":0,"cell":"C3","near":"what else is in that cell","confidence":0.9}]}`);
     const cost = await logUsage(studioId, 'find-in-photo', usage);
     const arr = Array.isArray(data) ? data : (data.found || []);
     // Everything it saw, listed or not. A bare "0 of 2" says nothing
@@ -8482,6 +8492,7 @@ app.post('/api/packing/find-listed', async (req, res) => {
         id: wanted[f.i].id,
         description: wanted[f.i].description,
         cell: typeof f.cell === 'string' ? f.cell.trim().toUpperCase() : null,
+        near: typeof f.near === 'string' ? f.near : null,
         size: typeof f.size === 'number' ? Math.max(0.2, Math.min(3, f.size)) : 1,
         confidence: f.confidence === undefined ? null : f.confidence,
         saw: f.saw || '',

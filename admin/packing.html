@@ -654,8 +654,10 @@ function drawPhoto(raw, marks) {
 
     for (const m of placed) {
       const p = cellToPoint(m.cell);
-      const x = p.x * img.width, y = p.y * img.height;
       const r = Math.max(cellW * 0.22, (m.size || 1) * cellW * 0.5);
+      // Clamp so a circle on an edge cell isn't half outside the photo.
+      const x = Math.max(r, Math.min(img.width - r, p.x * img.width));
+      const y = Math.max(r, Math.min(img.height - r, p.y * img.height));
       ctx.lineWidth = Math.max(4, Math.round(img.width / 190));
       // White under green so the ring reads on a dark piece as well as
       // a pale shelf.
@@ -665,13 +667,29 @@ function drawPhoto(raw, marks) {
       ctx.lineWidth = Math.max(2, Math.round(img.width / 320));
       ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
 
-      const label = String(m.label).slice(0, 24) + (m.conf && m.conf < 0.8 ? ' ?' : '');
+      // Labels were running off the frame — "white jug with orange an"
+      // with the rest lost past the edge. Shortened to the part that
+      // distinguishes, and the plate is clamped inside the image so a
+      // piece near the right-hand side still reads.
+      let label = String(m.label);
+      if (label.length > 18) {
+        // Keep the colour and pattern, drop the noun — "cream, orange
+        // leaves" identifies a piece better than "white jug with or…".
+        const bits = label.split(/\s*(?:with|,)\s*/).filter(Boolean);
+        label = (bits.length > 1 ? bits.slice(-2).join(', ') : label).slice(0, 20);
+      }
+      if (m.conf && m.conf < 0.8) label += ' ?';
       const tw = ctx.measureText(label).width;
+      const bw = tw + 16, bh = fs + 9;
+      let bx = x - bw / 2;
+      bx = Math.max(4, Math.min(img.width - bw - 4, bx));   // never off-frame
       const ly = Math.max(fs + 6, y - r - 10);
-      ctx.fillStyle = 'rgba(0,0,0,.72)';
-      ctx.fillRect(x - tw / 2 - 8, ly - fs, tw + 16, fs + 9);
+      ctx.fillStyle = 'rgba(0,0,0,.78)';
+      ctx.fillRect(bx, ly - fs, bw, bh);
       ctx.fillStyle = '#4CAF50';
-      ctx.fillText(label, x, ly);
+      ctx.textAlign = 'left';
+      ctx.fillText(label, bx + 8, ly);
+      ctx.textAlign = 'center';
     }
 
     if (unplaced.length) {
