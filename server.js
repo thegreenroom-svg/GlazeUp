@@ -13957,21 +13957,78 @@ app.listen(port, async () => {
     console.log('Device cleanup skipped:', err.message);
   }
 
-  // Real daily Square sync
-  cron.schedule('0 3 * * *', async () => {
-    console.log('Running genuine real daily Square sync for all connected studios…');
-    try {
-      const { data: connections } = await supabase.from('square_connections').select('studio_id, square_access_token');
-      for (const conn of (connections || [])) {
-        try {
-          await syncSquareData(conn.studio_id, conn.square_access_token);
-        } catch (err) {
-          console.error(`Real daily sync failed for studio ${conn.studio_id}:`, err.message);
-        }
+  // ── SQUARE SYNC, AUTOMATIC AND COMPLETE ───────────────────────────
+  // [25 Jul] Daisy: 'let's pull all the history when we sync — and can
+  // we not make sync automatic, it's a pain having to do it every
+  // time.' Both were real faults rather than preferences:
+  //
+  //   1. syncSquareData defaults to daysBack = 1, so the nightly job
+  //      only ever kept things current going FORWARD. The studio has
+  //      traded since 2022 and the record began Oct 2025 — three years
+  //      that were never pulled because nothing ever asked for them.
+  //   2. Nothing called the revenue sync automatically at all. The
+  //      bookings sync ran on load; takings waited for someone to
+  //      press a button in Money, which is why the Desk showed
+  //      yesterday's figure at six in the evening.
+  //
+  // Now: catch up on boot, then a wider nightly window.
+  const HISTORY_STARTS = '2022-01-01';   // when the studio began trading
+
+  async function syncAllStudios(daysBack, why) {
+    const { data: connections } = await supabase
+      .from('square_connections').select('studio_id, square_access_token');
+    for (const conn of (connections || [])) {
+      try {
+        await syncSquareData(conn.studio_id, conn.square_access_token, daysBack);
+        console.log(`✓ Square ${why} for ${conn.studio_id} (${daysBack}d)`);
+      } catch (err) {
+        console.error(`Square ${why} failed for ${conn.studio_id}:`, err.message);
       }
-      console.log(`Real daily sync complete — ${(connections || []).length} studio(s) processed.`);
+    }
+    return (connections || []).length;
+  }
+
+  // Catch-up on boot. Self-limiting: it asks how far back the record
+  // actually goes and only reaches for what is missing, so once the
+  // history is complete this becomes a cheap no-op rather than
+  // hammering Square on every restart.
+  setTimeout(async () => {
+    try {
+      const { data: earliest } = await supabase
+        .from('analytics_cache')
+        .select('metric_date')
+        .eq('metric_type', 'daily_revenue')
+        .order('metric_date', { ascending: true })
+        .limit(1);
+      const have = earliest && earliest[0] && earliest[0].metric_date;
+      const wantFrom = new Date(HISTORY_STARTS);
+      const daysToToday = (d) => Math.ceil((Date.now() - new Date(d).getTime()) / 86400000);
+
+      if (!have || new Date(have) > wantFrom) {
+        // Missing years: pull the lot, once.
+        const daysBack = daysToToday(HISTORY_STARTS);
+        console.log(`Square history starts ${have || 'nowhere'} — backfilling ${daysBack} days…`);
+        await syncAllStudios(daysBack, 'backfill');
+      } else {
+        // History is complete; just make sure today and the last few
+        // days are current, since card settlements can land late.
+        await syncAllStudios(7, 'catch-up');
+      }
     } catch (err) {
-      console.error('Real daily sync job failed to even start:', err.message);
+      console.error('Square boot sync failed:', err.message);
+    }
+  }, 20000);   // let the server finish starting first
+
+  // Nightly. Seven days rather than one, because a transaction can
+  // settle or be corrected after the day it belongs to, and a
+  // one-day window silently misses that forever.
+  cron.schedule('0 3 * * *', async () => {
+    console.log('Running nightly Square sync…');
+    try {
+      const n = await syncAllStudios(7, 'nightly');
+      console.log(`Nightly Square sync complete — ${n} studio(s).`);
+    } catch (err) {
+      console.error('Nightly Square sync failed to even start:', err.message);
     }
   });
 

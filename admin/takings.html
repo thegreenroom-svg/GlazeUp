@@ -69,8 +69,8 @@
 </div>
 
 <div class="acts">
-  <button class="primary" id="backfillBtn">Pull older history
-    <span class="d">from Square, back to 2022</span></button>
+  <button id="backfillBtn">Pull older history now
+    <span class="d">the server does this on its own — this forces it</span></button>
 </div>
 <div class="note" id="note"></div>
 
@@ -83,11 +83,12 @@
 // was already in analytics_cache; the app surfaced exactly one of them
 // (yesterday) and nothing else.
 //
-// Also: the record starts 4 Oct 2025 while the studio has traded since
-// 2022. The nightly sync calls syncSquareData with daysBack defaulting
-// to 1, so it only ever keeps things current going forward — the older
-// years were never pulled. /api/square/backfill has always been able
-// to do it and nothing ever called it, which is why the button is here.
+// Also: the record started 4 Oct 2025 while the studio has traded since
+// 2022, because syncSquareData defaulted to daysBack = 1 and so only
+// ever kept things current going forward. The server now backfills on
+// boot and syncs a seven-day window nightly, so this button is a
+// fallback rather than the mechanism — kept because a studio owner
+// should be able to force it rather than wait and wonder.
 // ─────────────────────────────────────────────────────────────────────
 
 const API = location.origin;
