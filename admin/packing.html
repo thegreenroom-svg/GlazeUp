@@ -507,7 +507,19 @@ function applyFound(found, wanted, raw) {
   }
 }
 
-function say(html) { $('said').innerHTML = html; $('said').classList.add('on'); }
+// The result line can carry an action. Daisy: after a miss you want to
+// try another angle without leaving the screen and coming back in —
+// re-photographing IS the next move when something is half-hidden, so
+// it belongs on the result, not three taps away behind a panel.
+function say(html, action) {
+  $('said').innerHTML = html
+    + (action ? `<div style="margin-top:9px">
+        <button id="said-act" style="width:100%;background:var(--go);border:none;color:#fff;
+          border-radius:11px;padding:11px;font-size:14px;font-weight:800;">${esc(action.label)}</button>
+       </div>` : '');
+  $('said').classList.add('on');
+  if (action) $('said-act').onclick = action.run;
+}
 
 // Rings are drawn only where the model actually reported seeing
 // something. A piece matched without a position is still ticked, but
@@ -620,7 +632,9 @@ $('tbAdd').onclick = () => pickImage(async raw => {
   } catch (e) { $('tbBody').innerHTML = `<div class="mut">Could not read that — ${esc(e.message)}</div>`; }
 });
 
-$('tbFind').onclick = () => pickImage(async raw => {
+function tbRunFind() { pickImage(tbFindWith); }
+$('tbFind').onclick = tbRunFind;
+async function tbFindWith(raw) {
   $('tbBody').innerHTML = '<div class="mut">Looking…</div>';
   try {
     const found = await findInPhoto(raw, tb.map((t, i) => ({ id: String(i), description: t.description })));
@@ -644,13 +658,17 @@ $('tbFind').onclick = () => pickImage(async raw => {
     // a failure. Say which of those it is.
     // Count what will actually be drawn, not what was returned — the
     // message promised shading three times while drawing nothing.
+    const missed = tb.length - hits;
     say(hits
-      ? `<b>Test: ${hits} of ${tb.length} found.</b> <em>Named on the photo.</em>`
+      ? `<b>Test: ${hits} of ${tb.length} found.</b> `
+        + (missed ? `<em>${missed} not spotted — another angle may catch ${missed === 1 ? 'it' : 'them'}.</em>`
+                  : `<em>Named on the photo.</em>`)
       : `<b>Test: none matched.</b> <em>It saw: ${lastAllPottery.length
-          ? esc(lastAllPottery.join('; ')) : 'no pottery at all'}.</em>`);
+          ? esc(lastAllPottery.join('; ')) : 'no pottery at all'}.</em>`,
+      missed ? { label: '📷 Try another angle', run: tbRunFind } : null);
     closeSheet('tbSheet');
   } catch (e) { $('tbBody').innerHTML = `<div class="mut">Could not read that — ${esc(e.message)}</div>`; }
-});
+}
 
 function renderTb(ran) {
   const h = $('tbHead');
