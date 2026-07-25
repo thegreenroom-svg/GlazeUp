@@ -817,6 +817,86 @@ app.get('/api/square/transactions', async (req, res) => {
   }
 });
 
+
+// GET /api/takings/history — everything the Desk should be able to show.
+//
+// [25 Jul] Daisy: "average day, best average day, best year — stuff we
+// can look at. It's the whole point of this desk." The daily figures
+// were already in analytics_cache and nothing surfaced more than
+// yesterday's number. This returns the whole series plus the
+// aggregates, so the page can render without doing arithmetic the
+// database is better at.
+app.get('/api/takings/history', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const { data, error } = await supabase
+      .from('analytics_cache')
+      .select('metric_date, metric_value')
+      .eq('studio_id', studioId)
+      .eq('metric_type', 'daily_revenue')
+      .order('metric_date', { ascending: true });
+    if (error) throw error;
+
+    const days = (data || []).map(r => ({
+      date: r.metric_date,
+      revenue: (r.metric_value?.revenue_cents ?? 0) / 100,
+      txns: r.metric_value?.transaction_count ?? 0,
+    }));
+    if (!days.length) return res.json({ days: [], stats: null });
+
+    const trading = days.filter(d => d.revenue > 0);
+    const total = days.reduce((s, d) => s + d.revenue, 0);
+    const best = days.reduce((a, b) => (b.revenue > a.revenue ? b : a), days[0]);
+
+    // By month and by year, so a good month is visible as a month
+    // rather than as thirty separate numbers.
+    const byMonth = {}, byYear = {}, byWeekday = {};
+    const WD = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    for (const d of days) {
+      const mk = d.date.slice(0, 7), yk = d.date.slice(0, 4);
+      byMonth[mk] = (byMonth[mk] || 0) + d.revenue;
+      byYear[yk] = (byYear[yk] || 0) + d.revenue;
+      if (d.revenue > 0) {
+        const w = WD[new Date(d.date + 'T12:00:00').getDay()];
+        (byWeekday[w] = byWeekday[w] || { total: 0, n: 0 }).total += d.revenue;
+        byWeekday[w].n++;
+      }
+    }
+    const months = Object.entries(byMonth).map(([m, v]) => ({ month: m, revenue: v }));
+    const years = Object.entries(byYear).map(([y, v]) => ({ year: y, revenue: v }));
+    const weekdays = WD.map(w => ({
+      day: w,
+      average: byWeekday[w] ? byWeekday[w].total / byWeekday[w].n : 0,
+      count: byWeekday[w] ? byWeekday[w].n : 0,
+    })).filter(w => w.count);
+
+    const bestMonth = months.reduce((a, b) => (b.revenue > a.revenue ? b : a), months[0]);
+    const bestYear = years.reduce((a, b) => (b.revenue > a.revenue ? b : a), years[0]);
+    const bestWeekday = weekdays.length
+      ? weekdays.reduce((a, b) => (b.average > a.average ? b : a), weekdays[0]) : null;
+
+    res.json({
+      days, months, years, weekdays,
+      stats: {
+        total,
+        daysRecorded: days.length,
+        tradingDays: trading.length,
+        earliest: days[0].date,
+        latest: days[days.length - 1].date,
+        averageTradingDay: trading.length ? total / trading.length : 0,
+        bestDay: best,
+        bestMonth,
+        bestYear,
+        bestWeekday,
+        totalTxns: days.reduce((s, d) => s + d.txns, 0),
+      },
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /api/square/backfill — genuine real one-time historical pull
 // (default 30 real days), since the daily cron only ever keeps things
 // current GOING FORWARD from whenever it starts running. This is what

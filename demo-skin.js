@@ -269,7 +269,14 @@
       { id: 'team', fn: null, label: 'Team & duties', icon: '👥', desc: 'Who does what today' },
       { id: 'tell-daisy', fn: 'openTellPicker', label: 'Tell Daisy', icon: '💬', desc: 'Good or bad, say it' },
     ];
-    if (isDirector()) picks.push({ id: 'daily-digest', fn: 'openDailyDigest', label: 'Daily digest', icon: '📊', desc: 'Yesterday · the week · what’s next' });
+    if (isDirector()) {
+      picks.push({ id: 'daily-digest', fn: 'openDailyDigest', label: 'Daily digest', icon: '📊', desc: 'Yesterday · the week · what\u2019s next' });
+      // [25 Jul] Every daily figure since Oct 2025 was already in
+      // analytics_cache and the app surfaced exactly one of them.
+      // Daisy: 'average day, best year, stuff we can look at — it's
+      // the whole point of this desk.'
+      picks.push({ id: 'takings', fn: 'openTakings', label: 'Takings', icon: '📈', desc: 'All time, bests, averages' });
+    }
     $('kc-index').innerHTML = picks.map(indexTile).join('');
   };
 
@@ -518,11 +525,48 @@
           // screen — two figures, one true, and no way to tell which.
           // A real number under an honest label beats a dash.
           let todayV = valueFor(dayKey(0));
-          let usedYesterday = false;
+
+          // TODAY'S TAKINGS ARE THE POINT. Daisy, in the evening:
+          // 'our sessions are over, I want to see what we did today.'
+          // The reason today was missing is that the automatic sync
+          // only ever pulled BOOKINGS — /api/bookings/sync — while
+          // takings live behind /api/square/sync, which nothing called
+          // unless someone pressed a button in Money. So the figure was
+          // always a day behind unless you went looking for it.
+          // Fire the revenue sync when today is missing, then read it
+          // again. Fire-and-forget on the request, patient on the
+          // re-read, because Square can take a few seconds.
           if (todayV === null) {
-            todayV = valueFor(dayKey(-1));
-            usedYesterday = todayV !== null;
+            fetch(`${base}/api/square/sync`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ studioId: sid }),
+            }).catch(() => {});
+            const m0 = $('kc-fig-money');
+            const ml0 = $('kc-fig-money-l');
+            if (m0) { m0.classList.remove('kc-skel-t'); m0.textContent = '…'; }
+            if (ml0) ml0.textContent = 'today · fetching';
+            setTimeout(() => {
+              fetch(`${base}/api/analytics/dashboard?studioId=${sid}`)
+                .then(r => r.json()).then(d2 => {
+                  const days2 = d2.revenueByDay || d2.dailyRevenue || null;
+                  const row = Array.isArray(days2)
+                    ? days2.find(x => (x.metric_date || x.date) === dayKey(0)) : null;
+                  const v = row ? (row.metric_value?.revenue_cents ?? row.revenue_cents ?? 0) / 100 : null;
+                  const m2 = $('kc-fig-money'), ml2 = $('kc-fig-money-l');
+                  if (!m2) return;
+                  if (v !== null) { m2.textContent = money(v); if (ml2) ml2.textContent = 'today'; }
+                  else {
+                    // Still nothing: show yesterday rather than a dash,
+                    // and say plainly which day it is.
+                    const y = valueFor(dayKey(-1));
+                    m2.textContent = y === null ? '—' : money(y);
+                    if (ml2) ml2.textContent = y === null ? 'not synced yet' : 'yesterday';
+                  }
+                }).catch(() => {});
+            }, 6000);
+            return;   // the timeout above owns the display from here
           }
+          let usedYesterday = false;
           const m = $('kc-fig-money');
           if (m) {
             m.classList.remove('kc-skel-t');

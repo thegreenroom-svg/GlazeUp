@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Takings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FFF9F0; --panel:#FFFDF9; --line:rgba(43,39,36,.14);
+    --ink:#2B2724; --mute:#6f665b; --go:#3E7C6A; --clay:#B87946;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{height:100%; overflow:hidden}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.4 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    display:flex; flex-direction:column;
+    padding:max(10px,env(safe-area-inset-top)) 11px calc(10px + env(safe-area-inset-bottom));
+    -webkit-text-size-adjust:100%}
+  .top{display:flex; align-items:baseline; gap:10px; flex-shrink:0; padding:2px 2px 8px}
+  .top h1{font-family:Caveat,serif; font-size:27px; margin:0; line-height:1}
+  .top .n{font-size:12px; color:var(--mute); flex:1; min-width:0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .top a{color:var(--mute); font-size:19px; text-decoration:none; padding:2px 6px}
+
+  .body{flex:1; min-height:0; display:flex; flex-direction:column; gap:9px}
+  .hero{display:grid; grid-template-columns:1fr 1fr; gap:9px; flex-shrink:0}
+  .card{background:var(--panel); border:1.5px solid var(--line); border-radius:14px; padding:11px 13px}
+  .card .k{font-size:11px; letter-spacing:.07em; text-transform:uppercase; color:var(--clay); font-weight:700}
+  .card .v{font-size:23px; font-weight:800; margin-top:2px; font-variant-numeric:tabular-nums}
+  .card .s{font-size:11.5px; color:var(--mute); margin-top:1px}
+  .card.wide{grid-column:1/-1}
+
+  .chartwrap{flex:1; min-height:0; background:var(--panel); border:1.5px solid var(--line);
+    border-radius:14px; padding:11px 13px; display:flex; flex-direction:column}
+  .chartwrap .k{font-size:11px; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--clay); font-weight:700; margin-bottom:8px; flex-shrink:0}
+  canvas{flex:1; min-height:0; width:100%}
+
+  .rows{display:flex; gap:7px; flex-wrap:wrap; margin-top:8px; flex-shrink:0}
+  .pill{font-size:11.5px; background:rgba(184,121,70,.1); border:1px solid rgba(184,121,70,.28);
+    border-radius:20px; padding:4px 10px; font-variant-numeric:tabular-nums}
+
+  .acts{flex-shrink:0; display:flex; gap:7px; padding-top:9px}
+  button{font:inherit; cursor:pointer; border-radius:12px; border:1.5px solid var(--line);
+    background:var(--panel); color:var(--ink); padding:12px 10px; flex:1; line-height:1.2}
+  button.primary{background:var(--go); border-color:transparent; color:#fff; font-weight:800}
+  button .d{display:block; font-size:10.5px; font-weight:400; color:var(--mute); margin-top:2px}
+  button.primary .d{color:rgba(255,255,255,.85)}
+  .note{font-size:11.5px; color:var(--mute); text-align:center; padding-top:7px; flex-shrink:0}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>Takings</h1>
+  <div class="n" id="range">Loading…</div>
+  <a href="/admin/dashboard-local.html" title="Back">✕</a>
+</div>
+
+<div class="body">
+  <div class="hero" id="hero"></div>
+  <div class="chartwrap">
+    <div class="k" id="chartTitle">By month</div>
+    <canvas id="chart"></canvas>
+    <div class="rows" id="weekdays"></div>
+  </div>
+</div>
+
+<div class="acts">
+  <button class="primary" id="backfillBtn">Pull older history
+    <span class="d">from Square, back to 2022</span></button>
+</div>
+<div class="note" id="note"></div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────
+// TAKINGS — the history the Desk was sitting on and never showed.
+//
+// [25 Jul] Daisy: "average day, best average day, best year — stuff we
+// can look at. It's the whole point of this desk." Every daily figure
+// was already in analytics_cache; the app surfaced exactly one of them
+// (yesterday) and nothing else.
+//
+// Also: the record starts 4 Oct 2025 while the studio has traded since
+// 2022. The nightly sync calls syncSquareData with daysBack defaulting
+// to 1, so it only ever keeps things current going forward — the older
+// years were never pulled. /api/square/backfill has always been able
+// to do it and nothing ever called it, which is why the button is here.
+// ─────────────────────────────────────────────────────────────────────
+
+const API = location.origin;
+const studioId = new URLSearchParams(location.search).get('studio')
+  || 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3';
+const $ = id => document.getElementById(id);
+const money = n => '£' + Math.round(n).toLocaleString('en-GB');
+const money2 = n => '£' + n.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const niceDate = d => new Date(d + 'T12:00:00').toLocaleDateString('en-GB',
+  { day: 'numeric', month: 'short', year: 'numeric' });
+const niceMonth = m => new Date(m + '-01T12:00:00').toLocaleDateString('en-GB',
+  { month: 'long', year: 'numeric' });
+
+let data = null;
+
+async function load() {
+  try {
+    const r = await fetch(`${API}/api/takings/history?studioId=${studioId}`);
+    data = await r.json();
+  } catch (e) { $('range').textContent = 'Could not reach the server'; return; }
+  if (!data.stats) { $('range').textContent = 'No takings recorded yet'; return; }
+  render();
+}
+
+function render() {
+  const s = data.stats;
+  $('range').textContent = `${niceDate(s.earliest)} – ${niceDate(s.latest)} · ${s.daysRecorded} days`;
+
+  $('hero').innerHTML = `
+    <div class="card wide">
+      <div class="k">All time</div>
+      <div class="v">${money2(s.total)}</div>
+      <div class="s">${s.totalTxns.toLocaleString('en-GB')} transactions over ${s.tradingDays} trading days</div>
+    </div>
+    <div class="card">
+      <div class="k">Average day</div>
+      <div class="v">${money(s.averageTradingDay)}</div>
+      <div class="s">days you were open</div>
+    </div>
+    <div class="card">
+      <div class="k">Best day</div>
+      <div class="v">${money(s.bestDay.revenue)}</div>
+      <div class="s">${niceDate(s.bestDay.date)}</div>
+    </div>
+    <div class="card">
+      <div class="k">Best month</div>
+      <div class="v">${money(s.bestMonth.revenue)}</div>
+      <div class="s">${niceMonth(s.bestMonth.month)}</div>
+    </div>
+    <div class="card">
+      <div class="k">Best year</div>
+      <div class="v">${money(s.bestYear.revenue)}</div>
+      <div class="s">${s.bestYear.year}${s.bestYear.year === String(new Date().getFullYear()) ? ' so far' : ''}</div>
+    </div>`;
+
+  $('weekdays').innerHTML = data.weekdays
+    .slice().sort((a, b) => b.average - a.average)
+    .map(w => `<span class="pill">${w.day.slice(0, 3)} ${money(w.average)}</span>`).join('');
+
+  drawMonths();
+}
+
+// Plain bars. A studio owner glancing at this wants the shape of the
+// year, not a plotting library — so it's drawn directly, which also
+// means nothing to load and nothing to break offline.
+function drawMonths() {
+  const c = $('chart');
+  const dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth, h = c.clientHeight;
+  c.width = w * dpr; c.height = h * dpr;
+  const ctx = c.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+
+  const ms = data.months.slice(-14);        // fits without crowding
+  if (!ms.length) return;
+  const max = Math.max(...ms.map(m => m.revenue));
+  const padB = 22, padT = 16;
+  const bw = w / ms.length;
+
+  ctx.font = '600 10px ui-sans-serif,system-ui,sans-serif';
+  ctx.textAlign = 'center';
+  ms.forEach((m, i) => {
+    const bh = max ? (m.revenue / max) * (h - padB - padT) : 0;
+    const x = i * bw + bw * 0.18, y = h - padB - bh;
+    ctx.fillStyle = i === ms.length - 1 ? '#B87946' : '#3E7C6A';
+    ctx.beginPath();
+    const r = Math.min(4, bw * 0.3);
+    ctx.roundRect(x, y, bw * 0.64, Math.max(2, bh), [r, r, 0, 0]);
+    ctx.fill();
+    ctx.fillStyle = '#6f665b';
+    const label = new Date(m.month + '-01T12:00:00').toLocaleDateString('en-GB', { month: 'short' });
+    ctx.fillText(label, i * bw + bw / 2, h - 8);
+    if (m.revenue === max) {
+      ctx.fillStyle = '#2B2724';
+      ctx.fillText(money(m.revenue), i * bw + bw / 2, Math.max(10, y - 4));
+    }
+  });
+}
+
+window.addEventListener('resize', () => { if (data && data.stats) drawMonths(); });
+
+// The backfill. Square can serve years of history but the nightly sync
+// asks for one day, so anything before whenever the first backfill ran
+// simply isn't here. This asks for it.
+$('backfillBtn').onclick = async () => {
+  const since2022 = Math.ceil((Date.now() - new Date('2022-01-01').getTime()) / 86400000);
+  if (!confirm(`Pull everything Square has back to January 2022 (${since2022} days)?\n\n`
+    + `It runs in the background and can take several minutes. You can carry on using the app.`)) return;
+  $('backfillBtn').disabled = true;
+  $('note').textContent = 'Asking Square for the older years…';
+  try {
+    const r = await fetch(`${API}/api/square/backfill`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, daysBack: since2022 }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'could not start');
+    $('note').innerHTML = `<b>Started.</b> Square is being read in the background —
+      reopen this page in a few minutes to see how far back it reached.`;
+  } catch (e) {
+    $('note').textContent = 'Could not start the backfill — ' + e.message;
+    $('backfillBtn').disabled = false;
+  }
+};
+
+load();
+</script>
+</body>
+</html>
