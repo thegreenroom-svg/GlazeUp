@@ -8546,6 +8546,45 @@ app.get('/api/ai-usage', async (req, res) => {
   }
 });
 
+// POST /api/pieces/save-group-photo — the photo a group was added from.
+//
+// [25 Jul] Daisy, on the circles: "there is no point to this if we
+// can't see them." She is right, and it reframes the problem. Knowing
+// a booking's pieces are on a shelf still leaves someone scanning
+// fifty pots by eye, and the circle — the thing meant to fix that — is
+// the one part that will not localise reliably.
+//
+// But the photo taken when the group was added already SHOWS the
+// pieces. Storing it means packing can display what to look for
+// rather than describing it, which needs no localisation at all and
+// cannot be wrong about where anything is.
+app.post('/api/pieces/save-group-photo', async (req, res) => {
+  const { studioId, bookingId, photoBase64 } = req.body;
+  if (!studioId || !bookingId || !photoBase64) {
+    return res.status(400).json({ error: 'studioId, bookingId and photoBase64 required' });
+  }
+  try {
+    const buffer = Buffer.from(String(photoBase64).replace(/^data:image\/\w+;base64,/, ''), 'base64');
+    const fileName = `${studioId}/group-photos/${bookingId.replace(/[^a-z0-9]/gi, '-')}-${Date.now()}.jpg`;
+    const { error: upErr } = await supabase.storage
+      .from('booking-photos').upload(fileName, buffer, { contentType: 'image/jpeg' });
+    if (upErr) throw upErr;
+    const { data: urlData } = supabase.storage.from('booking-photos').getPublicUrl(fileName);
+
+    // Attached to every piece of the booking, so it survives whichever
+    // piece someone happens to be looking at.
+    const { error } = await supabase.from('pottery_pieces')
+      .update({ reference_photo_url: urlData.publicUrl })
+      .eq('studio_id', studioId).eq('booking_id', bookingId)
+      .is('reference_photo_url', null);
+    if (error) throw error;
+    res.json({ status: 'saved', url: urlData.publicUrl });
+  } catch (e) {
+    console.error('save-group-photo:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /api/pieces/save-descriptions — [{pieceId, description}]
 app.post('/api/pieces/save-descriptions', async (req, res) => {
   const { studioId, items } = req.body;

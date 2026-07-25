@@ -53,6 +53,15 @@
   .said em{color:var(--mute); font-style:normal}
 
   /* ── bookings: one horizontal row of chips, no vertical list ── */
+  /* What to look for: the real photo of the pieces just found. */
+  .lookfor{flex-shrink:0; display:flex; gap:8px; overflow-x:auto; padding:9px 2px 0; scrollbar-width:none}
+  .lookfor::-webkit-scrollbar{display:none}
+  .lf{flex-shrink:0; width:96px; cursor:pointer}
+  .lf img{width:96px; height:96px; object-fit:cover; border-radius:11px;
+    border:2px solid var(--done); display:block}
+  .lf-n{font-size:10.5px; color:var(--ink); text-align:center; margin-top:3px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+
   .chips{flex-shrink:0; display:flex; gap:7px; overflow-x:auto; padding:9px 2px 3px;
     scrollbar-width:none}
   .chips::-webkit-scrollbar{display:none}
@@ -116,6 +125,7 @@
   <div class="working"><div class="spin"></div><span id="workingText">Looking…</span></div>
   <div class="said" id="said"></div>
 </div>
+<div class="lookfor" id="lookfor" style="display:none"></div>
 
 <div class="chips" id="chips"></div>
 
@@ -427,6 +437,7 @@ async function load() {
   for (const p of pieces) (by[p.booking_id] = by[p.booking_id] || []).push(p);
   bookings = Object.keys(by).map(id => ({
     id,
+    photo: (by[id].find(p => p.reference_photo_url) || {}).reference_photo_url || null,
     pieces: by[id].map(p => ({ id: p.id, description: p.description || '',
       type: p.piece_type || 'Piece', found: null })),
   }));
@@ -550,6 +561,11 @@ function applyFound(found, wanted, raw) {
   }
   drawPhoto(raw, rings);
   paint();
+  // Show the photograph of whatever was just found, so the pieces can
+  // actually be recognised on the shelf rather than merely counted.
+  showLookFor([...new Set(found.map(f => {
+    const w = wanted.find(x => x.id === f.id); return w ? w.b : null;
+  }).filter(Boolean))].map(b => ({ name: b.id, photo: b.photo })));
 
   const left = bookings.reduce((n, b) => n + b.pieces.filter(p => !p.found).length, 0);
   if (found.length) {
@@ -568,6 +584,38 @@ function applyFound(found, wanted, raw) {
 // try another angle without leaving the screen and coming back in —
 // re-photographing IS the next move when something is half-hidden, so
 // it belongs on the result, not three taps away behind a panel.
+// THE ANSWER TO 'WE CAN'T SEE THEM'. When a sweep finds a booking,
+// this shows the photograph its pieces were added from — the actual
+// objects, at the actual size, painted as they actually are. Tap to
+// fill the screen. It needs nothing located and cannot point at the
+// wrong thing, which is more than the circles ever managed.
+function showLookFor(hits) {
+  const strip = $('lookfor');
+  if (!strip) return;
+  const withPhoto = hits.filter(h => h.photo);
+  if (!withPhoto.length) { strip.style.display = 'none'; strip.innerHTML = ''; return; }
+  strip.style.display = 'flex';
+  strip.innerHTML = withPhoto.map((h, i) => `
+    <div class="lf" onclick="zoomPhoto(${i})">
+      <img src="${h.photo}" alt="">
+      <div class="lf-n">${esc(h.name)}</div>
+    </div>`).join('');
+  window._lookForPhotos = withPhoto;
+}
+
+function zoomPhoto(i) {
+  const h = (window._lookForPhotos || [])[i];
+  if (!h) return;
+  const o = document.createElement('div');
+  o.style.cssText = 'position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.94);'
+    + 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:14px';
+  o.innerHTML = `<div style="color:var(--ink);font-size:15px;font-weight:700">${esc(h.name)}</div>
+    <img src="${h.photo}" style="max-width:100%;max-height:82%;object-fit:contain;border-radius:12px">
+    <div style="color:var(--mute);font-size:12px">tap anywhere to close</div>`;
+  o.onclick = () => o.remove();
+  document.body.appendChild(o);
+}
+
 function say(html, action) {
   $('said').innerHTML = html
     + (action ? `<div style="margin-top:9px">
@@ -646,7 +694,7 @@ function drawPhoto(raw, marks) {
 }
 
 // ── add a group ──────────────────────────────────────────────────────
-let addItems = [];
+let addItems = [], addPhoto = null;
 $('addBtn').onclick = () => pickImage(async raw => {
   lastPhoto = raw;
   drawPhoto(raw, []);
@@ -655,6 +703,7 @@ $('addBtn').onclick = () => pickImage(async raw => {
     const seen = await describe('group', raw);
     busy(false);
     if (!seen.length) { say('<b>No pottery spotted.</b> <em>Try again, closer in.</em>'); return; }
+    addPhoto = raw;                 // kept so packing can show what to look for
     addItems = seen.map(s => s.description);
     renderAdd();
     $('addSheet').classList.add('on');
@@ -696,6 +745,19 @@ $('addSave').onclick = async () => {
         body: JSON.stringify({ studioId, items: [{ pieceId, description }] }),
       });
       bk.pieces.push({ id: pieceId, description, type: description.slice(0, 40), found: null });
+    }
+    // The photo goes with them. This is what makes a found piece
+    // visible later — a picture of the actual pieces beats any
+    // description, and needs nothing located.
+    if (addPhoto) {
+      try {
+        const small = await shrink(addPhoto, 1200);
+        await fetch(`${API}/api/pieces/save-group-photo`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studioId, bookingId: name, photoBase64: small }),
+        });
+        bk.photo = addPhoto;
+      } catch (e) { /* the pieces are saved either way */ }
     }
     sortBookings(); buildIdf(); paint();
     closeSheet('addSheet'); $('addBooking').value = '';
