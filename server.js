@@ -8294,33 +8294,56 @@ app.post('/api/packing/find-listed', async (req, res) => {
   try {
     const list = wanted.map((w, i) => `${i}: ${w.description}`).join('\n');
     const { data, usage } = await describeImage(photoBase64,
-      `${POTTERY_ONLY}\n\nHere is a list of pottery pieces I am looking for:\n${list}\n\n` +
-      `Look at the photo and decide which of these listed pieces are actually present. ` +
-      `Judge by what you can see — form, colour, decoration — not by whether the wording ` +
-      `matches how you would have described it yourself. The same piece can reasonably be ` +
-      `described in different words.\n\n` +
-      `Also list every piece of pottery you can see, whether or not it is on the list — ` +
-      `that tells me whether a miss is because the piece isn't there or because the wording ` +
-      `differs.\n\n` +
-      `For each listed piece you find, give its index, its rough position as fractions from ` +
-      `0 to 1 (x from left, y from top), how sure you are from 0 to 1, and a few words on ` +
-      `what you see there.\n` +
-      `Reply with ONLY this JSON, no prose and no markdown:\n` +
-      `{"found":[{"i":0,"x":0.42,"y":0.61,"confidence":0.9,"saw":"green fish jug on the tray"}],` +
-      `"allPottery":["green fish-shaped jug","cottage butter dish"]}`);
+      `${POTTERY_ONLY}\n\n` +
+      // STEP ONE FIRST, AND SEPARATELY. Asking for the inventory and
+      // the matches together let the wanted list bleed into the
+      // inventory: on a real studio shelf it reported seeing a green
+      // fish jug and a cottage butter dish, neither of which was in
+      // the photograph — both were items it had been asked to look
+      // for. The model writes left to right, so the inventory has to
+      // be written BEFORE it has seen or committed to any match,
+      // otherwise the answer contaminates the evidence.
+      `STEP 1. Ignore everything after this step for now. Look at the photo and list ` +
+      `every distinct piece of pottery you can actually see in it. Describe only what is ` +
+      `visibly there. Do not include anything you cannot see, however plausible.\n\n` +
+      `STEP 2. Only now, read this list of pieces someone is looking for:\n${list}\n\n` +
+      `Decide which of them appear in YOUR STEP 1 LIST. Judge by what you can see — form, ` +
+      `colour, decoration — not by whether the wording matches how you described it. The ` +
+      `same piece can reasonably be described in different words. If a listed piece is not ` +
+      `in your step 1 list, it is not there.\n\n` +
+      `Reply with ONLY this JSON, no prose and no markdown, and write "seen" first:\n` +
+      `{"seen":["what you actually saw, one entry per piece"],` +
+      `"found":[{"i":0,"x":0.42,"y":0.61,"confidence":0.9,"saw":"which of your seen items this is"}]}`);
     const cost = await logUsage(studioId, 'find-in-photo', usage);
     const arr = Array.isArray(data) ? data : (data.found || []);
     // Everything it saw, listed or not. A bare "0 of 2" says nothing
     // about WHY — this distinguishes "the pieces aren't in the photo"
     // from "they are, and the matching failed", which are opposite
     // problems with opposite fixes.
-    const allPottery = Array.isArray(data && data.allPottery) ? data.allPottery : [];
+    const allPottery = Array.isArray(data && data.seen) ? data.seen
+                     : (Array.isArray(data && data.allPottery) ? data.allPottery : []);
     // 0.4 rather than 0.55: the model is already told to be careful, so
     // a second conservative filter on top was rejecting real sightings
     // twice over. Anything under 0.8 is shown with a '?' anyway.
+    // A claim has to be backed by the model's own inventory. If it
+    // says it found piece 3 but nothing in its step-1 list resembles
+    // it, that is the contamination reasserting itself and the claim
+    // is dropped. Cheap, and it fails toward missing rather than
+    // inventing — the right direction when the cost of a false tick is
+    // someone hunting a shelf for a piece that was never there.
+    const invWords = new Set(
+      allPottery.join(' ').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean));
+    const backed = (desc) => {
+      if (!allPottery.length) return true;   // nothing to check against
+      const w = String(desc).toLowerCase().replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/).filter(x => x.length > 3);
+      if (!w.length) return true;
+      return w.some(x => invWords.has(x));
+    };
     const found = arr
       .filter(f => f && typeof f.i === 'number' && wanted[f.i])
       .filter(f => (f.confidence === undefined || f.confidence >= 0.4))
+      .filter(f => backed(wanted[f.i].description))
       .map(f => ({
         id: wanted[f.i].id,
         description: wanted[f.i].description,
