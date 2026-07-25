@@ -492,7 +492,10 @@ function _partySizeFromNote(note) {
   return null;
 }
 
-async function syncSquareData(studioId, accessToken, daysBack = 1) {
+// untilDate (optional, 'YYYY-MM-DD') bounds the top of the range so a
+// long backfill can be sliced into windows instead of pulling years of
+// orders into memory at once — see chunkedBackfill below.
+async function syncSquareData(studioId, accessToken, daysBack = 1, untilDate = null) {
   try {
     const { data: connectionRow } = await supabase
       .from('square_connections')
@@ -555,7 +558,8 @@ async function syncSquareData(studioId, accessToken, daysBack = 1) {
           filter: {
             dateTimeFilter: {
               createdAt: {
-                startAt: sinceDate + 'T00:00:00Z'
+                startAt: sinceDate + 'T00:00:00Z',
+                ...(untilDate ? { endAt: untilDate + 'T23:59:59Z' } : {}),
               }
             }
           },
@@ -14087,15 +14091,22 @@ app.listen(port, async () => {
       const wantFrom = new Date(HISTORY_STARTS);
       const daysToToday = (d) => Math.ceil((Date.now() - new Date(d).getTime()) / 86400000);
 
+      // ONLY the recent window automatically. A full backfill is NOT
+      // safe to fire on boot: syncSquareData accumulates every order
+      // in memory (orders = orders.concat(...), up to 100 pages of
+      // 500), so several years of a busy studio can exhaust a 512MB
+      // Render instance and restart the server mid-request. That is
+      // what happened at 20:06 on 25 Jul — a describe call came back
+      // as non-JSON because the process was cycling under a 1,667-day
+      // pull I had triggered on boot.
+      //
+      // The catch-up window is small and bounded, so it is safe every
+      // time. The full history stays on the manual button in Takings,
+      // where someone is watching and can see it finish.
+      await syncAllStudios(7, 'catch-up');
       if (!have || new Date(have) > wantFrom) {
-        // Missing years: pull the lot, once.
-        const daysBack = daysToToday(HISTORY_STARTS);
-        console.log(`Square history starts ${have || 'nowhere'} — backfilling ${daysBack} days…`);
-        await syncAllStudios(daysBack, 'backfill');
-      } else {
-        // History is complete; just make sure today and the last few
-        // days are current, since card settlements can land late.
-        await syncAllStudios(7, 'catch-up');
+        console.log(`Square history starts ${have || 'nowhere'} — `
+          + `older years NOT pulled automatically (memory). Use Takings → Pull older history.`);
       }
     } catch (err) {
       console.error('Square boot sync failed:', err.message);
