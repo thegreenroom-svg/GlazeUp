@@ -489,7 +489,7 @@ function applyFound(found, wanted, raw) {
     const w = wanted.find(x => x.id === f.id);
     if (!w || w.p.found) continue;
     w.p.found = { surface: surfaces, where: f.saw ? `seen: ${f.saw}` : '' };
-    if (f.zone) rings.push({ zone: f.zone, label: w.b.id, conf: f.confidence });
+    rings.push({ label: w.b.id, conf: f.confidence });
   }
   drawPhoto(raw, rings);
   paint();
@@ -500,7 +500,7 @@ function applyFound(found, wanted, raw) {
       const w = wanted.find(x => x.id === f.id); return w ? w.b.id : '';
     }).filter(Boolean))].join(', ');
     say(`<b>Found ${found.length} — ${esc(who)}.</b> ${left ? left + ' still out there.' : "That's everything."}`
-      + (rings.length ? '' : ' <em>Position not given for these.</em>'));
+);
   } else {
     say(`<b>None of them matched.</b> <em>It saw: ${lastAllPottery.length
       ? esc(lastAllPottery.join('; ')) : 'no pottery at all'}.</em>`);
@@ -520,56 +520,26 @@ function drawPhoto(raw, marks) {
     const ctx = cv.getContext('2d');
     ctx.drawImage(img, 0, 0);
 
-    // A shaded third of the photo, not a ring on one object. The model
-    // knows WHAT it saw far better than WHERE it was — measured, after
-    // it put two jugs on a butter dish — so the honest display is the
-    // area it can actually vouch for. Coarse and true beats precise
-    // and wrong: a wrong ring sends someone to the wrong shelf.
-    // Tolerant on purpose. Strict 'middle-left' parsing rejected
-    // perfectly good answers three times over — 'middle left',
-    // 'centre-left', 'Middle-Left', 'left-middle' are all the same
-    // place, and refusing them showed nothing while the message
-    // claimed something was shaded. Read the words, not the format.
-    const zoneToCell = (z) => {
-      const t = String(z || '').toLowerCase();
-      const row = /top|upper|back/.test(t) ? 0 : /bottom|lower|front/.test(t) ? 2 : 1;
-      const col = /left/.test(t) ? 0 : /right/.test(t) ? 2 : 1;
-      if (!/top|upper|back|bottom|lower|front|left|right|middle|centre|center/.test(t)) return null;
-      return [row, col];
-    };
-    const fs = Math.max(17, Math.round(img.width / 32));
-    ctx.font = '700 ' + fs + 'px ui-sans-serif,system-ui,sans-serif';
-    ctx.textAlign = 'center';
-
-    // Several pieces can share a zone; stack their labels.
-    const perZone = {};
-    for (const m of marks) {
-      const cell = zoneToCell(m.zone);
-      if (!cell) continue;
-      const key = cell[0] + ',' + cell[1];
-      (perZone[key] = perZone[key] || []).push(m);
+    // Names on the photo, no position claimed. Four attempts at
+    // showing WHERE all failed the same way, because this tool
+    // identifies well and localises badly. So it says what it found
+    // and stops — which is the part a packer actually needs, and the
+    // part that has worked every single time.
+    if (marks.length) {
+      const pad = Math.round(img.width * 0.03);
+      const fs = Math.max(20, Math.round(img.width / 26));
+      const lh = fs + Math.round(fs * 0.5);
+      ctx.font = '700 ' + fs + 'px ui-sans-serif,system-ui,sans-serif';
+      const lines = marks.map(m => '✓ ' + String(m.label)
+        + (m.conf && m.conf < 0.8 ? ' ?' : ''));
+      const boxH = lines.length * lh + pad;
+      const y0 = img.height - boxH - pad;
+      const wMax = Math.max(...lines.map(l => ctx.measureText(l).width));
+      ctx.fillStyle = 'rgba(0,0,0,.72)';
+      ctx.fillRect(pad, y0, Math.min(img.width - pad * 2, wMax + pad * 2), boxH);
+      ctx.fillStyle = '#4CAF50';
+      lines.forEach((l, i) => ctx.fillText(l, pad * 2, y0 + pad * 0.7 + (i + 1) * lh - lh * 0.28));
     }
-
-    const w = img.width / 3, h = img.height / 3;
-    for (const key in perZone) {
-      const [r, c] = key.split(',').map(Number);
-      const x = c * w, y = r * h;
-      ctx.fillStyle = 'rgba(76,175,80,.17)';
-      ctx.fillRect(x, y, w, h);
-      ctx.strokeStyle = '#4CAF50';
-      ctx.lineWidth = Math.max(3, Math.round(img.width / 260));
-      ctx.strokeRect(x + 2, y + 2, w - 4, h - 4);
-      perZone[key].forEach((m, i) => {
-        const label = String(m.label).slice(0, 22) + (m.conf && m.conf < 0.8 ? ' ?' : '');
-        const ly = y + h / 2 + (i - (perZone[key].length - 1) / 2) * (fs + 10);
-        const tw = ctx.measureText(label).width;
-        ctx.fillStyle = 'rgba(0,0,0,.72)';
-        ctx.fillRect(x + w / 2 - tw / 2 - 9, ly - fs, tw + 18, fs + 9);
-        ctx.fillStyle = '#4CAF50';
-        ctx.fillText(label, x + w / 2, ly);
-      });
-    }
-    ctx.textAlign = 'left';
     cv.style.display = 'block';
     $('hint').style.display = 'none';
   };
@@ -659,7 +629,7 @@ $('tbFind').onclick = () => pickImage(async raw => {
     for (const f of found) {
       const t = tb[Number(f.id)];
       if (!t) continue;
-      t.found = true; t.saw = f.saw; t.conf = f.confidence; t.zone = f.zone;
+      t.found = true; t.saw = f.saw; t.conf = f.confidence;
       if (f.x !== null && f.y !== null)
         rings.push({ x: f.x, y: f.y, label: t.description.split(',')[0], conf: f.confidence });
     }
@@ -671,16 +641,11 @@ $('tbFind').onclick = () => pickImage(async raw => {
     const hits = tb.filter(t => t.found).length;
     // The panel closes itself, so telling someone to close it was
     // instructions for a step that had already happened. And when no
-    // zone comes back nothing gets shaded — which looked identical to
     // a failure. Say which of those it is.
     // Count what will actually be drawn, not what was returned — the
     // message promised shading three times while drawing nothing.
-    const placed = rings.filter(r => r.zone).length;
     say(hits
-      ? `<b>Test: ${hits} of ${tb.length} found.</b> `
-        + (placed
-            ? `<em>Shaded areas show roughly where.</em>`
-            : `<em>Found, but it didn't say where — the list below names them.</em>`)
+      ? `<b>Test: ${hits} of ${tb.length} found.</b> <em>Named on the photo.</em>`
       : `<b>Test: none matched.</b> <em>It saw: ${lastAllPottery.length
           ? esc(lastAllPottery.join('; ')) : 'no pottery at all'}.</em>`);
     closeSheet('tbSheet');
@@ -702,7 +667,7 @@ function renderTb(ran) {
       <div class="tick" style="color:${t.found ? 'var(--done)' : 'var(--mute)'}">${t.found ? '✓' : '○'}</div>
       <div style="flex:1;min-width:0">
         <div>${esc(t.description)}</div>
-        ${t.found && t.saw ? `<div class="mut">saw: ${esc(t.saw)}${t.zone ? ` · ${esc(t.zone.replace('-', ' '))}` : ''}${t.conf ? ` · ${Math.round(t.conf * 100)}% sure` : ''}</div>`
+        ${t.found && t.saw ? `<div class="mut">saw: ${esc(t.saw)}${t.conf ? ` · ${Math.round(t.conf * 100)}% sure` : ''}</div>`
           : ran ? '<div class="mut">not in that photo</div>' : ''}
       </div>
     </div>`).join('')

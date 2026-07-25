@@ -8311,21 +8311,17 @@ app.post('/api/packing/find-listed', async (req, res) => {
       `colour, decoration — not by whether the wording matches how you described it. The ` +
       `same piece can reasonably be described in different words. If a listed piece is not ` +
       `in your step 1 list, it is not there.\n\n` +
-      // POSITION IS ASKED AS A ZONE, NOT A COORDINATE. Measured: on a
-      // real tray it identified a white jug and a cream jug correctly —
-      // both genuinely present — then placed both circles on a butter
-      // dish in the middle, while the jugs sat far left and upper
-      // right. Vision models say WHAT reliably and WHERE poorly, and a
-      // ring on the wrong object is worse than no ring: it sends
-      // someone hunting the wrong end of a shelf with false
-      // confidence. A named third of the photo is coarse, but it is
-      // true, and it still saves the walk.
-      `Say roughly where each one is using ONE of these nine zones: ` +
-      `top-left, top-centre, top-right, middle-left, middle-centre, middle-right, ` +
-      `bottom-left, bottom-centre, bottom-right.\n\n` +
+      // POSITION REMOVED ENTIRELY, 25 Jul, after four failed attempts:
+      // rings on the wrong objects, then no rings, then a message
+      // promising shading that never appeared, then zones the model
+      // declined to give at all. The pattern was consistent — this
+      // tool identifies reliably and localises badly — and every
+      // attempt to dress that up cost a round of debugging while the
+      // part that WORKS (which pieces are here, and whose) sat behind
+      // it looking broken. What a packer actually needs is the name.
       `Reply with ONLY this JSON, no prose and no markdown, and write "seen" first:\n` +
       `{"seen":["what you actually saw, one entry per piece"],` +
-      `"found":[{"i":0,"zone":"middle-left","confidence":0.9,"saw":"which of your seen items this is"}]}`);
+      `"found":[{"i":0,"confidence":0.9,"saw":"which of your seen items this is"}]}`);
     const cost = await logUsage(studioId, 'find-in-photo', usage);
     const arr = Array.isArray(data) ? data : (data.found || []);
     // Everything it saw, listed or not. A bare "0 of 2" says nothing
@@ -8359,7 +8355,6 @@ app.post('/api/packing/find-listed', async (req, res) => {
       .map(f => ({
         id: wanted[f.i].id,
         description: wanted[f.i].description,
-        zone: typeof f.zone === 'string' ? f.zone.toLowerCase().trim() : null,
         confidence: f.confidence === undefined ? null : f.confidence,
         saw: f.saw || '',
       }));
