@@ -882,7 +882,7 @@ $('addSave').onclick = async () => {
 };
 
 // ── test bed ─────────────────────────────────────────────────────────
-let tb = [];
+let tb = [], tbRefPhoto = null;
 $('testBtn').onclick = () => { renderTb(); openSheet('tbSheet'); };
 
 $('tbAdd').onclick = () => pickImage(async raw => {
@@ -890,6 +890,14 @@ $('tbAdd').onclick = () => pickImage(async raw => {
   try {
     const seen = await describe('group', raw, true);   // anyObject — no booking to protect here
     if (!seen.length) { $('tbBody').innerHTML = '<div class="mut">Nothing spotted — try closer in.</div>'; return; }
+    // [26 Jul] The photo was sitting in memory this whole time and
+    // never shown back. No booking, no server storage, nothing to
+    // conflict with "nothing saved" — this is just re-showing a photo
+    // the browser already has, exactly like the real Add flow does
+    // from a stored one. Useful precisely where it matters most: a
+    // piece half-hidden in a densely packed box is easier to eyeball
+    // against the original photo than against a ring alone.
+    tbRefPhoto = raw;
     tb = seen.map(s => ({ description: s.description, found: false, best: null, bestText: '', at: null }));
     buildIdf(tb.map(t => t.description));
     renderTb(); $('tbFind').disabled = false;
@@ -967,10 +975,18 @@ function renderTb(ran) {
       photograph again. Every score is shown, so a near miss reads as a near miss.</div>`;
     return;
   }
+  // The photo of what was registered, shown alongside the results —
+  // useful exactly where a ring alone struggles: a piece half-buried
+  // in a densely packed box is easier to pick out by eye against the
+  // original than against a coordinate.
+  const refStrip = tbRefPhoto
+    ? `<img src="${tbRefPhoto}" style="width:100%;border-radius:11px;margin-bottom:10px;
+        border:1.5px solid var(--line);display:block" alt="what was registered">`
+    : '';
   // Every miss says WHY, not just that it missed. A shelf of a dozen
   // similar unfired pieces is exactly the case that needs this —
   // "3 not spotted" told nothing about which three or what to try next.
-  $('tbBody').innerHTML = tb.map(t => {
+  $('tbBody').innerHTML = refStrip + tb.map(t => {
     if (t.found) {
       return `<div class="row">
         <div class="tick" style="color:var(--done)">✓</div>
