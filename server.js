@@ -8452,6 +8452,12 @@ fish-shaped with a wide mouth; ridged like an acorn). This matters most when
 there is little or no colour: an unpainted piece has nothing BUT its form to be
 told apart by, so never stop at "unpainted white" alone.
 
+A colour word ALONE IS NEVER A COMPLETE ANSWER, even for a single piece
+photographed on its own with nothing else in frame to compare it to. It will
+later need to be told apart from other pieces you cannot see right now, so the
+form must always be there too — every description names a specific shape or
+object, no exceptions.
+
 Keep it under fifteen words.
 Good: "blue and yellow stripes with a star, on a mug";
       "dark green all over, glossy, fish-shaped with a wide mouth";
@@ -8459,8 +8465,8 @@ Good: "blue and yellow stripes with a star, on a mug";
       "unpainted white, sun face with pointed rays, on a stand";
       "unpainted white, crouching rabbit with long upright ears".
 Bad: "a mug"; "ceramic piece"; "beautifully hand-painted item";
-     "unpainted white" with nothing else — too generic to tell apart from
-     other bisque pieces.`;
+     "unpainted white" alone, "cream", "pale blue" — a colour with no form is
+     always an incomplete answer, never acceptable on its own.`;
 
 // POST /api/pieces/describe-group — one photo of a table, back come
 // descriptions for each piece on it.
