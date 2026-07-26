@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Breakdown</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FFF9F0; --panel:#FFFDF9; --line:rgba(43,39,36,.14);
+    --ink:#2B2724; --mute:#6f665b; --go:#3E7C6A; --clay:#B87946; --warn:#B8860B;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{height:100%; overflow:hidden}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.4 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    display:flex; flex-direction:column;
+    padding:max(10px,env(safe-area-inset-top)) 11px calc(10px + env(safe-area-inset-bottom));
+    -webkit-text-size-adjust:100%}
+  .top{display:flex; align-items:baseline; gap:10px; flex-shrink:0; padding:2px 2px 8px}
+  .top h1{font-family:Caveat,serif; font-size:27px; margin:0; line-height:1}
+  .top .n{font-size:12px; color:var(--mute); flex:1; min-width:0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .top a{color:var(--mute); font-size:19px; text-decoration:none; padding:2px 6px}
+
+  .filterbar{flex-shrink:0; display:flex; gap:7px; margin-bottom:8px}
+  .filterbar select, .filterbar input{
+    font:inherit; font-size:13px; background:var(--panel); border:1.5px solid var(--line);
+    border-radius:10px; padding:8px 10px; color:var(--ink)}
+  .filterbar select{flex:0 0 auto}
+  .filterbar input{flex:1; min-width:0}
+
+  .body{flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:8px}
+  .card{background:var(--panel); border:1.5px solid var(--line); border-radius:14px; padding:11px 13px}
+  .totalcard{display:flex; justify-content:space-between; align-items:baseline}
+  .totalcard .v{font-size:22px; font-weight:800}
+  .totalcard .s{font-size:11.5px; color:var(--mute)}
+
+  .grp{border:1.5px solid var(--line); border-radius:13px; background:var(--panel); overflow:hidden}
+  .grp-head{display:flex; align-items:center; gap:10px; padding:11px 12px; cursor:pointer}
+  .grp-head .nm{flex:1; min-width:0; font-weight:800; font-size:14px}
+  .grp-head .rv{font-weight:800; font-size:14px; font-variant-numeric:tabular-nums}
+  .grp-head .ct{font-size:11px; color:var(--mute)}
+  .grp-head .car{font-size:13px; color:var(--mute); transition:transform .18s}
+  .grp.open .car{transform:rotate(90deg)}
+  .bar{height:6px; background:rgba(43,39,36,.08); margin:0 12px 10px}
+  .bar i{display:block; height:100%; background:var(--go)}
+  .grp.warn .bar i{background:var(--warn)}
+  .grp.warn .grp-head .nm{color:var(--warn)}
+
+  .cats{display:none; border-top:1px solid var(--line)}
+  .grp.open .cats{display:block}
+  .cat-row{display:flex; align-items:center; gap:10px; padding:9px 12px 9px 22px;
+    border-top:1px solid rgba(43,39,36,.07); font-size:13px}
+  .cat-row .nm{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .cat-row .rv{font-variant-numeric:tabular-nums; font-weight:700}
+  .cat-row .pct{font-size:11px; color:var(--mute); width:38px; text-align:right}
+  .cat-row .items{font-size:11px; color:var(--mute); width:52px; text-align:right}
+
+  .dock{flex-shrink:0; display:flex; gap:2px; justify-content:space-around;
+    background:#2B2724; border-radius:16px; padding:7px 4px; margin-top:9px}
+  .dock a{flex:1; text-align:center; text-decoration:none; color:#8F877C;
+    font-size:10px; padding:5px 2px; border-radius:11px; line-height:1.35}
+  .dock a .i{display:block; font-size:16px; line-height:1}
+  .dock a.on{color:#F4ECE0; background:rgba(244,236,224,.1)}
+  .empty{color:var(--mute); font-size:13px; text-align:center; padding:20px}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>Breakdown</h1>
+  <div class="n" id="range">Loading…</div>
+  <a href="/admin/takings.html" title="Takings summary">£</a>
+  <a href="/admin/dashboard-local.html?go=home" title="Back to the Desk">✕</a>
+</div>
+
+<div class="filterbar">
+  <select id="rangeSel">
+    <option value="all">All time</option>
+    <option value="year">This year</option>
+    <option value="90">Last 90 days</option>
+    <option value="30">Last 30 days</option>
+  </select>
+  <input type="search" id="filter" placeholder="Filter categories (e.g. mugs, plates)">
+</div>
+
+<div class="body" id="body"><div class="empty">Loading…</div></div>
+
+<div class="dock" id="dock">
+  <a href="/admin/dashboard-local.html?go=home"><span class="i">⌂</span>Desk</a>
+  <a href="/admin/dashboard-local.html?go=floor"><span class="i">◉</span>Floor</a>
+  <a href="/admin/packing.html" data-here="x"><span class="i">◍</span>Pieces</a>
+  <a href="/admin/takings.html" data-here="takings"><span class="i">£</span>Money</a>
+  <a href="/admin/dashboard-local.html?go=menu"><span class="i">☰</span>Menu</a>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────
+// BREAKDOWN — [26 Jul] Daisy: "complete breakdown of sales in
+// categories and sub groups to delve into figures."
+//
+// revenue_category_breakdown already existed with genuine Square
+// category data, and reaches back to 16 Nov 2022 — nearly two years
+// further than the daily-revenue table Takings was built on. Grouped
+// by the naming convention already present in the data rather than a
+// taxonomy invented on top of it: "PB " = Paint-your-own Bisque by
+// shape, "S." = studio sessions and fees, the rest sorted by what they
+// plainly are (drinks, food) with an honest "Unclassified in Square"
+// bucket for the one category literally called "Other" — which is the
+// single biggest line at £322k and worth knowing is unclassified
+// rather than a real category.
+// ─────────────────────────────────────────────────────────────────────
+
+const API = location.origin;
+const studioId = new URLSearchParams(location.search).get('studio')
+  || 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3';
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+const money = n => '£' + Math.round(n).toLocaleString('en-GB');
+
+document.querySelectorAll('#dock a').forEach(a => {
+  const u = new URL(a.getAttribute('href'), location.origin);
+  u.searchParams.set('studio', studioId);
+  a.setAttribute('href', u.pathname + u.search);
+});
+
+let raw = null, openGroups = new Set();
+
+function rangeDates(sel) {
+  if (sel === 'all') return {};
+  const to = new Date().toISOString().slice(0, 10);
+  if (sel === 'year') return { from: new Date().getFullYear() + '-01-01', to };
+  const from = new Date(Date.now() - (+sel) * 86400000).toISOString().slice(0, 10);
+  return { from, to };
+}
+
+async function load() {
+  const sel = $('rangeSel').value;
+  const { from, to } = rangeDates(sel);
+  $('body').innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    const q = new URLSearchParams({ studioId });
+    if (from) q.set('from', from);
+    if (to) q.set('to', to);
+    const r = await fetch(`${API}/api/takings/breakdown?${q}`);
+    raw = await r.json();
+  } catch (e) { $('body').innerHTML = '<div class="empty">Could not reach the server.</div>'; return; }
+  if (!raw.stats) { $('body').innerHTML = '<div class="empty">No sales data for this range.</div>'; $('range').textContent = ''; return; }
+  const s = raw.stats;
+  const nice = d => new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  $('range').textContent = `${nice(s.earliest)} – ${nice(s.latest)} · ${s.categoryCount} categories`;
+  render();
+}
+
+function render() {
+  const q = ($('filter').value || '').trim().toLowerCase();
+  const s = raw.stats;
+  const groups = raw.groups.map(g => ({
+    ...g,
+    categories: q ? g.categories.filter(c => c.category.toLowerCase().includes(q)) : g.categories,
+  })).filter(g => !q || g.categories.length || g.group.toLowerCase().includes(q));
+
+  const shownTotal = groups.reduce((n, g) => n + (q ? g.categories.reduce((m, c) => m + c.revenue, 0) : g.revenue), 0);
+
+  $('body').innerHTML = `
+    <div class="card totalcard">
+      <div><div class="v">${money(q ? shownTotal : s.total)}</div>
+        <div class="s">${q ? 'matching "' + esc(q) + '"' : 'total, all categories'}</div></div>
+      <div class="s">${s.totalItems.toLocaleString('en-GB')} items sold</div>
+    </div>
+    ${groups.map(g => {
+      const isOpen = openGroups.has(g.group) || !!q;
+      const isWarn = g.group === 'Unclassified in Square';
+      const pct = q ? (shownTotal ? g.categories.reduce((m, c) => m + c.revenue, 0) / shownTotal * 100 : 0) : g.pct;
+      return `
+      <div class="grp ${isOpen ? 'open' : ''} ${isWarn ? 'warn' : ''}" data-g="${esc(g.group)}">
+        <div class="grp-head" onclick="toggleGroup('${esc(g.group).replace(/'/g, "\\'")}')">
+          <span class="car">›</span>
+          <div class="nm">${esc(g.group)}
+            <div class="ct">${g.categoryCount} categor${g.categoryCount === 1 ? 'y' : 'ies'}</div></div>
+          <div class="rv">${money(q ? g.categories.reduce((m, c) => m + c.revenue, 0) : g.revenue)}
+            <div class="ct" style="text-align:right">${pct.toFixed(1)}%</div></div>
+        </div>
+        <div class="bar"><i style="width:${pct}%"></i></div>
+        <div class="cats">
+          ${g.categories.map(c => `
+            <div class="cat-row">
+              <div class="nm">${esc(c.category)}</div>
+              <div class="items">${c.items.toLocaleString('en-GB')}×</div>
+              <div class="pct">${c.pct.toFixed(1)}%</div>
+              <div class="rv">${money(c.revenue)}</div>
+            </div>`).join('') || '<div class="cat-row"><div class="nm" style="color:var(--mute)">nothing here</div></div>'}
+        </div>
+      </div>`;
+    }).join('') || '<div class="empty">Nothing matches that filter.</div>'}
+    ${groups.some(g => g.group === 'Unclassified in Square' && g.revenue > 0) ? `
+      <div class="card" style="font-size:11.5px;color:var(--mute);line-height:1.5">
+        <b style="color:var(--warn)">Unclassified in Square</b> is everything Square recorded as
+        category "Other" — it is genuinely unlabelled at source, not a filing choice made here.
+        Worth checking Square's own category setup if this figure matters.
+      </div>` : ''}
+  `;
+}
+
+function toggleGroup(g) {
+  if (openGroups.has(g)) openGroups.delete(g); else openGroups.add(g);
+  render();
+}
+window.toggleGroup = toggleGroup;
+
+$('rangeSel').addEventListener('change', load);
+$('filter').addEventListener('input', render);
+
+load();
+</script>
+</body>
+</html>

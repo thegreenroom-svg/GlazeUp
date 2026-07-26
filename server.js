@@ -822,6 +822,88 @@ app.get('/api/square/transactions', async (req, res) => {
 });
 
 
+
+// GET /api/takings/breakdown — full category/subgroup drill-down.
+//
+// [26 Jul] Daisy: "complete breakdown of sales in categories and sub
+// groups to delve into figures." revenue_category_breakdown already
+// existed with real Square category data — and goes back to 16 Nov
+// 2022, nearly two years further than analytics_cache (daily_revenue),
+// which is what Takings was built on. This is the missing history.
+//
+// Categories carry a natural hierarchy already in their own names:
+// 'PB ' = Paint-your-own Bisque, grouped by shape (Mugs, Plates,
+// Bowls...); 'S. ' = session-type fees (Painting Sessions, Glazing,
+// Postage, Events); everything else is food, drink or misc. Grouped
+// here rather than inventing a taxonomy on top of one that already
+// exists in the data.
+app.get('/api/takings/breakdown', async (req, res) => {
+  const { studioId, from, to } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    let q = supabase.from('revenue_category_breakdown')
+      .select('metric_date, category, revenue_cents, item_count')
+      .eq('studio_id', studioId).order('metric_date', { ascending: true });
+    if (from) q = q.gte('metric_date', from);
+    if (to) q = q.lte('metric_date', to);
+    const { data, error } = await q;
+    if (error) throw error;
+    if (!data.length) return res.json({ groups: [], stats: null });
+
+    const groupOf = (cat) => {
+      const c = (cat || '').trim();
+      if (c.startsWith('PB ')) return 'Paint your own — by shape';
+      if (c.startsWith('S.')) return 'Studio sessions & fees';
+      if (/drink|coffee|milkshake|smoothie|alcohol/i.test(c)) return 'Drinks';
+      if (/cake|food|cafe/i.test(c)) return 'Food';
+      if (c === 'Other') return 'Unclassified in Square';
+      return 'Other';
+    };
+
+    const cats = {};       // category -> { revenue, items, byMonth }
+    const groups = {};     // group -> { revenue, items, categories:Set }
+    const byMonth = {};    // 'YYYY-MM' -> revenue
+    let total = 0, totalItems = 0;
+    const earliest = data[0].metric_date, latest = data[data.length - 1].metric_date;
+
+    for (const r of data) {
+      const rev = (r.revenue_cents || 0) / 100;
+      const items = r.item_count || 0;
+      const cat = (r.category || 'Other').trim();
+      const grp = groupOf(cat);
+      const mk = r.metric_date.slice(0, 7);
+
+      total += rev; totalItems += items;
+      byMonth[mk] = (byMonth[mk] || 0) + rev;
+
+      if (!cats[cat]) cats[cat] = { category: cat, group: grp, revenue: 0, items: 0 };
+      cats[cat].revenue += rev; cats[cat].items += items;
+
+      if (!groups[grp]) groups[grp] = { group: grp, revenue: 0, items: 0, categories: new Set() };
+      groups[grp].revenue += rev; groups[grp].items += items; groups[grp].categories.add(cat);
+    }
+
+    const groupList = Object.values(groups)
+      .map(g => ({ group: g.group, revenue: g.revenue, items: g.items,
+        categoryCount: g.categories.size, pct: total ? g.revenue / total * 100 : 0,
+        categories: Object.values(cats).filter(c => c.group === g.group)
+          .sort((a, b) => b.revenue - a.revenue)
+          .map(c => ({ category: c.category, revenue: c.revenue, items: c.items,
+            pct: total ? c.revenue / total * 100 : 0 })) }))
+      .sort((a, b) => b.revenue - a.revenue);
+
+    const months = Object.entries(byMonth).map(([month, revenue]) => ({ month, revenue }));
+
+    res.json({
+      groups: groupList, months,
+      stats: { total, totalItems, earliest, latest, categoryCount: Object.keys(cats).length },
+    });
+  } catch (e) {
+    console.error('takings/breakdown:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/takings/history — everything the Desk should be able to show.
 //
 // [25 Jul] Daisy: "average day, best average day, best year — stuff we
