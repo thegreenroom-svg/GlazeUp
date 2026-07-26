@@ -8427,43 +8427,40 @@ brushes, water jars, cloths, furniture, bags, toys, bottles.`;
 // what the customer PAINTED on it — the colours, the pattern, where
 // the colour sits. Describing form first was describing the one
 // attribute guaranteed not to distinguish anything.
-const DESCRIBE_STYLE = `These are blank ceramic shapes that customers have painted, so MANY PIECES
-SHARE THE SAME SHAPE. The shape is rarely what tells them apart — the PAINTING is.
+// [26 Jul] Simplified to exactly two things, always both, on Daisy's
+// direct instruction: "Colour and form only." This also fixes a real
+// bug: the previous version's unpainted-piece guidance was written as
+// a JS comment (// ...) sitting INSIDE the template literal, so it
+// was never a code comment at all — it was being sent to the vision
+// model as literal prompt text on every single call. Making form a
+// permanent, unconditional requirement rather than a special case for
+// unpainted pieces removes the need for that branch entirely: a piece
+// with real colour still gets a specific enough form to be told apart
+// from a similar colour elsewhere, and a piece with none is no longer
+// relying on a rule that only fired sometimes.
+const DESCRIBE_STYLE = `Describe each piece using ONLY its colour and its form. Nothing else —
+no size, no guesses at what it is called, no other detail.
 
-Lead with the decoration: the colours, the pattern, and where the colour sits.
-Then, briefly, the shape. Do not agonise over what the object is called; if you
-are unsure whether it is a jug or a vase, say either — it does not matter.
+COLOUR: name the colours plainly (pale blue, dark green, orange, cream, unpainted
+white) and where they sit if it matters (stripes, spots, one solid colour, patchy,
+rim only).
 
-Say colours plainly and specifically (pale blue, dark green, orange, cream, unpainted
-white) and say how they are arranged (stripes, spots, flowers, a face, one solid
-colour, rim only, patchy, mostly white with a little colour).
-
-// [26 Jul] UNPAINTED / BISQUE PIECES ARE A SPECIAL CASE, and this is
-// the paragraph that fixes a real, confirmed miss: a plain white sun
-// figure was matched to a plain white rabbit, because both had been
-// written as nothing more than "unpainted white" — true of both, so
-// there was nothing left to tell them apart with. The colour-first
-// rule above is right for painted pieces, but actively wrong here: an
-// unfired piece has no decoration to lead with, so shape becomes the
-// ONLY thing that can distinguish it, and it must be specific, not a
-// generic noun.
-If a piece is unpainted, plain bisque, or only lightly painted, DO NOT stop at
-"unpainted white" — that is true of every bisque piece on the shelf and
-distinguishes nothing. Instead describe its actual FORM in enough detail that
-it could not be confused with a different unpainted piece: not just "figure"
-but what it is a figure OF (a sun with a face and pointed rays; a crouching
-rabbit with long ears; a star; a house shape), and any texture or detail
-visible in the clay itself (ridged, smooth, a face carved in, fur texture).
+FORM: always describe the actual shape specifically enough to tell it apart from a
+similarly-coloured piece — not "mug" or "figure", but what it actually looks like
+(a sun with a face and pointed rays; a crouching rabbit with long upright ears;
+fish-shaped with a wide mouth; ridged like an acorn). This matters most when
+there is little or no colour: an unpainted piece has nothing BUT its form to be
+told apart by, so never stop at "unpainted white" alone.
 
 Keep it under fifteen words.
 Good: "blue and yellow stripes with a star, on a mug";
-      "dark green all over, glossy, fish-shaped";
+      "dark green all over, glossy, fish-shaped with a wide mouth";
       "cream with orange flowers, small jug";
-      "mostly unpainted white, pink spots round the rim, small bowl";
       "unpainted white, sun face with pointed rays, on a stand";
       "unpainted white, crouching rabbit with long upright ears".
-Bad: "a mug"; "ceramic piece"; "beautifully hand-painted item"; "white pottery";
-     "unpainted white" (with nothing else — too generic to be useful alone).`;
+Bad: "a mug"; "ceramic piece"; "beautifully hand-painted item";
+     "unpainted white" with nothing else — too generic to tell apart from
+     other bisque pieces.`;
 
 // POST /api/pieces/describe-group — one photo of a table, back come
 // descriptions for each piece on it.
@@ -8555,12 +8552,19 @@ app.post('/api/packing/find-listed', async (req, res) => {
       `visibly there. Do not include anything you cannot see, however plausible.\n\n` +
       `STEP 2. Only now, read this list of pieces someone is looking for:\n${list}\n\n` +
       `Decide which of them appear in YOUR STEP 1 LIST.\n\n` +
-      `MATCH ON THE PAINTING, NOT THE WORDS. These are bought-in blanks, so several pieces ` +
-      `on a shelf may be the identical shape — the shape is usually the LEAST useful clue. ` +
-      `What identifies a piece is its colours, its pattern, and where the colour sits. ` +
-      `A "mug" and a "cup", or a "jug" and a "vase", may well be the same object described ` +
-      `differently; if the painting matches, it is the same piece. If the painting is ` +
-      `clearly different, it is not, however similar the shape.\n\n` +
+      // [26 Jul] Was "shape is usually the least useful clue" — true for
+      // painted pieces, but it is exactly the framing that lost an
+      // unpainted sun figure to an unpainted rabbit: with no colour on
+      // either, shape was the ONLY clue, and this told the judge to
+      // disregard it. Aligned with DESCRIBE_STYLE's colour-and-form
+      // rule instead, so writing and matching agree on what matters.
+      `MATCH ON COLOUR AND FORM. These are bought-in blanks, so several pieces on a shelf ` +
+      `may be the identical shape — a name like "mug" or "cup" tells you nothing, and ` +
+      `"jug" and "vase" may be the same object described differently. Judge by what the ` +
+      `piece actually looks like: its colours where it has them, and its specific form ` +
+      `always. Two pieces with the same colours are the same piece only if their form ` +
+      `matches too; two unpainted pieces are the same piece only if their form matches, ` +
+      `since colour cannot help you there at all.\n\n` +
       `If a listed piece is not in your step 1 list, it is not there.\n\n` +
       // POSITION REMOVED ENTIRELY, 25 Jul, after four failed attempts:
       // rings on the wrong objects, then no rings, then a message
