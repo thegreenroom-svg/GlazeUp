@@ -8654,49 +8654,22 @@ app.post('/api/packing/find-listed', async (req, res) => {
       `sightings it is, do NOT guess — leave this piece out rather than pick one.\n\n` +
       `If a listed piece has no sighting that survives stage A, it is not there — say so, ` +
       `do not reach for the closest thing in the photo instead.\n\n` +
-      // POSITION REMOVED ENTIRELY, 25 Jul, after four failed attempts:
-      // rings on the wrong objects, then no rings, then a message
-      // promising shading that never appeared, then zones the model
-      // declined to give at all. The pattern was consistent — this
-      // tool identifies reliably and localises badly — and every
-      // attempt to dress that up cost a round of debugging while the
-      // part that WORKS (which pieces are here, and whose) sat behind
-      // it looking broken. What a packer actually needs is the name.
-      // POSITION BY READING, NOT ESTIMATING. Four attempts at coordinates
-      // failed because this model localises poorly. A magenta grid is
-      // drawn onto the image before it is sent, so naming the cell a
-      // piece sits in is READING a label that is physically there —
-      // a different task, and one it is reliably good at. Magenta
-      // because nothing in a glaze range is that colour, so the grid
-      // can never be mistaken for decoration.
-      // ASK FOR LESS. The previous version wanted seen, index, cell,
-      // size, confidence and a note in one reply, and the cell — the
-      // only field that was actually new — came back missing every
-      // time. Dropping size and the note leaves three fields, with
-      // cell mandatory and stated as such.
-      // [26 Jul] 5x5 -> 8x8, matching the client. Coarser cells were
-      // landing correctly but on the wrong PART of the cell — a fifth of
-      // a cluttered shelf can hold several different pieces, so "right
-      // cell" still left a real gap to the actual object.
-      `A magenta grid is drawn over the photo. Columns are lettered A to H from the ` +
-      `left; rows are numbered 1 to 8 from the top. Every cell is labelled in its ` +
-      `top-left corner, so read the labels off the image.\n\n` +
-      `For each piece you find you MUST give "cell" — the label of the cell the piece ` +
-      `sits in, like "D5". Never omit it. If a piece straddles two cells, pick the one ` +
-      `holding most of it.\n\n` +
-      // Check the answer against the label actually printed there.
-      // Measured: a cream jug with orange leaves sitting bottom-left
-      // was reported two cells away, on a butter dish. Naming the
-      // neighbours forces the cell to be read off the image rather
-      // than estimated from a sense of where things are.
-      `Before answering, look again at the cell you chose and read the label printed in ` +
-      `its top-left corner. Confirm that label is the one you are about to give, and that ` +
-      `the piece really is inside that cell's lines — not in the one above, below or ` +
-      `beside it. Also give "near": what else is in that same cell, so the choice can be ` +
-      `checked.\n\n` +
+      // [26 Jul] POSITION SPLIT OUT ENTIRELY, after five failures with
+      // it asked for in this same call. Daisy: "if it can find a piece,
+      // surely it can put a circle on it" — right, and the real fault
+      // was asking WHICH and WHERE together. Generating a JSON list,
+      // the model fills fields left to right as a single text
+      // completion; nothing forces it to still be looking at the same
+      // sighting when it writes "cell" as when it wrote "i". Confident
+      // wrong labels on a completely different object (a box instead
+      // of a mug) are exactly what that decoupling looks like — not
+      // imprecision, a genuine mismatch between the two fields. This
+      // call now ONLY decides which pieces are present — the thing it
+      // has done reliably all day — and position is asked for
+      // afterwards, per piece, as its own dedicated question.
       `Reply with ONLY this JSON, no prose and no markdown:\n` +
       `{"seen":["what you actually saw, one per piece"],` +
-      `"found":[{"i":0,"cell":"D5","near":"what else is in that cell","confidence":0.9}]}`);
+      `"found":[{"i":0,"confidence":0.9}]}`);
     const cost = await logUsage(studioId, 'find-in-photo', usage);
     const arr = Array.isArray(data) ? data : (data.found || []);
     // Everything it saw, listed or not. A bare "0 of 2" says nothing
@@ -8723,38 +8696,47 @@ app.post('/api/packing/find-listed', async (req, res) => {
       .map(f => ({
         id: wanted[f.i].id,
         description: wanted[f.i].description,
-        cell: typeof f.cell === 'string' ? f.cell.trim().toUpperCase() : null,
-        near: typeof f.near === 'string' ? f.near : null,
-        size: typeof f.size === 'number' ? Math.max(0.2, Math.min(3, f.size)) : 1,
+        cell: null,
         confidence: f.confidence === undefined ? null : f.confidence,
-        saw: f.saw || '',
       }));
-    // IF NO CELLS CAME BACK, ASK AGAIN FOR JUST THE CELLS.
-    // Four rounds were lost to the cell field being quietly omitted
-    // from a six-field reply. Rather than hoping a firmer prompt fixes
-    // it, this asks a second, much smaller question — one job, one
-    // field — and only when the first attempt actually failed to
-    // provide them. Costs a second call on a minority of searches and
-    // nothing at all when the first reply is complete.
-    if (found.length && !found.some(f => f.cell)) {
+
+    // POSITION, ONE PIECE AT A TIME, EACH ITS OWN CALL.
+    // [26 Jul] The structural fix, not another prompt tweak. Batching
+    // "which piece AND where is it" into one JSON list let the two
+    // fields decouple — the model can write the right index and then,
+    // generating the next field, drift onto a different sighting
+    // entirely; a wicker box labelled with a mug's description is
+    // exactly that failure, not imprecision. Splitting matching and
+    // locating into separate calls already fixed an equivalent
+    // contamination bug on 25 Jul (inventory bleeding into the wanted
+    // list) — same fix, applied to the other axis of the same prompt.
+    // One object, one question, nothing else for the model to be
+    // doing at the same time.
+    //
+    // Cost: one extra call per FOUND piece, not per photo — a typical
+    // sweep finding 2-4 pieces costs 2-4 extra calls at ~0.4p each,
+    // and nothing at all for pieces that weren't found.
+    for (const f of found) {
       try {
-        const askList = found.map((f, n) => `${n}: ${f.description}`).join('\n');
-        const { data: cellData } = await describeImage(photoBase64,
+        const { data: posData, usage: posUsage } = await describeImage(photoBase64,
           `A magenta grid is drawn over this photo. Columns are lettered A to H from ` +
           `the left, rows numbered 1 to 8 from the top, and every cell is labelled in ` +
           `its top-left corner.\n\n` +
-          `These pieces are in the photo:\n${askList}\n\n` +
-          `For each one, read off which grid cell it sits in. Nothing else.\n` +
-          `Reply with ONLY: [{"n":0,"cell":"D5"}]`);
-        const cells = Array.isArray(cellData) ? cellData : (cellData.cells || []);
-        for (const c of cells) {
-          if (c && typeof c.n === 'number' && found[c.n] && typeof c.cell === 'string') {
-            found[c.n].cell = c.cell.trim().toUpperCase();
-          }
+          `There is exactly one thing to do: find this ONE piece — "${f.description}" — ` +
+          `and read off which grid cell it sits in. Look at nothing else in the photo.\n\n` +
+          `Look again before answering: read the label actually printed in the top-left ` +
+          `corner of the cell you have chosen, and confirm the piece is genuinely inside ` +
+          `that cell's lines, not a neighbouring one.\n\n` +
+          `Reply with ONLY this JSON: {"cell":"D5"}`);
+        // Log each call's REAL usage, not a placeholder — this is the
+        // actual token cost of a real vision call, same as every other
+        // usage-logged call in this file.
+        await logUsage(studioId, 'find-in-photo-position', posUsage);
+        if (posData && typeof posData.cell === 'string') {
+          f.cell = posData.cell.trim().toUpperCase();
         }
-        console.log(`find-listed: second pass recovered ${found.filter(f => f.cell).length}/${found.length} cells`);
       } catch (e) {
-        console.log('find-listed: cell retry failed —', e.message);
+        console.log(`find-listed: position call failed for "${f.description}" —`, e.message);
       }
     }
 

@@ -2741,9 +2741,45 @@ function updateStaffName() {
 </div>
 
 <!-- Splash / resting screen -->
-<div id="splash-screen" style="position:fixed;inset:0;z-index:5000;background:#0E1A18;display:grid;place-items:center;overflow:hidden;cursor:pointer;padding:max(20px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));" onclick="dismissSplash()">
+<div id="splash-screen" style="position:fixed;inset:0;z-index:5000;background:#0E1A18;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;overflow:hidden;cursor:pointer;padding:max(20px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));" onclick="dismissSplash()">
   <img src="/brand-assets/kiln-cafe-wordmark/kiln-cafe-wordmark.png" style="width:90%;max-width:400px;opacity:0.95;filter:drop-shadow(0 12px 40px rgba(184,121,70,0.4));">
+  <!-- [26 Jul] Daisy: tapping Menu from the Packing dock left her
+       looking at this logo with nothing to tap, nothing to read, no
+       way to tell whether it was working or dead. It's meant to
+       resolve itself in well under a second (a valid session auto-
+       resumes, or a real tap-through works instantly) — but "meant to"
+       is not a guarantee, and a silent wait with no rescue is a real
+       dead end if it doesn't. This appears on its own after 2s if
+       nothing has moved the page on, so there is always something
+       visible to do rather than an unexplained static logo. -->
+  <div id="splash-rescue" style="display:none;flex-direction:column;align-items:center;gap:10px;animation:splashRescueIn .3s ease">
+    <div style="color:rgba(244,236,224,.75);font-size:13px;text-align:center;max-width:280px;line-height:1.5">
+      Taking a moment — tap below to carry on
+    </div>
+    <button onclick="event.stopPropagation(); dismissSplash();"
+      style="background:#B87946;color:#fff;border:none;border-radius:12px;padding:13px 28px;
+      font-size:15px;font-weight:800;cursor:pointer;box-shadow:0 6px 20px rgba(184,121,70,.35)">
+      Continue →
+    </button>
+  </div>
 </div>
+<style>
+  @keyframes splashRescueIn { from { opacity:0; transform:translateY(6px) } to { opacity:1; transform:none } }
+</style>
+<script>
+  // Show the rescue prompt after 2s if the splash is still the thing
+  // on screen — i.e. nothing (auto-resume, a real tap, an idle
+  // dismissal) has hidden it in the meantime. Checked by reading the
+  // splash's own computed display rather than a flag, so it can never
+  // fire wrongly just because 2s happened to pass.
+  setTimeout(() => {
+    const sp = document.getElementById('splash-screen');
+    const rescue = document.getElementById('splash-rescue');
+    if (sp && rescue && getComputedStyle(sp).display !== 'none') {
+      rescue.style.display = 'flex';
+    }
+  }, 2000);
+</script>
 <script>
   /* Paint the page dark immediately — before any of the main app script
      runs — so there is never an ivory strip under the splash. */
@@ -16682,7 +16718,20 @@ async function landOnHome() {
           if (typeof showGridNav === 'function') showGridNav();
           else if (typeof _flowGraphEnter === 'function') _flowGraphEnter();
         }
-      } catch (e) { console.warn('[go] failed', _go, e); }
+      } catch (e) {
+        // Was console.warn only — invisible in a normal browsing
+        // session, so a real failure here looked identical to the
+        // ordinary slow-resume case: a stuck splash with no clue why.
+        // The rescue button above still gets someone through either
+        // way, but this makes the actual fault visible if it happens.
+        console.warn('[go] failed', _go, e);
+        const rescue = document.getElementById('splash-rescue');
+        if (rescue) {
+          rescue.style.display = 'flex';
+          const msg = rescue.querySelector('div');
+          if (msg) msg.textContent = 'Something went wrong opening that — tap below to carry on';
+        }
+      }
     })();
   }
 
