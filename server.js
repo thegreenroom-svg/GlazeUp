@@ -8470,6 +8470,64 @@ Bad: "a mug"; "ceramic piece"; "beautifully hand-painted item";
 
 // POST /api/pieces/describe-group — one photo of a table, back come
 // descriptions for each piece on it.
+// A rough heuristic for "this is just a colour, not a real description".
+// Not trying to be clever — just checking whether anything beyond a
+// handful of known colour/finish words survived. If a description is
+// nothing but that, it failed the prompt's own rule regardless of how
+// the rule was worded, and no amount of further prompt-tuning fixes a
+// model choosing not to comply on a given call.
+const COLOUR_ONLY_WORDS = new Set([
+  'unpainted','white','cream','pale','pastel','light','dark','bright',
+  'blue','red','green','yellow','orange','pink','purple','black','grey',
+  'gray','brown','glossy','matte','patchy','plain','mostly','and','with',
+  'a','an','the','all','over','solid','colour','color',
+  // Fillers and intensifiers. Found live: "mostly white with a little
+  // colour" was scored as fine because 'little' isn't a colour word —
+  // but it isn't a FORM word either, it's noise that let a genuinely
+  // bare description slip past the check it exists to enforce.
+  'little','some','few','very','quite','slightly','bit','touch','hint',
+  'splash','wash','most','majority','tone','shade','tinge','just','only',
+  'purely','simply','of','it','its','on','round','around','one'
+]);
+function looksColourOnly(desc) {
+  const words = String(desc || '').toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  return words.every(w => COLOUR_ONLY_WORDS.has(w));
+}
+
+// [26 Jul] "If you can see it, why can't the AI?" — a fair question,
+// answered honestly: it can see it, it just isn't always bothered to
+// SAY it. gpt-4o-mini is small and cheap on purpose, and a smaller
+// model defaults to the laziest answer that technically satisfies the
+// prompt more readily than a larger one does. No wording fixes a model
+// choosing not to comply on a given call — so this checks the actual
+// answer rather than trusting the prompt to have worked, and asks
+// again, harder, only for whatever failed. Same pattern already proven
+// today for grid cells that sometimes came back missing.
+async function retryWeakDescriptions(photoBase64, pieces, studioId, kind) {
+  const weak = pieces.map((p, i) => ({ p, i })).filter(({ p }) => looksColourOnly(p.description));
+  if (!weak.length) return pieces;
+  try {
+    const list = weak.map(({ p, i }) => `${i}: "${p.description}"`).join('\n');
+    const { data, usage } = await describeImage(photoBase64,
+      `${POTTERY_ONLY}\n\n` +
+      `These descriptions were rejected for being colour-only, with no shape or form:\n${list}\n\n` +
+      `Look again at each one. Whatever it is — a figure, a mug, an ornament — say specifically ` +
+      `what shape it is or what it depicts. If it is a figure, say of what. If it has a distinctive ` +
+      `outline (spikes, ears, a face, a handle, a lid), name it. A colour word alone is not an answer.\n\n` +
+      `Reply with ONLY this JSON, no prose:\n` +
+      `[{"i":0,"description":"unpainted white, sun face with pointed rays"}]`);
+    const fixed = Array.isArray(data) ? data : (data.fixed || []);
+    await logUsage(studioId, kind + '-retry', usage);
+    for (const f of fixed) {
+      if (f && typeof f.i === 'number' && pieces[f.i] && f.description && !looksColourOnly(f.description)) {
+        pieces[f.i].description = f.description;
+      }
+    }
+  } catch (e) { console.log(`${kind}: description retry failed —`, e.message); }
+  return pieces;
+}
+
 app.post('/api/pieces/describe-group', async (req, res) => {
   const { photoBase64 } = req.body;
   if (!photoBase64) return res.status(400).json({ error: 'photoBase64 required' });
@@ -8480,8 +8538,9 @@ app.post('/api/pieces/describe-group', async (req, res) => {
       `[{"description":"green fish-shaped jug, glossy"},{"description":"white mug, blue stripes"}]\n` +
       `If there is no pottery at all, reply []`);
     const cost = await logUsage(req.body.studioId, 'describe-group', usage);
-    const pieces = Array.isArray(out) ? out : (out.pieces || []);
-    res.json({ pieces: pieces.filter(p => p && p.description).slice(0, 40), cost });
+    let pieces = (Array.isArray(out) ? out : (out.pieces || [])).filter(p => p && p.description).slice(0, 40);
+    pieces = await retryWeakDescriptions(photoBase64, pieces, req.body.studioId, 'describe-group');
+    res.json({ pieces, cost });
   } catch (e) {
     console.error('describe-group:', e.message);
     res.status(500).json({ error: e.message });
@@ -8502,8 +8561,9 @@ app.post('/api/pieces/describe-shelf', async (req, res) => {
       `[{"description":"green fish-shaped jug, glossy","x":0.42,"y":0.61}]\n` +
       `If there is no pottery at all, reply []`);
     const cost = await logUsage(req.body.studioId, 'describe-shelf', usage);
-    const pieces = Array.isArray(out) ? out : (out.pieces || []);
-    res.json({ pieces: pieces.filter(p => p && p.description).slice(0, 60), cost });
+    let pieces = (Array.isArray(out) ? out : (out.pieces || [])).filter(p => p && p.description).slice(0, 60);
+    pieces = await retryWeakDescriptions(photoBase64, pieces, req.body.studioId, 'describe-shelf');
+    res.json({ pieces, cost });
   } catch (e) {
     console.error('describe-shelf:', e.message);
     res.status(500).json({ error: e.message });
