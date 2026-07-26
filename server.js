@@ -8617,21 +8617,33 @@ app.post('/api/packing/find-listed', async (req, res) => {
       `every distinct piece of pottery you can actually see in it. Describe only what is ` +
       `visibly there. Do not include anything you cannot see, however plausible.\n\n` +
       `STEP 2. Only now, read this list of pieces someone is looking for:\n${list}\n\n` +
-      `Decide which of them appear in YOUR STEP 1 LIST.\n\n` +
-      // [26 Jul] Was "shape is usually the least useful clue" — true for
-      // painted pieces, but it is exactly the framing that lost an
-      // unpainted sun figure to an unpainted rabbit: with no colour on
-      // either, shape was the ONLY clue, and this told the judge to
-      // disregard it. Aligned with DESCRIBE_STYLE's colour-and-form
-      // rule instead, so writing and matching agree on what matters.
-      `MATCH ON COLOUR AND FORM. These are bought-in blanks, so several pieces on a shelf ` +
-      `may be the identical shape — a name like "mug" or "cup" tells you nothing, and ` +
-      `"jug" and "vase" may be the same object described differently. Judge by what the ` +
-      `piece actually looks like: its colours where it has them, and its specific form ` +
-      `always. Two pieces with the same colours are the same piece only if their form ` +
-      `matches too; two unpainted pieces are the same piece only if their form matches, ` +
-      `since colour cannot help you there at all.\n\n` +
-      `If a listed piece is not in your step 1 list, it is not there.\n\n` +
+      // [26 Jul, Daisy's own process] "First thing you need to look for
+      // is the colour. Is it got red on it? If five of them have got
+      // red, they're the same. Then is it the same shape and size as
+      // the form? Then has it got red AND blue? That clicked it down to
+      // three." A single holistic "does this look about right" judgment
+      // was making confident wrong calls — matched to a pale pink sun
+      // face when nothing being looked for was anything like a sun
+      // face. Replaced with her actual process: a hard, ordered
+      // elimination, not a vibe. Each stage can only REMOVE candidates,
+      // never add one back — a candidate has to survive every stage.
+      `For EACH piece on the list, go through your STEP 1 sightings as a strict elimination, ` +
+      `in this exact order. Do not skip ahead or judge on overall impression.\n\n` +
+      `STAGE A — COLOUR, ONE AT A TIME. Read the colour words in the piece's description. ` +
+      `For each one, keep only sightings that plainly have that colour somewhere on them. ` +
+      `A pale, unfired version of a colour still counts as that colour (pale pink still ` +
+      `counts as pink) — but a colour that is absent is absent, not "close enough". If the ` +
+      `description names two colours, a sighting must have BOTH to survive this stage, not ` +
+      `just one. If nothing survives, STOP — this piece is not there.\n\n` +
+      `STAGE B — FORM. Of whatever survived stage A, keep only sightings whose specific ` +
+      `shape actually matches — not just "similar sort of object" but the particular form ` +
+      `described (a jug is not a vase, a mug is not a cup, a sun face is not a rabbit). ` +
+      `A shared name like "mug" is not enough on its own if the shapes plainly differ.\n\n` +
+      `STAGE C — DECIDE. If exactly one sighting survives both stages, that is the match. ` +
+      `If more than one survives, or if you are genuinely unsure which of several similar ` +
+      `sightings it is, do NOT guess — leave this piece out rather than pick one.\n\n` +
+      `If a listed piece has no sighting that survives stage A, it is not there — say so, ` +
+      `do not reach for the closest thing in the photo instead.\n\n` +
       // POSITION REMOVED ENTIRELY, 25 Jul, after four failed attempts:
       // rings on the wrong objects, then no rings, then a message
       // promising shading that never appeared, then zones the model
