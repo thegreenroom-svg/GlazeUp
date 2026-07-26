@@ -358,8 +358,19 @@ function busy(on, text) {
 // drawn on the image is a different task altogether — it's looking,
 // not guessing. So a labelled grid is burned into the copy that gets
 // sent, and the answer comes back as a cell reference.
-const GRID_COLS = 5, GRID_ROWS = 5;
-const COL_LETTERS = ['A', 'B', 'C', 'D', 'E'];
+// [26 Jul] 5x5 -> 8x8. Daisy: "close but no cigar" — the circle was
+// landing on the right CELL but not the actual piece, because a cell
+// is drawn at its own centre regardless of where inside it the object
+// really sits. At 5x5 each cell is a fifth of the whole shelf photo:
+// on a genuinely cluttered shelf several different pieces can share
+// one cell, so "correct cell" still leaves a real gap between the
+// ring and the piece. Finer cells shrink that gap directly. Not going
+// straight to something very fine (e.g. 12x12): reading a label off a
+// photo is what's proven reliable so far, and packing more labels
+// into the same frame risks the model misreading a crowded grid
+// rather than genuinely finding the piece more precisely.
+const GRID_COLS = 8, GRID_ROWS = 8;
+const COL_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
 function gridded(dataUrl, maxSide) {
   return new Promise((resolve) => {
@@ -376,7 +387,7 @@ function gridded(dataUrl, maxSide) {
       // if the grid is worth drawing it is worth drawing unmissably.
       ctx.lineWidth = Math.max(3, Math.round(c.width / 260));
       ctx.strokeStyle = 'rgba(255,0,255,.95)';       // magenta: never a glaze colour
-      const fs = Math.max(20, Math.round(c.width / 26));
+      const fs = Math.max(14, Math.round(c.width / 46));
       ctx.font = '800 ' + fs + 'px ui-sans-serif,system-ui,sans-serif';
       ctx.textBaseline = 'top';
       for (let r = 0; r < GRID_ROWS; r++) {
@@ -402,10 +413,10 @@ function gridded(dataUrl, maxSide) {
 
 // Cell reference -> centre of that cell, as fractions of the image.
 function cellToPoint(ref) {
-  const m = String(ref || '').trim().toUpperCase().match(/^([A-E])\s*([1-5])$/);
+  const m = String(ref || '').trim().toUpperCase().match(/^([A-H])\s*([1-8])$/);
   if (!m) return null;
   const col = COL_LETTERS.indexOf(m[1]), row = parseInt(m[2], 10) - 1;
-  if (col < 0 || row < 0) return null;
+  if (col < 0 || row < 0 || row >= GRID_ROWS) return null;
   return { x: (col + 0.5) / GRID_COLS, y: (row + 0.5) / GRID_ROWS };
 }
 

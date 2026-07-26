@@ -8652,11 +8652,15 @@ app.post('/api/packing/find-listed', async (req, res) => {
       // only field that was actually new — came back missing every
       // time. Dropping size and the note leaves three fields, with
       // cell mandatory and stated as such.
-      `A magenta grid is drawn over the photo. Columns are lettered A to E from the ` +
-      `left; rows are numbered 1 to 5 from the top. Every cell is labelled in its ` +
+      // [26 Jul] 5x5 -> 8x8, matching the client. Coarser cells were
+      // landing correctly but on the wrong PART of the cell — a fifth of
+      // a cluttered shelf can hold several different pieces, so "right
+      // cell" still left a real gap to the actual object.
+      `A magenta grid is drawn over the photo. Columns are lettered A to H from the ` +
+      `left; rows are numbered 1 to 8 from the top. Every cell is labelled in its ` +
       `top-left corner, so read the labels off the image.\n\n` +
       `For each piece you find you MUST give "cell" — the label of the cell the piece ` +
-      `sits in, like "C3". Never omit it. If a piece straddles two cells, pick the one ` +
+      `sits in, like "D5". Never omit it. If a piece straddles two cells, pick the one ` +
       `holding most of it.\n\n` +
       // Check the answer against the label actually printed there.
       // Measured: a cream jug with orange leaves sitting bottom-left
@@ -8670,7 +8674,7 @@ app.post('/api/packing/find-listed', async (req, res) => {
       `checked.\n\n` +
       `Reply with ONLY this JSON, no prose and no markdown:\n` +
       `{"seen":["what you actually saw, one per piece"],` +
-      `"found":[{"i":0,"cell":"C3","near":"what else is in that cell","confidence":0.9}]}`);
+      `"found":[{"i":0,"cell":"D5","near":"what else is in that cell","confidence":0.9}]}`);
     const cost = await logUsage(studioId, 'find-in-photo', usage);
     const arr = Array.isArray(data) ? data : (data.found || []);
     // Everything it saw, listed or not. A bare "0 of 2" says nothing
@@ -8714,12 +8718,12 @@ app.post('/api/packing/find-listed', async (req, res) => {
       try {
         const askList = found.map((f, n) => `${n}: ${f.description}`).join('\n');
         const { data: cellData } = await describeImage(photoBase64,
-          `A magenta grid is drawn over this photo. Columns are lettered A to E from ` +
-          `the left, rows numbered 1 to 5 from the top, and every cell is labelled in ` +
+          `A magenta grid is drawn over this photo. Columns are lettered A to H from ` +
+          `the left, rows numbered 1 to 8 from the top, and every cell is labelled in ` +
           `its top-left corner.\n\n` +
           `These pieces are in the photo:\n${askList}\n\n` +
           `For each one, read off which grid cell it sits in. Nothing else.\n` +
-          `Reply with ONLY: [{"n":0,"cell":"C3"}]`);
+          `Reply with ONLY: [{"n":0,"cell":"D5"}]`);
         const cells = Array.isArray(cellData) ? cellData : (cellData.cells || []);
         for (const c of cells) {
           if (c && typeof c.n === 'number' && found[c.n] && typeof c.cell === 'string') {
