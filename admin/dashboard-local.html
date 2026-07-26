@@ -25532,6 +25532,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     splash.style.display = 'grid';
     splash.style.zIndex = '5000';
   }
+
+  // [26 Jul] AUTO-SKIP THE SPLASH WHEN A SESSION IS ALREADY VALID.
+  // Daisy: "returns to this when desk touched." Packing/Takings/
+  // Breakdown are separate HTML files, so the dock's Desk link is
+  // always a full page reload of THIS file — and the splash's only
+  // way off was a manual tap, every single time, even mid-shift with
+  // someone already logged in. checkShiftLogin() already has the
+  // correct resume logic (same 4-hour window, same idle-timer
+  // respect) — it simply never ran until after that tap. Same
+  // condition, checked here, so a genuinely active session skips
+  // straight past the splash; an idle-flagged or expired one still
+  // gets the tap, exactly as before.
+  (function autoSkipSplashIfSessionValid() {
+    try {
+      const forceRelogin = localStorage.getItem('klnk_force_relogin') === '1';
+      const previousSession = localStorage.getItem('klnk_shift_staff');
+      const lastActiveAt = parseInt(localStorage.getItem('klnk_last_active') || '0', 10);
+      const hoursSinceActive = (Date.now() - lastActiveAt) / (1000 * 60 * 60);
+      const stillValid = !forceRelogin && previousSession && lastActiveAt && hoursSinceActive < 4;
+      if (stillValid) {
+        setTimeout(() => { if (typeof window.dismissSplash === 'function') window.dismissSplash(); }, 60);
+      }
+    } catch (e) { /* any doubt at all -> leave the normal tap-to-enter splash in place */ }
+  })();
   
   // Check API connection in the BACKGROUND — do not block first paint on a
   // /health round-trip. Render free-tier cold-starts can take several
