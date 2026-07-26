@@ -14332,6 +14332,26 @@ app.listen(port, async () => {
   // hammering Square on every restart.
   setTimeout(async () => {
     try {
+      // GUARD AGAINST A RESTARTING SERVER, NOT JUST THIS ONE BOOT.
+      // [26 Jul] sync_logs showed near-identical small syncs firing
+      // every 8-18 minutes from 04:00 to 13:32 — far more often than
+      // "once per boot" should ever produce. The only explanation is
+      // that the process itself has been restarting that often, and
+      // every restart re-ran this block. An in-memory flag cannot
+      // prevent that, because a restart wipes memory along with
+      // everything else — it has to be checked against something that
+      // survives the crash. Skips entirely if ANY sync ran in the last
+      // 30 minutes, regardless of which studio or what triggered it.
+      const { data: recent } = await supabase
+        .from('sync_logs')
+        .select('created_at')
+        .gte('created_at', new Date(Date.now() - 30 * 60 * 1000).toISOString())
+        .limit(1);
+      if (recent && recent.length) {
+        console.log('Boot sync skipped — one already ran in the last 30 minutes (server may be restarting repeatedly; that is the thing to fix, not this guard).');
+        return;
+      }
+
       const { data: earliest } = await supabase
         .from('analytics_cache')
         .select('metric_date')
