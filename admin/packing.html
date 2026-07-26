@@ -127,6 +127,15 @@
 </div>
 
 <div class="stage" id="stage">
+  <!-- [26 Jul] drawPhoto() is shared between a real sweep and the test
+       bed — same canvas, same photo area. Daisy saw "0 of 2 found" at
+       the top (the real booking, genuinely unmatched) directly above
+       "Test: 2 of 2 found" (a completely separate test-bed run) with
+       nothing distinguishing which result the circled photo actually
+       belonged to. This badge makes that unmistakable at a glance,
+       every time either flow draws anything. -->
+  <div id="modeBadge" style="display:none;position:absolute;top:8px;left:8px;z-index:5;
+    font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;letter-spacing:.02em"></div>
   <canvas id="canvas" style="display:none"></canvas>
   <div class="hint" id="hint">
     <b>Photograph a surface</b>
@@ -626,6 +635,7 @@ async function markPacked(i) {
 // ── sweep ────────────────────────────────────────────────────────────
 $('sweepBtn').onclick = () => pickImage(async raw => {
   lastPhoto = raw;
+  setMode('live', 'updates outstanding bookings');
   drawPhoto(raw, []);
   busy(true, 'Looking…');
   $('said').classList.remove('on');
@@ -649,6 +659,10 @@ $('sweepBtn').onclick = () => pickImage(async raw => {
 
 function applyFound(found, wanted, raw) {
   surfaces++;
+  const names = [...new Set(found.map(f => {
+    const w = wanted.find(x => x.id === f.id); return w ? w.b.id : '';
+  }).filter(Boolean))];
+  setMode('live', names.length ? names.join(', ') : 'updates outstanding bookings');
   const rings = [];
   for (const f of found) {
     const w = wanted.find(x => x.id === f.id);
@@ -726,6 +740,20 @@ function say(html, action) {
 // Rings are drawn only where the model actually reported seeing
 // something. A piece matched without a position is still ticked, but
 // never given an invented location.
+function setMode(mode, label) {
+  const b = $('modeBadge');
+  if (!b) return;
+  if (!mode) { b.style.display = 'none'; return; }
+  b.style.display = 'block';
+  if (mode === 'live') {
+    b.style.background = 'var(--go)'; b.style.color = '#fff';
+    b.textContent = 'LIVE — ' + (label || 'updates this booking');
+  } else {
+    b.style.background = 'var(--clay)'; b.style.color = '#fff';
+    b.textContent = 'TEST — nothing saved';
+  }
+}
+
 function drawPhoto(raw, marks) {
   const img = new Image();
   img.onload = () => {
@@ -812,6 +840,7 @@ function drawPhoto(raw, marks) {
 let addItems = [], addPhoto = null;
 $('addBtn').onclick = () => pickImage(async raw => {
   lastPhoto = raw;
+  setMode('live', 'will create a new booking');
   drawPhoto(raw, []);
   busy(true, 'Reading the table…');
   try {
@@ -908,6 +937,7 @@ function tbRunFind() { pickImage(tbFindWith); }
 $('tbFind').onclick = tbRunFind;
 async function tbFindWith(raw) {
   $('tbBody').innerHTML = '<div class="mut">Looking…</div>';
+  setMode('test');
   try {
     const found = await findInPhoto(raw, tb.map((t, i) => ({ id: String(i), description: t.description })));
     for (const t of tb) { t.found = false; t.saw = ''; t.conf = null; }
