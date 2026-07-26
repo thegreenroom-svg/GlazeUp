@@ -439,11 +439,19 @@ async function findInPhoto(rawPhoto, wanted) {
 }
 let lastAllPottery = [], lastDiag = null;
 
-async function describe(kind, rawPhoto) {
+// [26 Jul] anyObject: true, sent only from the test bed. Daisy: "do we
+// need to even say it's pottery? Is it just an object?" No — the
+// pottery-only gate exists because a real studio table always carries
+// a phone, keys, paint pots, and those must never be described or
+// matched against a real booking. The test bed has no such booking to
+// protect and exists specifically to test the matcher on anything, so
+// it asks the server to skip the gate entirely rather than risk real
+// pottery being rejected for not looking "pottery enough" in a photo.
+async function describe(kind, rawPhoto, anyObject) {
   const photoBase64 = await shrink(rawPhoto, 1400);
   const r = await fetch(`${API}/api/pieces/describe-${kind}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ photoBase64, studioId }),
+    body: JSON.stringify({ photoBase64, studioId, anyObject: !!anyObject }),
   });
   if (!r.ok) {
     let m = 'could not read that photo';
@@ -880,8 +888,8 @@ $('testBtn').onclick = () => { renderTb(); openSheet('tbSheet'); };
 $('tbAdd').onclick = () => pickImage(async raw => {
   $('tbBody').innerHTML = '<div class="mut">Reading the pieces…</div>';
   try {
-    const seen = await describe('group', raw);
-    if (!seen.length) { $('tbBody').innerHTML = '<div class="mut">No pottery spotted — try closer in.</div>'; return; }
+    const seen = await describe('group', raw, true);   // anyObject — no booking to protect here
+    if (!seen.length) { $('tbBody').innerHTML = '<div class="mut">Nothing spotted — try closer in.</div>'; return; }
     tb = seen.map(s => ({ description: s.description, found: false, best: null, bestText: '', at: null }));
     buildIdf(tb.map(t => t.description));
     renderTb(); $('tbFind').disabled = false;

@@ -8504,13 +8504,13 @@ function looksColourOnly(desc) {
 // answer rather than trusting the prompt to have worked, and asks
 // again, harder, only for whatever failed. Same pattern already proven
 // today for grid cells that sometimes came back missing.
-async function retryWeakDescriptions(photoBase64, pieces, studioId, kind) {
+async function retryWeakDescriptions(photoBase64, pieces, studioId, kind, anyObject) {
   const weak = pieces.map((p, i) => ({ p, i })).filter(({ p }) => looksColourOnly(p.description));
   if (!weak.length) return pieces;
   try {
     const list = weak.map(({ p, i }) => `${i}: "${p.description}"`).join('\n');
     const { data, usage } = await describeImage(photoBase64,
-      `${POTTERY_ONLY}\n\n` +
+      `${anyObject ? ANY_OBJECT : POTTERY_ONLY}\n\n` +
       `These descriptions were rejected for being colour-only, with no shape or form:\n${list}\n\n` +
       `Look again at each one. Whatever it is — a figure, a mug, an ornament — say specifically ` +
       `what shape it is or what it depicts. If it is a figure, say of what. If it has a distinctive ` +
@@ -8528,18 +8528,28 @@ async function retryWeakDescriptions(photoBase64, pieces, studioId, kind) {
   return pieces;
 }
 
+// [26 Jul] Generic framing for the test bed, where there is no real
+// booking to protect from a phone or a coffee cup — the ENTIRE point
+// of that screen was already agreed to be "can it be anything", and
+// the pottery gate below was quietly applying anyway because both
+// screens share this endpoint. Kept genuinely simple on purpose: no
+// second elaborate prompt, just skip the one line that says "ignore
+// anything that isn't pottery."
+const ANY_OBJECT = `You are looking at ordinary objects on a table or shelf.
+Describe every distinct object you can see — it does not matter what kind of thing it is.`;
+
 app.post('/api/pieces/describe-group', async (req, res) => {
-  const { photoBase64 } = req.body;
+  const { photoBase64, anyObject } = req.body;
   if (!photoBase64) return res.status(400).json({ error: 'photoBase64 required' });
   try {
     const { data: out, usage } = await describeImage(photoBase64,
-      `${POTTERY_ONLY}\n\n${DESCRIBE_STYLE}\n\nList every distinct piece you can see.\n` +
+      `${anyObject ? ANY_OBJECT : POTTERY_ONLY}\n\n${DESCRIBE_STYLE}\n\nList every distinct piece you can see.\n` +
       `Reply with ONLY a JSON array, no prose and no markdown:\n` +
       `[{"description":"green fish-shaped jug, glossy"},{"description":"white mug, blue stripes"}]\n` +
       `If there is no pottery at all, reply []`);
     const cost = await logUsage(req.body.studioId, 'describe-group', usage);
     let pieces = (Array.isArray(out) ? out : (out.pieces || [])).filter(p => p && p.description).slice(0, 40);
-    pieces = await retryWeakDescriptions(photoBase64, pieces, req.body.studioId, 'describe-group');
+    pieces = await retryWeakDescriptions(photoBase64, pieces, req.body.studioId, 'describe-group', anyObject);
     res.json({ pieces, cost });
   } catch (e) {
     console.error('describe-group:', e.message);
@@ -8550,11 +8560,11 @@ app.post('/api/pieces/describe-group', async (req, res) => {
 // POST /api/pieces/describe-shelf — one photo of a shelf or tray, back
 // comes what's on it, with rough positions so hits can be pointed at.
 app.post('/api/pieces/describe-shelf', async (req, res) => {
-  const { photoBase64 } = req.body;
+  const { photoBase64, anyObject } = req.body;
   if (!photoBase64) return res.status(400).json({ error: 'photoBase64 required' });
   try {
     const { data: out, usage } = await describeImage(photoBase64,
-      `${POTTERY_ONLY}\n\n${DESCRIBE_STYLE}\n\nList every distinct piece you can see, ` +
+      `${anyObject ? ANY_OBJECT : POTTERY_ONLY}\n\n${DESCRIBE_STYLE}\n\nList every distinct piece you can see, ` +
       `with its rough position in the frame as fractions from 0 to 1 ` +
       `(x from left, y from top).\n` +
       `Reply with ONLY a JSON array, no prose and no markdown:\n` +
@@ -8562,7 +8572,7 @@ app.post('/api/pieces/describe-shelf', async (req, res) => {
       `If there is no pottery at all, reply []`);
     const cost = await logUsage(req.body.studioId, 'describe-shelf', usage);
     let pieces = (Array.isArray(out) ? out : (out.pieces || [])).filter(p => p && p.description).slice(0, 60);
-    pieces = await retryWeakDescriptions(photoBase64, pieces, req.body.studioId, 'describe-shelf');
+    pieces = await retryWeakDescriptions(photoBase64, pieces, req.body.studioId, 'describe-shelf', anyObject);
     res.json({ pieces, cost });
   } catch (e) {
     console.error('describe-shelf:', e.message);
