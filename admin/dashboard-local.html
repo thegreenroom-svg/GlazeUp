@@ -16649,7 +16649,20 @@ async function landOnHome() {
   const _go = new URLSearchParams(location.search).get('go');
   if (_go) {
     history.replaceState({}, '', location.pathname);
-    setTimeout(() => {
+    // WAIT FOR THE LOGIN, don't race it. [26 Jul] The first version
+    // fired on a fixed 400ms timer, which lands before the app knows
+    // who is on shift — so tapping Desk from Packing dropped Daisy on
+    // the splash/login screen instead of home. A staff pick is a real
+    // gate, not a delay to be waited out: poll for it and only then
+    // navigate. Gives up after 15s so a genuinely logged-out session
+    // is left alone at the login screen, which is where it belongs.
+    (function goWhenReady(tries) {
+      tries = tries || 0;
+      const loggedIn = typeof currentShiftStaff !== 'undefined' && currentShiftStaff;
+      if (!loggedIn) {
+        if (tries < 60) return setTimeout(() => goWhenReady(tries + 1), 250);
+        return;   // still at the login screen — leave it there
+      }
       try {
         if (_go === 'home') {
           if (window.KC && typeof KC.showCanvas === 'function') KC.showCanvas();
@@ -16661,7 +16674,7 @@ async function landOnHome() {
           else if (typeof _flowGraphEnter === 'function') _flowGraphEnter();
         }
       } catch (e) { console.warn('[go] failed', _go, e); }
-    }, 400);
+    })();
   }
 
   if (new URLSearchParams(location.search).get('openMusic') === '1') {
