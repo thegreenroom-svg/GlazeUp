@@ -16374,7 +16374,16 @@ async function checkShiftLogin(fromNavigation) {
   const lastActiveAt = parseInt(localStorage.getItem('klnk_last_active') || '0', 10);
   const hoursSinceActive = (Date.now() - lastActiveAt) / (1000 * 60 * 60);
 
-  if (!forceRelogin && previousSession && lastActiveAt && hoursSinceActive < SESSION_TIMEOUT_HOURS) {
+  // A saved session with NO recorded activity time is treated as fine,
+  // not stale — a login path that forgets to record activity (found
+  // 26 Jul: the offline demo-fallback branch did exactly this) should
+  // degrade to "trust it and start timing now", not "silently force
+  // everyone back to the picker forever". One missing line in one
+  // login path should not be able to break resume for good.
+  if (!forceRelogin && previousSession && !lastActiveAt) {
+    localStorage.setItem('klnk_last_active', Date.now().toString());
+  }
+  if (!forceRelogin && previousSession && (!lastActiveAt || hoursSinceActive < SESSION_TIMEOUT_HOURS)) {
     // Still within the same shift window AND wasn't idle-flagged —
     // resume without asking again
     try {
@@ -17484,6 +17493,17 @@ async function submitShiftPin() {
     currentShiftStaff = { id: match.id, name: match.name, role: match.role };
     currentShiftId = null; // no server shift row — timesheet stays honest
     localStorage.setItem('klnk_shift_staff', JSON.stringify(currentShiftStaff));
+    // [26 Jul] Was missing here. Daisy: "back to login" on every single
+    // navigation, no matter where from. Root cause: this offline
+    // fallback branch saved the session but never called
+    // markSessionActive(), so klnk_last_active was never written.
+    // Every later reload found a saved session with no recorded
+    // activity time, correctly judged it stale, and ran the full
+    // clock-out-and-reshow-the-picker path — every time, forever,
+    // regardless of how recently anyone had actually used the app.
+    // The real server-verified login a few lines below already calls
+    // this; this fallback simply never got the same line.
+    markSessionActive();
     document.getElementById('shift-login-modal').style.display = 'none';
     await landOnHome(); // home is your tiles
     return;
@@ -25550,7 +25570,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       const previousSession = localStorage.getItem('klnk_shift_staff');
       const lastActiveAt = parseInt(localStorage.getItem('klnk_last_active') || '0', 10);
       const hoursSinceActive = (Date.now() - lastActiveAt) / (1000 * 60 * 60);
-      const stillValid = !forceRelogin && previousSession && lastActiveAt && hoursSinceActive < 4;
+      // Same tolerance as checkShiftLogin's own resume check just
+      // above — a missing timestamp is trusted, not treated as stale.
+      const stillValid = !forceRelogin && previousSession && (!lastActiveAt || hoursSinceActive < 4);
       if (stillValid) {
         setTimeout(() => { if (typeof window.dismissSplash === 'function') window.dismissSplash(); }, 60);
       }
