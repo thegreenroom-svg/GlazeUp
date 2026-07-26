@@ -948,18 +948,43 @@ function renderTb(ran) {
       photograph again. Every score is shown, so a near miss reads as a near miss.</div>`;
     return;
   }
-  $('tbBody').innerHTML = tb.map(t => `
-    <div class="row">
-      <div class="tick" style="color:${t.found ? 'var(--done)' : 'var(--mute)'}">${t.found ? '✓' : '○'}</div>
+  // Every miss says WHY, not just that it missed. A shelf of a dozen
+  // similar unfired pieces is exactly the case that needs this —
+  // "3 not spotted" told nothing about which three or what to try next.
+  $('tbBody').innerHTML = tb.map(t => {
+    if (t.found) {
+      return `<div class="row">
+        <div class="tick" style="color:var(--done)">✓</div>
+        <div style="flex:1;min-width:0">
+          <div>${esc(t.description)}</div>
+          ${t.saw ? `<div class="mut">saw: ${esc(t.saw)}${t.conf ? ` · ${Math.round(t.conf * 100)}% sure` : ''}</div>` : ''}
+        </div>
+      </div>`;
+    }
+    if (!ran) return `<div class="row"><div class="tick" style="color:var(--mute)">○</div>
+      <div style="flex:1;min-width:0">${esc(t.description)}</div></div>`;
+    // A miss on a real shelf is one of two different problems: the
+    // model never mentioned anything resembling it (not seen at all —
+    // often a plain/pale piece with nothing to grip), or it described
+    // something plausible that just didn't match this exact wording
+    // (near miss — the words are the fix, not the photo).
+    const nearWords = lastAllPottery.filter(p => {
+      const a = new Set(t.description.toLowerCase().split(/[^a-z]+/).filter(w => w.length > 3));
+      const b = p.toLowerCase();
+      return [...a].some(w => b.includes(w));
+    });
+    return `<div class="row">
+      <div class="tick" style="color:var(--warn)">✕</div>
       <div style="flex:1;min-width:0">
         <div>${esc(t.description)}</div>
-        ${t.found && t.saw ? `<div class="mut">saw: ${esc(t.saw)}${t.conf ? ` · ${Math.round(t.conf * 100)}% sure` : ''}</div>`
-          : ran ? '<div class="mut">not in that photo</div>' : ''}
+        ${nearWords.length
+          ? `<div class="mut">close by wording, not matched: "${esc(nearWords[0])}" — try rewording this description to match</div>`
+          : `<div class="mut">nothing like it in what was seen — likely too pale/plain to stand out, or out of frame</div>`}
       </div>
-    </div>`).join('')
+    </div>`;
+  }).join('')
     + (ran ? `<div class="mut" style="padding-top:10px">
-        <b>It saw in that photo:</b> ${lastAllPottery.length ? esc(lastAllPottery.join('; ')) : 'no pottery at all'}.
-        <br>If a piece is in that list but not ticked above, the matching is at fault, not the camera.</div>` : '');
+        <b>Everything it saw in that photo:</b> ${lastAllPottery.length ? esc(lastAllPottery.join('; ')) : 'no pottery at all'}.</div>` : '');
 }
 
 // What is ACTUALLY deployed. 'I pushed but nothing changed' has cost

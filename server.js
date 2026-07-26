@@ -8438,12 +8438,32 @@ Say colours plainly and specifically (pale blue, dark green, orange, cream, unpa
 white) and say how they are arranged (stripes, spots, flowers, a face, one solid
 colour, rim only, patchy, mostly white with a little colour).
 
+// [26 Jul] UNPAINTED / BISQUE PIECES ARE A SPECIAL CASE, and this is
+// the paragraph that fixes a real, confirmed miss: a plain white sun
+// figure was matched to a plain white rabbit, because both had been
+// written as nothing more than "unpainted white" — true of both, so
+// there was nothing left to tell them apart with. The colour-first
+// rule above is right for painted pieces, but actively wrong here: an
+// unfired piece has no decoration to lead with, so shape becomes the
+// ONLY thing that can distinguish it, and it must be specific, not a
+// generic noun.
+If a piece is unpainted, plain bisque, or only lightly painted, DO NOT stop at
+"unpainted white" — that is true of every bisque piece on the shelf and
+distinguishes nothing. Instead describe its actual FORM in enough detail that
+it could not be confused with a different unpainted piece: not just "figure"
+but what it is a figure OF (a sun with a face and pointed rays; a crouching
+rabbit with long ears; a star; a house shape), and any texture or detail
+visible in the clay itself (ridged, smooth, a face carved in, fur texture).
+
 Keep it under fifteen words.
 Good: "blue and yellow stripes with a star, on a mug";
       "dark green all over, glossy, fish-shaped";
       "cream with orange flowers, small jug";
-      "mostly unpainted white, pink spots round the rim, small bowl".
-Bad: "a mug"; "ceramic piece"; "beautifully hand-painted item"; "white pottery".`;
+      "mostly unpainted white, pink spots round the rim, small bowl";
+      "unpainted white, sun face with pointed rays, on a stand";
+      "unpainted white, crouching rabbit with long upright ears".
+Bad: "a mug"; "ceramic piece"; "beautifully hand-painted item"; "white pottery";
+     "unpainted white" (with nothing else — too generic to be useful alone).`;
 
 // POST /api/pieces/describe-group — one photo of a table, back come
 // descriptions for each piece on it.
