@@ -439,7 +439,7 @@ app.get('/api/square/callback', async (req, res) => {
 
     // Trigger initial sync — genuine real .catch() since syncSquareData
     // now throws on real failure instead of silently swallowing it
-    syncSquareData(studioId, tokenData.access_token).catch(err => console.error('Initial sync failed:', err.message));
+    syncSquareData(studioId, tokenData.access_token, 1, null, 'oauth-initial').catch(err => console.error('Initial sync failed:', err.message));
 
     // Show a simple success page instead of redirecting — the admin dashboard
     // is a standalone file, not hosted by this API server
@@ -495,7 +495,17 @@ function _partySizeFromNote(note) {
 // untilDate (optional, 'YYYY-MM-DD') bounds the top of the range so a
 // long backfill can be sliced into windows instead of pulling years of
 // orders into memory at once — see chunkedBackfill below.
-async function syncSquareData(studioId, accessToken, daysBack = 1, untilDate = null) {
+// [26 Jul] `reason` added. Every row in sync_logs read 'backfill',
+// because sync_type was derived from nothing but `daysBack > 1` — so a
+// boot catch-up, a nightly run and a real historical backfill window
+// were indistinguishable in the log. That is precisely the question
+// that mattered when trying to work out why syncs were firing every
+// ten minutes, and the log could not answer it. Nothing anywhere reads
+// sync_type (checked), so it is free to say something useful.
+async function syncSquareData(studioId, accessToken, daysBack = 1, untilDate = null, reason = null) {
+  // Hoisted out of the try so the catch can scope its failure update to
+  // THIS row — see the catch block for why that matters.
+  let syncLogId = null;
   try {
     const { data: connectionRow } = await supabase
       .from('square_connections')
@@ -508,7 +518,7 @@ async function syncSquareData(studioId, accessToken, daysBack = 1, untilDate = n
       .from('sync_logs')
       .insert({
         square_connection_id: connectionRow.id,
-        sync_type: daysBack > 1 ? 'backfill' : 'incremental',
+        sync_type: reason || (daysBack > 1 ? 'backfill' : 'incremental'),
         status: 'pending'
       })
       .select()
@@ -520,6 +530,7 @@ async function syncSquareData(studioId, accessToken, daysBack = 1, untilDate = n
     // unrelated null-property error instead of the real, honest cause.
     if (syncLogError) throw new Error(`Could not create sync log: ${syncLogError.message}`);
     if (!syncLog?.id) throw new Error('Sync log was not created — check RLS policies on sync_logs.');
+    syncLogId = syncLog.id;
 
     const client = await getSquareClient(accessToken);
     let recordsSynced = 0;
@@ -720,15 +731,23 @@ async function syncSquareData(studioId, accessToken, daysBack = 1, untilDate = n
     // function) — if THAT lookup ever returned null, it would mask
     // the real, actual, original error with a confusing, unrelated
     // "Cannot read properties of null" instead. Now genuinely guarded.
-    const { data: connRow } = await supabase.from('square_connections').select('id').eq('studio_id', studioId).single();
-    if (connRow?.id) {
+    // [26 Jul] REAL BUG, fixed. This filtered on square_connection_id
+    // alone with no id filter, so a single failure rewrote the status
+    // of EVERY sync_logs row this studio has ever written — hundreds of
+    // successful historical runs relabelled 'failed', all carrying the
+    // same error message, the moment one sync went wrong. Latent rather
+    // than observed (no failures in the recent record), but it would
+    // have destroyed the sync history at exactly the moment that
+    // history became the thing worth reading. Scoped to this row.
+    if (syncLogId) {
       await supabase
         .from('sync_logs')
-        .update({
-          status: 'failed',
-          error_message: error.message
-        })
-        .eq('square_connection_id', connRow.id);
+        .update({ status: 'failed', error_message: error.message })
+        .eq('id', syncLogId);
+    } else {
+      // Failed before the log row existed — nothing to update, and
+      // deliberately NOT falling back to a connection-wide write.
+      console.error('Sync failed before its log row was created:', error.message);
     }
     // Genuine real fix: this used to only log the error and quietly
     // return undefined — any real caller (like the new backfill
@@ -757,7 +776,7 @@ app.post('/api/square/sync', async (req, res) => {
   }
 
   // Genuine real .catch() since syncSquareData now throws on real failure
-  syncSquareData(studioId, connection.square_access_token).catch(err => console.error('Manual sync failed:', err.message));
+  syncSquareData(studioId, connection.square_access_token, 1, null, 'manual').catch(err => console.error('Manual sync failed:', err.message));
   res.json({ status: 'sync started' });
 });
 
@@ -1008,7 +1027,7 @@ async function chunkedBackfill(studioId, token, daysBack, windowDays = 90) {
     const span = Math.min(windowDays, daysBack - offset);
     const untilStr = until.toISOString().slice(0, 10);
     try {
-      const r = await syncSquareData(studioId, token, offset + span, untilStr);
+      const r = await syncSquareData(studioId, token, offset + span, untilStr, 'backfill-window');
       orders += (r && r.recordsSynced) || 0;
       windows++;
       console.log(`[backfill] window to ${untilStr} (${span}d) — ${(r && r.recordsSynced) || 0} orders`);
@@ -1023,9 +1042,71 @@ async function chunkedBackfill(studioId, token, daysBack, windowDays = 90) {
   return { windows, orders, recordsSynced: orders };
 }
 
+// [26 Jul] SINGLE-FLIGHT LOCK — this is the missing piece dc9b5b5 said
+// it could not find. Evidence, from sync_logs itself: between 08:56 and
+// 09:26 today, backfill windows landed in EXACT PAIRS, 25ms apart, with
+// identical records_synced (3060/3060, 3770/3770, 1369/1369, 4019/4019).
+// One syncSquareData call writes exactly one row, and there is only one
+// square_connections row, so a pair can only mean two backfill walks
+// running side by side.
+//
+// Nothing stopped that. The endpoint answers 'started' instantly and
+// does the work in the background, so pressing the button feels like
+// nothing happened — and there are three of these buttons in the client
+// (dashboard-local twice, takings once). Every press began another full
+// multi-year walk.
+//
+// That matters because of the memory note above: a single walk is
+// deliberately chunked to keep the heap flat on a 512MB instance. Two
+// walks at once doubles it, along with the Square API load. It fits
+// what was actually seen — the server cycling, and the studio unable to
+// load Square at 11:20.
+//
+// Two layers, because either alone is not enough:
+//   in-memory, so concurrent presses on one instance are refused
+//   outright; and a sync_logs check, because a restart wipes the flag
+//   and the whole point is surviving a restart.
+// The flag is time-limited so a crash mid-walk cannot wedge the button
+// closed forever.
+let _backfillInFlight = null;   // { studioId, startedAt }
+const BACKFILL_STALE_MS = 60 * 60 * 1000;
+
+function backfillRunning() {
+  if (!_backfillInFlight) return null;
+  if (Date.now() - _backfillInFlight.startedAt > BACKFILL_STALE_MS) {
+    _backfillInFlight = null;   // assume it died with a restart
+    return null;
+  }
+  return _backfillInFlight;
+}
+
 app.post('/api/square/backfill', async (req, res) => {
   const { studioId, daysBack } = req.body;
   if (!studioId) return res.status(400).json({ error: 'studio_id required' });
+
+  const running = backfillRunning();
+  if (running) {
+    const mins = Math.round((Date.now() - running.startedAt) / 60000);
+    return res.json({
+      status: 'already-running',
+      startedMinutesAgo: mins,
+      message: `Already pulling history — started ${mins === 0 ? 'just now' : mins + ' min ago'}. Leave it running.`
+    });
+  }
+
+  // Survives a restart, where the flag above does not.
+  const { data: pending } = await supabase
+    .from('sync_logs')
+    .select('created_at')
+    .eq('status', 'pending')
+    .gte('created_at', new Date(Date.now() - 15 * 60 * 1000).toISOString())
+    .limit(1);
+  if (pending && pending.length) {
+    return res.json({
+      status: 'already-running',
+      message: 'A pull is already in progress — leave it running.'
+    });
+  }
 
   const { data: connection } = await supabase
     .from('square_connections')
@@ -1041,8 +1122,9 @@ app.post('/api/square/backfill', async (req, res) => {
   // from Square — browser fetch has a 30s timeout. Return immediately with
   // "started: true" and fire the sync async in the background. Client polls
   // the sync_logs table or watches refreshKilnCafeRevenueData() for updates.
+  _backfillInFlight = { studioId, startedAt: Date.now() };
   res.json({ status: 'started', daysBack: daysBack || 30, message: 'Pulling Square data in background…' });
-  
+
   // Fire the sync async — don't wait for it to complete
   setImmediate(async () => {
     try {
@@ -1051,6 +1133,10 @@ app.post('/api/square/backfill', async (req, res) => {
       console.log(`[backfill] Complete: ${result.recordsSynced} orders synced`);
     } catch (error) {
       console.error('REAL backfill error, full stack:', error.stack);
+    } finally {
+      // finally, not after the await — a thrown backfill must release
+      // the lock too, or the button stays shut until the stale timeout.
+      _backfillInFlight = null;
     }
   });
 });
@@ -14299,7 +14385,7 @@ app.listen(port, async () => {
       .from('square_connections').select('studio_id, square_access_token');
     for (const conn of (connections || [])) {
       try {
-        await syncSquareData(conn.studio_id, conn.square_access_token, daysBack);
+        await syncSquareData(conn.studio_id, conn.square_access_token, daysBack, null, why);
         console.log(`✓ Square ${why} for ${conn.studio_id} (${daysBack}d)`);
       } catch (err) {
         console.error(`Square ${why} failed for ${conn.studio_id}:`, err.message);

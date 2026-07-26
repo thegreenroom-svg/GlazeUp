@@ -230,8 +230,18 @@ $('backfillBtn').onclick = async () => {
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'could not start');
-    $('note').innerHTML = `<b>Started.</b> Square is being read in the background —
-      reopen this page in a few minutes to see how far back it reached.`;
+    // [26 Jul] The server can now answer 'already-running'. Say so
+    // plainly: the button returns instantly either way, so without
+    // this the honest "I already started one" and the genuine "off it
+    // goes" look identical, which is exactly what led to two walks
+    // running at once.
+    if (d.status === 'already-running') {
+      $('note').innerHTML = `<b>Already running.</b> ${d.message || 'A pull is already in progress.'}
+        Nothing new was started — reopen this page in a few minutes.`;
+    } else {
+      $('note').innerHTML = `<b>Started.</b> Square is being read in the background —
+        reopen this page in a few minutes to see how far back it reached.`;
+    }
   } catch (e) {
     $('note').textContent = 'Could not start the backfill — ' + e.message;
     $('backfillBtn').disabled = false;

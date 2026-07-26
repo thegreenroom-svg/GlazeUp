@@ -25356,6 +25356,10 @@ async function _runSquareSync() {
     });
     const data = await res.json();
     if (!res.ok) { _setSquareSyncState('error'); return; }
+    // Already-running is not an error and not a fresh start — hold the
+    // pill on 'pulling' rather than flashing green at a pull this tap
+    // did not begin.
+    if (data.status === 'already-running') { _setSquareSyncState('pulling'); return; }
     setTimeout(() => {
       try { if (typeof refreshKilnCafeRevenueData === 'function') refreshKilnCafeRevenueData(); } catch(e){}
       _setSquareSyncState('connected');
@@ -25395,6 +25399,11 @@ async function triggerKilnCafeBackfill() {
     // moment to return everything for a 30-day pull, so this waits a
     // few real seconds before refreshing the actual displayed figures
     // — not instant, but genuinely reflects real data once it lands.
+    if (data.status === 'already-running') {
+      btns.forEach((b) => { b.disabled = true; b.textContent = 'Already pulling…'; });
+      alert(data.message || 'A pull is already running — leave it to finish.');
+      return;
+    }
     setTimeout(() => {
       refreshKilnCafeRevenueData();
       btns.forEach((b, i) => { b.disabled = false; b.textContent = '✓ Done — figures updated'; setTimeout(() => { b.textContent = originalTexts[i]; }, 3000); });
