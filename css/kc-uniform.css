@@ -1,0 +1,140 @@
+/* ═══════════════════════════════════════════════════════════════════
+   KC-UNIFORM — ONE LOOK, EVERY PAGE. 2 Aug 2026.
+
+   Daisy, after a day of screens that each looked slightly different:
+   "I need every single page in this app to look identical. From the
+   headers to the squares — just the NUMBER of squares changing, all
+   the squares exactly the same shape and size. Every part apart from
+   the login and the splash."
+
+   That is a design system, not a tidy-up, and it has to be enforced in
+   ONE place or it drifts apart again within a week — which is exactly
+   what happened to the tiles, the menu and the legacy home, each of
+   which was "made to match" separately and then diverged.
+
+   HOW THIS WORKS, and why it is written the way it is:
+
+   - Loaded LAST on every page, so it wins without needing a fight.
+   - !important throughout. Normally a smell, correct here: this file's
+     whole job is to overrule ten months of per-screen styling that
+     cannot all be hunted down individually, and any rule that loses is
+     a screen that looks different.
+   - Targets SHAPES not screens (.kc-tile, .glaze-tile, .ghtile-sq,
+     .sq, .chip...), so a page built tomorrow inherits the system
+     without anyone remembering to add it.
+   - Explicitly excludes the login and splash, as asked — those are
+     full-bleed moments, not working screens.
+
+   THE SYSTEM
+   ──────────
+   Square:  56px tall, icon 30px left, one line of 13px text, 14px
+            radius, one shadow. Never a different size anywhere.
+   Grid:    auto-fill from 148px. The number of columns changes with
+            the screen; the squares never do.
+   Header:  24px Caveat title, 12.5px muted subtitle, one action on
+            the right. Same on every page.
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  --u-paper:#FFF9F0; --u-card:#FFFDF9; --u-ink:#2B2724;
+  --u-mute:#6f665b; --u-line:rgba(43,39,36,.14);
+  --u-clay:#B87946; --u-go:#3E7C6A;
+  --u-sq-h:56px;            /* the one square height, everywhere */
+  --u-sq-min:148px;         /* the one minimum square width */
+  --u-radius:14px;
+}
+
+/* ── THE HEADER ─────────────────────────────────────────────────── */
+.kc-u-head,
+body > .top {
+  display:flex !important; align-items:center !important; gap:10px !important;
+  flex-shrink:0 !important; padding:2px 2px 8px !important;
+}
+.kc-u-head h1, body > .top h1 {
+  font-family:'Caveat',cursive !important; font-size:24px !important;
+  margin:0 !important; line-height:1 !important; color:var(--u-ink) !important;
+}
+.kc-u-head .n, body > .top .n, .kc-u-head .crumb, body > .top .crumb {
+  flex:1 !important; min-width:0 !important; font-size:12.5px !important;
+  color:var(--u-mute) !important;
+  overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important;
+}
+
+/* ── THE SQUARE ─────────────────────────────────────────────────── */
+/* Every tappable card in the app, whatever it was called before. */
+.kc-tile,
+.glaze-tile,
+.ghtile-sq,
+.ghtile-mini,
+.kc-u-sq {
+  height:var(--u-sq-h) !important;
+  min-height:var(--u-sq-h) !important;
+  max-height:var(--u-sq-h) !important;
+  aspect-ratio:auto !important;
+  display:flex !important; flex-direction:row !important;
+  align-items:center !important; justify-content:flex-start !important;
+  gap:10px !important;
+  padding:0 12px !important;
+  border:none !important; border-radius:var(--u-radius) !important;
+  background:var(--u-card) !important; color:var(--u-ink) !important;
+  text-align:left !important;
+  box-shadow:0 1px 2px rgba(43,39,36,.06), 0 5px 14px -11px rgba(43,39,36,.3) !important;
+  filter:none !important;
+  font:inherit !important;
+  cursor:pointer !important;
+  overflow:hidden !important;
+}
+/* The gloss and inner sheens that made older tiles look like a
+   different product entirely. */
+.kc-tile::before, .kc-tile::after,
+.glaze-tile::before, .glaze-tile::after,
+.ghtile-sq::before, .ghtile-mini::before { display:none !important; }
+
+.kc-tile:active, .glaze-tile:active, .ghtile-sq:active, .kc-u-sq:active {
+  transform:scale(0.97) !important; background:#FFF6EA !important;
+}
+
+/* Icon: always the same box, always on the left. */
+.kc-tile-i, .glaze-tile .i, .ghtile-sq .i, .kc-u-sq .i {
+  width:30px !important; height:30px !important; min-width:30px !important;
+  font-size:17px !important; line-height:1 !important;
+  border-radius:9px !important;
+  background:rgba(184,121,70,0.12) !important;
+  display:flex !important; align-items:center !important; justify-content:center !important;
+  flex-shrink:0 !important;
+}
+
+/* Label: one line, shortened with an ellipsis, never broken mid-word. */
+.kc-tile-l, .glaze-tile .t, .ghtile-sq .t, .kc-u-sq .t {
+  flex:1 !important; min-width:0 !important;
+  font-size:13px !important; font-weight:700 !important;
+  line-height:1.2 !important; letter-spacing:-0.01em !important;
+  color:var(--u-ink) !important; text-align:left !important;
+  display:block !important; white-space:nowrap !important;
+  overflow:hidden !important; text-overflow:ellipsis !important;
+}
+
+/* ── THE GRID ───────────────────────────────────────────────────── */
+/* Columns change with the screen. Squares never do. */
+.kc-index,
+.kc-section-grow .kc-index,
+.kc-u-grid,
+.gh-grid {
+  display:grid !important;
+  grid-template-columns:repeat(auto-fill,minmax(var(--u-sq-min),1fr)) !important;
+  grid-auto-rows:var(--u-sq-h) !important;
+  align-content:start !important;
+  height:auto !important;
+  gap:8px !important;
+}
+
+/* ── EXCLUSIONS, as asked ───────────────────────────────────────── */
+/* The login and splash are full-bleed moments, not working screens. */
+#splash-screen, #splash-screen *,
+#shift-login-modal, #shift-login-modal * {
+  height:auto !important; min-height:0 !important; max-height:none !important;
+}
+#splash-screen .kc-tile, #shift-login-modal .kc-tile,
+#shift-login-modal .glaze-tile {
+  height:auto !important; max-height:none !important;
+}

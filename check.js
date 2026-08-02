@@ -255,6 +255,27 @@ function checkDataReads(server) {
   } else warn('server.js: could not locate /api/packing/queue to verify');
 }
 
+// ── 7. THE UNIFORM LOOK ─────────────────────────────────────────────
+// [2 Aug] Daisy: "every single page must look identical — headers,
+// squares, only the NUMBER of squares changing." A design system that
+// is only a stylesheet drifts apart the first time someone adds a
+// page and forgets to link it. This makes forgetting a build failure
+// rather than something she finds on a tablet a week later.
+function checkUniform(name, html) {
+  if (/splash|login/i.test(name)) return;
+  if (!html.includes('kc-uniform.css')) {
+    fail(`${name}: does not load kc-uniform.css — this page will not match the others`);
+    return;
+  }
+  // It must load LAST, or per-page CSS below it wins and the page
+  // quietly looks different despite being linked.
+  const uni = html.lastIndexOf('kc-uniform.css');
+  const lastCss = html.lastIndexOf('.css"');
+  if (lastCss > uni + 40) {
+    warn(`${name}: kc-uniform.css is not the last stylesheet — later CSS may override the system`);
+  }
+}
+
 // ── RUN ─────────────────────────────────────────────────────────────
 console.log('Checking every app…\n');
 
@@ -286,6 +307,7 @@ for (const f of HTML) {
   syntax(f, code);
   checkNames(f, code);
   checkEndpoints(f, code, routes);
+  checkUniform(f, html);
   const so = (html.match(/<style[^>]*>/g) || []).length;
   const sc = (html.match(/<\/style>/g) || []).length;
   if (so !== sc) fail(`${f}: ${so} <style> vs ${sc} </style>`);
