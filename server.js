@@ -3357,6 +3357,55 @@ app.post('/api/catalogue/sync', async (req, res) => {
 // Registering this first would have shadowed it silently — the exact
 // collision that broke Find My Piece on 25 Jul. Caught by check.js
 // before it shipped this time.
+// POST /api/pos/order — send a built order to Square.
+//
+// [2 Aug] Uses _safeCreateOrder, so with SQUARE_WRITES_ENABLED unset
+// it returns simulated:true rather than pretending. The till surfaces
+// that plainly: a member of staff must never tap "send", get a tick,
+// and walk away from an order that was never created.
+app.post('/api/pos/order', async (req, res) => {
+  const { studioId, lines, note } = req.body;
+  if (!studioId || !Array.isArray(lines) || !lines.length) {
+    return res.status(400).json({ error: 'studioId and lines required' });
+  }
+  try {
+    const { data: conn } = await supabase.from('square_connections')
+      .select('square_access_token').eq('studio_id', studioId).maybeSingle();
+    if (!conn) return res.status(404).json({ error: 'Square not connected' });
+
+    const { data: studio } = await supabase.from('studios')
+      .select('square_location_id').eq('id', studioId).maybeSingle();
+
+    const client = new Client({
+      accessToken: conn.square_access_token,
+      environment: process.env.SQUARE_ENVIRONMENT === 'sandbox' ? Environment.Sandbox : Environment.Production,
+    });
+
+    const payload = {
+      idempotencyKey: `pos-${studioId}-${Date.now()}`,
+      order: {
+        locationId: studio?.square_location_id,
+        lineItems: lines.map(l => ({
+          name: String(l.name || 'Item').slice(0, 255),
+          quantity: String(l.qty || 1),
+          basePriceMoney: { amount: Math.round((l.price || 0) * 100), currency: 'GBP' },
+        })),
+        ...(note ? { note: String(note).slice(0, 500) } : {}),
+      },
+    };
+
+    const r = await _safeCreateOrder(client, payload, 'pos till');
+    res.json({
+      simulated: !!r.simulated,
+      orderId: r.result?.order?.id || null,
+      total: lines.reduce((n, l) => n + (l.price || 0) * (l.qty || 1), 0),
+    });
+  } catch (e) {
+    console.error('pos/order:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/api/pos/items', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });

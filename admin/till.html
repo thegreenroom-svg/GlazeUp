@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Till</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap" rel="stylesheet">
+<style>
+  /* ═══════════════════════════════════════════════════════════════
+     THE TILL — the EPOS pattern, in the studio's own colours.
+
+     [2 Aug] Daisy: the interface bar staff use — a grid of coloured
+     squares, tap to drill down, items add to a running bill, tap back
+     and back. One screen, never scrolling.
+
+     Why that pattern earns its place rather than being copied: it is
+     built for someone standing up, holding something, with a customer
+     waiting. Everything is a large target, nothing needs reading twice,
+     and the path back is always one tap. Depth instead of scrolling —
+     you go INTO a category rather than past it.
+
+     What is NOT copied is the usual EPOS palette of saturated primary
+     blocks. Colour here still has to mean something — each category
+     keeps the SAME colour every time, so within a week the hand goes
+     to the right square before the eye reads the label. The hues are
+     drawn from the studio's own world: clay, sage, plum, ochre, kiln
+     green, brick.
+     ═══════════════════════════════════════════════════════════════ */
+  :root{
+    --bg:#FFF9F0; --panel:#FFFDF9; --line:rgba(43,39,36,.14);
+    --ink:#2B2724; --mute:#6f665b; --go:#3E7C6A; --clay:#B87946;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{height:100%; overflow:hidden}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.4 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    display:flex; flex-direction:column;
+    padding:max(8px,env(safe-area-inset-top)) 10px calc(8px + env(safe-area-inset-bottom));
+    -webkit-text-size-adjust:100%; overscroll-behavior:none}
+
+  .top{display:flex; align-items:center; gap:9px; flex-shrink:0; padding:2px 2px 7px}
+  .top h1{font-family:Caveat,serif; font-size:24px; margin:0; line-height:1}
+  .crumb{flex:1; min-width:0; font-size:12.5px; color:var(--mute);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .top button, .top a{font:inherit; font-size:13px; cursor:pointer; text-decoration:none;
+    background:var(--panel); border:1.5px solid var(--line); border-radius:10px;
+    padding:8px 13px; color:var(--ink)}
+  .top button:disabled{opacity:.35}
+
+  /* Two columns: the grid you tap, the order you are building. On a
+     narrow screen the order drops underneath — but it is never hidden,
+     because an order you cannot see is an order that gets forgotten. */
+  .main{flex:1; min-height:0; display:grid; grid-template-columns:1fr 300px; gap:9px}
+  @media (max-width:820px){ .main{grid-template-columns:1fr; grid-template-rows:1fr auto} }
+
+  .grid{display:grid; gap:7px; min-height:0;
+    grid-template-columns:repeat(auto-fill,minmax(126px,1fr));
+    grid-auto-rows:minmax(74px,1fr); align-content:start;
+    overflow:hidden}
+
+  .sq{border:none; border-radius:13px; cursor:pointer; color:#fff;
+    padding:9px 10px; display:flex; flex-direction:column;
+    justify-content:space-between; text-align:left; font:inherit;
+    box-shadow:0 1px 2px rgba(43,39,36,.10), 0 5px 14px -10px rgba(43,39,36,.45);
+    transition:transform .09s ease, filter .09s ease}
+  .sq:active{transform:scale(0.96); filter:brightness(1.08)}
+  .sq .l{font-size:12.5px; font-weight:800; line-height:1.2;
+    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden}
+  .sq .p{font-size:13px; font-weight:800; opacity:.95; font-variant-numeric:tabular-nums}
+  .sq .c{font-size:10.5px; opacity:.85}
+
+  /* THE ORDER. Deliberately the only thing on screen with a plain
+     surface — everything else is coloured, so the bill reads as the
+     one place holding the truth. */
+  .order{background:var(--panel); border:1.5px solid var(--line);
+    border-radius:14px; display:flex; flex-direction:column; min-height:0; overflow:hidden}
+  .order .h{padding:9px 12px; border-bottom:1.5px solid var(--line);
+    font-size:11px; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--clay); font-weight:700; display:flex; justify-content:space-between}
+  .lines{flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch}
+  .line{display:flex; align-items:center; gap:8px; padding:8px 11px;
+    border-bottom:1px solid rgba(43,39,36,.07); font-size:13px}
+  .line .q{font-weight:800; min-width:22px; font-variant-numeric:tabular-nums}
+  .line .n{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .line .m{font-variant-numeric:tabular-nums; font-weight:700}
+  .line .x{border:none; background:none; color:var(--mute); font-size:16px;
+    cursor:pointer; padding:0 2px; line-height:1}
+  .empty{color:var(--mute); font-size:12.5px; text-align:center; padding:22px 14px; line-height:1.5}
+
+  .foot{border-top:1.5px solid var(--line); padding:10px 12px; flex-shrink:0}
+  .tot{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:9px}
+  .tot .k{font-size:12px; color:var(--mute)}
+  .tot .v{font-size:23px; font-weight:800; font-variant-numeric:tabular-nums}
+  .acts{display:flex; gap:7px}
+  .acts button{flex:1; font:inherit; font-size:13.5px; font-weight:800; cursor:pointer;
+    border:1.5px solid var(--line); background:var(--panel); color:var(--ink);
+    border-radius:11px; padding:12px 8px}
+  .acts button.go{background:var(--go); border-color:transparent; color:#fff}
+  .acts button:disabled{opacity:.4}
+
+  .note{font-size:11px; color:var(--mute); text-align:center; padding-top:7px; line-height:1.45}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>Till</h1>
+  <button id="back" disabled>‹ Back</button>
+  <div class="crumb" id="crumb">Loading…</div>
+  <a href="/admin/dashboard-local.html?go=home" title="Back to the Desk">✕</a>
+</div>
+
+<div class="main">
+  <div class="grid" id="grid"></div>
+
+  <div class="order">
+    <div class="h"><span>This order</span><span id="count"></span></div>
+    <div class="lines" id="lines">
+      <div class="empty">Tap a category, then an item.<br>It builds up here.</div>
+    </div>
+    <div class="foot">
+      <div class="tot"><span class="k">Total</span><span class="v" id="total">£0.00</span></div>
+      <div class="acts">
+        <button id="clear" disabled>Clear</button>
+        <button id="send" class="go" disabled>Send to Square</button>
+      </div>
+      <div class="note" id="note"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────
+// THE TILL. Category squares -> item squares -> the order builds up.
+// Back is always one tap, and nothing ever scrolls off the screen.
+//
+// Honest about what it is: this BUILDS an order and sends it to Square.
+// It does not take payment — Square does that, on the terminal, as
+// now. And if writes are disabled server-side it says "simulated"
+// rather than showing a tick for something that never happened.
+// ─────────────────────────────────────────────────────────────────────
+
+const API = location.origin;
+const studioId = new URLSearchParams(location.search).get('studio')
+  || 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3';
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[<>&"]/g, c =>
+  ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+const money = n => '£' + n.toFixed(2);
+
+// The studio's own hues rather than EPOS primaries. Chosen to stay
+// distinguishable at a glance and to sit together without shouting.
+const HUES = [
+  '#B87946',  // clay
+  '#3E7C6A',  // kiln green
+  '#8C5B7B',  // plum
+  '#A8762B',  // ochre
+  '#5E7A9B',  // slate blue
+  '#A3452F',  // brick
+  '#6B7F4A',  // sage
+  '#7A5C3E',  // walnut
+];
+// Same category, same colour, every single time — that consistency is
+// what lets someone's hand find a square before they have read it.
+function hueFor(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return HUES[h % HUES.length];
+}
+
+let groups = [], path = [], order = [];
+
+async function load() {
+  try {
+    const r = await fetch(`${API}/api/pos/items?studioId=${studioId}`);
+    const d = await r.json();
+    groups = d.groups || [];
+  } catch (e) {
+    $('grid').innerHTML = '<div class="empty">Could not reach the server.</div>';
+    return;
+  }
+  if (!groups.length) {
+    $('crumb').textContent = '';
+    $('grid').innerHTML = `<div class="empty" style="grid-column:1/-1">
+      No prices stored yet — open Prices and pull them from Square first.</div>`;
+    return;
+  }
+  render();
+}
+
+function render() {
+  $('back').disabled = !path.length;
+  $('crumb').textContent = path.length ? path.join(' › ') : `${groups.length} categories`;
+
+  if (!path.length) {
+    $('grid').innerHTML = groups.map(g => `
+      <button class="sq" style="background:${hueFor(g.category)}"
+        onclick="openCat(${JSON.stringify(g.category).replace(/"/g,'&quot;')})">
+        <div class="l">${esc(g.category)}</div>
+        <div class="c">${g.items.length} item${g.items.length === 1 ? '' : 's'}</div>
+      </button>`).join('');
+    return;
+  }
+
+  const g = groups.find(x => x.category === path[0]);
+  if (!g) { path = []; return render(); }
+  $('grid').innerHTML = g.items.map((it, i) => `
+    <button class="sq" style="background:${hueFor(g.category)}"
+      onclick="addItem(${i})">
+      <div class="l">${esc(it.name)}</div>
+      <div class="p">${it.price > 0 ? money(it.price) : 'price at till'}</div>
+    </button>`).join('');
+}
+
+function openCat(c) { path = [c]; render(); }
+window.openCat = openCat;
+
+function addItem(i) {
+  const g = groups.find(x => x.category === path[0]);
+  const it = g && g.items[i];
+  if (!it) return;
+  // Tapping the same item again bumps the quantity rather than adding
+  // a second line — the behaviour anyone who has used a till expects.
+  const found = order.find(l => l.name === it.name && l.price === it.price);
+  if (found) found.qty++;
+  else order.push({ name: it.name, price: it.price, qty: 1 });
+  paintOrder();
+}
+window.addItem = addItem;
+
+function removeLine(i) {
+  if (order[i] && order[i].qty > 1) order[i].qty--;
+  else order.splice(i, 1);
+  paintOrder();
+}
+window.removeLine = removeLine;
+
+function paintOrder() {
+  const total = order.reduce((n, l) => n + l.price * l.qty, 0);
+  const items = order.reduce((n, l) => n + l.qty, 0);
+  $('total').textContent = money(total);
+  $('count').textContent = items ? `${items} item${items === 1 ? '' : 's'}` : '';
+  $('clear').disabled = !order.length;
+  $('send').disabled = !order.length;
+  $('lines').innerHTML = order.length
+    ? order.map((l, i) => `
+        <div class="line">
+          <span class="q">${l.qty}×</span>
+          <span class="n">${esc(l.name)}</span>
+          <span class="m">${money(l.price * l.qty)}</span>
+          <button class="x" onclick="removeLine(${i})" aria-label="Remove one">−</button>
+        </div>`).join('')
+    : '<div class="empty">Tap a category, then an item.<br>It builds up here.</div>';
+}
+
+$('back').onclick = () => { path = []; render(); };
+$('clear').onclick = () => { order = []; paintOrder(); $('note').textContent = ''; };
+
+$('send').onclick = async () => {
+  const btn = $('send');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try {
+    const r = await fetch(`${API}/api/pos/order`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId, lines: order }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'failed');
+    // Never a tick for something that did not happen.
+    $('note').innerHTML = d.simulated
+      ? `<b style="color:var(--clay)">Not sent — Square writes are switched off.</b><br>
+         The order was built correctly but nothing reached Square. Take payment on the terminal.`
+      : `<b style="color:var(--go)">Sent to Square.</b> Take payment on the terminal.`;
+    if (!d.simulated) { order = []; paintOrder(); }
+  } catch (e) {
+    $('note').innerHTML = `<b style="color:#A3452F">Could not send</b> — ${esc(e.message)}`;
+  } finally {
+    btn.textContent = 'Send to Square';
+    btn.disabled = !order.length;
+  }
+};
+
+// Back gesture goes up a level rather than leaving the till.
+history.pushState({ till: 1 }, '');
+window.addEventListener('popstate', () => {
+  if (path.length) { path = []; render(); history.pushState({ till: 1 }, ''); }
+  else location.href = '/admin/dashboard-local.html?go=home';
+});
+
+paintOrder();
+load();
+</script>
+</body>
+</html>
