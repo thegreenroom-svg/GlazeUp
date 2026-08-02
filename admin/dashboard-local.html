@@ -31351,11 +31351,81 @@ async function submitDamageReport() {
 }
 
 function openBookingSearch() {
+  // [2 Aug] Daisy: "Find Booking is useless — go through THAT in a busy
+  // studio? I want to see the bookings so I can just tap them. Name,
+  // time. I don't want to see writing."
+  //
+  // She is right, and the fault was the premise. Searching assumes you
+  // know what to type and have a free hand to type it. Standing at a
+  // counter with a customer waiting you have neither — but you DO know
+  // the name when you see it. So today's bookings load immediately as
+  // tappable squares, and the search field is left underneath for the
+  // rare case of a booking that is not today.
   document.getElementById('booking-search-modal').style.display = 'flex';
   document.getElementById('booking-search-input').value = '';
-  document.getElementById('booking-search-results').innerHTML = '';
-  setTimeout(() => document.getElementById('booking-search-input')?.focus(), 100);
+  loadTodayBookingSquares();
+  // Deliberately NOT focusing the input any more: it threw the keyboard
+  // up over the squares, which is exactly the interruption she is
+  // describing.
 }
+
+// Today's bookings as squares — name and time, nothing else, because
+// nothing else is needed to recognise your own booking.
+async function loadTodayBookingSquares() {
+  const el = document.getElementById('booking-search-results');
+  if (!el) return;
+  el.innerHTML = '<div style="color:#8F877C;font-size:13px;padding:14px">Loading today…</div>';
+  try {
+    const d = new Date();
+    const date = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const r = await fetch(`${API_URL}/api/bookings/day?studioId=${studioId}&date=${date}`);
+    const data = await r.json();
+    const list = data.bookings || [];
+    if (!list.length) {
+      el.innerHTML = '<div style="color:#8F877C;font-size:13px;padding:14px">Nothing booked today.</div>';
+      return;
+    }
+    const hhmm = t => new Date(t).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+    const now = Date.now();
+    el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;">`
+      + list.map(b => {
+          const start = new Date(b.session_start).getTime();
+          const end = new Date(b.session_end || b.session_start).getTime();
+          // In now, still to come, already finished — read at a glance
+          // by colour rather than by reading a time and doing the sum.
+          const live = now >= start && now <= end;
+          const past = now > end;
+          const bg = live ? '#3E7C6A' : past ? '#6f665b' : '#B87946';
+          return `<button onclick="openBookingFromSquare('${String(b.booking_code || b.id).replace(/'/g,"")}')"
+            style="border:none;border-radius:13px;background:${bg};color:#fff;padding:11px 12px;
+            text-align:left;cursor:pointer;min-height:70px;display:flex;flex-direction:column;
+            justify-content:space-between;font:inherit;opacity:${past ? '.55' : '1'}">
+            <div style="font-size:13.5px;font-weight:800;line-height:1.2;overflow:hidden;
+              text-overflow:ellipsis;white-space:nowrap">${(b.customer_name||'No name').replace(/</g,'&lt;')}</div>
+            <div style="font-size:12px;opacity:.9;font-variant-numeric:tabular-nums">
+              ${hhmm(b.session_start)}${b.table_number ? ' · ' + String(b.table_number).replace(/</g,'&lt;') : ''}
+              ${live ? ' · in now' : ''}</div>
+          </button>`;
+        }).join('')
+      + `</div>`;
+  } catch (e) {
+    el.innerHTML = '<div style="color:#8F877C;font-size:13px;padding:14px">Could not load today.</div>';
+  }
+}
+
+function openBookingFromSquare(code) {
+  closeBookingSearch();
+  try {
+    if (typeof openBookingAtRealStage === 'function') openBookingAtRealStage(code);
+    else if (typeof lookupBookingSection1 === 'function') {
+      goToTab('staff'); s1ChooseExisting();
+      const f = document.getElementById('s1-booking-code');
+      if (f) { f.value = code; lookupBookingSection1(); }
+    }
+  } catch (e) { console.warn('[booking square]', e); }
+}
+window.openBookingFromSquare = openBookingFromSquare;
+window.loadTodayBookingSquares = loadTodayBookingSquares;
 
 function closeBookingSearch() {
   document.getElementById('booking-search-modal').style.display = 'none';
