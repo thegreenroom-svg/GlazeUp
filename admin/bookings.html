@@ -64,6 +64,34 @@
   .appt.vault{background:var(--vault)}
   .appt.other{background:#6f665b}
 
+  /* SIDE-BY-SIDE DAY GRID — Square's real layout: a column per table,
+     hours down the left, appointments as blue blocks. */
+  .daywrap{position:relative}
+  .sbs{display:grid; align-items:stretch}
+  .colhead{position:sticky; top:0; z-index:2; background:var(--bg);
+    height:26px; font-size:11px; font-weight:800; color:var(--mute);
+    display:flex; align-items:center; justify-content:center;
+    border-bottom:1.5px solid var(--line)}
+  .tlab{font-size:10.5px; color:var(--mute); text-align:right;
+    padding:2px 6px 0 0; border-top:1px solid var(--line);
+    height:56px; font-variant-numeric:tabular-nums}
+  .cell{border-top:1px solid var(--line); border-left:1px solid var(--line);
+    height:56px; padding:2px; position:relative}
+
+  .appt{border-radius:5px; padding:4px 5px; cursor:pointer; color:#fff;
+    overflow:hidden; font-size:10px; line-height:1.2}
+  .appt .tm{font-weight:800; font-size:10.5px}
+  .appt .nm{font-weight:700; text-transform:uppercase; margin-top:1px}
+  .appt .sv{opacity:.9; margin-top:1px}
+  .appt .rm{opacity:.85; margin-top:1px}
+
+  /* The red now-line, marker in the gutter, exactly as Square draws it. */
+  .nowline{position:absolute; left:0; right:0; height:0;
+    border-top:1.5px solid #E5322D; z-index:3; pointer-events:none}
+  .nowdot{position:absolute; left:0; top:-4px; width:0; height:0;
+    border-top:4px solid transparent; border-bottom:4px solid transparent;
+    border-left:7px solid #E5322D}
+
   /* LIST VIEW — the same data as rows, for scanning rather than timing. */
   .row{display:flex; gap:10px; align-items:center; padding:10px 2px;
     border-bottom:1px solid var(--line); cursor:pointer}
@@ -151,6 +179,8 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[<>&"]/g, c =>
   ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
 
+const ROW_H = 56;   // px per hour — matches Square's density on iPad
+const HEAD_H = 26;  // the table-name header row
 let day = new Date(); day.setHours(0, 0, 0, 0);
 let view = 'day';
 let bookings = [];
@@ -201,28 +231,56 @@ function render() {
 }
 
 function dayView() {
-  // Hours bounded by what is actually booked, so the studio's real day
-  // fills the screen instead of a fixed 00:00-23:00 grid mostly empty.
+  // [2 Aug] REBUILT against the real screen. Square shows SIDE-BY-SIDE
+  // columns, one per table (T7a, T7b, T8, T9…), not a single column —
+  // which is the whole point on a day when four tables run at once,
+  // and it is what the girls actually scan. My first version stacked
+  // everything into one column and lost the table entirely.
+  const tables = [...new Set(bookings.map(b => b.table_number || '—'))].sort();
+
   const starts = bookings.map(b => new Date(b.session_start).getHours());
   const ends = bookings.map(b => new Date(b.session_end || b.session_start).getHours() + 1);
   const from = Math.max(0, Math.min(...starts) - 1);
   const to = Math.min(24, Math.max(...ends) + 1);
 
-  let html = '<div class="grid">';
+  const now = new Date();
+  const showNow = iso(day) === iso(now) && now.getHours() >= from && now.getHours() < to;
+  const nowTop = ((now.getHours() - from) + now.getMinutes() / 60) * ROW_H;
+
+  let html = `<div class="sbs" style="grid-template-columns:44px repeat(${tables.length},minmax(112px,1fr))">`;
+  html += `<div class="colhead"></div>`;
+  for (const t of tables) html += `<div class="colhead">${esc(t)}</div>`;
+
   for (let h = from; h < to; h++) {
-    const inHour = bookings.filter(b => new Date(b.session_start).getHours() === h);
-    html += `<div class="hour"><div class="lab">${String(h).padStart(2, '0')}:00</div><div class="slot">`;
-    for (const b of inHour) {
-      html += `<div class="appt ${roomClass(b)}" onclick="openDetail('${esc(b.id)}')">
-        <div class="nm">${esc(b.customer_name || 'No name')}</div>
-        <div class="meta">${hhmm(b.session_start)}${b.session_end ? '–' + hhmm(b.session_end) : ''}${
-          b.party_size ? ' · ' + b.party_size + (b.party_size === 1 ? ' cover' : ' covers') : ''}${
-          b.room ? ' · ' + esc(b.room) : ''}</div>
-      </div>`;
+    html += `<div class="tlab">${String(h).padStart(2, '0')}</div>`;
+    for (const t of tables) {
+      const inCell = bookings.filter(b =>
+        (b.table_number || '—') === t && new Date(b.session_start).getHours() === h);
+      html += `<div class="cell">` + inCell.map(b => {
+        const mins = (new Date(b.session_end || b.session_start) - new Date(b.session_start)) / 60000;
+        const h2 = Math.max(ROW_H - 4, (mins / 60) * ROW_H - 4);
+        return `<div class="appt ${roomClass(b)}" style="height:${h2}px"
+          onclick="openDetail('${esc(b.id)}')">
+          <div class="tm">${hhmm(b.session_start)}</div>
+          <div class="nm">${esc(b.customer_name || 'No name')}</div>
+          <div class="sv">${esc(b.booking_type || 'Pottery Painting Session')}</div>
+          <div class="rm">${esc(b.room || b.space_name || '')}</div>
+        </div>`;
+      }).join('') + `</div>`;
     }
-    html += '</div></div>';
   }
-  return html + '</div>';
+  html += '</div>';
+
+  // The red now-line, with its marker in the left gutter exactly as
+  // Square draws it. It is how someone tells at a glance what has
+  // already started — worth copying precisely.
+  if (showNow) {
+    html = `<div class="daywrap"><div class="nowline" style="top:${nowTop + HEAD_H}px">
+      <span class="nowdot"></span></div>` + html + '</div>';
+  } else {
+    html = `<div class="daywrap">` + html + '</div>';
+  }
+  return html;
 }
 
 function listView() {

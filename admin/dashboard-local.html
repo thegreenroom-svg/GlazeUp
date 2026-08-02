@@ -16404,7 +16404,18 @@ async function checkShiftLogin(fromNavigation) {
   // force a re-login, but the device genuinely being put down and
   // picked up by someone else always should — no silent resume, ever,
   // regardless of how little time has passed.
-  const SESSION_TIMEOUT_HOURS = 4;
+  // [2 Aug] 4 hours -> 30 minutes. Daisy: "I want the logins back."
+  // A 4-hour silent resume spans an entire shift change, so the app
+  // carried on as whoever opened it that morning and every "who did
+  // this" record — timesheet, packed-by, piece history — quietly
+  // attributed the afternoon's work to the wrong person.
+  //
+  // 30 minutes still covers the thing the window was for: walking
+  // between screens, the iPad locking while someone carries a tray.
+  // It cannot span a handover. markSessionActive() refreshes on touch
+  // roughly once a minute, so anyone actually working stays signed in
+  // indefinitely; only a genuinely idle iPad asks again.
+  const SESSION_TIMEOUT_HOURS = 0.5;
   const forceRelogin = localStorage.getItem('klnk_force_relogin') === '1';
   const previousSession = localStorage.getItem('klnk_shift_staff');
   const lastActiveAt = parseInt(localStorage.getItem('klnk_last_active') || '0', 10);
@@ -25630,7 +25641,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       const hoursSinceActive = (Date.now() - lastActiveAt) / (1000 * 60 * 60);
       // Same tolerance as checkShiftLogin's own resume check just
       // above — a missing timestamp is trusted, not treated as stale.
-      const stillValid = !forceRelogin && previousSession && (!lastActiveAt || hoursSinceActive < 4);
+      // [2 Aug] Daisy: "I want the logins back." The 4-hour resume
+      // window meant nobody signed in across a whole shift change —
+      // the app carried on as whoever opened it that morning, so the
+      // timesheet and every "who did this" record quietly became
+      // wrong. That window was mine and it was too generous for a
+      // studio where the person holding the iPad changes hourly.
+      //
+      // 30 minutes keeps the thing it was actually for — walking
+      // between Packing and the Desk, or the screen locking while you
+      // carry a tray — without ever spanning a handover.
+      // Deliberately the same window as checkShiftLogin's own resume
+      // (SESSION_TIMEOUT_HOURS, 0.5). Two different numbers here would
+      // mean the splash skips but the login still appears behind it,
+      // or the reverse — which is exactly the kind of half-state that
+      // has cost real testing time on this app.
+      const stillValid = !forceRelogin && previousSession
+        && lastActiveAt && (hoursSinceActive * 60) < 30;
       if (stillValid) {
         setTimeout(() => { if (typeof window.dismissSplash === 'function') window.dismissSplash(); }, 60);
       }
