@@ -3210,6 +3210,117 @@ app.post('/api/bookings/:bookingCode/stage', async (req, res) => {
 // forward from today, which cannot drive a calendar someone navigates
 // — and the whole point of emulating the Square Appointments day view
 // is that the girls already move between dates without thinking.
+// ── THE PRICE LIST ──────────────────────────────────────────────────
+// [2 Aug] Daisy: emulate the point-of-sale terminals — drinks, bisque
+// and so on. The catalogue was already being fetched on every sync
+// (963 variations mapped in the boot log) and then thrown away after
+// being used to categorise revenue. square_items existed with exactly
+// the right columns and had never held a single row.
+//
+// IMPORTANT, and reflected throughout the UI: this is a PRICE LIST,
+// not a till. It takes no payment and creates no order. A screen that
+// looks like a POS but silently isn't one is genuinely dangerous —
+// someone taps through a sale, believes a customer has been charged,
+// and the money is never taken. Square remains the only thing that
+// handles money.
+app.post('/api/catalogue/sync', async (req, res) => {
+  const { studioId } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const { data: conn } = await supabase.from('square_connections')
+      .select('square_access_token').eq('studio_id', studioId).single();
+    if (!conn) return res.status(404).json({ error: 'Square not connected' });
+
+    const client = new Client({
+      accessToken: conn.square_access_token,
+      environment: process.env.SQUARE_ENVIRONMENT === 'sandbox' ? Environment.Sandbox : Environment.Production,
+    });
+
+    // Categories first, so every item can carry a human-readable group
+    // rather than a Square object id nobody can read on a shelf.
+    const catRes = await client.catalogApi.listCatalog(undefined, 'CATEGORY');
+    const catName = {};
+    for (const c of (catRes.result?.objects || [])) {
+      catName[c.id] = c.categoryData?.name || 'Other';
+    }
+
+    const rows = [];
+    let cursor;
+    do {
+      const ir = await client.catalogApi.listCatalog(cursor, 'ITEM');
+      for (const item of (ir.result?.objects || [])) {
+        const d = item.itemData; if (!d) continue;
+        const cat = catName[d.categoryId] || d.reportingCategory?.id && catName[d.reportingCategory.id] || 'Other';
+        for (const v of (d.variations || [])) {
+          const vd = v.itemVariationData; if (!vd) continue;
+          // A variation's own name is often just "Regular"; the item
+          // name is what is actually written on a shelf label, so the
+          // two are joined only when the variation adds meaning.
+          const vName = vd.name && !/^regular$/i.test(vd.name) ? ` — ${vd.name}` : '';
+          rows.push({
+            studio_id: studioId,
+            item_id: item.id,
+            variation_id: v.id,
+            item_name: (d.name || 'Unnamed') + vName,
+            category: cat,
+            price_cents: Number(vd.priceMoney?.amount || 0),
+            updated_at: new Date().toISOString(),
+          });
+        }
+      }
+      cursor = ir.result?.cursor;
+    } while (cursor);
+
+    if (rows.length) {
+      await supabase.from('square_items').delete().eq('studio_id', studioId);
+      for (let i = 0; i < rows.length; i += 500) {
+        const { error } = await supabase.from('square_items').insert(rows.slice(i, i + 500));
+        if (error) throw error;
+      }
+    }
+    console.log(`[catalogue] stored ${rows.length} priced variations`);
+    res.json({ status: 'synced', items: rows.length });
+  } catch (e) {
+    console.error('catalogue/sync:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/pos/items — grouped by category, biggest groups first.
+//
+// [2 Aug] NOT /api/catalogue: that path was already taken further down
+// this file, serving piece_catalogue (the studio's own bisque list).
+// Registering this first would have shadowed it silently — the exact
+// collision that broke Find My Piece on 25 Jul. Caught by check.js
+// before it shipped this time.
+app.get('/api/pos/items', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const { data, error } = await supabase.from('square_items')
+      .select('item_name, category, price_cents')
+      .eq('studio_id', studioId)
+      .order('category', { ascending: true })
+      .order('item_name', { ascending: true });
+    if (error) throw error;
+
+    const groups = {};
+    for (const r of (data || [])) {
+      (groups[r.category] = groups[r.category] || []).push({
+        name: r.item_name, price: (r.price_cents || 0) / 100,
+      });
+    }
+    res.json({
+      total: (data || []).length,
+      groups: Object.entries(groups)
+        .map(([category, items]) => ({ category, items }))
+        .sort((a, b) => b.items.length - a.items.length),
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/api/bookings/day', async (req, res) => {
   const { studioId, date } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });

@@ -15,7 +15,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = __dirname;
-const HTML = ['admin/dashboard-local.html', 'admin/packing.html', 'admin/takings.html', 'admin/breakdown.html', 'admin/bookings.html',
+const HTML = ['admin/dashboard-local.html', 'admin/packing.html', 'admin/takings.html', 'admin/breakdown.html', 'admin/bookings.html', 'admin/prices.html',
               'admin/match-test.html', 'app/index.html'];
 const JS = ['server.js', 'demo-skin.js', 'shelf-matcher.js'];
 
@@ -136,6 +136,38 @@ function calledNames(code) {
 // checker.
 const BROWSER_PREFIX = /^(_|kc|tb|open|load|render|draw|say|show|close|paint|assign|find|describe|shrink|gridded|cell|pick|money|nice|esc|words|weight|similarity|build|sort|gaps|edit|mark|zoom|sweep|match|apply|check|sync|chunk|handle|update|get|set|is|has|to|fmt|format)/i;
 
+// [2 Aug] SCREAMING_CASE identifiers used but never declared. Caught a
+// live one the moment it was written: SQUARE_ENVIRONMENT referenced
+// bare in a new endpoint when every other call site correctly uses
+// process.env.SQUARE_ENVIRONMENT. checkNames only looks at things
+// CALLED as functions, so a plain variable reference slipped straight
+// past it — and a ReferenceError inside a try/catch would have
+// surfaced as a vague "sync failed" rather than the real cause.
+function checkConstants(name, code, isNode) {
+  if (!isNode) return;
+  const declared = new Set();
+  for (const m of code.matchAll(/(?:const|let|var)\s+([A-Z][A-Z0-9_]{2,})/g)) declared.add(m[1]);
+  for (const m of code.matchAll(/process\.env\.([A-Z][A-Z0-9_]{2,})/g)) declared.add(m[1]);
+  const stripped = code
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+    .replace(/`(?:[^`\\]|\\.)*`/g, '``')
+    .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
+    .replace(/"(?:[^"\\\n]|\\.)*"/g, '""');
+  // Object-literal keys (MIN_TRANSITIONS: 12) declare a property, not a
+  // variable — and LEARN.MIN_TRANSITIONS reads one. Neither is an
+  // undeclared identifier; both were reported as such on first run.
+  for (const m of code.matchAll(/([A-Z][A-Z0-9_]{2,})\s*:/g)) declared.add(m[1]);
+  const missing = new Set();
+  for (const m of stripped.matchAll(/(?<![.\w$])([A-Z][A-Z0-9_]{2,})(?![\w$])/g)) {
+    const n = m[1];
+    if (declared.has(n) || BUILTIN.has(n)) continue;
+    if (/^(GET|POST|PUT|DELETE|PATCH|OK|JSON|URL|UTC|API|SQL|HTML|CSS|ID|UUID|NULL|TRUE|FALSE|AND|OR|NOT|SELECT|FROM|WHERE|ERROR|WARN|INFO)$/.test(n)) continue;
+    missing.add(n);
+  }
+  if (missing.size) fail(`${name}: SCREAMING_CASE used but never declared — ${[...missing].join(', ')}`);
+}
+
 function checkNames(name, code, isNode) {
   const def = definedNames(code);
   const missing = [];
@@ -240,6 +272,7 @@ for (const f of JS) {
   checked++;
   syntax(f, code);
   checkNames(f, f === 'demo-skin.js' ? code + '\n;\n' + dashJs : code, f === 'server.js' || f === 'shelf-matcher.js');
+  checkConstants(f, code, f === 'server.js' || f === 'shelf-matcher.js');
   if (f !== 'server.js') checkEndpoints(f, code, routes);
 }
 

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Prices</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FFF9F0; --panel:#FFFDF9; --line:rgba(43,39,36,.14);
+    --ink:#2B2724; --mute:#6f665b; --go:#3E7C6A; --clay:#B87946; --warn:#B8860B;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{height:100%; overflow:hidden}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.4 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    display:flex; flex-direction:column;
+    padding:max(10px,env(safe-area-inset-top)) 11px calc(10px + env(safe-area-inset-bottom));
+    -webkit-text-size-adjust:100%}
+
+  .top{display:flex; align-items:baseline; gap:10px; flex-shrink:0; padding:2px 2px 6px}
+  .top h1{font-family:Caveat,serif; font-size:27px; margin:0; line-height:1}
+  .top .n{font-size:12px; color:var(--mute); flex:1; min-width:0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .top a{color:var(--mute); font-size:19px; text-decoration:none; padding:2px 6px}
+
+  /* Said once, plainly, and never repeated. This looks enough like a
+     till that the difference has to be stated — but a banner repeated
+     on every screen becomes wallpaper and stops being read. */
+  .notice{flex-shrink:0; font-size:11.5px; color:var(--warn); background:rgba(184,134,11,.09);
+    border:1px solid rgba(184,134,11,.28); border-radius:9px;
+    padding:7px 10px; margin-bottom:8px; line-height:1.4}
+
+  .search{flex-shrink:0; margin-bottom:8px}
+  .search input{width:100%; font:inherit; font-size:15px; padding:10px 12px;
+    border:1.5px solid var(--line); border-radius:11px; background:var(--panel);
+    color:var(--ink); -webkit-appearance:none}
+  .search input:focus{outline:none; border-color:var(--clay)}
+
+  .cats{flex-shrink:0; display:flex; gap:6px; overflow-x:auto; padding-bottom:8px;
+    scrollbar-width:none}
+  .cats::-webkit-scrollbar{display:none}
+  .cat{flex-shrink:0; font:inherit; font-size:12px; cursor:pointer;
+    border:1.5px solid var(--line); background:var(--panel); color:var(--mute);
+    border-radius:20px; padding:6px 13px; white-space:nowrap}
+  .cat.on{background:var(--go); border-color:transparent; color:#fff; font-weight:700}
+
+  .body{flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch}
+
+  /* The terminal grid: tiles, name over price, thumb-sized. Copies the
+     POS shape the girls already read, at a size that works one-handed
+     with a piece of pottery in the other. */
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(104px,1fr)); gap:7px}
+  .tile{background:var(--panel); border:1.5px solid var(--line); border-radius:12px;
+    padding:9px 9px 8px; min-height:74px; display:flex; flex-direction:column;
+    justify-content:space-between; cursor:pointer}
+  .tile .nm{font-size:12px; line-height:1.25; font-weight:600;
+    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden}
+  .tile .pr{font-size:15px; font-weight:800; margin-top:5px; font-variant-numeric:tabular-nums}
+  .tile .pr.free{font-size:11px; font-weight:600; color:var(--mute)}
+  .tile:active{border-color:var(--clay)}
+
+  .grouphead{font-size:11px; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--clay); font-weight:700; margin:12px 0 7px}
+  .grouphead:first-child{margin-top:0}
+  .empty{color:var(--mute); font-size:13px; text-align:center; padding:26px 12px; line-height:1.5}
+  .empty button{font:inherit; margin-top:12px; cursor:pointer; background:var(--go);
+    border:none; color:#fff; border-radius:11px; padding:11px 20px; font-weight:800}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>Prices</h1>
+  <div class="n" id="hdr">Loading…</div>
+  <a href="/admin/dashboard-local.html?go=home" title="Back to the Desk">✕</a>
+</div>
+
+<div class="notice">
+  Prices only — this takes no payment. Charge on Square as usual.
+</div>
+
+<div class="search"><input type="search" id="q" placeholder="Search drinks, bisque, anything"
+  autocapitalize="off" autocorrect="off"></div>
+
+<div class="cats" id="cats"></div>
+<div class="body" id="body"><div class="empty">Loading…</div></div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────
+// PRICES — the point-of-sale grid, as a lookup.
+//
+// [2 Aug] Daisy: emulate the terminals — drinks, bisque and so on. The
+// Square catalogue was already being fetched on every sync and thrown
+// away; square_items existed with the right columns and had never held
+// a row. This reads it back as the tile grid the girls already know.
+//
+// IT IS NOT A TILL, and the difference matters more than the
+// resemblance: a screen that looks like a POS but silently takes no
+// money is genuinely dangerous — someone taps through a sale, believes
+// the customer has been charged, and the money is never taken. Said
+// once at the top, plainly, and not repeated into wallpaper.
+//
+// So the useful job it DOES do is the one Square is slow at: standing
+// in the studio being asked "how much is that one?" and finding the
+// answer in a second without leaving what you were doing.
+// ─────────────────────────────────────────────────────────────────────
+
+const API = location.origin;
+const studioId = new URLSearchParams(location.search).get('studio')
+  || 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3';
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[<>&"]/g, c =>
+  ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+const money = n => '£' + n.toFixed(2);
+
+let groups = [], cat = 'all';
+
+async function load() {
+  try {
+    const r = await fetch(`${API}/api/pos/items?studioId=${studioId}`);
+    const d = await r.json();
+    groups = d.groups || [];
+    $('hdr').textContent = d.total ? `${d.total} items` : '';
+  } catch (e) {
+    $('body').innerHTML = '<div class="empty">Could not reach the server.</div>';
+    return;
+  }
+  if (!groups.length) {
+    $('cats').innerHTML = '';
+    $('body').innerHTML = `<div class="empty">
+      No prices stored yet.<br>Pull them from Square — takes a few seconds.
+      <br><button onclick="syncNow(this)">Get prices from Square</button></div>`;
+    return;
+  }
+  renderCats();
+  render();
+}
+
+async function syncNow(btn) {
+  btn.disabled = true; btn.textContent = 'Fetching from Square…';
+  try {
+    const r = await fetch(`${API}/api/catalogue/sync`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ studioId }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'sync failed');
+    load();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Get prices from Square';
+    alert('Could not fetch the catalogue — ' + e.message);
+  }
+}
+window.syncNow = syncNow;
+
+function renderCats() {
+  $('cats').innerHTML = `<button class="cat ${cat === 'all' ? 'on' : ''}"
+      onclick="setCat('all')">All</button>`
+    + groups.map(g => `<button class="cat ${cat === g.category ? 'on' : ''}"
+        onclick="setCat(${JSON.stringify(g.category).replace(/"/g, '&quot;')})">
+        ${esc(g.category)}</button>`).join('');
+}
+
+function setCat(c) { cat = c; renderCats(); render(); }
+window.setCat = setCat;
+
+function render() {
+  const q = ($('q').value || '').trim().toLowerCase();
+  const shown = groups
+    .filter(g => cat === 'all' || g.category === cat)
+    .map(g => ({ ...g, items: q ? g.items.filter(i => i.name.toLowerCase().includes(q)) : g.items }))
+    .filter(g => g.items.length);
+
+  if (!shown.length) {
+    $('body').innerHTML = `<div class="empty">Nothing matches${q ? ` “${esc(q)}”` : ''}.</div>`;
+    return;
+  }
+
+  $('body').innerHTML = shown.map(g => `
+    <div class="grouphead">${esc(g.category)} · ${g.items.length}</div>
+    <div class="grid">
+      ${g.items.map(i => `
+        <div class="tile">
+          <div class="nm">${esc(i.name)}</div>
+          ${i.price > 0
+            ? `<div class="pr">${money(i.price)}</div>`
+            // A zero price in Square usually means "varies" or "set at
+            // the till", not free — saying £0.00 would be a lie a
+            // customer could be quoted.
+            : `<div class="pr free">price set at till</div>`}
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+$('q').addEventListener('input', render);
+load();
+</script>
+</body>
+</html>
