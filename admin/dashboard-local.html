@@ -17257,6 +17257,49 @@ function _homeScreenWatchdog() {
     }
   }, 5000);
 }
+// ═══════════════════════════════════════════════════════════════════
+// THE BLANK-SCREEN WATCHDOG. [2 Aug]
+//
+// Daisy has now photographed an empty page after the splash three
+// separate times today, each with a different cause: applyShiftUI()
+// navigating nowhere, a login branch returning early, a stale session
+// resolving to no view. Each was fixed individually and another took
+// its place, because the real fault is structural — the boot sequence
+// hides every .view up front and then relies on exactly one of several
+// branches to reveal something. Any branch that returns without
+// showing a screen leaves a blank page, and there are more branches
+// than I can chase one at a time on a live tablet.
+//
+// So: stop chasing branches, and check the outcome instead. Three
+// seconds after boot, ask the only question that matters — is anything
+// actually on screen? If not, show the login. It cannot fix the cause,
+// but it means a blank screen is never where someone is left, whatever
+// new branch appears later.
+function _blankScreenWatchdog() {
+  setTimeout(() => {
+    try {
+      const splash = document.getElementById('splash-screen');
+      if (splash && getComputedStyle(splash).display !== 'none') return;  // still on the splash, fine
+      const modal = document.getElementById('shift-login-modal');
+      if (modal && getComputedStyle(modal).display !== 'none') return;    // login showing, fine
+      const desk = document.getElementById('kc-canvas');
+      if (desk && !desk.classList.contains('kc-away') && desk.offsetParent !== null) return;
+      const anyView = [...document.querySelectorAll('.view')]
+        .some(v => v.offsetParent !== null && getComputedStyle(v).display !== 'none');
+      if (anyView) return;
+
+      console.warn('[boot] nothing on screen after 3s — showing the login');
+      if (modal) {
+        modal.style.display = 'flex';
+        if (typeof showLoginScreen === 'function') showLoginScreen('picker');
+        if (typeof loadLoginNamePicker === 'function') loadLoginNamePicker();
+        if (typeof _pickerWatchdog === 'function') _pickerWatchdog();
+      }
+    } catch (e) { console.warn('[boot] watchdog failed', e); }
+  }, 3000);
+}
+window._blankScreenWatchdog = _blankScreenWatchdog;
+
 function _pickerWatchdog() {
   setTimeout(() => {
     const g = document.getElementById('login-name-grid');
@@ -25719,6 +25762,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // condition, checked here, so a genuinely active session skips
   // straight past the splash; an idle-flagged or expired one still
   // gets the tap, exactly as before.
+  _blankScreenWatchdog();
+
   (function autoSkipSplashIfSessionValid() {
     try {
       const forceRelogin = localStorage.getItem('klnk_force_relogin') === '1';
