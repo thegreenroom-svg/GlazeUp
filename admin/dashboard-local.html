@@ -4453,9 +4453,20 @@ function updateStaffName() {
 
           <div class="chart-container">
             <h3>Select Table</h3>
-            <select id="s2-table-select" onchange="loadTableOrders('s2')" style="width: 100%; padding: 10px; border: 1px solid var(--gu-border); border-radius: 6px; font-size: 13px;">
+            <select id="s2-table-select" onchange="loadTableOrders('s2')" style="display:none">
               <option value="">Loading open tables...</option>
             </select>
+            <!-- [2 Aug] Daisy: "ridiculously long — no scrolling, busy
+                 staff, like a restaurant." A native select opens a
+                 full-height scrolling picker over the whole screen: the
+                 worst control for someone standing with a customer
+                 waiting. The select stays, hidden, because three other
+                 places read its .value — the squares just set it and
+                 fire the same change event, so nothing downstream
+                 changes. -->
+            <div id="s2-table-squares" style="display:grid;
+              grid-template-columns:repeat(auto-fill,minmax(112px,1fr));
+              grid-auto-rows:56px;gap:8px;align-content:start"></div>
           </div>
 
           <div id="s2-order-panel" class="chart-container" style="display: none;">
@@ -31432,6 +31443,72 @@ async function submitDamageReport() {
 // Opens a booking tapped from the arriving strip. Deliberately the
 // same routing the booking picker uses, so a name tapped on the floor
 // screen behaves identically to a name tapped anywhere else.
+// Renders the hidden table <select>'s options as tappable squares.
+// Reads the select rather than re-fetching, so there is one source of
+// truth and the squares cannot drift from what is actually selectable.
+// Written with plain string concatenation rather than nested template
+// literals — the first attempt at this broke the whole file's parse.
+function _renderTableSquares() {
+  var sel = document.getElementById('s2-table-select');
+  var host = document.getElementById('s2-table-squares');
+  if (!sel || !host) return;
+  var opts = [];
+  for (var i = 0; i < sel.options.length; i++) {
+    if (sel.options[i].value) opts.push(sel.options[i]);
+  }
+  if (!opts.length) {
+    host.innerHTML = '<div style="grid-column:1/-1;color:#6f665b;font-size:13px;padding:10px">'
+      + 'No open tables.</div>';
+    return;
+  }
+  var html = '';
+  for (var j = 0; j < opts.length; j++) {
+    var o = opts[j];
+    var on = sel.value === o.value;
+    var txt = (o.textContent || '').trim();
+    var parts = txt.split(/\s{2,}|\u00a0{2,}/);
+    var name = (parts[0] || txt).replace(/</g, '&lt;');
+    var sub = (parts[1] || '').replace(/</g, '&lt;');
+    html += '<button type="button" data-v="' + o.value.replace(/"/g, '&quot;') + '"'
+      + ' style="border:none;border-radius:14px;cursor:pointer;font:inherit;text-align:left;'
+      + 'padding:0 12px;height:56px;display:flex;flex-direction:column;justify-content:center;'
+      + 'background:' + (on ? '#3E7C6A' : '#FFFDF9') + ';color:' + (on ? '#fff' : '#2B2724') + ';'
+      + 'box-shadow:0 1px 2px rgba(43,39,36,.06), 0 5px 14px -11px rgba(43,39,36,.3)">'
+      + '<span style="font-size:13px;font-weight:800;overflow:hidden;text-overflow:ellipsis;'
+      + 'white-space:nowrap">' + name + '</span>'
+      + (sub ? '<span style="font-size:11px;opacity:.75">' + sub + '</span>' : '')
+      + '</button>';
+  }
+  host.innerHTML = html;
+  var btns = host.querySelectorAll('button[data-v]');
+  for (var k = 0; k < btns.length; k++) {
+    btns[k].onclick = function () {
+      sel.value = this.getAttribute('data-v');
+      _renderTableSquares();
+      // Fire exactly what the dropdown would have fired, so every
+      // existing handler runs unchanged.
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+  }
+}
+window._renderTableSquares = _renderTableSquares;
+
+// Watching the select means every existing code path that fills it
+// keeps working untouched — no loader had to be found or rewritten.
+(function watchTableSelect() {
+  function start() {
+    var sel = document.getElementById('s2-table-select');
+    if (!sel) { setTimeout(start, 800); return; }
+    try {
+      new MutationObserver(function () { _renderTableSquares(); })
+        .observe(sel, { childList: true });
+    } catch (e) {}
+    _renderTableSquares();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+
 function _openArrivingBooking(ref) {
   if (!ref) return;
   try {
