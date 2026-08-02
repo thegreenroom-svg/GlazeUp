@@ -34749,6 +34749,14 @@ function playExtrasPing() {
 }
 
 function showExtrasToast(items) {
+  // [2 Aug] Daisy, seeing it pop up over a working screen: "get rid".
+  // It announced a £1 checkout extra over whatever someone was doing,
+  // with a Mute button that only silenced it until the next one. The
+  // information still exists on the dashboard for anyone who wants it;
+  // it just no longer interrupts. Left as an early return rather than
+  // deleted so the polling that feeds it stays intact and reversible.
+  return;
+  // eslint-disable-next-line no-unreachable
   const existing = document.getElementById('extras-alert-toast');
   if (existing) existing.remove();
 
