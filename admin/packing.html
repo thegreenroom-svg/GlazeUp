@@ -184,6 +184,9 @@
   </div>
   <div class="sheetbody" id="addBody"></div>
   <div class="sheetfoot">
+    <div id="tagNote" style="display:none;font-size:11.5px;color:var(--mute);
+      background:rgba(184,121,70,.1);border:1px solid rgba(184,121,70,.28);
+      border-radius:9px;padding:7px 10px;margin-bottom:7px;line-height:1.45"></div>
     <input type="text" id="addBooking" placeholder="Booking name" autocapitalize="words">
     <button class="primary" id="addSave">Save to booking</button>
   </div>
@@ -849,6 +852,33 @@ $('addBtn').onclick = () => pickImage(async raw => {
     if (!seen.length) { say('<b>No pottery spotted.</b> <em>Try again, closer in.</em>'); return; }
     addPhoto = raw;                 // kept so packing can show what to look for
     addItems = seen.map(s => s.description);
+    // [2 Aug] THE CHALKBOARD, FINALLY WIRED IN. The name is written on
+    // a board in the very photo just taken, so asking someone to type
+    // it was always redundant. Prefilled, never auto-saved: it stays an
+    // editable suggestion, because a misread name attaches a customer's
+    // pottery to the wrong person — far worse than typing six letters.
+    const nameField = $('addBooking'), note = $('tagNote');
+    if (nameField && lastTag && lastTag.name) {
+      nameField.value = lastTag.name;
+      const bits = [];
+      if (lastTag.collect) bits.push('collect ' + lastTag.collect);
+      if (lastTag.room) bits.push(lastTag.room);
+      if (lastTag.unpaid) bits.push('NOT PAID');
+      if (note) {
+        note.innerHTML = `Read from the chalkboard: <b>${esc(lastTag.name)}</b>`
+          + (bits.length ? ` · ${esc(bits.join(' · '))}` : '')
+          // Tag counts and the pieces actually on the table disagree
+          // often enough to be worth saying out loud — seen 23 Jul, a
+          // tag reading x2 with five pieces in front of it.
+          + (lastTag.count && lastTag.count !== seen.length
+              ? ` — <span style="color:var(--warn)">tag says ${lastTag.count}, ${seen.length} spotted</span>` : '')
+          + ` · check before saving`;
+        note.style.display = 'block';
+      }
+    } else {
+      if (note) note.style.display = 'none';
+      if (nameField) nameField.value = '';
+    }
     renderAdd();
     openSheet('addSheet');
   } catch (e) {

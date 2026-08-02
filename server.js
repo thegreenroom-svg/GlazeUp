@@ -8839,14 +8839,40 @@ app.post('/api/pieces/describe-group', async (req, res) => {
   if (!photoBase64) return res.status(400).json({ error: 'photoBase64 required' });
   try {
     const { data: out, usage } = await describeImage(photoBase64,
-      `${anyObject ? ANY_OBJECT : POTTERY_ONLY}\n\n${DESCRIBE_STYLE}\n\nList every distinct piece you can see.\n` +
-      `Reply with ONLY a JSON array, no prose and no markdown:\n` +
-      `[{"description":"green fish-shaped jug, glossy"},{"description":"white mug, blue stripes"}]\n` +
-      `If there is no pottery at all, reply []`);
+      `${anyObject ? ANY_OBJECT : POTTERY_ONLY}\n\n${DESCRIBE_STYLE}\n\nList every distinct piece you can see.\n\n` +
+      // [2 Aug] THE CHALKBOARD. Proven on 23 Jul against real studio
+      // photos — the tags read clearly at full size: customer name,
+      // paint date and time, collection date, room, piece count, and
+      // "NP" underlined for not paid. It was never wired in, so the
+      // Add flow still asks someone to type a name that is written on
+      // a board in the same photograph.
+      //
+      // Read here rather than in a second call: the tag is in the shot
+      // already, so it costs nothing extra.
+      //
+      // Tags get reused and wiped, so older chalk ghosts underneath —
+      // hence "the clearest, most recent writing" rather than
+      // everything legible, which would merge two customers' names.
+      `ALSO: these tables carry a small black chalkboard tag with white chalk handwriting. ` +
+      `If one is visible, read it. Tags are reused, so faint ghost writing from previous ` +
+      `bookings often shows underneath — report only the clearest, most recent writing.\n` +
+      `Typical layout: paint date and time along the top, the customer's NAME in the ` +
+      `middle, collection date bottom-left, room or table and a piece count like "x5" ` +
+      `bottom-right. "NP" usually means not paid.\n\n` +
+      `Reply with ONLY this JSON, no prose and no markdown:\n` +
+      `{"pieces":[{"description":"green fish-shaped jug, glossy"}],` +
+      `"tag":{"name":"Lindsay Moulin","collect":"23/7","room":"Table 1","count":5,"unpaid":false}}\n` +
+      `Omit "tag" entirely if no chalkboard is visible or the writing cannot be read. ` +
+      `Never guess a name — a wrong name attaches someone's pottery to the wrong person.`);
     const cost = await logUsage(req.body.studioId, 'describe-group', usage);
     let pieces = (Array.isArray(out) ? out : (out.pieces || [])).filter(p => p && p.description).slice(0, 40);
     pieces = await retryWeakDescriptions(photoBase64, pieces, req.body.studioId, 'describe-group', anyObject);
-    res.json({ pieces, cost });
+    // Only pass the tag on if it actually names someone — a tag with a
+    // count but no readable name is worse than none, because it looks
+    // like a successful read.
+    const tag = (out && out.tag && typeof out.tag.name === 'string' && out.tag.name.trim())
+      ? out.tag : null;
+    res.json({ pieces, tag, cost });
   } catch (e) {
     console.error('describe-group:', e.message);
     res.status(500).json({ error: e.message });
