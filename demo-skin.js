@@ -286,7 +286,14 @@
       // the whole point of this desk.'
 
     }
-    $('kc-index').innerHTML = picks.map(indexTile).join('');
+    // [2 Aug] Money parked — filter financial tiles at the source
+    // rather than hiding them with CSS. A tile that exists but is
+    // invisible still occupies a place in the grid's flow on some
+    // layouts, and still gets found by anything iterating the list.
+    const shown = (typeof window.MONEY_VISIBLE !== 'undefined' && !window.MONEY_VISIBLE)
+      ? picks.filter(p => !['takings', 'daily-digest', 'margins', 'revenue'].includes(p.id))
+      : picks;
+    $('kc-index').innerHTML = shown.map(indexTile).join('');
   };
 
   /* ── jump search over the real nav + real tables ─────────────── */

@@ -946,3 +946,35 @@ html.demo-skin .kc-tile-l {
   overflow: hidden; text-overflow: ellipsis;
   -webkit-line-clamp: none;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   MONEY PARKED. [2 Aug] Everything financial hidden behind one class,
+   set by money-parked.js. Nothing is deleted — the pages, endpoints
+   and the whole 2022-onwards history are untouched and still work if
+   opened directly. This only decides what is SHOWN.
+
+   Hidden by REGION rather than by hunting individual elements, so
+   anything financial added later is covered automatically instead of
+   needing to be remembered.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* The Desk's takings figure and its label. */
+html.kc-money-parked #kc-fig-money,
+html.kc-money-parked #kc-fig-money-l,
+html.kc-money-parked #kc-fig-money + span,
+/* The Money button in the dock. */
+html.kc-money-parked #kc-dock-money,
+/* The morning invoice-scanning nudge — costs, so it goes too. */
+html.kc-money-parked #kc-inv-nudge,
+html.kc-money-parked .kc-inv-nudge,
+/* Anything explicitly tagged financial anywhere in either app. */
+html.kc-money-parked [data-money],
+html.kc-money-parked .kc-money-only {
+  display: none !important;
+}
+
+/* The stat strip holds the money figure first; with it hidden the
+   remaining stats close up rather than leaving a gap where a number
+   used to be. */
+html.kc-money-parked .kc-strip { gap: 18px; }
