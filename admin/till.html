@@ -101,7 +101,6 @@
 
   .note{font-size:11px; color:var(--mute); text-align:center; padding-top:7px; line-height:1.45}
 </style>
-  <link rel="stylesheet" href="/css/kc-uniform.css">
 </head>
 <body>
 
@@ -292,5 +291,11 @@ window.addEventListener('popstate', () => {
 paintOrder();
 load();
 </script>
+  <!-- [2 Aug] LAST, deliberately. In <head> this lost to the 13
+       inline style blocks further down the document (later
+       rules beat earlier ones at equal specificity), so the design
+       system was linked but never actually winning. Loading it
+       here, after everything, is what makes it authoritative. -->
+  <link rel="stylesheet" href="/css/kc-uniform.css">
 </body>
 </html>

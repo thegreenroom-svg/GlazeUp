@@ -2177,7 +2177,6 @@
        own layout already wraps to viewport width (documented at the
        floor-plan render, ~13234: "works portrait and landscape") — this
        was fighting that, not protecting it. -->
-  <link rel="stylesheet" href="/css/kc-uniform.css">
 </head>
 <body>
 <!-- ═══════════════════════════════════════════════════════════
@@ -35941,5 +35940,11 @@ h1,h2,h3,h4,
     </div>
 
   </div>
+  <!-- [2 Aug] LAST, deliberately. In <head> this lost to the 13
+       inline style blocks further down the document (later
+       rules beat earlier ones at equal specificity), so the design
+       system was linked but never actually winning. Loading it
+       here, after everything, is what makes it authoritative. -->
+  <link rel="stylesheet" href="/css/kc-uniform.css">
 </body>
 </html>

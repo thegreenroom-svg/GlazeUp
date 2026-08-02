@@ -68,7 +68,6 @@
   .empty button{font:inherit; margin-top:12px; cursor:pointer; background:var(--go);
     border:none; color:#fff; border-radius:11px; padding:11px 20px; font-weight:800}
 </style>
-  <link rel="stylesheet" href="/css/kc-uniform.css">
 </head>
 <body>
 
@@ -198,5 +197,11 @@ function render() {
 $('q').addEventListener('input', render);
 load();
 </script>
+  <!-- [2 Aug] LAST, deliberately. In <head> this lost to the 13
+       inline style blocks further down the document (later
+       rules beat earlier ones at equal specificity), so the design
+       system was linked but never actually winning. Loading it
+       here, after everything, is what makes it authoritative. -->
+  <link rel="stylesheet" href="/css/kc-uniform.css">
 </body>
 </html>

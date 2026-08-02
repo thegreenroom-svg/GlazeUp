@@ -66,7 +66,6 @@
   .dock a.on{color:#F4ECE0; background:rgba(244,236,224,.1)}
   .empty{color:var(--mute); font-size:13px; text-align:center; padding:20px}
 </style>
-  <link rel="stylesheet" href="/css/kc-uniform.css">
 </head>
 <body>
 
@@ -216,5 +215,11 @@ $('filter').addEventListener('input', render);
 
 load();
 </script>
+  <!-- [2 Aug] LAST, deliberately. In <head> this lost to the 13
+       inline style blocks further down the document (later
+       rules beat earlier ones at equal specificity), so the design
+       system was linked but never actually winning. Loading it
+       here, after everything, is what makes it authoritative. -->
+  <link rel="stylesheet" href="/css/kc-uniform.css">
 </body>
 </html>

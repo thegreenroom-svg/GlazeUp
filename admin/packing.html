@@ -115,7 +115,6 @@
     border-radius:11px; padding:12px; font:inherit; font-size:15px; width:100%}
   .mut{font-size:11.5px; color:var(--mute); line-height:1.5}
 </style>
-  <link rel="stylesheet" href="/css/kc-uniform.css">
 </head>
 <body>
 
@@ -1118,5 +1117,11 @@ $('infoBtn').onclick = (e) => { e.preventDefault(); loadCost(); loadBuild(); ope
 loadCost();
 load();
 </script>
+  <!-- [2 Aug] LAST, deliberately. In <head> this lost to the 13
+       inline style blocks further down the document (later
+       rules beat earlier ones at equal specificity), so the design
+       system was linked but never actually winning. Loading it
+       here, after everything, is what makes it authoritative. -->
+  <link rel="stylesheet" href="/css/kc-uniform.css">
 </body>
 </html>

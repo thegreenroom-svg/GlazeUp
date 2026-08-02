@@ -267,12 +267,20 @@ function checkUniform(name, html) {
     fail(`${name}: does not load kc-uniform.css — this page will not match the others`);
     return;
   }
-  // It must load LAST, or per-page CSS below it wins and the page
-  // quietly looks different despite being linked.
+  // It must come after EVERY inline <style> block, not just after the
+  // other <link>s. [2 Aug] The first version only checked the latter
+  // and passed clean while the system was being overridden by 13
+  // inline blocks further down the page — the check said uniform, the
+  // tablet said otherwise, and the tablet was right.
   const uni = html.lastIndexOf('kc-uniform.css');
+  const stylesAfter = (html.slice(uni).match(/<style/g) || []).length;
+  if (stylesAfter > 0) {
+    fail(`${name}: ${stylesAfter} inline <style> block(s) come AFTER kc-uniform.css — `
+       + `later rules win, so the design system is linked but not applied`);
+  }
   const lastCss = html.lastIndexOf('.css"');
   if (lastCss > uni + 40) {
-    warn(`${name}: kc-uniform.css is not the last stylesheet — later CSS may override the system`);
+    fail(`${name}: another stylesheet loads after kc-uniform.css`);
   }
 }
 
