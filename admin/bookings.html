@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Bookings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FFF9F0; --panel:#FFFDF9; --line:rgba(43,39,36,.14);
+    --ink:#2B2724; --mute:#6f665b; --go:#3E7C6A; --clay:#B87946;
+    --lounge:#3E7C6A; --studio:#B87946; --vault:#6B5B95;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{height:100%; overflow:hidden}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.4 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    display:flex; flex-direction:column;
+    padding:max(10px,env(safe-area-inset-top)) 11px calc(10px + env(safe-area-inset-bottom));
+    -webkit-text-size-adjust:100%}
+
+  .top{display:flex; align-items:baseline; gap:10px; flex-shrink:0; padding:2px 2px 8px}
+  .top h1{font-family:Caveat,serif; font-size:27px; margin:0; line-height:1}
+  .top .n{font-size:12px; color:var(--mute); flex:1; min-width:0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .top a{color:var(--mute); font-size:19px; text-decoration:none; padding:2px 6px}
+
+  /* Square's day navigator: arrows either side of the date, range
+     toggle beside it. Kept because it is the bit the girls already
+     reach for without looking. */
+  .daybar{flex-shrink:0; display:flex; align-items:center; gap:8px; margin-bottom:8px}
+  .daybar button{font:inherit; cursor:pointer; background:var(--panel);
+    border:1.5px solid var(--line); border-radius:10px; color:var(--ink);
+    padding:8px 12px; font-size:15px; line-height:1}
+  .daybar .date{flex:1; text-align:center; font-weight:800; font-size:14px}
+  .daybar .date small{display:block; font-weight:400; font-size:11px; color:var(--mute); margin-top:1px}
+
+  .views{flex-shrink:0; display:flex; border:1.5px solid var(--line);
+    border-radius:11px; overflow:hidden; margin-bottom:9px; background:var(--panel)}
+  .views button{flex:1; font:inherit; font-size:12px; cursor:pointer; border:none;
+    border-right:1.5px solid var(--line); background:transparent; color:var(--mute);
+    padding:8px 4px}
+  .views button:last-child{border-right:none}
+  .views button.on{background:var(--go); color:#fff; font-weight:700}
+
+  .body{flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch}
+
+  /* DAY VIEW — a time grid, appointments as blocks against the hours,
+     which is how Square draws it and how a session reads at a glance. */
+  .grid{position:relative}
+  .hour{display:flex; border-top:1px solid var(--line); min-height:52px}
+  .hour .lab{width:52px; flex-shrink:0; font-size:10.5px; color:var(--mute);
+    padding:3px 6px 0 0; text-align:right; font-variant-numeric:tabular-nums}
+  .hour .slot{flex:1; min-width:0; padding:3px 0 3px 4px; display:flex; flex-direction:column; gap:3px}
+
+  .appt{border-radius:9px; padding:7px 9px; cursor:pointer; color:#fff;
+    border-left:4px solid rgba(0,0,0,.18)}
+  .appt .nm{font-weight:800; font-size:13px; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap}
+  .appt .meta{font-size:11px; opacity:.92; margin-top:1px}
+  .appt.lounge{background:var(--lounge)}
+  .appt.studio{background:var(--studio)}
+  .appt.vault{background:var(--vault)}
+  .appt.other{background:#6f665b}
+
+  /* LIST VIEW — the same data as rows, for scanning rather than timing. */
+  .row{display:flex; gap:10px; align-items:center; padding:10px 2px;
+    border-bottom:1px solid var(--line); cursor:pointer}
+  .row .t{width:52px; flex-shrink:0; font-weight:800; font-size:13px;
+    font-variant-numeric:tabular-nums}
+  .row .mid{flex:1; min-width:0}
+  .row .mid .nm{font-weight:700; font-size:14px; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap}
+  .row .mid .meta{font-size:11.5px; color:var(--mute); margin-top:1px}
+  .row .dot{width:10px; height:10px; border-radius:50%; flex-shrink:0}
+
+  .empty{color:var(--mute); font-size:13px; text-align:center; padding:26px 12px}
+
+  /* DETAIL — Square's order: who, when, where, then notes. */
+  .sheet{display:none; position:fixed; inset:0; z-index:60; background:var(--bg);
+    flex-direction:column; padding:max(12px,env(safe-area-inset-top)) 13px calc(13px + env(safe-area-inset-bottom))}
+  .sheet.on{display:flex}
+  .sheethead{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:10px}
+  .sheethead .t{font-family:Caveat,serif; font-size:25px; line-height:1.1}
+  .sheethead button{font:inherit; cursor:pointer; background:var(--panel);
+    border:1.5px solid var(--line); border-radius:10px; padding:9px 14px; color:var(--ink)}
+  .sheetbody{flex:1; overflow-y:auto}
+  .fld{padding:10px 0; border-bottom:1px solid var(--line)}
+  .fld .k{font-size:10.5px; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--clay); font-weight:700}
+  .fld .v{font-size:15px; margin-top:2px}
+  .fld .v a{color:var(--go)}
+  .pill{display:inline-block; font-size:11px; font-weight:700; padding:3px 9px;
+    border-radius:20px; background:rgba(62,124,106,.13); color:var(--go)}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>Bookings</h1>
+  <div class="n" id="hdr">Loading…</div>
+  <a href="/admin/dashboard-local.html?go=home" title="Back to the Desk">✕</a>
+</div>
+
+<div class="daybar">
+  <button id="prev" aria-label="Previous day">‹</button>
+  <div class="date" id="dateLabel">—</div>
+  <button id="next" aria-label="Next day">›</button>
+  <button id="today">Today</button>
+</div>
+
+<div class="views">
+  <button id="vDay" class="on" onclick="setView('day')">Day</button>
+  <button id="vList" onclick="setView('list')">List</button>
+</div>
+
+<div class="body" id="body"><div class="empty">Loading…</div></div>
+
+<div class="sheet" id="detail">
+  <div class="sheethead">
+    <div><div class="t" id="dName">Booking</div>
+      <div style="font-size:12px;color:var(--mute)" id="dWhen"></div></div>
+    <button onclick="closeDetail()">Close</button>
+  </div>
+  <div class="sheetbody" id="dBody"></div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────
+// BOOKINGS — Square Appointments' shape, the studio's own skin.
+//
+// [2 Aug] Daisy: emulate the Square pages the girls already see on the
+// iPads, so there is nothing new to learn. What is copied is the
+// STRUCTURE, because that is what muscle memory actually is: the day
+// navigator with arrows either side of the date, a Day/List range
+// toggle, appointments as coloured blocks against an hour grid, and a
+// detail view ordered who → when → where → notes.
+//
+// What is deliberately NOT copied is Square's colouring. Both apps run
+// on the same iPad, and if they look identical someone will act on the
+// wrong one — a confusion that costs more than the familiarity gains.
+// Colour here means the ROOM, which is information Square's own colour
+// coding does not carry and the girls need constantly.
+// ─────────────────────────────────────────────────────────────────────
+
+const API = location.origin;
+const studioId = new URLSearchParams(location.search).get('studio')
+  || 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3';
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[<>&"]/g, c =>
+  ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
+let day = new Date(); day.setHours(0, 0, 0, 0);
+let view = 'day';
+let bookings = [];
+
+const iso = d => {
+  const x = new Date(d);
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+};
+const hhmm = d => new Date(d).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+function roomClass(b) {
+  const r = (b.room || b.space_name || '').toLowerCase();
+  if (r.includes('lounge')) return 'lounge';
+  if (r.includes('vault')) return 'vault';
+  if (r.includes('studio') || r.includes('main')) return 'studio';
+  return 'other';
+}
+
+async function load() {
+  $('dateLabel').innerHTML = day.toLocaleDateString('en-GB',
+    { weekday: 'long', day: 'numeric', month: 'long' })
+    + `<small>${iso(day) === iso(new Date()) ? 'today' : ''}</small>`;
+  $('body').innerHTML = '<div class="empty">Loading…</div>';
+  try {
+    const r = await fetch(`${API}/api/bookings/day?studioId=${studioId}&date=${iso(day)}`);
+    const d = await r.json();
+    bookings = d.bookings || [];
+    // Most Square bookings arrive without party_size set, so a covers
+    // total of 0 would read as "nobody is coming" when it actually
+    // means "not recorded". Only shown when there is a real number.
+    $('hdr').textContent = bookings.length
+      ? `${bookings.length} booking${bookings.length === 1 ? '' : 's'}`
+        + (d.covers ? ` · ${d.covers} cover${d.covers === 1 ? '' : 's'}` : '')
+      : '';
+  } catch (e) {
+    $('body').innerHTML = '<div class="empty">Could not reach the server.</div>';
+    return;
+  }
+  render();
+}
+
+function render() {
+  if (!bookings.length) {
+    $('body').innerHTML = '<div class="empty">Nothing booked this day.</div>';
+    return;
+  }
+  $('body').innerHTML = view === 'day' ? dayView() : listView();
+}
+
+function dayView() {
+  // Hours bounded by what is actually booked, so the studio's real day
+  // fills the screen instead of a fixed 00:00-23:00 grid mostly empty.
+  const starts = bookings.map(b => new Date(b.session_start).getHours());
+  const ends = bookings.map(b => new Date(b.session_end || b.session_start).getHours() + 1);
+  const from = Math.max(0, Math.min(...starts) - 1);
+  const to = Math.min(24, Math.max(...ends) + 1);
+
+  let html = '<div class="grid">';
+  for (let h = from; h < to; h++) {
+    const inHour = bookings.filter(b => new Date(b.session_start).getHours() === h);
+    html += `<div class="hour"><div class="lab">${String(h).padStart(2, '0')}:00</div><div class="slot">`;
+    for (const b of inHour) {
+      html += `<div class="appt ${roomClass(b)}" onclick="openDetail('${esc(b.id)}')">
+        <div class="nm">${esc(b.customer_name || 'No name')}</div>
+        <div class="meta">${hhmm(b.session_start)}${b.session_end ? '–' + hhmm(b.session_end) : ''}${
+          b.party_size ? ' · ' + b.party_size + (b.party_size === 1 ? ' cover' : ' covers') : ''}${
+          b.room ? ' · ' + esc(b.room) : ''}</div>
+      </div>`;
+    }
+    html += '</div></div>';
+  }
+  return html + '</div>';
+}
+
+function listView() {
+  return bookings.map(b => `
+    <div class="row" onclick="openDetail('${esc(b.id)}')">
+      <div class="t">${hhmm(b.session_start)}</div>
+      <div class="mid">
+        <div class="nm">${esc(b.customer_name || 'No name')}</div>
+        <div class="meta">${b.party_size ? b.party_size + (b.party_size === 1 ? ' cover · ' : ' covers · ') : ''}${
+          esc(b.room || b.space_name || 'Room not set')}${b.table_number ? ' · Table ' + esc(b.table_number) : ''}</div>
+      </div>
+      <div class="dot" style="background:var(--${roomClass(b) === 'other' ? 'mute' : roomClass(b)})"></div>
+    </div>`).join('');
+}
+
+function openDetail(id) {
+  const b = bookings.find(x => String(x.id) === String(id));
+  if (!b) return;
+  $('dName').textContent = b.customer_name || 'No name';
+  $('dWhen').textContent = day.toLocaleDateString('en-GB',
+    { weekday: 'long', day: 'numeric', month: 'long' })
+    + ' · ' + hhmm(b.session_start) + (b.session_end ? '–' + hhmm(b.session_end) : '');
+
+  // Square's own order: who, when, where, then anything extra. Fields
+  // with nothing in them are left out rather than shown empty — a
+  // blank row reads as missing data when it usually just isn't set.
+  const f = [];
+  const add = (k, v) => { if (v) f.push(`<div class="fld"><div class="k">${k}</div><div class="v">${v}</div></div>`); };
+  add('Party size', b.party_size ? `${b.party_size} ${b.party_size === 1 ? 'person' : 'people'}` : '');
+  add('Room', esc(b.room || b.space_name || ''));
+  add('Table', b.table_number ? esc(b.table_number) : '');
+  add('Booking type', esc(b.booking_type || ''));
+  add('Phone', b.customer_phone ? `<a href="tel:${esc(b.customer_phone)}">${esc(b.customer_phone)}</a>` : '');
+  add('Email', b.customer_email ? `<a href="mailto:${esc(b.customer_email)}">${esc(b.customer_email)}</a>` : '');
+  add('Reference', esc(b.booking_code || ''));
+  add('Status', b.status ? `<span class="pill">${esc(b.status)}</span>` : '');
+  add('Notes', esc(b.notes || ''));
+  add('From Square', b.synced_from_square ? new Date(b.synced_from_square).toLocaleString('en-GB') : '');
+  $('dBody').innerHTML = f.join('') || '<div class="empty">Nothing else recorded.</div>';
+
+  $('detail').classList.add('on');
+  try { history.pushState({ sheet: 1 }, ''); } catch (e) {}
+}
+function closeDetail() {
+  $('detail').classList.remove('on');
+  try { if (history.state && history.state.sheet) history.back(); } catch (e) {}
+}
+window.openDetail = openDetail;
+window.closeDetail = closeDetail;
+
+// Back gesture closes the detail rather than leaving the page.
+window.addEventListener('popstate', () => {
+  if ($('detail').classList.contains('on')) $('detail').classList.remove('on');
+});
+$('detail').addEventListener('click', e => { if (e.target === $('detail')) closeDetail(); });
+
+function setView(v) {
+  view = v;
+  $('vDay').classList.toggle('on', v === 'day');
+  $('vList').classList.toggle('on', v === 'list');
+  render();
+}
+window.setView = setView;
+
+$('prev').onclick = () => { day.setDate(day.getDate() - 1); load(); };
+$('next').onclick = () => { day.setDate(day.getDate() + 1); load(); };
+$('today').onclick = () => { day = new Date(); day.setHours(0, 0, 0, 0); load(); };
+
+load();
+</script>
+</body>
+</html>

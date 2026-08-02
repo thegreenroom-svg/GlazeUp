@@ -3204,6 +3204,41 @@ app.post('/api/bookings/:bookingCode/stage', async (req, res) => {
  * GET /api/bookings/upcoming?studioId=&days=7
  * List bookings from today through the next N days (default 7), for the look-ahead view
  */
+// GET /api/bookings/day?studioId&date=YYYY-MM-DD
+//
+// [2 Aug] Any single day, forwards or back. /upcoming only ever counts
+// forward from today, which cannot drive a calendar someone navigates
+// — and the whole point of emulating the Square Appointments day view
+// is that the girls already move between dates without thinking.
+app.get('/api/bookings/day', async (req, res) => {
+  const { studioId, date } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const day = date ? new Date(date + 'T00:00:00') : new Date();
+    if (isNaN(day)) return res.status(400).json({ error: 'bad date' });
+    const start = new Date(day); start.setHours(0, 0, 0, 0);
+    const end = new Date(start); end.setDate(end.getDate() + 1);
+
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('studio_id', studioId)
+      .gte('session_start', start.toISOString())
+      .lt('session_start', end.toISOString())
+      .order('session_start', { ascending: true });
+    if (error) throw error;
+
+    res.json({
+      date: start.toISOString().slice(0, 10),
+      bookings: data || [],
+      covers: (data || []).reduce((n, b) => n + (b.party_size || 0), 0),
+    });
+  } catch (e) {
+    console.error('bookings/day:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/api/bookings/upcoming', async (req, res) => {
   const { studioId } = req.query;
   const days = parseInt(req.query.days) || 7;

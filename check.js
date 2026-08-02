@@ -15,7 +15,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = __dirname;
-const HTML = ['admin/dashboard-local.html', 'admin/packing.html', 'admin/takings.html', 'admin/breakdown.html',
+const HTML = ['admin/dashboard-local.html', 'admin/packing.html', 'admin/takings.html', 'admin/breakdown.html', 'admin/bookings.html',
               'admin/match-test.html', 'app/index.html'];
 const JS = ['server.js', 'demo-skin.js', 'shelf-matcher.js'];
 
