@@ -299,3 +299,60 @@ body > .top {
 .view h2, .view h3 {
   font-size:15px !important; margin:0 0 8px !important;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   MODALS ARE NOT PAGES. [2 Aug]
+
+   The Find Booking modal came out squashed: its header wrapped into a
+   narrow column, the search field was cut off and the results grid
+   collapsed to a single column.
+
+   Cause — the legacy-conversion rules above match by id suffix
+   ([id$="-results"], [id$="-list"]) and do not care WHERE the element
+   is. #booking-search-results sits inside a fixed overlay with its own
+   flex layout, so forcing a grid, fixed row heights and box-sizing
+   onto it fought that layout and the modal lost.
+
+   Converting a page's list is right. Reaching inside an overlay and
+   re-laying-out its internals is not — the overlay already knows its
+   own shape. So the conversion stops at the modal boundary, and the
+   modals get sized properly instead.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Undo the page-list conversion inside any overlay. */
+#booking-search-modal [id$="-results"],
+#booking-search-modal [id$="-list"],
+#shift-login-modal [id$="-list"],
+.klnk-glazed-modal [id$="-list"],
+.klnk-glazed-modal [id$="-results"] {
+  display:block !important;
+  grid-template-columns:none !important;
+  grid-auto-rows:auto !important;
+}
+#booking-search-modal [id$="-results"] > div,
+#booking-search-modal [id$="-list"] > div,
+.klnk-glazed-modal [id$="-list"] > div,
+.klnk-glazed-modal [id$="-results"] > div {
+  height:auto !important; min-height:0 !important; max-height:none !important;
+  display:block !important;
+}
+
+/* And give the search modal a shape of its own rather than letting it
+   be squeezed by whatever is inside it. */
+#booking-search-modal {
+  align-items:center !important; justify-content:center !important;
+  padding:16px !important;
+}
+#booking-search-modal > div {
+  width:100% !important; max-width:560px !important;
+  max-height:86vh !important;
+  display:flex !important; flex-direction:column !important;
+  border-radius:16px !important;
+}
+#booking-search-modal .kc-u-grid,
+#booking-search-modal #booking-search-results > div[style*="grid"] {
+  display:grid !important;
+  grid-template-columns:repeat(auto-fill,minmax(148px,1fr)) !important;
+  gap:8px !important;
+}
