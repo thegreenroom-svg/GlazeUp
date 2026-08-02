@@ -284,6 +284,27 @@ function checkUniform(name, html) {
   }
 }
 
+// ── 8. THE LOGIN MUST NOT BREAK AGAIN ───────────────────────────────
+// [2 Aug] Daisy: "not suddenly ending up on login again like it was."
+// The login broke four separate times today, each from a different
+// well-meaning change, and each time it took a deploy and a screenshot
+// to find out. These are the safeguards that make it work; any future
+// edit that removes one fails the build instead of failing in a studio.
+function checkLogin(html) {
+  const need = [
+    ['SHIFT_PIN_LOGIN_ENABLED = true', 'PIN login is switched off'],
+    ['_hasLanded && (currentShiftStaff || previousSession)',
+      'the _hasLanded guard is unconditional again — it will block the picker'],
+    ['_blankScreenWatchdog', 'the blank-screen watchdog is gone'],
+    ["if (!currentShiftStaff) { forceFreshLogin(); return; }",
+      'logout does nothing when logged out — the one state it is needed in'],
+    ["get('reset') === '1'", 'the ?reset=1 escape hatch is gone'],
+  ];
+  for (const [needle, why] of need) {
+    if (!html.includes(needle)) fail(`dashboard: LOGIN SAFEGUARD LOST — ${why}`);
+  }
+}
+
 // ── RUN ─────────────────────────────────────────────────────────────
 console.log('Checking every app…\n');
 
@@ -316,6 +337,7 @@ for (const f of HTML) {
   checkNames(f, code);
   checkEndpoints(f, code, routes);
   checkUniform(f, html);
+  if (f === 'admin/dashboard-local.html') checkLogin(html);
   const so = (html.match(/<style[^>]*>/g) || []).length;
   const sc = (html.match(/<\/style>/g) || []).length;
   if (so !== sc) fail(`${f}: ${so} <style> vs ${sc} </style>`);
