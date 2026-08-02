@@ -618,5 +618,13 @@ renderItems();
        system was linked but never actually winning. Loading it
        here, after everything, is what makes it authoritative. -->
   <link rel="stylesheet" href="/css/kc-uniform.css">
+  <!-- [2 Aug] This page had no route home at all — reachable and not
+       leavable. Caught by check.js the moment "every page must have a
+       way back" became a build requirement rather than an intention. -->
+  <a href="/admin/dashboard-local.html?go=home"
+     style="position:fixed;top:max(10px,env(safe-area-inset-top));right:10px;z-index:9999;
+     width:40px;height:40px;display:flex;align-items:center;justify-content:center;
+     border-radius:11px;background:#FFFDF9;border:1.5px solid rgba(43,39,36,.14);
+     color:#2B2724;font-size:17px;text-decoration:none">&times;</a>
 </body>
 </html>

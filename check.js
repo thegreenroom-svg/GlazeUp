@@ -263,6 +263,17 @@ function checkDataReads(server) {
 // rather than something she finds on a tablet a week later.
 function checkUniform(name, html) {
   if (/splash|login/i.test(name)) return;
+  // [2 Aug] Daisy: "need to get back from everywhere as well." Every
+  // standalone page must have a route home. A page you can reach and
+  // not leave is a trap, and this app has produced several today —
+  // the blank screen, the dead Logout, the stuck splash. Making it a
+  // build requirement is cheaper than finding the next one on a
+  // tablet.
+  if (name.startsWith('admin/') && !name.includes('dashboard-local')) {
+    if (!/dashboard-local\.html/.test(html)) {
+      fail(`${name}: no way back to the Desk — a page you cannot leave is a trap`);
+    }
+  }
   if (!html.includes('kc-uniform.css')) {
     fail(`${name}: does not load kc-uniform.css — this page will not match the others`);
     return;

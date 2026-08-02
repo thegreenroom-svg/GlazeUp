@@ -376,3 +376,49 @@ body > .top {
 /* With the row gone the studio name has the header to itself and stops
    being truncated to three characters. */
 .admin-header-left, .admin-header-brand { flex:1 !important; min-width:0 !important; }
+
+
+/* ── THE DOCK, PINNED — AND A WAY BACK FROM EVERYWHERE ──────────────
+   [2 Aug] On Takings the dock rendered in the MIDDLE of the page,
+   between the chart and the button below it, rather than at the
+   bottom. Cause: on the standalone pages it is an ordinary flex child
+   in a column, so it sits wherever the content happens to end. On a
+   short page that is the middle of the screen.
+
+   To be clear about what was removed earlier and what was not: the
+   emoji header row is gone — that was the second, competing
+   navigation. The dock stays. It is the single navigation, and it now
+   behaves like one on every page rather than only on the Desk.
+
+   Pinned to the bottom, above the safe area, on every page that has
+   one. Content gets padding so nothing hides behind it. */
+.dock {
+  position:fixed !important;
+  left:10px !important; right:10px !important;
+  bottom:calc(8px + env(safe-area-inset-bottom)) !important;
+  z-index:900 !important;
+  margin:0 !important;
+  box-shadow:0 6px 24px -10px rgba(43,39,36,.5) !important;
+}
+/* Room for it, so the last row of content is never trapped underneath. */
+body:has(.dock) .body,
+body:has(.dock) .sheetbody,
+body:has(.dock) .main {
+  padding-bottom:78px !important;
+}
+
+/* A WAY BACK FROM EVERYWHERE. Every standalone page's ✕ is the exit,
+   and it must be reachable and obvious rather than a faint character
+   in a corner. Same size and position on every page, so it becomes
+   somewhere the hand goes without looking. */
+.top a[href*="dashboard-local"], .top a[title*="Back"] {
+  flex-shrink:0 !important;
+  min-width:40px !important; height:40px !important;
+  display:flex !important; align-items:center !important; justify-content:center !important;
+  border-radius:11px !important;
+  background:var(--u-card) !important;
+  border:1.5px solid var(--u-line) !important;
+  color:var(--u-ink) !important;
+  font-size:17px !important;
+  text-decoration:none !important;
+}
