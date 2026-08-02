@@ -207,3 +207,95 @@ body > .top {
 .admin-header-left, .admin-header-brand {
   flex-shrink:0 !important; min-width:auto !important;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   LEGACY SCREENS, CONVERTED IN PLACE. [2 Aug]
+
+   Daisy: "do it all now, legacy."
+
+   The legacy screens are dozens of hand-built lists, cards and rows
+   written over ten months, each with its own inline styling. Rewriting
+   them one by one is weeks of work and every rewrite risks breaking a
+   flow that currently functions.
+
+   So: convert by SHAPE, not by screen. Everything that behaves like a
+   row — a bordered block in a list, a card with a border-radius, a
+   result row — is given the one square treatment. A screen written
+   next month gets it too, without anyone remembering.
+
+   Where this cannot go: it changes how things LOOK, not how they work.
+   A screen that asks someone to type still asks them to type. That
+   part is genuinely per-screen work, and pretending otherwise would be
+   the kind of "done" that gets found out on a tablet.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Any list container gets the standard grid. */
+[id$="-list"], [id$="-results"], [id$="-bookings"],
+.kc-list, .gh-list, .dp-list {
+  display:grid !important;
+  grid-template-columns:repeat(auto-fill,minmax(var(--u-sq-min),1fr)) !important;
+  grid-auto-rows:var(--u-sq-h) !important;
+  align-content:start !important;
+  gap:8px !important;
+  padding:0 !important;
+}
+
+/* Direct children of those containers become squares — whatever tag
+   or inline styling they were written with. */
+[id$="-list"] > div,
+[id$="-results"] > div,
+[id$="-bookings"] > div,
+.kc-list > div, .gh-list > div, .dp-list > div {
+  height:var(--u-sq-h) !important;
+  min-height:var(--u-sq-h) !important;
+  max-height:var(--u-sq-h) !important;
+  margin:0 !important;
+  padding:0 12px !important;
+  border:none !important;
+  border-radius:var(--u-radius) !important;
+  background:var(--u-card) !important;
+  box-shadow:0 1px 2px rgba(43,39,36,.06), 0 5px 14px -11px rgba(43,39,36,.3) !important;
+  display:flex !important;
+  align-items:center !important;
+  gap:9px !important;
+  overflow:hidden !important;
+  box-sizing:border-box !important;
+}
+
+/* Inside a converted row, keep the first line and let the rest fall
+   away rather than overflowing the square. A row that was three lines
+   of detail becomes a name you can tap — which is the point. */
+[id$="-list"] > div > div,
+[id$="-results"] > div > div,
+[id$="-bookings"] > div > div {
+  min-width:0 !important;
+  overflow:hidden !important; text-overflow:ellipsis !important;
+  white-space:nowrap !important;
+  font-size:13px !important;
+  margin:0 !important;
+}
+[id$="-list"] > div > div:nth-child(n+3),
+[id$="-results"] > div > div:nth-child(n+3),
+[id$="-bookings"] > div > div:nth-child(n+3) { display:none !important; }
+
+/* Empty states are prose, not squares — they must not be forced into
+   a 56px box or the message gets cut in half. */
+[id$="-list"] > p, [id$="-results"] > p, [id$="-bookings"] > p,
+[id$="-list"] > .empty, [id$="-results"] > .empty {
+  grid-column:1/-1 !important;
+  height:auto !important; max-height:none !important;
+  background:none !important; box-shadow:none !important;
+  text-align:center !important; padding:20px !important;
+}
+
+/* Long prose blocks on legacy screens — the "Manage your team, set
+   default duties per role..." paragraphs — shrink rather than eating
+   half the screen before anything tappable appears. */
+.view p, .chart-container p {
+  font-size:12.5px !important; line-height:1.5 !important;
+  color:var(--u-mute) !important; margin:0 0 10px !important;
+}
+.view h2, .view h3 {
+  font-size:15px !important; margin:0 0 8px !important;
+}
