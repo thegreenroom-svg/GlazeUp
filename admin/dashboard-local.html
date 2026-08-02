@@ -18831,7 +18831,24 @@ function _renderArrivals(unseated) {
     const here = !!b.arrived_at;
     // Paying separately? Staff want to know BEFORE they start totting up.
     const split = b.payment_split === 'separately' ? '½' : '';
-    return `<button class="glaze-tile" onclick="_startSeating('${b.booking_code}')"
+    // [2 Aug] Daisy: "the names don't click through to bookings."
+    //
+    // Two faults. First, this only ever started SEATING — it put the
+    // screen into "now tap a table" mode rather than opening the
+    // booking, which is what tapping a customer's name plainly ought
+    // to do. Second, and why it often did nothing at all: it passed
+    // b.booking_code, and most Square-synced bookings here have no
+    // code. The handler received the string "undefined", found no
+    // match, and failed silently — a tap that looks broken because
+    // nothing whatsoever happens.
+    //
+    // Now it opens the booking, falling back to the customer name when
+    // there is no code, which is the same identifier the rest of the
+    // packing flow already uses. Seating is still reachable from inside
+    // the booking, where it belongs — it is a thing you do TO a
+    // booking, not instead of opening one.
+    const ref = String(b.booking_code || b.customer_name || '').replace(/'/g, "");
+    return `<button class="glaze-tile" onclick="_openArrivingBooking('${ref}')"
       style="background:${on?'#2B2724':here?'rgba(76,175,80,0.15)':'rgba(43,39,36,0.07)'};
       color:${on?'#fff':'#2B2724'};
       border:1px ${on?'solid #2B2724':here?'solid rgba(76,175,80,0.5)':'dashed rgba(43,39,36,0.25)'};
@@ -31405,6 +31422,22 @@ async function submitDamageReport() {
 // caller was going to make someone type into and runs whatever that
 // screen already does next — so no existing flow is rewritten or put
 // at risk, they just stop demanding a keyboard.
+// Opens a booking tapped from the arriving strip. Deliberately the
+// same routing the booking picker uses, so a name tapped on the floor
+// screen behaves identically to a name tapped anywhere else.
+function _openArrivingBooking(ref) {
+  if (!ref) return;
+  try {
+    if (typeof openBookingFromSquare === 'function') { openBookingFromSquare(ref); return; }
+    if (typeof openBookingAtRealStage === 'function') { openBookingAtRealStage(ref); return; }
+    goToTab('staff');
+    if (typeof s1ChooseExisting === 'function') s1ChooseExisting();
+    const f = document.getElementById('s1-booking-code');
+    if (f) { f.value = ref; if (typeof lookupBookingSection1 === 'function') lookupBookingSection1(); }
+  } catch (e) { console.warn('[arriving]', e); }
+}
+window._openArrivingBooking = _openArrivingBooking;
+
 async function pickBooking(targetInputId, thenFn) {
   let host = document.getElementById('kc-booking-picker');
   if (host) host.remove();
