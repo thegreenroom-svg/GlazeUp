@@ -2475,7 +2475,7 @@ function updateStaffName() {
       <div style="font-size:14px;font-weight:700;color:white;margin-bottom:12px;">Search by customer name</div>
       <input type="text" id="returns-name-input" placeholder="Customer name or booking code…"
         style="width:100%;padding:12px;border-radius:12px;border:none;font-size:14px;box-sizing:border-box;margin-bottom:10px;"
-        oninput="searchReturnsByName(this.value)">
+        oninput="searchReturnsByName(this.value)"><button type="button" onclick="pickBooking('returns-name-input')" style="margin-left:6px;border:1.5px solid rgba(43,39,36,.14);background:#FFFDF9;border-radius:10px;padding:10px 13px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">Tap a name</button>
       <div id="returns-name-results" style="margin-top:8px;"></div>
     </div>
 
@@ -2611,7 +2611,7 @@ function updateStaffName() {
 
     <div id="fp1-booking-check-area" style="display:none;width:100%;max-width:400px;margin-top:10px;">
       <div style="display:flex;gap:8px;">
-        <input type="text" id="fp1-booking-check-input" placeholder="Scan QR or paste booking code" style="flex:1;padding:14px;border:1px solid #3d3833;border-radius:12px;font-size:14px;box-sizing:border-box;background:#2B2724;color:white;" onkeydown="if(event.key==='Enter') checkBookingFoundStatus()">
+        <input type="text" id="fp1-booking-check-input" placeholder="Scan QR or paste booking code" style="flex:1;padding:14px;border:1px solid #3d3833;border-radius:12px;font-size:14px;box-sizing:border-box;background:#2B2724;color:white;" onkeydown="if(event.key==='Enter') checkBookingFoundStatus()"><button type="button" onclick="pickBooking('fp1-booking-check-input', checkBookingFoundStatus)" style="margin-left:6px;border:1.5px solid rgba(43,39,36,.14);background:#FFFDF9;border-radius:10px;padding:10px 13px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">Tap a name</button>
         <button class="glaze-tile" onclick="checkBookingFoundStatus()" style="background:#3d3833;color:white;border:none;border-radius:12px;padding:0 18px;font-size:14px;font-weight:700;cursor:pointer;">Check</button>
       </div>
       <div id="fp1-booking-check-result" style="margin-top:12px;"></div>
@@ -4289,7 +4289,7 @@ function updateStaffName() {
               <div style="flex: 1; height: 1px; background: var(--gu-border);"></div>
             </div>
 
-            <input type="text" id="s1-booking-code" placeholder="Type a booking code" style="width: 100%; padding: 12px; border: 1.5px solid var(--gu-border); border-radius: 10px; font-size: 14px; margin-bottom: 12px; box-sizing: border-box;">
+            <input type="text" id="s1-booking-code" placeholder="Type a booking code" style="width: 100%; padding: 12px; border: 1.5px solid var(--gu-border); border-radius: 10px; font-size: 14px; margin-bottom: 12px; box-sizing: border-box;"><button type="button" onclick="pickBooking('s1-booking-code', lookupBookingSection1)" style="margin-left:6px;border:1.5px solid rgba(43,39,36,.14);background:#FFFDF9;border-radius:10px;padding:10px 13px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">Tap a name</button>
             <button class="glaze-tile btn-connect" style="width: 100%; margin-bottom:18px;" onclick="lookupBookingSection1()">Look Up Booking</button>
 
             <div style="display: flex; gap: 6px; margin-bottom: 12px;">
@@ -4596,7 +4596,7 @@ function updateStaffName() {
             <div id="kiln-unload-qr-fallback" style="display:none;margin-top:8px;">
               <div style="font-size:11px;color:var(--gu-dust);margin-bottom:8px;">Not recognised from the photo — enter the booking code:</div>
               <div style="display:flex;gap:8px;">
-                <input type="text" id="kiln-unload-scan-input" placeholder="Paste booking code" style="flex:1;padding:10px;border:1px solid var(--gu-border);border-radius:6px;font-size:13px;" onkeydown="if(event.key==='Enter') confirmReadyByScan()">
+                <input type="text" id="kiln-unload-scan-input" placeholder="Paste booking code" style="flex:1;padding:10px;border:1px solid var(--gu-border);border-radius:6px;font-size:13px;" onkeydown="if(event.key==='Enter') confirmReadyByScan()"><button type="button" onclick="pickBooking('kiln-unload-scan-input', confirmReadyByScan)" style="margin-left:6px;border:1.5px solid rgba(43,39,36,.14);background:#FFFDF9;border-radius:10px;padding:10px 13px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">Tap a name</button>
                 <button class="glaze-tile btn-connect glaze-sage" style="padding:10px 16px;" onclick="confirmReadyByScan()">✓ Confirm</button>
               </div>
             </div>
@@ -4664,7 +4664,7 @@ function updateStaffName() {
             </div>
             <div id="packing-complete-form" style="display:none;background:white;border-radius:10px;padding:14px;border:1px solid var(--gu-border);">
               <div style="font-size:12px;font-weight:700;margin-bottom:8px;" id="packing-form-title">Complete packing</div>
-              <input type="text" id="packing-reference-code" placeholder="Booking code (fallback if photo unclear)" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">
+              <input type="text" id="packing-reference-code" placeholder="Booking code (fallback if photo unclear)" style="width:100%;padding:9px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;margin-bottom:8px;box-sizing:border-box;"><button type="button" onclick="pickBooking('packing-reference-code')" style="margin-left:6px;border:1.5px solid rgba(43,39,36,.14);background:#FFFDF9;border-radius:10px;padding:10px 13px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">Tap a name</button>
               <div style="display:flex;gap:8px;margin-bottom:8px;">
                 <div style="flex:1;">
                   <div style="font-size:10px;color:var(--gu-dust);margin-bottom:3px;">Fired date</div>
@@ -4697,7 +4697,7 @@ function updateStaffName() {
               Photograph the whole tray at once — the AI outlines every piece it can distinguish and suggests which booking each one belongs to. If any piece can't be identified from the photo, enter a booking code below as a fallback for just that one.
             </p>
             <div style="display:flex;gap:8px;margin-bottom:12px;">
-              <input type="text" id="wts-booking-scan-input" placeholder="Booking code (fallback for unrecognised pieces)" style="flex:1;padding:10px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;" onkeydown="if(event.key==='Enter') loadWholeTrayGroup()">
+              <input type="text" id="wts-booking-scan-input" placeholder="Booking code (fallback for unrecognised pieces)" style="flex:1;padding:10px;border:1px solid var(--gu-border);border-radius:8px;font-size:13px;" onkeydown="if(event.key==='Enter') loadWholeTrayGroup()"><button type="button" onclick="pickBooking('wts-booking-scan-input', loadWholeTrayGroup)" style="margin-left:6px;border:1.5px solid rgba(43,39,36,.14);background:#FFFDF9;border-radius:10px;padding:10px 13px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">Tap a name</button>
               <button class="glaze-tile" onclick="loadWholeTrayGroup()" style="background:var(--gu-primary);color:white;border:none;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700;cursor:pointer;">Load</button>
             </div>
             <button class="glaze-tile" id="wts-scan-btn" onclick="captureWholeTrayPhoto()" disabled style="width:100%;background:#8a8175;color:white;border:none;border-radius:12px;padding:16px;font-size:15px;font-weight:800;cursor:not-allowed;margin-bottom:14px;">📷 Confirm layout is spaced first ☝️</button>
@@ -31349,6 +31349,97 @@ async function submitDamageReport() {
     alert('Could not submit the report — please try again.');
   }
 }
+
+// ── ONE BOOKING PICKER, USED EVERYWHERE ─────────────────────────────
+// [2 Aug] Daisy: "every aspect of this app is like this — you have to
+// type something or find something. It just needs squares."
+//
+// An audit found 93 text inputs. Most should STAY: a postcode, a return
+// address, an Etsy order reference all genuinely need a keyboard, and
+// replacing them with squares would be worse, not better.
+//
+// But SIX of them ask the same question in six different ways — which
+// booking? — and each was built with its own field, its own lookup and
+// its own failure message:
+//   s1-booking-code, s1-customer-name, returns-name-input,
+//   fp1-booking-check-input, kiln-unload-scan-input,
+//   packing-reference-code, wts-booking-scan-input
+//
+// One picker answers all of them. Tap the name, it fills the field the
+// caller was going to make someone type into and runs whatever that
+// screen already does next — so no existing flow is rewritten or put
+// at risk, they just stop demanding a keyboard.
+async function pickBooking(targetInputId, thenFn) {
+  let host = document.getElementById('kc-booking-picker');
+  if (host) host.remove();
+  host = document.createElement('div');
+  host.id = 'kc-booking-picker';
+  host.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(43,39,36,.55);'
+    + 'display:flex;align-items:flex-end;justify-content:center;padding:0';
+  host.innerHTML = `<div style="background:#FFF9F0;width:100%;max-height:82vh;border-radius:18px 18px 0 0;
+      padding:14px 13px calc(14px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="font-family:Caveat,cursive;font-size:23px;flex:1">Which booking?</div>
+        <button id="kc-bp-close" style="border:1.5px solid rgba(43,39,36,.14);background:#FFFDF9;
+          border-radius:10px;padding:8px 14px;font:inherit;cursor:pointer">Close</button>
+      </div>
+      <div id="kc-bp-grid" style="flex:1;min-height:0;overflow-y:auto;display:grid;
+        grid-template-columns:repeat(auto-fill,minmax(148px,1fr));grid-auto-rows:56px;
+        align-content:start;gap:8px">
+        <div style="grid-column:1/-1;color:#6f665b;font-size:13px;padding:16px">Loading today…</div>
+      </div>
+    </div>`;
+  document.body.appendChild(host);
+  const close = () => host.remove();
+  document.getElementById('kc-bp-close').onclick = close;
+  host.onclick = (e) => { if (e.target === host) close(); };
+
+  try {
+    const d = new Date();
+    const date = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const r = await fetch(`${API_URL}/api/bookings/day?studioId=${studioId}&date=${date}`);
+    const list = (await r.json()).bookings || [];
+    const grid = document.getElementById('kc-bp-grid');
+    if (!grid) return;
+    if (!list.length) {
+      grid.innerHTML = '<div style="grid-column:1/-1;color:#6f665b;font-size:13px;padding:16px">'
+        + 'Nothing booked today. Close this and type the code instead.</div>';
+      return;
+    }
+    const hhmm = t => new Date(t).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+    const now = Date.now();
+    grid.innerHTML = list.map(b => {
+      const start = new Date(b.session_start).getTime();
+      const end = new Date(b.session_end || b.session_start).getTime();
+      const live = now >= start && now <= end, past = now > end;
+      const bg = live ? '#3E7C6A' : past ? '#6f665b' : '#B87946';
+      const val = String(b.booking_code || b.customer_name || '').replace(/'/g, '');
+      return `<button data-v="${val.replace(/"/g,'&quot;')}"
+        style="border:none;border-radius:14px;background:${bg};color:#fff;padding:0 12px;
+        height:56px;display:flex;flex-direction:column;justify-content:center;gap:2px;
+        text-align:left;cursor:pointer;font:inherit;opacity:${past ? '.55' : '1'}">
+        <div style="font-size:13px;font-weight:800;overflow:hidden;text-overflow:ellipsis;
+          white-space:nowrap">${String(b.customer_name||'No name').replace(/</g,'&lt;')}</div>
+        <div style="font-size:11.5px;opacity:.9">${hhmm(b.session_start)}${live ? ' · in now' : ''}</div>
+      </button>`;
+    }).join('');
+    grid.querySelectorAll('button[data-v]').forEach(btn => {
+      btn.onclick = () => {
+        const field = document.getElementById(targetInputId);
+        if (field) field.value = btn.dataset.v;
+        close();
+        // Run whatever that screen already did with a typed value, so
+        // nothing downstream needed changing.
+        try { if (typeof thenFn === 'function') thenFn(); } catch (e) { console.warn('[picker]', e); }
+      };
+    });
+  } catch (e) {
+    const grid = document.getElementById('kc-bp-grid');
+    if (grid) grid.innerHTML = '<div style="grid-column:1/-1;color:#6f665b;font-size:13px;padding:16px">'
+      + 'Could not load today. Close this and type the code instead.</div>';
+  }
+}
+window.pickBooking = pickBooking;
 
 function openBookingSearch() {
   // [2 Aug] Daisy: "Find Booking is useless — go through THAT in a busy
