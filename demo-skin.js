@@ -169,7 +169,7 @@
       <button class="kc-dock-b" onclick="KC.go('floor-plan','showFloorPlan')" aria-label="Floor">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.4" fill="currentColor"/></svg><span>Floor</span></button>
       <button class="kc-dock-b" onclick="openPackingSession()" aria-label="Pieces">
-        <svg viewBox="0 0 24 24"><path d="M12 3c3 3.5 6 5.6 6 9.4A6 6 0 0 1 6 12.4C6 8.6 9 6.5 12 3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span>Pieces</span></button>
+        <svg viewBox="0 0 24 24"><path d="M3 8.5 12 4l9 4.5v7L12 20l-9-4.5v-7Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M3 8.5 12 13l9-4.5M12 13v7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg><span>Packing</span></button>
       <button class="kc-dock-b" id="kc-dock-money" aria-label="Money">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9.5 15V9.2h3a2 2 0 0 1 0 4H9.5m0 0H14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Money</span></button>
       <button class="kc-dock-b" onclick="KC.openMenu()" aria-label="Everything">
