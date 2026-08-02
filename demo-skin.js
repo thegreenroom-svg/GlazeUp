@@ -259,13 +259,22 @@
   KC._renderIndex = function () {
     // The desk index: the things a shift actually reaches for, as a grid
     // of squares — tap one, its screen slides in. Apple-home feel.
+    // [2 Aug] Daisy: "I'm seeing a lot of things that aren't relevant
+    // to that particular page — I can reach them from the black menu
+    // bar or the header." Right. Packing and Takings were BOTH here
+    // and in the dock, as Pieces and Money. A tile that duplicates the
+    // dock costs a row of screen and teaches nothing, because the dock
+    // is where someone will look for it next time anyway.
+    //
+    // What stays are the things the dock does NOT reach: Bookings,
+    // Collections, Team, Tell Daisy, Daily digest.
     const picks = [
       { id: 'staff', fn: null, label: 'Bookings', icon: '🪑', desc: 'Start, walk-in, party' },
       { id: 'collections', fn: 'openCollections', label: 'Collections', icon: '📦', desc: 'Ready to go home' },
       // [25 Jul] Packing absorbed Piece matching: that tile opened the
       // pixel matcher, which the packing session replaced with the
       // engine that works. One door to finding a piece, not two.
-      { id: 'packing', fn: 'openPackingSession', label: 'Packing', icon: '🎁', desc: 'Find, pack, send home' },
+
       { id: 'team', fn: null, label: 'Team & duties', icon: '👥', desc: 'Who does what today' },
       { id: 'tell-daisy', fn: 'openTellPicker', label: 'Tell Daisy', icon: '💬', desc: 'Good or bad, say it' },
     ];
@@ -275,7 +284,7 @@
       // analytics_cache and the app surfaced exactly one of them.
       // Daisy: 'average day, best year, stuff we can look at — it's
       // the whole point of this desk.'
-      picks.push({ id: 'takings', fn: 'openTakings', label: 'Takings', icon: '📈', desc: 'All time, bests, averages' });
+
     }
     $('kc-index').innerHTML = picks.map(indexTile).join('');
   };

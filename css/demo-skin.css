@@ -477,12 +477,12 @@ html.demo-skin .kc-section-grow .kc-tile { aspect-ratio: auto; min-height: 0; }
    3. Labels up to 13.5px and allowed two lines. They were 12px and
       being cut off — the commonest reason a tile gets mis-tapped. */
 html.demo-skin .kc-tile {
-  aspect-ratio: auto; min-height: 62px;
+  aspect-ratio: auto; min-height: 58px;
   border: none; border-radius: 16px; cursor: pointer;
   background: var(--m-surface, #fff);
   box-shadow: 0 1px 2px rgba(43,39,36,.06), 0 6px 16px -12px rgba(43,39,36,.28);
   display: flex; flex-direction: row; align-items: center; justify-content: flex-start;
-  gap: 11px; padding: 11px 13px; text-align: left;
+  gap: 9px; padding: 10px 11px; text-align: left;
   transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
 }
 html.demo-skin .kc-tile:active {
@@ -491,16 +491,24 @@ html.demo-skin .kc-tile:active {
   box-shadow: 0 1px 2px rgba(43,39,36,.10);
 }
 html.demo-skin .kc-tile-i {
-  font-size: 20px; line-height: 1; flex-shrink: 0;
-  width: 38px; height: 38px; border-radius: 11px;
+  font-size: 18px; line-height: 1; flex-shrink: 0;
+  width: 32px; height: 32px; border-radius: 10px;
   background: rgba(184,121,70,0.12);
   display: flex; align-items: center; justify-content: center;
 }
 html.demo-skin .kc-tile-l {
-  font-size: 13.5px; font-weight: 700; color: var(--m-text, #2B2724);
+  /* [2 Aug] Labels were clipping — "Bookin", "Team &…", "Takings" all
+     cut off mid-word. Two causes, both mine from this morning's
+     restyle: a flex child will not shrink below its content width
+     without min-width:0, and the fixed 38px icon plus gap was taking
+     the room the text needed. Given room to shrink and wrap properly,
+     and the icon trimmed, they fit. A clipped label is the commonest
+     reason a tile gets mis-tapped — it is worth the two lines. */
+  flex: 1; min-width: 0;
+  font-size: 13px; font-weight: 700; color: var(--m-text, #2B2724);
   line-height: 1.2; letter-spacing: -0.01em;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  overflow: hidden;
+  overflow: hidden; word-break: break-word;
 }
 
 /* Day navigation header — arrows + calendar + today, right-aligned. */
