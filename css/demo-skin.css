@@ -744,3 +744,66 @@ html.demo-skin [id$="-list"],
 html.demo-skin .kc-timeline {
   overflow-y: auto; -webkit-overflow-scrolling: touch; min-height: 0;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   THE LEGACY HOME, MODERNISED. [2 Aug]
+
+   Daisy keeps landing on this screen — handwritten "HOME", a row of
+   nine small glossy buttons in nine different colours, then two huge
+   flat tiles below. It predates the Desk and never got the same
+   treatment, so it reads as a different app: candy gradients, white
+   inner sheen, saturated blues and reds that appear nowhere else in
+   the studio's palette.
+
+   Not rebuilt — restyled, so nothing about its behaviour changes.
+   Scoped to html.demo-skin and appended last so it wins cleanly, and
+   every rule here is cosmetic only.
+
+   The colours are deliberately flattened to the studio's own: one
+   surface, clay for anything active, ink for text. Nine competing
+   colours is what made it look chaotic, and none of them carried
+   meaning — they were decoration standing in for hierarchy.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* The quick-action row: one calm surface instead of nine colours. */
+html.demo-skin .ghtile-mini,
+html.demo-skin .ghtile-sq {
+  background: var(--kc-card, #FFFDF9) !important;
+  color: var(--kc-ink, #2B2724) !important;
+  box-shadow: 0 1px 2px rgba(43,39,36,.06), 0 4px 12px -10px rgba(43,39,36,.3) !important;
+  border: 1px solid rgba(43,39,36,.08) !important;
+}
+/* The glossy inner sheen is what made them look like sweets. */
+html.demo-skin .ghtile-mini::before,
+html.demo-skin .ghtile-sq::before { display: none !important; }
+
+html.demo-skin .ghtile-sq {
+  width: auto !important; min-width: 76px; min-height: 56px !important;
+  border-radius: 13px !important; padding: 8px 10px !important;
+}
+html.demo-skin .ghtile-sq .t {
+  font-size: 11px !important; font-weight: 700 !important;
+  color: var(--kc-ink, #2B2724) !important; letter-spacing: -0.01em;
+}
+html.demo-skin .ghtile-sq .i { font-size: 17px !important; }
+html.demo-skin .ghtile-mini:active,
+html.demo-skin .ghtile-sq:active {
+  background: #FFF6EA !important; transform: scale(0.97);
+}
+
+/* The two oversized flat tiles below the row: same treatment as the
+   Desk's, so the two screens stop looking like different products. */
+html.demo-skin .glaze-tile {
+  border-radius: 16px !important;
+  box-shadow: 0 1px 2px rgba(43,39,36,.06), 0 6px 16px -12px rgba(43,39,36,.28) !important;
+}
+
+/* "HOME" in the studio's own hand, sized like a heading rather than a
+   doodle, and the squiggle under it retired. */
+html.demo-skin .gh-section-title,
+html.demo-skin #grid-nav-view h2 {
+  font-family: 'Caveat', cursive !important;
+  font-size: 22px !important; color: var(--kc-ink, #2B2724) !important;
+  margin-bottom: 8px !important;
+}
