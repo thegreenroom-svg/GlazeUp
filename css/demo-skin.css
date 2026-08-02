@@ -807,3 +807,67 @@ html.demo-skin #grid-nav-view h2 {
   font-size: 22px !important; color: var(--kc-ink, #2B2724) !important;
   margin-bottom: 8px !important;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   EVERYTHING SMALLER, EVERYTHING DESK-LIKE. [2 Aug]
+
+   Daisy: "everything's too big and doesn't fit on the screen", and
+   "I want everything to look like the Desk."
+
+   The legacy tiles were sized for a phone held in one hand — huge
+   blocks with the label stranded at the bottom. On a landscape tablet
+   two of them fill the screen and push everything else off, which is
+   what she has been photographing all afternoon.
+
+   Sized to the Desk's own proportions instead: icon beside the label,
+   the studio's surface rather than saturated blocks, and a height a
+   row of them can actually share. Cosmetic only — nothing moves,
+   nothing is renamed, every tile does exactly what it did.
+   ═══════════════════════════════════════════════════════════════════ */
+html.demo-skin .glaze-tile {
+  min-height: 64px !important;
+  aspect-ratio: auto !important;
+  padding: 11px 13px !important;
+  border-radius: 16px !important;
+  display: flex !important; flex-direction: row !important;
+  align-items: center !important; justify-content: flex-start !important;
+  gap: 11px !important;
+  background: var(--kc-card, #FFFDF9) !important;
+  color: var(--kc-ink, #2B2724) !important;
+  filter: none !important;
+  box-shadow: 0 1px 2px rgba(43,39,36,.06), 0 6px 16px -12px rgba(43,39,36,.28) !important;
+  text-align: left !important;
+}
+/* The heavy inset gloss is what made these read as plastic blocks. */
+html.demo-skin .glaze-tile::before,
+html.demo-skin .glaze-tile::after { display: none !important; }
+
+/* Icon and label side by side, at Desk proportions. */
+html.demo-skin .glaze-tile > span:first-child,
+html.demo-skin .glaze-tile .i {
+  font-size: 20px !important; flex-shrink: 0 !important;
+  width: 38px !important; height: 38px !important;
+  border-radius: 11px !important;
+  background: rgba(184,121,70,0.12) !important;
+  display: flex !important; align-items: center !important; justify-content: center !important;
+}
+html.demo-skin .glaze-tile .t,
+html.demo-skin .glaze-tile > span:last-child {
+  font-size: 13.5px !important; font-weight: 700 !important;
+  color: var(--kc-ink, #2B2724) !important;
+  line-height: 1.2 !important; text-align: left !important;
+}
+html.demo-skin .glaze-tile:active {
+  transform: scale(0.97) !important;
+  background: #FFF6EA !important;
+}
+
+/* Rows of tiles flow to fill the width rather than stacking two huge
+   ones — the single biggest reason nothing fitted. */
+html.demo-skin #grid-nav-view .gh-grid,
+html.demo-skin #grid-nav-view > div > div {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important;
+  gap: 8px !important;
+}

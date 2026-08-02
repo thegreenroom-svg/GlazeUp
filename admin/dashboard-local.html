@@ -17296,7 +17296,7 @@ function _blankScreenWatchdog() {
         if (typeof _pickerWatchdog === 'function') _pickerWatchdog();
       }
     } catch (e) { console.warn('[boot] watchdog failed', e); }
-  }, 3000);
+  }, 1800);
 }
 window._blankScreenWatchdog = _blankScreenWatchdog;
 
@@ -22800,6 +22800,35 @@ function forceFreshLogin() {
   location.replace(location.pathname);
 }
 window.forceFreshLogin = forceFreshLogin;
+
+// ?login=1 — show the name picker NOW, whatever the app thinks.
+// [2 Aug] Daisy has reported "still no login" four times, and each of
+// my explanations was a guess at which branch swallowed it. This does
+// not reason about branches at all: it clears the session and puts the
+// picker on screen directly, a second after load, over whatever else
+// happened. If this shows a login and the normal path does not, the
+// fault is upstream in the boot sequence, which is a far more useful
+// thing to know than another guess.
+try {
+  if (new URLSearchParams(location.search).get('login') === '1') {
+    ['klnk_shift_staff', 'klnk_shift_id', 'klnk_break_id',
+     'klnk_last_active', 'klnk_force_relogin'].forEach(k => localStorage.removeItem(k));
+    setTimeout(() => {
+      try {
+        if (typeof currentShiftStaff !== 'undefined') currentShiftStaff = null;
+        const sp = document.getElementById('splash-screen');
+        if (sp) sp.style.display = 'none';
+        const m = document.getElementById('shift-login-modal');
+        if (m) {
+          m.style.display = 'flex';
+          m.style.zIndex = '99999';
+          if (typeof showLoginScreen === 'function') showLoginScreen('picker');
+          if (typeof loadLoginNamePicker === 'function') loadLoginNamePicker();
+        }
+      } catch (e) { console.warn('[login=1]', e); }
+    }, 1000);
+  }
+} catch (e) {}
 
 // ?reset=1 — the escape hatch. Runs before anything else can fail.
 try {
