@@ -16207,7 +16207,16 @@ function startAlertPolling() {
 // timesheet and every "who did this" record attribute to one identity,
 // so those figures cannot be trusted while this is false. Flip back to
 // true to restore real PIN login; nothing else needs changing.
-const SHIFT_PIN_LOGIN_ENABLED = false;
+const SHIFT_PIN_LOGIN_ENABLED = true;
+
+// [2 Aug] Kept SEPARATE from the login flag on purpose. Daisy asked for
+// two different things in the same breath — logins back, alerts off —
+// and while the idle prompts were gated on SHIFT_PIN_LOGIN_ENABLED,
+// restoring one silently restored the other. These are the two that
+// interrupt: the splash thrown over a working screen after a few idle
+// minutes, and the "still on this?" card that navigates home by itself
+// if nobody answers. Both stay off regardless of login.
+const IDLE_INTERRUPTIONS_ENABLED = false;
 
 // Demo mode: shows the "everyone uses 0000" notice on the PIN screen.
 // Set to false once real individual PINs are in use and you don't want
@@ -16434,6 +16443,19 @@ async function checkShiftLogin(fromNavigation) {
   // roughly once a minute, so anyone actually working stays signed in
   // indefinitely; only a genuinely idle iPad asks again.
   const SESSION_TIMEOUT_HOURS = 0.5;
+  // [2 Aug] ONE FORCED LOGIN AFTER THIS DEPLOY. Login was off for a
+  // stretch this afternoon, so tablets are carrying sessions that
+  // would resume silently — meaning "logins back" would still show no
+  // login on the very devices that need it. Bumping the epoch retires
+  // those sessions exactly once; afterwards the normal 30-minute
+  // window applies and nobody is asked again unnecessarily.
+  const LOGIN_EPOCH = '2026-08-02a';
+  if (localStorage.getItem('klnk_login_epoch') !== LOGIN_EPOCH) {
+    localStorage.setItem('klnk_login_epoch', LOGIN_EPOCH);
+    localStorage.removeItem('klnk_shift_staff');
+    localStorage.removeItem('klnk_last_active');
+  }
+
   const forceRelogin = localStorage.getItem('klnk_force_relogin') === '1';
   const previousSession = localStorage.getItem('klnk_shift_staff');
   const lastActiveAt = parseInt(localStorage.getItem('klnk_last_active') || '0', 10);
@@ -19000,8 +19022,24 @@ function renderFloorPlanElegant() {
   // than five separate currentTab checks that could each individually
   // go stale. "Make sure this doesn't happen anywhere else" — swept and
   // fixed at every real reveal point in the file, not just this one.
+  // [2 Aug] Daisy: "I keep spying the floor plan between screens."
+  // A real blind spot in this guard, not a race. It asks whether the
+  // OLD tile grid (#grid-nav-view) is on screen — but the Desk
+  // (#kc-canvas, from demo-skin) replaced that as home months later and
+  // was never added here. So with the Desk up, grid-nav-view is hidden,
+  // gridGenuinelyVisible reads false, and a stale currentTab of
+  // 'floor-plan' is enough to reveal the floor plan underneath or
+  // between screens — exactly the flash she keeps catching.
+  //
+  // The guard's own comment argues for DOM truth over stale variables;
+  // it simply predates the Desk. Both homes now count as home.
   const gridGenuinelyVisible = document.getElementById('grid-nav-view')?.style.display !== 'none';
-  if (currentTab === 'floor-plan' && !gridGenuinelyVisible) view.style.display = 'flex';
+  const deskGenuinelyVisible = (() => {
+    const c = document.getElementById('kc-canvas');
+    return !!c && !c.classList.contains('kc-away') && c.offsetParent !== null;
+  })();
+  const atHome = gridGenuinelyVisible || deskGenuinelyVisible;
+  if (currentTab === 'floor-plan' && !atHome) view.style.display = 'flex';
   const { rooms, bookingByTable, unseated, tomorrow } = _elegantRoomsData();
   const resting = Object.keys(rooms).length === 0;
 
@@ -25678,9 +25716,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       // protect, so it is pure friction on every open — dismissed
       // unconditionally rather than gated on a session that no longer
       // means anything.
-      const stillValid = (typeof SHIFT_PIN_LOGIN_ENABLED !== 'undefined' && !SHIFT_PIN_LOGIN_ENABLED)
-        || (!forceRelogin && previousSession
-            && lastActiveAt && (hoursSinceActive * 60) < 30);
+      const stillValid = !forceRelogin && previousSession
+        && lastActiveAt && (hoursSinceActive * 60) < 30;
       if (stillValid) {
         setTimeout(() => { if (typeof window.dismissSplash === 'function') window.dismissSplash(); }, 60);
       }
@@ -34437,7 +34474,7 @@ function triggerIdleSplash() {
   // only ever interrupt — there is no session behind it to protect, so
   // throwing the splash over a working screen after a few idle minutes
   // is pure obstruction. Returns before doing anything.
-  if (!SHIFT_PIN_LOGIN_ENABLED) return;
+  if (!IDLE_INTERRUPTIONS_ENABLED) return;
   // Only genuinely meaningful if someone's actually logged in — no
   // point flagging "put down" state before anyone's started a shift.
   if (currentShiftStaff && currentShiftStaff.id !== 'testing') {
@@ -34521,7 +34558,7 @@ function showIdleAsk() {
   // if nobody answers. Useful when an unattended iPad might be showing
   // someone's private tile order; meaningless when there is no login
   // at all, and it moves the screen under whoever picks it up next.
-  if (!SHIFT_PIN_LOGIN_ENABLED) return;
+  if (!IDLE_INTERRUPTIONS_ENABLED) return;
   if (document.getElementById('idle-ask-card')) return;
   if (!currentShiftStaff) return;                       // nobody on shift
   if (_floorViewMode === 'plan' && currentTab === 'floor-plan') return;  // already home
