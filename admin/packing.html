@@ -91,27 +91,12 @@
   /* Dock, matching the main app. These pages are separate HTML files
      so they never inherited it — you could reach them but not move on
      from them, which is why Daisy said "can't move around". */
-  /* THE STAGE RAIL — the only navigation in the app.
-     Three stages a piece moves ALONG, left to right, in one direction,
-     the way it physically does in the studio: off the table, onto the
-     shelf, bagged, gone. Deliberately not a generic pill row — the
-     segments butt together as one continuous rail, and the count is
-     the point, so it is set larger than the label. */
-  .stages{flex-shrink:0; display:flex; margin:0 0 9px;
-    border:1.5px solid var(--line); border-radius:13px; overflow:hidden;
-    background:var(--panel)}
-  .stagetab{flex:1; min-width:0; font:inherit; cursor:pointer;
-    border:none; border-right:1.5px solid var(--line); border-radius:0;
-    background:transparent; color:var(--mute);
-    padding:9px 6px 8px; text-align:center; line-height:1.15;
-    font-size:11px; letter-spacing:.01em;
-    transition:background .15s, color .15s}
-  .stagetab:last-child{border-right:none}
-  .stagetab .n{display:block; font-size:19px; font-weight:800;
-    font-variant-numeric:tabular-nums; margin-top:2px; color:var(--ink)}
-  .stagetab.on{background:var(--go); color:rgba(255,255,255,.9)}
-  .stagetab.on .n{color:#fff}
-  .stagetab:focus-visible{outline:2px solid var(--clay); outline-offset:-3px}
+  .dock{flex-shrink:0; display:flex; gap:2px; justify-content:space-around;
+    background:#2B2724; border-radius:16px; padding:7px 4px; margin-top:9px}
+  .dock a{flex:1; text-align:center; text-decoration:none; color:#8F877C;
+    font-size:10px; padding:5px 2px; border-radius:11px; line-height:1.35}
+  .dock a .i{display:block; font-size:16px; line-height:1}
+  .dock a.on{color:#F4ECE0; background:rgba(244,236,224,.1)}
   .sheet{display:none; position:fixed; inset:0; z-index:60; background:#141110;
     flex-direction:column; padding:max(12px,env(safe-area-inset-top)) 13px calc(13px + env(safe-area-inset-bottom))}
   .sheet.on{display:flex}
@@ -133,20 +118,13 @@
 </head>
 <body>
 
-<!-- [26 Jul] This is the entire app now. Daisy: "just pottery painted
-     to pottery collected and identified" — so there is no Desk to go
-     back to, no takings, no floor plan, nothing else in the header. The
-     only secondary control left is the running cost, because it is her
-     money being spent. -->
 <div class="top">
-  <h1>The&nbsp;shelf</h1>
+  <h1>Packing</h1>
   <div class="n" id="hdr">Loading…</div>
-  <a href="#" id="infoBtn" title="What this is costing">ⓘ</a>
+  <a href="/admin/takings.html" id="takingsBtn" title="Takings history">£</a>
+  <a href="#" id="infoBtn" title="Costs and settings">ⓘ</a>
+  <a href="/admin/dashboard-local.html?go=home" title="Back to the Desk">✕</a>
 </div>
-
-<!-- The journey, and the only navigation there is. Three stages a
-     piece moves ALONG in one direction — not tabs to browse. -->
-<div class="stages" id="stages"></div>
 
 <div class="stage" id="stage">
   <!-- [26 Jul] drawPhoto() is shared between a real sweep and the test
@@ -160,9 +138,9 @@
     font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;letter-spacing:.02em"></div>
   <canvas id="canvas" style="display:none"></canvas>
   <div class="hint" id="hint">
-    <b>Photograph the shelves</b>
-    Whatever it recognises gets ticked off its booking.
-    One stray piece works too — photograph it and it tells you whose it is.
+    <b>Photograph a surface</b>
+    A table, a shelf, a box — whatever it recognises gets ticked off.
+    One stray piece works the same way: photograph it and it tells you whose it is.
   </div>
   <div class="working"><div class="spin"></div><span id="workingText">Looking…</span></div>
   <div class="said" id="said"></div>
@@ -172,12 +150,17 @@
 <div class="chips" id="chips"></div>
 
 <div class="acts">
-  <!-- Named for what actually happens, in the order the day happens in:
-       a table finishes, later you go and find its pieces. Both say the
-       real-world action, not the app's mechanism. -->
-  <button class="primary" id="sweepBtn">Find pieces<span class="d">photograph the shelves</span></button>
-  <button id="addBtn">Table finished<span class="d">photograph what they painted</span></button>
-  <button id="testBtn">Test bed<span class="d">nothing saved</span></button>
+  <button class="primary" id="sweepBtn">Photograph<span class="d">a shelf, or one stray</span></button>
+  <button id="addBtn">Add<span class="d">new group</span></button>
+  <button id="testBtn">Test bed<span class="d">no booking</span></button>
+</div>
+
+<div class="dock" id="dock">
+  <a href="/admin/dashboard-local.html?go=home"><span class="i">⌂</span>Desk</a>
+  <a href="/admin/dashboard-local.html?go=floor"><span class="i">◉</span>Floor</a>
+  <a href="/admin/packing.html" data-here="packing"><span class="i">◍</span>Pieces</a>
+  <a href="/admin/takings.html" data-here="takings"><span class="i">£</span>Money</a>
+  <a href="/admin/dashboard-local.html?go=menu"><span class="i">☰</span>Menu</a>
 </div>
 
 <!-- booking detail -->
@@ -501,54 +484,20 @@ async function loadCost() {
 }
 
 // ── load ─────────────────────────────────────────────────────────────
-// [26 Jul] THE APP IS NOW ONLY THIS. Daisy: "track the pottery from
-// table finish to packing, linked to a booking... just pottery painted
-// to pottery collected and identified." Everything else — takings,
-// floor plan, food and drink, customer messaging — is gone from the
-// journey. Three stages, nothing else:
-//
-//   WAITING  a table was photographed, pieces registered, still here
-//   PACKED   found, bagged, waiting to be picked up
-//   GONE     collected, out of the way (kept, not deleted)
-//
-// includeDone=1 so packed and collected pieces still load — they are
-// stages of the journey, not finished business to be hidden.
-const STAGE_PACKED = ['packed'];
-const STAGE_GONE = ['collected', 'picked_up', 'posted'];
-let stage = 'waiting';
-
-function stageOf(p) {
-  const st = (p.status || '').toLowerCase();
-  if (STAGE_GONE.includes(st)) return 'gone';
-  if (STAGE_PACKED.includes(st)) return 'packed';
-  return 'waiting';
-}
-
 async function load() {
   let pieces = [];
   try {
-    const r = await fetch(`${API}/api/packing/queue?studioId=${studioId}&includeDone=1`);
+    const r = await fetch(`${API}/api/packing/queue?studioId=${studioId}`);
     pieces = (await r.json()).pieces || [];
   } catch (e) { $('hdr').textContent = 'No connection'; return; }
   const by = {};
   for (const p of pieces) (by[p.booking_id] = by[p.booking_id] || []).push(p);
-  bookings = Object.keys(by).map(id => {
-    const group = by[id];
-    // A booking's stage is the LEAST advanced piece in it — one piece
-    // still on the shelf means the whole booking is still being packed,
-    // which is what someone standing at the shelves actually needs to
-    // know. Nothing is "ready" until all of it is.
-    const stages = group.map(stageOf);
-    const bookingStage = stages.includes('waiting') ? 'waiting'
-      : stages.includes('packed') ? 'packed' : 'gone';
-    return {
-      id,
-      stage: bookingStage,
-      photo: (group.find(p => p.reference_photo_url) || {}).reference_photo_url || null,
-      pieces: group.map(p => ({ id: p.id, description: p.description || '',
-        type: p.piece_type || 'Piece', found: null, status: p.status || '' })),
-    };
-  });
+  bookings = Object.keys(by).map(id => ({
+    id,
+    photo: (by[id].find(p => p.reference_photo_url) || {}).reference_photo_url || null,
+    pieces: by[id].map(p => ({ id: p.id, description: p.description || '',
+      type: p.piece_type || 'Piece', found: null })),
+  }));
   sortBookings();
   buildIdf();
   paint();
@@ -563,56 +512,26 @@ function sortBookings() {
 const gapsOf = b => b.pieces.filter(p => !p.description).length;
 
 function paint() {
-  const counts = { waiting: 0, packed: 0, gone: 0 };
-  for (const b of bookings) counts[b.stage]++;
+  const total = bookings.reduce((n, b) => n + b.pieces.length, 0);
+  const found = bookings.reduce((n, b) => n + b.pieces.filter(p => p.found).length, 0);
+  const gaps = bookings.reduce((n, b) => n + gapsOf(b), 0);
+  $('hdr').innerHTML = bookings.length
+    ? `${found} of ${total} found · ${bookings.length} booking${bookings.length === 1 ? '' : 's'}`
+      + (gaps ? ` · <span style="color:var(--warn)">${gaps} undescribed</span>` : '')
+    : 'Nothing outstanding';
 
-  // Stage tabs replace the old single flat list. The journey IS the
-  // navigation now — there is nothing else in this app to navigate to.
-  const tabs = [
-    ['waiting', 'On the shelves', counts.waiting],
-    ['packed', 'Bagged up', counts.packed],
-    ['gone', 'Collected', counts.gone],
-  ];
-  $('stages').innerHTML = tabs.map(([k, label, n]) =>
-    `<button class="stagetab ${stage === k ? 'on' : ''}" onclick="setStage('${k}')">
-       ${label}<span class="n">${n}</span></button>`).join('');
-
-  const shown = bookings.filter(b => b.stage === stage);
-  const total = shown.reduce((n, b) => n + b.pieces.length, 0);
-  const found = shown.reduce((n, b) => n + b.pieces.filter(p => p.found).length, 0);
-  const gaps = shown.reduce((n, b) => n + gapsOf(b), 0);
-
-  $('hdr').innerHTML = shown.length
-    ? (stage === 'waiting'
-        ? `${found} of ${total} found` + (gaps ? ` · <span style="color:var(--warn)">${gaps} undescribed</span>` : '')
-        : `${shown.length} booking${shown.length === 1 ? '' : 's'} · ${total} piece${total === 1 ? '' : 's'}`)
-    : '';
-
-  const empty = {
-    waiting: 'Nothing on the shelves. Photograph a finished table to start one.',
-    packed: 'Nothing bagged up yet.',
-    gone: 'Nothing collected yet.',
-  }[stage];
-
-  $('chips').innerHTML = shown.map((b) => {
-    const i = bookings.indexOf(b);
+  $('chips').innerHTML = bookings.map((b, i) => {
     const f = b.pieces.filter(p => p.found).length;
     const done = f === b.pieces.length;
     const fresh = b.pieces.some(p => p.found && p.found.surface === surfaces);
     const gap = gapsOf(b);
-    const sub = stage === 'waiting'
-      ? (gap ? gap + ' to describe' : f + ' of ' + b.pieces.length)
-      : b.pieces.length + ' piece' + (b.pieces.length === 1 ? '' : 's');
-    return `<div class="chip ${done && stage === 'waiting' ? 'done' : fresh ? 'hit' : ''} ${gap ? 'gap' : ''} ${selected === i ? 'sel' : ''}"
+    return `<div class="chip ${done ? 'done' : fresh ? 'hit' : ''} ${gap ? 'gap' : ''} ${selected === i ? 'sel' : ''}"
       onclick="openBooking(${i})">
       <div class="nm">${esc(b.id)}</div>
-      <div class="ct">${sub}</div>
+      <div class="ct">${gap ? gap + ' to describe' : f + ' of ' + b.pieces.length}</div>
     </div>`;
-  }).join('') || `<div class="mut" style="padding:6px 4px">${empty}</div>`;
+  }).join('') || '<div class="mut" style="padding:6px 4px">Nothing outstanding.</div>';
 }
-
-function setStage(k) { stage = k; selected = null; paint(); }
-window.setStage = setStage;
 
 // ── booking detail ───────────────────────────────────────────────────
 function openBooking(i) {
@@ -632,26 +551,9 @@ function openBooking(i) {
       <button onclick="editPiece(${i},${pi})" style="padding:7px 10px;font-size:12px">
         ${p.description ? 'edit' : 'write'}</button>
     </div>`).join('');
-  // The action always names exactly what happens next in the journey,
-  // and only offers the step this booking is genuinely ready for.
-  // Nothing is skippable and nothing is ambiguous: a booking on the
-  // shelves gets bagged, a bagged one gets collected, a collected one
-  // is finished and offers nothing at all.
-  const btn = $('bkPacked');
-  if (b.stage === 'waiting') {
-    const all = f === b.pieces.length;
-    btn.style.display = '';
-    btn.disabled = !all;
-    btn.textContent = all ? 'Bag up this booking' : `${b.pieces.length - f} still to find`;
-    btn.onclick = () => advance(i, 'packed', 'Bagged up');
-  } else if (b.stage === 'packed') {
-    btn.style.display = '';
-    btn.disabled = false;
-    btn.textContent = 'Customer collected it';
-    btn.onclick = () => advance(i, 'collected', 'Collected');
-  } else {
-    btn.style.display = 'none';
-  }
+  $('bkPacked').disabled = f !== b.pieces.length;
+  $('bkPacked').textContent = f === b.pieces.length ? 'Mark packed' : `${b.pieces.length - f} still to find`;
+  $('bkPacked').onclick = () => markPacked(i);
   openSheet('bkSheet');
 }
 // ── ALWAYS A WAY OUT ────────────────────────────────────────────────
@@ -718,33 +620,16 @@ function editPiece(bi, pi) {
   buildIdf(); paint(); openBooking(bi);
 }
 
-// Moves a whole booking one step along the journey. Replaces the old
-// markPacked(), which only knew the single packed step and REMOVED the
-// booking from view afterwards — wrong now that "bagged up" and
-// "collected" are real places a booking lives rather than the end of
-// it. Nothing is deleted; it moves to the next stage and stays
-// findable there.
-async function advance(i, status, label) {
+async function markPacked(i) {
   const b = bookings[i];
-  const btn = $('bkPacked');
-  const original = btn.textContent;
-  btn.disabled = true; btn.textContent = 'Saving…';
   try {
-    const r = await fetch(`${API}/api/pieces/set-booking-status`, {
+    await fetch(`${API}/api/pieces/set-booking-status`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studioId, bookingId: b.id, status, by: 'the shelf' }),
+      body: JSON.stringify({ studioId, bookingId: b.id, status: 'packed', by: 'packing session' }),
     });
-    if (!r.ok) throw new Error('server refused');
-    b.stage = status === 'collected' ? 'gone' : 'packed';
-    for (const p of b.pieces) p.status = status;
-    selected = null;
-    stage = b.stage;              // follow the booking to where it went
+    bookings.splice(i, 1); selected = null;
     buildIdf(); paint(); closeSheet('bkSheet');
-    say(`<b>${esc(b.id)} — ${esc(label.toLowerCase())}.</b>`);
-  } catch (e) {
-    btn.disabled = false; btn.textContent = original;
-    alert('Could not update that booking — it stays where it is.');
-  }
+  } catch (e) { alert('Could not update that booking.'); }
 }
 
 // ── sweep ────────────────────────────────────────────────────────────
@@ -756,20 +641,11 @@ $('sweepBtn').onclick = () => pickImage(async raw => {
   $('said').classList.remove('on');
   try {
     const wanted = [];
-    // ONLY what is genuinely still on the shelves. bookings now holds
-    // the whole journey including bagged and collected orders, so
-    // without this filter a sweep would hunt for pieces already in a
-    // bag or already gone home — and could "find" one, which is worse
-    // than useless.
-    for (const b of bookings) {
-      if (b.stage !== 'waiting') continue;
-      for (const p of b.pieces)
-        if (!p.found && p.description) wanted.push({ id: p.id, description: p.description, b, p });
-    }
+    for (const b of bookings) for (const p of b.pieces)
+      if (!p.found && p.description) wanted.push({ id: p.id, description: p.description, b, p });
     if (!wanted.length) {
       busy(false);
-      say('<b>Nothing on the shelves to look for.</b> '
-        + '<em>Photograph a finished table to put a booking here.</em>');
+      say('<b>Nothing to look for.</b> <em>Every outstanding piece still needs describing — use Add.</em>');
       return;
     }
     const found = await findInPhoto(raw, wanted.map(w => ({ id: w.id, description: w.description })));
@@ -1197,6 +1073,16 @@ async function loadBuild() {
 $('infoBtn').onclick = (e) => { e.preventDefault(); loadCost(); loadBuild(); openSheet('infoSheet'); };
 
 
+// Carry the studio through every dock link, and mark where we are.
+(function dock() {
+  const here = location.pathname.includes('takings') ? 'takings' : 'packing';
+  document.querySelectorAll('#dock a').forEach(a => {
+    const u = new URL(a.getAttribute('href'), location.origin);
+    u.searchParams.set('studio', studioId);
+    a.setAttribute('href', u.pathname + u.search);
+    if (a.dataset.here === here) a.classList.add('on');
+  });
+})();
 
 loadCost();
 load();

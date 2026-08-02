@@ -304,13 +304,6 @@ html.demo-skin .info-banner {
 html.demo-skin .info-banner strong {
   color: var(--kc-brick) !important;
 }
-  --kc-ink: #2B2724;
-  --kc-brick: #A32D21;
-  --kc-blush: #F7AFAD;
-  --kc-clay: #B87946;
-  --kc-line: rgba(43, 39, 36, 0.14);
-  --kc-card: #FFFDF9;
-}
 @media (prefers-color-scheme: dark) {
   html.demo-skin {
     --kc-paper: #201C1A;

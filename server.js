@@ -303,12 +303,7 @@ app.use('/docs', express.static(path.join(__dirname, 'docs'), staticCacheOptions
 // the /promo folder, untouched, in case they're wanted again — only the
 // routes that made them reachable are removed. Nothing about the
 // customer app (/app) or the staff app (/admin) is touched by this.
-// [26 Jul] The app is the pottery journey now. Daisy: "just pottery
-// painted to pottery collected and identified." The old dashboard is
-// still on disk and still reachable directly — nothing is deleted, and
-// a whole studio's tooling should not vanish on one afternoon's
-// decision — but it is no longer what opens.
-app.get('/', (req, res) => res.redirect('/admin/packing.html'));
+app.get('/', (req, res) => res.redirect('/admin/dashboard-local.html'));
 
 // Favicon — served from root so browsers find it automatically
 // at glazeup-api.onrender.com/favicon.ico
