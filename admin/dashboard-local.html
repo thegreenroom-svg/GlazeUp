@@ -16617,6 +16617,26 @@ async function checkShiftLogin(fromNavigation) {
     localStorage.removeItem('klnk_last_active');
   }
 
+  // [2 Aug] SOMEONE ALREADY SIGNED IN IS NEVER ASKED AGAIN BY
+  // NAVIGATION. Daisy: "I end up here after clicking Floor."
+  //
+  // checkShiftLogin() is not only a login step — populateDashboard()
+  // calls it, and opening a tab calls populateDashboard(). There is a
+  // guard for that at the top of this function, but it only fires when
+  // the caller remembered to pass fromNavigation=true, and not every
+  // caller does. Any that forgets falls all the way down here, where
+  // the session is cleared and the picker thrown up over whatever the
+  // person was actually doing.
+  //
+  // Rather than hunting every caller and hoping none is added later,
+  // the rule is stated where it matters: if someone is signed in, this
+  // path must not clear them and must not ask again. Only a genuinely
+  // absent session reaches the picker.
+  if (currentShiftStaff) {
+    applyShiftUI();
+    return;
+  }
+
   currentShiftStaff = null;
   currentShiftId = null;
   currentBreakId = null;

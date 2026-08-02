@@ -299,6 +299,8 @@ function checkLogin(html) {
     ["if (!currentShiftStaff) { forceFreshLogin(); return; }",
       'logout does nothing when logged out — the one state it is needed in'],
     ["get('reset') === '1'", 'the ?reset=1 escape hatch is gone'],
+    ['if (currentShiftStaff) {\n    applyShiftUI();\n    return;\n  }',
+      'navigation can clear a live session and show the login again'],
   ];
   for (const [needle, why] of need) {
     if (!html.includes(needle)) fail(`dashboard: LOGIN SAFEGUARD LOST — ${why}`);
