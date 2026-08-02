@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Order</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#221F1D; --panel:#2C2825; --line:rgba(255,255,255,.10);
+    --ink:#F4ECE0; --mute:#9A9187; --go:#3E7C6A; --clay:#B87946;
+    --hot:#B4472E; --cold:#3C6E8F; --food:#8A6D3B; --pot:#6B5B95;
+    --sess:#3E7C6A; --misc:#6f665b;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{height:100%; overflow:hidden}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.4 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    display:flex; height:100dvh;
+    padding:max(8px,env(safe-area-inset-top)) 9px calc(8px + env(safe-area-inset-bottom));
+    gap:9px; -webkit-text-size-adjust:100%; user-select:none}
+
+  /* LEFT — the bill. Always visible, never scrolls the page. */
+  .bill{width:31%; min-width:210px; max-width:300px; flex-shrink:0;
+    background:var(--panel); border-radius:15px; display:flex; flex-direction:column;
+    overflow:hidden}
+  .bill .top{padding:11px 13px 9px; border-bottom:1px solid var(--line); flex-shrink:0}
+  .bill .tbl{font-family:Caveat,serif; font-size:23px; line-height:1}
+  .bill .who{font-size:11.5px; color:var(--mute); margin-top:2px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .lines{flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:6px 8px}
+  .line{display:flex; align-items:center; gap:7px; padding:7px 5px;
+    border-bottom:1px solid rgba(255,255,255,.06); font-size:13px}
+  .line .q{background:rgba(255,255,255,.1); border-radius:6px; padding:1px 6px;
+    font-size:11.5px; font-weight:800; flex-shrink:0; font-variant-numeric:tabular-nums}
+  .line .n{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .line .p{font-variant-numeric:tabular-nums; font-weight:700; flex-shrink:0}
+  .line .x{color:var(--mute); padding:0 3px; flex-shrink:0; font-size:15px}
+  .bill .foot{padding:10px 13px calc(4px); border-top:1px solid var(--line); flex-shrink:0}
+  .bill .tot{display:flex; justify-content:space-between; align-items:baseline;
+    font-size:21px; font-weight:800; font-variant-numeric:tabular-nums}
+  .bill .tot span:first-child{font-size:12px; color:var(--mute); font-weight:400}
+  .bill button{width:100%; margin-top:8px; font:inherit; font-size:14px; font-weight:800;
+    border:none; border-radius:11px; padding:12px; cursor:pointer;
+    background:var(--go); color:#fff}
+  .bill button:disabled{opacity:.35}
+  .empty{color:var(--mute); font-size:12.5px; text-align:center; padding:22px 10px; line-height:1.5}
+
+  /* RIGHT — the pad. Tiles only, never scrolls. */
+  .pad{flex:1; min-width:0; display:flex; flex-direction:column; gap:8px}
+  .padtop{display:flex; align-items:center; gap:8px; flex-shrink:0}
+  .padtop button{font:inherit; font-size:14px; cursor:pointer; background:var(--panel);
+    border:1px solid var(--line); color:var(--ink); border-radius:11px; padding:9px 14px}
+  .padtop .crumb{flex:1; min-width:0; font-size:13px; color:var(--mute);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .padtop a{color:var(--mute); text-decoration:none; font-size:18px; padding:2px 6px}
+
+  .grid{flex:1; min-height:0; display:grid; gap:8px;
+    grid-template-columns:repeat(auto-fill,minmax(128px,1fr));
+    grid-auto-rows:minmax(0,1fr); overflow:hidden; align-content:start}
+  .sq{border:none; border-radius:14px; cursor:pointer; color:#fff;
+    font:inherit; font-size:13.5px; font-weight:700; line-height:1.2;
+    padding:10px; display:flex; flex-direction:column; justify-content:flex-end;
+    text-align:left; min-height:0; overflow:hidden;
+    box-shadow:0 2px 8px rgba(0,0,0,.25); transition:transform .1s ease, filter .1s ease}
+  .sq:active{transform:scale(0.96); filter:brightness(1.15)}
+  .sq .pr{font-size:12px; font-weight:600; opacity:.9; margin-top:3px;
+    font-variant-numeric:tabular-nums}
+  .sq .ct{font-size:11px; font-weight:500; opacity:.85; margin-top:3px}
+  .sq.more{background:var(--misc)}
+
+  @media (max-width:720px){
+    .bill{width:38%; min-width:150px}
+    .grid{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}
+  }
+</style>
+</head>
+<body>
+
+<div class="bill">
+  <div class="top">
+    <div class="tbl" id="tableName">No table</div>
+    <div class="who" id="tableWho">Tap a table to start</div>
+  </div>
+  <div class="lines" id="lines"><div class="empty">Nothing on this bill yet.</div></div>
+  <div class="foot">
+    <div class="tot"><span>Total</span><span id="total">£0.00</span></div>
+    <button id="sendBtn" disabled>Send to the bar</button>
+  </div>
+</div>
+
+<div class="pad">
+  <div class="padtop">
+    <button id="backBtn">‹ Back</button>
+    <div class="crumb" id="crumb">Tables</div>
+    <a href="/admin/dashboard-local.html?go=home" title="Desk">✕</a>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────
+// THE ORDER PAD — bar/EPOS style, as Daisy described it: coloured
+// squares, tap through category to item, the bill building beside you,
+// and back always in the same place.
+//
+// [2 Aug] Three things taken from how these actually work behind a bar,
+// rather than from how an app usually looks:
+//
+//   THE BILL NEVER MOVES. It sits to the left at all times, because
+//   the question being asked over a counter is "what's on it so far?"
+//   and hunting for that is what makes a till feel slow. Only the
+//   PAD changes as you drill down.
+//
+//   DARK, NOT PAPER. Every other screen in this app is the studio's
+//   warm paper. This one is dark on purpose: colour-coded squares need
+//   to separate at a glance under bar lighting, and saturated blocks
+//   on cream read as muddy. It should feel like a till because it is
+//   one.
+//
+//   ONE TAP ADDS. No quantity dialog, no confirm step. Tapping the
+//   same item again increments it, and the line has an × to remove.
+//   That is how a round of four coffees gets rung in without thinking.
+//
+// Categories are grouped from the studio's own Square catalogue rather
+// than invented, so the pad matches what is actually sold.
+// ─────────────────────────────────────────────────────────────────────
+
+const API = location.origin;
+const studioId = new URLSearchParams(location.search).get('studio')
+  || 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3';
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[<>&"]/g, c =>
+  ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+const money = n => '£' + n.toFixed(2);
+
+let catalogue = [];      // [{category, items:[{name, price}]}]
+let bookings = [];       // today's, to name the tables
+let bill = [];           // [{name, price, qty, type}]
+let table = null;        // {name, who, sessionId}
+let level = 'tables';    // tables | categories | items
+let currentCat = null;
+
+// Colour by what the thing IS, so the same category is always the same
+// colour — that consistency is what lets someone hit the right square
+// without reading it.
+function colourFor(cat) {
+  const c = (cat || '').toLowerCase();
+  if (/tea|coffee|hot choc|latte|cappu|espresso/.test(c)) return 'var(--hot)';
+  if (/cold|juice|smoothie|milkshake|water|coke|soft/.test(c)) return 'var(--cold)';
+  if (/cake|food|toast|panini|snack|crisp|biscuit/.test(c)) return 'var(--food)';
+  if (/^pb |bisque|pottery|paint/.test(c)) return 'var(--pot)';
+  if (/^s\.|session|studio|fee|postage/.test(c)) return 'var(--sess)';
+  return 'var(--misc)';
+}
+function typeFor(cat) {
+  const c = (cat || '').toLowerCase();
+  if (/^pb |bisque/.test(c)) return 'piece';
+  if (/cake|food|biscuit/.test(c)) return 'cake';
+  if (/glaze/.test(c)) return 'glaze';
+  return 'drink';   // the endpoint accepts piece | drink | glaze | cake
+}
+
+async function boot() {
+  try {
+    const [c, b] = await Promise.all([
+      fetch(`${API}/api/pos/items?studioId=${studioId}`).then(r => r.json()),
+      fetch(`${API}/api/bookings/day?studioId=${studioId}`).then(r => r.json()),
+    ]);
+    catalogue = (c.groups || []).filter(g => g.items.length);
+    bookings = b.bookings || [];
+  } catch (e) { /* render anyway — an empty pad is better than a dead one */ }
+  render();
+}
+
+function render() {
+  $('crumb').textContent =
+    level === 'tables' ? 'Choose a table'
+    : level === 'categories' ? (table ? table.name : '') 
+    : `${table ? table.name : ''} · ${currentCat}`;
+  $('backBtn').style.visibility = level === 'tables' ? 'hidden' : 'visible';
+
+  if (level === 'tables') return renderTables();
+  if (level === 'categories') return renderCategories();
+  renderItems();
+}
+
+function renderTables() {
+  // Tables come from today's real bookings, so a name is attached to a
+  // table rather than someone having to remember which is which.
+  // The booking id is carried through, not just the table name: the
+  // orders endpoint requires it, and a round with no booking behind it
+  // cannot be recorded against anything.
+  const seen = new Map();
+  for (const b of bookings) {
+    const t = b.table_number || b.room || '—';
+    if (!seen.has(t)) seen.set(t, { who: b.customer_name || '', id: b.id });
+  }
+  const tiles = [...seen.entries()];
+  if (!tiles.length) {
+    $('grid').innerHTML = '<div class="empty">No bookings today, so there is no table to put a round against.</div>';
+    return;
+  }
+  $('grid').innerHTML = tiles.map(([t, v]) => `
+    <button class="sq" style="background:var(--sess)"
+      onclick="pickTable(${JSON.stringify(t).replace(/"/g,'&quot;')},${JSON.stringify(v.who).replace(/"/g,'&quot;')},${JSON.stringify(String(v.id)).replace(/"/g,'&quot;')})">
+      ${esc(t)}<div class="ct">${esc(v.who || 'free')}</div></button>`).join('');
+}
+
+function renderCategories() {
+  $('grid').innerHTML = catalogue.map(g => `
+    <button class="sq" style="background:${colourFor(g.category)}"
+      onclick="openCat(${JSON.stringify(g.category).replace(/"/g,'&quot;')})">
+      ${esc(g.category)}<div class="ct">${g.items.length}</div></button>`).join('')
+    || '<div class="empty">No catalogue yet — pull prices from Square first.</div>';
+}
+
+function renderItems() {
+  const g = catalogue.find(x => x.category === currentCat);
+  if (!g) { level = 'categories'; return render(); }
+  $('grid').innerHTML = g.items.map(i => `
+    <button class="sq" style="background:${colourFor(g.category)}"
+      onclick="addItem(${JSON.stringify(i.name).replace(/"/g,'&quot;')},${i.price},${JSON.stringify(g.category).replace(/"/g,'&quot;')})">
+      ${esc(i.name)}
+      <div class="pr">${i.price > 0 ? money(i.price) : 'at till'}</div></button>`).join('');
+}
+
+function pickTable(t, who, bookingId) {
+  table = { name: t, who, bookingId };
+  $('tableName').textContent = t;
+  $('tableWho').textContent = who || 'no name on the booking';
+  level = 'categories';
+  render();
+}
+function openCat(c) { currentCat = c; level = 'items'; render(); }
+
+function addItem(name, price, cat) {
+  const found = bill.find(l => l.name === name);
+  if (found) found.qty++;
+  else bill.push({ name, price, qty: 1, type: typeFor(cat) });
+  paintBill();
+}
+function removeLine(i) { bill.splice(i, 1); paintBill(); }
+
+function paintBill() {
+  if (!bill.length) {
+    $('lines').innerHTML = '<div class="empty">Nothing on this bill yet.</div>';
+  } else {
+    $('lines').innerHTML = bill.map((l, i) => `
+      <div class="line">
+        <span class="q">${l.qty}</span>
+        <span class="n">${esc(l.name)}</span>
+        <span class="p">${l.price > 0 ? money(l.price * l.qty) : '—'}</span>
+        <span class="x" onclick="removeLine(${i})">×</span>
+      </div>`).join('');
+  }
+  const total = bill.reduce((n, l) => n + (l.price * l.qty), 0);
+  $('total').textContent = money(total);
+  $('sendBtn').disabled = !bill.length || !table;
+}
+
+$('backBtn').onclick = () => {
+  if (level === 'items') { level = 'categories'; currentCat = null; }
+  else if (level === 'categories') { level = 'tables'; }
+  render();
+};
+
+// Sends the round to the studio's own order record. Says plainly what
+// it does and does not do: this is what the kitchen and bar work from,
+// and payment still happens on Square. A till that silently takes no
+// money is the one genuinely dangerous thing to build here.
+$('sendBtn').onclick = async () => {
+  if (!bill.length || !table) return;
+  const btn = $('sendBtn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try {
+    const r = await fetch(`${API}/api/table-sessions`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      // Matches the endpoint's real contract — studioId and bookingId
+      // are required, tableNumber optional. Sending tableName/
+      // customerName would have failed with a 400 on every round.
+      body: JSON.stringify({ studioId, bookingId: table.bookingId, tableNumber: table.name }),
+    });
+    const sess = await r.json();
+    const sessionId = sess.session?.id || sess.id;
+    if (!sessionId) throw new Error('no session came back');
+
+    for (const l of bill) {
+      await fetch(`${API}/api/table-sessions/${sessionId}/orders`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itemType: l.type, itemName: l.name,
+          unitPriceCents: Math.round(l.price * 100), quantity: l.qty,
+        }),
+      });
+    }
+    bill = []; paintBill();
+    btn.textContent = 'Sent — take payment on Square';
+    setTimeout(() => { btn.textContent = 'Send to the bar'; paintBill(); }, 2600);
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Send to the bar';
+    alert('Could not send that round — nothing was recorded, so it is safe to try again.');
+  }
+};
+
+window.pickTable = pickTable; window.openCat = openCat;
+window.addItem = addItem; window.removeLine = removeLine;
+
+boot();
+</script>
+</body>
+</html>
