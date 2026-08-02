@@ -177,3 +177,33 @@ body > .top {
   height:40px !important; min-height:40px !important; max-height:40px !important;
   padding:0 10px !important;
 }
+
+
+/* ── THE HEADER BUTTON ROW ──────────────────────────────────────────
+   [2 Aug] In every screenshot today this row has run off the right
+   edge of the screen with the studio logo squashed to "Th..." beneath
+   it. It scrolls horizontally, so nothing is unreachable — but a row
+   that visibly overflows reads as broken, and the logo being crushed
+   makes the whole header look like a rendering fault rather than a
+   design.
+
+   The container already had overflow-x:auto and min-width:0. What it
+   lacked was any limit on how much room the buttons could demand
+   before the logo gave up its own space. Given a floor to sit on, the
+   logo keeps its size and the buttons scroll within what is left. */
+#admin-header-right-buttons {
+  flex-shrink:1 !important;
+  min-width:0 !important;
+  gap:6px !important;
+  padding:2px 0 !important;
+  scrollbar-width:none !important;
+  -webkit-overflow-scrolling:touch !important;
+  mask-image:linear-gradient(to right, #000 calc(100% - 18px), transparent) !important;
+}
+#admin-header-right-buttons::-webkit-scrollbar { display:none !important; }
+
+/* The logo and studio name stop being squeezed to "Th..." — they hold
+   their width and the buttons take what remains. */
+.admin-header-left, .admin-header-brand {
+  flex-shrink:0 !important; min-width:auto !important;
+}
