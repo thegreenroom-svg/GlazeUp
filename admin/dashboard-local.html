@@ -15,7 +15,13 @@
   <link rel="stylesheet" href="/css/demo-skin.css">
   <link rel="stylesheet" href="/css/demo-skin-deep.css">
   <link rel="stylesheet" href="/css/demo-skin-modern.css">
-  <script>if (window.DEMO_SKIN) document.documentElement.classList.add('demo-skin');</script>
+  <script>if (window.DEMO_SKIN) document.documentElement.classList.add('demo-skin');
+  // [2 Aug] Marks THIS as the staff app. css/demo-skin.css is shared
+  // with the customer app (app/index.html loads the same file), so any
+  // rule that should only apply here — the one-screen no-scroll rule
+  // above all — must be scoped to this class or it silently freezes a
+  // phone app that legitimately needs to scroll.
+  document.documentElement.classList.add('kc-staff-app');</script>
   <script src="/demo-skin.js" defer></script>
   <script src="/demo-skin-deep-all.js" defer></script>
   <script src="/demo-skin-money.js" defer></script>

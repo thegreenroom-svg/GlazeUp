@@ -729,14 +729,20 @@ html.demo-skin .view { background: var(--kc-paper) !important; }
    page that scrolls and a list that does. The rule is that the SCREEN
    holds still, not that content cannot be long.
    ═══════════════════════════════════════════════════════════════════ */
-html.demo-skin, html.demo-skin body {
+/* SCOPED TO THE STAFF APP. [2 Aug] This file is shared with the
+   customer app, which loads the same stylesheet — an unscoped
+   overflow:hidden here would freeze a phone app that genuinely needs
+   to scroll, and it would have shipped that way. The one-screen rule
+   is a studio-tablet requirement, not a universal one. */
+html.demo-skin.kc-staff-app,
+html.demo-skin.kc-staff-app body {
   height: 100dvh; max-height: 100dvh; overflow: hidden;
 }
 /* Panels that legitimately hold long lists scroll within themselves,
    so the page behind them never moves. */
-html.demo-skin .view,
-html.demo-skin #kc-canvas,
-html.demo-skin .chart-container {
+html.demo-skin.kc-staff-app .view,
+html.demo-skin.kc-staff-app #kc-canvas,
+html.demo-skin.kc-staff-app .chart-container {
   max-height: 100dvh;
 }
 html.demo-skin .kc-list,
