@@ -25850,8 +25850,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       // protect, so it is pure friction on every open — dismissed
       // unconditionally rather than gated on a session that no longer
       // means anything.
-      const stillValid = !forceRelogin && previousSession
-        && lastActiveAt && (hoursSinceActive * 60) < 30;
+      // [2 Aug] NO SESSION MEANS NOTHING TO PROTECT. The splash sat
+      // waiting for a tap with only the login behind it — Daisy
+      // photographed the rescue button appearing, which is the app
+      // correctly noticing it had stalled on a screen with no purpose.
+      // The tap exists to guard a resumed session; with none, it is
+      // one more thing between someone and the name picker.
+      const stillValid = (!previousSession && !forceRelogin)
+        || (!forceRelogin && previousSession
+            && lastActiveAt && (hoursSinceActive * 60) < 30);
       if (stillValid) {
         setTimeout(() => { if (typeof window.dismissSplash === 'function') window.dismissSplash(); }, 60);
       }
