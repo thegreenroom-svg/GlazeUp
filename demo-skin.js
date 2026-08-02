@@ -275,7 +275,7 @@
       // pixel matcher, which the packing session replaced with the
       // engine that works. One door to finding a piece, not two.
 
-      { id: 'team', fn: null, label: 'Team & duties', icon: '👥', desc: 'Who does what today' },
+      { id: 'team', fn: null, label: 'Team', icon: '👥', desc: 'Who does what today' },
       { id: 'tell-daisy', fn: 'openTellPicker', label: 'Tell Daisy', icon: '💬', desc: 'Good or bad, say it' },
     ];
     if (isDirector()) {

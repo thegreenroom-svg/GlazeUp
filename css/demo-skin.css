@@ -508,7 +508,7 @@ html.demo-skin .kc-tile-l {
   font-size: 13px; font-weight: 700; color: var(--m-text, #2B2724);
   line-height: 1.2; letter-spacing: -0.01em;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  overflow: hidden; word-break: break-word;
+  overflow: hidden;
 }
 
 /* Day navigation header — arrows + calendar + today, right-aligned. */
@@ -884,4 +884,65 @@ html.demo-skin #grid-nav-view > div > div {
   display: grid !important;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important;
   gap: 8px !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   ONE TILE. THE SAME EVERYWHERE. [2 Aug]
+
+   Daisy: "why are all the boxes weird... just make everything
+   standardised, everything the same, so it looks uniform."
+
+   She is right, and the cause was mine twice over:
+
+   1. .kc-section-grow .kc-index set grid-auto-rows:1fr and height:100%
+      so the grid stretched its rows to fill the screen. Five tiles on a
+      tall screen became five very tall boxes with a small icon and a
+      label floating in the middle of each. Nothing was wrong with the
+      tile — the ROW was being stretched around it.
+
+   2. word-break:break-word, which I added an hour ago to stop labels
+      overflowing, snapped whole words instead: "Bookin / gs",
+      "Collect / ions". It solved overflow by creating something worse.
+
+   So: one fixed tile height, rows that do not stretch, labels on one
+   line that shorten with an ellipsis rather than breaking mid-word, and
+   the same rule applied to every tile in the app. Uniform because there
+   is one definition, not because several were nudged to match.
+   ═══════════════════════════════════════════════════════════════════ */
+html.demo-skin .kc-index,
+html.demo-skin .kc-section-grow .kc-index {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  grid-auto-rows: 56px;          /* fixed — never stretched to fill */
+  align-content: start;
+  height: auto;
+  gap: 8px;
+}
+html.demo-skin .kc-tile,
+html.demo-skin .kc-section-grow .kc-tile {
+  min-height: 56px; height: 56px; aspect-ratio: auto;
+  display: flex; flex-direction: row; align-items: center;
+  justify-content: flex-start; gap: 10px;
+  padding: 0 12px; text-align: left;
+  border: none; border-radius: 14px;
+  background: var(--kc-card, #FFFDF9);
+  box-shadow: 0 1px 2px rgba(43,39,36,.06), 0 5px 14px -11px rgba(43,39,36,.3);
+}
+html.demo-skin .kc-tile-i {
+  width: 30px; height: 30px; min-width: 30px;
+  font-size: 17px; border-radius: 9px;
+  background: rgba(184,121,70,0.12);
+  display: flex; align-items: center; justify-content: center;
+}
+html.demo-skin .kc-tile-l {
+  flex: 1; min-width: 0;
+  font-size: 13px; font-weight: 700; line-height: 1.2;
+  color: var(--kc-ink, #2B2724);
+  /* One line, shortened with an ellipsis. A word is never broken in
+     half — "Bookin gs" is harder to read than "Team & du…" and looks
+     like a fault rather than a shortening. */
+  display: block; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+  -webkit-line-clamp: none;
 }
