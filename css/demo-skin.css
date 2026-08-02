@@ -973,6 +973,13 @@ html.kc-money-parked [data-money],
 html.kc-money-parked .kc-money-only {
   display: none !important;
 }
+/* [2 Aug] ...except the single door. Daisy asked for the revenue side
+   back "on one button that takes you into everything separate" — so
+   the figures stay off every working screen, and one tile leads to the
+   page that holds them all. Hiding that tile too would park the thing
+   she asked to unpark. */
+html.kc-money-parked .kc-tile[data-id="money"],
+html.kc-money-parked #kc-dock-money { display: flex !important; }
 
 /* The stat strip holds the money figure first; with it hidden the
    remaining stats close up rather than leaving a gap where a number

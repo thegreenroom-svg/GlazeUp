@@ -9590,6 +9590,13 @@ function _enterProcess(key) {
 }
 
 
+// [2 Aug] The single financial door. Everything else money-related is
+// reached from inside it rather than from the working screens.
+function openMoney() {
+  window.location.href = '/admin/money.html?studio=' + encodeURIComponent(studioId);
+}
+window.openMoney = openMoney;
+
 function openTakings() {
   document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
   const dashboardView = document.getElementById('dashboard-view');

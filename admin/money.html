@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Money</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FFF9F0; --panel:#FFFDF9; --line:rgba(43,39,36,.14);
+    --ink:#2B2724; --mute:#6f665b; --go:#3E7C6A; --clay:#B87946;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{height:100%; overflow:hidden}
+  body{margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.4 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    display:flex; flex-direction:column;
+    padding:max(10px,env(safe-area-inset-top)) 11px calc(10px + env(safe-area-inset-bottom));
+    -webkit-text-size-adjust:100%}
+  .top{display:flex; align-items:baseline; gap:10px; flex-shrink:0; padding:2px 2px 8px}
+  .top h1{font-family:Caveat,serif; font-size:27px; margin:0; line-height:1}
+  .top .n{font-size:12.5px; color:var(--mute); flex:1; min-width:0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .top a{color:var(--mute); font-size:19px; text-decoration:none; padding:2px 6px}
+
+  /* Today's figure earns its size — it is the one number anyone opens
+     this screen to see, and burying it in a tile would be perverse. */
+  .today{flex-shrink:0; background:var(--panel); border:1.5px solid var(--line);
+    border-radius:16px; padding:14px 16px; margin-bottom:10px}
+  .today .k{font-size:11px; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--clay); font-weight:700}
+  .today .v{font-size:30px; font-weight:800; margin-top:2px; font-variant-numeric:tabular-nums}
+  .today .s{font-size:12px; color:var(--mute); margin-top:2px}
+
+  .grid{display:grid; gap:8px; align-content:start;
+    grid-template-columns:repeat(auto-fill,minmax(148px,1fr));
+    grid-auto-rows:56px}
+  .sq{border:none; border-radius:14px; background:var(--panel); color:var(--ink);
+    box-shadow:0 1px 2px rgba(43,39,36,.06), 0 5px 14px -11px rgba(43,39,36,.3);
+    display:flex; align-items:center; gap:10px; padding:0 12px;
+    text-align:left; font:inherit; cursor:pointer; text-decoration:none}
+  .sq:active{transform:scale(.97); background:#FFF6EA}
+  .sq .i{width:30px; height:30px; min-width:30px; font-size:17px; border-radius:9px;
+    background:rgba(184,121,70,.12); display:flex; align-items:center; justify-content:center}
+  .sq .t{flex:1; min-width:0; font-size:13px; font-weight:700;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .note{font-size:11.5px; color:var(--mute); padding-top:10px; line-height:1.5}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>Money</h1>
+  <div class="n" id="hdr"></div>
+  <a href="/admin/dashboard-local.html?go=home" title="Back to the Desk">✕</a>
+</div>
+
+<div class="today">
+  <div class="k" id="todayLabel">Today</div>
+  <div class="v" id="todayValue">—</div>
+  <div class="s" id="todaySub">Loading…</div>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<div class="note">
+  Everything financial lives here. Nothing on the working screens shows
+  takings or costs, so the studio side stays about pottery.
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────
+// MONEY — one door. [2 Aug]
+//
+// Daisy: "bring back the revenue stuff, just on one button that takes
+// you into everything separate."
+//
+// The financial pages were never deleted when she asked to park them —
+// they were hidden behind a flag precisely so this could be a decision
+// rather than a rebuild. This is that decision: one entry point, with
+// everything behind it, instead of takings and digests scattered
+// across working screens where they distracted from the job.
+//
+// Today's figure is shown at full size rather than as a tile. It is
+// the one number anyone opens this screen for, and it comes from
+// /api/takings/today which syncs and WAITS rather than guessing — the
+// same endpoint that fixed "not synced yet" on the Desk.
+// ─────────────────────────────────────────────────────────────────────
+
+const API = location.origin;
+const studioId = new URLSearchParams(location.search).get('studio')
+  || 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3';
+const $ = id => document.getElementById(id);
+const money = n => '£' + n.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const q = '?studio=' + encodeURIComponent(studioId);
+
+const PAGES = [
+  ['📈', 'Takings',        '/admin/takings.html'],
+  ['▤',  'Breakdown',      '/admin/breakdown.html'],
+  ['🧾', 'Prices',         '/admin/prices.html'],
+  ['🟩', 'Till',           '/admin/till.html'],
+];
+
+$('grid').innerHTML = PAGES.map(([i, t, href]) =>
+  `<a class="sq" href="${href}${q}"><span class="i">${i}</span><span class="t">${t}</span></a>`).join('');
+
+(async function today() {
+  try {
+    const r = await fetch(`${API}/api/takings/today?studioId=${studioId}`);
+    const d = await r.json();
+    if (d.value === null || d.value === undefined) {
+      $('todayValue').textContent = '—';
+      $('todaySub').textContent = 'Nothing recorded yet';
+      return;
+    }
+    $('todayValue').textContent = money(d.value);
+    // Says WHICH day the figure is from. A number labelled "today" that
+    // is actually yesterday's is worse than no number.
+    $('todayLabel').textContent = d.label === 'yesterday' ? 'Yesterday' : 'Today';
+    $('todaySub').textContent = d.label === 'yesterday'
+      ? 'Today has not synced from Square yet'
+      : 'Synced from Square';
+  } catch (e) {
+    $('todaySub').textContent = 'Could not reach the server';
+  }
+})();
+</script>
+  <link rel="stylesheet" href="/css/kc-uniform.css">
+</body>
+</html>

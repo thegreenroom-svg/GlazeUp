@@ -288,6 +288,9 @@
       { id: 'break', fn: 'toggleBreak', label: 'Break', icon: '☕', desc: 'Start or end a break' },
       { id: 'sync', fn: 'syncLiveData', label: 'Sync', icon: '🔄', desc: 'Pull from Square now' },
       { id: 'logout', fn: 'confirmDirectLogout', label: 'Log out', icon: '🚪', desc: 'End your shift' },
+      // [2 Aug] Revenue back, but as ONE door rather than scattered
+      // across working screens. Everything financial lives behind this.
+      { id: 'money', fn: 'openMoney', label: 'Money', icon: '💷', desc: 'Takings, prices, till' },
     ];
     if (isDirector()) {
       picks.push({ id: 'daily-digest', fn: 'openDailyDigest', label: 'Daily digest', icon: '📊', desc: 'Yesterday · the week · what\u2019s next' });
