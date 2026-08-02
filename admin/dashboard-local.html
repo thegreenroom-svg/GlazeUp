@@ -16554,7 +16554,31 @@ async function checkShiftLogin(fromNavigation) {
   // still appears immediately at the real 15-minute mark, unaffected —
   // this only stops the DEFERRED consequence from ambushing whatever
   // the person taps next, sometimes minutes or hours later.
-  if (_hasLanded) { applyShiftUI(); return; }
+  // [2 Aug] THE REASON "STILL NO LOGIN" KEPT HAPPENING.
+  //
+  // Found by tracing every branch of this function rather than guessing
+  // at symptoms again — Daisy, rightly: "there's no point doing all
+  // this unless you do a full audit of every walkthrough."
+  //
+  // This guard exists for a real reason: checkShiftLogin() runs on
+  // every Dashboard open via populateDashboard(), so a deferred
+  // idle-relogin flag could ambush an ordinary tap long after the
+  // person had resumed working. Once a landing decision has been made
+  // this page-load, don't disrupt it.
+  //
+  // But it returns BEFORE the picker is shown, and _hasLanded is set by
+  // markSessionActive() — which every login-success path and the resume
+  // branch call. So the moment anything has landed on home during this
+  // page life, the login picker can never be reached, no matter how
+  // genuinely absent the session is. Clearing the session then made it
+  // worse rather than better: no session AND no way to be asked for
+  // one.
+  //
+  // The guard should protect an EXISTING session from interruption,
+  // which is what it was written for. With no session to protect there
+  // is nothing to interrupt, and the picker is the only correct
+  // outcome.
+  if (_hasLanded && (currentShiftStaff || previousSession)) { applyShiftUI(); return; }
 
   if (previousSession) {
     // Genuinely stale session (past the timeout, idle-flagged, or a
