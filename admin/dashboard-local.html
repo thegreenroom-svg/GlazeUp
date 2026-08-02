@@ -22731,12 +22731,42 @@ function remindStaffA2HSLater() {
 // the task queue drawer first. Confirms first since logging out mid-task
 // is disruptive and clocks the person out immediately.
 function confirmDirectLogout() {
-  if (!currentShiftStaff) return;
+  // [2 Aug] Was: if (!currentShiftStaff) return; — so Logout did
+  // NOTHING whenever nobody was signed in, which is precisely the
+  // state you need it in. Daisy was stranded on the old home screen
+  // with a Logout button that silently ignored every tap and no other
+  // way back to the login. A dead exit is worse than no exit: you
+  // stop looking for another way out.
+  if (!currentShiftStaff) { forceFreshLogin(); return; }
   const name = currentShiftStaff.name;
   if (confirm(`Log out ${name}?`)) {
     logOutOfShift();
   }
 }
+
+// The guaranteed way back to a clean login, depending on nothing that
+// might already be broken: clear the stored session and reload. Also
+// reachable without tapping anything, via ?reset=1, for when the
+// screen itself is unresponsive.
+function forceFreshLogin() {
+  try {
+    ['klnk_shift_staff', 'klnk_shift_id', 'klnk_break_id',
+     'klnk_last_active', 'klnk_force_relogin', 'klnk_login_epoch']
+      .forEach(k => localStorage.removeItem(k));
+  } catch (e) {}
+  location.replace(location.pathname);
+}
+window.forceFreshLogin = forceFreshLogin;
+
+// ?reset=1 — the escape hatch. Runs before anything else can fail.
+try {
+  if (new URLSearchParams(location.search).get('reset') === '1') {
+    ['klnk_shift_staff', 'klnk_shift_id', 'klnk_break_id',
+     'klnk_last_active', 'klnk_force_relogin', 'klnk_login_epoch']
+      .forEach(k => localStorage.removeItem(k));
+    history.replaceState({}, '', location.pathname);
+  }
+} catch (e) {}
 
 // Platform Revenue is director-level data — only visible to named
 // directors, checked against the logged-in shift staff member's name.
