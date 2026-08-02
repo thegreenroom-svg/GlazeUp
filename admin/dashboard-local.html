@@ -16201,7 +16201,13 @@ function startAlertPolling() {
 // all features (task queue, step counter, headset
 // help) remain visible using a placeholder identity.
 // ═══════════════════════════════════════════
-const SHIFT_PIN_LOGIN_ENABLED = true; // genuine real login restored after tonight's presentation
+// [2 Aug] Daisy, with the app opening to a blank screen in a live
+// studio: straight past the splash, straight to the home screen.
+// Her call, her studio — noted honestly that with no login the
+// timesheet and every "who did this" record attribute to one identity,
+// so those figures cannot be trusted while this is false. Flip back to
+// true to restore real PIN login; nothing else needs changing.
+const SHIFT_PIN_LOGIN_ENABLED = false;
 
 // Demo mode: shows the "everyone uses 0000" notice on the PIN screen.
 // Set to false once real individual PINs are in use and you don't want
@@ -16391,7 +16397,19 @@ async function checkShiftLogin(fromNavigation) {
     // SHIFT_PIN_LOGIN_ENABLED back to true after tonight to restore
     // real, genuine PIN-based login.
     currentShiftStaff = currentShiftStaff || { id: 'testing', name: 'David', role: 'Director' };
+    markSessionActive();
     applyShiftUI();
+    // THE BLANK SCREEN. applyShiftUI() dresses the interface but
+    // navigates nowhere, and the boot sequence has already hidden every
+    // .view — so with login skipped nothing was ever shown and the page
+    // sat empty under the header, which is exactly what Daisy
+    // photographed. Landing has to be explicit here, the same way the
+    // resume path does it a few hundred lines below.
+    try {
+      if (window.DEMO_SKIN && window.KC && typeof KC.showCanvas === 'function') KC.showCanvas();
+      else if (typeof landOnHome === 'function') landOnHome();
+      else if (typeof goToRealLandingPage === 'function') goToRealLandingPage();
+    } catch (e) { console.warn('[boot] landing failed', e); }
     return;
   }
 
@@ -25656,8 +25674,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       // mean the splash skips but the login still appears behind it,
       // or the reverse — which is exactly the kind of half-state that
       // has cost real testing time on this app.
-      const stillValid = !forceRelogin && previousSession
-        && lastActiveAt && (hoursSinceActive * 60) < 30;
+      // With PIN login off there is nothing behind the splash to
+      // protect, so it is pure friction on every open — dismissed
+      // unconditionally rather than gated on a session that no longer
+      // means anything.
+      const stillValid = (typeof SHIFT_PIN_LOGIN_ENABLED !== 'undefined' && !SHIFT_PIN_LOGIN_ENABLED)
+        || (!forceRelogin && previousSession
+            && lastActiveAt && (hoursSinceActive * 60) < 30);
       if (stillValid) {
         setTimeout(() => { if (typeof window.dismissSplash === 'function') window.dismissSplash(); }, 60);
       }
@@ -34410,6 +34433,11 @@ function resetIdleTimer() {
   idleTimer = setTimeout(triggerIdleSplash, IDLE_TIMEOUT_MS);
 }
 function triggerIdleSplash() {
+  // [2 Aug] Daisy: login alerts off. With PIN login disabled this can
+  // only ever interrupt — there is no session behind it to protect, so
+  // throwing the splash over a working screen after a few idle minutes
+  // is pure obstruction. Returns before doing anything.
+  if (!SHIFT_PIN_LOGIN_ENABLED) return;
   // Only genuinely meaningful if someone's actually logged in — no
   // point flagging "put down" state before anyone's started a shift.
   if (currentShiftStaff && currentShiftStaff.id !== 'testing') {
@@ -34488,6 +34516,12 @@ function _dismissIdleAsk(stay) {
 }
 
 function showIdleAsk() {
+  // Off with the login alerts too — this is the "still on this?" card
+  // that appears after two idle minutes and navigates home on its own
+  // if nobody answers. Useful when an unattended iPad might be showing
+  // someone's private tile order; meaningless when there is no login
+  // at all, and it moves the screen under whoever picks it up next.
+  if (!SHIFT_PIN_LOGIN_ENABLED) return;
   if (document.getElementById('idle-ask-card')) return;
   if (!currentShiftStaff) return;                       // nobody on shift
   if (_floorViewMode === 'plan' && currentTab === 'floor-plan') return;  // already home
