@@ -17339,7 +17339,18 @@ function _blankScreenWatchdog() {
         .some(v => v.offsetParent !== null && getComputedStyle(v).display !== 'none');
       if (anyView) return;
 
-      console.warn('[boot] nothing on screen after 3s — showing the login');
+      // [2 Aug] NEVER over a live session. Daisy kept landing on the
+      // login after tapping Floor, and this was one of two causes: the
+      // floor plan can take longer than the watchdog's timeout to
+      // render — Render cold starts, a slow floor fetch — so the
+      // watchdog decided the screen was blank and threw the login over
+      // someone mid-task. A rescue that interrupts working people is
+      // not a rescue. It exists for a genuinely stuck, logged-OUT boot.
+      if (typeof currentShiftStaff !== 'undefined' && currentShiftStaff) {
+        console.warn('[boot] watchdog stood down — signed in, so not blank, just slow');
+        return;
+      }
+      console.warn('[boot] nothing on screen — showing the login');
       if (modal) {
         modal.style.display = 'flex';
         if (typeof showLoginScreen === 'function') showLoginScreen('picker');
@@ -17347,7 +17358,7 @@ function _blankScreenWatchdog() {
         if (typeof _pickerWatchdog === 'function') _pickerWatchdog();
       }
     } catch (e) { console.warn('[boot] watchdog failed', e); }
-  }, 1800);
+  }, 6000);
 }
 window._blankScreenWatchdog = _blankScreenWatchdog;
 
@@ -22862,6 +22873,11 @@ window.forceFreshLogin = forceFreshLogin;
 // thing to know than another guess.
 try {
   if (new URLSearchParams(location.search).get('login') === '1') {
+    // Clear it from the URL immediately. Without this the parameter
+    // survives every reload and re-opens the login each time — a
+    // deliberate one-off escape hatch turned into a permanent trap,
+    // which is very likely part of what Daisy has been hitting.
+    history.replaceState({}, '', location.pathname);
     ['klnk_shift_staff', 'klnk_shift_id', 'klnk_break_id',
      'klnk_last_active', 'klnk_force_relogin'].forEach(k => localStorage.removeItem(k));
     setTimeout(() => {
