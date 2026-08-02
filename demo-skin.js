@@ -497,6 +497,11 @@
         : `<div class="kc-empty">${KC._viewedDate ? 'No bookings on this day.' : 'A quiet book. Perfect day to tidy the glaze shelf.'}</div>`;
     }).catch(() => { const t = $('kc-timeline'); if (t) t.innerHTML = '<div class="kc-empty">Waking the server… pull back to the Desk in a moment.</div>'; });
 
+    // Guards the legacy chain below from overwriting a trusted figure
+    // that has already landed. Declared here, in the same scope as the
+    // fetches that use it, rather than assumed to exist.
+    let _moneyDone = false;
+
     /* pieces waiting to go home — same endpoint Packing trusts */
     fetch(`${base}/api/packing/queue?studioId=${sid}`).then(r => r.json()).then(d => {
       const n = (typeof d.count === 'number') ? d.count : ((d.pieces || []).length || 0);
@@ -506,6 +511,24 @@
 
     /* the money — directors only, same endpoint Takings trusts */
     if (dir) {
+      // [2 Aug] Ask the one endpoint that guarantees an answer first.
+      // /api/takings/today checks, syncs, WAITS for the sync, and
+      // replies — so "not synced yet" can no longer be caused by the
+      // client giving up before Square answered. Everything below is
+      // the original chain, untouched: if this call fails for any
+      // reason the Desk behaves exactly as it did before.
+      fetch(`${base}/api/takings/today?studioId=${sid}`)
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(t => {
+          const m = $('kc-fig-money'), ml = $('kc-fig-money-l');
+          if (!m || t.value === null || t.value === undefined) return Promise.reject();
+          m.classList.remove('kc-skel-t');
+          m.textContent = money(t.value);
+          if (ml) ml.textContent = t.label;
+          _moneyDone = true;
+        })
+        .catch(() => {});
+
       fetch(`${base}/api/analytics/dashboard?studioId=${sid}&staffMemberId=${(typeof currentShiftStaff !== 'undefined' && currentShiftStaff?.id) || ''}`)
         .then(r => r.json()).then(d => {
           const days = d.revenueByDay || d.dailyRevenue || null;
@@ -524,6 +547,7 @@
           // the Desk showed £0.00 for the same studio on the same
           // screen — two figures, one true, and no way to tell which.
           // A real number under an honest label beats a dash.
+          if (_moneyDone) return;   // a trusted figure already landed
           let todayV = valueFor(dayKey(0));
 
           // TODAY'S TAKINGS ARE THE POINT. Daisy, in the evening:

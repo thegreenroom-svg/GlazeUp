@@ -462,22 +462,45 @@ html.demo-skin .kc-section-grow .kc-index {
   grid-auto-rows: 1fr; height: 100%;
 }
 html.demo-skin .kc-section-grow .kc-tile { aspect-ratio: auto; min-height: 0; }
+/* [2 Aug] TILES TIDIED. On the real tablet they read as thin blue
+   outlines with an emoji floating in the middle and the label clipped
+   at the bottom — cramped, and nothing tied them to the studio's own
+   palette. Three changes, all structural rather than decorative:
+
+   1. Icon LEFT, label beside it, not stacked and centred. A wide tile
+      on a landscape tablet has plenty of horizontal room and almost
+      none vertical, so stacking is what was clipping "Daily digest"
+      and "Takings" in the first place.
+   2. A soft clay wash behind the icon instead of a hairline border
+      around the whole tile. Gives each one weight without a grid of
+      competing outlines, and puts the studio's colour on the screen.
+   3. Labels up to 13.5px and allowed two lines. They were 12px and
+      being cut off — the commonest reason a tile gets mis-tapped. */
 html.demo-skin .kc-tile {
-  aspect-ratio: 1 / 1; border: 1px solid var(--m-border, #ece7e0); border-radius: 20px; cursor: pointer;
+  aspect-ratio: auto; min-height: 62px;
+  border: none; border-radius: 16px; cursor: pointer;
   background: var(--m-surface, #fff);
-  box-shadow: var(--m-shadow, 0 8px 20px -12px rgba(0,0,0,0.22));
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 8px; padding: 10px; text-align: center;
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  box-shadow: 0 1px 2px rgba(43,39,36,.06), 0 6px 16px -12px rgba(43,39,36,.28);
+  display: flex; flex-direction: row; align-items: center; justify-content: flex-start;
+  gap: 11px; padding: 11px 13px; text-align: left;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
 }
 html.demo-skin .kc-tile:active {
-  transform: scale(0.95);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  transform: scale(0.97);
+  background: #FFF6EA;
+  box-shadow: 0 1px 2px rgba(43,39,36,.10);
 }
-html.demo-skin .kc-tile-i { font-size: 30px; line-height: 1; }
+html.demo-skin .kc-tile-i {
+  font-size: 20px; line-height: 1; flex-shrink: 0;
+  width: 38px; height: 38px; border-radius: 11px;
+  background: rgba(184,121,70,0.12);
+  display: flex; align-items: center; justify-content: center;
+}
 html.demo-skin .kc-tile-l {
-  font-size: 12px; font-weight: 700; color: var(--m-text, #2B2724);
-  line-height: 1.15; letter-spacing: -0.01em;
+  font-size: 13.5px; font-weight: 700; color: var(--m-text, #2B2724);
+  line-height: 1.2; letter-spacing: -0.01em;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* Day navigation header — arrows + calendar + today, right-aligned. */

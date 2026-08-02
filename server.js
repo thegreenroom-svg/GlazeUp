@@ -931,6 +931,70 @@ app.get('/api/takings/breakdown', async (req, res) => {
 // yesterday's number. This returns the whole series plus the
 // aggregates, so the page can render without doing arithmetic the
 // database is better at.
+// GET /api/takings/today — a figure for today, or an honest reason.
+//
+// [2 Aug] "Make sync work." The Desk showed "not synced yet" because
+// getting today's number was being assembled on the CLIENT: fire
+// /api/square/sync, wait a fixed few seconds, re-read the dashboard,
+// fall back to yesterday. Too many moving parts, and the fixed wait is
+// a guess — Square is sometimes slower than it, so the re-read finds
+// nothing and the label sticks at "not synced yet" even though the
+// sync succeeded a second later.
+//
+// Doing it in one place server-side removes the guesswork: check,
+// sync if needed, WAIT for that sync to actually finish, then answer.
+// The client asks one question and gets one answer.
+//
+// The existing client fallback chain is deliberately left in place —
+// if this endpoint is unavailable the Desk still behaves exactly as it
+// did before.
+app.get('/api/takings/today', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+
+  const key = (offset) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    return d.toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
+  };
+  const readDay = async (metric_date) => {
+    const { data } = await supabase.from('analytics_cache')
+      .select('metric_value')
+      .eq('studio_id', studioId).eq('metric_type', 'daily_revenue')
+      .eq('metric_date', metric_date).maybeSingle();
+    return data ? (data.metric_value?.revenue_cents ?? 0) / 100 : null;
+  };
+
+  try {
+    let today = await readDay(key(0));
+
+    if (today === null) {
+      // Sync and actually wait for it, rather than firing and hoping.
+      const { data: conn } = await supabase.from('square_connections')
+        .select('square_access_token').eq('studio_id', studioId).maybeSingle();
+      if (conn) {
+        try {
+          await syncSquareData(studioId, conn.square_access_token, 1);
+          today = await readDay(key(0));
+        } catch (e) {
+          console.error('takings/today sync failed:', e.message);
+        }
+      }
+    }
+
+    if (today !== null) return res.json({ value: today, label: 'today', synced: true });
+
+    // Genuinely nothing for today — say which day the number IS from,
+    // rather than showing a bare dash that reads as broken.
+    const y = await readDay(key(-1));
+    if (y !== null) return res.json({ value: y, label: 'yesterday', synced: false });
+    res.json({ value: null, label: 'no takings recorded', synced: false });
+  } catch (e) {
+    console.error('takings/today:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/api/takings/history', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
