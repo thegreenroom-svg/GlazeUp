@@ -288,6 +288,17 @@ app.get('/demo-skin.js', (req, res) => {
   res.set('Cache-Control', 'public, max-age=300, must-revalidate');
   res.sendFile(path.join(__dirname, 'demo-skin.js'));
 });
+// [2 Aug] money-parked.js needed its own route for the same reason the
+// two above have one — the repo root is deliberately not served, so a
+// new root-level script 404s silently. That is exactly what happened:
+// the file was written, linked in both apps, and never loaded, so the
+// takings figure and invoice nudge stayed on screen and it looked like
+// the parking had simply not worked.
+app.get('/money-parked.js', (req, res) => {
+  res.type('application/javascript');
+  res.set('Cache-Control', 'no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, 'money-parked.js'));
+});
 app.use('/css', express.static(path.join(__dirname, 'css'), staticCacheOptions));
 // Genuine real fix: /brand-assets was referenced directly in the real
 // HTML (apple-touch-icon, manifest icons) but never actually had a

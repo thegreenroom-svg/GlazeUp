@@ -138,3 +138,42 @@ body > .top {
 #shift-login-modal .glaze-tile {
   height:auto !important; max-height:none !important;
 }
+
+
+/* ── THE STAGGER ────────────────────────────────────────────────────
+   [2 Aug] Daisy's Team screen: tiles cascading down the page, each one
+   wider than the last, like a staircase. Cause — those tiles are NOT
+   inside one of the grid containers named above, so each sized itself
+   to its own text: "Alerts" narrow, "Home Screen Setup" wide.
+
+   Targeting the tile itself rather than hunting every container it
+   might sit in. A square must be a square wherever it is put, which is
+   the whole premise: only the NUMBER changes, never the shape. */
+.kc-tile, .glaze-tile, .ghtile-sq, .kc-u-sq {
+  width:100% !important;
+  max-width:none !important;
+  min-width:0 !important;
+  flex:none !important;
+  align-self:stretch !important;
+  box-sizing:border-box !important;
+}
+/* Any plain container holding tiles becomes the standard grid, so a
+   screen built without one still lays out correctly. */
+.view div:has(> .kc-tile),
+.view div:has(> .glaze-tile) {
+  display:grid !important;
+  grid-template-columns:repeat(auto-fill,minmax(var(--u-sq-min),1fr)) !important;
+  grid-auto-rows:var(--u-sq-h) !important;
+  align-content:start !important;
+  gap:8px !important;
+}
+
+/* ── THE CRAMPED HEADER ROW ─────────────────────────────────────────
+   The row of emoji buttons at the top of the legacy screens was
+   overflowing off the right edge with the logo squashed under it. Made
+   to wrap and sit at a consistent size rather than run off. */
+.ghtile-mini {
+  width:auto !important; min-width:44px !important;
+  height:40px !important; min-height:40px !important; max-height:40px !important;
+  padding:0 10px !important;
+}
