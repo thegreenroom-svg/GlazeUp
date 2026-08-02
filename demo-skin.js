@@ -277,6 +277,17 @@
 
       { id: 'team', fn: null, label: 'Team', icon: '👥', desc: 'Who does what today' },
       { id: 'tell-daisy', fn: 'openTellPicker', label: 'Tell Daisy', icon: '💬', desc: 'Good or bad, say it' },
+      // [2 Aug] Daisy: "why do we need the menu bar as well as the black
+      // one — can we not access everything from the landing page?" Right.
+      // The emoji header row has been cut off and squashed in every
+      // screenshot today and mostly duplicated the dock. But five of its
+      // eleven actions lived ONLY there, so they move here before it goes
+      // — removing a row is only safe once you know what was on it.
+      { id: 'alerts', fn: 'toggleAlertFeed', label: 'Alerts', icon: '🔔', desc: 'What needs you' },
+      { id: 'glazes', fn: 'openColorPicker', label: 'Glazes', icon: '🎨', desc: 'Colours and codes' },
+      { id: 'break', fn: 'toggleBreak', label: 'Break', icon: '☕', desc: 'Start or end a break' },
+      { id: 'sync', fn: 'syncLiveData', label: 'Sync', icon: '🔄', desc: 'Pull from Square now' },
+      { id: 'logout', fn: 'confirmDirectLogout', label: 'Log out', icon: '🚪', desc: 'End your shift' },
     ];
     if (isDirector()) {
       picks.push({ id: 'daily-digest', fn: 'openDailyDigest', label: 'Daily digest', icon: '📊', desc: 'Yesterday · the week · what\u2019s next' });
