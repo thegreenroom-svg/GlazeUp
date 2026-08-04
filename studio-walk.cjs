@@ -68,6 +68,13 @@ app.get('/api/takings/breakdown',(q,r)=>r.json({groups:[
  {group:'Drinks',revenue:44100,items:15580,categories:[
    {category:'Hot Drinks',revenue:33150,items:11714}]}]}));
 app.get('/api/floor/active',(q,r)=>r.json({bookings:[]}));
+app.get('/api/floor/items/:code',(q,r)=>r.json({items:[
+ {item_name:'PB Mugs And Cups',price_cents:1997,qty:2},
+ {item_name:'S. Pottery Painting Sessions',price_cents:1074,qty:4},
+ {item_name:'Hot Drinks',price_cents:283,qty:3}]}));
+app.get('/api/pieces/for-booking',(q,r)=>r.json({pieces:[
+ {id:'p1',piece_type:'Mug — pale blue with white spots',status:'fired',reference_photo_url:null},
+ {id:'p2',piece_type:'Plate — yellow rim, red flowers',status:'fired',reference_photo_url:null}]}));
 app.get('/api/ai-usage',(q,r)=>r.json({today:0.02,month:0.39,model:'gpt-4o-mini'}));
 let searchCalls=0;
 app.post('/api/packing/find-listed',express.json({limit:'12mb'}),(q,r)=>{
@@ -105,6 +112,14 @@ const srv=app.listen(4801,async()=>{
   await p.evaluate(()=>go('day')); await new Promise(r=>setTimeout(r,500));
   await p.evaluate(()=>$('next').click()); await new Promise(r=>setTimeout(r,600));
   await p.evaluate(()=>$('prev').click()); await new Promise(r=>setTimeout(r,600));
+
+  // THE BOOKING AS A WORKFLOW: seated -> till total -> pieces -> find
+  await p.evaluate(()=>go('day')); await new Promise(r=>setTimeout(r,700));
+  await p.evaluate(()=>document.querySelector('.ev').click());
+  await new Promise(r=>setTimeout(r,900));
+  await p.screenshot({path:'/home/claude/shots/s-8-workflow.png',fullPage:true});
+  console.log('workflow steps  :', await p.$$eval('#bk .card h2',e=>e.map(x=>x.textContent).join(' | ')));
+  console.log('till total shown:', await p.$eval('#bk .fig',e=>e.textContent).catch(()=>'none'));
 
   // THE PACKING FLOW: booking -> table photo -> photograph a shelf -> circles
   await p.evaluate(()=>go('pack')); await new Promise(r=>setTimeout(r,700));

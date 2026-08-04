@@ -21,11 +21,12 @@ const ALLOWED = [
   '/api/staff/team-for-login', '/api/bookings/day', '/api/floor/active',
   '/api/pos/items', '/api/packing/queue', '/api/takings/today',
   '/api/takings/breakdown', '/api/takings/history', '/api/analytics/dashboard',
-  '/api/ai-usage',
+  '/api/ai-usage', '/api/pieces/for-booking',
 ];
 async function read(path, params = {}) {
   const url = new URL(path, API);
-  if (!ALLOWED.includes(url.pathname))
+  const ok = ALLOWED.includes(url.pathname) || url.pathname.startsWith('/api/floor/items/');
+  if (!ok)
     throw new Error('Blocked: ' + url.pathname + ' is not a read this app is allowed to make.');
   url.searchParams.set('studioId', STUDIO);
   for (const [k, v] of Object.entries(params)) if (v != null) url.searchParams.set(k, v);
@@ -300,38 +301,166 @@ async function loadDay() {
 }
 function shift(n) { day = new Date(day.getTime() + n * 864e5); loadDay(); }
 
-/* ── booking ─────────────────────────────────────────────────────── */
-function openBooking(b) {
+/* ── booking: the whole session on one screen ────────────────────────
+   [stated] Daisy: "where does it go from here? Where's the workflow?
+   Where's the total for the till? Where's the photograph of the pieces
+   on the table when finished?" So the booking is no longer a card that
+   ends — it is the spine of the session, in the order it happens:
+      who and when  ->  what's on the table (the till total)
+      ->  her pieces  ->  find them on the shelf  ->  packed.
+   Every step reads. None of them writes. */
+let bkNow = null;
+
+async function openBooking(b) {
+  bkNow = b; foundMap = {};
+  paintBooking();
+  go('bk');
+  // the two session reads, after the screen is already up
+  const code = b.booking_code;
+  if (!code) return;
+  const [items, pieces] = await Promise.all([
+    read('/api/floor/items/' + encodeURIComponent(code)).catch(() => null),
+    read('/api/pieces/for-booking', { bookingCode: code }).catch(() => null),
+  ]);
+  bkNow._items = items && items.items ? items.items : [];
+  bkNow._pieces = pieces && pieces.pieces ? pieces.pieces : [];
+  if (view === 'bk') paintBooking();
+}
+
+function stepRow(n, title, body, done) {
+  return `<div class="card" style="border-left:4px solid ${done ? 'var(--soon)' : 'var(--line)'}">
+    <div style="display:flex;gap:10px;align-items:baseline">
+      <span style="font-family:var(--serif);font-weight:900;font-size:13px;
+        color:${done ? 'var(--soon)' : 'var(--mute)'};min-width:16px">${done ? '●' : n}</span>
+      <div style="flex:1"><h2 style="margin-bottom:6px">${title}</h2>${body}</div></div></div>`;
+}
+
+function paintBooking() {
+  const b = bkNow;
   const st = b.session_start ? new Date(b.session_start) : null;
   const en = b.session_end ? new Date(b.session_end) : null;
   const mins = st && en ? Math.round((en - st) / 6e4) : null;
-  const row = (k, v) => v ? `<div class="row"><div><div class="k">${k}</div>
-    <div class="l" style="margin-top:3px">${esc(v)}</div></div></div>` : '';
+  const items = b._items, pieces = b._pieces;
+  const now = Date.now();
+  const seated = b.table_number != null;
+  const running = st && st.getTime() <= now && (!en || en.getTime() >= now);
+  const finished = en && en.getTime() < now;
+
+  const total = items ? items.reduce((s, i) =>
+    s + ((i.price_cents != null ? i.price_cents / 100 : (i.price || 0)) * (i.qty || i.quantity || 1)), 0) : 0;
+
+  const withPhoto = pieces ? pieces.filter(p => p.reference_photo_url).length : 0;
+
   $('bk').innerHTML = `
     <div class="card">
       <div style="font-family:var(--serif);font-weight:900;font-size:24px">${esc(b.customer_name || 'Booking')}</div>
-      ${st ? `<div style="font-family:var(--serif);font-weight:900;font-size:19px;margin-top:9px">
+      ${st ? `<div style="font-family:var(--serif);font-weight:900;font-size:19px;margin-top:8px">
         ${hhmm(st)}${en ? ' – ' + hhmm(en) : ''}
         ${mins ? `<span style="font-family:var(--ui);font-size:12.5px;font-weight:600;color:var(--clay)">
-        (${Math.floor(mins / 60)} hr${Math.floor(mins / 60) === 1 ? '' : 's'} ${mins % 60} mins)</span>` : ''}</div>
+        (${Math.floor(mins/60)} hr${Math.floor(mins/60)===1?'':'s'} ${mins%60} mins)</span>` : ''}</div>
         <div style="font-size:13px;font-weight:600">${DAYNAME(st)}</div>` : ''}
+      <div style="font-size:12px;color:var(--clay);margin-top:6px">${esc(b.space_name || '')}</div>
     </div>
-    <div class="card">
-      ${row('Service', b.space_name)}
-      ${row('Painters', b.party_size)}
-      ${row('Table', b.table_number != null ? b.table_number : 'Not seated yet')}
-      ${row('Phone', b.customer_phone)}
-      ${row('Email', b.customer_email)}
-      ${row('Notes', b.notes)}
-      ${row('Reference', b.booking_code)}
-    </div>
-    <button class="btn" id="bk-till">Open a practice ticket</button>
-    <div class="note">Read-only: this booking can't be changed from here. Use Square for anything real.</div>`;
+
+    ${stepRow(1, 'Seated', seated
+      ? `<div class="l">Table ${esc(b.table_number)}${b.party_size ? ' · ' + b.party_size + ' painting' : ''}</div>`
+      : `<div style="font-size:12.5px;color:var(--clay)">Not seated yet. The table lands here when
+         someone seats them at the terminal — Square Appointments has no table on it.</div>`, seated)}
+
+    ${stepRow(2, 'On the table', items === undefined
+      ? '<div style="font-size:12.5px;color:var(--clay)">Reading the till…</div>'
+      : (items && items.length
+        ? `${items.map(i => `<div class="row"><div class="l">${esc(i.item_name || i.name || 'Item')}
+             ${(i.qty || i.quantity) > 1 ? ' ×' + (i.qty || i.quantity) : ''}</div>
+             <div class="v">${money((i.price_cents != null ? i.price_cents/100 : i.price || 0) * (i.qty || i.quantity || 1))}</div></div>`).join('')}
+           <div class="row" style="border-top:1.5px solid var(--line);border-bottom:none">
+             <div class="l" style="font-weight:800">Total</div>
+             <div class="fig" style="font-size:22px">${money(total)}</div></div>`
+        : `<div style="font-size:12.5px;color:var(--clay)">Nothing rung up against this booking yet.
+           It appears here as the girls add pieces and drinks at the terminal.</div>`),
+      !!(items && items.length))}
+
+    ${stepRow(3, 'Her pieces', pieces === undefined
+      ? '<div style="font-size:12.5px;color:var(--clay)">Reading…</div>'
+      : (pieces && pieces.length
+        ? `${pieces.map(p => `<div class="row"><div style="flex:1">
+             <div class="l">${esc(p.piece_type || 'Piece')}</div>
+             <div class="m">${p.reference_photo_url ? 'Photographed' : 'No photograph yet'}</div></div>
+             ${p.reference_photo_url ? `<img src="${esc(p.reference_photo_url)}" alt=""
+               style="width:44px;height:44px;object-fit:cover;border-radius:9px;
+               border:1px solid var(--line)">` : '<div class="v" style="color:var(--mute)">○</div>'}</div>`).join('')}
+           <div style="font-size:11.5px;color:var(--clay);margin-top:8px">
+             ${withPhoto} of ${pieces.length} photographed</div>`
+        : `<div style="font-size:12.5px;color:var(--clay)">No pieces on this booking yet. They are
+           created when the table is photographed at the end of the session — the chalk tag names
+           whose they are, and each piece gets its own picture, which is what makes it findable
+           on the shelf afterwards.</div>`),
+      !!(pieces && pieces.length && withPhoto === pieces.length))}
+
+    ${stepRow(4, 'Find them on the shelf',
+      (pieces && pieces.length)
+        ? `<div style="font-size:12.5px;color:var(--clay);margin-bottom:9px">Photograph a tray or
+             shelf. Whatever of hers is in the picture gets circled.</div>
+           <label class="btn" style="display:flex;align-items:center;justify-content:center;
+             cursor:pointer;margin-top:0" for="bkshot">Photograph a tray or shelf</label>
+           <input type="file" id="bkshot" accept="image/*" capture="environment" style="display:none">
+           <div style="font-size:10.5px;color:var(--clay);text-align:center;margin-top:8px">
+             About 0.3p a photo · ${spend ? spend.toFixed(1) + 'p this session' : 'nothing spent yet'}</div>
+           <div id="bkfound"></div>`
+        : `<div style="font-size:12.5px;color:var(--clay)">Nothing to look for until her pieces
+           are photographed at the end of the session.</div>`,
+      false)}
+
+    ${finished && !(pieces && pieces.length)
+      ? `<div class="note"><strong>This session has finished.</strong> If the table has been
+         cleared, photographing it is the step that turns it into findable pieces.</div>` : ''}
+
+    <button class="btn ghost" id="bk-till">Open a practice ticket</button>
+    <div class="note">Read-only — this booking can't be changed from here. Use Square for anything real.</div>`;
+
   $('bk-till').onclick = () => {
     tickWhere = (b.customer_name || 'Booking') + (b.table_number != null ? ' · Table ' + b.table_number : '');
     go('till');
   };
-  go('bk');
+  const shot = $('bkshot');
+  if (shot) shot.onchange = e => { const f = e.target.files[0]; if (f) bookingSearch(f); };
+}
+
+async function bookingSearch(file) {
+  const pieces = bkNow._pieces || [];
+  const wanted = pieces.filter(p => !foundMap[p.id])
+    .map(p => ({ id: p.id, description: p.description || p.piece_type || '' }))
+    .filter(w => w.description);
+  const box = $('bkfound');
+  if (!wanted.length) { if (box) box.innerHTML = '<div class="note">Nothing left to look for.</div>'; return; }
+  const raw = await readFile(file);
+  if (box) box.innerHTML = '<div style="font-size:12.5px;color:var(--clay);padding:10px 0">Looking…</div>';
+  try {
+    const d = await search({ photoBase64: await gridded(raw, 1400), wanted });
+    if (typeof d.cost === 'number') spend += d.cost * 100;
+    const found = d.found || [];
+    let rings = '';
+    found.forEach(f => {
+      const p = cellPoint(f.cell);
+      const piece = pieces.find(x => String(x.id) === String(f.id));
+      if (piece) foundMap[piece.id] = f.cell || 'in this photo';
+      if (!p) return;
+      rings += `<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;
+        inset:0;width:100%;height:100%;pointer-events:none">
+        <circle cx="${(p.x*100).toFixed(1)}" cy="${(p.y*100).toFixed(1)}" r="7" fill="none"
+          stroke="#2E7D32" stroke-width="4" vector-effect="non-scaling-stroke"/>
+        <circle cx="${(p.x*100).toFixed(1)}" cy="${(p.y*100).toFixed(1)}" r="7" fill="none"
+          stroke="#fff" stroke-width="1.4" vector-effect="non-scaling-stroke"/></svg>`;
+    });
+    if (box) box.innerHTML = `<div style="margin-top:11px">
+      <div style="font-family:var(--serif);font-weight:900;font-size:15px;margin-bottom:7px">
+        ${found.length ? found.length + ' of ' + wanted.length + ' found' : 'None of hers in this one'}</div>
+      <div style="position:relative;line-height:0">
+        <img src="${esc(raw)}" alt="" style="width:100%;border-radius:12px;border:1.5px solid var(--line)">
+        ${rings}</div></div>`;
+  } catch (e) {
+    if (box) box.innerHTML = `<div class="err">${esc(e.message)}</div>`;
+  }
 }
 
 /* ── till (practice ticket, never sent) ──────────────────────────────
