@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#FFF9F0">
+<title>The Kiln Cafe — Studio</title>
+<link rel="stylesheet" href="/studio/app.css">
+</head>
+<body>
+
+<header class="bar">
+  <button class="back" id="back" aria-label="Back">‹</button>
+  <div style="flex:1;min-width:0">
+    <h1 id="ttl">The Kiln Cafe</h1>
+    <div class="sub" id="sub"></div>
+  </div>
+  <div class="who" id="who"></div>
+</header>
+
+<main id="main">
+
+  <!-- LOGIN -->
+  <section class="pane on" id="p-login" style="padding:0">
+    <div class="login">
+      <div class="mark">THE KILN CAFE</div>
+      <div class="greet" id="greet">Morning</div>
+      <div class="people" id="people"><div class="empty">Loading the team…</div></div>
+    </div>
+  </section>
+
+  <!-- HOME -->
+  <section class="pane" id="p-home">
+    <div class="tiles" id="hometiles"></div>
+    <div class="note" id="readonly-note"><strong>Read-only.</strong> This app shows the studio's
+      live data and lets you move around it, but it never sends anything back — not to Square,
+      not to the bookings, not to the till. Anything you tap here resets when you log in again.</div>
+  </section>
+
+  <!-- FLOOR -->
+  <section class="pane" id="p-floor">
+    <div id="floor"><div class="empty">Reading the floor…</div></div>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--live)"></i>Painting now</span>
+      <span><i class="dot" style="background:var(--soon)"></i>Booked in later</span>
+      <span><i class="dot" style="background:var(--line)"></i>Free</span>
+    </div>
+  </section>
+
+  <!-- DAY -->
+  <section class="pane" id="p-day">
+    <div class="dayctl">
+      <button id="prev" aria-label="Previous day">←</button>
+      <div class="lbl" id="daylbl">—</div>
+      <button id="next" aria-label="Next day">→</button>
+    </div>
+    <div class="calbox"><div class="cal" id="cal"></div></div>
+    <div id="daynote"></div>
+  </section>
+
+  <!-- BOOKING -->
+  <section class="pane" id="p-bk"><div id="bk"></div></section>
+
+  <!-- TILL -->
+  <section class="pane" id="p-till">
+    <div class="chips" id="cats"></div>
+    <div class="items" id="items"><div class="empty">Reading prices…</div></div>
+    <div style="height:170px"></div>
+  </section>
+
+  <!-- PACKING -->
+  <section class="pane" id="p-pack"><div id="pack"><div class="empty">Reading the shelf…</div></div></section>
+
+  <!-- MONEY -->
+  <section class="pane" id="p-money"><div id="money"><div class="empty">Reading takings…</div></div></section>
+
+</main>
+
+<div class="ticket" id="ticket">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <span class="k" id="tkwhere">Practice ticket</span>
+    <button class="chip" style="min-height:34px;padding:5px 12px" id="tkclear">Clear</button>
+  </div>
+  <div id="tklines" style="max-height:112px;overflow-y:auto;margin:7px 0"></div>
+  <div style="display:flex;justify-content:space-between;align-items:baseline;
+    border-top:1px solid var(--line);padding-top:8px">
+    <span style="font-weight:700;font-size:13px">Total</span>
+    <span class="fig" style="font-size:24px" id="tktotal">£0.00</span>
+  </div>
+  <div class="note" style="margin-top:9px;padding:8px 11px;font-size:11px">
+    Nothing is sent anywhere. Ring the real order up on the till as usual.</div>
+</div>
+
+<nav id="dock"></nav>
+
+<script src="/studio/app.js"></script>
+</body>
+</html>

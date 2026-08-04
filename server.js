@@ -299,6 +299,18 @@ app.get('/money-parked.js', (req, res) => {
   res.set('Cache-Control', 'no-store, must-revalidate');
   res.sendFile(path.join(__dirname, 'money-parked.js'));
 });
+// [4 Aug] THE STUDIO APP — the new in-house front door.
+// Read-only by construction (see studio/app.js): it may only GET, and
+// only from a short allow-list. Nothing it does can reach Square, the
+// bookings or the till. Served explicitly because the repo root is
+// deliberately not mounted.
+app.get('/studio', (req, res) => {
+  res.set('Cache-Control', 'no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, 'studio', 'index.html'));
+});
+app.use('/studio', express.static(path.join(__dirname, 'studio'),
+  { setHeaders: r => r.set('Cache-Control', 'no-store, must-revalidate') }));
+
 // [4 Aug] Practice mode. Same reason as the three routes above: the
 // repo root is deliberately not served, so a root-level HTML file
 // 404s silently. Single explicit route, no-store so staff always get
