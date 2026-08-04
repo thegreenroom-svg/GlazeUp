@@ -82,6 +82,8 @@ main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
   text-transform:uppercase;color:var(--clay);margin:18px 0 9px}
 .roomname:first-child{margin-top:2px}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.gridpos{display:grid;gap:9px;margin-bottom:2px}
+.gridpos .tbl{width:100%;height:100%}
 .tbl{aspect-ratio:1;border:2px solid var(--line);background:var(--card);border-radius:15px;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
   cursor:pointer;font:inherit;color:inherit;padding:7px;min-height:var(--tap)}

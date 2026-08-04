@@ -26,7 +26,18 @@ app.get('/api/bookings/day',(q,r)=>r.json({date:q.query.date,covers:11,bookings:
   party_size:2,space_name:'The Lounge Pottery Painting *Adult Only*',booking_code:'BK-3'},
  {customer_name:'The Sowerby Party',session_start:iso(13,0),session_end:iso(15,30),table_number:null,
   party_size:12,space_name:'The Vault - perfect for private parties!',booking_code:'BK-4'}]}));
-app.get('/api/pos/items',(q,r)=>r.json({total:0,groups:[]}));   // as the studio really is
+app.get('/api/pos/items',(q,r)=>r.json({total:11,groups:[
+ {category:'PB Mugs And Cups',items:[{name:'Mug',price:19.97}]},
+ {category:'PB Plates & Platters',items:[{name:'Plate',price:26.42}]},
+ {category:'PB Bowls & Pet Bowls',items:[{name:'Bowl',price:24.05}]},
+ {category:'PB Vases',items:[{name:'Vase',price:27.24}]},
+ {category:'S. Pottery Painting Sessions',items:[{name:'Session fee',price:10.74}]},
+ {category:'S. Glazing',items:[{name:'Glazing',price:1.98}]},
+ {category:'Hot Drinks',items:[{name:'Latte',price:3.4}]},
+ {category:'Cold Drinks',items:[{name:'Iced tea',price:2.6}]},
+ {category:'Cakes',items:[{name:'Brownie',price:4.03}]},
+ {category:'Booking Fees',items:[{name:'Booking fee',price:36.44}]},
+ {category:'Other',items:[{name:'Misc',price:12.35}]}]}));  // real 41-category shape, trimmed
 app.get('/api/takings/history',(q,r)=>{
   const days=[],months=[],years=[];
   for(let i=400;i>=0;i--){const d=new Date(Date.now()-i*864e5);
@@ -77,6 +88,22 @@ app.get('/api/pieces/for-booking',(q,r)=>r.json({pieces:
  {id:'p1',piece_type:'Mug — pale blue with white spots',status:'fired',reference_photo_url:null},
  {id:'p2',piece_type:'Plate — yellow rim, red flowers',status:'fired',reference_photo_url:null}]}));
 app.get('/api/ai-usage',(q,r)=>r.json({today:0.02,month:0.39,model:'gpt-4o-mini'}));
+app.get('/api/floor/tables',(q,r)=>r.json({tables:[
+ {name:'Table 1',room:'Main Studio',capacity:6,sort_order:1,grid_row:1,grid_col:0},
+ {name:'Table 2',room:'Main Studio',capacity:4,sort_order:2,grid_row:2,grid_col:0},
+ {name:'Table 3',room:'Main Studio',capacity:4,sort_order:3,grid_row:3,grid_col:0},
+ {name:'Table 4',room:'Main Studio',capacity:6,sort_order:4,grid_row:4,grid_col:0},
+ {name:'Table 5',room:'Main Studio',capacity:6,sort_order:5,grid_row:4,grid_col:2},
+ {name:'Table 6',room:'Main Studio',capacity:4,sort_order:6,grid_row:2,grid_col:2},
+ {name:'Table 7',room:'Main Studio',capacity:4,sort_order:7,grid_row:1,grid_col:2},
+ {name:'Table 8',room:'Main Studio',capacity:8,sort_order:8,grid_row:0,grid_col:1},
+ {name:'Lounge 1',room:'Lounge',capacity:4,sort_order:1,grid_row:0,grid_col:0},
+ {name:'Lounge 2',room:'Lounge',capacity:4,sort_order:2,grid_row:1,grid_col:0},
+ {name:'Lounge 3',room:'Lounge',capacity:4,sort_order:3,grid_row:2,grid_col:0},
+ {name:'Lounge 4',room:'Lounge',capacity:4,sort_order:4,grid_row:0,grid_col:2},
+ {name:'Lounge 5',room:'Lounge',capacity:4,sort_order:5,grid_row:1,grid_col:2},
+ {name:'Lounge 6',room:'Lounge',capacity:4,sort_order:6,grid_row:2,grid_col:2},
+ {name:'The Vault',room:'The Vault',capacity:14,sort_order:15,grid_row:0,grid_col:0}]}));
 let searchCalls=0;
 app.post('/api/packing/find-listed',express.json({limit:'12mb'}),(q,r)=>{
   searchCalls++;
@@ -104,8 +131,11 @@ const srv=app.listen(4801,async()=>{
   }
   // exercise: add till items, open a booking, page the day
   await p.evaluate(()=>go('till')); await new Promise(r=>setTimeout(r,500));
-  await p.evaluate(()=>{document.querySelectorAll('.item')[0].click();
-                       document.querySelectorAll('.item')[1].click();});
+  await p.evaluate(()=>{
+    const items = document.querySelectorAll('.item');
+    if (items[0]) items[0].click();
+    if (items[1]) items[1].click(); else if (items[0]) items[0].click(); // add a 2nd line either way
+  });
   await new Promise(r=>setTimeout(r,400)); await shot('4-ticket');
   // the demo send must complete the flow and reach nothing
   await p.evaluate(()=>$('tksend').click()); await new Promise(r=>setTimeout(r,500));
@@ -142,16 +172,25 @@ const srv=app.listen(4801,async()=>{
   console.log('table step shown:', (await p.$('#tableshot')) ? 'yes' : 'NO ✗');
   const ti=await p.$('#tableshot');
   if(ti){ await ti.uploadFile('/tmp/shelf.png'); await new Promise(r=>setTimeout(r,600));
-    await p.evaluate(()=>{const i=$('tableimg'); if(i){const r=i.getBoundingClientRect();
-      i.onclick({clientX:r.left+r.width*0.3,clientY:r.top+r.height*0.4});
-      i.onclick({clientX:r.left+r.width*0.7,clientY:r.top+r.height*0.6});}});
-    await new Promise(r=>setTimeout(r,500));
+    // paintTableMark() replaces #tableimg on every tap, so the element
+    // must be re-fetched each time — reusing one handle across two taps
+    // hits a detached node on the second, which the app's own zero-size
+    // guard then (correctly) refuses. Re-query to test the real path.
+    for (const [fx,fy] of [[0.3,0.4],[0.7,0.6]]) {
+      await p.evaluate(([fx,fy])=>{ const i=$('tableimg'); if(!i) return;
+        const r=i.getBoundingClientRect();
+        i.onclick({clientX:r.left+r.width*fx,clientY:r.top+r.height*fy}); }, [fx,fy]);
+      await new Promise(r=>setTimeout(r,250));
+    }
     console.log('pieces marked   :', await p.evaluate(()=>marks.length));
     await p.screenshot({path:'/home/claude/shots/s-10-table.png',fullPage:true}); }
 
   // THE PACKING FLOW: booking -> table photo -> photograph a shelf -> circles
   await p.evaluate(()=>go('pack')); await new Promise(r=>setTimeout(r,700));
-  await p.evaluate(()=>document.querySelector('[data-p]').click());
+  const clickErr = await p.evaluate(()=>{
+    try { document.querySelector('#pack [data-p]').click(); return null; }
+    catch(e){ return e.message + '\n' + e.stack; }
+  });
   await new Promise(r=>setTimeout(r,500));
   await p.screenshot({path:'/home/claude/shots/s-6-booking.png',fullPage:true});
   // a real file through the real input, so the iOS-safe path is exercised
@@ -160,6 +199,22 @@ const srv=app.listen(4801,async()=>{
   const inp=await p.$('#shelfshot'); await inp.uploadFile('/tmp/shelf.png');
   await new Promise(r=>setTimeout(r,1400));
   await p.screenshot({path:'/home/claude/shots/s-7-found.png',fullPage:true});
+  // POSITIONED FLOOR: prove the Lounge lays out 2 cols x 3 rows, not 3-per-row
+  await p.evaluate(()=>go('floor')); await new Promise(r=>setTimeout(r,700));
+  await p.screenshot({path:'/home/claude/shots/s-12-floor-real.png',fullPage:true});
+  const gp = await p.$('.gridpos');
+  console.log('positioned grid :', gp ? 'used' : 'MISSING ✗ (fell back to flat grid3)');
+
+  // SUBGROUPED TILL: prove 41 flat categories become parent chips, not one giant row
+  await p.evaluate(()=>go('till')); await new Promise(r=>setTimeout(r,700));
+  await p.screenshot({path:'/home/claude/shots/s-13-till-real.png',fullPage:true});
+  const parentChips = await p.$$eval('#cats .chip', e => e.map(x => x.textContent));
+  console.log('parent chips    :', parentChips.join(' | '));
+  console.log('parent count    :', parentChips.length, parentChips.length <= 6 ? '(OK, not 41)' : 'STILL FLAT ✗');
+  await p.click('#leafcats .chip:nth-child(2)').catch(()=>{});
+  await new Promise(r=>setTimeout(r,400));
+  await p.screenshot({path:'/home/claude/shots/s-14-till-leaf.png',fullPage:true});
+
   console.log('search calls    :', searchCalls);
   console.log('rings drawn     :', await p.$$eval('circle',e=>e.length).catch(()=>0));
   console.log('result heading  :', await p.$$eval('.card h2',e=>e.map(x=>x.textContent).join(' | ')));
@@ -170,6 +225,24 @@ const srv=app.listen(4801,async()=>{
   console.log('team read      :', names.join(', '));
   console.log('guard test     :', blocked);
   console.log('unsanctioned writes:', writes.length? '✗ '+writes.join(', ') : 'NONE ✓');
+
+  // separately prove the empty-floor case, on a server with no bookings at all
+  const app2=require('express')(); app2.use(express.json());
+  app2.get('/studio',(q,r)=>r.sendFile(path.join(D,'studio','index.html')));
+  app2.use('/studio',express.static(path.join(D,'studio')));
+  app2.get('/api/staff/team-for-login',(q,r)=>r.json({team:[{id:'1',name:'David',role:'Co-Director'}]}));
+  app2.get('/api/bookings/day',(q,r)=>r.json({date:q.query.date,covers:0,bookings:[]}));
+  await new Promise(resolveListen => {
+    const s2=app2.listen(4809, async () => {
+      const p2=await b.newPage(); await p2.setViewport({width:412,height:900,deviceScaleFactor:2});
+      await p2.goto('http://localhost:4809/studio',{waitUntil:'networkidle0'});
+      await p2.click('.person'); await new Promise(r=>setTimeout(r,400));
+      await p2.evaluate(()=>go('floor')); await new Promise(r=>setTimeout(r,600));
+      console.log('empty-floor note:', (await p2.$('.note')) ? 'shown' : 'MISSING ✗');
+      await p2.screenshot({path:'/home/claude/shots/s-11-empty-floor.png'});
+      await p2.close(); s2.close(); resolveListen();
+    });
+  });
   console.log(errs.length? '✗ ERRORS:\n  '+errs.join('\n  ') : '✓ zero errors across all screens');
   await b.close(); srv.close(); process.exit(errs.length||writes.length?1:0);
 });

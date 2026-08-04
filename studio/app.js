@@ -19,7 +19,7 @@ const API = location.origin;
 /* ── the guard ───────────────────────────────────────────────────── */
 const ALLOWED = [
   '/api/staff/team-for-login', '/api/bookings/day', '/api/floor/active',
-  '/api/pos/items', '/api/packing/queue', '/api/takings/today',
+  '/api/floor/tables', '/api/pos/items', '/api/packing/queue', '/api/takings/today',
   '/api/takings/breakdown', '/api/takings/history', '/api/analytics/dashboard',
   '/api/ai-usage', '/api/pieces/for-booking',
 ];
@@ -66,8 +66,13 @@ const hhmm = d => new Date(d).toLocaleTimeString('en-GB', { hour: '2-digit', min
 const isoDay = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
 const DAYNAME = d => d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
-/* The real floor, as the studio is actually laid out. */
-const TABLES = [
+/* [4 Aug] Was hardcoded from a one-off read of studio_tables. Daisy asked
+   whether the layout had since changed — it hadn't, names and capacities
+   still matched exactly — but hardcoding it meant the app would never
+   have noticed if it had. /api/floor/tables is a GET, so there is no
+   reason not to read the real thing: loaded once at boot, this constant
+   becomes the fallback if that read ever fails, not the source of truth. */
+let TABLES = [
   ['Table 1','Main Studio',6],['Table 2','Main Studio',4],['Table 3','Main Studio',4],
   ['Table 4','Main Studio',6],['Table 5','Main Studio',6],['Table 6','Main Studio',4],
   ['Table 7','Main Studio',4],['Table 8','Main Studio',8],
@@ -75,6 +80,24 @@ const TABLES = [
   ['Lounge 4','Lounge',4],['Lounge 5','Lounge',4],['Lounge 6','Lounge',4],
   ['The Vault','The Vault',14],
 ];
+let TABLE_POS = {};    // name -> {row, col}, filled once the real layout loads
+let tablesLoaded = false;
+
+async function loadTables() {
+  try {
+    const d = await read('/api/floor/tables');
+    const t = d.tables || [];
+    if (!t.length) throw new Error('empty');
+    TABLES = t.map(x => [x.name, x.room, x.capacity])
+      .sort((a, b) => (t.find(x => x.name === a[0]).sort_order || 0) -
+                       (t.find(x => x.name === b[0]).sort_order || 0));
+    TABLE_POS = {};
+    t.forEach(x => { TABLE_POS[x.name] = { row: x.grid_row || 0, col: x.grid_col || 0 }; });
+  } catch (e) {
+    // stays on the fallback above — never leaves the floor blank
+  }
+  tablesLoaded = true;
+}
 const short = n => n.replace('Table ', 'T').replace('Lounge ', 'L').replace('The Vault', 'Vault');
 
 /* Square writes the room into the service name; this is the only
@@ -152,8 +175,10 @@ const ADMIN = ['general manager', 'co-director', 'studio executive', 'director']
 function signIn(name, role) {
   me = { name, role, admin: ADMIN.some(r => (role || '').toLowerCase().includes(r)) };
   ticket = []; stack = [];                       // every login starts clean
+  priceGroups = []; tillMode = null; parentCatSel = null; cat = null;
   $('who').textContent = name;
   go('home', false);
+  if (!tablesLoaded) loadTables();               // real layout, once; falls back silently
 }
 
 /* ── home ────────────────────────────────────────────────────────── */
@@ -223,23 +248,48 @@ async function loadFloor() {
     if (!byTable[t] || state === 'live') byTable[t] = { b, state };
   });
   let h = '';
+  if (!bookings.length) {
+    h += `<div class="note" style="margin-bottom:16px">
+      Nothing booked in today — ${DAYNAME(new Date())}. The tables below are real,
+      just empty. Try Bookings and page forward to see a busier day.</div>`;
+  }
   ['Main Studio', 'Lounge', 'The Vault'].forEach(room => {
-    h += `<div class="roomname">${room}</div><div class="grid3">`;
-    TABLES.filter(t => t[1] === room).forEach(([name, , seats]) => {
-      const hit = byTable[name];
-      const cls = hit ? hit.state : '';
-      const note = hit ? (hit.state === 'live' ? esc(hit.b.customer_name || 'In now')
-                        : 'at ' + hhmm(hit.b.session_start)) : seats + ' seats';
-      h += `<button class="tbl ${cls}" data-t="${esc(name)}"><span class="n">${short(name)}</span>
-        <span class="s">${note}</span></button>`;
-    });
-    h += '</div>';
+    const inRoom = TABLES.filter(t => t[1] === room);
+    const positioned = inRoom.every(([name]) => TABLE_POS[name]);
+    h += `<div class="roomname">${room}</div>`;
+    if (positioned && inRoom.length > 1) {
+      // The real shape of the room, not reading order. studio_tables
+      // carries this (grid_row/grid_col) — e.g. the Lounge is genuinely
+      // two columns of three, not a left-to-right run of six.
+      const rows = Math.max(...inRoom.map(([n]) => TABLE_POS[n].row)) + 1;
+      const cols = Math.max(...inRoom.map(([n]) => TABLE_POS[n].col)) + 1;
+      h += `<div class="gridpos" style="grid-template-columns:repeat(${cols},1fr);
+        grid-template-rows:repeat(${rows},1fr)">`;
+      inRoom.forEach(([name, , seats]) => {
+        const p = TABLE_POS[name];
+        h += tableTile(name, seats, byTable[name],
+          `grid-row:${p.row + 1};grid-column:${p.col + 1}`);
+      });
+      h += '</div>';
+    } else {
+      h += '<div class="grid3">';
+      inRoom.forEach(([name, , seats]) => h += tableTile(name, seats, byTable[name], ''));
+      h += '</div>';
+    }
   });
   $('floor').innerHTML = h;
   $('floor').querySelectorAll('[data-t]').forEach(el => el.onclick = () => {
     const hit = byTable[el.dataset.t];
     if (hit) openBooking(hit.b); else { tickWhere = el.dataset.t; go('till'); }
   });
+}
+
+function tableTile(name, seats, hit, posStyle) {
+  const cls = hit ? hit.state : '';
+  const note = hit ? (hit.state === 'live' ? esc(hit.b.customer_name || 'In now')
+                    : 'at ' + hhmm(hit.b.session_start)) : seats + ' seats';
+  return `<button class="tbl ${cls}" data-t="${esc(name)}" style="${posStyle}">
+    <span class="n">${short(name)}</span><span class="s">${note}</span></button>`;
 }
 
 /* ── day ─────────────────────────────────────────────────────────── */
@@ -475,6 +525,7 @@ function paintTableMark() {
   const img = $('tableimg');
   if (img) img.onclick = ev => {
     const r = img.getBoundingClientRect();
+    if (!(r.width > 0) || !(r.height > 0)) return;   // image hasn't laid out yet — ignore the tap
     marks.push({ x: ((ev.clientX - r.left) / r.width) * 100, y: ((ev.clientY - r.top) / r.height) * 100 });
     paintTableMark();
   };
@@ -562,19 +613,64 @@ async function loadTill() {
   }
 }
 
+/* [4 Aug] Daisy: "till is not easily categorised." True once the
+   catalogue autopull fills square_items — /api/pos/items returns a flat
+   list, one chip per raw Square category, and the studio has 41 of
+   them. The 'average' fallback already avoided this because
+   /api/takings/breakdown groups server-side into five real buckets;
+   this mirrors that SAME classifier so catalogue mode gets it too,
+   rather than inventing a second taxonomy that could drift from it. */
+function parentOf(cat) {
+  const c = String(cat || '').trim();
+  if (c.startsWith('PB ')) return 'Paint your own — by shape';
+  if (c.startsWith('S.')) return 'Studio sessions & fees';
+  if (/drink|coffee|milkshake|smoothie|alcohol/i.test(c)) return 'Drinks';
+  if (/cake|food|cafe/i.test(c)) return 'Food';
+  return 'Other';
+}
+let parentCatSel = null;
+
 function paintTill() {
-  $('cats').innerHTML = priceGroups.map(g =>
-    `<button class="chip ${g.category === cat ? 'on' : ''}" data-c="${esc(g.category)}">${esc(g.category)}</button>`).join('');
-  $('cats').querySelectorAll('[data-c]').forEach(b => b.onclick = () => { cat = b.dataset.c; paintTill(); });
-  const g = priceGroups.find(x => x.category === cat) || priceGroups[0];
+  // 'average' mode groups server-side already (/api/takings/breakdown's
+  // own groupOf) — g.category there IS the parent bucket, so running
+  // parentOf() on it again would classify an already-grouped name like
+  // 'Paint your own — by shape' as neither PB-prefixed nor S.-prefixed
+  // and dump it into 'Other'. Only catalogue mode's raw Square
+  // categories (up to 41 of them) need bucketing at all.
+  const parents = {};
+  if (tillMode === 'catalogue') {
+    priceGroups.forEach(g => (parents[parentOf(g.category)] = parents[parentOf(g.category)] || []).push(g));
+  } else {
+    priceGroups.forEach(g => (parents[g.category] = [g]));
+  }
+  const parentNames = Object.keys(parents);
+  if (!parentCatSel || !parents[parentCatSel]) parentCatSel = parentNames[0];
+  const leaves = parents[parentCatSel] || [];
+  if (!leaves.find(x => x.category === cat)) cat = leaves[0] && leaves[0].category;
+
+  $('cats').innerHTML = parentNames.map(p =>
+    `<button class="chip ${p === parentCatSel ? 'on' : ''}" data-pc="${esc(p)}">${esc(p)}</button>`).join('');
+  $('cats').querySelectorAll('[data-pc]').forEach(b =>
+    b.onclick = () => { parentCatSel = b.dataset.pc; cat = null; paintTill(); });
+
+  let leafRow = '';
+  if (leaves.length > 1) {
+    leafRow = `<div class="chips" id="leafcats" style="margin-top:-2px;grid-column:1/-1">${leaves.map(g =>
+      `<button class="chip ${g.category === cat ? 'on' : ''}" data-c="${esc(g.category)}"
+        style="min-height:34px;padding:6px 12px;font-size:11.5px">${esc(g.category)}</button>`).join('')}</div>`;
+  }
+  const g = leaves.find(x => x.category === cat) || leaves[0];
   const banner = tillMode === 'average'
-    ? `<div class="note" style="grid-column:1/-1;margin:0 0 4px">These are your real categories with
+    ? `<div class="note" style="grid-column:1/-1;margin:0 0 10px">These are your real categories with
        the <strong>average</strong> you actually sell each at, worked out from four years of takings —
        not the Square price list. The real one appears here once the catalogue is pulled from Square.</div>`
     : '';
-  $('items').innerHTML = banner + (g.items || []).map((it, i) =>
+  $('items').innerHTML = `${leafRow}${banner}${(g && g.items || []).map((it, i) =>
     `<button class="item" data-i="${i}"><span class="n">${esc(it.name)}</span>
-     <span class="p">${money(it.price)}</span></button>`).join('');
+     <span class="p">${money(it.price)}</span></button>`).join('')}`;
+  const leafcats = $('leafcats');
+  if (leafcats) leafcats.querySelectorAll('[data-c]').forEach(b =>
+    b.onclick = () => { cat = b.dataset.c; paintTill(); });
   $('items').querySelectorAll('[data-i]').forEach(b => b.onclick = () => {
     const it = g.items[+b.dataset.i]; ticket.push({ n: it.name, p: it.price }); syncTicket();
   });
