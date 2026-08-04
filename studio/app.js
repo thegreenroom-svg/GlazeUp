@@ -18,7 +18,7 @@ const API = location.origin;
 
 /* ── the guard ───────────────────────────────────────────────────── */
 const ALLOWED = [
-  '/api/staff/team-for-login', '/api/bookings/day', '/api/floor/active',
+  '/api/staff/team-for-login', '/api/bookings/day', '/api/bookings/search', '/api/floor/active',
   '/api/floor/tables', '/api/pos/items', '/api/packing/queue', '/api/takings/today',
   '/api/takings/breakdown', '/api/takings/history', '/api/analytics/dashboard',
   '/api/ai-usage', '/api/pieces/for-booking',
@@ -182,6 +182,55 @@ function signIn(name, role) {
 }
 
 /* ── home ────────────────────────────────────────────────────────── */
+/* ── the front door ──────────────────────────────────────────────────
+   [4 Aug] David: a walk-in gives their name, not a time slot. "Click
+   table 3, Leanne" — one hop, not Home -> Bookings -> find her in a
+   day grid -> tap. This box is that hop: type a name or a table
+   number, tap the result, land straight on her session — the same
+   workflow page Bookings already opens, nothing new to build there.
+   Read-only still holds: /api/bookings/search is a GET, and picking a
+   result never seats anyone — it opens what's already true. Seating
+   itself is a write and happens on the real terminal, same as ringing
+   up the till; this shows it back once it's done. */
+let findTimer = null;
+function wireFind() {
+  const box = $('findbox'); if (!box) return;
+  box.addEventListener('input', () => {
+    clearTimeout(findTimer);
+    const q = box.value.trim();
+    if (q.length < 2) { $('findresults').innerHTML = ''; return; }
+    findTimer = setTimeout(() => runFind(q), 220);
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#findbox') && !e.target.closest('#findresults')) $('findresults').innerHTML = '';
+  });
+}
+async function runFind(q) {
+  let bookings;
+  try { bookings = (await read('/api/bookings/search', { q })).bookings || []; }
+  catch (e) { $('findresults').innerHTML = `<div class="findempty">
+    Couldn't search. ${esc(e.message)}</div>`; return; }
+  if (!$('findbox') || $('findbox').value.trim() !== q) return;   // typed on since
+  if (!bookings.length) {
+    $('findresults').innerHTML = `<div class="findempty">
+      No one matching "${esc(q)}" in the last 90 days.</div>`;
+    return;
+  }
+  $('findresults').innerHTML = bookings.map((b, i) => {
+    const st = b.session_start ? new Date(b.session_start) : null;
+    const when = st ? (isoDay(st) === isoDay(new Date()) ? 'Today ' + hhmm(st)
+      : st.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' ' + hhmm(st)) : '';
+    return `<button class="findrow" data-f="${i}"><span class="n">${esc(b.customer_name || 'Booking')}</span>
+      <span class="m">${b.table_number != null ? 'Table ' + esc(b.table_number) + ' · ' : ''}${esc(when)}</span></button>`;
+  }).join('');
+  $('findresults').querySelectorAll('[data-f]').forEach(el =>
+    el.onclick = () => {
+      const b = bookings[+el.dataset.f];
+      $('findbox').value = ''; $('findresults').innerHTML = '';
+      openBooking(b);
+    });
+}
+
 async function loadHome() {
   $('sub').textContent = DAYNAME(new Date());
   const t = [
@@ -1097,4 +1146,5 @@ $('prev').onclick = () => shift(-1);
 $('next').onclick = () => shift(1);
 $('tkclear').onclick = () => { ticket = []; syncTicket(); };
 $('tksend').onclick = sendTicket;
+wireFind();
 loadLogin();

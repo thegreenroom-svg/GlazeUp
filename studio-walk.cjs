@@ -88,6 +88,12 @@ app.get('/api/pieces/for-booking',(q,r)=>r.json({pieces:
  {id:'p1',piece_type:'Mug — pale blue with white spots',status:'fired',reference_photo_url:null},
  {id:'p2',piece_type:'Plate — yellow rim, red flowers',status:'fired',reference_photo_url:null}]}));
 app.get('/api/ai-usage',(q,r)=>r.json({today:0.02,month:0.39,model:'gpt-4o-mini'}));
+app.get('/api/bookings/search',(q,r)=>{
+  const term=(q.query.q||'').toLowerCase();
+  const all=[{customer_name:'Leanne Fisher',booking_code:'BK-99',table_number:3,
+    session_start:new Date().toISOString(),customer_email:'leanne@example.com'}];
+  r.json({bookings:all.filter(b=>b.customer_name.toLowerCase().includes(term)||String(b.table_number)===term)});
+});
 app.get('/api/floor/tables',(q,r)=>r.json({tables:[
  {name:'Table 1',room:'Main Studio',capacity:6,sort_order:1,grid_row:1,grid_col:0},
  {name:'Table 2',room:'Main Studio',capacity:4,sort_order:2,grid_row:2,grid_col:0},
@@ -126,6 +132,19 @@ const srv=app.listen(4801,async()=>{
   await new Promise(r=>setTimeout(r,500)); await shot('1-login');
   const names=await p.$$eval('.person .n',e=>e.map(x=>x.textContent));
   await p.click('.person'); await new Promise(r=>setTimeout(r,600)); await shot('2-home');
+
+  // THE FRONT DOOR: type a walk-in's name, one tap onto her full session
+  await p.type('#findbox','Leanne',{delay:40});
+  await new Promise(r=>setTimeout(r,500));
+  const findRows = await p.$$eval('#findresults .findrow',e=>e.map(x=>x.textContent.trim()));
+  console.log('search results  :', findRows.join(' | ') || 'NONE ✗');
+  await p.screenshot({path:'/home/claude/shots/s-15-search.png'});
+  await p.click('#findresults .findrow');
+  await new Promise(r=>setTimeout(r,700));
+  console.log('landed on view  :', await p.evaluate(()=>view));
+  console.log('landed on       :', await p.$eval('#bk .card',e=>e.textContent.trim().slice(0,40)).catch(()=>'NOTHING ✗'));
+  await p.screenshot({path:'/home/claude/shots/s-16-onehop.png',fullPage:true});
+  await p.evaluate(()=>{stack=[];go('home',false);});
   for(const v of ['floor','day','till','pack','money']){
     await p.evaluate(x=>go(x),v); await new Promise(r=>setTimeout(r,700)); await shot('3-'+v);
   }
