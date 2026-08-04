@@ -3336,13 +3336,15 @@ app.post('/api/bookings/:bookingCode/stage', async (req, res) => {
 // someone taps through a sale, believes a customer has been charged,
 // and the money is never taken. Square remains the only thing that
 // handles money.
-app.post('/api/catalogue/sync', async (req, res) => {
-  const { studioId } = req.body;
-  if (!studioId) return res.status(400).json({ error: 'studioId required' });
-  try {
+// [4 Aug] Pulled out of the route so the schedule and the button run the
+// SAME code. Daisy asked for the catalogue to pull itself — the till was
+// empty because square_items had never been populated, and nobody should
+// have to remember to press anything. Reads Square, writes only our own
+// price cache; nothing goes back to Square.
+async function syncCatalogue(studioId) {
     const { data: conn } = await supabase.from('square_connections')
       .select('square_access_token').eq('studio_id', studioId).single();
-    if (!conn) return res.status(404).json({ error: 'Square not connected' });
+    if (!conn) throw new Error('Square not connected');
 
     const client = new Client({
       accessToken: conn.square_access_token,
@@ -3392,7 +3394,15 @@ app.post('/api/catalogue/sync', async (req, res) => {
       }
     }
     console.log(`[catalogue] stored ${rows.length} priced variations`);
-    res.json({ status: 'synced', items: rows.length });
+    return rows.length;
+}
+
+app.post('/api/catalogue/sync', async (req, res) => {
+  const { studioId } = req.body;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const items = await syncCatalogue(studioId);
+    res.json({ status: 'synced', items });
   } catch (e) {
     console.error('catalogue/sync:', e.message);
     res.status(500).json({ error: e.message });
@@ -14798,6 +14808,42 @@ app.listen(port, async () => {
       console.error('Nightly Square sync failed to even start:', err.message);
     }
   });
+
+  // ── CATALOGUE, PULLED AUTOMATICALLY ───────────────────────────────
+  // [4 Aug] Daisy: 'autopull from Square catalogue.' The till was blank
+  // because square_items had NEVER been populated — the pull existed but
+  // only ever ran if somebody pressed it, and nobody knew they had to.
+  //
+  // Prices barely move, so nightly is plenty; but an empty table is a
+  // broken till, so boot fills it if there is nothing there. The boot
+  // pass is deliberately conditional — a full catalogue walk on every
+  // restart would be wasteful on a free instance that restarts often
+  // (the same trap the revenue backfill fell into in July).
+  async function catalogueForAllStudios(why, onlyIfEmpty) {
+    const { data: connections } = await supabase
+      .from('square_connections').select('studio_id');
+    for (const conn of (connections || [])) {
+      try {
+        if (onlyIfEmpty) {
+          const { count } = await supabase.from('square_items')
+            .select('id', { count: 'exact', head: true })
+            .eq('studio_id', conn.studio_id);
+          if (count > 0) { console.log(`[catalogue] ${why}: ${conn.studio_id} already has ${count}, skipping`); continue; }
+        }
+        const n = await syncCatalogue(conn.studio_id);
+        console.log(`[catalogue] ${why}: ${n} items for ${conn.studio_id}`);
+      } catch (err) {
+        console.error(`[catalogue] ${why} failed for ${conn.studio_id}:`, err.message);
+      }
+    }
+  }
+
+  // 3.30am, after the revenue sync so the two never overlap.
+  cron.schedule('30 3 * * *', () => catalogueForAllStudios('nightly', false));
+
+  // On boot, ONLY if the till would otherwise be empty.
+  setTimeout(() => catalogueForAllStudios('boot', true).catch(e =>
+    console.error('[catalogue] boot pass failed:', e.message)), 45000);
 
   // Keep-alive ping
   const SELF_URL = process.env.API_URL || 'https://glazeup-api.onrender.com';

@@ -391,10 +391,8 @@ function paintBooking() {
                border:1px solid var(--line)">` : '<div class="v" style="color:var(--mute)">○</div>'}</div>`).join('')}
            <div style="font-size:11.5px;color:var(--clay);margin-top:8px">
              ${withPhoto} of ${pieces.length} photographed</div>`
-        : `<div style="font-size:12.5px;color:var(--clay)">No pieces on this booking yet. They are
-           created when the table is photographed at the end of the session — the chalk tag names
-           whose they are, and each piece gets its own picture, which is what makes it findable
-           on the shelf afterwards.</div>`),
+        : `<div style="font-size:12.5px;color:var(--clay)">No pieces yet. They are created by
+           photographing the table at the end of the session — below.</div>`),
       !!(pieces && pieces.length && withPhoto === pieces.length))}
 
     ${stepRow(4, 'Find them on the shelf',
@@ -411,9 +409,18 @@ function paintBooking() {
            are photographed at the end of the session.</div>`,
       false)}
 
-    ${finished && !(pieces && pieces.length)
-      ? `<div class="note"><strong>This session has finished.</strong> If the table has been
-         cleared, photographing it is the step that turns it into findable pieces.</div>` : ''}
+    ${(!pieces || !pieces.length)
+      ? `<div class="card" style="border-left:4px solid var(--warn)">
+          <h2>Photograph the table</h2>
+          <div style="font-size:12.5px;color:var(--clay);line-height:1.55;margin-bottom:10px">
+            Taken from inside this booking, so it already knows whose pieces these are —
+            no chalk tag to write, none to read. Tap each piece in the photo and each one
+            gets its own picture, which is what makes it findable on the shelf later.</div>
+          <label class="btn" style="display:flex;align-items:center;justify-content:center;
+            cursor:pointer;margin-top:0" for="tableshot">Photograph the table</label>
+          <input type="file" id="tableshot" accept="image/*" capture="environment" style="display:none">
+          <div id="tablemark"></div>
+        </div>` : ''}
 
     <button class="btn ghost" id="bk-till">Open a practice ticket</button>
     <div class="note">Read-only — this booking can't be changed from here. Use Square for anything real.</div>`;
@@ -424,6 +431,55 @@ function paintBooking() {
   };
   const shot = $('bkshot');
   if (shot) shot.onchange = e => { const f = e.target.files[0]; if (f) bookingSearch(f); };
+  const tshot = $('tableshot');
+  if (tshot) tshot.onchange = e => { const f = e.target.files[0]; if (f) markTable(f); };
+}
+
+/* [4 Aug] Daisy: 'do we need chalk tags if we know the booking?' No —
+   and that removes the weakest link in the whole chain. The tag only
+   ever existed because the girls photograph on the iPad camera, outside
+   the app, so the booking was lost by the time the picture arrived and
+   OCR was the only way back. Taken from inside the booking, the link is
+   context, not handwriting.
+   Worth knowing what that saves: of the ten tags read by hand in July,
+   one name was misread outright, one surname was never legible, and one
+   board had an older name ghosting underneath because tags get reused.
+   Each of those is pieces attached to the wrong customer.
+   Read-only for now, so this marks up and shows what WOULD be created;
+   saving pieces is a write and waits on Daisy. */
+let tableShot = null, marks = [];
+async function markTable(file) {
+  tableShot = await readFile(file); marks = [];
+  paintTableMark();
+}
+function paintTableMark() {
+  const box = $('tablemark'); if (!box || !tableShot) return;
+  box.innerHTML = `
+    <div style="position:relative;line-height:0;margin-top:11px">
+      <img id="tableimg" src="${esc(tableShot)}" alt="The table"
+        style="width:100%;border-radius:12px;border:1.5px solid var(--line);cursor:crosshair">
+      ${marks.map((m, i) => `<svg viewBox="0 0 100 100" preserveAspectRatio="none"
+        style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none">
+        <circle cx="${m.x.toFixed(1)}" cy="${m.y.toFixed(1)}" r="6" fill="none" stroke="#2E7D32"
+          stroke-width="4" vector-effect="non-scaling-stroke"/>
+        <circle cx="${m.x.toFixed(1)}" cy="${m.y.toFixed(1)}" r="6" fill="none" stroke="#fff"
+          stroke-width="1.3" vector-effect="non-scaling-stroke"/></svg>`).join('')}
+    </div>
+    <div style="font-size:12.5px;font-weight:700;margin-top:10px">
+      ${marks.length ? marks.length + (marks.length === 1 ? ' piece marked' : ' pieces marked')
+                     : 'Tap each piece'}</div>
+    ${marks.length ? `<button class="btn ghost" id="undomark" style="margin-top:8px">Undo last</button>
+      <div class="note">Read-only for now — this is what would be saved: ${marks.length}
+        ${marks.length === 1 ? 'piece' : 'pieces'} on ${esc(bkNow.customer_name || 'this booking')},
+        each with its own cropped photograph. Turning that on is a write, so it needs your say-so.</div>` : ''}`;
+  const img = $('tableimg');
+  if (img) img.onclick = ev => {
+    const r = img.getBoundingClientRect();
+    marks.push({ x: ((ev.clientX - r.left) / r.width) * 100, y: ((ev.clientY - r.top) / r.height) * 100 });
+    paintTableMark();
+  };
+  const u = $('undomark');
+  if (u) u.onclick = () => { marks.pop(); paintTableMark(); };
 }
 
 async function bookingSearch(file) {
@@ -524,6 +580,43 @@ function paintTill() {
   });
   $('sub').textContent = tillMode === 'average'
     ? 'Average prices — practice only' : 'Practice only — nothing is sent';
+}
+
+/* [4 Aug] Daisy: 'want till to send, but only for demo at this stage.'
+   So the flow completes — ticket, send, receipt — and nothing leaves the
+   app. This does NOT call /api/pos/order and could not: the guard only
+   permits GETs, and the one sanctioned POST is the shelf search. The
+   receipt says so on its face, because a demo that looks like a real
+   sale is how a real sale gets rung up by accident. */
+function sendTicket() {
+  if (!ticket.length) return;
+  const lines = ticket.slice();
+  const total = lines.reduce((s, i) => s + i.p, 0);
+  const now = new Date();
+  ticket = []; syncTicket();
+  $('items').insertAdjacentHTML('afterbegin', `
+    <div class="card" id="demo-receipt" style="grid-column:1/-1">
+      <div style="text-align:center;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;line-height:1.7">
+        <div style="font-weight:700;letter-spacing:.08em">THE KILN CAFE</div>
+        <div style="color:var(--clay)">The Old Bank, Cheapside, Langport</div>
+        <hr style="border:none;border-top:1px dashed var(--line);margin:9px 0">
+        <div style="display:flex;justify-content:space-between"><span>${esc(tickWhere)}</span></div>
+        <div style="display:flex;justify-content:space-between;color:var(--clay)">
+          <span>${now.toLocaleDateString('en-GB')}</span><span>${hhmm(now)}</span></div>
+        <hr style="border:none;border-top:1px dashed var(--line);margin:9px 0">
+        ${lines.map(i => `<div style="display:flex;justify-content:space-between;gap:12px">
+          <span style="text-align:left">${esc(i.n)}</span><span>${money(i.p)}</span></div>`).join('')}
+        <hr style="border:none;border-top:1px dashed var(--line);margin:9px 0">
+        <div style="display:flex;justify-content:space-between;font-weight:700;font-size:13px">
+          <span>TOTAL</span><span>${money(total)}</span></div>
+      </div>
+      <div class="err" style="margin-top:12px"><strong>Demo only — this was not sent.</strong>
+        Nothing reached Square, no payment was taken and no order exists. Ring the real one up
+        on the till as usual.</div>
+      <button class="btn ghost" id="clear-receipt">Clear</button>
+    </div>`);
+  $('clear-receipt').onclick = () => { const r = $('demo-receipt'); if (r) r.remove(); };
+  $('main').scrollTop = 0;
 }
 
 function syncTicket() {
@@ -907,4 +1000,5 @@ $('hometap').onclick = () => { if (me && view !== 'login') { stack = []; go('hom
 $('prev').onclick = () => shift(-1);
 $('next').onclick = () => shift(1);
 $('tkclear').onclick = () => { ticket = []; syncTicket(); };
+$('tksend').onclick = sendTicket;
 loadLogin();

@@ -72,7 +72,8 @@ app.get('/api/floor/items/:code',(q,r)=>r.json({items:[
  {item_name:'PB Mugs And Cups',price_cents:1997,qty:2},
  {item_name:'S. Pottery Painting Sessions',price_cents:1074,qty:4},
  {item_name:'Hot Drinks',price_cents:283,qty:3}]}));
-app.get('/api/pieces/for-booking',(q,r)=>r.json({pieces:[
+app.get('/api/pieces/for-booking',(q,r)=>r.json({pieces:
+ q.query.bookingCode==='BK-3'?[]:[
  {id:'p1',piece_type:'Mug — pale blue with white spots',status:'fired',reference_photo_url:null},
  {id:'p2',piece_type:'Plate — yellow rim, red flowers',status:'fired',reference_photo_url:null}]}));
 app.get('/api/ai-usage',(q,r)=>r.json({today:0.02,month:0.39,model:'gpt-4o-mini'}));
@@ -106,6 +107,18 @@ const srv=app.listen(4801,async()=>{
   await p.evaluate(()=>{document.querySelectorAll('.item')[0].click();
                        document.querySelectorAll('.item')[1].click();});
   await new Promise(r=>setTimeout(r,400)); await shot('4-ticket');
+  // the demo send must complete the flow and reach nothing
+  await p.evaluate(()=>$('tksend').click()); await new Promise(r=>setTimeout(r,500));
+  await p.screenshot({path:'/home/claude/shots/s-9-receipt.png',fullPage:true});
+  console.log('receipt shown   :', (await p.$('#demo-receipt')) ? 'yes' : 'NO ✗');
+  console.log('receipt warns   :', await p.$eval('#demo-receipt .err',e=>
+    e.textContent.includes('not sent')).catch(()=>false));
+  console.log('ticket cleared  :', await p.evaluate(()=>ticket.length===0));
+  // demo send: the flow must complete and reach nothing
+  await p.evaluate(()=>$('tksend').click()); await new Promise(r=>setTimeout(r,500));
+  await p.screenshot({path:'/home/claude/shots/s-9-receipt.png',fullPage:true});
+  console.log('receipt shown   :', await p.$eval('#demo-receipt .err',e=>e.textContent.trim().slice(0,44)).catch(()=>'NONE'));
+  console.log('ticket cleared  :', await p.evaluate(()=>ticket.length===0));
   await p.evaluate(()=>go('day')); await new Promise(r=>setTimeout(r,700));
   await p.evaluate(()=>document.querySelector('.ev').click());
   await new Promise(r=>setTimeout(r,500)); await shot('5-booking');
@@ -120,6 +133,21 @@ const srv=app.listen(4801,async()=>{
   await p.screenshot({path:'/home/claude/shots/s-8-workflow.png',fullPage:true});
   console.log('workflow steps  :', await p.$$eval('#bk .card h2',e=>e.map(x=>x.textContent).join(' | ')));
   console.log('till total shown:', await p.$eval('#bk .fig',e=>e.textContent).catch(()=>'none'));
+
+  // a booking with no pieces yet -> the photograph-the-table step
+  await p.evaluate(()=>go('day')); await new Promise(r=>setTimeout(r,600));
+  await p.evaluate(()=>{const e=[...document.querySelectorAll('.ev')]
+    .find(x=>x.textContent.includes('Marcus')); if(e) e.click();});
+  await new Promise(r=>setTimeout(r,900));
+  console.log('table step shown:', (await p.$('#tableshot')) ? 'yes' : 'NO ✗');
+  const ti=await p.$('#tableshot');
+  if(ti){ await ti.uploadFile('/tmp/shelf.png'); await new Promise(r=>setTimeout(r,600));
+    await p.evaluate(()=>{const i=$('tableimg'); if(i){const r=i.getBoundingClientRect();
+      i.onclick({clientX:r.left+r.width*0.3,clientY:r.top+r.height*0.4});
+      i.onclick({clientX:r.left+r.width*0.7,clientY:r.top+r.height*0.6});}});
+    await new Promise(r=>setTimeout(r,500));
+    console.log('pieces marked   :', await p.evaluate(()=>marks.length));
+    await p.screenshot({path:'/home/claude/shots/s-10-table.png',fullPage:true}); }
 
   // THE PACKING FLOW: booking -> table photo -> photograph a shelf -> circles
   await p.evaluate(()=>go('pack')); await new Promise(r=>setTimeout(r,700));
