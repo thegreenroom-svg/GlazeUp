@@ -24,16 +24,47 @@ app.get('/api/bookings/day',(q,r)=>r.json({date:q.query.date,covers:11,bookings:
   party_size:2,space_name:'The Lounge Pottery Painting *Adult Only*',booking_code:'BK-3'},
  {customer_name:'The Sowerby Party',session_start:iso(13,0),session_end:iso(15,30),table_number:null,
   party_size:12,space_name:'The Vault - perfect for private parties!',booking_code:'BK-4'}]}));
-app.get('/api/pos/items',(q,r)=>r.json({total:5,groups:[
- {category:'PB Mugs And Cups',items:[{name:'Mug',price:19.97},{name:'Espresso cup',price:12.5}]},
- {category:'Hot Drinks',items:[{name:'Latte',price:3.4},{name:'Tea',price:2.6}]},
- {category:'S. Pottery Painting Sessions',items:[{name:'Studio fee',price:10.74}]}]}));
-app.get('/api/packing/queue',(q,r)=>r.json({count:2,pieces:[
- {booking_id:'Lindsay Moulin',piece_type:'Hamster',status:'fired',notes:'NOT PAID — charge at collection'},
- {booking_id:'Olivia Smethhust',piece_type:'Bird dish',status:'fired'}]}));
+app.get('/api/pos/items',(q,r)=>r.json({total:0,groups:[]}));   // as the studio really is
+app.get('/api/takings/history',(q,r)=>{
+  const days=[],months=[],years=[];
+  for(let i=400;i>=0;i--){const d=new Date(Date.now()-i*864e5);
+    days.push({date:d.toISOString().slice(0,10),
+      revenue: (i%7===1||i%7===2)?0:Math.round(400+Math.random()*1400),
+      txns: Math.round(10+Math.random()*70)});}
+  const bm={}; days.forEach(d=>{const k=d.date.slice(0,7); bm[k]=(bm[k]||0)+d.revenue;});
+  Object.entries(bm).forEach(([m,v])=>months.push({month:m,revenue:v}));
+  const by={}; days.forEach(d=>{const y=d.date.slice(0,4); by[y]=(by[y]||0)+d.revenue;});
+  Object.entries(by).forEach(([y,v])=>years.push({year:y,revenue:v}));
+  const tot=days.reduce((s,d)=>s+d.revenue,0), tr=days.filter(d=>d.revenue>0);
+  r.json({days,months,years,
+    weekdays:['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+      .map((w,i)=>({day:w,average:300+i*140,count:57})),
+    stats:{total:tot,daysRecorded:days.length,tradingDays:tr.length,
+      earliest:days[0].date,latest:days[days.length-1].date,
+      averageTradingDay:tot/tr.length,
+      bestDay:days.reduce((a,b)=>b.revenue>a.revenue?b:a,days[0]),
+      bestMonth:months.reduce((a,b)=>b.revenue>a.revenue?b:a,months[0]),
+      bestYear:years[0],totalTxns:days.reduce((s,d)=>s+d.txns,0)}});
+});
+app.get('/api/packing/queue',(q,r)=>r.json({count:5,pieces:[
+ {booking_id:'Kim Driscoll',piece_type:'Cup (pink interior)',status:'fired',
+  notes:'Painted 19/7 · Collect 23/7 · Lounge · NOT PAID, charge at collection'},
+ {booking_id:'Kim Driscoll',piece_type:'Saucer (folk florals)',status:'fired',notes:'Collect 23/7'},
+ {booking_id:'Frederica Findlater',piece_type:'Bunny (floral)',status:'fired',
+  notes:'Painted 19/7 10-12 · Collect 23/7 · tag x5'},
+ {booking_id:'Frederica Findlater',piece_type:'Motorbike',status:'fired',notes:'Collect 23/7'},
+ {booking_id:'Georgina Callin',piece_type:'Cosy Duck plaque',status:'fired',notes:'Collect 23/7'}]}));
 app.get('/api/takings/today',(q,r)=>r.json({value:1284.5,label:'today',synced:true}));
-app.get('/api/takings/breakdown',(q,r)=>r.json({categories:[
- {category:'PB Mugs And Cups',revenue_cents:42000},{category:'Hot Drinks',revenue_cents:19800}]}));
+app.get('/api/takings/breakdown',(q,r)=>r.json({groups:[
+ {group:'Paint your own — by shape',revenue:407316,items:20418,categories:[
+   {category:'PB Mugs And Cups',revenue:80300,items:4021},
+   {category:'PB Plates & Platters',revenue:52840,items:2000}]},
+ {group:'Unclassified in Square',revenue:324497,items:26268,categories:[
+   {category:'Other',revenue:324497,items:26268}]},
+ {group:'Studio sessions & fees',revenue:113000,items:10087,categories:[
+   {category:'S. Pottery Painting Sessions',revenue:108334,items:10087}]},
+ {group:'Drinks',revenue:44100,items:15580,categories:[
+   {category:'Hot Drinks',revenue:33150,items:11714}]}]}));
 app.get('/api/floor/active',(q,r)=>r.json({bookings:[]}));
 
 const srv=app.listen(4801,async()=>{

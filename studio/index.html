@@ -11,12 +11,15 @@
 
 <header class="bar">
   <button class="back" id="back" aria-label="Back">‹</button>
-  <div style="flex:1;min-width:0">
+  <button id="hometap" style="flex:1;min-width:0;background:none;border:none;padding:0;
+    text-align:left;font:inherit;color:inherit;cursor:pointer">
     <h1 id="ttl">The Kiln Cafe</h1>
     <div class="sub" id="sub"></div>
-  </div>
+  </button>
   <div class="who" id="who"></div>
 </header>
+
+<div class="ro">Read-only demo · nothing you do here changes live data</div>
 
 <main id="main">
 
@@ -32,9 +35,9 @@
   <!-- HOME -->
   <section class="pane" id="p-home">
     <div class="tiles" id="hometiles"></div>
-    <div class="note" id="readonly-note"><strong>Read-only.</strong> This app shows the studio's
-      live data and lets you move around it, but it never sends anything back — not to Square,
-      not to the bookings, not to the till. Anything you tap here resets when you log in again.</div>
+    <div class="note" id="readonly-note">Live data, read straight from the studio. Nothing is
+      ever sent back — not to Square, not to the bookings, not to the till. Anything you tap
+      here clears when you log in again.</div>
   </section>
 
   <!-- FLOOR -->
@@ -91,7 +94,6 @@
     Nothing is sent anywhere. Ring the real order up on the till as usual.</div>
 </div>
 
-<nav id="dock"></nav>
 
 <script src="/studio/app.js"></script>
 </body>
