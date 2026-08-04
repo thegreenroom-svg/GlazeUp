@@ -20,7 +20,7 @@ const API = location.origin;
 const ALLOWED = [
   '/api/staff/team-for-login', '/api/bookings/day', '/api/floor/active',
   '/api/pos/items', '/api/packing/queue', '/api/takings/today',
-  '/api/takings/breakdown', '/api/analytics/dashboard',
+  '/api/takings/breakdown', '/api/takings/history', '/api/analytics/dashboard',
 ];
 async function read(path, params = {}) {
   const url = new URL(path, API);

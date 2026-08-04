@@ -342,7 +342,17 @@ app.use('/docs', express.static(path.join(__dirname, 'docs'), staticCacheOptions
 // The old app is not deleted; it stays reachable at /legacy so nothing is
 // lost and this is a one-line revert. But it is no longer what opens.
 app.get('/', (req, res) => res.redirect('/studio'));
-app.get('/legacy', (req, res) => res.redirect('/admin/dashboard-local.html'));
+
+// [4 Aug, second pass] THE OLD APP IS NOW UNREACHABLE, not merely bypassed.
+// Switching the front door was not enough: admin/manifest.json set
+// start_url to /admin/dashboard-local.html, so anyone who had added the
+// app to a home screen kept opening the old one whatever '/' did — and
+// every lean page still had a ✕ linking back to it. Both fixed, and this
+// route closes the door on any link, bookmark or cached reference that
+// remains. The file is untouched in git; this is a one-line revert.
+app.get('/admin/dashboard-local.html', (req, res) => res.redirect('/studio'));
+app.get('/admin', (req, res) => res.redirect('/studio'));
+app.get('/admin/', (req, res) => res.redirect('/studio'));
 
 // Favicon — served from root so browsers find it automatically
 // at glazeup-api.onrender.com/favicon.ico

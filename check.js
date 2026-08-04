@@ -269,9 +269,12 @@ function checkUniform(name, html) {
   // the blank screen, the dead Logout, the stuck splash. Making it a
   // build requirement is cheaper than finding the next one on a
   // tablet.
+  // [4 Aug] The Desk is now /studio — the old dashboard is unreachable.
+  // The rule is unchanged (every page must have a route home); only its
+  // idea of where home IS has moved.
   if (name.startsWith('admin/') && !name.includes('dashboard-local')) {
-    if (!/dashboard-local\.html/.test(html)) {
-      fail(`${name}: no way back to the Desk — a page you cannot leave is a trap`);
+    if (!/\/studio|dashboard-local\.html/.test(html)) {
+      fail(`${name}: no way back home — a page you cannot leave is a trap`);
     }
   }
   if (!html.includes('kc-uniform.css')) {

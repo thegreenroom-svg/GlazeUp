@@ -108,7 +108,7 @@
   <h1>Till</h1>
   <button id="back" disabled>‹ Back</button>
   <div class="crumb" id="crumb">Loading…</div>
-  <a href="/admin/dashboard-local.html?go=home" title="Back to the Desk">✕</a>
+  <a href="/studio" title="Back to the Desk">✕</a>
 </div>
 
 <div class="main">
@@ -285,7 +285,7 @@ $('send').onclick = async () => {
 history.pushState({ till: 1 }, '');
 window.addEventListener('popstate', () => {
   if (path.length) { path = []; render(); history.pushState({ till: 1 }, ''); }
-  else location.href = '/admin/dashboard-local.html?go=home';
+  else location.href = '/studio';
 });
 
 paintOrder();
