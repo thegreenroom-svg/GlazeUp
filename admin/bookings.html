@@ -309,6 +309,32 @@ function openDetail(id) {
   // blank row reads as missing data when it usually just isn't set.
   const f = [];
   const add = (k, v) => { if (v) f.push(`<div class="fld"><div class="k">${k}</div><div class="v">${v}</div></div>`); };
+
+  // [2 Aug] THE CUSTOMER'S OWN MESSAGE, FIRST AND UNMISSABLE.
+  // Reading Daisy's Square screenshots properly: the note sits high in
+  // the detail view, and hers said "this session is for me to paint my
+  // reserved £30 Santa head jar (reserved 22nd Dec)". That is not a
+  // detail — it is the entire reason the booking exists, and a member
+  // of staff who misses it hands the customer a blank mug.
+  //
+  // So it is not a field in the list like a phone number. It is set
+  // apart, at the top, in the studio's clay, because it is the one
+  // thing on this screen that changes what someone DOES.
+  if (b.notes || b.customer_note) {
+    f.push(`<div style="background:rgba(184,121,70,.1);border:1px solid rgba(184,121,70,.3);
+      border-radius:12px;padding:11px 13px;margin-bottom:10px">
+      <div class="k" style="margin-bottom:3px">What they said</div>
+      <div style="font-size:14px;line-height:1.45">${esc(b.notes || b.customer_note)}</div>
+    </div>`);
+  }
+
+  // Duration alongside the times, the way Square shows it — "2 hrs" is
+  // read faster than working it out from 10:00 and 12:00.
+  if (b.session_end) {
+    const mins = Math.round((new Date(b.session_end) - new Date(b.session_start)) / 60000);
+    const h = Math.floor(mins / 60), m = mins % 60;
+    add('Length', (h ? h + ' hr' + (h === 1 ? '' : 's') : '') + (m ? ' ' + m + ' mins' : ''));
+  }
   add('Party size', b.party_size ? `${b.party_size} ${b.party_size === 1 ? 'person' : 'people'}` : '');
   add('Room', esc(b.room || b.space_name || ''));
   add('Table', b.table_number ? esc(b.table_number) : '');
@@ -317,7 +343,10 @@ function openDetail(id) {
   add('Email', b.customer_email ? `<a href="mailto:${esc(b.customer_email)}">${esc(b.customer_email)}</a>` : '');
   add('Reference', esc(b.booking_code || ''));
   add('Status', b.status ? `<span class="pill">${esc(b.status)}</span>` : '');
-  add('Notes', esc(b.notes || ''));
+  // (Notes are shown at the top instead — see above.)
+  add('Booked', b.created_at
+    ? new Date(b.created_at).toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })
+    : '');
   add('From Square', b.synced_from_square ? new Date(b.synced_from_square).toLocaleString('en-GB') : '');
   $('dBody').innerHTML = f.join('') || '<div class="empty">Nothing else recorded.</div>';
 
