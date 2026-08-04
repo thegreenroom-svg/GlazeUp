@@ -21,6 +21,7 @@ const ALLOWED = [
   '/api/staff/team-for-login', '/api/bookings/day', '/api/floor/active',
   '/api/pos/items', '/api/packing/queue', '/api/takings/today',
   '/api/takings/breakdown', '/api/takings/history', '/api/analytics/dashboard',
+  '/api/ai-usage',
 ];
 async function read(path, params = {}) {
   const url = new URL(path, API);
@@ -31,6 +32,25 @@ async function read(path, params = {}) {
   const r = await fetch(url, { method: 'GET', cache: 'no-store' });
   if (!r.ok) throw new Error('The server answered ' + r.status + '.');
   return r.json();
+}
+
+/* THE ONE EXCEPTION, and it is deliberate.
+   /api/packing/find-listed is a POST only because it carries a photo.
+   Its handler was read line by line on 4 Aug: it touches no table —
+   no insert, no update, no upsert, no delete. It sends the picture and
+   the wanted list to the vision model and returns where things are.
+   Nothing in the studio changes. It does cost roughly a third of a
+   penny per photo, so the price of every search is shown on screen.
+   Nothing else may use this path. */
+const SEARCH_PATH = '/api/packing/find-listed';
+async function search(body) {
+  const r = await fetch(API + SEARCH_PATH, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...body, studioId: STUDIO }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || ('the server answered ' + r.status));
+  return d;
 }
 
 /* ── state (memory only, cleared on every load) ──────────────────── */
@@ -450,14 +470,31 @@ function paintPack() {
     b.onclick = () => openPackBooking(packBookings[+b.dataset.p]));
 }
 
+/* ── the booking, as Jenny works it ──────────────────────────────────
+   Tap a booking → the table photograph the girls took when they cleared
+   it → photograph a tray or a piece you think is hers → the pieces get
+   circled → tick them off. The whole job on one screen, in that order. */
+let openBk = null, foundMap = {}, spend = 0;
+
 function openPackBooking(g) {
-  PANES.packbk = ['Packing', g.who];
+  openBk = g; foundMap = {};
+  paintBookingCard();
+  $('main').scrollTop = 0;
+}
+
+function paintBookingCard(photoShown, rings, note) {
+  const g = openBk;
+  const wanted = g.pieces.filter(p => !foundMap[p.id]);
+  $('sub').textContent = g.who;
   $('pack').innerHTML = `
-    ${g.photo ? `<img src="${esc(g.photo)}" alt="The table photo for this booking"
-      style="width:100%;border-radius:16px;border:1.5px solid var(--line);margin-bottom:12px">`
-      : `<div class="note" style="margin-bottom:12px">No table photo on this booking yet. Once the
-         studio photos are loading in, the chalk tag is read off the picture and it lands here —
-         so you can see the pieces rather than hunt for them.</div>`}
+    ${g.photo ? `<img src="${esc(g.photo)}" alt="The table when it was cleared"
+      style="width:100%;border-radius:16px;border:1.5px solid var(--line);margin-bottom:4px">
+      <div style="font-size:11px;color:var(--clay);text-align:center;margin-bottom:12px">
+        The table when the girls cleared it</div>`
+      : `<div class="note" style="margin-bottom:12px">No table photograph on this booking yet.
+         When the girls photograph the table as they clear it, the chalk tag is read off the
+         picture and it lands here — so you see her pieces instead of hunting for them.</div>`}
+
     <div class="card">
       <div style="font-family:var(--serif);font-weight:900;font-size:22px">${esc(g.who)}</div>
       <div style="font-size:12px;color:var(--clay);margin-top:3px">
@@ -465,17 +502,134 @@ function openPackBooking(g) {
       ${g.unpaid ? `<div class="err" style="margin-top:10px"><strong>Not paid.</strong>
         The chalk tag says charge at collection.</div>` : ''}
     </div>
-    <div class="card"><h2>The pieces</h2>
-      ${g.pieces.map(p => `<div class="row"><div style="flex:1">
-        <div class="l">${esc(p.piece_type || p.label || 'Piece')}</div>
-        ${p.notes ? `<div class="m">${esc(p.notes)}</div>` : ''}</div>
-        <div class="v" style="font-size:10.5px;color:var(--clay);text-transform:uppercase;
-          letter-spacing:.05em">${esc(p.status || '')}</div></div>`).join('')}
+
+    <div class="card">
+      <h2>Find them</h2>
+      <div style="font-size:12px;color:var(--clay);margin:-4px 0 10px">
+        Photograph a tray or a shelf you think hers is on. Whatever of hers is in the picture
+        gets circled.</div>
+      <label class="btn" style="display:flex;align-items:center;justify-content:center;
+        cursor:pointer;margin-top:0" for="shelfshot">Photograph a tray or shelf</label>
+      <input type="file" id="shelfshot" accept="image/*" capture="environment" style="display:none">
+      <div style="font-size:10.5px;color:var(--clay);text-align:center;margin-top:8px">
+        About 0.3p a photo · ${spend ? spend.toFixed(1) + 'p this session' : 'nothing spent yet'}</div>
+      ${(!wanted.length && !photoShown) ? `<div class="note" style="margin-top:10px">
+        Every piece is accounted for.</div>` : ''}
     </div>
-    <button class="btn ghost" id="pack-back">Back to the list</button>
-    <div class="note">Read-only — marking a piece packed still happens on the real system.</div>`;
-  $('pack-back').onclick = () => { paintPack(); $('main').scrollTop = 0; };
-  $('main').scrollTop = 0;
+
+    ${photoShown ? `<div class="card"><h2>${esc(note || 'Result')}</h2>
+      <div style="position:relative;line-height:0">
+        <img src="${esc(photoShown)}" alt="The shelf you photographed"
+          style="width:100%;border-radius:12px;border:1.5px solid var(--line)">
+        ${rings || ''}
+      </div></div>` : ''}
+
+    <div class="card"><h2>Her pieces</h2>
+      ${g.pieces.map(p => {
+        const hit = foundMap[p.id];
+        return `<div class="row"><div style="flex:1">
+          <div class="l">${esc(p.description || p.piece_type || 'Piece')}</div>
+          ${p.notes ? `<div class="m">${esc(p.notes)}</div>` : ''}
+          ${hit ? `<div class="m" style="color:var(--soon);font-weight:700">
+            Found — ${esc(hit)}</div>` : ''}</div>
+          <div class="v" style="font-size:15px;color:${hit ? 'var(--soon)' : 'var(--mute)'}">
+            ${hit ? '●' : '○'}</div></div>`;
+      }).join('')}
+    </div>
+
+    <button class="btn ghost" id="pack-back">Back to the bookings</button>
+    <div class="note">Read-only — ticking a piece off for real still happens on the live system.</div>`;
+
+  // iOS only opens a picker while the tap is still live, so nothing may
+  // be awaited before this fires. The question comes after the camera.
+  $('shelfshot').onchange = e => { const f = e.target.files[0]; if (f) runSearch(f); };
+  $('pack-back').onclick = () => { openBk = null; PANES.pack[1] = ''; paintPack(); $('main').scrollTop = 0; };
+}
+
+/* An 8x8 magenta grid burned into the photo before it is sent, so the
+   model READS a cell reference rather than estimating a position. Four
+   earlier attempts at coordinates and named zones put rings on the
+   wrong things; this was the first that landed. */
+const COLS8 = ['A','B','C','D','E','F','G','H'];
+function gridded(dataUrl, maxSide) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const sc = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
+      const x = c.getContext('2d');
+      x.drawImage(img, 0, 0, c.width, c.height);
+      const cw = c.width / 8, ch = c.height / 8;
+      x.lineWidth = Math.max(3, Math.round(c.width / 260));
+      x.strokeStyle = 'rgba(255,0,255,.95)';          // never a glaze colour
+      const fs = Math.max(14, Math.round(c.width / 46));
+      x.font = '800 ' + fs + 'px system-ui,sans-serif'; x.textBaseline = 'top';
+      for (let r = 0; r < 8; r++) for (let col = 0; col < 8; col++) {
+        const px = col * cw, py = r * ch;
+        x.strokeRect(px, py, cw, ch);
+        const lab = COLS8[col] + (r + 1), tw = x.measureText(lab).width;
+        x.fillStyle = 'rgba(255,255,255,.95)'; x.fillRect(px + 4, py + 4, tw + 14, fs + 10);
+        x.fillStyle = '#FF00FF'; x.fillText(lab, px + 11, py + 9);
+      }
+      x.textBaseline = 'alphabetic';
+      resolve(c.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+const cellPoint = ref => {
+  const m = String(ref || '').trim().toUpperCase().match(/^([A-H])\s*([1-8])$/);
+  if (!m) return null;
+  return { x: (COLS8.indexOf(m[1]) + .5) / 8, y: (parseInt(m[2], 10) - 1 + .5) / 8 };
+};
+const readFile = f => new Promise((ok, no) => {
+  const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = no; r.readAsDataURL(f);
+});
+
+async function runSearch(file) {
+  const g = openBk;
+  const wanted = g.pieces.filter(p => !foundMap[p.id])
+    .map(p => ({ id: p.id, description: p.description || p.piece_type || '' }))
+    .filter(w => w.description);
+  if (!wanted.length) { paintBookingCard(null, null, 'Nothing left to look for'); return; }
+
+  const raw = await readFile(file);
+  paintBookingCard(raw, null, 'Looking…');
+  try {
+    const gridPhoto = await gridded(raw, 1400);
+    const d = await search({ photoBase64: gridPhoto, wanted });
+    if (typeof d.cost === 'number') spend += d.cost * 100;
+
+    const found = d.found || [];
+    let rings = '';
+    found.forEach((f, i) => {
+      const p = cellPoint(f.cell);
+      const piece = g.pieces.find(x => String(x.id) === String(f.id));
+      if (piece) foundMap[piece.id] = f.cell ? 'circled ' + f.cell : 'in this photo';
+      if (!p) return;
+      rings += `<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;
+        inset:0;width:100%;height:100%;pointer-events:none">
+        <circle cx="${(p.x*100).toFixed(1)}" cy="${(p.y*100).toFixed(1)}" r="7"
+          fill="none" stroke="#2E7D32" stroke-width="4" vector-effect="non-scaling-stroke"/>
+        <circle cx="${(p.x*100).toFixed(1)}" cy="${(p.y*100).toFixed(1)}" r="7"
+          fill="none" stroke="#fff" stroke-width="1.4" vector-effect="non-scaling-stroke"/></svg>`;
+    });
+
+    const n = found.length, m = wanted.length;
+    const placed = found.filter(f => f.cell).length;
+    let note = `${n} of ${m} found`;
+    if (n && !placed) note += ' — in this photo, but not placed';
+    if (!n) note = `None of her ${m} in this one`;
+    paintBookingCard(raw, rings, note);
+    if (!n) $('pack').insertAdjacentHTML('beforeend',
+      `<div class="note">Nothing of hers here. Try the next shelf — and a piece can only be
+       found if its own description is on file, which comes from the table photograph.</div>`);
+  } catch (e) {
+    paintBookingCard(raw, null, 'Search failed');
+    $('pack').insertAdjacentHTML('beforeend', `<div class="err">${esc(e.message)}</div>`);
+  }
 }
 
 /* ── money (admin only) ─────────────────────────────────────────────

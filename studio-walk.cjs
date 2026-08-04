@@ -3,7 +3,9 @@
 const express=require('express'), path=require('path'), P=require('puppeteer-core');
 const app=express(); const D=__dirname;
 const writes=[];
-app.use((q,_r,n)=>{ if(q.method!=='GET') writes.push(q.method+' '+q.path); n(); });
+// The ONE sanctioned exception. Anything else non-GET is a failure.
+const SANCTIONED='/api/packing/find-listed';
+app.use((q,_r,n)=>{ if(q.method!=='GET' && q.path!==SANCTIONED) writes.push(q.method+' '+q.path); n(); });
 app.get('/studio',(q,r)=>r.sendFile(path.join(D,'studio','index.html')));
 app.use('/studio',express.static(path.join(D,'studio')));
 
@@ -66,6 +68,14 @@ app.get('/api/takings/breakdown',(q,r)=>r.json({groups:[
  {group:'Drinks',revenue:44100,items:15580,categories:[
    {category:'Hot Drinks',revenue:33150,items:11714}]}]}));
 app.get('/api/floor/active',(q,r)=>r.json({bookings:[]}));
+app.get('/api/ai-usage',(q,r)=>r.json({today:0.02,month:0.39,model:'gpt-4o-mini'}));
+let searchCalls=0;
+app.post('/api/packing/find-listed',express.json({limit:'12mb'}),(q,r)=>{
+  searchCalls++;
+  const w=q.body.wanted||[];
+  r.json({cost:0.0031,allPottery:['pale pink cottage jar','blue speckled mug'],
+    found:w.slice(0,2).map((x,i)=>({id:x.id,cell:['C4','E6'][i]})),
+    diag:{returned:w.length,kept:Math.min(2,w.length),withCell:Math.min(2,w.length)}});});
 
 const srv=app.listen(4801,async()=>{
   const b=await P.launch({executablePath:'/opt/google/chrome/chrome',
@@ -95,13 +105,28 @@ const srv=app.listen(4801,async()=>{
   await p.evaluate(()=>go('day')); await new Promise(r=>setTimeout(r,500));
   await p.evaluate(()=>$('next').click()); await new Promise(r=>setTimeout(r,600));
   await p.evaluate(()=>$('prev').click()); await new Promise(r=>setTimeout(r,600));
+
+  // THE PACKING FLOW: booking -> table photo -> photograph a shelf -> circles
+  await p.evaluate(()=>go('pack')); await new Promise(r=>setTimeout(r,700));
+  await p.evaluate(()=>document.querySelector('[data-p]').click());
+  await new Promise(r=>setTimeout(r,500));
+  await p.screenshot({path:'/home/claude/shots/s-6-booking.png',fullPage:true});
+  // a real file through the real input, so the iOS-safe path is exercised
+  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==','base64');
+  require('fs').writeFileSync('/tmp/shelf.png',png);
+  const inp=await p.$('#shelfshot'); await inp.uploadFile('/tmp/shelf.png');
+  await new Promise(r=>setTimeout(r,1400));
+  await p.screenshot({path:'/home/claude/shots/s-7-found.png',fullPage:true});
+  console.log('search calls    :', searchCalls);
+  console.log('rings drawn     :', await p.$$eval('circle',e=>e.length).catch(()=>0));
+  console.log('result heading  :', await p.$$eval('.card h2',e=>e.map(x=>x.textContent).join(' | ')));
   // try to force a write through the guard
   const blocked=await p.evaluate(async()=>{ try{ await read('/api/pos/order'); return 'NOT BLOCKED'; }
     catch(e){ return e.message.slice(0,40); } });
 
   console.log('team read      :', names.join(', '));
   console.log('guard test     :', blocked);
-  console.log('writes attempted:', writes.length? writes.join(', ') : 'NONE ✓');
+  console.log('unsanctioned writes:', writes.length? '✗ '+writes.join(', ') : 'NONE ✓');
   console.log(errs.length? '✗ ERRORS:\n  '+errs.join('\n  ') : '✓ zero errors across all screens');
   await b.close(); srv.close(); process.exit(errs.length||writes.length?1:0);
 });
