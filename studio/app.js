@@ -56,7 +56,8 @@ async function search(body) {
 
 /* ── state (memory only, cleared on every load) ──────────────────── */
 let me = null, view = 'login', stack = [], day = new Date(),
-    bookings = [], floor = [], priceGroups = [], cat = null, ticket = [], tickWhere = 'Practice ticket';
+    bookings = [], floor = [], priceGroups = [], cat = null, ticket = [], tickWhere = 'Practice ticket',
+    tillTable = null;
 
 const $ = id => document.getElementById(id);
 const money = n => '£' + (n || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -99,6 +100,41 @@ async function loadTables() {
   tablesLoaded = true;
 }
 const short = n => n.replace('Table ', 'T').replace('Lounge ', 'L').replace('The Vault', 'Vault');
+
+/* [4 Aug] David: "choose a table for the booking and go through
+   workflows" + "add table no at till" — then, rightly, "surely we can
+   use the existing bookings and complete then clear the day?" So this
+   is deliberately small: real bookings, a table chosen LOCALLY to walk
+   the workflow through, one tap clears it back to nothing. No fake
+   data invented, nothing written — picking a table here can no more
+   seat someone than the practice ticket can ring one up.
+   Shared by the booking's Seated step and the Till header. */
+function tablePickerHTML(selected) {
+  const rooms = [...new Set(TABLES.map(t => t[1]))];
+  return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+    ${rooms.map(room => TABLES.filter(t => t[1] === room).map(([name]) =>
+      `<button class="chip pickt ${name === selected ? 'on' : ''}" data-tbl="${esc(name)}"
+        style="min-height:34px;padding:6px 12px;font-size:11.5px">${esc(short(name))}</button>`
+    ).join('')).join('')}
+  </div>`;
+}
+function wireTablePicker(root, onPick) {
+  root.querySelectorAll('.pickt').forEach(b => b.onclick = () => onPick(b.dataset.tbl));
+}
+
+/* One tap to clear every local, unsaved choice — the practice ticket,
+   any table picked at Till or on a booking, table-photo marks not yet
+   saved. Nothing here was ever real, so "clearing" is just resetting
+   JS state; logging out already did this implicitly, this makes it an
+   explicit, immediate action instead. */
+function clearPracticeState() {
+  ticket = []; tillTable = null; tickWhere = 'Practice ticket';
+  if (bkNow) delete bkNow._practiceTable;
+  marks = []; tableShot = null;
+  syncTicket();
+  if (view === 'bk' && bkNow) paintBooking();
+  if (view === 'till') paintTill();
+}
 
 /* Square writes the room into the service name; this is the only
    thing that reliably says which room a booking belongs to. */
@@ -175,7 +211,7 @@ const ADMIN = ['general manager', 'co-director', 'studio executive', 'director']
 function signIn(name, role) {
   me = { name, role, admin: ADMIN.some(r => (role || '').toLowerCase().includes(r)) };
   ticket = []; stack = [];                       // every login starts clean
-  priceGroups = []; tillMode = null; parentCatSel = null; cat = null;
+  priceGroups = []; tillMode = null; parentCatSel = null; cat = null; tillTable = null;
   $('who').textContent = name;
   go('home', false);
   if (!tablesLoaded) loadTables();               // real layout, once; falls back silently
@@ -329,7 +365,7 @@ async function loadFloor() {
   $('floor').innerHTML = h;
   $('floor').querySelectorAll('[data-t]').forEach(el => el.onclick = () => {
     const hit = byTable[el.dataset.t];
-    if (hit) openBooking(hit.b); else { tickWhere = el.dataset.t; go('till'); }
+    if (hit) openBooking(hit.b); else { tillTable = el.dataset.t; tickWhere = el.dataset.t; go('till'); }
   });
 }
 
@@ -463,8 +499,17 @@ function paintBooking() {
 
     ${stepRow(1, 'Seated', seated
       ? `<div class="l">Table ${esc(b.table_number)}${b.party_size ? ' · ' + b.party_size + ' painting' : ''}</div>`
-      : `<div style="font-size:12.5px;color:var(--clay)">Not seated yet. The table lands here when
-         someone seats them at the terminal — Square Appointments has no table on it.</div>`, seated)}
+      : `<div style="font-size:12.5px;color:var(--clay);margin-bottom:2px">Not seated yet — that
+         lands here once someone's seated at the terminal, since Square Appointments has no table
+         on it. Jenny plans tables most mornings before that; pick where this one's going to sit
+         to see the rest of the workflow for it.</div>
+         ${b._practiceTable
+           ? `<div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+                <span class="chip on" style="min-height:34px;padding:6px 12px;font-size:11.5px">
+                  ${esc(short(b._practiceTable))} — Jenny's plan</span>
+                <button class="chip" id="chgtable" style="min-height:34px;padding:6px 12px;
+                  font-size:11.5px">Change</button></div>`
+           : tablePickerHTML(null)}`, seated)}
 
     ${stepRow(2, 'On the table', items === undefined
       ? '<div style="font-size:12.5px;color:var(--clay)">Reading the till…</div>'
@@ -525,9 +570,13 @@ function paintBooking() {
     <div class="note">Read-only — this booking can't be changed from here. Use Square for anything real.</div>`;
 
   $('bk-till').onclick = () => {
-    tickWhere = (b.customer_name || 'Booking') + (b.table_number != null ? ' · Table ' + b.table_number : '');
+    tillTable = b.table_number != null ? 'Table ' + b.table_number : (b._practiceTable || null);
+    tickWhere = (b.customer_name || 'Booking') + (tillTable ? ' · ' + tillTable : '');
     go('till');
   };
+  wireTablePicker($('bk'), name => { b._practiceTable = name; paintBooking(); });
+  const chg = $('chgtable');
+  if (chg) chg.onclick = () => { delete b._practiceTable; paintBooking(); };
   const shot = $('bkshot');
   if (shot) shot.onchange = e => { const f = e.target.files[0]; if (f) bookingSearch(f); };
   const tshot = $('tableshot');
@@ -679,7 +728,30 @@ function parentOf(cat) {
 }
 let parentCatSel = null;
 
+function paintTillTable() {
+  const el = $('tilltable'); if (!el) return;
+  if (tillTable) {
+    el.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;
+        background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:10px 12px">
+      <span><span class="k">Table</span>
+        <span style="display:block;font-family:var(--serif);font-weight:800;font-size:15px;
+          margin-top:2px">${esc(short(tillTable))}</span></span>
+      <button class="chip" id="tillchg" style="min-height:34px;padding:6px 12px">Change</button>
+    </div>`;
+    $('tillchg').onclick = () => { tillTable = null; paintTillTable(); };
+  } else {
+    el.innerHTML = `<div class="k" style="margin-bottom:6px">Table — none chosen</div>
+      ${tablePickerHTML(null)}`;
+    wireTablePicker(el, name => {
+      tillTable = name;
+      if (tickWhere === 'Practice ticket' || !tickWhere) tickWhere = short(name);
+      paintTillTable(); syncTicket();
+    });
+  }
+}
+
 function paintTill() {
+  paintTillTable();
   // 'average' mode groups server-side already (/api/takings/breakdown's
   // own groupOf) — g.category there IS the parent bucket, so running
   // parentOf() on it again would classify an already-grouped name like
@@ -1144,7 +1216,7 @@ $('back').onclick = back;
 $('hometap').onclick = () => { if (me && view !== 'login') { stack = []; go('home', false); } };
 $('prev').onclick = () => shift(-1);
 $('next').onclick = () => shift(1);
-$('tkclear').onclick = () => { ticket = []; syncTicket(); };
+$('tkclear').onclick = clearPracticeState;
 $('tksend').onclick = sendTicket;
 wireFind();
 loadLogin();

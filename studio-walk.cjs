@@ -204,6 +204,37 @@ const srv=app.listen(4801,async()=>{
     console.log('pieces marked   :', await p.evaluate(()=>marks.length));
     await p.screenshot({path:'/home/claude/shots/s-10-table.png',fullPage:true}); }
 
+  // JENNY'S TABLE PLAN: an unseated booking offers a local table pick,
+  // carries into a practice ticket, and one tap clears everything.
+  await p.evaluate(()=>go('day')); await new Promise(r=>setTimeout(r,700));
+  await p.evaluate(()=>{const e=[...document.querySelectorAll('.ev')]
+    .find(x=>x.textContent.includes('Marcus')); if(e) e.click();});
+  await new Promise(r=>setTimeout(r,600));
+  console.log('picker shown    :', (await p.$('#bk .pickt')) ? 'yes' : 'NO ✗');
+  await p.evaluate(()=>document.querySelector('#bk .pickt').click());
+  await new Promise(r=>setTimeout(r,300));
+  const planChip = await p.$eval('#bk .chip.on', e=>e.textContent.trim()).catch(()=>'NONE ✗');
+  console.log('table planned   :', planChip);
+  await p.screenshot({path:'/home/claude/shots/s-17-plan.png',fullPage:true});
+  await p.evaluate(()=>document.querySelector('#bk-till').click());
+  await new Promise(r=>setTimeout(r,400));
+  const tillTableShown = await p.$eval('#tilltable', e=>e.textContent.replace(/\s+/g,' ').trim()).catch(()=>'NONE ✗');
+  console.log('till table shown:', tillTableShown);
+  await p.screenshot({path:'/home/claude/shots/s-18-tilltable.png'});
+  // add an item so 'clear the day' has something real to prove it clears
+  await p.evaluate(()=>{const it=document.querySelector('.item'); if(it) it.click();});
+  await new Promise(r=>setTimeout(r,300));
+  console.log('ticket before   :', await p.evaluate(()=>ticket.length), 'tillTable before:', await p.evaluate(()=>tillTable));
+  await p.evaluate(()=>document.getElementById('tkclear').click());
+  await new Promise(r=>setTimeout(r,300));
+  console.log('ticket after    :', await p.evaluate(()=>ticket.length), 'tillTable after :', await p.evaluate(()=>tillTable));
+  await p.screenshot({path:'/home/claude/shots/s-19-cleared.png'});
+
+  // direct Home -> Till, no booking context: the picker must appear here too
+  await p.evaluate(()=>{stack=[];go('home',false);}); await new Promise(r=>setTimeout(r,300));
+  await p.evaluate(()=>go('till')); await new Promise(r=>setTimeout(r,500));
+  console.log('picker on direct till:', (await p.$('#tilltable .pickt')) ? 'yes' : 'NO ✗');
+
   // THE PACKING FLOW: booking -> table photo -> photograph a shelf -> circles
   await p.evaluate(()=>go('pack')); await new Promise(r=>setTimeout(r,700));
   const clickErr = await p.evaluate(()=>{
