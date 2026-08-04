@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GlazeUp App Emulator</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #f5f5f5;
+    }
+
+    .emulator-frame {
+      width: 100%;
+      max-width: 430px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 40px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      position: relative;
+    }
+
+    .status-bar {
+      background: #000;
+      color: white;
+      padding: 8px 16px;
+      font-size: 11px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .notch {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 200px;
+      height: 24px;
+      background: #000;
+      border-radius: 0 0 20px 20px;
+      z-index: 100;
+    }
+
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding-top: 8px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .screen {
+      display: none;
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    .screen.active {
+      display: flex;
+      flex-direction: column;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    /* ──────── LOGIN SCREEN ──────── */
+    .login-screen {
+      background: linear-gradient(135deg, #B87946 0%, #8A6244 100%);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+
+    .logo {
+      font-size: 48px;
+      margin-bottom: 20px;
+    }
+
+    .studio-name {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .tagline {
+      font-size: 13px;
+      opacity: 0.8;
+      margin-bottom: 40px;
+    }
+
+    .staff-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .staff-button {
+      background: rgba(255,255,255,0.15);
+      border: 2px solid rgba(255,255,255,0.3);
+      color: white;
+      padding: 20px;
+      border-radius: 12px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .staff-button:active {
+      background: rgba(255,255,255,0.25);
+      transform: scale(0.98);
+    }
+
+    .staff-role {
+      font-size: 10px;
+      opacity: 0.7;
+      margin-top: 4px;
+    }
+
+    /* ──────── HOME SCREEN ──────── */
+    .home-header {
+      background: linear-gradient(135deg, #B87946 0%, #8A6244 100%);
+      color: white;
+      padding: 20px 16px;
+      border-radius: 0 0 20px 20px;
+      margin: -16px -16px 16px -16px;
+    }
+
+    .greeting {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .time-display {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+
+    .tile-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .tile {
+      background: linear-gradient(135deg, #F9F8F6 0%, #FFFDF9 100%);
+      border: 1.5px solid #E8E0D8;
+      border-radius: 12px;
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .tile:active {
+      transform: scale(0.98);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .tile-icon {
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    .tile-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #2B2724;
+    }
+
+    .tile-sub {
+      font-size: 10px;
+      color: #9B8B7E;
+      margin-top: 4px;
+    }
+
+    /* ──────── BOOKING SCREEN ──────── */
+    .booking-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #2B2724;
+    }
+
+    .form-input {
+      border: 1.5px solid #E8E0D8;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: #B87946;
+      box-shadow: 0 0 0 3px rgba(184, 121, 70, 0.1);
+    }
+
+    .button-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .button-primary {
+      background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .button-primary:active {
+      transform: scale(0.98);
+    }
+
+    .button-secondary {
+      background: #F9F8F6;
+      color: #2B2724;
+      border: 1.5px solid #E8E0D8;
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .button-secondary:active {
+      background: #EFE8E0;
+    }
+
+    /* ──────── FLOOR PLAN ──────── */
+    .floor-plan {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .table-tile {
+      background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+      border: 2px solid #4CAF50;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 12px;
+      color: #1B5E20;
+    }
+
+    .table-tile.occupied {
+      background: linear-gradient(135deg, #C8E6C9 0%, #A5D6A7 100%);
+      border-color: #2E7D32;
+    }
+
+    /* ──────── TILL SCREEN ──────── */
+    .terminal {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+
+    .terminal-header {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+      opacity: 0.9;
+    }
+
+    .amount-display {
+      font-size: 48px;
+      font-weight: 700;
+      margin: 20px 0;
+      letter-spacing: -1px;
+    }
+
+    .payment-methods {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .payment-btn {
+      background: linear-gradient(135deg, rgba(76,175,80,0.3), rgba(56,142,60,0.3));
+      border: 1px solid rgba(255,255,255,0.2);
+      color: white;
+      padding: 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .payment-btn:active {
+      background: rgba(76,175,80,0.5);
+    }
+
+    /* ──────── RECEIPT ──────── */
+    .receipt {
+      background: #FFF9F0;
+      border: 2px dashed #B87946;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      line-height: 1.6;
+      text-align: center;
+      margin-top: 16px;
+    }
+
+    .receipt-header {
+      font-weight: 700;
+      font-size: 13px;
+      margin-bottom: 8px;
+      border-bottom: 1px dashed #B87946;
+      padding-bottom: 8px;
+    }
+
+    .receipt-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(184,121,70,0.2);
+    }
+
+    .receipt-total {
+      font-weight: 700;
+      font-size: 14px;
+      margin: 12px 0;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* ──────── MODALS ──────── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      width: 90%;
+      max-width: 320px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    /* ──────── HEADER ──────── */
+    .header {
+      background: white;
+      border-bottom: 1px solid #E8E0D8;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #2B2724;
+    }
+
+    .back-button {
+      background: none;
+      border: none;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 4px 8px;
+      color: #B87946;
+    }
+
+    .logout-button {
+      background: #B87946;
+      color: white;
+      border: none;
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    /* ──────── SCROLL ──────── */
+    .content::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .content::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+
+    .content::-webkit-scrollbar-thumb {
+      background: #B87946;
+      border-radius: 3px;
+    }
+
+    .content::-webkit-scrollbar-thumb:hover {
+      background: #8A6244;
+    }
+  </style>
+</head>
+<body>
+  <div class="emulator-frame">
+    <div class="status-bar">
+      <span id="time-display">09:41</span>
+      <span>📶 WiFi</span>
+    </div>
+    <div class="notch"></div>
+
+    <div class="content">
+      <!-- LOGIN SCREEN -->
+      <div id="screen-login" class="screen active login-screen">
+        <div class="logo">🧑</div>
+        <div class="studio-name">The Kiln Cafe</div>
+        <div class="tagline">Pottery Painting Studio</div>
+        <div class="staff-grid">
+          <button class="staff-button" onclick="login('Daisy', 'General Manager')">
+            Daisy
+            <div class="staff-role">GM</div>
+          </button>
+          <button class="staff-button" onclick="login('Jenny', 'Studio Executive')">
+            Jenny
+            <div class="staff-role">Executive</div>
+          </button>
+          <button class="staff-button" onclick="login('David', 'Manager')">
+            David
+            <div class="staff-role">Manager</div>
+          </button>
+          <button class="staff-button" onclick="login('Ruby', 'Assistant')">
+            Ruby
+            <div class="staff-role">Assistant</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- HOME SCREEN -->
+      <div id="screen-home" class="screen">
+        <div class="home-header">
+          <div class="greeting">Hi, <span id="staff-name">Daisy</span>!</div>
+          <div class="time-display">Friday, July 23 · Open until 5pm</div>
+        </div>
+        <div class="tile-grid">
+          <div class="tile" onclick="navigateTo('floor-plan')">
+            <div class="tile-icon">🎨</div>
+            <div class="tile-label">Floor Plan</div>
+            <div class="tile-sub">Tables & bookings</div>
+          </div>
+          <div class="tile" onclick="navigateTo('booking')">
+            <div class="tile-icon">📅</div>
+            <div class="tile-label">New Booking</div>
+            <div class="tile-sub">Walk-in or online</div>
+          </div>
+          <div class="tile" onclick="navigateTo('pieces')">
+            <div class="tile-icon">🖼️</div>
+            <div class="tile-label">Pieces</div>
+            <div class="tile-sub">Kiln & packing</div>
+          </div>
+          <div class="tile" onclick="navigateTo('till')">
+            <div class="tile-icon">💳</div>
+            <div class="tile-label">Till</div>
+            <div class="tile-sub">Payment & receipts</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FLOOR PLAN SCREEN -->
+      <div id="screen-floor-plan" class="screen">
+        <div class="header">
+          <button class="back-button" onclick="navigateTo('home')">←</button>
+          <div class="header-title">Floor Plan</div>
+          <div style="width: 40px;"></div>
+        </div>
+        <div style="padding: 16px;">
+          <div style="font-size: 12px; font-weight: 600; margin-bottom: 12px; color: #2B2724;">Main Studio</div>
+          <div class="floor-plan" id="main-studio-plan"></div>
+          <div style="font-size: 12px; font-weight: 600; margin: 20px 0 12px; color: #2B2724;">Lounge</div>
+          <div class="floor-plan" id="lounge-plan"></div>
+        </div>
+      </div>
+
+      <!-- BOOKING SCREEN -->
+      <div id="screen-booking" class="screen">
+        <div class="header">
+          <button class="back-button" onclick="navigateTo('home')">←</button>
+          <div class="header-title">New Booking</div>
+          <div style="width: 40px;"></div>
+        </div>
+        <div style="padding: 16px; flex: 1;">
+          <div class="booking-form">
+            <div class="form-group">
+              <label class="form-label">Customer Name</label>
+              <input type="text" id="booking-name" class="form-input" placeholder="e.g. Sarah Johnson" value="Sarah Johnson">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Date</label>
+              <input type="date" id="booking-date" class="form-input">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Time</label>
+              <select id="booking-time" class="form-input">
+                <option>10:00 AM</option>
+                <option>11:00 AM</option>
+                <option>12:00 PM</option>
+                <option>1:00 PM</option>
+                <option>2:00 PM</option>
+                <option>3:00 PM</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Duration</label>
+              <select id="booking-duration" class="form-input">
+                <option>1 hour (£8)</option>
+                <option>1.5 hours (£12)</option>
+                <option>2 hours (£16)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Guests</label>
+              <input type="number" id="booking-guests" class="form-input" min="1" max="8" value="2">
+            </div>
+            <div class="button-group" style="margin-top: 20px;">
+              <button class="button-secondary" onclick="navigateTo('home')">Cancel</button>
+              <button class="button-primary" onclick="confirmBooking()">Confirm</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TILL SCREEN -->
+      <div id="screen-till" class="screen">
+        <div class="header">
+          <button class="back-button" onclick="navigateTo('home')">←</button>
+          <div class="header-title">Till & Payment</div>
+          <div style="width: 40px;"></div>
+        </div>
+        <div style="padding: 16px; flex: 1;">
+          <div class="terminal">
+            <div class="terminal-header">SQUARE TERMINAL</div>
+            <div style="font-size: 11px; opacity: 0.7; margin-bottom: 8px;">Amount Due</div>
+            <div class="amount-display" id="till-amount">£24.00</div>
+            <div style="font-size: 10px; opacity: 0.6; margin-bottom: 16px;">Sarah Johnson · Table 3</div>
+          </div>
+
+          <div class="payment-methods">
+            <button class="payment-btn" onclick="processPayment('card')">💳 Card</button>
+            <button class="payment-btn" onclick="processPayment('contactless')">📱 Contactless</button>
+            <button class="payment-btn" onclick="processPayment('cash')">💷 Cash</button>
+            <button class="payment-btn" onclick="processPayment('square')">🔲 Square App</button>
+          </div>
+
+          <div style="text-align: center; margin: 20px 0; padding: 16px 0; border-top: 1px solid rgba(0,0,0,0.1);">
+            <div id="payment-status" style="font-size: 12px; color: #2B2724;">Select a payment method</div>
+          </div>
+
+          <div class="receipt" id="receipt-display" style="display: none;">
+            <div class="receipt-header">═══ THE KILN CAFE ═══</div>
+            <div style="font-size: 10px; margin: 8px 0;">Old Bank, Langport</div>
+            <div style="margin: 12px 0; padding: 12px 0; border-bottom: 1px dashed #B87946;">
+              <div style="text-align: left;">Sarah Johnson</div>
+              <div style="text-align: left; font-size: 10px; opacity: 0.7;">Table 3 · 2 guests</div>
+            </div>
+            <div style="margin: 8px 0;">
+              <div class="receipt-item">
+                <span>Paint Session (2h)</span>
+                <span>£16.00</span>
+              </div>
+              <div class="receipt-item">
+                <span>Drinks</span>
+                <span>£8.00</span>
+              </div>
+            </div>
+            <div class="receipt-total">
+              <span>TOTAL:</span>
+              <span id="receipt-total">£24.00</span>
+            </div>
+            <div style="margin-top: 12px; font-size: 10px; opacity: 0.7;">
+              💳 Card Payment
+            </div>
+            <div style="margin-top: 12px;">Thank you!</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PIECES/KILN SCREEN -->
+      <div id="screen-pieces" class="screen">
+        <div class="header">
+          <button class="back-button" onclick="navigateTo('home')">←</button>
+          <div class="header-title">Pieces & Kiln</div>
+          <div style="width: 40px;"></div>
+        </div>
+        <div style="padding: 16px; flex: 1;">
+          <div style="margin-bottom: 20px;">
+            <div style="font-size: 12px; font-weight: 700; margin-bottom: 12px; color: #2B2724;">Ready for Packing</div>
+            <div style="background: linear-gradient(135deg, #E8F5E9, #C8E6C9); border-radius: 8px; padding: 12px; margin-bottom: 8px;">
+              <div style="font-weight: 600; color: #1B5E20;">Mug · Sarah Johnson</div>
+              <div style="font-size: 11px; color: #2E7D32;">Painted: Jul 21 · Fired: Today</div>
+            </div>
+            <div style="background: linear-gradient(135deg, #E8F5E9, #C8E6C9); border-radius: 8px; padding: 12px;">
+              <div style="font-weight: 600; color: #1B5E20;">Plate · Emma Wilson</div>
+              <div style="font-size: 11px; color: #2E7D32;">Painted: Jul 20 · Fired: Yesterday</div>
+            </div>
+          </div>
+
+          <div>
+            <div style="font-size: 12px; font-weight: 700; margin-bottom: 12px; color: #2B2724;">In the Kiln</div>
+            <div style="background: linear-gradient(135deg, #FFF3E0, #FFE0B2); border-radius: 8px; padding: 12px; margin-bottom: 8px;">
+              <div style="font-weight: 600; color: #E65100;">Bowl · Tom Smith</div>
+              <div style="font-size: 11px; color: #F57C00;">Dip: In progress</div>
+            </div>
+            <div style="background: linear-gradient(135deg, #FFF3E0, #FFE0B2); border-radius: 8px; padding: 12px;">
+              <div style="font-weight: 600; color: #E65100;">Vase · Lisa Chen</div>
+              <div style="font-size: 11px; color: #F57C00;">Fired: In kiln</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Demo data
+    const tables = [
+      { id: 1, name: 'T1', occupied: true },
+      { id: 2, name: 'T2', occupied: false },
+      { id: 3, name: 'T3', occupied: true },
+      { id: 4, name: 'T4', occupied: false },
+      { id: 5, name: 'L1', occupied: true },
+      { id: 6, name: 'L2', occupied: false },
+      { id: 7, name: 'L3', occupied: false },
+      { id: 8, name: 'L4', occupied: true },
+    ];
+
+    let currentStaff = null;
+    let currentScreen = 'login';
+
+    function updateTime() {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      document.getElementById('time-display').textContent = `${hours}:${minutes}`;
+    }
+
+    setInterval(updateTime, 1000);
+    updateTime();
+
+    function login(name, role) {
+      currentStaff = name;
+      document.getElementById('staff-name').textContent = name;
+      navigateTo('home');
+    }
+
+    function navigateTo(screen) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById(`screen-${screen}`).classList.add('active');
+      currentScreen = screen;
+
+      if (screen === 'floor-plan') {
+        renderFloorPlan();
+      }
+    }
+
+    function renderFloorPlan() {
+      const mainStudio = document.getElementById('main-studio-plan');
+      const lounge = document.getElementById('lounge-plan');
+      mainStudio.innerHTML = '';
+      lounge.innerHTML = '';
+
+      tables.slice(0, 4).forEach(table => {
+        const el = createTableTile(table);
+        mainStudio.appendChild(el);
+      });
+
+      tables.slice(4).forEach(table => {
+        const el = createTableTile(table);
+        lounge.appendChild(el);
+      });
+    }
+
+    function createTableTile(table) {
+      const div = document.createElement('div');
+      div.className = `table-tile ${table.occupied ? 'occupied' : ''}`;
+      div.textContent = table.name;
+      div.onclick = () => selectTable(table);
+      return div;
+    }
+
+    function selectTable(table) {
+      document.getElementById('till-amount').textContent = '£24.00';
+      navigateTo('till');
+    }
+
+    function confirmBooking() {
+      const name = document.getElementById('booking-name').value;
+      const date = document.getElementById('booking-date').value;
+      alert(`Booking confirmed for ${name} on ${date}`);
+      navigateTo('home');
+    }
+
+    function processPayment(method) {
+      const methods = {
+        'card': '💳 Card Payment',
+        'contactless': '📱 Contactless Payment',
+        'cash': '💷 Cash Payment',
+        'square': '🔲 Square App'
+      };
+
+      document.getElementById('payment-status').textContent = `Processing ${methods[method]}...`;
+      document.getElementById('receipt-display').style.display = 'none';
+
+      setTimeout(() => {
+        document.getElementById('payment-status').textContent = '✓ Payment Successful';
+        document.getElementById('receipt-display').style.display = 'block';
+      }, 1500);
+    }
+  </script>
+</body>
+</html>
