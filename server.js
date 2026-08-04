@@ -299,6 +299,15 @@ app.get('/money-parked.js', (req, res) => {
   res.set('Cache-Control', 'no-store, must-revalidate');
   res.sendFile(path.join(__dirname, 'money-parked.js'));
 });
+// [4 Aug] Practice mode. Same reason as the three routes above: the
+// repo root is deliberately not served, so a root-level HTML file
+// 404s silently. Single explicit route, no-store so staff always get
+// the current build rather than a cached one on a studio iPad.
+app.get('/practice', (req, res) => {
+  res.set('Cache-Control', 'no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, 'app-emulator.html'));
+});
+
 app.use('/css', express.static(path.join(__dirname, 'css'), staticCacheOptions));
 // Genuine real fix: /brand-assets was referenced directly in the real
 // HTML (apple-touch-icon, manifest icons) but never actually had a

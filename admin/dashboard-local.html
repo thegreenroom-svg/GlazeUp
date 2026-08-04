@@ -4740,128 +4740,6 @@ function updateStaffName() {
           </div>
         </div>
 
-        <!-- ════════════════════════════════════════════════════════════════════ -->
-        <!-- SECTION 4: TILL & PAYMENT (Square Terminal emulation + Receipt flow) -->
-        <!-- ════════════════════════════════════════════════════════════════════ -->
-        <div id="staff-section-till" class="staff-section" style="display: none;">
-
-          <!-- ── SQUARE TERMINAL EMULATION ── -->
-          <div class="chart-container" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: #fff; border: 2px solid #0f3460; padding: 0; overflow: hidden; border-radius: 12px;">
-            <div style="background: linear-gradient(90deg, #0f3460 0%, #1a1a2e 100%); padding: 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f3460;">
-              <div style="font-weight: 700; font-size: 18px; letter-spacing: 1px;">SQUARE TERMINAL</div>
-              <div id="terminal-status" style="background: rgba(46,125,50,0.3); padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700;">READY</div>
-            </div>
-
-            <!-- Transaction Amount Display -->
-            <div style="padding: 24px 16px; text-align: center; background: rgba(0,0,0,0.3); border-bottom: 1px solid rgba(255,255,255,0.1);">
-              <div style="font-size: 13px; color: rgba(255,255,255,0.6); margin-bottom: 8px;">AMOUNT DUE</div>
-              <div style="font-size: 48px; font-weight: 700; letter-spacing: -1px;" id="terminal-amount">£0.00</div>
-              <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 8px;" id="terminal-booking">Awaiting selection</div>
-            </div>
-
-            <!-- Payment Methods Grid -->
-            <div style="padding: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.1);">
-              <button class="till-tile" onclick="processPayment('card')" style="background: linear-gradient(135deg, #00bcd4, #0097a7); color: white; padding: 16px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 700;">
-                <div style="font-size: 22px; margin-bottom: 4px;">💳</div>
-                <div>Card</div>
-              </button>
-              <button class="till-tile" onclick="processPayment('contactless')" style="background: linear-gradient(135deg, #4caf50, #388e3c); color: white; padding: 16px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 700;">
-                <div style="font-size: 22px; margin-bottom: 4px;">📱</div>
-                <div>Contactless</div>
-              </button>
-              <button class="till-tile" onclick="processPayment('cash')" style="background: linear-gradient(135deg, #ff9800, #f57c00); color: white; padding: 16px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 700;">
-                <div style="font-size: 22px; margin-bottom: 4px;">💷</div>
-                <div>Cash</div>
-              </button>
-              <button class="till-tile" onclick="processPayment('square_app')" style="background: linear-gradient(135deg, #9c27b0, #7b1fa2); color: white; padding: 16px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 700;">
-                <div style="font-size: 22px; margin-bottom: 4px;">🔲</div>
-                <div>Square App</div>
-              </button>
-            </div>
-
-            <!-- Status Message -->
-            <div style="padding: 12px 16px; text-align: center; font-size: 11px; color: rgba(255,255,255,0.7);" id="terminal-message">
-              Select a payment method or enter a booking above
-            </div>
-          </div>
-
-          <!-- ── QUICK TILL BUTTONS ── -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px;">
-            <button class="glaze-tile till-tile glaze-honey" style="padding: 16px;" onclick="openTillForBooking()">
-              <div style="font-size: 20px; margin-bottom: 4px;">🧾</div>
-              <div style="font-size: 13px; font-weight: 700;">New Sale</div>
-            </button>
-            <button class="glaze-tile till-tile glaze-ocean" style="padding: 16px;" onclick="showRecentTransactions()">
-              <div style="font-size: 20px; margin-bottom: 4px;">📜</div>
-              <div style="font-size: 13px; font-weight: 700;">Transactions</div>
-            </button>
-          </div>
-
-          <!-- ── DIGITAL TILL REGISTER ── -->
-          <div class="chart-container" style="margin-top: 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-              <h3 style="margin: 0;">Digital Till Register</h3>
-              <button onclick="refreshTillData()" style="background: none; border: none; cursor: pointer; color: var(--gu-primary); font-size: 14px; padding: 4px 8px; font-weight: bold;">🔄 Refresh</button>
-            </div>
-
-            <!-- Till Summary -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px;">
-              <div style="background: rgba(46,125,50,0.1); padding: 12px; border-radius: 8px; border-left: 4px solid #2e7d32;">
-                <div style="font-size: 10px; color: var(--gu-dust); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Today's Takings</div>
-                <div style="font-size: 22px; font-weight: 700; color: #2e7d32;" id="till-today">£0.00</div>
-              </div>
-              <div style="background: rgba(33,150,243,0.1); padding: 12px; border-radius: 8px; border-left: 4px solid #2196f3;">
-                <div style="font-size: 10px; color: var(--gu-dust); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Transactions</div>
-                <div style="font-size: 22px; font-weight: 700; color: #2196f3;" id="till-count">0</div>
-              </div>
-              <div style="background: rgba(255,152,0,0.1); padding: 12px; border-radius: 8px; border-left: 4px solid #ff9800;">
-                <div style="font-size: 10px; color: var(--gu-dust); text-transform: uppercase; font-weight: 700; margin-bottom: 4px;">Card vs Cash</div>
-                <div style="font-size: 13px; font-weight: 700;" id="till-breakdown">
-                  <span style="color: #2196f3;">💳 £0</span> | <span style="color: #ff9800;">💷 £0</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Recent Transactions List -->
-            <div style="font-size: 11px; font-weight: 700; color: var(--gu-dust); text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.05em;">Recent Transactions</div>
-            <div id="till-transactions-list" style="max-height: 300px; overflow-y: auto;">
-              <div style="padding: 12px; text-align: center; color: var(--gu-dust); font-size: 12px;">No transactions yet</div>
-            </div>
-          </div>
-
-          <!-- ── RECEIPT DISPLAY ── -->
-          <div class="chart-container" style="margin-top: 16px; background: #FFF9F0; border: 1.5px solid #B87946;" id="receipt-container">
-            <div style="background: #fff; border-bottom: 2px dashed #B87946; padding: 12px; text-align: center; font-family: 'Courier New', monospace; font-size: 13px;">
-              <div style="font-size: 16px; font-weight: 700; margin-bottom: 4px;">═══════════════════════</div>
-              <div style="font-size: 11px; letter-spacing: 1px;">THE KILN CAFE</div>
-              <div style="font-size: 10px; color: var(--gu-dust); margin-top: 4px;">Old Bank, Cheapside, Langport</div>
-              <div style="font-size: 10px; color: var(--gu-dust);">Somerset TA10 9AB</div>
-            </div>
-            <div style="padding: 12px; font-family: 'Courier New', monospace; font-size: 12px;">
-              <div id="receipt-customer" style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed #B87946;">
-                <div style="font-weight: 700;" id="receipt-name">Customer Name</div>
-                <div style="font-size: 10px; color: var(--gu-dust);" id="receipt-date">Date</div>
-                <div style="font-size: 10px; color: var(--gu-dust);" id="receipt-time">Time</div>
-              </div>
-              <div id="receipt-items" style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed #B87946;">
-                <!-- Items populated by JS -->
-              </div>
-              <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 14px; margin: 10px 0;">
-                <div>TOTAL:</div>
-                <div id="receipt-total">£0.00</div>
-              </div>
-              <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 10px;">
-                <div>Payment:</div>
-                <div id="receipt-method">Card</div>
-              </div>
-              <div style="text-align: center; font-size: 10px; color: var(--gu-dust);">
-                <div>Thank you for visiting!</div>
-                <div style="margin-top: 8px;">═══════════════════════</div>
-              </div>
-            </div>
-          </div>
-
-        </div>
 
         <!-- The 4 big stage tiles, relocated to the BOTTOM 20 Jul per Daisy
              ("move the big green tiles to the bottom, booking stuff on top").
@@ -4888,11 +4766,6 @@ function updateStaffName() {
             <span style="font-size:24px;">🔥</span>
             <span style="font-size:14px;font-weight:800;margin-top:6px;">Kiln &amp; Inventory</span>
             <span style="font-size:10px;opacity:0.85;margin-top:4px;">What's firing, real stock</span>
-          </button>
-          <button class="flow-step glaze-tile" id="staff-subtab-till" onclick="showStaffSection('till')" style="background:#B87946;filter:brightness(0.7);color:white;border:none;border-radius:14px;aspect-ratio:1;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;">
-            <span style="font-size:24px;">💳</span>
-            <span style="font-size:14px;font-weight:800;margin-top:6px;">Till & Payment</span>
-            <span style="font-size:10px;opacity:0.85;margin-top:4px;">Square terminal, receipts</span>
           </button>
         </div>
 
@@ -8589,6 +8462,24 @@ async function openCustomerDemo() {
     if (first?.booking_code) bookingCode = first.booking_code;
   } catch(e) { /* fall back to demo */ }
   window.open(`${API_URL}/app?booking=${encodeURIComponent(bookingCode)}`, '_blank');
+}
+
+// ═══════════════════════════════════════════════════════════
+// PRACTICE MODE — a safe copy of the app to learn on
+// ═══════════════════════════════════════════════════════════
+// Opens app-emulator.html, served by the server's own /practice
+// route (the repo root is deliberately not served, so a root-level
+// file needs an explicit route or it 404s silently — same trap the
+// demo-skin and money-parked scripts already hit).
+//
+// The emulator carries the studio's REAL structure — the seven
+// bookable services named as Square has them, the fifteen tables
+// with their real seat counts, the live till categories at the
+// studio's own average prices — but invented customers, and it
+// makes no network calls at all. Someone can tap every button in
+// it without a booking, a piece or a penny moving anywhere.
+function openPracticeMode() {
+  window.open(`${API_URL}/practice`, '_blank');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -21352,6 +21243,7 @@ const GRID_NAV_STRUCTURE = [
     { tab: 'learning', label: '🌱 Learning & Insights', desc: 'What the app has noticed · workflow analytics', fn: 'openLearning' },
     { tab: 'setup', label: '⚙️ Studio Setup', desc: 'Connections, branding, add-ons, offers' },
     { tab: 'navigation-help', fn: 'openNavigationHelp', label: '🧭 Help & Practice', desc: 'How to use the app · run a practice demo' },
+    { tab: 'practice-mode', fn: 'openPracticeMode', label: '🎓 Practice Mode', desc: 'A safe copy to learn on · nothing here is real' },
     { tab: 'trial-reset', label: '🔄 Clear & Start Again', desc: 'Reset today for testing', fn: 'openTrialReset' },
   ]},
 ];
@@ -36019,98 +35911,6 @@ if (typeof window !== 'undefined' && typeof window._manualFloorSync !== 'functio
     try { if (typeof loadFloorPlan === 'function') await loadFloorPlan(); }
     catch (e) { console.warn('_manualFloorSync fallback:', e); }
   };
-}
-
-// ─ TILL & PAYMENT FUNCTIONS ─
-function openTillForBooking() {
-  showStaffSection('till');
-  document.getElementById('terminal-amount').textContent = '£24.00';
-  document.getElementById('terminal-booking').textContent = 'Awaiting selection';
-}
-
-function showRecentTransactions() {
-  showStaffSection('till');
-  loadTillTransactions();
-}
-
-function refreshTillData() {
-  loadTillTransactions();
-  updateTillSummary();
-}
-
-function loadTillTransactions() {
-  const list = document.getElementById('till-transactions-list');
-  if (!list) return;
-  
-  // Demo data
-  const transactions = [
-    { name: 'Sarah Johnson', amount: '£24.00', time: '14:23', method: 'Card' },
-    { name: 'Emma Wilson', amount: '£18.50', time: '13:45', method: 'Contactless' },
-    { name: 'Tom Smith', amount: '£32.00', time: '13:12', method: 'Cash' },
-    { name: 'Lisa Chen', amount: '£16.00', time: '12:30', method: 'Card' },
-  ];
-  
-  list.innerHTML = transactions.map(t => `
-    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid rgba(0,0,0,0.05);">
-      <div style="flex: 1;">
-        <div style="font-weight: 600; font-size: 12px; color: #2B2724;">${t.name}</div>
-        <div style="font-size: 10px; color: var(--gu-dust); margin-top: 2px;">${t.time} · ${t.method}</div>
-      </div>
-      <div style="font-weight: 700; color: #2e7d32; font-size: 14px;">${t.amount}</div>
-    </div>
-  `).join('');
-}
-
-function updateTillSummary() {
-  const today = document.getElementById('till-today');
-  const count = document.getElementById('till-count');
-  const breakdown = document.getElementById('till-breakdown');
-  
-  if (today) today.textContent = '£90.50';
-  if (count) count.textContent = '4';
-  if (breakdown) breakdown.innerHTML = '<span style="color: #2196f3;">💳 £56.00</span> | <span style="color: #ff9800;">💷 £34.50</span>';
-}
-
-function processPayment(method) {
-  const icon = document.getElementById('processing-icon');
-  const text = document.getElementById('processing-text');
-  const amount = document.getElementById('processing-amount');
-  const bar = document.getElementById('processing-bar');
-  const screen = document.getElementById('payment-processing-screen');
-  
-  if (!screen) return;
-  
-  screen.style.display = 'flex';
-  
-  const methods = {
-    'card': { text: '💳 Card Payment', icon: '💳' },
-    'contactless': { text: '📱 Contactless Payment', icon: '📱' },
-    'cash': { text: '💷 Cash Payment', icon: '💷' },
-    'square_app': { text: '🔲 Square App', icon: '🔲' }
-  };
-  
-  const m = methods[method] || methods['card'];
-  if (text) text.textContent = m.text;
-  if (icon) icon.textContent = m.icon;
-  if (amount) amount.textContent = '£24.00';
-  
-  // Animate progress bar
-  let progress = 0;
-  const interval = setInterval(() => {
-    progress += Math.random() * 30;
-    if (progress >= 100) {
-      progress = 100;
-      clearInterval(interval);
-      
-      // Show receipt
-      setTimeout(() => {
-        screen.style.display = 'none';
-        const receipt = document.getElementById('receipt-container');
-        if (receipt) receipt.style.display = 'block';
-      }, 300);
-    }
-    if (bar) bar.style.width = progress + '%';
-  }, 200);
 }
 
 </script>
