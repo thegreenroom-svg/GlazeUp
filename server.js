@@ -409,6 +409,101 @@ async function getSquareClient(accessToken) {
   return client;
 }
 
+// [4 Aug] THE MISSING PIECE. Square access tokens expire 30 days after
+// they're issued — always, no exceptions (confirmed against Square's own
+// current OAuth docs, not assumed). Sonos and Spotify both have refresh
+// logic in this file already (see _sonosToken above); Square never did,
+// despite a refresh_token having been stored in square_connections since
+// the very first connection. The gap sat quiet for exactly 30 days and
+// then every Square call started failing with 401 at once.
+//
+// Square's own guidance: renew every 7 days or less, REGARDLESS of
+// active use, specifically so a failed renewal is caught with days of
+// margin rather than discovered as a hard outage on day 30 — which is
+// exactly what happened here. So this refreshes proactively on a
+// schedule (see the cron registration further down), not reactively on
+// a failed call. Every one of the ~20 places in this file that reads
+// square_access_token keeps working unchanged — they just always find
+// a token that was refreshed within the last day, nowhere near expiry.
+//
+// A token can still be renewed up to 15 days AFTER it expires using the
+// stored refresh_token; only past that does a seller need to fully
+// reconnect through Square's own authorization screen.
+async function refreshSquareToken(studioId) {
+  const { data: conn, error } = await supabase.from('square_connections')
+    .select('square_refresh_token').eq('studio_id', studioId).single();
+  if (error || !conn || !conn.square_refresh_token)
+    throw new Error('No refresh token on file — this studio needs to reconnect Square from scratch.');
+
+  const isSandbox = process.env.SQUARE_ENVIRONMENT === 'sandbox';
+  const tokenBaseUrl = isSandbox
+    ? 'https://connect.squareupsandbox.com/oauth2/token'
+    : 'https://connect.squareup.com/oauth2/token';
+
+  const r = await fetch(tokenBaseUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: process.env.SQUARE_CLIENT_ID,
+      client_secret: process.env.SQUARE_CLIENT_SECRET,
+      refresh_token: conn.square_refresh_token,
+      grant_type: 'refresh_token',
+    }),
+  });
+  const t = await r.json();
+  if (!t.access_token) throw new Error('Square refresh failed: ' + JSON.stringify(t));
+
+  await supabase.from('square_connections').update({
+    square_access_token: t.access_token,
+    // Square's code-flow refresh returns the SAME refresh token back,
+    // but store whatever it actually sent rather than assume that.
+    square_refresh_token: t.refresh_token || conn.square_refresh_token,
+    square_token_expires_at: t.expires_at || null,
+    sync_status: 'idle',
+  }).eq('studio_id', studioId);
+
+  return t.access_token;
+}
+
+async function refreshSquareTokenForAllStudios(why) {
+  const { data: connections } = await supabase.from('square_connections')
+    .select('studio_id, square_token_expires_at');
+  for (const conn of (connections || [])) {
+    // Only bother Square if we're within 6 days of expiry (their own
+    // 'every 7 days or less' guidance) or we've never recorded one —
+    // no point renewing a token that's still got three weeks on it.
+    const stale = !conn.square_token_expires_at ||
+      new Date(conn.square_token_expires_at).getTime() - Date.now() < 6 * 86400000;
+    if (!stale) continue;
+    try {
+      await refreshSquareToken(conn.studio_id);
+      console.log(`[square-token] ${why}: refreshed for ${conn.studio_id}`);
+    } catch (err) {
+      console.error(`[square-token] ${why} failed for ${conn.studio_id}:`, err.message);
+    }
+  }
+}
+
+// A one-tap way to trigger this the moment it's deployed, rather than
+// wait for the schedule — same pattern as the earlier bookings/sync-check
+// endpoint: read-only from the caller's side (no body, no params beyond
+// which studio), plain JSON back, nothing hidden in logs.
+app.get('/api/square/refresh-token-now', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const { data: before } = await supabase.from('square_connections')
+      .select('square_token_expires_at').eq('studio_id', studioId).single();
+    await refreshSquareToken(studioId);
+    const { data: after } = await supabase.from('square_connections')
+      .select('square_token_expires_at, sync_status').eq('studio_id', studioId).single();
+    res.json({ ok: true, was_valid_until: before?.square_token_expires_at || null,
+      now_valid_until: after?.square_token_expires_at, sync_status: after?.sync_status });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 // ═══════════════════════════════════════════
 // SQUARE OAUTH ROUTES
 // ═══════════════════════════════════════════
@@ -492,6 +587,7 @@ app.get('/api/square/callback', async (req, res) => {
         studio_id: studioId,
         square_access_token: tokenData.access_token,
         square_refresh_token: tokenData.refresh_token,
+        square_token_expires_at: tokenData.expires_at || null,
         square_merchant_id: merchantId,
         sync_status: 'idle'
       }, { onConflict: 'studio_id' });
@@ -14856,6 +14952,24 @@ app.listen(port, async () => {
   // On boot, ONLY if the till would otherwise be empty.
   setTimeout(() => catalogueForAllStudios('boot', true).catch(e =>
     console.error('[catalogue] boot pass failed:', e.message)), 45000);
+
+  // ── SQUARE TOKEN, KEPT ALIVE PROACTIVELY ──────────────────────────
+  // [4 Aug] The gap this closes: nothing ever refreshed the Square
+  // token before today, so it ran dead-on to its 30-day expiry and
+  // every Square call started failing with 401 at once. Runs daily,
+  // BEFORE the revenue sync at 3am, so the token the rest of the
+  // morning's jobs rely on is never more than a day old — Square's own
+  // guidance is 'every 7 days or less'; daily gives a wide margin.
+  // refreshSquareTokenForAllStudios only actually calls Square for a
+  // connection within 6 days of expiry, so most days this is a no-op.
+  cron.schedule('0 2 * * *', () => refreshSquareTokenForAllStudios('nightly'));
+
+  // On boot: the token that's dead RIGHT NOW as this is deployed still
+  // has a 15-day grace window per Square's own rules, so catch it up
+  // immediately rather than wait for 2am. Same 30s stagger as the other
+  // boot passes, so they don't all hit Supabase in the same instant.
+  setTimeout(() => refreshSquareTokenForAllStudios('boot').catch(e =>
+    console.error('[square-token] boot pass failed:', e.message)), 30000);
 
   // Keep-alive ping
   const SELF_URL = process.env.API_URL || 'https://glazeup-api.onrender.com';
