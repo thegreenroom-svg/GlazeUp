@@ -335,7 +335,14 @@ app.use('/docs', express.static(path.join(__dirname, 'docs'), staticCacheOptions
 // the /promo folder, untouched, in case they're wanted again — only the
 // routes that made them reachable are removed. Nothing about the
 // customer app (/app) or the staff app (/admin) is touched by this.
-app.get('/', (req, res) => res.redirect('/admin/dashboard-local.html'));
+// [4 Aug] THE FRONT DOOR IS NOW THE NEW APP.
+// It pointed at admin/dashboard-local.html — the 36,000-line app — which
+// is why every deploy still looked identical: the new screens were built
+// and shipped, but nothing sent anyone to them.
+// The old app is not deleted; it stays reachable at /legacy so nothing is
+// lost and this is a one-line revert. But it is no longer what opens.
+app.get('/', (req, res) => res.redirect('/studio'));
+app.get('/legacy', (req, res) => res.redirect('/admin/dashboard-local.html'));
 
 // Favicon — served from root so browsers find it automatically
 // at glazeup-api.onrender.com/favicon.ico
