@@ -54,33 +54,44 @@ body{background:#E7E2DA;font-family:var(--ui);color:var(--ink);
 .main-l{font-family:var(--serif);font-weight:700;font-size:16px}
 .main-s{font-size:11px;color:var(--clay);margin-top:2px}
 
-/* ── DAY LIST (Square Appointments shape) ── */
-.daybar{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px}
-.daybar::-webkit-scrollbar{display:none}
-.chip{border:1.5px solid var(--line);background:var(--card);border-radius:20px;
-  padding:7px 13px;font-size:12px;font-weight:700;white-space:nowrap;cursor:pointer;
-  font-family:var(--ui);color:var(--ink)}
-.chip.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+/* ── DAY: Square's side-by-side calendar ── */
+.ctrls{display:flex;gap:6px;margin-bottom:10px;overflow-x:auto;padding-bottom:2px}
+.ctrls::-webkit-scrollbar{display:none}
+.ctl{border:1.5px solid var(--line);background:var(--card);border-radius:20px;
+  padding:6px 12px;font-size:11.5px;white-space:nowrap;cursor:pointer;
+  font-family:var(--ui);color:var(--ink);font-weight:600}
+.ctl-flat{cursor:default;color:var(--clay)}
+.ctl-flat b{color:var(--ink)}
 
-.slot{display:grid;grid-template-columns:52px 1fr;gap:10px;margin-bottom:10px;align-items:start}
-.slot-t{font-family:var(--serif);font-weight:700;font-size:15px;padding-top:14px;
-  color:var(--ink);text-align:right}
-.bk{background:var(--card);border:1.5px solid var(--line);border-left-width:4px;
-  border-radius:12px;padding:12px 13px;cursor:pointer;width:100%;text-align:left;
-  font:inherit;color:inherit;display:block}
-.bk:active{transform:scale(.99)}
-.bk.live{border-left-color:var(--live)}
-.bk.due{border-left-color:var(--due)}
-.bk.upcoming{border-left-color:var(--soon)}
-.bk.done{border-left-color:var(--rest);opacity:.62}
-.bk-n{font-family:var(--serif);font-weight:700;font-size:15px;line-height:1.25}
-.bk-m{font-size:11px;color:var(--clay);margin-top:3px;line-height:1.45}
-.bk-tag{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.1em;
-  text-transform:uppercase;padding:2px 7px;border-radius:10px;margin-top:7px}
-.t-live{background:rgba(163,45,33,.12);color:var(--live)}
-.t-due{background:rgba(201,122,30,.14);color:var(--due)}
-.t-upcoming{background:rgba(46,125,50,.12);color:var(--soon)}
-.t-done{background:rgba(43,39,36,.08);color:var(--rest)}
+.calwrap{overflow-x:auto;border:1.5px solid var(--line);border-radius:12px;
+  background:var(--card);-webkit-overflow-scrolling:touch}
+.cal{display:grid;position:relative;min-width:max-content}
+.gut,.colh{position:sticky;background:var(--card);z-index:3}
+.colh{top:0;font-family:var(--serif);font-weight:900;font-size:12px;text-align:center;
+  padding:9px 4px;border-bottom:1.5px solid var(--line);border-left:1px solid var(--line)}
+.gut{left:0;z-index:4;font-size:10px;font-weight:700;color:var(--clay);
+  text-align:right;padding:2px 7px 0 0;border-right:1.5px solid var(--line)}
+.corner{position:sticky;left:0;top:0;z-index:5;background:var(--card);
+  border-right:1.5px solid var(--line);border-bottom:1.5px solid var(--line)}
+.cell{border-left:1px solid rgba(43,39,36,.06);border-bottom:1px solid rgba(43,39,36,.05)}
+.cell.hr{border-bottom-color:var(--line)}
+.blk{margin:1px;border-radius:6px;padding:5px 6px;cursor:pointer;overflow:hidden;
+  font:inherit;color:#fff;text-align:left;border:none;background:#3B4CC0;
+  display:flex;flex-direction:column;gap:1px;z-index:2}
+.blk:active{filter:brightness(1.15)}
+.blk.live{background:var(--live)}
+.blk.done{background:#8C8579}
+.blk-t{font-size:10px;font-weight:800;line-height:1.1}
+.blk-n{font-size:10.5px;font-weight:700;line-height:1.15;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.blk-s{font-size:8.5px;opacity:.85;line-height:1.15;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.nowline{position:absolute;height:0;border-top:1.5px solid #E03B2F;z-index:6;
+  pointer-events:none;left:46px;right:0}
+.nowdot{position:absolute;width:0;height:0;border-top:4px solid transparent;
+  border-bottom:4px solid transparent;border-left:6px solid #E03B2F;
+  left:46px;margin-top:-4px;z-index:7;pointer-events:none}
+.scrollhint{font-size:10.5px;color:var(--clay);text-align:center;margin-top:8px;font-weight:600}
 
 /* ── DETAIL ── */
 .dl{border-top:1px solid var(--line);padding:11px 0;display:flex;justify-content:space-between;gap:16px}
@@ -168,7 +179,7 @@ body{background:#E7E2DA;font-family:var(--ui);color:var(--ink);
     <button class="back" id="back" onclick="goBack()" aria-label="Back">‹</button>
     <div style="flex:1">
       <div class="title" id="title">The Kiln Cafe</div>
-      <div class="sub" id="sub">Thursday 6 August</div>
+      <div class="sub" id="sub">Sunday, 2 August</div>
     </div>
   </div>
 
@@ -177,7 +188,7 @@ body{background:#E7E2DA;font-family:var(--ui);color:var(--ink);
     <!-- HOME -->
     <div class="screen on" id="s-home">
       <div class="hello">Morning, Ruby.</div>
-      <div class="standfirst">14 booked in today · 2 to pack</div>
+      <div class="standfirst" id="h-stand">— booked in today · 2 to pack</div>
       <div class="mains">
         <button class="main" onclick="go('day')">
           <span class="main-n" id="h-count">14</span>
@@ -195,10 +206,17 @@ body{background:#E7E2DA;font-family:var(--ui);color:var(--ink);
       <div class="note"><strong>This is a practice copy.</strong> It uses the studio's real services, tables and till categories, but the customers are made up. Nothing you tap here reaches Square, the bookings, or the takings.</div>
     </div>
 
-    <!-- DAY LIST -->
+    <!-- DAY — Square's side-by-side calendar: tables across, time down -->
     <div class="screen" id="s-day">
-      <div class="daybar" id="daybar"></div>
-      <div id="daylist"></div>
+      <div class="ctrls">
+        <button class="ctl" onclick="shiftDay(-1)">←</button>
+        <span class="ctl ctl-flat">Date <b>2 Aug</b></span>
+        <button class="ctl" onclick="shiftDay(1)">→</button>
+        <span class="ctl ctl-flat">Range <b>Day</b></span>
+        <span class="ctl ctl-flat">View <b>Side-by-side</b></span>
+      </div>
+      <div class="calwrap"><div class="cal" id="cal"></div></div>
+      <div class="scrollhint">Swipe across for the other tables →</div>
     </div>
 
     <!-- BOOKING DETAIL -->
@@ -302,24 +320,52 @@ const TILL={
  Cafe:[['Hot Drinks',2.83],['Cold Drinks',1.83],['Drinks',4.03],['Cakes',4.03],
   ['Cakes & Food',4.05],['Milkshakes',5.17],['Smoothies',5.05],['Iced Coffees',3.32],['Alcohol',6.51]]};
 
+/* Columns are TABLES, exactly as Square is set up here: each table is a
+   "staff member" that performs the services. Seen on the studio iPad:
+   T7 a, T7 b, T8, T9, Thursdays — so tables split A/B, and the Thursday
+   session has its own column. Square reports 64 selected; a phone shows
+   a slice and scrolls, which is what Square itself does when narrow. */
+const COLS=['T6','T7 a','T7 b','T8','T9','L1','L2','Vault','Thursdays'];
+
+const OPEN=9, CLOSE=17, PX=15;           // 9am-5pm, 15px per 15 minutes
+const mins=t=>{const[h,m]=t.split(':').map(Number);return h*60+m;};
+
 const DAY=[
- {t:'09:00',n:'Hannah Pryce',svc:0,size:4,table:'Table 1',st:'live'},
- {t:'09:00',n:'Marcus Bell',svc:1,size:2,table:'Lounge 2',st:'live'},
- {t:'09:30',n:'The Okafor Family',svc:0,size:5,table:'Table 4',st:'live'},
- {t:'09:30',n:'Rosa Lindqvist',svc:6,size:2,table:'Table 7',st:'due'},
- {t:'10:00',n:'Yusuf Karim',svc:0,size:3,table:null,st:'upcoming'},
- {t:'11:15',n:'Nell Broughton',svc:5,size:1,table:null,st:'upcoming'},
- {t:'11:30',n:'Delia Amankwah',svc:0,size:6,table:null,st:'upcoming'},
- {t:'12:30',n:'The Sowerby Party',svc:4,size:12,table:'The Vault',st:'upcoming'},
- {t:'12:30',n:'Priya Raghavan',svc:1,size:2,table:null,st:'upcoming'},
- {t:'14:00',n:'Tomasz Wierzbicki',svc:0,size:4,table:null,st:'upcoming'},
- {t:'08:30',n:'Iris Fenwick',svc:0,size:2,table:'Table 2',st:'done'},
- {t:'08:30',n:'Callum Reid',svc:3,size:2,table:'Table 5',st:'done'}];
+ {t:'10:00',dur:120,n:'JOY DAVENPORT',svc:0,col:'T8',size:4,st:'live',
+  ph:'07700 900412',em:'j.davenport@example.com',note:'',
+  by:'Joy Davenport on 29 Jul at 09:12'},
+ {t:'10:00',dur:120,n:'Louise Morton',svc:0,col:'T9',size:2,st:'live',
+  ph:'07700 900565',em:'l.morton@example.com',
+  note:'Hi. This session is for me to paint my reserved £30 Santa head jar (reserved 22nd Dec)',
+  by:'Louise Morton on 31 Jul at 15:44'},
+ {t:'10:00',dur:120,n:'Marcus Bell',svc:1,col:'L2',size:2,st:'live',
+  ph:'07700 900118',em:'m.bell@example.com',note:'',
+  by:'Marcus Bell on 30 Jul at 20:03'},
+ {t:'12:30',dur:120,n:'Hannah Sparks',svc:0,col:'T9',size:3,st:'upcoming',
+  ph:'07700 900733',em:'h.sparks@example.com',note:'',
+  by:'Hannah Sparks on 1 Aug at 11:27'},
+ {t:'12:30',dur:150,n:'The Sowerby Party',svc:4,col:'Vault',size:12,st:'upcoming',
+  ph:'07700 900904',em:'sowerby.party@example.com',
+  note:'Birthday - 12 of us, 4 adults. Can we bring a cake?',
+  by:'Ruth Sowerby on 18 Jul at 14:50'},
+ {t:'10:00',dur:330,n:'Delia Amankwah',svc:3,col:'Thursdays',size:2,st:'upcoming',
+  ph:'07700 900287',em:'d.amankwah@example.com',note:'',
+  by:'Delia Amankwah on 27 Jul at 08:41'},
+ {t:'11:15',dur:120,n:'Nell Broughton',svc:5,col:'T6',size:1,st:'upcoming',
+  ph:'07700 900650',em:'n.broughton@example.com',note:'First time on the wheel',
+  by:'Nell Broughton on 2 Aug at 07:15'},
+ {t:'14:00',dur:120,n:'Yusuf Karim',svc:0,col:'T7 a',size:3,st:'upcoming',
+  ph:'07700 900341',em:'y.karim@example.com',note:'',
+  by:'Yusuf Karim on 28 Jul at 19:33'},
+ {t:'09:00',dur:60,n:'Iris Fenwick',svc:0,col:'T7 b',size:2,st:'done',
+  ph:'07700 900876',em:'i.fenwick@example.com',note:'',
+  by:'Iris Fenwick on 26 Jul at 16:02'},
+];
 
 const LABEL={live:'Painting now',due:'Due in',upcoming:'Booked',done:'Finished · paid'};
 const TITLES={home:'The Kiln Cafe',day:'Bookings',bk:'Booking',floor:'Floor',
   till:'Till',pay:'Take payment',rcpt:'Receipt'};
-const SUBS={home:'Thursday 6 August',day:'Thursday 6 August',bk:'',
+const SUBS={home:'Sunday, 2 August',day:'Sunday, 2 August',bk:'',
   floor:'Three rooms · 15 tables',till:'Tap to add to the ticket',pay:'',rcpt:''};
 
 let view='home', stack=[], ticket=[], ticketWhere='Walk-in', cat='Bisque';
@@ -345,56 +391,109 @@ function go(v,push=true){
 }
 function goBack(){ const p=stack.pop()||'home'; go(p,false); }
 
-/* ── day list ── */
+/* ── day: Square's side-by-side calendar ── */
 function renderDay(){
-  const bar=$('daybar');
-  bar.innerHTML=['Today','Tomorrow','Fri 7','Sat 8','Sun 9']
-    .map((d,i)=>`<button class="chip${i===0?' on':''}" onclick="pickDay(this)">${d}</button>`).join('');
-  const order={live:0,due:1,upcoming:2,done:3};
-  const rows=[...DAY].sort((a,b)=>order[a.st]-order[b.st]||a.t.localeCompare(b.t));
-  $('daylist').innerHTML=rows.map((b,i)=>{
+  const rows=(CLOSE-OPEN)*4;                       // 15-min rows
+  const cal=$('cal');
+  cal.style.gridTemplateColumns=`46px repeat(${COLS.length},104px)`;
+  cal.style.gridTemplateRows=`30px repeat(${rows},${PX}px)`;
+  let h='<div class="corner"></div>';
+  COLS.forEach(c=>{ h+=`<div class="colh">${c}</div>`; });
+  // hour gutter labels
+  for(let r=0;r<rows;r++){
+    if(r%4===0) h+=`<div class="gut" style="grid-row:${r+2}/span 4;grid-column:1">${OPEN+r/4}:00</div>`;
+  }
+  // empty cells
+  for(let r=0;r<rows;r++) for(let c=0;c<COLS.length;c++)
+    h+=`<div class="cell${(r+1)%4===0?' hr':''}" style="grid-row:${r+2};grid-column:${c+2}"></div>`;
+  // bookings
+  DAY.forEach((b,i)=>{
+    const ci=COLS.indexOf(b.col); if(ci<0) return;
+    const startRow=Math.round((mins(b.t)-OPEN*60)/15)+2;
+    const span=Math.max(2,Math.round(b.dur/15));
     const s=SERVICES[b.svc];
-    const tbl=(b.table && b.table!==s.short)?' · '+b.table:'';
-    return `<div class="slot">
-      <div class="slot-t">${b.t}</div>
-      <button class="bk ${b.st}" onclick="openBooking(${DAY.indexOf(b)})">
-        <div class="bk-n">${b.n}</div>
-        <div class="bk-m">${s.short} · ${b.size} ${b.size===1?'painter':'painters'}${tbl}</div>
-        <span class="bk-tag t-${b.st}">${LABEL[b.st]}</span>
-      </button></div>`;
-  }).join('');
+    h+=`<button class="blk ${b.st}" style="grid-row:${startRow}/span ${span};grid-column:${ci+2}"
+        onclick="openBooking(${i})">
+        <span class="blk-t">${b.t}</span>
+        <span class="blk-n">${b.n}</span>
+        <span class="blk-s">${s.short}</span></button>`;
+  });
+  cal.innerHTML=h;
+  drawNow();
 }
-function pickDay(el){
-  document.querySelectorAll('#daybar .chip').forEach(c=>c.classList.remove('on'));
-  el.classList.add('on');
-  if(el.textContent!=='Today'){
-    $('daylist').innerHTML='<div class="empty">Practice mode only carries today.<br>The real app shows every day.</div>';
-  } else renderDay();
+function drawNow(){
+  const cal=$('cal'); const now=new Date();
+  let m=now.getHours()*60+now.getMinutes();
+  if(m<OPEN*60||m>CLOSE*60) m=13*60+15;            // out of hours: park it at 13:15
+  const top=30+((m-OPEN*60)/15)*PX;
+  cal.insertAdjacentHTML('beforeend',
+    `<div class="nowdot" style="top:${top}px"></div><div class="nowline" style="top:${top}px"></div>`);
+}
+function shiftDay(){
+  $('cal').innerHTML='<div style="grid-column:1/-1;padding:34px 18px;text-align:center;'+
+    'color:var(--clay);font-size:12.5px;line-height:1.6">Practice mode only carries today.<br>'+
+    'The real calendar moves day to day.</div>';
+  $('cal').style.gridTemplateColumns='1fr'; $('cal').style.gridTemplateRows='auto';
 }
 
 /* ── booking detail ── */
 function openBooking(i){
   const b=DAY[i], s=SERVICES[b.svc];
+  const end=(()=>{const m=mins(b.t)+b.dur;
+    return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');})();
+  const hrs=Math.floor(b.dur/60), rem=b.dur%60;
+  const dur=`${hrs} hr${hrs===1?'':'s'} ${rem} mins`;
+  // Field order follows Square's own panel: name, phone/email, the
+  // service's standing description, then the customer's own note,
+  // then time, staff (the table), then who booked it and when.
   $('bk-body').innerHTML=`
-    <div class="hero">${b.n}</div>
-    <span class="bk-tag t-${b.st}" style="margin:0 0 14px">${LABEL[b.st]}</span>
-    <div class="dl"><span class="dl-k">Service</span><span class="dl-v">${s.name}</span></div>
-    <div class="dl"><span class="dl-k">Starts</span><span class="dl-v">${b.t}</span></div>
-    <div class="dl"><span class="dl-k">Painters</span><span class="dl-v">${b.size}</span></div>
-    <div class="dl"><span class="dl-k">Room</span><span class="dl-v">${s.room}</span></div>
-    <div class="dl"><span class="dl-k">Table</span><span class="dl-v">${b.table||'Not seated yet'}</span></div>
-    <div class="dl" style="border-bottom:1px solid var(--line)"><span class="dl-k">Booked via</span><span class="dl-v">Square Appointments</span></div>
-    <button class="pay" onclick="startTicket('${b.n.replace(/'/g,"\\'")}','${b.table||'Not seated'}')">Open a ticket for this table</button>
-    ${b.table?'':'<div class="note">No table yet. In the studio the table lands when someone seats them at the terminal.</div>'}`;
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:12px">
+      <button class="ctl" onclick="goBack()">Book next</button>
+      <button class="ctl" onclick="goBack()">Edit</button>
+    </div>
+    <div class="hero" style="text-decoration:underline;text-underline-offset:3px">${b.n}</div>
+    <div style="display:flex;gap:22px;margin:12px 0 14px;flex-wrap:wrap">
+      <div><div class="dl-k">Phone</div><div style="font-size:13px;font-weight:600">${b.ph}</div></div>
+      <div><div class="dl-k">Email</div><div style="font-size:12.5px;font-weight:600;color:var(--clay);
+        text-decoration:underline;word-break:break-all">${b.em}</div></div>
+    </div>
+    <div style="font-size:10.5px;letter-spacing:.03em;color:var(--rest);line-height:1.6;
+      text-transform:uppercase;margin-bottom:8px">More than 4 of you? Book another table to fit
+      your party size. Any special requirements? Space for a pram / wheelchair user.</div>
+    ${b.note?`<div style="font-size:13px;line-height:1.55;margin-bottom:14px">${b.note}</div>`:''}
+    <hr style="border:none;border-top:1px solid var(--line);margin:14px 0">
+    <div style="font-family:var(--serif);font-weight:900;font-size:19px">${b.t} – ${end}
+      <span style="font-family:var(--ui);font-weight:600;font-size:13px;color:var(--clay)">(${dur})</span></div>
+    <div style="font-size:13px;font-weight:600;margin-top:2px">Sunday, 2 August</div>
+    <div style="margin-top:16px"><div class="dl-k">Staff</div>
+      <div style="font-size:13px;font-weight:600">${b.col} ${b.col}</div>
+      <div style="font-size:12px;color:var(--clay)">(Book with any available)</div></div>
+    <div style="margin-top:16px"><div class="dl-k">Booked by</div>
+      <div style="font-size:13px;font-weight:600">${b.by}</div>
+      <div style="font-size:12px;color:var(--clay)">Client local time: ${b.t} BST</div></div>
+    <div style="margin-top:16px"><div class="dl-k">Service</div>
+      <div style="font-size:13px;font-weight:600;line-height:1.4">${s.name}</div></div>
+    <hr style="border:none;border-top:1px solid var(--line);margin:16px 0">
+    <button class="pay" onclick="startTicket('${b.n.replace(/'/g,"\\'")}','${b.col}')"
+      style="margin-top:0">Open a ticket for this table</button>`;
   go('bk');
 }
 
 /* ── floor ── */
+// Square's column names and the app's table names are NOT the same list.
+// Square splits Table 7 into "T7 a"/"T7 b", has a "T9" the app's table
+// list doesn't carry at all, and uses a "Thursdays" column that is a
+// service rather than a table. Mapped explicitly rather than guessed.
+const COL_TO_TABLE={'T1':'Table 1','T2':'Table 2','T3':'Table 3','T4':'Table 4',
+ 'T5':'Table 5','T6':'Table 6','T7 a':'Table 7','T7 b':'Table 7','T8':'Table 8',
+ 'L1':'Lounge 1','L2':'Lounge 2','L3':'Lounge 3','L4':'Lounge 4','L5':'Lounge 5',
+ 'L6':'Lounge 6','Vault':'The Vault'};
+
 function renderFloor(){
   const live={}, soon={};
-  DAY.forEach(b=>{ if(!b.table) return;
-    if(b.st==='live'||b.st==='due') live[b.table]=b;
-    else if(b.st==='upcoming') soon[b.table]=b; });
+  DAY.forEach(b=>{ const t=COL_TO_TABLE[b.col]; if(!t) return;
+    if(b.st==='live'||b.st==='due') live[t]=b;
+    else if(b.st==='upcoming') soon[t]=b; });
   let html='';
   ['Main Studio','Lounge','The Vault'].forEach(room=>{
     html+=`<div class="room">${room}</div><div class="tables">`;
@@ -408,10 +507,16 @@ function renderFloor(){
     });
     html+='</div>';
   });
+  // Anything Square has a column for that the floor plan has no table for
+  // is shown honestly rather than silently dropped.
+  const orphans=[...new Set(DAY.filter(b=>!COL_TO_TABLE[b.col]&&b.st!=='done').map(b=>b.col))];
+  if(orphans.length) html+=`<div class="note" style="margin-top:16px"><strong>Not on the floor plan:
+    ${orphans.join(', ')}.</strong> Square has a column for these; the studio's table list doesn't
+    carry them, so bookings there won't show on a table.</div>`;
   $('floor-body').innerHTML=html;
 }
 function tapTable(name){
-  const b=DAY.find(x=>x.table===name && x.st!=='done');
+  const b=DAY.find(x=>COL_TO_TABLE[x.col]===name && x.st!=='done');
   if(b) openBooking(DAY.indexOf(b)); else startTicket('Walk-in',name);
 }
 
@@ -470,7 +575,9 @@ function takePayment(method){
 function finish(){ ticket=[]; ticketWhere='Walk-in'; stack=[]; go('home',false); }
 
 /* boot */
-$('h-count').textContent=DAY.filter(b=>b.st!=='done').length;
+const openN=DAY.filter(b=>b.st!=='done').length;
+$('h-count').textContent=openN;
+$('h-stand').textContent=openN+' booked in today · 2 to pack';
 $('h-live').textContent=DAY.filter(b=>b.st==='live').length;
 renderDay();
 </script>
