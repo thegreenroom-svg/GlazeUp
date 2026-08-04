@@ -519,9 +519,11 @@ function paintBooking() {
              <div class="v">${money((i.price_cents != null ? i.price_cents/100 : i.price || 0) * (i.qty || i.quantity || 1))}</div></div>`).join('')}
            <div class="row" style="border-top:1.5px solid var(--line);border-bottom:none">
              <div class="l" style="font-weight:800">Total</div>
-             <div class="fig" style="font-size:22px">${money(total)}</div></div>`
-        : `<div style="font-size:12.5px;color:var(--clay)">Nothing rung up against this booking yet.
-           It appears here as the girls add pieces and drinks at the terminal.</div>`),
+             <div class="fig" style="font-size:22px">${money(total)}</div></div>
+           <button class="btn ghost" id="bk-till">Open the till</button>`
+        : `<div style="font-size:12.5px;color:var(--clay);margin-bottom:10px">Nothing rung up against this booking yet.
+           It appears here as the girls add pieces and drinks at the terminal.</div>
+           <button class="btn ghost" id="bk-till" style="margin-top:0">Open the till</button>`),
       !!(items && items.length))}
 
     ${stepRow(3, 'Her pieces', pieces === undefined
@@ -566,10 +568,10 @@ function paintBooking() {
           <div id="tablemark"></div>
         </div>` : ''}
 
-    <button class="btn ghost" id="bk-till">Open a practice ticket</button>
     <div class="note">Read-only — this booking can't be changed from here. Use Square for anything real.</div>`;
 
-  $('bk-till').onclick = () => {
+  const tillBtn = $('bk-till');
+  if (tillBtn) tillBtn.onclick = () => {
     tillTable = b.table_number != null ? 'Table ' + b.table_number : (b._practiceTable || null);
     tickWhere = (b.customer_name || 'Booking') + (tillTable ? ' · ' + tillTable : '');
     go('till');
