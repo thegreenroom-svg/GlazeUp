@@ -259,6 +259,26 @@ const staticCacheOptions = {
     }
   },
 };
+// [4 Aug] FOUND AND FIXED A REAL REGRESSION: the static mount below used
+// to be registered BEFORE the explicit /admin/dashboard-local.html (and
+// /admin, /admin/) redirects further down this file. Express matches in
+// registration order, so the static file always won — proved with a
+// standalone harness reproducing just these two registrations: GET
+// /admin/dashboard-local.html returned 200 with the raw 1.9MB monolith,
+// not a redirect. The "close every door" commit's own verification
+// passed because its test harness didn't include this static mount, so
+// it proved something that wasn't true of the real server.
+//
+// David was explicit: no old page reachable, full stop — not just the
+// dashboard. admin/ still holds a dozen retired HTML files (the lean
+// pages from before /studio, plus dashboard-local.html itself). Rather
+// than special-case three paths again, anything requesting a .html file
+// under /admin now redirects to /studio before the static mount is
+// given a chance — so a new retired page added later can't slip through
+// the same way this one did.
+app.get(/^\/admin\/.*\.html$/, (req, res) => res.redirect('/studio'));
+app.get('/admin', (req, res) => res.redirect('/studio'));
+app.get('/admin/', (req, res) => res.redirect('/studio'));
 app.use('/admin', express.static(path.join(__dirname, 'admin'), staticCacheOptions));
 app.use('/app', express.static(path.join(__dirname, 'app'), staticCacheOptions));
 // ═══════════════════════════════════════════════════════════════════
@@ -312,13 +332,12 @@ app.use('/studio', express.static(path.join(__dirname, 'studio'),
   { setHeaders: r => r.set('Cache-Control', 'no-store, must-revalidate') }));
 
 // [4 Aug] Practice mode. Same reason as the three routes above: the
-// repo root is deliberately not served, so a root-level HTML file
-// 404s silently. Single explicit route, no-store so staff always get
-// the current build rather than a cached one on a studio iPad.
-app.get('/practice', (req, res) => {
-  res.set('Cache-Control', 'no-store, must-revalidate');
-  res.sendFile(path.join(__dirname, 'app-emulator.html'));
-});
+// [4 Aug] /practice served app-emulator.html — superseded by /studio,
+// which is real (read-only, live data) rather than a mock with invented
+// customers. David was explicit: no old surfaces reachable at all. This
+// one was still live at a guessable URL even after /studio shipped.
+// Redirects rather than 404s, in case anyone has it bookmarked.
+app.get('/practice', (req, res) => res.redirect('/studio'));
 
 app.use('/css', express.static(path.join(__dirname, 'css'), staticCacheOptions));
 // Genuine real fix: /brand-assets was referenced directly in the real
@@ -343,16 +362,9 @@ app.use('/docs', express.static(path.join(__dirname, 'docs'), staticCacheOptions
 // lost and this is a one-line revert. But it is no longer what opens.
 app.get('/', (req, res) => res.redirect('/studio'));
 
-// [4 Aug, second pass] THE OLD APP IS NOW UNREACHABLE, not merely bypassed.
-// Switching the front door was not enough: admin/manifest.json set
-// start_url to /admin/dashboard-local.html, so anyone who had added the
-// app to a home screen kept opening the old one whatever '/' did — and
-// every lean page still had a ✕ linking back to it. Both fixed, and this
-// route closes the door on any link, bookmark or cached reference that
-// remains. The file is untouched in git; this is a one-line revert.
-app.get('/admin/dashboard-local.html', (req, res) => res.redirect('/studio'));
-app.get('/admin', (req, res) => res.redirect('/studio'));
-app.get('/admin/', (req, res) => res.redirect('/studio'));
+// [4 Aug, second pass] THE OLD APP IS NOW UNREACHABLE, not merely bypassed
+// — see the /admin redirect registered ahead of the static mount above,
+// which is where this actually needs to sit to take effect at all.
 
 // Favicon — served from root so browsers find it automatically
 // at glazeup-api.onrender.com/favicon.ico
