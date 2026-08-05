@@ -1563,6 +1563,48 @@ app.get('/api/margins', async (req, res) => {
   }
 });
 
+// GET /api/gift-cards/lookup?studioId=&gan= — [4 Aug] David: "Square does
+// gift vouchers." Confirmed rather than assumed: the SDK already used
+// for catalogue/bookings sync (giftCardsApi) genuinely supports this,
+// and retrieveGiftCardFromGAN takes only a GAN and returns state +
+// balance — nothing that could change either. Square's own transport
+// happens to use POST internally for this specific lookup (their own
+// API design, not a write on their end or ours); this route stays a
+// GET here regardless, so /studio's read() guard needs no new
+// exception to reach it — same as every other real GET it already has.
+app.get('/api/gift-cards/lookup', async (req, res) => {
+  const { studioId, gan } = req.query;
+  if (!studioId || !gan) return res.status(400).json({ error: 'studioId and gan required' });
+  try {
+    const { data: connection } = await supabase.from('square_connections')
+      .select('square_access_token').eq('studio_id', studioId).single();
+    if (!connection) return res.status(404).json({ error: 'Square not connected' });
+
+    const squareClient = await getSquareClient(connection.square_access_token);
+    const result = await squareClient.giftCardsApi.retrieveGiftCardFromGAN({ gan: String(gan).trim() });
+    const card = result.result.giftCard;
+    if (!card) return res.status(404).json({ error: 'No gift card found with that number' });
+
+    res.json({
+      gan: card.gan,
+      state: card.state,
+      balance: card.balanceMoney ? {
+        amount: Number(card.balanceMoney.amount) / 100,
+        currency: card.balanceMoney.currency,
+      } : null,
+    });
+  } catch (error) {
+    // Square's real ApiError carries statusCode + an errors[] array with
+    // a .code — checked against the actual class (node_modules/square/
+    // src/errors/apiError.ts) rather than guessed at.
+    const notFound = error.statusCode === 404 ||
+      (error.errors || []).some(e => e.code === 'NOT_FOUND');
+    if (notFound) return res.status(404).json({ error: 'No gift card found with that number' });
+    console.error('Error looking up gift card:', error);
+    res.status(500).json({ error: error.message || 'Could not reach Square' });
+  }
+});
+
 // POST /api/margins/cost — a director sets or corrects a cost.
 // { studioId, variationId?, name, costCents, isOverhead? }
 app.post('/api/margins/cost', async (req, res) => {

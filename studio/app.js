@@ -30,7 +30,7 @@ const ALLOWED = [
   '/api/staff/team-for-login', '/api/bookings/day', '/api/bookings/search', '/api/floor/active',
   '/api/floor/tables', '/api/pos/items', '/api/packing/queue', '/api/takings/today',
   '/api/takings/breakdown', '/api/takings/history', '/api/analytics/dashboard',
-  '/api/ai-usage', '/api/pieces/for-booking',
+  '/api/ai-usage', '/api/pieces/for-booking', '/api/gift-cards/lookup',
 ];
 async function read(path, params = {}) {
   const url = new URL(path, API);
@@ -40,7 +40,17 @@ async function read(path, params = {}) {
   url.searchParams.set('studioId', STUDIO);
   for (const [k, v] of Object.entries(params)) if (v != null) url.searchParams.set(k, v);
   const r = await fetch(url, { method: 'GET', cache: 'no-store' });
-  if (!r.ok) throw new Error('The server answered ' + r.status + '.');
+  if (!r.ok) {
+    // [4 Aug] Every other write/read helper in this file (search,
+    // writePin) already prefers the server's own {error:"..."} body
+    // over a bare status code — read() was the one place that didn't,
+    // caught when the gift-card lookup's genuinely useful "No gift
+    // card found with that number" was being thrown away in favour of
+    // "The server answered 404." Every existing caller of read() gets
+    // the better message too now, not just vouchers.
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.error || ('The server answered ' + r.status + '.'));
+  }
   return r.json();
 }
 
@@ -217,6 +227,7 @@ const PANES = {
   pack:  ['Packing', 'Pieces waiting to go home'],
   money: ['Money', 'Live from Square'],
   pins:  ['Staff PINs', 'Director-only'],
+  vouchers: ['Gift Vouchers', 'Live from Square'],
 };
 
 function go(v, push = true) {
@@ -236,6 +247,7 @@ function go(v, push = true) {
   if (v === 'pack') loadPack();
   if (v === 'money') loadMoney();
   if (v === 'pins') loadPins();
+  if (v === 'vouchers') loadVouchers();
   if (v === 'home') loadHome();
 }
 function back() { go(stack.pop() || 'home', false); }
@@ -389,6 +401,7 @@ async function loadHome() {
     ['day',   '◷', 'Bookings', 'The day, table by table', 'dayN'],
     ['till',  '£', 'Till', 'Real prices, ready to use', null],
     ['pack',  '◲', 'Packing', 'Pieces waiting to go home', 'packN'],
+    ['vouchers', '◈', 'Gift Vouchers', 'Check a balance, live from Square', null],
   ];
   if (me && me.admin) t.push(['money', '£', 'Money', 'Takings, live from Square', 'moneyN']);
   if (me && me.admin) t.push(['pins', '••', 'Staff PINs', 'Set or reset someone\'s code', null]);
@@ -1363,6 +1376,52 @@ function paintResetConfirm(targetId, targetName) {
       else $('reseterr').textContent = d.error || 'Could not reset that PIN.';
     } catch (e) { $('reseterr').textContent = e.message; }
   };
+}
+
+/* ── gift vouchers ────────────────────────────────────────────────────
+   [4 Aug] David: "Square does gift vouchers." Confirmed, not assumed —
+   the Square account already connected for revenue/bookings genuinely
+   supports gift cards, and looking one up is a real GET here even
+   though Square's own API happens to use POST internally for it (their
+   design, not a write on either end — see the server-side note beside
+   the endpoint). Anyone can check a voucher, same as anyone can use
+   the till — this isn't director-only. */
+function loadVouchers() {
+  $('vouchers').innerHTML = `
+    <div class="card">
+      <h2>Check a voucher</h2>
+      <div style="font-size:12px;color:var(--clay);margin-bottom:10px">The number on the card
+        or the receipt it came with.</div>
+      <input type="text" inputmode="numeric" id="ganentry" placeholder="Gift card number"
+        style="width:100%;padding:12px;font-size:15px;border:1.5px solid var(--line);
+        border-radius:12px;font-family:var(--ui);background:var(--paper)">
+      <button class="btn" id="gancheck" style="margin-top:10px">Check</button>
+      <div id="ganresult"></div>
+    </div>`;
+  const go = () => checkVoucher($('ganentry').value.trim());
+  $('gancheck').onclick = go;
+  $('ganentry').onkeydown = e => { if (e.key === 'Enter') go(); };
+  $('ganentry').focus();
+}
+async function checkVoucher(gan) {
+  if (!gan) return;
+  const box = $('ganresult');
+  box.innerHTML = `<div style="font-size:12.5px;color:var(--clay);margin-top:12px">Reading…</div>`;
+  try {
+    const d = await read('/api/gift-cards/lookup', { gan });
+    const stateGood = d.state === 'ACTIVE';
+    const amount = d.balance ? money(d.balance.amount) : '—';
+    box.innerHTML = `
+      <div class="card" style="margin-top:12px;border-left:4px solid ${stateGood ? 'var(--soon)' : 'var(--warn)'}">
+        <div style="font-family:var(--serif);font-weight:900;font-size:28px">${esc(amount)}</div>
+        <div style="font-size:12.5px;color:${stateGood ? 'var(--soon)' : 'var(--warn)'};font-weight:700;
+          margin-top:4px">${esc(d.state || 'UNKNOWN')}</div>
+        <div style="font-size:11px;color:var(--clay);margin-top:8px;font-family:ui-monospace,monospace">
+          ${esc(d.gan || gan)}</div>
+      </div>`;
+  } catch (e) {
+    box.innerHTML = `<div class="err" style="margin-top:12px">${esc(e.message)}</div>`;
+  }
 }
 
 async function loadMoney() {

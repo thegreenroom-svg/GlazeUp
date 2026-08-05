@@ -109,6 +109,11 @@ app.get('/api/pieces/for-booking',(q,r)=>r.json({pieces:
  {id:'p1',piece_type:'Mug — pale blue with white spots',status:'fired',reference_photo_url:null},
  {id:'p2',piece_type:'Plate — yellow rim, red flowers',status:'fired',reference_photo_url:null}]}));
 app.get('/api/ai-usage',(q,r)=>r.json({today:0.02,month:0.39,model:'gpt-4o-mini'}));
+app.get('/api/gift-cards/lookup',(q,r)=>{
+  if (q.query.gan==='7783320000000000')
+    return r.json({gan:q.query.gan,state:'ACTIVE',balance:{amount:45.50,currency:'GBP'}});
+  r.status(404).json({error:'No gift card found with that number'});
+});
 app.get('/api/bookings/search',(q,r)=>{
   const term=(q.query.q||'').toLowerCase();
   const all=[{customer_name:'Leanne Fisher',booking_code:'BK-99',table_number:3,
@@ -463,6 +468,22 @@ const srv=app.listen(4801,async()=>{
   await new Promise(r=>setTimeout(r,700));
   const noMatch = await p.$eval('#pack', e=>e.textContent).catch(()=>'');
   console.log('packing (no match) is honest about it:', noMatch.includes('No booking on file') ? 'yes ✓' : '✗');
+
+  // GIFT VOUCHERS: David — "Square does gift vouchers." Real GET, no
+  // new write exception, everyone (not just directors) can check one.
+  await p.evaluate(()=>{stack=[];go('home',false);}); await new Promise(r=>setTimeout(r,300));
+  console.log('vouchers tile visible to everyone:', (await p.$$eval('.tile',e=>e.map(x=>x.textContent).join('|'))).includes('Gift Vouchers') ? 'yes ✓' : '✗');
+  await p.evaluate(()=>go('vouchers')); await new Promise(r=>setTimeout(r,400));
+  await p.type('#ganentry','7783320000000000',{delay:10});
+  await p.evaluate(()=>document.getElementById('gancheck').click());
+  await new Promise(r=>setTimeout(r,500));
+  console.log('real voucher balance shown:', await p.$eval('#ganresult',e=>e.textContent.replace(/\s+/g,' ').trim()).catch(()=>'✗'));
+  await p.screenshot({path:'/home/claude/shots/s-28-voucher-found.png'});
+  await p.evaluate(()=>{document.getElementById('ganentry').value='';});
+  await p.type('#ganentry','0000000000000000',{delay:10});
+  await p.evaluate(()=>document.getElementById('gancheck').click());
+  await new Promise(r=>setTimeout(r,500));
+  console.log('unknown voucher is honest:', await p.$eval('#ganresult',e=>e.textContent.trim()).catch(()=>'✗'));
 
   console.log('search calls    :', searchCalls);
   console.log('rings drawn     :', await p.$$eval('circle',e=>e.length).catch(()=>0));
