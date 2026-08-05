@@ -346,6 +346,12 @@ const srv=app.listen(4801,async()=>{
   console.log('view still on booking after add :', await p.evaluate(()=>view), '(never navigated ✓)');
   const inlineAdded = await p.$eval('#bk', e=>e.textContent).catch(()=>'');
   console.log('item shows inline immediately    :', inlineAdded.includes('Added this session') ? 'yes ✓' : '✗');
+  // David: "I have to scroll all the way down... don't want to scroll
+  // past everything I haven't chosen to get to the next phase." The
+  // picker's full item grid must be GONE after one tap, not still open.
+  const pickerClosed = !(await p.$('.bkaddit'));
+  console.log('picker closes after adding item  :', pickerClosed ? 'yes ✓' : '✗ STILL OPEN');
+  console.log('scroll reset after collapse      :', (await p.evaluate(()=>document.getElementById('main').scrollTop)) === 0 ? 'yes ✓' : '✗');
   await p.screenshot({path:'/home/claude/shots/s-24-inline-add.png',fullPage:true});
   // survives leaving and coming back, same as the till fix proved earlier
   await p.evaluate(()=>go('day')); await new Promise(r=>setTimeout(r,600));

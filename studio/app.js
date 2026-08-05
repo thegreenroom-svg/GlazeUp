@@ -939,7 +939,16 @@ function wireBkAdd(root, b) {
       localTickets[key] = (localTickets[key] || []).concat([{ n: it.name, p: it.price }]);
       if (ticketKey === key) ticket = localTickets[key];   // keep Till in step if it's open on the same booking
     }
+    // [4 Aug] David: "I have to scroll all the way down... I don't want
+    // to scroll past everything I haven't chosen to get to the next
+    // phase. As soon as I put it in, [I want to be] in the booking."
+    // One tap adds it and closes straight back to the compact toggle —
+    // no more sitting inside a whole category's worth of items you
+    // didn't want just to reach the rest of the page. bkAddCat/Leaf
+    // stay set, so reopening picks up exactly where this tap left off.
+    bkAddOpen = false;
     paintBooking();
+    $('main').scrollTop = 0;
   });
 }
 
