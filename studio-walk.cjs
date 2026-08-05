@@ -84,7 +84,7 @@ app.get('/api/floor/items/:code',(q,r)=>r.json({items:[
  {item_name:'S. Pottery Painting Sessions',price_cents:1074,qty:4},
  {item_name:'Hot Drinks',price_cents:283,qty:3}]}));
 app.get('/api/pieces/for-booking',(q,r)=>r.json({pieces:
- q.query.bookingCode==='BK-3'?[]:[
+ ['BK-3','BK-4'].includes(q.query.bookingCode)?[]:[
  {id:'p1',piece_type:'Mug — pale blue with white spots',status:'fired',reference_photo_url:null},
  {id:'p2',piece_type:'Plate — yellow rim, red flowers',status:'fired',reference_photo_url:null}]}));
 app.get('/api/ai-usage',(q,r)=>r.json({today:0.02,month:0.39,model:'gpt-4o-mini'}));
@@ -211,7 +211,38 @@ const srv=app.listen(4801,async()=>{
       await new Promise(r=>setTimeout(r,250));
     }
     console.log('pieces marked   :', await p.evaluate(()=>marks.length));
-    await p.screenshot({path:'/home/claude/shots/s-10-table.png',fullPage:true}); }
+    await p.screenshot({path:'/home/claude/shots/s-10-table.png',fullPage:true});
+
+    // THE FULL LOOP: David — "photograph the table... needs to then
+    // complete so we can actually find these things on the shelves...
+    // start to finish, circle." Type descriptions, finish, confirm Her
+    // Pieces + Find Them appear from nothing but this session's own
+    // photo, then actually run the finder against them.
+    await p.evaluate(()=>{
+      const inputs=[...document.querySelectorAll('[data-desc]')];
+      if(inputs[0]){inputs[0].value='blue mug, white spots'; inputs[0].dispatchEvent(new Event('change'));}
+      if(inputs[1]){inputs[1].value='yellow plate, red flowers'; inputs[1].dispatchEvent(new Event('change'));}
+    });
+    await new Promise(r=>setTimeout(r,200));
+    console.log('descriptions set:', await p.evaluate(()=>marks.map(m=>m.desc).join(' | ')));
+    await p.evaluate(()=>document.getElementById('finishmarks').click());
+    await new Promise(r=>setTimeout(r,800));
+    const afterFinish = await p.$$eval('#bk .card h2', e=>e.map(x=>x.textContent));
+    console.log('steps after finish:', afterFinish.join(' | '));
+    console.log('  Her pieces + Find them now real:',
+      (afterFinish.includes('Her pieces') && afterFinish.includes('Find them on the shelf')) ? 'yes ✓' : '✗');
+    const localLabel = await p.$eval('#bk', e=>e.textContent).catch(()=>'');
+    console.log('  labelled as this session:', localLabel.includes('Added this session') ? 'yes ✓' : '✗');
+    await p.screenshot({path:'/home/claude/shots/s-22-pieces-made.png',fullPage:true});
+    // now actually search for them
+    const bshot=await p.$('#bkshot');
+    if(bshot){
+      await bshot.uploadFile('/tmp/shelf.png'); await new Promise(r=>setTimeout(r,1200));
+      const foundText = await p.$eval('#bkfound', e=>e.textContent).catch(()=>'NONE');
+      console.log('finder ran on local pieces:', foundText.includes('found') ? foundText.trim() : '✗ '+foundText);
+      await p.screenshot({path:'/home/claude/shots/s-23-loop-closed.png',fullPage:true});
+    } else console.log('finder ran on local pieces: ✗ no #bkshot present');
+  }
 
   // SIMPLIFIED TABLE FLOW: David — Jenny's plan is a paper thing done
   // in the morning, not a digital pre-allocation step; table choice
@@ -221,7 +252,7 @@ const srv=app.listen(4801,async()=>{
   // its own picker if none is.
   await p.evaluate(()=>go('day')); await new Promise(r=>setTimeout(r,700));
   await p.evaluate(()=>{const e=[...document.querySelectorAll('.ev')]
-    .find(x=>x.textContent.includes('Marcus')); if(e) e.click();});
+    .find(x=>x.textContent.includes('Sowerby')); if(e) e.click();});   // untouched by the full-loop test above
   await new Promise(r=>setTimeout(r,600));
   console.log('no picker on bk :', (await p.$('#bk .pickt')) ? '✗ STILL THERE' : 'yes, gone ✓');
   // David: steps 3/4 as two inert placeholders were "irrelevant" — should
@@ -254,7 +285,7 @@ const srv=app.listen(4801,async()=>{
   console.log('visited a different booking:', await p.evaluate(()=>bkNow && bkNow.customer_name));
   await p.evaluate(()=>go('day')); await new Promise(r=>setTimeout(r,600));
   await p.evaluate(()=>{const e=[...document.querySelectorAll('.ev')]
-    .find(x=>x.textContent.includes('Marcus')); if(e) e.click();});   // back to the original
+    .find(x=>x.textContent.includes('Sowerby')); if(e) e.click();});   // back to the original
   await new Promise(r=>setTimeout(r,500));
   const localBlock = await p.$eval('#bk', e=>e.textContent).catch(()=>'');
   console.log('local addition survived the trip:', localBlock.includes('Added this session') ? 'yes ✓' : '✗ LOST');

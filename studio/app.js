@@ -67,6 +67,14 @@ let me = null, view = 'login', stack = [], day = new Date(),
    and returning shows exactly what was there. Still entirely local —
    nothing here has ever been read from or written to Square. */
 let localTickets = {}, ticketKey = null, ticketKeyIsBooking = false;
+/* [4 Aug] David: "everything needs to link together... photograph the
+   table, then find these things on the shelf... the app needs to work,
+   start to finish, circle." Same local-only pattern as localTickets:
+   pieces created by tapping the table photo are kept here, keyed by
+   booking code, so Her Pieces and Find Them On The Shelf can use them
+   in the SAME practice session — completing the loop without writing
+   anything to the real pottery_pieces table. */
+let localPieces = {};
 function loadTicketFor(key, isBooking) {
   ticketKey = key; ticketKeyIsBooking = !!isBooking;
   ticket = (key && localTickets[key]) ? localTickets[key] : [];
@@ -142,7 +150,7 @@ function wireTablePicker(root, onPick) {
    immediate action instead. */
 function clearPracticeState() {
   ticket = []; tillTable = null; tickWhere = 'Practice ticket';
-  localTickets = {}; ticketKey = null; ticketKeyIsBooking = false;   // null BEFORE syncTicket, or it would re-save just this one
+  localTickets = {}; ticketKey = null; ticketKeyIsBooking = false; localPieces = {};   // null BEFORE syncTicket, or it would re-save just this one
   marks = []; tableShot = null;
   syncTicket();
   if (view === 'bk' && bkNow) paintBooking();
@@ -226,7 +234,7 @@ function signIn(name, role) {
   me = { name, role, admin: ADMIN.some(r => (role || '').toLowerCase().includes(r)) };
   ticket = []; stack = [];                       // every login starts clean
   priceGroups = []; tillMode = null; parentCatSel = null; cat = null; tillTable = null; day = new Date();
-  localTickets = {}; ticketKey = null; ticketKeyIsBooking = false;
+  localTickets = {}; ticketKey = null; ticketKeyIsBooking = false; localPieces = {};
   $('who').textContent = name;
   go('home', false);
   if (!tablesLoaded) loadTables();               // real layout, once; falls back silently
@@ -511,6 +519,15 @@ function paintBooking() {
 
   const withPhoto = pieces ? pieces.filter(p => p.reference_photo_url).length : 0;
   const hasPieces = !!(pieces && pieces.length);
+  // Completes the loop: no real pieces yet doesn't have to mean nothing
+  // to work with. If this booking has been photographed THIS session,
+  // use those — Her Pieces and Find Them On The Shelf both read from
+  // whichever list is real.
+  const localPcs = (b.booking_code && localPieces[b.booking_code]) || [];
+  const isLocalPieces = !hasPieces && localPcs.length > 0;
+  const effPieces = hasPieces ? pieces : localPcs;
+  const effHasPieces = hasPieces || isLocalPieces;
+  const effWithPhoto = hasPieces ? withPhoto : localPcs.filter(p => p.reference_photo_url).length;
 
   $('bk').innerHTML = `
     <div class="card">
@@ -561,16 +578,18 @@ function paintBooking() {
         !!(items && items.length));
     })()}
 
-    ${hasPieces ? `
-    ${stepRow(2, 'Her pieces', `${pieces.map(p => `<div class="row"><div style="flex:1">
+    ${effHasPieces ? `
+    ${stepRow(2, 'Her pieces', `${isLocalPieces ? `<div class="k" style="margin-bottom:8px;
+        color:var(--warn)">Added this session — not sent</div>` : ''}
+           ${effPieces.map(p => `<div class="row"><div style="flex:1">
              <div class="l">${esc(p.piece_type || 'Piece')}</div>
              <div class="m">${p.reference_photo_url ? 'Photographed' : 'No photograph yet'}</div></div>
              ${p.reference_photo_url ? `<img src="${esc(p.reference_photo_url)}" alt=""
                style="width:44px;height:44px;object-fit:cover;border-radius:9px;
                border:1px solid var(--line)">` : '<div class="v" style="color:var(--mute)">○</div>'}</div>`).join('')}
            <div style="font-size:11.5px;color:var(--clay);margin-top:8px">
-             ${withPhoto} of ${pieces.length} photographed</div>`,
-      withPhoto === pieces.length)}
+             ${effWithPhoto} of ${effPieces.length} photographed</div>`,
+      effWithPhoto === effPieces.length)}
 
     ${stepRow(3, 'Find them on the shelf',
       `<div style="font-size:12.5px;color:var(--clay);margin-bottom:9px">Photograph a tray or
@@ -645,31 +664,79 @@ function paintTableMark() {
         style="width:100%;border-radius:12px;border:1.5px solid var(--line);cursor:crosshair">
       ${marks.map((m, i) => `<svg viewBox="0 0 100 100" preserveAspectRatio="none"
         style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none">
-        <circle cx="${m.x.toFixed(1)}" cy="${m.y.toFixed(1)}" r="6" fill="none" stroke="#2E7D32"
+        <circle cx="${m.x.toFixed(1)}" cy="${m.y.toFixed(1)}" r="7" fill="none" stroke="#2E7D32"
           stroke-width="4" vector-effect="non-scaling-stroke"/>
-        <circle cx="${m.x.toFixed(1)}" cy="${m.y.toFixed(1)}" r="6" fill="none" stroke="#fff"
-          stroke-width="1.3" vector-effect="non-scaling-stroke"/></svg>`).join('')}
+        <circle cx="${m.x.toFixed(1)}" cy="${m.y.toFixed(1)}" r="7" fill="none" stroke="#fff"
+          stroke-width="1.3" vector-effect="non-scaling-stroke"/>
+        <text x="${m.x.toFixed(1)}" y="${m.y.toFixed(1)}" fill="#fff" font-size="6" font-weight="800"
+          text-anchor="middle" dominant-baseline="central" style="paint-order:stroke;
+          stroke:#2E7D32;stroke-width:1.6px">${i + 1}</text></svg>`).join('')}
     </div>
     <div style="font-size:12.5px;font-weight:700;margin-top:10px">
       ${marks.length ? marks.length + (marks.length === 1 ? ' piece marked' : ' pieces marked')
                      : 'Tap each piece'}</div>
-    ${marks.length ? `<button class="btn ghost" id="undomark" style="margin-top:8px">Undo last</button>
-      <div class="note">Read-only for now — this is what would be saved: ${marks.length}
-        ${marks.length === 1 ? 'piece' : 'pieces'} on ${esc(bkNow.customer_name || 'this booking')},
-        each with its own cropped photograph. Turning that on is a write, so it needs your say-so.</div>` : ''}`;
+    ${marks.length ? `
+      <div style="margin-top:9px">
+        ${marks.map((m, i) => `<div class="row" style="gap:8px">
+          <span style="font-family:var(--serif);font-weight:900;color:var(--soon);
+            min-width:16px">${i + 1}</span>
+          <input type="text" data-desc="${i}" value="${esc(m.desc || '')}"
+            placeholder="e.g. blue mug, white spots" style="flex:1;border:1.5px solid var(--line);
+            border-radius:9px;padding:8px 10px;font-size:12.5px;font-family:var(--ui)">
+          <button data-rm="${i}" style="background:none;border:none;color:var(--clay);
+            font-size:16px;cursor:pointer;padding:0 2px">✕</button></div>`).join('')}
+      </div>
+      <div style="font-size:11px;color:var(--clay);margin-top:6px">A quick description of the
+        colour and pattern is what makes a piece findable — form alone won't do, most of these
+        started as the same blank shape.</div>
+      <button class="btn" id="finishmarks" style="margin-top:10px">Finish — ${marks.length}
+        ${marks.length === 1 ? 'piece' : 'pieces'}</button>
+      <div class="note">Read-only still holds: this saves nothing to the real system. It creates
+        ${marks.length === 1 ? 'a piece' : 'pieces'} for THIS practice session only, so Her Pieces
+        and Find Them On The Shelf have something real to work with straight away.</div>` : ''}`;
   const img = $('tableimg');
   if (img) img.onclick = ev => {
     const r = img.getBoundingClientRect();
     if (!(r.width > 0) || !(r.height > 0)) return;   // image hasn't laid out yet — ignore the tap
-    marks.push({ x: ((ev.clientX - r.left) / r.width) * 100, y: ((ev.clientY - r.top) / r.height) * 100 });
+    marks.push({ x: ((ev.clientX - r.left) / r.width) * 100, y: ((ev.clientY - r.top) / r.height) * 100, desc: '' });
     paintTableMark();
   };
-  const u = $('undomark');
-  if (u) u.onclick = () => { marks.pop(); paintTableMark(); };
+  box.querySelectorAll('[data-desc]').forEach(inp =>
+    inp.onchange = () => { marks[+inp.dataset.desc].desc = inp.value; });
+  box.querySelectorAll('[data-rm]').forEach(btn =>
+    btn.onclick = () => { marks.splice(+btn.dataset.rm, 1); paintTableMark(); });
+  const fin = $('finishmarks');
+  if (fin) fin.onclick = finishTableMarks;
+}
+
+/* The step that actually closes the loop: crop each tap into its own
+   piece photo, keep whatever was typed, store as a local piece against
+   THIS booking. Nothing here reaches pottery_pieces — completing the
+   demo, not the real record. */
+async function finishTableMarks() {
+  const b = bkNow; if (!b || !tableShot || !marks.length) return;
+  const fin = $('finishmarks');
+  if (fin) { fin.disabled = true; fin.textContent = 'Saving…'; }
+  const made = [];
+  for (let i = 0; i < marks.length; i++) {
+    const m = marks[i];
+    const photo = await cropAround(tableShot, m.x, m.y);
+    made.push({
+      id: 'local-' + Date.now() + '-' + i,
+      piece_type: m.desc || ('Piece ' + (i + 1)),
+      description: m.desc || '',
+      reference_photo_url: photo,
+    });
+  }
+  const key = b.booking_code || null;
+  if (key) localPieces[key] = (localPieces[key] || []).concat(made);
+  marks = []; tableShot = null;
+  paintBooking();
 }
 
 async function bookingSearch(file) {
-  const pieces = bkNow._pieces || [];
+  const real = bkNow._pieces || [];
+  const pieces = real.length ? real : ((bkNow.booking_code && localPieces[bkNow.booking_code]) || []);
   const wanted = pieces.filter(p => !foundMap[p.id])
     .map(p => ({ id: p.id, description: p.description || p.piece_type || '' }))
     .filter(w => w.description);
@@ -1056,6 +1123,28 @@ function gridded(dataUrl, maxSide) {
         x.fillStyle = '#FF00FF'; x.fillText(lab, px + 11, py + 9);
       }
       x.textBaseline = 'alphabetic';
+      resolve(c.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+/* [4 Aug] Each tap becomes its own piece photo — a 34%-of-short-side
+   square around the tap, same crop the studio's own earlier work
+   settled on. This never leaves the device or costs anything; it only
+   feeds the local "her pieces" preview and, later, the one sanctioned
+   search call — same as every other photo already handled this way. */
+function cropAround(dataUrl, xPct, yPct) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const side = 0.34 * Math.min(img.width, img.height);
+      const cx = (xPct / 100) * img.width, cy = (yPct / 100) * img.height;
+      const sx = Math.max(0, Math.min(img.width - side, cx - side / 2));
+      const sy = Math.max(0, Math.min(img.height - side, cy - side / 2));
+      const c = document.createElement('canvas');
+      c.width = 260; c.height = 260;
+      c.getContext('2d').drawImage(img, sx, sy, side, side, 0, 0, 260, 260);
       resolve(c.toDataURL('image/jpeg', 0.85));
     };
     img.onerror = () => resolve(dataUrl);
