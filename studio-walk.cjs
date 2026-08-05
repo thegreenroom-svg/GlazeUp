@@ -168,7 +168,7 @@ const srv=app.listen(4801,async()=>{
   await p.screenshot({path:'/home/claude/shots/s-9-receipt.png',fullPage:true});
   console.log('receipt shown   :', (await p.$('#demo-receipt')) ? 'yes' : 'NO ✗');
   console.log('receipt warns   :', await p.$eval('#demo-receipt .err',e=>
-    e.textContent.includes('not sent')).catch(()=>false));
+    e.textContent.includes('nothing reached Square')).catch(()=>false));
   console.log('ticket cleared  :', await p.evaluate(()=>ticket.length===0));
   // demo send: the flow must complete and reach nothing
   await p.evaluate(()=>$('tksend').click()); await new Promise(r=>setTimeout(r,500));

@@ -56,7 +56,7 @@ async function search(body) {
 
 /* ── state (memory only, cleared on every load) ──────────────────── */
 let me = null, view = 'login', stack = [], day = new Date(),
-    bookings = [], floor = [], priceGroups = [], cat = null, ticket = [], tickWhere = 'Practice ticket',
+    bookings = [], floor = [], priceGroups = [], cat = null, ticket = [], tickWhere = 'New order',
     tillTable = null;
 
 /* [4 Aug] David: rang items into a table's till, went to another
@@ -149,7 +149,7 @@ function wireTablePicker(root, onPick) {
    out already did this implicitly, this makes it an explicit,
    immediate action instead. */
 function clearPracticeState() {
-  ticket = []; tillTable = null; tickWhere = 'Practice ticket';
+  ticket = []; tillTable = null; tickWhere = 'New order';
   localTickets = {}; ticketKey = null; ticketKeyIsBooking = false; localPieces = {};   // null BEFORE syncTicket, or it would re-save just this one
   marks = []; tableShot = null;
   syncTicket();
@@ -177,7 +177,7 @@ const PANES = {
   floor: ['Floor', 'Tap a table'],
   day:   ['Bookings', ''],
   bk:    ['Booking', ''],
-  till:  ['Till', 'Practice only — nothing is sent'],
+  till:  ['Till', 'Real prices — nothing is sent'],
   pack:  ['Packing', 'Pieces waiting to go home'],
   money: ['Money', 'Live from Square'],
 };
@@ -223,9 +223,9 @@ async function loadLogin() {
       b.onclick = () => signIn(b.dataset.name, b.dataset.role));
   } catch (e) {
     $('people').innerHTML = `<div class="err" style="grid-column:1/-1">Couldn't reach the studio.
-      ${esc(e.message)}<br><br>You can still look around with the practice team.</div>
+      ${esc(e.message)}<br><br>You can still look around, but nothing will be live.</div>
       <button class="person" id="fallback" style="grid-column:1/-1"><span class="n">Carry on anyway</span>
-      <span class="r">Practice, no live data</span></button>`;
+      <span class="r">No connection — nothing live</span></button>`;
     $('fallback').onclick = () => signIn('there', '');
   }
 }
@@ -295,7 +295,7 @@ async function loadHome() {
   const t = [
     ['floor', '▦', 'Floor', 'Who is in, table by table', 'floorN'],
     ['day',   '◷', 'Bookings', 'The day, table by table', 'dayN'],
-    ['till',  '£', 'Till', 'Prices and a practice ticket', null],
+    ['till',  '£', 'Till', 'Real prices, ready to use', null],
     ['pack',  '◲', 'Packing', 'Pieces waiting to go home', 'packN'],
   ];
   if (me && me.admin) t.push(['money', '£', 'Money', 'Takings, live from Square', 'moneyN']);
@@ -859,7 +859,7 @@ function paintTillTable() {
       ${tablePickerHTML(null)}`;
     wireTablePicker(el, name => {
       tillTable = name;
-      if (tickWhere === 'Practice ticket' || !tickWhere) tickWhere = short(name);
+      if (tickWhere === 'New order' || !tickWhere) tickWhere = short(name);
       // A booking-owned ticket (arrived via a booking's Open the till,
       // even one not yet seated) keeps belonging to that booking no
       // matter what table gets picked here — this is only a display
@@ -993,7 +993,7 @@ function paintTill() {
     const it = g.items[+b.dataset.i]; ticket.push({ n: it.name, p: it.price }); syncTicket();
   });
   $('sub').textContent = tillMode === 'average'
-    ? 'Average prices — practice only' : 'Practice only — nothing is sent';
+    ? 'Average prices — not sent' : 'Real prices — nothing is sent';
 }
 
 /* [4 Aug] Daisy: 'want till to send, but only for demo at this stage.'
@@ -1024,9 +1024,8 @@ function sendTicket() {
         <div style="display:flex;justify-content:space-between;font-weight:700;font-size:13px">
           <span>TOTAL</span><span>${money(total)}</span></div>
       </div>
-      <div class="err" style="margin-top:12px"><strong>Demo only — this was not sent.</strong>
-        Nothing reached Square, no payment was taken and no order exists. Ring the real one up
-        on the till as usual.</div>
+      <div class="err" style="margin-top:12px"><strong>Not sent — nothing reached Square.</strong>
+        No payment was taken and no order exists. Ring the real one up on the till as usual.</div>
       <button class="btn ghost" id="clear-receipt">Clear</button>
     </div>`);
   $('clear-receipt').onclick = () => { const r = $('demo-receipt'); if (r) r.remove(); };
