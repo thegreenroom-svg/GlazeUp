@@ -59,14 +59,15 @@ app.get('/api/takings/history',(q,r)=>{
       bestMonth:months.reduce((a,b)=>b.revenue>a.revenue?b:a,months[0]),
       bestYear:years[0],totalTxns:days.reduce((s,d)=>s+d.txns,0)}});
 });
-app.get('/api/packing/queue',(q,r)=>r.json({count:5,pieces:[
+app.get('/api/packing/queue',(q,r)=>r.json({count:6,pieces:[
  {booking_id:'Kim Driscoll',piece_type:'Cup (pink interior)',status:'fired',
   notes:'Painted 19/7 · Collect 23/7 · Lounge · NOT PAID, charge at collection'},
  {booking_id:'Kim Driscoll',piece_type:'Saucer (folk florals)',status:'fired',notes:'Collect 23/7'},
  {booking_id:'Frederica Findlater',piece_type:'Bunny (floral)',status:'fired',
   notes:'Painted 19/7 10-12 · Collect 23/7 · tag x5'},
  {booking_id:'Frederica Findlater',piece_type:'Motorbike',status:'fired',notes:'Collect 23/7'},
- {booking_id:'Georgina Callin',piece_type:'Cosy Duck plaque',status:'fired',notes:'Collect 23/7'}]}));
+ {booking_id:'Georgina Callin',piece_type:'Cosy Duck plaque',status:'fired',notes:'Collect 23/7'},
+ {booking_id:'Leanne Fisher',piece_type:'Mug (blue spots)',status:'fired',notes:'Collect 23/7'}]}));
 app.get('/api/takings/today',(q,r)=>r.json({value:1284.5,label:'today',synced:true}));
 app.get('/api/takings/breakdown',(q,r)=>r.json({groups:[
  {group:'Paint your own — by shape',revenue:407316,items:20418,categories:[
@@ -192,6 +193,13 @@ const srv=app.listen(4801,async()=>{
     (withPiecesH2s.includes('Her pieces') && withPiecesH2s.includes('Find them on the shelf')) ? 'yes ✓' : '✗');
   console.log('till total shown:', await p.$eval('#bk .fig',e=>e.textContent).catch(()=>'none'));
 
+  // A real file through real inputs from here on — create it once,
+  // before its first genuine use (it used to only be written much
+  // later in this script, which "worked" only because a stale file
+  // was left over in /tmp from an earlier run in the same container).
+  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==','base64');
+  require('fs').writeFileSync('/tmp/shelf.png',png);
+
   // a booking with no pieces yet -> the photograph-the-table step
   await p.evaluate(()=>go('day')); await new Promise(r=>setTimeout(r,600));
   await p.evaluate(()=>{const e=[...document.querySelectorAll('.ev')]
@@ -304,20 +312,6 @@ const srv=app.listen(4801,async()=>{
   await p.evaluate(()=>go('till')); await new Promise(r=>setTimeout(r,500));
   console.log('picker on direct till:', (await p.$('#tilltable .pickt')) ? 'yes' : 'NO ✗');
 
-  // THE PACKING FLOW: booking -> table photo -> photograph a shelf -> circles
-  await p.evaluate(()=>go('pack')); await new Promise(r=>setTimeout(r,700));
-  const clickErr = await p.evaluate(()=>{
-    try { document.querySelector('#pack [data-p]').click(); return null; }
-    catch(e){ return e.message + '\n' + e.stack; }
-  });
-  await new Promise(r=>setTimeout(r,500));
-  await p.screenshot({path:'/home/claude/shots/s-6-booking.png',fullPage:true});
-  // a real file through the real input, so the iOS-safe path is exercised
-  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==','base64');
-  require('fs').writeFileSync('/tmp/shelf.png',png);
-  const inp=await p.$('#shelfshot'); await inp.uploadFile('/tmp/shelf.png');
-  await new Promise(r=>setTimeout(r,1400));
-  await p.screenshot({path:'/home/claude/shots/s-7-found.png',fullPage:true});
   // POSITIONED FLOOR: prove the Lounge lays out 2 cols x 3 rows, not 3-per-row
   await p.evaluate(()=>go('floor')); await new Promise(r=>setTimeout(r,700));
   await p.screenshot({path:'/home/claude/shots/s-12-floor-real.png',fullPage:true});
@@ -333,6 +327,58 @@ const srv=app.listen(4801,async()=>{
   await p.click('#leafcats .chip:nth-child(2)').catch(()=>{});
   await new Promise(r=>setTimeout(r,400));
   await p.screenshot({path:'/home/claude/shots/s-14-till-leaf.png',fullPage:true});
+
+  // INLINE ADD, NO NAVIGATION: David — "it kind of all needs to be done
+  // from the one page instead of to go back... the booking's live all
+  // the time." Louise Morton (BK-2) is untouched by every earlier test.
+  await p.evaluate(()=>{stack=[];go('home',false);}); await new Promise(r=>setTimeout(r,300));
+  await p.evaluate(()=>go('day')); await new Promise(r=>setTimeout(r,700));
+  await p.evaluate(()=>{const e=[...document.querySelectorAll('.ev')]
+    .find(x=>x.textContent.includes('Louise')); if(e) e.click();});
+  await new Promise(r=>setTimeout(r,600));
+  console.log('view stayed on booking before add:', await p.evaluate(()=>view));
+  await p.evaluate(()=>document.getElementById('bkaddtoggle').click());
+  await new Promise(r=>setTimeout(r,500));   // ensurePriceGroups may need to load
+  const catsShown = await p.$$eval('.bkaddpc', e=>e.map(x=>x.textContent)).catch(()=>[]);
+  console.log('inline categories:', catsShown.join(' | '));
+  await p.evaluate(()=>{const it=document.querySelector('.bkaddit'); if(it) it.click();});
+  await new Promise(r=>setTimeout(r,400));
+  console.log('view still on booking after add :', await p.evaluate(()=>view), '(never navigated ✓)');
+  const inlineAdded = await p.$eval('#bk', e=>e.textContent).catch(()=>'');
+  console.log('item shows inline immediately    :', inlineAdded.includes('Added this session') ? 'yes ✓' : '✗');
+  await p.screenshot({path:'/home/claude/shots/s-24-inline-add.png',fullPage:true});
+  // survives leaving and coming back, same as the till fix proved earlier
+  await p.evaluate(()=>go('day')); await new Promise(r=>setTimeout(r,600));
+  await p.evaluate(()=>{const e=[...document.querySelectorAll('.ev')]
+    .find(x=>x.textContent.includes('Joy')); if(e) e.click();});
+  await new Promise(r=>setTimeout(r,400));
+  await p.evaluate(()=>go('day')); await new Promise(r=>setTimeout(r,600));
+  await p.evaluate(()=>{const e=[...document.querySelectorAll('.ev')]
+    .find(x=>x.textContent.includes('Louise')); if(e) e.click();});
+  await new Promise(r=>setTimeout(r,500));
+  const survived = await p.$eval('#bk', e=>e.textContent).catch(()=>'');
+  console.log('inline addition survived the trip:', survived.includes('Added this session') ? 'yes ✓' : '✗ LOST');
+
+  // PACKING NO LONGER HAS ITS OWN DEAD-END CARD: David — "get rid of the
+  // [old] booking test thing in packing... I need to see right through
+  // to the end of the workflow." A packing entry with a real match
+  // opens the SAME booking page; one with no match says so honestly.
+  await p.evaluate(()=>{stack=[];go('home',false);}); await new Promise(r=>setTimeout(r,300));
+  await p.evaluate(()=>go('pack')); await new Promise(r=>setTimeout(r,700));
+  await p.evaluate(()=>{const e=[...document.querySelectorAll('#pack [data-p]')]
+    .find(x=>x.textContent.includes('Leanne')); if(e) e.click();});
+  await new Promise(r=>setTimeout(r,900));
+  console.log('packing (matched) opens the real booking:', await p.evaluate(()=>view),
+    await p.$eval('#bk .card', e=>e.textContent.includes('Leanne')).catch(()=>false) ? '— it is her ✓' : '✗');
+  console.log('booking page has the real workflow steps:',
+    (await p.$$eval('#bk .card h2', e=>e.map(x=>x.textContent))).join(' | '));
+  await p.evaluate(()=>{stack=[];go('home',false);}); await new Promise(r=>setTimeout(r,300));
+  await p.evaluate(()=>go('pack')); await new Promise(r=>setTimeout(r,700));
+  await p.evaluate(()=>{const e=[...document.querySelectorAll('#pack [data-p]')]
+    .find(x=>x.textContent.includes('Kim')); if(e) e.click();});
+  await new Promise(r=>setTimeout(r,700));
+  const noMatch = await p.$eval('#pack', e=>e.textContent).catch(()=>'');
+  console.log('packing (no match) is honest about it:', noMatch.includes('No booking on file') ? 'yes ✓' : '✗');
 
   console.log('search calls    :', searchCalls);
   console.log('rings drawn     :', await p.$$eval('circle',e=>e.length).catch(()=>0));

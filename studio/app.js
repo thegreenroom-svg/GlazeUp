@@ -478,9 +478,14 @@ function shift(n) {
       ->  her pieces  ->  find them on the shelf  ->  packed.
    Every step reads. None of them writes. */
 let bkNow = null;
+// [4 Aug] David: "it kind of all needs to be done from the one page
+// instead of to go back... the booking's live all the time." Separate
+// from Till's own parentCatSel/cat so browsing one never disturbs the
+// other if both happen to have been opened this session.
+let bkAddOpen = false, bkAddCat = null, bkAddLeaf = null;
 
 async function openBooking(b) {
-  bkNow = b; foundMap = {};
+  bkNow = b; foundMap = {}; bkAddOpen = false;
   paintBooking();
   go('bk');
   // the two session reads, after the screen is already up
@@ -500,7 +505,7 @@ function stepRow(n, title, body, done) {
     <div style="display:flex;gap:10px;align-items:baseline">
       <span style="font-family:var(--serif);font-weight:900;font-size:13px;
         color:${done ? 'var(--soon)' : 'var(--mute)'};min-width:16px">${done ? '●' : n}</span>
-      <div style="flex:1"><h2 style="margin-bottom:6px">${title}</h2>${body}</div></div></div>`;
+      <div style="flex:1;min-width:0"><h2 style="margin-bottom:6px">${title}</h2>${body}</div></div></div>`;
 }
 
 function paintBooking() {
@@ -571,10 +576,10 @@ function paintBooking() {
            <div class="row" style="border-top:1.5px solid var(--line);border-bottom:none">
              <div class="l" style="font-weight:800">Total</div>
              <div class="fig" style="font-size:22px">${money(total)}</div></div>
-           <button class="btn ghost" id="bk-till">Open the till</button>${localBlock}`
+           <button class="btn ghost" id="bk-till">Open the till</button>${localBlock}${bkAddHTML()}`
           : `<div style="font-size:12.5px;color:var(--clay);margin-bottom:10px">Nothing rung up against this booking yet.
            It appears here as the girls add pieces and drinks at the terminal.</div>
-           <button class="btn ghost" id="bk-till" style="margin-top:0">Open the till</button>${localBlock}`),
+           <button class="btn ghost" id="bk-till" style="margin-top:0">Open the till</button>${localBlock}${bkAddHTML()}`),
         !!(items && items.length));
     })()}
 
@@ -633,6 +638,7 @@ function paintBooking() {
     loadTicketFor(b.booking_code || null, true);
     go('till');
   };
+  wireBkAdd($('bk'), b);
   const shot = $('bkshot');
   if (shot) shot.onchange = e => { const f = e.target.files[0]; if (f) bookingSearch(f); };
   const tshot = $('tableshot');
@@ -782,16 +788,18 @@ async function bookingSearch(file) {
    up as the catalogue. */
 let tillMode = null;
 
-async function loadTill() {
-  if (priceGroups.length) return paintTill();
+/* [4 Aug] David: "it kind of all needs to be done from the one page
+   instead of to go back... the booking's live all the time." Split out
+   from loadTill so the SAME catalogue load can feed an inline picker on
+   the booking page too — no second network path, no duplicated logic. */
+async function ensurePriceGroups() {
+  if (priceGroups.length) return;
   try {
     const d = await read('/api/pos/items');
     if ((d.groups || []).length) {
-      priceGroups = d.groups; tillMode = 'catalogue';
-      cat = priceGroups[0].category; return paintTill();
+      priceGroups = d.groups; tillMode = 'catalogue'; cat = priceGroups[0].category; return;
     }
   } catch (e) { /* fall through to the categories below */ }
-
   try {
     const b = await read('/api/takings/breakdown');
     // Square's own catch-all is not something anyone rings up — it is an
@@ -808,11 +816,14 @@ async function loadTill() {
       })).filter(i => i.name && i.price > 0).sort((a, b2) => b2.price - a.price),
     })).filter(g => g.items.length);
     if (!priceGroups.length) throw new Error('no items');
-    tillMode = 'average'; cat = priceGroups[0].category; paintTill();
-  } catch (e) {
-    $('items').innerHTML = `<div class="err" style="grid-column:1/-1">
-      Couldn't read prices or categories. ${esc(e.message)}</div>`;
-  }
+    tillMode = 'average'; cat = priceGroups[0].category;
+  } catch (e) { /* leaves priceGroups empty; each caller shows its own message */ }
+}
+async function loadTill() {
+  await ensurePriceGroups();
+  if (priceGroups.length) return paintTill();
+  $('items').innerHTML = `<div class="err" style="grid-column:1/-1">
+    Couldn't read prices or categories.</div>`;
 }
 
 /* [4 Aug] Daisy: "till is not easily categorised." True once the
@@ -860,6 +871,78 @@ function paintTillTable() {
   }
 }
 
+/* Shared by Till and the booking page's inline picker — one grouping
+   rule, used everywhere prices are browsed, so the two can never drift
+   into different category shapes. */
+function groupByParent() {
+  const parents = {};
+  if (tillMode === 'catalogue') {
+    priceGroups.forEach(g => (parents[parentOf(g.category)] = parents[parentOf(g.category)] || []).push(g));
+  } else {
+    priceGroups.forEach(g => (parents[g.category] = [g]));
+  }
+  return parents;
+}
+
+/* [4 Aug] David: "it kind of all needs to be done from the one page
+   instead of to go back... you go back and add some more... the
+   booking's live all the time." Same catalogue, same categories as
+   Till (via groupByParent/ensurePriceGroups), rendered inline so
+   ringing something else up never means leaving the booking. */
+function bkAddHTML() {
+  if (!bkAddOpen) {
+    return `<button class="chip" id="bkaddtoggle" style="min-height:36px;margin-top:10px">+ Add something</button>`;
+  }
+  if (!priceGroups.length) {
+    return `<button class="chip" id="bkaddtoggle" style="min-height:36px;margin-top:10px">Close</button>
+      <div style="font-size:12px;color:var(--clay);margin-top:8px">Reading prices…</div>`;
+  }
+  const parents = groupByParent();
+  const parentNames = Object.keys(parents);
+  if (!bkAddCat || !parents[bkAddCat]) bkAddCat = parentNames[0];
+  const leaves = parents[bkAddCat] || [];
+  if (!leaves.find(x => x.category === bkAddLeaf)) bkAddLeaf = leaves[0] && leaves[0].category;
+  const g = leaves.find(x => x.category === bkAddLeaf) || leaves[0];
+  return `
+    <button class="chip" id="bkaddtoggle" style="min-height:36px;margin-top:10px">Close</button>
+    <div class="chips" style="margin-top:8px">
+      ${parentNames.map(p => `<button class="chip bkaddpc ${p === bkAddCat ? 'on' : ''}" data-pc="${esc(p)}"
+        style="min-height:34px;padding:6px 12px;font-size:11.5px">${esc(p)}</button>`).join('')}
+    </div>
+    ${leaves.length > 1 ? `<div class="chips" style="margin-top:-2px">
+      ${leaves.map(lg => `<button class="chip bkaddleaf ${lg.category === bkAddLeaf ? 'on' : ''}" data-c="${esc(lg.category)}"
+        style="min-height:32px;padding:5px 11px;font-size:11px">${esc(lg.category)}</button>`).join('')}
+    </div>` : ''}
+    <div class="items" style="margin-top:8px">
+      ${(g && g.items || []).map((it, i) => `<button class="item bkaddit" data-i="${i}">
+        <span class="n">${esc(it.name)}</span><span class="p">${money(it.price)}</span></button>`).join('')}
+    </div>`;
+}
+function wireBkAdd(root, b) {
+  const t = root.querySelector('#bkaddtoggle');
+  if (t) t.onclick = async () => {
+    bkAddOpen = !bkAddOpen;
+    if (bkAddOpen && !priceGroups.length) { paintBooking(); await ensurePriceGroups(); }
+    paintBooking();
+  };
+  root.querySelectorAll('.bkaddpc').forEach(el =>
+    el.onclick = () => { bkAddCat = el.dataset.pc; bkAddLeaf = null; paintBooking(); });
+  root.querySelectorAll('.bkaddleaf').forEach(el =>
+    el.onclick = () => { bkAddLeaf = el.dataset.c; paintBooking(); });
+  root.querySelectorAll('.bkaddit').forEach(el => el.onclick = () => {
+    const parents = groupByParent();
+    const leaves = parents[bkAddCat] || [];
+    const g = leaves.find(x => x.category === bkAddLeaf) || leaves[0];
+    const it = g && g.items[+el.dataset.i]; if (!it) return;
+    const key = b.booking_code || null;
+    if (key) {
+      localTickets[key] = (localTickets[key] || []).concat([{ n: it.name, p: it.price }]);
+      if (ticketKey === key) ticket = localTickets[key];   // keep Till in step if it's open on the same booking
+    }
+    paintBooking();
+  });
+}
+
 function paintTill() {
   paintTillTable();
   // 'average' mode groups server-side already (/api/takings/breakdown's
@@ -868,12 +951,7 @@ function paintTill() {
   // 'Paint your own — by shape' as neither PB-prefixed nor S.-prefixed
   // and dump it into 'Other'. Only catalogue mode's raw Square
   // categories (up to 41 of them) need bucketing at all.
-  const parents = {};
-  if (tillMode === 'catalogue') {
-    priceGroups.forEach(g => (parents[parentOf(g.category)] = parents[parentOf(g.category)] || []).push(g));
-  } else {
-    priceGroups.forEach(g => (parents[g.category] = [g]));
-  }
+  const parents = groupByParent();
   const parentNames = Object.keys(parents);
   if (!parentCatSel || !parents[parentCatSel]) parentCatSel = parentNames[0];
   const leaves = parents[parentCatSel] || [];
@@ -1017,84 +1095,37 @@ function paintPack() {
       <span style="color:var(--clay);font-size:20px">›</span>
     </button>`).join('');
   $('pack').querySelectorAll('[data-p]').forEach(b =>
-    b.onclick = () => openPackBooking(packBookings[+b.dataset.p]));
+    b.onclick = () => openPackAsBooking(packBookings[+b.dataset.p]));
+}
+
+/* [4 Aug] David: "get rid of the [old] booking test thing in packing...
+   I need to see right through to the end of the workflow." Packing used
+   to open its own separate card with its own copy of the finder — built
+   before the booking page grew the same thing properly, with the till
+   and the real session steps alongside it. One workflow now, not two:
+   a packing entry searches for its real booking and opens THAT, so
+   photographing/finding happens on the same page as everything else. */
+async function openPackAsBooking(g) {
+  $('pack').innerHTML = '<div class="empty">Finding her booking…</div>';
+  try {
+    const d = await read('/api/bookings/search', { q: g.who });
+    const hit = (d.bookings || [])[0];
+    if (hit) { openBooking(hit); return; }
+    $('pack').innerHTML = `<div class="empty">No booking on file for "${esc(g.who)}" in the
+      last 90 days — nothing to open. This entry is real (from the packing queue), it just
+      isn't tied to a bookable session.</div>
+      <button class="btn ghost" id="pack-back" style="margin-top:10px">Back to the list</button>`;
+    const back = $('pack-back'); if (back) back.onclick = paintPack;
+  } catch (e) {
+    $('pack').innerHTML = `<div class="err">Couldn't search for her booking. ${esc(e.message)}</div>`;
+  }
 }
 
 /* ── the booking, as Jenny works it ──────────────────────────────────
    Tap a booking → the table photograph the girls took when they cleared
    it → photograph a tray or a piece you think is hers → the pieces get
    circled → tick them off. The whole job on one screen, in that order. */
-let openBk = null, foundMap = {}, spend = 0;
-
-function openPackBooking(g) {
-  openBk = g; foundMap = {};
-  paintBookingCard();
-  $('main').scrollTop = 0;
-}
-
-function paintBookingCard(photoShown, rings, note) {
-  const g = openBk;
-  const wanted = g.pieces.filter(p => !foundMap[p.id]);
-  $('sub').textContent = g.who;
-  $('pack').innerHTML = `
-    ${g.photo ? `<img src="${esc(g.photo)}" alt="The table when it was cleared"
-      style="width:100%;border-radius:16px;border:1.5px solid var(--line);margin-bottom:4px">
-      <div style="font-size:11px;color:var(--clay);text-align:center;margin-bottom:12px">
-        The table when the girls cleared it</div>`
-      : `<div class="note" style="margin-bottom:12px">No table photograph on this booking yet.
-         When the girls photograph the table as they clear it, the chalk tag is read off the
-         picture and it lands here — so you see her pieces instead of hunting for them.</div>`}
-
-    <div class="card">
-      <div style="font-family:var(--serif);font-weight:900;font-size:22px">${esc(g.who)}</div>
-      <div style="font-size:12px;color:var(--clay);margin-top:3px">
-        ${g.pieces.length} ${g.pieces.length === 1 ? 'piece' : 'pieces'}${g.collect ? ' · collect ' + esc(g.collect) : ''}</div>
-      ${g.unpaid ? `<div class="err" style="margin-top:10px"><strong>Not paid.</strong>
-        The chalk tag says charge at collection.</div>` : ''}
-    </div>
-
-    <div class="card">
-      <h2>Find them</h2>
-      <div style="font-size:12px;color:var(--clay);margin:-4px 0 10px">
-        Photograph a tray or a shelf you think hers is on. Whatever of hers is in the picture
-        gets circled.</div>
-      <label class="btn" style="display:flex;align-items:center;justify-content:center;
-        cursor:pointer;margin-top:0" for="shelfshot">Photograph a tray or shelf</label>
-      <input type="file" id="shelfshot" accept="image/*" capture="environment" style="display:none">
-      <div style="font-size:10.5px;color:var(--clay);text-align:center;margin-top:8px">
-        About 0.3p a photo · ${spend ? spend.toFixed(1) + 'p this session' : 'nothing spent yet'}</div>
-      ${(!wanted.length && !photoShown) ? `<div class="note" style="margin-top:10px">
-        Every piece is accounted for.</div>` : ''}
-    </div>
-
-    ${photoShown ? `<div class="card"><h2>${esc(note || 'Result')}</h2>
-      <div style="position:relative;line-height:0">
-        <img src="${esc(photoShown)}" alt="The shelf you photographed"
-          style="width:100%;border-radius:12px;border:1.5px solid var(--line)">
-        ${rings || ''}
-      </div></div>` : ''}
-
-    <div class="card"><h2>Her pieces</h2>
-      ${g.pieces.map(p => {
-        const hit = foundMap[p.id];
-        return `<div class="row"><div style="flex:1">
-          <div class="l">${esc(p.description || p.piece_type || 'Piece')}</div>
-          ${p.notes ? `<div class="m">${esc(p.notes)}</div>` : ''}
-          ${hit ? `<div class="m" style="color:var(--soon);font-weight:700">
-            Found — ${esc(hit)}</div>` : ''}</div>
-          <div class="v" style="font-size:15px;color:${hit ? 'var(--soon)' : 'var(--mute)'}">
-            ${hit ? '●' : '○'}</div></div>`;
-      }).join('')}
-    </div>
-
-    <button class="btn ghost" id="pack-back">Back to the bookings</button>
-    <div class="note">Read-only — ticking a piece off for real still happens on the live system.</div>`;
-
-  // iOS only opens a picker while the tap is still live, so nothing may
-  // be awaited before this fires. The question comes after the camera.
-  $('shelfshot').onchange = e => { const f = e.target.files[0]; if (f) runSearch(f); };
-  $('pack-back').onclick = () => { openBk = null; PANES.pack[1] = ''; paintPack(); $('main').scrollTop = 0; };
-}
+let foundMap = {}, spend = 0;
 
 /* An 8x8 magenta grid burned into the photo before it is sent, so the
    model READS a cell reference rather than estimating a position. Four
@@ -1159,50 +1190,6 @@ const cellPoint = ref => {
 const readFile = f => new Promise((ok, no) => {
   const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = no; r.readAsDataURL(f);
 });
-
-async function runSearch(file) {
-  const g = openBk;
-  const wanted = g.pieces.filter(p => !foundMap[p.id])
-    .map(p => ({ id: p.id, description: p.description || p.piece_type || '' }))
-    .filter(w => w.description);
-  if (!wanted.length) { paintBookingCard(null, null, 'Nothing left to look for'); return; }
-
-  const raw = await readFile(file);
-  paintBookingCard(raw, null, 'Looking…');
-  try {
-    const gridPhoto = await gridded(raw, 1400);
-    const d = await search({ photoBase64: gridPhoto, wanted });
-    if (typeof d.cost === 'number') spend += d.cost * 100;
-
-    const found = d.found || [];
-    let rings = '';
-    found.forEach((f, i) => {
-      const p = cellPoint(f.cell);
-      const piece = g.pieces.find(x => String(x.id) === String(f.id));
-      if (piece) foundMap[piece.id] = f.cell ? 'circled ' + f.cell : 'in this photo';
-      if (!p) return;
-      rings += `<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;
-        inset:0;width:100%;height:100%;pointer-events:none">
-        <circle cx="${(p.x*100).toFixed(1)}" cy="${(p.y*100).toFixed(1)}" r="7"
-          fill="none" stroke="#2E7D32" stroke-width="4" vector-effect="non-scaling-stroke"/>
-        <circle cx="${(p.x*100).toFixed(1)}" cy="${(p.y*100).toFixed(1)}" r="7"
-          fill="none" stroke="#fff" stroke-width="1.4" vector-effect="non-scaling-stroke"/></svg>`;
-    });
-
-    const n = found.length, m = wanted.length;
-    const placed = found.filter(f => f.cell).length;
-    let note = `${n} of ${m} found`;
-    if (n && !placed) note += ' — in this photo, but not placed';
-    if (!n) note = `None of her ${m} in this one`;
-    paintBookingCard(raw, rings, note);
-    if (!n) $('pack').insertAdjacentHTML('beforeend',
-      `<div class="note">Nothing of hers here. Try the next shelf — and a piece can only be
-       found if its own description is on file, which comes from the table photograph.</div>`);
-  } catch (e) {
-    paintBookingCard(raw, null, 'Search failed');
-    $('pack').insertAdjacentHTML('beforeend', `<div class="err">${esc(e.message)}</div>`);
-  }
-}
 
 /* ── money (admin only) ─────────────────────────────────────────────
    Everything is already on the server: /api/takings/history returns
