@@ -123,13 +123,12 @@ function wireTablePicker(root, onPick) {
 }
 
 /* One tap to clear every local, unsaved choice — the practice ticket,
-   any table picked at Till or on a booking, table-photo marks not yet
-   saved. Nothing here was ever real, so "clearing" is just resetting
-   JS state; logging out already did this implicitly, this makes it an
-   explicit, immediate action instead. */
+   any table picked at Till, table-photo marks not yet saved. Nothing
+   here was ever real, so "clearing" is just resetting JS state; logging
+   out already did this implicitly, this makes it an explicit,
+   immediate action instead. */
 function clearPracticeState() {
   ticket = []; tillTable = null; tickWhere = 'Practice ticket';
-  if (bkNow) delete bkNow._practiceTable;
   marks = []; tableShot = null;
   syncTicket();
   if (view === 'bk' && bkNow) paintBooking();
@@ -510,17 +509,8 @@ function paintBooking() {
 
     ${stepRow(1, 'Seated', seated
       ? `<div class="l">Table ${esc(b.table_number)}${b.party_size ? ' · ' + b.party_size + ' painting' : ''}</div>`
-      : `<div style="font-size:12.5px;color:var(--clay);margin-bottom:2px">Not seated yet — that
-         lands here once someone's seated at the terminal, since Square Appointments has no table
-         on it. Jenny plans tables most mornings before that; pick where this one's going to sit
-         to see the rest of the workflow for it.</div>
-         ${b._practiceTable
-           ? `<div style="display:flex;align-items:center;gap:8px;margin-top:8px">
-                <span class="chip on" style="min-height:34px;padding:6px 12px;font-size:11.5px">
-                  ${esc(short(b._practiceTable))} — Jenny's plan</span>
-                <button class="chip" id="chgtable" style="min-height:34px;padding:6px 12px;
-                  font-size:11.5px">Change</button></div>`
-           : tablePickerHTML(null)}`, seated)}
+      : `<div style="font-size:12.5px;color:var(--clay)">Not seated yet — that lands here once
+         someone's seated at the terminal, since Square Appointments has no table on it.</div>`, seated)}
 
     ${stepRow(2, 'On the table', items === undefined
       ? '<div style="font-size:12.5px;color:var(--clay)">Reading the till…</div>'
@@ -583,13 +573,10 @@ function paintBooking() {
 
   const tillBtn = $('bk-till');
   if (tillBtn) tillBtn.onclick = () => {
-    tillTable = b.table_number != null ? 'Table ' + b.table_number : (b._practiceTable || null);
+    tillTable = b.table_number != null ? 'Table ' + b.table_number : null;
     tickWhere = (b.customer_name || 'Booking') + (tillTable ? ' · ' + tillTable : '');
     go('till');
   };
-  wireTablePicker($('bk'), name => { b._practiceTable = name; paintBooking(); });
-  const chg = $('chgtable');
-  if (chg) chg.onclick = () => { delete b._practiceTable; paintBooking(); };
   const shot = $('bkshot');
   if (shot) shot.onchange = e => { const f = e.target.files[0]; if (f) bookingSearch(f); };
   const tshot = $('tableshot');

@@ -210,20 +210,23 @@ const srv=app.listen(4801,async()=>{
     console.log('pieces marked   :', await p.evaluate(()=>marks.length));
     await p.screenshot({path:'/home/claude/shots/s-10-table.png',fullPage:true}); }
 
-  // JENNY'S TABLE PLAN: an unseated booking offers a local table pick,
-  // carries into a practice ticket, and one tap clears everything.
+  // SIMPLIFIED TABLE FLOW: David — Jenny's plan is a paper thing done
+  // in the morning, not a digital pre-allocation step; table choice
+  // belongs at the till (or Floor's tap-a-table), not duplicated on
+  // the booking page. An unseated booking should show plain text only,
+  // no picker; the till carries whatever table's carried, or offers
+  // its own picker if none is.
   await p.evaluate(()=>go('day')); await new Promise(r=>setTimeout(r,700));
   await p.evaluate(()=>{const e=[...document.querySelectorAll('.ev')]
     .find(x=>x.textContent.includes('Marcus')); if(e) e.click();});
   await new Promise(r=>setTimeout(r,600));
-  console.log('picker shown    :', (await p.$('#bk .pickt')) ? 'yes' : 'NO ✗');
-  await p.evaluate(()=>document.querySelector('#bk .pickt').click());
-  await new Promise(r=>setTimeout(r,300));
-  const planChip = await p.$eval('#bk .chip.on', e=>e.textContent.trim()).catch(()=>'NONE ✗');
-  console.log('table planned   :', planChip);
+  console.log('no picker on bk :', (await p.$('#bk .pickt')) ? '✗ STILL THERE' : 'yes, gone ✓');
   await p.screenshot({path:'/home/claude/shots/s-17-plan.png',fullPage:true});
   await p.evaluate(()=>document.querySelector('#bk-till').click());
   await new Promise(r=>setTimeout(r,400));
+  console.log('till picker shown on open booking:', (await p.$('#tilltable .pickt')) ? 'yes ✓' : 'NO ✗');
+  await p.evaluate(()=>document.querySelector('#tilltable .pickt').click());
+  await new Promise(r=>setTimeout(r,300));
   const tillTableShown = await p.$eval('#tilltable', e=>e.textContent.replace(/\s+/g,' ').trim()).catch(()=>'NONE ✗');
   console.log('till table shown:', tillTableShown);
   await p.screenshot({path:'/home/claude/shots/s-18-tilltable.png'});
