@@ -242,6 +242,26 @@ const srv=app.listen(4801,async()=>{
   // add an item so 'clear the day' has something real to prove it clears
   await p.evaluate(()=>{const it=document.querySelector('.item'); if(it) it.click();});
   await new Promise(r=>setTimeout(r,300));
+  // THE REAL BUG: David rang items in, left the booking, opened another,
+  // came back — the till had forgotten everything even though nothing
+  // was ever sent. Prove it now actually persists per booking.
+  console.log('ticket has item before leaving:', await p.evaluate(()=>ticket.length));
+  await p.evaluate(()=>{stack=[];go('home',false);}); await new Promise(r=>setTimeout(r,300));
+  await p.evaluate(()=>go('day')); await new Promise(r=>setTimeout(r,600));
+  await p.evaluate(()=>{const e=[...document.querySelectorAll('.ev')]
+    .find(x=>x.textContent.includes('Joy')); if(e) e.click();});   // a DIFFERENT booking
+  await new Promise(r=>setTimeout(r,500));
+  console.log('visited a different booking:', await p.evaluate(()=>bkNow && bkNow.customer_name));
+  await p.evaluate(()=>go('day')); await new Promise(r=>setTimeout(r,600));
+  await p.evaluate(()=>{const e=[...document.querySelectorAll('.ev')]
+    .find(x=>x.textContent.includes('Marcus')); if(e) e.click();});   // back to the original
+  await new Promise(r=>setTimeout(r,500));
+  const localBlock = await p.$eval('#bk', e=>e.textContent).catch(()=>'');
+  console.log('local addition survived the trip:', localBlock.includes('Added this session') ? 'yes ✓' : '✗ LOST');
+  await p.screenshot({path:'/home/claude/shots/s-21-persisted.png',fullPage:true});
+  await p.evaluate(()=>document.getElementById('bk-till').click());
+  await new Promise(r=>setTimeout(r,400));
+  console.log('ticket reloaded on return:', await p.evaluate(()=>ticket.length), '(should still be 1)');
   console.log('ticket before   :', await p.evaluate(()=>ticket.length), 'tillTable before:', await p.evaluate(()=>tillTable));
   await p.evaluate(()=>document.getElementById('tkclear').click());
   await new Promise(r=>setTimeout(r,300));

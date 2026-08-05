@@ -59,6 +59,19 @@ let me = null, view = 'login', stack = [], day = new Date(),
     bookings = [], floor = [], priceGroups = [], cat = null, ticket = [], tickWhere = 'Practice ticket',
     tillTable = null;
 
+/* [4 Aug] David: rang items into a table's till, went to another
+   booking, came back — the till had forgotten everything, even though
+   nothing was ever sent. Real people keep buying through a visit.
+   ticket alone is one shared scratchpad; localTickets keeps one PER
+   booking (or per table, if there's no booking behind it), so leaving
+   and returning shows exactly what was there. Still entirely local —
+   nothing here has ever been read from or written to Square. */
+let localTickets = {}, ticketKey = null, ticketKeyIsBooking = false;
+function loadTicketFor(key, isBooking) {
+  ticketKey = key; ticketKeyIsBooking = !!isBooking;
+  ticket = (key && localTickets[key]) ? localTickets[key] : [];
+}
+
 const $ = id => document.getElementById(id);
 const money = n => '£' + (n || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
@@ -129,6 +142,7 @@ function wireTablePicker(root, onPick) {
    immediate action instead. */
 function clearPracticeState() {
   ticket = []; tillTable = null; tickWhere = 'Practice ticket';
+  localTickets = {}; ticketKey = null; ticketKeyIsBooking = false;   // null BEFORE syncTicket, or it would re-save just this one
   marks = []; tableShot = null;
   syncTicket();
   if (view === 'bk' && bkNow) paintBooking();
@@ -212,6 +226,7 @@ function signIn(name, role) {
   me = { name, role, admin: ADMIN.some(r => (role || '').toLowerCase().includes(r)) };
   ticket = []; stack = [];                       // every login starts clean
   priceGroups = []; tillMode = null; parentCatSel = null; cat = null; tillTable = null; day = new Date();
+  localTickets = {}; ticketKey = null; ticketKeyIsBooking = false;
   $('who').textContent = name;
   go('home', false);
   if (!tablesLoaded) loadTables();               // real layout, once; falls back silently
@@ -372,7 +387,7 @@ async function loadFloor() {
   $('floor').innerHTML = h;
   $('floor').querySelectorAll('[data-t]').forEach(el => el.onclick = () => {
     const hit = byTable[el.dataset.t];
-    if (hit) openBooking(hit.b); else { tillTable = el.dataset.t; tickWhere = el.dataset.t; go('till'); }
+    if (hit) openBooking(hit.b); else { tillTable = el.dataset.t; tickWhere = el.dataset.t; loadTicketFor(el.dataset.t); go('till'); }
   });
 }
 
@@ -513,20 +528,38 @@ function paintBooking() {
           : `Not seated yet — lands here once someone's at the terminal`}</div>
     </div>
 
-    ${stepRow(1, 'On the table', items === undefined
-      ? '<div style="font-size:12.5px;color:var(--clay)">Reading the till…</div>'
-      : (items && items.length
-        ? `${items.map(i => `<div class="row"><div class="l">${esc(i.item_name || i.name || 'Item')}
+    ${(() => {
+      // Local additions persist per booking now (loadTicketFor), so this
+      // shows even when Square has nothing real yet — clearly its own
+      // subtotal, never folded into `total`, which stays strictly the
+      // real Square figure.
+      const localItems = (b.booking_code && localTickets[b.booking_code]) || [];
+      const localTotal = localItems.reduce((s, i) => s + i.p, 0);
+      const localBlock = localItems.length ? `
+        <div style="margin-top:12px;padding-top:12px;border-top:1.5px dashed var(--line)">
+          <div class="k" style="margin-bottom:6px">Added this session — not sent</div>
+          ${localItems.map(i => `<div class="row" style="padding:6px 0">
+            <div class="l" style="font-size:12.5px">${esc(i.n)}</div>
+            <div class="v" style="font-size:13px">${money(i.p)}</div></div>`).join('')}
+          <div class="row" style="border-top:1px solid var(--line);border-bottom:none;padding-top:6px">
+            <div class="l" style="font-weight:700;font-size:12.5px">Local subtotal</div>
+            <div class="v" style="font-weight:800">${money(localTotal)}</div></div>
+        </div>` : '';
+      return stepRow(1, 'On the table', items === undefined
+        ? '<div style="font-size:12.5px;color:var(--clay)">Reading the till…</div>'
+        : (items && items.length
+          ? `${items.map(i => `<div class="row"><div class="l">${esc(i.item_name || i.name || 'Item')}
              ${(i.qty || i.quantity) > 1 ? ' ×' + (i.qty || i.quantity) : ''}</div>
              <div class="v">${money((i.price_cents != null ? i.price_cents/100 : i.price || 0) * (i.qty || i.quantity || 1))}</div></div>`).join('')}
            <div class="row" style="border-top:1.5px solid var(--line);border-bottom:none">
              <div class="l" style="font-weight:800">Total</div>
              <div class="fig" style="font-size:22px">${money(total)}</div></div>
-           <button class="btn ghost" id="bk-till">Open the till</button>`
-        : `<div style="font-size:12.5px;color:var(--clay);margin-bottom:10px">Nothing rung up against this booking yet.
+           <button class="btn ghost" id="bk-till">Open the till</button>${localBlock}`
+          : `<div style="font-size:12.5px;color:var(--clay);margin-bottom:10px">Nothing rung up against this booking yet.
            It appears here as the girls add pieces and drinks at the terminal.</div>
-           <button class="btn ghost" id="bk-till" style="margin-top:0">Open the till</button>`),
-      !!(items && items.length))}
+           <button class="btn ghost" id="bk-till" style="margin-top:0">Open the till</button>${localBlock}`),
+        !!(items && items.length));
+    })()}
 
     ${hasPieces ? `
     ${stepRow(2, 'Her pieces', `${pieces.map(p => `<div class="row"><div style="flex:1">
@@ -578,6 +611,7 @@ function paintBooking() {
   if (tillBtn) tillBtn.onclick = () => {
     tillTable = b.table_number != null ? 'Table ' + b.table_number : null;
     tickWhere = (b.customer_name || 'Booking') + (tillTable ? ' · ' + tillTable : '');
+    loadTicketFor(b.booking_code || null, true);
     go('till');
   };
   const shot = $('bkshot');
@@ -748,6 +782,12 @@ function paintTillTable() {
     wireTablePicker(el, name => {
       tillTable = name;
       if (tickWhere === 'Practice ticket' || !tickWhere) tickWhere = short(name);
+      // A booking-owned ticket (arrived via a booking's Open the till,
+      // even one not yet seated) keeps belonging to that booking no
+      // matter what table gets picked here — this is only a display
+      // label. Only a table-only session (Floor / direct Till, no
+      // booking behind it) may re-key itself to a newly picked table.
+      if (!ticketKeyIsBooking) loadTicketFor(name);
       paintTillTable(); syncTicket();
     });
   }
@@ -840,6 +880,7 @@ function sendTicket() {
 }
 
 function syncTicket() {
+  if (ticketKey) localTickets[ticketKey] = ticket;   // one choke point, called after every add/remove
   const show = view === 'till' && ticket.length > 0;
   $('ticket').classList.toggle('up', show);
   $('tkwhere').textContent = tickWhere;
