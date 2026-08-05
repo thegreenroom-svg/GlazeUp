@@ -144,7 +144,13 @@ const srv=app.listen(4801,async()=>{
   console.log('landed on view  :', await p.evaluate(()=>view));
   console.log('landed on       :', await p.$eval('#bk .card',e=>e.textContent.trim().slice(0,40)).catch(()=>'NOTHING ✗'));
   await p.screenshot({path:'/home/claude/shots/s-16-onehop.png',fullPage:true});
-  await p.evaluate(()=>{stack=[];go('home',false);});
+  // EVERY PAGE NEEDS A WAY HOME: from three levels deep (search -> a
+  // real booking), one tap on the explicit home icon, not the stack.
+  console.log('home icon visible on a nested page:', (await p.$eval('#hometap2',e=>e.classList.contains('on'))) ? 'yes' : 'NO ✗');
+  await p.evaluate(()=>document.getElementById('hometap2').click());
+  await new Promise(r=>setTimeout(r,400));
+  console.log('home icon -> view:', await p.evaluate(()=>view), await p.evaluate(()=>view)==='home' ? '(one tap ✓)' : '✗');
+  console.log('home icon hidden on home:', (await p.$eval('#hometap2',e=>e.classList.contains('on'))) ? '✗ STILL SHOWING' : 'yes, hidden ✓');
   for(const v of ['floor','day','till','pack','money']){
     await p.evaluate(x=>go(x),v); await new Promise(r=>setTimeout(r,700)); await shot('3-'+v);
   }
@@ -275,6 +281,34 @@ const srv=app.listen(4801,async()=>{
   console.log('team read      :', names.join(', '));
   console.log('guard test     :', blocked);
   console.log('unsanctioned writes:', writes.length? '✗ '+writes.join(', ') : 'NONE ✓');
+
+  // FLOOR CALENDAR: forward/back arrows, and Floor + Bookings share one
+  // date so paging one moves the other.
+  const bookingDates = [];
+  p.on('request', req => {
+    const u = req.url();
+    if (u.includes('/api/bookings/day')) bookingDates.push(new URL(u).searchParams.get('date'));
+  });
+  await p.evaluate(()=>{stack=[];go('home',false);}); await new Promise(r=>setTimeout(r,300));
+  await p.evaluate(()=>go('floor')); await new Promise(r=>setTimeout(r,500));
+  const todayLbl = await p.$eval('#flbl', e=>e.textContent);
+  console.log('floor label     :', todayLbl);
+  await p.evaluate(()=>document.getElementById('fnext').click());
+  await new Promise(r=>setTimeout(r,500));
+  const nextLbl = await p.$eval('#flbl', e=>e.textContent);
+  console.log('floor +1 day    :', nextLbl, nextLbl !== todayLbl ? '(changed ✓)' : '✗ DID NOT CHANGE');
+  await p.evaluate(()=>go('day')); await new Promise(r=>setTimeout(r,500));
+  const bookingsLbl = await p.$eval('#daylbl', e=>e.textContent);
+  console.log('bookings shows  :', bookingsLbl, bookingsLbl === nextLbl ? '(shared with floor ✓)' : '✗ OUT OF SYNC');
+  await p.evaluate(()=>go('floor')); await new Promise(r=>setTimeout(r,300));
+  await p.evaluate(()=>{document.getElementById('fprev').click(); document.getElementById('fprev').click();});
+  await new Promise(r=>setTimeout(r,500));
+  const pastLbl = await p.$eval('#flbl', e=>e.textContent);
+  const pastErr = await p.$('#floor .err');
+  console.log('floor -1 day    :', pastLbl, pastErr ? '✗ ERRORED' : '(no crash ✓)');
+  console.log('dates requested :', bookingDates.join(', '));
+  await p.screenshot({path:'/home/claude/shots/s-20-floor-calendar.png'});
+  await p.evaluate(()=>{stack=[];go('home',false);});
 
   // separately prove the empty-floor case, on a server with no bookings at all
   const app2=require('express')(); app2.use(express.json());

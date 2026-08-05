@@ -11,11 +11,11 @@
 
 <header class="bar">
   <button class="back" id="back" aria-label="Back">‹</button>
-  <button id="hometap" style="flex:1;min-width:0;background:none;border:none;padding:0;
-    text-align:left;font:inherit;color:inherit;cursor:pointer">
+  <button class="homeicon" id="hometap2" aria-label="Home">⌂</button>
+  <div style="flex:1;min-width:0">
     <h1 id="ttl">The Kiln Cafe</h1>
     <div class="sub" id="sub"></div>
-  </button>
+  </div>
   <div class="who" id="who"></div>
 </header>
 
@@ -47,10 +47,15 @@
 
   <!-- FLOOR -->
   <section class="pane" id="p-floor">
+    <div class="dayctl">
+      <button id="fprev" aria-label="Previous day">←</button>
+      <div class="lbl" id="flbl">—</div>
+      <button id="fnext" aria-label="Next day">→</button>
+    </div>
     <div id="floor"><div class="empty">Reading the floor…</div></div>
     <div class="legend">
       <span><i class="dot" style="background:var(--live)"></i>Painting now</span>
-      <span><i class="dot" style="background:var(--soon)"></i>Booked in later</span>
+      <span><i class="dot" style="background:var(--soon)"></i>Booked in</span>
       <span><i class="dot" style="background:var(--line)"></i>Free</span>
     </div>
   </section>

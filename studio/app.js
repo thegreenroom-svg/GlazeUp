@@ -169,6 +169,7 @@ function go(v, push = true) {
   const [t, s] = PANES[v] || ['', ''];
   $('ttl').textContent = t; $('sub').textContent = s;
   $('back').classList.toggle('on', v !== 'login' && v !== 'home');
+  $('hometap2').classList.toggle('on', v !== 'login' && v !== 'home');
   $('main').scrollTop = 0;
   syncTicket();
   if (v === 'floor') loadFloor();
@@ -211,7 +212,7 @@ const ADMIN = ['general manager', 'co-director', 'studio executive', 'director']
 function signIn(name, role) {
   me = { name, role, admin: ADMIN.some(r => (role || '').toLowerCase().includes(r)) };
   ticket = []; stack = [];                       // every login starts clean
-  priceGroups = []; tillMode = null; parentCatSel = null; cat = null; tillTable = null;
+  priceGroups = []; tillMode = null; parentCatSel = null; cat = null; tillTable = null; day = new Date();
   $('who').textContent = name;
   go('home', false);
   if (!tablesLoaded) loadTables();               // real layout, once; falls back silently
@@ -308,11 +309,13 @@ async function countUp() {
 
 /* ── floor ───────────────────────────────────────────────────────── */
 async function loadFloor() {
+  $('flbl').textContent = DAYNAME(day);
+  const isToday = isoDay(day) === isoDay(new Date());
   try {
-    const d = await read('/api/bookings/day', { date: isoDay(new Date()) });
+    const d = await read('/api/bookings/day', { date: isoDay(day) });
     bookings = d.bookings || [];
   } catch (e) {
-    $('floor').innerHTML = `<div class="err">Couldn't read today's bookings. ${esc(e.message)}</div>`;
+    $('floor').innerHTML = `<div class="err">Couldn't read that day's bookings. ${esc(e.message)}</div>`;
     return;
   }
   const now = Date.now();
@@ -320,7 +323,12 @@ async function loadFloor() {
   bookings.forEach(b => {
     const s = b.session_start ? new Date(b.session_start).getTime() : 0;
     const e = b.session_end ? new Date(b.session_end).getTime() : s + 2 * 36e5;
-    const state = (s && s <= now && e >= now) ? 'live' : (s > now ? 'soon' : 'past');
+    // 'Live now' only means anything when looking at today. Any other
+    // day — forward or back — just shows what's booked in, with no
+    // claim about whether it's happening this second.
+    const state = isToday
+      ? ((s && s <= now && e >= now) ? 'live' : (s > now ? 'soon' : 'past'))
+      : (s ? 'soon' : 'past');
     if (state === 'past') return;
     let t = b.table_number != null ? String(b.table_number) : null;
     if (t && /^\d+$/.test(t)) t = 'Table ' + t;
@@ -335,8 +343,8 @@ async function loadFloor() {
   let h = '';
   if (!bookings.length) {
     h += `<div class="note" style="margin-bottom:16px">
-      Nothing booked in today — ${DAYNAME(new Date())}. The tables below are real,
-      just empty. Try Bookings and page forward to see a busier day.</div>`;
+      Nothing booked in — ${DAYNAME(day)}. The tables below are real,
+      just empty. Use the arrows above to look at another day.</div>`;
   }
   ['Main Studio', 'Lounge', 'The Vault'].forEach(room => {
     const inRoom = TABLES.filter(t => t[1] === room);
@@ -434,7 +442,10 @@ async function loadDay() {
   $('daynote').innerHTML = `<div class="note">${list.length} booked${d.covers ? ' · ' + d.covers + ' covers' : ''}.
     Columns are tables, as Square has them.</div>`;
 }
-function shift(n) { day = new Date(day.getTime() + n * 864e5); loadDay(); }
+function shift(n) {
+  day = new Date(day.getTime() + n * 864e5);
+  if (view === 'floor') loadFloor(); else loadDay();
+}
 
 /* ── booking: the whole session on one screen ────────────────────────
    [stated] Daisy: "where does it go from here? Where's the workflow?
@@ -1215,9 +1226,11 @@ function paintMoney() {
 $('back').onclick = back;
 // The masthead is the way home from anywhere — no permanent bar taking up
 // the bottom of a phone, and nothing that looks like the old app's dock.
-$('hometap').onclick = () => { if (me && view !== 'login') { stack = []; go('home', false); } };
+$('hometap2').onclick = () => { if (me && view !== 'login') { stack = []; go('home', false); } };
 $('prev').onclick = () => shift(-1);
 $('next').onclick = () => shift(1);
+$('fprev').onclick = () => shift(-1);
+$('fnext').onclick = () => shift(1);
 $('tkclear').onclick = clearPracticeState;
 $('tksend').onclick = sendTicket;
 wireFind();

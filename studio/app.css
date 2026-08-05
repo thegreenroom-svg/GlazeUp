@@ -30,6 +30,11 @@ body{background:var(--paper);color:var(--ink);font-family:var(--ui);
 .back{min-width:var(--tap);min-height:44px;border:none;background:none;color:var(--clay);
   font-size:26px;cursor:pointer;display:none;align-items:center;padding:0;margin-left:-8px}
 .back.on{display:flex}
+.homeicon{min-width:38px;min-height:38px;border:1.5px solid var(--line);background:var(--card);
+  color:var(--brick);font-size:17px;border-radius:11px;cursor:pointer;display:none;
+  align-items:center;justify-content:center;margin-right:8px;flex-shrink:0}
+.homeicon.on{display:flex}
+.homeicon:active{background:var(--brick);color:#fff;border-color:var(--brick)}
 .bar h1{font-family:var(--serif);font-weight:900;font-size:18px;letter-spacing:-.01em;flex:1}
 .bar .sub{font-size:11.5px;color:var(--clay);font-weight:600;margin-top:1px}
 .who{font-size:11px;font-weight:700;color:var(--mute);white-space:nowrap}
