@@ -495,6 +495,7 @@ function paintBooking() {
     s + ((i.price_cents != null ? i.price_cents / 100 : (i.price || 0)) * (i.qty || i.quantity || 1)), 0) : 0;
 
   const withPhoto = pieces ? pieces.filter(p => p.reference_photo_url).length : 0;
+  const hasPieces = !!(pieces && pieces.length);
 
   $('bk').innerHTML = `
     <div class="card">
@@ -527,47 +528,49 @@ function paintBooking() {
            <button class="btn ghost" id="bk-till" style="margin-top:0">Open the till</button>`),
       !!(items && items.length))}
 
-    ${stepRow(3, 'Her pieces', pieces === undefined
-      ? '<div style="font-size:12.5px;color:var(--clay)">Reading…</div>'
-      : (pieces && pieces.length
-        ? `${pieces.map(p => `<div class="row"><div style="flex:1">
+    ${hasPieces ? `
+    ${stepRow(3, 'Her pieces', `${pieces.map(p => `<div class="row"><div style="flex:1">
              <div class="l">${esc(p.piece_type || 'Piece')}</div>
              <div class="m">${p.reference_photo_url ? 'Photographed' : 'No photograph yet'}</div></div>
              ${p.reference_photo_url ? `<img src="${esc(p.reference_photo_url)}" alt=""
                style="width:44px;height:44px;object-fit:cover;border-radius:9px;
                border:1px solid var(--line)">` : '<div class="v" style="color:var(--mute)">○</div>'}</div>`).join('')}
            <div style="font-size:11.5px;color:var(--clay);margin-top:8px">
-             ${withPhoto} of ${pieces.length} photographed</div>`
-        : `<div style="font-size:12.5px;color:var(--clay)">No pieces yet. They are created by
-           photographing the table at the end of the session — below.</div>`),
-      !!(pieces && pieces.length && withPhoto === pieces.length))}
+             ${withPhoto} of ${pieces.length} photographed</div>`,
+      withPhoto === pieces.length)}
 
     ${stepRow(4, 'Find them on the shelf',
-      (pieces && pieces.length)
-        ? `<div style="font-size:12.5px;color:var(--clay);margin-bottom:9px">Photograph a tray or
+      `<div style="font-size:12.5px;color:var(--clay);margin-bottom:9px">Photograph a tray or
              shelf. Whatever of hers is in the picture gets circled.</div>
            <label class="btn" style="display:flex;align-items:center;justify-content:center;
              cursor:pointer;margin-top:0" for="bkshot">Photograph a tray or shelf</label>
            <input type="file" id="bkshot" accept="image/*" capture="environment" style="display:none">
            <div style="font-size:10.5px;color:var(--clay);text-align:center;margin-top:8px">
              About 0.3p a photo · ${spend ? spend.toFixed(1) + 'p this session' : 'nothing spent yet'}</div>
-           <div id="bkfound"></div>`
-        : `<div style="font-size:12.5px;color:var(--clay)">Nothing to look for until her pieces
-           are photographed at the end of the session.</div>`,
+           <div id="bkfound"></div>`,
       false)}
-
-    ${(!pieces || !pieces.length)
-      ? `<div class="card" style="border-left:4px solid var(--warn)">
-          <h2>Photograph the table</h2>
+    ` : (pieces === undefined ? `
+    <div class="card" style="border-left:4px solid var(--line)">
+      <div style="display:flex;gap:10px;align-items:baseline">
+        <span style="font-family:var(--serif);font-weight:900;font-size:13px;color:var(--mute);min-width:16px">3</span>
+        <div style="flex:1"><h2 style="margin-bottom:6px">Her pieces</h2>
+        <div style="font-size:12.5px;color:var(--clay)">Reading…</div></div></div></div>
+    ` : `
+    <div class="card" style="border-left:4px solid var(--warn)">
+      <div style="display:flex;gap:10px;align-items:baseline">
+        <span style="font-family:var(--serif);font-weight:900;font-size:13px;color:var(--warn);min-width:16px">3</span>
+        <div style="flex:1">
+          <h2 style="margin-bottom:6px">Photograph the table</h2>
           <div style="font-size:12.5px;color:var(--clay);line-height:1.55;margin-bottom:10px">
-            Taken from inside this booking, so it already knows whose pieces these are —
-            no chalk tag to write, none to read. Tap each piece in the photo and each one
-            gets its own picture, which is what makes it findable on the shelf later.</div>
+            No pieces yet — taken from inside this booking, so it already knows whose these
+            are, no chalk tag to write, none to read. Tap each piece in the photo and each one
+            gets its own picture, which is what makes it findable on the shelf afterwards.</div>
           <label class="btn" style="display:flex;align-items:center;justify-content:center;
             cursor:pointer;margin-top:0" for="tableshot">Photograph the table</label>
           <input type="file" id="tableshot" accept="image/*" capture="environment" style="display:none">
           <div id="tablemark"></div>
-        </div>` : ''}
+        </div></div></div>
+    `)}
 
     <div class="note">Read-only — this booking can't be changed from here. Use Square for anything real.</div>`;
 

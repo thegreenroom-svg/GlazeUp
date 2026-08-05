@@ -187,6 +187,9 @@ const srv=app.listen(4801,async()=>{
   await new Promise(r=>setTimeout(r,900));
   await p.screenshot({path:'/home/claude/shots/s-8-workflow.png',fullPage:true});
   console.log('workflow steps  :', await p.$$eval('#bk .card h2',e=>e.map(x=>x.textContent).join(' | ')));
+  const withPiecesH2s = await p.$$eval('#bk .card h2', e=>e.map(x=>x.textContent));
+  console.log('has-pieces booking shows both real steps:',
+    (withPiecesH2s.includes('Her pieces') && withPiecesH2s.includes('Find them on the shelf')) ? 'yes ✓' : '✗');
   console.log('till total shown:', await p.$eval('#bk .fig',e=>e.textContent).catch(()=>'none'));
 
   // a booking with no pieces yet -> the photograph-the-table step
@@ -221,6 +224,12 @@ const srv=app.listen(4801,async()=>{
     .find(x=>x.textContent.includes('Marcus')); if(e) e.click();});
   await new Promise(r=>setTimeout(r,600));
   console.log('no picker on bk :', (await p.$('#bk .pickt')) ? '✗ STILL THERE' : 'yes, gone ✓');
+  // David: steps 3/4 as two inert placeholders were "irrelevant" — should
+  // collapse to ONE real next step (Photograph the table) when there's
+  // nothing yet, and only show as two real steps once pieces exist.
+  const bkH2s = await p.$$eval('#bk .card h2', e=>e.map(x=>x.textContent));
+  console.log('no-pieces steps :', bkH2s.join(' | '));
+  console.log('  one merged 3, no bare 4:', (bkH2s.includes('Photograph the table') && !bkH2s.includes('Find them on the shelf')) ? 'yes ✓' : '✗');
   await p.screenshot({path:'/home/claude/shots/s-17-plan.png',fullPage:true});
   await p.evaluate(()=>document.querySelector('#bk-till').click());
   await new Promise(r=>setTimeout(r,400));
