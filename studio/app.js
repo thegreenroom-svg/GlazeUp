@@ -506,14 +506,14 @@ function paintBooking() {
         (${Math.floor(mins/60)} hr${Math.floor(mins/60)===1?'':'s'} ${mins%60} mins)</span>` : ''}</div>
         <div style="font-size:13px;font-weight:600">${DAYNAME(st)}</div>` : ''}
       <div style="font-size:12px;color:var(--clay);margin-top:6px">${esc(b.space_name || '')}</div>
+      <div style="font-size:12px;font-weight:700;margin-top:9px;padding-top:9px;
+        border-top:1px solid var(--line);color:${seated ? 'var(--soon)' : 'var(--clay)'}">
+        ${seated
+          ? `Seated · Table ${esc(b.table_number)}${b.party_size ? ' · ' + b.party_size + ' painting' : ''}`
+          : `Not seated yet — lands here once someone's at the terminal`}</div>
     </div>
 
-    ${stepRow(1, 'Seated', seated
-      ? `<div class="l">Table ${esc(b.table_number)}${b.party_size ? ' · ' + b.party_size + ' painting' : ''}</div>`
-      : `<div style="font-size:12.5px;color:var(--clay)">Not seated yet — that lands here once
-         someone's seated at the terminal, since Square Appointments has no table on it.</div>`, seated)}
-
-    ${stepRow(2, 'On the table', items === undefined
+    ${stepRow(1, 'On the table', items === undefined
       ? '<div style="font-size:12.5px;color:var(--clay)">Reading the till…</div>'
       : (items && items.length
         ? `${items.map(i => `<div class="row"><div class="l">${esc(i.item_name || i.name || 'Item')}
@@ -529,7 +529,7 @@ function paintBooking() {
       !!(items && items.length))}
 
     ${hasPieces ? `
-    ${stepRow(3, 'Her pieces', `${pieces.map(p => `<div class="row"><div style="flex:1">
+    ${stepRow(2, 'Her pieces', `${pieces.map(p => `<div class="row"><div style="flex:1">
              <div class="l">${esc(p.piece_type || 'Piece')}</div>
              <div class="m">${p.reference_photo_url ? 'Photographed' : 'No photograph yet'}</div></div>
              ${p.reference_photo_url ? `<img src="${esc(p.reference_photo_url)}" alt=""
@@ -539,7 +539,7 @@ function paintBooking() {
              ${withPhoto} of ${pieces.length} photographed</div>`,
       withPhoto === pieces.length)}
 
-    ${stepRow(4, 'Find them on the shelf',
+    ${stepRow(3, 'Find them on the shelf',
       `<div style="font-size:12.5px;color:var(--clay);margin-bottom:9px">Photograph a tray or
              shelf. Whatever of hers is in the picture gets circled.</div>
            <label class="btn" style="display:flex;align-items:center;justify-content:center;
@@ -552,13 +552,13 @@ function paintBooking() {
     ` : (pieces === undefined ? `
     <div class="card" style="border-left:4px solid var(--line)">
       <div style="display:flex;gap:10px;align-items:baseline">
-        <span style="font-family:var(--serif);font-weight:900;font-size:13px;color:var(--mute);min-width:16px">3</span>
+        <span style="font-family:var(--serif);font-weight:900;font-size:13px;color:var(--mute);min-width:16px">2</span>
         <div style="flex:1"><h2 style="margin-bottom:6px">Her pieces</h2>
         <div style="font-size:12.5px;color:var(--clay)">Reading…</div></div></div></div>
     ` : `
     <div class="card" style="border-left:4px solid var(--warn)">
       <div style="display:flex;gap:10px;align-items:baseline">
-        <span style="font-family:var(--serif);font-weight:900;font-size:13px;color:var(--warn);min-width:16px">3</span>
+        <span style="font-family:var(--serif);font-weight:900;font-size:13px;color:var(--warn);min-width:16px">2</span>
         <div style="flex:1">
           <h2 style="margin-bottom:6px">Photograph the table</h2>
           <div style="font-size:12.5px;color:var(--clay);line-height:1.55;margin-bottom:10px">
