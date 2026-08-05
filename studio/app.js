@@ -1,15 +1,24 @@
 /* ══════════════════════════════════════════════════════════════════
    THE KILN CAFE — studio app. 4 Aug 2026, built from scratch.
 
-   READ-ONLY BY CONSTRUCTION. Daisy's instruction: show the live data,
-   let people move around it, but never send anything back to Square,
-   the bookings or the till. That is not a convention here — the
-   fetch wrapper below physically refuses any request that is not a
-   GET, and refuses any URL not on the allow-list. A write cannot be
+   READ-ONLY AGAINST THE BUSINESS. Daisy's instruction: show the live
+   data, let people move around it, but never send anything back to
+   Square, the bookings or the till. The fetch wrapper below (read())
+   physically refuses any request that is not a GET, and refuses any
+   URL not on the allow-list — a write to any of THAT data cannot be
    made from this app even by mistake.
 
-   Nothing persists. No storage, no cookies. Log in again and you get
-   the live data fresh, with every practice tap cleared.
+   One deliberate exception, added 4 Aug: David asked for a real login
+   with real per-person codes, directors able to reset one another's.
+   That needs to actually write — but only to staff_pins, never to a
+   booking, the till or Square. Kept in a completely separate function
+   (writePin, below read()) rather than folded into read()'s allow-list,
+   so the boundary between "the read-only data layer" and "the one
+   place this app is allowed to touch something real" stays visible in
+   the code's shape, not just a comment.
+
+   Nothing else persists. No storage, no cookies. Log in again and you
+   get the live data fresh, with every practice tap cleared.
    ══════════════════════════════════════════════════════════════════ */
 'use strict';
 
@@ -46,6 +55,33 @@ async function read(path, params = {}) {
 const SEARCH_PATH = '/api/packing/find-listed';
 async function search(body) {
   const r = await fetch(API + SEARCH_PATH, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...body, studioId: STUDIO }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || ('the server answered ' + r.status));
+  return d;
+}
+
+/* THE ONE PLACE THIS APP WRITES ANYTHING REAL, and it is deliberate.
+   David: "an actual login for everyone, their own code, admin can
+   reset it." That's staff identity, not business data — never a
+   booking, never the till, never Square. Three endpoints only, none
+   of them reachable through read()'s guard:
+     verify-pin  — checks a PIN, changes nothing (kept separate from
+                   shift-login on the server specifically so /studio
+                   never has to clock anyone in for real just to
+                   confirm who they are)
+     set-pin     — a staff member choosing their own PIN, first time
+     reset-pin   — director-only, needs the director's OWN PIN, clears
+                   someone else's so they can set a new one
+   Every other write this app could make — seating someone, ringing
+   something up, saving a piece — is still refused, unchanged. */
+const PIN_WRITES = ['/api/staff/verify-pin', '/api/staff/set-pin', '/api/staff/reset-pin'];
+async function writePin(path, body) {
+  if (!PIN_WRITES.includes(path))
+    throw new Error('Blocked: ' + path + ' is not a write this app is allowed to make.');
+  const r = await fetch(API + path, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...body, studioId: STUDIO }),
   });
@@ -180,6 +216,7 @@ const PANES = {
   till:  ['Till', 'Real prices — nothing is sent'],
   pack:  ['Packing', 'Pieces waiting to go home'],
   money: ['Money', 'Live from Square'],
+  pins:  ['Staff PINs', 'Director-only'],
 };
 
 function go(v, push = true) {
@@ -198,6 +235,7 @@ function go(v, push = true) {
   if (v === 'till') loadTill();
   if (v === 'pack') loadPack();
   if (v === 'money') loadMoney();
+  if (v === 'pins') loadPins();
   if (v === 'home') loadHome();
 }
 function back() { go(stack.pop() || 'home', false); }
@@ -209,18 +247,22 @@ function greeting() {
 }
 async function loadLogin() {
   $('greet').textContent = greeting();
+  $('pinpanel').innerHTML = '';
   try {
     const d = await read('/api/staff/team-for-login');
     const team = (d.team || d.members || d || []).filter(p => p && p.name);
     if (!team.length) throw new Error('No team came back.');
     $('people').innerHTML = team.map(p => `
-      <button class="person" data-id="${esc(p.id)}" data-name="${esc(p.name)}" data-role="${esc(p.role || '')}">
+      <button class="person" data-id="${esc(p.id)}" data-name="${esc(p.name)}" data-role="${esc(p.role || '')}"
+        data-pin="${p.hasPinSet ? '1' : '0'}">
         <span class="n">${esc(p.name)}</span>
         <span class="r">${esc(p.role || '')}</span>
         ${p.onShift || p.on_shift ? '<span class="on-shift">ON SHIFT</span>' : ''}
       </button>`).join('');
-    $('people').querySelectorAll('.person').forEach(b =>
-      b.onclick = () => signIn(b.dataset.name, b.dataset.role));
+    $('people').querySelectorAll('.person').forEach(b => {
+      const p = { id: b.dataset.id, name: b.dataset.name, role: b.dataset.role };
+      b.onclick = () => (b.dataset.pin === '1') ? paintPin(p) : paintSetPin(p);
+    });
   } catch (e) {
     $('people').innerHTML = `<div class="err" style="grid-column:1/-1">Couldn't reach the studio.
       ${esc(e.message)}<br><br>You can still look around, but nothing will be live.</div>
@@ -229,9 +271,59 @@ async function loadLogin() {
     $('fallback').onclick = () => signIn('there', '');
   }
 }
+
+/* [4 Aug] David: "an actual login for everyone, with their own code."
+   Tap a name -> if they've set a PIN before, prove it's them; if not,
+   let them choose one now. Either way ends the same place signIn()
+   always has. writePin's guard is the only thing that can reach these
+   three endpoints — nothing else in the app can. */
+function pinShell(p, heading, sub, buttonLabel) {
+  $('people').innerHTML = '';
+  $('pinpanel').innerHTML = `
+    <div style="text-align:center;padding:20px 18px 8px">
+      <div style="font-family:var(--serif);font-weight:900;font-size:22px">${esc(p.name)}</div>
+      <div style="font-size:12.5px;color:var(--clay);margin:4px 0 2px">${heading}</div>
+      ${sub ? `<div style="font-size:11px;color:var(--clay);margin-bottom:14px">${sub}</div>` : '<div style="margin-bottom:14px"></div>'}
+      <input type="password" inputmode="numeric" pattern="[0-9]*" id="pinentry" maxlength="6"
+        style="width:170px;text-align:center;font-size:24px;letter-spacing:.35em;padding:12px 8px;
+        border:1.5px solid var(--line);border-radius:12px;font-family:var(--ui);background:var(--card)">
+      <div id="pinerr" style="color:var(--brick);font-size:12px;margin-top:10px;min-height:16px"></div>
+      <button class="btn" id="pingo" style="margin-top:10px;max-width:230px;margin-left:auto;margin-right:auto">${buttonLabel}</button>
+      <button class="btn ghost" id="pinback" style="margin-top:8px;max-width:230px;margin-left:auto;margin-right:auto">Not you? Go back</button>
+    </div>`;
+  $('pinback').onclick = () => loadLogin();
+  const entry = $('pinentry'); entry.focus();
+  entry.onkeydown = e => { if (e.key === 'Enter') $('pingo').click(); };
+  return entry;
+}
+function paintPin(p) {
+  pinShell(p, 'Enter your PIN', '', 'Continue');
+  $('pingo').onclick = async () => {
+    const pin = $('pinentry').value.trim();
+    if (!pin) return;
+    $('pinerr').textContent = '';
+    try {
+      const d = await writePin('/api/staff/verify-pin', { staffMemberId: p.id, pin });
+      if (d.ok) signIn(p.name, p.role, p.id);
+      else { $('pinerr').textContent = 'Wrong PIN — try again.'; $('pinentry').value = ''; $('pinentry').focus(); }
+    } catch (e) { $('pinerr').textContent = e.message; }
+  };
+}
+function paintSetPin(p) {
+  pinShell(p, 'No PIN set yet — choose one now', '4 to 6 digits, whatever you\'ll remember', 'Set PIN');
+  $('pingo').onclick = async () => {
+    const pin = $('pinentry').value.trim();
+    if (!/^\d{4,6}$/.test(pin)) { $('pinerr').textContent = '4 to 6 digits.'; return; }
+    try {
+      const d = await writePin('/api/staff/set-pin', { staffMemberId: p.id, pin });
+      if (d.ok) signIn(p.name, p.role, p.id);
+      else $('pinerr').textContent = d.error || 'Could not set a PIN.';
+    } catch (e) { $('pinerr').textContent = e.message; }
+  };
+}
 const ADMIN = ['general manager', 'co-director', 'studio executive', 'director'];
-function signIn(name, role) {
-  me = { name, role, admin: ADMIN.some(r => (role || '').toLowerCase().includes(r)) };
+function signIn(name, role, id) {
+  me = { name, role, id, admin: ADMIN.some(r => (role || '').toLowerCase().includes(r)) };
   ticket = []; stack = [];                       // every login starts clean
   priceGroups = []; tillMode = null; parentCatSel = null; cat = null; tillTable = null; day = new Date();
   localTickets = {}; ticketKey = null; ticketKeyIsBooking = false; localPieces = {};
@@ -299,6 +391,7 @@ async function loadHome() {
     ['pack',  '◲', 'Packing', 'Pieces waiting to go home', 'packN'],
   ];
   if (me && me.admin) t.push(['money', '£', 'Money', 'Takings, live from Square', 'moneyN']);
+  if (me && me.admin) t.push(['pins', '••', 'Staff PINs', 'Set or reset someone\'s code', null]);
   $('hometiles').innerHTML = t.map(([v, ic, title, sub, slot]) => `
     <button class="tile" data-go="${v}">
       <span class="ic">${ic}</span>
@@ -1206,6 +1299,71 @@ const readFile = f => new Promise((ok, no) => {
    Square categories. Both are reads. Nothing is pulled on demand —
    the screen loads once and the ranges just re-slice what it has. */
 let hist = null, brk = null, range = '30d';
+
+/* ── staff PINs (director-only) ──────────────────────────────────────
+   [4 Aug] David: "admin can reset it for them... just an admin
+   function, for the directors." Reading the list is a normal read;
+   resetting someone's PIN goes through writePin's narrow gate, and
+   the server itself still requires the ACTING director's own PIN to
+   prove who they are before it clears anything — this screen can't
+   bypass that, and doesn't try to. If a director forgets their own
+   PIN, this can't get them back in either; that's the server's own
+   design (set-pin's own message says the same: ask your manager),
+   not a gap to route around here. */
+let pinsTeam = [];
+async function loadPins() {
+  try {
+    const d = await read('/api/staff/team-for-login');
+    pinsTeam = (d.team || []).filter(p => p && p.name);
+    paintPins();
+  } catch (e) {
+    $('pins').innerHTML = `<div class="err">Couldn't read the team. ${esc(e.message)}</div>`;
+  }
+}
+function paintPins(msg) {
+  $('pins').innerHTML = `
+    ${msg ? `<div class="note" style="margin-bottom:12px">${msg}</div>` : ''}
+    <div class="card">
+      ${pinsTeam.map(p => `<div class="row"><div style="flex:1">
+          <div class="l">${esc(p.name)}</div>
+          <div class="m">${esc(p.role || '')} · ${p.hasPinSet ? 'PIN set' : 'No PIN yet'}</div></div>
+          ${p.hasPinSet ? `<button class="chip" data-reset="${esc(p.id)}" data-name="${esc(p.name)}"
+            style="min-height:34px;padding:6px 12px">Reset</button>` : ''}
+        </div>`).join('')}
+    </div>
+    <div id="resetbox"></div>
+    <div class="note">Resetting clears their PIN — they'll choose a new one next time they
+      log in. This needs YOUR own PIN to confirm it's really you.</div>`;
+  $('pins').querySelectorAll('[data-reset]').forEach(b =>
+    b.onclick = () => paintResetConfirm(b.dataset.reset, b.dataset.name));
+}
+function paintResetConfirm(targetId, targetName) {
+  $('resetbox').innerHTML = `
+    <div class="card">
+      <h2>Reset ${esc(targetName)}'s PIN</h2>
+      <div style="font-size:12px;color:var(--clay);margin-bottom:10px">Enter your own PIN to confirm.</div>
+      <input type="password" inputmode="numeric" pattern="[0-9]*" id="resetpin" maxlength="6"
+        style="width:100%;text-align:center;font-size:20px;letter-spacing:.3em;padding:10px;
+        border:1.5px solid var(--line);border-radius:12px;font-family:var(--ui);background:var(--paper)">
+      <div id="reseterr" style="color:var(--brick);font-size:12px;margin-top:8px;min-height:16px"></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn" id="resetgo" style="margin-top:0">Clear the PIN</button>
+        <button class="btn ghost" id="resetcancel" style="margin-top:0">Cancel</button>
+      </div>
+    </div>`;
+  $('resetpin').focus();
+  $('resetcancel').onclick = () => { $('resetbox').innerHTML = ''; };
+  $('resetpin').onkeydown = e => { if (e.key === 'Enter') $('resetgo').click(); };
+  $('resetgo').onclick = async () => {
+    const managerPin = $('resetpin').value.trim();
+    if (!managerPin) return;
+    try {
+      const d = await writePin('/api/staff/reset-pin', { targetStaffMemberId: targetId, managerPin });
+      if (d.ok) { await loadPins(); paintPins(`${esc(targetName)}'s PIN was cleared.`); }
+      else $('reseterr').textContent = d.error || 'Could not reset that PIN.';
+    } catch (e) { $('reseterr').textContent = e.message; }
+  };
+}
 
 async function loadMoney() {
   if (!me || !me.admin) { $('money').innerHTML = '<div class="empty">Takings are for the directors.</div>'; return; }

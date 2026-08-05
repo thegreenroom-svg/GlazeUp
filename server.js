@@ -10357,12 +10357,43 @@ app.post('/api/staff/reset-pin', async (req, res) => {
 
   const { data: manager } = await supabase.from('staff_team')
     .select('role').eq('id', managerPinRow.staff_member_id).single();
-  if (!manager || !['Studio Manager', 'Studio Executive'].includes(manager.role)) {
-    return res.status(403).json({ error: 'Only a Studio Manager or Studio Executive can reset PINs' });
+  // [4 Aug] Was ['Studio Manager','Studio Executive'] only — checked
+  // against the real staff_team roles for this studio and neither
+  // director actually holds either title (Daisy is 'General Manager',
+  // David is 'Co-Director'; Jenny's 'Studio Executive' was the only one
+  // that ever passed). As written, the endpoint meant for the three
+  // directors would have rejected two of them. Added their real titles
+  // rather than renaming the roles themselves in staff_team.
+  const AUTHORISED_TO_RESET_PINS = ['Studio Manager', 'Studio Executive', 'General Manager', 'Co-Director'];
+  if (!manager || !AUTHORISED_TO_RESET_PINS.includes(manager.role)) {
+    return res.status(403).json({ error: 'Only a director or studio manager can reset PINs' });
   }
 
   await supabase.from('staff_pins').delete().eq('studio_id', studioId).eq('staff_member_id', targetStaffMemberId);
   res.json({ ok: true, message: 'PIN cleared — that person can now set a new one from the login screen.' });
+});
+
+// POST /api/staff/verify-pin — [4 Aug] checks a PIN against the person it
+// was entered for and returns ok:true/false. Nothing is written, nothing
+// is clocked in or out — this exists ONLY because shift-login (below) is
+// the sole other place a PIN gets checked, and it clocks the person in as
+// a side effect. /studio needed a way to confirm someone is who they say
+// they are without that consequence. POST rather than GET because a PIN,
+// like a password, shouldn't sit in a URL where it could end up logged.
+// Matches shift-login's own matching logic exactly (staffMemberId + hash,
+// since PINs can collide between people) and carries the same lack of
+// rate-limiting shift-login already has — this doesn't introduce a new
+// gap, it mirrors the existing one rather than inventing a stricter or
+// laxer standard for the same kind of check.
+app.post('/api/staff/verify-pin', async (req, res) => {
+  const { studioId, staffMemberId, pin } = req.body;
+  if (!studioId || !staffMemberId || !pin) {
+    return res.status(400).json({ error: 'studioId, staffMemberId, pin required' });
+  }
+  const { data } = await supabase.from('staff_pins')
+    .select('staff_member_id').eq('studio_id', studioId).eq('staff_member_id', staffMemberId)
+    .eq('pin_hash', hashPin(pin)).single();
+  res.json({ ok: !!data });
 });
 
 // POST /api/staff/shift-login — enter a PIN to start a shift on this device

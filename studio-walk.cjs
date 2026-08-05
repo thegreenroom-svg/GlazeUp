@@ -4,17 +4,37 @@ const express=require('express'), path=require('path'), P=require('puppeteer-cor
 const app=express(); const D=__dirname;
 const writes=[];
 // The ONE sanctioned exception. Anything else non-GET is a failure.
-const SANCTIONED='/api/packing/find-listed';
-app.use((q,_r,n)=>{ if(q.method!=='GET' && q.path!==SANCTIONED) writes.push(q.method+' '+q.path); n(); });
+// The one search POST, plus the three staff-identity writes (verify/
+// set/reset-pin) — matches PIN_WRITES in studio/app.js exactly. Any
+// OTHER non-GET is still a failure; this isn't a general write allowance.
+const SANCTIONED=['/api/packing/find-listed','/api/staff/verify-pin','/api/staff/set-pin','/api/staff/reset-pin'];
+app.use((q,_r,n)=>{ if(q.method!=='GET' && !SANCTIONED.includes(q.path)) writes.push(q.method+' '+q.path); n(); });
 app.get('/studio',(q,r)=>r.sendFile(path.join(D,'studio','index.html')));
 app.use('/studio',express.static(path.join(D,'studio')));
 
 const iso=(h,m)=>{const d=new Date();d.setHours(h,m,0,0);return d.toISOString();};
+const pinState = {'1':'4242','2':'1357','4':'9999'};
 app.get('/api/staff/team-for-login',(q,r)=>r.json({team:[
- {id:'1',name:'Daisy',role:'General Manager',onShift:true},
- {id:'2',name:'Jenny',role:'Studio Executive'},
- {id:'3',name:'Ruby',role:'Studio Assistant'},
- {id:'4',name:'Lucy',role:'Ceramic Technician'}]}));
+ {id:'1',name:'Daisy',role:'General Manager',onShift:true,hasPinSet:!!pinState['1']},
+ {id:'2',name:'Jenny',role:'Studio Executive',hasPinSet:!!pinState['2']},
+ {id:'3',name:'Ruby',role:'Studio Assistant',hasPinSet:!!pinState['3']},
+ {id:'4',name:'Lucy',role:'Ceramic Technician',hasPinSet:!!pinState['4']}]}));
+// [4 Aug] stateful enough to prove the real round trip: Daisy's PIN is
+// '4242'; Ruby has none yet. Reset actually clears server-side state
+// here too, so re-reading the team after a reset shows the real change.
+app.post('/api/staff/verify-pin',express.json(),(q,r)=>
+  r.json({ok: pinState[q.body.staffMemberId]===String(q.body.pin)}));
+app.post('/api/staff/set-pin',express.json(),(q,r)=>{
+  if (pinState[q.body.staffMemberId]) return res_409(r);
+  pinState[q.body.staffMemberId]=String(q.body.pin); r.json({ok:true});
+});
+function res_409(r){ r.status(409).json({error:'A PIN is already set for this person.'}); }
+app.post('/api/staff/reset-pin',express.json(),(q,r)=>{
+  const managerId=Object.keys(pinState).find(id=>pinState[id]===String(q.body.managerPin));
+  if (!managerId) return r.status(401).json({error:'Incorrect manager PIN'});
+  delete pinState[q.body.targetStaffMemberId];
+  r.json({ok:true,message:'PIN cleared.'});
+});
 app.get('/api/bookings/day',(q,r)=>r.json({date:q.query.date,covers:11,bookings:[
  {customer_name:'Joy Davenport',session_start:iso(10,0),session_end:iso(12,0),table_number:8,
   party_size:4,space_name:'Pottery Painting Session *Family Friendly* Main Studio',
@@ -132,7 +152,65 @@ const srv=app.listen(4801,async()=>{
   await p.goto('http://localhost:4801/studio',{waitUntil:'networkidle0'});
   await new Promise(r=>setTimeout(r,500)); await shot('1-login');
   const names=await p.$$eval('.person .n',e=>e.map(x=>x.textContent));
-  await p.click('.person'); await new Promise(r=>setTimeout(r,600)); await shot('2-home');
+  // THE LOGIN ITSELF NOW GOES THROUGH A REAL PIN — Daisy's is '4242' in
+  // the stand-in. A bare .person click used to sign straight in; now it
+  // opens the PIN screen, same as it would for a real person.
+  await p.click('.person'); await new Promise(r=>setTimeout(r,400));
+  console.log('PIN screen shown:', (await p.$('#pinentry')) ? 'yes ✓' : 'NO ✗');
+  await p.screenshot({path:'/home/claude/shots/s-26-pin-entry.png'});
+  await p.type('#pinentry','4242',{delay:30});
+  await p.evaluate(()=>document.getElementById('pingo').click());
+  await new Promise(r=>setTimeout(r,600)); await shot('2-home');
+  console.log('signed in as    :', await p.evaluate(()=>me && me.name), '(admin:', await p.evaluate(()=>me && me.admin)+')');
+
+  // THE LOGIN/PIN WORK: David — "an actual login for everyone, their
+  // own code, admin can reset it." Test the whole real loop.
+  await p.evaluate(()=>{go('login',false); loadLogin();}); await new Promise(r=>setTimeout(r,500));
+  await p.click('.person'); await new Promise(r=>setTimeout(r,400));   // Daisy again
+  await p.type('#pinentry','0000',{delay:20});                        // deliberately wrong
+  await p.evaluate(()=>document.getElementById('pingo').click());
+  await new Promise(r=>setTimeout(r,400));
+  console.log('wrong PIN rejected:', await p.$eval('#pinerr',e=>e.textContent).catch(()=>'NO ERROR SHOWN ✗'),
+    '| still on login:', await p.evaluate(()=>view)==='login' ? 'yes ✓' : '✗');
+  await p.evaluate(()=>document.getElementById('pinentry').value='');
+  await p.type('#pinentry','4242',{delay:20});                        // the right one
+  await p.evaluate(()=>document.getElementById('pingo').click());
+  await new Promise(r=>setTimeout(r,500));
+  console.log('right PIN signs in:', await p.evaluate(()=>me && me.name), await p.evaluate(()=>view)==='home' ? '✓' : '✗');
+
+  // Ruby has no PIN yet — must get the set-a-PIN flow, not enter-PIN
+  await p.evaluate(()=>{go('login',false); loadLogin();}); await new Promise(r=>setTimeout(r,500));
+  await p.evaluate(()=>{const b=[...document.querySelectorAll('.person')].find(x=>x.textContent.includes('Ruby')); if(b) b.click();});
+  await new Promise(r=>setTimeout(r,400));
+  const setPinHeading = await p.$eval('#pinpanel',e=>e.textContent).catch(()=>'');
+  console.log('Ruby gets set-PIN flow:', setPinHeading.includes('choose one now') ? 'yes ✓' : '✗');
+  await p.screenshot({path:'/home/claude/shots/s-27-set-pin.png'});
+  await p.type('#pinentry','7777',{delay:20});
+  await p.evaluate(()=>document.getElementById('pingo').click());
+  await new Promise(r=>setTimeout(r,500));
+  console.log('Ruby signed in    :', await p.evaluate(()=>me && me.name), '(admin:', await p.evaluate(()=>me && me.admin)+')');
+  console.log('non-admin sees no Staff PINs tile:', (await p.$$eval('.tile',e=>e.map(x=>x.textContent).join('|'))).includes('Staff PINs') ? '✗ SHOWS' : 'yes, hidden ✓');
+
+  // back in as Daisy (a director) — Staff PINs tile, and the reset flow
+  await p.evaluate(()=>{go('login',false); loadLogin();}); await new Promise(r=>setTimeout(r,500));
+  await p.click('.person'); await new Promise(r=>setTimeout(r,400));
+  await p.type('#pinentry','4242',{delay:20});
+  await p.evaluate(()=>document.getElementById('pingo').click());
+  await new Promise(r=>setTimeout(r,500));
+  console.log('admin sees Staff PINs tile:', (await p.$$eval('.tile',e=>e.map(x=>x.textContent).join('|'))).includes('Staff PINs') ? 'yes ✓' : '✗ MISSING');
+  await p.evaluate(()=>go('pins')); await new Promise(r=>setTimeout(r,700));
+  const pinsListBefore = await p.$eval('#pins',e=>e.textContent).catch(()=>'');
+  console.log('Ruby now shows PIN set:', pinsListBefore.includes('Ruby') && pinsListBefore.match(/Ruby[^▦]*PIN set/) ? 'yes ✓' : '(check manually)');
+  await p.evaluate(()=>{const b=[...document.querySelectorAll('[data-reset]')].find(x=>x.dataset.name==='Jenny'); if(b) b.click();});
+  await new Promise(r=>setTimeout(r,400));
+  console.log('reset-confirm shown for Jenny:', (await p.$('#resetpin')) ? 'yes ✓' : '✗');
+  await p.type('#resetpin','4242',{delay:20});                        // Daisy's own PIN, to authorise
+  await p.evaluate(()=>document.getElementById('resetgo').click());
+  await new Promise(r=>setTimeout(r,600));
+  const pinsListAfter = await p.$eval('#pins',e=>e.textContent).catch(()=>'');
+  console.log('Jenny cleared     :', pinsListAfter.includes('cleared') || /Jenny[^▦]*No PIN yet/.test(pinsListAfter) ? 'yes ✓' : '✗');
+  await p.screenshot({path:'/home/claude/shots/s-25-pins.png',fullPage:true});
+  await p.evaluate(()=>{stack=[];go('home',false);});
 
   // THE FRONT DOOR: type a walk-in's name, one tap onto her full session
   await p.type('#findbox','Leanne',{delay:40});
@@ -429,13 +507,17 @@ const srv=app.listen(4801,async()=>{
   const app2=require('express')(); app2.use(express.json());
   app2.get('/studio',(q,r)=>r.sendFile(path.join(D,'studio','index.html')));
   app2.use('/studio',express.static(path.join(D,'studio')));
-  app2.get('/api/staff/team-for-login',(q,r)=>r.json({team:[{id:'1',name:'David',role:'Co-Director'}]}));
+  app2.get('/api/staff/team-for-login',(q,r)=>r.json({team:[{id:'1',name:'David',role:'Co-Director',hasPinSet:true}]}));
+  app2.post('/api/staff/verify-pin',(q,r)=>r.json({ok:String(q.body.pin)==='9090'}));
   app2.get('/api/bookings/day',(q,r)=>r.json({date:q.query.date,covers:0,bookings:[]}));
   await new Promise(resolveListen => {
     const s2=app2.listen(4809, async () => {
       const p2=await b.newPage(); await p2.setViewport({width:412,height:900,deviceScaleFactor:2});
       await p2.goto('http://localhost:4809/studio',{waitUntil:'networkidle0'});
       await p2.click('.person'); await new Promise(r=>setTimeout(r,400));
+      await p2.type('#pinentry','9090',{delay:20});
+      await p2.evaluate(()=>document.getElementById('pingo').click());
+      await new Promise(r=>setTimeout(r,500));
       await p2.evaluate(()=>go('floor')); await new Promise(r=>setTimeout(r,600));
       console.log('empty-floor note:', (await p2.$('.note')) ? 'shown' : 'MISSING ✗');
       await p2.screenshot({path:'/home/claude/shots/s-11-empty-floor.png'});
