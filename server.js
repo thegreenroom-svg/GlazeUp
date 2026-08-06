@@ -418,6 +418,29 @@ function generateCodeChallenge(verifier) {
   return crypto.createHash('sha256').update(verifier).digest('base64url');
 }
 
+/* [6 Aug] THE ACTUAL ROOT CAUSE of every "still October" report today,
+   found only after a cache-busted raw request proved caching was
+   never the problem: Supabase's "Max Rows" is enforced by PostgREST
+   ITSELF, server-side, in the Supabase project's own API settings —
+   NOT by the client library. A .limit(5000) call in this file's own
+   code cannot override it; PostgREST silently caps the response at
+   its own configured max (1000 here) regardless of what limit the
+   caller asks for. Confirmed via Supabase's own documented behaviour,
+   not assumed. The standard, correct fix is pagination — fetch in
+   chunks under the real cap and concatenate, which works no matter
+   what the project's Max Rows setting is now or ever becomes. */
+async function fetchAllRows(queryBuilder, pageSize = 1000) {
+  let all = [], from = 0;
+  while (true) {
+    const { data, error } = await queryBuilder(from, from + pageSize - 1);
+    if (error) throw error;
+    all = all.concat(data || []);
+    if (!data || data.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
+}
+
 async function getSquareClient(accessToken) {
   // Create a client with the specific access token for this studio
   const client = new Client({
@@ -967,15 +990,14 @@ app.get('/api/square/transactions', async (req, res) => {
 
   try {
     // Get all daily revenue data from analytics cache
-    const { data: dailyRevenue, error } = await supabase
+    const dailyRevenue = await fetchAllRows((from, to) => supabase
       .from('analytics_cache')
       .select('metric_date, metric_value')
       .eq('studio_id', studioId)
       .eq('metric_type', 'daily_revenue')
       .order('metric_date', { ascending: false })
-      .limit(5000);
+      .range(from, to));
 
-    if (error) throw error;
 
     // Convert daily revenue into transaction-like format for dashboard.
     // metric_value is stored by syncSquareData as an OBJECT:
@@ -1183,14 +1205,13 @@ app.get('/api/takings/history', async (req, res) => {
     // lands almost exactly in October 2025, which is precisely what
     // kept showing up. /api/takings/today never hit this because it
     // only ever asks for a single day. 5000 gives years of headroom.
-    const { data, error } = await supabase
+    const data = await fetchAllRows((from, to) => supabase
       .from('analytics_cache')
       .select('metric_date, metric_value')
       .eq('studio_id', studioId)
       .eq('metric_type', 'daily_revenue')
       .order('metric_date', { ascending: true })
-      .limit(5000);
-    if (error) throw error;
+      .range(from, to));
 
     const days = (data || []).map(r => ({
       date: r.metric_date,
@@ -2676,12 +2697,12 @@ app.get('/api/analytics/dashboard', async (req, res) => {
     // Genuine real ALL-TIME total — every real day of Square data this
     // studio has ever had synced, not just the last 30 days, per
     // direct request.
-    const { data: allTimeRevenue } = await supabase
+    const allTimeRevenue = await fetchAllRows((from, to) => supabase
       .from('analytics_cache')
       .select('metric_value')
       .eq('studio_id', studioId)
       .eq('metric_type', 'daily_revenue')
-      .limit(5000);
+      .range(from, to));
     const allTimeRevenueCents = (allTimeRevenue || []).reduce((sum, day) => sum + (day.metric_value?.revenue_cents || 0), 0);
     const allTimeTransactionCount = (allTimeRevenue || []).reduce((sum, day) => sum + (day.metric_value?.transaction_count || 0), 0);
 
