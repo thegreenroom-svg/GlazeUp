@@ -32,6 +32,7 @@ const ALLOWED = [
   '/api/takings/breakdown', '/api/takings/history', '/api/analytics/dashboard',
   '/api/ai-usage', '/api/pieces/for-booking', '/api/gift-cards/lookup',
   '/api/addons/catalogue', '/api/addons/status', '/api/cleos-club/config',
+  '/api/practice/bookings', '/api/practice/pieces',
 ];
 async function read(path, params = {}) {
   const url = new URL(path, API);
@@ -133,6 +134,27 @@ async function writePin(path, body) {
 const SETTINGS_WRITES = ['/api/addons/enable', '/api/addons/disable', '/api/cleos-club/config'];
 async function writeSettings(path, body) {
   if (!SETTINGS_WRITES.includes(path))
+    throw new Error('Blocked: ' + path + ' is not a write this app is allowed to make.');
+  const r = await fetch(API + path, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...body, studioId: STUDIO }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || ('the server answered ' + r.status));
+  return d;
+}
+
+/* A FIFTH, separate write path — [6 Aug] David: "I want this app
+   populated with those bookings... goes forward and back in time...
+   test the AI and calibrate." A real, PERSISTENT write (unlike
+   everything else in this app, which clears on login) — but reaches
+   exactly one endpoint, and that endpoint writes only to
+   practice_bookings/practice_pieces, a table kept deliberately
+   separate from the real bookings table. This is calibration data
+   for the packing-finder AI, never a real Square-linked booking. */
+const PRACTICE_WRITES = ['/api/practice/booking-from-photo'];
+async function writePractice(path, body) {
+  if (!PRACTICE_WRITES.includes(path))
     throw new Error('Blocked: ' + path + ' is not a write this app is allowed to make.');
   const r = await fetch(API + path, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -271,6 +293,7 @@ const PANES = {
   money: ['Money', 'Live from Square'],
   pins:  ['Staff PINs', 'Director-only'],
   settings: ['Studio Settings', 'Director-only'],
+  practice: ['Test Bookings', 'Calibration data for the AI'],
   vouchers: ['Gift Vouchers', 'Live from Square'],
 };
 
@@ -292,6 +315,7 @@ function go(v, push = true) {
   if (v === 'money') loadMoney();
   if (v === 'pins') loadPins();
   if (v === 'settings') loadSettings();
+  if (v === 'practice') loadPractice();
   if (v === 'vouchers') loadVouchers();
   if (v === 'home') loadHome();
 }
@@ -452,6 +476,7 @@ async function loadHome() {
   if (me && me.admin) t.push(['money', '£', 'Money', 'Takings, live from Square', 'moneyN']);
   if (me && me.admin) t.push(['pins', '••', 'Staff PINs', 'Set or reset someone\'s code', null]);
   if (me && me.admin) t.push(['settings', '⚙', 'Studio Settings', 'Cleo\'s Club, add-ons and pricing', null]);
+  if (me && me.admin) t.push(['practice', '◫', 'Test Bookings', 'Photograph a table, calibrate the AI', null]);
   $('hometiles').innerHTML = t.map(([v, ic, title, sub, slot]) => `
     <button class="tile" data-go="${v}">
       <span class="ic">${ic}</span>
@@ -941,13 +966,12 @@ async function finishTableMarks() {
   paintBooking();
 }
 
-async function bookingSearch(file) {
-  const real = bkNow._pieces || [];
-  const pieces = real.length ? real : ((bkNow.booking_code && localPieces[bkNow.booking_code]) || []);
-  const wanted = pieces.filter(p => !foundMap[p.id])
-    .map(p => ({ id: p.id, description: p.description || p.piece_type || '' }))
-    .filter(w => w.description);
-  const box = $('bkfound');
+/* [6 Aug] Factored out of bookingSearch so the new practice-bookings
+   finder can reuse the exact same proven ring-drawing/found-count
+   rendering rather than duplicate it — one rendering path for
+   "photograph a shelf, find what's wanted," whichever screen it's
+   called from. */
+async function runShelfSearch(file, wanted, box, onFound) {
   if (!wanted.length) { if (box) box.innerHTML = '<div class="note">Nothing left to look for.</div>'; return; }
   const raw = await readFile(file);
   if (box) box.innerHTML = '<div style="font-size:12.5px;color:var(--clay);padding:10px 0">Looking…</div>';
@@ -958,8 +982,7 @@ async function bookingSearch(file) {
     let rings = '';
     found.forEach(f => {
       const p = cellPoint(f.cell);
-      const piece = pieces.find(x => String(x.id) === String(f.id));
-      if (piece) foundMap[piece.id] = f.cell || 'in this photo';
+      onFound(f);
       if (!p) return;
       rings += `<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;
         inset:0;width:100%;height:100%;pointer-events:none">
@@ -977,6 +1000,17 @@ async function bookingSearch(file) {
   } catch (e) {
     if (box) box.innerHTML = `<div class="err">${esc(e.message)}</div>`;
   }
+}
+async function bookingSearch(file) {
+  const real = bkNow._pieces || [];
+  const pieces = real.length ? real : ((bkNow.booking_code && localPieces[bkNow.booking_code]) || []);
+  const wanted = pieces.filter(p => !foundMap[p.id])
+    .map(p => ({ id: p.id, description: p.description || p.piece_type || '' }))
+    .filter(w => w.description);
+  await runShelfSearch(file, wanted, $('bkfound'), f => {
+    const piece = pieces.find(x => String(x.id) === String(f.id));
+    if (piece) foundMap[piece.id] = f.cell || 'in this photo';
+  });
 }
 
 /* ── till (practice ticket, never sent) ──────────────────────────────
@@ -1450,6 +1484,104 @@ let pinsTeam = [];
    through writeSettings' narrow gate — studio configuration only,
    never a booking, a customer record, the till or Square. */
 let settingsClub = null, settingsAddons = null, settingsCatalogue = null;
+/* ── test bookings (calibration data for the packing-finder AI) ──────
+   [6 Aug] David: "I want this app populated with those bookings...
+   goes forward and back in time... take photos every few days...
+   test the AI and calibrate." The one genuinely persistent write
+   surface in this app — everything else clears on login, this
+   deliberately doesn't, because the whole point is browsing it again
+   days later. Kept in its own table (practice_bookings/practice_pieces),
+   never the real bookings table, never mistaken for a real Square
+   customer. */
+let practiceDay = new Date(), practiceBookings = [], practicePieces = [], practiceOpenId = null;
+async function loadPractice() { await fetchPracticeDay(); }
+async function fetchPracticeDay() {
+  practiceOpenId = null;
+  try {
+    const dateStr = practiceDay.toISOString().slice(0, 10);
+    const d = await read('/api/practice/bookings', { date: dateStr });
+    practiceBookings = d.bookings || [];
+  } catch (e) { practiceBookings = []; }
+  paintPractice();
+}
+function paintPractice(msg) {
+  $('practice').innerHTML = `
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <button class="chip" id="pday-back" style="min-height:34px;padding:6px 14px">‹</button>
+        <div style="font-weight:700;font-size:13px">${DAYNAME(practiceDay)}</div>
+        <button class="chip" id="pday-fwd" style="min-height:34px;padding:6px 14px">›</button>
+      </div>
+      <label class="btn" for="pphoto" style="display:flex;align-items:center;justify-content:center;
+        cursor:pointer;margin-top:0">+ Add a table photo</label>
+      <input type="file" id="pphoto" accept="image/*" capture="environment" style="display:none">
+      <div style="font-size:10.5px;color:var(--clay);text-align:center;margin-top:8px">
+        Reads the chalk tag for a name, date and time, and describes each piece — about 0.3p a photo.</div>
+      <div id="pupload"></div>
+    </div>
+    ${msg ? `<div class="note" style="margin-bottom:11px">${msg}</div>` : ''}
+    <div class="card">
+      ${practiceBookings.length === 0
+        ? `<div style="font-size:12.5px;color:var(--clay)">No test bookings for this day yet.</div>`
+        : practiceBookings.map(b => `<div class="row" data-open="${esc(b.id)}" style="cursor:pointer">
+            <div style="flex:1"><div class="l">${esc(b.customer_name)}</div>
+              <div class="m">${b.session_time ? esc(b.session_time) + ' · ' : ''}${b.piece_count}
+                piece${b.piece_count === 1 ? '' : 's'}</div></div>
+            <span style="color:var(--clay);font-size:20px">›</span></div>`).join('')}
+    </div>
+    <div id="pbookingdetail"></div>`;
+  $('pday-back').onclick = () => { practiceDay.setDate(practiceDay.getDate() - 1); fetchPracticeDay(); };
+  $('pday-fwd').onclick = () => { practiceDay.setDate(practiceDay.getDate() + 1); fetchPracticeDay(); };
+  $('pphoto').onchange = e => { const f = e.target.files[0]; if (f) uploadPracticePhoto(f); };
+  $('practice').querySelectorAll('[data-open]').forEach(el =>
+    el.onclick = () => openPracticeBooking(el.dataset.open));
+  if (practiceOpenId) openPracticeBooking(practiceOpenId);
+}
+async function uploadPracticePhoto(file) {
+  $('pupload').innerHTML = '<div style="font-size:12px;color:var(--clay);margin-top:8px">Reading the tag and the pieces…</div>';
+  try {
+    const photoBase64 = await readFile(file);
+    const d = await writePractice('/api/practice/booking-from-photo', { photoBase64 });
+    await fetchPracticeDay();
+    paintPractice(`Added ${esc(d.booking.customer_name)} — ${d.pieces.length} piece${d.pieces.length === 1 ? '' : 's'}.`);
+  } catch (e) {
+    $('pupload').innerHTML = `<div class="err" style="margin-top:8px">${esc(e.message)}</div>`;
+  }
+}
+async function openPracticeBooking(id) {
+  practiceOpenId = id;
+  const b = practiceBookings.find(x => String(x.id) === String(id));
+  if (!b) return;
+  $('pbookingdetail').innerHTML = '<div class="card"><div class="empty">Reading her pieces…</div></div>';
+  try {
+    const d = await read('/api/practice/pieces', { bookingId: id });
+    practicePieces = d.pieces || [];
+    paintPracticeBooking(b);
+  } catch (e) {
+    $('pbookingdetail').innerHTML = `<div class="err">${esc(e.message)}</div>`;
+  }
+}
+function paintPracticeBooking(b) {
+  $('pbookingdetail').innerHTML = `
+    <div class="card">
+      <h2>${esc(b.customer_name)}</h2>
+      ${practicePieces.map(p => `<div class="row"><div class="l" style="flex:1">${esc(p.description)}</div>
+        ${p.found ? '<span style="color:var(--soon);font-size:11px;font-weight:700">FOUND</span>' : ''}</div>`).join('')}
+      <label class="btn" for="pshelf" style="display:flex;align-items:center;justify-content:center;
+        cursor:pointer;margin-top:12px">Photograph a tray or shelf</label>
+      <input type="file" id="pshelf" accept="image/*" capture="environment" style="display:none">
+      <div id="pfound"></div>
+    </div>`;
+  $('pshelf').onchange = e => { const f = e.target.files[0]; if (f) practiceSearch(f); };
+}
+async function practiceSearch(file) {
+  const wanted = practicePieces.filter(p => !p.found).map(p => ({ id: p.id, description: p.description }));
+  await runShelfSearch(file, wanted, $('pfound'), f => {
+    const piece = practicePieces.find(x => String(x.id) === String(f.id));
+    if (piece) piece.found = true;
+  });
+}
+
 async function loadSettings() {
   try {
     const [club, cat, status] = await Promise.all([

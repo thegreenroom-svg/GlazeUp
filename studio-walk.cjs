@@ -7,7 +7,7 @@ const writes=[];
 // The one search POST, plus the three staff-identity writes (verify/
 // set/reset-pin) — matches PIN_WRITES in studio/app.js exactly. Any
 // OTHER non-GET is still a failure; this isn't a general write allowance.
-const SANCTIONED=['/api/packing/find-listed','/api/pieces/describe-group','/api/staff/verify-pin','/api/staff/set-pin','/api/staff/reset-pin','/api/addons/enable','/api/addons/disable','/api/cleos-club/config'];
+const SANCTIONED=['/api/packing/find-listed','/api/pieces/describe-group','/api/staff/verify-pin','/api/staff/set-pin','/api/staff/reset-pin','/api/addons/enable','/api/addons/disable','/api/cleos-club/config','/api/practice/booking-from-photo'];
 app.use((q,_r,n)=>{ if(q.method!=='GET' && !SANCTIONED.includes(q.path)) writes.push(q.method+' '+q.path); n(); });
 app.get('/studio',(q,r)=>r.sendFile(path.join(D,'studio','index.html')));
 app.use('/studio',express.static(path.join(D,'studio')));
@@ -114,6 +114,25 @@ app.get('/api/pieces/for-booking',(q,r)=>r.json({pieces:
  {id:'p1',piece_type:'Mug — pale blue with white spots',status:'fired',reference_photo_url:null},
  {id:'p2',piece_type:'Plate — yellow rim, red flowers',status:'fired',reference_photo_url:null}]}));
 app.get('/api/ai-usage',(q,r)=>r.json({today:0.02,month:0.39,model:'gpt-4o-mini'}));
+const practiceStore = {bookings:[], pieces:[]};
+app.post('/api/practice/booking-from-photo',express.json({limit:'20mb'}),(q,r)=>{
+  const id='pb-'+(practiceStore.bookings.length+1);
+  const booking={id,customer_name:'Demo: Sammy Okafor',session_date:new Date().toISOString().slice(0,10),
+    session_time:'6-9',created_at:new Date().toISOString()};
+  practiceStore.bookings.push(booking);
+  const pieces=[{id:id+'-p1',practice_booking_id:id,description:'blue mug, white spots',found:false},
+    {id:id+'-p2',practice_booking_id:id,description:'yellow plate, red flowers',found:false}];
+  practiceStore.pieces.push(...pieces);
+  r.json({booking,pieces,tag:{name:booking.customer_name},cost:0.0031});
+});
+app.get('/api/practice/bookings',(q,r)=>{
+  const rows=practiceStore.bookings.filter(b=>b.session_date===q.query.date)
+    .map(b=>({...b,piece_count:practiceStore.pieces.filter(p=>p.practice_booking_id===b.id).length}));
+  r.json({bookings:rows});
+});
+app.get('/api/practice/pieces',(q,r)=>{
+  r.json({pieces:practiceStore.pieces.filter(p=>p.practice_booking_id===q.query.bookingId)});
+});
 app.get('/api/gift-cards/lookup',(q,r)=>{
   if (q.query.gan==='7783320000000000')
     return r.json({gan:q.query.gan,state:'ACTIVE',balance:{amount:45.50,currency:'GBP'}});
@@ -553,6 +572,41 @@ const srv=app.listen(4801,async()=>{
   console.log('real club config shown:', await p.$eval('#cc-every',e=>e.value).catch(()=>'✗'));
   const addonsText = await p.$eval('#settings',e=>e.textContent).catch(()=>'');
   console.log('add-ons show no price:', addonsText.includes('£20.00/mo') || addonsText.includes('/mo') ? '✗ STILL PRICED' : 'yes ✓');
+
+  // TEST BOOKINGS: David — "I want this app populated with those
+  // bookings... goes forward and back in time... test the AI." The one
+  // genuinely persistent write in this whole app.
+  await p.evaluate(()=>{stack=[];go('home',false);}); await new Promise(r=>setTimeout(r,300));
+  console.log('test bookings tile visible:', (await p.$$eval('.tile',e=>e.map(x=>x.textContent).join('|'))).includes('Test Bookings') ? 'yes ✓' : '✗');
+  await p.evaluate(()=>go('practice')); await new Promise(r=>setTimeout(r,500));
+  await p.evaluate(()=>{practiceDay=new Date();});
+  const bshot=await p.$('#pphoto');
+  await bshot.uploadFile('/tmp/shelf.png'); await new Promise(r=>setTimeout(r,900));
+  const uploadMsg = await p.$eval('#practice',e=>e.textContent).catch(()=>'');
+  console.log('photo created a real booking:', uploadMsg.includes('Sammy Okafor') ? 'yes ✓' : '✗');
+  // leave the screen entirely, come back — must still be there (real persistence, not local state)
+  await p.evaluate(()=>{stack=[];go('home',false);}); await new Promise(r=>setTimeout(r,300));
+  await p.evaluate(()=>go('practice')); await new Promise(r=>setTimeout(r,600));
+  const afterReturn = await p.$eval('#practice',e=>e.textContent).catch(()=>'');
+  console.log('booking survived leaving and returning:', afterReturn.includes('Sammy Okafor') ? 'yes ✓' : '✗ LOST');
+  await p.evaluate(()=>{
+    const row=[...document.querySelectorAll('[data-open]')].find(x=>x.textContent.includes('Sammy'));
+    if(row) row.click();
+  });
+  await new Promise(r=>setTimeout(r,500));
+  const detail = await p.$eval('#pbookingdetail',e=>e.textContent).catch(()=>'');
+  console.log('real pieces shown            :', detail.includes('blue mug') && detail.includes('yellow plate') ? 'yes ✓' : '✗');
+  const pshot = await p.$('#pshelf');
+  if (pshot) {
+    await pshot.uploadFile('/tmp/shelf.png'); await new Promise(r=>setTimeout(r,1200));
+    const foundText = await p.$eval('#pfound', e=>e.textContent).catch(()=>'');
+    console.log('shelf finder ran on real practice pieces:', foundText.includes('found') ? foundText.trim() : '✗ '+foundText);
+  }
+  await p.screenshot({path:'/home/claude/shots/s-31-practice.png',fullPage:true});
+  // the pre-existing settings tests below assume they're still on the
+  // Settings screen — my block above navigated away, so go back to it
+  await p.evaluate(()=>{stack=[];go('home',false);}); await new Promise(r=>setTimeout(r,300));
+  await p.evaluate(()=>go('settings')); await new Promise(r=>setTimeout(r,500));
   await p.evaluate(()=>{document.getElementById('cc-every').value='7';});
   await p.evaluate(()=>document.getElementById('cc-save').click());
   await new Promise(r=>setTimeout(r,500));

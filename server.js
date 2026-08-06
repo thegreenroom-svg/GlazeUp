@@ -9154,50 +9154,131 @@ async function retryWeakDescriptions(photoBase64, pieces, studioId, kind, anyObj
 const ANY_OBJECT = `You are looking at ordinary objects on a table or shelf.
 Describe every distinct object you can see — it does not matter what kind of thing it is.`;
 
+/* [6 Aug] Factored out of describe-group so /api/practice/booking-from-photo
+   can reuse the SAME proven call rather than duplicate this carefully-tuned
+   prompt — this is the commercial product's own matching pipeline, not
+   something to rebuild. The one real addition: paintDate/paintTime added to
+   the tag schema. The prompt already told the model to read "paint date and
+   time along the top" — it just never had a field to put them in, so that
+   half of every chalk tag was being read and silently discarded on every
+   call this endpoint has ever made. */
+async function describePiecesAndTag(photoBase64, studioId, anyObject, endpointName) {
+  const { data: out, usage } = await describeImage(photoBase64,
+    `${anyObject ? ANY_OBJECT : POTTERY_ONLY}\n\n${DESCRIBE_STYLE}\n\nList every distinct piece you can see.\n\n` +
+    `ALSO: these tables carry a small black chalkboard tag with white chalk handwriting. ` +
+    `If one is visible, read it. Tags are reused, so faint ghost writing from previous ` +
+    `bookings often shows underneath — report only the clearest, most recent writing.\n` +
+    `Typical layout: paint date and time along the top, the customer's NAME in the ` +
+    `middle, collection date bottom-left, room or table and a piece count like "x5" ` +
+    `bottom-right. "NP" usually means not paid.\n\n` +
+    `Reply with ONLY this JSON, no prose and no markdown:\n` +
+    `{"pieces":[{"description":"green fish-shaped jug, glossy"}],` +
+    `"tag":{"name":"Lindsay Moulin","paintDate":"23/7","paintTime":"6-9","collect":"27/7",` +
+    `"room":"Table 1","count":5,"unpaid":false}}\n` +
+    `Omit "tag" entirely if no chalkboard is visible or the writing cannot be read. ` +
+    `Never guess a name — a wrong name attaches someone's pottery to the wrong person.`);
+  const cost = await logUsage(studioId, endpointName, usage);
+  let pieces = (Array.isArray(out) ? out : (out.pieces || [])).filter(p => p && p.description).slice(0, 40);
+  pieces = await retryWeakDescriptions(photoBase64, pieces, studioId, endpointName, anyObject);
+  const tag = (out && out.tag && typeof out.tag.name === 'string' && out.tag.name.trim())
+    ? out.tag : null;
+  return { pieces, tag, cost };
+}
+
 app.post('/api/pieces/describe-group', async (req, res) => {
   const { photoBase64, anyObject } = req.body;
   if (!photoBase64) return res.status(400).json({ error: 'photoBase64 required' });
   try {
-    const { data: out, usage } = await describeImage(photoBase64,
-      `${anyObject ? ANY_OBJECT : POTTERY_ONLY}\n\n${DESCRIBE_STYLE}\n\nList every distinct piece you can see.\n\n` +
-      // [2 Aug] THE CHALKBOARD. Proven on 23 Jul against real studio
-      // photos — the tags read clearly at full size: customer name,
-      // paint date and time, collection date, room, piece count, and
-      // "NP" underlined for not paid. It was never wired in, so the
-      // Add flow still asks someone to type a name that is written on
-      // a board in the same photograph.
-      //
-      // Read here rather than in a second call: the tag is in the shot
-      // already, so it costs nothing extra.
-      //
-      // Tags get reused and wiped, so older chalk ghosts underneath —
-      // hence "the clearest, most recent writing" rather than
-      // everything legible, which would merge two customers' names.
-      `ALSO: these tables carry a small black chalkboard tag with white chalk handwriting. ` +
-      `If one is visible, read it. Tags are reused, so faint ghost writing from previous ` +
-      `bookings often shows underneath — report only the clearest, most recent writing.\n` +
-      `Typical layout: paint date and time along the top, the customer's NAME in the ` +
-      `middle, collection date bottom-left, room or table and a piece count like "x5" ` +
-      `bottom-right. "NP" usually means not paid.\n\n` +
-      `Reply with ONLY this JSON, no prose and no markdown:\n` +
-      `{"pieces":[{"description":"green fish-shaped jug, glossy"}],` +
-      `"tag":{"name":"Lindsay Moulin","collect":"23/7","room":"Table 1","count":5,"unpaid":false}}\n` +
-      `Omit "tag" entirely if no chalkboard is visible or the writing cannot be read. ` +
-      `Never guess a name — a wrong name attaches someone's pottery to the wrong person.`);
-    const cost = await logUsage(req.body.studioId, 'describe-group', usage);
-    let pieces = (Array.isArray(out) ? out : (out.pieces || [])).filter(p => p && p.description).slice(0, 40);
-    pieces = await retryWeakDescriptions(photoBase64, pieces, req.body.studioId, 'describe-group', anyObject);
-    // Only pass the tag on if it actually names someone — a tag with a
-    // count but no readable name is worse than none, because it looks
-    // like a successful read.
-    const tag = (out && out.tag && typeof out.tag.name === 'string' && out.tag.name.trim())
-      ? out.tag : null;
+    const { pieces, tag, cost } = await describePiecesAndTag(photoBase64, req.body.studioId, anyObject, 'describe-group');
     res.json({ pieces, tag, cost });
   } catch (e) {
     console.error('describe-group:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
+
+/* [6 Aug] David: "I want this app populated with those bookings... goes
+   forward and back in time... take photos every few days... test the AI
+   and calibrate." One photo of a table in, a real persistent booking +
+   its pieces out — reusing the SAME proven describePiecesAndTag() call
+   the commercial packing-finder already relies on, not a new prompt.
+   Deliberately writes to practice_bookings/practice_pieces, never the
+   real bookings table — this is calibration data for the AI, not a
+   real Square-linked booking, and must never be mistaken for one. */
+function parseTagDate(d) {
+  if (!d || typeof d !== 'string') return null;
+  const m = d.match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (!m) return null;
+  const now = new Date();
+  let year = now.getFullYear();
+  const candidate = new Date(year, +m[2] - 1, +m[1]);
+  if (candidate > now) year -= 1;   // a bare day/month in the future is almost certainly last year
+  return new Date(year, +m[2] - 1, +m[1]).toISOString().split('T')[0];
+}
+
+app.post('/api/practice/booking-from-photo', async (req, res) => {
+  const { studioId, photoBase64 } = req.body;
+  if (!studioId || !photoBase64) return res.status(400).json({ error: 'studioId and photoBase64 required' });
+  try {
+    const { pieces, tag, cost } = await describePiecesAndTag(photoBase64, studioId, false, 'practice-booking-from-photo');
+    if (!tag || !tag.name) {
+      return res.status(422).json({ error: 'Could not read a name off the chalk tag in this photo — nothing was created.', cost });
+    }
+    const { data: booking, error: bErr } = await supabase.from('practice_bookings').insert({
+      studio_id: studioId,
+      customer_name: tag.name,
+      session_date: parseTagDate(tag.paintDate),
+      session_time: tag.paintTime || null,
+    }).select().single();
+    if (bErr) throw bErr;
+
+    let piecesInserted = [];
+    if (pieces.length) {
+      const { data: inserted, error: pErr } = await supabase.from('practice_pieces')
+        .insert(pieces.map(p => ({ studio_id: studioId, practice_booking_id: booking.id, description: p.description })))
+        .select();
+      if (pErr) throw pErr;
+      piecesInserted = inserted;
+    }
+    res.json({ booking, pieces: piecesInserted, tag, cost });
+  } catch (e) {
+    console.error('practice/booking-from-photo:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/practice/bookings?studioId=&date= — one day at a time, same
+// forward/back-in-time shape as the real Bookings/Floor screens.
+app.get('/api/practice/bookings', async (req, res) => {
+  const { studioId, date } = req.query;
+  if (!studioId || !date) return res.status(400).json({ error: 'studioId and date required' });
+  try {
+    const { data, error } = await supabase.from('practice_bookings')
+      .select('*, practice_pieces(id)')
+      .eq('studio_id', studioId).eq('session_date', date)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    res.json({ bookings: (data || []).map(b => ({ ...b, piece_count: (b.practice_pieces || []).length, practice_pieces: undefined })) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/practice/pieces?studioId=&bookingId=
+app.get('/api/practice/pieces', async (req, res) => {
+  const { studioId, bookingId } = req.query;
+  if (!studioId || !bookingId) return res.status(400).json({ error: 'studioId and bookingId required' });
+  try {
+    const { data, error } = await supabase.from('practice_pieces')
+      .select('*').eq('studio_id', studioId).eq('practice_booking_id', bookingId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    res.json({ pieces: data || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 
 // POST /api/pieces/describe-shelf — one photo of a shelf or tray, back
 // comes what's on it, with rough positions so hits can be pointed at.
