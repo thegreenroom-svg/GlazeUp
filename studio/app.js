@@ -73,6 +73,28 @@ async function search(body) {
   return d;
 }
 
+/* A SECOND sanctioned exception, same reasoning as the first.
+   /api/pieces/describe-group is a POST only because it carries a
+   photo — already live, already used by the studio's own shelf-scan
+   work, read line by line here again on 4 Aug: it calls the vision
+   model, logs its own cost to ai_usage (bookkeeping, not a booking or
+   a piece), and returns descriptions. Nothing in the studio changes.
+   [4 Aug] David, looking at two blank "e.g. blue mug, white spots"
+   fields: "Ai should describe." Right — the model already writes
+   better painting-first descriptions than asking someone to type from
+   a placeholder example, and this exact endpoint already exists for
+   precisely that job. Reused as-is, not rebuilt. */
+const DESCRIBE_PATH = '/api/pieces/describe-group';
+async function describeCrop(photoBase64) {
+  const r = await fetch(API + DESCRIBE_PATH, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ photoBase64, studioId: STUDIO }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || ('the server answered ' + r.status));
+  return d;
+}
+
 /* THE ONE PLACE THIS APP WRITES ANYTHING REAL, and it is deliberate.
    David: "an actual login for everyone, their own code, admin can
    reset it." That's staff identity, not business data — never a
@@ -792,16 +814,20 @@ function paintTableMark() {
         ${marks.map((m, i) => `<div class="row" style="gap:8px">
           <span style="font-family:var(--serif);font-weight:900;color:var(--soon);
             min-width:16px">${i + 1}</span>
-          <input type="text" data-desc="${i}" value="${esc(m.desc || '')}"
-            placeholder="e.g. blue mug, white spots" style="flex:1;border:1.5px solid var(--line);
-            border-radius:9px;padding:8px 10px;font-size:12.5px;font-family:var(--ui)">
-          <button data-rm="${i}" style="background:none;border:none;color:var(--clay);
-            font-size:16px;cursor:pointer;padding:0 2px">✕</button></div>`).join('')}
+          <input type="text" data-desc="${m.id}" value="${esc(m.desc || '')}"
+            placeholder="${m.descLoading ? 'Describing\u2026' : 'e.g. blue mug, white spots'}"
+            style="flex:1;border:1.5px solid var(--line);
+            border-radius:9px;padding:8px 10px;font-size:12.5px;font-family:var(--ui);
+            ${m.descLoading ? 'color:var(--clay)' : ''}">
+          <button data-rm="${m.id}" style="background:none;border:none;color:var(--clay);
+            font-size:16px;cursor:pointer;padding:0 2px">\u2715</button></div>`).join('')}
       </div>
-      <div style="font-size:11px;color:var(--clay);margin-top:6px">A quick description of the
-        colour and pattern is what makes a piece findable — form alone won't do, most of these
-        started as the same blank shape.</div>
-      <button class="btn" id="finishmarks" style="margin-top:10px">Finish — ${marks.length}
+      <div style="font-size:11px;color:var(--clay);margin-top:6px">
+        ${marks.some(m => m.descLoading)
+          ? 'AI is having a first guess at each one \u2014 colour and pattern, the same way it looks for pieces on a shelf. Check them, change anything it got wrong.'
+          : 'A quick description of the colour and pattern is what makes a piece findable \u2014 form alone won\'t do, most of these started as the same blank shape.'}
+        ${descSpend ? ' \u00b7 ' + descSpend.toFixed(1) + 'p on descriptions this session' : ''}</div>
+      <button class="btn" id="finishmarks" style="margin-top:10px">Finish \u2014 ${marks.length}
         ${marks.length === 1 ? 'piece' : 'pieces'}</button>
       <div class="note">Read-only still holds: this saves nothing to the real system. It creates
         ${marks.length === 1 ? 'a piece' : 'pieces'} for THIS practice session only, so Her Pieces
@@ -810,13 +836,18 @@ function paintTableMark() {
   if (img) img.onclick = ev => {
     const r = img.getBoundingClientRect();
     if (!(r.width > 0) || !(r.height > 0)) return;   // image hasn't laid out yet — ignore the tap
-    marks.push({ x: ((ev.clientX - r.left) / r.width) * 100, y: ((ev.clientY - r.top) / r.height) * 100, desc: '' });
+    const id = Date.now() + '-' + Math.random().toString(36).slice(2);
+    marks.push({ id, x: ((ev.clientX - r.left) / r.width) * 100, y: ((ev.clientY - r.top) / r.height) * 100,
+      desc: '', descLoading: true });
     paintTableMark();
+    autoDescribeMark(id);
   };
   box.querySelectorAll('[data-desc]').forEach(inp =>
-    inp.onchange = () => { marks[+inp.dataset.desc].desc = inp.value; });
+    inp.onchange = () => {
+      const m = marks.find(x => x.id === inp.dataset.desc); if (m) m.desc = inp.value;
+    });
   box.querySelectorAll('[data-rm]').forEach(btn =>
-    btn.onclick = () => { marks.splice(+btn.dataset.rm, 1); paintTableMark(); });
+    btn.onclick = () => { marks = marks.filter(x => x.id !== btn.dataset.rm); paintTableMark(); });
   const fin = $('finishmarks');
   if (fin) fin.onclick = finishTableMarks;
 }
@@ -825,6 +856,42 @@ function paintTableMark() {
    piece photo, keep whatever was typed, store as a local piece against
    THIS booking. Nothing here reaches pottery_pieces — completing the
    demo, not the real record. */
+/* [4 Aug] David, looking at two blank description fields: "Ai should
+   describe." Fires the instant a piece is tapped — by the time
+   someone's finished tapping the rest of the table, most fields
+   already have a real guess sitting in them instead of a placeholder
+   to type from scratch. Never blocks Finish: if this fails, is slow,
+   or the network's bad, the field just falls back to the same manual
+   typing that already worked before this existed. Never clobbers a
+   manual edit either — only applies its answer if the field is still
+   exactly as it was left (empty, still loading) when the answer
+   arrives. */
+async function autoDescribeMark(id) {
+  const m = marks.find(x => x.id === id); if (!m) return;
+  try {
+    const photo = await cropAround(tableShot, m.x, m.y);
+    const d = await describeCrop(photo);
+    if (typeof d.cost === 'number') descSpend += d.cost * 100;
+    const still = marks.find(x => x.id === id);
+    if (still && still.descLoading && !still.desc) {
+      const guess = d.pieces && d.pieces[0] && d.pieces[0].description;
+      if (guess) still.desc = guess;
+    }
+  } catch (e) {
+    // A failed guess is not a failed piece — the manual field beneath
+    // it has worked all along and still does.
+  } finally {
+    const still = marks.find(x => x.id === id);
+    if (still) still.descLoading = false;
+    // Never repaint out from under someone actively typing a different
+    // field's description — the data's already correct in marks[], it
+    // shows on the next natural repaint (another tap, a removal, Finish).
+    const typing = document.activeElement && document.activeElement.matches
+      && document.activeElement.matches('[data-desc]');
+    if (!typing) paintTableMark();
+  }
+}
+
 async function finishTableMarks() {
   const b = bkNow; if (!b || !tableShot || !marks.length) return;
   const fin = $('finishmarks');
@@ -1239,7 +1306,7 @@ async function openPackAsBooking(g) {
    Tap a booking → the table photograph the girls took when they cleared
    it → photograph a tray or a piece you think is hers → the pieces get
    circled → tick them off. The whole job on one screen, in that order. */
-let foundMap = {}, spend = 0;
+let foundMap = {}, spend = 0, descSpend = 0;
 
 /* An 8x8 magenta grid burned into the photo before it is sent, so the
    model READS a cell reference rather than estimating a position. Four

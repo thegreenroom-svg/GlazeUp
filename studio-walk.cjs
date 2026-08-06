@@ -7,7 +7,7 @@ const writes=[];
 // The one search POST, plus the three staff-identity writes (verify/
 // set/reset-pin) — matches PIN_WRITES in studio/app.js exactly. Any
 // OTHER non-GET is still a failure; this isn't a general write allowance.
-const SANCTIONED=['/api/packing/find-listed','/api/staff/verify-pin','/api/staff/set-pin','/api/staff/reset-pin'];
+const SANCTIONED=['/api/packing/find-listed','/api/pieces/describe-group','/api/staff/verify-pin','/api/staff/set-pin','/api/staff/reset-pin'];
 app.use((q,_r,n)=>{ if(q.method!=='GET' && !SANCTIONED.includes(q.path)) writes.push(q.method+' '+q.path); n(); });
 app.get('/studio',(q,r)=>r.sendFile(path.join(D,'studio','index.html')));
 app.use('/studio',express.static(path.join(D,'studio')));
@@ -143,6 +143,11 @@ app.post('/api/packing/find-listed',express.json({limit:'12mb'}),(q,r)=>{
   r.json({cost:0.0031,allPottery:['pale pink cottage jar','blue speckled mug'],
     found:w.slice(0,2).map((x,i)=>({id:x.id,cell:['C4','E6'][i]})),
     diag:{returned:w.length,kept:Math.min(2,w.length),withCell:Math.min(2,w.length)}});});
+let describeCalls=0;
+app.post('/api/pieces/describe-group',express.json({limit:'12mb'}),(q,r)=>{
+  describeCalls++;
+  r.json({cost:0.0009,pieces:[{description:'pale blue mug, white spots'}],tag:null});
+});
 
 const srv=app.listen(4801,async()=>{
   const b=await P.launch({executablePath:'/opt/google/chrome/chrome',
@@ -302,6 +307,12 @@ const srv=app.listen(4801,async()=>{
       await new Promise(r=>setTimeout(r,250));
     }
     console.log('pieces marked   :', await p.evaluate(()=>marks.length));
+    // AI SHOULD DESCRIBE: David — "Ai should describe." Give the two
+    // in-flight auto-describe calls time to land, then check the
+    // fields hold a real guess BEFORE any manual typing overwrites them.
+    await new Promise(r=>setTimeout(r,500));
+    console.log('AI guess landed :', await p.evaluate(()=>marks.map(m=>m.desc).join(' | ')));
+    console.log('describe calls  :', describeCalls);
     await p.screenshot({path:'/home/claude/shots/s-10-table.png',fullPage:true});
 
     // THE FULL LOOP: David — "photograph the table... needs to then
