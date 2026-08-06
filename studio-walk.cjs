@@ -58,7 +58,9 @@ app.get('/api/pos/items',(q,r)=>r.json({total:11,groups:[
  {category:'Cakes',items:[{name:'Brownie',price:4.03}]},
  {category:'Booking Fees',items:[{name:'Booking fee',price:36.44}]},
  {category:'Other',items:[{name:'Misc',price:12.35}]}]}));  // real 41-category shape, trimmed
+let moneyHistCalls = 0;
 app.get('/api/takings/history',(q,r)=>{
+  moneyHistCalls++;
   const days=[],months=[],years=[];
   for(let i=400;i>=0;i--){const d=new Date(Date.now()-i*864e5);
     days.push({date:d.toISOString().slice(0,10),
@@ -484,6 +486,19 @@ const srv=app.listen(4801,async()=>{
   // new write exception, everyone (not just directors) can check one.
   await p.evaluate(()=>{stack=[];go('home',false);}); await new Promise(r=>setTimeout(r,300));
   console.log('vouchers tile visible to everyone:', (await p.$$eval('.tile',e=>e.map(x=>x.textContent).join('|'))).includes('Gift Vouchers') ? 'yes ✓' : '✗');
+
+  // MONEY MUST NEVER GO STALE: David found real Oct 2025 figures still
+  // showing as "today" — the cache never refetched, not even across a
+  // login. Prove it actually re-reads every single visit now.
+  const moneyCallsBefore = moneyHistCalls;
+  await p.evaluate(()=>go('money')); await new Promise(r=>setTimeout(r,700));
+  await p.evaluate(()=>{stack=[];go('home',false);}); await new Promise(r=>setTimeout(r,300));
+  await p.evaluate(()=>go('money')); await new Promise(r=>setTimeout(r,700));
+  await p.evaluate(()=>{stack=[];go('home',false);}); await new Promise(r=>setTimeout(r,300));
+  await p.evaluate(()=>go('money')); await new Promise(r=>setTimeout(r,700));
+  const moneyCallsDelta = moneyHistCalls - moneyCallsBefore;
+  console.log('money refetches for 3 separate visits:', moneyCallsDelta,
+    moneyCallsDelta === 3 ? '(refetches every time ✓)' : '✗ STILL CACHING');
   await p.evaluate(()=>go('vouchers')); await new Promise(r=>setTimeout(r,400));
   await p.type('#ganentry','7783320000000000',{delay:10});
   await p.evaluate(()=>document.getElementById('gancheck').click());

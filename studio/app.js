@@ -361,6 +361,7 @@ function signIn(name, role, id) {
   ticket = []; stack = [];                       // every login starts clean
   priceGroups = []; tillMode = null; parentCatSel = null; cat = null; tillTable = null; day = new Date();
   localTickets = {}; ticketKey = null; ticketKeyIsBooking = false; localPieces = {};
+  hist = null; brk = null;
   $('who').textContent = name;
   go('home', false);
   if (!tablesLoaded) loadTables();               // real layout, once; falls back silently
@@ -1493,7 +1494,21 @@ async function checkVoucher(gan) {
 
 async function loadMoney() {
   if (!me || !me.admin) { $('money').innerHTML = '<div class="empty">Takings are for the directors.</div>'; return; }
-  if (hist) return paintMoney();
+  /* [6 Aug] David: "the money isn't up to date, only goes to October.
+     What's October got to do with anything?" Real, and worse than it
+     first looked: the figures on his screen were genuine, correct,
+     real October 2025 revenue — the server's real data is fresh
+     through yesterday, confirmed directly against analytics_cache. The
+     gap was here: `if (hist) return paintMoney();` cached whatever
+     Money first loaded for the ENTIRE life of the tab, and never once
+     refetched — not on returning to the screen, not on logging out and
+     back in (hist was never in either reset block). Every other screen
+     in this app reloads fresh on every visit; Money was silently the
+     one exception to an app that calls itself "Live from Square" on
+     its own header. Removed the cache — the one extra lightweight read
+     this costs on each visit is nothing against showing a director
+     financial figures that are eleven months old and calling them
+     current. */
   $('money').innerHTML = '<div class="empty">Reading four years of takings…</div>';
   try {
     const [h, b] = await Promise.all([
