@@ -218,6 +218,24 @@ app.use(cors({
 
 app.use(express.json({ limit: '50mb' }));
 
+// [6 Aug] The missing layer, found after two real, correctly-verified
+// fixes (a client-side cache, then the service worker) both failed to
+// resolve the same symptom on a device with consistently poor signal
+// in every screenshot. Neither fix could touch this: without an
+// explicit Cache-Control header, an API response is fair game for ANY
+// intermediate cache — a mobile carrier's transparent proxy, Render's
+// own edge — none of which are bound by a client-side fetch() option
+// or a service worker's own logic, since those only govern the
+// browser, not the network path in front of it. Every /api/ response
+// now says so explicitly, closing the gap at its actual source rather
+// than chasing it layer by layer again.
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  next();
+});
+
+
 // Serve the admin dashboard (and other static frontend files) so they have real URLs
 const path = require('path');
 // Genuine real cache-control — was previously entirely uncached (no
