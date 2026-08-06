@@ -3,7 +3,7 @@
  * Caches the app shell for offline use and fast loading.
  */
 
-const CACHE_VERSION = 'glazeup-v4-2026-08-04-studio';
+const CACHE_VERSION = 'glazeup-v5-2026-08-06-api-never-cached';
 
 const SHELL_FILES = [
   '/',
@@ -69,6 +69,21 @@ self.addEventListener('fetch', event => {
 
   if (event.request.method !== 'GET') return;
   if (url.hostname.includes('supabase')) return;
+
+  // [6 Aug] Real gap found via David's phone genuinely on one signal
+  // bar: network-first still means ANY momentary failure — a flaky
+  // connection, not just wifi being fully down — falls through to
+  // whatever this SW cached from the last successful call to that
+  // exact URL. Fine for the app shell (HTML/CSS/JS): stale UI while
+  // offline is what a service worker is FOR. Wrong for /api/ data —
+  // a stale response looks EXACTLY like a fresh one, no error shown,
+  // and this is where real financial and business figures live. An
+  // API call now either succeeds with real data or fails honestly;
+  // it is never cached and never falls back to a cached copy.
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
 
   event.respondWith(
     fetch(event.request).then(response => {
