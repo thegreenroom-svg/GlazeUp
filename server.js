@@ -12303,6 +12303,7 @@ async function recordLoyaltyVisit(studioId, customerId, bookingCode, spendCents)
     booking_code: bookingCode || null,
     points_earned: totalNewPoints,
     transaction_type: 'visit',
+    spend_cents: spendCents || 0,
     description: `Visit #${newVisits} — ${visitPoints} visit points + ${spendPoints} spend points${spendCents ? ` (£${(spendCents/100).toFixed(2)} spent)` : ''}`,
   });
 
@@ -12464,7 +12465,8 @@ app.delete('/api/cleos-club/sticker-types/:code', async (req, res) => {
 // (in a real billed version this would also touch Stripe subscription
 // items — kept simple here as the on/off + settings switch itself)
 app.post('/api/cleos-club/config', async (req, res) => {
-  const { studioId, enabled, rewardEveryNVisits, rewardDescription, monthlyAddonPriceCents } = req.body;
+  const { studioId, enabled, rewardEveryNVisits, rewardDescription, monthlyAddonPriceCents,
+    pricingModel, pricePerVisitCents, pricePercentOfSpend, minimumMonthlyCents } = req.body;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
   const updates = {
     studio_id: studioId, enabled: !!enabled,
@@ -12472,14 +12474,75 @@ app.post('/api/cleos-club/config', async (req, res) => {
     reward_description: rewardDescription || 'Free small piece + a drink',
     enabled_at: enabled ? new Date().toISOString() : null,
   };
-  // Only touch the price if genuinely provided — don't silently reset
-  // it to the schema default every time someone just edits the reward
+  // Only touch a field if genuinely provided — don't silently reset it
+  // to the schema default every time someone just edits the reward
   // description or toggles off.
   if (monthlyAddonPriceCents !== undefined) updates.monthly_addon_price_cents = monthlyAddonPriceCents;
+  if (pricingModel !== undefined) updates.pricing_model = pricingModel;
+  if (pricePerVisitCents !== undefined) updates.price_per_visit_cents = pricePerVisitCents;
+  if (pricePercentOfSpend !== undefined) updates.price_percent_of_spend = pricePercentOfSpend;
+  if (minimumMonthlyCents !== undefined) updates.minimum_monthly_cents = minimumMonthlyCents;
 
   const { data, error } = await supabase.from('cleos_club_config').upsert(updates, { onConflict: 'studio_id' }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json({ config: data });
+});
+
+/* [6 Aug] David: "we can't have ten pound a month, it has to be based
+   on visits and expenditure." The real formula: pence per loyalty
+   visit recorded in the period, plus a percentage of the spend behind
+   those visits, floored so a barely-used club still covers baseline
+   cost. Reads loyalty_transactions' own spend_cents (real numbers,
+   added 6 Aug — the old description text was never a sound basis for
+   money math). A studio still on pricing_model='flat' gets the old
+   flat figure back unchanged, so nothing reading this for a
+   not-yet-switched studio breaks. */
+async function calculateCleosClubCharge(studioId, periodStart, periodEnd) {
+  const { data: config } = await supabase.from('cleos_club_config')
+    .select('*').eq('studio_id', studioId).single();
+  if (!config) return null;
+
+  if (config.pricing_model !== 'usage') {
+    return { pricingModel: 'flat', chargeCents: config.monthly_addon_price_cents };
+  }
+
+  const { data: rows } = await supabase.from('loyalty_transactions')
+    .select('spend_cents')
+    .eq('studio_id', studioId).eq('transaction_type', 'visit')
+    .gte('created_at', periodStart).lt('created_at', periodEnd);
+
+  const visits = (rows || []).length;
+  const spendCents = (rows || []).reduce((s, r) => s + (r.spend_cents || 0), 0);
+  const formulaCents = Math.round(
+    visits * config.price_per_visit_cents + spendCents * (config.price_percent_of_spend / 100));
+  const chargeCents = Math.max(formulaCents, config.minimum_monthly_cents);
+
+  return {
+    pricingModel: 'usage', chargeCents, formulaCents,
+    flooredAtMinimum: formulaCents < config.minimum_monthly_cents,
+    visits, spendCents,
+    ratePerVisitCents: config.price_per_visit_cents,
+    ratePercentOfSpend: Number(config.price_percent_of_spend),
+    minimumCents: config.minimum_monthly_cents,
+  };
+}
+
+// GET /api/cleos-club/charge?studioId=&start=&end= — what a studio
+// actually owes for a real period under whichever pricing model it's
+// on. No automated Stripe metering is wired to this (Cleo's Club is
+// tracked separately from the studio_addons/Stripe MRR machinery on
+// purpose) — this is the real number for whoever handles invoicing to
+// read and act on by hand, not a live charge trigger.
+app.get('/api/cleos-club/charge', async (req, res) => {
+  const { studioId, start, end } = req.query;
+  if (!studioId || !start || !end) return res.status(400).json({ error: 'studioId, start, end required' });
+  try {
+    const result = await calculateCleosClubCharge(studioId, start, end);
+    if (!result) return res.status(404).json({ error: 'No Cleo\'s Club config for this studio' });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // ═══════════════════════════════════════════
