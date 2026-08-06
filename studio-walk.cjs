@@ -7,7 +7,7 @@ const writes=[];
 // The one search POST, plus the three staff-identity writes (verify/
 // set/reset-pin) — matches PIN_WRITES in studio/app.js exactly. Any
 // OTHER non-GET is still a failure; this isn't a general write allowance.
-const SANCTIONED=['/api/packing/find-listed','/api/pieces/describe-group','/api/staff/verify-pin','/api/staff/set-pin','/api/staff/reset-pin'];
+const SANCTIONED=['/api/packing/find-listed','/api/pieces/describe-group','/api/staff/verify-pin','/api/staff/set-pin','/api/staff/reset-pin','/api/addons/enable','/api/addons/disable','/api/cleos-club/config'];
 app.use((q,_r,n)=>{ if(q.method!=='GET' && !SANCTIONED.includes(q.path)) writes.push(q.method+' '+q.path); n(); });
 app.get('/studio',(q,r)=>r.sendFile(path.join(D,'studio','index.html')));
 app.use('/studio',express.static(path.join(D,'studio')));
@@ -115,6 +115,27 @@ app.get('/api/gift-cards/lookup',(q,r)=>{
   if (q.query.gan==='7783320000000000')
     return r.json({gan:q.query.gan,state:'ACTIVE',balance:{amount:45.50,currency:'GBP'}});
   r.status(404).json({error:'No gift card found with that number'});
+});
+let clubConfig = {enabled:true,reward_every_n_visits:5,reward_description:'Free small piece + a drink',
+  pricing_model:'usage',price_per_visit_cents:8,price_percent_of_spend:1.0,minimum_monthly_cents:300};
+app.get('/api/cleos-club/config',(q,r)=>r.json({config:clubConfig}));
+app.post('/api/cleos-club/config',express.json(),(q,r)=>{
+  clubConfig={...clubConfig,enabled:!!q.body.enabled,reward_every_n_visits:q.body.rewardEveryNVisits,
+    reward_description:q.body.rewardDescription};
+  r.json({config:clubConfig});
+});
+const addonCatalogue = {
+  ai_piece_finder:{name:'AI Piece Finder',description:'Piece matching and whole-tray scan.',monthlyPriceCents:2000},
+  piece_catalogue:{name:'Piece Catalogue',description:'Browse and reserve stock from home.',monthlyPriceCents:1500},
+};
+let addonStatus = {};
+app.get('/api/addons/catalogue',(q,r)=>r.json({catalogue:addonCatalogue}));
+app.get('/api/addons/status',(q,r)=>r.json({addons:addonStatus}));
+app.post('/api/addons/enable',express.json(),(q,r)=>{
+  addonStatus[q.body.addonKey]={enabled:true}; r.json({status:'enabled'});
+});
+app.post('/api/addons/disable',express.json(),(q,r)=>{
+  addonStatus[q.body.addonKey]={enabled:false}; r.json({status:'disabled'});
 });
 app.get('/api/bookings/search',(q,r)=>{
   const term=(q.query.q||'').toLowerCase();
@@ -499,6 +520,27 @@ const srv=app.listen(4801,async()=>{
   const moneyCallsDelta = moneyHistCalls - moneyCallsBefore;
   console.log('money refetches for 3 separate visits:', moneyCallsDelta,
     moneyCallsDelta === 3 ? '(refetches every time ✓)' : '✗ STILL CACHING');
+
+  // STUDIO SETTINGS: David — "adjust these parameters for gifts, for
+  // promotions." Real infra found in the old monolith, wired back in.
+  await p.evaluate(()=>{stack=[];go('home',false);}); await new Promise(r=>setTimeout(r,300));
+  console.log('settings tile visible to admin:', (await p.$$eval('.tile',e=>e.map(x=>x.textContent).join('|'))).includes('Studio Settings') ? 'yes ✓' : '✗');
+  await p.evaluate(()=>go('settings')); await new Promise(r=>setTimeout(r,500));
+  console.log('real club config shown:', await p.$eval('#cc-every',e=>e.value).catch(()=>'✗'));
+  await p.evaluate(()=>{document.getElementById('cc-every').value='7';});
+  await p.evaluate(()=>document.getElementById('cc-save').click());
+  await new Promise(r=>setTimeout(r,500));
+  console.log('club config saved   :', await p.$eval('#cc-every',e=>e.value).catch(()=>'✗'), '(should be 7)');
+  const addonBtn = await p.$('[data-toggle]');
+  console.log('add-ons listed       :', addonBtn ? 'yes ✓' : '✗');
+  if (addonBtn) {
+    await addonBtn.click(); await new Promise(r=>setTimeout(r,400));
+    await p.evaluate(()=>document.getElementById('addon-go').click());
+    await new Promise(r=>setTimeout(r,500));
+    const nowOn = await p.$eval('#settings',e=>e.textContent).catch(()=>'');
+    console.log('add-on toggled       :', nowOn.includes('enabled') || nowOn.includes('On') ? 'yes ✓' : '✗');
+  }
+  await p.screenshot({path:'/home/claude/shots/s-29-settings.png',fullPage:true});
   await p.evaluate(()=>go('vouchers')); await new Promise(r=>setTimeout(r,400));
   await p.type('#ganentry','7783320000000000',{delay:10});
   await p.evaluate(()=>document.getElementById('gancheck').click());

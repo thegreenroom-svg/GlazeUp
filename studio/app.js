@@ -31,6 +31,7 @@ const ALLOWED = [
   '/api/floor/tables', '/api/pos/items', '/api/packing/queue', '/api/takings/today',
   '/api/takings/breakdown', '/api/takings/history', '/api/analytics/dashboard',
   '/api/ai-usage', '/api/pieces/for-booking', '/api/gift-cards/lookup',
+  '/api/addons/catalogue', '/api/addons/status', '/api/cleos-club/config',
 ];
 async function read(path, params = {}) {
   const url = new URL(path, API);
@@ -112,6 +113,26 @@ async function describeCrop(photoBase64) {
 const PIN_WRITES = ['/api/staff/verify-pin', '/api/staff/set-pin', '/api/staff/reset-pin'];
 async function writePin(path, body) {
   if (!PIN_WRITES.includes(path))
+    throw new Error('Blocked: ' + path + ' is not a write this app is allowed to make.');
+  const r = await fetch(API + path, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...body, studioId: STUDIO }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || ('the server answered ' + r.status));
+  return d;
+}
+
+/* A FOURTH, separate write path — [6 Aug] David: "we used to have a
+   dashboard for the admin team... to adjust these parameters for
+   gifts, for promotions." Real, already-live infrastructure found in
+   the old monolith and confirmed still working server-side — not
+   rebuilt, just given a way back in. Studio-level configuration only:
+   which paid add-ons are switched on, and Cleo's Club's own reward
+   settings. Never a booking, a customer record, the till or Square. */
+const SETTINGS_WRITES = ['/api/addons/enable', '/api/addons/disable', '/api/cleos-club/config'];
+async function writeSettings(path, body) {
+  if (!SETTINGS_WRITES.includes(path))
     throw new Error('Blocked: ' + path + ' is not a write this app is allowed to make.');
   const r = await fetch(API + path, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -249,6 +270,7 @@ const PANES = {
   pack:  ['Packing', 'Pieces waiting to go home'],
   money: ['Money', 'Live from Square'],
   pins:  ['Staff PINs', 'Director-only'],
+  settings: ['Studio Settings', 'Director-only'],
   vouchers: ['Gift Vouchers', 'Live from Square'],
 };
 
@@ -269,6 +291,7 @@ function go(v, push = true) {
   if (v === 'pack') loadPack();
   if (v === 'money') loadMoney();
   if (v === 'pins') loadPins();
+  if (v === 'settings') loadSettings();
   if (v === 'vouchers') loadVouchers();
   if (v === 'home') loadHome();
 }
@@ -428,6 +451,7 @@ async function loadHome() {
   ];
   if (me && me.admin) t.push(['money', '£', 'Money', 'Takings, live from Square', 'moneyN']);
   if (me && me.admin) t.push(['pins', '••', 'Staff PINs', 'Set or reset someone\'s code', null]);
+  if (me && me.admin) t.push(['settings', '⚙', 'Studio Settings', 'Cleo\'s Club, add-ons and pricing', null]);
   $('hometiles').innerHTML = t.map(([v, ic, title, sub, slot]) => `
     <button class="tile" data-go="${v}">
       <span class="ic">${ic}</span>
@@ -1392,6 +1416,112 @@ let hist = null, brk = null, range = '30d';
    design (set-pin's own message says the same: ask your manager),
    not a gap to route around here. */
 let pinsTeam = [];
+/* ── studio settings (director-only) ──────────────────────────────────
+   [6 Aug] David: "we used to have a dashboard for the admin team...
+   to adjust these parameters for gifts, for promotions." Real,
+   already-live infrastructure — found in the old monolith, confirmed
+   still working server-side, not rebuilt. Cleo's Club's own reward
+   settings (the actual "promotion"), plus the real paid add-on
+   catalogue this studio can turn on or off. Every write here goes
+   through writeSettings' narrow gate — studio configuration only,
+   never a booking, a customer record, the till or Square. */
+let settingsClub = null, settingsAddons = null, settingsCatalogue = null;
+async function loadSettings() {
+  try {
+    const [club, cat, status] = await Promise.all([
+      read('/api/cleos-club/config'),
+      read('/api/addons/catalogue'),
+      read('/api/addons/status'),
+    ]);
+    settingsClub = club.config || club;
+    settingsCatalogue = cat.catalogue || {};
+    settingsAddons = status.addons || {};
+    paintSettings();
+  } catch (e) {
+    $('settings').innerHTML = `<div class="err">Couldn't read settings. ${esc(e.message)}</div>`;
+  }
+}
+function paintSettings(msg) {
+  const club = settingsClub || {};
+  $('settings').innerHTML = `
+    ${msg ? `<div class="note" style="margin-bottom:12px">${msg}</div>` : ''}
+    <div class="card">
+      <h2>Cleo's Club</h2>
+      <div style="font-size:12px;color:var(--clay);margin-bottom:10px">
+        ${club.enabled ? 'Live for this studio.' : 'Not enabled for this studio.'}</div>
+      <div class="k" style="margin-bottom:4px">Reward every</div>
+      <input type="number" min="1" id="cc-every" value="${club.reward_every_n_visits || 5}"
+        style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;
+        font-family:var(--ui);margin-bottom:10px">
+      <div class="k" style="margin-bottom:4px">The reward</div>
+      <input type="text" id="cc-desc" value="${esc(club.reward_description || '')}"
+        style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;
+        font-family:var(--ui);margin-bottom:10px">
+      ${club.pricing_model === 'usage' ? `<div style="font-size:11px;color:var(--clay);margin-bottom:10px">
+        Priced on usage: ${club.price_per_visit_cents}p a visit + ${Number(club.price_percent_of_spend)}%
+        of the spend behind it, £${(club.minimum_monthly_cents / 100).toFixed(2)} minimum a month.</div>`
+        : `<div style="font-size:11px;color:var(--clay);margin-bottom:10px">
+        Flat £${((club.monthly_addon_price_cents || 0) / 100).toFixed(2)} a month.</div>`}
+      <button class="btn" id="cc-save" style="margin-top:0">Save</button>
+      <div id="cc-err" style="color:var(--brick);font-size:12px;margin-top:8px;min-height:16px"></div>
+    </div>
+
+    <div class="card">
+      <h2>Add-ons</h2>
+      <div style="font-size:12px;color:var(--clay);margin-bottom:10px">Real paid features this
+        studio can switch on or off.</div>
+      ${Object.entries(settingsCatalogue || {}).map(([key, a]) => {
+        const on = !!(settingsAddons[key] && settingsAddons[key].enabled);
+        return `<div class="row"><div style="flex:1">
+            <div class="l">${esc(a.name)}</div>
+            <div class="m">£${(a.monthlyPriceCents / 100).toFixed(2)}/mo · ${on ? 'On' : 'Off'}</div></div>
+          <button class="chip" data-toggle="${esc(key)}" data-on="${on ? '1' : '0'}"
+            style="min-height:34px;padding:6px 12px">${on ? 'Disable' : 'Enable'}</button>
+        </div>`;
+      }).join('')}
+    </div>
+    <div id="addonbox"></div>`;
+
+  $('cc-save').onclick = async () => {
+    $('cc-err').textContent = '';
+    try {
+      const d = await writeSettings('/api/cleos-club/config', {
+        enabled: !!club.enabled,
+        rewardEveryNVisits: +$('cc-every').value || 5,
+        rewardDescription: $('cc-desc').value,
+      });
+      settingsClub = d.config || settingsClub;
+      paintSettings('Saved.');
+    } catch (e) { $('cc-err').textContent = e.message; }
+  };
+  $('settings').querySelectorAll('[data-toggle]').forEach(b =>
+    b.onclick = () => paintAddonConfirm(b.dataset.toggle, b.dataset.on === '1'));
+}
+function paintAddonConfirm(key, currentlyOn) {
+  const a = settingsCatalogue[key];
+  $('addonbox').innerHTML = `
+    <div class="card">
+      <h2>${currentlyOn ? 'Disable' : 'Enable'} ${esc(a.name)}</h2>
+      <div style="font-size:12px;color:var(--clay);margin-bottom:10px">${esc(a.description)}</div>
+      ${!currentlyOn ? `<div style="font-size:12.5px;font-weight:700;margin-bottom:10px">
+        £${(a.monthlyPriceCents / 100).toFixed(2)} a month, starting now.</div>` : ''}
+      <div style="display:flex;gap:8px">
+        <button class="btn" id="addon-go" style="margin-top:0">
+          ${currentlyOn ? 'Disable it' : 'Enable it'}</button>
+        <button class="btn ghost" id="addon-cancel" style="margin-top:0">Cancel</button>
+      </div>
+      <div id="addon-err" style="color:var(--brick);font-size:12px;margin-top:8px;min-height:16px"></div>
+    </div>`;
+  $('addon-cancel').onclick = () => { $('addonbox').innerHTML = ''; };
+  $('addon-go').onclick = async () => {
+    try {
+      await writeSettings(currentlyOn ? '/api/addons/disable' : '/api/addons/enable', { addonKey: key });
+      await loadSettings();
+      paintSettings(`${esc(a.name)} ${currentlyOn ? 'disabled' : 'enabled'}.`);
+    } catch (e) { $('addon-err').textContent = e.message; }
+  };
+}
+
 async function loadPins() {
   try {
     const d = await read('/api/staff/team-for-login');
