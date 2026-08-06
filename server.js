@@ -972,7 +972,8 @@ app.get('/api/square/transactions', async (req, res) => {
       .select('metric_date, metric_value')
       .eq('studio_id', studioId)
       .eq('metric_type', 'daily_revenue')
-      .order('metric_date', { ascending: false });
+      .order('metric_date', { ascending: false })
+      .limit(5000);
 
     if (error) throw error;
 
@@ -1174,12 +1175,21 @@ app.get('/api/takings/history', async (req, res) => {
   const { studioId } = req.query;
   if (!studioId) return res.status(400).json({ error: 'studioId required' });
   try {
+    // [6 Aug] THE REAL CAUSE, after three other real fixes today that
+    // were each individually correct and still didn't touch this:
+    // Supabase silently caps an unbounded select() at 1000 rows. This
+    // studio has 1291. No limit() meant this query was quietly cut off
+    // 291 rows before the true end — counting back from today, that
+    // lands almost exactly in October 2025, which is precisely what
+    // kept showing up. /api/takings/today never hit this because it
+    // only ever asks for a single day. 5000 gives years of headroom.
     const { data, error } = await supabase
       .from('analytics_cache')
       .select('metric_date, metric_value')
       .eq('studio_id', studioId)
       .eq('metric_type', 'daily_revenue')
-      .order('metric_date', { ascending: true });
+      .order('metric_date', { ascending: true })
+      .limit(5000);
     if (error) throw error;
 
     const days = (data || []).map(r => ({
@@ -2670,7 +2680,8 @@ app.get('/api/analytics/dashboard', async (req, res) => {
       .from('analytics_cache')
       .select('metric_value')
       .eq('studio_id', studioId)
-      .eq('metric_type', 'daily_revenue');
+      .eq('metric_type', 'daily_revenue')
+      .limit(5000);
     const allTimeRevenueCents = (allTimeRevenue || []).reduce((sum, day) => sum + (day.metric_value?.revenue_cents || 0), 0);
     const allTimeTransactionCount = (allTimeRevenue || []).reduce((sum, day) => sum + (day.metric_value?.transaction_count || 0), 0);
 
