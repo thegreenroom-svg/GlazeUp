@@ -14780,6 +14780,33 @@ app.get('/api/version', (req, res) => {
   res.json({ buildId: BUILD_ID, bootTime: SERVER_BOOT_TIME });
 });
 
+// [6 Aug] David, repeatedly, on a real device, with real frustration:
+// the raw /api/takings/history dump is too long to scroll or search on
+// a phone. This is the same real question — is the 1000-row limit fix
+// actually live on whatever's being hit — with nothing to scroll to
+// and nothing to search for. One line, unmistakable either way.
+app.get('/api/takings/history-check', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const { count } = await supabase.from('analytics_cache')
+      .select('metric_date', { count: 'exact', head: true })
+      .eq('studio_id', studioId).eq('metric_type', 'daily_revenue');
+    const { data } = await supabase.from('analytics_cache')
+      .select('metric_date').eq('studio_id', studioId).eq('metric_type', 'daily_revenue')
+      .order('metric_date', { ascending: false }).limit(1);
+    res.json({
+      build: BUILD_ID,
+      real_row_count_in_database: count,
+      most_recent_date_this_request_returned: data?.[0]?.metric_date || null,
+      fix_is_working_if_this_says: 'true, and the date above is today or yesterday',
+      fix_is_working: (data?.[0]?.metric_date || '') >= '2026-08-05',
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/changelog — plain-English "what's new" entries, shown when
 // someone taps the green "update available" banner. Daisy doesn't have
 // a developer to explain each change to her, so this is genuinely her
