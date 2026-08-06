@@ -46,8 +46,11 @@ app.get('/api/bookings/day',(q,r)=>r.json({date:q.query.date,covers:11,bookings:
   party_size:2,space_name:'The Lounge Pottery Painting *Adult Only*',booking_code:'BK-3'},
  {customer_name:'The Sowerby Party',session_start:iso(13,0),session_end:iso(15,30),table_number:null,
   party_size:12,space_name:'The Vault - perfect for private parties!',booking_code:'BK-4'}]}));
-app.get('/api/pos/items',(q,r)=>r.json({total:11,groups:[
- {category:'PB Mugs And Cups',items:[{name:'Mug',price:19.97}]},
+app.get('/api/pos/items',(q,r)=>r.json({total:19,groups:[
+ {category:'PB Mugs And Cups',items:[{name:'Mug',price:19.97},{name:'Big Mug',price:22.50},
+   {name:'Small Mug',price:16.20},{name:'Owl',price:18.50},{name:'Spaniel Pup',price:26.00},
+   {name:'Standing Dog',price:20.00},{name:'Tom cat',price:16.00},{name:'Unicorn',price:24.00},
+   {name:'Wide Mouth Frog',price:28.00},{name:'Wise owl',price:26.00},{name:'Woody dog',price:25.00}]},
  {category:'PB Plates & Platters',items:[{name:'Plate',price:26.42}]},
  {category:'PB Bowls & Pet Bowls',items:[{name:'Bowl',price:24.05}]},
  {category:'PB Vases',items:[{name:'Vase',price:27.24}]},
@@ -195,6 +198,8 @@ const srv=app.listen(4801,async()=>{
   await p.evaluate(()=>document.getElementById('pingo').click());
   await new Promise(r=>setTimeout(r,600)); await shot('2-home');
   console.log('signed in as    :', await p.evaluate(()=>me && me.name), '(admin:', await p.evaluate(()=>me && me.admin)+')');
+  const appLinkHref = await p.$eval('a[href^="/app"]', e=>e.getAttribute('href')).catch(()=>null);
+  console.log('customer app link on Home:', appLinkHref === '/app' ? 'yes ✓' : '✗ '+appLinkHref);
 
   // THE LOGIN/PIN WORK: David — "an actual login for everyone, their
   // own code, admin can reset it." Test the whole real loop.
@@ -441,6 +446,25 @@ const srv=app.listen(4801,async()=>{
   const parentChips = await p.$$eval('#cats .chip', e => e.map(x => x.textContent));
   console.log('parent chips    :', parentChips.join(' | '));
   console.log('parent count    :', parentChips.length, parentChips.length <= 6 ? '(OK, not 41)' : 'STILL FLAT ✗');
+
+  // MOST POPULAR IN, REST BEHIND MORE: David — "put the most popular
+  // ones in and keep the others hidden... more button... too big."
+  await p.evaluate(()=>{
+    const btn=[...document.querySelectorAll('#leafcats .chip')].find(x=>x.textContent.includes('Mugs And Cups'));
+    if(btn) btn.click();
+  });
+  await new Promise(r=>setTimeout(r,400));
+  const itemsBefore = await p.$$eval('#items .item', e=>e.length);
+  const hasMore = await p.$('#items [data-more]');
+  console.log('items shown before More:', itemsBefore, '(should be 9 - 8 real + the More button itself)');
+  console.log('More button present    :', hasMore ? 'yes ✓' : '✗');
+  if (hasMore) {
+    await hasMore.click(); await new Promise(r=>setTimeout(r,300));
+    const itemsAfter = await p.$$eval('#items .item', e=>e.length);
+    console.log('items shown after More :', itemsAfter, '(should be 11, all of them)');
+  }
+  await p.screenshot({path:'/home/claude/shots/s-30-more-button.png'});
+
   await p.click('#leafcats .chip:nth-child(2)').catch(()=>{});
   await new Promise(r=>setTimeout(r,400));
   await p.screenshot({path:'/home/claude/shots/s-14-till-leaf.png',fullPage:true});
@@ -527,6 +551,8 @@ const srv=app.listen(4801,async()=>{
   console.log('settings tile visible to admin:', (await p.$$eval('.tile',e=>e.map(x=>x.textContent).join('|'))).includes('Studio Settings') ? 'yes ✓' : '✗');
   await p.evaluate(()=>go('settings')); await new Promise(r=>setTimeout(r,500));
   console.log('real club config shown:', await p.$eval('#cc-every',e=>e.value).catch(()=>'✗'));
+  const addonsText = await p.$eval('#settings',e=>e.textContent).catch(()=>'');
+  console.log('add-ons show no price:', addonsText.includes('£20.00/mo') || addonsText.includes('/mo') ? '✗ STILL PRICED' : 'yes ✓');
   await p.evaluate(()=>{document.getElementById('cc-every').value='7';});
   await p.evaluate(()=>document.getElementById('cc-save').click());
   await new Promise(r=>setTimeout(r,500));

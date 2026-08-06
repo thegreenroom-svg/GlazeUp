@@ -3676,6 +3676,18 @@ app.get('/api/pos/items', async (req, res) => {
       .order('item_name', { ascending: true });
     if (error) throw error;
 
+    // [6 Aug] David: "put the most popular ones in... keep the others
+    // hidden." Categories used to sort by how many SKUs they contain,
+    // which rewards a category for being big, not for actually
+    // selling. This sorts by real sales instead — summed once here,
+    // not per-item (an earlier attempt at this joined day-by-day rows
+    // straight against every SKU in a category and inflated the totals
+    // by however many SKUs existed; aggregate first, then use it).
+    const { data: sales } = await supabase.from('revenue_category_breakdown')
+      .select('category, item_count').eq('studio_id', studioId);
+    const soldByCategory = {};
+    (sales || []).forEach(r => { soldByCategory[r.category] = (soldByCategory[r.category] || 0) + (r.item_count || 0); });
+
     const groups = {};
     for (const r of (data || [])) {
       (groups[r.category] = groups[r.category] || []).push({
@@ -3685,8 +3697,8 @@ app.get('/api/pos/items', async (req, res) => {
     res.json({
       total: (data || []).length,
       groups: Object.entries(groups)
-        .map(([category, items]) => ({ category, items }))
-        .sort((a, b) => b.items.length - a.items.length),
+        .map(([category, items]) => ({ category, items, sold: soldByCategory[category] || 0 }))
+        .sort((a, b) => b.sold - a.sold),
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -12659,11 +12671,15 @@ app.post('/api/addons/enable', async (req, res) => {
     }, { onConflict: 'studio_id,addon_key' }).select().single();
     if (error) throw error;
 
-    const billedForMonth = new Date(); billedForMonth.setDate(1); billedForMonth.setHours(0,0,0,0);
-    await supabase.from('addon_revenue_log').insert({
-      studio_id: studioId, addon_key: addonKey,
-      amount_cents: catalogueEntry.monthlyPriceCents, billed_for_month: billedForMonth.toISOString().split('T')[0],
-    });
+    // [6 Aug] David: "they're just free because there are add-ons, and
+    // we're not selling to other studios at this stage, so they just
+    // need to be part of the app." Used to log a real row into
+    // addon_revenue_log here for the full catalogue price on every
+    // enable — genuinely fictitious revenue for a feature nobody is
+    // actually being billed for right now. Removed; the catalogue
+    // price stays on record on studio_addons itself for whenever
+    // real billing is genuinely switched on, it just isn't logged as
+    // having happened yet.
 
     res.json({ status: 'enabled', addon: data });
   } catch (error) {

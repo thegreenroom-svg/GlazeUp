@@ -384,7 +384,7 @@ function signIn(name, role, id) {
   ticket = []; stack = [];                       // every login starts clean
   priceGroups = []; tillMode = null; parentCatSel = null; cat = null; tillTable = null; day = new Date();
   localTickets = {}; ticketKey = null; ticketKeyIsBooking = false; localPieces = {};
-  hist = null; brk = null;
+  hist = null; brk = null; expandedGroups = new Set();
   $('who').textContent = name;
   go('home', false);
   if (!tablesLoaded) loadTables();               // real layout, once; falls back silently
@@ -701,6 +701,9 @@ function paintBooking() {
         ${seated
           ? `Seated · Table ${esc(b.table_number)}${b.party_size ? ' · ' + b.party_size + ' painting' : ''}`
           : `Not seated yet — lands here once someone's at the terminal`}</div>
+      ${b.booking_code ? `<a class="btn ghost" style="margin-top:10px;display:block;text-align:center;
+        text-decoration:none" href="/app?booking=${encodeURIComponent(b.booking_code)}"
+        target="_blank" rel="noopener">View her app</a>` : ''}
     </div>
 
     ${(() => {
@@ -1072,6 +1075,26 @@ function paintTillTable() {
 /* Shared by Till and the booking page's inline picker — one grouping
    rule, used everywhere prices are browsed, so the two can never drift
    into different category shapes. */
+/* [6 Aug] David: "the most popular ones in, keep the others hidden...
+   more of these because it's just too big." Categories ARE sorted by
+   real sales now (see /api/pos/items) — that data genuinely exists.
+   Individual items within one category are NOT reordered by
+   popularity here, because that data doesn't exist anywhere real:
+   Square's own sales reporting only breaks revenue down by category,
+   never down to which specific mug shape sold. This is a display
+   simplification for a long list, not a popularity sort dressed up
+   as one — showing the first few and revealing the rest on request,
+   same order they'd already be in. */
+let expandedGroups = new Set();
+function itemButtons(items, key, cssClass, showLimit = 8) {
+  const shown = expandedGroups.has(key) ? items : items.slice(0, showLimit);
+  const rest = items.length - shown.length;
+  return shown.map((it, i) => `<button class="item ${cssClass}" data-i="${i}">
+       <span class="n">${esc(it.name)}</span><span class="p">${money(it.price)}</span></button>`).join('')
+    + (rest > 0 ? `<button class="item" data-more="${esc(key)}"
+         style="color:var(--clay);font-weight:700">More (${rest})</button>` : '');
+}
+
 function groupByParent() {
   const parents = {};
   if (tillMode === 'catalogue') {
@@ -1112,8 +1135,7 @@ function bkAddHTML() {
         style="min-height:32px;padding:5px 11px;font-size:11px">${esc(lg.category)}</button>`).join('')}
     </div>` : ''}
     <div class="items" style="margin-top:8px">
-      ${(g && g.items || []).map((it, i) => `<button class="item bkaddit" data-i="${i}">
-        <span class="n">${esc(it.name)}</span><span class="p">${money(it.price)}</span></button>`).join('')}
+      ${itemButtons(g && g.items || [], 'bkadd:' + bkAddLeaf, 'bkaddit')}
     </div>`;
 }
 function wireBkAdd(root, b) {
@@ -1127,6 +1149,8 @@ function wireBkAdd(root, b) {
     el.onclick = () => { bkAddCat = el.dataset.pc; bkAddLeaf = null; paintBooking(); });
   root.querySelectorAll('.bkaddleaf').forEach(el =>
     el.onclick = () => { bkAddLeaf = el.dataset.c; paintBooking(); });
+  const moreBtn = root.querySelector('[data-more]');
+  if (moreBtn) moreBtn.onclick = () => { expandedGroups.add(moreBtn.dataset.more); paintBooking(); };
   root.querySelectorAll('.bkaddit').forEach(el => el.onclick = () => {
     const parents = groupByParent();
     const leaves = parents[bkAddCat] || [];
@@ -1181,15 +1205,15 @@ function paintTill() {
        the <strong>average</strong> you actually sell each at, worked out from four years of takings —
        not the Square price list. The real one appears here once the catalogue is pulled from Square.</div>`
     : '';
-  $('items').innerHTML = `${leafRow}${banner}${(g && g.items || []).map((it, i) =>
-    `<button class="item" data-i="${i}"><span class="n">${esc(it.name)}</span>
-     <span class="p">${money(it.price)}</span></button>`).join('')}`;
+  $('items').innerHTML = `${leafRow}${banner}${itemButtons(g && g.items || [], 'till:' + cat, '')}`;
   const leafcats = $('leafcats');
   if (leafcats) leafcats.querySelectorAll('[data-c]').forEach(b =>
     b.onclick = () => { cat = b.dataset.c; paintTill(); });
   $('items').querySelectorAll('[data-i]').forEach(b => b.onclick = () => {
     const it = g.items[+b.dataset.i]; ticket.push({ n: it.name, p: it.price }); syncTicket();
   });
+  const moreBtn = $('items').querySelector('[data-more]');
+  if (moreBtn) moreBtn.onclick = () => { expandedGroups.add(moreBtn.dataset.more); paintTill(); };
   $('sub').textContent = tillMode === 'average'
     ? 'Average prices — not sent' : 'Real prices — nothing is sent';
 }
@@ -1468,13 +1492,13 @@ function paintSettings(msg) {
 
     <div class="card">
       <h2>Add-ons</h2>
-      <div style="font-size:12px;color:var(--clay);margin-bottom:10px">Real paid features this
-        studio can switch on or off.</div>
+      <div style="font-size:12px;color:var(--clay);margin-bottom:10px">
+        Real features this studio can switch on or off — not billed, this is the only studio using this app right now.</div>
       ${Object.entries(settingsCatalogue || {}).map(([key, a]) => {
         const on = !!(settingsAddons[key] && settingsAddons[key].enabled);
         return `<div class="row"><div style="flex:1">
             <div class="l">${esc(a.name)}</div>
-            <div class="m">£${(a.monthlyPriceCents / 100).toFixed(2)}/mo · ${on ? 'On' : 'Off'}</div></div>
+            <div class="m">${on ? 'On' : 'Off'}</div></div>
           <button class="chip" data-toggle="${esc(key)}" data-on="${on ? '1' : '0'}"
             style="min-height:34px;padding:6px 12px">${on ? 'Disable' : 'Enable'}</button>
         </div>`;
@@ -1503,8 +1527,6 @@ function paintAddonConfirm(key, currentlyOn) {
     <div class="card">
       <h2>${currentlyOn ? 'Disable' : 'Enable'} ${esc(a.name)}</h2>
       <div style="font-size:12px;color:var(--clay);margin-bottom:10px">${esc(a.description)}</div>
-      ${!currentlyOn ? `<div style="font-size:12.5px;font-weight:700;margin-bottom:10px">
-        £${(a.monthlyPriceCents / 100).toFixed(2)} a month, starting now.</div>` : ''}
       <div style="display:flex;gap:8px">
         <button class="btn" id="addon-go" style="margin-top:0">
           ${currentlyOn ? 'Disable it' : 'Enable it'}</button>
