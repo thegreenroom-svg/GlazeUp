@@ -298,6 +298,19 @@ const staticCacheOptions = {
 app.get(/^\/admin\/.*\.html$/, (req, res) => res.redirect('/studio'));
 app.get('/admin', (req, res) => res.redirect('/studio'));
 app.get('/admin/', (req, res) => res.redirect('/studio'));
+
+// [7 Aug] TEMPORARY comparison link, Daisy's request: she wants to see
+// the Potter's Desk (the fuller demo-skin redesign, dashboard-local.html)
+// side by side with /studio before deciding which stays as the front
+// door. This is a deliberate single exception to the "no old page
+// reachable" rule above — one clearly-named URL, not a re-opened door.
+// Same live Supabase/Square data either way, so having both open at once
+// is safe: neither writes anything the other doesn't already. Remove
+// this route once Daisy has decided which app wins.
+app.get('/potters-desk', (req, res) => {
+  res.set('Cache-Control', 'no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, 'admin', 'dashboard-local.html'));
+});
 app.use('/admin', express.static(path.join(__dirname, 'admin'), staticCacheOptions));
 app.use('/app', express.static(path.join(__dirname, 'app'), staticCacheOptions));
 // ═══════════════════════════════════════════════════════════════════
