@@ -42,6 +42,7 @@ const { Client, Environment } = require('square');
 // in Render once this is back to being a real, live studio again.
 // ═══════════════════════════════════════════════════════════
 const SQUARE_WRITES_ENABLED = process.env.SQUARE_WRITES_ENABLED === 'true';
+const RESEND_API_KEY = process.env.RESEND_API_KEY || null;
 
 // ═══════════════════════════════════════════════════════════
 // AI COST SWITCHES — 22 July 2026, Daisy's call.
@@ -688,6 +689,49 @@ function _partySizeFromNote(note) {
     }
   }
   return null;
+}
+
+// ═══════════════════════════════════════════════════════════
+// CUSTOMER NOTIFICATIONS — Email via Resend
+// ═══════════════════════════════════════════════════════════
+// Send emails to customers when their pieces are ready to collect.
+// Uses Resend.com (free tier: 100 emails/day).
+//
+// Configure: Set RESEND_API_KEY=re_xyz... on Render environment.
+// Resend account: https://resend.com (sign up free, takes 2 min).
+async function sendEmailViaResend(to, subject, html) {
+  if (!RESEND_API_KEY) {
+    console.warn(`[email] No RESEND_API_KEY configured, skipping email to ${to}`);
+    return { success: false, reason: 'no API key' };
+  }
+  
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: 'hello@thekilncafe.com',  // Update to your domain
+        to,
+        subject,
+        html
+      })
+    });
+    
+    const data = await res.json();
+    if (!res.ok) {
+      console.error('[email] Resend error:', data);
+      return { success: false, reason: data.message || 'unknown' };
+    }
+    
+    console.log(`[email] ✓ Email sent to ${to}, ID: ${data.id}`);
+    return { success: true, id: data.id };
+  } catch (err) {
+    console.error('[email] Network error:', err.message);
+    return { success: false, reason: err.message };
+  }
 }
 
 // untilDate (optional, 'YYYY-MM-DD') bounds the top of the range so a
@@ -8723,12 +8767,36 @@ app.post('/api/floor/chairs', async (req, res) => {
 // POST /api/notifications/piece-ready — email customer that their piece
 // is ready to collect. Called from the Returns screen.
 app.post('/api/notifications/piece-ready', async (req, res) => {
-  const { studioId, email, name } = req.body;
+  const { studioId, email, name, pieceName, collectCode } = req.body;
   if (!studioId || !email) return res.status(400).json({ error: 'studioId and email required' });
-  // For now log it — real email integration goes through the existing
-  // notification system once SMTP is configured in Setup.
-  console.log(`[piece-ready] Notify ${name} <${email}> — studio ${studioId}`);
-  res.json({ sent: true, note: 'Notification queued — email will send once SMTP is configured in Setup.' });
+  
+  try {
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px;">
+        <h2 style="color: #B87946;">Your pottery is ready to collect!</h2>
+        <p>Hi ${name},</p>
+        <p>We're excited to let you know that <strong>${pieceName || 'your pottery'}</strong> is ready for you to pick up at The Kiln Cafe.</p>
+        ${collectCode ? `<p style="background: #F7F4EE; padding: 12px; border-radius: 6px; font-weight: bold;">Collection code: <code>${collectCode}</code></p>` : ''}
+        <p style="color: #666; font-size: 14px; margin-top: 20px;">Opening hours: Tuesday–Sunday, 10am–6pm<br>
+        Old Bank, Cheapside, Langport, Somerset</p>
+        <p>See you soon!</p>
+        <p style="color: #B87946; font-weight: bold;">— The Kiln Cafe</p>
+      </div>
+    `;
+    
+    const result = await sendEmailViaResend(email, '✨ Your pottery is ready to collect!', html);
+    
+    if (result.success) {
+      console.log(`[piece-ready] ✓ Notified ${name} <${email}>`);
+      res.json({ sent: true, emailId: result.id });
+    } else {
+      console.warn(`[piece-ready] Email failed for ${email}:`, result.reason);
+      res.json({ sent: false, reason: result.reason, fallback: 'Email not configured yet' });
+    }
+  } catch (error) {
+    console.error('[piece-ready] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.get('/api/pieces/ready-for-pickup', async (req, res) => {
