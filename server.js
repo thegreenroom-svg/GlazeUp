@@ -5124,6 +5124,12 @@ app.get('/api/pieces/stats', async (req, res) => {
       collected: pieces_data.filter(p => p.collected).length,
       inProcess: pieces_data.filter(p => !['collected', 'posted'].includes(p.status)).length,
       firstVisit: pieces_data.length > 0 ? new Date(Math.min(...pieces_data.map(p => new Date(p.created_date).getTime()))).toISOString() : null,
+      statuses
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // POST /api/pieces/bulk-archive — archive multiple pieces at once
 app.post('/api/pieces/bulk-archive', async (req, res) => {
@@ -5266,8 +5272,6 @@ app.get('/api/consistency-check', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-      statuses
-    });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PERFORMANCE INDEXES — Applied to Supabase via migration
@@ -5344,10 +5348,6 @@ app.get('/api/stats/database', async (req, res) => {
     
     console.log('[stats] studio=' + studioId + ' pieces=' + stats.pieces + ' bookings=' + stats.bookings);
     res.json(stats);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
