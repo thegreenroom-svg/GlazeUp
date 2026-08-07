@@ -3,7 +3,7 @@
  * Caches the app shell for offline use and fast loading.
  */
 
-const CACHE_VERSION = 'glazeup-v6-2026-08-07-critical-fixes';
+const CACHE_VERSION = 'glazeup-v7-2026-08-07-desk-fix';
 
 const SHELL_FILES = [
   '/',
