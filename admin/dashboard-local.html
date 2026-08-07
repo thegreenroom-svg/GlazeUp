@@ -2179,6 +2179,20 @@
        was fighting that, not protecting it. -->
 </head>
 <body>
+<div id="kc-diag-banner" style="position:fixed;top:0;left:0;right:0;z-index:999999;background:#111;color:#0f0;font-family:monospace;font-size:11px;padding:6px 8px;line-height:1.5;"></div>
+<script>
+(function(){
+  var b = document.getElementById('kc-diag-banner');
+  function line(s){ b.innerHTML += s + '<br>'; }
+  line('BUILD: 460fb9e-desk-fix');
+  setTimeout(function(){
+    line('DEMO_SKIN=' + window.DEMO_SKIN + ' | KC=' + (!!window.KC) + ' | showCanvas=' + (window.KC && typeof window.KC.showCanvas));
+  }, 500);
+  window.addEventListener('error', function(e){
+    line('JS ERROR: ' + e.message + ' (' + e.filename + ':' + e.lineno + ')');
+  });
+})();
+</script>
 <!-- ═══════════════════════════════════════════════════════════
      GLOBAL LOADING BAR. 18 July 2026.
      A thin bar pinned to the very top of the screen. Any data load
