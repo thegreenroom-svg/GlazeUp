@@ -1565,13 +1565,24 @@ function paintPracticeBooking(b) {
   $('pbookingdetail').innerHTML = `
     <div class="card">
       <h2>${esc(b.customer_name)}</h2>
-      ${practicePieces.map(p => `<div class="row"><div class="l" style="flex:1">${esc(p.description)}</div>
-        ${p.found ? '<span style="color:var(--soon);font-size:11px;font-weight:700">FOUND</span>' : ''}</div>`).join('')}
+      ${practicePieces.map((p, i) => `<div class="row" style="align-items:flex-start">
+        ${p.reference_photo_url ? `<img src="${esc(p.reference_photo_url)}" alt="" data-thumb="${i}"
+          style="width:44px;height:44px;border-radius:8px;object-fit:cover;margin-right:10px;
+          border:1px solid var(--line);cursor:pointer;flex-shrink:0">` : ''}
+        <div class="l" style="flex:1">${esc(p.description)}</div>
+        ${p.found ? '<span style="color:var(--soon);font-size:11px;font-weight:700">FOUND</span>' : ''}
+      </div>
+      ${p.reference_photo_url ? `<img src="${esc(p.reference_photo_url)}" alt="" data-full="${i}"
+        style="display:none;width:100%;border-radius:10px;margin:6px 0 10px;border:1px solid var(--line)">` : ''}`).join('')}
       <label class="btn" for="pshelf" style="display:flex;align-items:center;justify-content:center;
         cursor:pointer;margin-top:12px">Photograph a tray or shelf</label>
       <input type="file" id="pshelf" accept="image/*" capture="environment" style="display:none">
       <div id="pfound"></div>
     </div>`;
+  $('pbookingdetail').querySelectorAll('[data-thumb]').forEach(el => el.onclick = () => {
+    const full = $('pbookingdetail').querySelector(`[data-full="${el.dataset.thumb}"]`);
+    if (full) full.style.display = full.style.display === 'none' ? 'block' : 'none';
+  });
   $('pshelf').onchange = e => { const f = e.target.files[0]; if (f) practiceSearch(f); };
 }
 async function practiceSearch(file) {

@@ -120,7 +120,8 @@ app.post('/api/practice/booking-from-photo',express.json({limit:'20mb'}),(q,r)=>
   const booking={id,customer_name:'Demo: Sammy Okafor',session_date:new Date().toISOString().slice(0,10),
     session_time:'6-9',created_at:new Date().toISOString()};
   practiceStore.bookings.push(booking);
-  const pieces=[{id:id+'-p1',practice_booking_id:id,description:'blue mug, white spots',found:false},
+  const testPhoto='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+  const pieces=[{id:id+'-p1',practice_booking_id:id,description:'blue mug, white spots',found:false,reference_photo_url:testPhoto},
     {id:id+'-p2',practice_booking_id:id,description:'yellow plate, red flowers',found:false}];
   practiceStore.pieces.push(...pieces);
   r.json({booking,pieces,tag:{name:booking.customer_name},cost:0.0031});
@@ -596,6 +597,13 @@ const srv=app.listen(4801,async()=>{
   await new Promise(r=>setTimeout(r,500));
   const detail = await p.$eval('#pbookingdetail',e=>e.textContent).catch(()=>'');
   console.log('real pieces shown            :', detail.includes('blue mug') && detail.includes('yellow plate') ? 'yes ✓' : '✗');
+  const thumbCount = await p.$$eval('#pbookingdetail [data-thumb]', e => e.length).catch(() => 0);
+  console.log('photo thumbnail rendered     :', thumbCount === 1 ? 'yes ✓ (exactly the 1 piece with a photo)' : '✗ '+thumbCount);
+  const fullBefore = await p.$eval('#pbookingdetail [data-full="0"]', e => e.style.display).catch(() => 'MISSING');
+  await p.click('#pbookingdetail [data-thumb="0"]').catch(() => {});
+  await new Promise(r => setTimeout(r, 200));
+  const fullAfter = await p.$eval('#pbookingdetail [data-full="0"]', e => e.style.display).catch(() => 'MISSING');
+  console.log('thumbnail expands on tap     :', fullBefore === 'none' && fullAfter === 'block' ? 'yes ✓' : `✗ before=${fullBefore} after=${fullAfter}`);
   const pshot = await p.$('#pshelf');
   if (pshot) {
     await pshot.uploadFile('/tmp/shelf.png'); await new Promise(r=>setTimeout(r,1200));
