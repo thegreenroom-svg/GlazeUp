@@ -16464,10 +16464,14 @@ async function checkShiftLogin(fromNavigation) {
     // photographed. Landing has to be explicit here, the same way the
     // resume path does it a few hundred lines below.
     try {
-      if (window.DEMO_SKIN && window.KC && typeof KC.showCanvas === 'function') KC.showCanvas();
+      console.log('[boot] landing:', 'DEMO_SKIN=' + (window.DEMO_SKIN), 'KC=' + (!!window.KC), 'showCanvas=' + (window.KC && typeof KC.showCanvas));
+      if (window.DEMO_SKIN && window.KC && typeof KC.showCanvas === 'function') {
+        console.log('[boot] calling KC.showCanvas()...');
+        KC.showCanvas();
+      }
       else if (typeof landOnHome === 'function') landOnHome();
       else if (typeof goToRealLandingPage === 'function') goToRealLandingPage();
-    } catch (e) { console.warn('[boot] landing failed', e); }
+    } catch (e) { console.warn('[boot] landing failed', e.message, e); }
     return;
   }
 

@@ -90,7 +90,17 @@
   };
 
   KC.showCanvas = function () {
-    KC.build();
+    try {
+      KC.build();
+    } catch (e) {
+      console.error('[KC.build] failed:', e.message, e);
+      // Show red error banner for diagnostics
+      const banner = document.createElement('div');
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#c00;color:#fff;padding:12px;z-index:99999;font-family:monospace;font-size:12px;';
+      banner.textContent = 'Desk build failed: ' + e.message;
+      document.body.appendChild(banner);
+      throw e;
+    }
     const c = $('kc-canvas');
     if (!c) throw new Error('canvas element missing after build()');
     c.classList.remove('kc-away');
