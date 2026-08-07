@@ -12833,23 +12833,28 @@ function _kcPhotoPiece(pieceId) {
     input.remove();
     if (!file) return;
     try {
+      console.log(`[photos] Photographing piece ${pieceId}, file: ${file.name} (${file.size} bytes)`);
       toast('Saving photo…', 'info');
       const phash = await computePerceptualHash(file);
+      console.log(`[photos] Computed hash for ${pieceId}: ${phash.substring(0, 40)}...`);
       const photoBase64 = await new Promise((resolve, reject) => {
         const r = new FileReader();
         r.onload = () => resolve(r.result);
         r.onerror = () => reject(new Error('Could not read the photo'));
         r.readAsDataURL(file);
       });
+      console.log(`[photos] Uploading reference photo to /api/pieces/${pieceId}/reference-photo`);
       await api(`/api/pieces/${pieceId}/reference-photo`, {
         method: 'POST', timeoutMs: 30000,
         body: { studioId, photoBase64, phash }
       });
+      console.log(`[photos] ✓ Reference photo saved for piece ${pieceId}`);
       toast('Photo saved', 'success');
       const cardOpen = document.getElementById('booking-pack-card')?.style.display === 'flex';
       if (cardOpen) { await _renderBookingPackCard(); }
       else if (typeof openPacking === 'function') openPacking();
     } catch (e) {
+      console.error(`[photos] Error saving photo for piece ${pieceId}:`, e.message);
       toast('Could not save that photo', 'error');
     }
   };
