@@ -5063,6 +5063,74 @@ app.post('/api/marketplace/:id/use', async (req, res) => {
 });
 
 
+// GET /api/pieces/collections — customer's piece groupings/collections
+app.get('/api/pieces/collections', async (req, res) => {
+  const { studioId, customerId } = req.query;
+  if (!studioId || !customerId) return res.status(400).json({ error: 'studioId and customerId required' });
+  try {
+    const { data: pieces, error } = await supabase
+      .from('pottery_pieces')
+      .select('id, piece_reference, description, status, reference_photo_url, booking_id, created_date')
+      .eq('studio_id', studioId)
+      .eq('customer_id', customerId)
+      .not('archived', 'is', true)
+      .order('created_date', { ascending: false });
+    if (error) throw error;
+    
+    // Group by booking (natural collection)
+    const byBooking = {};
+    (pieces || []).forEach(p => {
+      const bid = p.booking_id || 'ungrouped';
+      if (!byBooking[bid]) byBooking[bid] = [];
+      byBooking[bid].push(p);
+    });
+    
+    const collections = Object.entries(byBooking).map(([bid, items]) => ({
+      bookingId: bid,
+      pieces: items,
+      count: items.length,
+      firstCreated: Math.min(...items.map(p => new Date(p.created_date).getTime())),
+      statuses: [...new Set(items.map(p => p.status))]
+    }));
+    
+    console.log('[collections] ' + customerId + ' has ' + collections.length + ' collections');
+    res.json({ collections, totalPieces: pieces.length });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/pieces/stats?studioId=&customerId= — customer stats for memory/journey
+app.get('/api/pieces/stats', async (req, res) => {
+  const { studioId, customerId } = req.query;
+  if (!studioId || !customerId) return res.status(400).json({ error: 'studioId and customerId required' });
+  try {
+    const { data: pieces, error } = await supabase
+      .from('pottery_pieces')
+      .select('id, status, created_date, fired, collected')
+      .eq('studio_id', studioId)
+      .eq('customer_id', customerId)
+      .not('archived', 'is', true);
+    if (error) throw error;
+    
+    const pieces_data = pieces || [];
+    const statuses = {};
+    pieces_data.forEach(p => {
+      statuses[p.status] = (statuses[p.status] || 0) + 1;
+    });
+    
+    res.json({
+      totalCreations: pieces_data.length,
+      collected: pieces_data.filter(p => p.collected).length,
+      inProcess: pieces_data.filter(p => !['collected', 'posted'].includes(p.status)).length,
+      firstVisit: pieces_data.length > 0 ? new Date(Math.min(...pieces_data.map(p => new Date(p.created_date).getTime()))).toISOString() : null,
+      statuses
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 /**
  * POST /api/community/posts/:postId/like
  * Simple like toggle, deduped by a device fingerprint (no login required)
