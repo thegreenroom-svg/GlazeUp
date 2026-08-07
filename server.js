@@ -9709,6 +9709,27 @@ app.post('/api/pieces/:pieceId/archive', async (req, res) => {
     console.error('Archive piece error:', error);
     res.status(500).json({ error: error.message });
   }
+
+// GET /api/pieces/archive — list archived pieces for recovery/audit
+app.get('/api/pieces/archive', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const { data: pieces, error } = await supabase
+      .from('pottery_pieces')
+      .select('id, piece_reference, customer_id, booking_id, description, status, archived, created_date, updated_at')
+      .eq('studio_id', studioId)
+      .eq('archived', true)
+      .order('updated_at', { ascending: false });
+    if (error) throw error;
+    const enriched = await enrichPiecesWithCustomerName(studioId, pieces || []);
+    console.log('[archive] Listed ' + enriched.length + ' archived pieces for studio=' + studioId);
+    res.json({ pieces: enriched, count: enriched.length });
+  } catch (error) {
+    console.error('Archive list error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 });
 
 // GET /api/pieces/bookings — the studio's current booking names, for
