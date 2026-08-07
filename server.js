@@ -5124,6 +5124,78 @@ app.get('/api/pieces/stats', async (req, res) => {
       collected: pieces_data.filter(p => p.collected).length,
       inProcess: pieces_data.filter(p => !['collected', 'posted'].includes(p.status)).length,
       firstVisit: pieces_data.length > 0 ? new Date(Math.min(...pieces_data.map(p => new Date(p.created_date).getTime()))).toISOString() : null,
+
+// POST /api/pieces/bulk-archive — archive multiple pieces at once
+app.post('/api/pieces/bulk-archive', async (req, res) => {
+  const { studioId, pieceIds, archived } = req.body;
+  if (!studioId || !pieceIds || pieceIds.length === 0) {
+    return res.status(400).json({ error: 'studioId and pieceIds required' });
+  }
+  try {
+    const { error } = await supabase
+      .from('pottery_pieces')
+      .update({ archived: archived !== false, updated_at: new Date().toISOString() })
+      .eq('studio_id', studioId)
+      .in('id', pieceIds);
+    if (error) throw error;
+    console.log('[bulk] Archived ' + pieceIds.length + ' pieces');
+    res.json({ count: pieceIds.length, status: archived !== false ? 'archived' : 'restored' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/pieces/bulk-status — update status for multiple pieces
+app.post('/api/pieces/bulk-status', async (req, res) => {
+  const { studioId, pieceIds, status } = req.body;
+  if (!studioId || !pieceIds || !status) {
+    return res.status(400).json({ error: 'studioId, pieceIds and status required' });
+  }
+  try {
+    const { error } = await supabase
+      .from('pottery_pieces')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('studio_id', studioId)
+      .in('id', pieceIds);
+    if (error) throw error;
+    console.log('[bulk] Updated ' + pieceIds.length + ' pieces to status=' + status);
+    res.json({ count: pieceIds.length, status });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/pieces?studioId=&limit=50&offset=0 — paginated pieces
+app.get('/api/pieces', async (req, res) => {
+  const { studioId, limit = 50, offset = 0, status, customerId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    let query = supabase
+      .from('pottery_pieces')
+      .select('id, piece_reference, customer_id, description, status, reference_photo_url, created_date', { count: 'exact' })
+      .eq('studio_id', studioId)
+      .not('archived', 'is', true)
+      .order('created_date', { ascending: false })
+      .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+    
+    if (status) query = query.eq('status', status);
+    if (customerId) query = query.eq('customer_id', customerId);
+    
+    const { data: pieces, error, count } = await query;
+    if (error) throw error;
+    
+    const enriched = await enrichPiecesWithCustomerName(studioId, pieces || []);
+    res.json({
+      pieces: enriched,
+      total: count,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      hasMore: (parseInt(offset) + parseInt(limit)) < count
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
       statuses
     });
   } catch (error) {
