@@ -17321,7 +17321,22 @@ function selectDemoStaff(idx) {
   const headerRight = document.getElementById('admin-header-right-buttons');
   if (headerRight) headerRight.style.display = 'flex';
   
-  _flowGraphEnter();
+  // [7 Aug] This staff-picker path was calling _flowGraphEnter() directly,
+  // bypassing DEMO_SKIN/KC.showCanvas() entirely — so the Desk redesign
+  // never showed after tapping a name here, even though it worked fine
+  // via the other two login paths that do check the flag. Same guard as
+  // landOnHome() and the resume path: try the Desk first, fall back to
+  // the flow graph if the flag is off or the Desk build fails.
+  try {
+    if (window.DEMO_SKIN && window.KC && typeof KC.showCanvas === 'function') {
+      KC.showCanvas();
+    } else {
+      _flowGraphEnter();
+    }
+  } catch (e) {
+    console.warn('[selectDemoStaff] Desk failed, falling back to tiles', e);
+    _flowGraphEnter();
+  }
 }
 
 
