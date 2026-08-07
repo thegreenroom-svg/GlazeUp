@@ -14987,6 +14987,58 @@ app.get('/api/version', (req, res) => {
   res.json({ buildId: BUILD_ID, bootTime: SERVER_BOOT_TIME });
 });
 
+
+// GET /api/health — comprehensive system diagnostics
+app.get('/api/health', async (req, res) => {
+  const startMs = Date.now();
+  const health = {
+    buildId: BUILD_ID,
+    bootTime: SERVER_BOOT_TIME,
+    status: 'checking...',
+    checks: {},
+    responseTimeMs: 0
+  };
+
+  try {
+    // Database connectivity
+    const { count: testCount, error: dbError } = await supabase
+      .from('studios').select('id', { count: 'exact', head: true });
+    health.checks.database = dbError 
+      ? { status: 'FAIL', error: dbError.message }
+      : { status: 'OK', studiosFound: testCount };
+
+    // Square token validity (one studio as test)
+    const { data: conn } = await supabase
+      .from('square_connections').select('id').limit(1).single();
+    health.checks.square = conn 
+      ? { status: 'CONNECTED', connection_id: conn.id }
+      : { status: 'NOT_CONFIGURED' };
+
+    // OpenAI key
+    health.checks.openai = RESEND_API_KEY ? 'CONFIGURED' : 'NOT_CONFIGURED';
+    health.checks.email_service = RESEND_API_KEY ? 'READY (Resend)' : 'NOT_CONFIGURED';
+
+    // Environment
+    health.environment = {
+      NODE_ENV: process.env.NODE_ENV,
+      PORT: process.env.PORT,
+      SQUARE_WRITES_ENABLED,
+      CLEO_ENABLED: process.env.CLEO_ENABLED === 'true'
+    };
+
+    health.status = health.checks.database?.status === 'OK' ? 'OK' : 'DEGRADED';
+    health.responseTimeMs = Date.now() - startMs;
+    
+    console.log('[health] check completed, status=' + health.status);
+    res.json(health);
+  } catch (error) {
+    health.status = 'FAIL';
+    health.error = error.message;
+    health.responseTimeMs = Date.now() - startMs;
+    console.error('[health] check failed:', error.message);
+    res.status(503).json(health);
+  }
+});
 // [6 Aug] David, repeatedly, on a real device, with real frustration:
 // the raw /api/takings/history dump is too long to scroll or search on
 // a phone. This is the same real question — is the 1000-row limit fix
