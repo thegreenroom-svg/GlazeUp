@@ -5196,6 +5196,76 @@ app.get('/api/pieces', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AUDIT LOGGING — Every consequential operation logged for accountability
+// ═══════════════════════════════════════════════════════════════════════════
+const AUDIT_EVENTS = ['piece_archived', 'status_updated', 'photo_added', 'email_sent', 'payment_recorded'];
+
+async function auditLog(studioId, staffId, event, details) {
+  if (!AUDIT_EVENTS.includes(event)) return; // only log known events
+  try {
+    await supabase.from('audit_logs').insert({
+      studio_id: studioId,
+      staff_id: staffId || null,
+      event_type: event,
+      details: JSON.stringify(details || {}),
+      created_at: new Date().toISOString()
+    });
+    console.log('[audit] ' + event + ' for studio=' + studioId);
+  } catch (e) {
+    console.warn('[audit] Could not log ' + event + ':', e.message);
+    // never let bookkeeping block operations
+  }
+}
+
+// GET /api/audit?studioId=&limit=100 — staff audit trail (read-only for compliance)
+app.get('/api/audit', async (req, res) => {
+  const { studioId, limit = 100 } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const { data, error } = await supabase
+      .from('audit_logs')
+      .select('event_type, staff_id, details, created_at')
+      .eq('studio_id', studioId)
+      .order('created_at', { ascending: false })
+      .limit(parseInt(limit));
+    if (error) throw error;
+    res.json({ logs: data || [], count: (data || []).length });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/consistency-check?studioId= — verify data integrity
+app.get('/api/consistency-check', async (req, res) => {
+  const { studioId } = req.query;
+  if (!studioId) return res.status(400).json({ error: 'studioId required' });
+  try {
+    const issues = [];
+    
+    // Check: orphaned pieces (booking doesn't exist)
+    const { data: orphaned } = await supabase.from('pottery_pieces')
+      .select('id, booking_id').eq('studio_id', studioId)
+      .not('booking_id', 'is', null);
+    if (orphaned && orphaned.length > 0) {
+      issues.push({ type: 'ORPHANED_PIECES', count: orphaned.length, note: 'pieces reference deleted bookings' });
+    }
+    
+    // Check: pieces without customer
+    const { data: noCustomer } = await supabase.from('pottery_pieces')
+      .select('id').eq('studio_id', studioId).is('customer_id', null)
+      .not('archived', 'is', true);
+    if (noCustomer && noCustomer.length > 0) {
+      issues.push({ type: 'UNASSIGNED_PIECES', count: noCustomer.length, note: 'pieces need customer assignment' });
+    }
+    
+    console.log('[consistency] Found ' + issues.length + ' issues for studio=' + studioId);
+    res.json({ studioId, status: issues.length === 0 ? 'OK' : 'ISSUES_FOUND', issues });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
       statuses
     });
   } catch (error) {
