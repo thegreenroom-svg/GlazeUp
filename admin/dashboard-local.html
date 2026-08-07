@@ -22722,17 +22722,20 @@ function applyShiftUI() {
   // honestly rather than swallowing them in silence.
   const _origSync=_silentSquareSync;
   _silentSquareSync = async function() {
+    const syncStart = Date.now();
     try {
+      console.log('[sync] Starting Square bookings sync for studio=' + studioId);
       const res = await fetch(`${API_URL}/api/bookings/sync`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ studioId }),
       });
       const data = await res.json();
+      const syncMs = Date.now() - syncStart;
       if (!res.ok) {
         // Square not connected, or other error. The dot goes amber so it
         // is visible rather than silently wrong. The most common cause is
         // Square not connected in Setup → Dashboard → Square Connection.
-        console.warn('[sync] Square sync failed:', data.error || res.status);
+        console.warn(`[sync] Square sync failed (${syncMs}ms): HTTP ${res.status}, error="${data.error || 'unknown'}"`);
         _updateSyncIndicator(false);
         // Show a one-time nudge if Square has never been connected — not
         // an alert (too aggressive mid-shift), just the dot with a tooltip.
@@ -22741,15 +22744,18 @@ function applyShiftUI() {
           dot.title='Square not connected — set up in Setup → Square Connection';
         }
       } else {
+        console.log(`[sync] ✓ Square sync succeeded (${syncMs}ms), response=${JSON.stringify(data).substring(0,80)}`);
         _updateSyncIndicator(true);
       }
     } catch(e) {
-      console.warn('[sync] Square sync network error:', e.message);
+      const syncMs = Date.now() - syncStart;
+      console.warn(`[sync] Square sync network error (${syncMs}ms): ${e.message}`);
       _updateSyncIndicator(false);
     }
   };
 
   // Run once now so the first load has the freshest Square data
+  console.log('[boot] Triggering initial Square sync on page load');
   _silentSquareSync();
 
   // ─── BOTH TIMERS GUARDED. 18 July 2026. Same stomp class as the
