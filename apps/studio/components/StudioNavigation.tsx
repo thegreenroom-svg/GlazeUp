@@ -2,16 +2,13 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useSession, useSupabaseClient } from '@supabase/auth-helpers-react';
+import { usePathname } from 'next/navigation';
 import {
   Home,
   Calendar,
   Palette,
   Zap,
   Users,
-  Settings,
-  LogOut,
   Menu,
   X,
   TrendingUp,
@@ -21,15 +18,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export function StudioNavigation() {
   const pathname = usePathname();
-  const router = useRouter();
-  const session = useSession();
-  const supabase = useSupabaseClient();
   const [isOpen, setIsOpen] = useState(true);
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.push('/auth/login');
-  };
 
   const menuItems = [
     { label: 'Dashboard', icon: <Home className="w-5 h-5" />, href: '/' },
@@ -38,8 +27,7 @@ export function StudioNavigation() {
     { label: 'Kiln Workflow', icon: <Zap className="w-5 h-5" />, href: '/kiln-workflow' },
     { label: 'Inventory', icon: <Package className="w-5 h-5" />, href: '/inventory' },
     { label: 'Customers', icon: <Users className="w-5 h-5" />, href: '/customers' },
-    { label: 'Reports', icon: <TrendingUp className="w-5 h-5" />, href: '/reports' },
-    { label: 'Settings', icon: <Settings className="w-5 h-5" />, href: '/settings' }
+    { label: 'Reports', icon: <TrendingUp className="w-5 h-5" />, href: '/reports' }
   ];
 
   const isActive = (href: string) => {
@@ -49,7 +37,6 @@ export function StudioNavigation() {
 
   return (
     <>
-      {/* Mobile Toggle */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="fixed bottom-6 right-6 z-50 md:hidden bg-blue-600 text-white p-3 rounded-full shadow-lg"
@@ -57,7 +44,6 @@ export function StudioNavigation() {
         {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
       </button>
 
-      {/* Sidebar */}
       <AnimatePresence>
         {isOpen && (
           <motion.nav
@@ -68,12 +54,11 @@ export function StudioNavigation() {
           >
             <div className="p-6 border-b border-gray-800">
               <h1 className="text-2xl font-bold text-blue-400">GlazeUp</h1>
-              <p className="text-sm text-gray-400 mt-1">Studio Management</p>
+              <p className="text-sm text-gray-400 mt-1">Read-only demo</p>
             </div>
 
-            {/* Menu Items */}
             <div className="py-6">
-              {menuItems.map((item, i) => (
+              {menuItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
@@ -93,25 +78,10 @@ export function StudioNavigation() {
                 </Link>
               ))}
             </div>
-
-            {/* Footer */}
-            <div className="absolute bottom-0 w-full border-t border-gray-800 p-4">
-              <div className="mb-4 px-2">
-                <p className="text-xs text-gray-500">{session?.user?.email}</p>
-              </div>
-              <button
-                onClick={handleSignOut}
-                className="w-full flex items-center gap-3 px-4 py-2 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors"
-              >
-                <LogOut className="w-5 h-5" />
-                <span>Sign Out</span>
-              </button>
-            </div>
           </motion.nav>
         )}
       </AnimatePresence>
 
-      {/* Mobile Backdrop */}
       <AnimatePresence>
         {isOpen && (
           <motion.div

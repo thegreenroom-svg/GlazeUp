@@ -129,6 +129,94 @@ const upload = multer({
 });
 
 // ============================================================================
+// READ-ONLY DEMO ENDPOINTS
+// ============================================================================
+// GET-only, hardcoded to a single studio (The Kiln Cafe). No auth required
+// since these never write anything. No route here performs INSERT, UPDATE,
+// or DELETE -- viewing only. Do not add write logic to this section.
+
+const DEMO_STUDIO_ID = 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3';
+
+app.get('/api/demo/studio', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('studios')
+      .select('id, name, slug, city, country, website')
+      .eq('id', DEMO_STUDIO_ID)
+      .single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/demo/bookings', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('id, customer_name, customer_email, party_size, status, session_start, session_end, room, current_stage')
+      .eq('studio_id', DEMO_STUDIO_ID)
+      .order('session_start', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/demo/pieces', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('pottery_pieces')
+      .select('id, piece_type, status, is_complete, created_at, scheduled_firing_date')
+      .eq('studio_id', DEMO_STUDIO_ID)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/demo/kiln-sessions', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('kiln_sessions')
+      .select('id, label, status, batch_code, fired_at, created_at')
+      .eq('studio_id', DEMO_STUDIO_ID)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/demo/customers', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('customers')
+      .select('id, name, email, phone, tier, loyalty_points, visit_count, total_spend_cents')
+      .eq('studio_id', DEMO_STUDIO_ID)
+      .order('last_visit_at', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ============================================================================
 // HEALTH & READY
 // ============================================================================
 
