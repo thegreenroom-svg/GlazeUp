@@ -1,5 +1,5 @@
 import express from 'express';
-import cors from 'express-cors';
+import cors from 'cors';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import { Client as SquareClient } from 'square';
