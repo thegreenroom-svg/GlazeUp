@@ -35,7 +35,7 @@ export function StudioNavigation() {
     { label: 'Dashboard', icon: <Home className="w-5 h-5" />, href: '/' },
     { label: 'Bookings', icon: <Calendar className="w-5 h-5" />, href: '/bookings' },
     { label: 'Pieces', icon: <Palette className="w-5 h-5" />, href: '/pieces' },
-    { label: 'Kiln Workflow', icon: <Zap className="w-5 h-5" />, href: '/kiln' },
+    { label: 'Kiln Workflow', icon: <Zap className="w-5 h-5" />, href: '/kiln-workflow' },
     { label: 'Inventory', icon: <Package className="w-5 h-5" />, href: '/inventory' },
     { label: 'Customers', icon: <Users className="w-5 h-5" />, href: '/customers' },
     { label: 'Reports', icon: <TrendingUp className="w-5 h-5" />, href: '/reports' },
