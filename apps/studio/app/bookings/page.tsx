@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useEffect, useState } from 'react';
 import { useSession, useSupabaseClient } from '@supabase/auth-helpers-react';
 import { useRouter } from 'next/navigation';
@@ -97,12 +99,12 @@ export default function BookingsPage() {
           { event: '*', schema: 'public', table: 'bookings', filter: `studio_id=eq.${studioId}` },
           (payload) => {
             if (payload.eventType === 'INSERT') {
-              setBookings((prev) => [...prev, payload.new].sort((a, b) =>
+              setBookings((prev) => [...prev, payload.new as Booking].sort((a, b) =>
                 new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime()
               ));
             } else if (payload.eventType === 'UPDATE') {
               setBookings((prev) =>
-                prev.map((b) => (b.id === payload.new.id ? payload.new : b))
+                prev.map((b) => (b.id === payload.new.id ? (payload.new as Booking) : b))
               );
             }
           }

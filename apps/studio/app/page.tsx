@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useEffect, useState } from 'react';
 import { useSession, useSupabaseClient } from '@supabase/auth-helpers-react';
 import { useRouter } from 'next/navigation';
@@ -141,10 +143,10 @@ export default function Dashboard() {
         { event: '*', schema: 'public', table: 'bookings' },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            setBookings((prev) => [...prev, payload.new]);
+            setBookings((prev) => [...prev, payload.new as Booking]);
           } else if (payload.eventType === 'UPDATE') {
             setBookings((prev) =>
-              prev.map((b) => (b.id === payload.new.id ? payload.new : b))
+              prev.map((b) => (b.id === payload.new.id ? (payload.new as Booking) : b))
             );
           }
         }

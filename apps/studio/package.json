@@ -15,6 +15,7 @@
     "react-dom": "^18.2.0",
     "@supabase/supabase-js": "^2.38.5",
     "@supabase/auth-helpers-nextjs": "^0.8.7",
+    "@supabase/auth-helpers-react": "^0.4.2",
     "zustand": "^4.4.0",
     "axios": "^1.6.0",
     "framer-motion": "^10.16.4",
