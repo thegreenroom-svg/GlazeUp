@@ -1,0 +1,67 @@
+services:
+  - type: web
+    name: glazeup-backend
+    env: node
+    plan: standard
+    
+    # Build
+    buildCommand: "cd backend && npm install"
+    startCommand: "cd backend && npm start"
+    
+    # Environment
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        fromDatabase:
+          name: supabase
+          property: connection_string_base
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        scope: secret
+      - key: SUPABASE_ANON_KEY
+        scope: secret
+      - key: SQUARE_APPLICATION_ID
+        scope: secret
+      - key: SQUARE_ACCESS_TOKEN
+        scope: secret
+      - key: SQUARE_LOCATION_ID
+        scope: secret
+      - key: ANTHROPIC_API_KEY
+        scope: secret
+    
+    # Scaling
+    numInstances: 1
+    autoDeploy: true
+    previewPlan: starter
+
+  - type: web
+    name: glazeup-customer
+    env: node
+    buildCommand: "cd apps/customer && npm install && npm run build"
+    startCommand: "cd apps/customer && npm start"
+    
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        scope: secret
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        scope: secret
+      - key: NEXT_PUBLIC_API_URL
+        value: "https://glazeup-backend.onrender.com"
+
+  - type: web
+    name: glazeup-studio
+    env: node
+    buildCommand: "cd apps/studio && npm install && npm run build"
+    startCommand: "cd apps/studio && npm start"
+    
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        scope: secret
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        scope: secret
+      - key: NEXT_PUBLIC_API_URL
+        value: "https://glazeup-backend.onrender.com"
