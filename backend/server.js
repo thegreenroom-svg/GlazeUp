@@ -157,7 +157,7 @@ app.get('/api/demo/bookings', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('bookings')
-      .select('id, customer_name, customer_email, party_size, status, session_start, session_end, room, current_stage, table_number, notes, booking_type, arrived_at')
+      .select('id, booking_code, customer_name, customer_email, party_size, status, session_start, session_end, room, current_stage, table_number, notes, booking_type, arrived_at')
       .eq('studio_id', DEMO_STUDIO_ID)
       .order('session_start', { ascending: false })
       .limit(50);
@@ -364,6 +364,42 @@ app.get('/api/demo/till', async (req, res) => {
     }));
 
     res.json(result);
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/demo/bookings/:code/detail', async (req, res) => {
+  try {
+    const { data: booking, error: bookingError } = await supabase
+      .from('bookings')
+      .select('id, booking_code, customer_name, customer_email, customer_phone, party_size, status, session_start, session_end, room, table_number, current_stage, notes, booking_type, arrived_at')
+      .eq('booking_code', req.params.code)
+      .eq('studio_id', DEMO_STUDIO_ID)
+      .single();
+
+    if (bookingError || !booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const { data: session } = await supabase
+      .from('table_sessions')
+      .select('id, table_number, status, number_of_places, created_at')
+      .eq('booking_id', req.params.code)
+      .eq('studio_id', DEMO_STUDIO_ID)
+      .maybeSingle();
+
+    let orders = [];
+    if (session) {
+      const { data: orderData } = await supabase
+        .from('table_session_orders')
+        .select('id, item_type, item_name, quantity, unit_price_cents, notes')
+        .eq('table_session_id', session.id);
+      orders = orderData || [];
+    }
+
+    res.json({ booking, session, orders });
   } catch (err) {
     logger.error(err);
     res.status(500).json({ error: err.message });

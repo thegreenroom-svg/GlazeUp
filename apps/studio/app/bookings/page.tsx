@@ -4,9 +4,11 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { Receipt } from 'lucide-react';
 
 interface Booking {
   id: string;
+  booking_code: string;
   customer_name: string;
   customer_email: string | null;
   party_size: number | null;
@@ -21,10 +23,19 @@ interface Booking {
   arrived_at: string | null;
 }
 
+interface BookingDetail {
+  booking: Booking & { customer_phone: string | null };
+  session: { id: string; table_number: string; status: string; number_of_places: number } | null;
+  orders: { id: string; item_name: string; quantity: number; unit_price_cents: number; notes: string | null }[];
+}
+
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedCode, setSelectedCode] = useState<string | null>(null);
+  const [detail, setDetail] = useState<BookingDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings`)
@@ -37,19 +48,26 @@ export default function BookingsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (!selectedCode) {
+      setDetail(null);
+      return;
+    }
+    setDetailLoading(true);
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${selectedCode}/detail`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then(setDetail)
+      .catch(() => setDetail(null))
+      .finally(() => setDetailLoading(false));
+  }, [selectedCode]);
+
+  const orderTotal = (orders: BookingDetail['orders']) =>
+    orders.reduce((sum, o) => sum + (o.unit_price_cents * o.quantity) / 100, 0);
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem' }}>
-      <div
-        style={{
-          padding: '0.75rem 1rem',
-          backgroundColor: '#fff8e1',
-          border: '1px solid #ffca28',
-          borderRadius: '4px',
-          marginBottom: '1.5rem',
-          fontSize: '0.875rem',
-        }}
-      >
-        Demo view — read-only.
+      <div style={{ padding: '0.75rem 1rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '4px', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
+        Demo view — read-only. Tap a booking to see its table session and orders.
       </div>
 
       <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '2rem' }}>Bookings</h1>
@@ -75,7 +93,13 @@ export default function BookingsPage() {
             </thead>
             <tbody>
               {bookings.map((b) => (
-                <tr key={b.id} style={{ borderBottom: '1px solid #eee' }}>
+                <tr
+                  key={b.id}
+                  onClick={() => setSelectedCode(b.booking_code)}
+                  style={{ borderBottom: '1px solid #eee', cursor: 'pointer' }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#fafafa')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
                   <td style={{ padding: '0.75rem' }}>{b.customer_name}</td>
                   <td style={{ padding: '0.75rem' }}>{b.party_size ?? '—'}</td>
                   <td style={{ padding: '0.75rem' }}>{new Date(b.session_start).toLocaleString()}</td>
@@ -90,6 +114,79 @@ export default function BookingsPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {selectedCode && (
+        <div
+          onClick={() => setSelectedCode(null)}
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'white', borderRadius: '8px', maxWidth: '450px', width: '100%', maxHeight: '85vh', overflow: 'auto', padding: '1.5rem' }}>
+            {detailLoading ? (
+              <p style={{ color: '#666' }}>Loading...</p>
+            ) : !detail ? (
+              <p style={{ color: '#c33' }}>Could not load booking detail.</p>
+            ) : (
+              <>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>{detail.booking.customer_name}</h2>
+                <p style={{ color: '#999', fontSize: '0.8rem', marginBottom: '1rem', fontFamily: 'monospace' }}>{detail.booking.booking_code}</p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
+                  {detail.booking.customer_email && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#999' }}>Email</span><span>{detail.booking.customer_email}</span></div>
+                  )}
+                  {detail.booking.customer_phone && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#999' }}>Phone</span><span>{detail.booking.customer_phone}</span></div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#999' }}>Party size</span><span>{detail.booking.party_size ?? '—'}</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#999' }}>Session</span><span>{new Date(detail.booking.session_start).toLocaleString()}</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#999' }}>Stage</span><span style={{ textTransform: 'capitalize' }}>{detail.booking.current_stage}</span></div>
+                  {detail.booking.notes && (
+                    <div style={{ padding: '0.5rem', backgroundColor: '#f9f9f9', borderRadius: '4px', marginTop: '0.25rem' }}>{detail.booking.notes}</div>
+                  )}
+                </div>
+
+                <div style={{ paddingTop: '1rem', borderTop: '1px solid #eee' }}>
+                  <h3 style={{ fontSize: '0.95rem', fontWeight: '600', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Receipt size={16} /> Table Session
+                  </h3>
+                  {!detail.session ? (
+                    <p style={{ fontSize: '0.85rem', color: '#999' }}>No table session linked to this booking yet.</p>
+                  ) : (
+                    <>
+                      <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.5rem' }}>
+                        Table {detail.session.table_number} · {detail.session.number_of_places} places · <span style={{ textTransform: 'capitalize' }}>{detail.session.status}</span>
+                      </p>
+                      {detail.orders.length === 0 ? (
+                        <p style={{ fontSize: '0.85rem', color: '#999' }}>No items ordered yet.</p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          {detail.orders.map((o) => (
+                            <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                              <span>{o.quantity}× {o.item_name}</span>
+                              <span>£{((o.unit_price_cents * o.quantity) / 100).toFixed(2)}</span>
+                            </div>
+                          ))}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', paddingTop: '0.4rem', borderTop: '1px solid #eee', marginTop: '0.2rem' }}>
+                            <span>Total</span>
+                            <span>£{orderTotal(detail.orders).toFixed(2)}</span>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setSelectedCode(null)}
+                  style={{ marginTop: '1.5rem', width: '100%', padding: '0.6rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  Close
+                </button>
+              </>
+            )}
+          </div>
         </div>
       )}
     </motion.div>
