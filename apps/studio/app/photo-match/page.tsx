@@ -22,18 +22,23 @@ interface MatchResult {
 
 export default function PhotoMatchPage() {
   const [preview, setPreview] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<MatchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [confirmedCode, setConfirmedCode] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setSelectedFile(file);
     setPreview(URL.createObjectURL(file));
     setResult(null);
     setError(null);
+    setConfirmedCode(null);
     setLoading(true);
 
     const formData = new FormData();
@@ -54,6 +59,30 @@ export default function PhotoMatchPage() {
       setError(err.message || 'Something went wrong.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConfirm = async (bookingCode: string) => {
+    if (!selectedFile || !result) return;
+    setConfirming(bookingCode);
+
+    const formData = new FormData();
+    formData.append('photo', selectedFile);
+    formData.append('booking_code', bookingCode);
+    formData.append('chalk_tag_name', result.chalk_tag_name || '');
+    formData.append('description', result.description || '');
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/photo-match/confirm`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!response.ok) throw new Error('Failed to save');
+      setConfirmedCode(bookingCode);
+    } catch (err) {
+      setError('Could not save the confirmed match.');
+    } finally {
+      setConfirming(null);
     }
   };
 
@@ -124,15 +153,41 @@ export default function PhotoMatchPage() {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {result.candidates.map((c) => (
-                  <div key={c.booking_code} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem', backgroundColor: '#f9f9f9', borderRadius: '6px' }}>
-                    <div>
-                      <p style={{ fontWeight: '500', fontSize: '0.9rem' }}>{c.customer_name}</p>
-                      <p style={{ fontSize: '0.75rem', color: '#999' }}>{new Date(c.session_start).toLocaleDateString()}</p>
+                  <div key={c.booking_code} style={{ padding: '0.6rem', backgroundColor: '#f9f9f9', borderRadius: '6px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <p style={{ fontWeight: '500', fontSize: '0.9rem' }}>{c.customer_name}</p>
+                        <p style={{ fontSize: '0.75rem', color: '#999' }}>{new Date(c.session_start).toLocaleDateString()}</p>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        {c.score >= 0.9 && <CheckCircle size={16} color="#00aa00" />}
+                        <span style={{ fontSize: '0.8rem', fontWeight: '600' }}>{Math.round(c.score * 100)}%</span>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      {c.score >= 0.9 && <CheckCircle size={16} color="#00aa00" />}
-                      <span style={{ fontSize: '0.8rem', fontWeight: '600' }}>{Math.round(c.score * 100)}%</span>
-                    </div>
+                    {confirmedCode === c.booking_code ? (
+                      <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#00aa00', fontSize: '0.8rem' }}>
+                        <CheckCircle size={14} /> Saved to this booking
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleConfirm(c.booking_code)}
+                        disabled={confirming === c.booking_code}
+                        style={{
+                          marginTop: '0.5rem',
+                          width: '100%',
+                          padding: '0.4rem',
+                          backgroundColor: '#E85D8A',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          fontSize: '0.8rem',
+                          cursor: confirming === c.booking_code ? 'not-allowed' : 'pointer',
+                          opacity: confirming === c.booking_code ? 0.6 : 1,
+                        }}
+                      >
+                        {confirming === c.booking_code ? 'Saving...' : 'Confirm — this is the right booking'}
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

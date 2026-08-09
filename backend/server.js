@@ -418,6 +418,77 @@ app.get('/api/demo/till', async (req, res) => {
   }
 });
 
+// Live Square pull -- reads the real, currently-valid Square access token
+// from square_connections (read-only), then calls Square's own API live
+// (List Locations, then Orders Search for today). Nothing is written to
+// any database anywhere in this endpoint; it's a live pass-through.
+app.get('/api/demo/square-live', async (req, res) => {
+  try {
+    const { data: connection, error: connError } = await supabase
+      .from('square_connections')
+      .select('square_access_token, square_token_expires_at, last_synced_at')
+      .eq('studio_id', DEMO_STUDIO_ID)
+      .single();
+
+    if (connError || !connection) {
+      return res.status(404).json({ error: 'No Square connection found for this studio' });
+    }
+
+    if (new Date(connection.square_token_expires_at) < new Date()) {
+      return res.status(400).json({ error: 'Square token has expired', last_synced_at: connection.last_synced_at });
+    }
+
+    const token = connection.square_access_token;
+
+    const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', {
+      headers: { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18' },
+    });
+
+    const locations = locationsRes.data.locations || [];
+    if (locations.length === 0) {
+      return res.json({ locations: [], orders: [] });
+    }
+
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+
+    const ordersRes = await axios.post(
+      'https://connect.squareup.com/v2/orders/search',
+      {
+        location_ids: locations.map((l) => l.id),
+        query: {
+          filter: {
+            date_time_filter: {
+              created_at: { start_at: todayStart.toISOString() },
+            },
+            state_filter: { states: ['OPEN', 'COMPLETED'] },
+          },
+          sort: { sort_field: 'CREATED_AT', sort_order: 'DESC' },
+        },
+        limit: 50,
+      },
+      { headers: { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18', 'Content-Type': 'application/json' } }
+    );
+
+    const orders = (ordersRes.data.orders || []).map((o) => ({
+      id: o.id,
+      state: o.state,
+      created_at: o.created_at,
+      total_money: o.total_money ? o.total_money.amount / 100 : 0,
+      line_items: (o.line_items || []).map((li) => ({ name: li.name, quantity: li.quantity, total: li.total_money ? li.total_money.amount / 100 : 0 })),
+    }));
+
+    res.json({
+      locations: locations.map((l) => ({ id: l.id, name: l.name })),
+      orders,
+      pulled_at: new Date().toISOString(),
+    });
+  } catch (err) {
+    logger.error(err.response?.data || err);
+    res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message });
+  }
+});
+
 app.get('/api/demo/bookings/:code/detail', async (req, res) => {
   try {
     const { data: booking, error: bookingError } = await supabase
@@ -544,6 +615,66 @@ app.post('/api/demo/photo-match', upload.single('photo'), async (req, res) => {
   } catch (err) {
     logger.error(err);
     res.status(500).json({ error: err.response?.data?.error?.message || err.message });
+  }
+});
+
+// Confirm a photo match against a booking: uploads the photo to an isolated
+// storage path (demo-app-test/, separate from real booking-photos/), then
+// inserts a row into the isolated demo_app_photo_matches table. Never
+// touches pottery_pieces, bookings, or any real production table/storage path.
+app.post('/api/demo/photo-match/confirm', upload.single('photo'), async (req, res) => {
+  try {
+    const { booking_code, chalk_tag_name, description, confirmed_by } = req.body;
+    if (!req.file || !booking_code) {
+      return res.status(400).json({ error: 'photo and booking_code are required' });
+    }
+
+    const filename = `demo-app-test/photo-matches/${DEMO_STUDIO_ID}/${Date.now()}-${uuidv4()}.jpg`;
+    const { error: uploadError } = await supabase.storage
+      .from('booking-photos')
+      .upload(filename, req.file.buffer, { contentType: req.file.mimetype });
+
+    if (uploadError) throw uploadError;
+
+    const { data: urlData } = supabase.storage.from('booking-photos').getPublicUrl(filename);
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('demo_app_photo_matches')
+      .insert([
+        {
+          studio_id: DEMO_STUDIO_ID,
+          booking_code,
+          photo_url: urlData.publicUrl,
+          chalk_tag_name: chalk_tag_name || null,
+          ai_description: description || null,
+          confirmed_by: confirmed_by || null,
+        },
+      ])
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+
+    res.json(inserted);
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/demo/bookings/:code/photo-matches', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('demo_app_photo_matches')
+      .select('id, photo_url, chalk_tag_name, ai_description, confirmed_by, created_at')
+      .eq('booking_code', req.params.code)
+      .eq('studio_id', DEMO_STUDIO_ID)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
   }
 });
 

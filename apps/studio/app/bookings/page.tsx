@@ -30,6 +30,14 @@ interface BookingDetail {
   orders: { id: string; item_name: string; quantity: number; unit_price_cents: number; notes: string | null }[];
 }
 
+interface PhotoMatch {
+  id: string;
+  photo_url: string;
+  chalk_tag_name: string | null;
+  ai_description: string | null;
+  created_at: string;
+}
+
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [search, setSearch] = useState('');
@@ -37,6 +45,7 @@ export default function BookingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [detail, setDetail] = useState<BookingDetail | null>(null);
+  const [photoMatches, setPhotoMatches] = useState<PhotoMatch[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
@@ -53,6 +62,7 @@ export default function BookingsPage() {
   useEffect(() => {
     if (!selectedCode) {
       setDetail(null);
+      setPhotoMatches([]);
       return;
     }
     setDetailLoading(true);
@@ -61,6 +71,11 @@ export default function BookingsPage() {
       .then(setDetail)
       .catch(() => setDetail(null))
       .finally(() => setDetailLoading(false));
+
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${selectedCode}/photo-matches`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then(setPhotoMatches)
+      .catch(() => setPhotoMatches([]));
   }, [selectedCode]);
 
   const orderTotal = (orders: BookingDetail['orders']) =>
@@ -194,6 +209,23 @@ export default function BookingsPage() {
                     </>
                   )}
                 </div>
+
+                {photoMatches.length > 0 && (
+                  <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #eee' }}>
+                    <h3 style={{ fontSize: '0.95rem', fontWeight: '600', marginBottom: '0.75rem' }}>AI Matched Photos</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {photoMatches.map((m) => (
+                        <div key={m.id} style={{ display: 'flex', gap: '0.75rem', border: '1px solid #eee', borderRadius: '6px', overflow: 'hidden' }}>
+                          <img src={m.photo_url} alt="Matched pieces" style={{ width: '90px', height: '90px', objectFit: 'cover', flexShrink: 0 }} />
+                          <div style={{ padding: '0.5rem 0.5rem 0.5rem 0' }}>
+                            {m.ai_description && <p style={{ fontSize: '0.8rem', color: '#444' }}>{m.ai_description}</p>}
+                            <p style={{ fontSize: '0.7rem', color: '#999', marginTop: '0.25rem' }}>{new Date(m.created_at).toLocaleString()}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <button
                   onClick={() => setSelectedCode(null)}

@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Receipt } from 'lucide-react';
+import { Receipt, Zap, AlertCircle } from 'lucide-react';
 import { SkeletonGrid } from '@/components/Skeleton';
 
 interface Order {
@@ -25,10 +25,21 @@ interface TableSession {
   orders: Order[];
 }
 
+interface SquareOrder {
+  id: string;
+  state: string;
+  created_at: string;
+  total_money: number;
+  line_items: { name: string; quantity: string; total: number }[];
+}
+
 export default function TillPage() {
   const [sessions, setSessions] = useState<TableSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [squareOrders, setSquareOrders] = useState<SquareOrder[] | null>(null);
+  const [squareLoading, setSquareLoading] = useState(true);
+  const [squareError, setSquareError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/till`)
@@ -39,6 +50,18 @@ export default function TillPage() {
       .then(setSessions)
       .catch(() => setError('Could not load till.'))
       .finally(() => setLoading(false));
+
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/square-live`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Failed to load Square data');
+        }
+        return res.json();
+      })
+      .then((data) => setSquareOrders(data.orders || []))
+      .catch((err) => setSquareError(err.message))
+      .finally(() => setSquareLoading(false));
   }, []);
 
   const sessionTotal = (session: TableSession) =>
@@ -50,7 +73,38 @@ export default function TillPage() {
         Demo view — read-only. Live table sessions and orders.
       </div>
 
-      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '2rem' }}>Till</h1>
+      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>Till</h1>
+
+      <div style={{ marginBottom: '2rem' }}>
+        <h2 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <Zap size={18} color="#E85D8A" /> Live from Square (today)
+        </h2>
+        {squareLoading ? (
+          <p style={{ color: '#999', fontSize: '0.85rem' }}>Pulling live Square data...</p>
+        ) : squareError ? (
+          <div style={{ padding: '0.75rem', backgroundColor: '#fee', color: '#c33', borderRadius: '6px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <AlertCircle size={16} /> {squareError}
+          </div>
+        ) : squareOrders && squareOrders.length === 0 ? (
+          <p style={{ color: '#999', fontSize: '0.85rem' }}>No Square orders yet today.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {squareOrders?.map((o) => (
+              <div key={o.id} style={{ padding: '0.75rem', backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#999', textTransform: 'capitalize' }}>{o.state.toLowerCase()}</span>
+                  <span style={{ fontWeight: 'bold' }}>£{o.total_money.toFixed(2)}</span>
+                </div>
+                {o.line_items.map((li, i) => (
+                  <p key={i} style={{ fontSize: '0.8rem', color: '#666' }}>{li.quantity}× {li.name}</p>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <h2 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.75rem' }}>Table Sessions</h2>
 
       {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
 
