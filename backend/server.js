@@ -157,7 +157,7 @@ app.get('/api/demo/bookings', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('bookings')
-      .select('id, customer_name, customer_email, party_size, status, session_start, session_end, room, current_stage')
+      .select('id, customer_name, customer_email, party_size, status, session_start, session_end, room, current_stage, table_number, notes, booking_type, arrived_at')
       .eq('studio_id', DEMO_STUDIO_ID)
       .order('session_start', { ascending: false })
       .limit(50);
@@ -205,10 +205,26 @@ app.get('/api/demo/customers', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('customers')
-      .select('id, name, email, phone, tier, loyalty_points, visit_count, total_spend_cents')
+      .select('id, name, email, phone, tier, loyalty_points, visit_count, total_spend_cents, total_pieces_painted')
       .eq('studio_id', DEMO_STUDIO_ID)
       .order('last_visit_at', { ascending: false })
       .limit(50);
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/demo/revenue', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('revenue_category_breakdown')
+      .select('metric_date, category, revenue_cents, item_count')
+      .eq('studio_id', DEMO_STUDIO_ID)
+      .order('metric_date', { ascending: false })
+      .limit(200);
     if (error) throw error;
     res.json(data);
   } catch (err) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -18,7 +18,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export function StudioNavigation() {
   const pathname = usePathname();
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    // Default open on desktop, closed on mobile
+    setIsOpen(window.innerWidth >= 768);
+  }, []);
 
   const menuItems = [
     { label: 'Dashboard', icon: <Home className="w-5 h-5" />, href: '/' },

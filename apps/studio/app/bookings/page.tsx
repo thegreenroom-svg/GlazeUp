@@ -15,6 +15,10 @@ interface Booking {
   session_end: string;
   room: string | null;
   current_stage: string;
+  table_number: string | null;
+  notes: string | null;
+  booking_type: string | null;
+  arrived_at: string | null;
 }
 
 export default function BookingsPage() {
@@ -62,8 +66,9 @@ export default function BookingsPage() {
             <thead>
               <tr style={{ borderBottom: '2px solid #ddd', backgroundColor: '#f9f9f9' }}>
                 <th style={{ textAlign: 'left', padding: '0.75rem' }}>Customer</th>
+                <th style={{ textAlign: 'left', padding: '0.75rem' }}>Party</th>
                 <th style={{ textAlign: 'left', padding: '0.75rem' }}>Session</th>
-                <th style={{ textAlign: 'left', padding: '0.75rem' }}>Room</th>
+                <th style={{ textAlign: 'left', padding: '0.75rem' }}>Room / Table</th>
                 <th style={{ textAlign: 'left', padding: '0.75rem' }}>Stage</th>
                 <th style={{ textAlign: 'left', padding: '0.75rem' }}>Status</th>
               </tr>
@@ -72,8 +77,9 @@ export default function BookingsPage() {
               {bookings.map((b) => (
                 <tr key={b.id} style={{ borderBottom: '1px solid #eee' }}>
                   <td style={{ padding: '0.75rem' }}>{b.customer_name}</td>
+                  <td style={{ padding: '0.75rem' }}>{b.party_size ?? '—'}</td>
                   <td style={{ padding: '0.75rem' }}>{new Date(b.session_start).toLocaleString()}</td>
-                  <td style={{ padding: '0.75rem' }}>{b.room || '—'}</td>
+                  <td style={{ padding: '0.75rem' }}>{[b.room, b.table_number].filter(Boolean).join(' / ') || '—'}</td>
                   <td style={{ padding: '0.75rem', textTransform: 'capitalize' }}>{b.current_stage}</td>
                   <td style={{ padding: '0.75rem' }}>
                     <span style={{ padding: '0.25rem 0.75rem', backgroundColor: '#eef', borderRadius: '9999px', fontSize: '0.75rem', textTransform: 'capitalize' }}>
