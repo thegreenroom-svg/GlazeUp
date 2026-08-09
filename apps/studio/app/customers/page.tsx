@@ -12,10 +12,8 @@ interface Customer {
   name: string;
   email: string | null;
   phone: string | null;
-  tier: string;
-  loyalty_points: number;
   visit_count: number;
-  total_spend_cents: number;
+  last_visit: string;
 }
 
 export default function CustomersPage() {
@@ -88,8 +86,8 @@ export default function CustomersPage() {
                 </div>
               )}
               <div style={{ paddingTop: '0.75rem', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-                <span style={{ textTransform: 'capitalize' }}>{c.tier} tier</span>
-                <span>{c.visit_count} visits</span>
+                <span style={{ color: '#999' }}>Last visit {new Date(c.last_visit).toLocaleDateString()}</span>
+                <span>{c.visit_count} visit{c.visit_count === 1 ? '' : 's'}</span>
               </div>
             </div>
           ))}

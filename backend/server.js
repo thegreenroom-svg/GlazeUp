@@ -292,14 +292,44 @@ app.get('/api/demo/kiln-sessions', async (req, res) => {
 
 app.get('/api/demo/customers', async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('customers')
-      .select('id, name, email, phone, tier, loyalty_points, visit_count, total_spend_cents, total_pieces_painted')
+    // The 'customers' table itself is stale/demo data (literal "Demo: Ivy
+    // Whitlock" rows plus a handful of personal test entries with no real
+    // spend). Real customer data lives in bookings -- derive customers by
+    // grouping real bookings by name/email instead.
+    const { data: bookings, error } = await supabase
+      .from('bookings')
+      .select('customer_name, customer_email, customer_phone, session_start')
       .eq('studio_id', DEMO_STUDIO_ID)
-      .order('last_visit_at', { ascending: false })
-      .limit(50);
+      .order('session_start', { ascending: false })
+      .limit(500);
     if (error) throw error;
-    res.json(data);
+
+    const byName = new Map();
+    (bookings || []).forEach((b) => {
+      const key = (b.customer_name || '').trim().toLowerCase();
+      if (!key) return;
+      if (!byName.has(key)) {
+        byName.set(key, {
+          id: key,
+          name: b.customer_name.trim(),
+          email: b.customer_email || null,
+          phone: b.customer_phone || null,
+          visit_count: 0,
+          last_visit: b.session_start,
+        });
+      }
+      const entry = byName.get(key);
+      entry.visit_count += 1;
+      if (b.session_start > entry.last_visit) entry.last_visit = b.session_start;
+      if (!entry.email && b.customer_email) entry.email = b.customer_email;
+      if (!entry.phone && b.customer_phone) entry.phone = b.customer_phone;
+    });
+
+    const customers = Array.from(byName.values())
+      .sort((a, b) => (b.last_visit > a.last_visit ? 1 : -1))
+      .slice(0, 50);
+
+    res.json(customers);
   } catch (err) {
     logger.error(err);
     res.status(500).json({ error: err.message });
