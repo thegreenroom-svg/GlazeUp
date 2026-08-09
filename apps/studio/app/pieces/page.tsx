@@ -20,6 +20,15 @@ interface Piece {
   requires_second_firing: boolean;
   transfer_stage: string | null;
   glaze_fired_at: string | null;
+  photo_phash: string | null;
+}
+
+interface Match {
+  id: string;
+  piece_type: string;
+  reference_photo_url: string | null;
+  mark_code: string | null;
+  distance: number;
 }
 
 export default function PiecesPage() {
@@ -27,6 +36,21 @@ export default function PiecesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Piece | null>(null);
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [matchesLoading, setMatchesLoading] = useState(false);
+
+  useEffect(() => {
+    if (!selected || !selected.photo_phash) {
+      setMatches([]);
+      return;
+    }
+    setMatchesLoading(true);
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/pieces/${selected.id}/matches`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then(setMatches)
+      .catch(() => setMatches([]))
+      .finally(() => setMatchesLoading(false));
+  }, [selected]);
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/pieces`)
@@ -134,6 +158,32 @@ export default function PiecesPage() {
                   <div style={{ padding: '0.5rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', fontSize: '0.8rem' }}>Marked as damaged</div>
                 )}
               </div>
+
+              {selected.photo_phash && (
+                <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #eee' }}>
+                  <h3 style={{ fontSize: '0.95rem', fontWeight: '600', marginBottom: '0.75rem' }}>Possible Matches</h3>
+                  {matchesLoading ? (
+                    <p style={{ fontSize: '0.8rem', color: '#999' }}>Comparing photos...</p>
+                  ) : matches.length === 0 ? (
+                    <p style={{ fontSize: '0.8rem', color: '#999' }}>No close matches found among other pieces with photos.</p>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                      {matches.map((m) => (
+                        <div key={m.id} style={{ border: '1px solid #ddd', borderRadius: '4px', overflow: 'hidden' }}>
+                          <div style={{ width: '100%', aspectRatio: '1', backgroundColor: '#f0f0f0' }}>
+                            {m.reference_photo_url && (
+                              <img src={m.reference_photo_url} alt={m.piece_type} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            )}
+                          </div>
+                          <div style={{ padding: '0.4rem' }}>
+                            <p style={{ fontSize: '0.7rem', fontWeight: '500' }}>{Math.round((1 - m.distance) * 100)}% similar</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <button
                 onClick={() => setSelected(null)}

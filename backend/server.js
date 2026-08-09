@@ -173,12 +173,83 @@ app.get('/api/demo/pieces', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('pottery_pieces')
-      .select('id, piece_type, status, is_complete, created_at, scheduled_firing_date, reference_photo_url, mark_code, description, damaged, requires_second_firing, transfer_stage, glaze_fired_at')
+      .select('id, piece_type, status, is_complete, created_at, scheduled_firing_date, reference_photo_url, mark_code, description, damaged, requires_second_firing, transfer_stage, glaze_fired_at, photo_phash')
       .eq('studio_id', DEMO_STUDIO_ID)
       .order('created_at', { ascending: false })
       .limit(50);
     if (error) throw error;
     res.json(data);
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Real perceptual-hash matching: compares a piece's photo_phash against
+// every other piece with a phash using hamming distance, returns closest
+// candidates. This is genuine similarity search over real stored hashes,
+// not a mock -- read-only, no writes.
+function hexToBinary(hex) {
+  return hex
+    .split('')
+    .map((c) => parseInt(c, 16).toString(2).padStart(4, '0'))
+    .join('');
+}
+
+function hammingDistance(hashA, hashB) {
+  const segmentsA = hashA.split('|');
+  const segmentsB = hashB.split('|');
+  let totalBits = 0;
+  let diffBits = 0;
+
+  for (let i = 0; i < Math.min(segmentsA.length, segmentsB.length); i++) {
+    const binA = hexToBinary(segmentsA[i]);
+    const binB = hexToBinary(segmentsB[i]);
+    const len = Math.min(binA.length, binB.length);
+    for (let j = 0; j < len; j++) {
+      totalBits++;
+      if (binA[j] !== binB[j]) diffBits++;
+    }
+  }
+
+  return totalBits > 0 ? diffBits / totalBits : 1;
+}
+
+app.get('/api/demo/pieces/:id/matches', async (req, res) => {
+  try {
+    const { data: target, error: targetError } = await supabase
+      .from('pottery_pieces')
+      .select('id, photo_phash')
+      .eq('id', req.params.id)
+      .eq('studio_id', DEMO_STUDIO_ID)
+      .single();
+
+    if (targetError || !target || !target.photo_phash) {
+      return res.json([]);
+    }
+
+    const { data: candidates, error: candError } = await supabase
+      .from('pottery_pieces')
+      .select('id, piece_type, reference_photo_url, photo_phash, mark_code')
+      .eq('studio_id', DEMO_STUDIO_ID)
+      .not('photo_phash', 'is', null)
+      .neq('id', target.id)
+      .limit(200);
+
+    if (candError) throw candError;
+
+    const scored = candidates
+      .map((c) => ({
+        id: c.id,
+        piece_type: c.piece_type,
+        reference_photo_url: c.reference_photo_url,
+        mark_code: c.mark_code,
+        distance: hammingDistance(target.photo_phash, c.photo_phash),
+      }))
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 5);
+
+    res.json(scored);
   } catch (err) {
     logger.error(err);
     res.status(500).json({ error: err.message });
