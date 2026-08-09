@@ -12,7 +12,10 @@ import {
   Menu,
   X,
   TrendingUp,
-  Package
+  Package,
+  Bell,
+  UserCircle,
+  PoundSterling
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -32,7 +35,10 @@ export function StudioNavigation() {
     { label: 'Kiln Workflow', icon: <Zap className="w-5 h-5" />, href: '/kiln-workflow' },
     { label: 'Inventory', icon: <Package className="w-5 h-5" />, href: '/inventory' },
     { label: 'Customers', icon: <Users className="w-5 h-5" />, href: '/customers' },
-    { label: 'Reports', icon: <TrendingUp className="w-5 h-5" />, href: '/reports' }
+    { label: 'Reports', icon: <TrendingUp className="w-5 h-5" />, href: '/reports' },
+    { label: 'Money', icon: <PoundSterling className="w-5 h-5" />, href: '/money' },
+    { label: 'Alerts', icon: <Bell className="w-5 h-5" />, href: '/alerts' },
+    { label: 'Team', icon: <UserCircle className="w-5 h-5" />, href: '/team' }
   ];
 
   const isActive = (href: string) => {

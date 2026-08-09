@@ -304,6 +304,39 @@ app.get('/api/demo/revenue', async (req, res) => {
   }
 });
 
+app.get('/api/demo/alerts', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('staff_alerts')
+      .select('id, trigger_type, label, message, priority, acknowledged, created_at')
+      .eq('studio_id', DEMO_STUDIO_ID)
+      .order('created_at', { ascending: false })
+      .limit(30);
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/demo/team', async (req, res) => {
+  try {
+    // Deliberately excludes whatsapp_number and any other contact details --
+    // this endpoint has no auth, so staff personal contact info stays out.
+    const { data, error } = await supabase
+      .from('staff_team')
+      .select('id, name, role, active')
+      .eq('studio_id', DEMO_STUDIO_ID)
+      .order('active', { ascending: false });
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============================================================================
 // HEALTH & READY
 // ============================================================================
