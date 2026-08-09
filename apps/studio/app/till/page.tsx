@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Receipt } from 'lucide-react';
+import { SkeletonGrid } from '@/components/Skeleton';
 
 interface Order {
   id: string;
@@ -54,7 +55,7 @@ export default function TillPage() {
       {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
 
       {loading ? (
-        <p style={{ color: '#666' }}>Loading...</p>
+        <SkeletonGrid count={4} />
       ) : sessions.length === 0 ? (
         <p style={{ color: '#999' }}>No table sessions found.</p>
       ) : (

@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Phone } from 'lucide-react';
+import { SkeletonGrid } from '@/components/Skeleton';
 
 interface Customer {
   id: string;
@@ -68,7 +69,7 @@ export default function CustomersPage() {
       {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
 
       {loading ? (
-        <p style={{ color: '#666' }}>Loading...</p>
+        <SkeletonGrid count={6} />
       ) : filteredCustomers.length === 0 ? (
         <p style={{ color: '#999' }}>{customers.length === 0 ? 'No customers found.' : 'No customers match your search.'}</p>
       ) : (

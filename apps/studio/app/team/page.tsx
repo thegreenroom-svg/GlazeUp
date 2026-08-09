@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { User } from 'lucide-react';
+import { SkeletonGrid } from '@/components/Skeleton';
 
 interface TeamMember {
   id: string;
@@ -40,7 +41,7 @@ export default function TeamPage() {
       {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
 
       {loading ? (
-        <p style={{ color: '#666' }}>Loading...</p>
+        <SkeletonGrid count={4} />
       ) : team.length === 0 ? (
         <p style={{ color: '#999' }}>No team members found.</p>
       ) : (

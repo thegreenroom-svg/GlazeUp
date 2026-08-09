@@ -151,3 +151,28 @@ tbody tr {
 .animate-pulse {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Dark mode glazes */
+[data-theme='dark'] body {
+  background-color: #1a1520;
+  color: #f0e8ec;
+}
+
+[data-theme='dark'] .glaze-surface {
+  background-color: #2a2230 !important;
+  border-color: #443a4d !important;
+  color: #f0e8ec !important;
+}
+
+[data-theme='dark'] .glaze-muted {
+  color: #b8a8c0 !important;
+}

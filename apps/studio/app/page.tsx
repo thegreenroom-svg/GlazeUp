@@ -2,10 +2,12 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { Calendar, PoundSterling, Flame, Palette, Bell, Users } from 'lucide-react';
+import { Calendar, PoundSterling, Flame, Palette, Bell, Users, RefreshCw } from 'lucide-react';
+import { SkeletonTiles } from '@/components/Skeleton';
+import { usePullToRefresh } from '@/components/usePullToRefresh';
 
 interface TileData {
   bookingsToday: number;
@@ -71,58 +73,76 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const base = process.env.NEXT_PUBLIC_API_URL;
-        const [studioRes, bookingsRes, revenueRes, kilnRes, piecesRes, alertsRes, customersRes] = await Promise.all([
-          fetch(`${base}/api/demo/studio`),
-          fetch(`${base}/api/demo/bookings`),
-          fetch(`${base}/api/demo/revenue`),
-          fetch(`${base}/api/demo/kiln-sessions`),
-          fetch(`${base}/api/demo/pieces`),
-          fetch(`${base}/api/demo/alerts`),
-          fetch(`${base}/api/demo/customers`),
-        ]);
+  const load = useCallback(async () => {
+    try {
+      const base = process.env.NEXT_PUBLIC_API_URL;
+      const [studioRes, bookingsRes, revenueRes, kilnRes, piecesRes, alertsRes, customersRes] = await Promise.all([
+        fetch(`${base}/api/demo/studio`),
+        fetch(`${base}/api/demo/bookings`),
+        fetch(`${base}/api/demo/revenue`),
+        fetch(`${base}/api/demo/kiln-sessions`),
+        fetch(`${base}/api/demo/pieces`),
+        fetch(`${base}/api/demo/alerts`),
+        fetch(`${base}/api/demo/customers`),
+      ]);
 
-        const studio = studioRes.ok ? await studioRes.json() : null;
-        const bookings = bookingsRes.ok ? await bookingsRes.json() : [];
-        const revenue = revenueRes.ok ? await revenueRes.json() : [];
-        const kiln = kilnRes.ok ? await kilnRes.json() : [];
-        const pieces = piecesRes.ok ? await piecesRes.json() : [];
-        const alerts = alertsRes.ok ? await alertsRes.json() : [];
-        const customers = customersRes.ok ? await customersRes.json() : [];
+      const studio = studioRes.ok ? await studioRes.json() : null;
+      const bookings = bookingsRes.ok ? await bookingsRes.json() : [];
+      const revenue = revenueRes.ok ? await revenueRes.json() : [];
+      const kiln = kilnRes.ok ? await kilnRes.json() : [];
+      const pieces = piecesRes.ok ? await piecesRes.json() : [];
+      const alerts = alertsRes.ok ? await alertsRes.json() : [];
+      const customers = customersRes.ok ? await customersRes.json() : [];
 
-        if (studio?.name) setStudioName(studio.name);
+      if (studio?.name) setStudioName(studio.name);
 
-        const todayStr = new Date().toDateString();
-        const bookingsToday = bookings.filter((b: any) => new Date(b.session_start).toDateString() === todayStr).length;
+      const todayStr = new Date().toDateString();
+      const bookingsToday = bookings.filter((b: any) => new Date(b.session_start).toDateString() === todayStr).length;
 
-        const mostRecentDate = revenue.length > 0 ? revenue.reduce((max: string, r: any) => (r.metric_date > max ? r.metric_date : max), revenue[0].metric_date) : null;
-        const moneyToday = revenue.filter((r: any) => r.metric_date === mostRecentDate).reduce((sum: number, r: any) => sum + r.revenue_cents, 0) / 100;
+      const mostRecentDate = revenue.length > 0 ? revenue.reduce((max: string, r: any) => (r.metric_date > max ? r.metric_date : max), revenue[0].metric_date) : null;
+      const moneyToday = revenue.filter((r: any) => r.metric_date === mostRecentDate).reduce((sum: number, r: any) => sum + r.revenue_cents, 0) / 100;
 
-        const kilnActive = kiln.filter((k: any) => k.status !== 'fired').length;
-        const alertsUnread = alerts.filter((a: any) => !a.acknowledged).length;
+      const kilnActive = kiln.filter((k: any) => k.status !== 'fired').length;
+      const alertsUnread = alerts.filter((a: any) => !a.acknowledged).length;
 
-        setData({
-          bookingsToday,
-          moneyToday,
-          kilnActive,
-          piecesCount: pieces.length,
-          alertsUnread,
-          customersCount: customers.length,
-        });
-      } catch (err) {
-        // leave data null, tiles will show a loading state indefinitely rather than crash
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+      setData({
+        bookingsToday,
+        moneyToday,
+        kilnActive,
+        piecesCount: pieces.length,
+        alertsUnread,
+        customersCount: customers.length,
+      });
+    } catch (err) {
+      // leave data null, tiles will show a loading state indefinitely rather than crash
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const { pulling, pullDistance } = usePullToRefresh(load);
+
+  // Predictive home: during opening hours (9am-5pm) bookings lead, since
+  // that's what staff need front and centre while customers are in. Outside
+  // those hours -- early morning kiln loading, or evening after close --
+  // the kiln takes the lead tile instead, since that's what's actually
+  // happening then. Driven by the real current hour, not a fixed layout.
+  const hour = new Date().getHours();
+  const isServiceHours = hour >= 9 && hour < 17;
+
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '1.5rem', backgroundColor: '#FDF6F1', minHeight: '100%' }}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '1.5rem', backgroundColor: '#FDF6F1', minHeight: '100%', position: 'relative' }}>
+      {pullDistance > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'center', height: `${pullDistance}px`, alignItems: 'center', overflow: 'hidden' }}>
+          <RefreshCw size={20} color="#E85D8A" style={{ transform: `rotate(${pullDistance * 3.6}deg)`, opacity: pullDistance / 100 }} />
+        </div>
+      )}
+      {pulling && <p style={{ textAlign: 'center', color: '#E85D8A', fontSize: '0.8rem', marginBottom: '0.5rem' }}>Refreshing...</p>}
+
       <div
         style={{
           padding: '0.75rem 1rem',
@@ -137,44 +157,31 @@ export default function Dashboard() {
       </div>
 
       {loading || !data ? (
-        <p style={{ color: '#999' }}>Loading...</p>
+        <SkeletonTiles />
       ) : (
         <div style={{ maxWidth: '520px', margin: '0 auto' }}>
-          {/* Row 1: largest tile, full width */}
-          <div style={{ marginBottom: '0.75rem' }}>
-            <Tile
-              label="Bookings Today"
-              icon={Calendar}
-              value={String(data.bookingsToday)}
-              color="#E85D8A"
-              fontSize="2.4rem"
-              onClick={() => router.push('/bookings')}
-            />
-          </div>
+          {isServiceHours ? (
+            <>
+              <div style={{ marginBottom: '0.75rem' }}>
+                <Tile label="Bookings Today" icon={Calendar} value={String(data.bookingsToday)} color="#E85D8A" fontSize="2.4rem" onClick={() => router.push('/bookings')} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                <Tile label="Takings" icon={PoundSterling} value={`£${data.moneyToday.toFixed(0)}`} subtext="most recent day" color="#C58C5B" fontSize="1.5rem" onClick={() => router.push('/money')} />
+                <Tile label="Kiln Active" icon={Flame} value={String(data.kilnActive)} subtext="loading / firing" color="#A85D35" fontSize="1.5rem" onClick={() => router.push('/kiln-workflow')} />
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ marginBottom: '0.75rem' }}>
+                <Tile label="Kiln Active" icon={Flame} value={String(data.kilnActive)} subtext="loading / firing" color="#A85D35" fontSize="2.4rem" onClick={() => router.push('/kiln-workflow')} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                <Tile label="Bookings Today" icon={Calendar} value={String(data.bookingsToday)} color="#E85D8A" fontSize="1.5rem" onClick={() => router.push('/bookings')} />
+                <Tile label="Takings" icon={PoundSterling} value={`£${data.moneyToday.toFixed(0)}`} subtext="most recent day" color="#C58C5B" fontSize="1.5rem" onClick={() => router.push('/money')} />
+              </div>
+            </>
+          )}
 
-          {/* Row 2: two medium tiles */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-            <Tile
-              label="Takings"
-              icon={PoundSterling}
-              value={`£${data.moneyToday.toFixed(0)}`}
-              subtext="most recent day"
-              color="#C58C5B"
-              fontSize="1.5rem"
-              onClick={() => router.push('/money')}
-            />
-            <Tile
-              label="Kiln Active"
-              icon={Flame}
-              value={String(data.kilnActive)}
-              subtext="loading / firing"
-              color="#A85D35"
-              fontSize="1.5rem"
-              onClick={() => router.push('/kiln-workflow')}
-            />
-          </div>
-
-          {/* Row 3: three smaller tiles */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.6rem', marginBottom: '0.6rem' }}>
             <Tile label="Pieces" icon={Palette} value={String(data.piecesCount)} color="#C23F6B" fontSize="1.1rem" onClick={() => router.push('/pieces')} />
             <Tile label="Alerts" icon={Bell} value={String(data.alertsUnread)} color="#D97742" fontSize="1.1rem" onClick={() => router.push('/alerts')} />

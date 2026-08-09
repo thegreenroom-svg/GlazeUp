@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, Calendar } from 'lucide-react';
+import { SkeletonRows } from '@/components/Skeleton';
 
 interface RevenueRow {
   metric_date: string;
@@ -59,7 +60,7 @@ export default function ReportsPage() {
       {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1.5rem' }}>{error}</div>}
 
       {loading ? (
-        <p style={{ color: '#666' }}>Loading...</p>
+        <SkeletonRows count={5} />
       ) : (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>

@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { AlertTriangle } from 'lucide-react';
+import { SkeletonGrid } from '@/components/Skeleton';
 
 interface Piece {
   id: string;
@@ -90,7 +91,7 @@ export default function PiecesPage() {
       {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
 
       {loading ? (
-        <p style={{ color: '#666' }}>Loading...</p>
+        <SkeletonGrid count={8} />
       ) : filteredPieces.length === 0 ? (
         <p style={{ color: '#999' }}>{pieces.length === 0 ? 'No pieces found.' : 'No pieces match your search.'}</p>
       ) : (

@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Package, AlertCircle, CheckCircle } from 'lucide-react';
+import { SkeletonGrid } from '@/components/Skeleton';
 
 interface Piece {
   id: string;
@@ -60,7 +61,7 @@ export default function InventoryPage() {
       {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
 
       {loading ? (
-        <p style={{ color: '#666' }}>Loading...</p>
+        <SkeletonGrid count={3} />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
           <StatCard icon={Package} label="Total Pieces" value={pieces.length} color="#0066cc" />

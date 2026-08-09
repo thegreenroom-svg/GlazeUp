@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { SkeletonRows } from '@/components/Skeleton';
 import { Receipt } from 'lucide-react';
 
 interface Booking {
@@ -91,7 +92,7 @@ export default function BookingsPage() {
       {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
 
       {loading ? (
-        <p style={{ color: '#666' }}>Loading...</p>
+        <SkeletonRows count={6} />
       ) : filteredBookings.length === 0 ? (
         <p style={{ color: '#999' }}>{bookings.length === 0 ? 'No bookings found.' : 'No bookings match your search.'}</p>
       ) : (

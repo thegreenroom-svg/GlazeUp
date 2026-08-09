@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { StudioNavigation } from '@/components/StudioNavigation';
+import { AppShell } from './AppShell';
 
 export const metadata: Metadata = {
   title: 'GlazeUp Studio - Read-only Demo',
@@ -15,12 +15,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-gray-50">
-        <div className="flex h-screen">
-          <StudioNavigation />
-          <main className="flex-1 overflow-auto">
-            {children}
-          </main>
-        </div>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

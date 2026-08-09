@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Bell, CheckCircle } from 'lucide-react';
+import { SkeletonRows } from '@/components/Skeleton';
 
 interface Alert {
   id: string;
@@ -45,7 +46,7 @@ export default function AlertsPage() {
       {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
 
       {loading ? (
-        <p style={{ color: '#666' }}>Loading...</p>
+        <SkeletonRows count={4} />
       ) : alerts.length === 0 ? (
         <p style={{ color: '#999' }}>No alerts found.</p>
       ) : (
