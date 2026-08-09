@@ -156,18 +156,15 @@ app.get('/api/demo/studio', async (req, res) => {
 
 app.get('/api/demo/bookings', async (req, res) => {
   try {
-    // Show today's bookings first, then upcoming, soonest first -- not
-    // furthest-future-first, which is what a plain DESC sort produced.
-    const todayStart = new Date();
-    todayStart.setUTCHours(0, 0, 0, 0);
-
+    // Show all real bookings, most recent first. (Earlier version filtered
+    // to today-onward only, which hid most of the 209 real bookings since
+    // most are in the past -- Daisy asked to see everything.)
     const { data, error } = await supabase
       .from('bookings')
       .select('id, booking_code, customer_name, customer_email, party_size, status, session_start, session_end, room, current_stage, table_number, notes, booking_type, arrived_at')
       .eq('studio_id', DEMO_STUDIO_ID)
-      .gte('session_start', todayStart.toISOString())
-      .order('session_start', { ascending: true })
-      .limit(50);
+      .order('session_start', { ascending: false })
+      .limit(250);
     if (error) throw error;
     res.json(data);
   } catch (err) {
@@ -486,6 +483,106 @@ app.get('/api/demo/square-live', async (req, res) => {
   } catch (err) {
     logger.error(err.response?.data || err);
     res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message });
+  }
+});
+
+// Real menu catalog, already synced from Square into square_items. Read-only.
+app.get('/api/demo/menu', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('square_items')
+      .select('item_name, category, price_cents')
+      .eq('studio_id', DEMO_STUDIO_ID)
+      .order('category', { ascending: true })
+      .order('item_name', { ascending: true });
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Till workflow -- isolated from real Square/table_session_orders. Lets
+// staff add items to a booking's running total for testing the workflow.
+// No real payment is processed, no real order is created anywhere.
+app.get('/api/demo/bookings/:code/till', async (req, res) => {
+  try {
+    const { data: items, error: itemsError } = await supabase
+      .from('demo_app_till_items')
+      .select('id, item_name, category, quantity, unit_price_cents, created_at')
+      .eq('booking_code', req.params.code)
+      .eq('studio_id', DEMO_STUDIO_ID)
+      .order('created_at', { ascending: true });
+    if (itemsError) throw itemsError;
+
+    const { data: status } = await supabase
+      .from('demo_app_session_status')
+      .select('finished_at, finished_by')
+      .eq('booking_code', req.params.code)
+      .eq('studio_id', DEMO_STUDIO_ID)
+      .maybeSingle();
+
+    res.json({ items: items || [], finished_at: status?.finished_at || null, finished_by: status?.finished_by || null });
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/demo/bookings/:code/till', async (req, res) => {
+  try {
+    const { item_name, category, unit_price_cents, quantity, added_by } = req.body;
+    if (!item_name || unit_price_cents === undefined) {
+      return res.status(400).json({ error: 'item_name and unit_price_cents are required' });
+    }
+    const { data, error } = await supabase
+      .from('demo_app_till_items')
+      .insert([
+        {
+          studio_id: DEMO_STUDIO_ID,
+          booking_code: req.params.code,
+          item_name,
+          category: category || null,
+          quantity: quantity || 1,
+          unit_price_cents,
+          added_by: added_by || null,
+        },
+      ])
+      .select()
+      .single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/demo/till-items/:id', async (req, res) => {
+  try {
+    const { error } = await supabase.from('demo_app_till_items').delete().eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ deleted: true });
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/demo/bookings/:code/finish', async (req, res) => {
+  try {
+    const { finished_by } = req.body;
+    const { data, error } = await supabase
+      .from('demo_app_session_status')
+      .upsert([{ booking_code: req.params.code, studio_id: DEMO_STUDIO_ID, finished_at: new Date().toISOString(), finished_by: finished_by || null }], { onConflict: 'booking_code' })
+      .select()
+      .single();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
   }
 });
 
