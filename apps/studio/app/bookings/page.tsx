@@ -31,6 +31,7 @@ interface BookingDetail {
 
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
@@ -64,20 +65,35 @@ export default function BookingsPage() {
   const orderTotal = (orders: BookingDetail['orders']) =>
     orders.reduce((sum, o) => sum + (o.unit_price_cents * o.quantity) / 100, 0);
 
+  const filteredBookings = bookings.filter((b) =>
+    b.customer_name.toLowerCase().includes(search.toLowerCase()) ||
+    (b.customer_email || '').toLowerCase().includes(search.toLowerCase()) ||
+    (b.room || '').toLowerCase().includes(search.toLowerCase()) ||
+    (b.table_number || '').toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem' }}>
       <div style={{ padding: '0.75rem 1rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '4px', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
         Demo view — read-only. Tap a booking to see its table session and orders.
       </div>
 
-      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '2rem' }}>Bookings</h1>
+      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '1rem' }}>Bookings</h1>
+
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search by customer, room, or table..."
+        style={{ width: '100%', maxWidth: '400px', padding: '0.6rem 0.9rem', border: '1px solid #ddd', borderRadius: '6px', marginBottom: '1.5rem', fontSize: '0.9rem', boxSizing: 'border-box' }}
+      />
 
       {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
 
       {loading ? (
         <p style={{ color: '#666' }}>Loading...</p>
-      ) : bookings.length === 0 ? (
-        <p style={{ color: '#999' }}>No bookings found.</p>
+      ) : filteredBookings.length === 0 ? (
+        <p style={{ color: '#999' }}>{bookings.length === 0 ? 'No bookings found.' : 'No bookings match your search.'}</p>
       ) : (
         <div style={{ overflowX: 'auto', backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '8px' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
@@ -92,7 +108,7 @@ export default function BookingsPage() {
               </tr>
             </thead>
             <tbody>
-              {bookings.map((b) => (
+              {filteredBookings.map((b) => (
                 <tr
                   key={b.id}
                   onClick={() => setSelectedCode(b.booking_code)}

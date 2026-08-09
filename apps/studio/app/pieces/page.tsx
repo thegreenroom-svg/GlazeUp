@@ -33,6 +33,7 @@ interface Match {
 
 export default function PiecesPage() {
   const [pieces, setPieces] = useState<Piece[]>([]);
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Piece | null>(null);
@@ -52,6 +53,12 @@ export default function PiecesPage() {
       .finally(() => setMatchesLoading(false));
   }, [selected]);
 
+  const filteredPieces = pieces.filter((p) =>
+    p.piece_type.toLowerCase().includes(search.toLowerCase()) ||
+    (p.description || '').toLowerCase().includes(search.toLowerCase()) ||
+    (p.mark_code || '').toLowerCase().includes(search.toLowerCase())
+  );
+
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/pieces`)
       .then((res) => {
@@ -69,17 +76,25 @@ export default function PiecesPage() {
         Demo view — read-only. Showing your 50 most recent pieces.
       </div>
 
-      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '2rem' }}>Pieces</h1>
+      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '1rem' }}>Pieces</h1>
+
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search by type, description, or kiln code..."
+        style={{ width: '100%', maxWidth: '400px', padding: '0.6rem 0.9rem', border: '1px solid #ddd', borderRadius: '6px', marginBottom: '1.5rem', fontSize: '0.9rem', boxSizing: 'border-box' }}
+      />
 
       {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
 
       {loading ? (
         <p style={{ color: '#666' }}>Loading...</p>
-      ) : pieces.length === 0 ? (
-        <p style={{ color: '#999' }}>No pieces found.</p>
+      ) : filteredPieces.length === 0 ? (
+        <p style={{ color: '#999' }}>{pieces.length === 0 ? 'No pieces found.' : 'No pieces match your search.'}</p>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
-          {pieces.map((piece) => (
+          {filteredPieces.map((piece) => (
             <div
               key={piece.id}
               onClick={() => setSelected(piece)}

@@ -21,6 +21,7 @@ export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/customers`)
@@ -32,6 +33,12 @@ export default function CustomersPage() {
       .catch(() => setError('Could not load customers.'))
       .finally(() => setLoading(false));
   }, []);
+
+  const filteredCustomers = customers.filter((c) =>
+    c.name.toLowerCase().includes(search.toLowerCase()) ||
+    (c.email || '').toLowerCase().includes(search.toLowerCase()) ||
+    (c.phone || '').toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem' }}>
@@ -48,17 +55,25 @@ export default function CustomersPage() {
         Demo view — read-only.
       </div>
 
-      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '2rem' }}>Customers</h1>
+      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '1rem' }}>Customers</h1>
+
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search by name, email, or phone..."
+        style={{ width: '100%', maxWidth: '400px', padding: '0.6rem 0.9rem', border: '1px solid #ddd', borderRadius: '6px', marginBottom: '1.5rem', fontSize: '0.9rem', boxSizing: 'border-box' }}
+      />
 
       {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
 
       {loading ? (
         <p style={{ color: '#666' }}>Loading...</p>
-      ) : customers.length === 0 ? (
-        <p style={{ color: '#999' }}>No customers found.</p>
+      ) : filteredCustomers.length === 0 ? (
+        <p style={{ color: '#999' }}>{customers.length === 0 ? 'No customers found.' : 'No customers match your search.'}</p>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
-          {customers.map((c) => (
+          {filteredCustomers.map((c) => (
             <div key={c.id} style={{ padding: '1.5rem', backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '8px' }}>
               <h3 style={{ fontWeight: 'bold', fontSize: '1.125rem', marginBottom: '0.75rem' }}>{c.name}</h3>
               {c.email && (
