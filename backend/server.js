@@ -690,12 +690,16 @@ app.post('/api/demo/photo-match', upload.single('photo'), async (req, res) => {
 
     let candidates = [];
     if (parsed.chalk_tag_name) {
+      // Search the full real booking set, not just a date-limited slice --
+      // a chalk tag name could match any real booking regardless of how far
+      // in the past or future it is. Previously limited to 100 rows ordered
+      // by furthest-future date, which silently excluded real matches like
+      // older July bookings once enough future bookings existed to push
+      // them out of that window.
       const { data: recentBookings } = await supabase
         .from('bookings')
         .select('booking_code, customer_name, session_start, status')
-        .eq('studio_id', DEMO_STUDIO_ID)
-        .order('session_start', { ascending: false })
-        .limit(100);
+        .eq('studio_id', DEMO_STUDIO_ID);
 
       candidates = (recentBookings || [])
         .map((b) => ({ ...b, score: nameSimilarity(parsed.chalk_tag_name, b.customer_name) }))
