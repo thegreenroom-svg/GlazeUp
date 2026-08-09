@@ -337,6 +337,39 @@ app.get('/api/demo/team', async (req, res) => {
   }
 });
 
+app.get('/api/demo/till', async (req, res) => {
+  try {
+    const { data: sessions, error: sessionsError } = await supabase
+      .from('table_sessions')
+      .select('id, table_number, status, number_of_places, created_at')
+      .eq('studio_id', DEMO_STUDIO_ID)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    if (sessionsError) throw sessionsError;
+
+    const sessionIds = sessions.map((s) => s.id);
+    let orders = [];
+    if (sessionIds.length > 0) {
+      const { data: orderData, error: ordersError } = await supabase
+        .from('table_session_orders')
+        .select('id, table_session_id, item_type, item_name, quantity, unit_price_cents, notes, created_at')
+        .in('table_session_id', sessionIds);
+      if (ordersError) throw ordersError;
+      orders = orderData;
+    }
+
+    const result = sessions.map((s) => ({
+      ...s,
+      orders: orders.filter((o) => o.table_session_id === s.id),
+    }));
+
+    res.json(result);
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ============================================================================
 // HEALTH & READY
 // ============================================================================

@@ -15,7 +15,8 @@ import {
   Package,
   Bell,
   UserCircle,
-  PoundSterling
+  PoundSterling,
+  Receipt
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -38,7 +39,8 @@ export function StudioNavigation() {
     { label: 'Reports', icon: <TrendingUp className="w-5 h-5" />, href: '/reports' },
     { label: 'Money', icon: <PoundSterling className="w-5 h-5" />, href: '/money' },
     { label: 'Alerts', icon: <Bell className="w-5 h-5" />, href: '/alerts' },
-    { label: 'Team', icon: <UserCircle className="w-5 h-5" />, href: '/team' }
+    { label: 'Team', icon: <UserCircle className="w-5 h-5" />, href: '/team' },
+    { label: 'Till', icon: <Receipt className="w-5 h-5" />, href: '/till' }
   ];
 
   const isActive = (href: string) => {
