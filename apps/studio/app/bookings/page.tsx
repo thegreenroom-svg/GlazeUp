@@ -41,6 +41,7 @@ interface PhotoMatch {
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [search, setSearch] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
@@ -81,12 +82,17 @@ export default function BookingsPage() {
   const orderTotal = (orders: BookingDetail['orders']) =>
     orders.reduce((sum, o) => sum + (o.unit_price_cents * o.quantity) / 100, 0);
 
-  const filteredBookings = bookings.filter((b) =>
-    b.customer_name.toLowerCase().includes(search.toLowerCase()) ||
-    (b.customer_email || '').toLowerCase().includes(search.toLowerCase()) ||
-    (b.room || '').toLowerCase().includes(search.toLowerCase()) ||
-    (b.table_number || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredBookings = bookings.filter((b) => {
+    const matchesSearch =
+      b.customer_name.toLowerCase().includes(search.toLowerCase()) ||
+      (b.customer_email || '').toLowerCase().includes(search.toLowerCase()) ||
+      (b.room || '').toLowerCase().includes(search.toLowerCase()) ||
+      (b.table_number || '').toLowerCase().includes(search.toLowerCase());
+    const matchesDate = !dateFilter || b.session_start.startsWith(dateFilter);
+    return matchesSearch && matchesDate;
+  });
+
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem' }}>
@@ -101,8 +107,31 @@ export default function BookingsPage() {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Search by customer, room, or table..."
-        style={{ width: '100%', maxWidth: '400px', padding: '0.6rem 0.9rem', border: '1px solid #ddd', borderRadius: '6px', marginBottom: '1.5rem', fontSize: '0.9rem', boxSizing: 'border-box' }}
+        style={{ width: '100%', maxWidth: '400px', padding: '0.6rem 0.9rem', border: '1px solid #ddd', borderRadius: '6px', marginBottom: '0.75rem', fontSize: '0.9rem', boxSizing: 'border-box' }}
       />
+
+      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+        <input
+          type="date"
+          value={dateFilter}
+          onChange={(e) => setDateFilter(e.target.value)}
+          style={{ padding: '0.55rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem' }}
+        />
+        <button
+          onClick={() => setDateFilter(todayStr)}
+          style={{ padding: '0.55rem 0.9rem', backgroundColor: dateFilter === todayStr ? '#E85D8A' : '#f0f0f0', color: dateFilter === todayStr ? 'white' : '#333', border: 'none', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer' }}
+        >
+          Today
+        </button>
+        {dateFilter && (
+          <button
+            onClick={() => setDateFilter('')}
+            style={{ padding: '0.55rem 0.9rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer' }}
+          >
+            Clear date
+          </button>
+        )}
+      </div>
 
       {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
 
