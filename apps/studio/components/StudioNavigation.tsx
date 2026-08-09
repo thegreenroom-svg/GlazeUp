@@ -149,7 +149,7 @@ export function StudioNavigation() {
 
       {/* Desktop sidebar */}
       {!isMobile && isOpen && (
-        <nav className="relative w-64 h-screen bg-gray-900 text-white z-0 overflow-y-auto">
+        <nav className="relative w-64 bg-gray-900 text-white z-0 overflow-y-auto" style={{ height: '100dvh' }}>
           {headerAndSearch}
           {menuList}
         </nav>
