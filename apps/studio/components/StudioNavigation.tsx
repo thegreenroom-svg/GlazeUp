@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Home,
   Calendar,
@@ -17,13 +17,16 @@ import {
   UserCircle,
   PoundSterling,
   Receipt,
-  Camera
+  Camera,
+  Search
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export function StudioNavigation() {
   const pathname = usePathname();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     // Default open on desktop, closed on mobile
@@ -54,7 +57,8 @@ export function StudioNavigation() {
     <>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 z-50 md:hidden bg-blue-600 text-white p-3 rounded-full shadow-lg"
+        className="fixed bottom-6 right-6 z-50 md:hidden text-white p-3 rounded-full shadow-lg"
+        style={{ backgroundColor: '#E85D8A' }}
       >
         {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
       </button>
@@ -67,9 +71,43 @@ export function StudioNavigation() {
             exit={{ x: -256 }}
             className="fixed md:relative w-64 h-screen bg-gray-900 text-white z-40 md:z-0 overflow-y-auto"
           >
-            <div className="p-6 border-b border-gray-800">
-              <h1 className="text-2xl font-bold text-blue-400">GlazeUp</h1>
-              <p className="text-sm text-gray-400 mt-1">Read-only demo</p>
+            <div className="p-6 border-b border-gray-800" style={{ background: 'linear-gradient(135deg, #E85D8A 0%, #C23F6B 100%)' }}>
+              <img
+                src="https://static.wixstatic.com/media/d0e5bd_2acf96e6189f4fbcb2159fae9f0a5674~mv2.png"
+                alt="The Kiln Cafe"
+                style={{ height: '40px', marginBottom: '0.5rem', filter: 'brightness(0) invert(1)' }}
+              />
+              <p className="text-sm text-white opacity-80">Read-only demo</p>
+            </div>
+
+            <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #333' }}>
+              <div style={{ position: 'relative' }}>
+                <Search size={14} style={{ position: 'absolute', left: '0.6rem', top: '50%', transform: 'translateY(-50%)', color: '#888' }} />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const match = menuItems.find((m) => m.label.toLowerCase().includes(query.toLowerCase()));
+                      if (match) {
+                        router.push(match.href);
+                        setQuery('');
+                        if (window.innerWidth < 768) setIsOpen(false);
+                      }
+                    }
+                  }}
+                  placeholder="Jump to..."
+                  style={{
+                    width: '100%',
+                    padding: '0.4rem 0.6rem 0.4rem 1.8rem',
+                    backgroundColor: '#1a1a2e',
+                    border: '1px solid #333',
+                    borderRadius: '6px',
+                    color: 'white',
+                    fontSize: '0.85rem',
+                  }}
+                />
+              </div>
             </div>
 
             <div className="py-6">
@@ -84,9 +122,10 @@ export function StudioNavigation() {
                   }}
                   className={`flex items-center gap-3 px-6 py-3 transition-all ${
                     isActive(item.href)
-                      ? 'bg-blue-600 text-white border-r-4 border-blue-400'
+                      ? 'text-white border-r-4'
                       : 'text-gray-400 hover:text-white hover:bg-gray-800'
                   }`}
+                  style={isActive(item.href) ? { backgroundColor: '#E85D8A', borderColor: '#C23F6B' } : {}}
                 >
                   {item.icon}
                   <span className="font-medium">{item.label}</span>

@@ -12,6 +12,8 @@ module.exports = {
         clay: '#C58C5B',
         terracotta: '#A85D35',
         charcoal: '#2F2A26',
+        kilnpink: '#E85D8A',
+        kilnpinkdark: '#C23F6B',
       },
       fontFamily: {
         sans: ['system-ui', 'sans-serif'],
