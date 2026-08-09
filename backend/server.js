@@ -173,7 +173,7 @@ app.get('/api/demo/pieces', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('pottery_pieces')
-      .select('id, piece_type, status, is_complete, created_at, scheduled_firing_date')
+      .select('id, piece_type, status, is_complete, created_at, scheduled_firing_date, reference_photo_url, mark_code, description, damaged, requires_second_firing, transfer_stage, glaze_fired_at')
       .eq('studio_id', DEMO_STUDIO_ID)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -189,7 +189,7 @@ app.get('/api/demo/kiln-sessions', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('kiln_sessions')
-      .select('id, label, status, batch_code, fired_at, created_at')
+      .select('id, label, status, batch_code, fired_at, created_at, morning_check_result, morning_check_confirmed_at, misfire_notes')
       .eq('studio_id', DEMO_STUDIO_ID)
       .order('created_at', { ascending: false })
       .limit(50);

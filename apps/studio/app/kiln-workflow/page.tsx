@@ -13,6 +13,9 @@ interface KilnSession {
   batch_code: string | null;
   fired_at: string | null;
   created_at: string;
+  morning_check_result: string | null;
+  morning_check_confirmed_at: string | null;
+  misfire_notes: string | null;
 }
 
 export default function KilnWorkflowPage() {
@@ -72,6 +75,14 @@ export default function KilnWorkflowPage() {
                 <h3 style={{ fontWeight: 'bold' }}>{s.label || s.batch_code || 'Untitled batch'}</h3>
               </div>
               {s.fired_at && <p style={{ color: '#666', fontSize: '0.875rem', marginBottom: '0.5rem' }}>Fired: {new Date(s.fired_at).toLocaleDateString()}</p>}
+              {s.morning_check_result && (
+                <p style={{ color: s.morning_check_result === 'ok' ? '#00aa00' : '#c33', fontSize: '0.875rem', marginBottom: '0.5rem', textTransform: 'capitalize' }}>
+                  Morning check: {s.morning_check_result}
+                </p>
+              )}
+              {s.misfire_notes && (
+                <p style={{ padding: '0.5rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', fontSize: '0.8rem', marginBottom: '0.5rem' }}>{s.misfire_notes}</p>
+              )}
               <div style={{ display: 'inline-block', padding: '0.25rem 0.75rem', backgroundColor: getStatusColor(s.status), color: 'white', borderRadius: '9999px', fontSize: '0.75rem', textTransform: 'capitalize' }}>
                 {s.status}
               </div>

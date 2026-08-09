@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { AlertTriangle } from 'lucide-react';
 
 interface Piece {
   id: string;
@@ -12,12 +13,20 @@ interface Piece {
   is_complete: boolean;
   created_at: string;
   scheduled_firing_date: string | null;
+  reference_photo_url: string | null;
+  mark_code: string | null;
+  description: string | null;
+  damaged: boolean;
+  requires_second_firing: boolean;
+  transfer_stage: string | null;
+  glaze_fired_at: string | null;
 }
 
 export default function PiecesPage() {
   const [pieces, setPieces] = useState<Piece[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Piece | null>(null);
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/pieces`)
@@ -32,17 +41,8 @@ export default function PiecesPage() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem' }}>
-      <div
-        style={{
-          padding: '0.75rem 1rem',
-          backgroundColor: '#fff8e1',
-          border: '1px solid #ffca28',
-          borderRadius: '4px',
-          marginBottom: '1.5rem',
-          fontSize: '0.875rem',
-        }}
-      >
-        Demo view — read-only.
+      <div style={{ padding: '0.75rem 1rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '4px', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
+        Demo view — read-only. Showing your 50 most recent pieces.
       </div>
 
       <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '2rem' }}>Pieces</h1>
@@ -54,14 +54,95 @@ export default function PiecesPage() {
       ) : pieces.length === 0 ? (
         <p style={{ color: '#999' }}>No pieces found.</p>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
           {pieces.map((piece) => (
-            <div key={piece.id} style={{ padding: '1rem', backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '8px' }}>
-              <h3 style={{ fontWeight: 'bold', marginBottom: '0.5rem', textTransform: 'capitalize' }}>{piece.piece_type}</h3>
-              <p style={{ color: '#666', fontSize: '0.875rem', marginBottom: '0.25rem', textTransform: 'capitalize' }}>Status: {piece.status.replace(/_/g, ' ')}</p>
-              <p style={{ color: '#999', fontSize: '0.75rem' }}>{new Date(piece.created_at).toLocaleDateString()}</p>
+            <div
+              key={piece.id}
+              onClick={() => setSelected(piece)}
+              style={{ backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '8px', overflow: 'hidden', cursor: 'pointer' }}
+            >
+              <div style={{ width: '100%', aspectRatio: '1', backgroundColor: '#f0f0f0', position: 'relative' }}>
+                {piece.reference_photo_url ? (
+                  <img src={piece.reference_photo_url} alt={piece.piece_type} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#999', fontSize: '0.75rem' }}>No photo</div>
+                )}
+                {piece.damaged && (
+                  <div style={{ position: 'absolute', top: '0.5rem', right: '0.5rem', backgroundColor: '#c33', color: 'white', borderRadius: '9999px', padding: '0.25rem' }}>
+                    <AlertTriangle size={14} />
+                  </div>
+                )}
+              </div>
+              <div style={{ padding: '0.75rem' }}>
+                <h3 style={{ fontWeight: '600', fontSize: '0.875rem', marginBottom: '0.25rem' }}>{piece.piece_type}</h3>
+                {piece.mark_code && <p style={{ fontSize: '0.75rem', color: '#0066cc', fontFamily: 'monospace', marginBottom: '0.25rem' }}>№ {piece.mark_code}</p>}
+                <span style={{ display: 'inline-block', padding: '0.15rem 0.6rem', backgroundColor: '#eef', borderRadius: '9999px', fontSize: '0.7rem', textTransform: 'capitalize' }}>
+                  {piece.status.replace(/_/g, ' ')}
+                </span>
+              </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {selected && (
+        <div
+          onClick={() => setSelected(null)}
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'white', borderRadius: '8px', maxWidth: '500px', width: '100%', maxHeight: '90vh', overflow: 'auto' }}>
+            {selected.reference_photo_url && (
+              <img src={selected.reference_photo_url} alt={selected.piece_type} style={{ width: '100%', maxHeight: '350px', objectFit: 'cover' }} />
+            )}
+            <div style={{ padding: '1.5rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>{selected.piece_type}</h2>
+              {selected.description && <p style={{ color: '#666', marginBottom: '1rem' }}>{selected.description}</p>}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.875rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#999' }}>Status</span>
+                  <span style={{ textTransform: 'capitalize' }}>{selected.status.replace(/_/g, ' ')}</span>
+                </div>
+                {selected.mark_code && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#999' }}>Kiln code</span>
+                    <span style={{ fontFamily: 'monospace' }}>№ {selected.mark_code}</span>
+                  </div>
+                )}
+                {selected.transfer_stage && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#999' }}>Transfer stage</span>
+                    <span style={{ textTransform: 'capitalize' }}>{selected.transfer_stage.replace(/_/g, ' ')}</span>
+                  </div>
+                )}
+                {selected.scheduled_firing_date && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#999' }}>Firing scheduled</span>
+                    <span>{new Date(selected.scheduled_firing_date).toLocaleDateString()}</span>
+                  </div>
+                )}
+                {selected.glaze_fired_at && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#999' }}>Glaze fired</span>
+                    <span>{new Date(selected.glaze_fired_at).toLocaleDateString()}</span>
+                  </div>
+                )}
+                {selected.requires_second_firing && (
+                  <div style={{ padding: '0.5rem', backgroundColor: '#fff3cd', borderRadius: '4px', fontSize: '0.8rem' }}>Requires a second firing</div>
+                )}
+                {selected.damaged && (
+                  <div style={{ padding: '0.5rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', fontSize: '0.8rem' }}>Marked as damaged</div>
+                )}
+              </div>
+
+              <button
+                onClick={() => setSelected(null)}
+                style={{ marginTop: '1.5rem', width: '100%', padding: '0.6rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </motion.div>
