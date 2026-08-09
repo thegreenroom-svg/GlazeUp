@@ -9,6 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 import multer from 'multer';
 import sharp from 'sharp';
+import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 
@@ -155,11 +156,17 @@ app.get('/api/demo/studio', async (req, res) => {
 
 app.get('/api/demo/bookings', async (req, res) => {
   try {
+    // Show today's bookings first, then upcoming, soonest first -- not
+    // furthest-future-first, which is what a plain DESC sort produced.
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+
     const { data, error } = await supabase
       .from('bookings')
       .select('id, booking_code, customer_name, customer_email, party_size, status, session_start, session_end, room, current_stage, table_number, notes, booking_type, arrived_at')
       .eq('studio_id', DEMO_STUDIO_ID)
-      .order('session_start', { ascending: false })
+      .gte('session_start', todayStart.toISOString())
+      .order('session_start', { ascending: true })
       .limit(50);
     if (error) throw error;
     res.json(data);
@@ -171,14 +178,25 @@ app.get('/api/demo/bookings', async (req, res) => {
 
 app.get('/api/demo/pieces', async (req, res) => {
   try {
+    // booking_id on this table is free-text (often an OCR'd customer name,
+    // sometimes a test/junk label like "Studio shelf" or "Test run"). Filter
+    // out the known junk values so test data doesn't pollute this view --
+    // checked live against the real table before excluding these.
+    const JUNK_BOOKING_LABELS = ['Studio shelf', 'Test run', 'Testing', 'Fest', 'Test', 'Run', 'Rum', 'G', 'Test2'];
+
     const { data, error } = await supabase
       .from('pottery_pieces')
-      .select('id, piece_type, status, is_complete, created_at, scheduled_firing_date, reference_photo_url, mark_code, description, damaged, requires_second_firing, transfer_stage, glaze_fired_at, photo_phash')
+      .select('id, piece_type, status, is_complete, created_at, scheduled_firing_date, reference_photo_url, mark_code, description, damaged, requires_second_firing, transfer_stage, glaze_fired_at, photo_phash, booking_id')
       .eq('studio_id', DEMO_STUDIO_ID)
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(100);
     if (error) throw error;
-    res.json(data);
+
+    const filtered = data
+      .filter((p) => !p.booking_id || !JUNK_BOOKING_LABELS.includes(p.booking_id))
+      .slice(0, 50);
+
+    res.json(filtered);
   } catch (err) {
     logger.error(err);
     res.status(500).json({ error: err.message });
@@ -403,6 +421,99 @@ app.get('/api/demo/bookings/:code/detail', async (req, res) => {
   } catch (err) {
     logger.error(err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Photo match: uploads a table photo, calls OpenAI vision to read the
+// chalk tag name and describe the pieces, then fuzzy-matches the name
+// against real recent bookings. Stateless -- nothing is written to any
+// table, real or otherwise. This is a test/demo endpoint only.
+function nameSimilarity(a, b) {
+  const normA = a.toLowerCase().trim().replace(/\s+/g, ' ');
+  const normB = b.toLowerCase().trim().replace(/\s+/g, ' ');
+  if (normA === normB) return 1;
+  const wordsA = normA.split(' ');
+  const wordsB = normB.split(' ');
+  let matches = 0;
+  wordsA.forEach((w) => {
+    if (w.length > 1 && wordsB.some((wb) => wb === w || wb.includes(w) || w.includes(wb))) matches++;
+  });
+  return matches / Math.max(wordsA.length, wordsB.length);
+}
+
+app.post('/api/demo/photo-match', upload.single('photo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No photo uploaded' });
+    }
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({ error: 'OPENAI_API_KEY not configured on this service' });
+    }
+
+    const base64Image = req.file.buffer.toString('base64');
+
+    const visionResponse = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'This is a photo of finished pottery pieces on a table at a paint-your-own-pottery studio, next to a chalkboard tag with a customer name written on it. Reply with ONLY a JSON object, no other text: {"chalk_tag_name": "<name read from the tag, or null if not legible>", "description": "<brief description of the pieces, colours and patterns, not shapes>"}',
+              },
+              {
+                type: 'image_url',
+                image_url: { url: `data:${req.file.mimetype};base64,${base64Image}` },
+              },
+            ],
+          },
+        ],
+        max_tokens: 300,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const raw = visionResponse.data.choices[0].message.content;
+    let parsed;
+    try {
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
+    } catch (parseErr) {
+      return res.status(500).json({ error: 'Could not parse vision response', raw });
+    }
+
+    let candidates = [];
+    if (parsed.chalk_tag_name) {
+      const { data: recentBookings } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, session_start, status')
+        .eq('studio_id', DEMO_STUDIO_ID)
+        .order('session_start', { ascending: false })
+        .limit(100);
+
+      candidates = (recentBookings || [])
+        .map((b) => ({ ...b, score: nameSimilarity(parsed.chalk_tag_name, b.customer_name) }))
+        .filter((b) => b.score > 0.3)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5);
+    }
+
+    res.json({
+      chalk_tag_name: parsed.chalk_tag_name,
+      description: parsed.description,
+      candidates,
+    });
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.response?.data?.error?.message || err.message });
   }
 });
 

@@ -21,6 +21,7 @@ interface Piece {
   transfer_stage: string | null;
   glaze_fired_at: string | null;
   photo_phash: string | null;
+  booking_id: string | null;
 }
 
 interface Match {
@@ -146,6 +147,11 @@ export default function PiecesPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#999' }}>Kiln code</span>
                     <span style={{ fontFamily: 'monospace' }}>№ {selected.mark_code}</span>
+                  </div>
+                )}
+                {selected.booking_id && (
+                  <div style={{ padding: '0.5rem', backgroundColor: '#f9f9f9', borderRadius: '4px', fontSize: '0.8rem' }}>
+                    Labelled for <strong>{selected.booking_id}</strong> — no matching current booking record (likely an older booking no longer in the system).
                   </div>
                 )}
                 {selected.transfer_stage && (
