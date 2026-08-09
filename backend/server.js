@@ -648,7 +648,7 @@ app.post('/api/demo/photo-match', upload.single('photo'), async (req, res) => {
       return res.status(500).json({ error: 'OPENAI_API_KEY not configured on this service' });
     }
 
-    const base64Image = req.file.buffer.toString('base64');
+    const base64Image = fs.readFileSync(req.file.path).toString('base64');
 
     const visionResponse = await axios.post(
       'https://api.openai.com/v1/chat/completions',
@@ -729,7 +729,7 @@ app.post('/api/demo/photo-match/confirm', upload.single('photo'), async (req, re
     const filename = `demo-app-test/photo-matches/${DEMO_STUDIO_ID}/${Date.now()}-${uuidv4()}.jpg`;
     const { error: uploadError } = await supabase.storage
       .from('booking-photos')
-      .upload(filename, req.file.buffer, { contentType: req.file.mimetype });
+      .upload(filename, fs.readFileSync(req.file.path), { contentType: req.file.mimetype });
 
     if (uploadError) throw uploadError;
 

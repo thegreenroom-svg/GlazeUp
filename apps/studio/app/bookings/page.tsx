@@ -102,35 +102,37 @@ export default function BookingsPage() {
 
       <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '1rem' }}>Bookings</h1>
 
-      <input
-        type="text"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Search by customer, room, or table..."
-        style={{ width: '100%', maxWidth: '400px', padding: '0.6rem 0.9rem', border: '1px solid #ddd', borderRadius: '6px', marginBottom: '0.75rem', fontSize: '0.9rem', boxSizing: 'border-box' }}
-      />
-
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+      <div style={{ position: 'sticky', top: 0, backgroundColor: '#FDF6F1', zIndex: 10, paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
         <input
-          type="date"
-          value={dateFilter}
-          onChange={(e) => setDateFilter(e.target.value)}
-          style={{ padding: '0.55rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem' }}
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by customer, room, or table..."
+          style={{ width: '100%', maxWidth: '400px', padding: '0.6rem 0.9rem', border: '1px solid #ddd', borderRadius: '6px', marginBottom: '0.75rem', fontSize: '0.9rem', boxSizing: 'border-box' }}
         />
-        <button
-          onClick={() => setDateFilter(todayStr)}
-          style={{ padding: '0.55rem 0.9rem', backgroundColor: dateFilter === todayStr ? '#E85D8A' : '#f0f0f0', color: dateFilter === todayStr ? 'white' : '#333', border: 'none', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer' }}
-        >
-          Today
-        </button>
-        {dateFilter && (
+
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            type="date"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            style={{ padding: '0.55rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem' }}
+          />
           <button
-            onClick={() => setDateFilter('')}
-            style={{ padding: '0.55rem 0.9rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer' }}
+            onClick={() => setDateFilter(todayStr)}
+            style={{ padding: '0.55rem 0.9rem', backgroundColor: dateFilter === todayStr ? '#E85D8A' : '#f0f0f0', color: dateFilter === todayStr ? 'white' : '#333', border: 'none', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer' }}
           >
-            Clear date
+            Today
           </button>
-        )}
+          {dateFilter && (
+            <button
+              onClick={() => setDateFilter('')}
+              style={{ padding: '0.55rem 0.9rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer' }}
+            >
+              Clear date
+            </button>
+          )}
+        </div>
       </div>
 
       {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
