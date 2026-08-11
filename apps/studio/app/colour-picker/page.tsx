@@ -12,23 +12,61 @@ interface Glaze {
   hex: string;
 }
 
-// Starter palette. These are placeholders keyed to the numbered swatch tiles
-// the studio already uses -- the hex values are approximations, NOT measured
-// fired colours. Editable in the app and stored per-device until a real glaze
-// table exists.
+// The studio's REAL stocked glazes, carried across from the main GlazeUp
+// build rather than invented: 14 Stroke & Coat colours plus the specialist
+// ranges (crystal, reactive and dimensional) sold at a premium.
+//
+// Product codes are kept for staff use, but note the standing brand rule:
+// the supplier's name is never shown in user-facing text, only the code and
+// colour name. Hex values are approximations of the FIRED tile, so they are
+// already the right target for matching -- unfired pots look nothing like this.
 const STARTER: Glaze[] = [
-  { code: '1', name: 'White', hex: '#F5F2EC' },
-  { code: '4', name: 'Soft Pink', hex: '#F0BFC8' },
-  { code: '6', name: 'Coral', hex: '#E8785D' },
-  { code: '9', name: 'Sunflower', hex: '#EFC04A' },
-  { code: '12', name: 'Leaf', hex: '#7FA05A' },
-  { code: '15', name: 'Sea', hex: '#5E9FB0' },
-  { code: '18', name: 'Denim', hex: '#4A6B96' },
-  { code: '21', name: 'Lilac', hex: '#A98BC0' },
-  { code: '24', name: 'Terracotta', hex: '#B5623F' },
-  { code: '28', name: 'Charcoal', hex: '#4A4744' },
-  { code: '31', name: 'Sage', hex: '#A8B79A' },
-  { code: '36', name: 'Butter', hex: '#F2E2B0' },
+  // Stroke & Coat
+  { code: 'SC-01', name: 'Pink-A-Boo', hex: '#D46A8B' },
+  { code: 'SC-05', name: 'Tiger Tail', hex: '#E0A93C' },
+  { code: 'SC-11', name: 'Blue Yonder', hex: '#3E6FA3' },
+  { code: 'SC-13', name: 'Grapel', hex: '#7C5AA6' },
+  { code: 'SC-15', name: 'Tuxedo', hex: '#8A6244' },
+  { code: 'SC-16', name: 'Cotton Tail', hex: '#D9694E' },
+  { code: 'SC-24', name: 'Dandelion', hex: '#E08A3C' },
+  { code: 'SC-26', name: 'Green Thumb', hex: '#4C8C5A' },
+  { code: 'SC-27', name: 'Sour Apple', hex: '#2F8F82' },
+  { code: 'SC-28', name: 'Blue Isle', hex: '#17403C' },
+  { code: 'SC-33', name: 'Fruit of the Vine', hex: '#6B4172' },
+  { code: 'SC-73', name: 'Candy Apple', hex: '#C0392B' },
+  { code: 'SC-76', name: 'Cara-bein Blue', hex: '#2B4C6F' },
+  { code: 'SC-88', name: 'Tp Toffee', hex: '#B87946' },
+  // Crystal glazes
+  { code: 'CG-717', name: 'Pistachio', hex: '#7CB87C' },
+  { code: 'CG-718', name: 'Blue Caprice', hex: '#4FC3F7' },
+  { code: 'CG-753', name: 'Sassy Orange', hex: '#F57C00' },
+  { code: 'CG-756', name: 'Firecracker', hex: '#E53935' },
+  { code: 'CG-780', name: 'Mystic Jade', hex: '#00796B' },
+  { code: 'CG-785', name: 'Royal Fantasy', hex: '#6B2DA8' },
+  { code: 'CG-798', name: 'Black Iris', hex: '#1A1A2E' },
+  { code: 'CG-962', name: 'Blue Azure', hex: '#1565C0' },
+  { code: 'CG-964', name: 'Kaleidoscope', hex: '#AA00FF' },
+  { code: 'CG-965', name: 'Mocha Marble', hex: '#795548' },
+  { code: 'CG-970', name: 'Masquerade', hex: '#880E4F' },
+  { code: 'CG-974', name: "Bloomin' Blue", hex: '#2979CC' },
+  { code: 'CG-1000', name: 'Mardi Gras', hex: '#9C27B0' },
+  { code: 'CG-1001', name: 'Gogh Iris', hex: '#5C6BC0' },
+  { code: 'CG-1002', name: 'Day Lily', hex: '#F48FB1' },
+  { code: 'CG-1004', name: 'Berry Tart', hex: '#AD1457' },
+  // Reactive / moving glazes
+  { code: 'EL-101', name: 'Rainforest', hex: '#2E7D32' },
+  { code: 'EL-102', name: 'Ocean', hex: '#01579B' },
+  { code: 'EL-103', name: 'Sahara', hex: '#E65100' },
+  { code: 'EL-104', name: 'Sedona', hex: '#BF360C' },
+  { code: 'EL-105', name: 'Midnight', hex: '#1A237E' },
+  { code: 'EL-106', name: 'Shale', hex: '#546E7A' },
+  { code: 'EL-107', name: 'Sandstone', hex: '#8D6E63' },
+  { code: 'EL-108', name: 'Copper', hex: '#BF8040' },
+  // Dimensional texture
+  { code: 'FD-200', name: 'White', hex: '#F5F5F5' },
+  { code: 'FD-201', name: 'Ivory', hex: '#F5E6C8' },
+  { code: 'FD-202', name: 'Black', hex: '#1A1A1A' },
+  { code: 'FD-203', name: 'Gold', hex: '#C9A43A' },
 ];
 
 const STORAGE_KEY = 'glazeup_palette';
@@ -117,7 +155,7 @@ export default function ColourPickerPage() {
       </p>
 
       <div style={{ padding: '0.7rem 0.9rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '1.25rem' }}>
-        The starter palette below is approximate, not measured fired colours. Edit it to your real glaze numbers and it will match properly.
+        Matching against the 42 glazes the studio actually stocks. Hex values approximate the fired tile, so remember an unfired pot will look far paler than its match.
       </div>
 
       <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{ display: 'none' }} />
