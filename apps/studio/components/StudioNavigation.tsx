@@ -27,6 +27,10 @@ import {
   CreditCard,
   Boxes,
   QrCode,
+  Pipette,
+  Eye,
+  PenTool,
+  ShieldCheck,
   Search,
   Sun,
   Moon
@@ -74,7 +78,11 @@ export function StudioNavigation() {
     { label: 'Community', icon: <Sparkles className="w-5 h-5" />, href: '/community' },
     { label: 'Catalogue', icon: <Boxes className="w-5 h-5" />, href: '/catalogue' },
     { label: 'Billing', icon: <CreditCard className="w-5 h-5" />, href: '/billing' },
-    { label: 'Customer View', icon: <QrCode className="w-5 h-5" />, href: '/customer' }
+    { label: 'Customer View', icon: <QrCode className="w-5 h-5" />, href: '/customer' },
+    { label: 'Colour Picker', icon: <Pipette className="w-5 h-5" />, href: '/colour-picker' },
+    { label: 'Design Preview', icon: <Eye className="w-5 h-5" />, href: '/design-preview' },
+    { label: 'Transfer Designer', icon: <PenTool className="w-5 h-5" />, href: '/transfer-designer' },
+    { label: 'Roles & Studio', icon: <ShieldCheck className="w-5 h-5" />, href: '/roles' }
   ];
 
   const isActive = (href: string) => {
