@@ -68,25 +68,24 @@ export function StudioNavigation() {
 
   const headerAndSearch = (
     <>
-      <div className="p-6 border-b border-gray-800" style={{ background: 'linear-gradient(135deg, #E85D8A 0%, #C23F6B 100%)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div className="px-4 py-3 border-b border-gray-800" style={{ background: 'linear-gradient(135deg, #E85D8A 0%, #C23F6B 100%)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <img
             src="https://static.wixstatic.com/media/d0e5bd_2acf96e6189f4fbcb2159fae9f0a5674~mv2.png"
             alt="The Kiln Cafe"
-            style={{ height: '40px', marginBottom: '0.5rem', filter: 'brightness(0) invert(1)' }}
+            style={{ height: '28px', filter: 'brightness(0) invert(1)' }}
           />
           <button
             onClick={toggleTheme}
-            style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
             aria-label="Toggle dark mode"
           >
-            {theme === 'dark' ? <Sun size={16} color="white" /> : <Moon size={16} color="white" />}
+            {theme === 'dark' ? <Sun size={14} color="white" /> : <Moon size={14} color="white" />}
           </button>
         </div>
-        <p className="text-sm text-white opacity-80">Read-only demo</p>
       </div>
 
-      <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #333' }}>
+      <div style={{ padding: '0.5rem 1rem', borderBottom: '1px solid #333' }}>
         <div style={{ position: 'relative' }}>
           <Search size={14} style={{ position: 'absolute', left: '0.6rem', top: '50%', transform: 'translateY(-50%)', color: '#888' }} />
           <input
@@ -127,13 +126,13 @@ export function StudioNavigation() {
           onClick={() => {
             if (isMobile) setIsOpen(false);
           }}
-          className={`flex items-center gap-3 px-6 py-3 transition-all ${
+          className={`flex items-center gap-3 px-6 py-2 transition-all ${
             isActive(item.href) ? 'text-white border-r-4' : 'text-gray-400 hover:text-white hover:bg-gray-800'
           }`}
           style={isActive(item.href) ? { backgroundColor: '#E85D8A', borderColor: '#C23F6B' } : {}}
         >
           {item.icon}
-          <span className="font-medium">{item.label}</span>
+          <span className="font-medium text-sm">{item.label}</span>
         </Link>
       ))}
     </div>
@@ -180,7 +179,7 @@ export function StudioNavigation() {
                 if (info.offset.y > 100) setIsOpen(false);
               }}
               className="fixed bottom-0 left-0 right-0 bg-gray-900 text-white z-40 overflow-y-auto"
-              style={{ borderTopLeftRadius: '20px', borderTopRightRadius: '20px', maxHeight: '85vh' }}
+              style={{ borderTopLeftRadius: '20px', borderTopRightRadius: '20px', maxHeight: '95dvh' }}
             >
               <div style={{ display: 'flex', justifyContent: 'center', padding: '0.6rem 0 0' }}>
                 <div style={{ width: '36px', height: '4px', borderRadius: '2px', backgroundColor: '#555' }} />
