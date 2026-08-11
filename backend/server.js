@@ -12,6 +12,7 @@ import sharp from 'sharp';
 import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
+import registerSpecRoutes from './spec-routes.js';
 
 // Load environment variables
 dotenv.config();
@@ -1370,6 +1371,8 @@ app.use((err, req, res, next) => {
     message: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });
+
+registerSpecRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

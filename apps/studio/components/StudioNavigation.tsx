@@ -19,6 +19,11 @@ import {
   Receipt,
   Camera,
   Layers,
+  GitBranch,
+  Award,
+  BellRing,
+  BarChart3,
+  Sparkles,
   Search,
   Sun,
   Moon
@@ -58,7 +63,12 @@ export function StudioNavigation() {
     { label: 'Team', icon: <UserCircle className="w-5 h-5" />, href: '/team' },
     { label: 'Till', icon: <Receipt className="w-5 h-5" />, href: '/till' },
     { label: 'Photo Match', icon: <Camera className="w-5 h-5" />, href: '/photo-match' },
-    { label: 'Shelf Sweep', icon: <Layers className="w-5 h-5" />, href: '/shelf-sweep' }
+    { label: 'Shelf Sweep', icon: <Layers className="w-5 h-5" />, href: '/shelf-sweep' },
+    { label: 'Lifecycle', icon: <GitBranch className="w-5 h-5" />, href: '/lifecycle' },
+    { label: 'Loyalty', icon: <Award className="w-5 h-5" />, href: '/loyalty' },
+    { label: 'Notifications', icon: <BellRing className="w-5 h-5" />, href: '/notifications' },
+    { label: 'Analytics', icon: <BarChart3 className="w-5 h-5" />, href: '/analytics' },
+    { label: 'Community', icon: <Sparkles className="w-5 h-5" />, href: '/community' }
   ];
 
   const isActive = (href: string) => {
