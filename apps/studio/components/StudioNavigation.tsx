@@ -18,6 +18,7 @@ import {
   PoundSterling,
   Receipt,
   Camera,
+  Layers,
   Search,
   Sun,
   Moon
@@ -56,7 +57,8 @@ export function StudioNavigation() {
     { label: 'Alerts', icon: <Bell className="w-5 h-5" />, href: '/alerts' },
     { label: 'Team', icon: <UserCircle className="w-5 h-5" />, href: '/team' },
     { label: 'Till', icon: <Receipt className="w-5 h-5" />, href: '/till' },
-    { label: 'Photo Match', icon: <Camera className="w-5 h-5" />, href: '/photo-match' }
+    { label: 'Photo Match', icon: <Camera className="w-5 h-5" />, href: '/photo-match' },
+    { label: 'Shelf Sweep', icon: <Layers className="w-5 h-5" />, href: '/shelf-sweep' }
   ];
 
   const isActive = (href: string) => {
