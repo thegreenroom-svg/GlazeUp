@@ -28,6 +28,7 @@ interface BookingDetail {
   booking: Booking & { customer_phone: string | null };
   session: { id: string; table_number: string; status: string; number_of_places: number } | null;
   orders: { id: string; item_name: string; quantity: number; unit_price_cents: number; notes: string | null }[];
+  pieces: { id: string; piece_type: string | null; description: string | null; status: string; reference_photo_url: string | null; reference_photo_taken_at: string | null; mark_code: string | null }[];
 }
 
 interface PhotoMatch {
@@ -486,6 +487,30 @@ export default function BookingsPage() {
                     </>
                   )}
                 </div>
+
+                {detail.pieces && detail.pieces.length > 0 && (
+                  <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #eee' }}>
+                    <h3 style={{ fontSize: '0.95rem', fontWeight: '600', marginBottom: '0.75rem' }}>
+                      Pieces ({detail.pieces.length})
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '0.5rem' }}>
+                      {detail.pieces.map((p) => (
+                        <div key={p.id} style={{ border: '1px solid #eee', borderRadius: '6px', overflow: 'hidden' }}>
+                          {p.reference_photo_url ? (
+                            <img src={p.reference_photo_url} alt="" style={{ width: '100%', height: 80, objectFit: 'cover', display: 'block' }} />
+                          ) : (
+                            <div style={{ width: '100%', height: 80, backgroundColor: '#f7f7f7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: '#bbb' }}>
+                              no photo yet
+                            </div>
+                          )}
+                          <div style={{ padding: '0.3rem' }}>
+                            <p style={{ fontSize: '0.68rem', textTransform: 'capitalize', color: '#666' }}>{(p.status || '').replace(/_/g, ' ')}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {photoMatches.length > 0 && (
                   <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #eee' }}>

@@ -624,7 +624,23 @@ app.get('/api/demo/bookings/:code/detail', async (req, res) => {
       orders = orderData || [];
     }
 
-    res.json({ booking, session, orders });
+    // Pieces belonging to this booking, with whatever reference photo they
+    // have -- including ones just set via Completion Stamp. booking_id on
+    // pottery_pieces holds the customer NAME (free text), not a foreign key,
+    // so the match is by name; junk test-run labels are excluded the same
+    // way every other piece view excludes them.
+    let pieces = [];
+    if (!JUNK_BOOKING_LABELS.includes(booking.customer_name)) {
+      const { data: pieceData } = await supabase
+        .from('pottery_pieces')
+        .select('id, piece_type, description, status, reference_photo_url, reference_photo_taken_at, mark_code')
+        .eq('studio_id', DEMO_STUDIO_ID)
+        .eq('booking_id', booking.customer_name)
+        .neq('archived', true);
+      pieces = pieceData || [];
+    }
+
+    res.json({ booking, session, orders, pieces });
   } catch (err) {
     logger.error(err);
     res.status(500).json({ error: err.message });
