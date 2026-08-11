@@ -83,7 +83,7 @@ export default function ShelfSweepPage() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '600px' }}>
       <div style={{ padding: '0.75rem 1rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '4px', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
-        Test tool — uses real AI vision (small per-photo cost, two calls). Photograph a whole table of jumbled fired pieces at once; it checks against real bookings from the last 21 days. Writes nothing anywhere. Doesn't attempt to point at individual pieces in the photo — that was tried and found unreliable — it names the booking and shows you the same photo to work from.
+        Test tool — uses real AI vision (small per-photo cost, two calls). Photograph a whole table of jumbled fired pieces at once; it checks against real bookings from the last 31 days. Writes nothing anywhere. Doesn't attempt to point at individual pieces in the photo — that was tried and found unreliable — it names the booking and shows you the same photo to work from.
       </div>
 
       <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>Shelf Sweep</h1>
@@ -135,7 +135,7 @@ export default function ShelfSweepPage() {
       {result && (
         <div style={{ backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '8px', padding: '1.5rem' }}>
           <p style={{ fontSize: '0.8rem', color: '#999', marginBottom: '1rem' }}>
-            Checked against {result.wanted_count} real bookings from the last 21 days.
+            Checked against {result.wanted_count} real bookings from the last 31 days.
           </p>
 
           {result.matches.length === 0 ? (

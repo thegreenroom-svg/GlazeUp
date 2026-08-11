@@ -742,9 +742,9 @@ app.post('/api/demo/shelf-sweep', upload.single('photo'), async (req, res) => {
       return res.status(500).json({ error: 'OPENAI_API_KEY not configured on this service' });
     }
 
-    // Wanted list: real bookings from the last 21 days, not yet packed/collected.
-    // (21 days covers paint -> dry -> glaze -> fire -> back on shelf.)
-    const windowStart = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString();
+    // Wanted list: real bookings from the last 31 days, not yet packed/collected.
+    // (31 days covers paint -> dry -> glaze -> fire -> back on shelf.)
+    const windowStart = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
     const { data: wantedBookings } = await supabase
       .from('bookings')
       .select('booking_code, customer_name, session_start, status')
