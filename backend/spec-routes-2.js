@@ -549,3 +549,126 @@ export function registerNetworkRoutes(app, supabase, STUDIO_ID, logger) {
     }
   });
 }
+
+// ============================================================================
+// WALK-IN BOOKINGS, KILN BATCHES, COMPLETION PHOTO
+// ----------------------------------------------------------------------------
+// Master doc section 4, staff app core workflow:
+// 1. Booking Details -- "walk-in creation, customer QR generation"
+// 4. Kiln & Inventory -- "Kiln Firing Batches (combine multiple bookings
+//    into one firing, batch QR code)", and Completion -- "photograph
+//    finished pieces, stamps QR + customer name + date onto the photo"
+// ============================================================================
+export function registerWorkflowRoutes(app, supabase, STUDIO_ID, logger, upload, fs) {
+  // Walk-in creation -- writes a REAL booking, same table live bookings use.
+  app.post('/api/spec/bookings/walk-in', async (req, res) => {
+    try {
+      const { customer_name, party_size, table_number, notes } = req.body || {};
+      if (!customer_name) return res.status(400).json({ error: 'customer_name required' });
+
+      const code = `walkin-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      const { data, error } = await supabase
+        .from('bookings')
+        .insert([{
+          studio_id: STUDIO_ID,
+          booking_code: code,
+          customer_name: String(customer_name).trim(),
+          session_start: new Date().toISOString(),
+          party_size: party_size ? Number(party_size) : null,
+          table_number: table_number || null,
+          status: 'active',
+          current_stage: 'booking',
+          booking_type: 'walk-in',
+          notes: notes || null,
+        }])
+        .select('booking_code, customer_name, session_start, table_number, party_size')
+        .maybeSingle();
+      if (error) throw error;
+      res.json(data);
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Kiln batch: create a firing session with an auto batch_code, then bulk-
+  // assign pieces from one or more bookings into it. This is what "combine
+  // multiple bookings into one firing" actually means against the real
+  // schema -- kiln_sessions already has batch_code, pottery_pieces already
+  // has kiln_session_id; the only missing part was the bulk-assign step.
+  app.post('/api/spec/kiln/batches', async (req, res) => {
+    try {
+      const { label } = req.body || {};
+      const batchCode = `KB-${Date.now().toString(36).toUpperCase()}`;
+      const { data, error } = await supabase
+        .from('kiln_sessions')
+        .insert([{
+          studio_id: STUDIO_ID,
+          label: label || `Firing ${new Date().toLocaleDateString('en-GB')}`,
+          status: 'queued',
+          batch_code: batchCode,
+        }])
+        .select('id, label, status, batch_code, created_at')
+        .maybeSingle();
+      if (error) throw error;
+      res.json(data);
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/spec/kiln/batches/:id/assign', async (req, res) => {
+    try {
+      const { piece_ids } = req.body || {};
+      if (!Array.isArray(piece_ids) || piece_ids.length === 0) {
+        return res.status(400).json({ error: 'piece_ids array required' });
+      }
+      const { data, error } = await supabase
+        .from('pottery_pieces')
+        .update({ kiln_session_id: req.params.id })
+        .in('id', piece_ids)
+        .eq('studio_id', STUDIO_ID)
+        .select('id');
+      if (error) throw error;
+      res.json({ assigned: (data || []).length });
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Completion photo: a REAL upload through the deployed backend's own
+  // Supabase credentials (this is the browser -> backend -> Storage path
+  // that already works for Photo Match; it was never blocked -- only my own
+  // sandbox lacks the network route there). Stamps happen client-side onto
+  // the canvas before upload, so what's stored is the final stamped image.
+  app.post('/api/spec/pieces/:id/completion-photo', upload.single('photo'), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
+      const filename = `completions/${STUDIO_ID}/${req.params.id}-${Date.now()}.jpg`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('booking-photos')
+        .upload(filename, fs.readFileSync(req.file.path), { contentType: req.file.mimetype || 'image/jpeg' });
+      if (uploadError) throw uploadError;
+
+      const { data: pub } = supabase.storage.from('booking-photos').getPublicUrl(filename);
+
+      const { data, error } = await supabase
+        .from('pottery_pieces')
+        .update({ reference_photo_url: pub.publicUrl, reference_photo_taken_at: new Date().toISOString() })
+        .eq('id', req.params.id)
+        .eq('studio_id', STUDIO_ID)
+        .select('id, reference_photo_url, reference_photo_taken_at')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return res.status(404).json({ error: 'Piece not found' });
+
+      res.json(data);
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}

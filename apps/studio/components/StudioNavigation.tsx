@@ -35,6 +35,7 @@ import {
   CalendarClock,
   Globe2,
   UserSquare2,
+  Stamp,
   Search,
   Sun,
   Moon
@@ -90,7 +91,8 @@ export function StudioNavigation() {
     { label: 'Collections', icon: <Library className="w-5 h-5" />, href: '/collections' },
     { label: 'My Bookings', icon: <CalendarClock className="w-5 h-5" />, href: '/my-bookings' },
     { label: 'Studios Worldwide', icon: <Globe2 className="w-5 h-5" />, href: '/studios-worldwide' },
-    { label: 'Our Profile', icon: <UserSquare2 className="w-5 h-5" />, href: '/our-profile' }
+    { label: 'Our Profile', icon: <UserSquare2 className="w-5 h-5" />, href: '/our-profile' },
+    { label: 'Completion', icon: <Stamp className="w-5 h-5" />, href: '/completion' }
   ];
 
   const isActive = (href: string) => {

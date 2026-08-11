@@ -59,6 +59,36 @@ export default function BookingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
+  const [showWalkIn, setShowWalkIn] = useState(false);
+  const [walkInName, setWalkInName] = useState('');
+  const [walkInParty, setWalkInParty] = useState('');
+  const [walkInTable, setWalkInTable] = useState('');
+  const [walkInBusy, setWalkInBusy] = useState(false);
+
+  const createWalkIn = async () => {
+    if (!walkInName.trim()) return;
+    setWalkInBusy(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/walk-in`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_name: walkInName,
+          party_size: walkInParty ? Number(walkInParty) : null,
+          table_number: walkInTable || null,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      const created = await res.json();
+      setBookings((prev) => [{ ...created, current_stage: 'booking', status: 'active', notes: null, booking_type: 'walk-in', arrived_at: null } as Booking, ...prev]);
+      setShowWalkIn(false);
+      setWalkInName(''); setWalkInParty(''); setWalkInTable('');
+    } catch {
+      setError('Could not create that walk-in booking.');
+    } finally {
+      setWalkInBusy(false);
+    }
+  };
   const [detail, setDetail] = useState<BookingDetail | null>(null);
   const [photoMatches, setPhotoMatches] = useState<PhotoMatch[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -228,8 +258,55 @@ export default function BookingsPage() {
               Clear date
             </button>
           )}
+          <button
+            onClick={() => setShowWalkIn(true)}
+            style={{ padding: '0.55rem 0.9rem', backgroundColor: 'var(--clay)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer', marginLeft: 'auto' }}
+          >
+            + Walk-in
+          </button>
         </div>
       </div>
+
+      {showWalkIn && (
+        <div
+          onClick={() => setShowWalkIn(false)}
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', zIndex: 60 }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'white', borderRadius: '10px', padding: '1.5rem', maxWidth: '360px', width: '100%' }}>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.9rem' }}>New walk-in</h3>
+            <input
+              value={walkInName}
+              onChange={(e) => setWalkInName(e.target.value)}
+              placeholder="Customer name"
+              style={{ width: '100%', padding: '0.5rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem', marginBottom: '0.5rem', boxSizing: 'border-box' }}
+            />
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.9rem' }}>
+              <input
+                value={walkInParty}
+                onChange={(e) => setWalkInParty(e.target.value.replace(/\D/g, ''))}
+                placeholder="Party size"
+                style={{ flex: 1, padding: '0.5rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box' }}
+              />
+              <input
+                value={walkInTable}
+                onChange={(e) => setWalkInTable(e.target.value)}
+                placeholder="Table"
+                style={{ flex: 1, padding: '0.5rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button onClick={() => setShowWalkIn(false)} style={{ flex: 1, padding: '0.55rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
+              <button
+                onClick={createWalkIn}
+                disabled={!walkInName.trim() || walkInBusy}
+                style={{ flex: 1, padding: '0.55rem', backgroundColor: 'var(--clay)', color: 'white', border: 'none', borderRadius: '6px', cursor: walkInName.trim() ? 'pointer' : 'not-allowed', opacity: walkInName.trim() ? 1 : 0.5 }}
+              >
+                {walkInBusy ? 'Creating...' : 'Create'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
 
