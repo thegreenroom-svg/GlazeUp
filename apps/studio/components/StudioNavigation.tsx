@@ -32,6 +32,9 @@ import {
   PenTool,
   ShieldCheck,
   Library,
+  CalendarClock,
+  Globe2,
+  UserSquare2,
   Search,
   Sun,
   Moon
@@ -84,7 +87,10 @@ export function StudioNavigation() {
     { label: 'Design Preview', icon: <Eye className="w-5 h-5" />, href: '/design-preview' },
     { label: 'Transfer Designer', icon: <PenTool className="w-5 h-5" />, href: '/transfer-designer' },
     { label: 'Roles & Studio', icon: <ShieldCheck className="w-5 h-5" />, href: '/roles' },
-    { label: 'Collections', icon: <Library className="w-5 h-5" />, href: '/collections' }
+    { label: 'Collections', icon: <Library className="w-5 h-5" />, href: '/collections' },
+    { label: 'My Bookings', icon: <CalendarClock className="w-5 h-5" />, href: '/my-bookings' },
+    { label: 'Studios Worldwide', icon: <Globe2 className="w-5 h-5" />, href: '/studios-worldwide' },
+    { label: 'Our Profile', icon: <UserSquare2 className="w-5 h-5" />, href: '/our-profile' }
   ];
 
   const isActive = (href: string) => {

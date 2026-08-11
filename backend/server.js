@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -1384,6 +1384,7 @@ registerSpecRoutes(app, supabase, DEMO_STUDIO_ID, logger, JUNK_BOOKING_LABELS);
 registerSpecRoutes2(app, supabase, DEMO_STUDIO_ID, logger, JUNK_BOOKING_LABELS);
 registerPinRoutes(app, supabase, DEMO_STUDIO_ID, logger, crypto);
 registerGapRoutes(app, supabase, DEMO_STUDIO_ID, logger, JUNK_BOOKING_LABELS);
+registerNetworkRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

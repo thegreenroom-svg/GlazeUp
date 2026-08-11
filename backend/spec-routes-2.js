@@ -416,3 +416,136 @@ export function registerGapRoutes(app, supabase, STUDIO_ID, logger, JUNK_BOOKING
     }
   });
 }
+
+// ============================================================================
+// MY BOOKINGS, STUDIOS WORLDWIDE, OUR PROFILE
+// ----------------------------------------------------------------------------
+// Master doc section 5: customer app "My Bookings -- past and upcoming
+// visits, matched automatically by phone/email". Section 4 Community tab:
+// "Our Profile" (connect socials, bio, directory toggle) and "Studios
+// Worldwide" (B2B network directory with activity signal).
+// ============================================================================
+export function registerNetworkRoutes(app, supabase, STUDIO_ID, logger) {
+  // My Bookings -- matched by customer_name for now, since the real bookings
+  // table stores no phone/email on the historical rows (many pre-date the
+  // point where that was captured). Name match is the honest current
+  // capability; documented rather than pretending phone/email matching works
+  // against data that doesn't have it.
+  app.get('/api/spec/my-bookings/:name', async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, session_start, table_number, party_size, current_stage, status')
+        .eq('studio_id', STUDIO_ID)
+        .ilike('customer_name', req.params.name)
+        .order('session_start', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+
+      const now = new Date();
+      const rows = data || [];
+      res.json({
+        upcoming: rows.filter((b) => new Date(b.session_start) >= now).reverse(),
+        past: rows.filter((b) => new Date(b.session_start) < now),
+        match_method: 'name',
+      });
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Our Profile -- what a director sets so the Studios Worldwide directory
+  // has something real to show. GET returns current values; POST updates
+  // only the profile fields (never bookings/financial columns on studios).
+  const PROFILE_FIELDS = ['instagram_handle', 'facebook_url', 'tiktok_handle', 'website_url', 'public_bio', 'city', 'country', 'directory_visible'];
+
+  app.get('/api/spec/studio-profile', async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('studios')
+        .select(['name', ...PROFILE_FIELDS].join(', '))
+        .eq('id', STUDIO_ID)
+        .maybeSingle();
+      if (error) throw error;
+      res.json(data || {});
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/spec/studio-profile', async (req, res) => {
+    try {
+      const update = {};
+      PROFILE_FIELDS.forEach((f) => {
+        if (f in (req.body || {})) update[f] = req.body[f];
+      });
+      if (Object.keys(update).length === 0) {
+        return res.status(400).json({ error: 'No profile fields provided' });
+      }
+      const { data, error } = await supabase
+        .from('studios')
+        .update(update)
+        .eq('id', STUDIO_ID)
+        .select(['name', ...PROFILE_FIELDS].join(', '))
+        .maybeSingle();
+      if (error) throw error;
+      res.json(data);
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Studios Worldwide -- the B2B network directory. Only studios that have
+  // opted into visibility appear; "shared this month" comes from real
+  // community_posts, not a fabricated number.
+  app.get('/api/spec/studios-worldwide', async (req, res) => {
+    try {
+      const { data: studios, error } = await supabase
+        .from('studios')
+        .select('id, name, city, country, public_bio, instagram_handle, website_url, directory_visible')
+        .eq('directory_visible', true)
+        .limit(500);
+      if (error) throw error;
+
+      // The real studios table holds 250+ seeded '(Demo)' rows alongside the
+      // one genuine studio (The Kiln Cafe) -- all with directory_visible=true.
+      // A B2B network directory showing 250 fake studios is worse than
+      // showing none, so these are filtered here rather than left for the
+      // frontend to somehow guess which rows are real. 'Host By Post' is
+      // Daisy's own mail-order product, not a peer studio, so it's excluded
+      // from a studio-to-studio directory too.
+      const rows = (studios || []).filter(
+        (s) => !/\(demo\)/i.test(s.name) && !/^demo:/i.test(s.name) && s.name !== 'Host By Post'
+      );
+      const ids = rows.map((s) => s.id);
+
+      const monthStart = new Date();
+      monthStart.setUTCDate(1);
+      monthStart.setUTCHours(0, 0, 0, 0);
+
+      let sharedCounts = {};
+      if (ids.length) {
+        const { data: posts } = await supabase
+          .from('community_posts')
+          .select('studio_id, created_at')
+          .in('studio_id', ids)
+          .gte('created_at', monthStart.toISOString());
+        (posts || []).forEach((p) => {
+          sharedCounts[p.studio_id] = (sharedCounts[p.studio_id] || 0) + 1;
+        });
+      }
+
+      res.json({
+        studios: rows.map((s) => ({ ...s, shared_this_month: sharedCounts[s.id] || 0 })),
+        count: rows.length,
+        note: rows.length === 0 ? 'No studios have opted into the public directory yet.' : null,
+      });
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
