@@ -68,7 +68,7 @@ export default function CollectionsPage() {
                       : new Date(c.last).toLocaleDateString()}
                   </p>
                 </div>
-                <span style={{ padding: '0.15rem 0.6rem', borderRadius: '999px', backgroundColor: '#E85D8A', color: 'white', fontSize: '0.8rem', fontWeight: 600 }}>
+                <span style={{ padding: '0.15rem 0.6rem', borderRadius: '999px', backgroundColor: 'var(--clay)', color: 'white', fontSize: '0.8rem', fontWeight: 600 }}>
                   {c.piece_count}
                 </span>
               </button>

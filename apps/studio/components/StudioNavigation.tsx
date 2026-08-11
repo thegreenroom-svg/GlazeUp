@@ -94,7 +94,7 @@ export function StudioNavigation() {
 
   const headerAndSearch = (
     <>
-      <div className="px-4 py-3 border-b border-gray-800" style={{ background: 'linear-gradient(135deg, #E85D8A 0%, #C23F6B 100%)' }}>
+      <div className="px-4 py-3 border-b border-gray-800" style={{ background: 'linear-gradient(135deg, var(--clay) 0%, #9A6435 100%)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <img
             src="https://static.wixstatic.com/media/d0e5bd_2acf96e6189f4fbcb2159fae9f0a5674~mv2.png"
@@ -153,9 +153,9 @@ export function StudioNavigation() {
             if (isMobile) setIsOpen(false);
           }}
           className={`flex items-center gap-3 px-6 py-2 transition-all ${
-            isActive(item.href) ? 'text-white border-r-4' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            isActive(item.href) ? 'text-white border-r-4' : 'text-gray-400 hover:text-white hover:opacity-80'
           }`}
-          style={isActive(item.href) ? { backgroundColor: '#E85D8A', borderColor: '#C23F6B' } : {}}
+          style={isActive(item.href) ? { backgroundColor: 'var(--clay)', borderColor: '#9A6435' } : {}}
         >
           {item.icon}
           <span className="font-medium text-sm">{item.label}</span>
@@ -169,14 +169,14 @@ export function StudioNavigation() {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="fixed bottom-6 right-6 z-50 md:hidden text-white p-3 rounded-full shadow-lg"
-        style={{ backgroundColor: '#E85D8A' }}
+        style={{ backgroundColor: 'var(--clay)' }}
       >
         {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
       </button>
 
       {/* Desktop sidebar */}
       {!isMobile && isOpen && (
-        <nav className="relative w-64 bg-gray-900 text-white z-0 overflow-y-auto" style={{ height: '100dvh' }}>
+        <nav className="relative w-64 text-white z-0 overflow-y-auto" style={{ height: '100dvh', backgroundColor: 'var(--charcoal)' }}>
           {headerAndSearch}
           {menuList}
         </nav>
@@ -204,8 +204,8 @@ export function StudioNavigation() {
               onDragEnd={(_, info) => {
                 if (info.offset.y > 100) setIsOpen(false);
               }}
-              className="fixed bottom-0 left-0 right-0 bg-gray-900 text-white z-40 overflow-y-auto"
-              style={{ borderTopLeftRadius: '20px', borderTopRightRadius: '20px', maxHeight: '95dvh' }}
+              className="fixed bottom-0 left-0 right-0 text-white z-40 overflow-y-auto"
+              style={{ borderTopLeftRadius: '20px', borderTopRightRadius: '20px', maxHeight: '95dvh', backgroundColor: 'var(--charcoal)' }}
             >
               <div style={{ display: 'flex', justifyContent: 'center', padding: '0.6rem 0 0' }}>
                 <div style={{ width: '36px', height: '4px', borderRadius: '2px', backgroundColor: '#555' }} />

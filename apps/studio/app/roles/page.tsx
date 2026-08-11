@@ -67,7 +67,7 @@ export default function RolesPage() {
                 { label: 'Team', value: data.team_size },
               ].map((s) => (
                 <div key={s.label} style={{ padding: '0.9rem', backgroundColor: 'white', border: '1px solid #eee', borderRadius: '8px', textAlign: 'center' }}>
-                  <p style={{ fontSize: '1.35rem', fontWeight: 700, color: '#E85D8A' }}>{s.value}</p>
+                  <p style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--clay)' }}>{s.value}</p>
                   <p style={{ fontSize: '0.7rem', color: '#999' }}>{s.label}</p>
                 </div>
               ))}

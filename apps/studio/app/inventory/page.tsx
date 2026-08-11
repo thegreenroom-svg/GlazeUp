@@ -64,7 +64,7 @@ export default function InventoryPage() {
         <SkeletonGrid count={3} />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-          <StatCard icon={Package} label="Total Pieces" value={pieces.length} color="#0066cc" />
+          <StatCard icon={Package} label="Total Pieces" value={pieces.length} color="var(--clay)" />
           <StatCard icon={AlertCircle} label="In Progress" value={inProgress} color="#ff9900" />
           <StatCard icon={CheckCircle} label="Complete" value={complete} color="#00aa00" />
         </div>

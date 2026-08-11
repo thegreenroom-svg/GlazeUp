@@ -138,7 +138,7 @@ export default function TransferDesignerPage() {
             style={{
               display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.65rem',
               borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '0.8rem',
-              backgroundColor: tool === t.key ? '#E85D8A' : '#f0f0f0',
+              backgroundColor: tool === t.key ? 'var(--clay)' : '#f0f0f0',
               color: tool === t.key ? 'white' : '#444',
             }}
           >
@@ -155,7 +155,7 @@ export default function TransferDesignerPage() {
             aria-label={`Colour ${c}`}
             style={{
               width: 30, height: 30, borderRadius: '50%', backgroundColor: c, cursor: 'pointer',
-              border: colour === c ? '3px solid #E85D8A' : '1px solid #ddd',
+              border: colour === c ? '3px solid var(--clay)' : '1px solid #ddd',
             }}
           />
         ))}
@@ -194,7 +194,7 @@ export default function TransferDesignerPage() {
         <button
           onClick={download}
           disabled={strokes.length === 0}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.5rem 0.8rem', backgroundColor: '#E85D8A', color: 'white', border: 'none', borderRadius: '6px', cursor: strokes.length ? 'pointer' : 'not-allowed', fontSize: '0.85rem', marginLeft: 'auto', opacity: strokes.length ? 1 : 0.5 }}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.5rem 0.8rem', backgroundColor: 'var(--clay)', color: 'white', border: 'none', borderRadius: '6px', cursor: strokes.length ? 'pointer' : 'not-allowed', fontSize: '0.85rem', marginLeft: 'auto', opacity: strokes.length ? 1 : 0.5 }}
         >
           <Download size={15} /> Save
         </button>

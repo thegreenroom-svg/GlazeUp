@@ -33,7 +33,7 @@ export default function AlertsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const priorityColor = (p: number) => (p >= 3 ? '#c33' : p === 2 ? '#ff9900' : '#0066cc');
+  const priorityColor = (p: number) => (p >= 3 ? '#c33' : p === 2 ? '#ff9900' : 'var(--clay)');
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem' }}>

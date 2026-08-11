@@ -119,7 +119,7 @@ export default function PhotoMatchPage() {
           marginBottom: '1.5rem',
         }}
       >
-        <Camera size={32} color="#0066cc" />
+        <Camera size={32} color="var(--clay)" />
         <span style={{ color: '#666' }}>Tap to take or choose a photo</span>
       </button>
 
@@ -176,7 +176,7 @@ export default function PhotoMatchPage() {
                           marginTop: '0.5rem',
                           width: '100%',
                           padding: '0.4rem',
-                          backgroundColor: '#E85D8A',
+                          backgroundColor: 'var(--clay)',
                           color: 'white',
                           border: 'none',
                           borderRadius: '4px',

@@ -85,7 +85,7 @@ export default function LifecyclePage() {
                     </span>
                     <span style={{
                       minWidth: '2rem', textAlign: 'center', padding: '0.15rem 0.5rem', borderRadius: '999px',
-                      backgroundColor: count > 0 ? '#E85D8A' : '#eee', color: count > 0 ? 'white' : '#999',
+                      backgroundColor: count > 0 ? 'var(--clay)' : '#eee', color: count > 0 ? 'white' : '#999',
                       fontSize: '0.8rem', fontWeight: 600,
                     }}>
                       {count}

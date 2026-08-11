@@ -49,13 +49,13 @@ export default function BillingPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.6rem', marginBottom: '1.5rem' }}>
             <div style={{ padding: '1rem', backgroundColor: 'white', border: '1px solid #eee', borderRadius: '8px' }}>
-              <p style={{ fontSize: '1.4rem', fontWeight: 700, color: '#E85D8A' }}>
+              <p style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--clay)' }}>
                 £{(data.monthly_total_cents / 100).toFixed(2)}
               </p>
               <p style={{ fontSize: '0.75rem', color: '#999' }}>Per month</p>
             </div>
             <div style={{ padding: '1rem', backgroundColor: 'white', border: '1px solid #eee', borderRadius: '8px' }}>
-              <p style={{ fontSize: '1.4rem', fontWeight: 700, color: '#E85D8A' }}>
+              <p style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--clay)' }}>
                 £{(data.ai_spend_this_month_cents / 100).toFixed(2)}
               </p>
               <p style={{ fontSize: '0.75rem', color: '#999' }}>AI spend this month</p>
@@ -69,13 +69,13 @@ export default function BillingPage() {
               return (
                 <div key={p.id} style={{
                   padding: '0.9rem', borderRadius: '8px',
-                  border: active ? '2px solid #E85D8A' : '1px solid #eee',
+                  border: active ? '2px solid var(--clay)' : '1px solid #eee',
                   backgroundColor: active ? '#fdf6f8' : 'white',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <p style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                       {p.name}
-                      {active && <Check size={15} color="#E85D8A" />}
+                      {active && <Check size={15} color="var(--clay)" />}
                     </p>
                     <span style={{ fontWeight: 700 }}>£{(p.price_cents / 100).toFixed(0)}<span style={{ fontSize: '0.75rem', color: '#999' }}>/mo</span></span>
                   </div>

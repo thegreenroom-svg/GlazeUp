@@ -216,7 +216,7 @@ export default function BookingsPage() {
           />
           <button
             onClick={() => setDateFilter(todayStr)}
-            style={{ padding: '0.55rem 0.9rem', backgroundColor: dateFilter === todayStr ? '#E85D8A' : '#f0f0f0', color: dateFilter === todayStr ? 'white' : '#333', border: 'none', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer' }}
+            style={{ padding: '0.55rem 0.9rem', backgroundColor: dateFilter === todayStr ? 'var(--clay)' : '#f0f0f0', color: dateFilter === todayStr ? 'white' : '#333', border: 'none', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer' }}
           >
             Today
           </button>
@@ -401,7 +401,7 @@ export default function BookingsPage() {
                         <button
                           onClick={finishSession}
                           disabled={tillBusy}
-                          style={{ width: '100%', padding: '0.5rem', backgroundColor: '#E85D8A', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.85rem', cursor: tillBusy ? 'not-allowed' : 'pointer', opacity: tillBusy ? 0.6 : 1 }}
+                          style={{ width: '100%', padding: '0.5rem', backgroundColor: 'var(--clay)', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.85rem', cursor: tillBusy ? 'not-allowed' : 'pointer', opacity: tillBusy ? 0.6 : 1 }}
                         >
                           Finish session
                         </button>

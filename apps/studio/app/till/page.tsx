@@ -77,7 +77,7 @@ export default function TillPage() {
 
       <div style={{ marginBottom: '2rem' }}>
         <h2 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <Zap size={18} color="#E85D8A" /> Live from Square (today)
+          <Zap size={18} color="var(--clay)" /> Live from Square (today)
         </h2>
         {squareLoading ? (
           <p style={{ color: '#999', fontSize: '0.85rem' }}>Pulling live Square data...</p>

@@ -76,7 +76,7 @@ export default function CataloguePage() {
                 style={{
                   padding: '0.35rem 0.7rem', borderRadius: '999px', border: 'none', cursor: 'pointer',
                   fontSize: '0.8rem', textTransform: 'capitalize',
-                  backgroundColor: cat === c ? '#E85D8A' : '#f0f0f0',
+                  backgroundColor: cat === c ? 'var(--clay)' : '#f0f0f0',
                   color: cat === c ? 'white' : '#444',
                 }}
               >

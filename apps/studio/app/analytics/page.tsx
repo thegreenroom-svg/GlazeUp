@@ -52,7 +52,7 @@ export default function AnalyticsPage() {
               { label: 'Total bookings', value: data.totals.bookings.toLocaleString() },
             ].map((s) => (
               <div key={s.label} style={{ padding: '1rem', backgroundColor: 'white', border: '1px solid #eee', borderRadius: '8px' }}>
-                <p style={{ fontSize: '1.4rem', fontWeight: 700, color: '#E85D8A' }}>{s.value}</p>
+                <p style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--clay)' }}>{s.value}</p>
                 <p style={{ fontSize: '0.75rem', color: '#999' }}>{s.label}</p>
               </div>
             ))}
@@ -79,7 +79,7 @@ export default function AnalyticsPage() {
                 <div key={d} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                   <span style={{ width: '5.5rem', fontSize: '0.8rem', color: '#666' }}>{d.slice(0, 3)}</span>
                   <div style={{ flex: 1, height: '18px', backgroundColor: '#f2f2f2', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ width: `${(v / maxWeekday) * 100}%`, height: '100%', backgroundColor: '#E85D8A' }} />
+                    <div style={{ width: `${(v / maxWeekday) * 100}%`, height: '100%', backgroundColor: 'var(--clay)' }} />
                   </div>
                   <span style={{ width: '2.5rem', textAlign: 'right', fontSize: '0.8rem', fontWeight: 600 }}>{v}</span>
                 </div>

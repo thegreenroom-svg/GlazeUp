@@ -86,7 +86,7 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
 
   if (!shift) {
     return (
-      <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', background: 'linear-gradient(135deg, #E85D8A 0%, #C23F6B 100%)' }}>
+      <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', background: 'linear-gradient(135deg, var(--clay) 0%, #9A6435 100%)' }}>
         <img
           src="https://static.wixstatic.com/media/d0e5bd_2acf96e6189f4fbcb2159fae9f0a5674~mv2.png"
           alt="The Kiln Cafe"

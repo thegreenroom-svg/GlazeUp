@@ -37,7 +37,7 @@ export default function KilnWorkflowPage() {
 
   const getStatusColor = (status: string) => {
     const colors: { [key: string]: string } = {
-      loading: '#0066cc',
+      loading: 'var(--clay)',
       firing: '#ff9900',
       fired: '#00aa00',
     };

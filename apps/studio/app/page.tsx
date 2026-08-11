@@ -143,10 +143,10 @@ export default function Dashboard() {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '1.5rem', backgroundColor: '#FDF6F1', minHeight: '100%', position: 'relative' }}>
       {pullDistance > 0 && (
         <div style={{ display: 'flex', justifyContent: 'center', height: `${pullDistance}px`, alignItems: 'center', overflow: 'hidden' }}>
-          <RefreshCw size={20} color="#E85D8A" style={{ transform: `rotate(${pullDistance * 3.6}deg)`, opacity: pullDistance / 100 }} />
+          <RefreshCw size={20} color="var(--clay)" style={{ transform: `rotate(${pullDistance * 3.6}deg)`, opacity: pullDistance / 100 }} />
         </div>
       )}
-      {pulling && <p style={{ textAlign: 'center', color: '#E85D8A', fontSize: '0.8rem', marginBottom: '0.5rem' }}>Refreshing...</p>}
+      {pulling && <p style={{ textAlign: 'center', color: 'var(--clay)', fontSize: '0.8rem', marginBottom: '0.5rem' }}>Refreshing...</p>}
 
       <div
         style={{
@@ -168,7 +168,7 @@ export default function Dashboard() {
           {isServiceHours ? (
             <>
               <div style={{ marginBottom: '0.75rem' }}>
-                <Tile label="Bookings Today" icon={Calendar} value={String(data.bookingsToday)} color="#E85D8A" fontSize="2.2rem" maxSize="180px" onClick={() => router.push('/bookings')} />
+                <Tile label="Bookings Today" icon={Calendar} value={String(data.bookingsToday)} color="var(--clay)" fontSize="2.2rem" maxSize="180px" onClick={() => router.push('/bookings')} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
                 <Tile label="Takings" icon={PoundSterling} value={`£${data.moneyToday.toFixed(0)}`} subtext="most recent day" color="#C58C5B" fontSize="1.5rem" maxSize="130px" onClick={() => router.push('/money')} />
@@ -181,14 +181,14 @@ export default function Dashboard() {
                 <Tile label="Kiln Active" icon={Flame} value={String(data.kilnActive)} subtext="loading / firing" color="#A85D35" fontSize="2.2rem" maxSize="180px" onClick={() => router.push('/kiln-workflow')} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                <Tile label="Bookings Today" icon={Calendar} value={String(data.bookingsToday)} color="#E85D8A" fontSize="1.5rem" maxSize="130px" onClick={() => router.push('/bookings')} />
+                <Tile label="Bookings Today" icon={Calendar} value={String(data.bookingsToday)} color="var(--clay)" fontSize="1.5rem" maxSize="130px" onClick={() => router.push('/bookings')} />
                 <Tile label="Takings" icon={PoundSterling} value={`£${data.moneyToday.toFixed(0)}`} subtext="most recent day" color="#C58C5B" fontSize="1.5rem" maxSize="130px" onClick={() => router.push('/money')} />
               </div>
             </>
           )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.6rem', marginBottom: '0.6rem' }}>
-            <Tile label="Pieces" icon={Palette} value={String(data.piecesCount)} color="#C23F6B" fontSize="1.1rem" maxSize="95px" onClick={() => router.push('/pieces')} />
+            <Tile label="Pieces" icon={Palette} value={String(data.piecesCount)} color="#9A6435" fontSize="1.1rem" maxSize="95px" onClick={() => router.push('/pieces')} />
             <Tile label="Alerts" icon={Bell} value={String(data.alertsUnread)} color="#D97742" fontSize="1.1rem" maxSize="95px" onClick={() => router.push('/alerts')} />
             <Tile label="Customers" icon={Users} value={String(data.customersCount)} color="#8B6F52" fontSize="1.1rem" maxSize="95px" onClick={() => router.push('/customers')} />
           </div>

@@ -116,7 +116,7 @@ export default function ShelfSweepPage() {
           marginBottom: '1.5rem',
         }}
       >
-        <Camera size={32} color="#0066cc" />
+        <Camera size={32} color="var(--clay)" />
         <span style={{ color: '#666' }}>Tap to photograph the table</span>
       </button>
 
@@ -189,7 +189,7 @@ export default function ShelfSweepPage() {
                               onClick={() => togglePacked(key)}
                               style={{
                                 display: 'flex', alignItems: 'center', gap: '0.3rem',
-                                padding: '0.4rem 0.7rem', backgroundColor: '#E85D8A', color: 'white',
+                                padding: '0.4rem 0.7rem', backgroundColor: 'var(--clay)', color: 'white',
                                 border: 'none', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer',
                               }}
                             >

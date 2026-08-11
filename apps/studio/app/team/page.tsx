@@ -50,7 +50,7 @@ export default function TeamPage() {
             <div key={m.id} style={{ padding: '1.25rem', backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '8px', opacity: m.active ? 1 : 0.5 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
                 <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#eef', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <User size={20} color="#0066cc" />
+                  <User size={20} color="var(--clay)" />
                 </div>
                 <div>
                   <p style={{ fontWeight: '600' }}>{m.name}</p>

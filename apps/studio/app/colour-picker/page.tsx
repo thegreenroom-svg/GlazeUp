@@ -163,7 +163,7 @@ export default function ColourPickerPage() {
         onClick={() => fileRef.current?.click()}
         style={{ width: '100%', padding: '1.5rem', border: '2px dashed #ccc', borderRadius: '8px', backgroundColor: 'white', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem', marginBottom: '1.25rem' }}
       >
-        <Camera size={28} color="#0066cc" />
+        <Camera size={28} color="var(--clay)" />
         <span style={{ color: '#666', fontSize: '0.9rem' }}>Take or choose a photo</span>
       </button>
 
@@ -196,7 +196,7 @@ export default function ColourPickerPage() {
                   <p style={{ fontWeight: i === 0 ? 600 : 400, fontSize: '0.88rem' }}>
                     Nº{m.code} {m.name}
                   </p>
-                  {i === 0 && <p style={{ fontSize: '0.72rem', color: '#E85D8A' }}>closest match</p>}
+                  {i === 0 && <p style={{ fontSize: '0.72rem', color: 'var(--clay)' }}>closest match</p>}
                 </div>
               </div>
             ))}
@@ -206,7 +206,7 @@ export default function ColourPickerPage() {
 
       <button
         onClick={() => setEditing(!editing)}
-        style={{ fontSize: '0.85rem', color: '#0066cc', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+        style={{ fontSize: '0.85rem', color: 'var(--clay)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
       >
         {editing ? 'Done editing' : 'Edit palette'}
       </button>

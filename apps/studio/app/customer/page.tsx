@@ -81,7 +81,7 @@ function CustomerInner() {
 
           {data.loyalty.balance > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 0.9rem', backgroundColor: '#fdf6f8', borderRadius: '8px', marginBottom: '1.25rem' }}>
-              <Award size={18} color="#E85D8A" />
+              <Award size={18} color="var(--clay)" />
               <span style={{ fontSize: '0.9rem' }}>
                 <strong>{data.loyalty.balance}</strong> loyalty points
               </span>

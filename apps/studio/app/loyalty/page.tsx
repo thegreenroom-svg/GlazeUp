@@ -68,7 +68,7 @@ export default function LoyaltyPage() {
               { label: 'Outstanding', value: data.totals.balance },
             ].map((s) => (
               <div key={s.label} style={{ padding: '0.9rem', backgroundColor: 'white', border: '1px solid #eee', borderRadius: '8px', textAlign: 'center' }}>
-                <p style={{ fontSize: '1.35rem', fontWeight: 700, color: '#E85D8A' }}>{s.value.toLocaleString()}</p>
+                <p style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--clay)' }}>{s.value.toLocaleString()}</p>
                 <p style={{ fontSize: '0.7rem', color: '#999' }}>{s.label}</p>
               </div>
             ))}
@@ -82,7 +82,7 @@ export default function LoyaltyPage() {
                   <p style={{ fontSize: '0.9rem', fontWeight: 500 }}>{r.event}</p>
                   <p style={{ fontSize: '0.75rem', color: '#999' }}>{r.note}</p>
                 </div>
-                <span style={{ fontWeight: 700, color: '#E85D8A' }}>+{r.points}</span>
+                <span style={{ fontWeight: 700, color: 'var(--clay)' }}>+{r.points}</span>
               </div>
             ))}
           </div>

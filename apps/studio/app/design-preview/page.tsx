@@ -126,7 +126,7 @@ export default function DesignPreviewPage() {
             onClick={() => setShape(k)}
             style={{
               padding: '0.4rem 0.8rem', borderRadius: '999px', border: 'none', cursor: 'pointer', fontSize: '0.8rem',
-              backgroundColor: shape === k ? '#E85D8A' : '#f0f0f0',
+              backgroundColor: shape === k ? 'var(--clay)' : '#f0f0f0',
               color: shape === k ? 'white' : '#444',
             }}
           >
@@ -140,7 +140,7 @@ export default function DesignPreviewPage() {
         onClick={() => fileRef.current?.click()}
         style={{ width: '100%', padding: '0.8rem', border: '2px dashed #ccc', borderRadius: '8px', backgroundColor: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginBottom: '1rem', fontSize: '0.88rem', color: '#666' }}
       >
-        <Upload size={17} color="#0066cc" /> {design ? 'Choose a different design' : 'Upload a design'}
+        <Upload size={17} color="var(--clay)" /> {design ? 'Choose a different design' : 'Upload a design'}
       </button>
 
       <canvas ref={canvasRef} style={{ width: '100%', maxWidth: 340, border: '1px solid #eee', borderRadius: '8px', display: 'block', marginBottom: '0.8rem' }} />

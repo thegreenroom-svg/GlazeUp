@@ -66,7 +66,7 @@ export default function ReportsPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
             <div style={{ padding: '1.5rem', backgroundColor: 'white', border: '1px solid #ddd', borderRadius: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                <TrendingUp size={24} color="#0066cc" />
+                <TrendingUp size={24} color="var(--clay)" />
                 <p style={{ color: '#666', fontSize: '0.875rem' }}>Total Revenue</p>
               </div>
               <h3 style={{ fontSize: '1.75rem', fontWeight: 'bold' }}>£{totalRevenue.toFixed(2)}</h3>

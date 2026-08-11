@@ -158,7 +158,7 @@ export default function PiecesPage() {
               </div>
               <div style={{ padding: '0.75rem' }}>
                 <h3 style={{ fontWeight: '600', fontSize: '0.875rem', marginBottom: '0.25rem' }}>{piece.piece_type}</h3>
-                {piece.mark_code && <p style={{ fontSize: '0.75rem', color: '#0066cc', fontFamily: 'monospace', marginBottom: '0.25rem' }}>№ {piece.mark_code}</p>}
+                {piece.mark_code && <p style={{ fontSize: '0.75rem', color: 'var(--clay)', fontFamily: 'monospace', marginBottom: '0.25rem' }}>№ {piece.mark_code}</p>}
                 <span style={{ display: 'inline-block', padding: '0.15rem 0.6rem', backgroundColor: '#eef', borderRadius: '9999px', fontSize: '0.7rem', textTransform: 'capitalize' }}>
                   {piece.status.replace(/_/g, ' ')}
                 </span>
@@ -188,7 +188,7 @@ export default function PiecesPage() {
                     style={{ width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box', fontFamily: 'inherit' }}
                   />
                   <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
-                    <button onClick={saveDescription} disabled={saving} style={{ padding: '0.35rem 0.8rem', backgroundColor: '#E85D8A', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer' }}>
+                    <button onClick={saveDescription} disabled={saving} style={{ padding: '0.35rem 0.8rem', backgroundColor: 'var(--clay)', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer' }}>
                       {saving ? 'Saving...' : 'Save'}
                     </button>
                     <button onClick={() => setEditingDesc(false)} style={{ padding: '0.35rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer' }}>
@@ -201,7 +201,7 @@ export default function PiecesPage() {
                   <p style={{ color: '#666' }}>{selected.description || <span style={{ color: '#bbb' }}>No description yet</span>}</p>
                   <button
                     onClick={() => { setDescDraft(selected.description || ''); setEditingDesc(true); }}
-                    style={{ background: 'none', border: 'none', color: '#0066cc', fontSize: '0.78rem', cursor: 'pointer', padding: 0, marginTop: '0.25rem' }}
+                    style={{ background: 'none', border: 'none', color: 'var(--clay)', fontSize: '0.78rem', cursor: 'pointer', padding: 0, marginTop: '0.25rem' }}
                   >
                     Edit description
                   </button>
