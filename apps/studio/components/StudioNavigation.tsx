@@ -24,6 +24,9 @@ import {
   BellRing,
   BarChart3,
   Sparkles,
+  CreditCard,
+  Boxes,
+  QrCode,
   Search,
   Sun,
   Moon
@@ -68,7 +71,10 @@ export function StudioNavigation() {
     { label: 'Loyalty', icon: <Award className="w-5 h-5" />, href: '/loyalty' },
     { label: 'Notifications', icon: <BellRing className="w-5 h-5" />, href: '/notifications' },
     { label: 'Analytics', icon: <BarChart3 className="w-5 h-5" />, href: '/analytics' },
-    { label: 'Community', icon: <Sparkles className="w-5 h-5" />, href: '/community' }
+    { label: 'Community', icon: <Sparkles className="w-5 h-5" />, href: '/community' },
+    { label: 'Catalogue', icon: <Boxes className="w-5 h-5" />, href: '/catalogue' },
+    { label: 'Billing', icon: <CreditCard className="w-5 h-5" />, href: '/billing' },
+    { label: 'Customer View', icon: <QrCode className="w-5 h-5" />, href: '/customer' }
   ];
 
   const isActive = (href: string) => {

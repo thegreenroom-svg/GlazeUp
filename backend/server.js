@@ -13,6 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
+import registerSpecRoutes2 from './spec-routes-2.js';
 
 // Load environment variables
 dotenv.config();
@@ -1373,6 +1374,7 @@ app.use((err, req, res, next) => {
 });
 
 registerSpecRoutes(app, supabase, DEMO_STUDIO_ID, logger);
+registerSpecRoutes2(app, supabase, DEMO_STUDIO_ID, logger);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
