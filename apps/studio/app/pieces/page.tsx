@@ -41,6 +41,48 @@ export default function PiecesPage() {
   const [selected, setSelected] = useState<Piece | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [descDraft, setDescDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const saveDescription = async () => {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/${selected.id}/description`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: descDraft }),
+      });
+      if (!res.ok) throw new Error();
+      setPieces((ps) => ps.map((p) => (p.id === selected.id ? { ...p, description: descDraft } : p)));
+      setSelected({ ...selected, description: descDraft });
+      setEditingDesc(false);
+    } catch {
+      setError('Could not save that description.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const archivePiece = async () => {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/${selected.id}/archive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ archived: true }),
+      });
+      if (!res.ok) throw new Error();
+      setPieces((ps) => ps.filter((p) => p.id !== selected.id));
+      setSelected(null);
+    } catch {
+      setError('Could not archive that piece.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (!selected || !selected.photo_phash) {
@@ -137,7 +179,34 @@ export default function PiecesPage() {
             )}
             <div style={{ padding: '1.5rem' }}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>{selected.piece_type}</h2>
-              {selected.description && <p style={{ color: '#666', marginBottom: '1rem' }}>{selected.description}</p>}
+              {editingDesc ? (
+                <div style={{ marginBottom: '1rem' }}>
+                  <textarea
+                    value={descDraft}
+                    onChange={(e) => setDescDraft(e.target.value)}
+                    rows={3}
+                    style={{ width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.875rem', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                  />
+                  <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
+                    <button onClick={saveDescription} disabled={saving} style={{ padding: '0.35rem 0.8rem', backgroundColor: '#E85D8A', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer' }}>
+                      {saving ? 'Saving...' : 'Save'}
+                    </button>
+                    <button onClick={() => setEditingDesc(false)} style={{ padding: '0.35rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer' }}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ marginBottom: '1rem' }}>
+                  <p style={{ color: '#666' }}>{selected.description || <span style={{ color: '#bbb' }}>No description yet</span>}</p>
+                  <button
+                    onClick={() => { setDescDraft(selected.description || ''); setEditingDesc(true); }}
+                    style={{ background: 'none', border: 'none', color: '#0066cc', fontSize: '0.78rem', cursor: 'pointer', padding: 0, marginTop: '0.25rem' }}
+                  >
+                    Edit description
+                  </button>
+                </div>
+              )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.875rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -207,12 +276,22 @@ export default function PiecesPage() {
                 </div>
               )}
 
-              <button
-                onClick={() => setSelected(null)}
-                style={{ marginTop: '1.5rem', width: '100%', padding: '0.6rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-              >
-                Close
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem' }}>
+                <button
+                  onClick={() => setSelected(null)}
+                  style={{ flex: 1, padding: '0.6rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  Close
+                </button>
+                <button
+                  onClick={archivePiece}
+                  disabled={saving}
+                  title="Removes it from the list but keeps the record"
+                  style={{ padding: '0.6rem 0.9rem', backgroundColor: 'white', color: '#c33', border: '1px solid #f0c8c8', borderRadius: '4px', cursor: saving ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
+                >
+                  {saving ? '...' : 'Archive'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

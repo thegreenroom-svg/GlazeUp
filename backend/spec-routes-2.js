@@ -274,3 +274,145 @@ export function registerPinRoutes(app, supabase, STUDIO_ID, logger, crypto) {
     }
   });
 }
+
+// ============================================================================
+// REMAINING SPEC GAPS: archive, manual descriptions, collections, listings
+// ============================================================================
+export function registerGapRoutes(app, supabase, STUDIO_ID, logger, JUNK_BOOKING_LABELS = []) {
+  // --------------------------------------------------------------------------
+  // ARCHIVE — remove-but-keep (spec: prefer archival over deletion)
+  // --------------------------------------------------------------------------
+  app.post('/api/spec/pieces/:id/archive', async (req, res) => {
+    try {
+      const { archived } = req.body || {};
+      const { data, error } = await supabase
+        .from('pottery_pieces')
+        .update({ archived: archived !== false })
+        .eq('id', req.params.id)
+        .eq('studio_id', STUDIO_ID)
+        .select('id, archived')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return res.status(404).json({ error: 'Piece not found' });
+      res.json(data);
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Archived pieces, so anything removed can always be found and restored.
+  app.get('/api/spec/pieces/archived', async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('pottery_pieces')
+        .select('id, booking_id, piece_type, status, description, reference_photo_url, mark_code, updated_at')
+        .eq('studio_id', STUDIO_ID)
+        .eq('archived', true)
+        .order('updated_at', { ascending: false })
+        .limit(300);
+      if (error) throw error;
+      res.json({ pieces: data || [], count: (data || []).length });
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --------------------------------------------------------------------------
+  // MANUAL DESCRIPTION EDIT — AI writes, a human corrects
+  // --------------------------------------------------------------------------
+  app.post('/api/spec/pieces/:id/description', async (req, res) => {
+    try {
+      const { description } = req.body || {};
+      if (typeof description !== 'string') {
+        return res.status(400).json({ error: 'description required' });
+      }
+      const { data, error } = await supabase
+        .from('pottery_pieces')
+        .update({ description: description.trim(), described_at: new Date().toISOString() })
+        .eq('id', req.params.id)
+        .eq('studio_id', STUDIO_ID)
+        .select('id, description, described_at')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return res.status(404).json({ error: 'Piece not found' });
+      res.json(data);
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --------------------------------------------------------------------------
+  // COLLECTIONS — a customer's pieces across every visit (spec section 12)
+  // --------------------------------------------------------------------------
+  // pottery_pieces.booking_id holds a customer NAME (free text), which is why
+  // grouping is by name rather than by a customer_id -- customer_id is null
+  // throughout the real data. Documented so this isn't "fixed" into a join
+  // that would return nothing.
+  app.get('/api/spec/collections', async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('pottery_pieces')
+        .select('id, booking_id, piece_type, status, description, reference_photo_url, created_at')
+        .eq('studio_id', STUDIO_ID)
+        .neq('archived', true)
+        .order('created_at', { ascending: false })
+        .limit(1000);
+      if (error) throw error;
+
+      const real = (data || []).filter(
+        (p) => p.booking_id && !JUNK_BOOKING_LABELS.includes(p.booking_id)
+      );
+
+      const byPerson = {};
+      real.forEach((p) => {
+        const k = p.booking_id;
+        if (!byPerson[k]) byPerson[k] = { name: k, pieces: [], first: p.created_at, last: p.created_at };
+        byPerson[k].pieces.push(p);
+        if (p.created_at < byPerson[k].first) byPerson[k].first = p.created_at;
+        if (p.created_at > byPerson[k].last) byPerson[k].last = p.created_at;
+      });
+
+      const collections = Object.values(byPerson)
+        .map((c) => ({ ...c, piece_count: c.pieces.length }))
+        .sort((a, b) => b.piece_count - a.piece_count);
+
+      res.json({ collections, count: collections.length });
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --------------------------------------------------------------------------
+  // MARKETPLACE LISTING — submitting a design, not just browsing
+  // --------------------------------------------------------------------------
+  app.post('/api/spec/marketplace', async (req, res) => {
+    try {
+      const { title, description, price_cents, customer_display_name, image_data } = req.body || {};
+      if (!title) return res.status(400).json({ error: 'title required' });
+
+      const { data, error } = await supabase
+        .from('marketplace_designs')
+        .insert([{
+          studio_id: STUDIO_ID,
+          title: String(title).slice(0, 120),
+          description: description ? String(description).slice(0, 600) : null,
+          price_cents: Number.isFinite(price_cents) ? price_cents : 0,
+          // First name only, matching the community feed rule.
+          customer_display_name: (customer_display_name || '').trim().split(/\s+/)[0] || null,
+          image_data: image_data || null,
+          download_count: 0,
+        }])
+        .select('id, title, price_cents, created_at')
+        .maybeSingle();
+      if (error) throw error;
+      res.json(data);
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}

@@ -31,6 +31,7 @@ import {
   Eye,
   PenTool,
   ShieldCheck,
+  Library,
   Search,
   Sun,
   Moon
@@ -82,7 +83,8 @@ export function StudioNavigation() {
     { label: 'Colour Picker', icon: <Pipette className="w-5 h-5" />, href: '/colour-picker' },
     { label: 'Design Preview', icon: <Eye className="w-5 h-5" />, href: '/design-preview' },
     { label: 'Transfer Designer', icon: <PenTool className="w-5 h-5" />, href: '/transfer-designer' },
-    { label: 'Roles & Studio', icon: <ShieldCheck className="w-5 h-5" />, href: '/roles' }
+    { label: 'Roles & Studio', icon: <ShieldCheck className="w-5 h-5" />, href: '/roles' },
+    { label: 'Collections', icon: <Library className="w-5 h-5" />, href: '/collections' }
   ];
 
   const isActive = (href: string) => {
