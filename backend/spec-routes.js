@@ -30,7 +30,8 @@ const PIECE_LIFECYCLE = [
 // at other waiting statuses.
 const DONE_STATUSES = ['packed', 'ready_for_pickup', 'collected', 'posted', 'picked_up'];
 
-export default function registerSpecRoutes(app, supabase, STUDIO_ID, logger) {
+export default function registerSpecRoutes(app, supabase, STUDIO_ID, logger, JUNK_BOOKING_LABELS = []) {
+  const isRealPiece = (p) => !p.booking_id || !JUNK_BOOKING_LABELS.includes(p.booking_id);
   // --------------------------------------------------------------------------
   // PIECE LIFECYCLE (spec Phase 2)
   // --------------------------------------------------------------------------
@@ -53,11 +54,16 @@ export default function registerSpecRoutes(app, supabase, STUDIO_ID, logger) {
         .limit(500);
       if (error) throw error;
 
+      // Test-run pieces are not real customer work -- exclude them or the
+      // lifecycle board fills with broccoli and traffic cones from engine
+      // testing, which is what a real screenshot showed.
+      const real = (data || []).filter(isRealPiece);
+
       const byStage = {};
       PIECE_LIFECYCLE.forEach((s) => { byStage[s] = []; });
       byStage.other = [];
 
-      (data || []).forEach((p) => {
+      real.forEach((p) => {
         const s = (p.status || '').toLowerCase();
         if (byStage[s]) byStage[s].push(p);
         else byStage.other.push(p);
@@ -66,7 +72,7 @@ export default function registerSpecRoutes(app, supabase, STUDIO_ID, logger) {
       const counts = {};
       Object.keys(byStage).forEach((k) => { counts[k] = byStage[k].length; });
 
-      res.json({ stages: PIECE_LIFECYCLE, by_stage: byStage, counts, total: (data || []).length });
+      res.json({ stages: PIECE_LIFECYCLE, by_stage: byStage, counts, total: real.length });
     } catch (err) {
       logger.error(err);
       res.status(500).json({ error: err.message });
@@ -201,7 +207,7 @@ export default function registerSpecRoutes(app, supabase, STUDIO_ID, logger) {
       if (error) throw error;
 
       const byBooking = {};
-      (data || []).forEach((p) => {
+      (data || []).filter(isRealPiece).forEach((p) => {
         const b = p.booking_id || 'unknown';
         if (!byBooking[b]) byBooking[b] = { booking: b, firing: 0, ready: 0, updated_at: p.updated_at };
         if (p.status === 'firing') byBooking[b].firing += 1;
@@ -247,7 +253,7 @@ export default function registerSpecRoutes(app, supabase, STUDIO_ID, logger) {
         supabase.from('kiln_sessions').select('id, status').eq('studio_id', STUDIO_ID).limit(200),
       ]);
 
-      const p = pieces || [];
+      const p = (pieces || []).filter(isRealPiece);
       const b = bookings || [];
       const s = sessions || [];
 

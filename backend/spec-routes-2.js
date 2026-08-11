@@ -18,7 +18,7 @@ const PLANS = [
   { id: 'pro', name: 'Pro', price_cents: 7900, blurb: 'Adds AI piece matching, analytics and the design tools' },
 ];
 
-export default function registerSpecRoutes2(app, supabase, STUDIO_ID, logger) {
+export default function registerSpecRoutes2(app, supabase, STUDIO_ID, logger, JUNK_BOOKING_LABELS = []) {
   // --------------------------------------------------------------------------
   // BILLING (spec Phase 1: Stripe subscription billing)
   // --------------------------------------------------------------------------
@@ -172,7 +172,8 @@ export default function registerSpecRoutes2(app, supabase, STUDIO_ID, logger) {
         { earned: 0, spent: 0 }
       );
 
-      const p = pieces || [];
+      // Exclude test-run pieces so a customer never sees engine-test junk.
+      const p = (pieces || []).filter((x) => !JUNK_BOOKING_LABELS.includes(booking.customer_name));
       const ready = p.filter((x) => ['fired', 'packed', 'ready_for_pickup'].includes((x.status || '').toLowerCase()));
       const inKiln = p.filter((x) => ['kiln_queue', 'firing'].includes((x.status || '').toLowerCase()));
 

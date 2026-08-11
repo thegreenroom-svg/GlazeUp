@@ -141,6 +141,13 @@ const upload = multer({
 
 const DEMO_STUDIO_ID = 'fab8b2d2-27b5-47ec-8c56-268bbf821dc3';
 
+// Test/junk booking labels created during engine testing (24-26 Jul). Pieces
+// carrying these are not real customer work and must never appear in any
+// customer-facing or operational view. Defined once here and exported so every
+// endpoint filters identically -- previously this list lived inside a single
+// handler, so newer endpoints silently showed the test data.
+export const JUNK_BOOKING_LABELS = ['Studio shelf', 'Test run', 'Testing', 'Fest', 'Test', 'Run', 'Rum', 'G', 'Test2'];
+
 app.get('/api/demo/studio', async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -181,7 +188,6 @@ app.get('/api/demo/pieces', async (req, res) => {
     // sometimes a test/junk label like "Studio shelf" or "Test run"). Filter
     // out the known junk values so test data doesn't pollute this view --
     // checked live against the real table before excluding these.
-    const JUNK_BOOKING_LABELS = ['Studio shelf', 'Test run', 'Testing', 'Fest', 'Test', 'Run', 'Rum', 'G', 'Test2'];
 
     const { data, error } = await supabase
       .from('pottery_pieces')
@@ -1373,8 +1379,8 @@ app.use((err, req, res, next) => {
   });
 });
 
-registerSpecRoutes(app, supabase, DEMO_STUDIO_ID, logger);
-registerSpecRoutes2(app, supabase, DEMO_STUDIO_ID, logger);
+registerSpecRoutes(app, supabase, DEMO_STUDIO_ID, logger, JUNK_BOOKING_LABELS);
+registerSpecRoutes2(app, supabase, DEMO_STUDIO_ID, logger, JUNK_BOOKING_LABELS);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
