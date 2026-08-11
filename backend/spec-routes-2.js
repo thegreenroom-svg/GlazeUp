@@ -226,3 +226,51 @@ export default function registerSpecRoutes2(app, supabase, STUDIO_ID, logger, JU
     }
   });
 }
+
+// ============================================================================
+// STAFF PIN GATE
+// ----------------------------------------------------------------------------
+// A light "who's on shift" gate, not a security boundary. Deliberately honest
+// about that: PINs are stored as unsalted SHA-256 and every staff member
+// currently shares the same one, so this identifies a shift, not a person.
+// Verification happens server-side so the hash never reaches the browser.
+// ============================================================================
+export function registerPinRoutes(app, supabase, STUDIO_ID, logger, crypto) {
+  app.post('/api/spec/pin/verify', async (req, res) => {
+    try {
+      const { pin } = req.body || {};
+      if (!pin) return res.status(400).json({ error: 'PIN required' });
+
+      const hash = crypto.createHash('sha256').update(String(pin)).digest('hex');
+
+      const { data: pins, error } = await supabase
+        .from('staff_pins')
+        .select('staff_member_id, pin_hash')
+        .eq('studio_id', STUDIO_ID);
+      if (error) throw error;
+
+      const match = (pins || []).find((p) => p.pin_hash === hash);
+      if (!match) return res.status(401).json({ ok: false, error: 'PIN not recognised' });
+
+      const { data: staff } = await supabase
+        .from('staff_team')
+        .select('name, role')
+        .eq('id', match.staff_member_id)
+        .maybeSingle();
+
+      // How many people share this PIN -- surfaced so the UI can be honest
+      // rather than greeting one named person when the PIN is shared.
+      const sharedBy = (pins || []).filter((p) => p.pin_hash === hash).length;
+
+      res.json({
+        ok: true,
+        staff: staff || null,
+        shared: sharedBy > 1,
+        shared_by: sharedBy,
+      });
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
