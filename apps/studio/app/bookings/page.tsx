@@ -38,6 +38,20 @@ interface PhotoMatch {
   created_at: string;
 }
 
+interface TillItem {
+  id: string;
+  item_name: string;
+  category: string | null;
+  quantity: number;
+  unit_price_cents: number;
+}
+
+interface MenuItem {
+  item_name: string;
+  category: string | null;
+  price_cents: number | null;
+}
+
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [search, setSearch] = useState('');
@@ -48,6 +62,10 @@ export default function BookingsPage() {
   const [detail, setDetail] = useState<BookingDetail | null>(null);
   const [photoMatches, setPhotoMatches] = useState<PhotoMatch[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [tillItems, setTillItems] = useState<TillItem[]>([]);
+  const [menu, setMenu] = useState<MenuItem[]>([]);
+  const [tillBusy, setTillBusy] = useState(false);
+  const [finished, setFinished] = useState(false);
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings`)
@@ -64,6 +82,8 @@ export default function BookingsPage() {
     if (!selectedCode) {
       setDetail(null);
       setPhotoMatches([]);
+      setTillItems([]);
+      setFinished(false);
       return;
     }
     setDetailLoading(true);
@@ -77,7 +97,83 @@ export default function BookingsPage() {
       .then((res) => (res.ok ? res.json() : []))
       .then(setPhotoMatches)
       .catch(() => setPhotoMatches([]));
+
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${selectedCode}/till`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((d) => {
+        setTillItems(Array.isArray(d) ? d : d?.items || []);
+        setFinished(Boolean(d?.finished_at));
+      })
+      .catch(() => setTillItems([]));
   }, [selectedCode]);
+
+  // Menu is the same for every booking, so load it once.
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/menu`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((d) => setMenu((Array.isArray(d) ? d : []).slice(0, 40)))
+      .catch(() => setMenu([]));
+  }, []);
+
+  const reloadTill = async (code: string) => {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${code}/till`);
+    const d = res.ok ? await res.json() : [];
+    setTillItems(Array.isArray(d) ? d : d?.items || []);
+  };
+
+  const addTillItem = async (m: MenuItem) => {
+    if (!selectedCode) return;
+    setTillBusy(true);
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${selectedCode}/till`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          item_name: m.item_name,
+          category: m.category,
+          quantity: 1,
+          unit_price_cents: m.price_cents ?? 0,
+        }),
+      });
+      await reloadTill(selectedCode);
+    } catch {
+      setError('Could not add that item.');
+    } finally {
+      setTillBusy(false);
+    }
+  };
+
+  const removeTillItem = async (id: string) => {
+    if (!selectedCode) return;
+    setTillBusy(true);
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/till-items/${id}`, { method: 'DELETE' });
+      await reloadTill(selectedCode);
+    } catch {
+      setError('Could not remove that item.');
+    } finally {
+      setTillBusy(false);
+    }
+  };
+
+  const finishSession = async () => {
+    if (!selectedCode) return;
+    setTillBusy(true);
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${selectedCode}/finish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ finished_by: 'studio' }),
+      });
+      setFinished(true);
+    } catch {
+      setError('Could not finish the session.');
+    } finally {
+      setTillBusy(false);
+    }
+  };
+
+  const tillTotal = tillItems.reduce((sum, i) => sum + i.unit_price_cents * i.quantity, 0);
 
   const orderTotal = (orders: BookingDetail['orders']) =>
     orders.reduce((sum, o) => sum + (o.unit_price_cents * o.quantity) / 100, 0);
@@ -236,6 +332,79 @@ export default function BookingsPage() {
                             <span>£{orderTotal(detail.orders).toFixed(2)}</span>
                           </div>
                         </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #eee' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <h3 style={{ fontSize: '0.95rem', fontWeight: '600' }}>Till</h3>
+                    <span style={{ fontSize: '0.7rem', color: '#999' }}>demo table only</span>
+                  </div>
+
+                  {tillItems.length === 0 ? (
+                    <p style={{ fontSize: '0.85rem', color: '#999', marginBottom: '0.75rem' }}>Nothing added yet.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '0.75rem' }}>
+                      {tillItems.map((i) => (
+                        <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', padding: '0.4rem 0.5rem', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
+                          <span>{i.quantity > 1 ? `${i.quantity}x ` : ''}{i.item_name}</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                            <span>£{((i.unit_price_cents * i.quantity) / 100).toFixed(2)}</span>
+                            {!finished && (
+                              <button
+                                onClick={() => removeTillItem(i.id)}
+                                disabled={tillBusy}
+                                style={{ background: 'none', border: 'none', color: '#c33', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, padding: 0 }}
+                                aria-label={`Remove ${i.item_name}`}
+                              >
+                                ×
+                              </button>
+                            )}
+                          </span>
+                        </div>
+                      ))}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, fontSize: '0.9rem', paddingTop: '0.4rem', borderTop: '1px solid #eee' }}>
+                        <span>Total</span>
+                        <span>£{(tillTotal / 100).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {finished ? (
+                    <div style={{ padding: '0.6rem', backgroundColor: '#eafaf0', color: '#1a8a3c', borderRadius: '4px', fontSize: '0.85rem', textAlign: 'center' }}>
+                      Session finished
+                    </div>
+                  ) : (
+                    <>
+                      {menu.length > 0 && (
+                        <select
+                          onChange={(e) => {
+                            const m = menu[Number(e.target.value)];
+                            if (m) addTillItem(m);
+                            e.target.value = '';
+                          }}
+                          disabled={tillBusy}
+                          defaultValue=""
+                          style={{ width: '100%', padding: '0.5rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.85rem', marginBottom: '0.5rem' }}
+                        >
+                          <option value="" disabled>Add an item...</option>
+                          {menu.map((m, idx) => (
+                            <option key={`${m.item_name}-${idx}`} value={idx}>
+                              {m.item_name}{m.price_cents ? ` — £${(m.price_cents / 100).toFixed(2)}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {tillItems.length > 0 && (
+                        <button
+                          onClick={finishSession}
+                          disabled={tillBusy}
+                          style={{ width: '100%', padding: '0.5rem', backgroundColor: '#E85D8A', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.85rem', cursor: tillBusy ? 'not-allowed' : 'pointer', opacity: tillBusy ? 0.6 : 1 }}
+                        >
+                          Finish session
+                        </button>
                       )}
                     </>
                   )}
