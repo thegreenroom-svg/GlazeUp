@@ -2,7 +2,8 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ChevronRight, Home, Camera, Printer, Check, Loader } from 'lucide-react';
 import QRCode from 'qrcode';
@@ -53,8 +54,11 @@ const B = {
 type Phase = 1 | 2 | 3 | 4 | 5;
 
 export default function FloorPage() {
+  const router = useRouter();
   const [phase, setPhase] = useState<Phase>(1);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [allBookings, setAllBookings] = useState<Booking[]>([]);
+  const [floorDate, setFloorDate] = useState(new Date().toISOString().slice(0, 10));
   const [menu, setMenu] = useState<TillGroup[]>([]);
   const [activeGroup, setActiveGroup] = useState<TillGroup | null>(null);
   const [activeSubsection, setActiveSubsection] = useState<Subsection | null>(null);
@@ -75,6 +79,11 @@ export default function FloorPage() {
 
   const tillTotal = tillItems.reduce((s, i) => s + i.unit_price_cents * i.quantity, 0);
 
+  useEffect(() => {
+    const dayStr = new Date(floorDate).toDateString();
+    setBookings(allBookings.filter((b) => new Date(b.session_start).toDateString() === dayStr).slice(0, 30));
+  }, [floorDate, allBookings]);
+
   const loadBookings = async () => {
     setLoading(true);
     try {
@@ -84,11 +93,7 @@ export default function FloorPage() {
       ]);
       const bData = bRes.ok ? await bRes.json() : [];
       const mData = mRes.ok ? await mRes.json() : [];
-      const todayStr = new Date().toDateString();
-      const today = (Array.isArray(bData) ? bData : []).filter(
-        (b: Booking) => new Date(b.session_start).toDateString() === todayStr
-      );
-      setBookings((today.length ? today : bData).slice(0, 30));
+      setAllBookings(Array.isArray(bData) ? bData : []);
       setMenu((mData?.groups || []).slice(0, 30));
       setPhase(2);
     } finally {
@@ -202,7 +207,7 @@ export default function FloorPage() {
 
   const Header = ({ label }: { label: string }) => (
     <div className="flex justify-between items-center mb-6 pt-4">
-      <button onClick={() => setPhase(1)} className="p-2" style={{ color: B.clay }}><Home size={24} /></button>
+      <button onClick={() => router.push('/')} className="p-2" style={{ color: B.clay }}><Home size={24} /></button>
       <p style={{ color: B.stone }} className="text-sm font-bold">{label}</p>
       <div style={{ width: 24 }} />
     </div>
@@ -241,7 +246,13 @@ export default function FloorPage() {
             <div className="text-center mb-6">
               <span className="text-4xl">🎨</span>
               <h2 className="text-xl font-bold mt-3" style={{ color: B.ivory }}>Select Table</h2>
-              <p style={{ color: B.stone, fontSize: '0.8rem', marginTop: '0.25rem' }}>{bookings.length} real booking{bookings.length === 1 ? '' : 's'} today</p>
+              <input
+                type="date"
+                value={floorDate}
+                onChange={(e) => setFloorDate(e.target.value)}
+                style={{ marginTop: '0.6rem', padding: '0.4rem 0.6rem', borderRadius: 8, border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: '0.85rem' }}
+              />
+              <p style={{ color: B.stone, fontSize: '0.8rem', marginTop: '0.4rem' }}>{bookings.length} real booking{bookings.length === 1 ? '' : 's'} on this day</p>
             </div>
             {bookings.length === 0 && <p style={{ color: B.stone, textAlign: 'center', fontSize: '0.85rem' }}>No bookings found for today.</p>}
             <div className="space-y-2" style={{ maxHeight: '55vh', overflowY: 'auto' }}>
