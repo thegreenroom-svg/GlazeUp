@@ -161,28 +161,49 @@ export default function Dashboard() {
         Demo view — read-only. {studioName}
       </div>
 
-      <button
-        onClick={() => router.push('/floor')}
-        style={{
-          width: '100%',
-          maxWidth: '520px',
-          margin: '0 auto 1.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '0.6rem',
-          padding: '1.1rem',
-          borderRadius: '14px',
-          border: 'none',
-          cursor: 'pointer',
-          background: 'linear-gradient(155deg, var(--clay) 0%, #9A6435 100%)',
-          color: 'var(--ivory)',
-          fontSize: '1.15rem',
-          fontWeight: 700,
-        }}
-      >
-        🏃 Start Floor
-      </button>
+      <div style={{ display: 'flex', gap: '0.6rem', maxWidth: '520px', margin: '0 auto 1.5rem' }}>
+        <button
+          onClick={() => router.push('/floor')}
+          style={{
+            flex: 2,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.6rem',
+            padding: '1.1rem',
+            borderRadius: '14px',
+            border: 'none',
+            cursor: 'pointer',
+            background: 'linear-gradient(155deg, var(--clay) 0%, #9A6435 100%)',
+            color: 'var(--ivory)',
+            fontSize: '1.15rem',
+            fontWeight: 700,
+          }}
+        >
+          🏃 Start Floor
+        </button>
+        <button
+          onClick={() => router.push('/daily-cards')}
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.2rem',
+            padding: '1.1rem 0.5rem',
+            borderRadius: '14px',
+            border: '2px solid var(--clay)',
+            cursor: 'pointer',
+            backgroundColor: 'white',
+            color: 'var(--charcoal)',
+            fontSize: '0.85rem',
+            fontWeight: 700,
+          }}
+        >
+          🖨️ Print Cards
+        </button>
+      </div>
 
       {loading || !data ? (
         <SkeletonTiles />

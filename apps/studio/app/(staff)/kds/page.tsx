@@ -56,7 +56,7 @@ export default function KdsPage() {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '700px' }}>
       <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>KDS</h1>
       <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-        Real orders placed by customers from their table. Refreshes automatically.
+        Real drink, food and glaze requests placed by customers or staff from the table. Refreshes automatically.
       </p>
 
       {loading && <p style={{ color: '#666' }}>Loading...</p>}

@@ -682,7 +682,12 @@ export function registerWorkflowRoutes(app, supabase, STUDIO_ID, logger, upload,
 // Real Cafe/Food categories, shared between the till menu and KDS so both
 // agree on what counts as "something the kitchen needs to make" -- never
 // duplicated as a second list that could drift out of sync.
-const KITCHEN_CATEGORIES = ['Hot Drinks', 'Cold Drinks', 'Iced Coffees', 'Milkshakes', 'Smoothies', 'Drinks', 'Alcohol', 'Cafe', 'Cakes', 'Cakes & Food'];
+// Categories that route to the floor/kitchen alert queue -- what genuinely
+// needs a staff member's attention when a customer orders it from their
+// table, not just cafe drinks. 'S. Glazing' added per Daisy: customers
+// asking for an extra glaze from their table needs the same live alert a
+// drink order gets, not a separate system.
+const KITCHEN_CATEGORIES = ['Hot Drinks', 'Cold Drinks', 'Iced Coffees', 'Milkshakes', 'Smoothies', 'Drinks', 'Alcohol', 'Cafe', 'Cakes', 'Cakes & Food', 'S. Glazing'];
 
 // Shared by /api/spec/till-menu and /api/spec/item-popularity so there is
 // only ONE real implementation of "ask Square for real recent sales" --

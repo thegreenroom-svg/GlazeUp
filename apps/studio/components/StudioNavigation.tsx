@@ -38,6 +38,7 @@ import {
   Stamp,
   Footprints,
   ChefHat,
+  PrinterIcon,
   Search,
   Sun,
   Moon
@@ -69,6 +70,7 @@ export function StudioNavigation() {
       section: 'Daily Workflow',
       items: [
         { label: 'Start Floor', icon: <Footprints className="w-5 h-5" />, href: '/floor' },
+        { label: 'Print Cards', icon: <PrinterIcon className="w-5 h-5" />, href: '/daily-cards' },
         { label: 'Bookings', icon: <Calendar className="w-5 h-5" />, href: '/bookings' },
         { label: 'Till', icon: <Receipt className="w-5 h-5" />, href: '/till' },
         { label: 'KDS', icon: <ChefHat className="w-5 h-5" />, href: '/kds' },
