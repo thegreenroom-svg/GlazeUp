@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Delete } from 'lucide-react';
 
@@ -18,6 +19,7 @@ interface Shift {
 const SHIFT_MS = 14 * 60 * 60 * 1000;
 
 export default function PinGate({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [shift, setShift] = useState<Shift | null>(null);
   const [checked, setChecked] = useState(false);
   const [pin, setPin] = useState('');
@@ -61,6 +63,12 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
       };
       try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(s)); } catch { /* private mode */ }
       setShift(s);
+      // A fresh PIN entry should always land on the Dashboard, regardless
+      // of which URL happened to be loaded when the shift started or
+      // expired -- previously this just revealed whatever page was already
+      // sitting in the browser, which is why unlocking could drop someone
+      // straight onto a tool like Print Booking Cards instead of home.
+      router.push('/');
     } catch {
       setError('Could not check that PIN');
       setPin('');
