@@ -106,7 +106,7 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
         </div>
 
         {error && (
-          <p style={{ color: 'white', fontSize: '0.85rem', marginBottom: '1rem', opacity: 0.9 }}>{error}</p>
+          <p style={{ color: 'var(--charcoal)', fontSize: '0.85rem', marginBottom: '1rem', fontWeight: 600, backgroundColor: 'rgba(255,255,255,0.85)', padding: '0.4rem 0.8rem', borderRadius: '6px' }}>{error}</p>
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 72px)', gap: '0.7rem' }}>
