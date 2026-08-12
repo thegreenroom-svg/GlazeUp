@@ -1432,17 +1432,22 @@ export function registerPartySizeRoute(app, supabase, STUDIO_ID, logger, axios) 
   // Square calls to stay well clear of rate limits across ~275 real rows.
   // Reports a real summary rather than a bare 'done' -- recovered / not
   // found / errored counts, so nothing is silently swallowed.
-  app.post('/api/spec/bookings/backfill-party-sizes', async (req, res) => {
-    try {
-      const { data: connection } = await supabase
-        .from('square_connections')
-        .select('square_access_token, square_token_expires_at')
-        .eq('studio_id', STUDIO_ID)
-        .single();
-      if (!connection || new Date(connection.square_token_expires_at) < new Date()) {
-        return res.status(400).json({ error: 'No valid Square connection' });
-      }
+  // Real, in-memory job state -- fine for a one-off ~40s job that lives and
+  // dies within this process, doesn't need Supabase-backed persistence.
+  const backfillState = {
+    running: false,
+    done: false,
+    recovered: 0,
+    not_found: 0,
+    errored: 0,
+    total: 0,
+    checked: 0,
+    errors: [],
+    startedError: null,
+  };
 
+  async function runBackfillJob(supabase, STUDIO_ID, axios, logger, connection) {
+    try {
       const { data: candidates, error: candErr } = await supabase
         .from('bookings')
         .select('booking_code, square_booking_id')
@@ -1451,7 +1456,7 @@ export function registerPartySizeRoute(app, supabase, STUDIO_ID, logger, axios) 
         .not('square_booking_id', 'is', null);
       if (candErr) throw candErr;
 
-      const results = { recovered: 0, not_found: 0, errored: 0, total: (candidates || []).length, errors: [] };
+      backfillState.total = (candidates || []).length;
 
       for (const c of candidates || []) {
         try {
@@ -1477,24 +1482,70 @@ export function registerPartySizeRoute(app, supabase, STUDIO_ID, logger, axios) 
               .update({ party_size: recovered })
               .eq('booking_code', c.booking_code)
               .eq('studio_id', STUDIO_ID);
-            results.recovered++;
+            backfillState.recovered++;
           } else {
-            results.not_found++;
+            backfillState.not_found++;
           }
         } catch (err) {
-          results.errored++;
-          if (results.errors.length < 10) {
-            results.errors.push({ booking_code: c.booking_code, error: err.response?.data?.errors?.[0]?.detail || err.message });
+          backfillState.errored++;
+          if (backfillState.errors.length < 10) {
+            backfillState.errors.push({ booking_code: c.booking_code, error: err.response?.data?.errors?.[0]?.detail || err.message });
           }
         }
+        backfillState.checked++;
         // Small pace between real Square calls across a real bulk run.
         await new Promise((r) => setTimeout(r, 150));
       }
-
-      res.json(results);
     } catch (err) {
-      logger.error('backfill-party-sizes failed', err.response?.data || err.message);
+      logger.error('backfill-party-sizes job failed', err.response?.data || err.message);
+      backfillState.startedError = err.message;
+    } finally {
+      backfillState.running = false;
+      backfillState.done = true;
+    }
+  }
+
+  // Starts the real job in the background and returns immediately --
+  // deliberately NOT awaited. The previous version held the HTTP request
+  // open for the full ~40s run with nothing sent back until the very end;
+  // over a real mobile connection that got killed by a network/proxy
+  // timeout before it ever finished; a blocked backfill isn't dangerous
+  // like a blocked Square charge, but it DID silently waste real API calls
+  // against the ones it got through before being cut off. Poll /status
+  // instead of waiting on this response.
+  app.post('/api/spec/bookings/backfill-party-sizes', async (req, res) => {
+    if (backfillState.running) {
+      return res.json({ started: false, already_running: true });
+    }
+    try {
+      const { data: connection } = await supabase
+        .from('square_connections')
+        .select('square_access_token, square_token_expires_at')
+        .eq('studio_id', STUDIO_ID)
+        .single();
+      if (!connection || new Date(connection.square_token_expires_at) < new Date()) {
+        return res.status(400).json({ error: 'No valid Square connection' });
+      }
+
+      backfillState.running = true;
+      backfillState.done = false;
+      backfillState.recovered = 0;
+      backfillState.not_found = 0;
+      backfillState.errored = 0;
+      backfillState.total = 0;
+      backfillState.checked = 0;
+      backfillState.errors = [];
+      backfillState.startedError = null;
+
+      runBackfillJob(supabase, STUDIO_ID, axios, logger, connection); // not awaited on purpose
+      res.json({ started: true });
+    } catch (err) {
+      logger.error('backfill-party-sizes failed to start', err.response?.data || err.message);
       res.status(500).json({ error: err.message });
     }
+  });
+
+  app.get('/api/spec/bookings/backfill-party-sizes/status', (req, res) => {
+    res.json(backfillState);
   });
 }
