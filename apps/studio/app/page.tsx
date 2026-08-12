@@ -52,7 +52,7 @@ function Tile({
         border: 'none',
         borderRadius: '14px',
         background: `linear-gradient(155deg, ${color} 0%, ${color}dd 100%)`,
-        color: 'white',
+        color: 'var(--charcoal)',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',

@@ -141,10 +141,10 @@ export function StudioNavigation() {
             style={{
               width: '100%',
               padding: '0.4rem 0.6rem 0.4rem 1.8rem',
-              backgroundColor: '#1a1a2e',
-              border: '1px solid #333',
+              backgroundColor: 'var(--charcoal)',
+              border: '1px solid var(--stone)',
               borderRadius: '6px',
-              color: 'white',
+              color: 'var(--ivory)',
               fontSize: '0.85rem',
             }}
           />
@@ -154,7 +154,7 @@ export function StudioNavigation() {
   );
 
   const menuList = (
-    <div className="py-6">
+    <div className="py-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
       {menuItems.map((item) => (
         <Link
           key={item.href}
@@ -162,13 +162,16 @@ export function StudioNavigation() {
           onClick={() => {
             if (isMobile) setIsOpen(false);
           }}
-          className={`flex items-center gap-3 px-6 py-2 transition-all ${
-            isActive(item.href) ? 'text-white border-r-4' : 'text-gray-400 hover:text-white hover:opacity-80'
+          className={`flex items-center gap-2 px-3 py-1.5 transition-all ${
+            isActive(item.href) ? 'text-white' : 'text-gray-400 hover:text-white hover:opacity-80'
           }`}
-          style={isActive(item.href) ? { backgroundColor: 'var(--clay)', borderColor: '#9A6435' } : {}}
+          style={{
+            fontSize: '0.8rem',
+            ...(isActive(item.href) ? { backgroundColor: 'var(--clay)', borderRadius: '4px' } : {}),
+          }}
         >
           {item.icon}
-          <span className="font-medium text-sm">{item.label}</span>
+          <span className="font-medium" style={{ fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
         </Link>
       ))}
     </div>
