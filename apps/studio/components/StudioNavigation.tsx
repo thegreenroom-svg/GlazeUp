@@ -74,6 +74,7 @@ export function StudioNavigation() {
         { label: 'Start Floor', icon: <Footprints className="w-5 h-5" />, href: '/floor' },
         { label: 'Print Cards', icon: <PrinterIcon className="w-5 h-5" />, href: '/daily-cards' },
         { label: 'Bookings', icon: <Calendar className="w-5 h-5" />, href: '/bookings' },
+        { label: 'Recover Party Sizes', icon: <RefreshIcon className="w-5 h-5" />, href: '/backfill-party-sizes' },
         { label: 'Till', icon: <Receipt className="w-5 h-5" />, href: '/till' },
         { label: 'KDS', icon: <ChefHat className="w-5 h-5" />, href: '/kds' },
         { label: 'Photo Match', icon: <Camera className="w-5 h-5" />, href: '/photo-match' },
@@ -129,7 +130,6 @@ export function StudioNavigation() {
         { label: 'Alerts', icon: <Bell className="w-5 h-5" />, href: '/alerts' },
         { label: 'Notifications', icon: <BellRing className="w-5 h-5" />, href: '/notifications' },
         { label: 'Roles & Studio', icon: <ShieldCheck className="w-5 h-5" />, href: '/roles' },
-        { label: 'Recover Party Sizes', icon: <RefreshIcon className="w-5 h-5" />, href: '/backfill-party-sizes' },
       ],
     },
   ];
