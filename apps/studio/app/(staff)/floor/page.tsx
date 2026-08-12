@@ -83,6 +83,11 @@ export default function FloorPage() {
   const [current, setCurrent] = useState<Booking | null>(null);
   const [pieceCount, setPieceCount] = useState(0);
   const [splitBillCount, setSplitBillCount] = useState(1);
+  const [quickAccessMode, setQuickAccessMode] = useState(false);
+  const [tableTotals, setTableTotals] = useState<Record<string, number>>({});
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash' | null>(null);
+  const [collectionMethod, setCollectionMethod] = useState<'studio' | 'postal' | null>(null);
+  const [postalPostcode, setPostalPostcode] = useState('');
   const [tillItems, setTillItems] = useState<TillItem[]>([]);
   const [tillBusy, setTillBusy] = useState(false);
   const [photo, setPhoto] = useState<File | null>(null);
@@ -106,6 +111,7 @@ export default function FloorPage() {
 
   const loadBookings = async () => {
     setLoading(true);
+    setQuickAccessMode(false);
     try {
       const [bRes, mRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings`),
@@ -121,6 +127,45 @@ export default function FloorPage() {
     }
   };
 
+  const loadSeatedBookings = async () => {
+    setLoading(true);
+    setQuickAccessMode(true);
+    try {
+      const [bRes, mRes] = await Promise.all([
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings`),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/till-menu`),
+      ]);
+      const bData = bRes.ok ? await bRes.json() : [];
+      const mData = mRes.ok ? await mRes.json() : [];
+      const all: Booking[] = Array.isArray(bData) ? bData : [];
+      setAllBookings(all);
+      setMenu((mData?.groups || []).slice(0, 30));
+
+      // Fetch running till totals for today's bookings so staff can see
+      // which tables already have items before jumping back in
+      const todayStr = new Date().toDateString();
+      const todays = all.filter((b) => new Date(b.session_start).toDateString() === todayStr);
+      const totals: Record<string, number> = {};
+      await Promise.all(
+        todays.map(async (b) => {
+          try {
+            const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${b.booking_code}/till`);
+            const d = r.ok ? await r.json() : [];
+            const items = Array.isArray(d) ? d : d?.items || [];
+            totals[b.booking_code] = items.reduce((s: number, i: TillItem) => s + i.unit_price_cents * i.quantity, 0);
+          } catch {
+            totals[b.booking_code] = 0;
+          }
+        })
+      );
+      setTableTotals(totals);
+      setFloorDate(new Date().toISOString().slice(0, 10));
+      setPhase(2);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const selectBooking = async (b: Booking) => {
     setCurrent(b);
     setPieceCount(0);  // Start at 0 - will be populated from Phase 2 photo (or show unfinished pieces if returning customer)
@@ -130,6 +175,9 @@ export default function FloorPage() {
     setActiveSubsection(null);
     setActiveBucket(null);
     setShowAllItems(false);
+    setPaymentMethod(null);
+    setCollectionMethod(null);
+    setPostalPostcode('');
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${b.booking_code}/till`);
       const d = res.ok ? await res.json() : [];
@@ -193,7 +241,14 @@ export default function FloorPage() {
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${current.booking_code}/finish`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ finished_by: 'start-floor' }),
+        body: JSON.stringify({
+          finished_by: 'start-floor',
+          payment_method: paymentMethod,
+          collection_method: collectionMethod,
+          postal_postcode: collectionMethod === 'postal' ? postalPostcode.trim() : undefined,
+          till_total_cents: tillTotal,
+          split_bill_count: splitBillCount > 1 ? splitBillCount : undefined,
+        }),
       });
       setFinished(true);
 
@@ -215,7 +270,7 @@ export default function FloorPage() {
   };
 
   const nextBooking = () => {
-    setPhase(2);
+    setPhase(quickAccessMode ? 2 : 2);
     setCurrent(null);
     setPieceCount(0);
     setTillItems([]);
@@ -224,6 +279,13 @@ export default function FloorPage() {
     setSaved(false);
     setFinished(false);
     setQrUrl(null);
+    setPaymentMethod(null);
+    setCollectionMethod(null);
+    setPostalPostcode('');
+    if (quickAccessMode) {
+      // Refresh totals so the seated list reflects the table just finished
+      loadSeatedBookings();
+    }
   };
 
   const Header = ({ label }: { label: string }) => (
@@ -248,6 +310,11 @@ export default function FloorPage() {
               {loading ? 'Loading...' : '🏃 Start Floor'}
               {!loading && <ChevronRight size={24} />}
             </button>
+            <button onClick={loadSeatedBookings} disabled={loading} className="w-full py-5 rounded-lg font-bold flex items-center justify-center gap-3 text-lg" style={{ backgroundColor: B.sand, color: B.charcoal }}>
+              {loading ? 'Loading...' : '🪑 Seated Bookings'}
+              {!loading && <ChevronRight size={24} />}
+            </button>
+            <p style={{ color: B.stone, fontSize: '0.75rem', textAlign: 'center' }}>Already-seated tables · more drinks or pieces · running totals</p>
             <a href="/shelf-sweep" className="w-full py-5 rounded-lg font-bold flex items-center justify-center gap-3 text-lg" style={{ backgroundColor: B.stone, color: B.charcoal, textDecoration: 'none' }}>
               <Camera size={24} /> Shelf Scan
             </a>
@@ -262,11 +329,12 @@ export default function FloorPage() {
     return (
       <div className="min-h-screen p-4" style={{ backgroundColor: B.charcoal }}>
         <div className="max-w-2xl mx-auto">
-          <Header label="Phase 2/5 · Table" />
+          <Header label={quickAccessMode ? 'Seated Bookings' : 'Phase 2/5 · Table'} />
           <div className="rounded-lg p-6" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
             <div className="text-center mb-6">
-              <span className="text-4xl">🎨</span>
-              <h2 className="text-xl font-bold mt-3" style={{ color: B.ivory }}>Select Table</h2>
+              <span className="text-4xl">{quickAccessMode ? '🪑' : '🎨'}</span>
+              <h2 className="text-xl font-bold mt-3" style={{ color: B.ivory }}>{quickAccessMode ? 'Active Tables' : 'Select Table'}</h2>
+              {quickAccessMode && <p style={{ color: B.stone, fontSize: '0.8rem', marginTop: '0.3rem' }}>Tap a table to add more drinks or pieces</p>}
               <input
                 type="date"
                 value={floorDate}
@@ -286,7 +354,14 @@ export default function FloorPage() {
                       {b.table_number ? ` · Table ${b.table_number}` : ''}
                     </p>
                   </div>
-                  <ChevronRight size={18} color={B.ivory} />
+                  <div className="flex items-center gap-2">
+                    {quickAccessMode && tableTotals[b.booking_code] !== undefined && (
+                      <span style={{ color: B.sand, fontWeight: 700, fontSize: '0.85rem' }}>
+                        £{(tableTotals[b.booking_code] / 100).toFixed(2)}
+                      </span>
+                    )}
+                    <ChevronRight size={18} color={B.ivory} />
+                  </div>
                 </button>
               ))}
             </div>
@@ -551,9 +626,73 @@ export default function FloorPage() {
       <div className="min-h-screen p-4" style={{ backgroundColor: B.charcoal }}>
         <div className="max-w-2xl mx-auto">
           <Header label="Phase 4/5 · Completion" />
+
+          {/* Totals summary */}
+          <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
+            <p style={{ color: B.ivory, fontWeight: 700, fontSize: '0.95rem' }}>{current?.customer_name}</p>
+            <div className="flex justify-between mt-1">
+              <span style={{ color: B.stone, fontSize: '0.8rem' }}>Till total</span>
+              <span style={{ color: B.ivory, fontWeight: 700, fontSize: '0.9rem' }}>£{(tillTotal / 100).toFixed(2)}</span>
+            </div>
+            {splitBillCount > 1 && (
+              <div className="flex justify-between mt-1">
+                <span style={{ color: B.stone, fontSize: '0.75rem' }}>Split {splitBillCount} ways</span>
+                <span style={{ color: B.sand, fontSize: '0.8rem' }}>£{((tillTotal / splitBillCount) / 100).toFixed(2)} each</span>
+              </div>
+            )}
+          </div>
+
+          {/* Collection method */}
+          <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
+            <p style={{ color: B.stone, fontSize: '0.75rem', marginBottom: '0.5rem' }}>Collection</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              <button
+                onClick={() => setCollectionMethod('studio')}
+                style={{ padding: '0.7rem', borderRadius: 8, border: collectionMethod === 'studio' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: collectionMethod === 'studio' ? B.clay + '30' : 'transparent', color: B.ivory, fontSize: '0.85rem', fontWeight: 600 }}
+              >
+                🏠 Studio pickup
+              </button>
+              <button
+                onClick={() => setCollectionMethod('postal')}
+                style={{ padding: '0.7rem', borderRadius: 8, border: collectionMethod === 'postal' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: collectionMethod === 'postal' ? B.clay + '30' : 'transparent', color: B.ivory, fontSize: '0.85rem', fontWeight: 600 }}
+              >
+                📮 Postal
+              </button>
+            </div>
+            {collectionMethod === 'postal' && (
+              <input
+                type="text"
+                value={postalPostcode}
+                onChange={(e) => setPostalPostcode(e.target.value)}
+                placeholder="Destination postcode"
+                style={{ marginTop: '0.6rem', width: '100%', padding: '0.5rem 0.6rem', borderRadius: 8, border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: '0.85rem' }}
+              />
+            )}
+          </div>
+
+          {/* Payment method (Square) */}
+          <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
+            <p style={{ color: B.stone, fontSize: '0.75rem', marginBottom: '0.5rem' }}>Payment · £{(tillTotal / 100).toFixed(2)}</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              <button
+                onClick={() => setPaymentMethod('card')}
+                style={{ padding: '0.7rem', borderRadius: 8, border: paymentMethod === 'card' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: paymentMethod === 'card' ? B.clay + '30' : 'transparent', color: B.ivory, fontSize: '0.85rem', fontWeight: 600 }}
+              >
+                💳 Card (Square)
+              </button>
+              <button
+                onClick={() => setPaymentMethod('cash')}
+                style={{ padding: '0.7rem', borderRadius: 8, border: paymentMethod === 'cash' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: paymentMethod === 'cash' ? B.clay + '30' : 'transparent', color: B.ivory, fontSize: '0.85rem', fontWeight: 600 }}
+              >
+                💵 Cash
+              </button>
+            </div>
+          </div>
+
+          {/* Photo */}
           <div className="rounded-lg p-6" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
             <div className="text-center mb-5">
-              <h2 className="text-xl font-bold" style={{ color: B.ivory }}>Photograph the table</h2>
+              <h2 className="text-xl font-bold" style={{ color: B.ivory }}>Photograph the pieces</h2>
               <p style={{ color: B.stone, fontSize: '0.8rem' }}>Real photo, confirmed against {current?.customer_name}&apos;s booking</p>
             </div>
 
@@ -569,12 +708,15 @@ export default function FloorPage() {
 
             <button
               onClick={saveAndFinish}
-              disabled={saving}
+              disabled={saving || !paymentMethod || !collectionMethod || (collectionMethod === 'postal' && !postalPostcode.trim())}
               className="w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2"
-              style={{ backgroundColor: B.clay, color: B.ivory, opacity: saving ? 0.7 : 1 }}
+              style={{ backgroundColor: B.clay, color: B.ivory, opacity: saving || !paymentMethod || !collectionMethod || (collectionMethod === 'postal' && !postalPostcode.trim()) ? 0.5 : 1 }}
             >
               {saving ? <><Loader size={18} className="animate-spin" /> Saving...</> : <>Finish &amp; Hand off <ChevronRight size={20} /></>}
             </button>
+            {(!paymentMethod || !collectionMethod) && (
+              <p style={{ color: B.stone, fontSize: '0.7rem', textAlign: 'center', marginTop: '0.5rem' }}>Choose collection and payment above to finish</p>
+            )}
           </div>
         </div>
       </div>
@@ -603,6 +745,11 @@ export default function FloorPage() {
               <p style={{ color: B.stone }} className="text-xs mt-2">
                 {pieceCount} piece{pieceCount === 1 ? '' : 's'} · £{(tillTotal / 100).toFixed(2)} till total{finished ? ' · marked finished' : ''}
               </p>
+              {paymentMethod && (
+                <p style={{ color: B.stone }} className="text-xs mt-1">
+                  {paymentMethod === 'card' ? '💳 Card' : '💵 Cash'} · {collectionMethod === 'postal' ? `📮 Postal to ${postalPostcode}` : '🏠 Studio pickup'}
+                </p>
+              )}
               {photo && <p style={{ color: '#7ec98a' }} className="text-xs mt-1 flex items-center gap-1"><Check size={12} /> Photo confirmed to booking</p>}
             </div>
           </div>
