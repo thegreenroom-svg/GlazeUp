@@ -1391,7 +1391,7 @@ export function registerPartySizeRoute(app, supabase, STUDIO_ID, logger, axios) 
 
       const bookingRes = await axios.get(
         `https://connect.squareup.com/v2/bookings/${booking.square_booking_id}`,
-        { headers: { Authorization: `Bearer ${connection.square_access_token}`, 'Square-Version': '2024-01-18' } }
+        { headers: { Authorization: `Bearer ${connection.square_access_token}`, 'Square-Version': '2024-01-18', Accept: 'application/json' } }
       );
       const segments = bookingRes.data.booking?.appointment_segments || [];
       const variationId = segments[0]?.service_variation_id || null;
@@ -1410,8 +1410,17 @@ export function registerPartySizeRoute(app, supabase, STUDIO_ID, logger, axios) 
 
       res.json({ ...booking, square_variation_id: variationId, matched_item_name: itemName, recovered });
     } catch (err) {
-      logger.error(err.response?.data || err);
-      res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message });
+      // Surface Square's ACTUAL error body rather than a generic axios
+      // message -- the first version of this tried to pull one specific
+      // field out of the error response that this error shape didn't have,
+      // so it silently fell back to 'Request failed with status code 406'
+      // and told us nothing real about what Square was actually objecting to.
+      logger.error('recover-party-size failed', err.response?.data || err.message);
+      return res.status(500).json({
+        error: err.message,
+        square_status: err.response?.status || null,
+        square_error_body: err.response?.data || null,
+      });
     }
   });
 }
