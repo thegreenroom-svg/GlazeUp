@@ -92,6 +92,30 @@ export default function BookingsPage() {
     }
   };
   const [detail, setDetail] = useState<BookingDetail | null>(null);
+  const [editingParty, setEditingParty] = useState(false);
+  const [partyDraft, setPartyDraft] = useState('');
+  const [savingParty, setSavingParty] = useState(false);
+
+  const savePartySize = async () => {
+    if (!detail) return;
+    const size = parseInt(partyDraft, 10);
+    if (!Number.isInteger(size) || size < 1 || size > 30) return;
+    setSavingParty(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${detail.booking.booking_code}/party-size`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ party_size: size }),
+      });
+      if (!res.ok) throw new Error();
+      setDetail({ ...detail, booking: { ...detail.booking, party_size: size } });
+      setEditingParty(false);
+    } catch {
+      setError('Could not save party size.');
+    } finally {
+      setSavingParty(false);
+    }
+  };
   const [photoMatches, setPhotoMatches] = useState<PhotoMatch[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [tillItems, setTillItems] = useState<TillItem[]>([]);
@@ -388,7 +412,43 @@ export default function BookingsPage() {
                   {detail.booking.customer_phone && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#999' }}>Phone</span><span>{detail.booking.customer_phone}</span></div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#999' }}>Party size</span><span>{detail.booking.party_size ?? '—'}</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#999' }}>Party size</span>
+                    {editingParty ? (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <input
+                          type="number"
+                          min={1}
+                          max={30}
+                          value={partyDraft}
+                          onChange={(e) => setPartyDraft(e.target.value)}
+                          autoFocus
+                          style={{ width: '3.5rem', padding: '0.25rem 0.4rem', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.85rem' }}
+                        />
+                        <button
+                          onClick={savePartySize}
+                          disabled={savingParty}
+                          style={{ padding: '0.25rem 0.6rem', backgroundColor: 'var(--clay)', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.78rem', cursor: 'pointer' }}
+                        >
+                          {savingParty ? '...' : 'Save'}
+                        </button>
+                        <button
+                          onClick={() => setEditingParty(false)}
+                          style={{ padding: '0.25rem 0.5rem', background: 'none', border: 'none', color: '#999', fontSize: '0.78rem', cursor: 'pointer' }}
+                        >
+                          Cancel
+                        </button>
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => { setPartyDraft(detail.booking.party_size ? String(detail.booking.party_size) : ''); setEditingParty(true); }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: detail.booking.party_size ? '#222' : 'var(--clay)', fontSize: '0.875rem' }}
+                      >
+                        {detail.booking.party_size ?? 'Set manually'}
+                        <span style={{ fontSize: '0.7rem', color: '#999' }}>✎</span>
+                      </button>
+                    )}
+                  </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#999' }}>Session</span><span>{new Date(detail.booking.session_start).toLocaleString()}</span></div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#999' }}>Stage</span><span style={{ textTransform: 'capitalize' }}>{detail.booking.current_stage}</span></div>
                   {detail.booking.notes && (

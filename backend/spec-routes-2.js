@@ -1275,6 +1275,34 @@ export function registerFulfilmentRoute(app, supabase, STUDIO_ID, logger) {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // Manual party-size entry -- the honest fallback for the real bookings
+  // that have no automatically-recoverable number anywhere in the system
+  // (checked directly: Square's own Bookings API, catalog pricing tiers,
+  // booking notes, and table-capacity data all came up empty for these).
+  // A real person types in what they actually know.
+  app.post('/api/spec/bookings/:code/party-size', async (req, res) => {
+    try {
+      const { party_size } = req.body || {};
+      const size = Number(party_size);
+      if (!Number.isInteger(size) || size < 1 || size > 30) {
+        return res.status(400).json({ error: 'party_size must be a whole number between 1 and 30' });
+      }
+      const { data, error } = await supabase
+        .from('bookings')
+        .update({ party_size: size })
+        .eq('booking_code', req.params.code)
+        .eq('studio_id', STUDIO_ID)
+        .select('booking_code, party_size')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return res.status(404).json({ error: 'Booking not found' });
+      res.json(data);
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
 }
 
 // ============================================================================
