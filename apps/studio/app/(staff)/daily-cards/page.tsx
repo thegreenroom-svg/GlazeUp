@@ -40,6 +40,7 @@ export default function DailyCardsPage() {
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [newSinceLoad, setNewSinceLoad] = useState<Booking[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [cardDate, setCardDate] = useState(() => new Date().toISOString().slice(0, 10));
   const cardDateRef = useRef(cardDate);
   const knownCodes = useRef<Set<string>>(new Set());
@@ -138,6 +139,34 @@ export default function DailyCardsPage() {
     }
   };
 
+  const toggleSelect = (bookingCode: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(bookingCode)) {
+        next.delete(bookingCode);
+      } else {
+        next.add(bookingCode);
+      }
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    if (selected.size === bookings.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(bookings.map((b) => b.booking_code)));
+    }
+  };
+
+  const handlePrintSelected = () => {
+    if (selected.size === 0) {
+      alert('Please select at least one card to print');
+      return;
+    }
+    window.print();
+  };
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '900px' }}>
       <div className="no-print">
@@ -206,10 +235,17 @@ export default function DailyCardsPage() {
         {bookings.length > 0 && (
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
             <button
-              onClick={() => window.print()}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', backgroundColor: 'var(--clay)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600 }}
+              onClick={handlePrintSelected}
+              disabled={selected.size === 0}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', backgroundColor: selected.size === 0 ? '#ccc' : 'var(--clay)', color: 'white', border: 'none', borderRadius: '6px', cursor: selected.size === 0 ? 'not-allowed' : 'pointer', fontSize: '0.9rem', fontWeight: 600 }}
             >
-              <Printer size={16} /> Print all {bookings.length} cards
+              <Printer size={16} /> Print selected {selected.size > 0 ? `(${selected.size})` : ''}
+            </button>
+            <button
+              onClick={selectAll}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', backgroundColor: '#f0f0f0', border: '1px solid #ddd', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}
+            >
+              {selected.size === bookings.length ? '✓ Deselect all' : '◯ Select all'}
             </button>
             <button
               onClick={handleManualSync}
@@ -230,15 +266,31 @@ export default function DailyCardsPage() {
       <div className="card-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
         {bookings.map((b) => {
           const isNew = newSinceLoad.some((n) => n.booking_code === b.booking_code);
+          const isSelected = selected.has(b.booking_code);
           return (
             <div
               key={b.booking_code}
               className="print-card"
+              data-selected={isSelected ? "true" : "false"}
               style={{
-                padding: '1rem', borderRadius: '10px', backgroundColor: 'white', textAlign: 'center',
-                border: isNew ? '2px solid #e0a020' : '1px solid #ddd',
+                padding: '1rem', 
+                borderRadius: '10px', 
+                backgroundColor: isSelected ? 'var(--clay-light, #f5e6d3)' : 'white', 
+                textAlign: 'center',
+                border: isNew ? '2px solid #e0a020' : isSelected ? '2px solid var(--clay)' : '1px solid #ddd',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                position: 'relative'
               }}
+              onClick={() => toggleSelect(b.booking_code)}
             >
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={() => toggleSelect(b.booking_code)}
+                onClick={(e) => e.stopPropagation()}
+                style={{ position: 'absolute', top: '0.8rem', right: '0.8rem', cursor: 'pointer', width: '18px', height: '18px' }}
+              />
               {isNew && <p style={{ fontSize: '0.7rem', color: '#e0a020', fontWeight: 700, marginBottom: '0.3rem' }}>NEW</p>}
               {qrUrls[b.booking_code] ? (
                 <img src={qrUrls[b.booking_code]} alt="" style={{ width: 120, height: 120, margin: '0 auto' }} />
@@ -269,8 +321,19 @@ export default function DailyCardsPage() {
           to { transform: rotate(360deg); }
         }
         
+        .card-grid > div:not([data-selected="true"]) {
+          display: block;
+        }
+        
         @media print {
           .no-print { display: none !important; }
+          input[type="checkbox"] { display: none !important; }
+          
+          /* Hide unselected cards during print */
+          .card-grid > div:not([data-selected="true"]) {
+            display: none !important;
+          }
+          
           /* Real 3x2in label stock, one label per page -- a label printer
              feeds one at a time, it doesn't print a multi-up sheet like a
              normal printer does, so the on-screen grid is replaced here
@@ -284,6 +347,7 @@ export default function DailyCardsPage() {
             break-after: page;
             border-radius: 0 !important;
             border: none !important;
+            background: white !important;
             display: flex !important;
             align-items: center;
             gap: 0.1in;
