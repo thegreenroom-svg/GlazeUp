@@ -36,6 +36,7 @@ import {
   Globe2,
   UserSquare2,
   Stamp,
+  Footprints,
   Search,
   Sun,
   Moon
@@ -92,7 +93,8 @@ export function StudioNavigation() {
     { label: 'My Bookings', icon: <CalendarClock className="w-5 h-5" />, href: '/my-bookings' },
     { label: 'Studios Worldwide', icon: <Globe2 className="w-5 h-5" />, href: '/studios-worldwide' },
     { label: 'Our Profile', icon: <UserSquare2 className="w-5 h-5" />, href: '/our-profile' },
-    { label: 'Completion', icon: <Stamp className="w-5 h-5" />, href: '/completion' }
+    { label: 'Completion', icon: <Stamp className="w-5 h-5" />, href: '/completion' },
+    { label: 'Start Floor', icon: <Footprints className="w-5 h-5" />, href: '/floor' }
   ];
 
   const isActive = (href: string) => {
