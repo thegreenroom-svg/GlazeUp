@@ -161,6 +161,29 @@ export default function Dashboard() {
         Demo view — read-only. {studioName}
       </div>
 
+      <button
+        onClick={() => router.push('/floor')}
+        style={{
+          width: '100%',
+          maxWidth: '520px',
+          margin: '0 auto 1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '0.6rem',
+          padding: '1.1rem',
+          borderRadius: '14px',
+          border: 'none',
+          cursor: 'pointer',
+          background: 'linear-gradient(155deg, var(--clay) 0%, #9A6435 100%)',
+          color: 'var(--ivory)',
+          fontSize: '1.15rem',
+          fontWeight: 700,
+        }}
+      >
+        🏃 Start Floor
+      </button>
+
       {loading || !data ? (
         <SkeletonTiles />
       ) : (
