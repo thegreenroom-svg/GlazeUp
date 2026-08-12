@@ -1,0 +1,28 @@
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slideUp {
+  animation: slideUp 0.3s ease-out;
+}
+
+/* Pottery themed colors */
+:root {
+  --color-charcoal: #2A2825;
+  --color-cream: #F5F1E8;
+  --color-clay: #A67C52;
+  --color-sand: #D4A574;
+  --color-terracotta: #C85A4D;
+}
+
+body {
+  background-color: var(--color-charcoal);
+  color: var(--color-cream);
+}
