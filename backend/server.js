@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -664,6 +664,33 @@ function nameSimilarity(a, b) {
   return matches / Math.max(wordsA.length, wordsB.length);
 }
 
+// Real gpt-4o-mini rates, confirmed current: $0.15/1M input tokens,
+// $0.60/1M output tokens (checked directly rather than assumed, since
+// this feeds a real running cost total someone will actually rely on).
+// Uses the token counts OpenAI's own response returns -- never estimated.
+const GPT4O_MINI_INPUT_PER_TOKEN = 0.15 / 1_000_000;
+const GPT4O_MINI_OUTPUT_PER_TOKEN = 0.60 / 1_000_000;
+
+async function logAiUsage(supabase, studioId, kind, usage) {
+  if (!usage) return;
+  const inputTokens = usage.prompt_tokens || 0;
+  const outputTokens = usage.completion_tokens || 0;
+  const costUsd = inputTokens * GPT4O_MINI_INPUT_PER_TOKEN + outputTokens * GPT4O_MINI_OUTPUT_PER_TOKEN;
+  try {
+    await supabase.from('ai_usage').insert([{
+      studio_id: studioId,
+      kind,
+      model: 'gpt-4o-mini',
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      cost_usd: costUsd,
+    }]);
+  } catch (err) {
+    // Never let a logging failure break the actual AI feature it's logging.
+    logger.error('logAiUsage failed', err);
+  }
+}
+
 app.post('/api/demo/photo-match', upload.single('photo'), async (req, res) => {
   try {
     if (!req.file) {
@@ -705,6 +732,7 @@ app.post('/api/demo/photo-match', upload.single('photo'), async (req, res) => {
     );
 
     const raw = visionResponse.data.choices[0].message.content;
+    await logAiUsage(supabase, DEMO_STUDIO_ID, 'photo-match', visionResponse.data.usage);
     let parsed;
     try {
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
@@ -801,6 +829,7 @@ app.post('/api/demo/shelf-sweep', upload.single('photo'), async (req, res) => {
       { headers: { Authorization: `Bearer ${OPENAI_API_KEY}` } }
     );
     const inventory = inventoryResp.data.choices[0].message.content;
+    await logAiUsage(supabase, DEMO_STUDIO_ID, 'shelf-sweep-inventory', inventoryResp.data.usage);
 
     // Step 2: given ONLY its own inventory, which wanted bookings appear.
     const matchResp = await axios.post(
@@ -816,6 +845,7 @@ app.post('/api/demo/shelf-sweep', upload.single('photo'), async (req, res) => {
       { headers: { Authorization: `Bearer ${OPENAI_API_KEY}` } }
     );
     let matches = [];
+    await logAiUsage(supabase, DEMO_STUDIO_ID, 'shelf-sweep-match', matchResp.data.usage);
     try {
       const raw = matchResp.data.choices[0].message.content;
       const jsonStr = raw.match(/\[[\s\S]*\]/)?.[0] || '[]';
@@ -1404,6 +1434,7 @@ registerNetworkRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 registerWorkflowRoutes(app, supabase, DEMO_STUDIO_ID, logger, upload, fs);
 registerTillMenuRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerKdsRoutes(app, supabase, DEMO_STUDIO_ID, logger);
+registerAiCostRoute(app, supabase, DEMO_STUDIO_ID, logger);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

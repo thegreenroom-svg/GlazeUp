@@ -950,3 +950,30 @@ export function registerPopularityRoute(app, supabase, STUDIO_ID, logger, axios)
     }
   });
 }
+
+// ============================================================================
+// AI COST COUNTER — the only real metered AI use anywhere in this app is
+// OpenAI vision (Photo Match, Shelf Sweep). Every call is logged to
+// ai_usage with the API's own real returned token counts (see
+// logAiUsage() in server.js). This endpoint sums the real running total
+// for a visible on-screen counter, so the actual cost is never hidden.
+// ============================================================================
+export function registerAiCostRoute(app, supabase, STUDIO_ID, logger) {
+  app.get('/api/spec/ai-cost-total', async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('ai_usage')
+        .select('cost_usd, kind')
+        .eq('studio_id', STUDIO_ID)
+        .in('kind', ['photo-match', 'shelf-sweep-inventory', 'shelf-sweep-match']);
+      if (error) throw error;
+
+      const rows = data || [];
+      const totalUsd = rows.reduce((s, r) => s + Number(r.cost_usd || 0), 0);
+      res.json({ total_usd: totalUsd, total_gbp: totalUsd * 0.79, call_count: rows.length });
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message, total_usd: 0, call_count: 0 });
+    }
+  });
+}

@@ -1,7 +1,5 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { AppShell } from './AppShell';
-import PinGate from '../components/PinGate';
 
 export const metadata: Metadata = {
   title: 'GlazeUp Studio - Read-only Demo',
@@ -16,9 +14,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-gray-50">
-        <PinGate>
-          <AppShell>{children}</AppShell>
-        </PinGate>
+        {children}
       </body>
     </html>
   );
