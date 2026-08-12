@@ -21,6 +21,20 @@ interface MenuItem {
   price_cents: number | null;
 }
 
+interface Subsection {
+  category: string;
+  label: string;
+  popularity: number;
+  items: MenuItem[];
+}
+
+interface TillGroup {
+  key: string;
+  label: string;
+  popularity: number;
+  subsections: Subsection[];
+}
+
 interface TillItem {
   id: string;
   item_name: string;
@@ -41,7 +55,10 @@ type Phase = 1 | 2 | 3 | 4 | 5;
 export default function FloorPage() {
   const [phase, setPhase] = useState<Phase>(1);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [menu, setMenu] = useState<MenuItem[]>([]);
+  const [menu, setMenu] = useState<TillGroup[]>([]);
+  const [activeGroup, setActiveGroup] = useState<TillGroup | null>(null);
+  const [activeSubsection, setActiveSubsection] = useState<Subsection | null>(null);
+  const [showAllItems, setShowAllItems] = useState(false);
   const [loading, setLoading] = useState(false);
   const [current, setCurrent] = useState<Booking | null>(null);
   const [pieceCount, setPieceCount] = useState(0);
@@ -63,7 +80,7 @@ export default function FloorPage() {
     try {
       const [bRes, mRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings`),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/menu`),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/till-menu`),
       ]);
       const bData = bRes.ok ? await bRes.json() : [];
       const mData = mRes.ok ? await mRes.json() : [];
@@ -72,7 +89,7 @@ export default function FloorPage() {
         (b: Booking) => new Date(b.session_start).toDateString() === todayStr
       );
       setBookings((today.length ? today : bData).slice(0, 30));
-      setMenu((Array.isArray(mData) ? mData : []).slice(0, 30));
+      setMenu((mData?.groups || []).slice(0, 30));
       setPhase(2);
     } finally {
       setLoading(false);
@@ -84,6 +101,9 @@ export default function FloorPage() {
     setPieceCount(b.party_size || 1);
     setTillItems([]);
     setFinished(false);
+    setActiveGroup(null);
+    setActiveSubsection(null);
+    setShowAllItems(false);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${b.booking_code}/till`);
       const d = res.ok ? await res.json() : [];
@@ -282,17 +302,70 @@ export default function FloorPage() {
             )}
 
             {menu.length > 0 && (
-              <select
-                onChange={(e) => { const m = menu[Number(e.target.value)]; if (m) addTillItem(m); e.target.value = ''; }}
-                disabled={tillBusy}
-                defaultValue=""
-                style={{ width: '100%', padding: '0.6rem', borderRadius: 8, border: 'none', backgroundColor: B.charcoal, color: B.ivory, fontSize: '0.85rem', marginBottom: '1rem' }}
-              >
-                <option value="" disabled>+ Add an item...</option>
-                {menu.map((m, idx) => (
-                  <option key={idx} value={idx}>{m.item_name}{m.price_cents ? ` — £${(m.price_cents / 100).toFixed(2)}` : ''}</option>
-                ))}
-              </select>
+              <div style={{ marginBottom: '1rem' }}>
+                {!activeGroup && (
+                  <>
+                    <p style={{ color: B.stone, fontSize: '0.75rem', marginBottom: '0.5rem' }}>Add an item</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                      {menu.map((g) => (
+                        <button
+                          key={g.key}
+                          onClick={() => setActiveGroup(g)}
+                          style={{ padding: '1rem 0.6rem', borderRadius: 10, border: 'none', backgroundColor: B.charcoal, color: B.ivory, fontWeight: 600, fontSize: '0.85rem' }}
+                        >
+                          {g.label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {activeGroup && !activeSubsection && (
+                  <>
+                    <button onClick={() => setActiveGroup(null)} style={{ color: B.clay, background: 'none', border: 'none', fontSize: '0.8rem', marginBottom: '0.5rem', padding: 0 }}>
+                      ← {activeGroup.label}
+                    </button>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                      {activeGroup.subsections.map((s) => (
+                        <button
+                          key={s.category}
+                          onClick={() => { setActiveSubsection(s); setShowAllItems(false); }}
+                          style={{ padding: '1rem 0.6rem', borderRadius: 10, border: 'none', backgroundColor: B.charcoal, color: B.ivory, fontWeight: 600, fontSize: '0.85rem' }}
+                        >
+                          {s.label}
+                          <span style={{ display: 'block', color: B.stone, fontSize: '0.7rem', fontWeight: 400, marginTop: '0.2rem' }}>{s.items.length} items</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {activeSubsection && (
+                  <>
+                    <button onClick={() => setActiveSubsection(null)} style={{ color: B.clay, background: 'none', border: 'none', fontSize: '0.8rem', marginBottom: '0.5rem', padding: 0 }}>
+                      ← {activeSubsection.label}
+                    </button>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                      {(showAllItems ? activeSubsection.items : activeSubsection.items.slice(0, 8)).map((item, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => addTillItem(item)}
+                          disabled={tillBusy}
+                          style={{ padding: '0.7rem 0.5rem', borderRadius: 8, border: 'none', backgroundColor: B.clay, color: B.ivory, fontSize: '0.78rem', textAlign: 'left' }}
+                        >
+                          {item.item_name}
+                          {item.price_cents ? <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.85 }}>£{(item.price_cents / 100).toFixed(2)}</span> : null}
+                        </button>
+                      ))}
+                    </div>
+                    {!showAllItems && activeSubsection.items.length > 8 && (
+                      <button onClick={() => setShowAllItems(true)} style={{ width: '100%', marginTop: '0.5rem', padding: '0.5rem', borderRadius: 8, border: `1px solid ${B.stone}`, background: 'none', color: B.stone, fontSize: '0.8rem' }}>
+                        + {activeSubsection.items.length - 8} more
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             )}
 
             <button onClick={() => setPhase(4)} className="w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2" style={{ backgroundColor: B.clay, color: B.ivory }}>

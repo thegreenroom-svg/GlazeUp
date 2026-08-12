@@ -672,3 +672,66 @@ export function registerWorkflowRoutes(app, supabase, STUDIO_ID, logger, upload,
     }
   });
 }
+
+// ============================================================================
+// TILL MENU — grouped tile structure for the Till step, matching the real
+// /studio till on main (category tiles, real popularity ordering, first-8 +
+// More rather than a flat dump). Rebuilt here against new-app-full's own
+// endpoints since it's a separate codebase.
+// ============================================================================
+export function registerTillMenuRoute(app, supabase, STUDIO_ID, logger) {
+  // Broad groups a till actually uses day-to-day. 'Other' (26k+ unclassified
+  // items in the real data) is deliberately excluded -- it's not a real
+  // usable category, just unclassified Square data, same as Money already
+  // treats it.
+  const GROUPS = [
+    { key: 'cafe', label: 'Cafe', categories: ['Hot Drinks', 'Cold Drinks', 'Iced Coffees', 'Milkshakes', 'Smoothies', 'Drinks', 'Alcohol', 'Cafe'] },
+    { key: 'food', label: 'Food', categories: ['Cakes', 'Cakes & Food'] },
+    { key: 'glazes', label: 'Pottery & Glazes', categories: ['Pottery & Glazes', 'S. Glazing'] },
+    { key: 'blanks', label: 'Pottery Blanks', categories: null }, // catch-all: anything starting "PB "
+  ];
+
+  app.get('/api/spec/till-menu', async (req, res) => {
+    try {
+      const [{ data: items }, { data: revenue }] = await Promise.all([
+        supabase.from('square_items').select('item_name, category, price_cents').eq('studio_id', STUDIO_ID),
+        supabase.from('revenue_category_breakdown').select('category, item_count').eq('studio_id', STUDIO_ID),
+      ]);
+
+      // Real popularity by category, summed across all dates on file.
+      const popularity = {};
+      (revenue || []).forEach((r) => {
+        popularity[r.category] = (popularity[r.category] || 0) + (r.item_count || 0);
+      });
+
+      const allItems = (items || []).filter((i) => i.category && i.category !== 'Other');
+
+      const groups = GROUPS.map((g) => {
+        const categoriesInGroup = g.categories
+          ? g.categories
+          : [...new Set(allItems.map((i) => i.category))].filter((c) => c.trim().startsWith('PB'));
+
+        const subsections = categoriesInGroup
+          .map((cat) => ({
+            category: cat,
+            // Cleaned display label: strip the internal 'PB '/'S. ' prefixes
+            // used in Square, keep the real underlying category for filtering.
+            label: cat.replace(/^PB\s+/, '').replace(/^S\.\s+/, '').trim(),
+            popularity: popularity[cat] || 0,
+            items: allItems.filter((i) => i.item_name && i.category === cat),
+          }))
+          .filter((s) => s.items.length > 0)
+          .sort((a, b) => b.popularity - a.popularity);
+
+        const groupPopularity = subsections.reduce((s, sub) => s + sub.popularity, 0);
+        return { key: g.key, label: g.label, popularity: groupPopularity, subsections };
+      }).filter((g) => g.subsections.length > 0)
+        .sort((a, b) => b.popularity - a.popularity);
+
+      res.json({ groups });
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
