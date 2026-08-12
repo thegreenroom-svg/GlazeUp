@@ -40,6 +40,7 @@ import {
   ChefHat,
   PrinterIcon,
   FlaskConical,
+  RefreshCw as RefreshIcon,
   Search,
   Sun,
   Moon
@@ -128,6 +129,7 @@ export function StudioNavigation() {
         { label: 'Alerts', icon: <Bell className="w-5 h-5" />, href: '/alerts' },
         { label: 'Notifications', icon: <BellRing className="w-5 h-5" />, href: '/notifications' },
         { label: 'Roles & Studio', icon: <ShieldCheck className="w-5 h-5" />, href: '/roles' },
+        { label: 'Recover Party Sizes', icon: <RefreshIcon className="w-5 h-5" />, href: '/backfill-party-sizes' },
       ],
     },
   ];
