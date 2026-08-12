@@ -171,7 +171,7 @@ app.get('/api/demo/bookings', async (req, res) => {
     // most are in the past -- Daisy asked to see everything.)
     const { data, error } = await supabase
       .from('bookings')
-      .select('id, booking_code, customer_name, customer_email, party_size, status, session_start, session_end, room, current_stage, table_number, notes, booking_type, arrived_at')
+      .select('id, booking_code, customer_name, customer_email, party_size, status, session_start, session_end, room, space_name, current_stage, table_number, notes, booking_type, arrived_at')
       .eq('studio_id', DEMO_STUDIO_ID)
       .order('session_start', { ascending: false })
       .limit(250);

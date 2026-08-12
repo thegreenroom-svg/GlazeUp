@@ -13,6 +13,23 @@ interface Booking {
   session_start: string;
   table_number: string | null;
   party_size: number | null;
+  space_name: string | null;
+}
+
+// Clean short label from the real (verbose) space_name text -- e.g.
+// 'The Vault - perfect for private parties!' -> 'Vault'. Falls back to
+// showing nothing rather than a guess when it doesn't match a known space.
+function shortSpaceLabel(spaceName: string | null): string | null {
+  if (!spaceName) return null;
+  const s = spaceName.toLowerCase();
+  if (s.includes('vault')) return 'Vault';
+  if (s.includes('lounge')) return 'Lounge';
+  if (s.includes('main studio')) return 'Main Studio';
+  if (s.includes('evening')) return 'Evening Session';
+  if (s.includes('thursdays')) return 'Thursdays';
+  if (s.includes('wheel hire')) return 'Wheel Hire';
+  if (s.includes('throwing taster')) return 'Throwing Taster';
+  return null;
 }
 
 export default function DailyCardsPage() {
@@ -195,6 +212,13 @@ export default function DailyCardsPage() {
                 {new Date(b.session_start).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
                 {b.table_number ? ` · Table ${b.table_number}` : ''}
               </p>
+              {(b.party_size || shortSpaceLabel(b.space_name)) && (
+                <p style={{ fontSize: '0.78rem', color: 'var(--clay)', fontWeight: 600, marginTop: '0.2rem' }}>
+                  {b.party_size ? `${b.party_size} seat${b.party_size === 1 ? '' : 's'}` : ''}
+                  {b.party_size && shortSpaceLabel(b.space_name) ? ' · ' : ''}
+                  {shortSpaceLabel(b.space_name) || ''}
+                </p>
+              )}
               <p style={{ fontSize: '0.7rem', color: '#aaa', fontFamily: 'monospace', marginTop: '0.3rem' }}>{b.booking_code}</p>
             </div>
           );
