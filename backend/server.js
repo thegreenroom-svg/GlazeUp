@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -1435,6 +1435,7 @@ registerWorkflowRoutes(app, supabase, DEMO_STUDIO_ID, logger, upload, fs);
 registerTillMenuRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerKdsRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 registerAiCostRoute(app, supabase, DEMO_STUDIO_ID, logger);
+registerLiveTotalRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

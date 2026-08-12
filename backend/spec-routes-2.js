@@ -977,3 +977,64 @@ export function registerAiCostRoute(app, supabase, STUDIO_ID, logger) {
     }
   });
 }
+
+// ============================================================================
+// LIVE TODAY TOTAL — bypasses the periodic revenue_category_breakdown sync
+// entirely. Same authenticated Square Orders Search pattern already proven
+// in /api/demo/square-live, just summed to one real number. Exists because
+// the synced breakdown table can genuinely fall behind (checked directly:
+// 5 real days stale as of this write) and Daisy needs today's real figure
+// regardless of whether that background sync job is currently healthy.
+// ============================================================================
+export function registerLiveTotalRoute(app, supabase, STUDIO_ID, logger, axios) {
+  app.get('/api/spec/today-live-total', async (req, res) => {
+    try {
+      const { data: connection } = await supabase
+        .from('square_connections')
+        .select('square_access_token, square_token_expires_at')
+        .eq('studio_id', STUDIO_ID)
+        .single();
+
+      if (!connection || new Date(connection.square_token_expires_at) < new Date()) {
+        return res.status(400).json({ error: 'No valid Square connection', total_gbp: null });
+      }
+
+      const token = connection.square_access_token;
+      const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', {
+        headers: { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18' },
+      });
+      const locations = locationsRes.data.locations || [];
+      if (!locations.length) return res.json({ total_gbp: 0, order_count: 0, pulled_at: new Date().toISOString() });
+
+      const todayStart = new Date();
+      todayStart.setUTCHours(0, 0, 0, 0);
+
+      const ordersRes = await axios.post(
+        'https://connect.squareup.com/v2/orders/search',
+        {
+          location_ids: locations.map((l) => l.id),
+          query: {
+            filter: {
+              date_time_filter: { created_at: { start_at: todayStart.toISOString() } },
+              state_filter: { states: ['COMPLETED'] },
+            },
+          },
+          limit: 200,
+        },
+        { headers: { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18', 'Content-Type': 'application/json' } }
+      );
+
+      const orders = ordersRes.data.orders || [];
+      const totalCents = orders.reduce((s, o) => s + (o.total_money ? o.total_money.amount : 0), 0);
+
+      res.json({
+        total_gbp: totalCents / 100,
+        order_count: orders.length,
+        pulled_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      logger.error(err.response?.data || err);
+      res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message, total_gbp: null });
+    }
+  });
+}
