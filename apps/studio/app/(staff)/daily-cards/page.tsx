@@ -21,16 +21,20 @@ export default function DailyCardsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newSinceLoad, setNewSinceLoad] = useState<Booking[]>([]);
+  const [cardDate, setCardDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const cardDateRef = useRef(cardDate);
   const knownCodes = useRef<Set<string>>(new Set());
   const firstLoadDone = useRef(false);
+
+  useEffect(() => { cardDateRef.current = cardDate; }, [cardDate]);
 
   const load = useCallback(async (isFirstLoad: boolean) => {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings`);
       const data = res.ok ? await res.json() : [];
-      const todayStr = new Date().toDateString();
+      const dayStr = new Date(cardDateRef.current).toDateString();
       const today = (Array.isArray(data) ? data : [])
-        .filter((b: Booking) => new Date(b.session_start).toDateString() === todayStr)
+        .filter((b: Booking) => new Date(b.session_start).toDateString() === dayStr)
         .sort((a: Booking, b: Booking) => new Date(a.session_start).getTime() - new Date(b.session_start).getTime());
 
       if (isFirstLoad) {
@@ -60,20 +64,25 @@ export default function DailyCardsPage() {
       );
       setQrUrls((prev) => ({ ...prev, ...urls }));
     } catch {
-      setError('Could not load today\'s bookings.');
+      setError('Could not load bookings for that day.');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    setNewSinceLoad([]);
+    setQrUrls({});
+    setLoading(true);
     load(true);
     firstLoadDone.current = true;
     // Real check for new bookings landing after the initial print run --
     // this is the 'update any further ones with an alert' Daisy asked for.
+    // Resets whenever the chosen date changes, so 'new since load' always
+    // means new for whichever day is currently on screen.
     const t = setInterval(() => load(false), 60000);
     return () => clearInterval(t);
-  }, [load]);
+  }, [load, cardDate]);
 
   const acceptNew = () => {
     setNewSinceLoad([]);
@@ -83,10 +92,43 @@ export default function DailyCardsPage() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '900px' }}>
       <div className="no-print">
-        <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Print Today&apos;s Cards</h1>
-        <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-          One real QR card per booking today — scan to view the session, order drinks, or track pieces. Checks for new bookings automatically.
+        <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Print Booking Cards</h1>
+        <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1rem' }}>
+          One real QR card per booking — scan to view the session, order drinks, or track pieces. Go forward or back to print ahead for a party or a busy day.
         </p>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setCardDate((d) => new Date(new Date(d).getTime() - 86400000).toISOString().slice(0, 10))}
+            style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.9rem' }}
+          >
+            ← Prev day
+          </button>
+          <input
+            type="date"
+            value={cardDate}
+            onChange={(e) => setCardDate(e.target.value)}
+            style={{ padding: '0.5rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem' }}
+          />
+          <button
+            onClick={() => setCardDate((d) => new Date(new Date(d).getTime() + 86400000).toISOString().slice(0, 10))}
+            style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.9rem' }}
+          >
+            Next day →
+          </button>
+          <button
+            onClick={() => setCardDate(new Date().toISOString().slice(0, 10))}
+            style={{ padding: '0.5rem 0.8rem', backgroundColor: cardDate === new Date().toISOString().slice(0, 10) ? 'var(--clay)' : '#f0f0f0', color: cardDate === new Date().toISOString().slice(0, 10) ? 'white' : '#333', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}
+          >
+            Today
+          </button>
+          <button
+            onClick={() => setCardDate((d) => new Date(new Date(d).getTime() + 7 * 86400000).toISOString().slice(0, 10))}
+            style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}
+          >
+            +1 week
+          </button>
+        </div>
 
         {loading && <p style={{ color: '#666' }}>Loading...</p>}
         {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
@@ -109,7 +151,7 @@ export default function DailyCardsPage() {
         )}
 
         {!loading && bookings.length === 0 && (
-          <p style={{ color: '#999', fontSize: '0.9rem' }}>No bookings found for today.</p>
+          <p style={{ color: '#999', fontSize: '0.9rem' }}>No bookings found for {new Date(cardDate).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}.</p>
         )}
 
         {bookings.length > 0 && (
