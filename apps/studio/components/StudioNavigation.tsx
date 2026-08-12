@@ -39,6 +39,7 @@ import {
   Footprints,
   ChefHat,
   PrinterIcon,
+  FlaskConical,
   Search,
   Sun,
   Moon
@@ -76,6 +77,7 @@ export function StudioNavigation() {
         { label: 'KDS', icon: <ChefHat className="w-5 h-5" />, href: '/kds' },
         { label: 'Photo Match', icon: <Camera className="w-5 h-5" />, href: '/photo-match' },
         { label: 'Shelf Sweep', icon: <Layers className="w-5 h-5" />, href: '/shelf-sweep' },
+        { label: 'Test AI', icon: <FlaskConical className="w-5 h-5" />, href: '/test-ai' },
         { label: 'Completion', icon: <Stamp className="w-5 h-5" />, href: '/completion' },
       ],
     },
