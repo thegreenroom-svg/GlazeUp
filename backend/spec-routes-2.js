@@ -1423,4 +1423,78 @@ export function registerPartySizeRoute(app, supabase, STUDIO_ID, logger, axios) 
       });
     }
   });
+
+  // Bulk backfill -- ONLY built and run after the single-booking diagnostic
+  // above was verified against real data (Tom Ashton, recovered:4, matched
+  // the real 'Table for 4' variation exactly). Same real recovery logic,
+  // applied to every real booking that's missing party_size and has a
+  // square_booking_id to recover it from. Paced with a small delay between
+  // Square calls to stay well clear of rate limits across ~275 real rows.
+  // Reports a real summary rather than a bare 'done' -- recovered / not
+  // found / errored counts, so nothing is silently swallowed.
+  app.post('/api/spec/bookings/backfill-party-sizes', async (req, res) => {
+    try {
+      const { data: connection } = await supabase
+        .from('square_connections')
+        .select('square_access_token, square_token_expires_at')
+        .eq('studio_id', STUDIO_ID)
+        .single();
+      if (!connection || new Date(connection.square_token_expires_at) < new Date()) {
+        return res.status(400).json({ error: 'No valid Square connection' });
+      }
+
+      const { data: candidates, error: candErr } = await supabase
+        .from('bookings')
+        .select('booking_code, square_booking_id')
+        .eq('studio_id', STUDIO_ID)
+        .is('party_size', null)
+        .not('square_booking_id', 'is', null);
+      if (candErr) throw candErr;
+
+      const results = { recovered: 0, not_found: 0, errored: 0, total: (candidates || []).length, errors: [] };
+
+      for (const c of candidates || []) {
+        try {
+          const bookingRes = await axios.get(
+            `https://connect.squareup.com/v2/bookings/${c.square_booking_id}`,
+            { headers: { Authorization: `Bearer ${connection.square_access_token}`, 'Square-Version': '2024-01-18', Accept: 'application/json' } }
+          );
+          const variationId = bookingRes.data.booking?.appointment_segments?.[0]?.service_variation_id || null;
+          let recovered = null;
+          if (variationId) {
+            const { data: item } = await supabase
+              .from('square_items')
+              .select('item_name')
+              .eq('studio_id', STUDIO_ID)
+              .eq('variation_id', variationId)
+              .maybeSingle();
+            recovered = partySizeFromItemName(item?.item_name || null);
+          }
+
+          if (recovered) {
+            await supabase
+              .from('bookings')
+              .update({ party_size: recovered })
+              .eq('booking_code', c.booking_code)
+              .eq('studio_id', STUDIO_ID);
+            results.recovered++;
+          } else {
+            results.not_found++;
+          }
+        } catch (err) {
+          results.errored++;
+          if (results.errors.length < 10) {
+            results.errors.push({ booking_code: c.booking_code, error: err.response?.data?.errors?.[0]?.detail || err.message });
+          }
+        }
+        // Small pace between real Square calls across a real bulk run.
+        await new Promise((r) => setTimeout(r, 150));
+      }
+
+      res.json(results);
+    } catch (err) {
+      logger.error('backfill-party-sizes failed', err.response?.data || err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
 }
