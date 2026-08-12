@@ -81,7 +81,10 @@ export default function FloorPage() {
 
   useEffect(() => {
     const dayStr = new Date(floorDate).toDateString();
-    setBookings(allBookings.filter((b) => new Date(b.session_start).toDateString() === dayStr).slice(0, 30));
+    const dayBookings = allBookings
+      .filter((b) => new Date(b.session_start).toDateString() === dayStr)
+      .sort((a, b) => new Date(a.session_start).getTime() - new Date(b.session_start).getTime());
+    setBookings(dayBookings.slice(0, 30));
   }, [floorDate, allBookings]);
 
   const loadBookings = async () => {

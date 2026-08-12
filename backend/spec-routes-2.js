@@ -735,3 +735,71 @@ export function registerTillMenuRoute(app, supabase, STUDIO_ID, logger) {
     }
   });
 }
+
+// ============================================================================
+// KDS (Kitchen Display) — customer self-service ordering feeds this queue.
+// ----------------------------------------------------------------------------
+// Uses the SAME real till-items table and add endpoint the staff Till
+// already writes to (demo_app_till_items) -- a customer order and a
+// staff-added order are the same real row, just tagged by who added it.
+// Nothing new to keep in sync.
+// ============================================================================
+export function registerKdsRoutes(app, supabase, STUDIO_ID, logger) {
+  // Pending queue: customer-submitted, not yet marked prepared, oldest first
+  // -- how a real KDS actually orders work.
+  app.get('/api/spec/kds-queue', async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('demo_app_till_items')
+        .select('id, booking_code, item_name, category, quantity, created_at')
+        .eq('studio_id', STUDIO_ID)
+        .eq('added_by', 'customer-app')
+        .is('prepared_at', null)
+        .order('created_at', { ascending: true })
+        .limit(100);
+      if (error) throw error;
+
+      // Attach the real customer name for each order, so kitchen staff know
+      // whose table it's for without a second lookup per item.
+      const codes = [...new Set((data || []).map((i) => i.booking_code))];
+      let names = {};
+      if (codes.length) {
+        const { data: bookings } = await supabase
+          .from('bookings')
+          .select('booking_code, customer_name, table_number')
+          .eq('studio_id', STUDIO_ID)
+          .in('booking_code', codes);
+        (bookings || []).forEach((b) => { names[b.booking_code] = b; });
+      }
+
+      const queue = (data || []).map((i) => ({
+        ...i,
+        customer_name: names[i.booking_code]?.customer_name || null,
+        table_number: names[i.booking_code]?.table_number || null,
+      }));
+
+      res.json({ queue, count: queue.length });
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/spec/till-items/:id/prepare', async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('demo_app_till_items')
+        .update({ prepared_at: new Date().toISOString() })
+        .eq('id', req.params.id)
+        .eq('studio_id', STUDIO_ID)
+        .select('id, prepared_at')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return res.status(404).json({ error: 'Order item not found' });
+      res.json(data);
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}

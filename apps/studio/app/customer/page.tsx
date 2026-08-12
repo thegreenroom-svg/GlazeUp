@@ -5,7 +5,90 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Flame, PackageCheck, Award } from 'lucide-react';
+import { Flame, PackageCheck, Award, Coffee } from 'lucide-react';
+
+interface MenuItem {
+  item_name: string;
+  category: string | null;
+  price_cents: number | null;
+}
+interface Subsection { category: string; label: string; items: MenuItem[] }
+interface TillGroup { key: string; label: string; subsections: Subsection[] }
+
+function OrderPanel({ bookingCode, onOrdered }: { bookingCode: string; onOrdered: () => void }) {
+  const [groups, setGroups] = useState<TillGroup[]>([]);
+  const [activeGroup, setActiveGroup] = useState<TillGroup | null>(null);
+  const [activeSub, setActiveSub] = useState<Subsection | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/till-menu`)
+      .then((r) => (r.ok ? r.json() : { groups: [] }))
+      .then((d) => setGroups((d.groups || []).filter((g: TillGroup) => g.key === 'cafe' || g.key === 'food')))
+      .catch(() => {});
+  }, []);
+
+  const order = async (item: MenuItem) => {
+    setSending(true);
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${bookingCode}/till`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_name: item.item_name, category: item.category, quantity: 1, unit_price_cents: item.price_cents ?? 0, added_by: 'customer-app' }),
+      });
+      onOrdered();
+      setActiveGroup(null);
+      setActiveSub(null);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div style={{ marginBottom: '1.25rem', padding: '1rem', backgroundColor: '#fdf6f8', borderRadius: '10px' }}>
+      {!activeGroup && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+          {groups.map((g) => (
+            <button key={g.key} onClick={() => setActiveGroup(g)} style={{ padding: '1rem 0.6rem', borderRadius: 10, border: 'none', backgroundColor: 'var(--charcoal)', color: 'white', fontWeight: 600, fontSize: '0.9rem' }}>
+              {g.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {activeGroup && !activeSub && (
+        <>
+          <button onClick={() => setActiveGroup(null)} style={{ color: 'var(--clay)', background: 'none', border: 'none', fontSize: '0.8rem', marginBottom: '0.5rem', padding: 0 }}>← {activeGroup.label}</button>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+            {activeGroup.subsections.map((s) => (
+              <button key={s.category} onClick={() => { setActiveSub(s); setShowAll(false); }} style={{ padding: '1rem 0.6rem', borderRadius: 10, border: 'none', backgroundColor: 'var(--charcoal)', color: 'white', fontWeight: 600, fontSize: '0.85rem' }}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      {activeSub && (
+        <>
+          <button onClick={() => setActiveSub(null)} style={{ color: 'var(--clay)', background: 'none', border: 'none', fontSize: '0.8rem', marginBottom: '0.5rem', padding: 0 }}>← {activeSub.label}</button>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+            {(showAll ? activeSub.items : activeSub.items.slice(0, 8)).map((item, i) => (
+              <button key={i} onClick={() => order(item)} disabled={sending} style={{ padding: '0.7rem 0.5rem', borderRadius: 8, border: 'none', backgroundColor: 'var(--clay)', color: 'white', fontSize: '0.78rem', textAlign: 'left' }}>
+                {item.item_name}
+                {item.price_cents ? <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.85 }}>£{(item.price_cents / 100).toFixed(2)}</span> : null}
+              </button>
+            ))}
+          </div>
+          {!showAll && activeSub.items.length > 8 && (
+            <button onClick={() => setShowAll(true)} style={{ width: '100%', marginTop: '0.5rem', padding: '0.5rem', borderRadius: 8, border: '1px solid #ccc', background: 'none', fontSize: '0.8rem' }}>
+              + {activeSub.items.length - 8} more
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
 
 interface Piece {
   id: string;
@@ -32,6 +115,8 @@ function CustomerInner() {
   const params = useSearchParams();
   const code = params.get('booking');
   const [data, setData] = useState<CustomerView | null>(null);
+  const [ordering, setOrdering] = useState(false);
+  const [orderConfirm, setOrderConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,6 +163,27 @@ function CustomerInner() {
             {data.ready_count ? <PackageCheck size={22} color="#1a8a3c" /> : data.in_kiln_count ? <Flame size={22} color="#b8860b" /> : null}
             <p style={{ fontWeight: 600 }}>{data.status_message}</p>
           </div>
+
+          <button
+            onClick={() => setOrdering((o) => !o)}
+            style={{
+              width: '100%', padding: '1.1rem', marginBottom: '1.25rem', borderRadius: '12px', border: 'none',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+              background: 'linear-gradient(155deg, var(--clay) 0%, #9A6435 100%)', color: 'white', fontSize: '1.05rem', fontWeight: 700,
+            }}
+          >
+            <Coffee size={20} /> {ordering ? 'Close menu' : 'Order a drink or cake'}
+          </button>
+
+          {ordering && code && (
+            <OrderPanel bookingCode={code} onOrdered={() => setOrderConfirm(true)} />
+          )}
+
+          {orderConfirm && (
+            <div style={{ padding: '0.7rem 0.9rem', backgroundColor: '#eafaf0', color: '#1a8a3c', borderRadius: '8px', marginBottom: '1.25rem', fontSize: '0.85rem', fontWeight: 600 }}>
+              Sent to the kitchen — someone will bring it over.
+            </div>
+          )}
 
           {data.loyalty.balance > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 0.9rem', backgroundColor: '#fdf6f8', borderRadius: '8px', marginBottom: '1.25rem' }}>

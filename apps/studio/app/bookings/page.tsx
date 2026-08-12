@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { SkeletonRows } from '@/components/Skeleton';
-import { Receipt } from 'lucide-react';
+import { Receipt, Calendar } from 'lucide-react';
 
 interface Booking {
   id: string;
@@ -56,7 +56,8 @@ interface MenuItem {
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [search, setSearch] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState(() => new Date().toISOString().slice(0, 10));
+  const [showAllDates, setShowAllDates] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
@@ -215,7 +216,7 @@ export default function BookingsPage() {
       (b.customer_email || '').toLowerCase().includes(search.toLowerCase()) ||
       (b.room || '').toLowerCase().includes(search.toLowerCase()) ||
       (b.table_number || '').toLowerCase().includes(search.toLowerCase());
-    const matchesDate = !dateFilter || b.session_start.startsWith(dateFilter);
+    const matchesDate = showAllDates || b.session_start.startsWith(dateFilter);
     return matchesSearch && matchesDate;
   });
 
@@ -239,24 +240,35 @@ export default function BookingsPage() {
         />
 
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <input
-            type="date"
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-            style={{ padding: '0.55rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem' }}
-          />
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <Calendar size={16} color="#888" style={{ position: 'absolute', left: '0.6rem', pointerEvents: 'none' }} />
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              style={{ padding: '0.55rem 0.7rem 0.55rem 2rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem', minWidth: '150px' }}
+            />
+          </div>
           <button
             onClick={() => setDateFilter(todayStr)}
             style={{ padding: '0.55rem 0.9rem', backgroundColor: dateFilter === todayStr ? 'var(--clay)' : '#f0f0f0', color: dateFilter === todayStr ? 'white' : '#333', border: 'none', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer' }}
           >
             Today
           </button>
-          {dateFilter && (
+          {showAllDates && (
             <button
-              onClick={() => setDateFilter('')}
+              onClick={() => setShowAllDates(false)}
               style={{ padding: '0.55rem 0.9rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer' }}
             >
-              Clear date
+              Back to one day
+            </button>
+          )}
+          {!showAllDates && (
+            <button
+              onClick={() => setShowAllDates(true)}
+              style={{ padding: '0.55rem 0.9rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer' }}
+            >
+              Show all dates
             </button>
           )}
           <button
