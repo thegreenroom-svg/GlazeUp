@@ -1359,6 +1359,43 @@ Respond with ONLY a JSON object, no markdown, no other text:
 // Bookings API (read) + the already-synced local catalog (no extra live
 // call needed to resolve the name), never guessed or invented.
 // ============================================================================
+// The REAL, authoritative party-size signal, carried over verbatim from
+// main's own proven parser rather than reinvented. Important correction to
+// the catalog-name approach above: Square's Bookings API has NO party size
+// field at all -- what partySizeFromItemName() recovers is which PRICING
+// TIER was booked ('Table for 4'), a plausible proxy that happened to be
+// right for the one booking it was tested on, not a genuine per-booking
+// headcount. This is the real signal: customers TELL staff the headcount
+// in their own booking note ('6 people', 'party of 4', 'table for 5').
+//
+// Deliberate privacy boundary, carried over exactly as reasoned on main:
+// extract ONLY the integer. Notes can contain real Article 9 special
+// category data under UK GDPR ('bringing a pram', 'gluten free option') --
+// parsing those into structured fields would build a database of who has
+// babies or coeliac disease with no consent and no lawful basis. Staff can
+// read the note directly since it's already on the booking; this function
+// extracts one number and looks away from everything else in it.
+function partySizeFromNote(note) {
+  if (!note || typeof note !== 'string') return null;
+  const n = note.toLowerCase();
+  const patterns = [
+    /\b(\d{1,2})\s*(?:people|persons?|adults?|ladies|guests?|painters?|of us)\b/,
+    /\bparty of\s*(\d{1,2})\b/,
+    /\bbooking for\s*(\d{1,2})\b/,
+    /\btable for\s*(\d{1,2})\b/,
+    /\bgroup of\s*(\d{1,2})\b/,
+    /\bthere(?:'ll| will) be\s*(\d{1,2})\b/,
+  ];
+  for (const re of patterns) {
+    const m = n.match(re);
+    if (m) {
+      const size = parseInt(m[1], 10);
+      if (size >= 1 && size <= 20) return size;
+    }
+  }
+  return null;
+}
+
 function partySizeFromItemName(name) {
   if (!name) return null;
   const m = name.match(/(?:table for|for)\s*(\d+)|(\d+)\s*(?:people|person)/i);
@@ -1547,5 +1584,43 @@ export function registerPartySizeRoute(app, supabase, STUDIO_ID, logger, axios) 
 
   app.get('/api/spec/bookings/backfill-party-sizes/status', (req, res) => {
     res.json(backfillState);
+  });
+
+  // The REAL, authoritative pass: parses party size from each real
+  // booking's already-stored notes text (the customer's own stated
+  // headcount), using partySizeFromNote() above. Purely local -- reads
+  // and writes only this database, no live Square call needed at all,
+  // so unlike the catalog-name approach this runs synchronously in one
+  // request rather than needing a background job.
+  app.post('/api/spec/bookings/backfill-party-sizes-from-notes', async (req, res) => {
+    try {
+      const { data: candidates, error } = await supabase
+        .from('bookings')
+        .select('booking_code, notes')
+        .eq('studio_id', STUDIO_ID)
+        .is('party_size', null)
+        .not('notes', 'is', null);
+      if (error) throw error;
+
+      let recovered = 0, not_found = 0;
+      for (const c of candidates || []) {
+        const size = partySizeFromNote(c.notes);
+        if (size) {
+          await supabase
+            .from('bookings')
+            .update({ party_size: size })
+            .eq('booking_code', c.booking_code)
+            .eq('studio_id', STUDIO_ID);
+          recovered++;
+        } else {
+          not_found++;
+        }
+      }
+
+      res.json({ recovered, not_found, total: (candidates || []).length });
+    } catch (err) {
+      logger.error('backfill-party-sizes-from-notes failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
   });
 }

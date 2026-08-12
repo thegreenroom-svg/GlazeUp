@@ -58,13 +58,54 @@ export default function BackfillPartySizesPage() {
     }
   };
 
+  const [notesResult, setNotesResult] = useState<{ recovered: number; not_found: number; total: number } | null>(null);
+  const [notesRunning, setNotesRunning] = useState(false);
+  const [notesError, setNotesError] = useState<string | null>(null);
+
+  const runNotesPass = async () => {
+    setNotesRunning(true);
+    setNotesError(null);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/backfill-party-sizes-from-notes`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      setNotesResult(data);
+    } catch (err: any) {
+      setNotesError(err.message || 'Something went wrong.');
+    } finally {
+      setNotesRunning(false);
+    }
+  };
+
   const pct = status && status.total > 0 ? Math.round((status.checked / status.total) * 100) : 0;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '520px' }}>
       <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Recover Party Sizes</h1>
+
+      <div style={{ padding: '0.9rem', backgroundColor: 'white', border: '1px solid #eee', borderRadius: '10px', marginBottom: '1.25rem' }}>
+        <p style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.4rem' }}>Real, authoritative — from booking notes</p>
+        <p style={{ color: '#666', fontSize: '0.85rem', marginBottom: '0.8rem' }}>
+          Customers often state a headcount directly in their booking note ({'"'}6 people{'"'}, {'"'}party of 4{'"'}). Purely local, no live Square call, runs in a couple of seconds.
+        </p>
+        <button
+          onClick={runNotesPass}
+          disabled={notesRunning}
+          style={{ width: '100%', padding: '0.7rem', backgroundColor: '#1a8a3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, cursor: notesRunning ? 'not-allowed' : 'pointer', opacity: notesRunning ? 0.7 : 1 }}
+        >
+          {notesRunning ? 'Checking notes...' : 'Recover from notes'}
+        </button>
+        {notesError && <p style={{ color: '#c33', fontSize: '0.82rem', marginTop: '0.5rem' }}>{notesError}</p>}
+        {notesResult && (
+          <p style={{ color: '#1a8a3c', fontSize: '0.85rem', marginTop: '0.6rem', fontWeight: 600 }}>
+            {notesResult.recovered} recovered from {notesResult.total} real bookings with a note
+          </p>
+        )}
+      </div>
+
+      <p style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.3rem' }}>Fallback — from catalog pricing tier</p>
       <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-        Runs the real recovery (verified on Tom Ashton&apos;s booking) across every real booking missing a party size. Runs in the background now — checks in every 2 seconds, so a dropped connection on your end won&apos;t lose the run.
+        A weaker proxy (which priced table size was booked, not a real stated headcount) — worth running on whatever&apos;s left after the notes pass above. Real Square lookups, runs in the background, checks in every 2 seconds.
       </p>
 
       {!status && (
@@ -73,7 +114,7 @@ export default function BackfillPartySizesPage() {
           disabled={starting}
           style={{ width: '100%', padding: '1rem', backgroundColor: 'var(--clay)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.05rem', fontWeight: 700, cursor: starting ? 'not-allowed' : 'pointer', opacity: starting ? 0.7 : 1 }}
         >
-          {starting ? 'Starting...' : 'Run the real backfill'}
+          {starting ? 'Starting...' : 'Run the catalog-tier fallback'}
         </button>
       )}
 
