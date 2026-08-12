@@ -194,6 +194,173 @@ app.get('/api/analytics/revenue', async (req, res) => {
   }
 });
 
+// ============ PHASE 3 TILL ============
+app.post('/api/bookings/:code/split-bill', async (req, res) => {
+  try {
+    const { code } = req.params;
+    const { isSplit, people } = req.body;
+
+    if (!code || !people || people.length === 0) {
+      return res.status(400).json({ error: 'Invalid split bill config' });
+    }
+
+    const { data, error } = await supabase
+      .from('till_sessions')
+      .upsert({
+        booking_code: code,
+        studio_id: STUDIO_ID,
+        is_split: isSplit,
+        people: people,
+        split_bill_started_at: new Date().toISOString(),
+        status: 'active'
+      }, { onConflict: 'booking_code' })
+      .select();
+
+    if (error) throw error;
+
+    res.json({ success: true, tillSession: data[0] });
+  } catch (err) {
+    console.error('Split bill error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/bookings/:code/items', async (req, res) => {
+  try {
+    const { code } = req.params;
+    const { personId, items, estimatedWeight = 500 } = req.body;
+
+    if (!code || !personId || !items || !Array.isArray(items)) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const { data: savedItems, error } = await supabase
+      .from('till_items')
+      .insert(
+        items.map(item => ({
+          booking_code: code,
+          person_id: personId,
+          item_name: item.name,
+          item_price: item.price,
+          estimated_weight: estimatedWeight,
+          studio_id: STUDIO_ID
+        }))
+      )
+      .select();
+
+    if (error) throw error;
+
+    res.json({ success: true, itemsAdded: savedItems.length });
+  } catch (err) {
+    console.error('Items error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/bookings/:code/till', async (req, res) => {
+  try {
+    const { code } = req.params;
+
+    const { data: session, error: sessionError } = await supabase
+      .from('till_sessions')
+      .select('*')
+      .eq('booking_code', code)
+      .single();
+
+    if (sessionError) throw sessionError;
+
+    const { data: items, error: itemsError } = await supabase
+      .from('till_items')
+      .select('*')
+      .eq('booking_code', code);
+
+    if (itemsError) throw itemsError;
+
+    // Calculate totals per person
+    const personTotals = {};
+    session.people.forEach(person => {
+      const personItems = items.filter(i => i.person_id === person.id);
+      const subtotal = personItems.reduce((sum, i) => sum + i.item_price, 0);
+      
+      let shipping = 0;
+      if (person.collection === 'postal') {
+        const totalWeight = personItems.reduce((sum, i) => sum + (i.estimated_weight || 500), 0);
+        shipping = getTillPostalRate(person.postalAddress || 'TA', totalWeight);
+      }
+
+      personTotals[person.id] = {
+        items: personItems,
+        subtotal,
+        shipping,
+        total: subtotal + shipping
+      };
+    });
+
+    const grandTotal = Object.values(personTotals).reduce((sum, p) => sum + p.total, 0);
+
+    res.json({
+      session,
+      items,
+      personTotals,
+      grandTotal
+    });
+  } catch (err) {
+    console.error('Till fetch error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/bookings/:code/complete-till', async (req, res) => {
+  try {
+    const { code } = req.params;
+    const { paymentMethod, paymentsByPerson } = req.body;
+
+    const { data, error } = await supabase
+      .from('till_sessions')
+      .update({
+        status: 'completed',
+        payment_method: paymentMethod,
+        payments_by_person: paymentsByPerson,
+        completed_at: new Date().toISOString()
+      })
+      .eq('booking_code', code)
+      .select();
+
+    if (error) throw error;
+
+    res.json({ success: true, completed: data[0] });
+  } catch (err) {
+    console.error('Complete till error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Helper: Get postal rate for till
+function getTillPostalRate(postcode, weightGrams) {
+  const zones = { 
+    'E': 1, 'EC': 1, 'SW': 1, 'N': 1, 'NW': 1, 'SE': 1, 'W': 1, 'WC': 1,
+    'BR': 1, 'CR': 1, 'DA': 1, 'EN': 1, 'IG': 1, 'KT': 1, 'RM': 1, 'SM': 1, 'SU': 1, 'TW': 1,
+    'BN': 2, 'PO': 2, 'GU': 2, 'SO': 2, 'SP': 2, 'DT': 2, 'EX': 2, 'PL': 2, 'TA': 2, 'TQ': 2,
+    'B': 3, 'CV': 3, 'M': 3,
+    'G': 4, 'EH': 4, 'DD': 4, 'PH': 4
+  };
+  
+  const zone = zones[postcode?.substring(0, 2).toUpperCase()] || 3;
+  
+  // RM24 rates by weight + zone (in GBP)
+  const rates = {
+    1: { 1: 2.35, 2: 2.55, 3: 2.75, 4: 3.10 },
+    2: { 1: 2.85, 2: 3.15, 3: 3.45, 4: 4.00 },
+    5: { 1: 4.35, 2: 4.80, 3: 5.25, 4: 6.00 }
+  };
+  
+  let bucket = 1;
+  if (weightGrams > 2000) bucket = 5;
+  else if (weightGrams > 1000) bucket = 2;
+  
+  return rates[bucket]?.[zone] || 2.75;
+}
+
 // ============ HEALTH CHECK ============
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
