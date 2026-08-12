@@ -1,0 +1,34 @@
+name: Deploy to Render
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Deploy to Render
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "⚠️  RENDER_DEPLOY_HOOK not set"
+            echo "Add it to GitHub Secrets:"
+            echo "1. Go to Settings → Secrets and variables → Actions"
+            echo "2. Add RENDER_DEPLOY_HOOK with your Render webhook URL"
+            exit 1
+          fi
+          
+          curl "$RENDER_DEPLOY_HOOK" \
+            -X POST \
+            -H "Content-Type: application/json"
+      
+      - name: Deployment Status
+        if: success()
+        run: echo "✅ Deployment triggered on Render"

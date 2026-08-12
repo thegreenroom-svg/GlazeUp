@@ -1,0 +1,16 @@
+.env
+.env.local
+.env.*.local
+node_modules/
+dist/
+build/
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.npm-global/
+*.log
+coverage/
+.cache/
