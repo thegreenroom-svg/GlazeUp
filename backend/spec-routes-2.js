@@ -1349,3 +1349,69 @@ Respond with ONLY a JSON object, no markdown, no other text:
     }
   });
 }
+
+// ============================================================================
+// PARTY SIZE RECOVERY — real gap found: party_size is null on 275 of 281
+// real bookings, but the actual number is encoded in the name of the real
+// Square catalog variation each booking references ('The Lounge -- Table
+// for 4', 'Evening Session -- 4 people'). Whatever originally synced
+// bookings from Square dropped this. Recovered here via Square's real
+// Bookings API (read) + the already-synced local catalog (no extra live
+// call needed to resolve the name), never guessed or invented.
+// ============================================================================
+function partySizeFromItemName(name) {
+  if (!name) return null;
+  const m = name.match(/(?:table for|for)\s*(\d+)|(\d+)\s*(?:people|person)/i);
+  if (!m) return null;
+  return parseInt(m[1] || m[2], 10);
+}
+
+export function registerPartySizeRoute(app, supabase, STUDIO_ID, logger, axios) {
+  // Read-only diagnostic for ONE booking -- check this looks right before
+  // trusting it enough to run at scale.
+  app.get('/api/spec/bookings/:code/recover-party-size', async (req, res) => {
+    try {
+      const { data: booking } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, square_booking_id, party_size')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_code', req.params.code)
+        .maybeSingle();
+      if (!booking) return res.status(404).json({ error: 'Booking not found' });
+      if (!booking.square_booking_id) return res.json({ ...booking, recovered: null, note: 'No square_booking_id on this row' });
+
+      const { data: connection } = await supabase
+        .from('square_connections')
+        .select('square_access_token, square_token_expires_at')
+        .eq('studio_id', STUDIO_ID)
+        .single();
+      if (!connection || new Date(connection.square_token_expires_at) < new Date()) {
+        return res.status(400).json({ error: 'No valid Square connection' });
+      }
+
+      const bookingRes = await axios.get(
+        `https://connect.squareup.com/v2/bookings/${booking.square_booking_id}`,
+        { headers: { Authorization: `Bearer ${connection.square_access_token}`, 'Square-Version': '2024-01-18' } }
+      );
+      const segments = bookingRes.data.booking?.appointment_segments || [];
+      const variationId = segments[0]?.service_variation_id || null;
+
+      let itemName = null, recovered = null;
+      if (variationId) {
+        const { data: item } = await supabase
+          .from('square_items')
+          .select('item_name')
+          .eq('studio_id', STUDIO_ID)
+          .eq('variation_id', variationId)
+          .maybeSingle();
+        itemName = item?.item_name || null;
+        recovered = partySizeFromItemName(itemName);
+      }
+
+      res.json({ ...booking, square_variation_id: variationId, matched_item_name: itemName, recovered });
+    } catch (err) {
+      logger.error(err.response?.data || err);
+      res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message });
+    }
+  });
+}
