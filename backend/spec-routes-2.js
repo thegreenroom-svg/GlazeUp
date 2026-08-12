@@ -1246,3 +1246,33 @@ export function registerDesignChargeRoute(app, supabase, STUDIO_ID, logger, axio
     }
   });
 }
+
+// ============================================================================
+// FULFILMENT METHOD — collection vs posted, set/confirmed at Completion.
+// Real column (bookings.fulfilment_method), currently 'collection' on every
+// real booking since none have been posted yet. This just lets staff record
+// it at the point pieces are photographed, per Daisy's request.
+// ============================================================================
+export function registerFulfilmentRoute(app, supabase, STUDIO_ID, logger) {
+  app.post('/api/spec/bookings/:code/fulfilment', async (req, res) => {
+    try {
+      const { fulfilment_method } = req.body || {};
+      if (!['collection', 'posted'].includes(fulfilment_method)) {
+        return res.status(400).json({ error: "fulfilment_method must be 'collection' or 'posted'" });
+      }
+      const { data, error } = await supabase
+        .from('bookings')
+        .update({ fulfilment_method })
+        .eq('booking_code', req.params.code)
+        .eq('studio_id', STUDIO_ID)
+        .select('booking_code, fulfilment_method')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return res.status(404).json({ error: 'Booking not found' });
+      res.json(data);
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}

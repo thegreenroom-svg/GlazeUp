@@ -121,6 +121,8 @@ export default function CompletionPage() {
     img.src = URL.createObjectURL(f);
   };
 
+  const [fulfilment, setFulfilment] = useState<'collection' | 'posted'>('collection');
+
   const save = async () => {
     const c = canvasRef.current;
     if (!c || !selectedPiece) return;
@@ -135,6 +137,15 @@ export default function CompletionPage() {
         body: formData,
       });
       if (!res.ok) throw new Error();
+      // Real, but never blocks the photo save if it fails -- the photo is
+      // the important part, fulfilment is a reference alongside it.
+      if (bookingCode) {
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${bookingCode}/fulfilment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fulfilment_method: fulfilment }),
+        }).catch(() => {});
+      }
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch {
@@ -187,6 +198,23 @@ export default function CompletionPage() {
       </button>
 
       <canvas ref={canvasRef} style={{ width: '100%', maxWidth: 360, borderRadius: '8px', display: photo ? 'block' : 'none', marginBottom: '0.9rem' }} />
+
+      {photo && (
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.9rem' }}>
+          <button
+            onClick={() => setFulfilment('collection')}
+            style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: fulfilment === 'collection' ? 'var(--clay)' : '#f0f0f0', color: fulfilment === 'collection' ? 'white' : '#333' }}
+          >
+            Collecting
+          </button>
+          <button
+            onClick={() => setFulfilment('posted')}
+            style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '0.85rem', backgroundColor: fulfilment === 'posted' ? 'var(--clay)' : '#f0f0f0', color: fulfilment === 'posted' ? 'white' : '#333' }}
+          >
+            Posting
+          </button>
+        </div>
+      )}
 
       {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '0.9rem' }}>{error}</div>}
 

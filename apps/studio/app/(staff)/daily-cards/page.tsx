@@ -228,8 +228,27 @@ export default function DailyCardsPage() {
       <style jsx global>{`
         @media print {
           .no-print { display: none !important; }
-          .card-grid { grid-template-columns: repeat(3, 1fr) !important; }
-          .print-card { break-inside: avoid; }
+          /* Real 3x2in label stock, one label per page -- a label printer
+             feeds one at a time, it doesn't print a multi-up sheet like a
+             normal printer does, so the on-screen grid is replaced here
+             rather than just scaled down. */
+          @page { size: 3in 2in; margin: 0.08in; }
+          .card-grid { display: block !important; }
+          .print-card {
+            width: 2.84in;
+            height: 1.84in;
+            page-break-after: always;
+            break-after: page;
+            border-radius: 0 !important;
+            border: none !important;
+            display: flex !important;
+            align-items: center;
+            gap: 0.1in;
+            text-align: left !important;
+            padding: 0.08in !important;
+          }
+          .print-card img { width: 1in !important; height: 1in !important; margin: 0 !important; flex-shrink: 0; }
+          .print-card p { margin: 0 !important; line-height: 1.25; }
         }
       `}</style>
     </motion.div>

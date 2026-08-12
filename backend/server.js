@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerEquipmentRequestRoute, registerDesignChargeRoute } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -171,7 +171,7 @@ app.get('/api/demo/bookings', async (req, res) => {
     // most are in the past -- Daisy asked to see everything.)
     const { data, error } = await supabase
       .from('bookings')
-      .select('id, booking_code, customer_name, customer_email, party_size, status, session_start, session_end, room, space_name, current_stage, table_number, notes, booking_type, arrived_at')
+      .select('id, booking_code, customer_name, customer_email, party_size, status, session_start, session_end, room, space_name, fulfilment_method, current_stage, table_number, notes, booking_type, arrived_at')
       .eq('studio_id', DEMO_STUDIO_ID)
       .order('session_start', { ascending: false })
       .limit(250);
@@ -1438,6 +1438,7 @@ registerAiCostRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerLiveTotalRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerEquipmentRequestRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerDesignChargeRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
+registerFulfilmentRoute(app, supabase, DEMO_STUDIO_ID, logger);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
