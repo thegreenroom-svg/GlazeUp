@@ -17,17 +17,28 @@ interface Booking {
 }
 
 interface MenuItem {
+  kind?: 'simple';
   item_name: string;
   category: string | null;
   price_cents: number | null;
 }
+interface CustomisableItem {
+  kind: 'customisable';
+  base: string;
+  category: string | null;
+  from_price_cents: number;
+  flavours: string[];
+  milks: string[];
+  lookup: Record<string, MenuItem>;
+}
+type MenuEntry = MenuItem | CustomisableItem;
 
-interface Bucket { label: string; items: MenuItem[] }
+interface Bucket { label: string; items: MenuEntry[] }
 interface Subsection {
   category: string;
   label: string;
   popularity: number;
-  items: MenuItem[];
+  items: MenuEntry[];
   buckets: Bucket[] | null;
 }
 
@@ -66,6 +77,8 @@ export default function FloorPage() {
   const [activeSubsection, setActiveSubsection] = useState<Subsection | null>(null);
   const [activeBucket, setActiveBucket] = useState<Bucket | null>(null);
   const [showAllItems, setShowAllItems] = useState(false);
+  const [customising, setCustomising] = useState<CustomisableItem | null>(null);
+  const [pickedFlavour, setPickedFlavour] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [current, setCurrent] = useState<Booking | null>(null);
   const [pieceCount, setPieceCount] = useState(0);
@@ -385,17 +398,31 @@ export default function FloorPage() {
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                           {(() => {
                             const list = activeBucket ? activeBucket.items : activeSubsection.items;
-                            return (showAllItems ? list : list.slice(0, 8)).map((item, idx) => (
-                              <button
-                                key={idx}
-                                onClick={() => addTillItem(item)}
-                                disabled={tillBusy}
-                                style={{ padding: '0.7rem 0.5rem', borderRadius: 8, border: 'none', backgroundColor: B.clay, color: B.ivory, fontSize: '0.78rem', textAlign: 'left' }}
-                              >
-                                {item.item_name}
-                                {item.price_cents ? <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.85 }}>£{(item.price_cents / 100).toFixed(2)}</span> : null}
-                              </button>
-                            ));
+                            return (showAllItems ? list : list.slice(0, 8)).map((entry, idx) => {
+                              if (entry.kind === 'customisable') {
+                                return (
+                                  <button
+                                    key={idx}
+                                    onClick={() => { setCustomising(entry); setPickedFlavour(null); }}
+                                    style={{ padding: '0.7rem 0.5rem', borderRadius: 8, border: 'none', backgroundColor: B.clay, color: B.ivory, fontSize: '0.78rem', textAlign: 'left' }}
+                                  >
+                                    {entry.base}
+                                    <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.85 }}>from £{(entry.from_price_cents / 100).toFixed(2)}</span>
+                                  </button>
+                                );
+                              }
+                              return (
+                                <button
+                                  key={idx}
+                                  onClick={() => addTillItem(entry)}
+                                  disabled={tillBusy}
+                                  style={{ padding: '0.7rem 0.5rem', borderRadius: 8, border: 'none', backgroundColor: B.clay, color: B.ivory, fontSize: '0.78rem', textAlign: 'left' }}
+                                >
+                                  {entry.item_name}
+                                  {entry.price_cents ? <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.85 }}>£{(entry.price_cents / 100).toFixed(2)}</span> : null}
+                                </button>
+                              );
+                            });
                           })()}
                         </div>
                         {(() => {
@@ -418,6 +445,62 @@ export default function FloorPage() {
             </button>
           </div>
         </div>
+
+        {customising && (
+          <div
+            onClick={() => setCustomising(null)}
+            style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', zIndex: 70 }}
+          >
+            <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: B.charcoal, borderRadius: 14, padding: '1.5rem', maxWidth: 360, width: '100%', border: `2px solid ${B.clay}` }}>
+              <h3 style={{ color: B.ivory, fontWeight: 700, fontSize: '1.1rem', marginBottom: '0.3rem' }}>{customising.base}</h3>
+              <p style={{ color: B.stone, fontSize: '0.8rem', marginBottom: '1rem' }}>
+                {pickedFlavour ? 'Milk?' : customising.flavours.length > 1 || customising.flavours[0] !== '(plain)' ? 'Syrup?' : 'Milk?'}
+              </p>
+
+              {!pickedFlavour ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                  {customising.flavours.map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setPickedFlavour(f)}
+                      style={{ padding: '0.7rem 0.5rem', borderRadius: 8, border: 'none', backgroundColor: f === '(plain)' ? B.stone : 'var(--clay)', color: B.ivory, fontSize: '0.82rem' }}
+                    >
+                      {f === '(plain)' ? 'No syrup' : f}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                  {customising.milks.map((m) => {
+                    const match = customising.lookup[`${pickedFlavour}|${m}`];
+                    return (
+                      <button
+                        key={m}
+                        onClick={() => { if (match) { addTillItem(match); setCustomising(null); } }}
+                        disabled={!match || tillBusy}
+                        style={{ padding: '0.7rem 0.5rem', borderRadius: 8, border: 'none', backgroundColor: 'var(--clay)', color: B.ivory, fontSize: '0.82rem', textAlign: 'left' }}
+                      >
+                        {m}
+                        {match?.price_cents ? <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.85 }}>£{(match.price_cents / 100).toFixed(2)}</span> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                {pickedFlavour && (
+                  <button onClick={() => setPickedFlavour(null)} style={{ flex: 1, padding: '0.5rem', borderRadius: 8, border: 'none', backgroundColor: '#00000030', color: B.ivory, fontSize: '0.8rem' }}>
+                    ← Back
+                  </button>
+                )}
+                <button onClick={() => setCustomising(null)} style={{ flex: 1, padding: '0.5rem', borderRadius: 8, border: 'none', backgroundColor: '#00000030', color: B.ivory, fontSize: '0.8rem' }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

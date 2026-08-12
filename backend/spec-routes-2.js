@@ -786,6 +786,80 @@ export function registerTillMenuRoute(app, supabase, STUDIO_ID, logger, axios) {
 
       const allItems = (items || []).filter((i) => i.category && i.category !== 'Other');
 
+      // Modifier decomposition: a base drink ('Latte') with many named
+      // flavour x milk variants collapses to ONE tile that opens a real
+      // two-step choice, instead of showing every combination flat.
+      // Verified safe against real data before shipping (test_parser.js,
+      // run standalone against the actual square_items rows): only applies
+      // when EVERY variant in the group has a detectable milk suffix AND
+      // every (flavour, milk) combination genuinely exists as a real row --
+      // both checked programmatically, not assumed. Falls back to a flat
+      // list otherwise (this is why Americano, Cappuccino and Tea are NOT
+      // decomposed here -- their real naming doesn't cleanly support it).
+      const MILK_SUFFIXES = ['Decaf Oat Milk', 'Oat Milk', 'Decaf', 'Oat', 'Dairy', 'Black'];
+
+      const decomposeGroup = (groupItems) => {
+        const rows = groupItems.map((item) => {
+          const idx = item.item_name.indexOf(' — ');
+          const rest = idx === -1 ? '' : item.item_name.slice(idx + 3);
+          let milk = null, flavour = rest;
+          for (const suf of MILK_SUFFIXES) {
+            if (rest === suf || rest.endsWith(', ' + suf) || rest.endsWith(' ' + suf)) {
+              milk = suf;
+              flavour = rest.slice(0, rest.length - suf.length).replace(/,\s*$/, '').trim();
+              break;
+            }
+          }
+          return { ...item, milk, flavour: flavour || '(plain)' };
+        });
+        if (!rows.every((r) => r.milk !== null)) return null;
+
+        const flavours = [...new Set(rows.map((r) => r.flavour))];
+        const milks = [...new Set(rows.map((r) => r.milk))];
+        const lookup = {};
+        rows.forEach((r) => { lookup[`${r.flavour}|${r.milk}`] = r; });
+        const fullGrid = flavours.every((f) => milks.every((m) => `${f}|${m}` in lookup));
+        if (!fullGrid) return null;
+
+        return { flavours, milks, lookup };
+      };
+
+      // Groups items sharing a base name (text before ' — ') and, where the
+      // group decomposes cleanly, turns it into ONE customisable tile.
+      // Otherwise every item in the group stays as its own separate item.
+      const applyModifierGrouping = (items) => {
+        const byBase = {};
+        items.forEach((i) => {
+          const idx = i.item_name.indexOf(' — ');
+          const base = idx === -1 ? i.item_name : i.item_name.slice(0, idx);
+          (byBase[base] = byBase[base] || []).push(i);
+        });
+
+        const result = [];
+        Object.entries(byBase).forEach(([base, groupItems]) => {
+          if (groupItems.length <= 3) {
+            result.push(...groupItems.map((i) => ({ kind: 'simple', ...i })));
+            return;
+          }
+          const decomposed = decomposeGroup(groupItems);
+          if (!decomposed) {
+            result.push(...groupItems.map((i) => ({ kind: 'simple', ...i })));
+            return;
+          }
+          const cheapest = groupItems.reduce((a, b) => (a.price_cents < b.price_cents ? a : b));
+          result.push({
+            kind: 'customisable',
+            base,
+            category: groupItems[0].category,
+            from_price_cents: cheapest.price_cents,
+            flavours: decomposed.flavours,
+            milks: decomposed.milks,
+            lookup: decomposed.lookup,
+          });
+        });
+        return result;
+      };
+
       const bucketiseItems = (items) => {
         // Real keyword match against the actual item names -- no invented
         // popularity, just grouping what's already there into the shape
@@ -800,10 +874,10 @@ export function registerTillMenuRoute(app, supabase, STUDIO_ID, logger, axios) {
         });
         return Object.entries(buckets)
           .filter(([, list]) => list.length > 0)
-          .map(([label, list]) => ({
-            label,
-            items: itemPopularityAvailable ? [...list].sort((a, b) => popularityForItem(b.item_name) - popularityForItem(a.item_name)) : list,
-          }));
+          .map(([label, list]) => {
+            const sorted = itemPopularityAvailable ? [...list].sort((a, b) => popularityForItem(b.item_name) - popularityForItem(a.item_name)) : list;
+            return { label, items: applyModifierGrouping(sorted) };
+          });
       };
 
       const groups = GROUPS.map((g) => {
@@ -823,7 +897,7 @@ export function registerTillMenuRoute(app, supabase, STUDIO_ID, logger, axios) {
               // used in Square, keep the real underlying category for filtering.
               label: cat.replace(/^PB\s+/, '').replace(/^S\.\s+/, '').trim(),
               popularity: popularity[cat] || 0,
-              items: sortedItems,
+              items: applyModifierGrouping(sortedItems),
               // Only bucket when a subsection is large enough that a flat
               // grid would be overwhelming -- small subsections stay as one
               // simple item grid.
