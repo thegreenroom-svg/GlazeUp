@@ -12,13 +12,15 @@ interface MenuItem {
   category: string | null;
   price_cents: number | null;
 }
-interface Subsection { category: string; label: string; items: MenuItem[] }
+interface Bucket { label: string; items: MenuItem[] }
+interface Subsection { category: string; label: string; items: MenuItem[]; buckets: Bucket[] | null }
 interface TillGroup { key: string; label: string; subsections: Subsection[] }
 
 function OrderPanel({ bookingCode, onOrdered }: { bookingCode: string; onOrdered: () => void }) {
   const [groups, setGroups] = useState<TillGroup[]>([]);
   const [activeGroup, setActiveGroup] = useState<TillGroup | null>(null);
   const [activeSub, setActiveSub] = useState<Subsection | null>(null);
+  const [activeBucket, setActiveBucket] = useState<Bucket | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [sending, setSending] = useState(false);
 
@@ -61,7 +63,7 @@ function OrderPanel({ bookingCode, onOrdered }: { bookingCode: string; onOrdered
           <button onClick={() => setActiveGroup(null)} style={{ color: 'var(--clay)', background: 'none', border: 'none', fontSize: '0.8rem', marginBottom: '0.5rem', padding: 0 }}>← {activeGroup.label}</button>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
             {activeGroup.subsections.map((s) => (
-              <button key={s.category} onClick={() => { setActiveSub(s); setShowAll(false); }} style={{ padding: '1rem 0.6rem', borderRadius: 10, border: 'none', backgroundColor: 'var(--charcoal)', color: 'white', fontWeight: 600, fontSize: '0.85rem' }}>
+              <button key={s.category} onClick={() => { setActiveSub(s); setActiveBucket(null); setShowAll(false); }} style={{ padding: '1rem 0.6rem', borderRadius: 10, border: 'none', backgroundColor: 'var(--charcoal)', color: 'white', fontWeight: 600, fontSize: '0.85rem' }}>
                 {s.label}
               </button>
             ))}
@@ -70,19 +72,40 @@ function OrderPanel({ bookingCode, onOrdered }: { bookingCode: string; onOrdered
       )}
       {activeSub && (
         <>
-          <button onClick={() => setActiveSub(null)} style={{ color: 'var(--clay)', background: 'none', border: 'none', fontSize: '0.8rem', marginBottom: '0.5rem', padding: 0 }}>← {activeSub.label}</button>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-            {(showAll ? activeSub.items : activeSub.items.slice(0, 8)).map((item, i) => (
-              <button key={i} onClick={() => order(item)} disabled={sending} style={{ padding: '0.7rem 0.5rem', borderRadius: 8, border: 'none', backgroundColor: 'var(--clay)', color: 'white', fontSize: '0.78rem', textAlign: 'left' }}>
-                {item.item_name}
-                {item.price_cents ? <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.85 }}>£{(item.price_cents / 100).toFixed(2)}</span> : null}
-              </button>
-            ))}
-          </div>
-          {!showAll && activeSub.items.length > 8 && (
-            <button onClick={() => setShowAll(true)} style={{ width: '100%', marginTop: '0.5rem', padding: '0.5rem', borderRadius: 8, border: '1px solid #ccc', background: 'none', fontSize: '0.8rem' }}>
-              + {activeSub.items.length - 8} more
-            </button>
+          <button onClick={() => (activeBucket ? setActiveBucket(null) : setActiveSub(null))} style={{ color: 'var(--clay)', background: 'none', border: 'none', fontSize: '0.8rem', marginBottom: '0.5rem', padding: 0 }}>
+            ← {activeBucket ? activeBucket.label : activeSub.label}
+          </button>
+
+          {activeSub.buckets && !activeBucket ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              {activeSub.buckets.map((bk) => (
+                <button key={bk.label} onClick={() => { setActiveBucket(bk); setShowAll(false); }} style={{ padding: '1rem 0.6rem', borderRadius: 10, border: 'none', backgroundColor: 'var(--charcoal)', color: 'white', fontWeight: 600, fontSize: '0.85rem' }}>
+                  {bk.label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                {(() => {
+                  const list = activeBucket ? activeBucket.items : activeSub.items;
+                  return (showAll ? list : list.slice(0, 8)).map((item, i) => (
+                    <button key={i} onClick={() => order(item)} disabled={sending} style={{ padding: '0.7rem 0.5rem', borderRadius: 8, border: 'none', backgroundColor: 'var(--clay)', color: 'white', fontSize: '0.78rem', textAlign: 'left' }}>
+                      {item.item_name}
+                      {item.price_cents ? <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.85 }}>£{(item.price_cents / 100).toFixed(2)}</span> : null}
+                    </button>
+                  ));
+                })()}
+              </div>
+              {(() => {
+                const list = activeBucket ? activeBucket.items : activeSub.items;
+                return !showAll && list.length > 8 && (
+                  <button onClick={() => setShowAll(true)} style={{ width: '100%', marginTop: '0.5rem', padding: '0.5rem', borderRadius: 8, border: '1px solid #ccc', background: 'none', fontSize: '0.8rem' }}>
+                    + {list.length - 8} more
+                  </button>
+                );
+              })()}
+            </>
           )}
         </>
       )}

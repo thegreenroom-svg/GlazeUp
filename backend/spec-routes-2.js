@@ -706,20 +706,44 @@ export function registerTillMenuRoute(app, supabase, STUDIO_ID, logger) {
 
       const allItems = (items || []).filter((i) => i.category && i.category !== 'Other');
 
+      const bucketiseItems = (items) => {
+        // Real keyword match against the actual item names -- no invented
+        // popularity, just grouping what's already there into the shape
+        // Daisy asked for ('coffees, teas, hot chocolate etc').
+        const buckets = { Coffees: [], Teas: [], 'Hot Chocolate': [], Other: [] };
+        items.forEach((i) => {
+          const n = (i.item_name || '').toLowerCase();
+          if (/flat white|latte|cappuccino|americano|espresso|mocha|macchiato|coffee/.test(n)) buckets.Coffees.push(i);
+          else if (/\btea\b|chai/.test(n)) buckets.Teas.push(i);
+          else if (/chocolate|cocoa/.test(n)) buckets['Hot Chocolate'].push(i);
+          else buckets.Other.push(i);
+        });
+        return Object.entries(buckets)
+          .filter(([, list]) => list.length > 0)
+          .map(([label, list]) => ({ label, items: list }));
+      };
+
       const groups = GROUPS.map((g) => {
         const categoriesInGroup = g.categories
           ? g.categories
           : [...new Set(allItems.map((i) => i.category))].filter((c) => c.trim().startsWith('PB'));
 
         const subsections = categoriesInGroup
-          .map((cat) => ({
-            category: cat,
-            // Cleaned display label: strip the internal 'PB '/'S. ' prefixes
-            // used in Square, keep the real underlying category for filtering.
-            label: cat.replace(/^PB\s+/, '').replace(/^S\.\s+/, '').trim(),
-            popularity: popularity[cat] || 0,
-            items: allItems.filter((i) => i.item_name && i.category === cat),
-          }))
+          .map((cat) => {
+            const catItems = allItems.filter((i) => i.item_name && i.category === cat);
+            return {
+              category: cat,
+              // Cleaned display label: strip the internal 'PB '/'S. ' prefixes
+              // used in Square, keep the real underlying category for filtering.
+              label: cat.replace(/^PB\s+/, '').replace(/^S\.\s+/, '').trim(),
+              popularity: popularity[cat] || 0,
+              items: catItems,
+              // Only bucket when a subsection is large enough that a flat
+              // grid would be overwhelming -- small subsections stay as one
+              // simple item grid.
+              buckets: catItems.length > 10 ? bucketiseItems(catItems) : null,
+            };
+          })
           .filter((s) => s.items.length > 0)
           .sort((a, b) => b.popularity - a.popularity);
 

@@ -22,11 +22,13 @@ interface MenuItem {
   price_cents: number | null;
 }
 
+interface Bucket { label: string; items: MenuItem[] }
 interface Subsection {
   category: string;
   label: string;
   popularity: number;
   items: MenuItem[];
+  buckets: Bucket[] | null;
 }
 
 interface TillGroup {
@@ -62,6 +64,7 @@ export default function FloorPage() {
   const [menu, setMenu] = useState<TillGroup[]>([]);
   const [activeGroup, setActiveGroup] = useState<TillGroup | null>(null);
   const [activeSubsection, setActiveSubsection] = useState<Subsection | null>(null);
+  const [activeBucket, setActiveBucket] = useState<Bucket | null>(null);
   const [showAllItems, setShowAllItems] = useState(false);
   const [loading, setLoading] = useState(false);
   const [current, setCurrent] = useState<Booking | null>(null);
@@ -111,6 +114,7 @@ export default function FloorPage() {
     setFinished(false);
     setActiveGroup(null);
     setActiveSubsection(null);
+    setActiveBucket(null);
     setShowAllItems(false);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${b.booking_code}/till`);
@@ -343,7 +347,7 @@ export default function FloorPage() {
                       {activeGroup.subsections.map((s) => (
                         <button
                           key={s.category}
-                          onClick={() => { setActiveSubsection(s); setShowAllItems(false); }}
+                          onClick={() => { setActiveSubsection(s); setActiveBucket(null); setShowAllItems(false); }}
                           style={{ padding: '1rem 0.6rem', borderRadius: 10, border: 'none', backgroundColor: B.charcoal, color: B.ivory, fontWeight: 600, fontSize: '0.85rem' }}
                         >
                           {s.label}
@@ -356,26 +360,53 @@ export default function FloorPage() {
 
                 {activeSubsection && (
                   <>
-                    <button onClick={() => setActiveSubsection(null)} style={{ color: B.clay, background: 'none', border: 'none', fontSize: '0.8rem', marginBottom: '0.5rem', padding: 0 }}>
-                      ← {activeSubsection.label}
+                    <button
+                      onClick={() => (activeBucket ? setActiveBucket(null) : setActiveSubsection(null))}
+                      style={{ color: B.clay, background: 'none', border: 'none', fontSize: '0.8rem', marginBottom: '0.5rem', padding: 0 }}
+                    >
+                      ← {activeBucket ? activeBucket.label : activeSubsection.label}
                     </button>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                      {(showAllItems ? activeSubsection.items : activeSubsection.items.slice(0, 8)).map((item, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => addTillItem(item)}
-                          disabled={tillBusy}
-                          style={{ padding: '0.7rem 0.5rem', borderRadius: 8, border: 'none', backgroundColor: B.clay, color: B.ivory, fontSize: '0.78rem', textAlign: 'left' }}
-                        >
-                          {item.item_name}
-                          {item.price_cents ? <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.85 }}>£{(item.price_cents / 100).toFixed(2)}</span> : null}
-                        </button>
-                      ))}
-                    </div>
-                    {!showAllItems && activeSubsection.items.length > 8 && (
-                      <button onClick={() => setShowAllItems(true)} style={{ width: '100%', marginTop: '0.5rem', padding: '0.5rem', borderRadius: 8, border: `1px solid ${B.stone}`, background: 'none', color: B.stone, fontSize: '0.8rem' }}>
-                        + {activeSubsection.items.length - 8} more
-                      </button>
+
+                    {activeSubsection.buckets && !activeBucket ? (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                        {activeSubsection.buckets.map((bk) => (
+                          <button
+                            key={bk.label}
+                            onClick={() => { setActiveBucket(bk); setShowAllItems(false); }}
+                            style={{ padding: '1rem 0.6rem', borderRadius: 10, border: 'none', backgroundColor: B.charcoal, color: B.ivory, fontWeight: 600, fontSize: '0.85rem' }}
+                          >
+                            {bk.label}
+                            <span style={{ display: 'block', color: B.stone, fontSize: '0.7rem', fontWeight: 400, marginTop: '0.2rem' }}>{bk.items.length} items</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                          {(() => {
+                            const list = activeBucket ? activeBucket.items : activeSubsection.items;
+                            return (showAllItems ? list : list.slice(0, 8)).map((item, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => addTillItem(item)}
+                                disabled={tillBusy}
+                                style={{ padding: '0.7rem 0.5rem', borderRadius: 8, border: 'none', backgroundColor: B.clay, color: B.ivory, fontSize: '0.78rem', textAlign: 'left' }}
+                              >
+                                {item.item_name}
+                                {item.price_cents ? <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.85 }}>£{(item.price_cents / 100).toFixed(2)}</span> : null}
+                              </button>
+                            ));
+                          })()}
+                        </div>
+                        {(() => {
+                          const list = activeBucket ? activeBucket.items : activeSubsection.items;
+                          return !showAllItems && list.length > 8 && (
+                            <button onClick={() => setShowAllItems(true)} style={{ width: '100%', marginTop: '0.5rem', padding: '0.5rem', borderRadius: 8, border: `1px solid ${B.stone}`, background: 'none', color: B.stone, fontSize: '0.8rem' }}>
+                              + {list.length - 8} more
+                            </button>
+                          );
+                        })()}
+                      </>
                     )}
                   </>
                 )}
