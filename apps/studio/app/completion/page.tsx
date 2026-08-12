@@ -75,9 +75,16 @@ export default function CompletionPage() {
     await new Promise((resolve) => { qrImg.onload = resolve; qrImg.src = qrDataUrl; });
 
     const pad = c.width * 0.03;
-    // White backing so the QR reads against any background.
+    const captionH = qrSize * 0.22;
+    // White backing so the QR (and its caption) reads against any background.
     ctx.fillStyle = 'rgba(255,255,255,0.92)';
-    ctx.fillRect(c.width - qrSize - pad * 2, c.height - qrSize - pad * 2, qrSize + pad, qrSize + pad);
+    ctx.fillRect(c.width - qrSize - pad * 2, c.height - qrSize - pad * 2 - captionH, qrSize + pad, qrSize + pad + captionH);
+    ctx.fillStyle = '#2B2724';
+    ctx.font = `700 ${Math.round(qrSize * 0.09)}px "Instrument Sans", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('Scan to order & track', c.width - qrSize / 2 - pad * 1.5, c.height - qrSize - pad * 2 - captionH + 4);
+    ctx.textAlign = 'left';
     ctx.drawImage(qrImg, c.width - qrSize - pad * 1.5, c.height - qrSize - pad * 1.5, qrSize, qrSize);
 
     // Name + date banner along the bottom.

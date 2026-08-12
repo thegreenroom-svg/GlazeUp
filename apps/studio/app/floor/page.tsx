@@ -470,7 +470,7 @@ export default function FloorPage() {
           </div>
           <div className="space-y-4 mb-8">
             <div className="p-4 rounded-lg text-center" style={{ backgroundColor: B.charcoal }}>
-              <p style={{ color: B.ivory }} className="font-bold text-sm mb-2">Real, scannable QR</p>
+              <p style={{ color: B.ivory }} className="font-bold text-sm mb-2">📱 Scan to track your pieces &amp; order drinks</p>
               <canvas ref={canvasRef} width={160} height={160} style={{ margin: '0 auto', borderRadius: 6, backgroundColor: 'white' }} />
               <p style={{ color: B.sand }} className="text-xs font-mono mt-2">{current?.booking_code}</p>
               <p style={{ color: B.stone }} className="text-xs mt-1">{current?.customer_name}</p>

@@ -64,39 +64,73 @@ export function StudioNavigation() {
     return () => window.removeEventListener('resize', checkSize);
   }, []);
 
+  const menuGroups: { section: string; items: { label: string; icon: React.ReactNode; href: string }[] }[] = [
+    {
+      section: 'Daily Workflow',
+      items: [
+        { label: 'Start Floor', icon: <Footprints className="w-5 h-5" />, href: '/floor' },
+        { label: 'Bookings', icon: <Calendar className="w-5 h-5" />, href: '/bookings' },
+        { label: 'Till', icon: <Receipt className="w-5 h-5" />, href: '/till' },
+        { label: 'KDS', icon: <ChefHat className="w-5 h-5" />, href: '/kds' },
+        { label: 'Photo Match', icon: <Camera className="w-5 h-5" />, href: '/photo-match' },
+        { label: 'Shelf Sweep', icon: <Layers className="w-5 h-5" />, href: '/shelf-sweep' },
+        { label: 'Completion', icon: <Stamp className="w-5 h-5" />, href: '/completion' },
+      ],
+    },
+    {
+      section: 'Studio',
+      items: [
+        { label: 'Pieces', icon: <Palette className="w-5 h-5" />, href: '/pieces' },
+        { label: 'Kiln Workflow', icon: <Zap className="w-5 h-5" />, href: '/kiln-workflow' },
+        { label: 'Inventory', icon: <Package className="w-5 h-5" />, href: '/inventory' },
+        { label: 'Lifecycle', icon: <GitBranch className="w-5 h-5" />, href: '/lifecycle' },
+        { label: 'Catalogue', icon: <Boxes className="w-5 h-5" />, href: '/catalogue' },
+      ],
+    },
+    {
+      section: 'Business',
+      items: [
+        { label: 'Customers', icon: <Users className="w-5 h-5" />, href: '/customers' },
+        { label: 'Reports', icon: <TrendingUp className="w-5 h-5" />, href: '/reports' },
+        { label: 'Money', icon: <PoundSterling className="w-5 h-5" />, href: '/money' },
+        { label: 'Analytics', icon: <BarChart3 className="w-5 h-5" />, href: '/analytics' },
+        { label: 'Billing', icon: <CreditCard className="w-5 h-5" />, href: '/billing' },
+        { label: 'Loyalty', icon: <Award className="w-5 h-5" />, href: '/loyalty' },
+      ],
+    },
+    {
+      section: 'Creative Tools',
+      items: [
+        { label: 'Colour Picker', icon: <Pipette className="w-5 h-5" />, href: '/colour-picker' },
+        { label: 'Design Preview', icon: <Eye className="w-5 h-5" />, href: '/design-preview' },
+        { label: 'Transfer Designer', icon: <PenTool className="w-5 h-5" />, href: '/transfer-designer' },
+      ],
+    },
+    {
+      section: 'Community',
+      items: [
+        { label: 'Community', icon: <Sparkles className="w-5 h-5" />, href: '/community' },
+        { label: 'Studios Worldwide', icon: <Globe2 className="w-5 h-5" />, href: '/studios-worldwide' },
+        { label: 'Our Profile', icon: <UserSquare2 className="w-5 h-5" />, href: '/our-profile' },
+        { label: 'Collections', icon: <Library className="w-5 h-5" />, href: '/collections' },
+        { label: 'My Bookings', icon: <CalendarClock className="w-5 h-5" />, href: '/my-bookings' },
+        { label: 'Customer View', icon: <QrCode className="w-5 h-5" />, href: '/customer' },
+      ],
+    },
+    {
+      section: 'Admin',
+      items: [
+        { label: 'Team', icon: <UserCircle className="w-5 h-5" />, href: '/team' },
+        { label: 'Alerts', icon: <Bell className="w-5 h-5" />, href: '/alerts' },
+        { label: 'Notifications', icon: <BellRing className="w-5 h-5" />, href: '/notifications' },
+        { label: 'Roles & Studio', icon: <ShieldCheck className="w-5 h-5" />, href: '/roles' },
+      ],
+    },
+  ];
+  // Flattened for isActive() lookups and anything else expecting a plain list.
   const menuItems = [
     { label: 'Dashboard', icon: <Home className="w-5 h-5" />, href: '/' },
-    { label: 'Bookings', icon: <Calendar className="w-5 h-5" />, href: '/bookings' },
-    { label: 'Pieces', icon: <Palette className="w-5 h-5" />, href: '/pieces' },
-    { label: 'Kiln Workflow', icon: <Zap className="w-5 h-5" />, href: '/kiln-workflow' },
-    { label: 'Inventory', icon: <Package className="w-5 h-5" />, href: '/inventory' },
-    { label: 'Customers', icon: <Users className="w-5 h-5" />, href: '/customers' },
-    { label: 'Reports', icon: <TrendingUp className="w-5 h-5" />, href: '/reports' },
-    { label: 'Money', icon: <PoundSterling className="w-5 h-5" />, href: '/money' },
-    { label: 'Alerts', icon: <Bell className="w-5 h-5" />, href: '/alerts' },
-    { label: 'Team', icon: <UserCircle className="w-5 h-5" />, href: '/team' },
-    { label: 'Till', icon: <Receipt className="w-5 h-5" />, href: '/till' },
-    { label: 'Photo Match', icon: <Camera className="w-5 h-5" />, href: '/photo-match' },
-    { label: 'Shelf Sweep', icon: <Layers className="w-5 h-5" />, href: '/shelf-sweep' },
-    { label: 'Lifecycle', icon: <GitBranch className="w-5 h-5" />, href: '/lifecycle' },
-    { label: 'Loyalty', icon: <Award className="w-5 h-5" />, href: '/loyalty' },
-    { label: 'Notifications', icon: <BellRing className="w-5 h-5" />, href: '/notifications' },
-    { label: 'Analytics', icon: <BarChart3 className="w-5 h-5" />, href: '/analytics' },
-    { label: 'Community', icon: <Sparkles className="w-5 h-5" />, href: '/community' },
-    { label: 'Catalogue', icon: <Boxes className="w-5 h-5" />, href: '/catalogue' },
-    { label: 'Billing', icon: <CreditCard className="w-5 h-5" />, href: '/billing' },
-    { label: 'Customer View', icon: <QrCode className="w-5 h-5" />, href: '/customer' },
-    { label: 'Colour Picker', icon: <Pipette className="w-5 h-5" />, href: '/colour-picker' },
-    { label: 'Design Preview', icon: <Eye className="w-5 h-5" />, href: '/design-preview' },
-    { label: 'Transfer Designer', icon: <PenTool className="w-5 h-5" />, href: '/transfer-designer' },
-    { label: 'Roles & Studio', icon: <ShieldCheck className="w-5 h-5" />, href: '/roles' },
-    { label: 'Collections', icon: <Library className="w-5 h-5" />, href: '/collections' },
-    { label: 'My Bookings', icon: <CalendarClock className="w-5 h-5" />, href: '/my-bookings' },
-    { label: 'Studios Worldwide', icon: <Globe2 className="w-5 h-5" />, href: '/studios-worldwide' },
-    { label: 'Our Profile', icon: <UserSquare2 className="w-5 h-5" />, href: '/our-profile' },
-    { label: 'Completion', icon: <Stamp className="w-5 h-5" />, href: '/completion' },
-    { label: 'Start Floor', icon: <Footprints className="w-5 h-5" />, href: '/floor' },
-    { label: 'KDS', icon: <ChefHat className="w-5 h-5" />, href: '/kds' }
+    ...menuGroups.flatMap((g) => g.items),
   ];
 
   const isActive = (href: string) => {
@@ -155,26 +189,40 @@ export function StudioNavigation() {
     </>
   );
 
+  const itemLink = (item: { label: string; icon: React.ReactNode; href: string }) => (
+    <Link
+      key={item.href}
+      href={item.href}
+      onClick={() => {
+        if (isMobile) setIsOpen(false);
+      }}
+      className={`flex items-center gap-2 px-3 py-1.5 transition-all ${
+        isActive(item.href) ? 'text-white' : 'text-gray-400 hover:text-white hover:opacity-80'
+      }`}
+      style={{
+        fontSize: '0.8rem',
+        ...(isActive(item.href) ? { backgroundColor: 'var(--clay)', borderRadius: '4px' } : {}),
+      }}
+    >
+      {item.icon}
+      <span className="font-medium" style={{ fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+    </Link>
+  );
+
   const menuList = (
-    <div className="py-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-      {menuItems.map((item) => (
-        <Link
-          key={item.href}
-          href={item.href}
-          onClick={() => {
-            if (isMobile) setIsOpen(false);
-          }}
-          className={`flex items-center gap-2 px-3 py-1.5 transition-all ${
-            isActive(item.href) ? 'text-white' : 'text-gray-400 hover:text-white hover:opacity-80'
-          }`}
-          style={{
-            fontSize: '0.8rem',
-            ...(isActive(item.href) ? { backgroundColor: 'var(--clay)', borderRadius: '4px' } : {}),
-          }}
-        >
-          {item.icon}
-          <span className="font-medium" style={{ fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
-        </Link>
+    <div className="py-3">
+      <div style={{ padding: '0 0.75rem 0.5rem' }}>
+        {itemLink({ label: 'Dashboard', icon: <Home className="w-5 h-5" />, href: '/' })}
+      </div>
+      {menuGroups.map((g) => (
+        <div key={g.section} style={{ marginBottom: '0.5rem' }}>
+          <p style={{ padding: '0.5rem 0.75rem 0.2rem', fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--stone)', borderTop: '1px solid rgba(255,255,255,0.08)', marginTop: '0.3rem' }}>
+            {g.section}
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+            {g.items.map(itemLink)}
+          </div>
+        </div>
       ))}
     </div>
   );

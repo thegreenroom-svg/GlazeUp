@@ -15,6 +15,7 @@ interface QueueItem {
   created_at: string;
   customer_name: string | null;
   table_number: string | null;
+  added_by: string | null;
 }
 
 export default function KdsPage() {
@@ -81,6 +82,7 @@ export default function KdsPage() {
                   <p style={{ fontWeight: 700, fontSize: '1rem' }}>{item.quantity > 1 ? `${item.quantity}x ` : ''}{item.item_name}</p>
                   <p style={{ fontSize: '0.78rem', color: '#666' }}>
                     {item.customer_name || item.booking_code}{item.table_number ? ` · Table ${item.table_number}` : ''}
+                    {item.added_by === 'customer-app' ? ' · self-ordered' : ' · staff'}
                   </p>
                 </div>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: urgent ? '#c33' : '#999', fontWeight: urgent ? 700 : 400, whiteSpace: 'nowrap' }}>

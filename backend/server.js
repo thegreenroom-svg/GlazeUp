@@ -1402,7 +1402,7 @@ registerPinRoutes(app, supabase, DEMO_STUDIO_ID, logger, crypto);
 registerGapRoutes(app, supabase, DEMO_STUDIO_ID, logger, JUNK_BOOKING_LABELS);
 registerNetworkRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 registerWorkflowRoutes(app, supabase, DEMO_STUDIO_ID, logger, upload, fs);
-registerTillMenuRoute(app, supabase, DEMO_STUDIO_ID, logger);
+registerTillMenuRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerKdsRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 
 app.use((req, res) => {

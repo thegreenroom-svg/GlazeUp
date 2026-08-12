@@ -679,7 +679,61 @@ export function registerWorkflowRoutes(app, supabase, STUDIO_ID, logger, upload,
 // More rather than a flat dump). Rebuilt here against new-app-full's own
 // endpoints since it's a separate codebase.
 // ============================================================================
-export function registerTillMenuRoute(app, supabase, STUDIO_ID, logger) {
+// Real Cafe/Food categories, shared between the till menu and KDS so both
+// agree on what counts as "something the kitchen needs to make" -- never
+// duplicated as a second list that could drift out of sync.
+const KITCHEN_CATEGORIES = ['Hot Drinks', 'Cold Drinks', 'Iced Coffees', 'Milkshakes', 'Smoothies', 'Drinks', 'Alcohol', 'Cafe', 'Cakes', 'Cakes & Food'];
+
+// Shared by /api/spec/till-menu and /api/spec/item-popularity so there is
+// only ONE real implementation of "ask Square for real recent sales" --
+// never two copies that could quietly drift apart.
+async function fetchSquareItemPopularity(supabase, STUDIO_ID, axios) {
+  const { data: connection } = await supabase
+    .from('square_connections')
+    .select('square_access_token, square_token_expires_at')
+    .eq('studio_id', STUDIO_ID)
+    .single();
+
+  if (!connection || new Date(connection.square_token_expires_at) < new Date()) {
+    return { popularity: {}, orders_scanned: 0, available: false };
+  }
+
+  const token = connection.square_access_token;
+  const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', {
+    headers: { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18' },
+  });
+  const locations = locationsRes.data.locations || [];
+  if (!locations.length) return { popularity: {}, orders_scanned: 0, available: true };
+
+  const windowStart = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  const ordersRes = await axios.post(
+    'https://connect.squareup.com/v2/orders/search',
+    {
+      location_ids: locations.map((l) => l.id),
+      query: {
+        filter: {
+          date_time_filter: { created_at: { start_at: windowStart.toISOString() } },
+          state_filter: { states: ['COMPLETED'] },
+        },
+      },
+      limit: 200,
+    },
+    { headers: { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18', 'Content-Type': 'application/json' } }
+  );
+
+  const orders = ordersRes.data.orders || [];
+  const baseCounts = {};
+  orders.forEach((o) => {
+    (o.line_items || []).forEach((li) => {
+      const name = (li.name || '').trim();
+      if (!name) return;
+      baseCounts[name] = (baseCounts[name] || 0) + (li.quantity ? Number(li.quantity) : 1);
+    });
+  });
+  return { popularity: baseCounts, orders_scanned: orders.length, available: true };
+}
+
+export function registerTillMenuRoute(app, supabase, STUDIO_ID, logger, axios) {
   // Broad groups a till actually uses day-to-day. 'Other' (26k+ unclassified
   // items in the real data) is deliberately excluded -- it's not a real
   // usable category, just unclassified Square data, same as Money already
@@ -697,6 +751,32 @@ export function registerTillMenuRoute(app, supabase, STUDIO_ID, logger) {
         supabase.from('square_items').select('item_name, category, price_cents').eq('studio_id', STUDIO_ID),
         supabase.from('revenue_category_breakdown').select('category, item_count').eq('studio_id', STUDIO_ID),
       ]);
+
+      // Real per-ITEM popularity, live from Square -- Supabase only has this
+      // at the category level. Failure here (token expired, Square down)
+      // must never break the till itself, so it's caught and item ordering
+      // just falls back to unordered rather than the whole menu failing.
+      let itemPopularity = {};
+      let itemPopularityAvailable = false;
+      try {
+        const sq = await fetchSquareItemPopularity(supabase, STUDIO_ID, axios);
+        itemPopularity = sq.popularity;
+        itemPopularityAvailable = sq.available && Object.keys(sq.popularity).length > 0;
+      } catch (sqErr) {
+        logger.error('till-menu: Square popularity fetch failed, continuing without it', sqErr.response?.data || sqErr.message);
+      }
+
+      // Substring match: Square's line_items are typically a base name
+      // ('Latte'), our menu rows are compound ('Latte — Caramel, Decaf').
+      // Approximate, not exact -- see the caveat on fetchSquareItemPopularity.
+      const popularityForItem = (itemName) => {
+        const lower = (itemName || '').toLowerCase();
+        let best = 0;
+        Object.entries(itemPopularity).forEach(([squareName, count]) => {
+          if (lower.includes(squareName.toLowerCase())) best = Math.max(best, count);
+        });
+        return best;
+      };
 
       // Real popularity by category, summed across all dates on file.
       const popularity = {};
@@ -720,7 +800,10 @@ export function registerTillMenuRoute(app, supabase, STUDIO_ID, logger) {
         });
         return Object.entries(buckets)
           .filter(([, list]) => list.length > 0)
-          .map(([label, list]) => ({ label, items: list }));
+          .map(([label, list]) => ({
+            label,
+            items: itemPopularityAvailable ? [...list].sort((a, b) => popularityForItem(b.item_name) - popularityForItem(a.item_name)) : list,
+          }));
       };
 
       const groups = GROUPS.map((g) => {
@@ -731,17 +814,20 @@ export function registerTillMenuRoute(app, supabase, STUDIO_ID, logger) {
         const subsections = categoriesInGroup
           .map((cat) => {
             const catItems = allItems.filter((i) => i.item_name && i.category === cat);
+            const sortedItems = itemPopularityAvailable
+              ? [...catItems].sort((a, b) => popularityForItem(b.item_name) - popularityForItem(a.item_name))
+              : catItems;
             return {
               category: cat,
               // Cleaned display label: strip the internal 'PB '/'S. ' prefixes
               // used in Square, keep the real underlying category for filtering.
               label: cat.replace(/^PB\s+/, '').replace(/^S\.\s+/, '').trim(),
               popularity: popularity[cat] || 0,
-              items: catItems,
+              items: sortedItems,
               // Only bucket when a subsection is large enough that a flat
               // grid would be overwhelming -- small subsections stay as one
               // simple item grid.
-              buckets: catItems.length > 10 ? bucketiseItems(catItems) : null,
+              buckets: catItems.length > 10 ? bucketiseItems(sortedItems) : null,
             };
           })
           .filter((s) => s.items.length > 0)
@@ -752,7 +838,7 @@ export function registerTillMenuRoute(app, supabase, STUDIO_ID, logger) {
       }).filter((g) => g.subsections.length > 0)
         .sort((a, b) => b.popularity - a.popularity);
 
-      res.json({ groups });
+      res.json({ groups, item_popularity_source: itemPopularityAvailable ? 'square_live_90d' : 'unavailable' });
     } catch (err) {
       logger.error(err);
       res.status(500).json({ error: err.message });
@@ -769,15 +855,18 @@ export function registerTillMenuRoute(app, supabase, STUDIO_ID, logger) {
 // Nothing new to keep in sync.
 // ============================================================================
 export function registerKdsRoutes(app, supabase, STUDIO_ID, logger) {
-  // Pending queue: customer-submitted, not yet marked prepared, oldest first
-  // -- how a real KDS actually orders work.
+  // Pending queue: any real, unprepared kitchen item -- whether the customer
+  // ordered it themselves or staff entered it on their behalf via Start
+  // Floor's Till. A kitchen queue that only showed self-service orders would
+  // silently miss every table where staff took the order, which is most of
+  // them. Oldest first, how a real KDS orders work.
   app.get('/api/spec/kds-queue', async (req, res) => {
     try {
       const { data, error } = await supabase
         .from('demo_app_till_items')
-        .select('id, booking_code, item_name, category, quantity, created_at')
+        .select('id, booking_code, item_name, category, quantity, added_by, created_at')
         .eq('studio_id', STUDIO_ID)
-        .eq('added_by', 'customer-app')
+        .in('category', KITCHEN_CATEGORIES)
         .is('prepared_at', null)
         .order('created_at', { ascending: true })
         .limit(100);
@@ -824,6 +913,40 @@ export function registerKdsRoutes(app, supabase, STUDIO_ID, logger) {
     } catch (err) {
       logger.error(err);
       res.status(500).json({ error: err.message });
+    }
+  });
+}
+
+// ============================================================================
+// REAL ITEM POPULARITY — sourced live from Square, not Supabase
+// ----------------------------------------------------------------------------
+// Supabase has real popularity at the CATEGORY level only (revenue_category_
+// breakdown) and the one table shaped for real per-item history
+// (table_session_orders) is genuinely empty -- checked directly, 0 rows.
+// Square itself has the real per-item sales data this app was missing.
+// Read-only: GET /orders/search against Square's own API, same pattern
+// already proven working in /api/demo/square-live. Never writes anywhere,
+// including back to Square -- matches Daisy's explicit boundary that this
+// app can read live from Square but must never touch the real production
+// system until she connects something on purpose.
+//
+// CAVEAT, stated plainly rather than assumed away: Square's line_items
+// usually carry a BASE name ('Latte'), while our menu rows are compound
+// ('Latte — Caramel, Decaf'). Matched here by substring (does the compound
+// name contain the Square base name), which is a reasonable approximation
+// but not a guaranteed exact match. This endpoint can only be tested
+// against the real Square account by the deployed backend -- I have no
+// network path to Square from this sandbox, so this has NOT been verified
+// against real live data. Check the numbers look sane on first real use.
+// ============================================================================
+export function registerPopularityRoute(app, supabase, STUDIO_ID, logger, axios) {
+  app.get('/api/spec/item-popularity', async (req, res) => {
+    try {
+      const result = await fetchSquareItemPopularity(supabase, STUDIO_ID, axios);
+      res.json({ popularity: result.popularity, orders_scanned: result.orders_scanned, window_days: 90 });
+    } catch (err) {
+      logger.error(err.response?.data || err);
+      res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message, popularity: {} });
     }
   });
 }
