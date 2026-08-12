@@ -36,6 +36,8 @@ export default function DailyCardsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [qrUrls, setQrUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [newSinceLoad, setNewSinceLoad] = useState<Booking[]>([]);
   const [cardDate, setCardDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -47,9 +49,26 @@ export default function DailyCardsPage() {
 
   const load = useCallback(async (isFirstLoad: boolean) => {
     try {
+      setError(null);
+      
+      // Trigger a Square sync first (only on manual refresh, not on auto-check)
+      if (!isFirstLoad) {
+        try {
+          await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/bookings/sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } catch (e) {
+          // Sync may fail if Square isn't connected, but we'll still try to fetch what we have
+          console.warn('Square sync failed:', e);
+        }
+      }
+      
+      // Fetch bookings for the selected date
+      const dateStr = cardDateRef.current;
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings`);
       const data = res.ok ? await res.json() : [];
-      const dayStr = new Date(cardDateRef.current).toDateString();
+      const dayStr = new Date(dateStr).toDateString();
       const today = (Array.isArray(data) ? data : [])
         .filter((b: Booking) => new Date(b.session_start).toDateString() === dayStr)
         .sort((a: Booking, b: Booking) => new Date(a.session_start).getTime() - new Date(b.session_start).getTime());
@@ -80,7 +99,8 @@ export default function DailyCardsPage() {
         })
       );
       setQrUrls((prev) => ({ ...prev, ...urls }));
-    } catch {
+    } catch (e) {
+      console.error('Load error:', e);
       setError('Could not load bookings for that day.');
     } finally {
       setLoading(false);
@@ -104,6 +124,18 @@ export default function DailyCardsPage() {
   const acceptNew = () => {
     setNewSinceLoad([]);
     knownCodes.current = new Set(bookings.map((b) => b.booking_code));
+  };
+
+  const handleManualSync = async () => {
+    setSyncing(true);
+    try {
+      await load(false);
+      setLastSyncTime(new Date());
+    } catch (e) {
+      console.error('Manual sync failed:', e);
+    } finally {
+      setSyncing(false);
+    }
   };
 
   return (
@@ -172,7 +204,7 @@ export default function DailyCardsPage() {
         )}
 
         {bookings.length > 0 && (
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
             <button
               onClick={() => window.print()}
               style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', backgroundColor: 'var(--clay)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600 }}
@@ -180,11 +212,17 @@ export default function DailyCardsPage() {
               <Printer size={16} /> Print all {bookings.length} cards
             </button>
             <button
-              onClick={() => load(false)}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.9rem' }}
+              onClick={handleManualSync}
+              disabled={syncing}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', backgroundColor: syncing ? '#e0e0e0' : '#f0f0f0', border: 'none', borderRadius: '6px', cursor: syncing ? 'wait' : 'pointer', fontSize: '0.9rem', opacity: syncing ? 0.6 : 1 }}
             >
-              <RefreshCw size={14} /> Check for new bookings now
+              <RefreshCw size={14} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} /> {syncing ? 'Checking...' : 'Check for new bookings now'}
             </button>
+            {lastSyncTime && (
+              <div style={{ fontSize: '0.75rem', color: '#999', alignSelf: 'center' }}>
+                Last checked: {lastSyncTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -226,6 +264,11 @@ export default function DailyCardsPage() {
       </div>
 
       <style jsx global>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        
         @media print {
           .no-print { display: none !important; }
           /* Real 3x2in label stock, one label per page -- a label printer
