@@ -123,7 +123,7 @@ export default function FloorPage() {
 
   const selectBooking = async (b: Booking) => {
     setCurrent(b);
-    setPieceCount(b.party_size || 1);
+    setPieceCount(0);  // Start at 0 - will be populated from Phase 2 photo (or show unfinished pieces if returning customer)
     setTillItems([]);
     setFinished(false);
     setActiveGroup(null);
@@ -308,11 +308,18 @@ export default function FloorPage() {
               <p style={{ color: B.stone, fontSize: '0.8rem' }}>Add items as the table orders</p>
             </div>
 
-            <div className="flex items-center gap-3 justify-center mb-5">
-              <span style={{ color: B.stone, fontSize: '0.8rem' }}>Pieces</span>
-              <span style={{ color: B.ivory, fontWeight: 700, minWidth: 26, textAlign: 'center', fontSize: '1.1rem' }}>{pieceCount}</span>
-              <span style={{ color: B.stone, fontSize: '0.65rem', fontStyle: 'italic' }}>from photo</span>
-            </div>
+            {pieceCount > 0 && (
+              <div className="flex items-center gap-3 justify-center mb-5">
+                <span style={{ color: B.stone, fontSize: '0.8rem' }}>Pieces captured</span>
+                <span style={{ color: B.ivory, fontWeight: 700, minWidth: 26, textAlign: 'center', fontSize: '1.1rem' }}>{pieceCount}</span>
+                <span style={{ color: B.stone, fontSize: '0.65rem', fontStyle: 'italic' }}>from photo</span>
+              </div>
+            )}
+            {pieceCount === 0 && (
+              <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                <p style={{ color: B.stone, fontSize: '0.8rem' }}>Pieces will appear here after photo taken</p>
+              </div>
+            )}
 
             {tillItems.length > 0 && (
               <div className="mb-4 p-3 rounded" style={{ backgroundColor: B.charcoal, borderLeft: `3px solid ${B.clay}` }}>
