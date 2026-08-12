@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Camera, Type, Star, Heart, Flower2, Sparkles, Circle, Trash2 } from 'lucide-react';
+import { SaveAndCharge } from '@/components/SaveAndCharge';
 
 type MotifKind = 'text' | 'star' | 'heart' | 'flower' | 'swirl' | 'dot';
 
@@ -293,6 +294,12 @@ export default function TransferDesignerPage() {
       <p style={{ fontSize: '0.75rem', color: '#999' }}>
         Tap a shape or text on the design to select and drag it. This plans placement — a real transfer decal is applied by staff.
       </p>
+
+      {elements.length > 0 && (
+        <div style={{ marginTop: '0.8rem' }}>
+          <SaveAndCharge tool="transfer-designer" label="Transfer Design" />
+        </div>
+      )}
     </motion.div>
   );
 }

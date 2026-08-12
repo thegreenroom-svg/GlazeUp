@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Flame, PackageCheck, Award, Coffee } from 'lucide-react';
+import { Flame, PackageCheck, Award, Coffee, PenTool } from 'lucide-react';
 
 interface MenuItem {
   kind?: 'simple';
@@ -219,6 +219,8 @@ function CustomerInner() {
   const [data, setData] = useState<CustomerView | null>(null);
   const [ordering, setOrdering] = useState(false);
   const [orderConfirm, setOrderConfirm] = useState(false);
+  const [equipmentSent, setEquipmentSent] = useState(false);
+  const [equipmentBusy, setEquipmentBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

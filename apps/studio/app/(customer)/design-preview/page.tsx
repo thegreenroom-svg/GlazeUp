@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Camera } from 'lucide-react';
+import { SaveAndCharge } from '@/components/SaveAndCharge';
 
 interface Fill {
   x: number;
@@ -137,6 +138,12 @@ export default function DesignPreviewPage() {
               New photo
             </button>
           </div>
+
+          {fills.length > 0 && (
+            <div style={{ marginTop: '0.8rem' }}>
+              <SaveAndCharge tool="design-preview" label="Design Preview" />
+            </div>
+          )}
         </>
       )}
     </motion.div>

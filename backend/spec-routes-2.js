@@ -215,8 +215,8 @@ export default function registerSpecRoutes2(app, supabase, STUDIO_ID, logger, JU
       res.json({
         tools: [
           { key: 'colour-picker', name: 'Colour Picker', price_cents: 0, note: 'Free — match a glaze to a colour' },
-          { key: 'design-preview', name: 'Design Preview', price_cents: cfg?.customer_generation_price_cents ?? 100, note: 'Preview a design on a piece shape' },
-          { key: 'transfer-designer', name: 'Transfer Designer', price_cents: cfg?.customer_print_price_cents ?? 100, note: 'Draw a design, print as a transfer' },
+          { key: 'design-preview', name: 'Design Preview', price_cents: cfg?.customer_generation_price_cents ?? 20, note: 'Preview a design on a piece shape' },
+          { key: 'transfer-designer', name: 'Transfer Designer', price_cents: cfg?.customer_print_price_cents ?? 150, note: 'Draw a design, print as a transfer' },
         ],
         ai_enabled: cfg?.enabled ?? false,
       });
@@ -1114,6 +1114,135 @@ export function registerLiveTotalRoute(app, supabase, STUDIO_ID, logger, axios) 
     } catch (err) {
       logger.error(err.response?.data || err);
       res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message, total_gbp: null });
+    }
+  });
+}
+
+// ============================================================================
+// EQUIPMENT REQUEST (stylus & tablet) — real staff alert, not a fake sale.
+// ----------------------------------------------------------------------------
+// No Square item exists for this (checked directly -- searched item_name for
+// stylus/tablet/pen/ipad, nothing real came back). This is a customer asking
+// staff to bring something over, not a purchase, so it writes to the real
+// staff_alerts table Alerts already reads, rather than being dressed up as
+// a £0 till item.
+// ============================================================================
+export function registerEquipmentRequestRoute(app, supabase, STUDIO_ID, logger) {
+  app.post('/api/spec/equipment-request', async (req, res) => {
+    try {
+      const { booking_code, customer_name, table_number } = req.body || {};
+      if (!booking_code) return res.status(400).json({ error: 'booking_code required' });
+
+      const { data, error } = await supabase
+        .from('staff_alerts')
+        .insert([{
+          studio_id: STUDIO_ID,
+          trigger_type: 'equipment_request',
+          booking_code,
+          icon: '✏️',
+          label: 'Stylus & tablet requested',
+          message: `${customer_name || 'A customer'}${table_number ? ` (Table ${table_number})` : ''} would like a stylus and tablet for the design tools.`,
+          priority: 2,
+          acknowledged: false,
+        }])
+        .select('id, created_at')
+        .maybeSingle();
+      if (error) throw error;
+      res.json(data);
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
+
+// ============================================================================
+// DESIGN TOOL CHARGES — real config, real Square order pathway, safe by
+// default. Mirrors main's _safeCreateOrder exactly: SQUARE_WRITES_ENABLED
+// must be explicitly 'true' or this returns simulated:true and does NOT
+// touch Square at all. A blocked charge must never look like a sent one --
+// that's the whole point of the pattern, carried over deliberately rather
+// than reinvented, because getting this wrong with real money is a much
+// worse failure than getting it wrong with a demo booking.
+// ============================================================================
+const DEFAULT_CUSTOMER_GENERATION_PRICE_CENTS = 20;  // Design Preview -- real default from main
+const DEFAULT_CUSTOMER_PRINT_PRICE_CENTS = 150;      // Transfer Designer -- real default from main
+
+async function safeCreateSquareOrder(supabase, STUDIO_ID, axios, logger, { itemName, priceCents, bookingCode, customerName }) {
+  const writesEnabled = process.env.SQUARE_WRITES_ENABLED === 'true';
+
+  if (!writesEnabled) {
+    logger.info(`[SQUARE WRITE BLOCKED — safe mode] Would have charged ${itemName} £${(priceCents / 100).toFixed(2)} for ${customerName || bookingCode}`);
+    return { simulated: true, order_id: `SIMULATED-${Date.now()}` };
+  }
+
+  const { data: connection } = await supabase
+    .from('square_connections')
+    .select('square_access_token, square_token_expires_at')
+    .eq('studio_id', STUDIO_ID)
+    .single();
+  if (!connection || new Date(connection.square_token_expires_at) < new Date()) {
+    throw new Error('No valid Square connection -- cannot create a real order');
+  }
+
+  const token = connection.square_access_token;
+  const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', {
+    headers: { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18' },
+  });
+  const locationId = locationsRes.data.locations?.[0]?.id;
+  if (!locationId) throw new Error('No Square location found');
+
+  const orderRes = await axios.post(
+    'https://connect.squareup.com/v2/orders',
+    {
+      order: {
+        location_id: locationId,
+        line_items: [{
+          name: itemName,
+          quantity: '1',
+          base_price_money: { amount: priceCents, currency: 'GBP' },
+          note: `Table: ${bookingCode || 'walk-in'}${customerName ? ` · ${customerName}` : ''}`,
+        }],
+        reference_id: bookingCode || undefined,
+        state: 'OPEN',
+      },
+      idempotency_key: `glazeup-${bookingCode || 'wk'}-${Date.now()}`,
+    },
+    { headers: { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18', 'Content-Type': 'application/json' } }
+  );
+
+  return { simulated: false, order_id: orderRes.data.order?.id };
+}
+
+export function registerDesignChargeRoute(app, supabase, STUDIO_ID, logger, axios) {
+  app.post('/api/spec/design-tools/:tool/charge', async (req, res) => {
+    try {
+      const { tool } = req.params;
+      const { booking_code, customer_name } = req.body || {};
+      if (!['design-preview', 'transfer-designer'].includes(tool)) {
+        return res.status(400).json({ error: 'Unknown tool' });
+      }
+
+      const { data: cfg } = await supabase
+        .from('ai_design_config')
+        .select('customer_generation_price_cents, customer_print_price_cents')
+        .eq('studio_id', STUDIO_ID)
+        .maybeSingle();
+
+      const priceCents = tool === 'design-preview'
+        ? cfg?.customer_generation_price_cents ?? DEFAULT_CUSTOMER_GENERATION_PRICE_CENTS
+        : cfg?.customer_print_price_cents ?? DEFAULT_CUSTOMER_PRINT_PRICE_CENTS;
+
+      const itemName = tool === 'design-preview' ? 'Design Preview' : 'Transfer Designer';
+
+      const result = await safeCreateSquareOrder(supabase, STUDIO_ID, axios, logger, {
+        itemName, priceCents, bookingCode: booking_code, customerName: customer_name,
+      });
+
+      res.json({ ...result, price_cents: priceCents, item_name: itemName });
+    } catch (err) {
+      logger.error(err.response?.data || err);
+      res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message });
     }
   });
 }
