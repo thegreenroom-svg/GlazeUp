@@ -82,6 +82,7 @@ export default function FloorPage() {
   const [loading, setLoading] = useState(false);
   const [current, setCurrent] = useState<Booking | null>(null);
   const [pieceCount, setPieceCount] = useState(0);
+  const [splitBillCount, setSplitBillCount] = useState(1);
   const [tillItems, setTillItems] = useState<TillItem[]>([]);
   const [tillBusy, setTillBusy] = useState(false);
   const [photo, setPhoto] = useState<File | null>(null);
@@ -309,10 +310,42 @@ export default function FloorPage() {
 
             <div className="flex items-center gap-3 justify-center mb-5">
               <span style={{ color: B.stone, fontSize: '0.8rem' }}>Pieces</span>
-              <button onClick={() => setPieceCount((n) => Math.max(0, n - 1))} style={{ width: 36, height: 36, borderRadius: 8, backgroundColor: B.charcoal, color: B.ivory, border: 'none' }}>−</button>
-              <span style={{ color: B.ivory, fontWeight: 700, minWidth: 26, textAlign: 'center' }}>{pieceCount}</span>
-              <button onClick={() => setPieceCount((n) => n + 1)} style={{ width: 36, height: 36, borderRadius: 8, backgroundColor: B.charcoal, color: B.ivory, border: 'none' }}>+</button>
+              <span style={{ color: B.ivory, fontWeight: 700, minWidth: 26, textAlign: 'center', fontSize: '1.1rem' }}>{pieceCount}</span>
+              <span style={{ color: B.stone, fontSize: '0.65rem', fontStyle: 'italic' }}>from photo</span>
             </div>
+
+            {tillItems.length > 0 && (
+              <div className="mb-4 p-3 rounded" style={{ backgroundColor: B.charcoal, borderLeft: `3px solid ${B.clay}` }}>
+                <p style={{ color: B.stone, fontSize: '0.75rem', marginBottom: '0.5rem' }}>Split bill</p>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  {[1, 2, 3, 4, 5, 6].map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => setSplitBillCount(n)}
+                      style={{
+                        padding: '0.4rem 0.8rem',
+                        borderRadius: 6,
+                        border: splitBillCount === n ? `2px solid ${B.clay}` : `1px solid ${B.stone}`,
+                        backgroundColor: splitBillCount === n ? B.clay + '30' : 'transparent',
+                        color: B.ivory,
+                        fontSize: '0.8rem',
+                        fontWeight: splitBillCount === n ? 600 : 400,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {n} {n === 1 ? 'person' : 'people'}
+                    </button>
+                  ))}
+                </div>
+                {splitBillCount > 1 && (
+                  <div style={{ marginTop: '0.5rem', padding: '0.5rem 0.6rem', backgroundColor: B.charcoal, borderRadius: 4, textAlign: 'center' }}>
+                    <p style={{ color: B.sand, fontSize: '0.75rem', fontWeight: 600 }}>
+                      Per person: £{((tillTotal / splitBillCount) / 100).toFixed(2)}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {tillItems.length > 0 && (
               <div className="space-y-1 mb-3" style={{ maxHeight: '28vh', overflowY: 'auto' }}>
