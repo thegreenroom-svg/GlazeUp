@@ -368,6 +368,8 @@ export default function DailyCardsPage() {
         {visibleBookings.map((b) => {
           const isNew = newSinceLoad.some((n) => n.booking_code === b.booking_code);
           const isSelected = selected.has(b.booking_code);
+          const hasNotes = !!(b.notes && b.notes.trim());
+          const setupFlags = tableSetupFlags(b.notes);
           return (
             <div
               key={b.booking_code}
@@ -449,9 +451,9 @@ export default function DailyCardsPage() {
                   {shortSpaceLabel(b.space_name) || ''}
                 </p>
               )}
-              {tableSetupFlags(b.notes).length > 0 && (
+              {setupFlags.length > 0 && (
                 <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.4rem' }}>
-                  {tableSetupFlags(b.notes).map((flag) => (
+                  {setupFlags.map((flag) => (
                     <span
                       key={flag}
                       style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8a5a00', backgroundColor: '#fff4d6', border: '1px solid #e0c060', borderRadius: 999, padding: '0.15rem 0.55rem' }}
@@ -461,6 +463,9 @@ export default function DailyCardsPage() {
                   ))}
                 </div>
               )}
+              <p style={{ fontSize: '0.72rem', color: hasNotes ? '#8a5a00' : '#aaa', fontWeight: hasNotes ? 700 : 400, marginTop: '0.35rem' }}>
+                Notes: {hasNotes ? 'Yes' : 'No'}
+              </p>
               <p style={{ fontSize: '0.7rem', color: '#aaa', fontFamily: 'monospace', marginTop: '0.3rem' }}>{b.booking_code}</p>
             </div>
           );
