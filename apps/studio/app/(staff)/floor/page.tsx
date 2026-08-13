@@ -9,6 +9,21 @@ import { ChevronRight, Home, Camera, Printer, Check, Loader, RefreshCw } from 'l
 import QRCode from 'qrcode';
 import { NudgeCard, HelpButton } from '@/components/NudgeSystem';
 
+// Same fix already applied in PinGate.tsx and daily-cards/page.tsx: a
+// plain fetch() has no timeout, and this file gates real controls (table
+// Save button, etc.) on busy flags -- if a fetch genuinely stalls, the
+// flag never resets and the control looks permanently broken rather than
+// just failing cleanly. Guarantees a call resolves or rejects within 20s.
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 20000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 interface Booking {
   booking_code: string;
   customer_name: string;
@@ -186,7 +201,7 @@ export default function FloorPage() {
   const loadLiveSquareOrder = async (bookingCode: string) => {
     setLiveSquareLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${bookingCode}/live-square-order`);
+      const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${bookingCode}/live-square-order`);
       const d = await res.json();
       setLiveSquareOrder(res.ok ? d : { matched: false, reason: 'error', order: null });
     } catch {
@@ -207,7 +222,7 @@ export default function FloorPage() {
     if (!value) return;
     setSavingTableInline(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${current.booking_code}/table-number`, {
+      const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${current.booking_code}/table-number`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ table_number: value }),

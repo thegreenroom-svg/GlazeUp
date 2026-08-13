@@ -7,6 +7,22 @@ import { motion } from 'framer-motion';
 import QRCode from 'qrcode';
 import { Printer, RefreshCw, AlertCircle } from 'lucide-react';
 
+// Same fix as PinGate.tsx: a plain fetch() has no timeout of its own. This
+// page gates real controls (Check for new bookings, Save on the table
+// editor) on busy flags while their fetch is in flight -- if one genuinely
+// stalls rather than failing outright, the flag never resets and the
+// button stays disabled forever, indistinguishable from the page being
+// broken. Guarantees every call here resolves or rejects within 20s.
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 20000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 interface Booking {
   booking_code: string;
   customer_name: string;
@@ -86,7 +102,7 @@ export default function DailyCardsPage() {
     if (!value) return;
     setSavingTableCode(bookingCode);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${bookingCode}/table-number`, {
+      const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${bookingCode}/table-number`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ table_number: value }),
@@ -94,8 +110,8 @@ export default function DailyCardsPage() {
       if (!res.ok) throw new Error();
       setBookings((prev) => prev.map((b) => (b.booking_code === bookingCode ? { ...b, table_number: value } : b)));
       setEditingTableCode(null);
-    } catch {
-      setError('Could not save table number.');
+    } catch (err: any) {
+      setError(err?.name === 'AbortError' ? 'Taking too long -- try again' : 'Could not save table number.');
     } finally {
       setSavingTableCode(null);
     }
@@ -108,7 +124,7 @@ export default function DailyCardsPage() {
       // Trigger a Square sync first (only on manual refresh, not on auto-check)
       if (!isFirstLoad) {
         try {
-          await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/bookings/sync`, {
+          await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/bookings/sync`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
           });
@@ -120,7 +136,7 @@ export default function DailyCardsPage() {
       
       // Fetch bookings for the selected date
       const dateStr = cardDateRef.current;
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings`);
+      const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings`);
       const data = res.ok ? await res.json() : [];
       const dayStr = new Date(dateStr).toDateString();
       const today = (Array.isArray(data) ? data : [])

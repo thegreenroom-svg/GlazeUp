@@ -7,6 +7,21 @@ import { motion } from 'framer-motion';
 import { SkeletonRows } from '@/components/Skeleton';
 import { Receipt, Calendar } from 'lucide-react';
 
+// Same fix already applied elsewhere (PinGate.tsx, daily-cards, floor):
+// a plain fetch() has no timeout, and this file gates real Save buttons
+// on busy flags -- a stalled fetch would leave them permanently
+// disabled rather than failing cleanly. Guarantees resolve/reject
+// within 20s either way.
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 20000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 interface Booking {
   id: string;
   booking_code: string;
@@ -105,7 +120,7 @@ export default function BookingsPage() {
     if (!Number.isInteger(size) || size < 1 || size > 30) return;
     setSavingParty(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${detail.booking.booking_code}/party-size`, {
+      const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${detail.booking.booking_code}/party-size`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ party_size: size }),
@@ -113,8 +128,8 @@ export default function BookingsPage() {
       if (!res.ok) throw new Error();
       setDetail({ ...detail, booking: { ...detail.booking, party_size: size } });
       setEditingParty(false);
-    } catch {
-      setError('Could not save party size.');
+    } catch (err: any) {
+      setError(err?.name === 'AbortError' ? 'Taking too long -- try again' : 'Could not save party size.');
     } finally {
       setSavingParty(false);
     }
@@ -130,7 +145,7 @@ export default function BookingsPage() {
     if (!value) return;
     setSavingTable(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${detail.booking.booking_code}/table-number`, {
+      const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${detail.booking.booking_code}/table-number`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ table_number: value }),
@@ -138,8 +153,8 @@ export default function BookingsPage() {
       if (!res.ok) throw new Error();
       setDetail({ ...detail, booking: { ...detail.booking, table_number: value } });
       setEditingTable(false);
-    } catch {
-      setError('Could not save table number.');
+    } catch (err: any) {
+      setError(err?.name === 'AbortError' ? 'Taking too long -- try again' : 'Could not save table number.');
     } finally {
       setSavingTable(false);
     }
