@@ -1315,6 +1315,123 @@ export function registerSquareOpenOrdersDiagnosticRoute(app, supabase, STUDIO_ID
 }
 
 // ============================================================================
+// LIVE SQUARE ORDER FOR A BOOKING'S TABLE -- read-only.
+// ----------------------------------------------------------------------------
+// The real feature the diagnostic above was checking feasibility for: when
+// staff open a booking in Floor, show what's actually been rung up for that
+// table on the physical Square handheld right now -- so they don't have to
+// separately ask, or re-enter it into this app's own till. Confirmed
+// buildable via the diagnostic (real open tickets do carry a ticket_name,
+// e.g. "T4") before this was written.
+//
+// Matching is a heuristic, not a guarantee -- ticket_name is free text a
+// person typed on the handheld, and booking.table_number is free text too
+// (it supports "3A"/"3+4" style splits/combines). This matches on the
+// DIGIT sequence common to both ("T4" and "4" both normalise to "4"), which
+// is honest about being approximate, same posture as the existing
+// item-popularity fuzzy match in till-menu above. A table using a letter
+// suffix only ("3A") won't match on digits alone here -- flagged in the
+// response via match_confidence rather than silently pretending certainty.
+// ============================================================================
+export function registerLiveSquareOrderRoute(app, supabase, STUDIO_ID, logger, axios) {
+  const digitsOf = (s) => (String(s || '').match(/\d+/g) || []).join('');
+
+  app.get('/api/spec/bookings/:code/live-square-order', async (req, res) => {
+    try {
+      const { data: booking } = await supabase
+        .from('bookings')
+        .select('booking_code, table_number')
+        .eq('booking_code', req.params.code)
+        .eq('studio_id', STUDIO_ID)
+        .maybeSingle();
+
+      if (!booking) return res.status(404).json({ error: 'Booking not found' });
+      if (!booking.table_number) {
+        return res.json({ matched: false, reason: 'no_table_set', order: null });
+      }
+
+      const tableDigits = digitsOf(booking.table_number);
+      if (!tableDigits) {
+        return res.json({ matched: false, reason: 'table_number_has_no_digits', table_number: booking.table_number, order: null });
+      }
+
+      const { data: connection } = await supabase
+        .from('square_connections')
+        .select('square_access_token, square_token_expires_at')
+        .eq('studio_id', STUDIO_ID)
+        .single();
+
+      if (!connection || new Date(connection.square_token_expires_at) < new Date()) {
+        return res.status(400).json({ error: 'No valid Square connection', matched: false, order: null });
+      }
+
+      const token = connection.square_access_token;
+      const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', {
+        headers: { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18' },
+      });
+      const locations = locationsRes.data.locations || [];
+      if (!locations.length) return res.json({ matched: false, reason: 'no_square_locations', order: null });
+
+      const todayStart = new Date();
+      todayStart.setUTCHours(0, 0, 0, 0);
+
+      const ordersRes = await axios.post(
+        'https://connect.squareup.com/v2/orders/search',
+        {
+          location_ids: locations.map((l) => l.id),
+          query: {
+            filter: {
+              date_time_filter: { created_at: { start_at: todayStart.toISOString() } },
+              state_filter: { states: ['OPEN'] },
+            },
+          },
+          limit: 100,
+        },
+        { headers: { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18', 'Content-Type': 'application/json' } }
+      );
+
+      const orders = ordersRes.data.orders || [];
+      const candidates = orders
+        .filter((o) => o.ticket_name && digitsOf(o.ticket_name) === tableDigits)
+        .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at));
+
+      if (candidates.length === 0) {
+        return res.json({ matched: false, reason: 'no_open_ticket_for_table', table_number: booking.table_number, order: null });
+      }
+
+      // Same table digits could genuinely match more than one open ticket
+      // (e.g. "T4" and "Table 4" both open at once, a real mistake someone
+      // could make) -- surfaced honestly rather than silently picking one.
+      const multiple = candidates.length > 1;
+      const o = candidates[0];
+
+      res.json({
+        matched: true,
+        multiple_candidates: multiple,
+        table_number: booking.table_number,
+        order: {
+          id: o.id,
+          ticket_name: o.ticket_name,
+          state: o.state,
+          created_at: o.created_at,
+          updated_at: o.updated_at,
+          total_gbp: o.total_money ? o.total_money.amount / 100 : null,
+          items: (o.line_items || []).map((li) => ({
+            name: li.name,
+            quantity: li.quantity,
+            total_gbp: li.total_money ? li.total_money.amount / 100 : null,
+          })),
+        },
+        pulled_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      logger.error(err.response?.data || err);
+      res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message, matched: false, order: null });
+    }
+  });
+}
+
+// ============================================================================
 // EQUIPMENT REQUEST (stylus & tablet) — real staff alert, not a fake sale.
 // ----------------------------------------------------------------------------
 // No Square item exists for this (checked directly -- searched item_name for

@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ChevronRight, Home, Camera, Printer, Check, Loader } from 'lucide-react';
+import { ChevronRight, Home, Camera, Printer, Check, Loader, RefreshCw } from 'lucide-react';
 import QRCode from 'qrcode';
 import { NudgeCard, HelpButton } from '@/components/NudgeSystem';
 
@@ -91,6 +91,11 @@ export default function FloorPage() {
   const [collectionMethod, setCollectionMethod] = useState<'studio' | 'postal' | null>(null);
   const [postalPostcode, setPostalPostcode] = useState('');
   const [collectionDate, setCollectionDate] = useState('');
+  const [liveSquareOrder, setLiveSquareOrder] = useState<{
+    matched: boolean; reason?: string; multiple_candidates?: boolean; table_number?: string;
+    order: { ticket_name: string; total_gbp: number | null; items: { name: string; quantity: number; total_gbp: number | null }[]; updated_at: string } | null;
+  } | null>(null);
+  const [liveSquareLoading, setLiveSquareLoading] = useState(false);
   const [tillItems, setTillItems] = useState<TillItem[]>([]);
   const [tillBusy, setTillBusy] = useState(false);
   const [photo, setPhoto] = useState<File | null>(null);
@@ -169,6 +174,25 @@ export default function FloorPage() {
     }
   };
 
+  // Live, read-only Square order for this booking's table -- what's
+  // actually been rung up on the physical handheld right now. Fetched
+  // fresh every time a booking is opened (matches "when you open up the
+  // app in that table, I see exactly what's on that table"), and
+  // refreshable from the Till screen since the girls keep adding to it
+  // live throughout the session.
+  const loadLiveSquareOrder = async (bookingCode: string) => {
+    setLiveSquareLoading(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${bookingCode}/live-square-order`);
+      const d = await res.json();
+      setLiveSquareOrder(res.ok ? d : { matched: false, reason: 'error', order: null });
+    } catch {
+      setLiveSquareOrder({ matched: false, reason: 'error', order: null });
+    } finally {
+      setLiveSquareLoading(false);
+    }
+  };
+
   const selectBooking = async (b: Booking) => {
     setCurrent(b);
     setPieceCount(0);  // Start at 0 - will be populated from Phase 2 photo (or show unfinished pieces if returning customer)
@@ -182,11 +206,13 @@ export default function FloorPage() {
     setCollectionMethod(null);
     setPostalPostcode('');
     setCollectionDate(defaultCollectionDate());
+    setLiveSquareOrder(null);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${b.booking_code}/till`);
       const d = res.ok ? await res.json() : [];
       setTillItems(Array.isArray(d) ? d : d?.items || []);
     } catch { /* fresh table, no till yet */ }
+    loadLiveSquareOrder(b.booking_code);
     setPhase(3);
   };
 
@@ -547,10 +573,61 @@ export default function FloorPage() {
 
           {/* Right: ticket panel */}
           <div style={{ flex: '1 1 32%', minWidth: 260 }}>
+            {/* Live from Square -- read-only, separate from GlazeUp's own
+                till below. What's actually been rung up on the real
+                handheld right now, per Daisy's request. */}
+            <div style={{ backgroundColor: SQ.panel, borderRadius: 10, border: `1px solid ${SQ.accent}`, overflow: 'hidden', marginBottom: '0.8rem' }}>
+              <div style={{ padding: '0.7rem 1rem', borderBottom: `1px solid ${SQ.line}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 700, fontSize: '0.82rem', color: SQ.accentDark }}>Live from Square</span>
+                <button
+                  onClick={() => current && loadLiveSquareOrder(current.booking_code)}
+                  disabled={liveSquareLoading}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: SQ.sub, display: 'flex', alignItems: 'center' }}
+                  aria-label="Refresh live Square order"
+                >
+                  <RefreshCw size={14} className={liveSquareLoading ? 'animate-spin' : ''} />
+                </button>
+              </div>
+              <div style={{ padding: '0.7rem 1rem' }}>
+                {liveSquareLoading && !liveSquareOrder ? (
+                  <p style={{ color: SQ.sub, fontSize: '0.78rem' }}>Checking Square...</p>
+                ) : liveSquareOrder?.matched && liveSquareOrder.order ? (
+                  <>
+                    {liveSquareOrder.multiple_candidates && (
+                      <p style={{ color: '#B8860B', fontSize: '0.72rem', marginBottom: '0.4rem' }}>
+                        ⚠ More than one open ticket matches this table — showing the most recently updated.
+                      </p>
+                    )}
+                    <p style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: '0.3rem' }}>"{liveSquareOrder.order.ticket_name}"</p>
+                    <div style={{ maxHeight: '16vh', overflowY: 'auto', marginBottom: '0.4rem' }}>
+                      {liveSquareOrder.order.items.map((it, idx) => (
+                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem', padding: '0.15rem 0' }}>
+                          <span>{it.quantity > 1 ? `${it.quantity}x ` : ''}{it.name}</span>
+                          {it.total_gbp !== null && <span style={{ color: SQ.sub }}>£{it.total_gbp.toFixed(2)}</span>}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.4rem', borderTop: `1px solid ${SQ.line}` }}>
+                      <span style={{ color: SQ.sub, fontSize: '0.78rem' }}>Square total</span>
+                      <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>£{(liveSquareOrder.order.total_gbp ?? 0).toFixed(2)}</span>
+                    </div>
+                  </>
+                ) : liveSquareOrder?.reason === 'no_table_set' ? (
+                  <p style={{ color: SQ.sub, fontSize: '0.78rem' }}>Set a table number to match against Square.</p>
+                ) : liveSquareOrder?.reason === 'no_open_ticket_for_table' ? (
+                  <p style={{ color: SQ.sub, fontSize: '0.78rem' }}>No open Square ticket found for {current?.table_number ? `Table ${current.table_number}` : 'this table'}.</p>
+                ) : liveSquareOrder?.reason === 'table_number_has_no_digits' ? (
+                  <p style={{ color: SQ.sub, fontSize: '0.78rem' }}>Table "{liveSquareOrder.table_number}" has no number to match on Square.</p>
+                ) : (
+                  <p style={{ color: SQ.sub, fontSize: '0.78rem' }}>Could not check Square right now.</p>
+                )}
+              </div>
+            </div>
+
             <div style={{ backgroundColor: SQ.panel, borderRadius: 10, border: `1px solid ${SQ.line}`, overflow: 'hidden', position: 'sticky', top: '1rem' }}>
               <div style={{ padding: '0.8rem 1rem', borderBottom: `1px solid ${SQ.line}`, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Printer size={16} color={SQ.sub} />
-                <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Current Sale</span>
+                <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>GlazeUp Till</span>
               </div>
 
               {pieceCount > 0 && (
