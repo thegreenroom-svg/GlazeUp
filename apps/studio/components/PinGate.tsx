@@ -7,6 +7,23 @@ import { Delete } from 'lucide-react';
 
 const SESSION_KEY = 'glazeup_shift';
 
+// A plain fetch() has no timeout of its own -- if the request genuinely
+// hangs (not just a slow-but-working cold start, a real stalled
+// connection), it can sit pending forever. Every submit here gates the
+// whole PinPad on a `busy` flag while its fetch is in flight, so a fetch
+// that never settles would leave the pad permanently unresponsive --
+// exactly what "stuck" looks like. This guarantees every call here
+// resolves or rejects within 20s either way.
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 20000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 interface Shift {
   id: string | null;
   name: string | null;
@@ -149,7 +166,7 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
     if (team.length > 0 || teamLoading) return;
     setTeamLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/team`);
+      const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/team`);
       const data = res.ok ? await res.json() : [];
       setTeam((Array.isArray(data) ? data : []).filter((m: TeamMember) => m.active));
     } catch { /* leave team empty, pickers will just show nothing to choose */ }
@@ -175,7 +192,7 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pin/verify`, {
+      const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pin/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pin: value }),
@@ -201,8 +218,8 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
         at: Date.now(),
       };
       finishLogin(s);
-    } catch {
-      setError('Could not check that PIN');
+    } catch (err: any) {
+      setError(err?.name === 'AbortError' ? "Taking too long to check — try again" : 'Could not check that PIN');
       setPin('');
     } finally {
       setBusy(false);
@@ -259,7 +276,7 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
       setPersonalizeBusy(true);
       setPersonalizeError(null);
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pin/set`, {
+        const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pin/set`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ staff_member_id: personalizing.id, old_pin: sharedPinUsed, new_pin: next }),
@@ -272,8 +289,8 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
           return;
         }
         finishLogin({ id: personalizing.id, name: personalizing.name, role: personalizing.role, at: Date.now() });
-      } catch {
-        setPersonalizeError('Could not set that PIN');
+      } catch (err: any) {
+        setPersonalizeError(err?.name === 'AbortError' ? 'Taking too long -- try again' : 'Could not set that PIN');
         setNewPin1(''); setNewPin2('');
         setMode('personalize-pin');
       } finally {
@@ -352,7 +369,7 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
       setAdminResetBusy(true);
       setAdminResetError(null);
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pin/admin-reset`, {
+        const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pin/admin-reset`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -370,8 +387,8 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
           return;
         }
         setAdminResetDone(`${resetTarget.name}'s PIN has been reset.`);
-      } catch {
-        setAdminResetError('Could not reset that PIN');
+      } catch (err: any) {
+        setAdminResetError(err?.name === 'AbortError' ? 'Taking too long -- try again' : 'Could not reset that PIN');
         setResetPin1(''); setResetPin2('');
         setAdminResetStage('new-pin');
       } finally {
@@ -468,9 +485,13 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
     return lockScreenShell(
       <>
         <PinPad value={pin} onPress={press} onDelete={() => setPin(pin.slice(0, -1))} error={error} />
-        <p style={{ color: 'white', opacity: 0.65, fontSize: '0.75rem', marginTop: '1.5rem', textAlign: 'center', maxWidth: 260 }}>
-          Staff PIN to open the studio app.
-        </p>
+        {busy ? (
+          <p style={{ color: 'white', opacity: 0.75, fontSize: '0.8rem', marginTop: '1.5rem' }}>Checking...</p>
+        ) : (
+          <p style={{ color: 'white', opacity: 0.65, fontSize: '0.75rem', marginTop: '1.5rem', textAlign: 'center', maxWidth: 260 }}>
+            Staff PIN to open the studio app.
+          </p>
+        )}
       </>
     );
   }
