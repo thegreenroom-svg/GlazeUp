@@ -1234,6 +1234,87 @@ export function registerLiveTotalRoute(app, supabase, STUDIO_ID, logger, axios) 
 }
 
 // ============================================================================
+// SQUARE OPEN ORDERS DIAGNOSTIC -- purely investigative, GET only
+// ----------------------------------------------------------------------------
+// Daisy asked whether staff opening a table in the app could see a live,
+// read-only view of what's actually been rung up on the physical Square
+// handheld for that table. Whether that's buildable hinges entirely on one
+// unknown: do the real open Square tickets carry a `ticket_name` (or
+// anything else) that identifies which table they belong to? This endpoint
+// answers that honestly by asking Square directly -- returns real OPEN
+// orders for today with exactly the fields that would matter for matching,
+// nothing invented. Not wired into any table/booking view yet: this is the
+// look-before-you-build step, not the feature itself.
+// ============================================================================
+export function registerSquareOpenOrdersDiagnosticRoute(app, supabase, STUDIO_ID, logger, axios) {
+  app.get('/api/spec/square/open-orders-diagnostic', async (req, res) => {
+    try {
+      const { data: connection } = await supabase
+        .from('square_connections')
+        .select('square_access_token, square_token_expires_at')
+        .eq('studio_id', STUDIO_ID)
+        .single();
+
+      if (!connection || new Date(connection.square_token_expires_at) < new Date()) {
+        return res.status(400).json({ error: 'No valid Square connection', orders: [] });
+      }
+
+      const token = connection.square_access_token;
+      const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', {
+        headers: { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18' },
+      });
+      const locations = locationsRes.data.locations || [];
+      if (!locations.length) return res.json({ orders: [], pulled_at: new Date().toISOString() });
+
+      const todayStart = new Date();
+      todayStart.setUTCHours(0, 0, 0, 0);
+
+      const ordersRes = await axios.post(
+        'https://connect.squareup.com/v2/orders/search',
+        {
+          location_ids: locations.map((l) => l.id),
+          query: {
+            filter: {
+              date_time_filter: { created_at: { start_at: todayStart.toISOString() } },
+              state_filter: { states: ['OPEN'] },
+            },
+          },
+          limit: 100,
+        },
+        { headers: { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18', 'Content-Type': 'application/json' } }
+      );
+
+      const orders = ordersRes.data.orders || [];
+
+      // Deliberately narrow -- exactly the fields that matter for judging
+      // whether an open ticket can be matched to a table, nothing more.
+      const summarised = orders.map((o) => ({
+        id: o.id,
+        ticket_name: o.ticket_name || null,
+        reference_id: o.reference_id || null,
+        state: o.state,
+        created_at: o.created_at,
+        updated_at: o.updated_at,
+        item_count: (o.line_items || []).length,
+        item_names: (o.line_items || []).map((li) => li.name),
+        total_gbp: o.total_money ? o.total_money.amount / 100 : null,
+        source: o.source?.name || null,
+      }));
+
+      res.json({
+        orders: summarised,
+        order_count: summarised.length,
+        has_any_ticket_name: summarised.some((o) => !!o.ticket_name),
+        pulled_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      logger.error(err.response?.data || err);
+      res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message, orders: [] });
+    }
+  });
+}
+
+// ============================================================================
 // EQUIPMENT REQUEST (stylus & tablet) — real staff alert, not a fake sale.
 // ----------------------------------------------------------------------------
 // No Square item exists for this (checked directly -- searched item_name for

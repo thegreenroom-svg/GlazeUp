@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerTestAiRoute, registerPartySizeRoute } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerTestAiRoute, registerPartySizeRoute } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -1547,6 +1547,7 @@ registerTillMenuRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerKdsRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 registerAiCostRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerLiveTotalRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
+registerSquareOpenOrdersDiagnosticRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerEquipmentRequestRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerDesignChargeRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerFulfilmentRoute(app, supabase, DEMO_STUDIO_ID, logger);
