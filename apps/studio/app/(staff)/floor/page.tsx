@@ -96,6 +96,9 @@ export default function FloorPage() {
     order: { ticket_name: string; total_gbp: number | null; items: { name: string; quantity: number; total_gbp: number | null }[]; updated_at: string } | null;
   } | null>(null);
   const [liveSquareLoading, setLiveSquareLoading] = useState(false);
+  const [editingTableInline, setEditingTableInline] = useState(false);
+  const [tableDraftInline, setTableDraftInline] = useState('');
+  const [savingTableInline, setSavingTableInline] = useState(false);
   const [tillItems, setTillItems] = useState<TillItem[]>([]);
   const [tillBusy, setTillBusy] = useState(false);
   const [photo, setPhoto] = useState<File | null>(null);
@@ -190,6 +193,31 @@ export default function FloorPage() {
       setLiveSquareOrder({ matched: false, reason: 'error', order: null });
     } finally {
       setLiveSquareLoading(false);
+    }
+  };
+
+  // Setting the table right from the Till header -- same real endpoint
+  // already used on Bookings and daily-cards, just reachable from here too
+  // since this is the actual point staff open a table and notice it's not
+  // set yet. Re-checks the live Square match afterwards since that match
+  // depends entirely on table_number.
+  const saveTableInline = async () => {
+    if (!current) return;
+    const value = tableDraftInline.trim();
+    if (!value) return;
+    setSavingTableInline(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${current.booking_code}/table-number`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table_number: value }),
+      });
+      if (!res.ok) return;
+      setCurrent({ ...current, table_number: value });
+      setEditingTableInline(false);
+      loadLiveSquareOrder(current.booking_code);
+    } finally {
+      setSavingTableInline(false);
     }
   };
 
@@ -445,6 +473,17 @@ export default function FloorPage() {
     const PALETTE = ['#3B7EC4', '#3F9A6E', '#A16FC2', '#D98A4E', '#4AA6A0', '#C25F86', '#7A8F4A', '#5D7BC4'];
     const colourFor = (idx: number) => PALETTE[idx % PALETTE.length];
 
+    // Quick-pick table options, same space-prefixed convention the girls
+    // already use on the tools they set tables with day to day -- 'Main
+    // Studio 4', 'Lounge 2' etc, rather than typing a bare number. Real
+    // studio layout: Main Studio has tables 1-8; Lounge is (still)
+    // referred to as 3 tables. Free text below covers anything these
+    // quick options don't -- splits/combines like '3A' or '3+4'.
+    const QUICK_TABLES = [
+      ...Array.from({ length: 8 }, (_, i) => `Main Studio ${i + 1}`),
+      ...Array.from({ length: 3 }, (_, i) => `Lounge ${i + 1}`),
+    ];
+
     const activeList = activeBucket ? activeBucket.items : activeSubsection ? activeSubsection.items : null;
 
     return (
@@ -457,13 +496,69 @@ export default function FloorPage() {
             </div>
             <div>
               <p style={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.1 }}>{current?.customer_name || 'Ticket'}</p>
-              <p style={{ color: SQ.sub, fontSize: '0.72rem' }}>{current?.table_number ? `Table ${current.table_number}` : 'No table set'}</p>
+              {!editingTableInline ? (
+                <button
+                  onClick={() => { setTableDraftInline(current?.table_number || ''); setEditingTableInline(true); }}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', color: current?.table_number ? SQ.sub : SQ.accent, fontSize: '0.72rem', fontWeight: current?.table_number ? 400 : 700 }}
+                >
+                  {current?.table_number ? `Table ${current.table_number}` : 'Set table'}
+                  <span style={{ fontSize: '0.62rem', opacity: 0.7 }}>✎</span>
+                </button>
+              ) : (
+                <p style={{ color: SQ.sub, fontSize: '0.72rem' }}>Choose a table below</p>
+              )}
             </div>
           </div>
           <button onClick={() => router.push('/floor')} style={{ background: 'none', border: 'none', color: SQ.sub, fontSize: '0.8rem', cursor: 'pointer' }}>
             <Home size={20} />
           </button>
         </div>
+
+        {editingTableInline && (
+          <div style={{ backgroundColor: SQ.panel, borderBottom: `1px solid ${SQ.line}`, padding: '0.8rem 1rem' }}>
+            <p style={{ color: SQ.sub, fontSize: '0.72rem', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Quick pick</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.8rem' }}>
+              {QUICK_TABLES.map((t) => (
+                <button
+                  key={t}
+                  onClick={() => { setTableDraftInline(t); }}
+                  style={{
+                    padding: '0.4rem 0.7rem', borderRadius: 6, fontSize: '0.78rem', cursor: 'pointer',
+                    border: tableDraftInline === t ? `1.5px solid ${SQ.accent}` : `1px solid ${SQ.line}`,
+                    backgroundColor: tableDraftInline === t ? SQ.accent + '15' : 'transparent',
+                    color: tableDraftInline === t ? SQ.accentDark : SQ.ink,
+                    fontWeight: tableDraftInline === t ? 700 : 400,
+                  }}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+              <input
+                type="text"
+                value={tableDraftInline}
+                onChange={(e) => setTableDraftInline(e.target.value)}
+                placeholder="Or type e.g. 3A, 3+4"
+                maxLength={30}
+                style={{ flex: 1, padding: '0.5rem 0.7rem', borderRadius: 6, border: `1px solid ${SQ.line}`, fontSize: '0.82rem' }}
+              />
+              <button
+                onClick={saveTableInline}
+                disabled={savingTableInline || !tableDraftInline.trim()}
+                style={{ padding: '0.5rem 0.9rem', borderRadius: 6, border: 'none', backgroundColor: SQ.accent, color: 'white', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', opacity: savingTableInline || !tableDraftInline.trim() ? 0.6 : 1 }}
+              >
+                {savingTableInline ? '...' : 'Save'}
+              </button>
+              <button
+                onClick={() => setEditingTableInline(false)}
+                style={{ padding: '0.5rem 0.7rem', borderRadius: 6, border: 'none', background: 'none', color: SQ.sub, fontSize: '0.8rem', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         {current?.notes && (
           <div style={{ backgroundColor: '#FFF4D6', borderBottom: '1px solid #E0C060', padding: '0.5rem 1rem', fontSize: '0.8rem' }}>
