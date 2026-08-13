@@ -1432,6 +1432,44 @@ export function registerLiveSquareOrderRoute(app, supabase, STUDIO_ID, logger, a
 }
 
 // ============================================================================
+// BOOKINGS NEEDING VERIFICATION -- real, read-only.
+// ----------------------------------------------------------------------------
+// A batch of real bookings were entered on 9 Aug from a photo of a diary
+// (OCR, not typed in directly) -- where the date/time couldn't be read with
+// full confidence, a note was added asking for it to be checked. Confirmed
+// live: 25 real bookings still carry this note, spanning 4-21 Aug, some
+// still upcoming. Nobody has been through and cleared them since. This
+// endpoint just surfaces the real list -- GET only, no write, no "mark
+// verified" action here; verifying is a real judgement call for a person
+// with the actual diary/records, not something this app should silently
+// resolve.
+//
+// Matched by the literal marker text the 9 Aug import used ('Added via
+// photo review') -- there's no dedicated boolean column for this in the
+// real bookings table (checked the schema directly before writing this),
+// so this is a text match, same honest posture as the other approximate
+// matches already in this file.
+// ============================================================================
+export function registerNeedsVerificationRoute(app, supabase, STUDIO_ID, logger) {
+  app.get('/api/spec/bookings/needs-verification', async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, table_number, session_start, notes')
+        .eq('studio_id', STUDIO_ID)
+        .ilike('notes', '%photo review%')
+        .order('session_start', { ascending: true });
+      if (error) throw error;
+
+      res.json({ bookings: data || [], count: (data || []).length });
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message, bookings: [] });
+    }
+  });
+}
+
+// ============================================================================
 // EQUIPMENT REQUEST (stylus & tablet) — real staff alert, not a fake sale.
 // ----------------------------------------------------------------------------
 // No Square item exists for this (checked directly -- searched item_name for

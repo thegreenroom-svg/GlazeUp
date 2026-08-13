@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerLiveSquareOrderRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerTestAiRoute, registerPartySizeRoute } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerTestAiRoute, registerPartySizeRoute } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -388,110 +388,6 @@ app.get('/api/demo/team', async (req, res) => {
   } catch (err) {
     logger.error(err);
     res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/demo/till', async (req, res) => {
-  try {
-    const { data: sessions, error: sessionsError } = await supabase
-      .from('table_sessions')
-      .select('id, table_number, status, number_of_places, created_at')
-      .eq('studio_id', DEMO_STUDIO_ID)
-      .order('created_at', { ascending: false })
-      .limit(20);
-    if (sessionsError) throw sessionsError;
-
-    const sessionIds = sessions.map((s) => s.id);
-    let orders = [];
-    if (sessionIds.length > 0) {
-      const { data: orderData, error: ordersError } = await supabase
-        .from('table_session_orders')
-        .select('id, table_session_id, item_type, item_name, quantity, unit_price_cents, notes, created_at')
-        .in('table_session_id', sessionIds);
-      if (ordersError) throw ordersError;
-      orders = orderData;
-    }
-
-    const result = sessions.map((s) => ({
-      ...s,
-      orders: orders.filter((o) => o.table_session_id === s.id),
-    }));
-
-    res.json(result);
-  } catch (err) {
-    logger.error(err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Live Square pull -- reads the real, currently-valid Square access token
-// from square_connections (read-only), then calls Square's own API live
-// (List Locations, then Orders Search for today). Nothing is written to
-// any database anywhere in this endpoint; it's a live pass-through.
-app.get('/api/demo/square-live', async (req, res) => {
-  try {
-    const { data: connection, error: connError } = await supabase
-      .from('square_connections')
-      .select('square_access_token, square_token_expires_at, last_synced_at')
-      .eq('studio_id', DEMO_STUDIO_ID)
-      .single();
-
-    if (connError || !connection) {
-      return res.status(404).json({ error: 'No Square connection found for this studio' });
-    }
-
-    if (new Date(connection.square_token_expires_at) < new Date()) {
-      return res.status(400).json({ error: 'Square token has expired', last_synced_at: connection.last_synced_at });
-    }
-
-    const token = connection.square_access_token;
-
-    const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', {
-      headers: { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18' },
-    });
-
-    const locations = locationsRes.data.locations || [];
-    if (locations.length === 0) {
-      return res.json({ locations: [], orders: [] });
-    }
-
-    const todayStart = new Date();
-    todayStart.setUTCHours(0, 0, 0, 0);
-
-    const ordersRes = await axios.post(
-      'https://connect.squareup.com/v2/orders/search',
-      {
-        location_ids: locations.map((l) => l.id),
-        query: {
-          filter: {
-            date_time_filter: {
-              created_at: { start_at: todayStart.toISOString() },
-            },
-            state_filter: { states: ['OPEN', 'COMPLETED'] },
-          },
-          sort: { sort_field: 'CREATED_AT', sort_order: 'DESC' },
-        },
-        limit: 50,
-      },
-      { headers: { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18', 'Content-Type': 'application/json' } }
-    );
-
-    const orders = (ordersRes.data.orders || []).map((o) => ({
-      id: o.id,
-      state: o.state,
-      created_at: o.created_at,
-      total_money: o.total_money ? o.total_money.amount / 100 : 0,
-      line_items: (o.line_items || []).map((li) => ({ name: li.name, quantity: li.quantity, total: li.total_money ? li.total_money.amount / 100 : 0 })),
-    }));
-
-    res.json({
-      locations: locations.map((l) => ({ id: l.id, name: l.name })),
-      orders,
-      pulled_at: new Date().toISOString(),
-    });
-  } catch (err) {
-    logger.error(err.response?.data || err);
-    res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message });
   }
 });
 
@@ -1549,6 +1445,7 @@ registerAiCostRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerLiveTotalRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerSquareOpenOrdersDiagnosticRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerLiveSquareOrderRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
+registerNeedsVerificationRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerEquipmentRequestRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerDesignChargeRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerFulfilmentRoute(app, supabase, DEMO_STUDIO_ID, logger);
