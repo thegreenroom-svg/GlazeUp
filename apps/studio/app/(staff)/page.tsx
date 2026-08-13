@@ -9,9 +9,22 @@ import { Calendar, PoundSterling, Palette, Bell, Users, RefreshCw } from 'lucide
 import { SkeletonTiles } from '@/components/Skeleton';
 import { usePullToRefresh } from '@/components/usePullToRefresh';
 
+// Same fix already applied across floor/bookings/daily-cards/PinGate: a
+// plain fetch() has no timeout of its own.
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 20000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 interface TileData {
   bookingsCount: number;
   moneyToday: number;
+  moneyAvailable: boolean;
   piecesCount: number;
   alertsUnread: number;
   customersCount: number;
@@ -121,10 +134,19 @@ export default function Dashboard() {
   const load = useCallback(async () => {
     try {
       const base = process.env.NEXT_PUBLIC_API_URL;
-      const [studioRes, bookingsRes, revenueRes, piecesRes, alertsRes, customersRes] = await Promise.all([
+      const [studioRes, bookingsRes, liveTotalRes, piecesRes, alertsRes, customersRes] = await Promise.all([
         fetch(`${base}/api/demo/studio`),
         fetch(`${base}/api/demo/bookings`),
-        fetch(`${base}/api/demo/revenue`),
+        // Real, live Square pull for today specifically -- deliberately NOT
+        // /api/demo/revenue (revenue_category_breakdown). Checked directly:
+        // that table hadn't been updated in 6 real days (last row 7 Aug),
+        // so "today's takings" from it would always show a false £0 or a
+        // stale number, not because anything on this page is broken but
+        // because whatever background job is meant to keep that table
+        // current has stopped. This route already existed for exactly
+        // this reason (see its own comment in spec-routes-2.js) -- it
+        // just wasn't wired into the dashboard tile until now.
+        fetchWithTimeout(`${base}/api/spec/today-live-total`),
         fetch(`${base}/api/demo/pieces`),
         fetch(`${base}/api/demo/alerts`),
         fetch(`${base}/api/demo/customers`),
@@ -132,7 +154,7 @@ export default function Dashboard() {
 
       const studio = studioRes.ok ? await studioRes.json() : null;
       const bookings = bookingsRes.ok ? await bookingsRes.json() : [];
-      const revenue = revenueRes.ok ? await revenueRes.json() : [];
+      const liveTotal = liveTotalRes.ok ? await liveTotalRes.json() : null;
       const pieces = piecesRes.ok ? await piecesRes.json() : [];
       const alerts = alertsRes.ok ? await alertsRes.json() : [];
       const customers = customersRes.ok ? await customersRes.json() : [];
@@ -143,21 +165,15 @@ export default function Dashboard() {
       const targetStr = target.toDateString();
       const bookingsCount = bookings.filter((b: any) => new Date(b.session_start).toDateString() === targetStr).length;
 
-      // Real today's takings specifically -- not "whatever the most recent
-      // synced day happens to be", which could silently be yesterday's
-      // figure if today hasn't synced yet. If today genuinely has no
-      // revenue rows yet, this honestly shows £0 rather than a stale
-      // number mislabeled as current.
-      const todayStr = new Date().toDateString();
-      const moneyToday = revenue
-        .filter((r: any) => new Date(r.metric_date).toDateString() === todayStr)
-        .reduce((sum: number, r: any) => sum + r.revenue_cents, 0) / 100;
+      const moneyToday = typeof liveTotal?.total_gbp === 'number' ? liveTotal.total_gbp : 0;
+      const moneyAvailable = liveTotal?.total_gbp !== null && liveTotal?.total_gbp !== undefined;
 
       const alertsUnread = alerts.filter((a: any) => !a.acknowledged).length;
 
       setData({
         bookingsCount,
         moneyToday,
+        moneyAvailable,
         piecesCount: pieces.length,
         alertsUnread,
         customersCount: customers.length,
@@ -248,7 +264,7 @@ export default function Dashboard() {
 
           {isAdmin && (
             <div style={{ marginBottom: '0.75rem' }}>
-              <Tile label="Takings" icon={PoundSterling} value={`£${data.moneyToday.toFixed(0)}`} subtext={takingsSubtext} color="#C58C5B" fontSize="1.5rem" maxSize="130px" onClick={() => router.push('/money')} />
+              <Tile label="Takings" icon={PoundSterling} value={data.moneyAvailable ? `£${data.moneyToday.toFixed(0)}` : '—'} subtext={data.moneyAvailable ? takingsSubtext : 'Square unavailable'} color="#C58C5B" fontSize="1.5rem" maxSize="130px" onClick={() => router.push('/money')} />
             </div>
           )}
 
