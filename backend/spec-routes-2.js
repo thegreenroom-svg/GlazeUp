@@ -264,10 +264,120 @@ export function registerPinRoutes(app, supabase, STUDIO_ID, logger, crypto) {
 
       res.json({
         ok: true,
-        staff: staff || null,
+        staff: staff ? { ...staff, id: match.staff_member_id } : null,
         shared: sharedBy > 1,
         shared_by: sharedBy,
       });
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin roles that can reset another team member's PIN. Matches the real
+  // roles on staff_team (checked live against Supabase before writing this)
+  // rather than hardcoding names -- whoever holds one of these roles gets
+  // the ability, without a code change if the people in these roles change.
+  const ADMIN_ROLES = ['General Manager', 'Co-Director', 'Studio Executive'];
+
+  // Set your own PIN -- moves one person off the shared default onto
+  // something only they know. Proof of access is the PIN they're
+  // CURRENTLY using (old_pin) hashing to what's already on file for that
+  // staff_member_id -- same 'not a security boundary, just identifies a
+  // shift' posture as verify above, just enough to stop blindly
+  // overwriting a colleague's PIN without knowing any valid PIN for that
+  // identity at all.
+  app.post('/api/spec/pin/set', async (req, res) => {
+    try {
+      const { staff_member_id, old_pin, new_pin } = req.body || {};
+      if (!staff_member_id || !old_pin || !new_pin) {
+        return res.status(400).json({ error: 'staff_member_id, old_pin and new_pin are required' });
+      }
+      if (!/^\d{4}$/.test(String(new_pin))) {
+        return res.status(400).json({ error: 'new_pin must be exactly 4 digits' });
+      }
+
+      const oldHash = crypto.createHash('sha256').update(String(old_pin)).digest('hex');
+      const { data: existing, error: fetchErr } = await supabase
+        .from('staff_pins')
+        .select('id, pin_hash')
+        .eq('staff_member_id', staff_member_id)
+        .eq('studio_id', STUDIO_ID)
+        .maybeSingle();
+      if (fetchErr) throw fetchErr;
+      if (!existing || existing.pin_hash !== oldHash) {
+        return res.status(401).json({ error: 'Current PIN not recognised for that person' });
+      }
+
+      const newHash = crypto.createHash('sha256').update(String(new_pin)).digest('hex');
+      const { error: updateErr } = await supabase
+        .from('staff_pins')
+        .update({ pin_hash: newHash })
+        .eq('id', existing.id);
+      if (updateErr) throw updateErr;
+
+      res.json({ ok: true });
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Admin reset -- lets General Manager/Co-Director/Studio Executive reset
+  // ANY team member's PIN (including their own, if forgotten). Authorised
+  // by the admin's OWN current PIN, checked server-side against their OWN
+  // staff_member_id and role -- never just a name or role trusted as sent
+  // from the client.
+  app.post('/api/spec/pin/admin-reset', async (req, res) => {
+    try {
+      const { admin_staff_member_id, admin_pin, target_staff_member_id, new_pin } = req.body || {};
+      if (!admin_staff_member_id || !admin_pin || !target_staff_member_id || !new_pin) {
+        return res.status(400).json({ error: 'admin_staff_member_id, admin_pin, target_staff_member_id and new_pin are required' });
+      }
+      if (!/^\d{4}$/.test(String(new_pin))) {
+        return res.status(400).json({ error: 'new_pin must be exactly 4 digits' });
+      }
+
+      const adminHash = crypto.createHash('sha256').update(String(admin_pin)).digest('hex');
+      const { data: adminPin, error: adminPinErr } = await supabase
+        .from('staff_pins')
+        .select('pin_hash')
+        .eq('staff_member_id', admin_staff_member_id)
+        .eq('studio_id', STUDIO_ID)
+        .maybeSingle();
+      if (adminPinErr) throw adminPinErr;
+      if (!adminPin || adminPin.pin_hash !== adminHash) {
+        return res.status(401).json({ error: 'PIN not recognised' });
+      }
+
+      const { data: adminStaff, error: adminStaffErr } = await supabase
+        .from('staff_team')
+        .select('role, active')
+        .eq('id', admin_staff_member_id)
+        .eq('studio_id', STUDIO_ID)
+        .maybeSingle();
+      if (adminStaffErr) throw adminStaffErr;
+      if (!adminStaff || !adminStaff.active || !ADMIN_ROLES.includes(adminStaff.role)) {
+        return res.status(403).json({ error: 'Not authorised to reset PINs' });
+      }
+
+      const { data: targetPinRow, error: targetFetchErr } = await supabase
+        .from('staff_pins')
+        .select('id')
+        .eq('staff_member_id', target_staff_member_id)
+        .eq('studio_id', STUDIO_ID)
+        .maybeSingle();
+      if (targetFetchErr) throw targetFetchErr;
+      if (!targetPinRow) return res.status(404).json({ error: 'That team member has no PIN record' });
+
+      const newHash = crypto.createHash('sha256').update(String(new_pin)).digest('hex');
+      const { error: updateErr } = await supabase
+        .from('staff_pins')
+        .update({ pin_hash: newHash })
+        .eq('id', targetPinRow.id);
+      if (updateErr) throw updateErr;
+
+      res.json({ ok: true });
     } catch (err) {
       logger.error(err);
       res.status(500).json({ error: err.message });

@@ -148,18 +148,9 @@ export default function Dashboard() {
       )}
       {pulling && <p style={{ textAlign: 'center', color: 'var(--clay)', fontSize: '0.8rem', marginBottom: '0.5rem' }}>Refreshing...</p>}
 
-      <div
-        style={{
-          padding: '0.75rem 1rem',
-          backgroundColor: '#fff8e1',
-          border: '1px solid #ffca28',
-          borderRadius: '4px',
-          marginBottom: '1.25rem',
-          fontSize: '0.8rem',
-        }}
-      >
-        Demo view — read-only. {studioName}
-      </div>
+      {studioName && (
+        <p style={{ fontSize: '0.8rem', color: '#999', marginBottom: '1.25rem' }}>{studioName}</p>
+      )}
 
       <div style={{ display: 'flex', gap: '0.6rem', maxWidth: '520px', margin: '0 auto 1.5rem' }}>
         <button

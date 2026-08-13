@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'GlazeUp Studio - Read-only Demo',
-  description: 'Read-only demo view of GlazeUp studio management'
+  title: 'GlazeUp Studio',
+  description: 'GlazeUp studio management'
 };
 
 export default function RootLayout({
