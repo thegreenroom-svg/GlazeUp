@@ -15,6 +15,7 @@ interface Booking {
   session_start: string;
   table_number: string | null;
   party_size: number | null;
+  notes: string | null;
 }
 
 interface MenuItem {
@@ -375,7 +376,10 @@ export default function FloorPage() {
               {bookings.map((b) => (
                 <button key={b.booking_code} onClick={() => selectBooking(b)} className="w-full text-left p-3 rounded-lg flex justify-between items-center" style={{ backgroundColor: B.charcoal, border: `1px solid ${B.stone}40` }}>
                   <div>
-                    <p style={{ color: B.ivory, fontWeight: 600, fontSize: '0.9rem' }}>{b.customer_name}</p>
+                    <p style={{ color: B.ivory, fontWeight: 600, fontSize: '0.9rem' }}>
+                      {b.customer_name}
+                      {b.notes && <span style={{ color: '#e0c060', marginLeft: '0.4rem' }} title="Has a note">●</span>}
+                    </p>
                     <p style={{ color: B.stone, fontSize: '0.75rem' }}>
                       {new Date(b.session_start).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
                       {b.table_number ? ` · Table ${b.table_number}` : ''}
@@ -410,6 +414,15 @@ export default function FloorPage() {
               <h2 className="text-xl font-bold" style={{ color: B.ivory }}>{current?.customer_name}</h2>
               <p style={{ color: B.stone, fontSize: '0.8rem' }}>Add items as the table orders</p>
             </div>
+
+            {current?.notes && (
+              <div style={{
+                backgroundColor: '#fff4d6', border: '1px solid #e0c060', borderRadius: 8,
+                padding: '0.6rem 0.8rem', marginBottom: '1.2rem', fontSize: '0.82rem', color: '#222', lineHeight: 1.4,
+              }}>
+                <strong>Note:</strong> {current?.notes}
+              </div>
+            )}
 
             {pieceCount > 0 && (
               <div className="flex items-center gap-3 justify-center mb-5">
