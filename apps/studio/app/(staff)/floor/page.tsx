@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ChevronRight, Home, Camera, Printer, Check, Loader } from 'lucide-react';
 import QRCode from 'qrcode';
+import { NudgeCard, HelpButton } from '@/components/NudgeSystem';
 
 interface Booking {
   booking_code: string;
@@ -186,6 +187,17 @@ export default function FloorPage() {
     setPhase(3);
   };
 
+  // Single-tap return from any depth (bucket, subsection, or item grid)
+  // straight to the top-level Till group tiles -- Cafe or Pottery Blanks
+  // side alike, instead of the previous chained back-one-level-at-a-time
+  // navigation.
+  const backToTillMenu = () => {
+    setActiveGroup(null);
+    setActiveSubsection(null);
+    setActiveBucket(null);
+    setShowAllItems(false);
+  };
+
   const addTillItem = async (m: MenuItem) => {
     if (!current) return;
     setTillBusy(true);
@@ -300,6 +312,7 @@ export default function FloorPage() {
   if (phase === 1) {
     return (
       <div className="min-h-screen p-4" style={{ backgroundColor: B.charcoal }}>
+        <HelpButton pageIds={['floor_home', 'floor_select_table', 'floor_seated_totals', 'floor_till', 'floor_split_bill', 'floor_completion', 'floor_photo', 'floor_handoff']} />
         <div className="max-w-2xl mx-auto">
           <div className="pt-6 pb-8 text-center">
             <h1 className="text-2xl font-bold" style={{ color: B.ivory }}>Start Floor</h1>
@@ -320,6 +333,7 @@ export default function FloorPage() {
             </a>
           </div>
         </div>
+        <NudgeCard id="floor_home" />
       </div>
     );
   }
@@ -367,6 +381,7 @@ export default function FloorPage() {
             </div>
           </div>
         </div>
+        <NudgeCard id={quickAccessMode ? 'floor_seated_totals' : 'floor_select_table'} />
       </div>
     );
   }
@@ -468,8 +483,8 @@ export default function FloorPage() {
 
                 {activeGroup && !activeSubsection && (
                   <>
-                    <button onClick={() => setActiveGroup(null)} style={{ color: B.clay, background: 'none', border: 'none', fontSize: '0.8rem', marginBottom: '0.5rem', padding: 0 }}>
-                      ← {activeGroup.label}
+                    <button onClick={backToTillMenu} style={{ color: B.clay, background: 'none', border: 'none', fontSize: '0.8rem', marginBottom: '0.5rem', padding: 0 }}>
+                      ← Back to Till
                     </button>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                       {activeGroup.subsections.map((s) => (
@@ -489,10 +504,10 @@ export default function FloorPage() {
                 {activeSubsection && (
                   <>
                     <button
-                      onClick={() => (activeBucket ? setActiveBucket(null) : setActiveSubsection(null))}
+                      onClick={backToTillMenu}
                       style={{ color: B.clay, background: 'none', border: 'none', fontSize: '0.8rem', marginBottom: '0.5rem', padding: 0 }}
                     >
-                      ← {activeBucket ? activeBucket.label : activeSubsection.label}
+                      ← Back to Till
                     </button>
 
                     {activeSubsection.buckets && !activeBucket ? (
@@ -560,6 +575,8 @@ export default function FloorPage() {
             </button>
           </div>
         </div>
+        <NudgeCard id="floor_till" />
+        {tillItems.length > 0 && <NudgeCard id="floor_split_bill" />}
 
         {customising && (
           <div
@@ -719,6 +736,8 @@ export default function FloorPage() {
             )}
           </div>
         </div>
+        <NudgeCard id="floor_completion" />
+        <NudgeCard id="floor_photo" />
       </div>
     );
   }
@@ -761,6 +780,7 @@ export default function FloorPage() {
           </button>
         </div>
       </div>
+      <NudgeCard id="floor_handoff" />
     </div>
   );
 }

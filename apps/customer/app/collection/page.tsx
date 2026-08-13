@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Image as ImageIcon, Archive, Zap, AlertCircle, Filter } from 'lucide-react';
 import Link from 'next/link';
+import { NudgeCard, HelpButton } from '@/components/NudgeSystem';
 
 interface Piece {
   id: string;
@@ -120,7 +121,7 @@ export default function CollectionPage() {
           Your permanent digital gallery of handmade pottery
         </p>
 
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
           {statuses.map((status) => (
             <button
               key={status.value}
@@ -133,6 +134,7 @@ export default function CollectionPage() {
               {status.label}
             </button>
           ))}
+          <HelpButton pageIds={['collection_pieces']} />
         </div>
       </motion.div>
 
@@ -141,6 +143,7 @@ export default function CollectionPage() {
           <div className="inline-block w-12 h-12 border-4 border-sand border-t-clay rounded-full animate-spin"></div>
         </div>
       ) : pieces.length > 0 ? (
+        <>
         <div className="grid md:grid-cols-3 gap-6">
           {pieces.map((piece, i) => (
             <motion.div
@@ -228,6 +231,8 @@ export default function CollectionPage() {
             </motion.div>
           ))}
         </div>
+        <NudgeCard id="collection_pieces" />
+        </>
       ) : (
         <motion.div
           className="card text-center py-16"

@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Home } from 'lucide-react';
 import { ThemeProvider } from '@/components/ThemeContext';
 import { StudioNavigation } from '@/components/StudioNavigation';
+import { NudgeProvider, HelpPanel } from '@/components/NudgeSystem';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -45,27 +46,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <ThemeProvider>
-      <div className="flex" style={{ height: '100dvh' }}>
-        <StudioNavigation />
-        <main className="flex-1 overflow-auto" style={{ position: 'relative' }}>
-          {pathname !== '/' && (
-            <button
-              onClick={() => router.push('/')}
-              aria-label="Return to home"
-              style={{
-                position: 'fixed', top: '0.75rem', right: '0.75rem', zIndex: 20,
-                width: 38, height: 38, borderRadius: '50%', border: 'none', cursor: 'pointer',
-                backgroundColor: 'var(--charcoal)', color: 'var(--ivory)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
-              }}
-            >
-              <Home size={18} />
-            </button>
-          )}
-          {children}
-        </main>
-      </div>
+      <NudgeProvider>
+        <div className="flex" style={{ height: '100dvh' }}>
+          <StudioNavigation />
+          <main className="flex-1 overflow-auto" style={{ position: 'relative' }}>
+            {pathname !== '/' && (
+              <button
+                onClick={() => router.push('/')}
+                aria-label="Return to home"
+                style={{
+                  position: 'fixed', top: '0.75rem', right: '0.75rem', zIndex: 20,
+                  width: 38, height: 38, borderRadius: '50%', border: 'none', cursor: 'pointer',
+                  backgroundColor: 'var(--charcoal)', color: 'var(--ivory)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                }}
+              >
+                <Home size={18} />
+              </button>
+            )}
+            {children}
+          </main>
+        </div>
+        <HelpPanel title="How this page works" />
+      </NudgeProvider>
     </ThemeProvider>
   );
 }

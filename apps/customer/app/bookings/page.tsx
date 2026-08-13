@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Calendar, MapPin, Users, Clock, ChevronRight, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { NudgeCard, HelpButton } from '@/components/NudgeSystem';
 
 interface Booking {
   id: string;
@@ -113,6 +114,7 @@ export default function BookingsPage() {
           <Link href="/studios" className="btn btn-secondary ml-auto">
             Book New Session
           </Link>
+          <HelpButton pageIds={['bookings_list', 'bookings_empty']} />
         </div>
       </motion.div>
 
@@ -121,6 +123,7 @@ export default function BookingsPage() {
           <div className="inline-block w-12 h-12 border-4 border-sand border-t-clay rounded-full animate-spin"></div>
         </div>
       ) : bookings.length > 0 ? (
+        <>
         <div className="space-y-4">
           {bookings.map((booking, i) => (
             <motion.div
@@ -217,6 +220,8 @@ export default function BookingsPage() {
             </motion.div>
           ))}
         </div>
+        <NudgeCard id="bookings_list" />
+        </>
       ) : (
         <motion.div
           className="card text-center py-12"
@@ -231,6 +236,7 @@ export default function BookingsPage() {
           <Link href="/studios" className="btn btn-primary">
             Browse Studios
           </Link>
+          <NudgeCard id="bookings_empty" />
         </motion.div>
       )}
     </div>
