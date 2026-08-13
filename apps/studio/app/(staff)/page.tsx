@@ -5,18 +5,24 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { Calendar, PoundSterling, Flame, Palette, Bell, Users, RefreshCw } from 'lucide-react';
+import { Calendar, PoundSterling, Palette, Bell, Users, RefreshCw } from 'lucide-react';
 import { SkeletonTiles } from '@/components/Skeleton';
 import { usePullToRefresh } from '@/components/usePullToRefresh';
 
 interface TileData {
-  bookingsToday: number;
+  bookingsCount: number;
   moneyToday: number;
-  kilnActive: number;
   piecesCount: number;
   alertsUnread: number;
   customersCount: number;
 }
+
+// Same three admin roles the PIN system already gates admin actions
+// behind (apps/studio/components/PinGate.tsx) -- real financial figures
+// on the dashboard should only be visible to Jenny/David/Daisy, same
+// bar as resetting a colleague's PIN.
+const ADMIN_ROLES = ['General Manager', 'Co-Director', 'Studio Executive'];
+const SESSION_KEY = 'glazeup_shift';
 
 function Tile({
   label,
@@ -76,16 +82,49 @@ export default function Dashboard() {
   const [data, setData] = useState<TileData | null>(null);
   const [studioName, setStudioName] = useState('');
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY);
+      if (raw) {
+        const shift = JSON.parse(raw);
+        setIsAdmin(!!(shift?.role && ADMIN_ROLES.includes(shift.role)));
+      }
+    } catch { /* no shift yet, stays non-admin */ }
+  }, []);
+
+  // Which day "Bookings" actually means right now -- after 4pm it moves
+  // forward to the next day staff would actually be planning for, since
+  // by then today's numbers matter less than what's coming. Sunday after
+  // 4pm is a special case: jumps straight to next Wednesday rather than
+  // Monday.
+  const bookingsTarget = useCallback(() => {
+    const now = new Date();
+    const after4 = now.getHours() >= 16;
+    const target = new Date(now);
+    let isToday = true;
+    if (after4) {
+      isToday = false;
+      if (now.getDay() === 0) {
+        // Sunday -> next Wednesday (Wed = day 3)
+        const daysAhead = (3 - now.getDay() + 7) % 7 || 7;
+        target.setDate(now.getDate() + daysAhead);
+      } else {
+        target.setDate(now.getDate() + 1);
+      }
+    }
+    return { target, isToday };
+  }, []);
 
   const load = useCallback(async () => {
     try {
       const base = process.env.NEXT_PUBLIC_API_URL;
-      const [studioRes, bookingsRes, revenueRes, kilnRes, piecesRes, alertsRes, customersRes] = await Promise.all([
+      const [studioRes, bookingsRes, revenueRes, piecesRes, alertsRes, customersRes] = await Promise.all([
         fetch(`${base}/api/demo/studio`),
         fetch(`${base}/api/demo/bookings`),
         fetch(`${base}/api/demo/revenue`),
-        fetch(`${base}/api/demo/kiln-sessions`),
         fetch(`${base}/api/demo/pieces`),
         fetch(`${base}/api/demo/alerts`),
         fetch(`${base}/api/demo/customers`),
@@ -94,26 +133,31 @@ export default function Dashboard() {
       const studio = studioRes.ok ? await studioRes.json() : null;
       const bookings = bookingsRes.ok ? await bookingsRes.json() : [];
       const revenue = revenueRes.ok ? await revenueRes.json() : [];
-      const kiln = kilnRes.ok ? await kilnRes.json() : [];
       const pieces = piecesRes.ok ? await piecesRes.json() : [];
       const alerts = alertsRes.ok ? await alertsRes.json() : [];
       const customers = customersRes.ok ? await customersRes.json() : [];
 
       if (studio?.name) setStudioName(studio.name);
 
+      const { target } = bookingsTarget();
+      const targetStr = target.toDateString();
+      const bookingsCount = bookings.filter((b: any) => new Date(b.session_start).toDateString() === targetStr).length;
+
+      // Real today's takings specifically -- not "whatever the most recent
+      // synced day happens to be", which could silently be yesterday's
+      // figure if today hasn't synced yet. If today genuinely has no
+      // revenue rows yet, this honestly shows £0 rather than a stale
+      // number mislabeled as current.
       const todayStr = new Date().toDateString();
-      const bookingsToday = bookings.filter((b: any) => new Date(b.session_start).toDateString() === todayStr).length;
+      const moneyToday = revenue
+        .filter((r: any) => new Date(r.metric_date).toDateString() === todayStr)
+        .reduce((sum: number, r: any) => sum + r.revenue_cents, 0) / 100;
 
-      const mostRecentDate = revenue.length > 0 ? revenue.reduce((max: string, r: any) => (r.metric_date > max ? r.metric_date : max), revenue[0].metric_date) : null;
-      const moneyToday = revenue.filter((r: any) => r.metric_date === mostRecentDate).reduce((sum: number, r: any) => sum + r.revenue_cents, 0) / 100;
-
-      const kilnActive = kiln.filter((k: any) => k.status !== 'fired').length;
       const alertsUnread = alerts.filter((a: any) => !a.acknowledged).length;
 
       setData({
-        bookingsToday,
+        bookingsCount,
         moneyToday,
-        kilnActive,
         piecesCount: pieces.length,
         alertsUnread,
         customersCount: customers.length,
@@ -123,7 +167,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [bookingsTarget]);
 
   useEffect(() => {
     load();
@@ -131,13 +175,11 @@ export default function Dashboard() {
 
   const { pulling, pullDistance } = usePullToRefresh(load);
 
-  // Predictive home: during opening hours (9am-5pm) bookings lead, since
-  // that's what staff need front and centre while customers are in. Outside
-  // those hours -- early morning kiln loading, or evening after close --
-  // the kiln takes the lead tile instead, since that's what's actually
-  // happening then. Driven by the real current hour, not a fixed layout.
-  const hour = new Date().getHours();
-  const isServiceHours = hour >= 9 && hour < 17;
+  const { target: bookingsDate, isToday: bookingsIsToday } = bookingsTarget();
+  const bookingsLabel = bookingsIsToday
+    ? 'Bookings Today'
+    : `Bookings ${bookingsDate.toLocaleDateString(undefined, { weekday: 'long' })}`;
+  const takingsSubtext = `Today, ${new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '1.5rem', backgroundColor: '#FDF6F1', minHeight: '100%', position: 'relative' }}>
@@ -200,26 +242,14 @@ export default function Dashboard() {
         <SkeletonTiles />
       ) : (
         <div style={{ maxWidth: '520px', margin: '0 auto' }}>
-          {isServiceHours ? (
-            <>
-              <div style={{ marginBottom: '0.75rem' }}>
-                <Tile label="Bookings Today" icon={Calendar} value={String(data.bookingsToday)} color="var(--clay)" fontSize="2.2rem" maxSize="180px" onClick={() => router.push('/bookings')} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                <Tile label="Takings" icon={PoundSterling} value={`£${data.moneyToday.toFixed(0)}`} subtext="most recent day" color="#C58C5B" fontSize="1.5rem" maxSize="130px" onClick={() => router.push('/money')} />
-                <Tile label="Kiln Active" icon={Flame} value={String(data.kilnActive)} subtext="loading / firing" color="#A85D35" fontSize="1.5rem" maxSize="130px" onClick={() => router.push('/kiln-workflow')} />
-              </div>
-            </>
-          ) : (
-            <>
-              <div style={{ marginBottom: '0.75rem' }}>
-                <Tile label="Kiln Active" icon={Flame} value={String(data.kilnActive)} subtext="loading / firing" color="#A85D35" fontSize="2.2rem" maxSize="180px" onClick={() => router.push('/kiln-workflow')} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                <Tile label="Bookings Today" icon={Calendar} value={String(data.bookingsToday)} color="var(--clay)" fontSize="1.5rem" maxSize="130px" onClick={() => router.push('/bookings')} />
-                <Tile label="Takings" icon={PoundSterling} value={`£${data.moneyToday.toFixed(0)}`} subtext="most recent day" color="#C58C5B" fontSize="1.5rem" maxSize="130px" onClick={() => router.push('/money')} />
-              </div>
-            </>
+          <div style={{ marginBottom: '0.75rem' }}>
+            <Tile label={bookingsLabel} icon={Calendar} value={String(data.bookingsCount)} color="var(--clay)" fontSize="2.2rem" maxSize="180px" onClick={() => router.push('/bookings')} />
+          </div>
+
+          {isAdmin && (
+            <div style={{ marginBottom: '0.75rem' }}>
+              <Tile label="Takings" icon={PoundSterling} value={`£${data.moneyToday.toFixed(0)}`} subtext={takingsSubtext} color="#C58C5B" fontSize="1.5rem" maxSize="130px" onClick={() => router.push('/money')} />
+            </div>
           )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.6rem', marginBottom: '0.6rem' }}>
