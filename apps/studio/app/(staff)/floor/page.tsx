@@ -403,225 +403,244 @@ export default function FloorPage() {
     );
   }
 
-  // ============ PHASE 3: TILL (real till, real menu) ============
+  // ============ PHASE 3: TILL (Square-style till, real menu, real data) ============
+  // Styled to match Square's own standard/default point-of-sale look, per
+  // Daisy's request -- so the girls recognise it instantly and it doesn't
+  // slow them down. Same real data, same real handlers as before (menu,
+  // addTillItem, tillItems, splitBillCount etc. all unchanged) -- this is
+  // a presentation change, not a data change. Square's actual POS is a
+  // LIGHT theme (white background, black text, teal accent), unlike the
+  // rest of this app -- that's deliberate here, it's the specific visual
+  // familiarity being asked for. Honest caveat: this matches Square's
+  // well-known standard/default skin, not a pixel trace of this exact
+  // device's screen, which nobody here has access to.
   if (phase === 3) {
+    const SQ = { bg: '#F7F7F5', ink: '#1A1A1A', sub: '#6B6B6B', line: '#E3E3E0', accent: '#00785A', accentDark: '#00563F', panel: '#FFFFFF' };
+    const PALETTE = ['#3B7EC4', '#3F9A6E', '#A16FC2', '#D98A4E', '#4AA6A0', '#C25F86', '#7A8F4A', '#5D7BC4'];
+    const colourFor = (idx: number) => PALETTE[idx % PALETTE.length];
+
+    const activeList = activeBucket ? activeBucket.items : activeSubsection ? activeSubsection.items : null;
+
     return (
-      <div className="min-h-screen p-4" style={{ backgroundColor: B.charcoal }}>
-        <div className="max-w-2xl mx-auto">
-          <Header label="Phase 3/5 · Till" />
-          <div className="rounded-lg p-6" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
-            <div className="text-center mb-5">
-              <h2 className="text-xl font-bold" style={{ color: B.ivory }}>{current?.customer_name}</h2>
-              <p style={{ color: B.stone, fontSize: '0.8rem' }}>Add items as the table orders</p>
+      <div style={{ minHeight: '100vh', backgroundColor: SQ.bg, color: SQ.ink, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+        {/* Header bar -- ticket name, receipt icon, standard Square-style top strip */}
+        <div style={{ backgroundColor: SQ.panel, borderBottom: `1px solid ${SQ.line}`, padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: SQ.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Printer size={16} color="white" />
             </div>
+            <div>
+              <p style={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.1 }}>{current?.customer_name || 'Ticket'}</p>
+              <p style={{ color: SQ.sub, fontSize: '0.72rem' }}>{current?.table_number ? `Table ${current.table_number}` : 'No table set'}</p>
+            </div>
+          </div>
+          <button onClick={() => router.push('/floor')} style={{ background: 'none', border: 'none', color: SQ.sub, fontSize: '0.8rem', cursor: 'pointer' }}>
+            <Home size={20} />
+          </button>
+        </div>
 
-            {current?.notes && (
-              <div style={{
-                backgroundColor: '#fff4d6', border: '1px solid #e0c060', borderRadius: 8,
-                padding: '0.6rem 0.8rem', marginBottom: '1.2rem', fontSize: '0.82rem', color: '#222', lineHeight: 1.4,
-              }}>
-                <strong>Note:</strong> {current?.notes}
-              </div>
-            )}
+        {current?.notes && (
+          <div style={{ backgroundColor: '#FFF4D6', borderBottom: '1px solid #E0C060', padding: '0.5rem 1rem', fontSize: '0.8rem' }}>
+            <strong>Note:</strong> {current.notes}
+          </div>
+        )}
 
-            {pieceCount > 0 && (
-              <div className="flex items-center gap-3 justify-center mb-5">
-                <span style={{ color: B.stone, fontSize: '0.8rem' }}>Pieces captured</span>
-                <span style={{ color: B.ivory, fontWeight: 700, minWidth: 26, textAlign: 'center', fontSize: '1.1rem' }}>{pieceCount}</span>
-                <span style={{ color: B.stone, fontSize: '0.65rem', fontStyle: 'italic' }}>from photo</span>
-              </div>
-            )}
-            {pieceCount === 0 && (
-              <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-                <p style={{ color: B.stone, fontSize: '0.8rem' }}>Pieces will appear here after photo taken</p>
-              </div>
-            )}
-
-            {tillItems.length > 0 && (
-              <div className="mb-4 p-3 rounded" style={{ backgroundColor: B.charcoal, borderLeft: `3px solid ${B.clay}` }}>
-                <p style={{ color: B.stone, fontSize: '0.75rem', marginBottom: '0.5rem' }}>Split bill</p>
-                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                  {[1, 2, 3, 4, 5, 6].map((n) => (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', padding: '1rem', maxWidth: 1100, margin: '0 auto' }}>
+          {/* Left: category tabs + item grid */}
+          <div style={{ flex: '1 1 60%', minWidth: 300 }}>
+            {menu.length > 0 && !activeGroup && (
+              <>
+                <p style={{ color: SQ.sub, fontSize: '0.75rem', marginBottom: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Categories</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.6rem' }}>
+                  {menu.map((g, idx) => (
                     <button
-                      key={n}
-                      onClick={() => setSplitBillCount(n)}
-                      style={{
-                        padding: '0.4rem 0.8rem',
-                        borderRadius: 6,
-                        border: splitBillCount === n ? `2px solid ${B.clay}` : `1px solid ${B.stone}`,
-                        backgroundColor: splitBillCount === n ? B.clay + '30' : 'transparent',
-                        color: B.ivory,
-                        fontSize: '0.8rem',
-                        fontWeight: splitBillCount === n ? 600 : 400,
-                        cursor: 'pointer'
-                      }}
+                      key={g.key}
+                      onClick={() => setActiveGroup(g)}
+                      style={{ aspectRatio: '1.4', borderRadius: 8, border: 'none', backgroundColor: colourFor(idx), color: 'white', fontWeight: 700, fontSize: '0.9rem', textAlign: 'left', padding: '0.8rem', cursor: 'pointer' }}
                     >
-                      {n} {n === 1 ? 'person' : 'people'}
+                      {g.label}
                     </button>
                   ))}
                 </div>
-                {splitBillCount > 1 && (
-                  <div style={{ marginTop: '0.5rem', padding: '0.5rem 0.6rem', backgroundColor: B.charcoal, borderRadius: 4, textAlign: 'center' }}>
-                    <p style={{ color: B.sand, fontSize: '0.75rem', fontWeight: 600 }}>
-                      Per person: £{((tillTotal / splitBillCount) / 100).toFixed(2)}
-                    </p>
-                  </div>
-                )}
-              </div>
+              </>
             )}
 
-            {tillItems.length > 0 && (
-              <div className="space-y-1 mb-3" style={{ maxHeight: '28vh', overflowY: 'auto' }}>
-                {tillItems.map((i) => (
-                  <div key={i.id} className="flex justify-between items-center px-3 py-2 rounded" style={{ backgroundColor: B.charcoal }}>
-                    <span style={{ color: B.ivory, fontSize: '0.85rem' }}>{i.quantity > 1 ? `${i.quantity}x ` : ''}{i.item_name}</span>
-                    <span className="flex items-center gap-2">
-                      <span style={{ color: B.sand, fontSize: '0.8rem' }}>£{((i.unit_price_cents * i.quantity) / 100).toFixed(2)}</span>
-                      <button onClick={() => removeTillItem(i.id)} style={{ color: '#e88', background: 'none', border: 'none', fontSize: '1rem' }}>×</button>
-                    </span>
-                  </div>
-                ))}
-                <div className="flex justify-between px-3 pt-2" style={{ borderTop: `1px solid ${B.stone}30` }}>
-                  <span style={{ color: B.stone, fontSize: '0.8rem' }}>Total</span>
-                  <span style={{ color: B.ivory, fontWeight: 700, fontSize: '0.9rem' }}>£{(tillTotal / 100).toFixed(2)}</span>
-                </div>
-              </div>
-            )}
-
-            {menu.length > 0 && (
-              <div style={{ marginBottom: '1rem' }}>
-                {!activeGroup && (
-                  <>
-                    <p style={{ color: B.stone, fontSize: '0.75rem', marginBottom: '0.5rem' }}>Add an item</p>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                      {menu.map((g) => (
-                        <button
-                          key={g.key}
-                          onClick={() => setActiveGroup(g)}
-                          style={{ padding: '1rem 0.6rem', borderRadius: 10, border: 'none', backgroundColor: B.charcoal, color: B.ivory, fontWeight: 600, fontSize: '0.85rem' }}
-                        >
-                          {g.label}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                {activeGroup && !activeSubsection && (
-                  <>
-                    <button onClick={backToTillMenu} style={{ color: B.clay, background: 'none', border: 'none', fontSize: '0.8rem', marginBottom: '0.5rem', padding: 0 }}>
-                      ← Back to Till
-                    </button>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                      {activeGroup.subsections.map((s) => (
-                        <button
-                          key={s.category}
-                          onClick={() => { setActiveSubsection(s); setActiveBucket(null); setShowAllItems(false); }}
-                          style={{ padding: '1rem 0.6rem', borderRadius: 10, border: 'none', backgroundColor: B.charcoal, color: B.ivory, fontWeight: 600, fontSize: '0.85rem' }}
-                        >
-                          {s.label}
-                          <span style={{ display: 'block', color: B.stone, fontSize: '0.7rem', fontWeight: 400, marginTop: '0.2rem' }}>{s.items.length} items</span>
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                {activeSubsection && (
-                  <>
+            {activeGroup && !activeSubsection && (
+              <>
+                <button onClick={backToTillMenu} style={{ color: SQ.accent, background: 'none', border: 'none', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.7rem', padding: 0, cursor: 'pointer' }}>
+                  ← Back to Till
+                </button>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.6rem' }}>
+                  {activeGroup.subsections.map((s: any, idx: number) => (
                     <button
-                      onClick={backToTillMenu}
-                      style={{ color: B.clay, background: 'none', border: 'none', fontSize: '0.8rem', marginBottom: '0.5rem', padding: 0 }}
+                      key={s.category}
+                      onClick={() => { setActiveSubsection(s); setActiveBucket(null); setShowAllItems(false); }}
+                      style={{ aspectRatio: '1.4', borderRadius: 8, border: 'none', backgroundColor: colourFor(idx), color: 'white', fontWeight: 700, fontSize: '0.88rem', textAlign: 'left', padding: '0.8rem', cursor: 'pointer' }}
                     >
-                      ← Back to Till
+                      {s.label}
+                      <span style={{ display: 'block', fontWeight: 400, fontSize: '0.72rem', opacity: 0.85, marginTop: '0.2rem' }}>{s.items.length} items</span>
                     </button>
+                  ))}
+                </div>
+              </>
+            )}
 
-                    {activeSubsection.buckets && !activeBucket ? (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                        {activeSubsection.buckets.map((bk) => (
-                          <button
-                            key={bk.label}
-                            onClick={() => { setActiveBucket(bk); setShowAllItems(false); }}
-                            style={{ padding: '1rem 0.6rem', borderRadius: 10, border: 'none', backgroundColor: B.charcoal, color: B.ivory, fontWeight: 600, fontSize: '0.85rem' }}
-                          >
-                            {bk.label}
-                            <span style={{ display: 'block', color: B.stone, fontSize: '0.7rem', fontWeight: 400, marginTop: '0.2rem' }}>{bk.items.length} items</span>
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                          {(() => {
-                            const list = activeBucket ? activeBucket.items : activeSubsection.items;
-                            return (showAllItems ? list : list.slice(0, 8)).map((entry, idx) => {
-                              if (entry.kind === 'customisable') {
-                                return (
-                                  <button
-                                    key={idx}
-                                    onClick={() => { setCustomising(entry); setPickedFlavour(null); }}
-                                    style={{ padding: '0.7rem 0.5rem', borderRadius: 8, border: 'none', backgroundColor: B.clay, color: B.ivory, fontSize: '0.78rem', textAlign: 'left' }}
-                                  >
-                                    {entry.base}
-                                    <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.85 }}>from £{(entry.from_price_cents / 100).toFixed(2)}</span>
-                                  </button>
-                                );
-                              }
-                              return (
-                                <button
-                                  key={idx}
-                                  onClick={() => addTillItem(entry)}
-                                  disabled={tillBusy}
-                                  style={{ padding: '0.7rem 0.5rem', borderRadius: 8, border: 'none', backgroundColor: B.clay, color: B.ivory, fontSize: '0.78rem', textAlign: 'left' }}
-                                >
-                                  {entry.item_name}
-                                  {entry.price_cents ? <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.85 }}>£{(entry.price_cents / 100).toFixed(2)}</span> : null}
-                                </button>
-                              );
-                            });
-                          })()}
-                        </div>
-                        {(() => {
-                          const list = activeBucket ? activeBucket.items : activeSubsection.items;
-                          return !showAllItems && list.length > 8 && (
-                            <button onClick={() => setShowAllItems(true)} style={{ width: '100%', marginTop: '0.5rem', padding: '0.5rem', borderRadius: 8, border: `1px solid ${B.stone}`, background: 'none', color: B.stone, fontSize: '0.8rem' }}>
-                              + {list.length - 8} more
+            {activeSubsection && (
+              <>
+                <button onClick={backToTillMenu} style={{ color: SQ.accent, background: 'none', border: 'none', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.7rem', padding: 0, cursor: 'pointer' }}>
+                  ← Back to Till
+                </button>
+
+                {activeSubsection.buckets && !activeBucket ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.6rem' }}>
+                    {activeSubsection.buckets.map((bk: any, idx: number) => (
+                      <button
+                        key={bk.label}
+                        onClick={() => { setActiveBucket(bk); setShowAllItems(false); }}
+                        style={{ aspectRatio: '1.4', borderRadius: 8, border: 'none', backgroundColor: colourFor(idx), color: 'white', fontWeight: 700, fontSize: '0.88rem', textAlign: 'left', padding: '0.8rem', cursor: 'pointer' }}
+                      >
+                        {bk.label}
+                        <span style={{ display: 'block', fontWeight: 400, fontSize: '0.72rem', opacity: 0.85, marginTop: '0.2rem' }}>{bk.items.length} items</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '0.5rem' }}>
+                      {(showAllItems ? activeList : activeList?.slice(0, 12))?.map((entry: any, idx: number) => {
+                        const colour = colourFor(idx);
+                        if (entry.kind === 'customisable') {
+                          return (
+                            <button
+                              key={idx}
+                              onClick={() => { setCustomising(entry); setPickedFlavour(null); }}
+                              style={{ aspectRatio: '1', borderRadius: 8, border: `1px solid ${SQ.line}`, backgroundColor: SQ.panel, borderTop: `4px solid ${colour}`, color: SQ.ink, fontSize: '0.8rem', textAlign: 'left', padding: '0.6rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
+                            >
+                              <span style={{ fontWeight: 600 }}>{entry.base}</span>
+                              <span style={{ color: SQ.sub, fontSize: '0.75rem' }}>from £{(entry.from_price_cents / 100).toFixed(2)}</span>
                             </button>
                           );
-                        })()}
-                      </>
+                        }
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => addTillItem(entry)}
+                            disabled={tillBusy}
+                            style={{ aspectRatio: '1', borderRadius: 8, border: `1px solid ${SQ.line}`, backgroundColor: SQ.panel, borderTop: `4px solid ${colour}`, color: SQ.ink, fontSize: '0.8rem', textAlign: 'left', padding: '0.6rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', opacity: tillBusy ? 0.6 : 1 }}
+                          >
+                            <span style={{ fontWeight: 600, lineHeight: 1.2 }}>{entry.item_name}</span>
+                            {entry.price_cents ? <span style={{ color: SQ.sub, fontSize: '0.75rem' }}>£{(entry.price_cents / 100).toFixed(2)}</span> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {!showAllItems && (activeList?.length || 0) > 12 && (
+                      <button onClick={() => setShowAllItems(true)} style={{ width: '100%', marginTop: '0.6rem', padding: '0.6rem', borderRadius: 8, border: `1px solid ${SQ.line}`, background: SQ.panel, color: SQ.sub, fontSize: '0.82rem', cursor: 'pointer' }}>
+                        + {(activeList?.length || 0) - 12} more
+                      </button>
                     )}
                   </>
                 )}
-              </div>
+              </>
             )}
+          </div>
 
-            <button onClick={() => setPhase(4)} className="w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2" style={{ backgroundColor: B.clay, color: B.ivory }}>
-              Continue to Completion <ChevronRight size={20} />
-            </button>
+          {/* Right: ticket panel */}
+          <div style={{ flex: '1 1 32%', minWidth: 260 }}>
+            <div style={{ backgroundColor: SQ.panel, borderRadius: 10, border: `1px solid ${SQ.line}`, overflow: 'hidden', position: 'sticky', top: '1rem' }}>
+              <div style={{ padding: '0.8rem 1rem', borderBottom: `1px solid ${SQ.line}`, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Printer size={16} color={SQ.sub} />
+                <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>Current Sale</span>
+              </div>
+
+              {pieceCount > 0 && (
+                <div style={{ padding: '0.5rem 1rem', borderBottom: `1px solid ${SQ.line}`, fontSize: '0.78rem', color: SQ.sub }}>
+                  {pieceCount} piece{pieceCount === 1 ? '' : 's'} captured from photo
+                </div>
+              )}
+
+              <div style={{ maxHeight: '32vh', overflowY: 'auto' }}>
+                {tillItems.length === 0 ? (
+                  <p style={{ padding: '1.2rem 1rem', color: SQ.sub, fontSize: '0.82rem', textAlign: 'center' }}>No items yet</p>
+                ) : (
+                  tillItems.map((i) => (
+                    <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 1rem', borderBottom: `1px solid ${SQ.line}` }}>
+                      <span style={{ fontSize: '0.85rem' }}>{i.quantity > 1 ? `${i.quantity}x ` : ''}{i.item_name}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>£{((i.unit_price_cents * i.quantity) / 100).toFixed(2)}</span>
+                        <button onClick={() => removeTillItem(i.id)} style={{ color: '#C0392B', background: 'none', border: 'none', fontSize: '1rem', cursor: 'pointer', lineHeight: 1 }}>×</button>
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div style={{ padding: '0.8rem 1rem', borderTop: `1px solid ${SQ.line}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                  <span style={{ color: SQ.sub, fontSize: '0.85rem' }}>Total</span>
+                  <span style={{ fontWeight: 700, fontSize: '1.1rem' }}>£{(tillTotal / 100).toFixed(2)}</span>
+                </div>
+
+                {tillItems.length > 0 && (
+                  <div style={{ marginTop: '0.6rem', marginBottom: '0.6rem' }}>
+                    <p style={{ color: SQ.sub, fontSize: '0.72rem', marginBottom: '0.4rem' }}>Split bill</p>
+                    <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                      {[1, 2, 3, 4, 5, 6].map((n) => (
+                        <button
+                          key={n}
+                          onClick={() => setSplitBillCount(n)}
+                          style={{
+                            padding: '0.3rem 0.6rem', borderRadius: 6, fontSize: '0.75rem', cursor: 'pointer',
+                            border: splitBillCount === n ? `1.5px solid ${SQ.accent}` : `1px solid ${SQ.line}`,
+                            backgroundColor: splitBillCount === n ? SQ.accent + '15' : 'transparent',
+                            color: splitBillCount === n ? SQ.accentDark : SQ.sub,
+                            fontWeight: splitBillCount === n ? 700 : 400,
+                          }}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                    {splitBillCount > 1 && (
+                      <p style={{ color: SQ.accentDark, fontSize: '0.78rem', fontWeight: 600, marginTop: '0.4rem' }}>
+                        £{((tillTotal / splitBillCount) / 100).toFixed(2)} each
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <button
+                  onClick={() => setPhase(4)}
+                  style={{ width: '100%', padding: '0.8rem', borderRadius: 8, border: 'none', backgroundColor: SQ.accent, color: 'white', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                >
+                  Continue to Completion <ChevronRight size={18} />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
+
         <NudgeCard id="floor_till" />
         {tillItems.length > 0 && <NudgeCard id="floor_split_bill" />}
 
         {customising && (
           <div
             onClick={() => setCustomising(null)}
-            style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', zIndex: 70 }}
+            style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', zIndex: 70 }}
           >
-            <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: B.charcoal, borderRadius: 14, padding: '1.5rem', maxWidth: 360, width: '100%', border: `2px solid ${B.clay}` }}>
-              <h3 style={{ color: B.ivory, fontWeight: 700, fontSize: '1.1rem', marginBottom: '0.3rem' }}>{customising.base}</h3>
-              <p style={{ color: B.stone, fontSize: '0.8rem', marginBottom: '1rem' }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: SQ.panel, borderRadius: 14, padding: '1.5rem', maxWidth: 360, width: '100%', border: `1px solid ${SQ.line}` }}>
+              <h3 style={{ color: SQ.ink, fontWeight: 700, fontSize: '1.1rem', marginBottom: '0.3rem' }}>{customising.base}</h3>
+              <p style={{ color: SQ.sub, fontSize: '0.8rem', marginBottom: '1rem' }}>
                 {pickedFlavour ? 'Milk?' : customising.flavours.length > 1 || customising.flavours[0] !== '(plain)' ? 'Syrup?' : 'Milk?'}
               </p>
 
               {!pickedFlavour ? (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                  {customising.flavours.map((f) => (
+                  {customising.flavours.map((f: string) => (
                     <button
                       key={f}
                       onClick={() => setPickedFlavour(f)}
-                      style={{ padding: '0.7rem 0.5rem', borderRadius: 8, border: 'none', backgroundColor: f === '(plain)' ? B.stone : 'var(--clay)', color: B.ivory, fontSize: '0.82rem' }}
+                      style={{ padding: '0.7rem 0.5rem', borderRadius: 8, border: 'none', backgroundColor: f === '(plain)' ? SQ.sub : SQ.accent, color: 'white', fontSize: '0.82rem', cursor: 'pointer' }}
                     >
                       {f === '(plain)' ? 'No syrup' : f}
                     </button>
@@ -629,14 +648,14 @@ export default function FloorPage() {
                 </div>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                  {customising.milks.map((m) => {
+                  {customising.milks.map((m: string) => {
                     const match = customising.lookup[`${pickedFlavour}|${m}`];
                     return (
                       <button
                         key={m}
                         onClick={() => { if (match) { addTillItem(match); setCustomising(null); } }}
                         disabled={!match || tillBusy}
-                        style={{ padding: '0.7rem 0.5rem', borderRadius: 8, border: 'none', backgroundColor: 'var(--clay)', color: B.ivory, fontSize: '0.82rem', textAlign: 'left' }}
+                        style={{ padding: '0.7rem 0.5rem', borderRadius: 8, border: 'none', backgroundColor: SQ.accent, color: 'white', fontSize: '0.82rem', textAlign: 'left', cursor: 'pointer', opacity: !match || tillBusy ? 0.5 : 1 }}
                       >
                         {m}
                         {match?.price_cents ? <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.85 }}>£{(match.price_cents / 100).toFixed(2)}</span> : null}
@@ -648,11 +667,11 @@ export default function FloorPage() {
 
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
                 {pickedFlavour && (
-                  <button onClick={() => setPickedFlavour(null)} style={{ flex: 1, padding: '0.5rem', borderRadius: 8, border: 'none', backgroundColor: '#00000030', color: B.ivory, fontSize: '0.8rem' }}>
+                  <button onClick={() => setPickedFlavour(null)} style={{ flex: 1, padding: '0.5rem', borderRadius: 8, border: `1px solid ${SQ.line}`, backgroundColor: 'transparent', color: SQ.ink, fontSize: '0.8rem', cursor: 'pointer' }}>
                     ← Back
                   </button>
                 )}
-                <button onClick={() => setCustomising(null)} style={{ flex: 1, padding: '0.5rem', borderRadius: 8, border: 'none', backgroundColor: '#00000030', color: B.ivory, fontSize: '0.8rem' }}>
+                <button onClick={() => setCustomising(null)} style={{ flex: 1, padding: '0.5rem', borderRadius: 8, border: `1px solid ${SQ.line}`, backgroundColor: 'transparent', color: SQ.ink, fontSize: '0.8rem', cursor: 'pointer' }}>
                   Cancel
                 </button>
               </div>
