@@ -226,7 +226,7 @@ export default function DailyCardsPage() {
   // jump straight to just the next session's cards without hand-picking
   // through a mixed list of the whole day.
   const sessionTimes = useMemo(() => {
-    const times = [...new Set(bookings.map((b) => b.session_start))];
+    const times = Array.from(new Set(bookings.map((b) => b.session_start)));
     return times.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
   }, [bookings]);
 
