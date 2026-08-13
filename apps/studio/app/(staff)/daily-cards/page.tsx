@@ -14,6 +14,7 @@ interface Booking {
   table_number: string | null;
   party_size: number | null;
   space_name: string | null;
+  notes: string | null;
 }
 
 // Clean short label from the real (verbose) space_name text -- e.g.
@@ -32,6 +33,24 @@ function shortSpaceLabel(spaceName: string | null): string | null {
   return null;
 }
 
+// Table-setup flags for the printed card -- deliberately NOT the raw note.
+// Girls placing cards need to know at a glance whether a table needs extra
+// space (pram) or a particular arrangement (wheelchair, highchair) before
+// they've had a chance to open the booking -- but the note itself can
+// contain far more personal detail than that, so only match these specific
+// physical-space keywords and show the flag word alone, never the note
+// text it came from. Keep this list short and about table setup only.
+function tableSetupFlags(notes: string | null): string[] {
+  if (!notes) return [];
+  const n = notes.toLowerCase();
+  const flags: string[] = [];
+  if (/\bpram|pushchair|buggy\b/.test(n)) flags.push('Pram');
+  if (/\bbaby|babies|infant\b/.test(n)) flags.push('Baby');
+  if (/\bwheelchair\b/.test(n)) flags.push('Wheelchair');
+  if (/\bhigh ?chair\b/.test(n)) flags.push('Highchair');
+  return flags;
+}
+
 export default function DailyCardsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [qrUrls, setQrUrls] = useState<Record<string, string>>({});
@@ -45,8 +64,37 @@ export default function DailyCardsPage() {
   const cardDateRef = useRef(cardDate);
   const knownCodes = useRef<Set<string>>(new Set());
   const firstLoadDone = useRef(false);
+  const [editingTableCode, setEditingTableCode] = useState<string | null>(null);
+  const [tableDraft, setTableDraft] = useState('');
+  const [savingTableCode, setSavingTableCode] = useState<string | null>(null);
 
   useEffect(() => { cardDateRef.current = cardDate; }, [cardDate]);
+
+  // Set/change the table a booking's card gets placed on. Same real
+  // endpoint the Bookings page already uses (POST .../table-number) --
+  // this is the point staff actually decide the table (reading the setup
+  // flags, checking which tables have room for a pram etc.), and the same
+  // control covers moving a booking to a different table later if the
+  // party changes -- one place, always reachable from the card itself.
+  const saveTableNumber = async (bookingCode: string) => {
+    const value = tableDraft.trim();
+    if (!value) return;
+    setSavingTableCode(bookingCode);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${bookingCode}/table-number`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table_number: value }),
+      });
+      if (!res.ok) throw new Error();
+      setBookings((prev) => prev.map((b) => (b.booking_code === bookingCode ? { ...b, table_number: value } : b)));
+      setEditingTableCode(null);
+    } catch {
+      setError('Could not save table number.');
+    } finally {
+      setSavingTableCode(null);
+    }
+  };
 
   const load = useCallback(async (isFirstLoad: boolean) => {
     try {
@@ -300,14 +348,65 @@ export default function DailyCardsPage() {
               <p style={{ fontWeight: 700, fontSize: '1rem', marginTop: '0.6rem' }}>{b.customer_name}</p>
               <p style={{ fontSize: '0.8rem', color: '#666' }}>
                 {new Date(b.session_start).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-                {b.table_number ? ` · Table ${b.table_number}` : ''}
               </p>
+
+              {/* Table -- set at print/placement time, or changed later if
+                  the party moves. Same real endpoint as the Bookings page. */}
+              <div onClick={(e) => e.stopPropagation()} style={{ marginTop: '0.3rem' }}>
+                {editingTableCode === b.booking_code ? (
+                  <span className="no-print" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <input
+                      type="text"
+                      value={tableDraft}
+                      onChange={(e) => setTableDraft(e.target.value)}
+                      placeholder="e.g. 3A"
+                      autoFocus
+                      maxLength={20}
+                      style={{ width: '5rem', padding: '0.2rem 0.35rem', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.8rem' }}
+                    />
+                    <button
+                      onClick={() => saveTableNumber(b.booking_code)}
+                      disabled={savingTableCode === b.booking_code || !tableDraft.trim()}
+                      style={{ padding: '0.2rem 0.5rem', backgroundColor: 'var(--clay)', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.72rem', cursor: 'pointer' }}
+                    >
+                      {savingTableCode === b.booking_code ? '...' : 'Save'}
+                    </button>
+                    <button
+                      onClick={() => setEditingTableCode(null)}
+                      style={{ padding: '0.2rem 0.4rem', background: 'none', border: 'none', color: '#999', fontSize: '0.72rem', cursor: 'pointer' }}
+                    >
+                      Cancel
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => { setTableDraft(b.table_number || ''); setEditingTableCode(b.booking_code); }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '0.8rem', color: b.table_number ? '#666' : 'var(--clay)', fontWeight: b.table_number ? 400 : 600 }}
+                  >
+                    {b.table_number ? `Table ${b.table_number}` : 'Set table'}
+                    <span className="no-print" style={{ fontSize: '0.65rem', color: '#999' }}>✎</span>
+                  </button>
+                )}
+              </div>
+
               {(b.party_size || shortSpaceLabel(b.space_name)) && (
                 <p style={{ fontSize: '0.78rem', color: 'var(--clay)', fontWeight: 600, marginTop: '0.2rem' }}>
                   {b.party_size ? `${b.party_size} seat${b.party_size === 1 ? '' : 's'}` : ''}
                   {b.party_size && shortSpaceLabel(b.space_name) ? ' · ' : ''}
                   {shortSpaceLabel(b.space_name) || ''}
                 </p>
+              )}
+              {tableSetupFlags(b.notes).length > 0 && (
+                <div style={{ display: 'flex', gap: '0.3rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                  {tableSetupFlags(b.notes).map((flag) => (
+                    <span
+                      key={flag}
+                      style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8a5a00', backgroundColor: '#fff4d6', border: '1px solid #e0c060', borderRadius: 999, padding: '0.15rem 0.55rem' }}
+                    >
+                      {flag}
+                    </span>
+                  ))}
+                </div>
               )}
               <p style={{ fontSize: '0.7rem', color: '#aaa', fontFamily: 'monospace', marginTop: '0.3rem' }}>{b.booking_code}</p>
             </div>
