@@ -95,6 +95,9 @@ export default function BookingsPage() {
   const [editingParty, setEditingParty] = useState(false);
   const [partyDraft, setPartyDraft] = useState('');
   const [savingParty, setSavingParty] = useState(false);
+  const [editingTable, setEditingTable] = useState(false);
+  const [tableDraft, setTableDraft] = useState('');
+  const [savingTable, setSavingTable] = useState(false);
 
   const savePartySize = async () => {
     if (!detail) return;
@@ -114,6 +117,31 @@ export default function BookingsPage() {
       setError('Could not save party size.');
     } finally {
       setSavingParty(false);
+    }
+  };
+
+  // Free-text table number -- covers splitting one table into smaller ones
+  // ('3A', '3B') or combining several into a group ('3+4', '1&2') without
+  // needing a rigid split/combine picker, since the column itself is just
+  // text underneath.
+  const saveTableNumber = async () => {
+    if (!detail) return;
+    const value = tableDraft.trim();
+    if (!value) return;
+    setSavingTable(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${detail.booking.booking_code}/table-number`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table_number: value }),
+      });
+      if (!res.ok) throw new Error();
+      setDetail({ ...detail, booking: { ...detail.booking, table_number: value } });
+      setEditingTable(false);
+    } catch {
+      setError('Could not save table number.');
+    } finally {
+      setSavingTable(false);
     }
   };
   const [photoMatches, setPhotoMatches] = useState<PhotoMatch[]>([]);
@@ -445,6 +473,43 @@ export default function BookingsPage() {
                         style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: detail.booking.party_size ? '#222' : 'var(--clay)', fontSize: '0.875rem' }}
                       >
                         {detail.booking.party_size ?? 'Set manually'}
+                        <span style={{ fontSize: '0.7rem', color: '#999' }}>✎</span>
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#999' }}>Table</span>
+                    {editingTable ? (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <input
+                          type="text"
+                          value={tableDraft}
+                          onChange={(e) => setTableDraft(e.target.value)}
+                          placeholder="e.g. 3A, 3+4"
+                          autoFocus
+                          maxLength={20}
+                          style={{ width: '6rem', padding: '0.25rem 0.4rem', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.85rem' }}
+                        />
+                        <button
+                          onClick={saveTableNumber}
+                          disabled={savingTable || !tableDraft.trim()}
+                          style={{ padding: '0.25rem 0.6rem', backgroundColor: 'var(--clay)', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.78rem', cursor: 'pointer' }}
+                        >
+                          {savingTable ? '...' : 'Save'}
+                        </button>
+                        <button
+                          onClick={() => setEditingTable(false)}
+                          style={{ padding: '0.25rem 0.5rem', background: 'none', border: 'none', color: '#999', fontSize: '0.78rem', cursor: 'pointer' }}
+                        >
+                          Cancel
+                        </button>
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => { setTableDraft(detail.booking.table_number || ''); setEditingTable(true); }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: detail.booking.table_number ? '#222' : 'var(--clay)', fontSize: '0.875rem' }}
+                      >
+                        {detail.booking.table_number || 'Set manually'}
                         <span style={{ fontSize: '0.7rem', color: '#999' }}>✎</span>
                       </button>
                     )}

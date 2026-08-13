@@ -1308,6 +1308,37 @@ export function registerFulfilmentRoute(app, supabase, STUDIO_ID, logger) {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // Manual table-number entry -- table_number is a free-text column (no
+  // enum, no split/combine picker needed): staff can already type any real
+  // arrangement -- '3A', '3B', '3+4', '1&2' -- for splitting one table into
+  // two smaller ones or combining several into a group, same as they'd
+  // write it on paper. Same guard pattern as party-size above.
+  app.post('/api/spec/bookings/:code/table-number', async (req, res) => {
+    try {
+      const raw = (req.body || {}).table_number;
+      const table_number = typeof raw === 'string' ? raw.trim() : '';
+      if (!table_number) {
+        return res.status(400).json({ error: 'table_number must be a non-empty string' });
+      }
+      if (table_number.length > 20) {
+        return res.status(400).json({ error: 'table_number must be 20 characters or fewer' });
+      }
+      const { data, error } = await supabase
+        .from('bookings')
+        .update({ table_number })
+        .eq('booking_code', req.params.code)
+        .eq('studio_id', STUDIO_ID)
+        .select('booking_code, table_number')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return res.status(404).json({ error: 'Booking not found' });
+      res.json(data);
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
 }
 
 // ============================================================================
