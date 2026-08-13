@@ -905,8 +905,13 @@ export function registerTillMenuRoute(app, supabase, STUDIO_ID, logger, axios) {
               items: applyModifierGrouping(sortedItems),
               // Only bucket when a subsection is large enough that a flat
               // grid would be overwhelming -- small subsections stay as one
-              // simple item grid.
-              buckets: catItems.length > 10 ? bucketiseItems(sortedItems) : null,
+              // simple item grid. The Coffees/Teas/Hot Chocolate keyword
+              // buckets only make sense for the Cafe group -- applying them
+              // to Pottery Blanks/Glazes subsections mis-sorts pieces whose
+              // NAME happens to contain a drink word (e.g. a "Chocolate
+              // Bunny" pottery blank was landing in a bogus "Hot Chocolate"
+              // bucket). Restrict bucketising to g.key === 'cafe'.
+              buckets: g.key === 'cafe' && catItems.length > 10 ? bucketiseItems(sortedItems) : null,
             };
           })
           .filter((s) => s.items.length > 0)
