@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import QRCode from 'qrcode';
 import { Printer, RefreshCw, AlertCircle } from 'lucide-react';
@@ -67,8 +67,13 @@ export default function DailyCardsPage() {
   const [editingTableCode, setEditingTableCode] = useState<string | null>(null);
   const [tableDraft, setTableDraft] = useState('');
   const [savingTableCode, setSavingTableCode] = useState<string | null>(null);
+  const [selectedSessionIdx, setSelectedSessionIdx] = useState<number | null>(null);
 
   useEffect(() => { cardDateRef.current = cardDate; }, [cardDate]);
+  // Reset the session filter whenever the day changes -- a session index
+  // from a different day (e.g. its 3rd Saturday slot) means nothing once
+  // you've moved to a day with only 2 sessions.
+  useEffect(() => { setSelectedSessionIdx(null); }, [cardDate]);
 
   // Set/change the table a booking's card gets placed on. Same real
   // endpoint the Bookings page already uses (POST .../table-number) --
@@ -200,10 +205,10 @@ export default function DailyCardsPage() {
   };
 
   const selectAll = () => {
-    if (selected.size === bookings.length) {
+    if (selected.size === visibleBookings.length) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(bookings.map((b) => b.booking_code)));
+      setSelected(new Set(visibleBookings.map((b) => b.booking_code)));
     }
   };
 
@@ -213,6 +218,30 @@ export default function DailyCardsPage() {
       return;
     }
     window.print();
+  };
+
+  // Distinct session start-times present on the selected day, sorted
+  // chronologically -- e.g. Main Studio's two (or three, Saturdays)
+  // sessions. Prev/Next Session below steps through these, so staff can
+  // jump straight to just the next session's cards without hand-picking
+  // through a mixed list of the whole day.
+  const sessionTimes = useMemo(() => {
+    const times = [...new Set(bookings.map((b) => b.session_start))];
+    return times.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+  }, [bookings]);
+
+  const visibleBookings = useMemo(() => {
+    if (selectedSessionIdx === null) return bookings;
+    const t = sessionTimes[selectedSessionIdx];
+    return t ? bookings.filter((b) => b.session_start === t) : bookings;
+  }, [bookings, sessionTimes, selectedSessionIdx]);
+
+  const goToNextSession = () => {
+    if (sessionTimes.length === 0) return;
+    setSelectedSessionIdx((idx) => (idx === null ? 0 : Math.min(idx + 1, sessionTimes.length - 1)));
+  };
+  const goToPrevSession = () => {
+    setSelectedSessionIdx((idx) => (idx === null || idx === 0 ? null : idx - 1));
   };
 
   return (
@@ -256,6 +285,30 @@ export default function DailyCardsPage() {
           </button>
         </div>
 
+        {sessionTimes.length > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={goToPrevSession}
+              disabled={selectedSessionIdx === null}
+              style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: selectedSessionIdx === null ? 'default' : 'pointer', fontSize: '0.85rem', opacity: selectedSessionIdx === null ? 0.5 : 1 }}
+            >
+              ← Previous session
+            </button>
+            <span style={{ padding: '0.4rem 0.7rem', fontSize: '0.85rem', color: '#666', fontWeight: 600 }}>
+              {selectedSessionIdx === null
+                ? `All sessions (${sessionTimes.length})`
+                : new Date(sessionTimes[selectedSessionIdx]).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+            </span>
+            <button
+              onClick={goToNextSession}
+              disabled={selectedSessionIdx !== null && selectedSessionIdx === sessionTimes.length - 1}
+              style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: (selectedSessionIdx !== null && selectedSessionIdx === sessionTimes.length - 1) ? 'default' : 'pointer', fontSize: '0.85rem', opacity: (selectedSessionIdx !== null && selectedSessionIdx === sessionTimes.length - 1) ? 0.5 : 1 }}
+            >
+              Next session →
+            </button>
+          </div>
+        )}
+
         {loading && <p style={{ color: '#666' }}>Loading...</p>}
         {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
 
@@ -293,7 +346,7 @@ export default function DailyCardsPage() {
               onClick={selectAll}
               style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', backgroundColor: '#f0f0f0', border: '1px solid #ddd', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}
             >
-              {selected.size === bookings.length ? '✓ Deselect all' : '◯ Select all'}
+              {selected.size === visibleBookings.length ? '✓ Deselect all' : '◯ Select all'}
             </button>
             <button
               onClick={handleManualSync}
@@ -312,7 +365,7 @@ export default function DailyCardsPage() {
       </div>
 
       <div className="card-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
-        {bookings.map((b) => {
+        {visibleBookings.map((b) => {
           const isNew = newSinceLoad.some((n) => n.booking_code === b.booking_code);
           const isSelected = selected.has(b.booking_code);
           return (
