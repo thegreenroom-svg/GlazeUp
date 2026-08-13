@@ -527,12 +527,20 @@ app.get('/api/demo/bookings/:code/till', async (req, res) => {
 
     const { data: status } = await supabase
       .from('demo_app_session_status')
-      .select('finished_at, finished_by')
+      .select('finished_at, finished_by, payment_method, collection_method, postal_postcode, collection_date, till_total_cents, split_bill_count')
       .eq('booking_code', req.params.code)
       .eq('studio_id', DEMO_STUDIO_ID)
       .maybeSingle();
 
-    res.json({ items: items || [], finished_at: status?.finished_at || null, finished_by: status?.finished_by || null });
+    res.json({
+      items: items || [],
+      finished_at: status?.finished_at || null,
+      finished_by: status?.finished_by || null,
+      payment_method: status?.payment_method || null,
+      collection_method: status?.collection_method || null,
+      postal_postcode: status?.postal_postcode || null,
+      collection_date: status?.collection_date || null,
+    });
   } catch (err) {
     logger.error(err);
     res.status(500).json({ error: err.message });
@@ -581,10 +589,29 @@ app.delete('/api/demo/till-items/:id', async (req, res) => {
 
 app.post('/api/demo/bookings/:code/finish', async (req, res) => {
   try {
-    const { finished_by } = req.body;
+    const {
+      finished_by,
+      payment_method,
+      collection_method,
+      postal_postcode,
+      collection_date,
+      till_total_cents,
+      split_bill_count,
+    } = req.body;
     const { data, error } = await supabase
       .from('demo_app_session_status')
-      .upsert([{ booking_code: req.params.code, studio_id: DEMO_STUDIO_ID, finished_at: new Date().toISOString(), finished_by: finished_by || null }], { onConflict: 'booking_code' })
+      .upsert([{
+        booking_code: req.params.code,
+        studio_id: DEMO_STUDIO_ID,
+        finished_at: new Date().toISOString(),
+        finished_by: finished_by || null,
+        payment_method: payment_method || null,
+        collection_method: collection_method || null,
+        postal_postcode: postal_postcode || null,
+        collection_date: collection_date || null,
+        till_total_cents: till_total_cents ?? null,
+        split_bill_count: split_bill_count ?? null,
+      }], { onConflict: 'booking_code' })
       .select()
       .single();
     if (error) throw error;

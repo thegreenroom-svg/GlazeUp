@@ -89,6 +89,7 @@ export default function FloorPage() {
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash' | null>(null);
   const [collectionMethod, setCollectionMethod] = useState<'studio' | 'postal' | null>(null);
   const [postalPostcode, setPostalPostcode] = useState('');
+  const [collectionDate, setCollectionDate] = useState('');
   const [tillItems, setTillItems] = useState<TillItem[]>([]);
   const [tillBusy, setTillBusy] = useState(false);
   const [photo, setPhoto] = useState<File | null>(null);
@@ -179,12 +180,22 @@ export default function FloorPage() {
     setPaymentMethod(null);
     setCollectionMethod(null);
     setPostalPostcode('');
+    setCollectionDate(defaultCollectionDate());
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${b.booking_code}/till`);
       const d = res.ok ? await res.json() : [];
       setTillItems(Array.isArray(d) ? d : d?.items || []);
     } catch { /* fresh table, no till yet */ }
     setPhase(3);
+  };
+
+  // Sensible default for the collection date field -- 14 days out, a
+  // typical bisque + glaze firing turnaround. Staff can change it; this
+  // just saves re-typing the same date on every booking.
+  const defaultCollectionDate = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
+    return d.toISOString().slice(0, 10);
   };
 
   // Single-tap return from any depth (bucket, subsection, or item grid)
@@ -258,6 +269,7 @@ export default function FloorPage() {
           payment_method: paymentMethod,
           collection_method: collectionMethod,
           postal_postcode: collectionMethod === 'postal' ? postalPostcode.trim() : undefined,
+          collection_date: collectionDate || undefined,
           till_total_cents: tillTotal,
           split_bill_count: splitBillCount > 1 ? splitBillCount : undefined,
         }),
@@ -294,6 +306,7 @@ export default function FloorPage() {
     setPaymentMethod(null);
     setCollectionMethod(null);
     setPostalPostcode('');
+    setCollectionDate('');
     if (quickAccessMode) {
       // Refresh totals so the seated list reflects the table just finished
       loadSeatedBookings();
@@ -639,6 +652,10 @@ export default function FloorPage() {
 
   // ============ PHASE 4: COMPLETION (real photo, real finish) ============
   if (phase === 4) {
+    const finishDisabled =
+      saving || !paymentMethod || !collectionMethod ||
+      (collectionMethod === 'postal' && !postalPostcode.trim()) ||
+      !collectionDate;
     return (
       <div className="min-h-screen p-4" style={{ backgroundColor: B.charcoal }}>
         <div className="max-w-2xl mx-auto">
@@ -685,6 +702,23 @@ export default function FloorPage() {
                 style={{ marginTop: '0.6rem', width: '100%', padding: '0.5rem 0.6rem', borderRadius: 8, border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: '0.85rem' }}
               />
             )}
+            {collectionMethod && (
+              <div style={{ marginTop: '0.6rem' }}>
+                <label style={{ display: 'block', color: B.stone, fontSize: '0.75rem', marginBottom: '0.3rem' }}>
+                  {collectionMethod === 'postal' ? 'Ready to post from' : 'Ready for collection on'}
+                </label>
+                <input
+                  type="date"
+                  value={collectionDate}
+                  min={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => setCollectionDate(e.target.value)}
+                  style={{ width: '100%', padding: '0.5rem 0.6rem', borderRadius: 8, border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: '0.85rem', colorScheme: 'dark' }}
+                />
+                <p style={{ color: B.stone, fontSize: '0.7rem', marginTop: '0.3rem' }}>
+                  Told to the customer at hand-off · defaults to 14 days for firing, change if needed
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Payment method (Square) */}
@@ -725,14 +759,14 @@ export default function FloorPage() {
 
             <button
               onClick={saveAndFinish}
-              disabled={saving || !paymentMethod || !collectionMethod || (collectionMethod === 'postal' && !postalPostcode.trim())}
+              disabled={finishDisabled}
               className="w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2"
-              style={{ backgroundColor: B.clay, color: B.ivory, opacity: saving || !paymentMethod || !collectionMethod || (collectionMethod === 'postal' && !postalPostcode.trim()) ? 0.5 : 1 }}
+              style={{ backgroundColor: B.clay, color: B.ivory, opacity: finishDisabled ? 0.5 : 1 }}
             >
               {saving ? <><Loader size={18} className="animate-spin" /> Saving...</> : <>Finish &amp; Hand off <ChevronRight size={20} /></>}
             </button>
-            {(!paymentMethod || !collectionMethod) && (
-              <p style={{ color: B.stone, fontSize: '0.7rem', textAlign: 'center', marginTop: '0.5rem' }}>Choose collection and payment above to finish</p>
+            {(!paymentMethod || !collectionMethod || !collectionDate) && (
+              <p style={{ color: B.stone, fontSize: '0.7rem', textAlign: 'center', marginTop: '0.5rem' }}>Choose collection, a date and payment above to finish</p>
             )}
           </div>
         </div>
@@ -767,6 +801,11 @@ export default function FloorPage() {
               {paymentMethod && (
                 <p style={{ color: B.stone }} className="text-xs mt-1">
                   {paymentMethod === 'card' ? '💳 Card' : '💵 Cash'} · {collectionMethod === 'postal' ? `📮 Postal to ${postalPostcode}` : '🏠 Studio pickup'}
+                </p>
+              )}
+              {collectionDate && (
+                <p style={{ color: B.ivory }} className="text-xs mt-2 font-semibold">
+                  📅 {collectionMethod === 'postal' ? 'Posting from' : 'Ready for collection'}: {new Date(collectionDate + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
                 </p>
               )}
               {photo && <p style={{ color: '#7ec98a' }} className="text-xs mt-1 flex items-center gap-1"><Check size={12} /> Photo confirmed to booking</p>}
