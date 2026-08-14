@@ -31,6 +31,7 @@ interface Booking {
   party_size: number | null;
   space_name: string | null;
   notes: string | null;
+  collection_date: string | null;
 }
 
 // Clean short label from the real (verbose) space_name text -- e.g.
@@ -83,6 +84,9 @@ export default function DailyCardsPage() {
   const [editingTableCode, setEditingTableCode] = useState<string | null>(null);
   const [tableDraft, setTableDraft] = useState('');
   const [savingTableCode, setSavingTableCode] = useState<string | null>(null);
+  const [editingCollectionCode, setEditingCollectionCode] = useState<string | null>(null);
+  const [collectionDraft, setCollectionDraft] = useState('');
+  const [savingCollectionCode, setSavingCollectionCode] = useState<string | null>(null);
   const [selectedSessionIdx, setSelectedSessionIdx] = useState<number | null>(null);
 
   useEffect(() => { cardDateRef.current = cardDate; }, [cardDate]);
@@ -114,6 +118,30 @@ export default function DailyCardsPage() {
       setError(err?.name === 'AbortError' ? 'Taking too long -- try again' : 'Could not save table number.');
     } finally {
       setSavingTableCode(null);
+    }
+  };
+
+  // Collection date, set right at print time -- per Daisy, this needs to
+  // happen the morning of, before the session's even run, not only at
+  // Floor completion. Real endpoint (POST .../collection-date), doesn't
+  // touch finished_at/payment/collection method -- setting a date doesn't
+  // mean anyone's been handed off yet.
+  const saveCollectionDate = async (bookingCode: string) => {
+    if (!collectionDraft) return;
+    setSavingCollectionCode(bookingCode);
+    try {
+      const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${bookingCode}/collection-date`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ collection_date: collectionDraft }),
+      });
+      if (!res.ok) throw new Error();
+      setBookings((prev) => prev.map((b) => (b.booking_code === bookingCode ? { ...b, collection_date: collectionDraft } : b)));
+      setEditingCollectionCode(null);
+    } catch (err: any) {
+      setError(err?.name === 'AbortError' ? 'Taking too long -- try again' : 'Could not save collection date.');
+    } finally {
+      setSavingCollectionCode(null);
     }
   };
 
@@ -455,6 +483,49 @@ export default function DailyCardsPage() {
                     style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '0.8rem', color: b.table_number ? '#666' : 'var(--clay)', fontWeight: b.table_number ? 400 : 600 }}
                   >
                     {b.table_number ? `Table ${b.table_number}` : 'Set table'}
+                    <span className="no-print" style={{ fontSize: '0.65rem', color: '#999' }}>✎</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Collection date -- set right here at print time, per
+                  Daisy: staff need this the morning of, before the session
+                  runs. Prints as resolved text on the physical card (she
+                  wants it visible, matching how the paper chalk cards
+                  already show it), edit controls hidden from print. */}
+              <div onClick={(e) => e.stopPropagation()} style={{ marginTop: '0.25rem' }}>
+                {editingCollectionCode === b.booking_code ? (
+                  <span className="no-print" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <input
+                      type="date"
+                      value={collectionDraft}
+                      onChange={(e) => setCollectionDraft(e.target.value)}
+                      min={new Date().toISOString().slice(0, 10)}
+                      autoFocus
+                      style={{ padding: '0.2rem 0.35rem', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.78rem' }}
+                    />
+                    <button
+                      onClick={() => saveCollectionDate(b.booking_code)}
+                      disabled={savingCollectionCode === b.booking_code || !collectionDraft}
+                      style={{ padding: '0.2rem 0.5rem', backgroundColor: 'var(--clay)', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.72rem', cursor: 'pointer' }}
+                    >
+                      {savingCollectionCode === b.booking_code ? '...' : 'Save'}
+                    </button>
+                    <button
+                      onClick={() => setEditingCollectionCode(null)}
+                      style={{ padding: '0.2rem 0.4rem', background: 'none', border: 'none', color: '#999', fontSize: '0.72rem', cursor: 'pointer' }}
+                    >
+                      Cancel
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => { setCollectionDraft(b.collection_date || ''); setEditingCollectionCode(b.booking_code); }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '0.78rem', color: b.collection_date ? '#666' : 'var(--clay)', fontWeight: b.collection_date ? 400 : 600 }}
+                  >
+                    {b.collection_date
+                      ? `Collect: ${new Date(b.collection_date + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`
+                      : 'Set collection date'}
                     <span className="no-print" style={{ fontSize: '0.65rem', color: '#999' }}>✎</span>
                   </button>
                 )}

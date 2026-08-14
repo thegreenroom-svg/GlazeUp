@@ -1949,6 +1949,49 @@ export function registerFulfilmentRoute(app, supabase, STUDIO_ID, logger) {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // Collection date, settable independently of the Floor completion flow --
+  // per Daisy: staff need to set this at print time (morning), before the
+  // session has even started, not only at hand-off. Upserts into
+  // demo_app_session_status without touching finished_at/payment/collection
+  // method -- setting a collection date doesn't mean the booking is
+  // finished, those stay whatever they already were (or null, for a fresh
+  // booking that hasn't run yet).
+  app.post('/api/spec/bookings/:code/collection-date', async (req, res) => {
+    try {
+      const raw = (req.body || {}).collection_date;
+      if (typeof raw !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        return res.status(400).json({ error: 'collection_date must be an ISO date string (YYYY-MM-DD)' });
+      }
+      const { data: existing } = await supabase
+        .from('demo_app_session_status')
+        .select('id')
+        .eq('booking_code', req.params.code)
+        .eq('studio_id', STUDIO_ID)
+        .maybeSingle();
+
+      let result;
+      if (existing) {
+        result = await supabase
+          .from('demo_app_session_status')
+          .update({ collection_date: raw })
+          .eq('id', existing.id)
+          .select('booking_code, collection_date')
+          .maybeSingle();
+      } else {
+        result = await supabase
+          .from('demo_app_session_status')
+          .insert({ studio_id: STUDIO_ID, booking_code: req.params.code, collection_date: raw })
+          .select('booking_code, collection_date')
+          .maybeSingle();
+      }
+      if (result.error) throw result.error;
+      res.json(result.data);
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
 }
 
 // ============================================================================

@@ -176,7 +176,27 @@ app.get('/api/demo/bookings', async (req, res) => {
       .order('session_start', { ascending: false })
       .limit(250);
     if (error) throw error;
-    res.json(data);
+
+    // collection_date can now be set at print time (before a session even
+    // starts), not just at Floor completion -- merge it in from
+    // demo_app_session_status so daily-cards (and anywhere else using this
+    // list) can show/edit whatever's already been chosen. booking_code is
+    // the real join key between the two tables (no formal FK, so this is a
+    // separate query + in-memory merge rather than relying on PostgREST
+    // embedding).
+    const codes = data.map((b) => b.booking_code);
+    let collectionDates = {};
+    if (codes.length) {
+      const { data: statuses } = await supabase
+        .from('demo_app_session_status')
+        .select('booking_code, collection_date')
+        .eq('studio_id', DEMO_STUDIO_ID)
+        .in('booking_code', codes);
+      (statuses || []).forEach((s) => { if (s.collection_date) collectionDates[s.booking_code] = s.collection_date; });
+    }
+    const merged = data.map((b) => ({ ...b, collection_date: collectionDates[b.booking_code] || null }));
+
+    res.json(merged);
   } catch (err) {
     logger.error(err);
     res.status(500).json({ error: err.message });
