@@ -1450,6 +1450,181 @@ export function registerLiveSquareOrderRoute(app, supabase, STUDIO_ID, logger, a
 // so this is a text match, same honest posture as the other approximate
 // matches already in this file.
 // ============================================================================
+// ============================================================================
+// REVENUE CATEGORY SYNC -- real, restored, not reinvented.
+// ----------------------------------------------------------------------------
+// The real sync logic (categorizeItemName keyword matcher + Square catalog
+// category mapping) EXISTED and worked, in the pre-rewrite server.js.
+// Confirmed via git history (commits a9072c9, then refined by 2f3eebd on 22
+// Jul): it kept revenue_category_breakdown current by upserting during the
+// same run that also wrote analytics_cache. That logic was never carried
+// over in the 12 Aug rewrite -- confirmed nothing in the current codebase
+// writes to this table at all, and the one surviving 'sync' endpoint
+// (/api/bookings/sync) is an unfinished stub that does nothing real.
+//
+// This is a faithful port of the REAL, proven logic from those two commits
+// -- same categorisation approach, same delete-before-upsert pattern to
+// avoid double-counting recategorised history -- adapted from the old
+// Square Node SDK (client.catalogApi) to raw axios REST calls, since the
+// SDK package isn't installed here (checked backend/package.json directly)
+// and every other Square call already added this session uses this same
+// raw REST pattern.
+//
+// No scheduler exists anywhere for this (checked: no pg_cron in Supabase,
+// no cron-type service in any render.yaml ever committed, no in-process
+// setInterval). Until a real Render Cron Job or similar is set up outside
+// this backend to call this on a schedule, catching up requires someone
+// tapping the sync button on Money -- documented plainly there, not
+// pretended to be automatic.
+// ============================================================================
+const REVENUE_CATEGORY_KEYWORDS = [
+  { category: 'Cakes & Food', keywords: ['cake', 'brownie', 'cookie', 'pastry', 'sandwich', 'toast', 'scone', 'muffin', 'flapjack'] },
+  { category: 'Drinks', keywords: ['coffee', 'tea', 'latte', 'cappuccino', 'espresso', 'juice', 'squash', 'hot chocolate', 'drink'] },
+  { category: 'Pottery & Glazes', keywords: ['glaze', 'pottery', 'painting', 'session', 'piece', 'firing', 'bisque', 'stroke'] },
+  { category: 'Booking Fees', keywords: ['booking fee', 'deposit', 'reservation'] },
+  { category: 'Return / Cancellation Fees', keywords: ['return fee', 'cancellation', 'refund fee', 'no-show'] },
+];
+function categorizeItemNameByKeyword(name) {
+  const lower = (name || '').toLowerCase();
+  for (const { category, keywords } of REVENUE_CATEGORY_KEYWORDS) {
+    if (keywords.some((kw) => lower.includes(kw))) return category;
+  }
+  return 'Other';
+}
+
+export function registerRevenueCategorySyncRoute(app, supabase, STUDIO_ID, logger, axios) {
+  app.post('/api/spec/revenue/sync', async (req, res) => {
+    try {
+      const daysBack = Math.min(Math.max(parseInt(req.query.daysBack, 10) || 30, 1), 365);
+
+      const { data: connection } = await supabase
+        .from('square_connections')
+        .select('square_access_token, square_token_expires_at')
+        .eq('studio_id', STUDIO_ID)
+        .single();
+      if (!connection || new Date(connection.square_token_expires_at) < new Date()) {
+        return res.status(400).json({ error: 'No valid Square connection', synced: false });
+      }
+      const token = connection.square_access_token;
+      const headers = { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18' };
+
+      const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', { headers });
+      const locations = locationsRes.data.locations || [];
+      if (!locations.length) return res.json({ synced: true, dates_synced: [], orders_processed: 0, rows_written: 0 });
+
+      // Real Square catalog -> category name maps, variation and item
+      // level, faithfully ported from the proven 22 Jul fix. Guarded: if
+      // this fails (scope/network), the keyword matcher below still works
+      // alone, same graceful degradation as the original.
+      const variationCategory = {};
+      const itemCategory = {};
+      let catalogVariationsMapped = 0;
+      try {
+        const catNameById = {};
+        let catCursor;
+        do {
+          const params = catCursor ? { types: 'CATEGORY', cursor: catCursor } : { types: 'CATEGORY' };
+          const catRes = await axios.get('https://connect.squareup.com/v2/catalog/list', { headers, params });
+          (catRes.data.objects || []).forEach((c) => { catNameById[c.id] = c.category_data?.name; });
+          catCursor = catRes.data.cursor;
+        } while (catCursor);
+
+        let itemCursor;
+        do {
+          const params = itemCursor ? { types: 'ITEM', cursor: itemCursor } : { types: 'ITEM' };
+          const itemRes = await axios.get('https://connect.squareup.com/v2/catalog/list', { headers, params });
+          (itemRes.data.objects || []).forEach((it) => {
+            const cid = it.item_data?.category_id || it.item_data?.categories?.[0]?.id;
+            const nm = catNameById[cid];
+            if (!nm) return;
+            itemCategory[it.id] = nm;
+            (it.item_data?.variations || []).forEach((v) => { variationCategory[v.id] = nm; });
+          });
+          itemCursor = itemRes.data.cursor;
+        } while (itemCursor);
+        catalogVariationsMapped = Object.keys(variationCategory).length;
+        logger.info(`[revenue-sync] Square catalog categories: ${catalogVariationsMapped} variations mapped`);
+      } catch (e) {
+        logger.warn('[revenue-sync] catalog categories unavailable, keyword fallback only', e?.response?.data || e.message);
+      }
+
+      const categorizeLineItem = (item) =>
+        variationCategory[item.catalog_object_id] || itemCategory[item.catalog_object_id] || categorizeItemNameByKeyword(item.name);
+
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - daysBack);
+      startDate.setUTCHours(0, 0, 0, 0);
+
+      let orders = [];
+      let orderCursor;
+      do {
+        const body = {
+          location_ids: locations.map((l) => l.id),
+          query: {
+            filter: {
+              date_time_filter: { created_at: { start_at: startDate.toISOString() } },
+              state_filter: { states: ['COMPLETED'] },
+            },
+          },
+          limit: 500,
+        };
+        if (orderCursor) body.cursor = orderCursor;
+        const ordersRes = await axios.post(
+          'https://connect.squareup.com/v2/orders/search',
+          body,
+          { headers: { ...headers, 'Content-Type': 'application/json' } }
+        );
+        orders = orders.concat(ordersRes.data.orders || []);
+        orderCursor = ordersRes.data.cursor;
+      } while (orderCursor);
+
+      const dailyCategoryBreakdown = {};
+      orders.forEach((order) => {
+        const date = (order.created_at || '').split('T')[0];
+        if (!date) return;
+        if (!dailyCategoryBreakdown[date]) dailyCategoryBreakdown[date] = {};
+        (order.line_items || []).forEach((item) => {
+          const category = categorizeLineItem(item);
+          const itemTotal = item.total_money ? Number(item.total_money.amount) : 0;
+          if (!dailyCategoryBreakdown[date][category]) dailyCategoryBreakdown[date][category] = { revenue_cents: 0, item_count: 0 };
+          dailyCategoryBreakdown[date][category].revenue_cents += itemTotal;
+          dailyCategoryBreakdown[date][category].item_count += Number(item.quantity || 1);
+        });
+      });
+
+      // Recategorising a date means old rows for it may sit under
+      // different category names than the fresh sync produces -- delete
+      // each synced date's existing rows first, same as the original,
+      // so nothing double-counts.
+      const syncedDates = Object.keys(dailyCategoryBreakdown);
+      if (syncedDates.length) {
+        await supabase.from('revenue_category_breakdown').delete().eq('studio_id', STUDIO_ID).in('metric_date', syncedDates);
+      }
+      let rowsWritten = 0;
+      for (const [date, categories] of Object.entries(dailyCategoryBreakdown)) {
+        for (const [category, { revenue_cents, item_count }] of Object.entries(categories)) {
+          const { error } = await supabase.from('revenue_category_breakdown').upsert({
+            studio_id: STUDIO_ID, metric_date: date, category, revenue_cents, item_count,
+          }, { onConflict: 'studio_id,metric_date,category' });
+          if (!error) rowsWritten++;
+        }
+      }
+
+      res.json({
+        synced: true,
+        dates_synced: syncedDates.sort(),
+        orders_processed: orders.length,
+        rows_written: rowsWritten,
+        catalog_variations_mapped: catalogVariationsMapped,
+      });
+    } catch (err) {
+      logger.error(err.response?.data || err);
+      res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message, synced: false });
+    }
+  });
+}
+
+
 export function registerNeedsVerificationRoute(app, supabase, STUDIO_ID, logger) {
   app.get('/api/spec/bookings/needs-verification', async (req, res) => {
     try {
