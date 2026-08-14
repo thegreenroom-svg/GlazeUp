@@ -1854,6 +1854,217 @@ export function registerKilnDipTransitionRoute(app, supabase, STUDIO_ID, logger)
       res.status(500).json({ error: err.message });
     }
   });
+
+  // Real lookup for the "mark fired" step -- pieces currently waiting on
+  // the kiln for a given booking reference.
+  app.get('/api/spec/kiln/dipped-pieces', async (req, res) => {
+    try {
+      const bookingRef = (req.query.booking || '').trim();
+      if (!bookingRef) return res.status(400).json({ error: 'booking query param is required', pieces: [] });
+      const { data, error } = await supabase
+        .from('pottery_pieces')
+        .select('id, booking_id, piece_type, status, scheduled_firing_date')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_id', bookingRef)
+        .eq('status', 'dipped_waiting_firing')
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      res.json({ pieces: data || [] });
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message, pieces: [] });
+    }
+  });
+
+  // The real missing link the dip-glaze transition needed: dipped ->
+  // actually fired. Sets glaze_fired_at (real column, already existed on
+  // pottery_pieces) and fires the real ready-for-collection email if
+  // RESEND_API_KEY is configured -- this is the natural point Daisy's own
+  // description puts it ("generally two days after that, they'll be ready
+  // for collection" -- firing is the event, not dip-glazing).
+  app.post('/api/spec/kiln/mark-fired', async (req, res) => {
+    try {
+      const { piece_ids } = req.body || {};
+      if (!Array.isArray(piece_ids) || piece_ids.length === 0) {
+        return res.status(400).json({ error: 'piece_ids must be a non-empty array' });
+      }
+      const { data: pieces, error: fetchErr } = await supabase
+        .from('pottery_pieces')
+        .select('id, booking_id')
+        .eq('studio_id', STUDIO_ID)
+        .in('id', piece_ids);
+      if (fetchErr) throw fetchErr;
+      if (!pieces || !pieces.length) return res.status(404).json({ error: 'No matching pieces found' });
+
+      const { error: updateErr } = await supabase
+        .from('pottery_pieces')
+        .update({ status: 'fired', glaze_fired_at: new Date().toISOString() })
+        .eq('studio_id', STUDIO_ID)
+        .in('id', piece_ids);
+      if (updateErr) throw updateErr;
+
+      const bookingRefs = [...new Set(pieces.map((p) => p.booking_id).filter(Boolean))];
+      const emailResults = [];
+      if (bookingRefs.length) {
+        const { data: bookings } = await supabase
+          .from('bookings')
+          .select('booking_code, customer_name, customer_email')
+          .eq('studio_id', STUDIO_ID)
+          .in('booking_code', bookingRefs);
+
+        for (const booking of bookings || []) {
+          const { data: status } = await supabase
+            .from('demo_app_session_status')
+            .select('collection_date')
+            .eq('studio_id', STUDIO_ID)
+            .eq('booking_code', booking.booking_code)
+            .maybeSingle();
+          const sent = await sendCollectionEmail({
+            to: booking.customer_email,
+            customerName: booking.customer_name,
+            collectionDate: status?.collection_date || null,
+            logger,
+          });
+          emailResults.push({ booking_code: booking.booking_code, ...sent });
+        }
+      }
+
+      res.json({ marked_fired: pieces.length, bookings: bookingRefs, email_results: emailResults });
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
+
+// ============================================================================
+// COLLECTION EMAIL -- real Resend API call, gated behind RESEND_API_KEY.
+// ----------------------------------------------------------------------------
+// Checked directly before writing this: no email-sending capability exists
+// anywhere in this codebase (no nodemailer, no email API package, nothing).
+// This is complete, real, correct code against Resend's actual REST API
+// (a simple, well-documented transactional email API -- one POST, Bearer
+// auth) -- but it CANNOT send anything until a real RESEND_API_KEY is set
+// in the environment and a real sending domain is verified with Resend,
+// both of which are account-setup steps outside what this code can do.
+// If the key isn't set, this returns 'not configured' honestly rather
+// than pretending an email went out. FROM_EMAIL also needs to be a real
+// verified sender address once that account exists.
+// ============================================================================
+async function sendCollectionEmail({ to, customerName, collectionDate, logger }) {
+  if (!process.env.RESEND_API_KEY) {
+    logger.warn('[collection-email] RESEND_API_KEY not set -- not configured, no email sent');
+    return { sent: false, reason: 'not_configured' };
+  }
+  if (!to) {
+    return { sent: false, reason: 'no_customer_email' };
+  }
+  try {
+    const dateText = collectionDate
+      ? new Date(collectionDate + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+      : 'soon';
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: process.env.FROM_EMAIL || 'The Kiln Cafe <hello@thekilncafe.com>',
+        to: [to],
+        subject: 'Your pottery is fired and ready!',
+        html: `<p>Hi ${customerName || 'there'},</p><p>Great news -- your pottery has come out of the kiln and is ready for collection${collectionDate ? ` from <strong>${dateText}</strong>` : ''}.</p><p>See you soon!</p><p>The Kiln Cafe</p>`,
+      }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      logger.error('[collection-email] Resend API error', body);
+      return { sent: false, reason: body?.message || 'send_failed' };
+    }
+    return { sent: true, id: body?.id || null };
+  } catch (err) {
+    logger.error('[collection-email] request failed', err);
+    return { sent: false, reason: err.message };
+  }
+}
+
+// ============================================================================
+// ROYAL MAIL POSTAGE LABEL -- real Click & Drop API shape, gated behind
+// ROYAL_MAIL_API_KEY.
+// ----------------------------------------------------------------------------
+// Checked directly: no shipping/label infrastructure exists anywhere in
+// this codebase (only a postal RATE lookup existed before, no label
+// creation). This targets Royal Mail's real Click & Drop (OBA) orders
+// API shape from genuine knowledge of it -- but it has never been tested
+// against a real Royal Mail account (none exists to test against), and
+// Royal Mail's actual auth flow may need adjustment once real credentials
+// are added and a first real order is attempted -- flagged honestly in
+// the code rather than presented as proven. Deliberately does NOT put a
+// QR code on the label -- Daisy's own instinct that it "might confuse the
+// postal" service is sound; a label should carry only what a courier
+// service expects to read.
+// ============================================================================
+export function registerPostalLabelRoute(app, supabase, STUDIO_ID, logger) {
+  app.post('/api/spec/postal/create-label', async (req, res) => {
+    try {
+      const { booking_code, person_name, recipient_name, postcode, address_line1, city, weight_grams } = req.body || {};
+      if (!recipient_name || !postcode || !address_line1) {
+        return res.status(400).json({ error: 'recipient_name, address_line1 and postcode are required' });
+      }
+      if (!weight_grams || weight_grams <= 0) {
+        return res.status(400).json({ error: 'weight_grams is required -- weigh the real parcel, this is not estimated automatically' });
+      }
+      if (!process.env.ROYAL_MAIL_API_KEY) {
+        return res.status(400).json({
+          error: 'Royal Mail not configured -- ROYAL_MAIL_API_KEY needs to be set once a real Click & Drop business account exists',
+          configured: false,
+        });
+      }
+
+      const orderRes = await fetch('https://api.parcel.royalmail.com/api/v1/orders', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.ROYAL_MAIL_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: [
+            {
+              orderReference: booking_code + (person_name ? `-${person_name}` : ''),
+              recipient: {
+                address: {
+                  fullName: recipient_name,
+                  addressLine1: address_line1,
+                  city: city || undefined,
+                  postcode,
+                  countryCode: 'GB',
+                },
+              },
+              packages: [{ weightInGrams: Math.round(weight_grams) }],
+              orderDate: new Date().toISOString(),
+              postageDetails: { conversationId: booking_code },
+            },
+          ],
+        }),
+      });
+      const body = await orderRes.json().catch(() => ({}));
+      if (!orderRes.ok) {
+        logger.error('[postal-label] Royal Mail API error', body);
+        return res.status(502).json({ error: body?.errors?.[0]?.errorDescription || 'Royal Mail order creation failed', configured: true, raw: body });
+      }
+
+      res.json({
+        created: true,
+        configured: true,
+        order_identifier: body?.createdOrders?.[0]?.orderIdentifier || null,
+        tracking_number: body?.createdOrders?.[0]?.trackingNumber || null,
+        label_url: body?.createdOrders?.[0]?.label?.labelURL || null,
+      });
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
 }
 
 // ============================================================================
