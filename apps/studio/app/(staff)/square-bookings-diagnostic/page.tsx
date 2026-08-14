@@ -29,17 +29,20 @@ export default function SquareBookingsDiagnosticPage() {
   const [bookingCount, setBookingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [diagnostic, setDiagnostic] = useState<any>(null);
   const [pulledAt, setPulledAt] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setDiagnostic(null);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/square-diagnostic`);
       const d = await res.json();
       if (!res.ok) {
         setError(d.error || 'Could not load');
+        setDiagnostic(d.diagnostic || null);
         setSummary([]);
         setSampleRaw([]);
         return;
@@ -90,8 +93,22 @@ export default function SquareBookingsDiagnosticPage() {
       )}
 
       {error && (
-        <div style={{ display: 'flex', gap: '0.5rem', padding: '0.9rem', backgroundColor: '#fee', color: '#c33', borderRadius: '6px', marginBottom: '1.25rem' }}>
-          <AlertCircle size={18} /> {error}
+        <div style={{ padding: '0.9rem', backgroundColor: '#fee', color: '#c33', borderRadius: '6px', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <AlertCircle size={18} /> {error}
+          </div>
+          {diagnostic && (
+            <div style={{ marginTop: '0.7rem', paddingTop: '0.7rem', borderTop: '1px solid #f0c0c0' }}>
+              <p style={{ fontSize: '0.78rem', fontWeight: 700 }}>Failed at step: {diagnostic.step}</p>
+              <p style={{ fontSize: '0.78rem' }}>Real HTTP status: {diagnostic.status} {diagnostic.statusText}</p>
+              {diagnostic.url && <p style={{ fontSize: '0.72rem', fontFamily: 'monospace', wordBreak: 'break-all' }}>{diagnostic.url}</p>}
+              {diagnostic.body && (
+                <pre style={{ fontSize: '0.7rem', marginTop: '0.5rem', padding: '0.6rem', backgroundColor: '#fff', borderRadius: '4px', overflowX: 'auto' }}>
+                  {JSON.stringify(diagnostic.body, null, 2)}
+                </pre>
+              )}
+            </div>
+          )}
         </div>
       )}
 

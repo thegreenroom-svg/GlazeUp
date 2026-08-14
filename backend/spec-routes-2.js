@@ -1343,6 +1343,29 @@ export function registerSquareOpenOrdersDiagnosticRoute(app, supabase, STUDIO_ID
 // ============================================================================
 export function registerSquareBookingsDiagnosticRoute(app, supabase, STUDIO_ID, logger, axios) {
   app.get('/api/spec/bookings/square-diagnostic', async (req, res) => {
+    // Wraps each real call with which step it was, and the true raw error
+    // (status + body), since axios's own generic message ('Request failed
+    // with status code 406') hides which of the three real API calls
+    // actually failed and why -- needed real diagnosis, not a guess.
+    const callStep = async (label, fn) => {
+      try {
+        return await fn();
+      } catch (err) {
+        const detail = {
+          step: label,
+          status: err.response?.status || null,
+          statusText: err.response?.statusText || null,
+          url: err.config?.url || null,
+          body: err.response?.data || null,
+          message: err.message,
+        };
+        logger.error(`[bookings-diagnostic] failed at step: ${label}`, detail);
+        const e = new Error(`Failed at step '${label}': ${err.message}`);
+        e.diagnostic = detail;
+        throw e;
+      }
+    };
+
     try {
       const { data: connection } = await supabase
         .from('square_connections')
@@ -1355,7 +1378,9 @@ export function registerSquareBookingsDiagnosticRoute(app, supabase, STUDIO_ID, 
       const token = connection.square_access_token;
       const headers = { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18' };
 
-      const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', { headers });
+      const locationsRes = await callStep('locations.list', () =>
+        axios.get('https://connect.squareup.com/v2/locations', { headers })
+      );
       const locations = locationsRes.data.locations || [];
       if (!locations.length) return res.json({ bookings: [], reason: 'no_square_locations' });
 
@@ -1366,15 +1391,17 @@ export function registerSquareBookingsDiagnosticRoute(app, supabase, STUDIO_ID, 
       const startMax = new Date();
       startMax.setDate(startMax.getDate() + 14);
 
-      const bookingsRes = await axios.get('https://connect.squareup.com/v2/bookings', {
-        headers,
-        params: {
-          location_id: locations[0].id,
-          start_at_min: startMin,
-          start_at_max: startMax.toISOString(),
-          limit: 50,
-        },
-      });
+      const bookingsRes = await callStep('bookings.list', () =>
+        axios.get('https://connect.squareup.com/v2/bookings', {
+          headers,
+          params: {
+            location_id: locations[0].id,
+            start_at_min: startMin,
+            start_at_max: startMax.toISOString(),
+            limit: 50,
+          },
+        })
+      );
       const bookings = bookingsRes.data.bookings || [];
 
       // Real customer names, for the first handful only -- this is a
@@ -1412,7 +1439,13 @@ export function registerSquareBookingsDiagnosticRoute(app, supabase, STUDIO_ID, 
       });
     } catch (err) {
       logger.error(err.response?.data || err);
-      res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message, bookings: [] });
+      res.status(500).json({
+        error: err.response?.data?.errors?.[0]?.detail || err.message,
+        // Real diagnostic detail, if this came from callStep above --
+        // exactly which real call failed, its true status and raw body.
+        diagnostic: err.diagnostic || null,
+        bookings: [],
+      });
     }
   });
 }
