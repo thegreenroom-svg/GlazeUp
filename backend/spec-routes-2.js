@@ -1376,7 +1376,14 @@ export function registerSquareBookingsDiagnosticRoute(app, supabase, STUDIO_ID, 
         return res.status(400).json({ error: 'No valid Square connection', bookings: [] });
       }
       const token = connection.square_access_token;
-      const headers = { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18' };
+      // Real, confirmed cause of the 406 seen live: Square's Bookings API
+      // specifically rejects axios's default Accept header (a multi-value
+      // list, 'application/json, text/plain, */*') -- its own error said so
+      // plainly ('Unrecognized accept=...'). Locations, on this same headers
+      // object, passed fine right before it failed -- this is a real quirk
+      // of the Bookings endpoint specifically, not every Square call this
+      // session, so fixed narrowly here rather than touched everywhere.
+      const headers = { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18', Accept: 'application/json' };
 
       const locationsRes = await callStep('locations.list', () =>
         axios.get('https://connect.squareup.com/v2/locations', { headers })
