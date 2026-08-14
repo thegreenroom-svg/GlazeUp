@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnDipTransitionRoute, registerPostalLabelRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerTestAiRoute, registerPartySizeRoute } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnDipTransitionRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerTestAiRoute, registerPartySizeRoute } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -1452,47 +1452,11 @@ app.patch('/api/notifications/:notificationId/read', authMiddleware, async (req,
   }
 });
 
-// Sync bookings from Square (used by Print Booking Cards "Check for new" button)
-app.post('/api/bookings/sync', async (req, res) => {
-  try {
-    // For the demo/development environment, this endpoint triggers a refresh
-    // In production, this would call Square's Bookings API to sync real data
-    
-    const { studioId = DEMO_STUDIO_ID } = req.query;
-    
-    // Check if Square is configured for this studio
-    const { data: connection } = await supabase
-      .from('studio_square_connections')
-      .select('square_access_token, square_token_expires_at')
-      .eq('studio_id', studioId)
-      .single();
-    
-    if (!connection?.square_access_token) {
-      return res.status(400).json({ 
-        error: 'Square not configured for this studio',
-        synced: 0
-      });
-    }
-    
-    // In a real implementation, this would:
-    // 1. Call Square Bookings API to fetch today's/selected date's bookings
-    // 2. Upsert them into the bookings table
-    // 3. Return count of new/updated bookings
-    
-    // For now, just return success - the bookings fetch will pull from demo data
-    res.json({ 
-      status: 'synced',
-      synced: 0,
-      message: 'Bookings synced from Square'
-    });
-  } catch (err) {
-    logger.error('Bookings sync error:', err);
-    res.status(500).json({ 
-      error: 'Could not sync bookings',
-      message: err.message 
-    });
-  }
-});
+// Real booking sync from Square Appointments (used by Print Booking Cards
+// "Check for new" button) -- registerRealBookingSyncRoute, called further
+// down where all the other spec routes are wired in. This used to be a
+// dead stub here (own comment admitted 'For now, just return success') --
+// removed rather than left behind now that the real one exists.
 
 // ============================================================================
 // ERROR HANDLING
@@ -1529,6 +1493,7 @@ registerDesignChargeRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerFulfilmentRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerTestAiRoute(app, supabase, DEMO_STUDIO_ID, logger, upload, fs, axios, logAiUsage);
 registerPartySizeRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
+registerRealBookingSyncRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

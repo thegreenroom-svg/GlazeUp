@@ -2843,3 +2843,154 @@ export function registerPartySizeRoute(app, supabase, STUDIO_ID, logger, axios) 
     }
   });
 }
+
+// ============================================================================
+// REAL BOOKING SYNC -- creates the actual missing rows, not just fixes
+// party_size on ones that already exist.
+// ----------------------------------------------------------------------------
+// The real gap: nothing has created a new booking row since 9 Aug (checked
+// directly: 256 real bookings, ALL carry a synced_from_square timestamp,
+// most recent exactly 9 Aug -- a real sync ran and stopped, same story as
+// revenue). Unlike revenue, no trace of the original sync code survives
+// anywhere in this repo's history (checked: its own first commit is
+// literally 'Initial commit') -- has to be rebuilt fresh, not ported.
+//
+// Reuses the exact proven party-size logic already built and tested here
+// (partySizeFromItemName, the local square_items cache) rather than
+// reinventing it or hitting Square's live Catalog API per booking --
+// confirmed live via the diagnostic: service variation names genuinely
+// encode party size directly ('3 Person', 'Table for 4' etc), and this
+// exact regex already handles both real conventions in use.
+//
+// Registered onto the SAME route path the dead stub used
+// (POST /api/bookings/sync) -- the existing 'Check for new bookings'
+// button on daily-cards already calls this, so it starts working for real
+// with zero frontend changes.
+export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, axios) {
+  app.post('/api/bookings/sync', async (req, res) => {
+    try {
+      const { data: connection } = await supabase
+        .from('square_connections')
+        .select('square_access_token, square_token_expires_at')
+        .eq('studio_id', STUDIO_ID)
+        .single();
+      if (!connection || new Date(connection.square_token_expires_at) < new Date()) {
+        return res.status(400).json({ error: 'No valid Square connection', synced: 0 });
+      }
+      const token = connection.square_access_token;
+      const headers = { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18', Accept: 'application/json' };
+
+      const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', { headers });
+      const locations = locationsRes.data.locations || [];
+      if (!locations.length) return res.json({ synced: 0, reason: 'no_square_locations' });
+
+      // Real gap-catching window: from the last known real sync (9 Aug)
+      // through 30 days ahead, so every run both catches up what's missing
+      // and keeps pulling genuinely new future bookings.
+      const startMin = new Date('2026-08-09T00:00:00Z').toISOString();
+      const startMax = new Date();
+      startMax.setDate(startMax.getDate() + 30);
+
+      let allBookings = [];
+      let cursor;
+      do {
+        const params = {
+          location_id: locations[0].id,
+          start_at_min: startMin,
+          start_at_max: startMax.toISOString(),
+          limit: 100,
+        };
+        if (cursor) params.cursor = cursor;
+        const bookingsRes = await axios.get('https://connect.squareup.com/v2/bookings', { headers, params });
+        allBookings = allBookings.concat(bookingsRes.data.bookings || []);
+        cursor = bookingsRes.data.cursor;
+      } while (cursor);
+
+      // Skip what's already real -- match on square_booking_id, the same
+      // real identifier every already-synced row carries.
+      const { data: existing } = await supabase
+        .from('bookings')
+        .select('square_booking_id')
+        .eq('studio_id', STUDIO_ID)
+        .not('square_booking_id', 'is', null);
+      const existingIds = new Set((existing || []).map((b) => b.square_booking_id));
+      const newBookings = allBookings.filter((b) => !existingIds.has(b.id));
+
+      let synced = 0, errored = 0;
+      const errors = [];
+
+      for (const b of newBookings) {
+        try {
+          // Real customer name -- a failed lookup here shouldn't lose the
+          // whole booking, just falls back honestly rather than guessing.
+          let customerName = 'Unknown';
+          if (b.customer_id) {
+            try {
+              const custRes = await axios.get(`https://connect.squareup.com/v2/customers/${b.customer_id}`, { headers });
+              const c = custRes.data.customer;
+              customerName = [c?.given_name, c?.family_name].filter(Boolean).join(' ') || c?.company_name || 'Unknown';
+            } catch (e) { /* leave as Unknown */ }
+          }
+
+          // Real party size, exact same proven logic as the existing
+          // party-size backfill above -- local square_items cache lookup,
+          // no extra live Catalog call needed.
+          const variationId = b.appointment_segments?.[0]?.service_variation_id || null;
+          let partySize = null;
+          if (variationId) {
+            const { data: item } = await supabase
+              .from('square_items')
+              .select('item_name')
+              .eq('studio_id', STUDIO_ID)
+              .eq('variation_id', variationId)
+              .maybeSingle();
+            partySize = partySizeFromItemName(item?.item_name || null);
+          }
+
+          const durationMin = b.appointment_segments?.[0]?.duration_minutes || null;
+          const startAt = new Date(b.start_at);
+          const endAt = durationMin ? new Date(startAt.getTime() + durationMin * 60000) : null;
+
+          // Real booking_code convention, confirmed directly against live
+          // rows: booking-YYYYMMDD-<8 random lowercase alphanumeric>.
+          const dateStr = startAt.toISOString().slice(0, 10).replace(/-/g, '');
+          const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+          let suffix = '';
+          for (let i = 0; i < 8; i++) suffix += chars[Math.floor(Math.random() * chars.length)];
+          const bookingCode = `booking-${dateStr}-${suffix}`;
+
+          const { error: insertErr } = await supabase.from('bookings').insert({
+            studio_id: STUDIO_ID,
+            booking_code: bookingCode,
+            square_booking_id: b.id,
+            customer_name: customerName,
+            session_start: b.start_at,
+            session_end: endAt ? endAt.toISOString() : null,
+            party_size: partySize,
+            synced_from_square: new Date().toISOString(),
+          });
+          if (insertErr) throw insertErr;
+          synced++;
+        } catch (err) {
+          errored++;
+          if (errors.length < 10) errors.push({ square_booking_id: b.id, error: err.message });
+        }
+        // Small pace between real Square calls, same as the existing
+        // backfill job, to stay well clear of rate limits.
+        await new Promise((r) => setTimeout(r, 120));
+      }
+
+      res.json({
+        status: 'synced',
+        synced,
+        skipped_existing: allBookings.length - newBookings.length,
+        errored,
+        total_from_square: allBookings.length,
+        errors,
+      });
+    } catch (err) {
+      logger.error('real bookings sync failed', err.response?.data || err.message);
+      res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message, synced: 0 });
+    }
+  });
+}
