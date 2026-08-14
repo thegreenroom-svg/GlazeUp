@@ -4,14 +4,13 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Camera } from 'lucide-react';
+import { Camera, Undo2, Trash2 } from 'lucide-react';
 import { SaveAndCharge } from '@/components/SaveAndCharge';
 
-interface Fill {
-  x: number;
-  y: number;
+interface Stroke {
   colour: string;
-  size: number;
+  width: number;
+  points: { x: number; y: number }[];
 }
 
 // The studio's real 82-colour range, matching the Colour Picker so a preview
@@ -23,11 +22,13 @@ const QUICK_COLOURS = [
 
 export default function DesignPreviewPage() {
   const [photo, setPhoto] = useState<HTMLImageElement | null>(null);
-  const [fills, setFills] = useState<Fill[]>([]);
+  const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [colour, setColour] = useState(QUICK_COLOURS[0]);
-  const [brushSize, setBrushSize] = useState(28);
+  const [brushSize, setBrushSize] = useState(14);
+  const [drawing, setDrawing] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const currentRef = useRef<Stroke | null>(null);
 
   const redraw = () => {
     const c = canvasRef.current;
@@ -35,17 +36,31 @@ export default function DesignPreviewPage() {
     if (!c || !ctx || !photo) return;
     ctx.clearRect(0, 0, c.width, c.height);
     ctx.drawImage(photo, 0, 0, c.width, c.height);
-    fills.forEach((f) => {
-      ctx.globalAlpha = 0.72;
-      ctx.fillStyle = f.colour;
+
+    const all = currentRef.current ? [...strokes, currentRef.current] : strokes;
+    ctx.globalAlpha = 0.72;
+    all.forEach((s) => {
+      if (s.points.length === 0) return;
+      ctx.strokeStyle = s.colour;
+      ctx.lineWidth = s.width;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
       ctx.beginPath();
-      ctx.arc(f.x, f.y, f.size, 0, Math.PI * 2);
-      ctx.fill();
+      if (s.points.length === 1) {
+        // A single tap with no drag -- still show a dab, same as before,
+        // rather than nothing at all.
+        ctx.arc(s.points[0].x, s.points[0].y, s.width / 2, 0, Math.PI * 2);
+        ctx.fillStyle = s.colour;
+        ctx.fill();
+      } else {
+        s.points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+        ctx.stroke();
+      }
     });
     ctx.globalAlpha = 1;
   };
 
-  useEffect(redraw, [fills, photo]);
+  useEffect(redraw, [strokes, photo]);
 
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -60,26 +75,52 @@ export default function DesignPreviewPage() {
         c.height = img.height * scale;
       }
       setPhoto(img);
-      setFills([]);
+      setStrokes([]);
     };
     img.src = URL.createObjectURL(f);
   };
 
-  const paint = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    const c = canvasRef.current;
-    if (!c || !photo) return;
-    const rect = c.getBoundingClientRect();
-    const point = 'touches' in e ? e.touches[0] : e;
-    const x = (point.clientX - rect.left) * (c.width / rect.width);
-    const y = (point.clientY - rect.top) * (c.height / rect.height);
-    setFills((prev) => [...prev, { x, y, colour, size: brushSize }]);
+  const pos = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const c = canvasRef.current!;
+    const r = c.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * (c.width / r.width), y: (e.clientY - r.top) * (c.height / r.height) };
+  };
+
+  const down = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!photo) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    // Real pressure-sensitive fine detail, where a stylus reports it (an
+    // Apple Pencil or similar reports real pressure via the Pointer Events
+    // API; a plain finger touch always reports a flat 0.5, a mouse
+    // reports 0.5 or nothing) -- falls back to the chosen brush size on a
+    // finger, same behaviour as before this was here.
+    const p = e.pressure && e.pressure > 0 && e.pressure !== 0.5 ? e.pressure : null;
+    currentRef.current = {
+      colour,
+      width: p ? Math.max(2, brushSize * p * 1.6) : brushSize,
+      points: [pos(e)],
+    };
+    setDrawing(true);
+    redraw();
+  };
+
+  const move = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!drawing || !currentRef.current) return;
+    currentRef.current.points.push(pos(e));
+    redraw();
+  };
+
+  const up = () => {
+    if (currentRef.current) setStrokes((s) => [...s, currentRef.current!]);
+    currentRef.current = null;
+    setDrawing(false);
   };
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '600px' }}>
       <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Design Preview</h1>
       <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-        Photograph your actual piece, then dab colour straight onto the photo to see how it might look.
+        Photograph your actual piece, then paint colour straight onto the photo to see how it might look. Works with a stylus for fine detail.
       </p>
 
       <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{ display: 'none' }} />
@@ -96,7 +137,10 @@ export default function DesignPreviewPage() {
         <>
           <canvas
             ref={canvasRef}
-            onClick={paint}
+            onPointerDown={down}
+            onPointerMove={move}
+            onPointerUp={up}
+            onPointerLeave={up}
             style={{ width: '100%', borderRadius: '8px', cursor: 'crosshair', display: 'block', marginBottom: '0.8rem', touchAction: 'none' }}
           />
 
@@ -113,23 +157,24 @@ export default function DesignPreviewPage() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.8rem' }}>
             <span style={{ fontSize: '0.8rem', color: '#666' }}>Brush size</span>
-            <input type="range" min={8} max={60} value={brushSize} onChange={(e) => setBrushSize(Number(e.target.value))} style={{ flex: 1 }} />
+            <input type="range" min={2} max={50} value={brushSize} onChange={(e) => setBrushSize(Number(e.target.value))} style={{ flex: 1 }} />
+            <span style={{ fontSize: '0.8rem', color: '#999', width: '1.5rem' }}>{brushSize}</span>
           </div>
 
           <div style={{ display: 'flex', gap: '0.4rem' }}>
             <button
-              onClick={() => setFills((f) => f.slice(0, -1))}
-              disabled={fills.length === 0}
-              style={{ flex: 1, padding: '0.5rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: fills.length ? 'pointer' : 'not-allowed', fontSize: '0.85rem' }}
+              onClick={() => setStrokes((s) => s.slice(0, -1))}
+              disabled={strokes.length === 0}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', padding: '0.5rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: strokes.length ? 'pointer' : 'not-allowed', fontSize: '0.85rem', opacity: strokes.length ? 1 : 0.5 }}
             >
-              Undo
+              <Undo2 size={15} /> Undo
             </button>
             <button
-              onClick={() => setFills([])}
-              disabled={fills.length === 0}
-              style={{ flex: 1, padding: '0.5rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: fills.length ? 'pointer' : 'not-allowed', fontSize: '0.85rem' }}
+              onClick={() => setStrokes([])}
+              disabled={strokes.length === 0}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem', padding: '0.5rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: strokes.length ? 'pointer' : 'not-allowed', fontSize: '0.85rem', opacity: strokes.length ? 1 : 0.5 }}
             >
-              Clear
+              <Trash2 size={15} /> Clear
             </button>
             <button
               onClick={() => fileRef.current?.click()}
@@ -139,7 +184,7 @@ export default function DesignPreviewPage() {
             </button>
           </div>
 
-          {fills.length > 0 && (
+          {strokes.length > 0 && (
             <div style={{ marginTop: '0.8rem' }}>
               <SaveAndCharge tool="design-preview" label="Design Preview" />
             </div>
