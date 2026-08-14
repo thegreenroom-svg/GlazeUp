@@ -27,6 +27,7 @@ export default function SquareBookingsDiagnosticPage() {
   const [sampleRaw, setSampleRaw] = useState<any[]>([]);
   const [locationId, setLocationId] = useState<string | null>(null);
   const [bookingCount, setBookingCount] = useState(0);
+  const [serviceVariations, setServiceVariations] = useState<Record<string, { name: string | null; price_gbp?: number | null; error?: string }>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [diagnostic, setDiagnostic] = useState<any>(null);
@@ -51,6 +52,7 @@ export default function SquareBookingsDiagnosticPage() {
       setSampleRaw(d.sample_raw || []);
       setLocationId(d.location_id || null);
       setBookingCount(d.booking_count || 0);
+      setServiceVariations(d.service_variations || {});
       setPulledAt(d.pulled_at || null);
     } catch {
       setError('Could not reach the server');
@@ -118,6 +120,22 @@ export default function SquareBookingsDiagnosticPage() {
 
       {!loading && summary.length > 0 && (
         <>
+          {Object.keys(serviceVariations).length > 0 && (
+            <>
+              <h2 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.6rem' }}>Real service variations used</h2>
+              <p style={{ color: '#999', fontSize: '0.78rem', marginBottom: '0.7rem' }}>Checking whether party size is encoded in the variation's own name.</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1.5rem' }}>
+                {Object.entries(serviceVariations).map(([id, v]) => (
+                  <div key={id} style={{ padding: '0.6rem 0.9rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.82rem' }}>
+                    <strong>{v.name || (v.error ? `(error: ${v.error})` : '(no name)')}</strong>
+                    {v.price_gbp != null && <span style={{ color: '#666' }}> — £{v.price_gbp.toFixed(2)}</span>}
+                    <p style={{ color: '#aaa', fontFamily: 'monospace', fontSize: '0.68rem', marginTop: '0.2rem' }}>{id}</p>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
           <h2 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.6rem' }}>All bookings (summary)</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
             {summary.map((b) => (

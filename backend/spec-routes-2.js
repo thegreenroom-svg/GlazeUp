@@ -1426,9 +1426,34 @@ export function registerSquareBookingsDiagnosticRoute(app, supabase, STUDIO_ID, 
         }
       }
 
+      // Real check: does the SERVICE VARIATION a booking uses actually
+      // encode party size in its own name (e.g. a studio offering separate
+      // 'for 2' / 'for 4' variations of the same service)? Confirmed no
+      // party-size field exists anywhere on the raw booking itself, so this
+      // is the next real place to check before assuming it isn't there.
+      const variationIds = [...new Set(
+        bookings.flatMap((b) => (b.appointment_segments || []).map((s) => s.service_variation_id)).filter(Boolean)
+      )];
+      const variations = {};
+      for (const id of variationIds) {
+        try {
+          const objRes = await axios.get(`https://connect.squareup.com/v2/catalog/object/${id}`, { headers });
+          const v = objRes.data.object?.item_variation_data;
+          variations[id] = {
+            name: v?.name || null,
+            price_gbp: v?.price_money ? v.price_money.amount / 100 : null,
+          };
+        } catch (e) {
+          variations[id] = { name: null, error: e.response?.data?.errors?.[0]?.detail || e.message };
+        }
+      }
+
       res.json({
         location_id: locations[0].id,
         booking_count: bookings.length,
+        // Real service variation names, keyed by ID -- checks directly
+        // whether party size is encoded here instead of on the booking.
+        service_variations: variations,
         // Full raw shape for the first few -- deliberately unprocessed, so
         // the real party-size encoding (and anything else unexpected) can
         // actually be seen rather than guessed at.
