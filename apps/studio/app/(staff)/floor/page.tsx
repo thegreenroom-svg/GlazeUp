@@ -71,6 +71,7 @@ interface TillItem {
   item_name: string;
   quantity: number;
   unit_price_cents: number;
+  person_name: string | null;
 }
 
 const B = {
@@ -115,6 +116,15 @@ export default function FloorPage() {
   const [tableDraftInline, setTableDraftInline] = useState('');
   const [savingTableInline, setSavingTableInline] = useState(false);
   const [tillItems, setTillItems] = useState<TillItem[]>([]);
+  // Real per-person billing/collection -- per Daisy: people at the same
+  // table often pay separately and may want different collection methods.
+  // null means 'shared/whole table', same as every booking before this
+  // existed. activePersonTag is who new items get attributed to right now.
+  const [activePersonTag, setActivePersonTag] = useState<string | null>(null);
+  const [newPersonInput, setNewPersonInput] = useState('');
+  const [addingPerson, setAddingPerson] = useState(false);
+  const [personCollection, setPersonCollection] = useState<Record<string, { collection_method: 'studio' | 'postal' | null; postal_postcode: string; payment_method: 'card' | 'cash' | null }>>({});
+  const [savingPersonCollection, setSavingPersonCollection] = useState<string | null>(null);
   const [tillBusy, setTillBusy] = useState(false);
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -250,10 +260,26 @@ export default function FloorPage() {
     setPostalPostcode('');
     setCollectionDate(defaultCollectionDate());
     setLiveSquareOrder(null);
+    setActivePersonTag(null);
+    setNewPersonInput('');
+    setPersonCollection({});
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${b.booking_code}/till`);
       const d = res.ok ? await res.json() : [];
       setTillItems(Array.isArray(d) ? d : d?.items || []);
+      // Real existing per-person collection prefs, if any were set on a
+      // previous visit to this booking (e.g. quick-access mid-session).
+      if (!Array.isArray(d) && Array.isArray(d?.people)) {
+        const prefs: typeof personCollection = {};
+        d.people.forEach((p: any) => {
+          prefs[p.person_name] = {
+            collection_method: p.collection_method || null,
+            postal_postcode: p.postal_postcode || '',
+            payment_method: p.payment_method || null,
+          };
+        });
+        setPersonCollection(prefs);
+      }
     } catch { /* fresh table, no till yet */ }
     loadLiveSquareOrder(b.booking_code);
     setPhase(3);
@@ -286,13 +312,35 @@ export default function FloorPage() {
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${current.booking_code}/till`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ item_name: m.item_name, category: m.category, quantity: 1, unit_price_cents: m.price_cents ?? 0 }),
+        body: JSON.stringify({ item_name: m.item_name, category: m.category, quantity: 1, unit_price_cents: m.price_cents ?? 0, person_name: activePersonTag }),
       });
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${current.booking_code}/till`);
       const d = res.ok ? await res.json() : [];
       setTillItems(Array.isArray(d) ? d : d?.items || []);
     } finally {
       setTillBusy(false);
+    }
+  };
+
+  // Save one named person's collection/payment preference -- real endpoint,
+  // separate from the whole-booking one used when nobody's split.
+  const savePersonCollection = async (personName: string) => {
+    if (!current) return;
+    const pref = personCollection[personName];
+    if (!pref?.collection_method) return;
+    setSavingPersonCollection(personName);
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${current.booking_code}/people/${encodeURIComponent(personName)}/collection`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          collection_method: pref.collection_method,
+          postal_postcode: pref.collection_method === 'postal' ? pref.postal_postcode : null,
+          payment_method: pref.payment_method,
+        }),
+      });
+    } finally {
+      setSavingPersonCollection(null);
     }
   };
 
@@ -377,6 +425,10 @@ export default function FloorPage() {
     setCollectionMethod(null);
     setPostalPostcode('');
     setCollectionDate('');
+    setActivePersonTag(null);
+    setNewPersonInput('');
+    setAddingPerson(false);
+    setPersonCollection({});
     if (quickAccessMode) {
       // Refresh totals so the seated list reflects the table just finished
       loadSeatedBookings();
@@ -581,6 +633,62 @@ export default function FloorPage() {
           </div>
         )}
 
+        {/* Who's this for -- real per-person billing. Shared (null) is the
+            default and behaves exactly as every booking always has.
+            Picking a name here just tags whatever's added next; nothing
+            retroactively changes for items already on the till. */}
+        <div style={{ backgroundColor: SQ.panel, borderBottom: `1px solid ${SQ.line}`, padding: '0.6rem 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.72rem', color: SQ.sub, marginRight: '0.2rem' }}>Adding for:</span>
+          <button
+            onClick={() => setActivePersonTag(null)}
+            style={{ padding: '0.3rem 0.7rem', borderRadius: 999, fontSize: '0.78rem', cursor: 'pointer', border: activePersonTag === null ? `1.5px solid ${SQ.accent}` : `1px solid ${SQ.line}`, backgroundColor: activePersonTag === null ? SQ.accent + '15' : 'transparent', color: activePersonTag === null ? SQ.accentDark : SQ.ink, fontWeight: activePersonTag === null ? 700 : 400 }}
+          >
+            Shared
+          </button>
+          {Array.from(new Set(tillItems.map((i) => i.person_name).filter((n): n is string => !!n))).map((name) => (
+            <button
+              key={name}
+              onClick={() => setActivePersonTag(name)}
+              style={{ padding: '0.3rem 0.7rem', borderRadius: 999, fontSize: '0.78rem', cursor: 'pointer', border: activePersonTag === name ? `1.5px solid ${SQ.accent}` : `1px solid ${SQ.line}`, backgroundColor: activePersonTag === name ? SQ.accent + '15' : 'transparent', color: activePersonTag === name ? SQ.accentDark : SQ.ink, fontWeight: activePersonTag === name ? 700 : 400 }}
+            >
+              {name}
+            </button>
+          ))}
+          {!addingPerson ? (
+            <button
+              onClick={() => setAddingPerson(true)}
+              style={{ padding: '0.3rem 0.6rem', borderRadius: 999, fontSize: '0.78rem', cursor: 'pointer', border: `1px dashed ${SQ.line}`, background: 'transparent', color: SQ.sub }}
+            >
+              + Add person
+            </button>
+          ) : (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+              <input
+                type="text"
+                value={newPersonInput}
+                onChange={(e) => setNewPersonInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newPersonInput.trim()) {
+                    setActivePersonTag(newPersonInput.trim());
+                    setNewPersonInput('');
+                    setAddingPerson(false);
+                  }
+                }}
+                placeholder="Name"
+                autoFocus
+                maxLength={30}
+                style={{ width: '7rem', padding: '0.25rem 0.5rem', borderRadius: 6, border: `1px solid ${SQ.line}`, fontSize: '0.78rem' }}
+              />
+              <button
+                onClick={() => { if (newPersonInput.trim()) { setActivePersonTag(newPersonInput.trim()); setNewPersonInput(''); } setAddingPerson(false); }}
+                style={{ padding: '0.25rem 0.5rem', borderRadius: 6, border: 'none', backgroundColor: SQ.accent, color: 'white', fontSize: '0.72rem', cursor: 'pointer' }}
+              >
+                Add
+              </button>
+            </span>
+          )}
+        </div>
+
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', padding: '1rem', maxWidth: 1100, margin: '0 auto' }}>
           {/* Left: category tabs + item grid */}
           <div style={{ flex: '1 1 60%', minWidth: 300 }}>
@@ -752,7 +860,10 @@ export default function FloorPage() {
                 ) : (
                   tillItems.map((i) => (
                     <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 1rem', borderBottom: `1px solid ${SQ.line}` }}>
-                      <span style={{ fontSize: '0.85rem' }}>{i.quantity > 1 ? `${i.quantity}x ` : ''}{i.item_name}</span>
+                      <span style={{ fontSize: '0.85rem' }}>
+                        {i.quantity > 1 ? `${i.quantity}x ` : ''}{i.item_name}
+                        {i.person_name && <span style={{ display: 'block', fontSize: '0.68rem', color: SQ.accent, fontWeight: 600 }}>{i.person_name}</span>}
+                      </span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>£{((i.unit_price_cents * i.quantity) / 100).toFixed(2)}</span>
                         <button onClick={() => removeTillItem(i.id)} style={{ color: '#C0392B', background: 'none', border: 'none', fontSize: '1rem', cursor: 'pointer', lineHeight: 1 }}>×</button>
@@ -875,6 +986,12 @@ export default function FloorPage() {
       saving || !paymentMethod || !collectionMethod ||
       (collectionMethod === 'postal' && !postalPostcode.trim()) ||
       !collectionDate;
+    // Real per-person breakdown -- only shows up if anyone was actually
+    // tagged while adding items. Bookings that never use this feature look
+    // exactly as they always have.
+    const namedPeople = Array.from(new Set(tillItems.map((i) => i.person_name).filter((n): n is string => !!n)));
+    const sharedTotal = tillItems.filter((i) => !i.person_name).reduce((s, i) => s + i.unit_price_cents * i.quantity, 0);
+    const personTotal = (name: string) => tillItems.filter((i) => i.person_name === name).reduce((s, i) => s + i.unit_price_cents * i.quantity, 0);
     return (
       <div className="min-h-screen p-4" style={{ backgroundColor: B.charcoal }}>
         <div className="max-w-2xl mx-auto">
@@ -895,9 +1012,79 @@ export default function FloorPage() {
             )}
           </div>
 
+          {/* Real per-person breakdown -- own subtotal, own collection
+              method, own payment. Separate from the whole-booking section
+              below, which still applies to anything left 'Shared'. */}
+          {namedPeople.length > 0 && (
+            <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
+              <p style={{ color: B.stone, fontSize: '0.75rem', marginBottom: '0.7rem' }}>Paying/collecting separately</p>
+              {sharedTotal > 0 && (
+                <div className="flex justify-between mb-2" style={{ paddingBottom: '0.5rem', borderBottom: `1px solid ${B.stone}30` }}>
+                  <span style={{ color: B.ivory, fontSize: '0.82rem' }}>Shared (whole table)</span>
+                  <span style={{ color: B.sand, fontWeight: 700, fontSize: '0.82rem' }}>£{(sharedTotal / 100).toFixed(2)}</span>
+                </div>
+              )}
+              {namedPeople.map((name) => {
+                const pref = personCollection[name] || { collection_method: null, postal_postcode: '', payment_method: null };
+                return (
+                  <div key={name} style={{ marginBottom: '0.9rem', paddingBottom: '0.9rem', borderBottom: `1px solid ${B.stone}30` }}>
+                    <div className="flex justify-between mb-2">
+                      <span style={{ color: B.ivory, fontWeight: 700, fontSize: '0.85rem' }}>{name}</span>
+                      <span style={{ color: B.sand, fontWeight: 700, fontSize: '0.85rem' }}>£{(personTotal(name) / 100).toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginBottom: '0.4rem' }}>
+                      <button
+                        onClick={() => setPersonCollection((prev) => ({ ...prev, [name]: { ...pref, collection_method: 'studio' } }))}
+                        style={{ padding: '0.5rem', borderRadius: 6, fontSize: '0.75rem', border: pref.collection_method === 'studio' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: pref.collection_method === 'studio' ? B.clay + '30' : 'transparent', color: B.ivory }}
+                      >
+                        🏠 Studio
+                      </button>
+                      <button
+                        onClick={() => setPersonCollection((prev) => ({ ...prev, [name]: { ...pref, collection_method: 'postal' } }))}
+                        style={{ padding: '0.5rem', borderRadius: 6, fontSize: '0.75rem', border: pref.collection_method === 'postal' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: pref.collection_method === 'postal' ? B.clay + '30' : 'transparent', color: B.ivory }}
+                      >
+                        📮 Postal
+                      </button>
+                    </div>
+                    {pref.collection_method === 'postal' && (
+                      <input
+                        type="text"
+                        value={pref.postal_postcode}
+                        onChange={(e) => setPersonCollection((prev) => ({ ...prev, [name]: { ...pref, postal_postcode: e.target.value } }))}
+                        placeholder="Their postcode"
+                        style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: 6, border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: '0.78rem', marginBottom: '0.4rem' }}
+                      />
+                    )}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginBottom: '0.4rem' }}>
+                      <button
+                        onClick={() => setPersonCollection((prev) => ({ ...prev, [name]: { ...pref, payment_method: 'card' } }))}
+                        style={{ padding: '0.5rem', borderRadius: 6, fontSize: '0.75rem', border: pref.payment_method === 'card' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: pref.payment_method === 'card' ? B.clay + '30' : 'transparent', color: B.ivory }}
+                      >
+                        💳 Card
+                      </button>
+                      <button
+                        onClick={() => setPersonCollection((prev) => ({ ...prev, [name]: { ...pref, payment_method: 'cash' } }))}
+                        style={{ padding: '0.5rem', borderRadius: 6, fontSize: '0.75rem', border: pref.payment_method === 'cash' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: pref.payment_method === 'cash' ? B.clay + '30' : 'transparent', color: B.ivory }}
+                      >
+                        💵 Cash
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => savePersonCollection(name)}
+                      disabled={savingPersonCollection === name || !pref.collection_method}
+                      style={{ width: '100%', padding: '0.4rem', borderRadius: 6, border: 'none', backgroundColor: B.clay, color: B.ivory, fontSize: '0.75rem', fontWeight: 700, opacity: !pref.collection_method ? 0.5 : 1 }}
+                    >
+                      {savingPersonCollection === name ? 'Saving...' : `Save ${name}'s choice`}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Collection method */}
           <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
-            <p style={{ color: B.stone, fontSize: '0.75rem', marginBottom: '0.5rem' }}>Collection</p>
+            <p style={{ color: B.stone, fontSize: '0.75rem', marginBottom: '0.5rem' }}>{namedPeople.length > 0 ? 'Collection — shared items / whole booking fallback' : 'Collection'}</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
               <button
                 onClick={() => setCollectionMethod('studio')}

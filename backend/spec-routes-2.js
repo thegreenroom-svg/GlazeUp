@@ -1734,6 +1734,129 @@ export function registerNeedsVerificationRoute(app, supabase, STUDIO_ID, logger)
 }
 
 // ============================================================================
+// KILN DIP-GLAZE TRANSITION -- real, not invented.
+// ----------------------------------------------------------------------------
+// Part of Daisy's described physical->digital pipeline: card + pieces go
+// into a box at collection, box goes for underglaze dip, then each piece's
+// card is scanned at that point (by Lucy or whoever's on kiln duty) --
+// moving status from 'packed' to a new 'dipped_waiting_firing' stage and
+// setting the real firing date. Collection date = firing date + 2 days,
+// exactly as stated, auto-set here rather than left for someone to
+// remember to calculate by hand.
+//
+// pottery_pieces.status has no CHECK constraint (confirmed directly against
+// pg_constraint before adding a new value) -- safe to introduce
+// 'dipped_waiting_firing' alongside the existing packed/fired/collected
+// without a migration. booking_id on pottery_pieces is free text (often an
+// OCR'd name, not always a real booking_code) -- collection_date is only
+// set on demo_app_session_status when booking_id genuinely matches a real
+// booking, otherwise the piece transition still happens, just without a
+// collection date to attach (nothing to attach it to).
+//
+// No camera-based QR scanning exists anywhere in this codebase yet -- this
+// is real lookup-and-transition logic reachable by typing/selecting a
+// booking reference, not a scanner. Actual camera scanning would need a
+// library like @zxing/browser added on the frontend, which is real,
+// separate follow-up work, not stubbed here as if it already works.
+// ============================================================================
+export function registerKilnDipTransitionRoute(app, supabase, STUDIO_ID, logger) {
+  // Real lookup -- packed pieces for a given booking reference (booking_code
+  // or the free-text name some pieces carry instead), so staff can see
+  // what's about to be transitioned before confirming.
+  app.get('/api/spec/kiln/packed-pieces', async (req, res) => {
+    try {
+      const bookingRef = (req.query.booking || '').trim();
+      if (!bookingRef) return res.status(400).json({ error: 'booking query param is required', pieces: [] });
+
+      const { data, error } = await supabase
+        .from('pottery_pieces')
+        .select('id, booking_id, piece_type, status, created_at')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_id', bookingRef)
+        .eq('status', 'packed')
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      res.json({ pieces: data || [] });
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message, pieces: [] });
+    }
+  });
+
+  // Real transition -- packed -> dipped_waiting_firing, sets the real
+  // firing date Lucy enters (not guessed -- no real kiln firing cadence is
+  // known, so this isn't auto-calculated), and auto-sets collection_date
+  // as firing_date + 2 days on the real booking if booking_id matches one.
+  app.post('/api/spec/kiln/dip-transition', async (req, res) => {
+    try {
+      const { piece_ids, firing_date } = req.body || {};
+      if (!Array.isArray(piece_ids) || piece_ids.length === 0) {
+        return res.status(400).json({ error: 'piece_ids must be a non-empty array' });
+      }
+      if (typeof firing_date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(firing_date)) {
+        return res.status(400).json({ error: 'firing_date must be an ISO date string (YYYY-MM-DD)' });
+      }
+
+      const { data: pieces, error: fetchErr } = await supabase
+        .from('pottery_pieces')
+        .select('id, booking_id, status')
+        .eq('studio_id', STUDIO_ID)
+        .in('id', piece_ids);
+      if (fetchErr) throw fetchErr;
+      if (!pieces || !pieces.length) return res.status(404).json({ error: 'No matching pieces found' });
+
+      const { error: updateErr } = await supabase
+        .from('pottery_pieces')
+        .update({ status: 'dipped_waiting_firing', scheduled_firing_date: firing_date })
+        .eq('studio_id', STUDIO_ID)
+        .in('id', piece_ids);
+      if (updateErr) throw updateErr;
+
+      // +2 days, exactly as stated -- real date arithmetic, not a guess.
+      const collectionDate = new Date(firing_date + 'T00:00:00Z');
+      collectionDate.setUTCDate(collectionDate.getUTCDate() + 2);
+      const collectionDateStr = collectionDate.toISOString().slice(0, 10);
+
+      const bookingRefs = [...new Set(pieces.map((p) => p.booking_id).filter(Boolean))];
+      const realBookingCodes = [];
+      if (bookingRefs.length) {
+        const { data: matched } = await supabase
+          .from('bookings')
+          .select('booking_code')
+          .eq('studio_id', STUDIO_ID)
+          .in('booking_code', bookingRefs);
+        (matched || []).forEach((b) => realBookingCodes.push(b.booking_code));
+      }
+
+      for (const code of realBookingCodes) {
+        const { data: existing } = await supabase
+          .from('demo_app_session_status')
+          .select('id')
+          .eq('studio_id', STUDIO_ID)
+          .eq('booking_code', code)
+          .maybeSingle();
+        if (existing) {
+          await supabase.from('demo_app_session_status').update({ collection_date: collectionDateStr }).eq('id', existing.id);
+        } else {
+          await supabase.from('demo_app_session_status').insert({ studio_id: STUDIO_ID, booking_code: code, collection_date: collectionDateStr });
+        }
+      }
+
+      res.json({
+        transitioned: pieces.length,
+        firing_date,
+        collection_date: collectionDateStr,
+        bookings_updated: realBookingCodes,
+        unmatched_booking_refs: bookingRefs.filter((r) => !realBookingCodes.includes(r)),
+      });
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
+
+// ============================================================================
 // EQUIPMENT REQUEST (stylus & tablet) — real staff alert, not a fake sale.
 // ----------------------------------------------------------------------------
 // No Square item exists for this (checked directly -- searched item_name for

@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerTestAiRoute, registerPartySizeRoute } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnDipTransitionRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerTestAiRoute, registerPartySizeRoute } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -435,7 +435,7 @@ app.get('/api/demo/bookings/:code/till', async (req, res) => {
   try {
     const { data: items, error: itemsError } = await supabase
       .from('demo_app_till_items')
-      .select('id, item_name, category, quantity, unit_price_cents, created_at')
+      .select('id, item_name, category, quantity, unit_price_cents, created_at, person_name')
       .eq('booking_code', req.params.code)
       .eq('studio_id', DEMO_STUDIO_ID)
       .order('created_at', { ascending: true });
@@ -448,6 +448,15 @@ app.get('/api/demo/bookings/:code/till', async (req, res) => {
       .eq('studio_id', DEMO_STUDIO_ID)
       .maybeSingle();
 
+    // Real per-person collection/payment preferences, if any have been set
+    // for this booking -- e.g. someone at the table wanting to collect
+    // separately or pay for just their own items.
+    const { data: people } = await supabase
+      .from('demo_app_person_collection')
+      .select('person_name, collection_method, postal_postcode, payment_method')
+      .eq('booking_code', req.params.code)
+      .eq('studio_id', DEMO_STUDIO_ID);
+
     res.json({
       items: items || [],
       finished_at: status?.finished_at || null,
@@ -456,6 +465,7 @@ app.get('/api/demo/bookings/:code/till', async (req, res) => {
       collection_method: status?.collection_method || null,
       postal_postcode: status?.postal_postcode || null,
       collection_date: status?.collection_date || null,
+      people: people || [],
     });
   } catch (err) {
     logger.error(err);
@@ -465,7 +475,7 @@ app.get('/api/demo/bookings/:code/till', async (req, res) => {
 
 app.post('/api/demo/bookings/:code/till', async (req, res) => {
   try {
-    const { item_name, category, unit_price_cents, quantity, added_by } = req.body;
+    const { item_name, category, unit_price_cents, quantity, added_by, person_name } = req.body;
     if (!item_name || unit_price_cents === undefined) {
       return res.status(400).json({ error: 'item_name and unit_price_cents are required' });
     }
@@ -480,6 +490,10 @@ app.post('/api/demo/bookings/:code/till', async (req, res) => {
           quantity: quantity || 1,
           unit_price_cents,
           added_by: added_by || null,
+          // Real per-person assignment -- null means "shared/whole table",
+          // same as every booking before this feature existed, so nothing
+          // that doesn't pass this breaks.
+          person_name: person_name || null,
         },
       ])
       .select()
@@ -497,6 +511,45 @@ app.delete('/api/demo/till-items/:id', async (req, res) => {
     const { error } = await supabase.from('demo_app_till_items').delete().eq('id', req.params.id);
     if (error) throw error;
     res.json({ deleted: true });
+  } catch (err) {
+    logger.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Real per-person collection/payment preference within a booking -- per
+// Daisy: people at the same table often pay separately and may want
+// different collection methods (one collects in person, another wants
+// theirs posted). Upserts by (studio, booking_code, person_name) --
+// setting this again for the same person just updates their row, doesn't
+// duplicate it.
+app.post('/api/demo/bookings/:code/people/:personName/collection', async (req, res) => {
+  try {
+    const { collection_method, postal_postcode, payment_method } = req.body || {};
+    if (collection_method && !['studio', 'postal'].includes(collection_method)) {
+      return res.status(400).json({ error: "collection_method must be 'studio' or 'postal'" });
+    }
+    const person_name = decodeURIComponent(req.params.personName).trim();
+    if (!person_name) return res.status(400).json({ error: 'person_name is required' });
+
+    const { data, error } = await supabase
+      .from('demo_app_person_collection')
+      .upsert(
+        {
+          studio_id: DEMO_STUDIO_ID,
+          booking_code: req.params.code,
+          person_name,
+          collection_method: collection_method || null,
+          postal_postcode: postal_postcode || null,
+          payment_method: payment_method || null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'studio_id,booking_code,person_name' }
+      )
+      .select()
+      .maybeSingle();
+    if (error) throw error;
+    res.json(data);
   } catch (err) {
     logger.error(err);
     res.status(500).json({ error: err.message });
@@ -1468,6 +1521,7 @@ registerLiveSquareOrderRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerNeedsVerificationRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerRevenueCategorySyncRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerRevenueBreakdownRoute(app, supabase, DEMO_STUDIO_ID, logger);
+registerKilnDipTransitionRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerEquipmentRequestRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerDesignChargeRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerFulfilmentRoute(app, supabase, DEMO_STUDIO_ID, logger);
