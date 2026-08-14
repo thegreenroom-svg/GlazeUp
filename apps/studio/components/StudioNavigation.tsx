@@ -238,7 +238,7 @@ export function StudioNavigation() {
     <>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 z-50 md:hidden text-white p-3 rounded-full shadow-lg"
+        className="fixed bottom-6 right-6 z-50 md:hidden text-white p-3 rounded-full shadow-lg no-print"
         style={{ backgroundColor: 'var(--clay)' }}
       >
         {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -246,7 +246,7 @@ export function StudioNavigation() {
 
       {/* Desktop sidebar */}
       {!isMobile && isOpen && (
-        <nav className="relative w-64 text-white z-0 overflow-y-auto" style={{ height: '100dvh', backgroundColor: 'var(--charcoal)' }}>
+        <nav className="relative w-64 text-white z-0 overflow-y-auto no-print" style={{ height: '100dvh', backgroundColor: 'var(--charcoal)' }}>
           {headerAndSearch}
           {menuList}
         </nav>
@@ -261,7 +261,7 @@ export function StudioNavigation() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsOpen(false)}
-              className="fixed inset-0 bg-black/50 z-30"
+              className="fixed inset-0 bg-black/50 z-30 no-print"
             />
             <motion.nav
               initial={{ y: '100%' }}
@@ -274,7 +274,7 @@ export function StudioNavigation() {
               onDragEnd={(_, info) => {
                 if (info.offset.y > 100) setIsOpen(false);
               }}
-              className="fixed bottom-0 left-0 right-0 text-white z-40 overflow-y-auto"
+              className="fixed bottom-0 left-0 right-0 text-white z-40 overflow-y-auto no-print"
               style={{ borderTopLeftRadius: '20px', borderTopRightRadius: '20px', maxHeight: '95dvh', backgroundColor: 'var(--charcoal)' }}
             >
               <div style={{ display: 'flex', justifyContent: 'center', padding: '0.6rem 0 0' }}>

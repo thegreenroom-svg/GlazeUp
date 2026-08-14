@@ -500,7 +500,7 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.9rem', padding: '0.4rem 0.8rem' }}>
+      <div className="no-print" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.9rem', padding: '0.4rem 0.8rem' }}>
         {isAdmin && (
           <button
             onClick={openAdminReset}

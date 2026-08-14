@@ -200,3 +200,19 @@ tbody tr {
 [data-theme='dark'] .glaze-muted {
   color: var(--stone) !important;
 }
+
+/* ── PRINT: hide persistent app chrome everywhere ──────────────────
+   Genuinely global, not page-scoped -- AppShell (the Home button, the
+   demo-reset button) and PinGate (the signed-in header: 'Reset a
+   PIN', sign-out) both wrap EVERY staff page, so this needs to live
+   here rather than inside any one page's own <style> block. The bug
+   this fixes: printing a page like Daily Cards was also printing the
+   app's own real navigation chrome right alongside it, because that
+   chrome was never marked to hide from print at all -- checked
+   directly, no .no-print rule existed anywhere global before this. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
+

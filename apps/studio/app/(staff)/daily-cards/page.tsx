@@ -570,7 +570,10 @@ export default function DailyCardsPage() {
         }
         
         @media print {
-          .no-print { display: none !important; }
+          /* .no-print's own display:none rule now lives in globals.css,
+             genuinely global rather than page-scoped -- see the fix
+             there for why (AppShell/PinGate chrome wasn't being hidden
+             at all). Kept here: only what's specific to this page. */
           input[type="checkbox"] { display: none !important; }
           
           /* Hide unselected cards during print */
@@ -578,28 +581,33 @@ export default function DailyCardsPage() {
             display: none !important;
           }
           
-          /* Real 3x2in label stock, one label per page -- a label printer
-             feeds one at a time, it doesn't print a multi-up sheet like a
-             normal printer does, so the on-screen grid is replaced here
-             rather than just scaled down. */
-          @page { size: 3in 2in; margin: 0.08in; }
+          /* Real 4x6in label stock, confirmed directly against the actual
+             Zebra label roll loaded (previously assumed 3x2in, which never
+             matched the real hardware -- that mismatch is what caused
+             printing to fail across every device type, not just one
+             platform). One label per page -- a label printer feeds one at
+             a time, it doesn't print a multi-up sheet like a normal
+             printer does, so the on-screen grid is replaced here rather
+             than just scaled down. The on-screen card is already a
+             natural vertical stack (QR, then name, then details) which
+             suits a tall 4x6 label directly -- no longer forcing the
+             cramped horizontal layout the old 3x2 size needed. */
+          @page { size: 4in 6in; margin: 0.15in; }
           .card-grid { display: block !important; }
           .print-card {
-            width: 2.84in;
-            height: 1.84in;
+            width: 3.7in;
+            height: 5.7in;
             page-break-after: always;
             break-after: page;
             border-radius: 0 !important;
             border: none !important;
             background: white !important;
-            display: flex !important;
-            align-items: center;
-            gap: 0.1in;
-            text-align: left !important;
-            padding: 0.08in !important;
+            display: block !important;
+            text-align: center !important;
+            padding: 0.2in !important;
           }
-          .print-card img { width: 1in !important; height: 1in !important; margin: 0 !important; flex-shrink: 0; }
-          .print-card p { margin: 0 !important; line-height: 1.25; }
+          .print-card img { width: 2.2in !important; height: 2.2in !important; margin: 0 auto 0.25in !important; display: block !important; }
+          .print-card p { margin: 0 0 0.1in !important; line-height: 1.3; }
         }
       `}</style>
     </motion.div>

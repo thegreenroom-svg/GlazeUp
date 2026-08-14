@@ -80,6 +80,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <button
                 onClick={() => router.push('/')}
                 aria-label="Return to home"
+                className="no-print"
                 style={{
                   position: 'fixed', top: '0.75rem', right: '0.75rem', zIndex: 20,
                   width: 38, height: 38, borderRadius: '50%', border: 'none', cursor: 'pointer',
@@ -102,6 +103,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           disabled={resetting}
           aria-label="Reset today's demo data"
           title="Reset today's demo data (till, KDS, photo matches)"
+          className="no-print"
           style={{
             position: 'fixed', bottom: '0.75rem', left: '0.75rem', zIndex: 20,
             width: 38, height: 38, borderRadius: '50%', border: 'none', cursor: resetting ? 'default' : 'pointer',
@@ -114,6 +116,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </button>
         {resetMessage && (
           <div
+            className="no-print"
             style={{
               position: 'fixed', bottom: '3.5rem', left: '0.75rem', right: '0.75rem', zIndex: 20,
               maxWidth: 360, padding: '0.6rem 0.9rem', borderRadius: 8,
