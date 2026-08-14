@@ -1624,6 +1624,95 @@ export function registerRevenueCategorySyncRoute(app, supabase, STUDIO_ID, logge
   });
 }
 
+// ============================================================================
+// REVENUE BREAKDOWN -- groups & sub-categories, real, ported not reinvented.
+// ----------------------------------------------------------------------------
+// Same lost-and-recovered history as the sync above: this is a faithful
+// port of GET /api/takings/breakdown (commit 27bc00e, 26 Jul) -- read-only,
+// pure aggregation over the real revenue_category_breakdown rows the sync
+// route above keeps current. Grouping uses the naming convention already
+// present in Square's own real category names rather than inventing a
+// taxonomy: 'PB ' = Paint-your-own Bisque (by shape), 'S.' = studio
+// sessions & fees, drink/food matched by keyword. Anything that doesn't
+// match a known pattern falls to a plain 'Other' group rather than being
+// forced into the wrong bucket or silently dropped -- covers real
+// categories Square has that nobody's hardcoded for yet (events, external
+// sales, whatever the catalog actually contains). The literal Square
+// category named 'Other' gets its own distinct, honestly-labelled
+// 'Unclassified in Square' group, since that's a real gap in Square's own
+// data, not the same thing as 'doesn't match our groups'.
+// ============================================================================
+export function registerRevenueBreakdownRoute(app, supabase, STUDIO_ID, logger) {
+  app.get('/api/spec/revenue/breakdown', async (req, res) => {
+    try {
+      const { from, to } = req.query;
+      let q = supabase
+        .from('revenue_category_breakdown')
+        .select('metric_date, category, revenue_cents, item_count')
+        .eq('studio_id', STUDIO_ID)
+        .order('metric_date', { ascending: true });
+      if (from) q = q.gte('metric_date', from);
+      if (to) q = q.lte('metric_date', to);
+      const { data, error } = await q;
+      if (error) throw error;
+      if (!data.length) return res.json({ groups: [], months: [], stats: null });
+
+      const groupOf = (cat) => {
+        const c = (cat || '').trim();
+        if (c.startsWith('PB ')) return 'Paint your own — by shape';
+        if (c.startsWith('S.')) return 'Studio sessions & fees';
+        if (/drink|coffee|milkshake|smoothie|alcohol/i.test(c)) return 'Drinks';
+        if (/cake|food|cafe/i.test(c)) return 'Food';
+        if (c === 'Other') return 'Unclassified in Square';
+        return 'Other';
+      };
+
+      const cats = {};
+      const groups = {};
+      const byMonth = {};
+      let total = 0, totalItems = 0;
+      const earliest = data[0].metric_date, latest = data[data.length - 1].metric_date;
+
+      for (const r of data) {
+        const rev = (r.revenue_cents || 0) / 100;
+        const items = r.item_count || 0;
+        const cat = (r.category || 'Other').trim();
+        const grp = groupOf(cat);
+        const mk = r.metric_date.slice(0, 7);
+
+        total += rev; totalItems += items;
+        byMonth[mk] = (byMonth[mk] || 0) + rev;
+
+        if (!cats[cat]) cats[cat] = { category: cat, group: grp, revenue: 0, items: 0 };
+        cats[cat].revenue += rev; cats[cat].items += items;
+
+        if (!groups[grp]) groups[grp] = { group: grp, revenue: 0, items: 0, categories: new Set() };
+        groups[grp].revenue += rev; groups[grp].items += items; groups[grp].categories.add(cat);
+      }
+
+      const groupList = Object.values(groups)
+        .map((g) => ({
+          group: g.group, revenue: g.revenue, items: g.items,
+          categoryCount: g.categories.size, pct: total ? (g.revenue / total) * 100 : 0,
+          categories: Object.values(cats).filter((c) => c.group === g.group)
+            .sort((a, b) => b.revenue - a.revenue)
+            .map((c) => ({ category: c.category, revenue: c.revenue, items: c.items, pct: total ? (c.revenue / total) * 100 : 0 })),
+        }))
+        .sort((a, b) => b.revenue - a.revenue);
+
+      const months = Object.entries(byMonth).map(([month, revenue]) => ({ month, revenue }));
+
+      res.json({
+        groups: groupList,
+        months,
+        stats: { total, totalItems, earliest, latest, categoryCount: Object.keys(cats).length },
+      });
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message, groups: [] });
+    }
+  });
+}
 
 export function registerNeedsVerificationRoute(app, supabase, STUDIO_ID, logger) {
   app.get('/api/spec/bookings/needs-verification', async (req, res) => {
