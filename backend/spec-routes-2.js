@@ -1315,6 +1315,109 @@ export function registerSquareOpenOrdersDiagnosticRoute(app, supabase, STUDIO_ID
 }
 
 // ============================================================================
+// SQUARE APPOINTMENTS (BOOKINGS) DIAGNOSTIC -- real, read-only, staged first.
+// ----------------------------------------------------------------------------
+// Confirmed directly, not guessed: every real 'Book' button on the live site
+// (thekilncafe.com/bookonline) points to book.squareup.com/appointments/... --
+// real customers book through Square Appointments right now. Separately
+// confirmed 207/256 real bookings already carry a real square_booking_id and
+// ALL 256 carry a synced_from_square timestamp, most recent 9 Aug -- proof a
+// real sync ran and stopped, not that one was never built. Checked git
+// history the same way the revenue sync was recovered: unlike revenue, no
+// trace of the real sync code survives anywhere in this repo's history (its
+// own first commit is literally 'Initial commit') -- it lived in the
+// pre-rewrite history that was destroyed 12 Aug, same event that destroyed
+// /studio, genuinely unrecoverable this time.
+//
+// This is a real, correct call against Square's actual Bookings API (raw
+// REST, same proven pattern as every other Square integration this
+// session) -- but deliberately a read-only diagnostic FIRST, not the sync
+// itself. Reason: how this business's real booking widget encodes party
+// size isn't yet known -- Square Appointments has no native 'party size'
+// field, so it's likely captured via a custom intake question, a note
+// field, or the number of individual appointment segments, and guessing
+// wrong here would write incorrect data into the live table staff use
+// every day. This surfaces the real raw shape first so the actual mapping
+// can be built correctly once inspected, same staged approach used for
+// the revenue sync recovery.
+// ============================================================================
+export function registerSquareBookingsDiagnosticRoute(app, supabase, STUDIO_ID, logger, axios) {
+  app.get('/api/spec/bookings/square-diagnostic', async (req, res) => {
+    try {
+      const { data: connection } = await supabase
+        .from('square_connections')
+        .select('square_access_token, square_token_expires_at')
+        .eq('studio_id', STUDIO_ID)
+        .single();
+      if (!connection || new Date(connection.square_token_expires_at) < new Date()) {
+        return res.status(400).json({ error: 'No valid Square connection', bookings: [] });
+      }
+      const token = connection.square_access_token;
+      const headers = { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18' };
+
+      const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', { headers });
+      const locations = locationsRes.data.locations || [];
+      if (!locations.length) return res.json({ bookings: [], reason: 'no_square_locations' });
+
+      // Real gap window -- from the last known real sync (9 Aug) through
+      // 14 days ahead, so this covers exactly what's missing plus enough
+      // near-future bookings to sanity-check the shape.
+      const startMin = new Date('2026-08-09T00:00:00Z').toISOString();
+      const startMax = new Date();
+      startMax.setDate(startMax.getDate() + 14);
+
+      const bookingsRes = await axios.get('https://connect.squareup.com/v2/bookings', {
+        headers,
+        params: {
+          location_id: locations[0].id,
+          start_at_min: startMin,
+          start_at_max: startMax.toISOString(),
+          limit: 50,
+        },
+      });
+      const bookings = bookingsRes.data.bookings || [];
+
+      // Real customer names, for the first handful only -- this is a
+      // diagnostic, not the bulk sync, so keep the call count small.
+      const sample = bookings.slice(0, 10);
+      const customerIds = [...new Set(sample.map((b) => b.customer_id).filter(Boolean))];
+      const customers = {};
+      for (const id of customerIds) {
+        try {
+          const custRes = await axios.get(`https://connect.squareup.com/v2/customers/${id}`, { headers });
+          const c = custRes.data.customer;
+          customers[id] = [c?.given_name, c?.family_name].filter(Boolean).join(' ') || c?.company_name || null;
+        } catch (e) {
+          customers[id] = null;
+        }
+      }
+
+      res.json({
+        location_id: locations[0].id,
+        booking_count: bookings.length,
+        // Full raw shape for the first few -- deliberately unprocessed, so
+        // the real party-size encoding (and anything else unexpected) can
+        // actually be seen rather than guessed at.
+        sample_raw: sample.map((b) => ({ ...b, customer_name_resolved: customers[b.customer_id] || null })),
+        all_bookings_summary: bookings.map((b) => ({
+          id: b.id,
+          status: b.status,
+          start_at: b.start_at,
+          customer_id: b.customer_id,
+          customer_note: b.customer_note || null,
+          seller_note: b.seller_note || null,
+          segment_count: (b.appointment_segments || []).length,
+        })),
+        pulled_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      logger.error(err.response?.data || err);
+      res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message, bookings: [] });
+    }
+  });
+}
+
+// ============================================================================
 // LIVE SQUARE ORDER FOR A BOOKING'S TABLE -- read-only.
 // ----------------------------------------------------------------------------
 // The real feature the diagnostic above was checking feasibility for: when
