@@ -414,7 +414,7 @@ export default function TransferDesignerPage() {
         Photograph your piece, then draw, fill, trace, or add text and motifs to plan a transfer before it goes on for real.
       </p>
 
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{ display: 'none' }} />
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }} />
       <button
         onClick={() => fileRef.current?.click()}
         style={{ width: '100%', padding: '0.7rem', border: '2px dashed #ccc', borderRadius: '8px', backgroundColor: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginBottom: '0.8rem', fontSize: '0.85rem', color: '#666' }}

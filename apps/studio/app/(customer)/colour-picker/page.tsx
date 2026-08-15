@@ -100,7 +100,7 @@ export default function ColourPickerPage() {
         Matching against the real 19 Stroke &amp; Coat colours actually stocked in the studio. An unfired pot will look far paler than its eventual match.
       </div>
 
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{ display: 'none' }} />
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }} />
       <button
         onClick={() => fileRef.current?.click()}
         style={{ width: '100%', padding: '1.5rem', border: '2px dashed #ccc', borderRadius: '8px', backgroundColor: 'white', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem', marginBottom: '1.25rem' }}

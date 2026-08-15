@@ -260,7 +260,7 @@ export default function DesignPreviewPage() {
         Photograph your actual piece, then paint, fill, or place colour straight onto the photo to see how it might look. Works with a stylus for fine detail.
       </p>
 
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{ display: 'none' }} />
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }} />
 
       {!photo ? (
         <button
