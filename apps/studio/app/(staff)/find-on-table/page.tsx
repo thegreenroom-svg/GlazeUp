@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { AiCostCounter } from '@/components/AiCostCounter';
 import { Camera, Loader, XCircle, Truck, Home as HomeIcon, Printer } from 'lucide-react';
 
 interface Booking {
@@ -98,8 +99,12 @@ export default function FindOnTablePage() {
         Pick a booking, photograph the table or tray you think its pieces are on — checks every piece from that booking at once.
       </p>
 
-      <div style={{ padding: '0.7rem 0.9rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '1.25rem' }}>
+      <div style={{ padding: '0.7rem 0.9rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '1rem' }}>
         Uses Google Gemini (a separate paid AI) for real pixel-level detection — roughly £0.003–0.005 per photo, logged into the same running AI cost total.
+      </div>
+
+      <div style={{ marginBottom: '1.25rem' }}>
+        <AiCostCounter />
       </div>
 
       <select

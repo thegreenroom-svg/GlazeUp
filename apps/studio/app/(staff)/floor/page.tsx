@@ -463,8 +463,8 @@ export default function FloorPage() {
               {!loading && <ChevronRight size={24} />}
             </button>
             <p style={{ color: B.stone, fontSize: '0.75rem', textAlign: 'center' }}>Already-seated tables · more drinks or pieces · running totals</p>
-            <a href="/shelf-sweep" className="w-full py-5 rounded-lg font-bold flex items-center justify-center gap-3 text-lg" style={{ backgroundColor: B.stone, color: B.charcoal, textDecoration: 'none' }}>
-              <Camera size={24} /> Shelf Scan
+            <a href="/find-on-table" className="w-full py-5 rounded-lg font-bold flex items-center justify-center gap-3 text-lg" style={{ backgroundColor: B.stone, color: B.charcoal, textDecoration: 'none' }}>
+              <Camera size={24} /> Find on Table
             </a>
           </div>
         </div>

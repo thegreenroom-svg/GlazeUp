@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerTestAiRoute, registerPartySizeRoute } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -838,95 +838,6 @@ app.post('/api/demo/photo-match', upload.single('photo'), async (req, res) => {
   }
 });
 
-// Shelf sweep: photograph a whole table of jumbled fired pieces at once.
-// Two-step "evidence before answer" prompt (see glazeup-vision-rebuild
-// findings) -- step 1 asks the model to describe everything it sees on the
-// table with NO knowledge of what's being searched for, step 2 asks which
-// of ITS OWN listed items correspond to which wanted booking. Asking both
-// in one shot lets the wanted list contaminate the inventory (measured:
-// the model previously "saw" pieces that weren't in the photo).
-//
-// Deliberately does NOT attempt to circle/locate pieces within the frame --
-// that was tried four separate ways in the real app and abandoned every
-// time (rings on wrong objects, or none at all). Shows the group photo
-// alongside the matched booking name instead, which is what actually
-// worked. Stateless -- writes nothing.
-app.post('/api/demo/shelf-sweep', upload.single('photo'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No photo uploaded' });
-    }
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-    if (!OPENAI_API_KEY) {
-      return res.status(500).json({ error: 'OPENAI_API_KEY not configured on this service' });
-    }
-
-    // Wanted list: real bookings from the last 31 days, not yet packed/collected.
-    // (31 days covers paint -> dry -> glaze -> fire -> back on shelf.)
-    const windowStart = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: wantedBookings } = await supabase
-      .from('bookings')
-      .select('booking_code, customer_name, session_start, status')
-      .eq('studio_id', DEMO_STUDIO_ID)
-      .gte('session_start', windowStart)
-      .order('session_start', { ascending: false })
-      .limit(150);
-
-    const wantedList = (wantedBookings || [])
-      .map((b) => `- ${b.customer_name} (booking ${b.booking_code}, ${new Date(b.session_start).toLocaleDateString('en-GB')})`)
-      .join('\n');
-
-    const base64Image = fs.readFileSync(req.file.path).toString('base64');
-
-    // Step 1: inventory only, no knowledge of the wanted list.
-    const inventoryResp = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-4o-mini',
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'text', text: 'This is a table of freshly-fired pottery pieces, laid out jumbled together after coming out of the kiln. List every distinct piece you can see. For each, describe: the colours present, the painted pattern and where the colour sits on the piece, and the rough shape (mug/bowl/plate/jug/figure/etc -- shape is the LEAST reliable clue since many pieces share the same blank shape, so lead with colour and pattern). Number them. Do not guess whose piece anything is -- just describe what is physically there.' },
-            { type: 'image_url', image_url: { url: `data:${req.file.mimetype};base64,${base64Image}` } },
-          ],
-        }],
-        max_tokens: 900,
-      },
-      { headers: { Authorization: `Bearer ${OPENAI_API_KEY}` } }
-    );
-    const inventory = inventoryResp.data.choices[0].message.content;
-    await logAiUsage(supabase, DEMO_STUDIO_ID, 'shelf-sweep-inventory', inventoryResp.data.usage);
-
-    // Step 2: given ONLY its own inventory, which wanted bookings appear.
-    const matchResp = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-4o-mini',
-        messages: [{
-          role: 'user',
-          content: `Here is an inventory of pottery pieces on a table, written by someone who could see the photo:\n\n${inventory}\n\nHere is a list of real bookings we're expecting pieces from (name, booking code, date):\n\n${wantedList}\n\nNote: pieces almost always look MORE vibrant and saturated once fired than they did when painted -- a pale pink underglaze fires bright pink, chalky pastels turn glossy and saturated. Bear that in mind, but you have no pre-fire reference photos here, so just use your best judgement on which inventory items plausibly belong to which booking based on typical customer painting choices -- this is a coarse first pass, not a certain match.\n\nRespond with ONLY a JSON array, no markdown, no other text. Each element: {"inventory_item": "<number and short description from the inventory>", "likely_booking_code": "<booking_code or null if no reasonable guess>", "likely_customer_name": "<name or null>", "confidence": "high|medium|low"}. Only include items where confidence is at least low. If genuinely nothing on the table looks like it belongs to anyone on the list, return an empty array.`,
-        }],
-        max_tokens: 700,
-      },
-      { headers: { Authorization: `Bearer ${OPENAI_API_KEY}` } }
-    );
-    let matches = [];
-    await logAiUsage(supabase, DEMO_STUDIO_ID, 'shelf-sweep-match', matchResp.data.usage);
-    try {
-      const raw = matchResp.data.choices[0].message.content;
-      const jsonStr = raw.match(/\[[\s\S]*\]/)?.[0] || '[]';
-      matches = JSON.parse(jsonStr);
-    } catch (e) {
-      logger.error('shelf-sweep: failed to parse match response', e);
-    }
-
-    res.json({ inventory, matches, wanted_count: (wantedBookings || []).length });
-  } catch (err) {
-    logger.error(err);
-    res.status(500).json({ error: err.response?.data?.error?.message || err.message });
-  }
-});
-
 // Confirm a photo match against a booking: uploads the photo to an isolated
 // storage path (demo-app-test/, separate from real booking-photos/), then
 // inserts a row into the isolated demo_app_photo_matches table. Never
@@ -1519,7 +1430,6 @@ registerPostalLabelRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerEquipmentRequestRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerDesignChargeRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerFulfilmentRoute(app, supabase, DEMO_STUDIO_ID, logger);
-registerTestAiRoute(app, supabase, DEMO_STUDIO_ID, logger, upload, fs, axios, logAiUsage);
 registerPartySizeRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerRealBookingSyncRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerLiveTableSyncRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);

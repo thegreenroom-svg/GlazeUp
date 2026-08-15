@@ -1157,11 +1157,17 @@ export function registerPopularityRoute(app, supabase, STUDIO_ID, logger, axios)
 }
 
 // ============================================================================
-// AI COST COUNTER — the only real metered AI use anywhere in this app is
-// OpenAI vision (Photo Match, Shelf Sweep). Every call is logged to
-// ai_usage with the API's own real returned token counts (see
-// logAiUsage() in server.js). This endpoint sums the real running total
-// for a visible on-screen counter, so the actual cost is never hidden.
+// AI COST COUNTER — every real metered AI call in this app (Photo Match,
+// Find on Table) is logged to ai_usage with the API's own real returned
+// token counts (see logAiUsage/logGeminiUsage in server.js). This endpoint
+// sums the real running total for a visible on-screen counter.
+//
+// Deliberately no 'kind' allowlist -- found a real bug here: it used to
+// hardcode ['photo-match', 'shelf-sweep-inventory', 'shelf-sweep-match'],
+// which silently excluded the newer find-on-table-gemini/
+// find-all-on-table-gemini costs (and would have excluded whatever comes
+// next too). Summing every real row for the studio is the honest total;
+// a manually-maintained allowlist just goes stale.
 // ============================================================================
 export function registerAiCostRoute(app, supabase, STUDIO_ID, logger) {
   app.get('/api/spec/ai-cost-total', async (req, res) => {
@@ -1169,8 +1175,7 @@ export function registerAiCostRoute(app, supabase, STUDIO_ID, logger) {
       const { data, error } = await supabase
         .from('ai_usage')
         .select('cost_usd, kind')
-        .eq('studio_id', STUDIO_ID)
-        .in('kind', ['photo-match', 'shelf-sweep-inventory', 'shelf-sweep-match']);
+        .eq('studio_id', STUDIO_ID);
       if (error) throw error;
 
       const rows = data || [];
@@ -2385,79 +2390,6 @@ export function registerFulfilmentRoute(app, supabase, STUDIO_ID, logger) {
     } catch (err) {
       logger.error(err);
       res.status(500).json({ error: err.message });
-    }
-  });
-}
-
-// ============================================================================
-// TEST AI — standalone shape/colour/pattern matching test, decoupled from
-// real bookings entirely. Daisy's request: photograph a couple of reference
-// items, then photograph them mixed among a pile of other household stuff,
-// see if the AI can pick the reference items back out. This isolates "does
-// the vision matching itself work" from "does it match a real customer",
-// which needs real fired pieces + real bookings to test properly and can't
-// be exercised with household items.
-//
-// Same real gpt-4o-mini call, same real cost logging, same honest confidence
-// bands as Shelf Sweep -- this is not a separate AI system, just a different
-// wanted-list source (a photo instead of the real bookings table).
-// ============================================================================
-export function registerTestAiRoute(app, supabase, STUDIO_ID, logger, upload, fs, axios, logAiUsage) {
-  app.post('/api/spec/test-ai/match', upload.fields([{ name: 'reference', maxCount: 1 }, { name: 'scene', maxCount: 1 }]), async (req, res) => {
-    try {
-      const referenceFile = req.files?.reference?.[0];
-      const sceneFile = req.files?.scene?.[0];
-      if (!referenceFile || !sceneFile) {
-        return res.status(400).json({ error: 'Both a reference photo and a scene photo are required' });
-      }
-      const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-      if (!OPENAI_API_KEY) return res.status(500).json({ error: 'OPENAI_API_KEY not configured on this service' });
-
-      const referenceB64 = fs.readFileSync(referenceFile.path).toString('base64');
-      const sceneB64 = fs.readFileSync(sceneFile.path).toString('base64');
-
-      const response = await axios.post(
-        'https://api.openai.com/v1/chat/completions',
-        {
-          model: 'gpt-4o-mini',
-          messages: [{
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `The FIRST image shows one or more reference items -- the things we're trying to find. The SECOND image shows a larger, jumbled scene that may or may not contain those same items mixed in among other things.
-
-Describe each reference item from image 1 first: its colour(s), its pattern or markings and where they sit, and only lastly its rough shape. Shape is the weakest clue here -- real testing on this project found that identically-shaped items are extremely common, so colour and pattern are what actually distinguish one object from another. Lead with those.
-
-Then look at image 2 and say, for EACH reference item, whether you can see it in the scene -- and if so, describe distinctly where it is in the frame (e.g. "back left, next to the blue mug") and what specifically about colour/pattern convinced you, not shape alone.
-
-Respond with ONLY a JSON object, no markdown, no other text:
-{"reference_items": [{"description": "<colour/pattern-led description>"}], "matches": [{"reference_item": "<short label>", "found": true|false, "location_in_scene": "<where, or null>", "reasoning": "<what colour/pattern evidence, or null>", "confidence": "high|medium|low"}]}`,
-              },
-              { type: 'image_url', image_url: { url: `data:${referenceFile.mimetype};base64,${referenceB64}` } },
-              { type: 'image_url', image_url: { url: `data:${sceneFile.mimetype};base64,${sceneB64}` } },
-            ],
-          }],
-          max_tokens: 900,
-        },
-        { headers: { Authorization: `Bearer ${OPENAI_API_KEY}` } }
-      );
-
-      await logAiUsage(supabase, STUDIO_ID, 'test-ai-match', response.data.usage);
-
-      let parsed = { reference_items: [], matches: [] };
-      try {
-        const raw = response.data.choices[0].message.content;
-        const jsonStr = raw.match(/\{[\s\S]*\}/)?.[0] || '{}';
-        parsed = JSON.parse(jsonStr);
-      } catch (e) {
-        logger.error('test-ai/match: failed to parse response', e);
-      }
-
-      res.json(parsed);
-    } catch (err) {
-      logger.error(err.response?.data || err);
-      res.status(500).json({ error: err.response?.data?.error?.message || err.message });
     }
   });
 }
