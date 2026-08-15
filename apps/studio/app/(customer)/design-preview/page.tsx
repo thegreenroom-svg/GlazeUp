@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Camera, Undo2, Trash2 } from 'lucide-react';
 import { SaveAndCharge } from '@/components/SaveAndCharge';
+import { STUDIO_COLOURS } from '@/lib/glazes';
 
 interface Stroke {
   colour: string;
@@ -13,12 +14,10 @@ interface Stroke {
   points: { x: number; y: number }[];
 }
 
-// The studio's real 82-colour range, matching the Colour Picker so a preview
-// uses glazes that actually exist on the shelf.
-const QUICK_COLOURS = [
-  '#f2a8c0', '#c81e2c', '#f9d423', '#8dc63f', '#2c4f9e', '#5b3a7a',
-  '#e8721f', '#f0836b', '#1a1a1a', '#f5f0e6', '#5e3d24', '#6a3b96',
-];
+// The studio's real 19 confirmed stocked Stroke & Coat colours, shared
+// with Colour Picker and Transfer Designer so the same real glaze always
+// looks the same everywhere in the app.
+const QUICK_COLOURS = STUDIO_COLOURS.map((c) => c.hex);
 
 export default function DesignPreviewPage() {
   const [photo, setPhoto] = useState<HTMLImageElement | null>(null);

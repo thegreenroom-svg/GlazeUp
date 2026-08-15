@@ -5,104 +5,11 @@ export const dynamic = 'force-dynamic';
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Camera, Plus, Trash2 } from 'lucide-react';
+import { STUDIO_COLOURS, type StudioColour } from '@/lib/glazes';
 
-interface Glaze {
-  code: string;
-  name: string;
-  hex: string;
-}
+type Glaze = StudioColour;
 
-// The studio's REAL 82-colour Mayco Stroke & Coat range, pulled directly
-// from the live customer app's own STUDIO_COLOURS array (app/index.html on
-// main) rather than reconstructed -- this is the exact palette customers
-// already see and build favourites from there. Hex values approximate the
-// FIRED tile, which is the right matching target: an unfired pot looks far
-// paler than its eventual colour.
-const STARTER: Glaze[] = [
-  { code: 'SC-16', name: 'Cotton Tail', hex: '#f5f0e6' },
-  { code: 'SC-37', name: 'Ivory Tower', hex: '#f0e6d2' },
-  { code: 'SC-55', name: 'Yella Bout It', hex: '#f5d020' },
-  { code: 'SC-6', name: 'Sunkissed', hex: '#f7c948' },
-  { code: 'SC-42', name: 'Butter Me Up', hex: '#f9e17a' },
-  { code: 'SC-24', name: 'Dandelion', hex: '#f9d423' },
-  { code: 'SC-97', name: 'Cant-elope', hex: '#f4a13a' },
-  { code: 'SC-102', name: 'Just Peachy', hex: '#f6b98a' },
-  { code: 'SC-23', name: 'Jack O\'Lantern', hex: '#e8721f' },
-  { code: 'SC-75', name: 'Orange-A-Peel', hex: '#eb7a1f' },
-  { code: 'SC-50', name: 'Orange Ya Happy', hex: '#f0862a' },
-  { code: 'SC-2', name: 'Melon-choly', hex: '#f0836b' },
-  { code: 'SC-89', name: 'Cutie Pie Coral', hex: '#f27a63' },
-  { code: 'SC-88', name: 'Tu Tu Tango', hex: '#e8437a' },
-  { code: 'SC-73', name: 'Candy Apple Red', hex: '#c81e2c' },
-  { code: 'SC-74', name: 'Hot Tamale', hex: '#d8331f' },
-  { code: 'SC-87', name: 'Ruby Slippers', hex: '#a3162a' },
-  { code: 'SC-81', name: 'Cinnamon Stix', hex: '#9c4a2e' },
-  { code: 'SC-1', name: 'Pink-A-Boo', hex: '#f2a8c0' },
-  { code: 'SC-100', name: 'Makin Me Blush', hex: '#f0b8be' },
-  { code: 'SC-70', name: 'Pink-A-Dot', hex: '#eb9fb8' },
-  { code: 'SC-95', name: 'Pinkie Swear', hex: '#f3a9c4' },
-  { code: 'SC-17', name: 'Cheeky Pinky', hex: '#e8799f' },
-  { code: 'SC-18', name: 'Rosey Posey', hex: '#d9738c' },
-  { code: 'SC-3', name: 'Wine About It', hex: '#5e1a2e' },
-  { code: 'SC-40', name: 'Blueberry Hill', hex: '#2c4f9e' },
-  { code: 'SC-13', name: 'Grapel', hex: '#5b3a7a' },
-  { code: 'SC-85', name: 'Orkid', hex: '#9a5bb0' },
-  { code: 'SC-103', name: 'Lavendear', hex: '#b39ddb' },
-  { code: 'SC-53', name: 'Purple Haze', hex: '#6a3b96' },
-  { code: 'SC-72', name: 'Grape Jelly', hex: '#4a2560' },
-  { code: 'SC-71', name: 'Purple-Licious', hex: '#7a3d99' },
-  { code: 'SC-33', name: 'Fruit Of The Vine', hex: '#42225c' },
-  { code: 'SC-104', name: 'Grape Expectations', hex: '#6e3f8f' },
-  { code: 'SC-45', name: 'My Blue Heaven', hex: '#5b9bd5' },
-  { code: 'SC-91', name: 'Seabreeze', hex: '#7fc7c2' },
-  { code: 'SC-65', name: 'Peri-Twinkle', hex: '#7b8fd6' },
-  { code: 'SC-30', name: 'Blue Dawn', hex: '#2f6fb0' },
-  { code: 'SC-31', name: 'The Blues', hex: '#274b8f' },
-  { code: 'SC-11', name: 'Blue Yonder', hex: '#3a6fb5' },
-  { code: 'SC-58', name: '501 Blues', hex: '#3c5a8c' },
-  { code: 'SC-76', name: 'Cara-bein Blue', hex: '#1c94a8' },
-  { code: 'SC-12', name: 'Moody Blue', hex: '#345a8a' },
-  { code: 'SC-96', name: 'Aqu-ward', hex: '#4fb8b0' },
-  { code: 'SC-101', name: 'Spruce It Up', hex: '#3c6e4f' },
-  { code: 'SC-9', name: 'Jaded', hex: '#3c8f6e' },
-  { code: 'SC-28', name: 'Blue Isle', hex: '#2e8f9e' },
-  { code: 'SC-10', name: 'Teal Next Time', hex: '#1f7d7a' },
-  { code: 'SC-29', name: 'Blue Grass', hex: '#4a8f7e' },
-  { code: 'SC-32', name: 'Bluebeard', hex: '#1c3f6e' },
-  { code: 'SC-93', name: 'Honeydew List', hex: '#c8dca0' },
-  { code: 'SC-43', name: 'Lettuce Alone', hex: '#7bab4a' },
-  { code: 'SC-7', name: 'Leapin\' Lizard', hex: '#8dc63f' },
-  { code: 'SC-26', name: 'Green Thumb', hex: '#4f8f3a' },
-  { code: 'SC-8', name: 'Just Froggy', hex: '#6fae3e' },
-  { code: 'SC-36', name: 'Irish Luck', hex: '#2e7d3e' },
-  { code: 'SC-77', name: 'Glo-Worm', hex: '#9fd83a' },
-  { code: 'SC-78', name: 'Lime Light', hex: '#c4e034' },
-  { code: 'SC-98', name: 'Slime Time', hex: '#a8c93a' },
-  { code: 'SC-27', name: 'Sour Apple', hex: '#9ecb3f' },
-  { code: 'SC-52', name: 'Toad-ily Green', hex: '#5e8f4a' },
-  { code: 'SC-79', name: 'It\'s Sage', hex: '#8fa878' },
-  { code: 'SC-39', name: 'Army Surplus', hex: '#5e6b3e' },
-  { code: 'SC-86', name: 'Old Lace', hex: '#f2e8d5' },
-  { code: 'SC-54', name: 'Vanilla Dip', hex: '#f0dfc0' },
-  { code: 'SC-20', name: 'Cashew Later', hex: '#c9a877' },
-  { code: 'SC-46', name: 'Rawhide', hex: '#b78a5e' },
-  { code: 'SC-51', name: 'Poo Bear', hex: '#7a5230' },
-  { code: 'SC-5', name: 'Tiger Tail', hex: '#c9752e' },
-  { code: 'SC-25', name: 'Crackerjack Brown', hex: '#6e4423' },
-  { code: 'SC-80', name: 'Basketball', hex: '#a85a2e' },
-  { code: 'SC-41', name: 'Brown Cow', hex: '#5c3b23' },
-  { code: 'SC-48', name: 'Camel Back', hex: '#c9a06a' },
-  { code: 'SC-14', name: 'Java Bean', hex: '#3c2718' },
-  { code: 'SC-34', name: 'Down To Earth', hex: '#6e5233' },
-  { code: 'SC-92', name: 'Café Ole', hex: '#5e3d24' },
-  { code: 'SC-90', name: 'Elephant Ears', hex: '#8a7d6e' },
-  { code: 'SC-83', name: 'Tip Taupe', hex: '#a89684' },
-  { code: 'SC-60', name: 'Silver Lining', hex: '#a8adb0' },
-  { code: 'SC-35', name: 'Gray Hare', hex: '#7e8286' },
-  { code: 'SC-99', name: 'Char-ming', hex: '#4a4a4a' },
-  { code: 'SC-15', name: 'Tuxedo', hex: '#1a1a1a' },
-];
-
+const STARTER: Glaze[] = STUDIO_COLOURS;
 
 const STORAGE_KEY = 'glazeup_palette';
 
@@ -190,7 +97,7 @@ export default function ColourPickerPage() {
       </p>
 
       <div style={{ padding: '0.7rem 0.9rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '1.25rem' }}>
-        Matching against the real 82-colour Stroke &amp; Coat range customers pick from in the studio app. An unfired pot will look far paler than its eventual match.
+        Matching against the real 19 Stroke &amp; Coat colours actually stocked in the studio. An unfired pot will look far paler than its eventual match.
       </div>
 
       <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{ display: 'none' }} />

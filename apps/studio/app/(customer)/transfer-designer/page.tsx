@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Camera, Type, Star, Heart, Flower2, Sparkles, Circle, Trash2 } from 'lucide-react';
 import { SaveAndCharge } from '@/components/SaveAndCharge';
+import { STUDIO_COLOURS } from '@/lib/glazes';
 
 type MotifKind = 'text' | 'star' | 'heart' | 'flower' | 'swirl' | 'dot';
 
@@ -24,7 +25,10 @@ interface Element {
 // Per the master doc: "draggable/resizable/rotatable text (4 fonts) and
 // simple motif shapes (star, heart, flower, swirl, dot)".
 const FONTS = ['Instrument Sans', 'Georgia', 'Courier New', 'Brush Script MT'];
-const COLOURS = ['#2B2724', '#B87946', '#c81e2c', '#2c4f9e', '#8dc63f', '#ffffff'];
+// The studio's real 19 confirmed stocked Stroke & Coat colours, shared
+// with Colour Picker and Design Preview -- a transfer design should use
+// the same real glazes it'll actually be fired in, not arbitrary colours.
+const COLOURS = STUDIO_COLOURS.map((c) => c.hex);
 
 function drawMotif(ctx: CanvasRenderingContext2D, kind: MotifKind, size: number, colour: string) {
   ctx.fillStyle = colour;
