@@ -3055,3 +3055,37 @@ export function registerLiveTableSyncRoute(app, supabase, STUDIO_ID, logger, axi
     }
   });
 }
+
+// ============================================================================
+// QUICK ADD PIECE -- closes a real gap found live: Completion required a
+// piece to already exist (from the now-removed 'packed' step) before a
+// photo could be attached, with no way to add one for a booking that's
+// never had a piece logged. "No pieces found for this booking" was a dead
+// end. This lets staff log a piece on the spot with a short description,
+// immediately selectable for photographing right after.
+// ============================================================================
+export function registerQuickAddPieceRoute(app, supabase, STUDIO_ID, logger) {
+  app.post('/api/spec/pieces/quick-add', async (req, res) => {
+    try {
+      const { booking_code, description } = req.body || {};
+      if (!booking_code || !description?.trim()) {
+        return res.status(400).json({ error: 'booking_code and description are required' });
+      }
+      const { data, error } = await supabase
+        .from('pottery_pieces')
+        .insert({
+          studio_id: STUDIO_ID,
+          booking_id: booking_code,
+          description: description.trim(),
+          status: 'packed',
+        })
+        .select('id, booking_id, description, piece_type')
+        .single();
+      if (error) throw error;
+      res.json(data);
+    } catch (err) {
+      logger.error('quick-add piece failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}

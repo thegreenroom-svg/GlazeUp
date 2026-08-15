@@ -24,6 +24,8 @@ export default function CompletionPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [pieces, setPieces] = useState<Piece[]>([]);
   const [selectedPiece, setSelectedPiece] = useState<string>('');
+  const [newPieceDesc, setNewPieceDesc] = useState('');
+  const [addingPiece, setAddingPiece] = useState(false);
   const [photo, setPhoto] = useState<HTMLImageElement | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -39,7 +41,7 @@ export default function CompletionPage() {
       .catch(() => {});
   }, []);
 
-  useEffect(() => {
+  const loadPieces = () => {
     if (!bookingCode) { setPieces([]); return; }
     const b = bookings.find((x) => x.booking_code === bookingCode);
     if (!b) return;
@@ -48,10 +50,33 @@ export default function CompletionPage() {
       .then((d) => {
         if (!d) return;
         const all: Piece[] = Object.values(d.by_stage || {}).flat() as Piece[];
-        setPieces(all.filter((p) => p.booking_id === b.customer_name));
+        setPieces(all.filter((p) => p.booking_id === b.booking_code));
       })
       .catch(() => {});
-  }, [bookingCode, bookings]);
+  };
+
+  useEffect(loadPieces, [bookingCode, bookings]);
+
+  const addPiece = async () => {
+    if (!bookingCode || !newPieceDesc.trim()) return;
+    setAddingPiece(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/quick-add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ booking_code: bookingCode, description: newPieceDesc.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Could not add piece');
+      setNewPieceDesc('');
+      loadPieces();
+      setSelectedPiece(data.id);
+    } catch (err: any) {
+      setError(err.message || 'Could not add piece');
+    } finally {
+      setAddingPiece(false);
+    }
+  };
 
   const stamp = async () => {
     const c = canvasRef.current;
@@ -174,17 +199,36 @@ export default function CompletionPage() {
       </select>
 
       {bookingCode && (
-        <select
-          value={selectedPiece}
-          onChange={(e) => setSelectedPiece(e.target.value)}
-          style={{ width: '100%', padding: '0.55rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.88rem', marginBottom: '0.9rem' }}
-        >
-          <option value="">Choose a piece...</option>
-          {pieces.map((p) => (
-            <option key={p.id} value={p.id}>{p.description || p.piece_type || 'Piece'}</option>
-          ))}
-          {pieces.length === 0 && <option value="" disabled>No pieces found for this booking</option>}
-        </select>
+        <>
+          <select
+            value={selectedPiece}
+            onChange={(e) => setSelectedPiece(e.target.value)}
+            style={{ width: '100%', padding: '0.55rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.88rem', marginBottom: '0.5rem' }}
+          >
+            <option value="">Choose a piece...</option>
+            {pieces.map((p) => (
+              <option key={p.id} value={p.id}>{p.description || p.piece_type || 'Piece'}</option>
+            ))}
+            {pieces.length === 0 && <option value="" disabled>No pieces logged for this booking yet</option>}
+          </select>
+
+          <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.9rem' }}>
+            <input
+              value={newPieceDesc}
+              onChange={(e) => setNewPieceDesc(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addPiece()}
+              placeholder="e.g. blue mug with stars"
+              style={{ flex: 1, padding: '0.5rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.85rem' }}
+            />
+            <button
+              onClick={addPiece}
+              disabled={!newPieceDesc.trim() || addingPiece}
+              style={{ padding: '0.5rem 0.8rem', backgroundColor: 'var(--clay)', color: 'white', border: 'none', borderRadius: '6px', cursor: newPieceDesc.trim() ? 'pointer' : 'not-allowed', fontSize: '0.85rem', opacity: newPieceDesc.trim() ? 1 : 0.6 }}
+            >
+              {addingPiece ? '...' : '+ Add piece'}
+            </button>
+          </div>
+        </>
       )}
 
       <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{ display: 'none' }} />
