@@ -3066,7 +3066,7 @@ export function registerLiveTableSyncRoute(app, supabase, STUDIO_ID, logger, axi
       );
       const openTickets = (ordersRes.data.orders || [])
         .filter((o) => o.ticket_name && digitsOf(o.ticket_name))
-        .map((o) => ({ id: o.id, ticket_name: o.ticket_name, digits: digitsOf(o.ticket_name) }));
+        .map((o) => ({ id: o.id, ticket_name: o.ticket_name, digits: digitsOf(o.ticket_name), created_at: o.created_at }));
 
       // "Currently active" -- a real session window, not every booking
       // today. Started within the last 3 hours (covers the real ~2hr
@@ -3097,22 +3097,53 @@ export function registerLiveTableSyncRoute(app, supabase, STUDIO_ID, logger, axi
         return !d || !openTickets.some((t) => t.digits === d);
       });
 
+      // Real matching for the normal case -- several tables active at
+      // once, not just one. A studio with 8 tables genuinely running
+      // multiple sessions simultaneously is the everyday case, not an
+      // edge case, so only handling exactly-one-of-each was too narrow
+      // and silently did nothing most of the time.
+      //
+      // Greedy nearest-time match: pair each unmatched ticket to the
+      // unmatched booking whose session_start is closest to when that
+      // ticket was actually opened on the till (real signal -- staff
+      // open the ticket shortly after seating someone), closest pairs
+      // first, each ticket and each booking used at most once. Capped at
+      // 2 hours apart so a pair is only made on real, plausible evidence
+      // -- if nothing plausible is within that window, it's left alone
+      // rather than forced.
+      const MAX_GAP_MS = 2 * 60 * 60 * 1000;
+      const candidatePairs = [];
+      for (const ticket of unmatchedTickets) {
+        for (const booking of unmatchedBookings) {
+          const gap = Math.abs(new Date(ticket.created_at).getTime() - new Date(booking.session_start).getTime());
+          if (gap <= MAX_GAP_MS) candidatePairs.push({ ticket, booking, gap });
+        }
+      }
+      candidatePairs.sort((a, b) => a.gap - b.gap);
+
+      const claimedTickets = new Set();
+      const claimedBookings = new Set();
       let updated = 0;
       const changes = [];
-      // Only act on the unambiguous case -- exactly one of each, paired
-      // with real evidence rather than a guess.
-      if (unmatchedTickets.length === 1 && unmatchedBookings.length === 1) {
-        const ticket = unmatchedTickets[0];
-        const booking = unmatchedBookings[0];
-        const newTable = `Main Studio ${ticket.digits}`;
+      for (const pair of candidatePairs) {
+        if (claimedTickets.has(pair.ticket.id) || claimedBookings.has(pair.booking.booking_code)) continue;
+        claimedTickets.add(pair.ticket.id);
+        claimedBookings.add(pair.booking.booking_code);
+        const newTable = `Main Studio ${pair.ticket.digits}`;
         const { error } = await supabase
           .from('bookings')
           .update({ table_number: newTable })
           .eq('studio_id', STUDIO_ID)
-          .eq('booking_code', booking.booking_code);
+          .eq('booking_code', pair.booking.booking_code);
         if (!error) {
-          updated = 1;
-          changes.push({ booking_code: booking.booking_code, old_table: booking.table_number, new_table: newTable, from_ticket: ticket.ticket_name });
+          updated++;
+          changes.push({
+            booking_code: pair.booking.booking_code,
+            old_table: pair.booking.table_number,
+            new_table: newTable,
+            from_ticket: pair.ticket.ticket_name,
+            gap_minutes: Math.round(pair.gap / 60000),
+          });
         }
       }
 
@@ -3121,9 +3152,8 @@ export function registerLiveTableSyncRoute(app, supabase, STUDIO_ID, logger, axi
         changes,
         open_tickets_today: openTickets.length,
         active_bookings_now: activeBookings.length,
-        unmatched_tickets: unmatchedTickets.length,
-        unmatched_bookings: unmatchedBookings.length,
-        skipped_ambiguous: unmatchedTickets.length > 1 || unmatchedBookings.length > 1,
+        unmatched_tickets: unmatchedTickets.length - claimedTickets.size,
+        unmatched_bookings: unmatchedBookings.length - claimedBookings.size,
         pulled_at: new Date().toISOString(),
       });
     } catch (err) {
