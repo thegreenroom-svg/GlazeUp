@@ -35,7 +35,7 @@ const FONTS = ['Instrument Sans', 'Georgia', 'Courier New', 'Brush Script MT'];
 // The studio's real 19 confirmed stocked Stroke & Coat colours, shared
 // with Colour Picker and Design Preview -- a transfer design should use
 // the same real glazes it'll actually be fired in, not arbitrary colours.
-const COLOURS = STUDIO_COLOURS.map((c) => c.hex);
+const COLOURS = STUDIO_COLOURS;
 
 function drawMotif(ctx: CanvasRenderingContext2D, kind: MotifKind, size: number, colour: string) {
   ctx.fillStyle = colour;
@@ -95,7 +95,7 @@ export default function TransferDesignerPage() {
   const [photo, setPhoto] = useState<HTMLImageElement | null>(null);
   const [elements, setElements] = useState<Element[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [colour, setColour] = useState(COLOURS[0]);
+  const [colour, setColour] = useState(COLOURS[0].hex);
   const [font, setFont] = useState(FONTS[0]);
   // Real second mode alongside placing text/motifs -- freehand,
   // pressure-sensitive drawing for fine detail work with a stylus,
@@ -341,12 +341,21 @@ export default function TransferDesignerPage() {
         <button onClick={() => addMotif('dot')} style={{ padding: '0.4rem 0.6rem', borderRadius: '6px', border: 'none', cursor: 'pointer', backgroundColor: '#f0f0f0' }}><Circle size={14} /></button>
       </div>
 
-      <div style={{ display: 'flex', gap: '0.3rem', marginBottom: '0.8rem' }}>
+      <p style={{ fontSize: '0.85rem', fontWeight: 600, color: '#333', marginBottom: '0.4rem' }}>
+        {COLOURS.find((c) => c.hex === colour)?.name || 'Colour'}
+        {' '}
+        <span style={{ color: '#999', fontWeight: 400 }}>
+          ({COLOURS.find((c) => c.hex === colour)?.code})
+        </span>
+      </p>
+      <div style={{ display: 'flex', gap: '0.3rem', marginBottom: '0.8rem', flexWrap: 'wrap' }}>
         {COLOURS.map((c) => (
           <button
-            key={c}
-            onClick={() => { setColour(c); updateSelected({ colour: c }); }}
-            style={{ width: 26, height: 26, borderRadius: '50%', backgroundColor: c, border: colour === c ? '2px solid #B87946' : '1px solid #ddd', cursor: 'pointer' }}
+            key={c.hex}
+            onClick={() => { setColour(c.hex); updateSelected({ colour: c.hex }); }}
+            title={`${c.name} (${c.code})`}
+            aria-label={`${c.name}, ${c.code}`}
+            style={{ width: 26, height: 26, borderRadius: '50%', backgroundColor: c.hex, border: colour === c.hex ? '2px solid #B87946' : '1px solid #ddd', cursor: 'pointer' }}
           />
         ))}
       </div>

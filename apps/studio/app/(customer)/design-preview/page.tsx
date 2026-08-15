@@ -17,12 +17,12 @@ interface Stroke {
 // The studio's real 19 confirmed stocked Stroke & Coat colours, shared
 // with Colour Picker and Transfer Designer so the same real glaze always
 // looks the same everywhere in the app.
-const QUICK_COLOURS = STUDIO_COLOURS.map((c) => c.hex);
+const QUICK_COLOURS = STUDIO_COLOURS;
 
 export default function DesignPreviewPage() {
   const [photo, setPhoto] = useState<HTMLImageElement | null>(null);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
-  const [colour, setColour] = useState(QUICK_COLOURS[0]);
+  const [colour, setColour] = useState(QUICK_COLOURS[0].hex);
   const [brushSize, setBrushSize] = useState(14);
   const [drawing, setDrawing] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -143,13 +143,21 @@ export default function DesignPreviewPage() {
             style={{ width: '100%', borderRadius: '8px', cursor: 'crosshair', display: 'block', marginBottom: '0.8rem', touchAction: 'none' }}
           />
 
+          <p style={{ fontSize: '0.85rem', fontWeight: 600, color: '#333', marginBottom: '0.4rem' }}>
+            {QUICK_COLOURS.find((c) => c.hex === colour)?.name || 'Colour'}
+            {' '}
+            <span style={{ color: '#999', fontWeight: 400 }}>
+              ({QUICK_COLOURS.find((c) => c.hex === colour)?.code})
+            </span>
+          </p>
           <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
             {QUICK_COLOURS.map((c) => (
               <button
-                key={c}
-                onClick={() => setColour(c)}
-                aria-label={`Colour ${c}`}
-                style={{ width: 30, height: 30, borderRadius: '50%', backgroundColor: c, cursor: 'pointer', border: colour === c ? '3px solid var(--clay)' : '1px solid #ddd' }}
+                key={c.hex}
+                onClick={() => setColour(c.hex)}
+                title={`${c.name} (${c.code})`}
+                aria-label={`${c.name}, ${c.code}`}
+                style={{ width: 30, height: 30, borderRadius: '50%', backgroundColor: c.hex, cursor: 'pointer', border: colour === c.hex ? '3px solid var(--clay)' : '1px solid #ddd' }}
               />
             ))}
           </div>
