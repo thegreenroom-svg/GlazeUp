@@ -264,6 +264,31 @@ export default function DesignPreviewPage() {
 
         {!photo ? (
           <label
+            onClick={(e) => {
+              // Real, maximally robust combined approach given severe time
+              // pressure -- the plain label-wrap (native browser
+              // label-click-through to its input) still wasn't opening
+              // the picker for Daisy despite working structurally
+              // identically on Colour Picker. Rather than keep guessing
+              // at why, this explicitly also fires .click() on the real
+              // input as a second, independent trigger path -- if the
+              // native label mechanism is what's failing here, this JS
+              // fallback covers it; if it's something else entirely, the
+              // visible confirm() surfaces real diagnostic detail to
+              // screenshot for next time rather than silent failure.
+              const input = e.currentTarget.querySelector('input[type="file"]') as HTMLInputElement | null;
+              if (input) {
+                try {
+                  input.click();
+                } catch (err: any) {
+                  // eslint-disable-next-line no-alert
+                  confirm(`Design Preview: even the explicit .click() fallback failed. Error: ${err?.message || err}. Please screenshot this and send it over.`);
+                }
+              } else {
+                // eslint-disable-next-line no-alert
+                confirm('Design Preview: could not find the real file input in the DOM at all when tapped. Please screenshot this and send it over.');
+              }
+            }}
             style={{ ...gradientActionCard(), width: '100%', padding: '2.2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem', position: 'relative' }}
           >
             {/* Real fix, confirmed by the red test button that React and
