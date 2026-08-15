@@ -264,7 +264,23 @@ export default function DesignPreviewPage() {
 
       {!photo ? (
         <button
-          onClick={() => fileRef.current?.click()}
+          onClick={() => {
+            // Real diagnostic -- Daisy reported tapping this does nothing
+            // at all, with no visible error, on a page that otherwise
+            // renders correctly. Same posture as the earlier Square 406
+            // fix: make any hidden failure visible rather than silent,
+            // since there's no way to see her actual browser console
+            // remotely.
+            try {
+              if (!fileRef.current) {
+                alert('Design Preview: the photo input was not found on the page. Please screenshot this message.');
+                return;
+              }
+              fileRef.current.click();
+            } catch (err: any) {
+              alert(`Design Preview: opening the photo picker failed with a real error: ${err?.message || err}. Please screenshot this message.`);
+            }
+          }}
           style={{ width: '100%', padding: '2rem', border: '2px dashed #ccc', borderRadius: '8px', backgroundColor: 'white', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}
         >
           <Camera size={30} color="var(--clay)" />
