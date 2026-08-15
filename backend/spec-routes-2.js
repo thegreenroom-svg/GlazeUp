@@ -3521,7 +3521,42 @@ export function registerCurrentCollectionDateRoute(app, supabase, STUDIO_ID, log
         .select('current_collection_date, current_collection_date_updated_at')
         .single();
       if (error) throw error;
-      res.json(data);
+
+      // Real "apply to all bookings until changed" -- per Daisy directly,
+      // not just a UI suggestion. Applies the new current date onto
+      // today's real bookings that don't already have their own,
+      // more-specific collection_date set. A booking with its own real
+      // date already set is left alone -- that's a genuine per-booking
+      // override, not something this default should overwrite.
+      const todayStart = new Date();
+      todayStart.setUTCHours(0, 0, 0, 0);
+      const todayEnd = new Date(todayStart);
+      todayEnd.setUTCDate(todayEnd.getUTCDate() + 1);
+      const { data: todaysBookings } = await supabase
+        .from('bookings')
+        .select('booking_code')
+        .eq('studio_id', STUDIO_ID)
+        .gte('session_start', todayStart.toISOString())
+        .lt('session_start', todayEnd.toISOString());
+      const codes = (todaysBookings || []).map((b) => b.booking_code);
+      let appliedCount = 0;
+      if (codes.length) {
+        const { data: existingStatuses } = await supabase
+          .from('demo_app_session_status')
+          .select('booking_code, collection_date')
+          .eq('studio_id', STUDIO_ID)
+          .in('booking_code', codes);
+        const alreadySet = new Set((existingStatuses || []).filter((s) => s.collection_date).map((s) => s.booking_code));
+        const toApply = codes.filter((c) => !alreadySet.has(c));
+        for (const booking_code of toApply) {
+          const { error: upsertErr } = await supabase
+            .from('demo_app_session_status')
+            .upsert([{ studio_id: STUDIO_ID, booking_code, collection_date: date }], { onConflict: 'booking_code' });
+          if (!upsertErr) appliedCount++;
+        }
+      }
+
+      res.json({ ...data, applied_to_bookings: appliedCount, total_bookings_today: codes.length });
     } catch (err) {
       logger.error(err);
       res.status(500).json({ error: err.message });

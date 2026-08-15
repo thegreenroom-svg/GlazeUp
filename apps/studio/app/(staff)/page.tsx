@@ -117,9 +117,12 @@ export default function Dashboard() {
 
   useEffect(loadCollectionDate, [loadCollectionDate]);
 
+  const [appliedMsg, setAppliedMsg] = useState<string | null>(null);
+
   const saveCollectionDate = async () => {
     if (!dateDraft) return;
     setSavingDate(true);
+    setAppliedMsg(null);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/studio/collection-date`, {
         method: 'POST',
@@ -130,6 +133,17 @@ export default function Dashboard() {
         const d = await res.json();
         setCollectionDateState(d.current_collection_date);
         setEditingDate(false);
+        // Real, direct confirmation of what actually happened -- per
+        // Daisy: "apply to all bookings until changed." This is a real
+        // write, not just a display default, so it's worth showing
+        // exactly how many bookings it genuinely applied to.
+        if (typeof d.applied_to_bookings === 'number') {
+          setAppliedMsg(
+            d.applied_to_bookings > 0
+              ? `Applied to ${d.applied_to_bookings} of ${d.total_bookings_today} bookings today (rest already had their own date set)`
+              : `No bookings today needed it — all ${d.total_bookings_today} already had their own date set`
+          );
+        }
       }
     } catch { /* silent, form stays open to retry */ }
     finally { setSavingDate(false); }
@@ -285,6 +299,9 @@ export default function Dashboard() {
               <Check size={16} />
             </button>
           </div>
+        )}
+        {appliedMsg && (
+          <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.85)', marginTop: '0.5rem' }}>{appliedMsg}</p>
         )}
       </div>
 
