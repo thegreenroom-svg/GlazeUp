@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Home, RotateCcw, Loader2 } from 'lucide-react';
 import { ThemeProvider } from '@/components/ThemeContext';
 import { StudioNavigation } from '@/components/StudioNavigation';
-import { NudgeProvider, HelpPanel } from '@/components/NudgeSystem';
+import { NudgeProvider, HelpPanel, NudgeSettingsPanel } from '@/components/NudgeSystem';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -96,6 +96,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </main>
         </div>
         <HelpPanel title="How this page works" />
+        <NudgeSettingsPanel />
 
         {/* Demo reset -- bottom-left, subtle, confirm-gated. For demoing only. */}
         <button
