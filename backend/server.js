@@ -352,8 +352,7 @@ app.get('/api/demo/customers', async (req, res) => {
     });
 
     const customers = Array.from(byName.values())
-      .sort((a, b) => (b.last_visit > a.last_visit ? 1 : -1))
-      .slice(0, 50);
+      .sort((a, b) => (b.last_visit > a.last_visit ? 1 : -1));
 
     res.json(customers);
   } catch (err) {
