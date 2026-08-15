@@ -120,7 +120,13 @@ export default function Dashboard() {
   const [appliedMsg, setAppliedMsg] = useState<string | null>(null);
 
   const saveCollectionDate = async () => {
-    if (!dateDraft) return;
+    if (!dateDraft) {
+      // Real, visible feedback instead of silently doing nothing --
+      // this exact silent path is a plausible real cause of "not
+      // working" with zero visible sign anything happened.
+      setAppliedMsg('No date selected in the field — please pick a date first, then tap the tick.');
+      return;
+    }
     setSavingDate(true);
     setAppliedMsg(null);
     try {
