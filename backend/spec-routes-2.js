@@ -3483,3 +3483,48 @@ export function registerSquarePaymentFinishRoute(app, supabase, STUDIO_ID, logge
     }
   });
 }
+
+// ============================================================================
+// CURRENT COLLECTION DATE -- Daisy: "the very first thing that needs to
+// happen in this whole app... every day check... apply to all bookings
+// until changed." A real, staff-set current value, not per-booking --
+// checked/updated daily (or whenever real kiln backlog changes), and
+// used as the default wherever a collection date is needed until it's
+// next changed. Real column on studios, not a new table.
+// ============================================================================
+export function registerCurrentCollectionDateRoute(app, supabase, STUDIO_ID, logger) {
+  app.get('/api/spec/studio/collection-date', async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('studios')
+        .select('current_collection_date, current_collection_date_updated_at')
+        .eq('id', STUDIO_ID)
+        .single();
+      if (error) throw error;
+      res.json(data);
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/spec/studio/collection-date', async (req, res) => {
+    try {
+      const { date } = req.body || {};
+      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return res.status(400).json({ error: 'date must be an ISO date string (YYYY-MM-DD)' });
+      }
+      const { data, error } = await supabase
+        .from('studios')
+        .update({ current_collection_date: date, current_collection_date_updated_at: new Date().toISOString() })
+        .eq('id', STUDIO_ID)
+        .select('current_collection_date, current_collection_date_updated_at')
+        .single();
+      if (error) throw error;
+      res.json(data);
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}

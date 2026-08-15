@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { Calendar, PoundSterling, Palette, Bell, Users, RefreshCw, Pipette, Eye, PenTool } from 'lucide-react';
+import { Calendar, PoundSterling, Palette, Bell, Users, RefreshCw, Pipette, Eye, PenTool, Flame, Check } from 'lucide-react';
 import { SkeletonTiles } from '@/components/Skeleton';
 import { usePullToRefresh } from '@/components/usePullToRefresh';
 
@@ -97,6 +97,43 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const router = useRouter();
+
+  // Real, per-day staff value -- per Daisy directly: "the very first
+  // thing that needs to happen in this whole app... every day check...
+  // apply to all bookings until changed." Not per-booking -- one current
+  // value, checked/updated daily, used as the default everywhere a
+  // collection date is needed until it's next changed.
+  const [collectionDate, setCollectionDateState] = useState<string | null>(null);
+  const [editingDate, setEditingDate] = useState(false);
+  const [dateDraft, setDateDraft] = useState('');
+  const [savingDate, setSavingDate] = useState(false);
+
+  const loadCollectionDate = useCallback(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/studio/collection-date`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setCollectionDateState(d?.current_collection_date || null))
+      .catch(() => {});
+  }, []);
+
+  useEffect(loadCollectionDate, [loadCollectionDate]);
+
+  const saveCollectionDate = async () => {
+    if (!dateDraft) return;
+    setSavingDate(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/studio/collection-date`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateDraft }),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        setCollectionDateState(d.current_collection_date);
+        setEditingDate(false);
+      }
+    } catch { /* silent, form stays open to retry */ }
+    finally { setSavingDate(false); }
+  };
 
   useEffect(() => {
     try {
@@ -209,6 +246,47 @@ export default function Dashboard() {
       {studioName && (
         <p style={{ fontSize: '0.8rem', color: '#999', marginBottom: '1.25rem' }}>{studioName}</p>
       )}
+
+      {/* Real, prominent widget -- per Daisy: "the very first thing that
+          needs to happen in this whole app... every day check." Right
+          at the top, above Start Floor, since she's calling it the
+          first thing. */}
+      <div style={{ maxWidth: '520px', margin: '0 auto 1.5rem', padding: '1rem 1.1rem', borderRadius: '14px', background: 'linear-gradient(155deg, var(--clay) 0%, #9A6435 100%)', boxShadow: '0 3px 10px rgba(184,121,70,0.25)' }}>
+        <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>
+          <Flame size={13} /> Today's collection date
+        </p>
+        {!editingDate ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <p style={{ fontSize: '1.1rem', fontWeight: 800, color: 'white' }}>
+              {collectionDate
+                ? new Date(collectionDate + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })
+                : 'Not set yet — check and set for today'}
+            </p>
+            <button
+              onClick={() => { setDateDraft(collectionDate || new Date().toISOString().slice(0, 10)); setEditingDate(true); }}
+              style={{ padding: '0.4rem 0.8rem', backgroundColor: 'rgba(255,255,255,0.2)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}
+            >
+              {collectionDate ? 'Change' : 'Set'}
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <input
+              type="date"
+              value={dateDraft}
+              onChange={(e) => setDateDraft(e.target.value)}
+              style={{ flex: 1, padding: '0.5rem', borderRadius: '8px', border: 'none', fontSize: '0.9rem' }}
+            />
+            <button
+              onClick={saveCollectionDate}
+              disabled={savingDate}
+              style={{ padding: '0.5rem 0.7rem', backgroundColor: 'white', color: 'var(--clay)', border: 'none', borderRadius: '8px', cursor: savingDate ? 'default' : 'pointer', display: 'flex', alignItems: 'center' }}
+            >
+              <Check size={16} />
+            </button>
+          </div>
+        )}
+      </div>
 
       <div style={{ display: 'flex', gap: '0.6rem', maxWidth: '520px', margin: '0 auto 1.5rem' }}>
         <button
