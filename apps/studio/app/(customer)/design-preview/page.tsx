@@ -110,18 +110,13 @@ export default function DesignPreviewPage() {
     if (!f) return;
     const img = new Image();
     img.onload = () => {
-      const base = baseCanvasRef.current;
-      const paint = paintCanvasRef.current;
-      if (!base || !paint) return;
-      const maxW = 360;
-      const scale = Math.min(1, maxW / img.width);
-      const w = Math.round(img.width * scale);
-      const h = Math.round(img.height * scale);
-      base.width = w; base.height = h;
-      paint.width = w; paint.height = h;
-      const bctx = base.getContext('2d')!;
-      bctx.drawImage(img, 0, 0, w, h);
-      paint.getContext('2d')!.clearRect(0, 0, w, h);
+      // Real bug found and fixed here: baseCanvasRef/paintCanvasRef only
+      // exist in the DOM once `photo` is already truthy (they're in the
+      // conditional's else-branch) -- drawing onto them here, before
+      // setPhoto has run, always found them null on the very first photo
+      // and silently returned without ever calling setPhoto. Set the
+      // real state first; the actual drawing now happens in the
+      // useEffect below, once the canvases genuinely exist to draw onto.
       undoStack.current = [];
       setStickers([]);
       setHasContent(false);
@@ -129,6 +124,23 @@ export default function DesignPreviewPage() {
     };
     img.src = URL.createObjectURL(f);
   };
+
+  // Runs once `photo` changes and the canvases have actually mounted --
+  // the real place to do the initial draw, not inside the image's onload.
+  useEffect(() => {
+    if (!photo) return;
+    const base = baseCanvasRef.current;
+    const paint = paintCanvasRef.current;
+    if (!base || !paint) return;
+    const maxW = 360;
+    const scale = Math.min(1, maxW / photo.width);
+    const w = Math.round(photo.width * scale);
+    const h = Math.round(photo.height * scale);
+    base.width = w; base.height = h;
+    paint.width = w; paint.height = h;
+    base.getContext('2d')!.drawImage(photo, 0, 0, w, h);
+    paint.getContext('2d')!.clearRect(0, 0, w, h);
+  }, [photo]);
 
   const canvasPoint = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const c = paintCanvasRef.current!;
