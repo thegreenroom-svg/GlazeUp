@@ -305,7 +305,17 @@ export default function Dashboard() {
               style={{ flex: 1, padding: '0.5rem', borderRadius: '8px', border: 'none', fontSize: '0.9rem' }}
             />
             <button
-              onClick={saveCollectionDate}
+              onClick={() => {
+                // Real, precise diagnostic -- given the exact same faded
+                // date persists across attempts with no visible error
+                // even after the earlier fix, this shows exactly what's
+                // actually stored the moment the button is tapped, to
+                // rule in/out a genuine click-registration issue (seen
+                // before with other buttons on iOS) versus dateDraft
+                // itself holding something unexpected.
+                alert(`Diagnostic: dateDraft is currently "${dateDraft}" (length ${dateDraft.length}). Tapping OK will attempt the real save now.`);
+                saveCollectionDate();
+              }}
               disabled={savingDate}
               style={{ padding: '0.5rem 0.7rem', backgroundColor: 'white', color: 'var(--clay)', border: 'none', borderRadius: '8px', cursor: savingDate ? 'default' : 'pointer', display: 'flex', alignItems: 'center' }}
             >
