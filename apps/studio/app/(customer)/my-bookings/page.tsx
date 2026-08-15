@@ -15,6 +15,7 @@ interface Booking {
   table_number: string | null;
   party_size: number | null;
   current_stage: string;
+  collection_date: string | null;
 }
 
 function MyBookingsInner() {
@@ -50,6 +51,11 @@ function MyBookingsInner() {
         {b.table_number ? ` · Table ${b.table_number}` : ''}
         {b.party_size ? ` · ${b.party_size} people` : ''}
       </p>
+      {b.collection_date && (
+        <p style={{ fontSize: '0.8rem', color: 'var(--clay)', fontWeight: 600, marginTop: '0.3rem' }}>
+          Ready for collection: {new Date(b.collection_date).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
+        </p>
+      )}
     </div>
   );
 

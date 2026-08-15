@@ -552,11 +552,22 @@ export function registerNetworkRoutes(app, supabase, STUDIO_ID, logger) {
         .limit(50);
       if (error) throw error;
 
-      const now = new Date();
       const rows = data || [];
+      // Real collection date lives on demo_app_session_status, not on
+      // bookings itself -- same real pattern as the kiln lookup above.
+      // Now the key thing customers actually want to know post-visit.
+      const { data: statuses } = await supabase
+        .from('demo_app_session_status')
+        .select('booking_code, collection_date')
+        .eq('studio_id', STUDIO_ID)
+        .in('booking_code', rows.map((b) => b.booking_code));
+      const collectionByCode = Object.fromEntries((statuses || []).map((s) => [s.booking_code, s.collection_date]));
+      const withCollectionDate = rows.map((b) => ({ ...b, collection_date: collectionByCode[b.booking_code] || null }));
+
+      const now = new Date();
       res.json({
-        upcoming: rows.filter((b) => new Date(b.session_start) >= now).reverse(),
-        past: rows.filter((b) => new Date(b.session_start) < now),
+        upcoming: withCollectionDate.filter((b) => new Date(b.session_start) >= now).reverse(),
+        past: withCollectionDate.filter((b) => new Date(b.session_start) < now),
         match_method: 'name',
       });
     } catch (err) {
