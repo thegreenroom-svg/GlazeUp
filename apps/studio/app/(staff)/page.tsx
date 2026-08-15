@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { Calendar, PoundSterling, Palette, Bell, Users, RefreshCw } from 'lucide-react';
+import { Calendar, PoundSterling, Palette, Bell, Users, RefreshCw, Pipette, Eye, PenTool } from 'lucide-react';
 import { SkeletonTiles } from '@/components/Skeleton';
 import { usePullToRefresh } from '@/components/usePullToRefresh';
 
@@ -272,6 +272,36 @@ export default function Dashboard() {
             <Tile label="Pieces" icon={Palette} value={String(data.piecesCount)} color="#9A6435" fontSize="1.1rem" maxSize="95px" onClick={() => router.push('/pieces')} />
             <Tile label="Alerts" icon={Bell} value={String(data.alertsUnread)} color="#D97742" fontSize="1.1rem" maxSize="95px" onClick={() => router.push('/alerts')} />
             <Tile label="Customers" icon={Users} value={String(data.customersCount)} color="#8B6F52" fontSize="1.1rem" maxSize="95px" onClick={() => router.push('/customers')} />
+          </div>
+
+          {/* Real, direct access -- per Daisy: "I still can't see any of
+              the design apps... where are they?" They already existed
+              in the nav (Creative Tools section), just buried below
+              Business. Putting them right on the dashboard instead of
+              only offering to move them further down a long menu. */}
+          <p style={{ fontSize: '0.7rem', color: '#999', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.5rem' }}>Design Tools</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.6rem' }}>
+            <button
+              onClick={() => router.push('/colour-picker')}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem', padding: '0.8rem 0.4rem', borderRadius: '12px', border: '1px solid #e5ddd2', backgroundColor: 'white', cursor: 'pointer' }}
+            >
+              <Pipette size={20} color="var(--clay)" />
+              <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--charcoal)', textAlign: 'center' }}>Colour Picker</span>
+            </button>
+            <button
+              onClick={() => router.push('/design-preview')}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem', padding: '0.8rem 0.4rem', borderRadius: '12px', border: '1px solid #e5ddd2', backgroundColor: 'white', cursor: 'pointer' }}
+            >
+              <Eye size={20} color="var(--clay)" />
+              <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--charcoal)', textAlign: 'center' }}>Design Preview</span>
+            </button>
+            <button
+              onClick={() => router.push('/transfer-designer')}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem', padding: '0.8rem 0.4rem', borderRadius: '12px', border: '1px solid #e5ddd2', backgroundColor: 'white', cursor: 'pointer' }}
+            >
+              <PenTool size={20} color="var(--clay)" />
+              <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--charcoal)', textAlign: 'center' }}>Transfer Designer</span>
+            </button>
           </div>
         </div>
       )}

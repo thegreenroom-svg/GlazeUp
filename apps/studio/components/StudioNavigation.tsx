@@ -84,6 +84,14 @@ export function StudioNavigation() {
       ],
     },
     {
+      section: 'Creative Tools',
+      items: [
+        { label: 'Colour Picker', icon: <Pipette className="w-5 h-5" />, href: '/colour-picker' },
+        { label: 'Design Preview', icon: <Eye className="w-5 h-5" />, href: '/design-preview' },
+        { label: 'Transfer Designer', icon: <PenTool className="w-5 h-5" />, href: '/transfer-designer' },
+      ],
+    },
+    {
       section: 'Studio',
       items: [
         { label: 'Pieces', icon: <Palette className="w-5 h-5" />, href: '/pieces' },
@@ -103,14 +111,6 @@ export function StudioNavigation() {
         { label: 'Analytics', icon: <BarChart3 className="w-5 h-5" />, href: '/analytics' },
         { label: 'Billing', icon: <CreditCard className="w-5 h-5" />, href: '/billing' },
         { label: 'Loyalty', icon: <Award className="w-5 h-5" />, href: '/loyalty' },
-      ],
-    },
-    {
-      section: 'Creative Tools',
-      items: [
-        { label: 'Colour Picker', icon: <Pipette className="w-5 h-5" />, href: '/colour-picker' },
-        { label: 'Design Preview', icon: <Eye className="w-5 h-5" />, href: '/design-preview' },
-        { label: 'Transfer Designer', icon: <PenTool className="w-5 h-5" />, href: '/transfer-designer' },
       ],
     },
     {
