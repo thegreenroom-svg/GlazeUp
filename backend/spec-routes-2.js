@@ -3251,3 +3251,179 @@ export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios
     }
   });
 }
+
+// ============================================================================
+// FIND ALL ON TABLE -- real packing workflow, not just single-piece lookup.
+// ----------------------------------------------------------------------------
+// Daisy: "if there was a group of cases on a table, would it find all
+// those, or prompt you... three out of five on this bench, check another
+// box... put yourself in the person's position." Real redesign, not an
+// add-on: a packer scans a whole booking, not one piece at a time.
+// Checks every one of that booking's still-unpacked pieces against ONE
+// candidate photo in a SINGLE Gemini call (cheaper and faster than one
+// call per piece), and reports honestly how many of the total were found
+// here versus still missing -- so "3 of 5, check another table for the
+// rest" is a real, direct answer, not something the packer has to work
+// out themselves by re-running single-piece checks five times.
+// ============================================================================
+export function registerFindAllOnTableRoute(app, supabase, STUDIO_ID, logger, axios, upload, fs, logGeminiUsage) {
+  app.post('/api/spec/bookings/:code/find-all-on-table', upload.single('photo'), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
+      const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+      if (!GEMINI_API_KEY) {
+        return res.status(500).json({ error: 'GEMINI_API_KEY not configured on this service.' });
+      }
+
+      const { data: pieces } = await supabase
+        .from('pottery_pieces')
+        .select('id, description, piece_type, status')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_id', req.params.code)
+        .neq('archived', true)
+        .not('status', 'in', '("packed","ready_for_pickup","collected","posted","picked_up")');
+      const unpacked = (pieces || []).filter((p) => p.description || p.piece_type);
+      if (unpacked.length === 0) {
+        return res.status(400).json({ error: 'No unpacked pieces with a description found for this booking' });
+      }
+
+      const base64Table = fs.readFileSync(req.file.path).toString('base64');
+      const pieceList = unpacked.map((p, i) => `${i + 1}. [id: ${p.id}] ${p.description || p.piece_type}`).join('\n');
+
+      const input = [
+        {
+          type: 'text',
+          text: `This photo shows a table/tray of several fired pottery pieces. You are checking it against a list of SPECIFIC pieces we're looking for, from one real booking:\n\n${pieceList}\n\nEach description was written pre-fire. Underglaze fires MORE vibrant and saturated than it looks when painted -- expect fired pieces to look more intense than their description suggests. Match on the underlying colour/pattern relationship, shape barely changes through firing.\n\nFor EACH piece in the list above, say whether you can see it in this photo. Not every piece needs to be found here -- some may genuinely be on a different table. Be honest -- a wrong match is worse than saying not found.`,
+        },
+        { type: 'image', data: base64Table, mime_type: req.file.mimetype || 'image/jpeg' },
+      ];
+
+      const responseSchema = {
+        type: 'object',
+        properties: {
+          results: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string' },
+                found: { type: 'boolean' },
+                confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+                box_2d: { type: 'array', items: { type: 'integer' } },
+                reasoning: { type: 'string' },
+              },
+              required: ['id', 'found'],
+            },
+          },
+        },
+        required: ['results'],
+      };
+
+      let aiRes;
+      try {
+        aiRes = await axios.post(
+          'https://generativelanguage.googleapis.com/v1beta/interactions',
+          {
+            model: 'gemini-3.6-flash',
+            input,
+            response_format: { type: 'text', mime_type: 'application/json', schema: responseSchema },
+          },
+          { headers: { 'x-goog-api-key': GEMINI_API_KEY, 'Content-Type': 'application/json' } }
+        );
+      } catch (err) {
+        logger.error('find-all-on-table: Gemini call failed', err.response?.data || err.message);
+        return res.status(500).json({ error: err.response?.data?.error?.message || 'The Gemini API call failed' });
+      }
+
+      const usage = aiRes.data.usage || aiRes.data.usageMetadata;
+      if (usage) {
+        await logGeminiUsage(supabase, STUDIO_ID, 'find-all-on-table-gemini', {
+          prompt_tokens: usage.prompt_tokens ?? usage.promptTokenCount ?? 0,
+          completion_tokens: usage.completion_tokens ?? usage.candidatesTokenCount ?? 0,
+        });
+      }
+
+      let parsed;
+      try {
+        const raw = aiRes.data.output_text || aiRes.data.output?.[0]?.text || aiRes.data.candidates?.[0]?.content?.parts?.[0]?.text;
+        parsed = JSON.parse((raw || '').match(/\{[\s\S]*\}/)?.[0] || '{}');
+      } catch (e) {
+        logger.error('find-all-on-table: could not parse Gemini response', aiRes.data);
+        return res.status(500).json({ error: 'Could not parse the Gemini response' });
+      }
+
+      const byId = Object.fromEntries((parsed.results || []).map((r) => [r.id, r]));
+      const results = unpacked.map((p) => {
+        const r = byId[p.id] || { found: false };
+        let x_pct = null, y_pct = null;
+        if (r.found && Array.isArray(r.box_2d) && r.box_2d.length === 4) {
+          const [ymin, xmin, ymax, xmax] = r.box_2d;
+          x_pct = ((xmin + xmax) / 2) / 10;
+          y_pct = ((ymin + ymax) / 2) / 10;
+        }
+        return {
+          id: p.id,
+          description: p.description || p.piece_type,
+          found: !!r.found,
+          confidence: r.confidence || 'low',
+          x_pct, y_pct,
+          reasoning: r.reasoning || null,
+        };
+      });
+
+      const foundCount = results.filter((r) => r.found).length;
+
+      res.json({
+        total: unpacked.length,
+        found_count: foundCount,
+        results,
+        all_found: foundCount === unpacked.length,
+      });
+    } catch (err) {
+      logger.error('find-all-on-table failed', err.response?.data || err.message);
+      res.status(500).json({ error: err.response?.data?.error?.message || err.message });
+    }
+  });
+
+  // Real fulfilment info for the packing flow -- checked directly against
+  // the real data first rather than assumed: bookings.fulfilment_method
+  // (set via the existing registerFulfilmentRoute) is populated on all
+  // 256 real bookings, while demo_app_session_status.collection_method
+  // only fills in once staff process that specific visit's till/collection
+  // details (2 of 5 rows). The bookings field is the reliable, always-
+  // available signal; the session-status table adds real supplementary
+  // detail (postcode, collection date) once that stage has happened.
+  // Named differently from the existing POST /fulfilment route (which
+  // sets bookings.fulfilment_method) to avoid two different routes
+  // sharing one URL, even though different HTTP methods don't collide.
+  app.get('/api/spec/bookings/:code/fulfilment-info', async (req, res) => {
+    try {
+      const { data: booking } = await supabase
+        .from('bookings')
+        .select('fulfilment_method')
+        .eq('booking_code', req.params.code)
+        .eq('studio_id', STUDIO_ID)
+        .maybeSingle();
+      const { data: status } = await supabase
+        .from('demo_app_session_status')
+        .select('postal_postcode, collection_date')
+        .eq('booking_code', req.params.code)
+        .eq('studio_id', STUDIO_ID)
+        .maybeSingle();
+      const { data: people } = await supabase
+        .from('demo_app_person_collection')
+        .select('person_name, collection_method, postal_postcode')
+        .eq('booking_code', req.params.code)
+        .eq('studio_id', STUDIO_ID);
+      res.json({
+        fulfilment_method: booking?.fulfilment_method || null,
+        postal_postcode: status?.postal_postcode || null,
+        collection_date: status?.collection_date || null,
+        people: people || [],
+      });
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}

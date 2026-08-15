@@ -2,7 +2,8 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Flame, Search, Mail, Package, CalendarDays } from 'lucide-react';
 
 interface BookingInfo {
@@ -21,7 +22,8 @@ interface BookingInfo {
 // out. All that's actually needed here: look up the booking, set/confirm
 // the collection date, and send the ready-for-collection email once
 // staff have confirmed the batch is out and found.
-export default function KilnPage() {
+function KilnPageInner() {
+  const params = useSearchParams();
   const [bookingRef, setBookingRef] = useState('');
   const [booking, setBooking] = useState<BookingInfo | null>(null);
   const [collectionDate, setCollectionDate] = useState('');
@@ -31,8 +33,8 @@ export default function KilnPage() {
   const [error, setError] = useState<string | null>(null);
   const [emailResult, setEmailResult] = useState<{ sent: boolean; reason?: string } | null>(null);
 
-  const lookup = async () => {
-    const ref = bookingRef.trim();
+  const lookup = async (refOverride?: string) => {
+    const ref = (refOverride ?? bookingRef).trim();
     if (!ref) return;
     setLoading(true);
     setError(null);
@@ -50,6 +52,17 @@ export default function KilnPage() {
       setLoading(false);
     }
   };
+
+  // Real deep-link support -- arriving from Find on Table with a known
+  // booking already selected there shouldn't mean retyping it here.
+  useEffect(() => {
+    const fromQuery = params.get('booking');
+    if (fromQuery) {
+      setBookingRef(fromQuery);
+      lookup(fromQuery);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const saveDate = async () => {
     if (!booking || !collectionDate) return;
@@ -109,7 +122,7 @@ export default function KilnPage() {
           style={{ flex: 1, padding: '0.6rem 0.8rem', borderRadius: 8, border: '1px solid #ddd', fontSize: '0.9rem' }}
         />
         <button
-          onClick={lookup}
+          onClick={() => lookup()}
           disabled={loading || !bookingRef.trim()}
           style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', backgroundColor: 'var(--clay)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
         >
@@ -170,10 +183,19 @@ export default function KilnPage() {
         </div>
       )}
 
-      <PostageLabelForm defaultBookingCode={bookingRef} />
+      <PostageLabelForm key={bookingRef} defaultBookingCode={bookingRef} />
     </div>
   );
 }
+
+export default function KilnPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: '2rem' }}>Loading...</div>}>
+      <KilnPageInner />
+    </Suspense>
+  );
+}
+
 
 // Real Royal Mail Click & Drop order creation -- see the backend route's
 // own comment for the full honesty note. Weight is entered by hand since
