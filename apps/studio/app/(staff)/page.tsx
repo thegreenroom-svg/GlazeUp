@@ -235,7 +235,7 @@ export default function Dashboard() {
   const takingsSubtext = `Today, ${new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '1.5rem', backgroundColor: '#FDF6F1', minHeight: '100%', position: 'relative' }}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '1rem 1.2rem 1.2rem', backgroundColor: '#FDF6F1', minHeight: '100%', position: 'relative' }}>
       {pullDistance > 0 && (
         <div style={{ display: 'flex', justifyContent: 'center', height: `${pullDistance}px`, alignItems: 'center', overflow: 'hidden' }}>
           <RefreshCw size={20} color="var(--clay)" style={{ transform: `rotate(${pullDistance * 3.6}deg)`, opacity: pullDistance / 100 }} />
@@ -251,7 +251,7 @@ export default function Dashboard() {
           needs to happen in this whole app... every day check." Right
           at the top, above Start Floor, since she's calling it the
           first thing. */}
-      <div style={{ maxWidth: '520px', margin: '0 auto 1.5rem', padding: '1rem 1.1rem', borderRadius: '14px', background: 'linear-gradient(155deg, var(--clay) 0%, #9A6435 100%)', boxShadow: '0 3px 10px rgba(184,121,70,0.25)' }}>
+      <div style={{ maxWidth: '520px', margin: '0 auto 0.9rem', padding: '0.75rem 1.1rem', borderRadius: '14px', background: 'linear-gradient(155deg, var(--clay) 0%, #9A6435 100%)', boxShadow: '0 3px 10px rgba(184,121,70,0.25)' }}>
         <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>
           <Flame size={13} /> Today's collection date
         </p>
@@ -288,7 +288,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: '0.6rem', maxWidth: '520px', margin: '0 auto 1.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.6rem', maxWidth: '520px', margin: '0 auto 0.9rem' }}>
         <button
           onClick={() => router.push('/floor')}
           style={{
@@ -297,7 +297,7 @@ export default function Dashboard() {
             alignItems: 'center',
             justifyContent: 'center',
             gap: '0.6rem',
-            padding: '1.1rem',
+            padding: '0.85rem',
             borderRadius: '14px',
             border: 'none',
             cursor: 'pointer',
@@ -318,7 +318,7 @@ export default function Dashboard() {
             alignItems: 'center',
             justifyContent: 'center',
             gap: '0.2rem',
-            padding: '1.1rem 0.5rem',
+            padding: '0.85rem 0.5rem',
             borderRadius: '14px',
             border: '2px solid var(--clay)',
             cursor: 'pointer',
@@ -336,20 +336,17 @@ export default function Dashboard() {
         <SkeletonTiles />
       ) : (
         <div style={{ maxWidth: '520px', margin: '0 auto' }}>
-          <div style={{ marginBottom: '0.75rem' }}>
-            <Tile label={bookingsLabel} icon={Calendar} value={String(data.bookingsCount)} color="var(--clay)" fontSize="2.2rem" maxSize="180px" onClick={() => router.push('/bookings')} />
+          <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1fr 1fr' : '1fr', gap: '0.6rem', marginBottom: '0.6rem' }}>
+            <Tile label={bookingsLabel} icon={Calendar} value={String(data.bookingsCount)} color="var(--clay)" fontSize="1.7rem" maxSize="110px" onClick={() => router.push('/bookings')} />
+            {isAdmin && (
+              <Tile label="Takings" icon={PoundSterling} value={data.moneyAvailable ? `£${data.moneyToday.toFixed(0)}` : '—'} subtext={data.moneyAvailable ? takingsSubtext : 'Square unavailable'} color="#C58C5B" fontSize="1.7rem" maxSize="110px" onClick={() => router.push('/money')} />
+            )}
           </div>
 
-          {isAdmin && (
-            <div style={{ marginBottom: '0.75rem' }}>
-              <Tile label="Takings" icon={PoundSterling} value={data.moneyAvailable ? `£${data.moneyToday.toFixed(0)}` : '—'} subtext={data.moneyAvailable ? takingsSubtext : 'Square unavailable'} color="#C58C5B" fontSize="1.5rem" maxSize="130px" onClick={() => router.push('/money')} />
-            </div>
-          )}
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.6rem', marginBottom: '0.6rem' }}>
-            <Tile label="Pieces" icon={Palette} value={String(data.piecesCount)} color="#9A6435" fontSize="1.1rem" maxSize="95px" onClick={() => router.push('/pieces')} />
-            <Tile label="Alerts" icon={Bell} value={String(data.alertsUnread)} color="#D97742" fontSize="1.1rem" maxSize="95px" onClick={() => router.push('/alerts')} />
-            <Tile label="Customers" icon={Users} value={String(data.customersCount)} color="#8B6F52" fontSize="1.1rem" maxSize="95px" onClick={() => router.push('/customers')} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginBottom: '0.6rem' }}>
+            <Tile label="Pieces" icon={Palette} value={String(data.piecesCount)} color="#9A6435" fontSize="1rem" maxSize="78px" onClick={() => router.push('/pieces')} />
+            <Tile label="Alerts" icon={Bell} value={String(data.alertsUnread)} color="#D97742" fontSize="1rem" maxSize="78px" onClick={() => router.push('/alerts')} />
+            <Tile label="Customers" icon={Users} value={String(data.customersCount)} color="#8B6F52" fontSize="1rem" maxSize="78px" onClick={() => router.push('/customers')} />
           </div>
 
           {/* Real, direct access -- per Daisy: "I still can't see any of
@@ -357,28 +354,28 @@ export default function Dashboard() {
               in the nav (Creative Tools section), just buried below
               Business. Putting them right on the dashboard instead of
               only offering to move them further down a long menu. */}
-          <p style={{ fontSize: '0.7rem', color: '#999', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.5rem' }}>Design Tools</p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.6rem' }}>
+          <p style={{ fontSize: '0.68rem', color: '#999', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '0.4rem' }}>Design Tools</p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
             <button
               onClick={() => router.push('/colour-picker')}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem', padding: '0.8rem 0.4rem', borderRadius: '12px', border: '1px solid #e5ddd2', backgroundColor: 'white', cursor: 'pointer' }}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem', padding: '0.55rem 0.3rem', borderRadius: '10px', border: '1px solid #e5ddd2', backgroundColor: 'white', cursor: 'pointer' }}
             >
-              <Pipette size={20} color="var(--clay)" />
-              <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--charcoal)', textAlign: 'center' }}>Colour Picker</span>
+              <Pipette size={17} color="var(--clay)" />
+              <span style={{ fontSize: '0.64rem', fontWeight: 600, color: 'var(--charcoal)', textAlign: 'center' }}>Colour Picker</span>
             </button>
             <button
               onClick={() => router.push('/design-preview')}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem', padding: '0.8rem 0.4rem', borderRadius: '12px', border: '1px solid #e5ddd2', backgroundColor: 'white', cursor: 'pointer' }}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem', padding: '0.55rem 0.3rem', borderRadius: '10px', border: '1px solid #e5ddd2', backgroundColor: 'white', cursor: 'pointer' }}
             >
-              <Eye size={20} color="var(--clay)" />
-              <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--charcoal)', textAlign: 'center' }}>Design Preview</span>
+              <Eye size={17} color="var(--clay)" />
+              <span style={{ fontSize: '0.64rem', fontWeight: 600, color: 'var(--charcoal)', textAlign: 'center' }}>Design Preview</span>
             </button>
             <button
               onClick={() => router.push('/transfer-designer')}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem', padding: '0.8rem 0.4rem', borderRadius: '12px', border: '1px solid #e5ddd2', backgroundColor: 'white', cursor: 'pointer' }}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem', padding: '0.55rem 0.3rem', borderRadius: '10px', border: '1px solid #e5ddd2', backgroundColor: 'white', cursor: 'pointer' }}
             >
-              <PenTool size={20} color="var(--clay)" />
-              <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--charcoal)', textAlign: 'center' }}>Transfer Designer</span>
+              <PenTool size={17} color="var(--clay)" />
+              <span style={{ fontSize: '0.64rem', fontWeight: 600, color: 'var(--charcoal)', textAlign: 'center' }}>Transfer Designer</span>
             </button>
           </div>
         </div>
