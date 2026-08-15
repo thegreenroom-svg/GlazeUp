@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { Camera, Undo2, Trash2, Paintbrush, PaintBucket, Sparkles, X } from 'lucide-react';
 import { SaveAndCharge } from '@/components/SaveAndCharge';
 import { STUDIO_COLOURS } from '@/lib/glazes';
+import { gradientSwatch, gradientActionCard, iconBadge, sectionLabel } from '@/lib/bougie';
 
 // The studio's real 19 confirmed stocked Stroke & Coat colours, shared
 // with Colour Picker and Transfer Designer so the same real glaze always
@@ -254,44 +255,47 @@ export default function DesignPreviewPage() {
   ];
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '600px' }}>
-      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Design Preview</h1>
-      <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-        Photograph your actual piece, then paint, fill, or place colour straight onto the photo to see how it might look. Works with a stylus for fine detail.
-      </p>
+    <div style={{ backgroundColor: 'var(--ivory)', minHeight: '100%' }}>
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ padding: '2rem 1.5rem', maxWidth: '600px', margin: '0 auto' }}>
+        <h1 style={{ fontSize: '1.9rem', fontWeight: 800, marginBottom: '0.3rem', color: 'var(--charcoal)', letterSpacing: '-0.02em' }}>Design Preview</h1>
+        <p style={{ color: 'var(--charcoal)', opacity: 0.65, fontSize: '0.92rem', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+          Photograph your actual piece, then paint, fill, or place colour straight onto the photo to see how it might look. Works with a stylus for fine detail.
+        </p>
 
-      {!photo ? (
-        <label
-          style={{ width: '100%', padding: '2rem', border: '2px dashed #ccc', borderRadius: '8px', backgroundColor: 'white', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', position: 'relative' }}
-        >
-          {/* Real fix, confirmed by the red test button that React and
-              click handling both work fine on this page: the actual
-              problem was narrower -- calling fileRef.current.click() on
-              a hidden input succeeded as a JS call with no error, but
-              iOS Safari wasn't reliably opening its native picker in
-              response, a known category of quirk with that exact
-              hidden-input-plus-programmatic-click pattern. This removes
-              the indirection entirely: the real file input IS the
-              visible label, so tapping it is a genuine native browser
-              interaction, not a simulated one. */}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={onFile}
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
-          />
-          <Camera size={30} color="var(--clay)" />
-          <span style={{ color: '#666', fontSize: '0.9rem' }}>Photograph your piece</span>
-        </label>
-      ) : (
-        <>
-          <div
-            ref={stackRef}
-            onPointerMove={stickerMove}
-            onPointerUp={stickerUp}
-            style={{ position: 'relative', width: '100%', maxWidth: 360, marginBottom: '0.8rem' }}
+        {!photo ? (
+          <label
+            style={{ ...gradientActionCard(), width: '100%', padding: '2.2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem', position: 'relative' }}
+          >
+            {/* Real fix, confirmed by the red test button that React and
+                click handling both work fine on this page: the actual
+                problem was narrower -- calling fileRef.current.click() on
+                a hidden input succeeded as a JS call with no error, but
+                iOS Safari wasn't reliably opening its native picker in
+                response, a known category of quirk with that exact
+                hidden-input-plus-programmatic-click pattern. This removes
+                the indirection entirely: the real file input IS the
+                visible label, so tapping it is a genuine native browser
+                interaction, not a simulated one. */}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={onFile}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+            />
+            <div style={iconBadge(52)}>
+              <Camera size={24} color="white" />
+            </div>
+            <span style={{ color: 'var(--charcoal)', fontSize: '0.92rem', fontWeight: 600 }}>Photograph your piece</span>
+          </label>
+        ) : (
+          <>
+            <div
+              ref={stackRef}
+              onPointerMove={stickerMove}
+              onPointerUp={stickerUp}
+              style={{ position: 'relative', width: '100%', maxWidth: 360, marginBottom: '0.8rem' }}
           >
             <canvas ref={baseCanvasRef} style={{ width: '100%', borderRadius: '8px', display: 'block' }} />
             <canvas
@@ -345,21 +349,27 @@ export default function DesignPreviewPage() {
             ))}
           </div>
 
-          <p style={{ fontSize: '0.85rem', fontWeight: 600, color: '#333', marginBottom: '0.4rem' }}>
+          <p style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--charcoal)', marginBottom: '0.5rem' }}>
             {QUICK_COLOURS.find((c) => c.hex === colour)?.name || 'Colour'}
             {' '}
-            <span style={{ color: '#999', fontWeight: 400 }}>
+            <span style={{ color: 'var(--stone)', fontWeight: 400 }}>
               ({QUICK_COLOURS.find((c) => c.hex === colour)?.code})
             </span>
           </p>
-          <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.7rem', flexWrap: 'wrap' }}>
             {QUICK_COLOURS.map((c) => (
               <button
                 key={c.hex}
                 onClick={() => setColour(c.hex)}
                 title={`${c.name} (${c.code})`}
                 aria-label={`${c.name}, ${c.code}`}
-                style={{ width: 30, height: 30, borderRadius: '50%', backgroundColor: c.hex, cursor: 'pointer', border: colour === c.hex ? '3px solid var(--clay)' : '1px solid #ddd' }}
+                style={{
+                  ...gradientSwatch(c.hex, 32),
+                  cursor: 'pointer',
+                  border: 'none',
+                  outline: colour === c.hex ? '2.5px solid var(--clay)' : 'none',
+                  outlineOffset: '2px',
+                }}
               />
             ))}
           </div>
@@ -414,6 +424,7 @@ export default function DesignPreviewPage() {
           )}
         </>
       )}
-    </motion.div>
+      </motion.div>
+    </div>
   );
 }

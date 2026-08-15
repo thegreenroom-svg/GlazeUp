@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { Camera, Type, Star, Heart, Flower2, Sparkles, Circle, Trash2, Paintbrush, Pen, PaintBucket, Wand2, Undo2, MousePointer2 } from 'lucide-react';
 import { SaveAndCharge } from '@/components/SaveAndCharge';
 import { STUDIO_COLOURS } from '@/lib/glazes';
+import { gradientSwatch, gradientActionCard, iconBadge } from '@/lib/bougie';
 
 type MotifKind = 'text' | 'star' | 'heart' | 'flower' | 'swirl' | 'dot';
 type Mode = 'place' | 'draw' | 'trace';
@@ -408,30 +409,34 @@ export default function TransferDesignerPage() {
   ];
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '600px' }}>
-      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Transfer Designer</h1>
-      <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-        Photograph your piece, then draw, fill, trace, or add text and motifs to plan a transfer before it goes on for real.
-      </p>
+    <div style={{ backgroundColor: 'var(--ivory)', minHeight: '100%' }}>
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ padding: '2rem 1.5rem', maxWidth: '600px', margin: '0 auto' }}>
+        <h1 style={{ fontSize: '1.9rem', fontWeight: 800, marginBottom: '0.3rem', color: 'var(--charcoal)', letterSpacing: '-0.02em' }}>Transfer Designer</h1>
+        <p style={{ color: 'var(--charcoal)', opacity: 0.65, fontSize: '0.92rem', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+          Photograph your piece, then draw, fill, trace, or add text and motifs to plan a transfer before it goes on for real.
+        </p>
 
-      <label
-        style={{ width: '100%', padding: '0.7rem', border: '2px dashed #ccc', borderRadius: '8px', backgroundColor: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginBottom: '0.8rem', fontSize: '0.85rem', color: '#666', position: 'relative' }}
-      >
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={onFile}
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
-        />
-        <Camera size={16} color="var(--clay)" /> {photo ? 'Choose a different photo' : 'Photograph your piece'}
-      </label>
+        <label
+          style={{ ...gradientActionCard(), width: '100%', padding: '0.8rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem', marginBottom: '1rem', fontSize: '0.88rem', fontWeight: 600, color: 'var(--charcoal)', position: 'relative' }}
+        >
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={onFile}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+          />
+          <div style={iconBadge(28)}>
+            <Camera size={13} color="white" />
+          </div>
+          {photo ? 'Choose a different photo' : 'Photograph your piece'}
+        </label>
 
-      <div style={{ position: 'relative', width: '100%', maxWidth: 340, marginBottom: '0.8rem' }}>
-        <canvas ref={baseCanvasRef} style={{ width: '100%', border: '1px solid #eee', borderRadius: '8px', display: 'block' }} />
-        <canvas ref={paintCanvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }} />
-        <canvas
+        <div style={{ position: 'relative', width: '100%', maxWidth: 340, marginBottom: '0.8rem' }}>
+          <canvas ref={baseCanvasRef} style={{ width: '100%', border: '1px solid #eee', borderRadius: '8px', display: 'block' }} />
+          <canvas ref={paintCanvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }} />
+          <canvas
           ref={topCanvasRef}
           onPointerDown={down}
           onPointerMove={move}
@@ -524,21 +529,27 @@ export default function TransferDesignerPage() {
 
       {mode !== 'trace' && (
         <>
-          <p style={{ fontSize: '0.85rem', fontWeight: 600, color: '#333', marginBottom: '0.4rem' }}>
+          <p style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--charcoal)', marginBottom: '0.5rem' }}>
             {COLOURS.find((c) => c.hex === colour)?.name || 'Colour'}
             {' '}
-            <span style={{ color: '#999', fontWeight: 400 }}>
+            <span style={{ color: 'var(--stone)', fontWeight: 400 }}>
               ({COLOURS.find((c) => c.hex === colour)?.code})
             </span>
           </p>
-          <div style={{ display: 'flex', gap: '0.3rem', marginBottom: '0.8rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '0.45rem', marginBottom: '0.9rem', flexWrap: 'wrap' }}>
             {COLOURS.map((c) => (
               <button
                 key={c.hex}
                 onClick={() => { setColour(c.hex); updateSelected({ colour: c.hex }); }}
                 title={`${c.name} (${c.code})`}
                 aria-label={`${c.name}, ${c.code}`}
-                style={{ width: 26, height: 26, borderRadius: '50%', backgroundColor: c.hex, border: colour === c.hex ? '2px solid #B87946' : '1px solid #ddd', cursor: 'pointer' }}
+                style={{
+                  ...gradientSwatch(c.hex, 28),
+                  border: 'none',
+                  outline: colour === c.hex ? '2.5px solid var(--clay)' : 'none',
+                  outlineOffset: '2px',
+                  cursor: 'pointer',
+                }}
               />
             ))}
           </div>
@@ -608,6 +619,7 @@ export default function TransferDesignerPage() {
           <SaveAndCharge tool="transfer-designer" label="Transfer Design" />
         </div>
       )}
-    </motion.div>
+      </motion.div>
+    </div>
   );
 }
