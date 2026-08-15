@@ -113,17 +113,17 @@ export default function ColourPickerPage() {
             palette" below, which is for actually changing entries and
             doesn't need to be the default view. */}
         <p style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--clay)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.7rem' }}>Our 19 real glazes</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: '0.7rem', marginBottom: '2rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(56px, 1fr))', gap: '0.5rem', marginBottom: '2rem' }}>
           {palette.map((g) => (
             <div key={g.code} style={{ textAlign: 'center' }}>
               <div style={{
                 width: '100%', aspectRatio: '1', borderRadius: '50%',
                 background: `linear-gradient(155deg, ${g.hex} 0%, ${g.hex}dd 100%)`,
-                boxShadow: `0 3px 10px ${g.hex}55, inset 0 1px 2px rgba(255,255,255,0.4)`,
-                marginBottom: '0.4rem',
+                boxShadow: `0 2px 6px ${g.hex}55, inset 0 1px 2px rgba(255,255,255,0.4)`,
+                marginBottom: '0.25rem',
               }} />
-              <p style={{ fontSize: '0.68rem', fontWeight: 700, lineHeight: 1.2, color: 'var(--charcoal)' }}>{g.name}</p>
-              <p style={{ fontSize: '0.62rem', color: 'var(--stone)' }}>Nº{g.code}</p>
+              <p style={{ fontSize: '0.58rem', fontWeight: 700, lineHeight: 1.15, color: 'var(--charcoal)' }}>{g.name}</p>
+              <p style={{ fontSize: '0.52rem', color: 'var(--stone)' }}>Nº{g.code}</p>
             </div>
           ))}
         </div>
