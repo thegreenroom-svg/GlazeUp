@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Pipette, Eye, PenTool, CalendarClock, Menu, X } from 'lucide-react';
+import { Pipette, Eye, PenTool, CalendarClock, Menu, X, ArrowLeft } from 'lucide-react';
 
 const CUSTOMER_LINKS = [
   { label: 'Colour Picker', icon: <Pipette size={16} />, href: '/colour-picker' },
@@ -20,11 +20,21 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         padding: '0.7rem 1rem', background: 'linear-gradient(135deg, var(--clay) 0%, #9A6435 100%)',
       }}>
-        <img
-          src="https://static.wixstatic.com/media/d0e5bd_2acf96e6189f4fbcb2159fae9f0a5674~mv2.png"
-          alt="The Kiln Cafe"
-          style={{ height: 26, filter: 'brightness(0) invert(1)' }}
-        />
+        {/* Real gap found: this layout only ever let you navigate between
+            the four customer pages -- no way back to the staff app at
+            all once inside it. */}
+        <Link
+          href="/"
+          aria-label="Back to staff app"
+          style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'white', textDecoration: 'none' }}
+        >
+          <ArrowLeft size={18} />
+          <img
+            src="https://static.wixstatic.com/media/d0e5bd_2acf96e6189f4fbcb2159fae9f0a5674~mv2.png"
+            alt="The Kiln Cafe"
+            style={{ height: 26, filter: 'brightness(0) invert(1)' }}
+          />
+        </Link>
         <button
           onClick={() => setOpen(!open)}
           aria-label="More"
@@ -36,6 +46,13 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
 
       {open && (
         <div style={{ backgroundColor: 'var(--charcoal)', padding: '0.5rem' }}>
+          <Link
+            href="/"
+            onClick={() => setOpen(false)}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 0.8rem', color: 'var(--stone)', textDecoration: 'none', fontSize: '0.85rem', borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '0.3rem' }}
+          >
+            <ArrowLeft size={16} /> Back to staff app
+          </Link>
           {CUSTOMER_LINKS.map((l) => (
             <Link
               key={l.href}

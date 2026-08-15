@@ -30,11 +30,20 @@ function distance(a: { r: number; g: number; b: number }, b: { r: number; g: num
   return Math.sqrt((2 + rMean / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rMean) / 256) * db * db);
 }
 
+// Real theoretical max for this weighted-RGB formula -- pure black vs pure
+// white, the furthest apart two colours can ever be. Used to turn a raw
+// distance into an honest 0-100% match, not an arbitrary scale.
+const MAX_DISTANCE = distance({ r: 0, g: 0, b: 0 }, { r: 255, g: 255, b: 255 });
+
+function matchPercent(d: number) {
+  return Math.max(0, Math.round(100 - (d / MAX_DISTANCE) * 100));
+}
+
 export default function ColourPickerPage() {
   const [palette, setPalette] = useState<Glaze[]>(STARTER);
   const [picked, setPicked] = useState<{ r: number; g: number; b: number } | null>(null);
   const [imgSrc, setImgSrc] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
+  const [editingPalette, setEditingPalette] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -86,18 +95,31 @@ export default function ColourPickerPage() {
     ? palette
         .map((g) => ({ ...g, d: distance(picked, hexToRgb(g.hex)) }))
         .sort((a, b) => a.d - b.d)
-        .slice(0, 4)
     : [];
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '600px' }}>
       <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Colour Picker</h1>
       <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-        Photograph anything, tap a colour, and see which glazes come closest. Free tool.
+        Have a vase, curtains, or a photo you love? Photograph it, tap the colour, and see how well each of our real glazes would match once fired.
       </p>
 
       <div style={{ padding: '0.7rem 0.9rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '1.25rem' }}>
         Matching against the real 19 Stroke &amp; Coat colours actually stocked in the studio. An unfired pot will look far paler than its eventual match.
+      </div>
+
+      {/* Real, always-visible palette browse -- separate from "Edit
+          palette" below, which is for actually changing entries and
+          doesn't need to be the default view. */}
+      <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem' }}>Our 19 real glazes</h2>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '0.5rem', marginBottom: '1.5rem' }}>
+        {palette.map((g) => (
+          <div key={g.code} style={{ textAlign: 'center' }}>
+            <div style={{ width: '100%', aspectRatio: '1', borderRadius: 8, border: '1px solid #ddd', backgroundColor: g.hex, marginBottom: '0.3rem' }} />
+            <p style={{ fontSize: '0.68rem', fontWeight: 600, lineHeight: 1.2 }}>{g.name}</p>
+            <p style={{ fontSize: '0.62rem', color: '#999' }}>Nº{g.code}</p>
+          </div>
+        ))}
       </div>
 
       <label
@@ -135,7 +157,7 @@ export default function ColourPickerPage() {
             </div>
           </div>
 
-          <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem' }}>Closest glazes</h2>
+          <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem' }}>All 19, ranked by match</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1.5rem' }}>
             {matches.map((m, i) => (
               <div key={m.code} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', padding: '0.55rem 0.7rem', backgroundColor: i === 0 ? '#fdf6f8' : '#f9f9f9', borderRadius: '6px' }}>
@@ -146,6 +168,9 @@ export default function ColourPickerPage() {
                   </p>
                   {i === 0 && <p style={{ fontSize: '0.72rem', color: 'var(--clay)' }}>closest match</p>}
                 </div>
+                <p style={{ fontWeight: 700, fontSize: '0.95rem', color: i === 0 ? 'var(--clay)' : '#666', flexShrink: 0 }}>
+                  {matchPercent(m.d)}%
+                </p>
               </div>
             ))}
           </div>
@@ -153,13 +178,13 @@ export default function ColourPickerPage() {
       )}
 
       <button
-        onClick={() => setEditing(!editing)}
+        onClick={() => setEditingPalette(!editingPalette)}
         style={{ fontSize: '0.85rem', color: 'var(--clay)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
       >
-        {editing ? 'Done editing' : 'Edit palette'}
+        {editingPalette ? 'Done editing' : 'Edit palette'}
       </button>
 
-      {editing && (
+      {editingPalette && (
         <div style={{ marginTop: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
           {palette.map((g, idx) => (
             <div key={idx} style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
