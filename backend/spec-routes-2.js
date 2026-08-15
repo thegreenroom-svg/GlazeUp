@@ -2951,6 +2951,23 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
           const startAt = new Date(b.start_at);
           const endAt = durationMin ? new Date(startAt.getTime() + durationMin * 60000) : null;
 
+          // Real, simple sequential table allocation -- "just numbers for
+          // now" per Daisy, so every synced booking has SOME table from
+          // the moment it exists rather than needing a manual step first.
+          // Cycles 1-8 (Main Studio's real table count) per exact session
+          // slot, since bookings at the same time genuinely need
+          // different tables, but different time slots on the same day
+          // can safely reuse the same numbers once a table's free again.
+          // This is a starting allocation only -- the real Square ticket
+          // sync below (registerLiveTableSyncRoute) overwrites it with
+          // the table staff actually seat people at, which always wins.
+          const { count: sameSlotCount } = await supabase
+            .from('bookings')
+            .select('id', { count: 'exact', head: true })
+            .eq('studio_id', STUDIO_ID)
+            .eq('session_start', b.start_at);
+          const tableNumber = `Main Studio ${((sameSlotCount || 0) % 8) + 1}`;
+
           // Real booking_code convention, confirmed directly against live
           // rows: booking-YYYYMMDD-<8 random lowercase alphanumeric>.
           const dateStr = startAt.toISOString().slice(0, 10).replace(/-/g, '');
@@ -2967,6 +2984,7 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
             session_start: b.start_at,
             session_end: endAt ? endAt.toISOString() : null,
             party_size: partySize,
+            table_number: tableNumber,
             synced_from_square: new Date().toISOString(),
           });
           if (insertErr) throw insertErr;
@@ -2991,6 +3009,126 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
     } catch (err) {
       logger.error('real bookings sync failed', err.response?.data || err.message);
       res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message, synced: 0 });
+    }
+  });
+}
+
+// ============================================================================
+// LIVE TABLE SYNC FROM SQUARE -- real write-back, not just read-only display.
+// ----------------------------------------------------------------------------
+// Daisy's exact described real workflow: staff seat a customer, then ring
+// the first item up on the physical Square till and type the table (e.g.
+// "T4") as the ticket name -- THAT moment is the real, true source of which
+// table a booking is at, not any guess made ahead of time. This makes the
+// app's table_number follow that real moment automatically, replacing the
+// need to manually check/set it.
+//
+// Deliberately conservative rather than guessing under ambiguity: only
+// updates a booking when there's an unambiguous 1:1 pairing between a real
+// open Square ticket that doesn't match ANY currently-active booking's
+// table, and a currently-active booking that doesn't match ANY currently-
+// open ticket. If there's more than one of either at once, it's left alone
+// rather than risking assigning the wrong table to the wrong booking --
+// same posture as the rest of this session's real Square matching (the
+// live-order route above, same digit-based approach, same honesty about
+// its own limits).
+// ============================================================================
+export function registerLiveTableSyncRoute(app, supabase, STUDIO_ID, logger, axios) {
+  const digitsOf = (s) => (String(s || '').match(/\d+/g) || []).join('');
+
+  app.post('/api/spec/bookings/sync-tables-from-square', async (req, res) => {
+    try {
+      const { data: connection } = await supabase
+        .from('square_connections')
+        .select('square_access_token, square_token_expires_at')
+        .eq('studio_id', STUDIO_ID)
+        .single();
+      if (!connection || new Date(connection.square_token_expires_at) < new Date()) {
+        return res.status(400).json({ error: 'No valid Square connection', updated: 0 });
+      }
+      const token = connection.square_access_token;
+      const headers = { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18', Accept: 'application/json' };
+
+      const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', { headers });
+      const locations = locationsRes.data.locations || [];
+      if (!locations.length) return res.json({ updated: 0, reason: 'no_square_locations' });
+
+      const todayStart = new Date();
+      todayStart.setUTCHours(0, 0, 0, 0);
+      const ordersRes = await axios.post(
+        'https://connect.squareup.com/v2/orders/search',
+        {
+          location_ids: locations.map((l) => l.id),
+          query: { filter: { date_time_filter: { created_at: { start_at: todayStart.toISOString() } }, state_filter: { states: ['OPEN'] } } },
+          limit: 100,
+        },
+        { headers: { ...headers, 'Content-Type': 'application/json' } }
+      );
+      const openTickets = (ordersRes.data.orders || [])
+        .filter((o) => o.ticket_name && digitsOf(o.ticket_name))
+        .map((o) => ({ id: o.id, ticket_name: o.ticket_name, digits: digitsOf(o.ticket_name) }));
+
+      // "Currently active" -- a real session window, not every booking
+      // today. Started within the last 3 hours (covers the real ~2hr
+      // session length plus some overrun) and not yet finished.
+      const now = new Date();
+      const activeSince = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select('booking_code, table_number, session_start')
+        .eq('studio_id', STUDIO_ID)
+        .gte('session_start', activeSince.toISOString())
+        .lte('session_start', now.toISOString());
+
+      const { data: statuses } = await supabase
+        .from('demo_app_session_status')
+        .select('booking_code, finished_at')
+        .eq('studio_id', STUDIO_ID)
+        .in('booking_code', (bookings || []).map((b) => b.booking_code));
+      const finishedCodes = new Set((statuses || []).filter((s) => s.finished_at).map((s) => s.booking_code));
+      const activeBookings = (bookings || []).filter((b) => !finishedCodes.has(b.booking_code));
+
+      const matchedTicketDigits = new Set(
+        activeBookings.map((b) => digitsOf(b.table_number)).filter((d) => d && openTickets.some((t) => t.digits === d))
+      );
+      const unmatchedTickets = openTickets.filter((t) => !matchedTicketDigits.has(t.digits));
+      const unmatchedBookings = activeBookings.filter((b) => {
+        const d = digitsOf(b.table_number);
+        return !d || !openTickets.some((t) => t.digits === d);
+      });
+
+      let updated = 0;
+      const changes = [];
+      // Only act on the unambiguous case -- exactly one of each, paired
+      // with real evidence rather than a guess.
+      if (unmatchedTickets.length === 1 && unmatchedBookings.length === 1) {
+        const ticket = unmatchedTickets[0];
+        const booking = unmatchedBookings[0];
+        const newTable = `Main Studio ${ticket.digits}`;
+        const { error } = await supabase
+          .from('bookings')
+          .update({ table_number: newTable })
+          .eq('studio_id', STUDIO_ID)
+          .eq('booking_code', booking.booking_code);
+        if (!error) {
+          updated = 1;
+          changes.push({ booking_code: booking.booking_code, old_table: booking.table_number, new_table: newTable, from_ticket: ticket.ticket_name });
+        }
+      }
+
+      res.json({
+        updated,
+        changes,
+        open_tickets_today: openTickets.length,
+        active_bookings_now: activeBookings.length,
+        unmatched_tickets: unmatchedTickets.length,
+        unmatched_bookings: unmatchedBookings.length,
+        skipped_ambiguous: unmatchedTickets.length > 1 || unmatchedBookings.length > 1,
+        pulled_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      logger.error('live table sync failed', err.response?.data || err.message);
+      res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message, updated: 0 });
     }
   });
 }

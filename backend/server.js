@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnDipTransitionRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerTestAiRoute, registerPartySizeRoute } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnDipTransitionRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerTestAiRoute, registerPartySizeRoute } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -1493,6 +1493,7 @@ registerFulfilmentRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerTestAiRoute(app, supabase, DEMO_STUDIO_ID, logger, upload, fs, axios, logAiUsage);
 registerPartySizeRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerRealBookingSyncRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
+registerLiveTableSyncRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
@@ -1506,4 +1507,29 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   logger.info(`GlazeUp backend running on port ${PORT}`);
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+
+  // Real periodic auto-sync -- per Daisy: 'I need this live data fed', not
+  // a manual button someone has to remember to press. Every 5 minutes,
+  // pulls new bookings from Square (registerRealBookingSyncRoute) then
+  // syncs any real table assignment set on the physical till
+  // (registerLiveTableSyncRoute) -- calls its own real endpoints
+  // internally rather than duplicating the logic. One honest caveat: if
+  // this specific Render service is on a tier that spins down after
+  // inactivity, this interval only runs while the process is actually
+  // awake -- genuine real user traffic (or a manual trigger) keeps it
+  // running, but this isn't a guaranteed-always-on external cron.
+  const SELF_URL = `http://localhost:${PORT}`;
+  setInterval(async () => {
+    try {
+      const bookingRes = await fetch(`${SELF_URL}/api/bookings/sync`, { method: 'POST' });
+      const bookingData = await bookingRes.json().catch(() => ({}));
+      if (bookingData.synced) logger.info(`[auto-sync] ${bookingData.synced} new booking(s) pulled from Square`);
+
+      const tableRes = await fetch(`${SELF_URL}/api/spec/bookings/sync-tables-from-square`, { method: 'POST' });
+      const tableData = await tableRes.json().catch(() => ({}));
+      if (tableData.updated) logger.info(`[auto-sync] table updated from real Square ticket`, tableData.changes);
+    } catch (err) {
+      logger.warn('[auto-sync] periodic sync failed', err.message);
+    }
+  }, 5 * 60 * 1000);
 });
