@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { Camera, Type, Star, Heart, Flower2, Sparkles, Circle, Trash2 } from 'lucide-react';
 import { SaveAndCharge } from '@/components/SaveAndCharge';
 import { STUDIO_COLOURS } from '@/lib/glazes';
+import { PenLine, MousePointer2 } from 'lucide-react';
 
 type MotifKind = 'text' | 'star' | 'heart' | 'flower' | 'swirl' | 'dot';
 
@@ -20,6 +21,12 @@ interface Element {
   text?: string;
   font?: string;
   colour: string;
+}
+
+interface Stroke {
+  colour: string;
+  width: number;
+  points: { x: number; y: number }[];
 }
 
 // Per the master doc: "draggable/resizable/rotatable text (4 fonts) and
@@ -90,6 +97,14 @@ export default function TransferDesignerPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [colour, setColour] = useState(COLOURS[0]);
   const [font, setFont] = useState(FONTS[0]);
+  // Real second mode alongside placing text/motifs -- freehand,
+  // pressure-sensitive drawing for fine detail work with a stylus,
+  // same proven pointer-event logic as Design Preview.
+  const [mode, setMode] = useState<'place' | 'draw'>('place');
+  const [strokes, setStrokes] = useState<Stroke[]>([]);
+  const [brushSize, setBrushSize] = useState(10);
+  const [drawingNow, setDrawingNow] = useState(false);
+  const currentStroke = useRef<Stroke | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const nextId = useRef(1);
@@ -102,6 +117,27 @@ export default function TransferDesignerPage() {
     ctx.clearRect(0, 0, c.width, c.height);
     if (photo) ctx.drawImage(photo, 0, 0, c.width, c.height);
     else { ctx.fillStyle = '#F7F4EE'; ctx.fillRect(0, 0, c.width, c.height); }
+
+    // Real freehand strokes, drawn first so placed text/motifs sit on top.
+    const allStrokes = currentStroke.current ? [...strokes, currentStroke.current] : strokes;
+    ctx.globalAlpha = 0.85;
+    allStrokes.forEach((s) => {
+      if (s.points.length === 0) return;
+      ctx.strokeStyle = s.colour;
+      ctx.lineWidth = s.width;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      if (s.points.length === 1) {
+        ctx.arc(s.points[0].x, s.points[0].y, s.width / 2, 0, Math.PI * 2);
+        ctx.fillStyle = s.colour;
+        ctx.fill();
+      } else {
+        s.points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+        ctx.stroke();
+      }
+    });
+    ctx.globalAlpha = 1;
 
     elements.forEach((el) => {
       ctx.save();
@@ -130,7 +166,7 @@ export default function TransferDesignerPage() {
     });
   };
 
-  useEffect(redraw, [elements, photo, selectedId]);
+  useEffect(redraw, [elements, strokes, photo, selectedId]);
 
   useEffect(() => {
     const c = canvasRef.current;
@@ -181,6 +217,22 @@ export default function TransferDesignerPage() {
   };
 
   const down = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (mode === 'draw') {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      // Real pressure sensitivity, same as Design Preview -- a stylus
+      // reports real values via the Pointer Events API; a finger or
+      // mouse reports a flat 0.5, which falls back to the chosen brush
+      // size instead.
+      const p = e.pressure && e.pressure > 0 && e.pressure !== 0.5 ? e.pressure : null;
+      currentStroke.current = {
+        colour,
+        width: p ? Math.max(2, brushSize * p * 1.6) : brushSize,
+        points: [pos(e)],
+      };
+      setDrawingNow(true);
+      redraw();
+      return;
+    }
     const p = pos(e);
     const hit = [...elements].reverse().find((el) => Math.hypot(el.x - p.x, el.y - p.y) < 45 * el.scale);
     if (hit) {
@@ -193,13 +245,27 @@ export default function TransferDesignerPage() {
   };
 
   const move = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (mode === 'draw') {
+      if (!drawingNow || !currentStroke.current) return;
+      currentStroke.current.points.push(pos(e));
+      redraw();
+      return;
+    }
     if (!dragging.current) return;
     const p = pos(e);
     const { id, offX, offY } = dragging.current;
     setElements((prev) => prev.map((el) => (el.id === id ? { ...el, x: p.x - offX, y: p.y - offY } : el)));
   };
 
-  const up = () => { dragging.current = null; };
+  const up = () => {
+    if (mode === 'draw') {
+      if (currentStroke.current) setStrokes((s) => [...s, currentStroke.current!]);
+      currentStroke.current = null;
+      setDrawingNow(false);
+      return;
+    }
+    dragging.current = null;
+  };
 
   const selected = elements.find((el) => el.id === selectedId);
 
@@ -234,8 +300,37 @@ export default function TransferDesignerPage() {
         onPointerMove={move}
         onPointerUp={up}
         onPointerLeave={up}
-        style={{ width: '100%', maxWidth: 340, border: '1px solid #eee', borderRadius: '8px', touchAction: 'none', display: 'block', marginBottom: '0.8rem' }}
+        style={{ width: '100%', maxWidth: 340, border: '1px solid #eee', borderRadius: '8px', touchAction: 'none', display: 'block', marginBottom: '0.8rem', cursor: mode === 'draw' ? 'crosshair' : 'default' }}
       />
+
+      <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.7rem' }}>
+        <button
+          onClick={() => setMode('place')}
+          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', padding: '0.5rem', borderRadius: '6px', border: mode === 'place' ? '2px solid var(--clay)' : '1px solid #ddd', backgroundColor: mode === 'place' ? 'var(--clay)' + '18' : 'white', color: mode === 'place' ? 'var(--clay)' : '#666', fontWeight: mode === 'place' ? 700 : 400, cursor: 'pointer', fontSize: '0.82rem' }}
+        >
+          <MousePointer2 size={15} /> Place
+        </button>
+        <button
+          onClick={() => setMode('draw')}
+          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', padding: '0.5rem', borderRadius: '6px', border: mode === 'draw' ? '2px solid var(--clay)' : '1px solid #ddd', backgroundColor: mode === 'draw' ? 'var(--clay)' + '18' : 'white', color: mode === 'draw' ? 'var(--clay)' : '#666', fontWeight: mode === 'draw' ? 700 : 400, cursor: 'pointer', fontSize: '0.82rem' }}
+        >
+          <PenLine size={15} /> Draw
+        </button>
+      </div>
+
+      {mode === 'draw' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.8rem' }}>
+          <span style={{ fontSize: '0.78rem', color: '#666' }}>Brush</span>
+          <input type="range" min={2} max={40} value={brushSize} onChange={(e) => setBrushSize(Number(e.target.value))} style={{ flex: 1 }} />
+          <button
+            onClick={() => setStrokes((s) => s.slice(0, -1))}
+            disabled={strokes.length === 0}
+            style={{ padding: '0.35rem 0.6rem', borderRadius: '5px', border: 'none', backgroundColor: '#f0f0f0', fontSize: '0.75rem', cursor: strokes.length ? 'pointer' : 'not-allowed', opacity: strokes.length ? 1 : 0.5 }}
+          >
+            Undo
+          </button>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
         <button onClick={() => addMotif('text')} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.7rem', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '0.8rem', backgroundColor: '#f0f0f0' }}><Type size={14} /> Text</button>
@@ -296,10 +391,13 @@ export default function TransferDesignerPage() {
       )}
 
       <p style={{ fontSize: '0.75rem', color: '#999' }}>
-        Tap a shape or text on the design to select and drag it. This plans placement — a real transfer decal is applied by staff.
+        {mode === 'place'
+          ? 'Tap a shape or text on the design to select and drag it.'
+          : 'Draw freehand for fine detail — works with a stylus for pressure-sensitive lines.'}
+        {' '}This plans placement — a real transfer decal is applied by staff.
       </p>
 
-      {elements.length > 0 && (
+      {(elements.length > 0 || strokes.length > 0) && (
         <div style={{ marginTop: '0.8rem' }}>
           <SaveAndCharge tool="transfer-designer" label="Transfer Design" />
         </div>
