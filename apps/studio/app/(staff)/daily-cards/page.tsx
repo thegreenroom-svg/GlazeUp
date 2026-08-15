@@ -299,7 +299,7 @@ export default function DailyCardsPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
           <button
             onClick={() => setCardDate((d) => new Date(new Date(d).getTime() - 86400000).toISOString().slice(0, 10))}
-            style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.9rem' }}
+            style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.9rem', color: '#333' }}
           >
             ← Prev day
           </button>
@@ -307,11 +307,11 @@ export default function DailyCardsPage() {
             type="date"
             value={cardDate}
             onChange={(e) => setCardDate(e.target.value)}
-            style={{ padding: '0.5rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem' }}
+            style={{ padding: '0.5rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem', color: '#333', backgroundColor: 'white' }}
           />
           <button
             onClick={() => setCardDate((d) => new Date(new Date(d).getTime() + 86400000).toISOString().slice(0, 10))}
-            style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.9rem' }}
+            style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.9rem', color: '#333' }}
           >
             Next day →
           </button>
@@ -323,7 +323,7 @@ export default function DailyCardsPage() {
           </button>
           <button
             onClick={() => setCardDate((d) => new Date(new Date(d).getTime() + 7 * 86400000).toISOString().slice(0, 10))}
-            style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}
+            style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', color: '#333' }}
           >
             +1 week
           </button>
@@ -334,7 +334,7 @@ export default function DailyCardsPage() {
             <button
               onClick={goToPrevSession}
               disabled={selectedSessionIdx === null}
-              style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: selectedSessionIdx === null ? 'default' : 'pointer', fontSize: '0.85rem', opacity: selectedSessionIdx === null ? 0.5 : 1 }}
+              style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', cursor: selectedSessionIdx === null ? 'default' : 'pointer', fontSize: '0.85rem', opacity: selectedSessionIdx === null ? 0.5 : 1 }}
             >
               ← Previous session
             </button>
@@ -346,7 +346,7 @@ export default function DailyCardsPage() {
             <button
               onClick={goToNextSession}
               disabled={selectedSessionIdx !== null && selectedSessionIdx === sessionTimes.length - 1}
-              style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: (selectedSessionIdx !== null && selectedSessionIdx === sessionTimes.length - 1) ? 'default' : 'pointer', fontSize: '0.85rem', opacity: (selectedSessionIdx !== null && selectedSessionIdx === sessionTimes.length - 1) ? 0.5 : 1 }}
+              style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', cursor: (selectedSessionIdx !== null && selectedSessionIdx === sessionTimes.length - 1) ? 'default' : 'pointer', fontSize: '0.85rem', opacity: (selectedSessionIdx !== null && selectedSessionIdx === sessionTimes.length - 1) ? 0.5 : 1 }}
             >
               Next session →
             </button>
@@ -388,14 +388,14 @@ export default function DailyCardsPage() {
             </button>
             <button
               onClick={selectAll}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', backgroundColor: '#f0f0f0', border: '1px solid #ddd', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', backgroundColor: '#f0f0f0', color: '#333', border: '1px solid #ddd', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}
             >
               {selected.size === visibleBookings.length ? '✓ Deselect all' : '◯ Select all'}
             </button>
             <button
               onClick={handleManualSync}
               disabled={syncing}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', backgroundColor: syncing ? '#e0e0e0' : '#f0f0f0', border: 'none', borderRadius: '6px', cursor: syncing ? 'wait' : 'pointer', fontSize: '0.9rem', opacity: syncing ? 0.6 : 1 }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', backgroundColor: syncing ? '#e0e0e0' : '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', cursor: syncing ? 'wait' : 'pointer', fontSize: '0.9rem', opacity: syncing ? 0.6 : 1 }}
             >
               <RefreshCw size={14} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} /> {syncing ? 'Checking...' : 'Check for new bookings now'}
             </button>

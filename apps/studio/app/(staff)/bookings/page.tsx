@@ -384,7 +384,7 @@ function BookingsPageInner() {
               />
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button onClick={() => setShowWalkIn(false)} style={{ flex: 1, padding: '0.55rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => setShowWalkIn(false)} style={{ flex: 1, padding: '0.55rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
               <button
                 onClick={createWalkIn}
                 disabled={!walkInName.trim() || walkInBusy}
@@ -692,7 +692,7 @@ function BookingsPageInner() {
 
                 <button
                   onClick={() => setSelectedCode(null)}
-                  style={{ marginTop: '1.5rem', width: '100%', padding: '0.6rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                  style={{ marginTop: '1.5rem', width: '100%', padding: '0.6rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
                 >
                   Close
                 </button>

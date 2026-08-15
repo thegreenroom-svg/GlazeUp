@@ -191,7 +191,7 @@ export default function PiecesPage() {
                     <button onClick={saveDescription} disabled={saving} style={{ padding: '0.35rem 0.8rem', backgroundColor: 'var(--clay)', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer' }}>
                       {saving ? 'Saving...' : 'Save'}
                     </button>
-                    <button onClick={() => setEditingDesc(false)} style={{ padding: '0.35rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer' }}>
+                    <button onClick={() => setEditingDesc(false)} style={{ padding: '0.35rem 0.8rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer' }}>
                       Cancel
                     </button>
                   </div>
@@ -279,7 +279,7 @@ export default function PiecesPage() {
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.5rem' }}>
                 <button
                   onClick={() => setSelected(null)}
-                  style={{ flex: 1, padding: '0.6rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                  style={{ flex: 1, padding: '0.6rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
                 >
                   Close
                 </button>
