@@ -412,7 +412,6 @@ export default function DailyCardsPage() {
         {visibleBookings.map((b) => {
           const isNew = newSinceLoad.some((n) => n.booking_code === b.booking_code);
           const isSelected = selected.has(b.booking_code);
-          const hasNotes = !!(b.notes && b.notes.trim());
           const setupFlags = tableSetupFlags(b.notes);
           return (
             <div
@@ -550,9 +549,11 @@ export default function DailyCardsPage() {
                   ))}
                 </div>
               )}
-              <p style={{ fontSize: '0.72rem', color: hasNotes ? '#8a5a00' : '#aaa', fontWeight: hasNotes ? 700 : 400, marginTop: '0.35rem' }}>
-                Notes: {hasNotes ? 'Yes' : 'No'}
-              </p>
+              {b.notes && (
+                <p style={{ fontSize: '0.72rem', color: '#8a5a00', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: 6, padding: '0.35rem 0.5rem', marginTop: '0.4rem', textAlign: 'left' }}>
+                  {b.notes}
+                </p>
+              )}
               <p style={{ fontSize: '0.7rem', color: '#aaa', fontFamily: 'monospace', marginTop: '0.3rem' }}>{b.booking_code}</p>
             </div>
           );

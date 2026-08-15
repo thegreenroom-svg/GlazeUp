@@ -90,7 +90,7 @@ export function StudioNavigation() {
       items: [
         { label: 'Pieces', icon: <Palette className="w-5 h-5" />, href: '/pieces' },
         { label: 'Kiln Workflow', icon: <Zap className="w-5 h-5" />, href: '/kiln-workflow' },
-        { label: 'Kiln — Dip & Fire', icon: <Flame className="w-5 h-5" />, href: '/kiln-dip' },
+        { label: 'Kiln — Collection & Post', icon: <Flame className="w-5 h-5" />, href: '/kiln-dip' },
         { label: 'Inventory', icon: <Package className="w-5 h-5" />, href: '/inventory' },
         { label: 'Lifecycle', icon: <GitBranch className="w-5 h-5" />, href: '/lifecycle' },
         { label: 'Catalogue', icon: <Boxes className="w-5 h-5" />, href: '/catalogue' },

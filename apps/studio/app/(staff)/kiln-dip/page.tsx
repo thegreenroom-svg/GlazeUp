@@ -3,61 +3,47 @@
 export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
-import { Flame, Search, Check, Mail, Package } from 'lucide-react';
+import { Flame, Search, Mail, Package, CalendarDays } from 'lucide-react';
 
-interface Piece {
-  id: string;
-  booking_id: string;
-  piece_type: string;
-  status: string;
-  created_at?: string;
-  scheduled_firing_date?: string | null;
+interface BookingInfo {
+  booking_code: string;
+  customer_name: string;
+  session_start: string;
+  party_size: number | null;
+  notes: string | null;
+  collection_date: string | null;
 }
 
-// Real dip-glaze -> fired transition, per Daisy's described kiln pipeline:
-// pieces go into a box for underglaze dip, get looked up here (typed/
-// selected -- real camera QR scanning would need a library like
-// @zxing/browser added, separate follow-up, not stubbed here as if it
-// exists), moved to 'dipped_waiting_firing' with a real firing date
-// (auto-calculates collection date as firing date + 2 days), then marked
-// 'fired' when they actually come out -- which is the real trigger point
-// for the ready-for-collection email, IF a real email provider is
-// configured (RESEND_API_KEY) -- checked and reported honestly if not.
-export default function KilnDipPage() {
+// SIMPLIFIED per Daisy directly: the old packed -> dipped -> fired staged
+// tracking (and QR scanning at any point) is no longer needed. Photos are
+// already linked to the booking from completion, and the real AI
+// shelf-matching (Shelf Sweep) finds pieces on the shelf once a batch is
+// out. All that's actually needed here: look up the booking, set/confirm
+// the collection date, and send the ready-for-collection email once
+// staff have confirmed the batch is out and found.
+export default function KilnPage() {
   const [bookingRef, setBookingRef] = useState('');
-  const [packedPieces, setPackedPieces] = useState<Piece[]>([]);
-  const [dippedPieces, setDippedPieces] = useState<Piece[]>([]);
-  const [selectedPacked, setSelectedPacked] = useState<Set<string>>(new Set());
-  const [selectedDipped, setSelectedDipped] = useState<Set<string>>(new Set());
+  const [booking, setBooking] = useState<BookingInfo | null>(null);
+  const [collectionDate, setCollectionDate] = useState('');
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [firingDate, setFiringDate] = useState('');
-  const [confirming, setConfirming] = useState(false);
-  const [markingFired, setMarkingFired] = useState(false);
-  const [dipResult, setDipResult] = useState<{ transitioned: number; collection_date: string; unmatched_booking_refs: string[] } | null>(null);
-  const [firedResult, setFiredResult] = useState<{ marked_fired: number; email_results: { booking_code: string; sent: boolean; reason?: string }[] } | null>(null);
+  const [emailResult, setEmailResult] = useState<{ sent: boolean; reason?: string } | null>(null);
 
   const lookup = async () => {
     const ref = bookingRef.trim();
     if (!ref) return;
     setLoading(true);
     setError(null);
-    setDipResult(null);
-    setFiredResult(null);
+    setBooking(null);
+    setEmailResult(null);
     try {
-      const [packedRes, dippedRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/kiln/packed-pieces?booking=${encodeURIComponent(ref)}`),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/kiln/dipped-pieces?booking=${encodeURIComponent(ref)}`),
-      ]);
-      const packedData = await packedRes.json();
-      const dippedData = await dippedRes.json();
-      const packed = packedData.pieces || [];
-      const dipped = dippedData.pieces || [];
-      setPackedPieces(packed);
-      setDippedPieces(dipped);
-      setSelectedPacked(new Set(packed.map((p: Piece) => p.id)));
-      setSelectedDipped(new Set(dipped.map((p: Piece) => p.id)));
-      if (!packed.length && !dipped.length) setError('Nothing packed or waiting for firing under that booking reference.');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/kiln/booking-lookup?booking=${encodeURIComponent(ref)}`);
+      const d = await res.json();
+      if (!res.ok) { setError(d.error || 'Could not find that booking.'); return; }
+      setBooking(d);
+      setCollectionDate(d.collection_date || '');
     } catch {
       setError('Could not reach the server.');
     } finally {
@@ -65,64 +51,52 @@ export default function KilnDipPage() {
     }
   };
 
-  const togglePacked = (id: string) => {
-    setSelectedPacked((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
-  };
-  const toggleDipped = (id: string) => {
-    setSelectedDipped((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
-  };
-
-  const confirmDip = async () => {
-    if (selectedPacked.size === 0 || !firingDate) return;
-    setConfirming(true);
+  const saveDate = async () => {
+    if (!booking || !collectionDate) return;
+    setSaving(true);
     setError(null);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/kiln/dip-transition`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${booking.booking_code}/collection-date`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ piece_ids: Array.from(selectedPacked), firing_date: firingDate }),
+        body: JSON.stringify({ collection_date: collectionDate }),
       });
       const d = await res.json();
-      if (!res.ok) { setError(d.error || 'Could not confirm transition.'); return; }
-      setDipResult(d);
-      setPackedPieces((prev) => prev.filter((p) => !selectedPacked.has(p.id)));
-      setSelectedPacked(new Set());
+      if (!res.ok) { setError(d.error || 'Could not save the collection date.'); return; }
+      setBooking((prev) => (prev ? { ...prev, collection_date: collectionDate } : prev));
     } catch {
       setError('Could not reach the server.');
     } finally {
-      setConfirming(false);
+      setSaving(false);
     }
   };
 
-  const confirmFired = async () => {
-    if (selectedDipped.size === 0) return;
-    setMarkingFired(true);
-    setError(null);
+  const sendEmail = async () => {
+    if (!booking) return;
+    setSending(true);
+    setEmailResult(null);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/kiln/mark-fired`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/kiln/send-ready-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ piece_ids: Array.from(selectedDipped) }),
+        body: JSON.stringify({ booking_code: booking.booking_code }),
       });
       const d = await res.json();
-      if (!res.ok) { setError(d.error || 'Could not mark as fired.'); return; }
-      setFiredResult(d);
-      setDippedPieces((prev) => prev.filter((p) => !selectedDipped.has(p.id)));
-      setSelectedDipped(new Set());
+      setEmailResult(d);
     } catch {
-      setError('Could not reach the server.');
+      setEmailResult({ sent: false, reason: 'Could not reach the server.' });
     } finally {
-      setMarkingFired(false);
+      setSending(false);
     }
   };
 
   return (
     <div style={{ padding: '1.5rem', maxWidth: 700, margin: '0 auto' }}>
       <h1 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <Flame size={22} color="var(--clay)" /> Kiln — Dip, Fire & Post
+        <Flame size={22} color="var(--clay)" /> Kiln — Collection &amp; Post
       </h1>
       <p style={{ color: '#666', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
-        Look up the booking on the card. Confirm packed pieces going in for dip + firing, or mark waiting pieces as fired once they're out.
+        Look up the booking, set the collection date, and send the ready-for-collection email once a batch is out and found on the shelf.
       </p>
 
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
@@ -145,108 +119,54 @@ export default function KilnDipPage() {
 
       {error && <div style={{ padding: '0.8rem', backgroundColor: '#fee', color: '#c33', borderRadius: 8, marginBottom: '1rem', fontSize: '0.85rem' }}>{error}</div>}
 
-      {dipResult && (
-        <div style={{ padding: '1rem', backgroundColor: '#e8f5e9', border: '1px solid #66bb6a', borderRadius: 8, marginBottom: '1.25rem' }}>
-          <p style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.3rem' }}>
-            <Check size={16} style={{ verticalAlign: 'middle', marginRight: '0.3rem' }} />
-            {dipResult.transitioned} piece{dipResult.transitioned === 1 ? '' : 's'} moved to dipped, waiting for firing
-          </p>
-          <p style={{ fontSize: '0.8rem', color: '#333' }}>Collection date set: {new Date(dipResult.collection_date + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</p>
-          {dipResult.unmatched_booking_refs.length > 0 && (
-            <p style={{ fontSize: '0.75rem', color: '#8a5a00', marginTop: '0.3rem' }}>
-              No real booking matched "{dipResult.unmatched_booking_refs.join(', ')}" -- pieces updated, no collection date attached anywhere.
-            </p>
-          )}
-        </div>
-      )}
-
-      {firedResult && (
-        <div style={{ padding: '1rem', backgroundColor: '#e8f5e9', border: '1px solid #66bb6a', borderRadius: 8, marginBottom: '1.25rem' }}>
-          <p style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.3rem' }}>
-            <Check size={16} style={{ verticalAlign: 'middle', marginRight: '0.3rem' }} />
-            {firedResult.marked_fired} piece{firedResult.marked_fired === 1 ? '' : 's'} marked fired
-          </p>
-          {firedResult.email_results.map((r) => (
-            <p key={r.booking_code} style={{ fontSize: '0.78rem', color: r.sent ? '#2e7d32' : '#8a5a00', marginTop: '0.2rem' }}>
-              <Mail size={13} style={{ verticalAlign: 'middle', marginRight: '0.3rem' }} />
-              {r.booking_code}: {r.sent ? 'ready-for-collection email sent' : r.reason === 'not_configured' ? 'email not sent -- no email provider configured yet' : `email not sent (${r.reason})`}
-            </p>
-          ))}
-        </div>
-      )}
-
-      {packedPieces.length > 0 && (
+      {booking && (
         <div style={{ marginBottom: '1.5rem' }}>
-          <p style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.5rem' }}>Packed — going in for dip</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.8rem' }}>
-            {packedPieces.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => togglePacked(p.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.7rem 0.9rem',
-                  borderRadius: 8, border: selectedPacked.has(p.id) ? '2px solid var(--clay)' : '1px solid #ddd',
-                  backgroundColor: selectedPacked.has(p.id) ? 'var(--clay-light, #f5e6d3)' : 'white', cursor: 'pointer', textAlign: 'left',
-                }}
-              >
-                <div style={{ width: 18, height: 18, borderRadius: 4, border: '2px solid var(--clay)', backgroundColor: selectedPacked.has(p.id) ? 'var(--clay)' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  {selectedPacked.has(p.id) && <Check size={12} color="white" />}
-                </div>
-                <span style={{ fontSize: '0.85rem' }}>{p.piece_type}</span>
-              </button>
-            ))}
+          <div style={{ padding: '0.9rem', border: '1px solid #eee', borderRadius: 8, marginBottom: '0.8rem' }}>
+            <p style={{ fontWeight: 700, fontSize: '0.95rem' }}>{booking.customer_name}</p>
+            <p style={{ fontSize: '0.78rem', color: '#999', fontFamily: 'monospace' }}>{booking.booking_code}</p>
+            <p style={{ fontSize: '0.82rem', color: '#666', marginTop: '0.3rem' }}>
+              {new Date(booking.session_start).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
+              {booking.party_size ? ` · party of ${booking.party_size}` : ''}
+            </p>
+            {booking.notes && (
+              <div style={{ marginTop: '0.6rem', padding: '0.6rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: 6 }}>
+                <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8a5a00', marginBottom: '0.15rem' }}>Booking notes</p>
+                <p style={{ fontSize: '0.82rem', color: '#333' }}>{booking.notes}</p>
+              </div>
+            )}
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.8rem' }}>
-            <label style={{ fontSize: '0.85rem', color: '#666' }}>Firing date</label>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem' }}>
+            <CalendarDays size={16} color="var(--clay)" />
+            <label style={{ fontSize: '0.85rem', color: '#666' }}>Collection date</label>
             <input
               type="date"
-              value={firingDate}
-              onChange={(e) => setFiringDate(e.target.value)}
-              min={new Date().toISOString().slice(0, 10)}
+              value={collectionDate}
+              onChange={(e) => setCollectionDate(e.target.value)}
               style={{ padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid #ddd', fontSize: '0.85rem' }}
             />
+            <button
+              onClick={saveDate}
+              disabled={saving || !collectionDate || collectionDate === booking.collection_date}
+              style={{ padding: '0.4rem 0.8rem', borderRadius: 6, border: 'none', backgroundColor: collectionDate && collectionDate !== booking.collection_date ? 'var(--clay)' : '#ccc', color: 'white', fontSize: '0.8rem', cursor: collectionDate && collectionDate !== booking.collection_date ? 'pointer' : 'default' }}
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
           </div>
-          <button
-            onClick={confirmDip}
-            disabled={confirming || selectedPacked.size === 0 || !firingDate}
-            style={{ width: '100%', padding: '0.8rem', borderRadius: 8, border: 'none', backgroundColor: selectedPacked.size && firingDate ? 'var(--clay)' : '#ccc', color: 'white', fontWeight: 700, fontSize: '0.9rem', cursor: selectedPacked.size && firingDate ? 'pointer' : 'default' }}
-          >
-            {confirming ? 'Saving...' : `Confirm ${selectedPacked.size} piece${selectedPacked.size === 1 ? '' : 's'} dipped & waiting for firing`}
-          </button>
-        </div>
-      )}
 
-      {dippedPieces.length > 0 && (
-        <div style={{ marginBottom: '1.5rem' }}>
-          <p style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.5rem' }}>Waiting for firing — mark fired once out</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.8rem' }}>
-            {dippedPieces.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => toggleDipped(p.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.7rem 0.9rem',
-                  borderRadius: 8, border: selectedDipped.has(p.id) ? '2px solid var(--clay)' : '1px solid #ddd',
-                  backgroundColor: selectedDipped.has(p.id) ? 'var(--clay-light, #f5e6d3)' : 'white', cursor: 'pointer', textAlign: 'left',
-                }}
-              >
-                <div style={{ width: 18, height: 18, borderRadius: 4, border: '2px solid var(--clay)', backgroundColor: selectedDipped.has(p.id) ? 'var(--clay)' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  {selectedDipped.has(p.id) && <Check size={12} color="white" />}
-                </div>
-                <span style={{ fontSize: '0.85rem' }}>
-                  {p.piece_type}
-                  {p.scheduled_firing_date && <span style={{ display: 'block', fontSize: '0.7rem', color: '#999' }}>Firing: {new Date(p.scheduled_firing_date + 'T00:00:00').toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>}
-                </span>
-              </button>
-            ))}
-          </div>
           <button
-            onClick={confirmFired}
-            disabled={markingFired || selectedDipped.size === 0}
-            style={{ width: '100%', padding: '0.8rem', borderRadius: 8, border: 'none', backgroundColor: selectedDipped.size ? 'var(--clay)' : '#ccc', color: 'white', fontWeight: 700, fontSize: '0.9rem', cursor: selectedDipped.size ? 'pointer' : 'default' }}
+            onClick={sendEmail}
+            disabled={sending}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%', padding: '0.7rem', borderRadius: 8, border: 'none', backgroundColor: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
           >
-            {markingFired ? 'Saving...' : `Mark ${selectedDipped.size} piece${selectedDipped.size === 1 ? '' : 's'} fired`}
+            <Mail size={15} /> {sending ? 'Sending...' : 'Send ready-for-collection email'}
           </button>
+
+          {emailResult && (
+            <div style={{ marginTop: '0.6rem', padding: '0.7rem', borderRadius: 8, fontSize: '0.8rem', backgroundColor: emailResult.sent ? '#e8f5e9' : '#fff3e0', border: `1px solid ${emailResult.sent ? '#66bb6a' : '#e0a020'}` }}>
+              {emailResult.sent ? 'Email sent.' : emailResult.reason === 'not_configured' ? "Email isn't connected yet — needs a real Resend API key added to the server." : emailResult.reason === 'no_customer_email' ? 'This booking has no email address on file.' : (emailResult.reason || 'Could not send the email.')}
+            </div>
+          )}
         </div>
       )}
 

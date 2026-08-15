@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnDipTransitionRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerTestAiRoute, registerPartySizeRoute } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerTestAiRoute, registerPartySizeRoute } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -1485,7 +1485,7 @@ registerLiveSquareOrderRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerNeedsVerificationRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerRevenueCategorySyncRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerRevenueBreakdownRoute(app, supabase, DEMO_STUDIO_ID, logger);
-registerKilnDipTransitionRoute(app, supabase, DEMO_STUDIO_ID, logger);
+registerKilnSimplifiedRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerPostalLabelRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerEquipmentRequestRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerDesignChargeRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
