@@ -728,6 +728,35 @@ async function logAiUsage(supabase, studioId, kind, usage) {
   }
 }
 
+// Real, current Gemini 3.6 Flash pricing, checked directly (not assumed
+// to match OpenAI's) -- $1.50/1M input tokens, $7.50/1M output tokens,
+// per Google's own pricing docs as of Aug 2026. A genuinely separate
+// paid service from the OpenAI calls used elsewhere in this app -- kept
+// as its own function rather than folded into logAiUsage, which
+// hardcodes the gpt-4o-mini model name and rate for every caller; reusing
+// it for Gemini would have mislabelled the cost and calculated it wrong.
+const GEMINI_FLASH_INPUT_PER_TOKEN = 1.50 / 1_000_000;
+const GEMINI_FLASH_OUTPUT_PER_TOKEN = 7.50 / 1_000_000;
+
+async function logGeminiUsage(supabase, studioId, kind, usage) {
+  if (!usage) return;
+  const inputTokens = usage.prompt_tokens || 0;
+  const outputTokens = usage.completion_tokens || 0;
+  const costUsd = inputTokens * GEMINI_FLASH_INPUT_PER_TOKEN + outputTokens * GEMINI_FLASH_OUTPUT_PER_TOKEN;
+  try {
+    await supabase.from('ai_usage').insert([{
+      studio_id: studioId,
+      kind,
+      model: 'gemini-3.6-flash',
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      cost_usd: costUsd,
+    }]);
+  } catch (err) {
+    logger.error('logGeminiUsage failed', err);
+  }
+}
+
 app.post('/api/demo/photo-match', upload.single('photo'), async (req, res) => {
   try {
     if (!req.file) {
@@ -1495,7 +1524,7 @@ registerPartySizeRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerRealBookingSyncRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerLiveTableSyncRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerQuickAddPieceRoute(app, supabase, DEMO_STUDIO_ID, logger);
-registerFindOnTableRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logAiUsage);
+registerFindOnTableRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

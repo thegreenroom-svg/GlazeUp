@@ -3103,22 +3103,48 @@ export function registerQuickAddPieceRoute(app, supabase, STUDIO_ID, logger) {
 // (its real description -- shape, colour, pattern -- exactly the
 // distinguishing features Daisy named, which barely change through
 // firing) and a NARROWER candidate photo (one table/tray, not a whole
-// shelf), find whether and roughly where that one piece appears. A single
-// constrained yes/where question, not open-ended description.
+// shelf), find whether and roughly where that one piece appears.
 //
-// Works from the real piece description (piece_type/description), not a
-// reference photo -- checked directly, real reference photos essentially
-// don't exist yet (Completion's photo upload had a real, separate bug
-// fixed this session), but rich text descriptions already do for most
-// real pieces. Uses a reference photo too if one exists, for free
-// improvement once Completion photos start flowing.
+// A first version used gpt-4o-mini asked to guess pixel coordinates --
+// this genuinely doesn't work; GPT-4o is not trained for spatial
+// localization, confirmed against a real screenshot showing text-only
+// location descriptions from a different page. A second version matched
+// that proven text-only pattern instead, which is honest and safe but
+// doesn't answer what was actually asked -- a real visual marker.
+//
+// This version uses Google's Gemini API instead, which -- checked
+// directly against Gemini's own current official docs -- has genuine,
+// dedicated training for object detection with real bounding-box output
+// (box_2d: [ymin, xmin, ymax, xmax], normalized 0-1000), a real,
+// documented capability GPT-4o and Claude explicitly don't have. A
+// separate paid service from the OpenAI calls used elsewhere in this
+// app -- requires its own GEMINI_API_KEY, reports clearly if missing
+// rather than silently failing. Roughly £0.003-0.005 per photo at
+// current gemini-3.6-flash pricing (two images + a short prompt),
+// logged into the same real running AI-cost tally as every other
+// feature (logAiUsage), not a separate untracked cost.
+//
+// Explicitly handles the fired/unfired colour shift -- BOTH the target
+// description and any reference photo are necessarily pre-fire (written
+// or photographed at Completion, right after painting), while the
+// candidate table photo is always post-fire. Underglaze fires
+// significantly more vibrant/saturated than it looks when painted, and
+// the prompt says so directly rather than leaving it implicit.
+//
+// Works from the real piece description (piece_type/description) as the
+// baseline -- checked directly, real reference photos essentially don't
+// exist yet (Completion's photo upload had a real, separate bug fixed
+// this session) -- and uses a reference photo too if one exists, for
+// free improvement once Completion photos start flowing.
 // ============================================================================
-export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios, upload, fs, logAiUsage) {
+export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios, upload, fs, logGeminiUsage) {
   app.post('/api/spec/pieces/:id/find-on-table', upload.single('photo'), async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
-      const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-      if (!OPENAI_API_KEY) return res.status(500).json({ error: 'OPENAI_API_KEY not configured on this service' });
+      const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+      if (!GEMINI_API_KEY) {
+        return res.status(500).json({ error: 'GEMINI_API_KEY not configured on this service -- a real pin needs this added to Render, separate from the OpenAI key already in use elsewhere.' });
+      }
 
       const { data: piece } = await supabase
         .from('pottery_pieces')
@@ -3134,19 +3160,12 @@ export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios
       }
 
       const base64Table = fs.readFileSync(req.file.path).toString('base64');
-      const content = [
+      const input = [
         {
           type: 'text',
-          // Real, proven prompt pattern -- matches Test AI's exact
-          // approach (checked directly against its working results, e.g.
-          // 'center right, next to the brown jug' at high confidence). A
-          // free-text location description, not pixel coordinates: AI
-          // vision models are genuinely good at the former and
-          // unreliable at the latter, confirmed live -- the earlier
-          // x_pct/y_pct version never produced anything usable.
-          text: `You are looking for ONE specific pottery piece on a table/tray photo of several fired pieces.\n\nWhat to look for -- its real, distinguishing description (shape barely changes through firing; colour and pattern are the most reliable clues):\n"${targetDescription}"\n\nLook at the photo. Does this specific piece appear on it? Pieces look MORE vibrant/saturated once fired than when painted, bear that in mind.\n\nRespond with ONLY JSON, no markdown: {"found": true|false, "confidence": "high"|"medium"|"low", "location_in_scene": "<where in the frame, e.g. 'back left, next to the blue mug', or null>", "reasoning": "<what colour/pattern evidence specifically matched, or why nothing did>"}. Be honest -- a wrong answer is worse than saying not found.`,
+          text: `You are looking for ONE specific fired pottery piece on this photo of a table/tray of several fired pieces.\n\nWhat to look for -- its real, distinguishing description, written before firing (shape barely changes through firing; colour and pattern are the most reliable clues):\n"${targetDescription}"\n\nImportant: that description was written pre-fire. Underglaze fires MORE vibrant and saturated than it looks when painted -- pale pastels turn bright and glossy. Expect the fired piece in the photo to look more intense than the description suggests, and match on the underlying colour/pattern relationship, not the exact painted shade.\n\nIf you can identify this specific piece in the photo, provide its bounding box. If you cannot confidently identify it, say so honestly -- a wrong box is worse than admitting it isn't there.`,
         },
-        { type: 'image_url', image_url: { url: `data:${req.file.mimetype};base64,${base64Table}` } },
+        { type: 'image', data: base64Table, mime_type: req.file.mimetype || 'image/jpeg' },
       ];
       // Free improvement once real reference photos exist -- include it
       // as a second image so the AI can compare directly, not just
@@ -3155,31 +3174,75 @@ export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios
         try {
           const refRes = await axios.get(piece.reference_photo_url, { responseType: 'arraybuffer' });
           const base64Ref = Buffer.from(refRes.data).toString('base64');
-          content.push({ type: 'text', text: 'For reference, here is an actual photo of the exact piece to look for:' });
-          content.push({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Ref}` } });
+          input.push({ type: 'text', text: 'For reference, here is an actual (pre-fire) photo of the exact piece to look for -- expect the fired version in the table photo to be more vibrant than this:' });
+          input.push({ type: 'image', data: base64Ref, mime_type: 'image/jpeg' });
         } catch (e) { /* real description alone is still a valid attempt */ }
       }
 
-      const aiRes = await axios.post(
-        'https://api.openai.com/v1/chat/completions',
-        { model: 'gpt-4o-mini', messages: [{ role: 'user', content }], max_tokens: 300 },
-        { headers: { Authorization: `Bearer ${OPENAI_API_KEY}` } }
-      );
-      await logAiUsage(supabase, STUDIO_ID, 'find-on-table', aiRes.data.usage);
+      const responseSchema = {
+        type: 'object',
+        properties: {
+          found: { type: 'boolean' },
+          confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+          box_2d: { type: 'array', items: { type: 'integer' }, description: '[ymin, xmin, ymax, xmax] normalized 0-1000, only if found' },
+          reasoning: { type: 'string', description: 'What colour/pattern evidence matched, or why nothing did' },
+        },
+        required: ['found', 'confidence', 'reasoning'],
+      };
+
+      let aiRes;
+      try {
+        aiRes = await axios.post(
+          'https://generativelanguage.googleapis.com/v1beta/interactions',
+          {
+            model: 'gemini-3.6-flash',
+            input,
+            response_format: { type: 'text', mime_type: 'application/json', schema: responseSchema },
+          },
+          { headers: { 'x-goog-api-key': GEMINI_API_KEY, 'Content-Type': 'application/json' } }
+        );
+      } catch (err) {
+        logger.error('find-on-table: Gemini call failed', err.response?.data || err.message);
+        return res.status(500).json({ error: err.response?.data?.error?.message || 'The Gemini API call failed', gemini_error: err.response?.data || null });
+      }
+
+      // Real usage logging into the same running tally as every other AI
+      // feature -- Gemini's response shape reports usage differently
+      // from OpenAI's, so mapped explicitly rather than assumed to match.
+      const usage = aiRes.data.usage || aiRes.data.usageMetadata;
+      if (usage) {
+        await logGeminiUsage(supabase, STUDIO_ID, 'find-on-table-gemini', {
+          prompt_tokens: usage.prompt_tokens ?? usage.promptTokenCount ?? 0,
+          completion_tokens: usage.completion_tokens ?? usage.candidatesTokenCount ?? 0,
+          total_tokens: usage.total_tokens ?? usage.totalTokenCount ?? 0,
+        });
+      }
 
       let result;
       try {
-        const raw = aiRes.data.choices[0].message.content;
-        result = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] || '{}');
+        const raw = aiRes.data.output_text || aiRes.data.output?.[0]?.text || aiRes.data.candidates?.[0]?.content?.parts?.[0]?.text;
+        result = JSON.parse((raw || '').match(/\{[\s\S]*\}/)?.[0] || '{}');
       } catch (e) {
-        return res.status(500).json({ error: 'Could not parse the AI response' });
+        logger.error('find-on-table: could not parse Gemini response', aiRes.data);
+        return res.status(500).json({ error: 'Could not parse the Gemini response' });
+      }
+
+      // box_2d is [ymin, xmin, ymax, xmax] normalized 0-1000 -- convert
+      // to a centre point as a plain percentage for the frontend, no
+      // need to know real pixel dimensions since both are 0-1000 scale.
+      let x_pct = null, y_pct = null;
+      if (result.found && Array.isArray(result.box_2d) && result.box_2d.length === 4) {
+        const [ymin, xmin, ymax, xmax] = result.box_2d;
+        x_pct = ((xmin + xmax) / 2) / 10;
+        y_pct = ((ymin + ymax) / 2) / 10;
       }
 
       res.json({
         piece_description: targetDescription,
         found: !!result.found,
         confidence: result.confidence || 'low',
-        location_in_scene: result.location_in_scene || null,
+        x_pct,
+        y_pct,
         reasoning: result.reasoning || null,
       });
     } catch (err) {
