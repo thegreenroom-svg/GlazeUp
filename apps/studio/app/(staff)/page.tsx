@@ -129,8 +129,8 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: dateDraft }),
       });
+      const d = await res.json().catch(() => ({}));
       if (res.ok) {
-        const d = await res.json();
         setCollectionDateState(d.current_collection_date);
         setEditingDate(false);
         // Real, direct confirmation of what actually happened -- per
@@ -144,8 +144,15 @@ export default function Dashboard() {
               : `No bookings today needed it — all ${d.total_bookings_today} already had their own date set`
           );
         }
+      } else {
+        // Real error surfaced, not silent -- previously failed with no
+        // visible sign anything went wrong, which is exactly how it went
+        // unnoticed that the save wasn't actually persisting.
+        setAppliedMsg(`Save failed: ${d.error || `HTTP ${res.status}`}`);
       }
-    } catch { /* silent, form stays open to retry */ }
+    } catch (err: any) {
+      setAppliedMsg(`Could not reach the server: ${err?.message || err}`);
+    }
     finally { setSavingDate(false); }
   };
 
@@ -301,7 +308,14 @@ export default function Dashboard() {
           </div>
         )}
         {appliedMsg && (
-          <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.85)', marginTop: '0.5rem' }}>{appliedMsg}</p>
+          <p style={{
+            fontSize: '0.75rem',
+            fontWeight: appliedMsg.startsWith('Save failed') || appliedMsg.startsWith('Could not reach') ? 700 : 400,
+            color: appliedMsg.startsWith('Save failed') || appliedMsg.startsWith('Could not reach') ? '#FFD9D0' : 'rgba(255,255,255,0.85)',
+            marginTop: '0.5rem',
+          }}>
+            {appliedMsg}
+          </p>
         )}
       </div>
 

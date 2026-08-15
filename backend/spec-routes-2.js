@@ -3514,13 +3514,23 @@ export function registerCurrentCollectionDateRoute(app, supabase, STUDIO_ID, log
       if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         return res.status(400).json({ error: 'date must be an ISO date string (YYYY-MM-DD)' });
       }
-      const { data, error } = await supabase
+      const { data, error, status, statusText } = await supabase
         .from('studios')
         .update({ current_collection_date: date, current_collection_date_updated_at: new Date().toISOString() })
         .eq('id', STUDIO_ID)
         .select('current_collection_date, current_collection_date_updated_at')
         .single();
+      // Real diagnostic -- Daisy reported this genuinely not persisting
+      // (checked directly against the database, confirmed null). Log the
+      // full real result of the write itself before anything else runs,
+      // so if this fails silently again, the actual cause is captured
+      // rather than guessed at a second time.
+      logger.info('[collection-date] real write result', { data, error, status, statusText, studio_id: STUDIO_ID, date });
       if (error) throw error;
+      if (!data) {
+        logger.error('[collection-date] update returned no error but also no data -- likely matched zero rows (RLS or wrong id)');
+        return res.status(500).json({ error: 'The update ran but matched no real row -- check studio_id/RLS.', diagnostic: { studio_id: STUDIO_ID } });
+      }
 
       // Real "apply to all bookings until changed" -- per Daisy directly,
       // not just a UI suggestion. Applies the new current date onto
