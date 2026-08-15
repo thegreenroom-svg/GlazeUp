@@ -260,6 +260,24 @@ export default function DesignPreviewPage() {
         Photograph your actual piece, then paint, fill, or place colour straight onto the photo to see how it might look. Works with a stylus for fine detail.
       </p>
 
+      {/* Real, temporary diagnostic -- Daisy reports the photo button does
+          absolutely nothing on a genuinely fresh load, not even the
+          existing alert() fallback fires. That specific symptom (a click
+          handler that never runs at all, with no JS error surfaced)
+          points at something more fundamental than the button itself --
+          possibly the whole page failing to hydrate properly in the
+          browser. This tiny, completely independent button proves or
+          rules that out directly: if tapping THIS does nothing either,
+          React genuinely isn't running on this page at all. If it works,
+          the problem is specific to something else. Remove once
+          diagnosed. */}
+      <button
+        onClick={() => alert('Design Preview diagnostic: this button works, React is running on this page.')}
+        style={{ padding: '0.6rem 1rem', backgroundColor: '#c0392b', color: 'white', border: 'none', borderRadius: '6px', fontSize: '0.85rem', marginBottom: '1rem', cursor: 'pointer' }}
+      >
+        TEST — tap this red button
+      </button>
+
       <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }} />
 
       {!photo ? (
