@@ -3089,3 +3089,96 @@ export function registerQuickAddPieceRoute(app, supabase, STUDIO_ID, logger) {
     }
   });
 }
+
+// ============================================================================
+// FIND ON TABLE -- a genuinely different, more tractable version of the same
+// problem Shelf Sweep tried and abandoned (4 real attempts, documented in
+// its own commit: "there is no point to this if we can't see them").
+// ----------------------------------------------------------------------------
+// Daisy's real redirect, not a guess: the old approach asked the AI to
+// describe an entire messy shelf and guess whose everything was -- open-
+// ended, unconstrained, and it never worked reliably at pinpointing
+// location within that. This flips the problem to something AI vision is
+// actually reasonably good at: given ONE specific, already-known piece
+// (its real description -- shape, colour, pattern -- exactly the
+// distinguishing features Daisy named, which barely change through
+// firing) and a NARROWER candidate photo (one table/tray, not a whole
+// shelf), find whether and roughly where that one piece appears. A single
+// constrained yes/where question, not open-ended description.
+//
+// Works from the real piece description (piece_type/description), not a
+// reference photo -- checked directly, real reference photos essentially
+// don't exist yet (Completion's photo upload had a real, separate bug
+// fixed this session), but rich text descriptions already do for most
+// real pieces. Uses a reference photo too if one exists, for free
+// improvement once Completion photos start flowing.
+// ============================================================================
+export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios, upload, fs, logAiUsage) {
+  app.post('/api/spec/pieces/:id/find-on-table', upload.single('photo'), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
+      const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+      if (!OPENAI_API_KEY) return res.status(500).json({ error: 'OPENAI_API_KEY not configured on this service' });
+
+      const { data: piece } = await supabase
+        .from('pottery_pieces')
+        .select('id, description, piece_type, reference_photo_url')
+        .eq('id', req.params.id)
+        .eq('studio_id', STUDIO_ID)
+        .maybeSingle();
+      if (!piece) return res.status(404).json({ error: 'Piece not found' });
+
+      const targetDescription = piece.description || piece.piece_type;
+      if (!targetDescription) {
+        return res.status(400).json({ error: 'This piece has no description or photo to match against' });
+      }
+
+      const base64Table = fs.readFileSync(req.file.path).toString('base64');
+      const content = [
+        {
+          type: 'text',
+          text: `You are looking for ONE specific pottery piece on a table/tray photo of several fired pieces.\n\nWhat to look for -- its real, distinguishing description (shape barely changes through firing; colour and pattern are the most reliable clues, exactly like the shape/colour/pattern the description below focuses on):\n"${targetDescription}"\n\nLook at the photo. Does this specific piece appear on it? Pieces look MORE vibrant/saturated once fired than when painted, bear that in mind.\n\nRespond with ONLY JSON, no markdown: {"found": true|false, "confidence": "high"|"medium"|"low", "x_pct": <0-100, left-to-right position of the piece's centre>, "y_pct": <0-100, top-to-bottom position>, "reasoning": "<one short sentence, what specifically matched or why nothing did>"}. If not found, x_pct/y_pct can be null. Be honest -- a wrong pin is worse than saying not found.`,
+        },
+        { type: 'image_url', image_url: { url: `data:${req.file.mimetype};base64,${base64Table}` } },
+      ];
+      // Free improvement once real reference photos exist -- include it
+      // as a second image so the AI can compare directly, not just
+      // against the text.
+      if (piece.reference_photo_url) {
+        try {
+          const refRes = await axios.get(piece.reference_photo_url, { responseType: 'arraybuffer' });
+          const base64Ref = Buffer.from(refRes.data).toString('base64');
+          content.push({ type: 'text', text: 'For reference, here is an actual photo of the exact piece to look for:' });
+          content.push({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Ref}` } });
+        } catch (e) { /* real description alone is still a valid attempt */ }
+      }
+
+      const aiRes = await axios.post(
+        'https://api.openai.com/v1/chat/completions',
+        { model: 'gpt-4o-mini', messages: [{ role: 'user', content }], max_tokens: 300 },
+        { headers: { Authorization: `Bearer ${OPENAI_API_KEY}` } }
+      );
+      await logAiUsage(supabase, STUDIO_ID, 'find-on-table', aiRes.data.usage);
+
+      let result;
+      try {
+        const raw = aiRes.data.choices[0].message.content;
+        result = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] || '{}');
+      } catch (e) {
+        return res.status(500).json({ error: 'Could not parse the AI response' });
+      }
+
+      res.json({
+        piece_description: targetDescription,
+        found: !!result.found,
+        confidence: result.confidence || 'low',
+        x_pct: result.x_pct ?? null,
+        y_pct: result.y_pct ?? null,
+        reasoning: result.reasoning || null,
+      });
+    } catch (err) {
+      logger.error('find-on-table failed', err.response?.data || err.message);
+      res.status(500).json({ error: err.response?.data?.error?.message || err.message });
+    }
+  });
+}
