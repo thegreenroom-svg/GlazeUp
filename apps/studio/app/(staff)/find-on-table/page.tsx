@@ -22,8 +22,7 @@ interface FindResult {
   piece_description: string;
   found: boolean;
   confidence: 'high' | 'medium' | 'low';
-  x_pct: number | null;
-  y_pct: number | null;
+  location_in_scene: string | null;
   reasoning: string | null;
 }
 
@@ -145,24 +144,7 @@ export default function FindOnTablePage() {
       {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1.25rem' }}>{error}</div>}
 
       {preview && (
-        <div style={{ position: 'relative', width: '100%', marginBottom: '1rem' }}>
-          <img src={preview} alt="Table" style={{ width: '100%', borderRadius: '8px', display: 'block' }} />
-          {result?.found && result.x_pct != null && result.y_pct != null && (
-            <div
-              style={{
-                position: 'absolute',
-                left: `${result.x_pct}%`,
-                top: `${result.y_pct}%`,
-                transform: 'translate(-50%, -50%)',
-                width: 44, height: 44,
-                borderRadius: '50%',
-                border: '3px solid #e0392b',
-                boxShadow: '0 0 0 2px white, 0 2px 8px rgba(0,0,0,0.4)',
-                pointerEvents: 'none',
-              }}
-            />
-          )}
-        </div>
+        <img src={preview} alt="Table" style={{ width: '100%', borderRadius: '8px', display: 'block', marginBottom: '1rem' }} />
       )}
 
       {result && (
@@ -171,7 +153,8 @@ export default function FindOnTablePage() {
             {result.found ? <MapPin size={16} /> : <XCircle size={16} />}
             {result.found ? `Found — ${result.confidence} confidence` : 'Not found on this photo'}
           </p>
-          {result.reasoning && <p style={{ fontSize: '0.82rem', color: '#666', marginTop: '0.4rem' }}>{result.reasoning}</p>}
+          {result.location_in_scene && <p style={{ fontSize: '0.82rem', color: '#444', marginTop: '0.4rem' }}>📍 {result.location_in_scene}</p>}
+          {result.reasoning && <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.2rem' }}>{result.reasoning}</p>}
         </div>
       )}
     </motion.div>

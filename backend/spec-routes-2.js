@@ -3137,7 +3137,14 @@ export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios
       const content = [
         {
           type: 'text',
-          text: `You are looking for ONE specific pottery piece on a table/tray photo of several fired pieces.\n\nWhat to look for -- its real, distinguishing description (shape barely changes through firing; colour and pattern are the most reliable clues, exactly like the shape/colour/pattern the description below focuses on):\n"${targetDescription}"\n\nLook at the photo. Does this specific piece appear on it? Pieces look MORE vibrant/saturated once fired than when painted, bear that in mind.\n\nRespond with ONLY JSON, no markdown: {"found": true|false, "confidence": "high"|"medium"|"low", "x_pct": <0-100, left-to-right position of the piece's centre>, "y_pct": <0-100, top-to-bottom position>, "reasoning": "<one short sentence, what specifically matched or why nothing did>"}. If not found, x_pct/y_pct can be null. Be honest -- a wrong pin is worse than saying not found.`,
+          // Real, proven prompt pattern -- matches Test AI's exact
+          // approach (checked directly against its working results, e.g.
+          // 'center right, next to the brown jug' at high confidence). A
+          // free-text location description, not pixel coordinates: AI
+          // vision models are genuinely good at the former and
+          // unreliable at the latter, confirmed live -- the earlier
+          // x_pct/y_pct version never produced anything usable.
+          text: `You are looking for ONE specific pottery piece on a table/tray photo of several fired pieces.\n\nWhat to look for -- its real, distinguishing description (shape barely changes through firing; colour and pattern are the most reliable clues):\n"${targetDescription}"\n\nLook at the photo. Does this specific piece appear on it? Pieces look MORE vibrant/saturated once fired than when painted, bear that in mind.\n\nRespond with ONLY JSON, no markdown: {"found": true|false, "confidence": "high"|"medium"|"low", "location_in_scene": "<where in the frame, e.g. 'back left, next to the blue mug', or null>", "reasoning": "<what colour/pattern evidence specifically matched, or why nothing did>"}. Be honest -- a wrong answer is worse than saying not found.`,
         },
         { type: 'image_url', image_url: { url: `data:${req.file.mimetype};base64,${base64Table}` } },
       ];
@@ -3172,8 +3179,7 @@ export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios
         piece_description: targetDescription,
         found: !!result.found,
         confidence: result.confidence || 'low',
-        x_pct: result.x_pct ?? null,
-        y_pct: result.y_pct ?? null,
+        location_in_scene: result.location_in_scene || null,
         reasoning: result.reasoning || null,
       });
     } catch (err) {
