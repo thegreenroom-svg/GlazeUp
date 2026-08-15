@@ -31,6 +31,8 @@ import {
   Eye,
   PenTool,
   ShieldCheck,
+  HeartPulse,
+  GraduationCap,
   Library,
   CalendarClock,
   Globe2,
@@ -131,6 +133,8 @@ export function StudioNavigation() {
         { label: 'Alerts', icon: <Bell className="w-5 h-5" />, href: '/alerts' },
         { label: 'Notifications', icon: <BellRing className="w-5 h-5" />, href: '/notifications' },
         { label: 'Roles & Studio', icon: <ShieldCheck className="w-5 h-5" />, href: '/roles' },
+        { label: 'Health & Safety', icon: <HeartPulse className="w-5 h-5" />, href: '/health-safety' },
+        { label: 'Training', icon: <GraduationCap className="w-5 h-5" />, href: '/training' },
       ],
     },
   ];
