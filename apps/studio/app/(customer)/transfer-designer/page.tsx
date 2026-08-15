@@ -414,13 +414,19 @@ export default function TransferDesignerPage() {
         Photograph your piece, then draw, fill, trace, or add text and motifs to plan a transfer before it goes on for real.
       </p>
 
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }} />
-      <button
-        onClick={() => fileRef.current?.click()}
-        style={{ width: '100%', padding: '0.7rem', border: '2px dashed #ccc', borderRadius: '8px', backgroundColor: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginBottom: '0.8rem', fontSize: '0.85rem', color: '#666' }}
+      <label
+        style={{ width: '100%', padding: '0.7rem', border: '2px dashed #ccc', borderRadius: '8px', backgroundColor: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginBottom: '0.8rem', fontSize: '0.85rem', color: '#666', position: 'relative' }}
       >
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={onFile}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+        />
         <Camera size={16} color="var(--clay)" /> {photo ? 'Choose a different photo' : 'Photograph your piece'}
-      </button>
+      </label>
 
       <div style={{ position: 'relative', width: '100%', maxWidth: 340, marginBottom: '0.8rem' }}>
         <canvas ref={baseCanvasRef} style={{ width: '100%', border: '1px solid #eee', borderRadius: '8px', display: 'block' }} />

@@ -260,50 +260,31 @@ export default function DesignPreviewPage() {
         Photograph your actual piece, then paint, fill, or place colour straight onto the photo to see how it might look. Works with a stylus for fine detail.
       </p>
 
-      {/* Real, temporary diagnostic -- Daisy reports the photo button does
-          absolutely nothing on a genuinely fresh load, not even the
-          existing alert() fallback fires. That specific symptom (a click
-          handler that never runs at all, with no JS error surfaced)
-          points at something more fundamental than the button itself --
-          possibly the whole page failing to hydrate properly in the
-          browser. This tiny, completely independent button proves or
-          rules that out directly: if tapping THIS does nothing either,
-          React genuinely isn't running on this page at all. If it works,
-          the problem is specific to something else. Remove once
-          diagnosed. */}
-      <button
-        onClick={() => alert('Design Preview diagnostic: this button works, React is running on this page.')}
-        style={{ padding: '0.6rem 1rem', backgroundColor: '#c0392b', color: 'white', border: 'none', borderRadius: '6px', fontSize: '0.85rem', marginBottom: '1rem', cursor: 'pointer' }}
-      >
-        TEST — tap this red button
-      </button>
-
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }} />
-
       {!photo ? (
-        <button
-          onClick={() => {
-            // Real diagnostic -- Daisy reported tapping this does nothing
-            // at all, with no visible error, on a page that otherwise
-            // renders correctly. Same posture as the earlier Square 406
-            // fix: make any hidden failure visible rather than silent,
-            // since there's no way to see her actual browser console
-            // remotely.
-            try {
-              if (!fileRef.current) {
-                alert('Design Preview: the photo input was not found on the page. Please screenshot this message.');
-                return;
-              }
-              fileRef.current.click();
-            } catch (err: any) {
-              alert(`Design Preview: opening the photo picker failed with a real error: ${err?.message || err}. Please screenshot this message.`);
-            }
-          }}
-          style={{ width: '100%', padding: '2rem', border: '2px dashed #ccc', borderRadius: '8px', backgroundColor: 'white', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}
+        <label
+          style={{ width: '100%', padding: '2rem', border: '2px dashed #ccc', borderRadius: '8px', backgroundColor: 'white', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', position: 'relative' }}
         >
+          {/* Real fix, confirmed by the red test button that React and
+              click handling both work fine on this page: the actual
+              problem was narrower -- calling fileRef.current.click() on
+              a hidden input succeeded as a JS call with no error, but
+              iOS Safari wasn't reliably opening its native picker in
+              response, a known category of quirk with that exact
+              hidden-input-plus-programmatic-click pattern. This removes
+              the indirection entirely: the real file input IS the
+              visible label, so tapping it is a genuine native browser
+              interaction, not a simulated one. */}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={onFile}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+          />
           <Camera size={30} color="var(--clay)" />
           <span style={{ color: '#666', fontSize: '0.9rem' }}>Photograph your piece</span>
-        </button>
+        </label>
       ) : (
         <>
           <div
@@ -412,12 +393,18 @@ export default function DesignPreviewPage() {
             >
               <Trash2 size={15} /> Clear
             </button>
-            <button
-              onClick={() => fileRef.current?.click()}
-              style={{ flex: 1, padding: '0.5rem', backgroundColor: 'var(--clay)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}
+            <label
+              style={{ flex: 1, padding: '0.5rem', backgroundColor: 'var(--clay)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', textAlign: 'center', position: 'relative' }}
             >
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={onFile}
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+              />
               New photo
-            </button>
+            </label>
           </div>
 
           {hasContent && (
