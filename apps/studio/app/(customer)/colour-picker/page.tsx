@@ -98,135 +98,166 @@ export default function ColourPickerPage() {
     : [];
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '600px' }}>
-      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Colour Picker</h1>
-      <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-        Have a vase, curtains, or a photo you love? Photograph it, tap the colour, and see how well each of our real glazes would match once fired.
-      </p>
+    <div style={{ backgroundColor: 'var(--ivory)', minHeight: '100%' }}>
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ padding: '2rem 1.5rem', maxWidth: '600px', margin: '0 auto' }}>
+        <h1 style={{ fontSize: '1.9rem', fontWeight: 800, marginBottom: '0.3rem', color: 'var(--charcoal)', letterSpacing: '-0.02em' }}>Colour Picker</h1>
+        <p style={{ color: 'var(--charcoal)', opacity: 0.65, fontSize: '0.92rem', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+          Have a vase, curtains, or a photo you love? Photograph it, tap the colour, and see how well each of our real glazes would match once fired.
+        </p>
 
-      <div style={{ padding: '0.7rem 0.9rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '1.25rem' }}>
-        Matching against the real 19 Stroke &amp; Coat colours actually stocked in the studio. An unfired pot will look far paler than its eventual match.
-      </div>
+        <div style={{ padding: '0.85rem 1rem', backgroundColor: 'var(--sand)', borderRadius: '12px', fontSize: '0.8rem', marginBottom: '1.75rem', color: 'var(--charcoal)', opacity: 0.85 }}>
+          Matching against the real 19 Stroke &amp; Coat colours actually stocked in the studio. An unfired pot will look far paler than its eventual match.
+        </div>
 
-      {/* Real, always-visible palette browse -- separate from "Edit
-          palette" below, which is for actually changing entries and
-          doesn't need to be the default view. */}
-      <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem' }}>Our 19 real glazes</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '0.5rem', marginBottom: '1.5rem' }}>
-        {palette.map((g) => (
-          <div key={g.code} style={{ textAlign: 'center' }}>
-            <div style={{ width: '100%', aspectRatio: '1', borderRadius: 8, border: '1px solid #ddd', backgroundColor: g.hex, marginBottom: '0.3rem' }} />
-            <p style={{ fontSize: '0.68rem', fontWeight: 600, lineHeight: 1.2 }}>{g.name}</p>
-            <p style={{ fontSize: '0.62rem', color: '#999' }}>Nº{g.code}</p>
-          </div>
-        ))}
-      </div>
-
-      <label
-        style={{ width: '100%', padding: '1.5rem', border: '2px dashed #ccc', borderRadius: '8px', backgroundColor: 'white', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem', marginBottom: '1.25rem', position: 'relative' }}
-      >
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={onFile}
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
-        />
-        <Camera size={28} color="var(--clay)" />
-        <span style={{ color: '#666', fontSize: '0.9rem' }}>Take or choose a photo</span>
-      </label>
-
-      {imgSrc && (
-        <canvas
-          ref={canvasRef}
-          onClick={pick}
-          style={{ width: '100%', borderRadius: '8px', cursor: 'crosshair', marginBottom: '1rem', display: 'block' }}
-        />
-      )}
-
-      {picked && (
-        <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', marginBottom: '1rem' }}>
-            <div style={{ width: 52, height: 52, borderRadius: 8, border: '1px solid #ddd', backgroundColor: `rgb(${picked.r},${picked.g},${picked.b})` }} />
-            <div>
-              <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>Picked colour</p>
-              <p style={{ fontSize: '0.75rem', color: '#999', fontFamily: 'monospace' }}>
-                rgb({picked.r}, {picked.g}, {picked.b})
-              </p>
-            </div>
-          </div>
-
-          <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem' }}>All 19, ranked by match</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '1.5rem' }}>
-            {matches.map((m, i) => (
-              <div key={m.code} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', padding: '0.55rem 0.7rem', backgroundColor: i === 0 ? '#fdf6f8' : '#f9f9f9', borderRadius: '6px' }}>
-                <div style={{ width: 34, height: 34, borderRadius: 5, border: '1px solid #ddd', backgroundColor: m.hex, flexShrink: 0 }} />
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontWeight: i === 0 ? 600 : 400, fontSize: '0.88rem' }}>
-                    Nº{m.code} {m.name}
-                  </p>
-                  {i === 0 && <p style={{ fontSize: '0.72rem', color: 'var(--clay)' }}>closest match</p>}
-                </div>
-                <p style={{ fontWeight: 700, fontSize: '0.95rem', color: i === 0 ? 'var(--clay)' : '#666', flexShrink: 0 }}>
-                  {matchPercent(m.d)}%
-                </p>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      <button
-        onClick={() => setEditingPalette(!editingPalette)}
-        style={{ fontSize: '0.85rem', color: 'var(--clay)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-      >
-        {editingPalette ? 'Done editing' : 'Edit palette'}
-      </button>
-
-      {editingPalette && (
-        <div style={{ marginTop: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-          {palette.map((g, idx) => (
-            <div key={idx} style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-              <input
-                type="color"
-                value={g.hex}
-                onChange={(e) => {
-                  const next = [...palette];
-                  next[idx] = { ...g, hex: e.target.value };
-                  savePalette(next);
-                }}
-                style={{ width: 38, height: 34, border: '1px solid #ddd', borderRadius: 5, padding: 0 }}
-              />
-              <input
-                value={g.code}
-                onChange={(e) => { const n = [...palette]; n[idx] = { ...g, code: e.target.value }; savePalette(n); }}
-                placeholder="Nº"
-                style={{ width: 54, padding: '0.4rem', border: '1px solid #ddd', borderRadius: 5, fontSize: '0.85rem' }}
-              />
-              <input
-                value={g.name}
-                onChange={(e) => { const n = [...palette]; n[idx] = { ...g, name: e.target.value }; savePalette(n); }}
-                placeholder="Name"
-                style={{ flex: 1, padding: '0.4rem', border: '1px solid #ddd', borderRadius: 5, fontSize: '0.85rem' }}
-              />
-              <button
-                onClick={() => savePalette(palette.filter((_, i) => i !== idx))}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c33' }}
-                aria-label="Remove glaze"
-              >
-                <Trash2 size={15} />
-              </button>
+        {/* Real, always-visible palette browse -- separate from "Edit
+            palette" below, which is for actually changing entries and
+            doesn't need to be the default view. */}
+        <p style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--clay)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.7rem' }}>Our 19 real glazes</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(88px, 1fr))', gap: '0.7rem', marginBottom: '2rem' }}>
+          {palette.map((g) => (
+            <div key={g.code} style={{ textAlign: 'center' }}>
+              <div style={{
+                width: '100%', aspectRatio: '1', borderRadius: '50%',
+                background: `linear-gradient(155deg, ${g.hex} 0%, ${g.hex}dd 100%)`,
+                boxShadow: `0 3px 10px ${g.hex}55, inset 0 1px 2px rgba(255,255,255,0.4)`,
+                marginBottom: '0.4rem',
+              }} />
+              <p style={{ fontSize: '0.68rem', fontWeight: 700, lineHeight: 1.2, color: 'var(--charcoal)' }}>{g.name}</p>
+              <p style={{ fontSize: '0.62rem', color: 'var(--stone)' }}>Nº{g.code}</p>
             </div>
           ))}
-          <button
-            onClick={() => savePalette([...palette, { code: '', name: 'New glaze', hex: '#cccccc' }])}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.45rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: 5, cursor: 'pointer', fontSize: '0.85rem', justifyContent: 'center' }}
-          >
-            <Plus size={14} /> Add a glaze
-          </button>
         </div>
-      )}
-    </motion.div>
+
+        <label
+          style={{
+            width: '100%', padding: '2rem', borderRadius: '16px', cursor: 'pointer',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem', marginBottom: '1.75rem', position: 'relative',
+            background: 'linear-gradient(155deg, var(--sand) 0%, #DCC9AC 100%)',
+            boxShadow: '0 4px 14px rgba(184,121,70,0.18)',
+          }}
+        >
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={onFile}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+          />
+          <div style={{ width: 52, height: 52, borderRadius: '50%', backgroundColor: 'var(--clay)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 3px 8px rgba(184,121,70,0.4)' }}>
+            <Camera size={24} color="white" />
+          </div>
+          <span style={{ color: 'var(--charcoal)', fontSize: '0.92rem', fontWeight: 600 }}>Take or choose a photo</span>
+        </label>
+
+        {imgSrc && (
+          <canvas
+            ref={canvasRef}
+            onClick={pick}
+            style={{ width: '100%', borderRadius: '16px', cursor: 'crosshair', marginBottom: '1.25rem', display: 'block', boxShadow: '0 4px 16px rgba(43,39,36,0.12)' }}
+          />
+        )}
+
+        {picked && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem', marginBottom: '1.5rem', padding: '0.9rem 1rem', backgroundColor: 'white', borderRadius: '14px', boxShadow: '0 3px 10px rgba(43,39,36,0.08)' }}>
+              <div style={{ width: 56, height: 56, borderRadius: '50%', boxShadow: `0 3px 8px rgba(${picked.r},${picked.g},${picked.b},0.4), inset 0 1px 2px rgba(255,255,255,0.4)`, backgroundColor: `rgb(${picked.r},${picked.g},${picked.b})`, flexShrink: 0 }} />
+              <div>
+                <p style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--charcoal)' }}>Picked colour</p>
+                <p style={{ fontSize: '0.75rem', color: 'var(--stone)', fontFamily: 'monospace' }}>
+                  rgb({picked.r}, {picked.g}, {picked.b})
+                </p>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--clay)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.7rem' }}>All 19, ranked by match</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.75rem' }}>
+              {matches.map((m, i) => (
+                <div
+                  key={m.code}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.8rem', padding: '0.7rem 0.9rem', borderRadius: '12px',
+                    backgroundColor: 'white',
+                    boxShadow: i === 0 ? '0 4px 14px rgba(184,121,70,0.22)' : '0 2px 6px rgba(43,39,36,0.06)',
+                    border: i === 0 ? '1.5px solid var(--clay)' : '1px solid transparent',
+                  }}
+                >
+                  <div style={{
+                    width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                    background: `linear-gradient(155deg, ${m.hex} 0%, ${m.hex}dd 100%)`,
+                    boxShadow: `0 2px 6px ${m.hex}55, inset 0 1px 2px rgba(255,255,255,0.4)`,
+                  }} />
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontWeight: i === 0 ? 700 : 500, fontSize: '0.88rem', color: 'var(--charcoal)' }}>
+                      Nº{m.code} {m.name}
+                    </p>
+                    {i === 0 && <p style={{ fontSize: '0.72rem', color: 'var(--clay)', fontWeight: 600 }}>closest match</p>}
+                  </div>
+                  <div style={{
+                    padding: '0.3rem 0.6rem', borderRadius: '999px', flexShrink: 0,
+                    backgroundColor: i === 0 ? 'var(--clay)' : 'var(--sand)',
+                  }}>
+                    <p style={{ fontWeight: 700, fontSize: '0.85rem', color: i === 0 ? 'white' : 'var(--charcoal)' }}>
+                      {matchPercent(m.d)}%
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        <button
+          onClick={() => setEditingPalette(!editingPalette)}
+          style={{ fontSize: '0.85rem', color: 'var(--clay)', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+        >
+          {editingPalette ? 'Done editing' : 'Edit palette'}
+        </button>
+
+        {editingPalette && (
+          <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', backgroundColor: 'white', borderRadius: '14px', padding: '1rem', boxShadow: '0 3px 10px rgba(43,39,36,0.08)' }}>
+            {palette.map((g, idx) => (
+              <div key={idx} style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                <input
+                  type="color"
+                  value={g.hex}
+                  onChange={(e) => {
+                    const next = [...palette];
+                    next[idx] = { ...g, hex: e.target.value };
+                    savePalette(next);
+                  }}
+                  style={{ width: 38, height: 34, border: '1px solid var(--stone)', borderRadius: '8px', padding: 0 }}
+                />
+                <input
+                  value={g.code}
+                  onChange={(e) => { const n = [...palette]; n[idx] = { ...g, code: e.target.value }; savePalette(n); }}
+                  placeholder="Nº"
+                  style={{ width: 54, padding: '0.4rem', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '0.85rem' }}
+                />
+                <input
+                  value={g.name}
+                  onChange={(e) => { const n = [...palette]; n[idx] = { ...g, name: e.target.value }; savePalette(n); }}
+                  placeholder="Name"
+                  style={{ flex: 1, padding: '0.4rem', border: '1px solid var(--stone)', borderRadius: '8px', fontSize: '0.85rem' }}
+                />
+                <button
+                  onClick={() => savePalette(palette.filter((_, i) => i !== idx))}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c33' }}
+                  aria-label="Remove glaze"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={() => savePalette([...palette, { code: '', name: 'New glaze', hex: '#cccccc' }])}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.5rem', backgroundColor: 'var(--sand)', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem', justifyContent: 'center', fontWeight: 600, color: 'var(--charcoal)' }}
+            >
+              <Plus size={14} /> Add a glaze
+            </button>
+          </div>
+        )}
+      </motion.div>
+    </div>
   );
 }
