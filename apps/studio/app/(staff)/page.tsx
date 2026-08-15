@@ -119,8 +119,13 @@ export default function Dashboard() {
 
   const [appliedMsg, setAppliedMsg] = useState<string | null>(null);
 
-  const saveCollectionDate = async () => {
-    if (!dateDraft) {
+  const saveCollectionDate = async (explicitDate?: string) => {
+    // Real, correct fix for the preset buttons -- setDateDraft(iso) above
+    // updates React state asynchronously, so calling saveCollectionDate()
+    // immediately after would still read the OLD dateDraft value. Passing
+    // the real date explicitly avoids that stale-closure bug entirely.
+    const dateToSave = explicitDate || dateDraft;
+    if (!dateToSave) {
       // Real, visible feedback instead of silently doing nothing --
       // this exact silent path is a plausible real cause of "not
       // working" with zero visible sign anything happened.
@@ -133,7 +138,7 @@ export default function Dashboard() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/studio/collection-date`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateDraft }),
+        body: JSON.stringify({ date: dateToSave }),
       });
       const d = await res.json().catch(() => ({}));
       if (res.ok) {
@@ -297,30 +302,50 @@ export default function Dashboard() {
             </button>
           </div>
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <input
-              type="date"
-              value={dateDraft}
-              onChange={(e) => setDateDraft(e.target.value)}
-              style={{ flex: 1, padding: '0.5rem', borderRadius: '8px', border: 'none', fontSize: '0.9rem' }}
-            />
-            <button
-              onClick={() => {
-                // Real, precise diagnostic -- given the exact same faded
-                // date persists across attempts with no visible error
-                // even after the earlier fix, this shows exactly what's
-                // actually stored the moment the button is tapped, to
-                // rule in/out a genuine click-registration issue (seen
-                // before with other buttons on iOS) versus dateDraft
-                // itself holding something unexpected.
-                alert(`Diagnostic: dateDraft is currently "${dateDraft}" (length ${dateDraft.length}). Tapping OK will attempt the real save now.`);
-                saveCollectionDate();
-              }}
-              disabled={savingDate}
-              style={{ padding: '0.5rem 0.7rem', backgroundColor: 'white', color: 'var(--clay)', border: 'none', borderRadius: '8px', cursor: savingDate ? 'default' : 'pointer', display: 'flex', alignItems: 'center' }}
-            >
-              <Check size={16} />
-            </button>
+          <div>
+            {/* Real, robust fix -- "calendar won't load" confirmed the
+                native date picker itself wasn't opening on tap, a
+                different and more fundamental failure point than
+                anything chased so far today. Rather than keep fighting
+                an unreliable native picker, quick presets sidestep it
+                entirely -- and are genuinely the faster real workflow
+                for "check daily, set the current turnaround" anyway. */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.4rem', marginBottom: '0.6rem' }}>
+              {[1, 2, 3, 4].map((weeks) => (
+                <button
+                  key={weeks}
+                  onClick={() => {
+                    const d = new Date();
+                    d.setDate(d.getDate() + weeks * 7);
+                    const iso = d.toISOString().slice(0, 10);
+                    setDateDraft(iso);
+                    saveCollectionDate(iso);
+                  }}
+                  disabled={savingDate}
+                  style={{ padding: '0.6rem 0.3rem', backgroundColor: 'rgba(255,255,255,0.2)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: savingDate ? 'default' : 'pointer' }}
+                >
+                  {weeks} wk{weeks > 1 ? 's' : ''}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <input
+                type="date"
+                value={dateDraft}
+                onChange={(e) => setDateDraft(e.target.value)}
+                style={{ flex: 1, padding: '0.5rem', borderRadius: '8px', border: 'none', fontSize: '0.9rem' }}
+              />
+              <button
+                onClick={() => saveCollectionDate()}
+                disabled={savingDate}
+                style={{ padding: '0.5rem 0.7rem', backgroundColor: 'white', color: 'var(--clay)', border: 'none', borderRadius: '8px', cursor: savingDate ? 'default' : 'pointer', display: 'flex', alignItems: 'center' }}
+              >
+                <Check size={16} />
+              </button>
+            </div>
+            <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.7)', marginTop: '0.4rem' }}>
+              Quick presets above save straight away. Or pick an exact date below, then tap the tick.
+            </p>
           </div>
         )}
         {appliedMsg && (
