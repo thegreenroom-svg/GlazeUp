@@ -3,6 +3,8 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { SkeletonRows } from '@/components/Skeleton';
 import { Receipt, Calendar } from 'lucide-react';
@@ -68,14 +70,21 @@ interface MenuItem {
   price_cents: number | null;
 }
 
-export default function BookingsPage() {
+// Real deep-link support -- per Daisy directly: "bookings need to be
+// ever-present, referenced everywhere... we can then go into the
+// bookings." This detail view previously only opened via clicking a row
+// within this same page (local state, no URL). Anything elsewhere in
+// the app (Alerts and others) can now link straight to a specific
+// booking with ?code=<booking_code>.
+function BookingsPageInner() {
+  const searchParams = useSearchParams();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [search, setSearch] = useState('');
   const [dateFilter, setDateFilter] = useState(() => new Date().toISOString().slice(0, 10));
   const [showAllDates, setShowAllDates] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedCode, setSelectedCode] = useState<string | null>(null);
+  const [selectedCode, setSelectedCode] = useState<string | null>(() => searchParams.get('code'));
   const [showWalkIn, setShowWalkIn] = useState(false);
   const [walkInName, setWalkInName] = useState('');
   const [walkInParty, setWalkInParty] = useState('');
@@ -693,5 +702,13 @@ export default function BookingsPage() {
         </div>
       )}
     </motion.div>
+  );
+}
+
+export default function BookingsPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: '2rem' }}>Loading...</div>}>
+      <BookingsPageInner />
+    </Suspense>
   );
 }

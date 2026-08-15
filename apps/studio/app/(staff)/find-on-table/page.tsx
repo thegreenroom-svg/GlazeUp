@@ -126,12 +126,20 @@ export default function FindOnTablePage() {
             </p>
           )}
           {!fulfilment.collection_date && <p style={{ fontSize: '0.78rem', color: '#999', marginTop: '0.2rem' }}>No collection date set yet</p>}
-          <a
-            href={`/kiln-dip?booking=${bookingCode}`}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.5rem', padding: '0.35rem 0.7rem', backgroundColor: 'var(--clay)', color: 'white', borderRadius: '5px', fontSize: '0.78rem', textDecoration: 'none' }}
-          >
-            {isPostal ? <><Printer size={13} /> Create postage label</> : <>Set collection date</>}
-          </a>
+          <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem' }}>
+            <a
+              href={`/kiln-dip?booking=${bookingCode}`}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.35rem 0.7rem', backgroundColor: 'var(--clay)', color: 'white', borderRadius: '5px', fontSize: '0.78rem', textDecoration: 'none' }}
+            >
+              {isPostal ? <><Printer size={13} /> Create postage label</> : <>Set collection date</>}
+            </a>
+            <a
+              href={`/bookings?code=${bookingCode}`}
+              style={{ display: 'inline-flex', alignItems: 'center', padding: '0.35rem 0.7rem', backgroundColor: 'white', border: '1px solid #ddd', color: '#666', borderRadius: '5px', fontSize: '0.78rem', textDecoration: 'none' }}
+            >
+              Open full booking →
+            </a>
+          </div>
         </div>
       )}
 

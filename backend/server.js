@@ -381,7 +381,7 @@ app.get('/api/demo/alerts', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('staff_alerts')
-      .select('id, trigger_type, label, message, priority, acknowledged, created_at')
+      .select('id, trigger_type, label, message, priority, acknowledged, created_at, booking_code')
       .eq('studio_id', DEMO_STUDIO_ID)
       .order('created_at', { ascending: false })
       .limit(30);

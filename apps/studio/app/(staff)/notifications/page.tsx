@@ -52,6 +52,11 @@ export default function NotificationsPage() {
                 <p style={{ fontSize: '0.75rem', color: '#666', marginBottom: '0.2rem' }}>{n.booking}</p>
                 <p style={{ fontWeight: 600, fontSize: '0.95rem' }}>{n.headline}</p>
                 <p style={{ fontSize: '0.85rem', color: '#444', marginTop: '0.2rem' }}>{n.message}</p>
+                {/^booking-/.test(n.booking) && (
+                  <a href={`/bookings?code=${n.booking}`} style={{ display: 'inline-block', marginTop: '0.4rem', fontSize: '0.78rem', color: 'var(--clay)', fontWeight: 600, textDecoration: 'none' }}>
+                    Open booking →
+                  </a>
+                )}
               </div>
             ))}
           </div>
@@ -69,6 +74,11 @@ export default function NotificationsPage() {
                 <p style={{ fontSize: '0.75rem', color: '#666', marginBottom: '0.2rem' }}>{n.booking}</p>
                 <p style={{ fontWeight: 600, fontSize: '0.95rem' }}>{n.headline}</p>
                 <p style={{ fontSize: '0.85rem', color: '#444', marginTop: '0.2rem' }}>{n.message}</p>
+                {/^booking-/.test(n.booking) && (
+                  <a href={`/bookings?code=${n.booking}`} style={{ display: 'inline-block', marginTop: '0.4rem', fontSize: '0.78rem', color: 'var(--clay)', fontWeight: 600, textDecoration: 'none' }}>
+                    Open booking →
+                  </a>
+                )}
               </div>
             ))}
           </div>

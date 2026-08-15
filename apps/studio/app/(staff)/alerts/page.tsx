@@ -15,6 +15,7 @@ interface Alert {
   priority: number;
   acknowledged: boolean;
   created_at: string;
+  booking_code: string | null;
 }
 
 export default function AlertsPage() {
@@ -72,6 +73,14 @@ export default function AlertsPage() {
                   <p style={{ fontWeight: '600', marginBottom: '0.25rem' }}>{a.label}</p>
                   <p style={{ color: '#666', fontSize: '0.875rem' }}>{a.message}</p>
                   <p style={{ color: '#999', fontSize: '0.75rem', marginTop: '0.4rem' }}>{new Date(a.created_at).toLocaleString()}</p>
+                  {a.booking_code && (
+                    <a
+                      href={`/bookings?code=${a.booking_code}`}
+                      style={{ display: 'inline-block', marginTop: '0.4rem', fontSize: '0.78rem', color: 'var(--clay)', fontWeight: 600, textDecoration: 'none' }}
+                    >
+                      Open booking →
+                    </a>
+                  )}
                 </div>
               </div>
               {a.acknowledged && <CheckCircle size={18} color="#00aa00" style={{ flexShrink: 0 }} />}

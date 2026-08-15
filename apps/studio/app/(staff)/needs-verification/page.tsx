@@ -98,7 +98,12 @@ export default function NeedsVerificationPage() {
                   {b.table_number ? ` · Table ${b.table_number}` : ''}
                 </p>
                 <p style={{ fontSize: '0.78rem', color: '#999', marginTop: '0.3rem' }}>{b.notes}</p>
-                <p style={{ fontSize: '0.7rem', color: '#bbb', fontFamily: 'monospace', marginTop: '0.3rem' }}>{b.booking_code}</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.3rem' }}>
+                  <p style={{ fontSize: '0.7rem', color: '#bbb', fontFamily: 'monospace' }}>{b.booking_code}</p>
+                  <a href={`/bookings?code=${b.booking_code}`} style={{ fontSize: '0.75rem', color: 'var(--clay)', fontWeight: 600, textDecoration: 'none' }}>
+                    Open booking →
+                  </a>
+                </div>
               </div>
             );
           })}
