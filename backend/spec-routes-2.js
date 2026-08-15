@@ -3359,3 +3359,127 @@ export function registerFindAllOnTableRoute(app, supabase, STUDIO_ID, logger, ax
     }
   });
 }
+
+// ============================================================================
+// REAL SQUARE PAYMENT COMPLETION -> SESSION FINISHED. Daisy's real insight:
+// "we will probably continue to use the square [till] for most operations,
+// this app is functioning alongside" -- not replacing Square, watching and
+// mirroring its real events. When staff take payment on the physical
+// Square terminal at the end of a table's session, that order transitions
+// to a real, detectable COMPLETED state via the API -- a genuine signal
+// this booking's session is over and ready for the next stage (kiln
+// collection), without anyone needing to tap anything in this app.
+// ----------------------------------------------------------------------------
+// Deliberately does NOT reuse the existing manual /finish endpoint as-is --
+// that one expects several fields only a person filling in a form would
+// know (finished_by, split_bill_count etc). This sets only what's
+// genuinely knowable from Square's own real data: finished_at (now,
+// confirmed by their own completed_at) and till_total_cents (their own
+// real total_money.amount) -- everything else stays null/manual.
+//
+// Same real matching approach already proven for live table sync: nearest-
+// time pairing between a real completed order and a currently-active,
+// not-yet-finished booking, capped at a plausible time window so a match
+// only happens on real evidence.
+// ============================================================================
+export function registerSquarePaymentFinishRoute(app, supabase, STUDIO_ID, logger, axios) {
+  app.post('/api/spec/bookings/sync-finished-from-square', async (req, res) => {
+    try {
+      const { data: connection } = await supabase
+        .from('square_connections')
+        .select('square_access_token, square_token_expires_at')
+        .eq('studio_id', STUDIO_ID)
+        .single();
+      if (!connection || new Date(connection.square_token_expires_at) < new Date()) {
+        return res.status(400).json({ error: 'No valid Square connection', finished: 0 });
+      }
+      const token = connection.square_access_token;
+      const headers = { Authorization: `Bearer ${token}`, 'Square-Version': '2024-01-18', Accept: 'application/json', 'Content-Type': 'application/json' };
+
+      const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', { headers });
+      const locations = locationsRes.data.locations || [];
+      if (!locations.length) return res.json({ finished: 0, reason: 'no_square_locations' });
+
+      const todayStart = new Date();
+      todayStart.setUTCHours(0, 0, 0, 0);
+      const ordersRes = await axios.post(
+        'https://connect.squareup.com/v2/orders/search',
+        {
+          location_ids: locations.map((l) => l.id),
+          query: { filter: { date_time_filter: { created_at: { start_at: todayStart.toISOString() } }, state_filter: { states: ['COMPLETED'] } } },
+          limit: 100,
+        },
+        { headers }
+      );
+      const digitsOf = (s) => (String(s || '').match(/\d+/g) || []).join('');
+      const completedTickets = (ordersRes.data.orders || [])
+        .filter((o) => o.ticket_name && digitsOf(o.ticket_name))
+        .map((o) => ({
+          id: o.id,
+          digits: digitsOf(o.ticket_name),
+          completed_at: o.closed_at || o.updated_at,
+          total_cents: o.total_money?.amount ?? null,
+        }));
+      if (!completedTickets.length) return res.json({ finished: 0, reason: 'no_completed_orders_today' });
+
+      // Currently-active real bookings (started in the last 4 hours,
+      // covers a real session plus overrun) that aren't already finished.
+      const now = new Date();
+      const activeSince = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select('booking_code, table_number, session_start')
+        .eq('studio_id', STUDIO_ID)
+        .gte('session_start', activeSince.toISOString())
+        .lte('session_start', now.toISOString());
+      const { data: statuses } = await supabase
+        .from('demo_app_session_status')
+        .select('booking_code, finished_at')
+        .eq('studio_id', STUDIO_ID)
+        .in('booking_code', (bookings || []).map((b) => b.booking_code));
+      const finishedCodes = new Set((statuses || []).filter((s) => s.finished_at).map((s) => s.booking_code));
+      const unfinished = (bookings || []).filter((b) => !finishedCodes.has(b.booking_code) && digitsOf(b.table_number));
+
+      // Same real greedy nearest-time matching as the live table sync --
+      // match a completed order to the booking at that same real table
+      // whose session_start is closest to when the order actually closed.
+      const MAX_GAP_MS = 4 * 60 * 60 * 1000;
+      const candidatePairs = [];
+      for (const ticket of completedTickets) {
+        for (const booking of unfinished) {
+          if (digitsOf(booking.table_number) !== ticket.digits) continue;
+          const gap = Math.abs(new Date(ticket.completed_at).getTime() - new Date(booking.session_start).getTime());
+          if (gap <= MAX_GAP_MS) candidatePairs.push({ ticket, booking, gap });
+        }
+      }
+      candidatePairs.sort((a, b) => a.gap - b.gap);
+
+      const claimedTickets = new Set();
+      const claimedBookings = new Set();
+      let finished = 0;
+      const changes = [];
+      for (const pair of candidatePairs) {
+        if (claimedTickets.has(pair.ticket.id) || claimedBookings.has(pair.booking.booking_code)) continue;
+        claimedTickets.add(pair.ticket.id);
+        claimedBookings.add(pair.booking.booking_code);
+        const { error } = await supabase
+          .from('demo_app_session_status')
+          .upsert([{
+            booking_code: pair.booking.booking_code,
+            studio_id: STUDIO_ID,
+            finished_at: pair.ticket.completed_at,
+            till_total_cents: pair.ticket.total_cents,
+          }], { onConflict: 'booking_code' });
+        if (!error) {
+          finished++;
+          changes.push({ booking_code: pair.booking.booking_code, table: pair.booking.table_number, till_total_cents: pair.ticket.total_cents });
+        }
+      }
+
+      res.json({ finished, changes, completed_orders_today: completedTickets.length, pulled_at: new Date().toISOString() });
+    } catch (err) {
+      logger.error('sync-finished-from-square failed', err.response?.data || err.message);
+      res.status(500).json({ error: err.response?.data?.error?.message || err.message, finished: 0 });
+    }
+  });
+}

@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -1433,6 +1433,7 @@ registerFulfilmentRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerPartySizeRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerRealBookingSyncRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerLiveTableSyncRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
+registerSquarePaymentFinishRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerQuickAddPieceRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerFindOnTableRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage);
 registerFindAllOnTableRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage);
@@ -1470,6 +1471,14 @@ app.listen(PORT, () => {
       const tableRes = await fetch(`${SELF_URL}/api/spec/bookings/sync-tables-from-square`, { method: 'POST' });
       const tableData = await tableRes.json().catch(() => ({}));
       if (tableData.updated) logger.info(`[auto-sync] table updated from real Square ticket`, tableData.changes);
+
+      // Per Daisy directly: the physical Square terminal stays the real
+      // day-to-day tool -- this app runs alongside it, watching its real
+      // events rather than replacing them. When staff take payment at a
+      // table, that's a genuine signal the session is over.
+      const finishRes = await fetch(`${SELF_URL}/api/spec/bookings/sync-finished-from-square`, { method: 'POST' });
+      const finishData = await finishRes.json().catch(() => ({}));
+      if (finishData.finished) logger.info(`[auto-sync] ${finishData.finished} booking(s) marked finished from real Square payment`, finishData.changes);
     } catch (err) {
       logger.warn('[auto-sync] periodic sync failed', err.message);
     }
