@@ -376,12 +376,16 @@ function BookingsPageInner() {
                 placeholder="Party size"
                 style={{ flex: 1, padding: '0.5rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box' }}
               />
-              <input
+              <select
                 value={walkInTable}
                 onChange={(e) => setWalkInTable(e.target.value)}
-                placeholder="Table"
-                style={{ flex: 1, padding: '0.5rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box' }}
-              />
+                style={{ flex: 1, padding: '0.5rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box', color: '#333', backgroundColor: 'white' }}
+              >
+                <option value="">Table (optional)</option>
+                {Array.from({ length: 8 }, (_, i) => `Main Studio ${i + 1}`).map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button onClick={() => setShowWalkIn(false)} style={{ flex: 1, padding: '0.55rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
