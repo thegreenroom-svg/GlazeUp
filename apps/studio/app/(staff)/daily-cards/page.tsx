@@ -149,17 +149,22 @@ export default function DailyCardsPage() {
     try {
       setError(null);
       
-      // Trigger a Square sync first (only on manual refresh, not on auto-check)
-      if (!isFirstLoad) {
-        try {
-          await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/bookings/sync`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          });
-        } catch (e) {
-          // Sync may fail if Square isn't connected, but we'll still try to fetch what we have
-          console.warn('Square sync failed:', e);
-        }
+      // Real fix -- per Daisy: "have it thinking automatically... every
+      // time you open the app, it's fresh." This used to skip the real
+      // sync specifically on first/automatic load, only running it when
+      // someone manually tapped "Check for new bookings now" -- meaning
+      // just opening this page never actually synced anything on its
+      // own. Now syncs every single load, first or not. The isFirstLoad
+      // distinction below (known-codes tracking vs "what's new" diffing)
+      // is untouched -- still correct either way.
+      try {
+        await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/bookings/sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } catch (e) {
+        // Sync may fail if Square isn't connected, but we'll still try to fetch what we have
+        console.warn('Square sync failed:', e);
       }
       
       // Fetch bookings for the selected date

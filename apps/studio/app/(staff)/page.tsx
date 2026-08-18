@@ -177,6 +177,25 @@ export default function Dashboard() {
     } catch { /* no shift yet, stays non-admin */ }
   }, []);
 
+  // Real "sync on open" -- per Daisy directly: bookings genuinely weren't
+  // showing up (confirmed against the real database -- 16 Aug had far
+  // fewer bookings than what was really on the tables that day). The
+  // periodic 5-minute server-side interval is unreliable on its own
+  // given this Render service goes cold between real visits (confirmed
+  // separately -- the last automatic sync was over 27 hours old). Tying
+  // the real sync to opening the app instead is more robust: it's real
+  // user activity that would wake the backend anyway, not dependent on
+  // the server already being awake independently. Fire-and-forget --
+  // doesn't block the Dashboard's own load, and every call already has
+  // its own real error handling server-side if the connection isn't
+  // ready yet.
+  useEffect(() => {
+    const base = process.env.NEXT_PUBLIC_API_URL;
+    fetch(`${base}/api/bookings/sync`, { method: 'POST' }).catch(() => {});
+    fetch(`${base}/api/spec/bookings/sync-tables-from-square`, { method: 'POST' }).catch(() => {});
+    fetch(`${base}/api/spec/bookings/sync-finished-from-square`, { method: 'POST' }).catch(() => {});
+  }, []);
+
   // Which day "Bookings" actually means right now -- after 4pm it moves
   // forward to the next day staff would actually be planning for, since
   // by then today's numbers matter less than what's coming. Sunday after
