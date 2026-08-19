@@ -68,6 +68,15 @@ export function StudioNavigation() {
     return () => window.removeEventListener('resize', checkSize);
   }, []);
 
+  // Restructured per Daisy's "fresh eyes" review -- previously 6 groups
+  // of ~35 items with real daily-use pages (Money, Pieces) sitting at
+  // the same visual weight as multi-studio SaaS features that aren't
+  // used running the studio day to day. Now ordered by real frequency
+  // of use: the genuine daily flow first, then the studio/business
+  // pages, with the rarely-touched SaaS and reference items grouped
+  // last under a clearly-labelled "Rarely needed" section rather than
+  // deleted -- reversible, and nothing that might still be wanted is
+  // destroyed.
   const menuGroups: { section: string; items: { label: string; icon: React.ReactNode; href: string }[] }[] = [
     {
       section: 'Daily Workflow',
@@ -75,12 +84,18 @@ export function StudioNavigation() {
         { label: 'Start Floor', icon: <Footprints className="w-5 h-5" />, href: '/floor' },
         { label: 'Print Cards', icon: <PrinterIcon className="w-5 h-5" />, href: '/daily-cards' },
         { label: 'Bookings', icon: <Calendar className="w-5 h-5" />, href: '/bookings' },
-        { label: 'Recover Party Sizes', icon: <RefreshIcon className="w-5 h-5" />, href: '/backfill-party-sizes' },
-        { label: 'Needs Verification', icon: <ShieldCheck className="w-5 h-5" />, href: '/needs-verification' },
-        { label: 'KDS', icon: <ChefHat className="w-5 h-5" />, href: '/kds' },
-        { label: 'Photo Match', icon: <Camera className="w-5 h-5" />, href: '/photo-match' },
-        { label: 'Find on Table', icon: <MapPin className="w-5 h-5" />, href: '/find-on-table' },
         { label: 'Completion', icon: <Stamp className="w-5 h-5" />, href: '/completion' },
+        { label: 'Find on Table', icon: <MapPin className="w-5 h-5" />, href: '/find-on-table' },
+        { label: 'Kiln — Collection & Post', icon: <Flame className="w-5 h-5" />, href: '/kiln-dip' },
+      ],
+    },
+    {
+      section: 'Studio & Money',
+      items: [
+        { label: 'Pieces', icon: <Palette className="w-5 h-5" />, href: '/pieces' },
+        { label: 'Money', icon: <PoundSterling className="w-5 h-5" />, href: '/money' },
+        { label: 'Customers', icon: <Users className="w-5 h-5" />, href: '/customers' },
+        { label: 'Alerts', icon: <Bell className="w-5 h-5" />, href: '/alerts' },
       ],
     },
     {
@@ -92,47 +107,36 @@ export function StudioNavigation() {
       ],
     },
     {
-      section: 'Studio',
+      section: 'Team & Safety',
       items: [
-        { label: 'Pieces', icon: <Palette className="w-5 h-5" />, href: '/pieces' },
+        { label: 'Team', icon: <UserCircle className="w-5 h-5" />, href: '/team' },
+        { label: 'Roles & Studio', icon: <ShieldCheck className="w-5 h-5" />, href: '/roles' },
+        { label: 'Health & Safety', icon: <HeartPulse className="w-5 h-5" />, href: '/health-safety' },
+        { label: 'Training', icon: <GraduationCap className="w-5 h-5" />, href: '/training' },
+      ],
+    },
+    {
+      section: 'Rarely needed',
+      items: [
+        { label: 'Photo Match', icon: <Camera className="w-5 h-5" />, href: '/photo-match' },
+        { label: 'Needs Verification', icon: <ShieldCheck className="w-5 h-5" />, href: '/needs-verification' },
+        { label: 'Recover Party Sizes', icon: <RefreshIcon className="w-5 h-5" />, href: '/backfill-party-sizes' },
+        { label: 'KDS', icon: <ChefHat className="w-5 h-5" />, href: '/kds' },
         { label: 'Kiln Workflow', icon: <Zap className="w-5 h-5" />, href: '/kiln-workflow' },
-        { label: 'Kiln — Collection & Post', icon: <Flame className="w-5 h-5" />, href: '/kiln-dip' },
         { label: 'Inventory', icon: <Package className="w-5 h-5" />, href: '/inventory' },
         { label: 'Lifecycle', icon: <GitBranch className="w-5 h-5" />, href: '/lifecycle' },
         { label: 'Catalogue', icon: <Boxes className="w-5 h-5" />, href: '/catalogue' },
-      ],
-    },
-    {
-      section: 'Business',
-      items: [
-        { label: 'Customers', icon: <Users className="w-5 h-5" />, href: '/customers' },
         { label: 'Reports', icon: <TrendingUp className="w-5 h-5" />, href: '/reports' },
-        { label: 'Money', icon: <PoundSterling className="w-5 h-5" />, href: '/money' },
         { label: 'Analytics', icon: <BarChart3 className="w-5 h-5" />, href: '/analytics' },
         { label: 'Billing', icon: <CreditCard className="w-5 h-5" />, href: '/billing' },
         { label: 'Loyalty', icon: <Award className="w-5 h-5" />, href: '/loyalty' },
-      ],
-    },
-    {
-      section: 'Community',
-      items: [
+        { label: 'Notifications', icon: <BellRing className="w-5 h-5" />, href: '/notifications' },
         { label: 'Community', icon: <Sparkles className="w-5 h-5" />, href: '/community' },
         { label: 'Studios Worldwide', icon: <Globe2 className="w-5 h-5" />, href: '/studios-worldwide' },
         { label: 'Our Profile', icon: <UserSquare2 className="w-5 h-5" />, href: '/our-profile' },
         { label: 'Collections', icon: <Library className="w-5 h-5" />, href: '/collections' },
         { label: 'My Bookings', icon: <CalendarClock className="w-5 h-5" />, href: '/my-bookings' },
         { label: 'Customer View', icon: <QrCode className="w-5 h-5" />, href: '/customer' },
-      ],
-    },
-    {
-      section: 'Admin',
-      items: [
-        { label: 'Team', icon: <UserCircle className="w-5 h-5" />, href: '/team' },
-        { label: 'Alerts', icon: <Bell className="w-5 h-5" />, href: '/alerts' },
-        { label: 'Notifications', icon: <BellRing className="w-5 h-5" />, href: '/notifications' },
-        { label: 'Roles & Studio', icon: <ShieldCheck className="w-5 h-5" />, href: '/roles' },
-        { label: 'Health & Safety', icon: <HeartPulse className="w-5 h-5" />, href: '/health-safety' },
-        { label: 'Training', icon: <GraduationCap className="w-5 h-5" />, href: '/training' },
       ],
     },
   ];
