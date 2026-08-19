@@ -169,6 +169,13 @@ function BookingsPageInner() {
     }
   };
   const [photoMatches, setPhotoMatches] = useState<PhotoMatch[]>([]);
+  // Real full-screen viewer -- per Daisy: "if I click on it, I can
+  // enlarge it so that I can visually try to see what I'm looking for
+  // in the app rather than scroll through all the photographs on the
+  // iPad to find what I'm looking for when it comes out of the kiln."
+  // An 80px thumbnail is genuinely useless for identifying a piece
+  // against a shelf of fired pottery.
+  const [zoomPhoto, setZoomPhoto] = useState<{ url: string; caption: string } | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [tillItems, setTillItems] = useState<TillItem[]>([]);
   const [menu, setMenu] = useState<MenuItem[]>([]);
@@ -662,7 +669,15 @@ function BookingsPageInner() {
                       {detail.pieces.map((p) => (
                         <div key={p.id} style={{ border: '1px solid #eee', borderRadius: '6px', overflow: 'hidden' }}>
                           {p.reference_photo_url ? (
-                            <img src={p.reference_photo_url} alt="" style={{ width: '100%', height: 80, objectFit: 'cover', display: 'block' }} />
+                            <img
+                              src={p.reference_photo_url}
+                              alt=""
+                              onClick={() => setZoomPhoto({
+                                url: p.reference_photo_url!,
+                                caption: [detail.booking?.customer_name, p.piece_type || p.description].filter(Boolean).join(' — '),
+                              })}
+                              style={{ width: '100%', height: 80, objectFit: 'cover', display: 'block', cursor: 'zoom-in' }}
+                            />
                           ) : (
                             <div style={{ width: '100%', height: 80, backgroundColor: '#f7f7f7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: '#bbb' }}>
                               no photo yet
@@ -683,7 +698,15 @@ function BookingsPageInner() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                       {photoMatches.map((m) => (
                         <div key={m.id} style={{ display: 'flex', gap: '0.75rem', border: '1px solid #eee', borderRadius: '6px', overflow: 'hidden' }}>
-                          <img src={m.photo_url} alt="Matched pieces" style={{ width: '90px', height: '90px', objectFit: 'cover', flexShrink: 0 }} />
+                          <img
+                            src={m.photo_url}
+                            alt="Matched pieces"
+                            onClick={() => setZoomPhoto({
+                              url: m.photo_url,
+                              caption: [detail.booking?.customer_name, m.ai_description].filter(Boolean).join(' — '),
+                            })}
+                            style={{ width: '90px', height: '90px', objectFit: 'cover', flexShrink: 0, cursor: 'zoom-in' }}
+                          />
                           <div style={{ padding: '0.5rem 0.5rem 0.5rem 0' }}>
                             {m.ai_description && <p style={{ fontSize: '0.8rem', color: '#444' }}>{m.ai_description}</p>}
                             <p style={{ fontSize: '0.7rem', color: '#999', marginTop: '0.25rem' }}>{new Date(m.created_at).toLocaleString()}</p>
@@ -703,6 +726,34 @@ function BookingsPageInner() {
               </>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Real full-screen photo viewer -- tap any piece or matched photo
+          to enlarge it, so a piece can actually be identified against
+          the shelf when it comes out of the kiln. Tap anywhere to
+          dismiss. */}
+      {zoomPhoto && (
+        <div
+          onClick={() => setZoomPhoto(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 100,
+            backgroundColor: 'rgba(0,0,0,0.92)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '1rem', cursor: 'zoom-out',
+          }}
+        >
+          <img
+            src={zoomPhoto.url}
+            alt={zoomPhoto.caption}
+            style={{ maxWidth: '100%', maxHeight: '82vh', objectFit: 'contain', borderRadius: 8 }}
+          />
+          {zoomPhoto.caption && (
+            <p style={{ color: 'white', fontSize: '0.9rem', fontWeight: 600, marginTop: '0.9rem', textAlign: 'center' }}>
+              {zoomPhoto.caption}
+            </p>
+          )}
+          <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', marginTop: '0.4rem' }}>Tap anywhere to close</p>
         </div>
       )}
     </PageShell>
