@@ -282,7 +282,15 @@ export default function FloorPage() {
       }
     } catch { /* fresh table, no till yet */ }
     loadLiveSquareOrder(b.booking_code);
-    setPhase(3);
+    // Per Daisy directly: "the Square till points are used... the girls
+    // know it. I think it's cumbersome within the app. We'll have the
+    // app for everything else other than payment." The in-app till
+    // (phase 3) is skipped entirely -- straight from selecting a table
+    // to Completion. Phase 3's code is left in place rather than ripped
+    // out of 450 interwoven lines: unreachable, zero risk to the
+    // working flow, and trivially restored by putting back setPhase(3)
+    // if that call ever changes.
+    setPhase(4);
   };
 
   // Sensible default for the collection date field -- 14 days out, a
@@ -478,7 +486,7 @@ export default function FloorPage() {
     return (
       <div className="min-h-screen p-4" style={{ backgroundColor: B.charcoal }}>
         <div className="max-w-2xl mx-auto">
-          <Header label={quickAccessMode ? 'Seated Bookings' : 'Phase 2/5 · Table'} />
+          <Header label={quickAccessMode ? 'Seated Bookings' : 'Step 2/4 · Table'} />
           <div className="rounded-lg p-6" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
             <div className="text-center mb-6">
               <span className="text-4xl">{quickAccessMode ? '🪑' : '🎨'}</span>
@@ -995,15 +1003,21 @@ export default function FloorPage() {
     return (
       <div className="min-h-screen p-4" style={{ backgroundColor: B.charcoal }}>
         <div className="max-w-2xl mx-auto">
-          <Header label="Phase 4/5 · Completion" />
+          <Header label="Step 3/4 · Completion" />
 
           {/* Totals summary */}
           <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
             <p style={{ color: B.ivory, fontWeight: 700, fontSize: '0.95rem' }}>{current?.customer_name}</p>
-            <div className="flex justify-between mt-1">
-              <span style={{ color: B.stone, fontSize: '0.8rem' }}>Till total</span>
-              <span style={{ color: B.ivory, fontWeight: 700, fontSize: '0.9rem' }}>£{(tillTotal / 100).toFixed(2)}</span>
-            </div>
+            {/* Payment is taken on the real Square till, not in the app --
+                so this only shows if a total genuinely exists (e.g. an
+                older booking that used the in-app till), rather than
+                displaying a meaningless £0.00 on every table. */}
+            {tillTotal > 0 && (
+              <div className="flex justify-between mt-1">
+                <span style={{ color: B.stone, fontSize: '0.8rem' }}>Till total</span>
+                <span style={{ color: B.ivory, fontWeight: 700, fontSize: '0.9rem' }}>£{(tillTotal / 100).toFixed(2)}</span>
+              </div>
+            )}
             {splitBillCount > 1 && (
               <div className="flex justify-between mt-1">
                 <span style={{ color: B.stone, fontSize: '0.75rem' }}>Split {splitBillCount} ways</span>
@@ -1186,7 +1200,7 @@ export default function FloorPage() {
   return (
     <div className="min-h-screen p-4" style={{ backgroundColor: B.charcoal }}>
       <div className="max-w-2xl mx-auto">
-        <Header label="Phase 5/5 · Hand-off" />
+        <Header label="Step 4/4 · Hand-off" />
         <div className="rounded-lg p-8" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
           <div className="text-center mb-6">
             <span className="text-4xl">✅</span>
