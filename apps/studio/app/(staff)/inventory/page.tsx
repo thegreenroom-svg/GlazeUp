@@ -2,72 +2,104 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Package, AlertCircle, CheckCircle } from 'lucide-react';
-import { SkeletonGrid } from '@/components/Skeleton';
+import { Search, Package } from 'lucide-react';
 
-interface Piece {
-  id: string;
-  piece_type: string;
-  status: string;
-  is_complete: boolean;
+interface BisqueItem {
+  item_name: string;
+  category: string | null;
+  price_cents: number | null;
 }
 
+// Real bisque stock, from the genuinely-populated Square catalog
+// (square_items) -- NOT customers' painted pieces, which is what this
+// page used to show by mistake. Per Daisy: "the girls look it up... if
+// people want a Z or a letter A, they'll go and look on quickly before
+// they check the stock room."
 export default function InventoryPage() {
-  const [pieces, setPieces] = useState<Piece[]>([]);
+  const [items, setItems] = useState<BisqueItem[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/pieces`)
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed to load');
-        return res.json();
+  const load = useCallback(() => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (search.trim()) params.set('search', search.trim());
+    if (category) params.set('category', category);
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/inventory/bisque?${params}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d) return;
+        setItems(d.items || []);
+        if ((d.categories || []).length) setCategories(d.categories);
       })
-      .then(setPieces)
-      .catch(() => setError('Could not load inventory.'))
+      .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [search, category]);
 
-  const inProgress = pieces.filter((p) => !p.is_complete).length;
-  const complete = pieces.filter((p) => p.is_complete).length;
-
-  const StatCard = ({ icon: Icon, label, value, color }: { icon: any; label: string; value: number; color: string }) => (
-    <div style={{ padding: '1.5rem', backgroundColor: 'white', border: `2px solid ${color}`, borderRadius: '8px', textAlign: 'center' }}>
-      <Icon size={32} color={color} style={{ margin: '0 auto 0.5rem' }} />
-      <p style={{ color: '#666', fontSize: '0.875rem', marginBottom: '0.5rem' }}>{label}</p>
-      <h3 style={{ fontSize: '2rem', fontWeight: 'bold', color }}>{value}</h3>
-    </div>
-  );
+  // Debounced so typing a search doesn't fire a request per keystroke.
+  useEffect(() => {
+    const t = setTimeout(load, 250);
+    return () => clearTimeout(t);
+  }, [load]);
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem' }}>
-      <div
-        style={{
-          padding: '0.75rem 1rem',
-          backgroundColor: '#fff8e1',
-          border: '1px solid #ffca28',
-          borderRadius: '4px',
-          marginBottom: '1.5rem',
-          fontSize: '0.875rem',
-        }}
-      >
-        Demo view — read-only.
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '1.5rem', maxWidth: 700, margin: '0 auto' }}>
+      <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem', color: 'var(--charcoal)' }}>Bisque Stock</h1>
+      <p style={{ color: '#666', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
+        What we carry, straight from the Square catalogue. Search before checking the stock room.
+      </p>
+
+      <div style={{ position: 'relative', marginBottom: '0.7rem' }}>
+        <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#999' }} />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search — e.g. letter A, mug, vase"
+          style={{ width: '100%', padding: '0.65rem 0.7rem 0.65rem 2.2rem', border: '1px solid #ddd', borderRadius: 8, fontSize: '0.9rem', color: '#333', backgroundColor: 'white', boxSizing: 'border-box' }}
+        />
       </div>
 
-      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '2rem' }}>Inventory</h1>
+      <select
+        value={category}
+        onChange={(e) => setCategory(e.target.value)}
+        style={{ width: '100%', padding: '0.6rem 0.7rem', border: '1px solid #ddd', borderRadius: 8, fontSize: '0.88rem', marginBottom: '1.1rem', color: '#333', backgroundColor: 'white' }}
+      >
+        <option value="">All bisque categories</option>
+        {categories.map((c) => (
+          <option key={c} value={c}>{c.replace(/^PB /, '')}</option>
+        ))}
+      </select>
 
-      {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
+      {loading && <p style={{ color: '#999', fontSize: '0.85rem' }}>Loading...</p>}
 
-      {loading ? (
-        <SkeletonGrid count={3} />
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-          <StatCard icon={Package} label="Total Pieces" value={pieces.length} color="var(--clay)" />
-          <StatCard icon={AlertCircle} label="In Progress" value={inProgress} color="#ff9900" />
-          <StatCard icon={CheckCircle} label="Complete" value={complete} color="#00aa00" />
-        </div>
+      {!loading && items.length === 0 && (
+        <p style={{ color: '#999', fontSize: '0.9rem' }}>Nothing matching that.</p>
+      )}
+
+      {!loading && items.length > 0 && (
+        <>
+          <p style={{ fontSize: '0.75rem', color: '#999', marginBottom: '0.5rem' }}>{items.length} item{items.length === 1 ? '' : 's'}</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            {items.map((it, i) => (
+              <div key={`${it.item_name}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', padding: '0.65rem 0.8rem', backgroundColor: 'white', borderRadius: 10, boxShadow: '0 1px 4px rgba(43,39,36,0.07)' }}>
+                <Package size={16} color="var(--clay)" style={{ flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--charcoal)' }}>{it.item_name}</p>
+                  {it.category && <p style={{ fontSize: '0.72rem', color: '#999' }}>{it.category.replace(/^PB /, '')}</p>}
+                </div>
+                {it.price_cents != null && (
+                  <p style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--clay)', flexShrink: 0 }}>
+                    £{(it.price_cents / 100).toFixed(2)}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </motion.div>
   );

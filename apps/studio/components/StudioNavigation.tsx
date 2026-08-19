@@ -93,6 +93,7 @@ export function StudioNavigation() {
       section: 'Studio & Money',
       items: [
         { label: 'Pieces', icon: <Palette className="w-5 h-5" />, href: '/pieces' },
+        { label: 'Bisque Stock', icon: <Package className="w-5 h-5" />, href: '/inventory' },
         { label: 'Money', icon: <PoundSterling className="w-5 h-5" />, href: '/money' },
         { label: 'Customers', icon: <Users className="w-5 h-5" />, href: '/customers' },
         { label: 'Alerts', icon: <Bell className="w-5 h-5" />, href: '/alerts' },
@@ -123,7 +124,6 @@ export function StudioNavigation() {
         { label: 'Recover Party Sizes', icon: <RefreshIcon className="w-5 h-5" />, href: '/backfill-party-sizes' },
         { label: 'KDS', icon: <ChefHat className="w-5 h-5" />, href: '/kds' },
         { label: 'Kiln Workflow', icon: <Zap className="w-5 h-5" />, href: '/kiln-workflow' },
-        { label: 'Inventory', icon: <Package className="w-5 h-5" />, href: '/inventory' },
         { label: 'Lifecycle', icon: <GitBranch className="w-5 h-5" />, href: '/lifecycle' },
         { label: 'Catalogue', icon: <Boxes className="w-5 h-5" />, href: '/catalogue' },
         { label: 'Reports', icon: <TrendingUp className="w-5 h-5" />, href: '/reports' },

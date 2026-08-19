@@ -3597,3 +3597,52 @@ export function registerCurrentCollectionDateRoute(app, supabase, STUDIO_ID, log
     }
   });
 }
+
+// ============================================================================
+// REAL BISQUE INVENTORY -- Daisy: "we actually have an inventory on the
+// system... the girls look it up... if people want a Z or a letter A,
+// they'll go and look on quickly before they check the stock room."
+//
+// The Inventory page was pointing at /api/demo/pieces -- customers' own
+// painted pottery, not stock at all. The real, genuinely-populated
+// inventory is square_items (1,190 real rows, checked directly), synced
+// from the real Square catalog, with real categories including "PB
+// Alphabet and numbers" (37 items -- exactly the letters being looked
+// up). This serves that real data, searchable.
+// ============================================================================
+export function registerBisqueInventoryRoute(app, supabase, STUDIO_ID, logger) {
+  app.get('/api/spec/inventory/bisque', async (req, res) => {
+    try {
+      const { search, category } = req.query;
+      let q = supabase
+        .from('square_items')
+        .select('item_name, category, price_cents')
+        .eq('studio_id', STUDIO_ID);
+
+      // Bisque only by default -- the real catalog also holds drinks,
+      // cakes and studio fees, which aren't what "stock room" means here.
+      // Real category prefix confirmed against the live data: every
+      // paint-your-own bisque category starts "PB ".
+      if (category) q = q.eq('category', category);
+      else q = q.like('category', 'PB %');
+
+      if (search) q = q.ilike('item_name', `%${String(search).trim()}%`);
+
+      const { data, error } = await q.order('item_name').limit(500);
+      if (error) throw error;
+
+      // Real category list for filtering, from the actual data.
+      const { data: allCats } = await supabase
+        .from('square_items')
+        .select('category')
+        .eq('studio_id', STUDIO_ID)
+        .like('category', 'PB %');
+      const categories = [...new Set((allCats || []).map((c) => c.category).filter(Boolean))].sort();
+
+      res.json({ items: data || [], categories, count: (data || []).length });
+    } catch (err) {
+      logger.error('bisque inventory failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
