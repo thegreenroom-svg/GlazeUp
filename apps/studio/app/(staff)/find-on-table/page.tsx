@@ -15,6 +15,7 @@ interface Booking {
 interface PieceResult {
   id: string;
   description: string;
+  reference_photo_url: string | null;
   found: boolean;
   confidence: 'high' | 'medium' | 'low';
   x_pct: number | null;
@@ -222,6 +223,16 @@ export default function FindOnTablePage() {
                 <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: '50%', backgroundColor: PIN_COLOURS[i % PIN_COLOURS.length], color: 'white', fontSize: '0.7rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
               ) : (
                 <XCircle size={18} color="#c33" style={{ flexShrink: 0, marginTop: 1 }} />
+              )}
+              {/* The real reference photo, right beside the result -- standing
+                  at the shelf, this is the side-by-side that actually helps:
+                  "here's what it looked like painted, here's where it is now." */}
+              {r.reference_photo_url && (
+                <img
+                  src={r.reference_photo_url}
+                  alt=""
+                  style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 6, flexShrink: 0, border: '1px solid #ddd' }}
+                />
               )}
               <div style={{ flex: 1 }}>
                 <p style={{ fontSize: '0.85rem', fontWeight: 600 }}>{r.description}</p>

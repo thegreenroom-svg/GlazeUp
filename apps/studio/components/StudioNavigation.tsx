@@ -84,7 +84,7 @@ export function StudioNavigation() {
         { label: 'Start Floor', icon: <Footprints className="w-5 h-5" />, href: '/floor' },
         { label: 'Print Cards', icon: <PrinterIcon className="w-5 h-5" />, href: '/daily-cards' },
         { label: 'Bookings', icon: <Calendar className="w-5 h-5" />, href: '/bookings' },
-        { label: 'Completion', icon: <Stamp className="w-5 h-5" />, href: '/completion' },
+        { label: 'Stamp a Piece', icon: <Stamp className="w-5 h-5" />, href: '/completion' },
         { label: 'Find on Table', icon: <MapPin className="w-5 h-5" />, href: '/find-on-table' },
         { label: 'Kiln — Collection & Post', icon: <Flame className="w-5 h-5" />, href: '/kiln-dip' },
       ],

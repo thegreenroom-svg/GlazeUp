@@ -3209,7 +3209,7 @@ export function registerFindAllOnTableRoute(app, supabase, STUDIO_ID, logger, ax
 
       const { data: pieces } = await supabase
         .from('pottery_pieces')
-        .select('id, description, piece_type, status')
+        .select('id, description, piece_type, status, reference_photo_url')
         .eq('studio_id', STUDIO_ID)
         .eq('booking_id', req.params.code)
         .neq('archived', true)
@@ -3296,6 +3296,7 @@ export function registerFindAllOnTableRoute(app, supabase, STUDIO_ID, logger, ax
         return {
           id: p.id,
           description: p.description || p.piece_type,
+          reference_photo_url: p.reference_photo_url || null,
           found: !!r.found,
           confidence: r.confidence || 'low',
           x_pct, y_pct,

@@ -907,7 +907,41 @@ app.post('/api/demo/photo-match/confirm', upload.single('photo'), async (req, re
 
     if (insertError) throw insertError;
 
-    res.json(inserted);
+    // Real end-to-end connection -- this was the genuine gap in the
+    // pipeline. Floor's completion already took one whole-table photo
+    // and saved it here against the booking, but never created
+    // pottery_pieces rows or set reference_photo_url. Find on Table (the
+    // kiln-unpacking tool) searches PIECES, not booking photos -- so the
+    // photo was visible on the booking yet invisible to the tool that
+    // actually needs it on the 28th. Now one table photo does the whole
+    // job: if piece_count is supplied and this booking has no pieces
+    // yet, create that many real piece rows, each carrying this photo as
+    // its reference. One tap on a busy floor, pipeline complete.
+    const pieceCount = parseInt(req.body.piece_count, 10);
+    let piecesCreated = 0;
+    if (Number.isFinite(pieceCount) && pieceCount > 0) {
+      const { count: existing } = await supabase
+        .from('pottery_pieces')
+        .select('id', { count: 'exact', head: true })
+        .eq('studio_id', DEMO_STUDIO_ID)
+        .eq('booking_id', booking_code);
+      if (!existing) {
+        const rows = Array.from({ length: pieceCount }, (_, i) => ({
+          studio_id: DEMO_STUDIO_ID,
+          booking_id: booking_code,
+          piece_type: `Piece ${i + 1} of ${pieceCount}`,
+          description: description || null,
+          status: 'queued',
+          reference_photo_url: urlData.publicUrl,
+          reference_photo_taken_at: new Date().toISOString(),
+        }));
+        const { data: created, error: piecesErr } = await supabase.from('pottery_pieces').insert(rows).select('id');
+        if (piecesErr) logger.error('[photo-match/confirm] piece creation failed', piecesErr);
+        else piecesCreated = (created || []).length;
+      }
+    }
+
+    res.json({ ...inserted, pieces_created: piecesCreated });
   } catch (err) {
     logger.error(err);
     res.status(500).json({ error: err.message });

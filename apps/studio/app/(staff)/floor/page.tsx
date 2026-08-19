@@ -395,6 +395,10 @@ export default function FloorPage() {
         formData.append('chalk_tag_name', current.customer_name);
         formData.append('description', `${pieceCount} pieces, Start Floor hand-off`);
         formData.append('confirmed_by', 'start-floor');
+        // Real pipeline connection: this one photo also creates the
+        // piece records with itself attached, so Find on Table can
+        // genuinely find them when the kiln comes out.
+        formData.append('piece_count', String(Math.max(1, pieceCount)));
         await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/photo-match/confirm`, { method: 'POST', body: formData });
       }
 

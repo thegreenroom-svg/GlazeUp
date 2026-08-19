@@ -181,10 +181,10 @@ export default function CompletionPage() {
   };
 
   return (
-    <PageShell title="Completion">
+    <PageShell title="Stamp a Piece">
       
       <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-        Photograph a finished piece — it gets a real, scannable QR plus the customer&apos;s name and today&apos;s date stamped on.
+        For an individual piece that needs its own stamped photo with a scannable QR. The normal flow is Start Floor, which photographs the whole table in one go.
       </p>
 
       <select

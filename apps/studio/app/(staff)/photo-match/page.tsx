@@ -91,7 +91,7 @@ export default function PhotoMatchPage() {
     <PageShell title="Photo Match">
       <AiCostCounter />
       <div style={{ padding: '0.75rem 1rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '4px', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
-        Test tool — uses real AI vision (small per-photo cost). Reads the chalk tag and pieces, checks against your real recent bookings. Writes nothing anywhere.
+        Identify whose pieces these are. Uses real AI vision (small per-photo cost). Reads the chalk tag and pieces, checks against recent bookings. Confirming a match saves the photo to that booking.
       </div>
 
       
