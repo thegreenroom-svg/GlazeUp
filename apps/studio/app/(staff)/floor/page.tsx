@@ -87,6 +87,18 @@ type Phase = 1 | 2 | 3 | 4 | 5;
 export default function FloorPage() {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>(1);
+  // Real per-studio setting, not a hardcoded choice -- The Kiln Cafe
+  // takes payment on physical Square terminals and skips the in-app
+  // till, but a studio without Square terminals may genuinely need it.
+  // Defaults true so a slow/failed load never hides functionality.
+  const [tillEnabled, setTillEnabled] = useState(true);
+
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/studio/features`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d && typeof d.feature_in_app_till === 'boolean') setTillEnabled(d.feature_in_app_till); })
+      .catch(() => {});
+  }, []);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [allBookings, setAllBookings] = useState<Booking[]>([]);
   const [floorDate, setFloorDate] = useState(new Date().toISOString().slice(0, 10));
@@ -284,13 +296,12 @@ export default function FloorPage() {
     loadLiveSquareOrder(b.booking_code);
     // Per Daisy directly: "the Square till points are used... the girls
     // know it. I think it's cumbersome within the app. We'll have the
-    // app for everything else other than payment." The in-app till
-    // (phase 3) is skipped entirely -- straight from selecting a table
-    // to Completion. Phase 3's code is left in place rather than ripped
-    // out of 450 interwoven lines: unreachable, zero risk to the
-    // working flow, and trivially restored by putting back setPhase(3)
-    // if that call ever changes.
-    setPhase(4);
+    // app for everything else other than payment." Now a real
+    // per-studio setting rather than hardcoded, since this has to be
+    // sellable to studios with genuinely different setups -- The Kiln
+    // Cafe skips straight to Completion; a studio that needs the in-app
+    // till still gets it.
+    setPhase(tillEnabled ? 3 : 4);
   };
 
   // Sensible default for the collection date field -- 14 days out, a
@@ -486,7 +497,7 @@ export default function FloorPage() {
     return (
       <div className="min-h-screen p-4" style={{ backgroundColor: B.charcoal }}>
         <div className="max-w-2xl mx-auto">
-          <Header label={quickAccessMode ? 'Seated Bookings' : 'Step 2/4 · Table'} />
+          <Header label={quickAccessMode ? 'Seated Bookings' : `Step 2/${tillEnabled ? 5 : 4} · Table`} />
           <div className="rounded-lg p-6" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
             <div className="text-center mb-6">
               <span className="text-4xl">{quickAccessMode ? '🪑' : '🎨'}</span>
@@ -1003,7 +1014,7 @@ export default function FloorPage() {
     return (
       <div className="min-h-screen p-4" style={{ backgroundColor: B.charcoal }}>
         <div className="max-w-2xl mx-auto">
-          <Header label="Step 3/4 · Completion" />
+          <Header label={`Step ${tillEnabled ? 4 : 3}/${tillEnabled ? 5 : 4} · Completion`} />
 
           {/* Totals summary */}
           <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
@@ -1200,7 +1211,7 @@ export default function FloorPage() {
   return (
     <div className="min-h-screen p-4" style={{ backgroundColor: B.charcoal }}>
       <div className="max-w-2xl mx-auto">
-        <Header label="Step 4/4 · Hand-off" />
+        <Header label={`Step ${tillEnabled ? 5 : 4}/${tillEnabled ? 5 : 4} · Hand-off`} />
         <div className="rounded-lg p-8" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
           <div className="text-center mb-6">
             <span className="text-4xl">✅</span>

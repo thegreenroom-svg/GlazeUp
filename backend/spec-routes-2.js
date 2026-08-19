@@ -3646,3 +3646,57 @@ export function registerBisqueInventoryRoute(app, supabase, STUDIO_ID, logger) {
     }
   });
 }
+
+// ============================================================================
+// STUDIO FEATURE FLAGS -- real per-studio settings, not hardcoded choices.
+// ----------------------------------------------------------------------------
+// Daisy: "other app users, companies using this app when we
+// commercialise may use different setups... we mustn't forget this has
+// to be something we want to sell." The in-app till is the first real
+// case: The Kiln Cafe takes payment on physical Square terminals and
+// finds the in-app till cumbersome, but a studio without Square
+// terminals may genuinely need it. So it's a real setting per studio,
+// defaulting ON for everyone else, rather than a decision baked into
+// the code for one studio's workflow.
+// ============================================================================
+export function registerStudioFeaturesRoute(app, supabase, STUDIO_ID, logger) {
+  app.get('/api/spec/studio/features', async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('studios')
+        .select('feature_in_app_till, feature_kds')
+        .eq('id', STUDIO_ID)
+        .single();
+      if (error) throw error;
+      res.json(data);
+    } catch (err) {
+      logger.error('studio features failed', err.message);
+      // Real fallback -- if this ever fails, default to the full
+      // feature set rather than silently hiding functionality a studio
+      // may depend on.
+      res.json({ feature_in_app_till: true, feature_kds: true });
+    }
+  });
+
+  app.post('/api/spec/studio/features', async (req, res) => {
+    try {
+      const { feature_in_app_till, feature_kds } = req.body || {};
+      const update = {};
+      if (typeof feature_in_app_till === 'boolean') update.feature_in_app_till = feature_in_app_till;
+      if (typeof feature_kds === 'boolean') update.feature_kds = feature_kds;
+      if (!Object.keys(update).length) return res.status(400).json({ error: 'No valid feature flags supplied' });
+
+      const { data, error } = await supabase
+        .from('studios')
+        .update(update)
+        .eq('id', STUDIO_ID)
+        .select('feature_in_app_till, feature_kds')
+        .single();
+      if (error) throw error;
+      res.json(data);
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
