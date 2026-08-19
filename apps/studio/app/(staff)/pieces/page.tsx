@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { PageShell } from '@/components/PageShell';
 import { AlertTriangle } from 'lucide-react';
 import { SkeletonGrid } from '@/components/Skeleton';
 
@@ -115,12 +115,12 @@ export default function PiecesPage() {
   }, []);
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem' }}>
+    <PageShell title="Pieces">
       <div style={{ padding: '0.75rem 1rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '4px', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
         Demo view — read-only. Showing your 50 most recent pieces.
       </div>
 
-      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '1rem' }}>Pieces</h1>
+      
 
       <input
         type="text"
@@ -296,6 +296,6 @@ export default function PiecesPage() {
           </div>
         </div>
       )}
-    </motion.div>
+    </PageShell>
   );
 }

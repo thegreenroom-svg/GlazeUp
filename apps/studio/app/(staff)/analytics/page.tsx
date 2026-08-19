@@ -34,7 +34,7 @@ export default function AnalyticsPage() {
   const maxWeekday = data ? Math.max(...WEEKDAYS.map((d) => data.by_weekday[d] || 0), 1) : 1;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '700px' }}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '1.5rem 1.25rem', maxWidth: '700px', margin: '0 auto' }}>
       <PageHeader title="Analytics" subtitle="Worked out from real bookings, pieces and firings." />
 
       <StatusBlock loading={loading} error={error} />

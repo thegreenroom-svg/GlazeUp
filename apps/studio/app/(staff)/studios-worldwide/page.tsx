@@ -33,7 +33,7 @@ export default function StudiosWorldwidePage() {
   }, []);
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '650px' }}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '1.5rem 1.25rem', maxWidth: '700px', margin: '0 auto' }}>
       <PageHeader title="Studios Worldwide" subtitle="Real studios on the network who&apos;ve opted into the public directory." />
 
       <StatusBlock loading={loading} error={error} />

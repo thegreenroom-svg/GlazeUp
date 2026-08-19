@@ -54,7 +54,7 @@ export default function LifecyclePage() {
   const stageOrder = data ? [...data.stages, 'other'] : [];
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '700px' }}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '1.5rem 1.25rem', maxWidth: '700px', margin: '0 auto' }}>
       <PageHeader title="Piece Lifecycle" subtitle="Every piece, by where it is in the journey. Tap a stage to see what&apos;s in it." />
 
       <StatusBlock loading={loading} error={error} />

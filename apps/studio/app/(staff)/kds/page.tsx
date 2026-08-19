@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { PageShell } from '@/components/PageShell';
 import { Check, Clock } from 'lucide-react';
 
 interface QueueItem {
@@ -53,8 +53,8 @@ export default function KdsPage() {
   const minutesAgo = (iso: string) => Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '700px' }}>
-      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>KDS</h1>
+    <PageShell title="KDS">
+      
       <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
         Real drink, food and glaze requests placed by customers or staff from the table. Refreshes automatically.
       </p>
@@ -100,6 +100,6 @@ export default function KdsPage() {
           );
         })}
       </div>
-    </motion.div>
+    </PageShell>
   );
 }

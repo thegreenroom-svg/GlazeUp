@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
-import { motion } from 'framer-motion';
+import { PageShell } from '@/components/PageShell';
 import { SkeletonRows } from '@/components/Skeleton';
 import { Receipt, Calendar } from 'lucide-react';
 
@@ -299,12 +299,12 @@ function BookingsPageInner() {
   const todayStr = new Date().toISOString().slice(0, 10);
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem' }}>
+    <PageShell title="Bookings">
       <div style={{ padding: '0.75rem 1rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '4px', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
         Demo view — read-only. Tap a booking to see its table session and orders.
       </div>
 
-      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '1rem' }}>Bookings</h1>
+      
 
       <div style={{ position: 'sticky', top: 0, backgroundColor: '#FDF6F1', zIndex: 10, paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
         <input
@@ -705,7 +705,7 @@ function BookingsPageInner() {
           </div>
         </div>
       )}
-    </motion.div>
+    </PageShell>
   );
 }
 

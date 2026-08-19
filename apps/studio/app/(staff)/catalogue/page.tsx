@@ -43,7 +43,7 @@ export default function CataloguePage() {
   const shown = data ? (cat === 'all' ? data.items : data.by_category[cat] || []) : [];
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '700px' }}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '1.5rem 1.25rem', maxWidth: '700px', margin: '0 auto' }}>
       <PageHeader title="Catalogue" subtitle="Bisque shapes available to paint, and what&apos;s left in stock." />
 
       <StatusBlock loading={loading} error={error} />

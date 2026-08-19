@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { PageShell } from '@/components/PageShell';
 import { Mail, Phone } from 'lucide-react';
 import { SkeletonGrid } from '@/components/Skeleton';
 
@@ -40,7 +40,7 @@ export default function CustomersPage() {
   );
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem' }}>
+    <PageShell title="Customers">
       <div
         style={{
           padding: '0.75rem 1rem',
@@ -54,7 +54,7 @@ export default function CustomersPage() {
         Demo view — read-only.
       </div>
 
-      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '1rem' }}>Customers</h1>
+      
 
       <input
         type="text"
@@ -93,6 +93,6 @@ export default function CustomersPage() {
           ))}
         </div>
       )}
-    </motion.div>
+    </PageShell>
   );
 }

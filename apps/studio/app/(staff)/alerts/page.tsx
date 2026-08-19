@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { PageShell } from '@/components/PageShell';
 import { Bell, CheckCircle } from 'lucide-react';
 import { SkeletonRows } from '@/components/Skeleton';
 
@@ -37,12 +37,12 @@ export default function AlertsPage() {
   const priorityColor = (p: number) => (p >= 3 ? '#c33' : p === 2 ? '#ff9900' : 'var(--clay)');
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem' }}>
+    <PageShell title="Alerts">
       <div style={{ padding: '0.75rem 1rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '4px', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
         Demo view — read-only.
       </div>
 
-      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '2rem' }}>Alerts</h1>
+      
 
       {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
 
@@ -88,6 +88,6 @@ export default function AlertsPage() {
           ))}
         </div>
       )}
-    </motion.div>
+    </PageShell>
   );
 }

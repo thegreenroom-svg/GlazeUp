@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { PageShell } from '@/components/PageShell';
 import { PoundSterling, Calendar, RefreshCw } from 'lucide-react';
 import { SkeletonRows } from '@/components/Skeleton';
 
@@ -179,8 +179,8 @@ export default function MoneyPage() {
     : null;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem' }}>
-      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '2rem' }}>Money</h1>
+    <PageShell title="Money">
+      
 
       {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1.5rem' }}>{error}</div>}
 
@@ -341,6 +341,6 @@ export default function MoneyPage() {
           </div>
         </>
       )}
-    </motion.div>
+    </PageShell>
   );
 }

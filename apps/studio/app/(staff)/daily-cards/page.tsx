@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { PageShell } from '@/components/PageShell';
 import QRCode from 'qrcode';
 import { Printer, RefreshCw, AlertCircle } from 'lucide-react';
 
@@ -294,9 +294,9 @@ export default function DailyCardsPage() {
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '900px' }}>
+    <PageShell title="Print Booking Cards">
       <div className="no-print">
-        <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Print Booking Cards</h1>
+        
         <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1rem' }}>
           One real QR card per booking — scan to view the session, order drinks, or track pieces. Go forward or back to print ahead for a party or a busy day.
         </p>
@@ -616,6 +616,6 @@ export default function DailyCardsPage() {
           .print-card p { margin: 0 0 0.1in !important; line-height: 1.3; }
         }
       `}</style>
-    </motion.div>
+    </PageShell>
   );
 }

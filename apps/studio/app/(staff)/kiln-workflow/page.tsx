@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { PageShell } from '@/components/PageShell';
 import { Flame } from 'lucide-react';
 import { SkeletonGrid } from '@/components/Skeleton';
 
@@ -45,7 +45,7 @@ export default function KilnWorkflowPage() {
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem' }}>
+    <PageShell title="Kiln Workflow">
       <div
         style={{
           padding: '0.75rem 1rem',
@@ -59,7 +59,7 @@ export default function KilnWorkflowPage() {
         Demo view — read-only.
       </div>
 
-      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '2rem' }}>Kiln Workflow</h1>
+      
 
       {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
 
@@ -91,6 +91,6 @@ export default function KilnWorkflowPage() {
           ))}
         </div>
       )}
-    </motion.div>
+    </PageShell>
   );
 }

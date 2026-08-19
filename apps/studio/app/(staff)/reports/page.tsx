@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { PageShell } from '@/components/PageShell';
 import { TrendingUp, Calendar } from 'lucide-react';
 import { SkeletonRows } from '@/components/Skeleton';
 
@@ -45,12 +45,12 @@ export default function ReportsPage() {
   const mostRecentDate = rows.length > 0 ? rows.reduce((max, r) => (r.metric_date > max ? r.metric_date : max), rows[0].metric_date) : null;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem' }}>
+    <PageShell title="Reports">
       <div style={{ padding: '0.75rem 1rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '4px', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
         Demo view — read-only. Revenue breakdown by category, real data.
       </div>
 
-      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>Reports</h1>
+      
       {mostRecentDate && (
         <p style={{ color: '#666', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
           <Calendar size={16} /> Most recent data: {new Date(mostRecentDate).toLocaleDateString()}
@@ -97,6 +97,6 @@ export default function ReportsPage() {
           </div>
         </>
       )}
-    </motion.div>
+    </PageShell>
   );
 }

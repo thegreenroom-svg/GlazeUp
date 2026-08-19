@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useRef } from 'react';
 import { AiCostCounter } from '@/components/AiCostCounter';
-import { motion } from 'framer-motion';
+import { PageShell } from '@/components/PageShell';
 import { Camera, Loader, CheckCircle } from 'lucide-react';
 
 interface Candidate {
@@ -88,13 +88,13 @@ export default function PhotoMatchPage() {
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '600px' }}>
+    <PageShell title="Photo Match">
       <AiCostCounter />
       <div style={{ padding: '0.75rem 1rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '4px', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
         Test tool — uses real AI vision (small per-photo cost). Reads the chalk tag and pieces, checks against your real recent bookings. Writes nothing anywhere.
       </div>
 
-      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>Photo Match</h1>
+      
 
       <input
         ref={fileInputRef}
@@ -197,6 +197,6 @@ export default function PhotoMatchPage() {
           </div>
         </div>
       )}
-    </motion.div>
+    </PageShell>
   );
 }

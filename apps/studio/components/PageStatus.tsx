@@ -1,10 +1,14 @@
 'use client';
 
+// Kept in step with PageShell's own heading treatment deliberately --
+// 11 pages already use this component, so aligning it here brings them
+// all into line automatically rather than needing 11 rewrites. Any
+// change to page heading style should be made in BOTH places.
 export function PageHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <>
-      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>{title}</h1>
-      <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.5rem' }}>{subtitle}</p>
+      <h1 style={{ fontSize: '1.55rem', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--charcoal)', marginBottom: '0.3rem' }}>{title}</h1>
+      <p style={{ color: 'var(--charcoal)', opacity: 0.6, fontSize: '0.88rem', lineHeight: 1.5, marginBottom: '1.4rem' }}>{subtitle}</p>
     </>
   );
 }

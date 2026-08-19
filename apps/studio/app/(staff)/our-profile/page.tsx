@@ -76,7 +76,7 @@ export default function OurProfilePage() {
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '520px' }}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '1.5rem 1.25rem', maxWidth: '700px', margin: '0 auto' }}>
       <PageHeader title="Our Profile" subtitle="What other studios and the Studios Worldwide directory see about you." />
 
       <StatusBlock loading={loading} error={error} />

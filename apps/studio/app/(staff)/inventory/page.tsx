@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { PageShell } from '@/components/PageShell';
 import { Search, Package } from 'lucide-react';
 
 interface BisqueItem {
@@ -47,8 +47,8 @@ export default function InventoryPage() {
   }, [load]);
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '1.5rem', maxWidth: 700, margin: '0 auto' }}>
-      <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.25rem', color: 'var(--charcoal)' }}>Bisque Stock</h1>
+    <PageShell title="Bisque Stock">
+      
       <p style={{ color: '#666', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
         What we carry, straight from the Square catalogue. Search before checking the stock room.
       </p>
@@ -101,6 +101,6 @@ export default function InventoryPage() {
           </div>
         </>
       )}
-    </motion.div>
+    </PageShell>
   );
 }

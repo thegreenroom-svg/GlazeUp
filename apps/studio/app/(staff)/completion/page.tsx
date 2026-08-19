@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { PageShell } from '@/components/PageShell';
 import QRCode from 'qrcode';
 import { Camera, Check } from 'lucide-react';
 
@@ -181,8 +181,8 @@ export default function CompletionPage() {
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '520px' }}>
-      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Completion</h1>
+    <PageShell title="Completion">
+      
       <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
         Photograph a finished piece — it gets a real, scannable QR plus the customer&apos;s name and today&apos;s date stamped on.
       </p>
@@ -271,6 +271,6 @@ export default function CompletionPage() {
           {saved ? <><Check size={16} /> Saved to this piece</> : saving ? 'Saving...' : 'Save stamped photo'}
         </button>
       )}
-    </motion.div>
+    </PageShell>
   );
 }

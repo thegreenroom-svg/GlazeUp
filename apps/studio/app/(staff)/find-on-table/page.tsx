@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { PageShell } from '@/components/PageShell';
 import { AiCostCounter } from '@/components/AiCostCounter';
 import { Camera, Loader, XCircle, Truck, Home as HomeIcon, Printer } from 'lucide-react';
 
@@ -93,8 +93,8 @@ export default function FindOnTablePage() {
   const isPostal = fulfilment?.fulfilment_method === 'posted';
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '600px' }}>
-      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Find on Table</h1>
+    <PageShell title="Find on Table">
+      
       <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
         Pick a booking, photograph the table or tray you think its pieces are on — checks every piece from that booking at once.
       </p>
@@ -234,6 +234,6 @@ export default function FindOnTablePage() {
           ))}
         </div>
       )}
-    </motion.div>
+    </PageShell>
   );
 }

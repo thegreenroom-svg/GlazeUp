@@ -32,7 +32,7 @@ export default function NotificationsPage() {
   const firing = items.filter((i) => i.type === 'firing');
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '650px' }}>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '1.5rem 1.25rem', maxWidth: '700px', margin: '0 auto' }}>
       <PageHeader title="Customer Notifications" subtitle="What each customer would be told right now, worked out live from where their pieces actually are." />
 
       <StatusBlock loading={loading} error={error} />

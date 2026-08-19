@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { PageShell } from '@/components/PageShell';
 import { Loader, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 interface BackfillStatus {
@@ -80,8 +80,8 @@ export default function BackfillPartySizesPage() {
   const pct = status && status.total > 0 ? Math.round((status.checked / status.total) * 100) : 0;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ padding: '2rem', maxWidth: '520px' }}>
-      <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>Recover Party Sizes</h1>
+    <PageShell title="Recover Party Sizes">
+      
 
       <div style={{ padding: '0.9rem', backgroundColor: 'white', border: '1px solid #eee', borderRadius: '10px', marginBottom: '1.25rem' }}>
         <p style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.4rem' }}>Real, authoritative — from booking notes</p>
@@ -164,6 +164,6 @@ export default function BackfillPartySizesPage() {
           )}
         </>
       )}
-    </motion.div>
+    </PageShell>
   );
 }
