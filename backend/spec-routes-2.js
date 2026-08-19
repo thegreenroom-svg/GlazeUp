@@ -3538,18 +3538,24 @@ export function registerCurrentCollectionDateRoute(app, supabase, STUDIO_ID, log
       // more-specific collection_date set. A booking with its own real
       // date already set is left alone -- that's a genuine per-booking
       // override, not something this default should overwrite.
+      // Real fix -- this previously only applied to bookings whose
+      // session_start was TODAY. That's genuinely the wrong window for
+      // how this is actually used: Daisy sets the current collection
+      // date so it applies to bookings being taken now and going
+      // forward ("apply to all bookings until changed"), not just ones
+      // that happen to be sitting on the floor at that exact moment.
+      // Now covers today onward, which is what "until changed" means in
+      // practice.
       const todayStart = new Date();
       todayStart.setUTCHours(0, 0, 0, 0);
-      const todayEnd = new Date(todayStart);
-      todayEnd.setUTCDate(todayEnd.getUTCDate() + 1);
-      const { data: todaysBookings } = await supabase
+      const { data: relevantBookings } = await supabase
         .from('bookings')
         .select('booking_code')
         .eq('studio_id', STUDIO_ID)
-        .gte('session_start', todayStart.toISOString())
-        .lt('session_start', todayEnd.toISOString());
-      const codes = (todaysBookings || []).map((b) => b.booking_code);
+        .gte('session_start', todayStart.toISOString());
+      const codes = (relevantBookings || []).map((b) => b.booking_code);
       let appliedCount = 0;
+      const upsertErrors = [];
       if (codes.length) {
         const { data: existingStatuses } = await supabase
           .from('demo_app_session_status')
@@ -3558,15 +3564,33 @@ export function registerCurrentCollectionDateRoute(app, supabase, STUDIO_ID, log
           .in('booking_code', codes);
         const alreadySet = new Set((existingStatuses || []).filter((s) => s.collection_date).map((s) => s.booking_code));
         const toApply = codes.filter((c) => !alreadySet.has(c));
-        for (const booking_code of toApply) {
-          const { error: upsertErr } = await supabase
+        // Real bulk upsert rather than one call per booking -- fewer
+        // round trips, and a single real error surfaced instead of
+        // silently counting failures as successes (the old loop
+        // incremented only on success but never reported the failures,
+        // so a systematic write failure looked like "0 applied" with no
+        // explanation).
+        if (toApply.length) {
+          const rows = toApply.map((booking_code) => ({ studio_id: STUDIO_ID, booking_code, collection_date: date }));
+          const { data: upserted, error: upsertErr } = await supabase
             .from('demo_app_session_status')
-            .upsert([{ studio_id: STUDIO_ID, booking_code, collection_date: date }], { onConflict: 'booking_code' });
-          if (!upsertErr) appliedCount++;
+            .upsert(rows, { onConflict: 'booking_code' })
+            .select('booking_code');
+          if (upsertErr) {
+            logger.error('[collection-date] real bulk upsert failed', upsertErr);
+            upsertErrors.push(upsertErr.message);
+          } else {
+            appliedCount = (upserted || []).length;
+          }
         }
       }
 
-      res.json({ ...data, applied_to_bookings: appliedCount, total_bookings_today: codes.length });
+      res.json({
+        ...data,
+        applied_to_bookings: appliedCount,
+        total_bookings_today: codes.length,
+        upsert_error: upsertErrors[0] || null,
+      });
     } catch (err) {
       logger.error(err);
       res.status(500).json({ error: err.message });

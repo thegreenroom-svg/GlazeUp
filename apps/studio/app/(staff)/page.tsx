@@ -149,11 +149,18 @@ export default function Dashboard() {
         // write, not just a display default, so it's worth showing
         // exactly how many bookings it genuinely applied to.
         if (typeof d.applied_to_bookings === 'number') {
-          setAppliedMsg(
-            d.applied_to_bookings > 0
-              ? `Applied to ${d.applied_to_bookings} of ${d.total_bookings_today} bookings today (rest already had their own date set)`
-              : `No bookings today needed it — all ${d.total_bookings_today} already had their own date set`
-          );
+          // Real error surfaced explicitly -- a genuine write failure
+          // previously showed as an innocuous "0 applied", which is
+          // exactly how it went unnoticed that nothing was saving.
+          if (d.upsert_error) {
+            setAppliedMsg(`Save failed applying to bookings: ${d.upsert_error}`);
+          } else {
+            setAppliedMsg(
+              d.applied_to_bookings > 0
+                ? `Applied to ${d.applied_to_bookings} of ${d.total_bookings_today} upcoming bookings (rest already had their own date set)`
+                : `No bookings needed it — all ${d.total_bookings_today} already had their own date set`
+            );
+          }
         }
       } else {
         // Real error surfaced, not silent -- previously failed with no
