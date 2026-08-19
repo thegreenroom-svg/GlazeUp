@@ -23,6 +23,9 @@ interface Piece {
   glaze_fired_at: string | null;
   photo_phash: string | null;
   booking_id: string | null;
+  customer_name: string | null;
+  session_start: string | null;
+  collection_date: string | null;
 }
 
 interface Match {
@@ -158,6 +161,24 @@ export default function PiecesPage() {
               </div>
               <div style={{ padding: '0.75rem' }}>
                 <h3 style={{ fontWeight: '600', fontSize: '0.875rem', marginBottom: '0.25rem' }}>{piece.piece_type}</h3>
+                {/* Real booking context -- without this the card was just
+                    "Painted plate / Packed", with genuinely no way to tell
+                    whose piece it is or when it was painted. */}
+                {piece.customer_name && (
+                  <p style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--charcoal)', marginBottom: '0.15rem' }}>
+                    {piece.customer_name}
+                  </p>
+                )}
+                {piece.session_start && (
+                  <p style={{ fontSize: '0.72rem', color: 'var(--stone)', marginBottom: '0.15rem' }}>
+                    Painted {new Date(piece.session_start).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                  </p>
+                )}
+                {piece.collection_date && (
+                  <p style={{ fontSize: '0.72rem', color: 'var(--clay)', fontWeight: 600, marginBottom: '0.25rem' }}>
+                    Collect {new Date(piece.collection_date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                  </p>
+                )}
                 {piece.mark_code && <p style={{ fontSize: '0.75rem', color: 'var(--clay)', fontFamily: 'monospace', marginBottom: '0.25rem' }}>№ {piece.mark_code}</p>}
                 <span style={{ display: 'inline-block', padding: '0.15rem 0.6rem', backgroundColor: '#eef', borderRadius: '9999px', fontSize: '0.7rem', textTransform: 'capitalize' }}>
                   {piece.status.replace(/_/g, ' ')}

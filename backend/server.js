@@ -222,7 +222,39 @@ app.get('/api/demo/pieces', async (req, res) => {
       .filter((p) => !p.booking_id || !JUNK_BOOKING_LABELS.includes(p.booking_id))
       .slice(0, 50);
 
-    res.json(filtered);
+    // Real booking context joined in -- per Daisy: "I still don't
+    // understand pieces... these are not the pieces from [that date]".
+    // The page previously showed only piece_type and status, so there
+    // was genuinely no way to tell whose piece it was or when. Joins the
+    // real customer name and session date, plus the real collection date
+    // from demo_app_session_status.
+    const codes = [...new Set(filtered.map((p) => p.booking_id).filter(Boolean))];
+    let bookingsByCode = {};
+    let collectionByCode = {};
+    if (codes.length) {
+      const { data: bks } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, session_start')
+        .eq('studio_id', DEMO_STUDIO_ID)
+        .in('booking_code', codes);
+      bookingsByCode = Object.fromEntries((bks || []).map((b) => [b.booking_code, b]));
+
+      const { data: sts } = await supabase
+        .from('demo_app_session_status')
+        .select('booking_code, collection_date')
+        .eq('studio_id', DEMO_STUDIO_ID)
+        .in('booking_code', codes);
+      collectionByCode = Object.fromEntries((sts || []).map((s) => [s.booking_code, s.collection_date]));
+    }
+
+    const enriched = filtered.map((p) => ({
+      ...p,
+      customer_name: bookingsByCode[p.booking_id]?.customer_name || null,
+      session_start: bookingsByCode[p.booking_id]?.session_start || null,
+      collection_date: collectionByCode[p.booking_id] || null,
+    }));
+
+    res.json(enriched);
   } catch (err) {
     logger.error(err);
     res.status(500).json({ error: err.message });
