@@ -3721,3 +3721,109 @@ export function registerStudioFeaturesRoute(app, supabase, STUDIO_ID, logger) {
     }
   });
 }
+
+// ============================================================================
+// TEST AI -- standalone accuracy test, no booking involved. Daisy: "I need
+// to be able to test the AI recognition... household items... the same
+// system that we're gonna be using for the glaze." Real, deliberate
+// request to use the SAME proven engine as Find on Table (Gemini, real
+// bounding boxes) rather than the old, removed gpt-4o-mini text-only
+// version this page used to run on -- "put back" means put back properly
+// this time, on the technology that's actually been proven since.
+//
+// Takes two directly-uploaded photos (a reference item, a scene it's
+// mixed into) rather than looking up a real piece -- there's no booking
+// here by design, it's a pure accuracy test against household objects
+// before trusting it on real fired pottery.
+// ============================================================================
+export function registerTestAiFindRoute(app, supabase, STUDIO_ID, logger, axios, upload, fs, logGeminiUsage) {
+  app.post('/api/spec/test-ai/find', upload.fields([{ name: 'reference', maxCount: 1 }, { name: 'scene', maxCount: 1 }]), async (req, res) => {
+    try {
+      const referenceFile = req.files?.reference?.[0];
+      const sceneFile = req.files?.scene?.[0];
+      if (!referenceFile || !sceneFile) return res.status(400).json({ error: 'Both a reference photo and a scene photo are required' });
+
+      const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+      if (!GEMINI_API_KEY) {
+        return res.status(500).json({ error: 'GEMINI_API_KEY not configured on this service.' });
+      }
+
+      const base64Ref = fs.readFileSync(referenceFile.path).toString('base64');
+      const base64Scene = fs.readFileSync(sceneFile.path).toString('base64');
+
+      // Same real prompt structure as Find on Table, adapted for a direct
+      // reference photo instead of a text description -- this is a test
+      // of the underlying visual matching itself, so the reference photo
+      // IS the thing being matched, not a stand-in for one.
+      const input = [
+        {
+          type: 'text',
+          text: `You are looking for ONE specific object. The first image is a reference photo of exactly the object to find. The second image is a scene where that object has been mixed in among several other similar objects.\n\nLook carefully at the reference object's real distinguishing features -- shape, colour, pattern, any markings. Find that same object in the second (scene) image.\n\nIf you can identify it confidently, provide its bounding box in the scene image. If you cannot confidently identify it, say so honestly -- a wrong box is worse than admitting it isn't there.`,
+        },
+        { type: 'image', data: base64Ref, mime_type: referenceFile.mimetype || 'image/jpeg' },
+        { type: 'image', data: base64Scene, mime_type: sceneFile.mimetype || 'image/jpeg' },
+      ];
+
+      const responseSchema = {
+        type: 'object',
+        properties: {
+          found: { type: 'boolean' },
+          confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+          box_2d: { type: 'array', items: { type: 'integer' }, description: '[ymin, xmin, ymax, xmax] normalized 0-1000, only if found' },
+          reasoning: { type: 'string', description: 'What specifically matched, or why nothing did' },
+        },
+        required: ['found', 'confidence', 'reasoning'],
+      };
+
+      let aiRes;
+      try {
+        aiRes = await axios.post(
+          'https://generativelanguage.googleapis.com/v1beta/interactions',
+          {
+            model: 'gemini-3.6-flash',
+            input,
+            response_format: { type: 'text', mime_type: 'application/json', schema: responseSchema },
+          },
+          { headers: { 'x-goog-api-key': GEMINI_API_KEY, 'Content-Type': 'application/json' } }
+        );
+      } catch (err) {
+        logger.error('test-ai/find: Gemini call failed', err.response?.data || err.message);
+        return res.status(500).json({ error: err.response?.data?.error?.message || 'The Gemini API call failed' });
+      }
+
+      const usage = aiRes.data.usage || aiRes.data.usageMetadata;
+      if (usage) {
+        await logGeminiUsage(supabase, STUDIO_ID, 'test-ai-find-gemini', {
+          prompt_tokens: usage.prompt_tokens ?? usage.promptTokenCount ?? 0,
+          completion_tokens: usage.completion_tokens ?? usage.candidatesTokenCount ?? 0,
+        });
+      }
+
+      let result;
+      try {
+        const raw = aiRes.data.output_text || aiRes.data.output?.[0]?.text || aiRes.data.candidates?.[0]?.content?.parts?.[0]?.text;
+        result = JSON.parse((raw || '').match(/\{[\s\S]*\}/)?.[0] || '{}');
+      } catch (e) {
+        logger.error('test-ai/find: could not parse Gemini response', aiRes.data);
+        return res.status(500).json({ error: 'Could not parse the Gemini response' });
+      }
+
+      let x_pct = null, y_pct = null;
+      if (result.found && Array.isArray(result.box_2d) && result.box_2d.length === 4) {
+        const [ymin, xmin, ymax, xmax] = result.box_2d;
+        x_pct = ((xmin + xmax) / 2) / 10;
+        y_pct = ((ymin + ymax) / 2) / 10;
+      }
+
+      res.json({
+        found: !!result.found,
+        confidence: result.confidence || 'low',
+        x_pct, y_pct,
+        reasoning: result.reasoning || null,
+      });
+    } catch (err) {
+      logger.error('test-ai/find failed', err.response?.data || err.message);
+      res.status(500).json({ error: err.response?.data?.error?.message || err.message });
+    }
+  });
+}
