@@ -303,12 +303,15 @@ export default function FindOnTablePage() {
       {/* Real reset -- same as Test AI, so both behave identically.
           Clears the cumulative multi-photo progress and starts the
           booking's search fresh. */}
+      {/* Deliberately understated -- this wipes the cumulative progress,
+          so it must not compete with "take another photo" as the
+          obvious next tap. */}
       {(preview || results) && (
         <button
           onClick={() => { setPreview(null); setResults(null); setTotals(null); setFoundInPreviousPhotos({}); setError(null); }}
-          style={{ width: '100%', padding: '0.7rem', marginBottom: '0.9rem', backgroundColor: '#f0f0f0', color: '#333', border: '1px solid #ddd', borderRadius: 8, fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+          style={{ width: '100%', padding: '0.6rem', marginBottom: '0.9rem', backgroundColor: 'transparent', color: '#999', border: 'none', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', textDecoration: 'underline' }}
         >
-          <RotateCcw size={15} /> Start this booking again
+          <RotateCcw size={13} /> Start this booking again
         </button>
       )}
 
@@ -322,21 +325,36 @@ export default function FindOnTablePage() {
         const allFound = cumulativeFound >= totals.total;
         const thisPhotoCount = totals.found_count;
         return (
-          <div style={{ padding: '0.9rem', backgroundColor: allFound ? '#eafaf0' : '#fdf6e3', borderRadius: '8px', marginBottom: '0.9rem' }}>
-            <p style={{ fontWeight: 700, fontSize: '0.95rem', color: allFound ? '#1a8a3c' : '#b8860b' }}>
-              {allFound
-                ? `All ${totals.total} pieces found — booking complete`
-                : `${cumulativeFound} of ${totals.total} found so far`}
-            </p>
-            {cumulativeFound > thisPhotoCount && (
-              <p style={{ fontSize: '0.78rem', color: '#666', marginTop: '0.3rem' }}>
-                {thisPhotoCount} in this photo, {cumulativeFound - thisPhotoCount} found in earlier photos
+          <div style={{ marginBottom: '0.9rem' }}>
+            <div style={{ padding: '0.9rem', backgroundColor: allFound ? '#eafaf0' : '#fdf6e3', borderRadius: '8px' }}>
+              <p style={{ fontWeight: 700, fontSize: '0.95rem', color: allFound ? '#1a8a3c' : '#b8860b' }}>
+                {allFound
+                  ? `All ${totals.total} pieces found — booking complete`
+                  : `${cumulativeFound} of ${totals.total} found so far`}
               </p>
-            )}
+              {cumulativeFound > thisPhotoCount && (
+                <p style={{ fontSize: '0.78rem', color: '#666', marginTop: '0.3rem' }}>
+                  {thisPhotoCount} in this photo, {cumulativeFound - thisPhotoCount} found in earlier photos
+                </p>
+              )}
+              {!allFound && (
+                <p style={{ fontSize: '0.82rem', color: '#666', marginTop: '0.3rem' }}>
+                  {totals.total - cumulativeFound} still missing — photograph another table or box and they will be added to this list.
+                </p>
+              )}
+            </div>
+
+            {/* Real "photograph another table" action, right under the
+                result where the gap is noticed -- same fix as Test AI.
+                The camera above is already scrolled past by this point,
+                so without this the only visible action was the reset. */}
             {!allFound && (
-              <p style={{ fontSize: '0.82rem', color: '#666', marginTop: '0.3rem' }}>
-                {totals.total - cumulativeFound} still missing — photograph another table or box and they will be added to this list.
-              </p>
+              <label
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '100%', padding: '0.9rem', marginTop: '0.6rem', borderRadius: 10, cursor: 'pointer', position: 'relative', background: 'linear-gradient(155deg, var(--clay) 0%, #9A6435 100%)', color: 'white', fontWeight: 700, fontSize: '0.9rem', boxShadow: '0 3px 10px rgba(184,121,70,0.3)' }}
+              >
+                <input type="file" accept="image/*" capture="environment" onChange={onFile} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }} />
+                <Camera size={18} /> Photograph another table
+              </label>
             )}
           </div>
         );

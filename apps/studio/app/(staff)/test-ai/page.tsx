@@ -115,38 +115,49 @@ export default function TestAiPage() {
         Uses Google Gemini for real pixel-level detection — roughly £0.0015–0.0025 per test, logged into the same running AI cost total.
       </div>
 
-      <p style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--clay)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.6rem' }}>
-        1. Reference items
-      </p>
-      <label
-        style={{ width: '100%', padding: referencePreview ? '0.5rem' : '1.5rem', borderRadius: 12, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', position: 'relative', background: referencePreview ? 'white' : 'linear-gradient(155deg, var(--sand) 0%, #DCC9AC 100%)', boxShadow: referencePreview ? '0 2px 6px rgba(43,39,36,0.08)' : '0 4px 14px rgba(184,121,70,0.18)' }}
-      >
-        <input type="file" accept="image/*" capture="environment" onChange={onReference} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }} />
-        {referencePreview ? (
-          <img src={referencePreview} alt="Reference" style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 8 }} />
-        ) : (
-          <>
-            <Camera size={26} color="var(--clay)" />
-            <span style={{ color: 'var(--charcoal)', fontSize: '0.88rem', fontWeight: 600 }}>Photograph the reference item(s)</span>
-          </>
-        )}
-      </label>
-      <p style={{ fontSize: '0.75rem', color: '#999', marginBottom: '1.25rem', textAlign: 'center' }}>
-        {referencePreview ? 'Tap to choose different reference items' : 'Include several items in one photo to test them all at once'}
-      </p>
+      {!results && (
+        <>
+          <p style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--clay)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.6rem' }}>
+            1. Reference items
+          </p>
+          <label
+            style={{ width: '100%', padding: referencePreview ? '0.5rem' : '1.5rem', borderRadius: 12, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', position: 'relative', background: referencePreview ? 'white' : 'linear-gradient(155deg, var(--sand) 0%, #DCC9AC 100%)', boxShadow: referencePreview ? '0 2px 6px rgba(43,39,36,0.08)' : '0 4px 14px rgba(184,121,70,0.18)' }}
+          >
+            <input type="file" accept="image/*" capture="environment" onChange={onReference} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }} />
+            {referencePreview ? (
+              <img src={referencePreview} alt="Reference" style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 8 }} />
+            ) : (
+              <>
+                <Camera size={26} color="var(--clay)" />
+                <span style={{ color: 'var(--charcoal)', fontSize: '0.88rem', fontWeight: 600 }}>Photograph the reference item(s)</span>
+              </>
+            )}
+          </label>
+          <p style={{ fontSize: '0.75rem', color: '#999', marginBottom: '1.25rem', textAlign: 'center' }}>
+            {referencePreview ? 'Tap to choose different reference items' : 'Include several items in one photo to test them all at once'}
+          </p>
+        </>
+      )}
 
-      <p style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--clay)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.6rem' }}>
-        2. Scene — mixed with other items
-      </p>
-      <label
-        style={{ width: '100%', padding: '1.5rem', borderRadius: 12, cursor: referenceFile ? 'pointer' : 'not-allowed', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem', position: 'relative', background: 'linear-gradient(155deg, var(--sand) 0%, #DCC9AC 100%)', boxShadow: '0 4px 14px rgba(184,121,70,0.18)', opacity: referenceFile ? 1 : 0.5 }}
-      >
-        <input type="file" accept="image/*" capture="environment" onChange={onScene} disabled={!referenceFile} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: referenceFile ? 'pointer' : 'not-allowed' }} />
-        <Camera size={26} color="var(--clay)" />
-        <span style={{ color: 'var(--charcoal)', fontSize: '0.88rem', fontWeight: 600 }}>
-          {referenceFile ? 'Photograph the mixed-up scene' : 'Add reference items first'}
-        </span>
-      </label>
+      {/* Hidden once results exist -- the "take another photo" button
+          under the results replaces it there, so there's exactly one
+          obvious next action rather than two competing cameras. */}
+      {!results && (
+        <>
+          <p style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--clay)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.6rem' }}>
+            2. Scene — mixed with other items
+          </p>
+          <label
+            style={{ width: '100%', padding: '1.5rem', borderRadius: 12, cursor: referenceFile ? 'pointer' : 'not-allowed', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem', position: 'relative', background: 'linear-gradient(155deg, var(--sand) 0%, #DCC9AC 100%)', boxShadow: '0 4px 14px rgba(184,121,70,0.18)', opacity: referenceFile ? 1 : 0.5 }}
+          >
+            <input type="file" accept="image/*" capture="environment" onChange={onScene} disabled={!referenceFile} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: referenceFile ? 'pointer' : 'not-allowed' }} />
+            <Camera size={26} color="var(--clay)" />
+            <span style={{ color: 'var(--charcoal)', fontSize: '0.88rem', fontWeight: 600 }}>
+              {referenceFile ? 'Photograph the mixed-up scene' : 'Add reference items first'}
+            </span>
+          </label>
+        </>
+      )}
 
       {loading && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#666', marginBottom: '1.25rem' }}>
@@ -248,34 +259,55 @@ export default function TestAiPage() {
         const cumulativeFound = Object.keys(foundInPreviousPhotos).length;
         const allFound = cumulativeFound >= totals.total;
         return (
-          <div style={{ padding: '0.9rem', backgroundColor: allFound ? '#eafaf0' : '#fdf6e3', borderRadius: '8px', marginBottom: '0.9rem' }}>
-            <p style={{ fontWeight: 700, fontSize: '0.95rem', color: allFound ? '#1a8a3c' : '#b8860b' }}>
-              {allFound
-                ? `All ${totals.total} found`
-                : `${cumulativeFound} of ${totals.total} found so far`}
-            </p>
-            {photoCount > 1 && (
-              <p style={{ fontSize: '0.78rem', color: '#666', marginTop: '0.3rem' }}>
-                Across {photoCount} photos · {totals.found_count} in this one
+          <div style={{ marginBottom: '0.9rem' }}>
+            <div style={{ padding: '0.9rem', backgroundColor: allFound ? '#eafaf0' : '#fdf6e3', borderRadius: '8px' }}>
+              <p style={{ fontWeight: 700, fontSize: '0.95rem', color: allFound ? '#1a8a3c' : '#b8860b' }}>
+                {allFound
+                  ? `All ${totals.total} found`
+                  : `${cumulativeFound} of ${totals.total} found so far`}
               </p>
-            )}
+              {photoCount > 1 && (
+                <p style={{ fontSize: '0.78rem', color: '#666', marginTop: '0.3rem' }}>
+                  Across {photoCount} photos · {totals.found_count} in this one
+                </p>
+              )}
+              {!allFound && (
+                <p style={{ fontSize: '0.82rem', color: '#666', marginTop: '0.3rem' }}>
+                  {totals.total - cumulativeFound} still missing — take another photo, closer or better lit, and anything found will be added.
+                </p>
+              )}
+            </div>
+
+            {/* Real "take another photo" action, right here under the
+                result -- per Daisy: "I went to test again... and it took
+                me to a whole new page to photograph the test items
+                again. I want to be able to take a second photograph of
+                the scene, maybe closer, to find the remaining items."
+                The scene camera existed but sat ABOVE the results,
+                already scrolled past, so the only visible action was
+                the reset -- which wiped everything. This is now the
+                prominent next step exactly where the gap is noticed. */}
             {!allFound && (
-              <p style={{ fontSize: '0.82rem', color: '#666', marginTop: '0.3rem' }}>
-                {totals.total - cumulativeFound} still missing — take another photo (closer, or better lit) and anything found will be added.
-              </p>
+              <label
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '100%', padding: '0.9rem', marginTop: '0.6rem', borderRadius: 10, cursor: 'pointer', position: 'relative', background: 'linear-gradient(155deg, var(--clay) 0%, #9A6435 100%)', color: 'white', fontWeight: 700, fontSize: '0.9rem', boxShadow: '0 3px 10px rgba(184,121,70,0.3)' }}
+              >
+                <input type="file" accept="image/*" capture="environment" onChange={onScene} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }} />
+                <Camera size={18} /> Take another photo of the scene
+              </label>
             )}
           </div>
         );
       })()}
 
-      {/* Real reset -- per Daisy: "there's no way to start again on
-          here." Only shown once something has actually been done. */}
+      {/* Deliberately understated -- this wipes everything, so it must
+          not compete with "take another photo" as the obvious next tap.
+          That exact confusion is what lost a 2-of-7 result. */}
       {(referencePreview || results) && (
         <button
           onClick={resetAll}
-          style={{ width: '100%', padding: '0.7rem', marginBottom: '0.9rem', backgroundColor: '#f0f0f0', color: '#333', border: '1px solid #ddd', borderRadius: 8, fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+          style={{ width: '100%', padding: '0.6rem', marginBottom: '0.9rem', backgroundColor: 'transparent', color: '#999', border: 'none', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', textDecoration: 'underline' }}
         >
-          <RotateCcw size={15} /> Start a new test
+          <RotateCcw size={13} /> Start over with different items
         </button>
       )}
 
