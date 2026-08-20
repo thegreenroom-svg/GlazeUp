@@ -268,8 +268,8 @@ export function NudgeSettingsPanel() {
         style={{ backgroundColor: 'var(--charcoal)', color: 'var(--ivory)' }}
       >
         <div className="flex justify-between items-center mb-3">
-          <h2 className="text-lg font-bold">Workflow tips</h2>
-          <button onClick={closeSettings} aria-label="Close settings"><X size={22} /></button>
+          <h2 className="text-lg font-bold" style={{ color: 'var(--ivory)' }}>Workflow tips</h2>
+          <button onClick={closeSettings} aria-label="Close settings" style={{ color: 'var(--ivory)' }}><X size={22} /></button>
         </div>
         <p className="text-xs mb-4" style={{ color: 'var(--stone)' }}>
           Turn any of these on or off. Saved on this device.
@@ -297,7 +297,12 @@ export function NudgeSettingsPanel() {
             const enabled = !disabledIds.has(id);
             return (
               <div key={id} className="flex items-center justify-between gap-3">
-                <p className="text-sm flex-1">{nudge.title}</p>
+                {/* Real contrast fix -- this had no colour set at all, so
+                    on the panel's dark background the label rendered
+                    invisible, leaving eight unlabelled toggles with no
+                    way to know what any of them controlled. Same class
+                    of bug found earlier on the Daily Cards buttons. */}
+                <p className="text-sm flex-1" style={{ color: 'var(--ivory)' }}>{nudge.title}</p>
                 <button
                   onClick={() => setNudgeEnabled(id, !enabled)}
                   aria-label={`${enabled ? 'Disable' : 'Enable'} ${nudge.title}`}
@@ -350,8 +355,8 @@ export function HelpPanel({ title }: { title: string }) {
         style={{ backgroundColor: 'var(--charcoal)', color: 'var(--ivory)' }}
       >
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-bold">{title}</h2>
-          <button onClick={closeHelp} aria-label="Close help"><X size={22} /></button>
+          <h2 className="text-lg font-bold" style={{ color: 'var(--ivory)' }}>{title}</h2>
+          <button onClick={closeHelp} aria-label="Close help" style={{ color: 'var(--ivory)' }}><X size={22} /></button>
         </div>
         <div className="space-y-4">
           {activeHelpIds.map((id, idx) => {
@@ -367,7 +372,7 @@ export function HelpPanel({ title }: { title: string }) {
                     {idx + 1}
                   </span>
                   <div>
-                    <p className="font-bold text-sm">{nudge.title}</p>
+                    <p className="font-bold text-sm" style={{ color: 'var(--ivory)' }}>{nudge.title}</p>
                     <p className="text-xs mt-1" style={{ color: 'var(--stone)' }}>{nudge.body}</p>
                   </div>
                 </div>
