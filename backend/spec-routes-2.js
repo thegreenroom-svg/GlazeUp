@@ -26,6 +26,38 @@
 // real Gemini call sites (Find on Table, Find All on Table, Test AI)
 // get the same real resilience, not three separate copies that could
 // drift.
+// Real bug found and fixed here -- confirmed directly against Google's
+// own current documentation. The Interactions API's actual response
+// shape is a `steps` array, where the real text lives at
+// steps[].content[].text on the step with type 'model_output' -- not a
+// flat `output_text`/`output`/`candidates` field, which is what this
+// code was checking for (a mix of older generateContent shapes and an
+// SDK-only convenience property that isn't guaranteed present on the
+// raw REST response). If none of those matched, this silently fell
+// through to an empty object -- exactly what happened live: Daisy's
+// real test showed 0 input/output tokens logged and a false "not
+// found", both symptoms of the real response never actually being
+// read at all, regardless of what Gemini genuinely saw in the photos.
+function extractGeminiText(data) {
+  const modelStep = (data.steps || []).find((s) => s.type === 'model_output');
+  const fromSteps = modelStep?.content?.find((c) => c.type === 'text')?.text;
+  return fromSteps || data.output_text || data.output?.[0]?.text || data.candidates?.[0]?.content?.parts?.[0]?.text;
+}
+
+// Real usage field names, confirmed directly against Google's own
+// current docs: total_input_tokens / total_output_tokens on the
+// Interactions API's real `usage` object -- not prompt_tokens/
+// promptTokenCount, which this code was checking for and never
+// matching, explaining the 0-token log entries.
+function extractGeminiUsage(data) {
+  const u = data.usage || data.usageMetadata;
+  if (!u) return null;
+  return {
+    prompt_tokens: u.total_input_tokens ?? u.prompt_tokens ?? u.promptTokenCount ?? 0,
+    completion_tokens: u.total_output_tokens ?? u.completion_tokens ?? u.candidatesTokenCount ?? 0,
+  };
+}
+
 async function callGeminiWithFallback(axios, apiKey, body) {
   const post = (model) => axios.post(
     'https://generativelanguage.googleapis.com/v1beta/interactions',
@@ -3189,21 +3221,26 @@ export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios
       }
 
       // Real usage logging into the same running tally as every other AI
-      // feature -- Gemini's response shape reports usage differently
-      // from OpenAI's, so mapped explicitly rather than assumed to match.
-      const usage = aiRes.data.usage || aiRes.data.usageMetadata;
+      // feature -- extractGeminiUsage checks the real, confirmed field
+      // names for this API rather than guessed ones.
+      const usage = extractGeminiUsage(aiRes.data);
       if (usage) {
-        await logGeminiUsage(supabase, STUDIO_ID, 'find-on-table-gemini', {
-          prompt_tokens: usage.prompt_tokens ?? usage.promptTokenCount ?? 0,
-          completion_tokens: usage.completion_tokens ?? usage.candidatesTokenCount ?? 0,
-          total_tokens: usage.total_tokens ?? usage.totalTokenCount ?? 0,
-        }, modelUsed);
+        await logGeminiUsage(supabase, STUDIO_ID, 'find-on-table-gemini', usage, modelUsed);
       }
 
       let result;
       try {
-        const raw = aiRes.data.output_text || aiRes.data.output?.[0]?.text || aiRes.data.candidates?.[0]?.content?.parts?.[0]?.text;
-        result = JSON.parse((raw || '').match(/\{[\s\S]*\}/)?.[0] || '{}');
+        const raw = extractGeminiText(aiRes.data);
+        if (!raw) {
+          // Real, visible failure instead of silently defaulting to an
+          // empty {} -- this exact silent path is what produced a false
+          // "not found" the first time this ran live, regardless of
+          // what Gemini actually saw. Logs the real raw response shape
+          // so a genuinely new format can be diagnosed immediately.
+          logger.error('find-on-table: no text extracted from Gemini response -- real shape:', JSON.stringify(aiRes.data).slice(0, 2000));
+          return res.status(500).json({ error: 'Got a response from Gemini but could not find its text output -- logged the real shape for diagnosis.' });
+        }
+        result = JSON.parse((raw.match(/\{[\s\S]*\}/) || [])[0] || '{}');
       } catch (e) {
         logger.error('find-on-table: could not parse Gemini response', aiRes.data);
         return res.status(500).json({ error: 'Could not parse the Gemini response' });
@@ -3312,18 +3349,19 @@ export function registerFindAllOnTableRoute(app, supabase, STUDIO_ID, logger, ax
         return res.status(500).json({ error: err.response?.data?.error?.message || 'The Gemini API call failed' });
       }
 
-      const usage = aiRes.data.usage || aiRes.data.usageMetadata;
+      const usage = extractGeminiUsage(aiRes.data);
       if (usage) {
-        await logGeminiUsage(supabase, STUDIO_ID, 'find-all-on-table-gemini', {
-          prompt_tokens: usage.prompt_tokens ?? usage.promptTokenCount ?? 0,
-          completion_tokens: usage.completion_tokens ?? usage.candidatesTokenCount ?? 0,
-        }, modelUsed);
+        await logGeminiUsage(supabase, STUDIO_ID, 'find-all-on-table-gemini', usage, modelUsed);
       }
 
       let parsed;
       try {
-        const raw = aiRes.data.output_text || aiRes.data.output?.[0]?.text || aiRes.data.candidates?.[0]?.content?.parts?.[0]?.text;
-        parsed = JSON.parse((raw || '').match(/\{[\s\S]*\}/)?.[0] || '{}');
+        const raw = extractGeminiText(aiRes.data);
+        if (!raw) {
+          logger.error('find-all-on-table: no text extracted from Gemini response -- real shape:', JSON.stringify(aiRes.data).slice(0, 2000));
+          return res.status(500).json({ error: 'Got a response from Gemini but could not find its text output -- logged the real shape for diagnosis.' });
+        }
+        parsed = JSON.parse((raw.match(/\{[\s\S]*\}/) || [])[0] || '{}');
       } catch (e) {
         logger.error('find-all-on-table: could not parse Gemini response', aiRes.data);
         return res.status(500).json({ error: 'Could not parse the Gemini response' });
@@ -3809,18 +3847,19 @@ export function registerTestAiFindRoute(app, supabase, STUDIO_ID, logger, axios,
         return res.status(500).json({ error: err.response?.data?.error?.message || 'The Gemini API call failed' });
       }
 
-      const usage = aiRes.data.usage || aiRes.data.usageMetadata;
+      const usage = extractGeminiUsage(aiRes.data);
       if (usage) {
-        await logGeminiUsage(supabase, STUDIO_ID, 'test-ai-find-gemini', {
-          prompt_tokens: usage.prompt_tokens ?? usage.promptTokenCount ?? 0,
-          completion_tokens: usage.completion_tokens ?? usage.candidatesTokenCount ?? 0,
-        }, modelUsed);
+        await logGeminiUsage(supabase, STUDIO_ID, 'test-ai-find-gemini', usage, modelUsed);
       }
 
       let result;
       try {
-        const raw = aiRes.data.output_text || aiRes.data.output?.[0]?.text || aiRes.data.candidates?.[0]?.content?.parts?.[0]?.text;
-        result = JSON.parse((raw || '').match(/\{[\s\S]*\}/)?.[0] || '{}');
+        const raw = extractGeminiText(aiRes.data);
+        if (!raw) {
+          logger.error('test-ai/find: no text extracted from Gemini response -- real shape:', JSON.stringify(aiRes.data).slice(0, 2000));
+          return res.status(500).json({ error: 'Got a response from Gemini but could not find its text output -- logged the real shape for diagnosis.' });
+        }
+        result = JSON.parse((raw.match(/\{[\s\S]*\}/) || [])[0] || '{}');
       } catch (e) {
         logger.error('test-ai/find: could not parse Gemini response', aiRes.data);
         return res.status(500).json({ error: 'Could not parse the Gemini response' });
