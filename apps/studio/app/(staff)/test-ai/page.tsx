@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { AiCostCounter } from '@/components/AiCostCounter';
-import { Camera, Loader, XCircle } from 'lucide-react';
+import { Camera, Loader, XCircle, Check, RotateCcw } from 'lucide-react';
 
 interface ItemResult {
   id: string;
@@ -34,6 +34,24 @@ export default function TestAiPage() {
   const [totals, setTotals] = useState<{ total: number; found_count: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [zoomed, setZoomed] = useState(false);
+  // Real cumulative tracking across multiple scene photos, matching
+  // Find on Table exactly -- per Daisy: "there's no 'two items not
+  // found, take another photo' option. I thought that was what we were
+  // doing." It was built into Find on Table but never into Test AI,
+  // which contradicts the whole point of Test AI being identical.
+  const [foundInPreviousPhotos, setFoundInPreviousPhotos] = useState<Record<string, ItemResult>>({});
+  const [photoCount, setPhotoCount] = useState(0);
+
+  const resetAll = () => {
+    setReferenceFile(null);
+    setReferencePreview(null);
+    setScenePreview(null);
+    setResults(null);
+    setTotals(null);
+    setError(null);
+    setFoundInPreviousPhotos({});
+    setPhotoCount(0);
+  };
 
   const onReference = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -44,14 +62,16 @@ export default function TestAiPage() {
     setResults(null);
     setTotals(null);
     setError(null);
+    // New reference items means a genuinely new test -- previous finds
+    // are no longer meaningful.
+    setFoundInPreviousPhotos({});
+    setPhotoCount(0);
   };
 
   const onScene = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f || !referenceFile) return;
     setScenePreview(URL.createObjectURL(f));
-    setResults(null);
-    setTotals(null);
     setError(null);
     setLoading(true);
     try {
@@ -64,7 +84,21 @@ export default function TestAiPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Could not check the photo');
-      setResults(data.results || []);
+      const fresh: ItemResult[] = data.results || [];
+
+      // Real cumulative merge, same as Find on Table -- an item found in
+      // ANY photo stays found, so items in a dark corner can be
+      // captured by a second, closer photo without losing the first.
+      // Keyed by description rather than id: unlike Find on Table's
+      // database pieces, ids here are generated per-call and won't
+      // match across separate photos.
+      setFoundInPreviousPhotos((prev) => {
+        const merged = { ...prev };
+        fresh.forEach((r) => { if (r.found) merged[r.description.toLowerCase().trim()] = r; });
+        return merged;
+      });
+      setPhotoCount((n) => n + 1);
+      setResults(fresh);
       setTotals({ total: data.total, found_count: data.found_count });
     } catch (err: any) {
       setError(err.message || 'Something went wrong.');
@@ -210,32 +244,72 @@ export default function TestAiPage() {
         </div>
       )}
 
-      {totals && (
-        <div style={{ padding: '0.9rem', backgroundColor: totals.found_count === totals.total ? '#eafaf0' : '#fdf6e3', borderRadius: '8px', marginBottom: '0.9rem' }}>
-          <p style={{ fontWeight: 700, fontSize: '0.95rem', color: totals.found_count === totals.total ? '#1a8a3c' : '#b8860b' }}>
-            {totals.found_count} of {totals.total} found
-          </p>
-        </div>
+      {totals && (() => {
+        const cumulativeFound = Object.keys(foundInPreviousPhotos).length;
+        const allFound = cumulativeFound >= totals.total;
+        return (
+          <div style={{ padding: '0.9rem', backgroundColor: allFound ? '#eafaf0' : '#fdf6e3', borderRadius: '8px', marginBottom: '0.9rem' }}>
+            <p style={{ fontWeight: 700, fontSize: '0.95rem', color: allFound ? '#1a8a3c' : '#b8860b' }}>
+              {allFound
+                ? `All ${totals.total} found`
+                : `${cumulativeFound} of ${totals.total} found so far`}
+            </p>
+            {photoCount > 1 && (
+              <p style={{ fontSize: '0.78rem', color: '#666', marginTop: '0.3rem' }}>
+                Across {photoCount} photos · {totals.found_count} in this one
+              </p>
+            )}
+            {!allFound && (
+              <p style={{ fontSize: '0.82rem', color: '#666', marginTop: '0.3rem' }}>
+                {totals.total - cumulativeFound} still missing — take another photo (closer, or better lit) and anything found will be added.
+              </p>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Real reset -- per Daisy: "there's no way to start again on
+          here." Only shown once something has actually been done. */}
+      {(referencePreview || results) && (
+        <button
+          onClick={resetAll}
+          style={{ width: '100%', padding: '0.7rem', marginBottom: '0.9rem', backgroundColor: '#f0f0f0', color: '#333', border: '1px solid #ddd', borderRadius: 8, fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+        >
+          <RotateCcw size={15} /> Start a new test
+        </button>
       )}
 
       {results && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {results.map((r, i) => (
-            <div key={r.id} style={{ padding: '0.7rem 0.9rem', backgroundColor: r.found ? '#f9f9f9' : '#fef6f6', borderRadius: '6px', display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
+          {results.map((r, i) => {
+            // Real cumulative status -- an item found in an earlier
+            // photo is genuinely still found, and must not show as
+            // missing just because it isn't in this one.
+            const foundEarlier = !r.found && !!foundInPreviousPhotos[r.description.toLowerCase().trim()];
+            const isFound = r.found || foundEarlier;
+            return (
+            <div key={r.id} style={{ padding: '0.7rem 0.9rem', backgroundColor: isFound ? '#f9f9f9' : '#fef6f6', borderRadius: '6px', display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
               {r.found ? (
                 <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: '50%', backgroundColor: PIN_COLOURS[i % PIN_COLOURS.length], color: 'white', fontSize: '0.7rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
+              ) : foundEarlier ? (
+                <Check size={18} color="#1a8a3c" style={{ flexShrink: 0, marginTop: 1 }} />
               ) : (
                 <XCircle size={18} color="#c33" style={{ flexShrink: 0, marginTop: 1 }} />
               )}
               <div style={{ flex: 1 }}>
                 <p style={{ fontSize: '0.85rem', fontWeight: 600 }}>{r.description}</p>
-                <p style={{ fontSize: '0.75rem', color: r.found ? '#1a8a3c' : '#c33', marginTop: '0.15rem' }}>
-                  {r.found ? `Found — ${r.confidence} confidence` : 'Not found in this scene'}
+                <p style={{ fontSize: '0.75rem', color: isFound ? '#1a8a3c' : '#c33', marginTop: '0.15rem' }}>
+                  {r.found
+                    ? `Found — ${r.confidence} confidence`
+                    : foundEarlier
+                      ? 'Already found in an earlier photo'
+                      : 'Not in this photo'}
                 </p>
-                {r.reasoning && <p style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.15rem' }}>{r.reasoning}</p>}
+                {r.found && r.reasoning && <p style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.15rem' }}>{r.reasoning}</p>}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </PageShell>

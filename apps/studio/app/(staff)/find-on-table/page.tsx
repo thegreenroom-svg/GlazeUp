@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useRef } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { AiCostCounter } from '@/components/AiCostCounter';
-import { Camera, Loader, XCircle, Check, Truck, Home as HomeIcon, Printer } from 'lucide-react';
+import { Camera, Loader, XCircle, Check, RotateCcw, Truck, Home as HomeIcon, Printer } from 'lucide-react';
 
 interface Booking {
   booking_code: string;
@@ -298,6 +298,18 @@ export default function FindOnTablePage() {
           </div>
           <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', marginTop: '0.7rem' }}>Tap anywhere to close</p>
         </div>
+      )}
+
+      {/* Real reset -- same as Test AI, so both behave identically.
+          Clears the cumulative multi-photo progress and starts the
+          booking's search fresh. */}
+      {(preview || results) && (
+        <button
+          onClick={() => { setPreview(null); setResults(null); setTotals(null); setFoundInPreviousPhotos({}); setError(null); }}
+          style={{ width: '100%', padding: '0.7rem', marginBottom: '0.9rem', backgroundColor: '#f0f0f0', color: '#333', border: '1px solid #ddd', borderRadius: 8, fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+        >
+          <RotateCcw size={15} /> Start this booking again
+        </button>
       )}
 
       {totals && (() => {
