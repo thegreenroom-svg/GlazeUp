@@ -2738,6 +2738,20 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
       const startMax = new Date();
       startMax.setDate(startMax.getDate() + 27);
 
+      // Real, real fetched once here -- per Daisy: "it will be relevant
+      // from today's collections... it should follow right through."
+      // The current studio-wide collection date previously only applied
+      // as a one-time bulk action from the Dashboard widget -- it never
+      // continued to apply to bookings that synced in AFTER that point.
+      // Fetching it once here so every booking this sync inserts gets it
+      // automatically, going forward, for as long as it stays current.
+      const { data: studioRow } = await supabase
+        .from('studios')
+        .select('current_collection_date')
+        .eq('id', STUDIO_ID)
+        .maybeSingle();
+      const currentCollectionDate = studioRow?.current_collection_date || null;
+
       let allBookings = [];
       let cursor;
       do {
@@ -2836,6 +2850,18 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
           });
           if (insertErr) throw insertErr;
           synced++;
+
+          // Real, ongoing application -- every newly-synced booking gets
+          // the current studio-wide collection date automatically, not
+          // just bookings that already existed at the moment the date
+          // was last set. This is what makes it genuinely "follow right
+          // through" rather than a one-time bulk action.
+          if (currentCollectionDate) {
+            const { error: dateErr } = await supabase
+              .from('demo_app_session_status')
+              .upsert([{ studio_id: STUDIO_ID, booking_code: bookingCode, collection_date: currentCollectionDate }], { onConflict: 'booking_code' });
+            if (dateErr) logger.error('[bookings/sync] could not apply current collection date to new booking', dateErr);
+          }
         } catch (err) {
           errored++;
           if (errors.length < 10) errors.push({ square_booking_id: b.id, error: err.message });
