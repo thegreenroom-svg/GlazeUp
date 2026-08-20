@@ -51,6 +51,11 @@ export default function FindOnTablePage() {
   // a booking spread across two tables needs several photos before it's
   // genuinely complete.
   const [foundInPreviousPhotos, setFoundInPreviousPhotos] = useState<Record<string, PieceResult>>({});
+  // Real photo history, same as Test AI -- pieces found two photos ago
+  // on another table can still be located, rather than being lost the
+  // moment a later photo replaces the view.
+  const [photoHistory, setPhotoHistory] = useState<{ url: string; results: PieceResult[]; index: number }[]>([]);
+  const [viewingPhoto, setViewingPhoto] = useState<number | null>(null);
   const [totals, setTotals] = useState<{ total: number; found_count: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Real, same tap-to-enlarge as Test AI -- per Daisy: "will look
@@ -108,6 +113,7 @@ export default function FindOnTablePage() {
         fresh.forEach((r) => { if (r.found) merged[r.id] = r; });
         return merged;
       });
+      setPhotoHistory((prev) => [...prev, { url: URL.createObjectURL(f), results: fresh, index: prev.length + 1 }]);
       setResults(fresh);
       setTotals({ total: data.total, found_count: data.found_count });
     } catch (err: any) {
@@ -136,7 +142,7 @@ export default function FindOnTablePage() {
 
       <select
         value={bookingCode}
-        onChange={(e) => { setBookingCode(e.target.value); setResults(null); setTotals(null); setPreview(null); setFoundInPreviousPhotos({}); }}
+        onChange={(e) => { setBookingCode(e.target.value); setResults(null); setTotals(null); setPreview(null); setFoundInPreviousPhotos({}); setPhotoHistory([]); setViewingPhoto(null); }}
         style={{ width: '100%', padding: '0.55rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.88rem', marginBottom: '0.9rem' }}
       >
         <option value="">Choose a booking...</option>
@@ -306,9 +312,106 @@ export default function FindOnTablePage() {
       {/* Deliberately understated -- this wipes the cumulative progress,
           so it must not compete with "take another photo" as the
           obvious next tap. */}
+      {/* Real photo history strip -- tap any earlier photo to see it
+          again with its own pieces still boxed and numbered, so a piece
+          found on an earlier table can still be located. */}
+      {photoHistory.length > 1 && (
+        <div style={{ marginBottom: '0.9rem' }}>
+          <p style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--clay)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.5rem' }}>
+            All photos taken
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.3rem' }}>
+            {photoHistory.map((ph) => {
+              const foundHere = ph.results.filter((r) => r.found).length;
+              return (
+                <button
+                  key={ph.index}
+                  onClick={() => setViewingPhoto(ph.index)}
+                  style={{ flexShrink: 0, width: 88, padding: 0, border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left' }}
+                >
+                  <div style={{ position: 'relative', width: 88, height: 88, borderRadius: 8, overflow: 'hidden', border: '1px solid #ddd' }}>
+                    <img src={ph.url} alt={`Photo ${ph.index}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    {ph.results.map((r, i) => (
+                      r.found && r.box && (
+                        <div
+                          key={r.id}
+                          style={{
+                            position: 'absolute',
+                            left: `${r.box.left_pct}%`,
+                            top: `${r.box.top_pct}%`,
+                            width: `${r.box.right_pct - r.box.left_pct}%`,
+                            height: `${r.box.bottom_pct - r.box.top_pct}%`,
+                            border: `2px solid ${PIN_COLOURS[i % PIN_COLOURS.length]}`,
+                            borderRadius: 2,
+                            pointerEvents: 'none',
+                          }}
+                        />
+                      )
+                    ))}
+                  </div>
+                  <p style={{ fontSize: '0.68rem', color: '#666', marginTop: '0.25rem' }}>
+                    Photo {ph.index} · {foundHere} found
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {viewingPhoto !== null && (() => {
+        const ph = photoHistory.find((p) => p.index === viewingPhoto);
+        if (!ph) return null;
+        return (
+          <div
+            onClick={() => setViewingPhoto(null)}
+            style={{ position: 'fixed', inset: 0, zIndex: 100, backgroundColor: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '1rem', cursor: 'zoom-out' }}
+          >
+            <div style={{ position: 'relative', maxWidth: '100%', maxHeight: '78vh' }}>
+              <img src={ph.url} alt={`Photo ${ph.index}`} style={{ maxWidth: '100%', maxHeight: '78vh', objectFit: 'contain', borderRadius: 8, display: 'block' }} />
+              {ph.results.map((r, i) => (
+                r.found && r.box && (
+                  <div
+                    key={r.id}
+                    style={{
+                      position: 'absolute',
+                      left: `${r.box.left_pct}%`,
+                      top: `${r.box.top_pct}%`,
+                      width: `${r.box.right_pct - r.box.left_pct}%`,
+                      height: `${r.box.bottom_pct - r.box.top_pct}%`,
+                      border: `3px solid ${PIN_COLOURS[i % PIN_COLOURS.length]}`,
+                      borderRadius: 4,
+                      boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: 'absolute', top: -11, left: -11,
+                        width: 24, height: 24, borderRadius: '50%',
+                        backgroundColor: PIN_COLOURS[i % PIN_COLOURS.length],
+                        color: 'white', fontSize: '0.75rem', fontWeight: 700,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 0 0 2px white',
+                      }}
+                    >
+                      {i + 1}
+                    </span>
+                  </div>
+                )
+              ))}
+            </div>
+            <p style={{ color: 'white', fontSize: '0.85rem', fontWeight: 600, marginTop: '0.8rem' }}>
+              Photo {ph.index} — {ph.results.filter((r) => r.found).length} found here
+            </p>
+            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', marginTop: '0.3rem' }}>Tap anywhere to close</p>
+          </div>
+        );
+      })()}
+
       {(preview || results) && (
         <button
-          onClick={() => { setPreview(null); setResults(null); setTotals(null); setFoundInPreviousPhotos({}); setError(null); }}
+          onClick={() => { setPreview(null); setResults(null); setTotals(null); setFoundInPreviousPhotos({}); setError(null); setPhotoHistory([]); setViewingPhoto(null); }}
           style={{ width: '100%', padding: '0.6rem', marginBottom: '0.9rem', backgroundColor: 'transparent', color: '#999', border: 'none', fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', textDecoration: 'underline' }}
         >
           <RotateCcw size={13} /> Start this booking again

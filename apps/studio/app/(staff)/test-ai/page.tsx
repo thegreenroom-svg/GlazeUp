@@ -41,6 +41,15 @@ export default function TestAiPage() {
   // which contradicts the whole point of Test AI being identical.
   const [foundInPreviousPhotos, setFoundInPreviousPhotos] = useState<Record<string, ItemResult>>({});
   const [photoCount, setPhotoCount] = useState(0);
+  // Real photo history -- per Daisy: "it might be useful to have the
+  // thumbnails of the previous photographs with the actual items still
+  // circled on them and numbered so that you can go back and reference
+  // if you haven't picked them all out in one go." Without this, only
+  // the most recent photo is visible, so where items 1, 5 and 6
+  // actually were is lost the moment a later photo replaces it.
+  // Each entry keeps its own results so boxes stay correct per photo.
+  const [photoHistory, setPhotoHistory] = useState<{ url: string; results: ItemResult[]; index: number }[]>([]);
+  const [viewingPhoto, setViewingPhoto] = useState<number | null>(null);
 
   const resetAll = () => {
     setReferenceFile(null);
@@ -51,6 +60,8 @@ export default function TestAiPage() {
     setError(null);
     setFoundInPreviousPhotos({});
     setPhotoCount(0);
+    setPhotoHistory([]);
+    setViewingPhoto(null);
   };
 
   const onReference = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -66,6 +77,8 @@ export default function TestAiPage() {
     // are no longer meaningful.
     setFoundInPreviousPhotos({});
     setPhotoCount(0);
+    setPhotoHistory([]);
+    setViewingPhoto(null);
   };
 
   const onScene = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -98,6 +111,9 @@ export default function TestAiPage() {
         return merged;
       });
       setPhotoCount((n) => n + 1);
+      // Real history entry -- kept with its own results so each photo's
+      // boxes stay correct when revisited.
+      setPhotoHistory((prev) => [...prev, { url: URL.createObjectURL(f), results: fresh, index: prev.length + 1 }]);
       setResults(fresh);
       setTotals({ total: data.total, found_count: data.found_count });
     } catch (err: any) {
@@ -302,6 +318,104 @@ export default function TestAiPage() {
       {/* Deliberately understated -- this wipes everything, so it must
           not compete with "take another photo" as the obvious next tap.
           That exact confusion is what lost a 2-of-7 result. */}
+      {/* Real photo history strip -- tap any earlier photo to see it
+          again with its own items still boxed and numbered, so a piece
+          found two photos ago can still be located on the shelf. */}
+      {photoHistory.length > 1 && (
+        <div style={{ marginBottom: '0.9rem' }}>
+          <p style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--clay)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.5rem' }}>
+            All photos taken
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.3rem' }}>
+            {photoHistory.map((ph) => {
+              const foundHere = ph.results.filter((r) => r.found).length;
+              return (
+                <button
+                  key={ph.index}
+                  onClick={() => setViewingPhoto(ph.index)}
+                  style={{ flexShrink: 0, width: 88, padding: 0, border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left' }}
+                >
+                  <div style={{ position: 'relative', width: 88, height: 88, borderRadius: 8, overflow: 'hidden', border: '1px solid #ddd' }}>
+                    <img src={ph.url} alt={`Photo ${ph.index}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    {ph.results.map((r, i) => (
+                      r.found && r.box && (
+                        <div
+                          key={r.id}
+                          style={{
+                            position: 'absolute',
+                            left: `${r.box.left_pct}%`,
+                            top: `${r.box.top_pct}%`,
+                            width: `${r.box.right_pct - r.box.left_pct}%`,
+                            height: `${r.box.bottom_pct - r.box.top_pct}%`,
+                            border: `2px solid ${PIN_COLOURS[i % PIN_COLOURS.length]}`,
+                            borderRadius: 2,
+                            pointerEvents: 'none',
+                          }}
+                        />
+                      )
+                    ))}
+                  </div>
+                  <p style={{ fontSize: '0.68rem', color: '#666', marginTop: '0.25rem' }}>
+                    Photo {ph.index} · {foundHere} found
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Full-screen view of an earlier photo, with its own boxes. */}
+      {viewingPhoto !== null && (() => {
+        const ph = photoHistory.find((p) => p.index === viewingPhoto);
+        if (!ph) return null;
+        return (
+          <div
+            onClick={() => setViewingPhoto(null)}
+            style={{ position: 'fixed', inset: 0, zIndex: 100, backgroundColor: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '1rem', cursor: 'zoom-out' }}
+          >
+            <div style={{ position: 'relative', maxWidth: '100%', maxHeight: '78vh' }}>
+              <img src={ph.url} alt={`Photo ${ph.index}`} style={{ maxWidth: '100%', maxHeight: '78vh', objectFit: 'contain', borderRadius: 8, display: 'block' }} />
+              {ph.results.map((r, i) => (
+                r.found && r.box && (
+                  <div
+                    key={r.id}
+                    style={{
+                      position: 'absolute',
+                      left: `${r.box.left_pct}%`,
+                      top: `${r.box.top_pct}%`,
+                      width: `${r.box.right_pct - r.box.left_pct}%`,
+                      height: `${r.box.bottom_pct - r.box.top_pct}%`,
+                      border: `3px solid ${PIN_COLOURS[i % PIN_COLOURS.length]}`,
+                      borderRadius: 4,
+                      boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: 'absolute', top: -11, left: -11,
+                        width: 24, height: 24, borderRadius: '50%',
+                        backgroundColor: PIN_COLOURS[i % PIN_COLOURS.length],
+                        color: 'white', fontSize: '0.75rem', fontWeight: 700,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        boxShadow: '0 0 0 2px white',
+                      }}
+                    >
+                      {i + 1}
+                    </span>
+                  </div>
+                )
+              ))}
+            </div>
+            <p style={{ color: 'white', fontSize: '0.85rem', fontWeight: 600, marginTop: '0.8rem' }}>
+              Photo {ph.index} — {ph.results.filter((r) => r.found).length} found here
+            </p>
+            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', marginTop: '0.3rem' }}>Tap anywhere to close</p>
+          </div>
+        );
+      })()}
+
       {(referencePreview || results) && (
         <button
           onClick={resetAll}
