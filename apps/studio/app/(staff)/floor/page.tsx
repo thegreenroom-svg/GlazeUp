@@ -157,6 +157,30 @@ export default function FloorPage() {
     setBookings(dayBookings.slice(0, 30));
   }, [floorDate, allBookings]);
 
+  const [syncWarning, setSyncWarning] = useState<string | null>(null);
+
+  // Real, visible failure reporting -- the previous fix used
+  // .catch(() => {}), a completely silent catch. Checked the real
+  // database directly: the last successful sync was ~24 hours old even
+  // after that fix shipped, meaning it's very likely failing here
+  // without any way to tell. A real 12s timeout too, so a slow cold
+  // backend can't hang this silently either -- it fails visibly and
+  // quickly instead.
+  const syncBookings = async () => {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/bookings/sync`, { method: 'POST', signal: controller.signal });
+      clearTimeout(timeout);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setSyncWarning(`Booking sync failed: ${body.error || `HTTP ${res.status}`}`);
+      }
+    } catch (err: any) {
+      setSyncWarning(err?.name === 'AbortError' ? 'Booking sync timed out — showing what was already loaded.' : `Could not reach the sync: ${err?.message || err}`);
+    }
+  };
+
   const loadBookings = async () => {
     setLoading(true);
     setQuickAccessMode(false);
@@ -168,7 +192,7 @@ export default function FloorPage() {
       // fix never fired here at all -- so a genuinely busier real day
       // could still show stale numbers. Syncing first, same as
       // everywhere else now does.
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/bookings/sync`, { method: 'POST' }).catch(() => {});
+      await syncBookings();
       const [bRes, mRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings`),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/till-menu`),
@@ -189,7 +213,7 @@ export default function FloorPage() {
     try {
       // Same real fix as loadBookings above -- Seated Bookings is its
       // own direct entry point too.
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/bookings/sync`, { method: 'POST' }).catch(() => {});
+      await syncBookings();
       const [bRes, mRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings`),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/till-menu`),
@@ -487,6 +511,11 @@ export default function FloorPage() {
             <h1 className="text-2xl font-bold" style={{ color: B.ivory }}>Start Floor</h1>
             <p className="text-sm mt-1" style={{ color: B.stone }}>Table → till → photo → hand-off. Real data throughout.</p>
           </div>
+          {syncWarning && (
+            <div style={{ backgroundColor: '#5a2a2a', color: '#ffcccc', padding: '0.7rem 0.9rem', borderRadius: 8, fontSize: '0.8rem', marginBottom: '1rem' }}>
+              {syncWarning}
+            </div>
+          )}
           <div className="space-y-3">
             <button onClick={loadBookings} disabled={loading} className="w-full py-5 rounded-lg font-bold flex items-center justify-center gap-3 text-lg" style={{ backgroundColor: B.clay, color: B.ivory }}>
               {loading ? 'Loading...' : '🏃 Start Floor'}
@@ -513,6 +542,11 @@ export default function FloorPage() {
       <div className="min-h-screen p-4" style={{ backgroundColor: B.charcoal }}>
         <div className="max-w-2xl mx-auto">
           <Header label={quickAccessMode ? 'Seated Bookings' : `Step 2/${tillEnabled ? 5 : 4} · Table`} />
+          {syncWarning && (
+            <div style={{ backgroundColor: '#5a2a2a', color: '#ffcccc', padding: '0.7rem 0.9rem', borderRadius: 8, fontSize: '0.8rem', marginBottom: '1rem' }}>
+              {syncWarning}
+            </div>
+          )}
           <div className="rounded-lg p-6" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
             <div className="text-center mb-6">
               <span className="text-4xl">{quickAccessMode ? '🪑' : '🎨'}</span>
