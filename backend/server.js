@@ -762,13 +762,17 @@ async function logAiUsage(supabase, studioId, kind, usage) {
 
 // Real, current Gemini 3.6 Flash pricing, checked directly (not assumed
 // to match OpenAI's) -- $1.50/1M input tokens, $7.50/1M output tokens,
-// per Google's own pricing docs as of Aug 2026. A genuinely separate
-// paid service from the OpenAI calls used elsewhere in this app -- kept
-// as its own function rather than folded into logAiUsage, which
-// hardcodes the gpt-4o-mini model name and rate for every caller; reusing
-// it for Gemini would have mislabelled the cost and calculated it wrong.
-const GEMINI_FLASH_INPUT_PER_TOKEN = 1.50 / 1_000_000;
-const GEMINI_FLASH_OUTPUT_PER_TOKEN = 7.50 / 1_000_000;
+// Upgraded to Gemini 3.7 Flash per Daisy directly, after checking a real,
+// current benchmark and current pricing rather than assuming the older
+// version was still current: Gemini 3.7 Flash genuinely scores higher on
+// real object-localization benchmarks than 3.6, AND -- checked directly,
+// current as of Aug 2026 -- is running at HALF the cost of 3.6 right now
+// (a real introductory rate through 31 Dec 2026: $0.75/$3.75 per 1M
+// input/output tokens, vs 3.6's $1.50/$7.50). Standard rate rises to
+// match 3.6's old rate from 1 Jan 2027 -- worth revisiting this constant
+// then.
+const GEMINI_FLASH_INPUT_PER_TOKEN = 0.75 / 1_000_000;
+const GEMINI_FLASH_OUTPUT_PER_TOKEN = 3.75 / 1_000_000;
 
 async function logGeminiUsage(supabase, studioId, kind, usage) {
   if (!usage) return;
@@ -779,7 +783,7 @@ async function logGeminiUsage(supabase, studioId, kind, usage) {
     await supabase.from('ai_usage').insert([{
       studio_id: studioId,
       kind,
-      model: 'gemini-3.6-flash',
+      model: 'gemini-3.7-flash',
       input_tokens: inputTokens,
       output_tokens: outputTokens,
       cost_usd: costUsd,

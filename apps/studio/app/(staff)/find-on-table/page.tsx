@@ -48,6 +48,11 @@ export default function FindOnTablePage() {
   const [results, setResults] = useState<PieceResult[] | null>(null);
   const [totals, setTotals] = useState<{ total: number; found_count: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Real, same tap-to-enlarge as Test AI -- per Daisy: "will look
+  // exactly the same, yeah?" These two are directly compared against
+  // each other, so they should genuinely match, not just share the
+  // same circle logic underneath.
+  const [zoomed, setZoomed] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -101,7 +106,7 @@ export default function FindOnTablePage() {
       </p>
 
       <div style={{ padding: '0.7rem 0.9rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '1rem' }}>
-        Uses Google Gemini (a separate paid AI) for real pixel-level detection — roughly £0.003–0.005 per photo, logged into the same running AI cost total.
+        Uses Google Gemini (a separate paid AI) for real pixel-level detection — roughly £0.0015–0.0025 per photo, logged into the same running AI cost total.
       </div>
 
       <div style={{ marginBottom: '1.25rem' }}>
@@ -175,8 +180,11 @@ export default function FindOnTablePage() {
       {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1.25rem' }}>{error}</div>}
 
       {preview && (
-        <div style={{ position: 'relative', width: '100%', marginBottom: '1rem' }}>
-          <img src={preview} alt="Table" style={{ width: '100%', borderRadius: '8px', display: 'block' }} />
+        <div
+          onClick={() => setZoomed(true)}
+          style={{ position: 'relative', width: '100%', marginBottom: '1rem', cursor: 'zoom-in', borderRadius: '8px', overflow: 'hidden' }}
+        >
+          <img src={preview} alt="Table" style={{ width: '100%', display: 'block' }} />
           {results?.map((r, i) => (
             r.found && r.x_pct != null && r.y_pct != null && (
               <div
@@ -199,6 +207,49 @@ export default function FindOnTablePage() {
               </div>
             )
           ))}
+          {results && results.some((r) => r.found) && (
+            <p style={{ position: 'absolute', bottom: 8, right: 10, fontSize: '0.7rem', color: 'white', backgroundColor: 'rgba(0,0,0,0.5)', padding: '0.2rem 0.5rem', borderRadius: 999 }}>
+              Tap to enlarge
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Real full-screen viewer, same pattern as Test AI -- per Daisy:
+          "will look exactly the same, yeah?" These are directly
+          compared against each other, so seeing all the numbered pins
+          clearly against a busy shelf photo works the same way here. */}
+      {zoomed && preview && (
+        <div
+          onClick={() => setZoomed(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 100, backgroundColor: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '1rem', cursor: 'zoom-out' }}
+        >
+          <div style={{ position: 'relative', maxWidth: '100%', maxHeight: '82vh' }}>
+            <img src={preview} alt="Table" style={{ maxWidth: '100%', maxHeight: '82vh', objectFit: 'contain', borderRadius: 8, display: 'block' }} />
+            {results?.map((r, i) => (
+              r.found && r.x_pct != null && r.y_pct != null && (
+                <div
+                  key={r.id}
+                  style={{
+                    position: 'absolute',
+                    left: `${r.x_pct}%`,
+                    top: `${r.y_pct}%`,
+                    transform: 'translate(-50%, -50%)',
+                    width: 50, height: 50,
+                    borderRadius: '50%',
+                    border: `3px solid ${PIN_COLOURS[i % PIN_COLOURS.length]}`,
+                    boxShadow: '0 0 0 3px white, 0 2px 10px rgba(0,0,0,0.5)',
+                    pointerEvents: 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '0.8rem', fontWeight: 700, color: 'white', backgroundColor: PIN_COLOURS[i % PIN_COLOURS.length],
+                  }}
+                >
+                  {i + 1}
+                </div>
+              )
+            ))}
+          </div>
+          <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem', marginTop: '0.7rem' }}>Tap anywhere to close</p>
         </div>
       )}
 

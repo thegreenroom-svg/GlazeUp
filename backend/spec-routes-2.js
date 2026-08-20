@@ -3149,7 +3149,7 @@ export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios
         aiRes = await axios.post(
           'https://generativelanguage.googleapis.com/v1beta/interactions',
           {
-            model: 'gemini-3.6-flash',
+            model: 'gemini-3.7-flash',
             input,
             response_format: { type: 'text', mime_type: 'application/json', schema: responseSchema },
           },
@@ -3278,7 +3278,7 @@ export function registerFindAllOnTableRoute(app, supabase, STUDIO_ID, logger, ax
         aiRes = await axios.post(
           'https://generativelanguage.googleapis.com/v1beta/interactions',
           {
-            model: 'gemini-3.6-flash',
+            model: 'gemini-3.7-flash',
             input,
             response_format: { type: 'text', mime_type: 'application/json', schema: responseSchema },
           },
@@ -3780,7 +3780,7 @@ export function registerTestAiFindRoute(app, supabase, STUDIO_ID, logger, axios,
         aiRes = await axios.post(
           'https://generativelanguage.googleapis.com/v1beta/interactions',
           {
-            model: 'gemini-3.6-flash',
+            model: 'gemini-3.7-flash',
             input,
             response_format: { type: 'text', mime_type: 'application/json', schema: responseSchema },
           },

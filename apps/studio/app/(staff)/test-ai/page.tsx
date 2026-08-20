@@ -69,7 +69,7 @@ export default function TestAiPage() {
       <AiCostCounter />
 
       <div style={{ padding: '0.7rem 0.9rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '1.25rem' }}>
-        Uses Google Gemini for real pixel-level detection — roughly £0.003–0.005 per test, logged into the same running AI cost total.
+        Uses Google Gemini for real pixel-level detection — roughly £0.0015–0.0025 per test, logged into the same running AI cost total.
       </div>
 
       <p style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--clay)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.6rem' }}>
