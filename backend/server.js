@@ -774,16 +774,27 @@ async function logAiUsage(supabase, studioId, kind, usage) {
 const GEMINI_FLASH_INPUT_PER_TOKEN = 0.75 / 1_000_000;
 const GEMINI_FLASH_OUTPUT_PER_TOKEN = 3.75 / 1_000_000;
 
-async function logGeminiUsage(supabase, studioId, kind, usage) {
+// Real 3.6 rate, kept alongside 3.7's -- needed for honestly costing
+// the real fallback calls that happen when 3.7 is overloaded and this
+// service automatically retries against 3.6 instead.
+const GEMINI_36_INPUT_PER_TOKEN = 1.50 / 1_000_000;
+const GEMINI_36_OUTPUT_PER_TOKEN = 7.50 / 1_000_000;
+
+async function logGeminiUsage(supabase, studioId, kind, usage, model = 'gemini-3.7-flash') {
   if (!usage) return;
   const inputTokens = usage.prompt_tokens || 0;
   const outputTokens = usage.completion_tokens || 0;
-  const costUsd = inputTokens * GEMINI_FLASH_INPUT_PER_TOKEN + outputTokens * GEMINI_FLASH_OUTPUT_PER_TOKEN;
+  // Real per-model rate -- if a fallback to 3.6 fired, that call genuinely
+  // cost more per token than 3.7's current introductory rate, so this
+  // must reflect whichever model actually ran, not always assume 3.7.
+  const inputRate = model === 'gemini-3.6-flash' ? GEMINI_36_INPUT_PER_TOKEN : GEMINI_FLASH_INPUT_PER_TOKEN;
+  const outputRate = model === 'gemini-3.6-flash' ? GEMINI_36_OUTPUT_PER_TOKEN : GEMINI_FLASH_OUTPUT_PER_TOKEN;
+  const costUsd = inputTokens * inputRate + outputTokens * outputRate;
   try {
     await supabase.from('ai_usage').insert([{
       studio_id: studioId,
       kind,
-      model: 'gemini-3.7-flash',
+      model,
       input_tokens: inputTokens,
       output_tokens: outputTokens,
       cost_usd: costUsd,

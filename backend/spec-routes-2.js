@@ -11,6 +11,39 @@
 // admin surface, and taking real money from a demo app would be wrong.
 // ============================================================================
 
+// Real, live-observed issue: Gemini 3.7 Flash (upgraded to across this
+// file's real matching endpoints) launched only around a week ago as of
+// this writing, and is genuinely returning "currently experiencing high
+// demand... please try again later" -- a brand-new model outpacing
+// Google's own capacity scaling in its first weeks, not a bug here.
+// Daisy hit this live during real testing.
+//
+// Real, sensible fallback rather than leaving her blocked: try 3.7
+// first (better real accuracy, checked directly against a current
+// benchmark), and if it's genuinely overloaded, automatically retry the
+// exact same request against 3.6 -- the older, proven-stable version --
+// rather than surface the failure and stop. Shared here so all three
+// real Gemini call sites (Find on Table, Find All on Table, Test AI)
+// get the same real resilience, not three separate copies that could
+// drift.
+async function callGeminiWithFallback(axios, apiKey, body) {
+  const post = (model) => axios.post(
+    'https://generativelanguage.googleapis.com/v1beta/interactions',
+    { ...body, model },
+    { headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' } }
+  );
+  try {
+    const response = await post('gemini-3.7-flash');
+    return { response, modelUsed: 'gemini-3.7-flash' };
+  } catch (err) {
+    const msg = err.response?.data?.error?.message || '';
+    const isOverloaded = err.response?.status === 503 || /overloaded|high demand|try again later/i.test(msg);
+    if (!isOverloaded) throw err;
+    const response = await post('gemini-3.6-flash');
+    return { response, modelUsed: 'gemini-3.6-flash' };
+  }
+}
+
 // Spec pricing tiers (studios subscribe at GBP 29-79/month).
 const PLANS = [
   { id: 'starter', name: 'Starter', price_cents: 2900, blurb: 'Single studio, core booking and piece tracking' },
@@ -3144,17 +3177,12 @@ export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios
         required: ['found', 'confidence', 'reasoning'],
       };
 
-      let aiRes;
+      let aiRes, modelUsed;
       try {
-        aiRes = await axios.post(
-          'https://generativelanguage.googleapis.com/v1beta/interactions',
-          {
-            model: 'gemini-3.7-flash',
-            input,
-            response_format: { type: 'text', mime_type: 'application/json', schema: responseSchema },
-          },
-          { headers: { 'x-goog-api-key': GEMINI_API_KEY, 'Content-Type': 'application/json' } }
-        );
+        ({ response: aiRes, modelUsed } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
+          input,
+          response_format: { type: 'text', mime_type: 'application/json', schema: responseSchema },
+        }));
       } catch (err) {
         logger.error('find-on-table: Gemini call failed', err.response?.data || err.message);
         return res.status(500).json({ error: err.response?.data?.error?.message || 'The Gemini API call failed', gemini_error: err.response?.data || null });
@@ -3169,7 +3197,7 @@ export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios
           prompt_tokens: usage.prompt_tokens ?? usage.promptTokenCount ?? 0,
           completion_tokens: usage.completion_tokens ?? usage.candidatesTokenCount ?? 0,
           total_tokens: usage.total_tokens ?? usage.totalTokenCount ?? 0,
-        });
+        }, modelUsed);
       }
 
       let result;
@@ -3273,17 +3301,12 @@ export function registerFindAllOnTableRoute(app, supabase, STUDIO_ID, logger, ax
         required: ['results'],
       };
 
-      let aiRes;
+      let aiRes, modelUsed;
       try {
-        aiRes = await axios.post(
-          'https://generativelanguage.googleapis.com/v1beta/interactions',
-          {
-            model: 'gemini-3.7-flash',
-            input,
-            response_format: { type: 'text', mime_type: 'application/json', schema: responseSchema },
-          },
-          { headers: { 'x-goog-api-key': GEMINI_API_KEY, 'Content-Type': 'application/json' } }
-        );
+        ({ response: aiRes, modelUsed } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
+          input,
+          response_format: { type: 'text', mime_type: 'application/json', schema: responseSchema },
+        }));
       } catch (err) {
         logger.error('find-all-on-table: Gemini call failed', err.response?.data || err.message);
         return res.status(500).json({ error: err.response?.data?.error?.message || 'The Gemini API call failed' });
@@ -3294,7 +3317,7 @@ export function registerFindAllOnTableRoute(app, supabase, STUDIO_ID, logger, ax
         await logGeminiUsage(supabase, STUDIO_ID, 'find-all-on-table-gemini', {
           prompt_tokens: usage.prompt_tokens ?? usage.promptTokenCount ?? 0,
           completion_tokens: usage.completion_tokens ?? usage.candidatesTokenCount ?? 0,
-        });
+        }, modelUsed);
       }
 
       let parsed;
@@ -3775,17 +3798,12 @@ export function registerTestAiFindRoute(app, supabase, STUDIO_ID, logger, axios,
         required: ['found', 'confidence', 'reasoning'],
       };
 
-      let aiRes;
+      let aiRes, modelUsed;
       try {
-        aiRes = await axios.post(
-          'https://generativelanguage.googleapis.com/v1beta/interactions',
-          {
-            model: 'gemini-3.7-flash',
-            input,
-            response_format: { type: 'text', mime_type: 'application/json', schema: responseSchema },
-          },
-          { headers: { 'x-goog-api-key': GEMINI_API_KEY, 'Content-Type': 'application/json' } }
-        );
+        ({ response: aiRes, modelUsed } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
+          input,
+          response_format: { type: 'text', mime_type: 'application/json', schema: responseSchema },
+        }));
       } catch (err) {
         logger.error('test-ai/find: Gemini call failed', err.response?.data || err.message);
         return res.status(500).json({ error: err.response?.data?.error?.message || 'The Gemini API call failed' });
@@ -3796,7 +3814,7 @@ export function registerTestAiFindRoute(app, supabase, STUDIO_ID, logger, axios,
         await logGeminiUsage(supabase, STUDIO_ID, 'test-ai-find-gemini', {
           prompt_tokens: usage.prompt_tokens ?? usage.promptTokenCount ?? 0,
           completion_tokens: usage.completion_tokens ?? usage.candidatesTokenCount ?? 0,
-        });
+        }, modelUsed);
       }
 
       let result;
