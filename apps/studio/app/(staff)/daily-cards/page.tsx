@@ -75,6 +75,7 @@ export default function DailyCardsPage() {
   const [syncing, setSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [newSinceLoad, setNewSinceLoad] = useState<Booking[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [cardDate, setCardDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -158,13 +159,23 @@ export default function DailyCardsPage() {
       // distinction below (known-codes tracking vs "what's new" diffing)
       // is untouched -- still correct either way.
       try {
-        await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/bookings/sync`, {
+        const syncRes = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/bookings/sync`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         });
-      } catch (e) {
-        // Sync may fail if Square isn't connected, but we'll still try to fetch what we have
-        console.warn('Square sync failed:', e);
+        // Real, visible error instead of a silent console.warn --
+        // exactly the class of thing that hid the real cause here:
+        // this page's own sync could have been failing with a genuine
+        // Square error (permission scope, expired token, etc.) with
+        // zero visible sign anything was wrong.
+        if (!syncRes.ok) {
+          const body = await syncRes.json().catch(() => ({}));
+          setSyncError(`Booking sync failed: ${body.error || `HTTP ${syncRes.status}`}`);
+        } else {
+          setSyncError(null);
+        }
+      } catch (e: any) {
+        setSyncError(e?.name === 'AbortError' ? 'Booking sync timed out.' : `Could not reach the sync: ${e?.message || e}`);
       }
       
       // Fetch bookings for the selected date
@@ -360,6 +371,7 @@ export default function DailyCardsPage() {
 
         {loading && <p style={{ color: '#666' }}>Loading...</p>}
         {error && <div style={{ padding: '1rem', backgroundColor: '#fee', color: '#c33', borderRadius: '4px', marginBottom: '1rem' }}>{error}</div>}
+        {syncError && <div style={{ padding: '1rem', backgroundColor: '#5a2a2a', color: '#ffcccc', borderRadius: '4px', marginBottom: '1rem' }}>{syncError}</div>}
 
         {newSinceLoad.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', padding: '0.9rem', backgroundColor: '#fdf6e3', border: '1px solid #e0a020', borderRadius: '8px', marginBottom: '1.25rem' }}>
