@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useRef } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { AiCostCounter } from '@/components/AiCostCounter';
-import { Camera, Loader, XCircle, Truck, Home as HomeIcon, Printer } from 'lucide-react';
+import { Camera, Loader, XCircle, Check, Truck, Home as HomeIcon, Printer } from 'lucide-react';
 
 interface Booking {
   booking_code: string;
@@ -20,6 +20,7 @@ interface PieceResult {
   confidence: 'high' | 'medium' | 'low';
   x_pct: number | null;
   y_pct: number | null;
+  box: { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number } | null;
   reasoning: string | null;
 }
 
@@ -46,6 +47,10 @@ export default function FindOnTablePage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<PieceResult[] | null>(null);
+  // Real cumulative tracking across multiple photos, keyed by piece id --
+  // a booking spread across two tables needs several photos before it's
+  // genuinely complete.
+  const [foundInPreviousPhotos, setFoundInPreviousPhotos] = useState<Record<string, PieceResult>>({});
   const [totals, setTotals] = useState<{ total: number; found_count: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Real, same tap-to-enlarge as Test AI -- per Daisy: "will look
@@ -74,8 +79,6 @@ export default function FindOnTablePage() {
     const f = e.target.files?.[0];
     if (!f || !bookingCode) return;
     setPreview(URL.createObjectURL(f));
-    setResults(null);
-    setTotals(null);
     setError(null);
     setLoading(true);
     try {
@@ -87,7 +90,25 @@ export default function FindOnTablePage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Could not check the photo');
-      setResults(data.results || []);
+      const fresh: PieceResult[] = data.results || [];
+
+      // Real cumulative search across multiple photos -- per Daisy
+      // directly: a real booking "may have seven pieces... may be
+      // eleven... and they may be spread across two tables. If it's not
+      // all there, take another photo until we find a whole booking."
+      // Each new photo previously wiped the previous results entirely,
+      // so a booking split across two tables could never be completed.
+      // Now a piece found in ANY photo stays found; only pieces still
+      // genuinely missing get re-checked against each new photo. The
+      // pins shown on the current photo are only the ones found in THIS
+      // photo, since a box from a previous table's photo would be
+      // meaningless drawn over a different image.
+      setFoundInPreviousPhotos((prev) => {
+        const merged = { ...prev };
+        fresh.forEach((r) => { if (r.found) merged[r.id] = r; });
+        return merged;
+      });
+      setResults(fresh);
       setTotals({ total: data.total, found_count: data.found_count });
     } catch (err: any) {
       setError(err.message || 'Something went wrong.');
@@ -115,7 +136,7 @@ export default function FindOnTablePage() {
 
       <select
         value={bookingCode}
-        onChange={(e) => { setBookingCode(e.target.value); setResults(null); setTotals(null); setPreview(null); }}
+        onChange={(e) => { setBookingCode(e.target.value); setResults(null); setTotals(null); setPreview(null); setFoundInPreviousPhotos({}); }}
         style={{ width: '100%', padding: '0.55rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.88rem', marginBottom: '0.9rem' }}
       >
         <option value="">Choose a booking...</option>
@@ -185,25 +206,42 @@ export default function FindOnTablePage() {
           style={{ position: 'relative', width: '100%', marginBottom: '1rem', cursor: 'zoom-in', borderRadius: '8px', overflow: 'hidden' }}
         >
           <img src={preview} alt="Table" style={{ width: '100%', display: 'block' }} />
+          {/* Real bounding boxes sized to the actual detected object,
+              replacing fixed-size circles -- per Daisy: "both circles
+              are over the same piece... they need to be very defined
+              because it could be a very busy table with lots of pieces
+              close together." A fixed 40px dot can't distinguish
+              adjacent items; a real box scales to what was actually
+              detected. Number badge sits just outside the top-left
+              corner so it never obscures the piece itself. */}
           {results?.map((r, i) => (
-            r.found && r.x_pct != null && r.y_pct != null && (
+            r.found && r.box && (
               <div
                 key={r.id}
                 style={{
                   position: 'absolute',
-                  left: `${r.x_pct}%`,
-                  top: `${r.y_pct}%`,
-                  transform: 'translate(-50%, -50%)',
-                  width: 40, height: 40,
-                  borderRadius: '50%',
+                  left: `${r.box.left_pct}%`,
+                  top: `${r.box.top_pct}%`,
+                  width: `${r.box.right_pct - r.box.left_pct}%`,
+                  height: `${r.box.bottom_pct - r.box.top_pct}%`,
                   border: `3px solid ${PIN_COLOURS[i % PIN_COLOURS.length]}`,
-                  boxShadow: '0 0 0 2px white, 0 2px 8px rgba(0,0,0,0.4)',
+                  borderRadius: 4,
+                  boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
                   pointerEvents: 'none',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '0.7rem', fontWeight: 700, color: 'white', backgroundColor: PIN_COLOURS[i % PIN_COLOURS.length],
                 }}
               >
-                {i + 1}
+                <span
+                  style={{
+                    position: 'absolute', top: -9, left: -9,
+                    width: 20, height: 20, borderRadius: '50%',
+                    backgroundColor: PIN_COLOURS[i % PIN_COLOURS.length],
+                    color: 'white', fontSize: '0.68rem', fontWeight: 700,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 0 0 2px white',
+                  }}
+                >
+                  {i + 1}
+                </span>
               </div>
             )
           ))}
@@ -227,24 +265,33 @@ export default function FindOnTablePage() {
           <div style={{ position: 'relative', maxWidth: '100%', maxHeight: '82vh' }}>
             <img src={preview} alt="Table" style={{ maxWidth: '100%', maxHeight: '82vh', objectFit: 'contain', borderRadius: 8, display: 'block' }} />
             {results?.map((r, i) => (
-              r.found && r.x_pct != null && r.y_pct != null && (
+              r.found && r.box && (
                 <div
                   key={r.id}
                   style={{
                     position: 'absolute',
-                    left: `${r.x_pct}%`,
-                    top: `${r.y_pct}%`,
-                    transform: 'translate(-50%, -50%)',
-                    width: 50, height: 50,
-                    borderRadius: '50%',
+                    left: `${r.box.left_pct}%`,
+                    top: `${r.box.top_pct}%`,
+                    width: `${r.box.right_pct - r.box.left_pct}%`,
+                    height: `${r.box.bottom_pct - r.box.top_pct}%`,
                     border: `3px solid ${PIN_COLOURS[i % PIN_COLOURS.length]}`,
-                    boxShadow: '0 0 0 3px white, 0 2px 10px rgba(0,0,0,0.5)',
+                    borderRadius: 4,
+                    boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
                     pointerEvents: 'none',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '0.8rem', fontWeight: 700, color: 'white', backgroundColor: PIN_COLOURS[i % PIN_COLOURS.length],
                   }}
                 >
-                  {i + 1}
+                  <span
+                    style={{
+                      position: 'absolute', top: -11, left: -11,
+                      width: 24, height: 24, borderRadius: '50%',
+                      backgroundColor: PIN_COLOURS[i % PIN_COLOURS.length],
+                      color: 'white', fontSize: '0.75rem', fontWeight: 700,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: '0 0 0 2px white',
+                    }}
+                  >
+                    {i + 1}
+                  </span>
                 </div>
               )
             ))}
@@ -253,25 +300,50 @@ export default function FindOnTablePage() {
         </div>
       )}
 
-      {totals && (
-        <div style={{ padding: '0.9rem', backgroundColor: totals.found_count === totals.total ? '#eafaf0' : '#fdf6e3', borderRadius: '8px', marginBottom: '0.9rem' }}>
-          <p style={{ fontWeight: 700, fontSize: '0.95rem', color: totals.found_count === totals.total ? '#1a8a3c' : '#b8860b' }}>
-            {totals.found_count} of {totals.total} found here
-          </p>
-          {totals.found_count < totals.total && (
-            <p style={{ fontSize: '0.82rem', color: '#666', marginTop: '0.3rem' }}>
-              {totals.total - totals.found_count} still missing — check another table or box for the rest.
+      {totals && (() => {
+        // Real cumulative count across every photo taken so far, not
+        // just the current one -- per Daisy: pieces "may be spread
+        // across two tables... take another photo until we find a whole
+        // booking." Showing only this photo's count would make a
+        // genuinely complete booking look incomplete.
+        const cumulativeFound = Object.keys(foundInPreviousPhotos).length;
+        const allFound = cumulativeFound >= totals.total;
+        const thisPhotoCount = totals.found_count;
+        return (
+          <div style={{ padding: '0.9rem', backgroundColor: allFound ? '#eafaf0' : '#fdf6e3', borderRadius: '8px', marginBottom: '0.9rem' }}>
+            <p style={{ fontWeight: 700, fontSize: '0.95rem', color: allFound ? '#1a8a3c' : '#b8860b' }}>
+              {allFound
+                ? `All ${totals.total} pieces found — booking complete`
+                : `${cumulativeFound} of ${totals.total} found so far`}
             </p>
-          )}
-        </div>
-      )}
+            {cumulativeFound > thisPhotoCount && (
+              <p style={{ fontSize: '0.78rem', color: '#666', marginTop: '0.3rem' }}>
+                {thisPhotoCount} in this photo, {cumulativeFound - thisPhotoCount} found in earlier photos
+              </p>
+            )}
+            {!allFound && (
+              <p style={{ fontSize: '0.82rem', color: '#666', marginTop: '0.3rem' }}>
+                {totals.total - cumulativeFound} still missing — photograph another table or box and they will be added to this list.
+              </p>
+            )}
+          </div>
+        );
+      })()}
 
       {results && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {results.map((r, i) => (
-            <div key={r.id} style={{ padding: '0.7rem 0.9rem', backgroundColor: r.found ? '#f9f9f9' : '#fef6f6', borderRadius: '6px', display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
+          {results.map((r, i) => {
+            // Real cumulative status -- a piece found in an earlier
+            // photo of another table is genuinely still found, and must
+            // not show as missing just because it isn't in this photo.
+            const foundEarlier = !r.found && !!foundInPreviousPhotos[r.id];
+            const isFound = r.found || foundEarlier;
+            return (
+            <div key={r.id} style={{ padding: '0.7rem 0.9rem', backgroundColor: isFound ? '#f9f9f9' : '#fef6f6', borderRadius: '6px', display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
               {r.found ? (
                 <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: '50%', backgroundColor: PIN_COLOURS[i % PIN_COLOURS.length], color: 'white', fontSize: '0.7rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
+              ) : foundEarlier ? (
+                <Check size={18} color="#1a8a3c" style={{ flexShrink: 0, marginTop: 1 }} />
               ) : (
                 <XCircle size={18} color="#c33" style={{ flexShrink: 0, marginTop: 1 }} />
               )}
@@ -287,13 +359,18 @@ export default function FindOnTablePage() {
               )}
               <div style={{ flex: 1 }}>
                 <p style={{ fontSize: '0.85rem', fontWeight: 600 }}>{r.description}</p>
-                <p style={{ fontSize: '0.75rem', color: r.found ? '#1a8a3c' : '#c33', marginTop: '0.15rem' }}>
-                  {r.found ? `Found — ${r.confidence} confidence` : 'Not found here'}
+                <p style={{ fontSize: '0.75rem', color: isFound ? '#1a8a3c' : '#c33', marginTop: '0.15rem' }}>
+                  {r.found
+                    ? `Found — ${r.confidence} confidence`
+                    : foundEarlier
+                      ? 'Already found in an earlier photo'
+                      : 'Not in this photo'}
                 </p>
-                {r.reasoning && <p style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.15rem' }}>{r.reasoning}</p>}
+                {r.found && r.reasoning && <p style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.15rem' }}>{r.reasoning}</p>}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </PageShell>

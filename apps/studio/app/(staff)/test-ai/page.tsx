@@ -12,6 +12,7 @@ interface FindResult {
   confidence: 'high' | 'medium' | 'low';
   x_pct: number | null;
   y_pct: number | null;
+  box: { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number } | null;
   reasoning: string | null;
 }
 
@@ -121,17 +122,20 @@ export default function TestAiPage() {
           style={{ position: 'relative', width: '100%', marginBottom: '1rem', cursor: 'zoom-in', borderRadius: 12, overflow: 'hidden', boxShadow: '0 3px 10px rgba(43,39,36,0.1)' }}
         >
           <img src={scenePreview} alt="Scene" style={{ width: '100%', display: 'block' }} />
-          {result?.found && result.x_pct != null && result.y_pct != null && (
+          {/* Real bounding box sized to the actual detected object, not a
+              fixed-size circle -- same change as Find on Table, so what
+              gets tested here genuinely reflects what the real tool does. */}
+          {result?.found && result.box && (
             <div
               style={{
                 position: 'absolute',
-                left: `${result.x_pct}%`,
-                top: `${result.y_pct}%`,
-                transform: 'translate(-50%, -50%)',
-                width: 46, height: 46,
-                borderRadius: '50%',
+                left: `${result.box.left_pct}%`,
+                top: `${result.box.top_pct}%`,
+                width: `${result.box.right_pct - result.box.left_pct}%`,
+                height: `${result.box.bottom_pct - result.box.top_pct}%`,
                 border: '3px solid #e0392b',
-                boxShadow: '0 0 0 2px white, 0 2px 8px rgba(0,0,0,0.4)',
+                borderRadius: 4,
+                boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
                 pointerEvents: 'none',
               }}
             />
@@ -162,17 +166,17 @@ export default function TestAiPage() {
         >
           <div style={{ position: 'relative', maxWidth: '100%', maxHeight: '82vh' }}>
             <img src={scenePreview} alt="Scene" style={{ maxWidth: '100%', maxHeight: '82vh', objectFit: 'contain', borderRadius: 8, display: 'block' }} />
-            {result?.found && result.x_pct != null && result.y_pct != null && (
+            {result?.found && result.box && (
               <div
                 style={{
                   position: 'absolute',
-                  left: `${result.x_pct}%`,
-                  top: `${result.y_pct}%`,
-                  transform: 'translate(-50%, -50%)',
-                  width: 56, height: 56,
-                  borderRadius: '50%',
+                  left: `${result.box.left_pct}%`,
+                  top: `${result.box.top_pct}%`,
+                  width: `${result.box.right_pct - result.box.left_pct}%`,
+                  height: `${result.box.bottom_pct - result.box.top_pct}%`,
                   border: '3px solid #e0392b',
-                  boxShadow: '0 0 0 3px white, 0 2px 10px rgba(0,0,0,0.5)',
+                  borderRadius: 4,
+                  boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
                   pointerEvents: 'none',
                 }}
               />

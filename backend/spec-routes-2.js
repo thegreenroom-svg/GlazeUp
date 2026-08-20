@@ -3246,14 +3246,20 @@ export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios
         return res.status(500).json({ error: 'Could not parse the Gemini response' });
       }
 
-      // box_2d is [ymin, xmin, ymax, xmax] normalized 0-1000 -- convert
-      // to a centre point as a plain percentage for the frontend, no
-      // need to know real pixel dimensions since both are 0-1000 scale.
-      let x_pct = null, y_pct = null;
+      // box_2d is [ymin, xmin, ymax, xmax] normalized 0-1000 -- kept as
+      // the real, full box (not collapsed to a midpoint) so the
+      // frontend can draw an actual box sized to the real detected
+      // object. Per Daisy directly: "smaller circles... very defined...
+      // busy table with lots of pieces close together" -- a fixed-size
+      // dot regardless of real object size was exactly what could bleed
+      // onto a neighbouring item on a cluttered table; the real box
+      // scales correctly instead.
+      let x_pct = null, y_pct = null, box = null;
       if (result.found && Array.isArray(result.box_2d) && result.box_2d.length === 4) {
         const [ymin, xmin, ymax, xmax] = result.box_2d;
         x_pct = ((xmin + xmax) / 2) / 10;
         y_pct = ((ymin + ymax) / 2) / 10;
+        box = { left_pct: xmin / 10, top_pct: ymin / 10, right_pct: xmax / 10, bottom_pct: ymax / 10 };
       }
 
       res.json({
@@ -3262,6 +3268,7 @@ export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios
         confidence: result.confidence || 'low',
         x_pct,
         y_pct,
+        box,
         reasoning: result.reasoning || null,
       });
     } catch (err) {
@@ -3370,11 +3377,17 @@ export function registerFindAllOnTableRoute(app, supabase, STUDIO_ID, logger, ax
       const byId = Object.fromEntries((parsed.results || []).map((r) => [r.id, r]));
       const results = unpacked.map((p) => {
         const r = byId[p.id] || { found: false };
-        let x_pct = null, y_pct = null;
+        // Real, full box kept (not collapsed to a midpoint) so the
+        // frontend draws a box sized to the real object. Matters most
+        // here: per Daisy, a real booking may have 7 or 11 pieces on one
+        // busy table, where fixed-size dots would overlap each other
+        // and their neighbours.
+        let x_pct = null, y_pct = null, box = null;
         if (r.found && Array.isArray(r.box_2d) && r.box_2d.length === 4) {
           const [ymin, xmin, ymax, xmax] = r.box_2d;
           x_pct = ((xmin + xmax) / 2) / 10;
           y_pct = ((ymin + ymax) / 2) / 10;
+          box = { left_pct: xmin / 10, top_pct: ymin / 10, right_pct: xmax / 10, bottom_pct: ymax / 10 };
         }
         return {
           id: p.id,
@@ -3382,7 +3395,7 @@ export function registerFindAllOnTableRoute(app, supabase, STUDIO_ID, logger, ax
           reference_photo_url: p.reference_photo_url || null,
           found: !!r.found,
           confidence: r.confidence || 'low',
-          x_pct, y_pct,
+          x_pct, y_pct, box,
           reasoning: r.reasoning || null,
         };
       });
@@ -3865,17 +3878,18 @@ export function registerTestAiFindRoute(app, supabase, STUDIO_ID, logger, axios,
         return res.status(500).json({ error: 'Could not parse the Gemini response' });
       }
 
-      let x_pct = null, y_pct = null;
+      let x_pct = null, y_pct = null, box = null;
       if (result.found && Array.isArray(result.box_2d) && result.box_2d.length === 4) {
         const [ymin, xmin, ymax, xmax] = result.box_2d;
         x_pct = ((xmin + xmax) / 2) / 10;
         y_pct = ((ymin + ymax) / 2) / 10;
+        box = { left_pct: xmin / 10, top_pct: ymin / 10, right_pct: xmax / 10, bottom_pct: ymax / 10 };
       }
 
       res.json({
         found: !!result.found,
         confidence: result.confidence || 'low',
-        x_pct, y_pct,
+        x_pct, y_pct, box,
         reasoning: result.reasoning || null,
       });
     } catch (err) {
