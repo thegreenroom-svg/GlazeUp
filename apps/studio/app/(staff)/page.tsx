@@ -157,7 +157,7 @@ export default function Dashboard() {
           } else {
             setAppliedMsg(
               d.applied_to_bookings > 0
-                ? `Applied to ${d.applied_to_bookings} of ${d.total_bookings_today} upcoming bookings (rest already had their own date set)`
+                ? `Applied to ${d.applied_to_bookings} of ${d.total_bookings_today} bookings today (rest already had their own date set)`
                 : `No bookings needed it — all ${d.total_bookings_today} already had their own date set`
             );
           }

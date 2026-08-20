@@ -2738,20 +2738,6 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
       const startMax = new Date();
       startMax.setDate(startMax.getDate() + 27);
 
-      // Real, real fetched once here -- per Daisy: "it will be relevant
-      // from today's collections... it should follow right through."
-      // The current studio-wide collection date previously only applied
-      // as a one-time bulk action from the Dashboard widget -- it never
-      // continued to apply to bookings that synced in AFTER that point.
-      // Fetching it once here so every booking this sync inserts gets it
-      // automatically, going forward, for as long as it stays current.
-      const { data: studioRow } = await supabase
-        .from('studios')
-        .select('current_collection_date')
-        .eq('id', STUDIO_ID)
-        .maybeSingle();
-      const currentCollectionDate = studioRow?.current_collection_date || null;
-
       let allBookings = [];
       let cursor;
       do {
@@ -2850,18 +2836,6 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
           });
           if (insertErr) throw insertErr;
           synced++;
-
-          // Real, ongoing application -- every newly-synced booking gets
-          // the current studio-wide collection date automatically, not
-          // just bookings that already existed at the moment the date
-          // was last set. This is what makes it genuinely "follow right
-          // through" rather than a one-time bulk action.
-          if (currentCollectionDate) {
-            const { error: dateErr } = await supabase
-              .from('demo_app_session_status')
-              .upsert([{ studio_id: STUDIO_ID, booking_code: bookingCode, collection_date: currentCollectionDate }], { onConflict: 'booking_code' });
-            if (dateErr) logger.error('[bookings/sync] could not apply current collection date to new booking', dateErr);
-          }
         } catch (err) {
           errored++;
           if (errors.length < 10) errors.push({ square_booking_id: b.id, error: err.message });
@@ -3581,27 +3555,25 @@ export function registerCurrentCollectionDateRoute(app, supabase, STUDIO_ID, log
         return res.status(500).json({ error: 'The update ran but matched no real row -- check studio_id/RLS.', diagnostic: { studio_id: STUDIO_ID } });
       }
 
-      // Real "apply to all bookings until changed" -- per Daisy directly,
-      // not just a UI suggestion. Applies the new current date onto
-      // today's real bookings that don't already have their own,
-      // more-specific collection_date set. A booking with its own real
-      // date already set is left alone -- that's a genuine per-booking
-      // override, not something this default should overwrite.
-      // Real fix -- this previously only applied to bookings whose
-      // session_start was TODAY. That's genuinely the wrong window for
-      // how this is actually used: Daisy sets the current collection
-      // date so it applies to bookings being taken now and going
-      // forward ("apply to all bookings until changed"), not just ones
-      // that happen to be sitting on the floor at that exact moment.
-      // Now covers today onward, which is what "until changed" means in
-      // practice.
+      // Real, correctly-scoped fix -- per Daisy directly, correcting an
+      // earlier over-broad version of this: "not for any future
+      // bookings for next week or whatever because the collection date
+      // may change... when we set the cards and apply the booking that
+      // collection date is fixed." A card only gets printed for a
+      // booking on the day it's actually happening -- pre-stamping
+      // next week's bookings with today's date would be wrong the
+      // moment the date changes before their card is ever printed.
+      // TODAY only, deliberately -- not "today onward".
       const todayStart = new Date();
       todayStart.setUTCHours(0, 0, 0, 0);
+      const todayEnd = new Date(todayStart);
+      todayEnd.setUTCDate(todayEnd.getUTCDate() + 1);
       const { data: relevantBookings } = await supabase
         .from('bookings')
         .select('booking_code')
         .eq('studio_id', STUDIO_ID)
-        .gte('session_start', todayStart.toISOString());
+        .gte('session_start', todayStart.toISOString())
+        .lt('session_start', todayEnd.toISOString());
       const codes = (relevantBookings || []).map((b) => b.booking_code);
       let appliedCount = 0;
       const upsertErrors = [];
