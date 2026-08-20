@@ -1407,10 +1407,19 @@ export function registerSquareBookingsDiagnosticRoute(app, supabase, STUDIO_ID, 
       const locations = locationsRes.data.locations || [];
       if (!locations.length) return res.json({ bookings: [], reason: 'no_square_locations' });
 
-      // Real gap window -- from the last known real sync (9 Aug) through
-      // 14 days ahead, so this covers exactly what's missing plus enough
-      // near-future bookings to sanity-check the shape.
-      const startMin = new Date('2026-08-09T00:00:00Z').toISOString();
+      // Real bug found and fixed here -- startMin was hardcoded to a
+      // fixed calendar date ('9 Aug'). That was fine when first written,
+      // but as real time moves forward, the gap between that fixed date
+      // and "today + 14 days" only grows -- eventually exceeding
+      // Square's real hard 31-day maximum window and failing every
+      // single sync from that point on. Confirmed directly: Daisy's
+      // real error was "Time range can be at most 31 days in length".
+      // Now a real rolling window instead -- a few days back to catch
+      // anything very recent, forward far enough to be useful, always
+      // safely under the real cap regardless of how much time passes.
+      const startMinDate = new Date();
+      startMinDate.setDate(startMinDate.getDate() - 3);
+      const startMin = startMinDate.toISOString();
       const startMax = new Date();
       startMax.setDate(startMax.getDate() + 14);
 
@@ -2709,12 +2718,25 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
       const locations = locationsRes.data.locations || [];
       if (!locations.length) return res.json({ synced: 0, reason: 'no_square_locations' });
 
-      // Real gap-catching window: from the last known real sync (9 Aug)
-      // through 30 days ahead, so every run both catches up what's missing
-      // and keeps pulling genuinely new future bookings.
-      const startMin = new Date('2026-08-09T00:00:00Z').toISOString();
+      // Real bug found and fixed here -- same class of issue as the
+      // diagnostic route above. startMin was hardcoded to a fixed
+      // calendar date ('9 Aug'), which only grows further from "today +
+      // 30 days" as real time passes -- eventually exceeding Square's
+      // real hard 31-day maximum window and failing every single sync
+      // from that point on with zero visible sign anything was wrong,
+      // until the error-surfacing fixes made it visible. Confirmed
+      // directly against Daisy's real error: "Time range can be at most
+      // 31 days in length". This is very likely the real root cause of
+      // every booking-sync gap found this entire session, not a
+      // permission/scope issue as first suspected.
+      //
+      // Now a real rolling window -- always safely under the cap
+      // regardless of how much time has passed since this was written.
+      const startMinDate = new Date();
+      startMinDate.setDate(startMinDate.getDate() - 3);
+      const startMin = startMinDate.toISOString();
       const startMax = new Date();
-      startMax.setDate(startMax.getDate() + 30);
+      startMax.setDate(startMax.getDate() + 27);
 
       let allBookings = [];
       let cursor;
