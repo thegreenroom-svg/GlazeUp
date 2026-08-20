@@ -3832,7 +3832,7 @@ export function registerTestAiFindRoute(app, supabase, STUDIO_ID, logger, axios,
       const input = [
         {
           type: 'text',
-          text: `You are looking for ONE specific object. The first image is a reference photo of exactly the object to find. The second image is a scene where that object has been mixed in among several other similar objects.\n\nLook carefully at the reference object's real distinguishing features -- shape, colour, pattern, any markings. Find that same object in the second (scene) image.\n\nIf you can identify it confidently, provide its bounding box in the scene image. If you cannot confidently identify it, say so honestly -- a wrong box is worse than admitting it isn't there.`,
+          text: `The first image is a reference photo showing one or more distinct objects. The second image is a scene where those objects have been mixed in among other similar objects.\n\nFirst, identify EVERY distinct object visible in the reference photo -- there may be one, or there may be several. Then, for EACH of them independently, look for that same object in the second (scene) image.\n\nReturn one result per reference object. For each, give a short description of the object (so it can be told apart from the others), whether you found it in the scene, and if found, its bounding box in the SCENE image.\n\nJudge each object separately -- finding one does not mean the others are present, and missing one does not mean the others are absent. If you cannot confidently identify a particular object, say so honestly for that one -- a wrong box is worse than admitting it isn't there.`,
         },
         { type: 'image', data: base64Ref, mime_type: referenceFile.mimetype || 'image/jpeg' },
         { type: 'image', data: base64Scene, mime_type: sceneFile.mimetype || 'image/jpeg' },
@@ -3841,12 +3841,23 @@ export function registerTestAiFindRoute(app, supabase, STUDIO_ID, logger, axios,
       const responseSchema = {
         type: 'object',
         properties: {
-          found: { type: 'boolean' },
-          confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
-          box_2d: { type: 'array', items: { type: 'integer' }, description: '[ymin, xmin, ymax, xmax] normalized 0-1000, only if found' },
-          reasoning: { type: 'string', description: 'What specifically matched, or why nothing did' },
+          results: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', description: 'A short label for this reference object, e.g. "1"' },
+                description: { type: 'string', description: 'Short description so this object can be told apart from the others' },
+                found: { type: 'boolean' },
+                confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+                box_2d: { type: 'array', items: { type: 'integer' } },
+                reasoning: { type: 'string' },
+              },
+              required: ['id', 'description', 'found'],
+            },
+          },
         },
-        required: ['found', 'confidence', 'reasoning'],
+        required: ['results'],
       };
 
       let aiRes, modelUsed;
@@ -3865,32 +3876,48 @@ export function registerTestAiFindRoute(app, supabase, STUDIO_ID, logger, axios,
         await logGeminiUsage(supabase, STUDIO_ID, 'test-ai-find-gemini', usage, modelUsed);
       }
 
-      let result;
+      let parsed;
       try {
         const raw = extractGeminiText(aiRes.data);
         if (!raw) {
           logger.error('test-ai/find: no text extracted from Gemini response -- real shape:', JSON.stringify(aiRes.data).slice(0, 2000));
           return res.status(500).json({ error: 'Got a response from Gemini but could not find its text output -- logged the real shape for diagnosis.' });
         }
-        result = JSON.parse((raw.match(/\{[\s\S]*\}/) || [])[0] || '{}');
+        parsed = JSON.parse((raw.match(/\{[\s\S]*\}/) || [])[0] || '{}');
       } catch (e) {
         logger.error('test-ai/find: could not parse Gemini response', aiRes.data);
         return res.status(500).json({ error: 'Could not parse the Gemini response' });
       }
 
-      let x_pct = null, y_pct = null, box = null;
-      if (result.found && Array.isArray(result.box_2d) && result.box_2d.length === 4) {
-        const [ymin, xmin, ymax, xmax] = result.box_2d;
-        x_pct = ((xmin + xmax) / 2) / 10;
-        y_pct = ((ymin + ymax) / 2) / 10;
-        box = { left_pct: xmin / 10, top_pct: ymin / 10, right_pct: xmax / 10, bottom_pct: ymax / 10 };
-      }
+      // Real, identical result shape to find-all-on-table -- per Daisy
+      // directly: "this has to be the same for all the apps using this
+      // because it has to be the same. When I'm testing, I have to
+      // effectively be testing Find on Table through the Test AI
+      // button." Same per-item independent judgement, same box
+      // conversion, same output fields -- so what's proven here
+      // genuinely holds for the real packing tool.
+      const results = (parsed.results || []).map((r, i) => {
+        let x_pct = null, y_pct = null, box = null;
+        if (r.found && Array.isArray(r.box_2d) && r.box_2d.length === 4) {
+          const [ymin, xmin, ymax, xmax] = r.box_2d;
+          x_pct = ((xmin + xmax) / 2) / 10;
+          y_pct = ((ymin + ymax) / 2) / 10;
+          box = { left_pct: xmin / 10, top_pct: ymin / 10, right_pct: xmax / 10, bottom_pct: ymax / 10 };
+        }
+        return {
+          id: String(r.id ?? i),
+          description: r.description || `Item ${i + 1}`,
+          found: !!r.found,
+          confidence: r.confidence || 'low',
+          x_pct, y_pct, box,
+          reasoning: r.reasoning || null,
+        };
+      });
 
       res.json({
-        found: !!result.found,
-        confidence: result.confidence || 'low',
-        x_pct, y_pct, box,
-        reasoning: result.reasoning || null,
+        total: results.length,
+        found_count: results.filter((r) => r.found).length,
+        results,
       });
     } catch (err) {
       logger.error('test-ai/find failed', err.response?.data || err.message);
