@@ -58,21 +58,84 @@ function extractGeminiUsage(data) {
   };
 }
 
+// Turns a raw Gemini API error into something a staff member can
+// actually act on. Daisy saw a full wall of quota-URL API text on
+// screen mid-test -- accurate, but not useful to someone standing at a
+// shelf trying to pack pottery.
+function friendlyGeminiError(err) {
+  const msg = err.response?.data?.error?.message || err.message || '';
+  const status = err.response?.status;
+  if (status === 429 || /quota|rate limit/i.test(msg)) {
+    return 'Too many AI checks in a short time — this is a per-minute limit, not a spending cap. Wait about a minute and try again.';
+  }
+  if (status === 503 || /overloaded|high demand/i.test(msg)) {
+    return 'The AI service is busy right now. Give it a moment and try again.';
+  }
+  if (status === 401 || status === 403) {
+    return 'The AI service rejected the request — the API key may need checking.';
+  }
+  return msg || 'The AI check failed.';
+}
+
 async function callGeminiWithFallback(axios, apiKey, body) {
   const post = (model) => axios.post(
     'https://generativelanguage.googleapis.com/v1beta/interactions',
     { ...body, model },
     { headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' } }
   );
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  const classify = (err) => {
+    const msg = err.response?.data?.error?.message || '';
+    const status = err.response?.status;
+    // Real 429 rate limit -- Daisy hit this during rapid testing: the
+    // free tier allows 20 requests per minute, and Google's own error
+    // says exactly how long to wait ("Please retry in 3.18s"). That's a
+    // genuinely temporary, self-resolving condition, not a failure
+    // worth showing the user -- so wait the real stated time and retry
+    // rather than surfacing a wall of raw API text.
+    if (status === 429 || /quota|rate limit|exceeded your current quota/i.test(msg)) {
+      const m = msg.match(/retry in ([\d.]+)s/i);
+      // Real stated delay plus a small buffer; sensible default if the
+      // message doesn't include one, capped so nothing hangs for long.
+      const waitMs = Math.min(m ? (parseFloat(m[1]) * 1000 + 500) : 5000, 15000);
+      return { kind: 'rate_limit', waitMs };
+    }
+    if (status === 503 || /overloaded|high demand|try again later/i.test(msg)) {
+      return { kind: 'overloaded' };
+    }
+    return { kind: 'other' };
+  };
+
   try {
     const response = await post('gemini-3.7-flash');
     return { response, modelUsed: 'gemini-3.7-flash' };
   } catch (err) {
-    const msg = err.response?.data?.error?.message || '';
-    const isOverloaded = err.response?.status === 503 || /overloaded|high demand|try again later/i.test(msg);
-    if (!isOverloaded) throw err;
-    const response = await post('gemini-3.6-flash');
-    return { response, modelUsed: 'gemini-3.6-flash' };
+    const first = classify(err);
+
+    if (first.kind === 'rate_limit') {
+      // Wait out the real stated window, then try once more on 3.7.
+      await sleep(first.waitMs);
+      try {
+        const response = await post('gemini-3.7-flash');
+        return { response, modelUsed: 'gemini-3.7-flash' };
+      } catch (retryErr) {
+        // Still limited (or now overloaded) -- 3.6 has its own separate
+        // real quota, so falling back genuinely helps here rather than
+        // just failing twice on the same limit.
+        const second = classify(retryErr);
+        if (second.kind === 'other') throw retryErr;
+        const response = await post('gemini-3.6-flash');
+        return { response, modelUsed: 'gemini-3.6-flash' };
+      }
+    }
+
+    if (first.kind === 'overloaded') {
+      const response = await post('gemini-3.6-flash');
+      return { response, modelUsed: 'gemini-3.6-flash' };
+    }
+
+    throw err;
   }
 }
 
@@ -3217,7 +3280,7 @@ export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios
         }));
       } catch (err) {
         logger.error('find-on-table: Gemini call failed', err.response?.data || err.message);
-        return res.status(500).json({ error: err.response?.data?.error?.message || 'The Gemini API call failed', gemini_error: err.response?.data || null });
+        return res.status(500).json({ error: friendlyGeminiError(err), gemini_error: err.response?.data || null });
       }
 
       // Real usage logging into the same running tally as every other AI
@@ -3353,7 +3416,7 @@ export function registerFindAllOnTableRoute(app, supabase, STUDIO_ID, logger, ax
         }));
       } catch (err) {
         logger.error('find-all-on-table: Gemini call failed', err.response?.data || err.message);
-        return res.status(500).json({ error: err.response?.data?.error?.message || 'The Gemini API call failed' });
+        return res.status(500).json({ error: friendlyGeminiError(err) });
       }
 
       const usage = extractGeminiUsage(aiRes.data);
@@ -3868,7 +3931,7 @@ export function registerTestAiFindRoute(app, supabase, STUDIO_ID, logger, axios,
         }));
       } catch (err) {
         logger.error('test-ai/find: Gemini call failed', err.response?.data || err.message);
-        return res.status(500).json({ error: err.response?.data?.error?.message || 'The Gemini API call failed' });
+        return res.status(500).json({ error: friendlyGeminiError(err) });
       }
 
       const usage = extractGeminiUsage(aiRes.data);
