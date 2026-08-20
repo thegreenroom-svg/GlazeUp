@@ -161,6 +161,14 @@ export default function FloorPage() {
     setLoading(true);
     setQuickAccessMode(false);
     try {
+      // Real fix -- this fetched straight from the database with zero
+      // sync call anywhere in this page, unlike the Dashboard and Daily
+      // Cards. If Floor is opened directly (very likely the most common
+      // real entry point, not the Dashboard), the earlier sync-on-open
+      // fix never fired here at all -- so a genuinely busier real day
+      // could still show stale numbers. Syncing first, same as
+      // everywhere else now does.
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/bookings/sync`, { method: 'POST' }).catch(() => {});
       const [bRes, mRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings`),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/till-menu`),
@@ -179,6 +187,9 @@ export default function FloorPage() {
     setLoading(true);
     setQuickAccessMode(true);
     try {
+      // Same real fix as loadBookings above -- Seated Bookings is its
+      // own direct entry point too.
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/bookings/sync`, { method: 'POST' }).catch(() => {});
       const [bRes, mRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings`),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/till-menu`),
