@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerIdentifyPiecesRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerIdentifyPiecesRoute, registerPieceFulfilmentRoutes, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -712,7 +712,7 @@ app.get('/api/demo/bookings/:code/detail', async (req, res) => {
     if (!JUNK_BOOKING_LABELS.includes(booking.customer_name)) {
       const { data: pieceData } = await supabase
         .from('pottery_pieces')
-        .select('id, piece_type, description, status, reference_photo_url, reference_photo_taken_at, mark_code')
+        .select('id, piece_type, description, status, reference_photo_url, reference_photo_taken_at, mark_code, assigned_to, fulfilment, postal_postcode, hold_reason')
         .eq('studio_id', DEMO_STUDIO_ID)
         .in('booking_id', [booking.booking_code, booking.customer_name])
         .neq('archived', true);
@@ -1543,6 +1543,7 @@ registerCurrentCollectionDateRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerBisqueInventoryRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerStudioFeaturesRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerIdentifyPiecesRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage);
+registerPieceFulfilmentRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 registerQuickAddPieceRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerFindOnTableRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage);
 registerTestAiFindRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage);

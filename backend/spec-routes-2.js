@@ -3369,12 +3369,15 @@ export function registerFindAllOnTableRoute(app, supabase, STUDIO_ID, logger, ax
 
       const { data: pieces } = await supabase
         .from('pottery_pieces')
-        .select('id, description, piece_type, status, reference_photo_url')
+        .select('id, description, piece_type, status, reference_photo_url, fulfilment, assigned_to')
         .eq('studio_id', STUDIO_ID)
         .eq('booking_id', req.params.code)
         .neq('archived', true)
-        .not('status', 'in', '("packed","ready_for_pickup","collected","posted","picked_up")');
-      const unpacked = (pieces || []).filter((p) => p.description || p.piece_type);
+        .not('status', 'in', '("packed","ready_for_pickup","collected","posted","picked_up","on_hold")');
+      // Real exclusion -- a piece held for a return visit isn't in the
+      // kiln and shouldn't be on the packing list, or the packer wastes
+      // time hunting a shelf for something that was never fired.
+      const unpacked = (pieces || []).filter((p) => (p.description || p.piece_type) && p.fulfilment !== 'return_visit');
       if (unpacked.length === 0) {
         return res.status(400).json({ error: 'No unpacked pieces with a description found for this booking' });
       }
@@ -4091,6 +4094,126 @@ export function registerIdentifyPiecesRoute(app, supabase, STUDIO_ID, logger, ax
     } catch (err) {
       logger.error('identify-in-photo failed', err.response?.data || err.message);
       res.status(500).json({ error: err.response?.data?.error?.message || err.message });
+    }
+  });
+}
+
+// ============================================================================
+// PER-PIECE FULFILMENT -- the commercial core. Daisy: "assign it to another
+// person within that booking who wants to pick up separately or have
+// postage... this really is the intrinsic part... the commercial value."
+//
+// The real constraint being broken: a Square booking is ONE row, but a
+// table is usually several people who each want different things.
+// Everything downstream (postage, packing, the kiln) currently treats a
+// booking as one indivisible unit, which is wrong in two expensive ways:
+//
+//   1. Postage is charged PER PARCEL. A booking split across two
+//      addresses is a second parcel -- a real cost that is currently
+//      invisible, so it can't be billed for. Every studio has this
+//      problem, not just this one.
+//   2. A piece held for a return visit must NOT be fired. Firing
+//      unfinished work destroys it and the studio replaces it free.
+//      A real, recurring loss that a flag prevents.
+//
+// Deliberately built on pottery_pieces rather than a new table: a piece
+// already exists as its own row with its own photo and description, so
+// assignment is four nullable columns, not a schema redesign. Anything
+// unassigned falls back to the booking-level fulfilment already in
+// demo_app_session_status, so existing bookings keep working untouched.
+// ============================================================================
+export function registerPieceFulfilmentRoutes(app, supabase, STUDIO_ID, logger) {
+  // Update one piece's assignment / fulfilment.
+  app.post('/api/spec/pieces/:id/fulfilment', async (req, res) => {
+    try {
+      const { assigned_to, fulfilment, postal_postcode, hold_reason } = req.body || {};
+      const VALID = ['collect', 'post', 'return_visit'];
+      if (fulfilment && !VALID.includes(fulfilment)) {
+        return res.status(400).json({ error: `fulfilment must be one of: ${VALID.join(', ')}` });
+      }
+      const update = { updated_at: new Date().toISOString() };
+      if (assigned_to !== undefined) update.assigned_to = assigned_to || null;
+      if (fulfilment !== undefined) update.fulfilment = fulfilment || null;
+      if (postal_postcode !== undefined) update.postal_postcode = postal_postcode || null;
+      if (hold_reason !== undefined) update.hold_reason = hold_reason || null;
+
+      // A piece held for a return visit is genuinely not ready to fire --
+      // clear any scheduled firing so it can't be swept into a kiln load
+      // by the collection-date logic. This is the real breakage-prevention.
+      if (fulfilment === 'return_visit') {
+        update.status = 'on_hold';
+        update.scheduled_firing_date = null;
+      } else if (fulfilment && fulfilment !== 'return_visit') {
+        // Coming off hold -- put it back in the normal queue.
+        const { data: existing } = await supabase
+          .from('pottery_pieces').select('status').eq('id', req.params.id).maybeSingle();
+        if (existing?.status === 'on_hold') update.status = 'queued';
+      }
+
+      const { data, error } = await supabase
+        .from('pottery_pieces')
+        .update(update)
+        .eq('id', req.params.id)
+        .eq('studio_id', STUDIO_ID)
+        .select('id, piece_type, description, assigned_to, fulfilment, postal_postcode, hold_reason, status')
+        .single();
+      if (error) throw error;
+      res.json(data);
+    } catch (err) {
+      logger.error('piece fulfilment update failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Real parcel grouping for a booking -- what packing and postage
+  // actually need to know: how many separate parcels this booking is,
+  // who each is for, and which pieces go in each.
+  app.get('/api/spec/bookings/:code/parcels', async (req, res) => {
+    try {
+      const booking_code = req.params.code;
+      const { data: pieces, error } = await supabase
+        .from('pottery_pieces')
+        .select('id, piece_type, description, reference_photo_url, assigned_to, fulfilment, postal_postcode, hold_reason, status')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_id', booking_code)
+        .neq('archived', true);
+      if (error) throw error;
+
+      // Booking-level fallback for anything not individually assigned --
+      // so existing bookings behave exactly as before.
+      const { data: status } = await supabase
+        .from('demo_app_session_status')
+        .select('collection_method, postal_postcode')
+        .eq('booking_code', booking_code)
+        .maybeSingle();
+      const defaultFulfilment = status?.collection_method === 'postal' ? 'post' : 'collect';
+
+      const groups = {};
+      const held = [];
+      (pieces || []).forEach((p) => {
+        if (p.fulfilment === 'return_visit') { held.push(p); return; }
+        const f = p.fulfilment || defaultFulfilment;
+        const who = p.assigned_to || null;
+        const postcode = p.postal_postcode || status?.postal_postcode || null;
+        // One parcel per person-and-destination. Two people collecting
+        // together is still one collection; two different postcodes is
+        // genuinely two parcels and two postage charges.
+        const key = f === 'post' ? `post|${who || ''}|${postcode || ''}` : `collect|${who || ''}`;
+        if (!groups[key]) groups[key] = { fulfilment: f, assigned_to: who, postal_postcode: f === 'post' ? postcode : null, pieces: [] };
+        groups[key].pieces.push(p);
+      });
+
+      const parcels = Object.values(groups);
+      res.json({
+        parcels,
+        parcel_count: parcels.length,
+        postal_parcel_count: parcels.filter((p) => p.fulfilment === 'post').length,
+        on_hold: held,
+        total_pieces: (pieces || []).length,
+      });
+    } catch (err) {
+      logger.error('parcels failed', err.message);
+      res.status(500).json({ error: err.message });
     }
   });
 }

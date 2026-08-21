@@ -45,7 +45,7 @@ interface BookingDetail {
   booking: Booking & { customer_phone: string | null };
   session: { id: string; table_number: string; status: string; number_of_places: number } | null;
   orders: { id: string; item_name: string; quantity: number; unit_price_cents: number; notes: string | null }[];
-  pieces: { id: string; piece_type: string | null; description: string | null; status: string; reference_photo_url: string | null; reference_photo_taken_at: string | null; mark_code: string | null }[];
+  pieces: { id: string; piece_type: string | null; description: string | null; status: string; reference_photo_url: string | null; reference_photo_taken_at: string | null; mark_code: string | null; assigned_to: string | null; fulfilment: string | null; postal_postcode: string | null; hold_reason: string | null }[];
 }
 
 interface PhotoMatch {
@@ -169,6 +169,24 @@ function BookingsPageInner() {
     }
   };
   const [photoMatches, setPhotoMatches] = useState<PhotoMatch[]>([]);
+
+  // Saves one piece's assignment. Deliberately fire-and-refresh rather
+  // than a form with a save button: staff are doing this while holding
+  // pottery, so every extra tap is a real cost. Refreshes the detail so
+  // the parcel count updates immediately.
+  const savePieceFulfilment = async (pieceId: string, patch: Record<string, string>) => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/${pieceId}/fulfilment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (res.ok && selectedCode) {
+        const d = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${selectedCode}/detail`);
+        if (d.ok) setDetail(await d.json());
+      }
+    } catch { /* non-blocking -- the field keeps its typed value either way */ }
+  };
   // Real full-screen viewer -- per Daisy: "if I click on it, I can
   // enlarge it so that I can visually try to see what I'm looking for
   // in the app rather than scroll through all the photographs on the
@@ -665,9 +683,13 @@ function BookingsPageInner() {
                     <h3 style={{ fontSize: '0.95rem', fontWeight: '600', marginBottom: '0.75rem' }}>
                       Pieces ({detail.pieces.length})
                     </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: '0.5rem' }}>
-                      {detail.pieces.map((p) => (
-                        <div key={p.id} style={{ border: '1px solid #eee', borderRadius: '6px', overflow: 'hidden' }}>
+                    {/* Real per-piece rows rather than a thumbnail grid --
+                        assignment needs room to show who each piece is for
+                        and how it's going out. This is where a split
+                        booking actually gets recorded. */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {detail.pieces.map((p, i) => (
+                        <div key={p.id} style={{ border: '1px solid #eee', borderRadius: '8px', padding: '0.6rem', display: 'flex', gap: '0.7rem', backgroundColor: p.fulfilment === 'return_visit' ? '#fff8e1' : 'white' }}>
                           {p.reference_photo_url ? (
                             <img
                               src={p.reference_photo_url}
@@ -676,19 +698,76 @@ function BookingsPageInner() {
                                 url: p.reference_photo_url!,
                                 caption: [detail.booking?.customer_name, p.piece_type || p.description].filter(Boolean).join(' — '),
                               })}
-                              style={{ width: '100%', height: 80, objectFit: 'cover', display: 'block', cursor: 'zoom-in' }}
+                              style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6, flexShrink: 0, cursor: 'zoom-in' }}
                             />
                           ) : (
-                            <div style={{ width: '100%', height: 80, backgroundColor: '#f7f7f7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: '#bbb' }}>
-                              no photo yet
+                            <div style={{ width: 64, height: 64, backgroundColor: '#f7f7f7', borderRadius: 6, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: '#bbb', textAlign: 'center' }}>
+                              no photo
                             </div>
                           )}
-                          <div style={{ padding: '0.3rem' }}>
-                            <p style={{ fontSize: '0.68rem', textTransform: 'capitalize', color: '#666' }}>{(p.status || '').replace(/_/g, ' ')}</p>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--charcoal)' }}>
+                              {i + 1}. {p.piece_type || 'Piece'}
+                            </p>
+                            {p.description && <p style={{ fontSize: '0.72rem', color: '#888', marginBottom: '0.4rem' }}>{p.description}</p>}
+
+                            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                              <input
+                                defaultValue={p.assigned_to || ''}
+                                placeholder="Who's it for?"
+                                onBlur={(e) => savePieceFulfilment(p.id, { assigned_to: e.target.value })}
+                                style={{ flex: '1 1 110px', minWidth: 0, padding: '0.3rem 0.45rem', fontSize: '0.72rem', border: '1px solid #ddd', borderRadius: 5, color: '#333', backgroundColor: 'white' }}
+                              />
+                              <select
+                                defaultValue={p.fulfilment || ''}
+                                onChange={(e) => savePieceFulfilment(p.id, { fulfilment: e.target.value })}
+                                style={{ padding: '0.3rem 0.45rem', fontSize: '0.72rem', border: '1px solid #ddd', borderRadius: 5, color: '#333', backgroundColor: 'white' }}
+                              >
+                                <option value="">Same as booking</option>
+                                <option value="collect">Collecting</option>
+                                <option value="post">Posting</option>
+                                <option value="return_visit">Coming back to finish</option>
+                              </select>
+                            </div>
+
+                            {p.fulfilment === 'post' && (
+                              <input
+                                defaultValue={p.postal_postcode || ''}
+                                placeholder="Postcode for this parcel"
+                                onBlur={(e) => savePieceFulfilment(p.id, { postal_postcode: e.target.value })}
+                                style={{ width: '100%', marginTop: '0.35rem', padding: '0.3rem 0.45rem', fontSize: '0.72rem', border: '1px solid #ddd', borderRadius: 5, color: '#333', backgroundColor: 'white' }}
+                              />
+                            )}
+                            {p.fulfilment === 'return_visit' && (
+                              <p style={{ fontSize: '0.7rem', color: '#b8860b', fontWeight: 600, marginTop: '0.35rem' }}>
+                                On hold — kept out of the kiln and off the packing list
+                              </p>
+                            )}
                           </div>
                         </div>
                       ))}
                     </div>
+
+                    {/* Real parcel summary -- the commercially useful bit:
+                        how many separate parcels this booking actually is,
+                        which is what postage gets charged on. */}
+                    {(() => {
+                      const live = detail.pieces.filter((p) => p.fulfilment !== 'return_visit');
+                      const keys = new Set(live.map((p) => {
+                        const f = p.fulfilment || 'booking-default';
+                        return f === 'post' ? `post|${p.assigned_to || ''}|${p.postal_postcode || ''}` : `${f}|${p.assigned_to || ''}`;
+                      }));
+                      const postal = new Set(live.filter((p) => p.fulfilment === 'post').map((p) => `${p.assigned_to || ''}|${p.postal_postcode || ''}`));
+                      const held = detail.pieces.filter((p) => p.fulfilment === 'return_visit').length;
+                      if (keys.size <= 1 && !held) return null;
+                      return (
+                        <div style={{ marginTop: '0.7rem', padding: '0.6rem 0.8rem', backgroundColor: '#f0f6ff', borderRadius: 8, fontSize: '0.78rem', color: '#2b4a7a' }}>
+                          <strong>{keys.size} separate parcel{keys.size === 1 ? '' : 's'}</strong>
+                          {postal.size > 0 && ` · ${postal.size} to post`}
+                          {held > 0 && ` · ${held} on hold`}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 
