@@ -4217,3 +4217,133 @@ export function registerPieceFulfilmentRoutes(app, supabase, STUDIO_ID, logger) 
     }
   });
 }
+
+// ============================================================================
+// RE-IDENTIFY PIECES FROM AN ALREADY-STORED PHOTO
+// ----------------------------------------------------------------------------
+// The identification step (registerIdentifyPiecesRoute) runs at photo
+// time, so the four real tables photographed BEFORE it existed are stuck
+// as a single generic "Piece 1 of 1" with the description "0 pieces,
+// Start Floor hand-off" -- Charlie Marlow's photo alone clearly shows
+// four separate pieces.
+//
+// Rather than ask staff to re-photograph tables that are already
+// correctly captured, this re-runs the same real identification against
+// the photo already stored on the booking, and replaces the placeholder
+// rows with one properly described piece each. Genuinely useful beyond
+// today too: any booking whose photo predates a prompt improvement can
+// be re-processed without touching the studio floor.
+// ============================================================================
+export function registerReidentifyRoute(app, supabase, STUDIO_ID, logger, axios, fs, logGeminiUsage) {
+  app.post('/api/spec/bookings/:code/reidentify-pieces', async (req, res) => {
+    try {
+      const booking_code = req.params.code;
+      const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+      if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured on this service.' });
+
+      const { data: existing } = await supabase
+        .from('pottery_pieces')
+        .select('id, reference_photo_url, reference_photo_taken_at, status, fulfilment, assigned_to')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_id', booking_code)
+        .neq('archived', true);
+
+      const photoUrl = (existing || []).find((p) => p.reference_photo_url)?.reference_photo_url;
+      if (!photoUrl) return res.status(400).json({ error: 'No stored photo found for this booking' });
+
+      // Real guard -- never destroy genuine work. If any piece has
+      // already been individually assigned or described by a person,
+      // this booking is left alone rather than overwritten.
+      const hasRealWork = (existing || []).some((p) => p.assigned_to || (p.fulfilment && p.fulfilment !== 'collect'));
+      if (hasRealWork && !req.body?.force) {
+        return res.status(409).json({ error: 'This booking already has pieces assigned to people. Re-identifying would overwrite that -- pass force to override.' });
+      }
+
+      const imgRes = await axios.get(photoUrl, { responseType: 'arraybuffer' });
+      const base64 = Buffer.from(imgRes.data).toString('base64');
+
+      const input = [
+        {
+          type: 'text',
+          text: `This is a photo of a table in a pottery painting studio, taken at the end of a customer's session.\n\nIdentify every PAINTED POTTERY PIECE belonging to the customer -- the items they have painted and will be taking home after firing.\n\nInclude: mugs, bowls, plates, figurines, vases, jugs, money boxes, ornaments and similar ceramic pieces that have been painted.\n\nDo NOT include: paint pots, brushes, water pots, palettes, colour charts, menus, price cards, chalk boards, drinks, cans, glasses, phones, bags, or anything belonging to the studio rather than the customer.\n\nFor each real piece, give a short specific description that would help someone find that exact piece later on a shelf of similar fired pottery -- mention its form and its distinguishing painted detail (e.g. "seated rabbit with pink flowers on its side", not just "rabbit").\n\nAlso give its bounding box in the photo.`,
+        },
+        { type: 'image', data: base64, mime_type: 'image/jpeg' },
+      ];
+
+      const responseSchema = {
+        type: 'object',
+        properties: {
+          pieces: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                description: { type: 'string' },
+                piece_type: { type: 'string' },
+                box_2d: { type: 'array', items: { type: 'integer' } },
+              },
+              required: ['description', 'piece_type'],
+            },
+          },
+        },
+        required: ['pieces'],
+      };
+
+      let aiRes, modelUsed;
+      try {
+        ({ response: aiRes, modelUsed } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
+          input,
+          response_format: { type: 'text', mime_type: 'application/json', schema: responseSchema },
+        }));
+      } catch (err) {
+        logger.error('reidentify: Gemini call failed', err.response?.data || err.message);
+        return res.status(500).json({ error: friendlyGeminiError(err) });
+      }
+
+      const usage = extractGeminiUsage(aiRes.data);
+      if (usage) await logGeminiUsage(supabase, STUDIO_ID, 'reidentify-pieces-gemini', usage, modelUsed);
+
+      let parsed;
+      try {
+        const raw = extractGeminiText(aiRes.data);
+        if (!raw) {
+          logger.error('reidentify: no text extracted -- real shape:', JSON.stringify(aiRes.data).slice(0, 2000));
+          return res.status(500).json({ error: 'Got a response from Gemini but could not read its output.' });
+        }
+        parsed = JSON.parse((raw.match(/\{[\s\S]*\}/) || [])[0] || '{}');
+      } catch (e) {
+        return res.status(500).json({ error: 'Could not parse the Gemini response' });
+      }
+
+      const found = parsed.pieces || [];
+      if (!found.length) return res.status(400).json({ error: 'No pottery pieces identified in the stored photo' });
+
+      const takenAt = (existing || []).find((p) => p.reference_photo_taken_at)?.reference_photo_taken_at || new Date().toISOString();
+      const keepStatus = (existing || [])[0]?.status || 'queued';
+
+      // Replace the placeholder rows with one properly described piece
+      // each. Archives rather than hard-deletes, so nothing is truly lost.
+      await supabase.from('pottery_pieces')
+        .update({ archived: true, updated_at: new Date().toISOString() })
+        .eq('studio_id', STUDIO_ID).eq('booking_id', booking_code);
+
+      const rows = found.map((p) => ({
+        studio_id: STUDIO_ID,
+        booking_id: booking_code,
+        piece_type: p.piece_type,
+        description: p.description,
+        status: keepStatus,
+        reference_photo_url: photoUrl,
+        reference_photo_taken_at: takenAt,
+        described_at: new Date().toISOString(),
+      }));
+      const { data: created, error: insErr } = await supabase.from('pottery_pieces').insert(rows).select('id, piece_type, description');
+      if (insErr) throw insErr;
+
+      res.json({ replaced: (existing || []).length, created: created.length, pieces: created });
+    } catch (err) {
+      logger.error('reidentify failed', err.response?.data || err.message);
+      res.status(500).json({ error: err.response?.data?.error?.message || err.message });
+    }
+  });
+}

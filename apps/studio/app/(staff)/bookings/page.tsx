@@ -176,6 +176,31 @@ function BookingsPageInner() {
   // than a form with a save button: staff are doing this while holding
   // pottery, so every extra tap is a real cost. Refreshes the detail so
   // the parcel count updates immediately.
+  const [reidentifying, setReidentifying] = useState(false);
+  const [reidentifyMsg, setReidentifyMsg] = useState<string | null>(null);
+
+  const reidentifyPieces = async () => {
+    if (!selectedCode) return;
+    setReidentifying(true);
+    setReidentifyMsg(null);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${selectedCode}/reidentify-pieces`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d?.error || 'Could not re-identify');
+      setReidentifyMsg(`Found ${d.created} piece${d.created === 1 ? '' : 's'}`);
+      const detailRes = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${selectedCode}/detail`);
+      if (detailRes.ok) setDetail(await detailRes.json());
+    } catch (err: any) {
+      setReidentifyMsg(`Could not re-identify: ${err.message}`);
+    } finally {
+      setReidentifying(false);
+    }
+  };
+
   const savePieceFulfilment = async (pieceId: string, patch: Record<string, string>) => {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/${pieceId}/fulfilment`, {
@@ -704,9 +729,25 @@ function BookingsPageInner() {
 
                 {detail.pieces && detail.pieces.length > 0 && (
                   <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #eee' }}>
-                    <h3 style={{ fontSize: '0.95rem', fontWeight: '600', marginBottom: '0.75rem' }}>
-                      Pieces ({detail.pieces.length})
-                    </h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', gap: '0.5rem' }}>
+                      <h3 style={{ fontSize: '0.95rem', fontWeight: '600' }}>
+                        Pieces ({detail.pieces.length})
+                      </h3>
+                      {/* Re-runs identification on the photo already stored.
+                          For bookings photographed before identification
+                          existed -- they're stuck as one generic "Piece 1 of
+                          1" even when the photo clearly shows several. */}
+                      <button
+                        onClick={reidentifyPieces}
+                        disabled={reidentifying}
+                        style={{ padding: '0.35rem 0.6rem', fontSize: '0.72rem', fontWeight: 600, backgroundColor: reidentifying ? '#eee' : 'var(--clay)', color: reidentifying ? '#999' : 'white', border: 'none', borderRadius: 6, cursor: reidentifying ? 'default' : 'pointer', flexShrink: 0 }}
+                      >
+                        {reidentifying ? 'Identifying...' : 'Re-identify from photo'}
+                      </button>
+                    </div>
+                    {reidentifyMsg && (
+                      <p style={{ fontSize: '0.75rem', color: reidentifyMsg.startsWith('Could not') ? '#c33' : '#1a8a3c', marginBottom: '0.6rem' }}>{reidentifyMsg}</p>
+                    )}
                     {/* Real per-piece rows rather than a thumbnail grid --
                         assignment needs room to show who each piece is for
                         and how it's going out. This is where a split
