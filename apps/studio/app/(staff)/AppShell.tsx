@@ -61,14 +61,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 aria-label="Return to home"
                 className="no-print"
                 style={{
-                  position: 'fixed', top: '0.75rem', right: '0.75rem', zIndex: 20,
-                  width: 38, height: 38, borderRadius: '50%', border: 'none', cursor: 'pointer',
+                  // Moved from top-right to bottom-LEFT. Top-right sits
+                  // directly under Safari's own controls and the app's
+                  // "Reset a PIN / sign out" bar on iPhone -- visible in
+                  // nearly every screenshot this session, overlapping
+                  // both. Bottom-left is clear of Safari's chrome and of
+                  // the menu button (bottom-right), so the two never
+                  // compete.
+                  position: 'fixed', bottom: '1rem', left: '1rem', zIndex: 20,
+                  width: 44, height: 44, borderRadius: '50%', border: 'none', cursor: 'pointer',
                   backgroundColor: 'var(--charcoal)', color: 'var(--ivory)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
                 }}
               >
-                <Home size={18} />
+                <Home size={20} />
               </button>
             )}
             {children}

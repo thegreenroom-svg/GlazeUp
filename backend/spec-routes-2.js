@@ -283,7 +283,10 @@ export default function registerSpecRoutes2(app, supabase, STUDIO_ID, logger, JU
         supabase.from('pottery_pieces')
           .select('id, piece_type, status, description, reference_photo_url, mark_code')
           .eq('studio_id', STUDIO_ID)
-          .eq('booking_id', booking.customer_name)
+          // Same real fix as the booking detail endpoint -- match the
+          // actual booking code the real photo pipeline stores, with
+          // the legacy customer_name kept as a fallback.
+          .in('booking_id', [booking.booking_code, booking.customer_name])
           .neq('archived', true),
         supabase.from('loyalty_transactions')
           .select('points_earned, points_spent')

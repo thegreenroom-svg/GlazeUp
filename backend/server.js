@@ -698,13 +698,23 @@ app.get('/api/demo/bookings/:code/detail', async (req, res) => {
     // pottery_pieces holds the customer NAME (free text), not a foreign key,
     // so the match is by name; junk test-run labels are excluded the same
     // way every other piece view excludes them.
+    // Real fix -- this matched pieces by booking.customer_name, a
+    // leftover from when booking_id on pottery_pieces held free-text
+    // customer names. The real photo pipeline (Floor -> Completion)
+    // correctly stores the actual BOOKING CODE, so a name could never
+    // match a code and Daisy's four real photographed tables showed no
+    // pieces at all despite being stored perfectly. Checked directly:
+    // all 4 pieces carry booking codes like 'booking-20260821-w2qfs9bt'.
+    //
+    // Matches on booking_code now, with the legacy customer_name match
+    // kept as a fallback so any older name-linked pieces still appear.
     let pieces = [];
     if (!JUNK_BOOKING_LABELS.includes(booking.customer_name)) {
       const { data: pieceData } = await supabase
         .from('pottery_pieces')
         .select('id, piece_type, description, status, reference_photo_url, reference_photo_taken_at, mark_code')
         .eq('studio_id', DEMO_STUDIO_ID)
-        .eq('booking_id', booking.customer_name)
+        .in('booking_id', [booking.booking_code, booking.customer_name])
         .neq('archived', true);
       pieces = pieceData || [];
     }
