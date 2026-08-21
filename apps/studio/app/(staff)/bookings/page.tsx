@@ -742,7 +742,7 @@ function BookingsPageInner() {
                         disabled={reidentifying}
                         style={{ padding: '0.35rem 0.6rem', fontSize: '0.72rem', fontWeight: 600, backgroundColor: reidentifying ? '#eee' : 'var(--clay)', color: reidentifying ? '#999' : 'white', border: 'none', borderRadius: 6, cursor: reidentifying ? 'default' : 'pointer', flexShrink: 0 }}
                       >
-                        {reidentifying ? 'Identifying...' : 'Re-check photo'}
+                        {reidentifying ? 'Identifying...' : 'Re-identify from photo'}
                       </button>
                     </div>
                     {reidentifyMsg && (
@@ -790,7 +790,7 @@ function BookingsPageInner() {
                           ))}
                           {boxed.length === 0 && (
                             <p style={{ fontSize: '0.72rem', color: '#888', marginTop: '0.35rem' }}>
-                              Not broken down yet — this runs automatically in the background, usually within a few minutes of the photo being taken.
+                              No piece positions stored for this photo yet — tap Re-identify from photo to break it down.
                             </p>
                           )}
                         </div>
