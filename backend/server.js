@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerIdentifyPiecesRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -942,7 +942,18 @@ app.post('/api/demo/photo-match/confirm', upload.single('photo'), async (req, re
     // job: if piece_count is supplied and this booking has no pieces
     // yet, create that many real piece rows, each carrying this photo as
     // its reference. One tap on a busy floor, pipeline complete.
-    const pieceCount = parseInt(req.body.piece_count, 10);
+    // Real per-piece details from the AI identification step, when
+    // supplied -- gives each piece its own real description ("seated
+    // rabbit with pink flowers") rather than a meaningless "Piece 1 of
+    // 2", which is what Find on Table actually needs to search on later.
+    // Falls back to the plain count if identification wasn't run.
+    let identified = null;
+    if (req.body.pieces_json) {
+      try { identified = JSON.parse(req.body.pieces_json); } catch { identified = null; }
+    }
+    const pieceCount = Array.isArray(identified) && identified.length
+      ? identified.length
+      : parseInt(req.body.piece_count, 10);
     let piecesCreated = 0;
     if (Number.isFinite(pieceCount) && pieceCount > 0) {
       const { count: existing } = await supabase
@@ -951,15 +962,18 @@ app.post('/api/demo/photo-match/confirm', upload.single('photo'), async (req, re
         .eq('studio_id', DEMO_STUDIO_ID)
         .eq('booking_id', booking_code);
       if (!existing) {
-        const rows = Array.from({ length: pieceCount }, (_, i) => ({
-          studio_id: DEMO_STUDIO_ID,
-          booking_id: booking_code,
-          piece_type: `Piece ${i + 1} of ${pieceCount}`,
-          description: description || null,
-          status: 'queued',
-          reference_photo_url: urlData.publicUrl,
-          reference_photo_taken_at: new Date().toISOString(),
-        }));
+        const rows = Array.from({ length: pieceCount }, (_, i) => {
+          const info = Array.isArray(identified) ? identified[i] : null;
+          return {
+            studio_id: DEMO_STUDIO_ID,
+            booking_id: booking_code,
+            piece_type: info?.piece_type || `Piece ${i + 1} of ${pieceCount}`,
+            description: info?.description || description || null,
+            status: 'queued',
+            reference_photo_url: urlData.publicUrl,
+            reference_photo_taken_at: new Date().toISOString(),
+          };
+        });
         const { data: created, error: piecesErr } = await supabase.from('pottery_pieces').insert(rows).select('id');
         if (piecesErr) logger.error('[photo-match/confirm] piece creation failed', piecesErr);
         else piecesCreated = (created || []).length;
@@ -1528,6 +1542,7 @@ registerSquarePaymentFinishRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerCurrentCollectionDateRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerBisqueInventoryRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerStudioFeaturesRoute(app, supabase, DEMO_STUDIO_ID, logger);
+registerIdentifyPiecesRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage);
 registerQuickAddPieceRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerFindOnTableRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage);
 registerTestAiFindRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage);

@@ -3991,3 +3991,106 @@ export function registerTestAiFindRoute(app, supabase, STUDIO_ID, logger, axios,
     }
   });
 }
+
+// ============================================================================
+// IDENTIFY PIECES IN A TABLE PHOTO -- Daisy: "it would be useful if the AI
+// can do what it does on the recognition and give a description of each
+// piece and maybe with a numbered square around each one so they can be
+// checked and maybe clicked on each piece."
+//
+// Real gap this closes: the Floor flow's pieceCount was never actually
+// set by anything (it starts at 0 and no code ever changes it), despite
+// the UI claiming "captured from photo". So every real table logged as a
+// single piece regardless -- Kathy d'Ambrumenil's photo shows two
+// rabbits but recorded "0 pieces". Without a real count and real
+// per-piece descriptions, Find on Table has nothing meaningful to search
+// for at the other end.
+//
+// Uses the SAME Gemini engine and box format as Find on Table and Test
+// AI, so what's proven there holds here.
+// ============================================================================
+export function registerIdentifyPiecesRoute(app, supabase, STUDIO_ID, logger, axios, upload, fs, logGeminiUsage) {
+  app.post('/api/spec/pieces/identify-in-photo', upload.single('photo'), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'A photo is required' });
+
+      const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+      if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured on this service.' });
+
+      const base64 = fs.readFileSync(req.file.path).toString('base64');
+
+      const input = [
+        {
+          type: 'text',
+          text: `This is a photo of a table in a pottery painting studio, taken at the end of a customer's session.\n\nIdentify every PAINTED POTTERY PIECE belonging to the customer -- the items they have painted and will be taking home after firing.\n\nInclude: mugs, bowls, plates, figurines, vases, jugs, money boxes, ornaments and similar ceramic pieces that have been painted.\n\nDo NOT include: paint pots, brushes, water pots, palettes, colour charts, menus, price cards, chalk boards, drinks, cans, glasses, phones, bags, or anything belonging to the studio rather than the customer.\n\nFor each real piece, give a short specific description that would help someone find that exact piece later on a shelf of similar fired pottery -- mention its form and its distinguishing painted detail (e.g. "seated rabbit with pink flowers on its side", not just "rabbit").\n\nAlso give its bounding box in the photo.`,
+        },
+        { type: 'image', data: base64, mime_type: req.file.mimetype || 'image/jpeg' },
+      ];
+
+      const responseSchema = {
+        type: 'object',
+        properties: {
+          pieces: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                description: { type: 'string', description: 'Short specific description to identify this piece later' },
+                piece_type: { type: 'string', description: 'The form, e.g. Mug, Rabbit figurine, Bowl' },
+                box_2d: { type: 'array', items: { type: 'integer' }, description: '[ymin, xmin, ymax, xmax] normalized 0-1000' },
+              },
+              required: ['description', 'piece_type'],
+            },
+          },
+        },
+        required: ['pieces'],
+      };
+
+      let aiRes, modelUsed;
+      try {
+        ({ response: aiRes, modelUsed } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
+          input,
+          response_format: { type: 'text', mime_type: 'application/json', schema: responseSchema },
+        }));
+      } catch (err) {
+        logger.error('identify-in-photo: Gemini call failed', err.response?.data || err.message);
+        return res.status(500).json({ error: friendlyGeminiError(err) });
+      }
+
+      const usage = extractGeminiUsage(aiRes.data);
+      if (usage) await logGeminiUsage(supabase, STUDIO_ID, 'identify-pieces-gemini', usage, modelUsed);
+
+      let parsed;
+      try {
+        const raw = extractGeminiText(aiRes.data);
+        if (!raw) {
+          logger.error('identify-in-photo: no text extracted -- real shape:', JSON.stringify(aiRes.data).slice(0, 2000));
+          return res.status(500).json({ error: 'Got a response from Gemini but could not find its text output.' });
+        }
+        parsed = JSON.parse((raw.match(/\{[\s\S]*\}/) || [])[0] || '{}');
+      } catch (e) {
+        logger.error('identify-in-photo: could not parse Gemini response', aiRes.data);
+        return res.status(500).json({ error: 'Could not parse the Gemini response' });
+      }
+
+      const pieces = (parsed.pieces || []).map((p, i) => {
+        let box = null;
+        if (Array.isArray(p.box_2d) && p.box_2d.length === 4) {
+          const [ymin, xmin, ymax, xmax] = p.box_2d;
+          box = { left_pct: xmin / 10, top_pct: ymin / 10, right_pct: xmax / 10, bottom_pct: ymax / 10 };
+        }
+        return {
+          index: i + 1,
+          piece_type: p.piece_type || `Piece ${i + 1}`,
+          description: p.description || '',
+          box,
+        };
+      });
+
+      res.json({ count: pieces.length, pieces });
+    } catch (err) {
+      logger.error('identify-in-photo failed', err.response?.data || err.message);
+      res.status(500).json({ error: err.response?.data?.error?.message || err.message });
+    }
+  });
+}

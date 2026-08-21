@@ -112,6 +112,9 @@ export default function FloorPage() {
   const [loading, setLoading] = useState(false);
   const [current, setCurrent] = useState<Booking | null>(null);
   const [pieceCount, setPieceCount] = useState(0);
+  // Real per-piece identification from the table photo.
+  const [identifiedPieces, setIdentifiedPieces] = useState<{ index: number; piece_type: string; description: string; box: { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number } | null }[] | null>(null);
+  const [identifying, setIdentifying] = useState(false);
   const [splitBillCount, setSplitBillCount] = useState(1);
   const [quickAccessMode, setQuickAccessMode] = useState(false);
   const [tableTotals, setTableTotals] = useState<Record<string, number>>({});
@@ -409,11 +412,31 @@ export default function FloorPage() {
     }
   };
 
-  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
     setPhoto(f);
     setPhotoPreview(URL.createObjectURL(f));
+    // Real AI identification of each piece on the table -- per Daisy:
+    // "it would be useful if the AI can give a description of each piece
+    // and maybe with a numbered square around each one so they can be
+    // checked." This also fixes a real bug: pieceCount was never set by
+    // anything despite the UI claiming "captured from photo", so every
+    // real table was logging as a single piece regardless (Kathy
+    // d'Ambrumenil's photo showed two rabbits but recorded "0 pieces").
+    setIdentifying(true);
+    setIdentifiedPieces(null);
+    try {
+      const fd = new FormData();
+      fd.append('photo', f);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/identify-in-photo`, { method: 'POST', body: fd });
+      const d = await res.json();
+      if (res.ok && Array.isArray(d.pieces)) {
+        setIdentifiedPieces(d.pieces);
+        setPieceCount(d.pieces.length);
+      }
+    } catch { /* identification is a helper, not a blocker -- staff can still finish */ }
+    finally { setIdentifying(false); }
   };
 
   const saveAndFinish = async () => {
@@ -434,6 +457,11 @@ export default function FloorPage() {
         // piece records with itself attached, so Find on Table can
         // genuinely find them when the kiln comes out.
         formData.append('piece_count', String(Math.max(1, pieceCount)));
+        // Real per-piece descriptions, so each piece is stored with
+        // something Find on Table can genuinely search on later.
+        if (identifiedPieces?.length) {
+          formData.append('pieces_json', JSON.stringify(identifiedPieces.map((p) => ({ piece_type: p.piece_type, description: p.description }))));
+        }
         await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/photo-match/confirm`, { method: 'POST', body: formData });
       }
 
@@ -1234,7 +1262,70 @@ export default function FloorPage() {
                 <span style={{ color: B.stone, fontSize: '0.85rem' }}>Tap to photograph</span>
               </button>
             ) : (
-              <img src={photoPreview} alt="" style={{ width: '100%', borderRadius: 8, marginBottom: '1rem', maxHeight: 240, objectFit: 'cover' }} onClick={() => fileRef.current?.click()} />
+              <>
+                {/* Real numbered boxes over each identified piece, so
+                    staff can check the AI got them all before finishing.
+                    Same box format and colours as Find on Table. */}
+                <div style={{ position: 'relative', marginBottom: '1rem' }}>
+                  <img src={photoPreview} alt="" style={{ width: '100%', borderRadius: 8, display: 'block' }} onClick={() => fileRef.current?.click()} />
+                  {identifiedPieces?.map((p, i) => (
+                    p.box && (
+                      <div
+                        key={p.index}
+                        style={{
+                          position: 'absolute',
+                          left: `${p.box.left_pct}%`,
+                          top: `${p.box.top_pct}%`,
+                          width: `${p.box.right_pct - p.box.left_pct}%`,
+                          height: `${p.box.bottom_pct - p.box.top_pct}%`,
+                          border: `3px solid ${['#e0392b', '#1a8a3c', '#2b6fe0', '#c77a0a', '#8b3ec7', '#0a9aa8'][i % 6]}`,
+                          borderRadius: 4,
+                          boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
+                          pointerEvents: 'none',
+                        }}
+                      >
+                        <span style={{ position: 'absolute', top: -9, left: -9, width: 20, height: 20, borderRadius: '50%', backgroundColor: ['#e0392b', '#1a8a3c', '#2b6fe0', '#c77a0a', '#8b3ec7', '#0a9aa8'][i % 6], color: 'white', fontSize: '0.68rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px white' }}>
+                          {p.index}
+                        </span>
+                      </div>
+                    )
+                  ))}
+                </div>
+
+                {identifying && (
+                  <p style={{ color: B.stone, fontSize: '0.8rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Loader size={14} className="animate-spin" /> Identifying pieces...
+                  </p>
+                )}
+
+                {identifiedPieces && identifiedPieces.length > 0 && (
+                  <div style={{ marginBottom: '1rem' }}>
+                    <p style={{ color: B.ivory, fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+                      {identifiedPieces.length} piece{identifiedPieces.length === 1 ? '' : 's'} identified — check before finishing
+                    </p>
+                    {identifiedPieces.map((p, i) => (
+                      <div key={p.index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', padding: '0.4rem 0' }}>
+                        <span style={{ flexShrink: 0, width: 18, height: 18, borderRadius: '50%', backgroundColor: ['#e0392b', '#1a8a3c', '#2b6fe0', '#c77a0a', '#8b3ec7', '#0a9aa8'][i % 6], color: 'white', fontSize: '0.62rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2 }}>
+                          {p.index}
+                        </span>
+                        <div style={{ flex: 1 }}>
+                          <p style={{ color: B.ivory, fontSize: '0.8rem', fontWeight: 600 }}>{p.piece_type}</p>
+                          <p style={{ color: B.stone, fontSize: '0.72rem' }}>{p.description}</p>
+                        </div>
+                      </div>
+                    ))}
+                    <p style={{ color: B.stone, fontSize: '0.72rem', marginTop: '0.4rem' }}>
+                      Wrong count? Tap the photo to retake it.
+                    </p>
+                  </div>
+                )}
+
+                {identifiedPieces && identifiedPieces.length === 0 && !identifying && (
+                  <p style={{ color: B.stone, fontSize: '0.8rem', marginBottom: '1rem' }}>
+                    No pieces identified — tap the photo to retake, or carry on and add them later.
+                  </p>
+                )}
+              </>
             )}
 
             <button
