@@ -50,14 +50,6 @@ interface BookingDetail {
   pieces: { id: string; piece_type: string | null; description: string | null; status: string; reference_photo_url: string | null; reference_photo_taken_at: string | null; mark_code: string | null; assigned_to: string | null; fulfilment: string | null; postal_postcode: string | null; hold_reason: string | null; photo_box: { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number } | null }[];
 }
 
-interface PhotoMatch {
-  id: string;
-  photo_url: string;
-  chalk_tag_name: string | null;
-  ai_description: string | null;
-  created_at: string;
-}
-
 interface TillItem {
   id: string;
   item_name: string;
@@ -170,7 +162,6 @@ function BookingsPageInner() {
       setSavingTable(false);
     }
   };
-  const [photoMatches, setPhotoMatches] = useState<PhotoMatch[]>([]);
 
   // Saves one piece's assignment. Deliberately fire-and-refresh rather
   // than a form with a save button: staff are doing this while holding
@@ -220,7 +211,7 @@ function BookingsPageInner() {
   // iPad to find what I'm looking for when it comes out of the kiln."
   // An 80px thumbnail is genuinely useless for identifying a piece
   // against a shelf of fired pottery.
-  const [zoomPhoto, setZoomPhoto] = useState<{ url: string; caption: string } | null>(null);
+  const [zoomPhoto, setZoomPhoto] = useState<{ url: string; caption: string; box?: PieceBox | null; colour?: string; number?: number } | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [tillItems, setTillItems] = useState<TillItem[]>([]);
   const [menu, setMenu] = useState<MenuItem[]>([]);
@@ -241,7 +232,6 @@ function BookingsPageInner() {
   useEffect(() => {
     if (!selectedCode) {
       setDetail(null);
-      setPhotoMatches([]);
       setTillItems([]);
       setFinished(false);
       return;
@@ -252,11 +242,6 @@ function BookingsPageInner() {
       .then(setDetail)
       .catch(() => setDetail(null))
       .finally(() => setDetailLoading(false));
-
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${selectedCode}/photo-matches`)
-      .then((res) => (res.ok ? res.json() : []))
-      .then(setPhotoMatches)
-      .catch(() => setPhotoMatches([]));
 
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${selectedCode}/till`)
       .then((res) => (res.ok ? res.json() : []))
@@ -809,8 +794,16 @@ function BookingsPageInner() {
                               onClick={() => setZoomPhoto({
                                 url: p.reference_photo_url!,
                                 caption: [detail.booking?.customer_name, p.piece_type || p.description].filter(Boolean).join(' — '),
+                                // Carries the box through so the enlarged
+                                // view rings THIS piece on the full table
+                                // rather than just showing the table again
+                                // and leaving you to work out which one you
+                                // tapped -- the whole point of enlarging.
+                                box: p.photo_box,
+                                colour: PIECE_COLOURS[i % 6],
+                                number: i + 1,
                               })}
-                              title={p.photo_box ? 'Cropped to this piece — tap for the full photo' : undefined}
+                              title={p.photo_box ? 'Tap to enlarge' : undefined}
                               style={{
                                 width: 64, height: 64, borderRadius: 6, flexShrink: 0, cursor: 'zoom-in',
                                 border: `2px solid ${PIECE_COLOURS[i % 6]}`,
@@ -896,31 +889,6 @@ function BookingsPageInner() {
                   </div>
                 )}
 
-                {photoMatches.length > 0 && (
-                  <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #eee' }}>
-                    <h3 style={{ fontSize: '0.95rem', fontWeight: '600', marginBottom: '0.75rem' }}>AI Matched Photos</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                      {photoMatches.map((m) => (
-                        <div key={m.id} style={{ display: 'flex', gap: '0.75rem', border: '1px solid #eee', borderRadius: '6px', overflow: 'hidden' }}>
-                          <img
-                            src={m.photo_url}
-                            alt="Matched pieces"
-                            onClick={() => setZoomPhoto({
-                              url: m.photo_url,
-                              caption: [detail.booking?.customer_name, m.ai_description].filter(Boolean).join(' — '),
-                            })}
-                            style={{ width: '90px', height: '90px', objectFit: 'cover', flexShrink: 0, cursor: 'zoom-in' }}
-                          />
-                          <div style={{ padding: '0.5rem 0.5rem 0.5rem 0' }}>
-                            {m.ai_description && <p style={{ fontSize: '0.8rem', color: '#444' }}>{m.ai_description}</p>}
-                            <p style={{ fontSize: '0.7rem', color: '#999', marginTop: '0.25rem' }}>{new Date(m.created_at).toLocaleString()}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 <button
                   onClick={() => setSelectedCode(null)}
                   style={{ marginTop: '1.5rem', width: '100%', padding: '0.6rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
@@ -947,11 +915,38 @@ function BookingsPageInner() {
             padding: '1rem', cursor: 'zoom-out',
           }}
         >
-          <img
-            src={zoomPhoto.url}
-            alt={zoomPhoto.caption}
-            style={{ maxWidth: '100%', maxHeight: '82vh', objectFit: 'contain', borderRadius: 8 }}
-          />
+          {/* inline-block wrapper so it shrinks to the rendered image,
+              which is what the percentage box positions are relative to.
+              Without it the overlay would sit against the full-screen
+              backdrop and the ring would land in the wrong place. */}
+          <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%', maxHeight: '82vh' }}>
+            <img
+              src={zoomPhoto.url}
+              alt={zoomPhoto.caption}
+              style={{ maxWidth: '100%', maxHeight: '82vh', objectFit: 'contain', borderRadius: 8, display: 'block' }}
+            />
+            {zoomPhoto.box && (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: `${zoomPhoto.box.left_pct}%`,
+                  top: `${zoomPhoto.box.top_pct}%`,
+                  width: `${zoomPhoto.box.right_pct - zoomPhoto.box.left_pct}%`,
+                  height: `${zoomPhoto.box.bottom_pct - zoomPhoto.box.top_pct}%`,
+                  border: `3px solid ${zoomPhoto.colour || '#e0392b'}`,
+                  borderRadius: 4,
+                  boxShadow: '0 0 0 1px rgba(255,255,255,0.9), 0 0 0 9999px rgba(0,0,0,0.45)',
+                  pointerEvents: 'none',
+                }}
+              >
+                {zoomPhoto.number && (
+                  <span style={{ position: 'absolute', top: -11, left: -11, width: 24, height: 24, borderRadius: '50%', backgroundColor: zoomPhoto.colour || '#e0392b', color: 'white', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px white' }}>
+                    {zoomPhoto.number}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
           {zoomPhoto.caption && (
             <p style={{ color: 'white', fontSize: '0.9rem', fontWeight: 600, marginTop: '0.9rem', textAlign: 'center' }}>
               {zoomPhoto.caption}
