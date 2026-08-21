@@ -47,7 +47,7 @@ interface BookingDetail {
   booking: Booking & { customer_phone: string | null };
   session: { id: string; table_number: string; status: string; number_of_places: number } | null;
   orders: { id: string; item_name: string; quantity: number; unit_price_cents: number; notes: string | null }[];
-  pieces: { id: string; piece_type: string | null; description: string | null; status: string; reference_photo_url: string | null; reference_photo_taken_at: string | null; mark_code: string | null; assigned_to: string | null; fulfilment: string | null; postal_postcode: string | null; hold_reason: string | null }[];
+  pieces: { id: string; piece_type: string | null; description: string | null; status: string; reference_photo_url: string | null; reference_photo_taken_at: string | null; mark_code: string | null; assigned_to: string | null; fulfilment: string | null; postal_postcode: string | null; hold_reason: string | null; photo_box: { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number } | null }[];
 }
 
 interface PhotoMatch {
@@ -748,6 +748,55 @@ function BookingsPageInner() {
                     {reidentifyMsg && (
                       <p style={{ fontSize: '0.75rem', color: reidentifyMsg.startsWith('Could not') ? '#c33' : '#1a8a3c', marginBottom: '0.6rem' }}>{reidentifyMsg}</p>
                     )}
+                    {/* The table photo ONCE, with a numbered coloured box
+                        over each piece -- per Daisy: "itemised numbered
+                        coloured squares and descriptions... then we can see
+                        each thing." The boxes were previously drawn only on
+                        the Floor screen at the moment of capture and thrown
+                        away, so opening the booking afterwards gave a list
+                        of descriptions with no way to tell which row was
+                        which pot on a table of four similar pieces. */}
+                    {(() => {
+                      const photo = detail.pieces.find((p) => p.reference_photo_url)?.reference_photo_url;
+                      const boxed = detail.pieces.filter((p) => p.photo_box);
+                      if (!photo) return null;
+                      return (
+                        <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
+                          <img
+                            src={photo}
+                            alt=""
+                            onClick={() => setZoomPhoto({ url: photo, caption: detail.booking?.customer_name || '' })}
+                            style={{ width: '100%', borderRadius: 8, display: 'block', cursor: 'zoom-in' }}
+                          />
+                          {detail.pieces.map((p, i) => p.photo_box && (
+                            <div
+                              key={p.id}
+                              style={{
+                                position: 'absolute',
+                                left: `${p.photo_box.left_pct}%`,
+                                top: `${p.photo_box.top_pct}%`,
+                                width: `${p.photo_box.right_pct - p.photo_box.left_pct}%`,
+                                height: `${p.photo_box.bottom_pct - p.photo_box.top_pct}%`,
+                                border: `3px solid ${PIECE_COLOURS[i % 6]}`,
+                                borderRadius: 4,
+                                boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
+                                pointerEvents: 'none',
+                              }}
+                            >
+                              <span style={{ position: 'absolute', top: -9, left: -9, width: 20, height: 20, borderRadius: '50%', backgroundColor: PIECE_COLOURS[i % 6], color: 'white', fontSize: '0.68rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px white' }}>
+                                {i + 1}
+                              </span>
+                            </div>
+                          ))}
+                          {boxed.length === 0 && (
+                            <p style={{ fontSize: '0.72rem', color: '#888', marginTop: '0.35rem' }}>
+                              No piece positions stored for this photo yet — tap Re-identify from photo to break it down.
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {/* Real per-piece rows rather than a thumbnail grid --
                         assignment needs room to show who each piece is for
                         and how it's going out. This is where a split
@@ -756,14 +805,22 @@ function BookingsPageInner() {
                       {detail.pieces.map((p, i) => (
                         <div key={p.id} style={{ border: '1px solid #eee', borderRadius: '8px', padding: '0.6rem', display: 'flex', gap: '0.7rem', backgroundColor: p.fulfilment === 'return_visit' ? '#fff8e1' : 'white' }}>
                           {p.reference_photo_url ? (
-                            <img
-                              src={p.reference_photo_url}
-                              alt=""
+                            <div
                               onClick={() => setZoomPhoto({
                                 url: p.reference_photo_url!,
                                 caption: [detail.booking?.customer_name, p.piece_type || p.description].filter(Boolean).join(' — '),
                               })}
-                              style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6, flexShrink: 0, cursor: 'zoom-in' }}
+                              title={p.photo_box ? 'Cropped to this piece — tap for the full photo' : undefined}
+                              style={{
+                                width: 64, height: 64, borderRadius: 6, flexShrink: 0, cursor: 'zoom-in',
+                                border: `2px solid ${PIECE_COLOURS[i % 6]}`,
+                                // Cropped to THIS piece when we know where it
+                                // sits; falls back to the whole table photo
+                                // for older pieces with no stored position.
+                                ...(p.photo_box
+                                  ? cropStyle(p.reference_photo_url, p.photo_box)
+                                  : { backgroundImage: `url(${p.reference_photo_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }),
+                              }}
                             />
                           ) : (
                             <div style={{ width: 64, height: 64, backgroundColor: '#f7f7f7', borderRadius: 6, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: '#bbb', textAlign: 'center' }}>
@@ -771,8 +828,11 @@ function BookingsPageInner() {
                             </div>
                           )}
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--charcoal)' }}>
-                              {i + 1}. {p.piece_type || 'Piece'}
+                            <p style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--charcoal)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <span style={{ flexShrink: 0, width: 18, height: 18, borderRadius: '50%', backgroundColor: PIECE_COLOURS[i % 6], color: 'white', fontSize: '0.62rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                                {i + 1}
+                              </span>
+                              {p.piece_type || 'Piece'}
                             </p>
                             {p.description && <p style={{ fontSize: '0.72rem', color: '#888', marginBottom: '0.4rem' }}>{p.description}</p>}
 
@@ -902,6 +962,32 @@ function BookingsPageInner() {
       )}
     </PageShell>
   );
+}
+
+// Same six colours used by Find on Table and the Floor capture screen, so
+// piece 3 is the same colour everywhere it appears in the app.
+const PIECE_COLOURS = ['#e0392b', '#1a8a3c', '#2b6fe0', '#c77a0a', '#8b3ec7', '#0a9aa8'];
+
+type PieceBox = { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number };
+
+// Crops the shared table photo down to a single piece using CSS background
+// positioning. Every piece on a booking shares ONE photo, so without this
+// each row showed four identical thumbnails of the same table -- useless
+// for telling which row is which pot. This shows just that piece instead.
+function cropStyle(url: string, box: PieceBox): React.CSSProperties {
+  const w = box.right_pct - box.left_pct;
+  const h = box.bottom_pct - box.top_pct;
+  if (!(w > 0) || !(h > 0)) return { backgroundImage: `url(${url})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+  return {
+    backgroundImage: `url(${url})`,
+    // Scale the photo up so the box fills the frame...
+    backgroundSize: `${(100 / w) * 100}% ${(100 / h) * 100}%`,
+    // ...then pan to it. CSS percentage positioning is relative to the
+    // overflow, hence the (100 - w) denominators; guarded against the
+    // divide-by-zero when a box spans the full width or height.
+    backgroundPosition: `${w >= 100 ? 0 : (box.left_pct / (100 - w)) * 100}% ${h >= 100 ? 0 : (box.top_pct / (100 - h)) * 100}%`,
+    backgroundRepeat: 'no-repeat',
+  };
 }
 
 export default function BookingsPage() {

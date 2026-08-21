@@ -741,7 +741,7 @@ app.get('/api/demo/bookings/:code/detail', async (req, res) => {
     if (!JUNK_BOOKING_LABELS.includes(booking.customer_name)) {
       const { data: pieceData } = await supabase
         .from('pottery_pieces')
-        .select('id, piece_type, description, status, reference_photo_url, reference_photo_taken_at, mark_code, assigned_to, fulfilment, postal_postcode, hold_reason')
+        .select('id, piece_type, description, status, reference_photo_url, reference_photo_taken_at, mark_code, assigned_to, fulfilment, postal_postcode, hold_reason, photo_box')
         .eq('studio_id', DEMO_STUDIO_ID)
         .in('booking_id', [booking.booking_code, booking.customer_name])
         .neq('archived', true);
@@ -1001,6 +1001,14 @@ app.post('/api/demo/photo-match/confirm', upload.single('photo'), async (req, re
             status: 'queued',
             reference_photo_url: urlData.publicUrl,
             reference_photo_taken_at: new Date().toISOString(),
+            // Where this piece actually sits in the table photo. Without
+            // storing it, the numbered boxes exist only on the Floor
+            // screen at the moment of capture and are gone the instant
+            // staff move on -- so opening the booking later shows a list
+            // of descriptions with no way to tell WHICH item is which on
+            // a photo of four similar pots. Storing it is what makes the
+            // breakdown genuinely reviewable afterwards.
+            photo_box: info?.box || null,
           };
         });
         const { data: created, error: piecesErr } = await supabase.from('pottery_pieces').insert(rows).select('id');

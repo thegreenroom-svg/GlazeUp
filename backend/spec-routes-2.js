@@ -4327,17 +4327,29 @@ export function registerReidentifyRoute(app, supabase, STUDIO_ID, logger, axios,
         .update({ archived: true, updated_at: new Date().toISOString() })
         .eq('studio_id', STUDIO_ID).eq('booking_id', booking_code);
 
-      const rows = found.map((p) => ({
-        studio_id: STUDIO_ID,
-        booking_id: booking_code,
-        piece_type: p.piece_type,
-        description: p.description,
-        status: keepStatus,
-        reference_photo_url: photoUrl,
-        reference_photo_taken_at: takenAt,
-        described_at: new Date().toISOString(),
-      }));
-      const { data: created, error: insErr } = await supabase.from('pottery_pieces').insert(rows).select('id, piece_type, description');
+      const rows = found.map((p) => {
+        // Convert Gemini's [ymin, xmin, ymax, xmax] normalized 0-1000
+        // into the same percentage shape the identify-at-capture route
+        // returns, so stored boxes are one consistent format regardless
+        // of which route produced them.
+        let box = null;
+        if (Array.isArray(p.box_2d) && p.box_2d.length === 4) {
+          const [ymin, xmin, ymax, xmax] = p.box_2d;
+          box = { left_pct: xmin / 10, top_pct: ymin / 10, right_pct: xmax / 10, bottom_pct: ymax / 10 };
+        }
+        return {
+          studio_id: STUDIO_ID,
+          booking_id: booking_code,
+          piece_type: p.piece_type,
+          description: p.description,
+          status: keepStatus,
+          reference_photo_url: photoUrl,
+          reference_photo_taken_at: takenAt,
+          described_at: new Date().toISOString(),
+          photo_box: box,
+        };
+      });
+      const { data: created, error: insErr } = await supabase.from('pottery_pieces').insert(rows).select('id, piece_type, description, photo_box');
       if (insErr) throw insErr;
 
       res.json({ replaced: (existing || []).length, created: created.length, pieces: created });

@@ -460,7 +460,7 @@ export default function FloorPage() {
         // Real per-piece descriptions, so each piece is stored with
         // something Find on Table can genuinely search on later.
         if (identifiedPieces?.length) {
-          formData.append('pieces_json', JSON.stringify(identifiedPieces.map((p) => ({ piece_type: p.piece_type, description: p.description }))));
+          formData.append('pieces_json', JSON.stringify(identifiedPieces.map((p) => ({ piece_type: p.piece_type, description: p.description, box: p.box }))));
         }
         await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/photo-match/confirm`, { method: 'POST', body: formData });
       }
