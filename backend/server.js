@@ -1009,6 +1009,15 @@ app.post('/api/demo/photo-match/confirm', upload.single('photo'), async (req, re
             // a photo of four similar pots. Storing it is what makes the
             // breakdown genuinely reviewable afterwards.
             photo_box: info?.box || null,
+            // Marks whether this piece already got a real breakdown at
+            // capture time. The background sweep looks for pieces with
+            // no described_at, so without this it would re-identify
+            // tables that were already done correctly on the iPad --
+            // paying for a second Gemini call and overwriting good data
+            // with a fresh guess. Left null when the client-side run
+            // failed, which is exactly when the sweep SHOULD pick it up.
+            described_at: info ? new Date().toISOString() : null,
+            identify_attempted_at: info ? new Date().toISOString() : null,
           };
         });
         const { data: created, error: piecesErr } = await supabase.from('pottery_pieces').insert(rows).select('id');
@@ -1628,6 +1637,23 @@ app.listen(PORT, () => {
       const finishRes = await fetch(`${SELF_URL}/api/spec/bookings/sync-finished-from-square`, { method: 'POST' });
       const finishData = await finishRes.json().catch(() => ({}));
       if (finishData.finished) logger.info(`[auto-sync] ${finishData.finished} booking(s) marked finished from real Square payment`, finishData.changes);
+
+      // Per Daisy: "I kinda want this done automatically. I don't wanna
+      // have to do it." Identification already runs on the iPad when the
+      // photo is taken, but that run is client-side and non-blocking --
+      // on the studio's genuinely flaky network it can fail silently and
+      // nothing ever retries, leaving the table stuck as a generic
+      // "Piece 1 of 1". This is the safety net that makes it automatic
+      // rather than automatic-when-the-wifi-holds. Small batch per tick
+      // and never retries the same photo, so it can't run up a Gemini
+      // bill; see registerReidentifyRoute for the full reasoning.
+      const idRes = await fetch(`${SELF_URL}/api/spec/pieces/identify-sweep`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 5 }),
+      });
+      const idData = await idRes.json().catch(() => ({}));
+      if (idData.identified) logger.info(`[auto-sync] identified pieces on ${idData.identified} table photo(s), ${idData.pieces_created} piece(s) created`);
     } catch (err) {
       logger.warn('[auto-sync] periodic sync failed', err.message);
     }
