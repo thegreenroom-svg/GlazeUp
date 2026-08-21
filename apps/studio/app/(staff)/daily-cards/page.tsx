@@ -32,6 +32,8 @@ interface Booking {
   space_name: string | null;
   notes: string | null;
   collection_date: string | null;
+  piece_count?: number;
+  photo_count?: number;
 }
 
 // Clean short label from the real (verbose) space_name text -- e.g.
@@ -460,7 +462,22 @@ export default function DailyCardsPage() {
               ) : (
                 <div style={{ width: 120, height: 120, margin: '0 auto', backgroundColor: '#f0f0f0' }} />
               )}
-              <p style={{ fontWeight: 700, fontSize: '1rem', marginTop: '0.6rem' }}>{b.customer_name}</p>
+              <p style={{ fontWeight: 700, fontSize: '1rem', marginTop: '0.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+                {/* Same real photo indicator as the bookings list -- at end
+                    of day this is how a missed table gets spotted without
+                    opening every booking. Hidden when printing: a status
+                    dot on a customer's card would be meaningless to them. */}
+                {(b.photo_count ?? 0) > 0 && (
+                  <span
+                    className="no-print"
+                    title={`${b.photo_count} piece${b.photo_count === 1 ? '' : 's'} photographed`}
+                    style={{ flexShrink: 0, width: 18, height: 18, borderRadius: '50%', backgroundColor: '#1a8a3c', color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.58rem', fontWeight: 700 }}
+                  >
+                    {b.photo_count}
+                  </span>
+                )}
+                {b.customer_name}
+              </p>
               <p style={{ fontSize: '0.8rem', color: '#666' }}>
                 {new Date(b.session_start).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
               </p>

@@ -194,7 +194,36 @@ app.get('/api/demo/bookings', async (req, res) => {
         .in('booking_code', codes);
       (statuses || []).forEach((s) => { if (s.collection_date) collectionDates[s.booking_code] = s.collection_date; });
     }
-    const merged = data.map((b) => ({ ...b, collection_date: collectionDates[b.booking_code] || null }));
+
+    // Real per-booking piece/photo counts -- per Daisy: "it would be
+    // really useful to have a photo attached dot here, so I know I can
+    // look at the ones that already have photos attached." Without it
+    // there's genuinely no way to tell which tables have been
+    // photographed without opening each booking one at a time, which on
+    // a busy day is the difference between spotting a missed table and
+    // not. One extra query and an in-memory tally rather than a count
+    // per booking.
+    const pieceCounts = {};
+    if (codes.length) {
+      const { data: pieceRows } = await supabase
+        .from('pottery_pieces')
+        .select('booking_id, reference_photo_url')
+        .eq('studio_id', DEMO_STUDIO_ID)
+        .in('booking_id', codes)
+        .neq('archived', true);
+      (pieceRows || []).forEach((p) => {
+        if (!pieceCounts[p.booking_id]) pieceCounts[p.booking_id] = { pieces: 0, with_photo: 0 };
+        pieceCounts[p.booking_id].pieces++;
+        if (p.reference_photo_url) pieceCounts[p.booking_id].with_photo++;
+      });
+    }
+
+    const merged = data.map((b) => ({
+      ...b,
+      collection_date: collectionDates[b.booking_code] || null,
+      piece_count: pieceCounts[b.booking_code]?.pieces || 0,
+      photo_count: pieceCounts[b.booking_code]?.with_photo || 0,
+    }));
 
     res.json(merged);
   } catch (err) {

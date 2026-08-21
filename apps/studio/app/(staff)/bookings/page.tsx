@@ -39,6 +39,8 @@ interface Booking {
   notes: string | null;
   booking_type: string | null;
   arrived_at: string | null;
+  piece_count?: number;
+  photo_count?: number;
 }
 
 interface BookingDetail {
@@ -454,7 +456,29 @@ function BookingsPageInner() {
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#fafafa')}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                 >
-                  <td style={{ padding: '0.75rem' }}>{b.customer_name}</td>
+                  <td style={{ padding: '0.75rem' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                      {/* Real photo indicator -- a filled green camera means
+                          this table has been photographed and its pieces are
+                          in the system; nothing means it hasn't. Lets a busy
+                          day be scanned at a glance instead of opening every
+                          booking to check. */}
+                      {(b.photo_count ?? 0) > 0 ? (
+                        <span
+                          title={`${b.photo_count} piece${b.photo_count === 1 ? '' : 's'} photographed`}
+                          style={{ flexShrink: 0, width: 20, height: 20, borderRadius: '50%', backgroundColor: '#1a8a3c', color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700 }}
+                        >
+                          {b.photo_count}
+                        </span>
+                      ) : (
+                        <span
+                          title="No photos yet"
+                          style={{ flexShrink: 0, width: 20, height: 20, borderRadius: '50%', border: '1.5px dashed #ccc', display: 'inline-block' }}
+                        />
+                      )}
+                      {b.customer_name}
+                    </span>
+                  </td>
                   <td style={{ padding: '0.75rem' }}>{b.party_size ?? '—'}</td>
                   <td style={{ padding: '0.75rem' }}>{new Date(b.session_start).toLocaleString()}</td>
                   <td style={{ padding: '0.75rem' }}>{[b.room, b.table_number].filter(Boolean).join(' / ') || '—'}</td>
