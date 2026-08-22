@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ChevronRight, Home, Camera, Printer, Check, Loader, RefreshCw } from 'lucide-react';
 import QRCode from 'qrcode';
@@ -340,6 +340,46 @@ export default function FloorPage() {
     setPhase(tillEnabled ? 3 : 4);
   };
 
+  // Deep link from the Schedule. The old phase 1 was a splash screen of
+  // three buttons holding no information, and phase 2 -- labelled "Select
+  // Table" -- was really a date picker over a flat list of the day's
+  // bookings. The Schedule shows the same thing spatially, in the layout
+  // the studio already reads every shift, and marks what's finished.
+  //
+  // It also answers "which table" before anyone taps, now that the real
+  // table comes from Square Appointments. That step only ever existed
+  // because the app didn't know.
+  const searchParams = useSearchParams();
+  const deepLinked = useRef(false);
+  useEffect(() => {
+    const code = searchParams.get('code');
+    if (!code || deepLinked.current) return;
+    deepLinked.current = true;
+    (async () => {
+      setLoading(true);
+      try {
+        const [bRes, mRes] = await Promise.all([
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings`),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/till-menu`),
+        ]);
+        const bData = bRes.ok ? await bRes.json() : [];
+        const mData = mRes.ok ? await mRes.json() : [];
+        const list = Array.isArray(bData) ? bData : [];
+        setAllBookings(list);
+        setBookings(list);
+        setMenu((mData?.groups || []).slice(0, 30));
+        const match = list.find((b: Booking) => b.booking_code === code);
+        // Falls back to the normal picker rather than a dead end if the
+        // booking genuinely isn't in today's list -- e.g. a stale link
+        // left open on an iPad overnight.
+        if (match) await selectBooking(match);
+        else setPhase(2);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [searchParams]);
+
   // Sensible default for the collection date field -- 14 days out, a
   // typical bisque + glaze firing turnaround. Staff can change it; this
   // just saves re-typing the same date on every booking.
@@ -543,18 +583,26 @@ export default function FloorPage() {
             </div>
           )}
           <div className="space-y-3">
-            <button onClick={loadBookings} disabled={loading} className="w-full py-5 rounded-lg font-bold flex items-center justify-center gap-3 text-lg" style={{ backgroundColor: B.clay, color: B.ivory }}>
-              {loading ? 'Loading...' : '🏃 Start Floor'}
-              {!loading && <ChevronRight size={24} />}
+            {/* The Schedule is now the way in: it shows the day by table,
+                in the Square Appointments layout the studio already reads,
+                and tapping a session comes straight back here with that
+                booking loaded. Kept first and prominent. */}
+            <a href="/schedule" className="w-full py-5 rounded-lg font-bold flex items-center justify-center gap-3 text-lg" style={{ backgroundColor: B.clay, color: B.ivory, textDecoration: 'none' }}>
+              📅 Open the Schedule <ChevronRight size={24} />
+            </a>
+            <p style={{ color: B.stone, fontSize: '0.75rem', textAlign: 'center' }}>The day by table · tap a session to run it</p>
+            <button onClick={loadBookings} disabled={loading} className="w-full py-4 rounded-lg font-semibold flex items-center justify-center gap-3" style={{ backgroundColor: 'transparent', color: B.ivory, border: `1px solid ${B.stone}` }}>
+              {loading ? 'Loading...' : 'Booking list instead'}
             </button>
-            <button onClick={loadSeatedBookings} disabled={loading} className="w-full py-5 rounded-lg font-bold flex items-center justify-center gap-3 text-lg" style={{ backgroundColor: B.sand, color: B.charcoal }}>
+            <button onClick={loadSeatedBookings} disabled={loading} className="w-full py-4 rounded-lg font-semibold flex items-center justify-center gap-3" style={{ backgroundColor: B.sand, color: B.charcoal }}>
               {loading ? 'Loading...' : '🪑 Seated Bookings'}
-              {!loading && <ChevronRight size={24} />}
+              {!loading && <ChevronRight size={20} />}
             </button>
             <p style={{ color: B.stone, fontSize: '0.75rem', textAlign: 'center' }}>Already-seated tables · more drinks or pieces · running totals</p>
-            <a href="/find-on-table" className="w-full py-5 rounded-lg font-bold flex items-center justify-center gap-3 text-lg" style={{ backgroundColor: B.stone, color: B.charcoal, textDecoration: 'none' }}>
-              <Camera size={24} /> Find on Table
-            </a>
+            {/* Find on Table moved to the Pieces section of the menu. It's
+                a different job -- locating fired pottery on a shelf, not
+                running a live table -- and it was only here because this
+                screen was the only launchpad. */}
           </div>
         </div>
         <NudgeCard id="floor_home" />

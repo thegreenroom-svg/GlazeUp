@@ -158,7 +158,7 @@ export default function SchedulePage() {
               {unassignedBookings.map((b) => (
                 <button
                   key={b.booking_code}
-                  onClick={() => router.push(`/bookings?code=${b.booking_code}`)}
+                  onClick={() => router.push(`/floor?code=${b.booking_code}`)}
                   style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderRadius: 999, border: '1px solid #E0B463', background: 'white', color: '#7A5B00', cursor: 'pointer' }}
                 >
                   {b.customer_name} · {new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
@@ -209,7 +209,11 @@ export default function SchedulePage() {
                   {inCol.map((b) => (
                     <button
                       key={b.booking_code}
-                      onClick={() => router.push(`/bookings?code=${b.booking_code}`)}
+                      // Mid-shift you want the till and the photo; after
+                      // firing you want the pieces. The schedule already
+                      // knows which of those a session is, so it sends you
+                      // to the right one instead of making you pick.
+                      onClick={() => router.push(b.finished ? `/bookings?code=${b.booking_code}` : `/floor?code=${b.booking_code}`)}
                       style={{
                         position: 'absolute',
                         top: topFor(b.session_start),
