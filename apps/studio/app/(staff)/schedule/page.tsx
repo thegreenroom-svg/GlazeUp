@@ -27,11 +27,21 @@ interface ScheduleBooking {
   finished: boolean;
 }
 
+interface Collection {
+  booking_code: string;
+  customer_name: string;
+  collection_method: string | null;
+  postal_postcode: string | null;
+  piece_count: number;
+  ready: boolean;
+}
+
 interface ScheduleData {
   date: string;
   columns: string[];
   bookings: ScheduleBooking[];
   unassigned: number;
+  collections: Collection[];
 }
 
 const HOUR_PX = 64;
@@ -246,6 +256,46 @@ export default function SchedulePage() {
               </div>
             );
           })}
+        </div>
+      )}
+      {/* Collections due today. Deliberately BELOW the grid: sessions are
+          the live thing, this is the second lane. But it's the reason
+          this view beats the Square calendar it's modelled on -- Square
+          sees an appointment that ended a fortnight ago and is done with
+          it, and has no idea a customer is walking in today for a plate.
+          Nothing else in the studio shows that alongside the day. */}
+      {(data?.collections?.length ?? 0) > 0 && (
+        <div style={{ marginTop: '1rem' }}>
+          <p style={{ fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#888', marginBottom: '0.5rem' }}>
+            Due back today
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
+            {(data?.collections || []).map((c) => (
+              <button
+                key={c.booking_code}
+                onClick={() => router.push(`/bookings?code=${c.booking_code}`)}
+                style={{
+                  flexShrink: 0,
+                  minWidth: 150,
+                  textAlign: 'left',
+                  padding: '0.55rem 0.65rem',
+                  borderRadius: 8,
+                  border: `1px solid ${c.ready ? '#9CC79C' : '#E4D8C8'}`,
+                  backgroundColor: c.ready ? '#F1F8F1' : '#FBF7F1',
+                  cursor: 'pointer',
+                }}
+              >
+                <span style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--charcoal)' }}>{c.customer_name}</span>
+                <span style={{ display: 'block', fontSize: '0.72rem', color: '#777' }}>
+                  {c.piece_count} piece{c.piece_count === 1 ? '' : 's'}
+                  {c.collection_method === 'postal' ? ' · posting' : ''}
+                </span>
+                <span style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, marginTop: '0.15rem', color: c.ready ? '#2E7D32' : '#A6761D' }}>
+                  {c.ready ? 'Ready' : 'Not ready yet'}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </PageShell>

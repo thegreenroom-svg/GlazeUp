@@ -4567,11 +4567,67 @@ export function registerSquareTablesRoutes(app, supabase, STUDIO_ID, logger, axi
         .in('booking_code', (bookings || []).map((b) => b.booking_code).concat(['__none__']));
       const finished = new Set((statuses || []).filter((s) => s.finished_at).map((s) => s.booking_code));
 
+      // Pottery due back TODAY, from sessions that happened weeks ago.
+      // This is the thing a Square calendar structurally cannot show,
+      // because Square doesn't know the pottery exists -- it sees a
+      // 90-minute appointment that ended a fortnight back and is done
+      // with it. A collection is a real event happening today with
+      // someone walking through the door for it, and it belongs on the
+      // day view next to the sessions.
+      // collection_date/method live on demo_app_session_status, NOT on
+      // bookings -- checked against the live schema rather than assumed.
+      // Querying bookings for them would have thrown and taken the whole
+      // day view down with it.
+      const { data: dueStatuses } = await supabase
+        .from('demo_app_session_status')
+        .select('booking_code, collection_date, collection_method, postal_postcode')
+        .eq('studio_id', STUDIO_ID)
+        .eq('collection_date', date);
+
+      const dueCodes = (dueStatuses || []).map((s2) => s2.booking_code);
+
+      // Names come from bookings, so a collection card says "Charlie
+      // Marlow" rather than a booking code nobody can read at a counter.
+      let nameByCode = new Map();
+      if (dueCodes.length) {
+        const { data: dueBookingRows } = await supabase
+          .from('bookings')
+          .select('booking_code, customer_name')
+          .eq('studio_id', STUDIO_ID)
+          .in('booking_code', dueCodes);
+        nameByCode = new Map((dueBookingRows || []).map((b) => [b.booking_code, b.customer_name]));
+      }
+      let piecesByBooking = {};
+      if (dueCodes.length) {
+        const { data: duePieces } = await supabase
+          .from('pottery_pieces')
+          .select('booking_id, status, piece_type')
+          .eq('studio_id', STUDIO_ID)
+          .in('booking_id', dueCodes)
+          .neq('archived', true);
+        for (const p of duePieces || []) {
+          if (!piecesByBooking[p.booking_id]) piecesByBooking[p.booking_id] = [];
+          piecesByBooking[p.booking_id].push(p);
+        }
+      }
+
       res.json({
         date,
         columns,
         bookings: (bookings || []).map((b) => ({ ...b, finished: finished.has(b.booking_code) })),
         unassigned: (bookings || []).filter((b) => !b.table_number).length,
+        collections: (dueStatuses || []).map((b) => ({
+          booking_code: b.booking_code,
+          customer_name: nameByCode.get(b.booking_code) || b.booking_code,
+          collection_method: b.collection_method,
+          postal_postcode: b.postal_postcode,
+          piece_count: (piecesByBooking[b.booking_code] || []).length,
+          // "Ready" means every piece has cleared the kiln stages. Counted
+          // rather than assumed, so the lane tells the truth about what can
+          // actually be handed over when someone arrives.
+          ready: (piecesByBooking[b.booking_code] || []).length > 0
+            && (piecesByBooking[b.booking_code] || []).every((p) => ['ready', 'collected', 'complete'].includes(String(p.status || '').toLowerCase())),
+        })),
       });
     } catch (err) {
       logger.error('schedule failed', err.message);

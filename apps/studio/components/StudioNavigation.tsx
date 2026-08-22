@@ -181,6 +181,10 @@ export function StudioNavigation() {
   // for them by name.
   const menuItems = [
     ...menuGroups.flatMap((g) => g.items),
+    // Pinned above the groups rather than inside one, so it isn't in
+    // menuGroups -- but it still needs to be findable by name.
+    { label: 'Dashboard', href: '/dashboard' },
+    { label: 'Schedule', href: '/schedule' },
     { label: 'Test AI', href: '/test-ai' },
     { label: 'Photo Match', href: '/photo-match' },
     { label: 'Needs Verification', href: '/needs-verification' },
@@ -268,7 +272,7 @@ export function StudioNavigation() {
   const menuList = (
     <div className="py-3">
       <div style={{ padding: '0 0.75rem 0.5rem' }}>
-        {itemLink({ label: 'Dashboard', icon: <Home className="w-5 h-5" />, href: '/' })}
+        {itemLink({ label: 'Dashboard', icon: <Home className="w-5 h-5" />, href: '/dashboard' })}
       </div>
       {menuGroups.map((g) => (
         <div key={g.section} style={{ marginBottom: '0.5rem' }}>

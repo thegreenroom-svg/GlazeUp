@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { SkeletonRows } from '@/components/Skeleton';
@@ -71,6 +71,7 @@ interface MenuItem {
 // the app (Alerts and others) can now link straight to a specific
 // booking with ?code=<booking_code>.
 function BookingsPageInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [search, setSearch] = useState('');
@@ -79,6 +80,9 @@ function BookingsPageInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCode, setSelectedCode] = useState<string | null>(() => searchParams.get('code'));
+  // Captured once at mount rather than read live: opening a booking from
+  // the list shouldn't retroactively turn into full-page mode.
+  const [deepLinked] = useState<boolean>(() => !!searchParams.get('code'));
   const [showWalkIn, setShowWalkIn] = useState(false);
   const [walkInName, setWalkInName] = useState('');
   const [walkInParty, setWalkInParty] = useState('');
@@ -512,11 +516,37 @@ function BookingsPageInner() {
       )}
 
       {selectedCode && (
+        // Arrived from the Schedule (or any direct link)? Then this IS the
+        // page, not something floating over a list you never asked for.
+        // A modal is right when you opened it from the list behind it and
+        // want to get back; it's wrong as a destination -- it can't be
+        // scrolled properly on a phone, the backdrop tap loses your place,
+        // and 85vh crops the piece list exactly when it matters.
+        //
+        // Same component either way, deliberately: duplicating this detail
+        // view into a separate page route would mean two copies of the
+        // piece rows, the crops, the assignment controls and the parcel
+        // summary drifting apart. It's the framing that changes.
         <div
-          onClick={() => setSelectedCode(null)}
-          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}
+          onClick={() => { if (!deepLinked) setSelectedCode(null); }}
+          style={deepLinked
+            ? { position: 'fixed', inset: 0, backgroundColor: 'white', zIndex: 50, overflowY: 'auto' }
+            : { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}
         >
-          <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'white', borderRadius: '8px', maxWidth: '450px', width: '100%', maxHeight: '85vh', overflow: 'auto', padding: '1.5rem' }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={deepLinked
+              ? { backgroundColor: 'white', maxWidth: 640, margin: '0 auto', width: '100%', padding: '1.25rem 1.25rem 3rem', minHeight: '100dvh' }
+              : { backgroundColor: 'white', borderRadius: '8px', maxWidth: '450px', width: '100%', maxHeight: '85vh', overflow: 'auto', padding: '1.5rem' }}
+          >
+            {deepLinked && (
+              <button
+                onClick={() => router.push('/schedule')}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', padding: '0 0 0.75rem', cursor: 'pointer', color: 'var(--clay)', fontSize: '0.85rem', fontWeight: 600 }}
+              >
+                ← Back to the day
+              </button>
+            )}
             {detailLoading ? (
               <p style={{ color: '#666' }}>Loading...</p>
             ) : !detail ? (
@@ -926,7 +956,7 @@ function BookingsPageInner() {
                 )}
 
                 <button
-                  onClick={() => setSelectedCode(null)}
+                  onClick={() => (deepLinked ? router.push('/schedule') : setSelectedCode(null))}
                   style={{ marginTop: '1.5rem', width: '100%', padding: '0.6rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
                 >
                   Close
