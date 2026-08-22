@@ -41,6 +41,10 @@ function shortSpaceLabel(spaceName: string | null): string | null {
   if (s.includes('thursdays')) return 'Thursdays';
   if (s.includes('wheel hire')) return 'Wheel Hire';
   if (s.includes('throwing taster')) return 'Throwing Taster';
+  if (s.includes('kids party')) return 'Kids Party';
+  if (s.includes('ultimate')) return 'Ultimate Party';
+  if (s.includes('pop-up') || s.includes('pop up')) return 'Pop-Up';
+  if (s.includes('grotto')) return 'Grotto';
   return null;
 }
 
