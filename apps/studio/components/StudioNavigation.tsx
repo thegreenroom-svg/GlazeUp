@@ -116,6 +116,7 @@ export function StudioNavigation() {
         { label: 'Packing', icon: <Package className="w-5 h-5" />, href: '/packing' },
         { label: 'Find on Table', icon: <MapPin className="w-5 h-5" />, href: '/find-on-table' },
         { label: 'Stamp a Piece', icon: <Stamp className="w-5 h-5" />, href: '/completion' },
+        { label: 'Kiln Batches', icon: <Flame className="w-5 h-5" />, href: '/kiln-batch' },
         { label: 'Kiln — Collection & Post', icon: <Flame className="w-5 h-5" />, href: '/kiln-dip' },
         { label: 'Collections', icon: <Library className="w-5 h-5" />, href: '/collections' },
         { label: 'Kiln Workflow', icon: <Zap className="w-5 h-5" />, href: '/kiln-workflow' },

@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerIdentifyPiecesRoute, registerPieceFulfilmentRoutes, registerReidentifyRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute, registerSquareTablesRoutes, registerPackingRoutes } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerIdentifyPiecesRoute, registerPieceFulfilmentRoutes, registerReidentifyRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute, registerSquareTablesRoutes, registerPackingRoutes, registerKilnBatchRoutes } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -1584,6 +1584,7 @@ registerPieceFulfilmentRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 registerReidentifyRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, fs, logGeminiUsage);
 registerSquareTablesRoutes(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerPackingRoutes(app, supabase, DEMO_STUDIO_ID, logger);
+registerKilnBatchRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 registerQuickAddPieceRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerFindOnTableRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage);
 registerTestAiFindRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage);

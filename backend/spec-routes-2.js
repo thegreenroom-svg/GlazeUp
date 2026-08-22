@@ -4793,3 +4793,163 @@ export function registerPackingRoutes(app, supabase, STUDIO_ID, logger) {
     }
   });
 }
+
+// ============================================================================
+// KILN BATCHES -- one scan takes a whole shelf out of the kiln
+// ----------------------------------------------------------------------------
+// Daisy: "Out of kiln actions... maybe we have a master QR for the collection
+// date."
+//
+// The right unit, and not the obvious one. Pieces are fired and shelved as a
+// BATCH sharing a collection date, so the natural action is "this whole
+// trolley is out", not forty individual taps -- and forty taps is the kind of
+// job that quietly stops being done on a busy Saturday.
+//
+// So a batch is every piece promised for one collection date. Print its QR
+// once, tape it to the shelf or trolley, and whoever unloads the kiln scans
+// it. Physical object, physical action, one scan.
+//
+// This introduces 'ready' as the status meaning out of the kiln and on the
+// shelf. Until now every piece in the studio sat at 'queued' from the moment
+// it was painted to the moment it was collected, so nothing could tell a
+// packer which pottery actually existed on a shelf yet.
+// ============================================================================
+export function registerKilnBatchRoutes(app, supabase, STUDIO_ID, logger) {
+  // Shared: the pieces belonging to one collection date.
+  const batchPieces = async (date) => {
+    const { data: statuses } = await supabase
+      .from('demo_app_session_status')
+      .select('booking_code')
+      .eq('studio_id', STUDIO_ID)
+      .eq('collection_date', date);
+    const codes = (statuses || []).map((s) => s.booking_code);
+    if (!codes.length) return { codes: [], pieces: [] };
+
+    const { data: pieces } = await supabase
+      .from('pottery_pieces')
+      .select('id, booking_id, status, fulfilment, piece_type')
+      .eq('studio_id', STUDIO_ID)
+      .in('booking_id', codes)
+      .neq('archived', true);
+    return { codes, pieces: pieces || [] };
+  };
+
+  // The list of batches -- what's in the kiln and what's coming.
+  app.get('/api/spec/kiln/batches', async (req, res) => {
+    try {
+      const { data: statuses, error } = await supabase
+        .from('demo_app_session_status')
+        .select('booking_code, collection_date')
+        .eq('studio_id', STUDIO_ID)
+        .not('collection_date', 'is', null)
+        .order('collection_date', { ascending: true });
+      if (error) throw error;
+
+      const codes = (statuses || []).map((s) => s.booking_code);
+      const dateByCode = new Map((statuses || []).map((s) => [s.booking_code, s.collection_date]));
+      if (!codes.length) return res.json({ batches: [] });
+
+      const { data: pieces } = await supabase
+        .from('pottery_pieces')
+        .select('booking_id, status, fulfilment')
+        .eq('studio_id', STUDIO_ID)
+        .in('booking_id', codes)
+        .neq('archived', true);
+
+      const byDate = {};
+      for (const p of pieces || []) {
+        const d = dateByCode.get(p.booking_id);
+        if (!d) continue;
+        // A piece held for a return visit is not in this firing -- the
+        // customer hasn't finished painting it. Counted separately so the
+        // batch total matches what's physically on the shelf.
+        if (p.fulfilment === 'return_visit') {
+          byDate[d] = byDate[d] || { date: d, pieces: 0, out: 0, on_hold: 0, bookings: new Set() };
+          byDate[d].on_hold++;
+          continue;
+        }
+        byDate[d] = byDate[d] || { date: d, pieces: 0, out: 0, on_hold: 0, bookings: new Set() };
+        byDate[d].pieces++;
+        byDate[d].bookings.add(p.booking_id);
+        if (['ready', 'collected', 'complete'].includes(String(p.status || '').toLowerCase())) byDate[d].out++;
+      }
+
+      const today = new Date().toISOString().slice(0, 10);
+      const batches = Object.values(byDate)
+        .map((b) => ({
+          date: b.date,
+          pieces: b.pieces,
+          out: b.out,
+          on_hold: b.on_hold,
+          bookings: b.bookings.size,
+          all_out: b.pieces > 0 && b.out === b.pieces,
+          days_until: Math.round(
+            (new Date(`${b.date}T00:00:00Z`).getTime() - new Date(`${today}T00:00:00Z`).getTime()) / 86400000
+          ),
+        }))
+        .filter((b) => b.pieces > 0)
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      res.json({ batches });
+    } catch (err) {
+      logger.error('kiln batches failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // One batch, as the QR lands on it.
+  app.get('/api/spec/kiln/batch/:date', async (req, res) => {
+    try {
+      const { codes, pieces } = await batchPieces(req.params.date);
+      const live = pieces.filter((p) => p.fulfilment !== 'return_visit');
+      const out = live.filter((p) => ['ready', 'collected', 'complete'].includes(String(p.status || '').toLowerCase()));
+
+      const { data: bookingRows } = codes.length
+        ? await supabase.from('bookings').select('booking_code, customer_name')
+            .eq('studio_id', STUDIO_ID).in('booking_code', codes)
+        : { data: [] };
+
+      res.json({
+        date: req.params.date,
+        bookings: (bookingRows || []).map((b) => ({
+          booking_code: b.booking_code,
+          customer_name: b.customer_name,
+          pieces: live.filter((p) => p.booking_id === b.booking_code).length,
+        })).filter((b) => b.pieces > 0),
+        piece_count: live.length,
+        already_out: out.length,
+        on_hold: pieces.length - live.length,
+      });
+    } catch (err) {
+      logger.error('kiln batch failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // The scan action itself.
+  app.post('/api/spec/kiln/batch/:date/out', async (req, res) => {
+    try {
+      const { pieces } = await batchPieces(req.params.date);
+      // Only move pieces genuinely still waiting. Deliberately excludes
+      // anything already collected -- a second scan of a QR still taped to
+      // a shelf must never drag a collected piece backwards into 'ready'.
+      const toMove = pieces
+        .filter((p) => p.fulfilment !== 'return_visit')
+        .filter((p) => !['ready', 'collected', 'complete'].includes(String(p.status || '').toLowerCase()))
+        .map((p) => p.id);
+
+      if (!toMove.length) return res.json({ moved: 0, already_out: true });
+
+      const { error } = await supabase
+        .from('pottery_pieces')
+        .update({ status: 'ready', updated_at: new Date().toISOString() })
+        .in('id', toMove);
+      if (error) throw error;
+
+      res.json({ moved: toMove.length, already_out: false });
+    } catch (err) {
+      logger.error('kiln batch out failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
