@@ -30,6 +30,7 @@ interface QueueItem {
   booking_code: string;
   customer_name: string;
   collection_date: string;
+  days_until: number;
   collection_method: string | null;
   postal_postcode: string | null;
   piece_count: number;
@@ -63,6 +64,16 @@ function cropStyle(url: string, box: PieceBox): React.CSSProperties {
     backgroundPosition: `${w >= 100 ? 0 : (box.left_pct / (100 - w)) * 100}% ${h >= 100 ? 0 : (box.top_pct / (100 - h)) * 100}%`,
     backgroundRepeat: 'no-repeat',
   };
+}
+
+// "due in 13 days" beats a bare date someone has to subtract from today
+// in their head while holding a box of pottery.
+function dueLabel(days: number): { text: string; colour: string } {
+  if (days < 0) return { text: `${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} overdue`, colour: '#C0392B' };
+  if (days === 0) return { text: 'Due today', colour: '#C0392B' };
+  if (days === 1) return { text: 'Due tomorrow', colour: '#A6761D' };
+  if (days <= 3) return { text: `Due in ${days} days`, colour: '#A6761D' };
+  return { text: `Due in ${days} days`, colour: '#777' };
 }
 
 export default function PackingPage() {
@@ -264,7 +275,7 @@ export default function PackingPage() {
         <div style={{ padding: '1.5rem', textAlign: 'center', border: '1px dashed #ddd', borderRadius: 10 }}>
           <Package size={26} style={{ color: '#ccc' }} />
           <p style={{ fontSize: '0.9rem', fontWeight: 600, marginTop: '0.5rem' }}>Nothing due to go out</p>
-          <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '0.25rem' }}>Bookings appear here once their collection date arrives.</p>
+          <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '0.25rem' }}>Bookings appear here as soon as they have pieces, so you can pack ahead of the collection date.</p>
         </div>
       )}
 
@@ -291,9 +302,14 @@ export default function PackingPage() {
                   photo that was never taken. */}
               {!q.has_photo && <p style={{ fontSize: '0.72rem', color: '#A6761D' }}>No photo — identify by description</p>}
             </div>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: q.done ? '#2E7D32' : 'var(--clay)', flexShrink: 0, marginLeft: '0.5rem' }}>
-              {q.done ? 'Packed' : `${q.collected}/${q.piece_count}`}
-            </span>
+            <div style={{ flexShrink: 0, marginLeft: '0.5rem', textAlign: 'right' }}>
+              <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: q.done ? '#2E7D32' : 'var(--clay)' }}>
+                {q.done ? 'Packed' : `${q.collected}/${q.piece_count}`}
+              </span>
+              <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 600, color: dueLabel(q.days_until).colour }}>
+                {dueLabel(q.days_until).text}
+              </span>
+            </div>
           </button>
         ))}
       </div>

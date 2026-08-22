@@ -4676,14 +4676,27 @@ export function registerSquareTablesRoutes(app, supabase, STUDIO_ID, logger, axi
 export function registerPackingRoutes(app, supabase, STUDIO_ID, logger) {
   app.get('/api/spec/packing/queue', async (req, res) => {
     try {
-      const upto = req.query.upto || new Date().toISOString().slice(0, 10);
+      // Packing happens when the pottery comes OUT OF THE KILN, which is
+      // days before the collection date -- Daisy's point, and the reason
+      // this screen was empty. The first version filtered to collection
+      // dates that had already arrived, so all four of today's bookings
+      // (collection 4 Sept, thirteen days out) were invisible to the
+      // packer who has the fired pieces in front of them right now.
+      //
+      // A collection date is a PROMISE TO THE CUSTOMER, not a signal that
+      // work can start. So the queue shows everything still to pack,
+      // soonest promise first, and lets the packer work as far ahead as
+      // they like.
+      const horizonDays = Math.min(parseInt(req.query.days, 10) || 60, 180);
+      const horizon = new Date(Date.now() + horizonDays * 24 * 60 * 60 * 1000)
+        .toISOString().slice(0, 10);
 
       const { data: statuses, error } = await supabase
         .from('demo_app_session_status')
         .select('booking_code, collection_date, collection_method, postal_postcode, finished_at')
         .eq('studio_id', STUDIO_ID)
         .not('collection_date', 'is', null)
-        .lte('collection_date', upto)
+        .lte('collection_date', horizon)
         .order('collection_date', { ascending: true });
       if (error) throw error;
 
@@ -4722,6 +4735,14 @@ export function registerPackingRoutes(app, supabase, STUDIO_ID, logger) {
           customer_name: bookingByCode.get(st.booking_code)?.customer_name || st.booking_code,
           session_start: bookingByCode.get(st.booking_code)?.session_start || null,
           collection_date: st.collection_date,
+          // Negative = overdue. Lets the queue say "due in 13 days" or
+          // "OVERDUE" rather than a bare date the packer has to subtract
+          // from today's in their head while holding a box.
+          days_until: Math.round(
+            (new Date(`${st.collection_date}T00:00:00Z`).getTime()
+              - new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00Z').getTime())
+            / 86400000
+          ),
           collection_method: st.collection_method,
           postal_postcode: st.postal_postcode,
           piece_count: live.length,
@@ -4738,7 +4759,7 @@ export function registerPackingRoutes(app, supabase, STUDIO_ID, logger) {
       // queue would just be noise on a screen used under time pressure.
       .filter((b) => b.piece_count > 0 || b.on_hold > 0);
 
-      res.json({ upto, queue });
+      res.json({ horizon, queue });
     } catch (err) {
       logger.error('packing queue failed', err.message);
       res.status(500).json({ error: err.message });
