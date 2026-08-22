@@ -44,15 +44,7 @@ function shortSpaceLabel(spaceName: string | null): string | null {
   if (!spaceName) return null;
   const s = spaceName.toLowerCase();
   if (s.includes('vault')) return 'Vault';
-  // The Lounge was renamed the Vault -- same room, new name -- so both
-  // service names resolve to 'Vault'. Deliberately applied to historical
-  // bookings too: a rename isn't a move, and the July session in that room
-  // happened in the room now called the Vault. Showing 'Lounge' on an old
-  // card would send someone to a door with a different name on it.
-  //
-  // The underlying space_name is untouched, so what Square actually said is
-  // never lost -- this is a label, not a rewrite of the record.
-  if (s.includes('lounge')) return 'Vault';
+  if (s.includes('lounge')) return 'Lounge';
   if (s.includes('main studio')) return 'Main Studio';
   if (s.includes('evening')) return 'Evening Session';
   if (s.includes('thursdays')) return 'Thursdays';
