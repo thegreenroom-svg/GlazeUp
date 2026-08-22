@@ -211,6 +211,12 @@ function BookingsPageInner() {
   // iPad to find what I'm looking for when it comes out of the kiln."
   // An 80px thumbnail is genuinely useless for identifying a piece
   // against a shelf of fired pottery.
+  // Which piece row has its assignment controls open. Collapsed by
+  // default: most bookings are one person collecting, so showing an
+  // input and a dropdown on every row put eight form controls on screen
+  // for a table of four and buried the pottery under admin.
+  const [openPiece, setOpenPiece] = useState<string | null>(null);
+  const [photoOpen, setPhotoOpen] = useState(false);
   const [zoomPhoto, setZoomPhoto] = useState<{ url: string; caption: string; box?: PieceBox | null; colour?: string; number?: number } | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [tillItems, setTillItems] = useState<TillItem[]>([]);
@@ -733,55 +739,6 @@ function BookingsPageInner() {
                     {reidentifyMsg && (
                       <p style={{ fontSize: '0.75rem', color: reidentifyMsg.startsWith('Could not') ? '#c33' : '#1a8a3c', marginBottom: '0.6rem' }}>{reidentifyMsg}</p>
                     )}
-                    {/* The table photo ONCE, with a numbered coloured box
-                        over each piece -- per Daisy: "itemised numbered
-                        coloured squares and descriptions... then we can see
-                        each thing." The boxes were previously drawn only on
-                        the Floor screen at the moment of capture and thrown
-                        away, so opening the booking afterwards gave a list
-                        of descriptions with no way to tell which row was
-                        which pot on a table of four similar pieces. */}
-                    {(() => {
-                      const photo = detail.pieces.find((p) => p.reference_photo_url)?.reference_photo_url;
-                      const boxed = detail.pieces.filter((p) => p.photo_box);
-                      if (!photo) return null;
-                      return (
-                        <div style={{ position: 'relative', marginBottom: '0.75rem' }}>
-                          <img
-                            src={photo}
-                            alt=""
-                            onClick={() => setZoomPhoto({ url: photo, caption: detail.booking?.customer_name || '' })}
-                            style={{ width: '100%', borderRadius: 8, display: 'block', cursor: 'zoom-in' }}
-                          />
-                          {detail.pieces.map((p, i) => p.photo_box && (
-                            <div
-                              key={p.id}
-                              style={{
-                                position: 'absolute',
-                                left: `${p.photo_box.left_pct}%`,
-                                top: `${p.photo_box.top_pct}%`,
-                                width: `${p.photo_box.right_pct - p.photo_box.left_pct}%`,
-                                height: `${p.photo_box.bottom_pct - p.photo_box.top_pct}%`,
-                                border: `3px solid ${PIECE_COLOURS[i % 6]}`,
-                                borderRadius: 4,
-                                boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
-                                pointerEvents: 'none',
-                              }}
-                            >
-                              <span style={{ position: 'absolute', top: -9, left: -9, width: 20, height: 20, borderRadius: '50%', backgroundColor: PIECE_COLOURS[i % 6], color: 'white', fontSize: '0.68rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px white' }}>
-                                {i + 1}
-                              </span>
-                            </div>
-                          ))}
-                          {boxed.length === 0 && (
-                            <p style={{ fontSize: '0.72rem', color: '#888', marginTop: '0.35rem' }}>
-                              No piece positions stored for this photo yet — tap Re-identify from photo to break it down.
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })()}
-
                     {/* Real per-piece rows rather than a thumbnail grid --
                         assignment needs room to show who each piece is for
                         and how it's going out. This is where a split
@@ -829,7 +786,27 @@ function BookingsPageInner() {
                             </p>
                             {p.description && <p style={{ fontSize: '0.72rem', color: '#888', marginBottom: '0.4rem' }}>{p.description}</p>}
 
-                            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                            {/* Quiet summary until tapped. Reads as plain
+                                English -- "Charlie, collecting" -- so the
+                                common case needs no interaction at all and
+                                the row stays about the pottery. */}
+                            <button
+                              onClick={() => setOpenPiece(openPiece === p.id ? null : p.id)}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: '0.3rem',
+                                background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                                fontSize: '0.72rem', color: p.assigned_to ? 'var(--charcoal)' : '#999',
+                                fontWeight: p.assigned_to ? 600 : 400, textAlign: 'left',
+                              }}
+                            >
+                              {[
+                                p.assigned_to || 'Not assigned',
+                                p.fulfilment === 'post' ? 'posting' : p.fulfilment === 'return_visit' ? 'coming back' : p.fulfilment === 'collect' ? 'collecting' : 'same as booking',
+                              ].join(' · ')}
+                              <span style={{ color: '#bbb', fontSize: '0.65rem' }}>{openPiece === p.id ? '▲' : '▼'}</span>
+                            </button>
+
+                            <div style={{ display: openPiece === p.id ? 'flex' : 'none', gap: '0.35rem', flexWrap: 'wrap', alignItems: 'center', marginTop: '0.4rem' }}>
                               <input
                                 defaultValue={p.assigned_to || ''}
                                 placeholder="Who's it for?"
@@ -848,7 +825,7 @@ function BookingsPageInner() {
                               </select>
                             </div>
 
-                            {p.fulfilment === 'post' && (
+                            {p.fulfilment === 'post' && openPiece === p.id && (
                               <input
                                 defaultValue={p.postal_postcode || ''}
                                 placeholder="Postcode for this parcel"
@@ -865,6 +842,65 @@ function BookingsPageInner() {
                         </div>
                       ))}
                     </div>
+
+                    {/* Photo moved BELOW the list. On a phone the table
+                        photo filled the first screen, so you scrolled past
+                        the thing you already understand -- you were sat at
+                        that table -- to reach the thing you came for. The
+                        list answers "which pieces"; the photo only settles
+                        the occasional "which one is that". Collapsed by
+                        default, one tap away. */}
+                    {(() => {
+                      const photo = detail.pieces.find((p) => p.reference_photo_url)?.reference_photo_url;
+                      const boxed = detail.pieces.filter((p) => p.photo_box);
+                      if (!photo) return null;
+                      return (
+                        <div style={{ marginTop: '0.75rem' }}>
+                          <button
+                            onClick={() => setPhotoOpen(!photoOpen)}
+                            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'none', border: 'none', padding: '0.2rem 0', cursor: 'pointer', fontSize: '0.76rem', color: 'var(--clay)', fontWeight: 600 }}
+                          >
+                            {photoOpen ? 'Hide table photo' : 'Show table photo'}
+                            <span style={{ fontSize: '0.65rem' }}>{photoOpen ? '▲' : '▼'}</span>
+                          </button>
+                          {photoOpen && (
+                            <div style={{ position: 'relative', marginTop: '0.5rem' }}>
+                              <img
+                                src={photo}
+                                alt=""
+                                onClick={() => setZoomPhoto({ url: photo, caption: detail.booking?.customer_name || '' })}
+                                style={{ width: '100%', borderRadius: 8, display: 'block', cursor: 'zoom-in' }}
+                              />
+                              {detail.pieces.map((p, i) => p.photo_box && (
+                                <div
+                                  key={p.id}
+                                  style={{
+                                    position: 'absolute',
+                                    left: `${p.photo_box.left_pct}%`,
+                                    top: `${p.photo_box.top_pct}%`,
+                                    width: `${p.photo_box.right_pct - p.photo_box.left_pct}%`,
+                                    height: `${p.photo_box.bottom_pct - p.photo_box.top_pct}%`,
+                                    border: `3px solid ${PIECE_COLOURS[i % 6]}`,
+                                    borderRadius: 4,
+                                    boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
+                                    pointerEvents: 'none',
+                                  }}
+                                >
+                                  <span style={{ position: 'absolute', top: -9, left: -9, width: 20, height: 20, borderRadius: '50%', backgroundColor: PIECE_COLOURS[i % 6], color: 'white', fontSize: '0.68rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px white' }}>
+                                    {i + 1}
+                                  </span>
+                                </div>
+                              ))}
+                              {boxed.length === 0 && (
+                                <p style={{ fontSize: '0.72rem', color: '#888', marginTop: '0.35rem' }}>
+                                  Not broken down yet — tap Re-identify from photo.
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Real parcel summary -- the commercially useful bit:
                         how many separate parcels this booking actually is,

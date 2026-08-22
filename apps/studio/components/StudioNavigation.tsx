@@ -69,83 +69,123 @@ export function StudioNavigation() {
     return () => window.removeEventListener('resize', checkSize);
   }, []);
 
-  // Restructured per Daisy's "fresh eyes" review -- previously 6 groups
-  // of ~35 items with real daily-use pages (Money, Pieces) sitting at
-  // the same visual weight as multi-studio SaaS features that aren't
-  // used running the studio day to day. Now ordered by real frequency
-  // of use: the genuine daily flow first, then the studio/business
-  // pages, with the rarely-touched SaaS and reference items grouped
-  // last under a clearly-labelled "Rarely needed" section rather than
-  // deleted -- reversible, and nothing that might still be wanted is
-  // destroyed.
+  // Diagnostics are MINE, not the product's. test-ai, the two Square
+  // diagnostic pages, party-size recovery and needs-verification are
+  // workbench tools built to debug this studio's data. A second studio
+  // opening a menu with "Test AI" in the daily-workflow section loses
+  // confidence in the whole thing before they've used it. They still
+  // exist and still work at their URLs -- they're just not advertised
+  // unless this env var is set.
+  const showDiagnostics = process.env.NEXT_PUBLIC_SHOW_DIAGNOSTICS === 'true';
+
+  // Four surfaces, not forty. The app had 39 staff pages, each with its
+  // own front door, which is navigable if you built it and bewildering
+  // if you didn't. The insight is that a piece of pottery has ONE life
+  // -- painted, photographed, fired, found, collected -- and ten of
+  // these screens were describing five states of it. Nobody thinks "I
+  // need the Completion screen"; they think "where is Charlie's plate".
+  //
+  // So this groups by the question being asked, not by the screen that
+  // happens to answer it. Nothing is deleted and every URL still works
+  // -- this is navigation, which is reversible, rather than surgery on
+  // 1,400 lines of working till logic, which is not.
   const menuGroups: { section: string; items: { label: string; icon: React.ReactNode; href: string }[] }[] = [
     {
-      section: 'Daily Workflow',
+      // What you touch with pottery in your hands.
+      section: 'Today',
       items: [
         { label: 'Start Floor', icon: <Footprints className="w-5 h-5" />, href: '/floor' },
-        { label: 'Print Cards', icon: <PrinterIcon className="w-5 h-5" />, href: '/daily-cards' },
         { label: 'Bookings', icon: <Calendar className="w-5 h-5" />, href: '/bookings' },
-        { label: 'Stamp a Piece', icon: <Stamp className="w-5 h-5" />, href: '/completion' },
-        { label: 'Find on Table', icon: <MapPin className="w-5 h-5" />, href: '/find-on-table' },
-        { label: 'Test AI', icon: <FlaskConical className="w-5 h-5" />, href: '/test-ai' },
-        { label: 'Kiln — Collection & Post', icon: <Flame className="w-5 h-5" />, href: '/kiln-dip' },
-      ],
-    },
-    {
-      section: 'Studio & Money',
-      items: [
-        { label: 'Pieces', icon: <Palette className="w-5 h-5" />, href: '/pieces' },
-        { label: 'Bisque Stock', icon: <Package className="w-5 h-5" />, href: '/inventory' },
-        { label: 'Money', icon: <PoundSterling className="w-5 h-5" />, href: '/money' },
-        { label: 'Customers', icon: <Users className="w-5 h-5" />, href: '/customers' },
+        { label: 'Print Cards', icon: <PrinterIcon className="w-5 h-5" />, href: '/daily-cards' },
         { label: 'Alerts', icon: <Bell className="w-5 h-5" />, href: '/alerts' },
       ],
     },
     {
-      section: 'Creative Tools',
+      // The piece's whole journey, in the order it actually happens.
+      // These five were scattered across two groups and a "rarely
+      // needed" bin, despite being the core of what the studio does.
+      section: 'Pieces',
       items: [
-        { label: 'Colour Picker', icon: <Pipette className="w-5 h-5" />, href: '/colour-picker' },
-        { label: 'Design Preview', icon: <Eye className="w-5 h-5" />, href: '/design-preview' },
-        { label: 'Transfer Designer', icon: <PenTool className="w-5 h-5" />, href: '/transfer-designer' },
+        { label: 'All Pieces', icon: <Palette className="w-5 h-5" />, href: '/pieces' },
+        { label: 'Find on Table', icon: <MapPin className="w-5 h-5" />, href: '/find-on-table' },
+        { label: 'Stamp a Piece', icon: <Stamp className="w-5 h-5" />, href: '/completion' },
+        { label: 'Kiln — Collection & Post', icon: <Flame className="w-5 h-5" />, href: '/kiln-dip' },
+        { label: 'Collections', icon: <Library className="w-5 h-5" />, href: '/collections' },
+        { label: 'Kiln Workflow', icon: <Zap className="w-5 h-5" />, href: '/kiln-workflow' },
       ],
     },
     {
-      section: 'Team & Safety',
+      section: 'Money',
+      items: [
+        { label: 'Takings', icon: <PoundSterling className="w-5 h-5" />, href: '/money' },
+        { label: 'Customers', icon: <Users className="w-5 h-5" />, href: '/customers' },
+        { label: 'Bisque Stock', icon: <Package className="w-5 h-5" />, href: '/inventory' },
+        { label: 'Reports', icon: <TrendingUp className="w-5 h-5" />, href: '/reports' },
+        { label: 'Analytics', icon: <BarChart3 className="w-5 h-5" />, href: '/analytics' },
+      ],
+    },
+    {
+      // Set up once, touched rarely. Grouping these together is what
+      // lets the three sections above stay short.
+      section: 'Studio',
       items: [
         { label: 'Team', icon: <UserCircle className="w-5 h-5" />, href: '/team' },
         { label: 'Roles & Studio', icon: <ShieldCheck className="w-5 h-5" />, href: '/roles' },
         { label: 'Health & Safety', icon: <HeartPulse className="w-5 h-5" />, href: '/health-safety' },
         { label: 'Training', icon: <GraduationCap className="w-5 h-5" />, href: '/training' },
+        { label: 'Catalogue', icon: <Boxes className="w-5 h-5" />, href: '/catalogue' },
+        { label: 'Our Profile', icon: <UserSquare2 className="w-5 h-5" />, href: '/our-profile' },
+        { label: 'Notifications', icon: <BellRing className="w-5 h-5" />, href: '/notifications' },
+        { label: 'Billing', icon: <CreditCard className="w-5 h-5" />, href: '/billing' },
       ],
     },
     {
-      section: 'Rarely needed',
+      // Customer-facing surfaces. Separated because they're a different
+      // audience -- staff open these to hand the iPad over.
+      section: 'For customers',
       items: [
+        { label: 'Colour Picker', icon: <Pipette className="w-5 h-5" />, href: '/colour-picker' },
+        { label: 'Design Preview', icon: <Eye className="w-5 h-5" />, href: '/design-preview' },
+        { label: 'Transfer Designer', icon: <PenTool className="w-5 h-5" />, href: '/transfer-designer' },
+        { label: 'Customer View', icon: <QrCode className="w-5 h-5" />, href: '/customer' },
+        { label: 'My Bookings', icon: <CalendarClock className="w-5 h-5" />, href: '/my-bookings' },
+      ],
+    },
+    {
+      // Platform-level features that belong to GlazeUp-the-business
+      // rather than to running a studio on a Tuesday.
+      section: 'Platform',
+      items: [
+        { label: 'Loyalty', icon: <Award className="w-5 h-5" />, href: '/loyalty' },
+        { label: 'Community', icon: <Sparkles className="w-5 h-5" />, href: '/community' },
+        { label: 'Studios Worldwide', icon: <Globe2 className="w-5 h-5" />, href: '/studios-worldwide' },
+        { label: 'KDS', icon: <ChefHat className="w-5 h-5" />, href: '/kds' },
+        { label: 'Lifecycle', icon: <GitBranch className="w-5 h-5" />, href: '/lifecycle' },
+      ],
+    },
+    ...(showDiagnostics ? [{
+      section: 'Diagnostics',
+      items: [
+        { label: 'Test AI', icon: <FlaskConical className="w-5 h-5" />, href: '/test-ai' },
         { label: 'Photo Match', icon: <Camera className="w-5 h-5" />, href: '/photo-match' },
         { label: 'Needs Verification', icon: <ShieldCheck className="w-5 h-5" />, href: '/needs-verification' },
         { label: 'Recover Party Sizes', icon: <RefreshIcon className="w-5 h-5" />, href: '/backfill-party-sizes' },
-        { label: 'KDS', icon: <ChefHat className="w-5 h-5" />, href: '/kds' },
-        { label: 'Kiln Workflow', icon: <Zap className="w-5 h-5" />, href: '/kiln-workflow' },
-        { label: 'Lifecycle', icon: <GitBranch className="w-5 h-5" />, href: '/lifecycle' },
-        { label: 'Catalogue', icon: <Boxes className="w-5 h-5" />, href: '/catalogue' },
-        { label: 'Reports', icon: <TrendingUp className="w-5 h-5" />, href: '/reports' },
-        { label: 'Analytics', icon: <BarChart3 className="w-5 h-5" />, href: '/analytics' },
-        { label: 'Billing', icon: <CreditCard className="w-5 h-5" />, href: '/billing' },
-        { label: 'Loyalty', icon: <Award className="w-5 h-5" />, href: '/loyalty' },
-        { label: 'Notifications', icon: <BellRing className="w-5 h-5" />, href: '/notifications' },
-        { label: 'Community', icon: <Sparkles className="w-5 h-5" />, href: '/community' },
-        { label: 'Studios Worldwide', icon: <Globe2 className="w-5 h-5" />, href: '/studios-worldwide' },
-        { label: 'Our Profile', icon: <UserSquare2 className="w-5 h-5" />, href: '/our-profile' },
-        { label: 'Collections', icon: <Library className="w-5 h-5" />, href: '/collections' },
-        { label: 'My Bookings', icon: <CalendarClock className="w-5 h-5" />, href: '/my-bookings' },
-        { label: 'Customer View', icon: <QrCode className="w-5 h-5" />, href: '/customer' },
       ],
-    },
+    }] : []),
   ];
-  // Flattened for isActive() lookups and anything else expecting a plain list.
+
+  // Flat list behind the "Jump to..." search. Deliberately includes the
+  // diagnostic pages even when they're hidden from the menu -- they're
+  // hidden from a new studio, not taken away from whoever knows to look
+  // for them by name.
   const menuItems = [
-    { label: 'Dashboard', icon: <Home className="w-5 h-5" />, href: '/' },
     ...menuGroups.flatMap((g) => g.items),
+    { label: 'Test AI', href: '/test-ai' },
+    { label: 'Photo Match', href: '/photo-match' },
+    { label: 'Needs Verification', href: '/needs-verification' },
+    { label: 'Recover Party Sizes', href: '/backfill-party-sizes' },
+    { label: 'Square Diagnostic', href: '/square-diagnostic' },
+    { label: 'Square Bookings Diagnostic', href: '/square-bookings-diagnostic' },
   ];
 
   const isActive = (href: string) => {
