@@ -304,7 +304,7 @@ export default function SchedulePage() {
 
       {/* Calendar and detail side by side on a tablet, stacked on a phone.
           The day stays on screen either way -- that's the whole point. */}
-      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', flexDirection: wide ? 'row' : 'column-reverse' }}>
+      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
       {!loading && columns.length > 0 && (
         // Horizontal scroll rather than squeezing every table onto a phone
         // screen: five columns at a legible width beats eight illegible
@@ -381,15 +381,27 @@ export default function SchedulePage() {
         </div>
       )}
       {selected && (
-        <div style={{
-          width: wide ? 330 : '100%', flexShrink: 0,
+        <div style={wide ? {
+          width: 330, flexShrink: 0,
           border: '1px solid #eee', borderRadius: 10, background: 'white',
           padding: '0.85rem',
           // Sticks alongside as you scroll the day on a tablet, so the
           // panel doesn't slide off while you're reading it.
-          position: wide ? 'sticky' : 'static', top: wide ? 12 : undefined,
-          maxHeight: wide ? 'calc(100dvh - 40px)' : undefined,
-          overflowY: wide ? 'auto' : undefined,
+          position: 'sticky', top: 12,
+          maxHeight: 'calc(100dvh - 40px)', overflowY: 'auto',
+        } : {
+          // On a phone this is a bottom sheet, not a block in the flow.
+          // It previously stacked ABOVE the grid via column-reverse, so
+          // tapping a session while scrolled into the afternoon opened the
+          // panel off-screen above -- it looked like nothing happened at
+          // all. Fixed to the bottom of the viewport, it's always where
+          // the thumb just was.
+          position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 40,
+          background: 'white', borderTop: '1px solid #ddd',
+          borderTopLeftRadius: 14, borderTopRightRadius: 14,
+          boxShadow: '0 -6px 24px rgba(0,0,0,0.16)',
+          padding: '0.85rem 0.85rem 1.4rem',
+          maxHeight: '62dvh', overflowY: 'auto',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
             <div>
