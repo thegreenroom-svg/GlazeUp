@@ -91,12 +91,17 @@ export function StudioNavigation() {
   // 1,400 lines of working till logic, which is not.
   const menuGroups: { section: string; items: { label: string; icon: React.ReactNode; href: string }[] }[] = [
     {
-      // What you touch with pottery in your hands.
+      // The Schedule is the way in, not one option among five. Everything
+      // operational happens TO a booking -- running the session, printing
+      // its card, packing its pottery -- and all of that is now reachable
+      // from the booking itself. These stay listed because a menu you
+      // can't find a page in is its own problem, but the day comes first
+      // and the rest are the back door.
       section: 'Today',
       items: [
-        { label: 'Start Floor', icon: <Footprints className="w-5 h-5" />, href: '/floor' },
-        { label: 'Schedule', icon: <CalendarDays className="w-5 h-5" />, href: '/schedule' },
+        { label: 'The Day', icon: <CalendarDays className="w-5 h-5" />, href: '/schedule' },
         { label: 'Bookings', icon: <Calendar className="w-5 h-5" />, href: '/bookings' },
+        { label: 'Start Floor', icon: <Footprints className="w-5 h-5" />, href: '/floor' },
         { label: 'Print Cards', icon: <PrinterIcon className="w-5 h-5" />, href: '/daily-cards' },
         { label: 'Alerts', icon: <Bell className="w-5 h-5" />, href: '/alerts' },
       ],
@@ -117,8 +122,13 @@ export function StudioNavigation() {
       ],
     },
     {
-      section: 'Money',
+      // Per Daisy: "all the reporting stuff, the finances, that could be
+      // separate, find somewhere else." Nobody opens the finances with a
+      // customer at the counter, so it sits below the two sections that
+      // are used with pottery in hand.
+      section: 'Business',
       items: [
+        { label: 'Dashboard', icon: <Home className="w-5 h-5" />, href: '/dashboard' },
         { label: 'Takings', icon: <PoundSterling className="w-5 h-5" />, href: '/money' },
         { label: 'Customers', icon: <Users className="w-5 h-5" />, href: '/customers' },
         { label: 'Bisque Stock', icon: <Package className="w-5 h-5" />, href: '/inventory' },
@@ -273,7 +283,7 @@ export function StudioNavigation() {
   const menuList = (
     <div className="py-3">
       <div style={{ padding: '0 0.75rem 0.5rem' }}>
-        {itemLink({ label: 'Dashboard', icon: <Home className="w-5 h-5" />, href: '/dashboard' })}
+        {itemLink({ label: 'The Day', icon: <CalendarDays className="w-5 h-5" />, href: '/schedule' })}
       </div>
       {menuGroups.map((g) => (
         <div key={g.section} style={{ marginBottom: '0.5rem' }}>

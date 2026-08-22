@@ -2,8 +2,9 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { PageShell } from '@/components/PageShell';
+import { useSearchParams } from 'next/navigation';
 import { Package, ChevronLeft, Check } from 'lucide-react';
 
 // The screen for whoever is actually boxing the pottery. There wasn't one:
@@ -75,6 +76,12 @@ export default function PackingPage() {
   const [openPiece, setOpenPiece] = useState<{ piece: Piece; index: number } | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
 
+  // Opened from a booking rather than from the queue. Packing is a job you
+  // reach FROM a booking as often as you reach it from a list -- the pieces
+  // are in your hand and the booking is what you're looking at.
+  const searchParams = useSearchParams();
+  const linkedCode = searchParams.get('code');
+
   const loadQueue = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -91,6 +98,18 @@ export default function PackingPage() {
   }, []);
 
   useEffect(() => { loadQueue(); }, [loadQueue]);
+
+  const jumped = useRef(false);
+  useEffect(() => {
+    if (!linkedCode || jumped.current || !queue.length) return;
+    const match = queue.find((q) => q.booking_code === linkedCode);
+    if (!match) return;
+    jumped.current = true;
+    openIt(match);
+    // openIt is stable enough for this one-shot jump; the guard ref stops
+    // it re-firing if the queue refreshes underneath.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedCode, queue]);
 
   const openIt = async (item: QueueItem) => {
     setOpenBooking(item);

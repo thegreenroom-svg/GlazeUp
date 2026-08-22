@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { PageShell } from '@/components/PageShell';
+import { useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import { Printer, RefreshCw, AlertCircle } from 'lucide-react';
 
@@ -80,7 +81,16 @@ export default function DailyCardsPage() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [newSinceLoad, setNewSinceLoad] = useState<Booking[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [cardDate, setCardDate] = useState(() => new Date().toISOString().slice(0, 10));
+  // Arriving from a booking: open that booking's day and preselect only
+  // its card. Every booking already HAS a card -- the QR on it points
+  // straight back at the booking -- so the card is really just the
+  // booking's printed form. Reaching it from the booking, rather than
+  // hunting a day-long list for the right name, is the way round that
+  // matches how the job is actually done.
+  const searchParams = useSearchParams();
+  const linkedCode = searchParams.get('code');
+  const linkedDate = searchParams.get('date');
+  const [cardDate, setCardDate] = useState(() => linkedDate || new Date().toISOString().slice(0, 10));
   const cardDateRef = useRef(cardDate);
   const knownCodes = useRef<Set<string>>(new Set());
   const firstLoadDone = useRef(false);
@@ -93,6 +103,13 @@ export default function DailyCardsPage() {
   const [selectedSessionIdx, setSelectedSessionIdx] = useState<number | null>(null);
 
   useEffect(() => { cardDateRef.current = cardDate; }, [cardDate]);
+  const preselected = useRef(false);
+  useEffect(() => {
+    if (!linkedCode || preselected.current || !bookings.length) return;
+    if (!bookings.some((b) => b.booking_code === linkedCode)) return;
+    preselected.current = true;
+    setSelected(new Set([linkedCode]));
+  }, [linkedCode, bookings]);
   // Reset the session filter whenever the day changes -- a session index
   // from a different day (e.g. its 3rd Saturday slot) means nothing once
   // you've moved to a day with only 2 sessions.

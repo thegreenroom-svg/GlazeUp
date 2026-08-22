@@ -748,6 +748,34 @@ function BookingsPageInner() {
                   )}
                 </div>
 
+                {/* The booking is the hub. Everything operational in the
+                    studio happens TO a booking -- running the session,
+                    printing its card, packing its pottery -- so those jobs
+                    should be reachable from the booking rather than each
+                    living behind its own menu entry that you enter from the
+                    top and then search for the right name in.
+                    The card in particular: every booking already has one,
+                    and its QR points straight back here, so the card is
+                    really just the booking's printed form. */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #eee' }}>
+                  {!finished && (
+                    <button onClick={() => router.push(`/floor?code=${detail.booking.booking_code}`)} style={hubBtn(true)}>
+                      Run this session
+                    </button>
+                  )}
+                  <button
+                    onClick={() => router.push(`/daily-cards?code=${detail.booking.booking_code}&date=${(detail.booking.session_start || '').slice(0, 10)}`)}
+                    style={hubBtn(false)}
+                  >
+                    Print card
+                  </button>
+                  {detail.pieces && detail.pieces.length > 0 && (
+                    <button onClick={() => router.push(`/packing?code=${detail.booking.booking_code}`)} style={hubBtn(false)}>
+                      Pack this
+                    </button>
+                  )}
+                </div>
+
                 {detail.pieces && detail.pieces.length > 0 && (
                   <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #eee' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', gap: '0.5rem' }}>
@@ -1058,3 +1086,14 @@ export default function BookingsPage() {
     </Suspense>
   );
 }
+
+const hubBtn = (primary: boolean): React.CSSProperties => ({
+  padding: '0.45rem 0.7rem',
+  fontSize: '0.78rem',
+  fontWeight: 600,
+  borderRadius: 7,
+  cursor: 'pointer',
+  border: primary ? 'none' : '1px solid #ddd',
+  backgroundColor: primary ? 'var(--clay)' : 'white',
+  color: primary ? 'white' : 'var(--charcoal)',
+});
