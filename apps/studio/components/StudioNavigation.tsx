@@ -108,6 +108,7 @@ export function StudioNavigation() {
       section: 'Pieces',
       items: [
         { label: 'All Pieces', icon: <Palette className="w-5 h-5" />, href: '/pieces' },
+        { label: 'Packing', icon: <Package className="w-5 h-5" />, href: '/packing' },
         { label: 'Find on Table', icon: <MapPin className="w-5 h-5" />, href: '/find-on-table' },
         { label: 'Stamp a Piece', icon: <Stamp className="w-5 h-5" />, href: '/completion' },
         { label: 'Kiln — Collection & Post', icon: <Flame className="w-5 h-5" />, href: '/kiln-dip' },

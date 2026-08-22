@@ -1,0 +1,295 @@
+'use client';
+
+export const dynamic = 'force-dynamic';
+
+import { useState, useEffect, useCallback } from 'react';
+import { PageShell } from '@/components/PageShell';
+import { Package, ChevronLeft, Check } from 'lucide-react';
+
+// The screen for whoever is actually boxing the pottery. There wasn't one:
+// kiln-dip is a lookup-by-code tool for collection dates and emails and
+// renders no photographs at all, so the person packing had nowhere to see
+// what they were packing. That's the one job where the reference photo
+// matters most -- a shelf of fired pottery all looks the same, and this
+// moment is why the table was photographed in the first place.
+//
+// Three levels, per Daisy: "somehow drillable, so it's not all on the huge
+// screen."
+//   1. QUEUE    - who's due, how many pieces, posting or collecting
+//   2. BOOKING  - that booking's pieces, each cropped to itself
+//   3. PIECE    - one piece, big, ringed on the table photo
+// Photos are loaded per booking on drill-down rather than for the whole
+// queue at once, so opening this page doesn't pull every image for the week.
+
+const PIECE_COLOURS = ['#e0392b', '#1a8a3c', '#2b6fe0', '#c77a0a', '#8b3ec7', '#0a9aa8'];
+
+type PieceBox = { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number };
+
+interface QueueItem {
+  booking_code: string;
+  customer_name: string;
+  collection_date: string;
+  collection_method: string | null;
+  postal_postcode: string | null;
+  piece_count: number;
+  on_hold: number;
+  collected: number;
+  has_photo: boolean;
+  done: boolean;
+}
+
+interface Piece {
+  id: string;
+  piece_type: string | null;
+  description: string | null;
+  status: string | null;
+  reference_photo_url: string | null;
+  photo_box: PieceBox | null;
+  assigned_to: string | null;
+  fulfilment: string | null;
+}
+
+// Crops the shared table photo to one piece. Every piece on a booking shares
+// ONE photo, so without this a packer sees the same picture of the whole
+// table on every row -- useless for telling which is which.
+function cropStyle(url: string, box: PieceBox): React.CSSProperties {
+  const w = box.right_pct - box.left_pct;
+  const h = box.bottom_pct - box.top_pct;
+  if (!(w > 0) || !(h > 0)) return { backgroundImage: `url(${url})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+  return {
+    backgroundImage: `url(${url})`,
+    backgroundSize: `${(100 / w) * 100}% ${(100 / h) * 100}%`,
+    backgroundPosition: `${w >= 100 ? 0 : (box.left_pct / (100 - w)) * 100}% ${h >= 100 ? 0 : (box.top_pct / (100 - h)) * 100}%`,
+    backgroundRepeat: 'no-repeat',
+  };
+}
+
+export default function PackingPage() {
+  const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [openBooking, setOpenBooking] = useState<QueueItem | null>(null);
+  const [pieces, setPieces] = useState<Piece[]>([]);
+  const [piecesLoading, setPiecesLoading] = useState(false);
+  const [openPiece, setOpenPiece] = useState<{ piece: Piece; index: number } | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
+
+  const loadQueue = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/packing/queue`);
+      if (!res.ok) throw new Error(`Could not load the packing queue (${res.status})`);
+      const d = await res.json();
+      setQueue(d.queue || []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load the packing queue');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadQueue(); }, [loadQueue]);
+
+  const openIt = async (item: QueueItem) => {
+    setOpenBooking(item);
+    setPieces([]);
+    setPiecesLoading(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${item.booking_code}/detail`);
+      const d = res.ok ? await res.json() : null;
+      setPieces(d?.pieces || []);
+    } catch { setPieces([]); } finally { setPiecesLoading(false); }
+  };
+
+  const markCollected = async (p: Piece) => {
+    setSaving(p.id);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/${p.id}/packed`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ packed: true }),
+      });
+      // Only tick the row if it genuinely saved. Showing a tick for a
+      // failed write is worse than showing nothing -- a packer would trust
+      // it and the piece would sit on the shelf marked as gone.
+      if (res.ok) setPieces((prev) => prev.map((x) => (x.id === p.id ? { ...x, status: 'collected' } : x)));
+    } catch { /* left as-is; the row simply doesn't tick */ } finally { setSaving(null); }
+  };
+
+  // ---------- LEVEL 3: one piece, big ----------
+  if (openPiece && openBooking) {
+    const { piece: p, index: i } = openPiece;
+    const colour = PIECE_COLOURS[i % 6];
+    return (
+      <PageShell title="Packing" subtitle={openBooking.customer_name}>
+        <button onClick={() => setOpenPiece(null)} style={backBtn}>
+          <ChevronLeft size={16} /> Back to the pieces
+        </button>
+        <div style={{ marginTop: '0.75rem' }}>
+          <p style={{ fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <span style={{ width: 24, height: 24, borderRadius: '50%', backgroundColor: colour, color: 'white', fontSize: '0.75rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
+            {p.piece_type || 'Piece'}
+          </p>
+          {p.description && <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.35rem' }}>{p.description}</p>}
+          {p.assigned_to && <p style={{ fontSize: '0.85rem', marginTop: '0.35rem' }}>For <strong>{p.assigned_to}</strong></p>}
+
+          {/* Big cropped view first: this is what you hold up against the
+              shelf. The full table photo sits underneath for context, with
+              this piece ringed, because sometimes the only way to identify
+              a plate is seeing what it was sitting next to. */}
+          {p.reference_photo_url && p.photo_box && (
+            <div style={{ marginTop: '0.75rem', width: '100%', aspectRatio: '1', borderRadius: 10, border: `3px solid ${colour}`, ...cropStyle(p.reference_photo_url, p.photo_box) }} />
+          )}
+          {p.reference_photo_url && (
+            <div style={{ position: 'relative', marginTop: '0.75rem' }}>
+              <p style={{ fontSize: '0.72rem', color: '#888', marginBottom: '0.3rem' }}>On the table</p>
+              <img src={p.reference_photo_url} alt="" style={{ width: '100%', borderRadius: 8, display: 'block' }} />
+              {p.photo_box && (
+                <div style={{
+                  position: 'absolute',
+                  left: `${p.photo_box.left_pct}%`,
+                  top: `calc(${p.photo_box.top_pct}% + 1.15rem)`,
+                  width: `${p.photo_box.right_pct - p.photo_box.left_pct}%`,
+                  height: `${p.photo_box.bottom_pct - p.photo_box.top_pct}%`,
+                  border: `3px solid ${colour}`,
+                  borderRadius: 4,
+                  boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
+                  pointerEvents: 'none',
+                }} />
+              )}
+            </div>
+          )}
+          {!p.reference_photo_url && (
+            <p style={{ marginTop: '0.75rem', fontSize: '0.82rem', color: '#888' }}>No photo on this piece — identify it from the description.</p>
+          )}
+
+          <button
+            onClick={() => markCollected(p)}
+            disabled={saving === p.id || p.status === 'collected'}
+            style={{ ...primaryBtn, marginTop: '1rem', opacity: p.status === 'collected' ? 0.5 : 1 }}
+          >
+            {p.status === 'collected' ? '✓ Packed' : saving === p.id ? 'Saving...' : 'Mark this one packed'}
+          </button>
+        </div>
+      </PageShell>
+    );
+  }
+
+  // ---------- LEVEL 2: one booking's pieces ----------
+  if (openBooking) {
+    const photo = pieces.find((p) => p.reference_photo_url)?.reference_photo_url;
+    return (
+      <PageShell title="Packing" subtitle={openBooking.customer_name}>
+        <button onClick={() => { setOpenBooking(null); loadQueue(); }} style={backBtn}>
+          <ChevronLeft size={16} /> Back to the queue
+        </button>
+
+        <p style={{ fontSize: '0.82rem', color: '#666', margin: '0.6rem 0 0.75rem' }}>
+          {openBooking.collection_method === 'postal'
+            ? `Posting${openBooking.postal_postcode ? ` to ${openBooking.postal_postcode}` : ''}`
+            : 'Collecting from the studio'}
+          {openBooking.on_hold > 0 && ` · ${openBooking.on_hold} on hold, not in this parcel`}
+        </p>
+
+        {piecesLoading && <p style={{ fontSize: '0.85rem', color: '#888' }}>Loading the pieces...</p>}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {pieces.filter((p) => p.fulfilment !== 'return_visit').map((p, i) => (
+            <button
+              key={p.id}
+              onClick={() => setOpenPiece({ piece: p, index: i })}
+              style={{
+                display: 'flex', gap: '0.65rem', alignItems: 'center', textAlign: 'left',
+                padding: '0.5rem', border: '1px solid #eee', borderRadius: 8,
+                background: p.status === 'collected' ? '#F4F8F4' : 'white', cursor: 'pointer',
+              }}
+            >
+              {p.reference_photo_url ? (
+                <div style={{
+                  width: 60, height: 60, borderRadius: 6, flexShrink: 0,
+                  border: `2px solid ${PIECE_COLOURS[i % 6]}`,
+                  ...(p.photo_box ? cropStyle(p.reference_photo_url, p.photo_box)
+                    : { backgroundImage: `url(${p.reference_photo_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }),
+                }} />
+              ) : (
+                <div style={{ width: 60, height: 60, borderRadius: 6, flexShrink: 0, backgroundColor: '#f7f7f7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: '#bbb' }}>no photo</div>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: '0.85rem', fontWeight: 600 }}>{i + 1}. {p.piece_type || 'Piece'}</p>
+                {p.description && <p style={{ fontSize: '0.72rem', color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.description}</p>}
+                {p.assigned_to && <p style={{ fontSize: '0.72rem', color: 'var(--clay)', fontWeight: 600 }}>For {p.assigned_to}</p>}
+              </div>
+              {p.status === 'collected' && <Check size={18} style={{ color: '#2E7D32', flexShrink: 0 }} />}
+            </button>
+          ))}
+        </div>
+
+        {!piecesLoading && photo && (
+          <div style={{ marginTop: '1rem' }}>
+            <p style={{ fontSize: '0.72rem', color: '#888', marginBottom: '0.3rem' }}>The whole table</p>
+            <img src={photo} alt="" style={{ width: '100%', borderRadius: 8, display: 'block' }} />
+          </div>
+        )}
+      </PageShell>
+    );
+  }
+
+  // ---------- LEVEL 1: the queue ----------
+  return (
+    <PageShell title="Packing" subtitle="Pottery due out">
+      {loading && <p style={{ fontSize: '0.85rem', color: '#888' }}>Loading...</p>}
+      {error && <p style={{ fontSize: '0.85rem', color: '#c0392b' }}>{error}</p>}
+      {!loading && !error && queue.length === 0 && (
+        <div style={{ padding: '1.5rem', textAlign: 'center', border: '1px dashed #ddd', borderRadius: 10 }}>
+          <Package size={26} style={{ color: '#ccc' }} />
+          <p style={{ fontSize: '0.9rem', fontWeight: 600, marginTop: '0.5rem' }}>Nothing due to go out</p>
+          <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '0.25rem' }}>Bookings appear here once their collection date arrives.</p>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        {queue.map((q) => (
+          <button
+            key={q.booking_code}
+            onClick={() => openIt(q)}
+            style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left',
+              padding: '0.7rem 0.8rem', borderRadius: 8, cursor: 'pointer',
+              border: `1px solid ${q.done ? '#CDE3CD' : '#eee'}`,
+              backgroundColor: q.done ? '#F4F8F4' : 'white',
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <p style={{ fontSize: '0.9rem', fontWeight: 700 }}>{q.customer_name}</p>
+              <p style={{ fontSize: '0.75rem', color: '#777' }}>
+                {q.piece_count} piece{q.piece_count === 1 ? '' : 's'}
+                {q.collection_method === 'postal' ? ' · posting' : ' · collecting'}
+                {q.on_hold > 0 ? ` · ${q.on_hold} on hold` : ''}
+              </p>
+              {/* Said up front so nobody walks to the shelf expecting a
+                  photo that was never taken. */}
+              {!q.has_photo && <p style={{ fontSize: '0.72rem', color: '#A6761D' }}>No photo — identify by description</p>}
+            </div>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: q.done ? '#2E7D32' : 'var(--clay)', flexShrink: 0, marginLeft: '0.5rem' }}>
+              {q.done ? 'Packed' : `${q.collected}/${q.piece_count}`}
+            </span>
+          </button>
+        ))}
+      </div>
+    </PageShell>
+  );
+}
+
+const backBtn: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: '0.25rem',
+  background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+  color: 'var(--clay)', fontSize: '0.85rem', fontWeight: 600,
+};
+
+const primaryBtn: React.CSSProperties = {
+  width: '100%', padding: '0.75rem', borderRadius: 8, border: 'none',
+  backgroundColor: 'var(--clay)', color: 'white', fontWeight: 700,
+  fontSize: '0.9rem', cursor: 'pointer',
+};

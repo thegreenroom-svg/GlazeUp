@@ -4635,3 +4635,122 @@ export function registerSquareTablesRoutes(app, supabase, STUDIO_ID, logger, axi
     }
   });
 }
+
+// ============================================================================
+// PACKING -- the screen for whoever is actually boxing the pottery
+// ----------------------------------------------------------------------------
+// Daisy: "I don't seem to know if there's an actual packing page that
+// whoever's packing just clicks on... we wanna keep the photographs if they
+// are present on the booking at all times with the detailed pieces and
+// somehow drillable. So it's not all on the huge screen."
+//
+// There wasn't one. kiln-dip is a lookup-by-booking-code tool for setting
+// collection dates and sending emails -- checked, and it renders no
+// photographs at all. So the person packing had nowhere to see what they
+// were packing, which is the one job where the reference photo matters most:
+// a shelf of fired pottery all looks the same, and the whole point of
+// photographing the table was this moment.
+//
+// Returns the queue only. Piece detail comes from the existing booking
+// detail endpoint on drill-down, so a packer loads photos for one booking
+// at a time rather than pulling every image for the week into one page.
+// ============================================================================
+export function registerPackingRoutes(app, supabase, STUDIO_ID, logger) {
+  app.get('/api/spec/packing/queue', async (req, res) => {
+    try {
+      const upto = req.query.upto || new Date().toISOString().slice(0, 10);
+
+      const { data: statuses, error } = await supabase
+        .from('demo_app_session_status')
+        .select('booking_code, collection_date, collection_method, postal_postcode, finished_at')
+        .eq('studio_id', STUDIO_ID)
+        .not('collection_date', 'is', null)
+        .lte('collection_date', upto)
+        .order('collection_date', { ascending: true });
+      if (error) throw error;
+
+      const codes = (statuses || []).map((s) => s.booking_code);
+      if (!codes.length) return res.json({ upto, queue: [] });
+
+      const { data: bookingRows } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, session_start')
+        .eq('studio_id', STUDIO_ID)
+        .in('booking_code', codes);
+      const bookingByCode = new Map((bookingRows || []).map((b) => [b.booking_code, b]));
+
+      const { data: pieces } = await supabase
+        .from('pottery_pieces')
+        .select('booking_id, status, fulfilment, assigned_to, reference_photo_url')
+        .eq('studio_id', STUDIO_ID)
+        .in('booking_id', codes)
+        .neq('archived', true);
+
+      const byBooking = {};
+      for (const p of pieces || []) {
+        (byBooking[p.booking_id] = byBooking[p.booking_id] || []).push(p);
+      }
+
+      const queue = (statuses || []).map((st) => {
+        const ps = byBooking[st.booking_code] || [];
+        // Pieces on hold are genuinely not part of this parcel -- the
+        // customer is coming back to finish them -- so they're counted
+        // separately rather than making a booking look incomplete forever.
+        const onHold = ps.filter((p) => p.fulfilment === 'return_visit').length;
+        const live = ps.filter((p) => p.fulfilment !== 'return_visit');
+        const collected = live.filter((p) => String(p.status || '').toLowerCase() === 'collected').length;
+        return {
+          booking_code: st.booking_code,
+          customer_name: bookingByCode.get(st.booking_code)?.customer_name || st.booking_code,
+          session_start: bookingByCode.get(st.booking_code)?.session_start || null,
+          collection_date: st.collection_date,
+          collection_method: st.collection_method,
+          postal_postcode: st.postal_postcode,
+          piece_count: live.length,
+          on_hold: onHold,
+          collected,
+          // Whether there's a reference photo to pack against at all. Shown
+          // honestly in the queue so a packer knows before they walk to the
+          // shelf that this is one they'll be identifying by hand.
+          has_photo: ps.some((p) => p.reference_photo_url),
+          done: live.length > 0 && collected === live.length,
+        };
+      })
+      // Anything with no pieces at all isn't packable -- keeping it in the
+      // queue would just be noise on a screen used under time pressure.
+      .filter((b) => b.piece_count > 0 || b.on_hold > 0);
+
+      res.json({ upto, queue });
+    } catch (err) {
+      logger.error('packing queue failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Ticking a piece off while packing. A separate route rather than reusing
+  // POST /pieces/:id/fulfilment, because that one only accepts assigned_to,
+  // fulfilment, postal_postcode and hold_reason -- it silently ignores any
+  // status passed to it, so packing would have appeared to work and saved
+  // nothing at all.
+  app.post('/api/spec/pieces/:id/packed', async (req, res) => {
+    try {
+      const packed = req.body?.packed !== false;
+      const { data, error } = await supabase
+        .from('pottery_pieces')
+        .update({ status: packed ? 'collected' : 'queued', updated_at: new Date().toISOString() })
+        .eq('id', req.params.id)
+        .eq('studio_id', STUDIO_ID)
+        // Never let a hold get packed by accident -- a piece kept back for
+        // a return visit must not leave the studio in someone else's box.
+        .neq('fulfilment', 'return_visit')
+        .select('id, status')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return res.status(404).json({ error: 'Piece not found, or it is on hold for a return visit' });
+      res.json(data);
+    } catch (err) {
+      logger.error('mark packed failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
