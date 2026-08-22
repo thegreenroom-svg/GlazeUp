@@ -2929,22 +2929,34 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
           const startAt = new Date(b.start_at);
           const endAt = durationMin ? new Date(startAt.getTime() + durationMin * 60000) : null;
 
-          // Real, simple sequential table allocation -- "just numbers for
-          // now" per Daisy, so every synced booking has SOME table from
-          // the moment it exists rather than needing a manual step first.
-          // Cycles 1-8 (Main Studio's real table count) per exact session
-          // slot, since bookings at the same time genuinely need
-          // different tables, but different time slots on the same day
-          // can safely reuse the same numbers once a table's free again.
-          // This is a starting allocation only -- the real Square ticket
-          // sync below (registerLiveTableSyncRoute) overwrites it with
-          // the table staff actually seat people at, which always wins.
-          const { count: sameSlotCount } = await supabase
-            .from('bookings')
-            .select('id', { count: 'exact', head: true })
-            .eq('studio_id', STUDIO_ID)
-            .eq('session_start', b.start_at);
-          const tableNumber = `Main Studio ${((sameSlotCount || 0) % 8) + 1}`;
+          // THE REAL TABLE, from the appointment itself. Daisy's tables are
+          // bookable staff in Square Appointments (T2 a, T4 b...), so the
+          // booking already says which one it's on -- no guessing needed.
+          //
+          // This used to invent one: a sequential cycle through "Main
+          // Studio 1-8". That was wrong the moment it was written and got
+          // worse, because the live till matcher works on table DIGITS --
+          // "Main Studio 4" and the real ticket "T4 a" both reduce to "4",
+          // so it half-worked by coincidence while T4 a and T4 b collided.
+          //
+          // Doing it here rather than only in the catch-up sweep is what
+          // makes it stick: otherwise every newly synced booking arrives
+          // wrong again and someone has to remember to press a button.
+          const teamMemberId = b.appointment_segments?.[0]?.team_member_id || null;
+          let tableNumber = null;
+          if (teamMemberId) {
+            const { data: tm } = await supabase
+              .from('square_team_members')
+              .select('display_name')
+              .eq('studio_id', STUDIO_ID)
+              .eq('team_member_id', teamMemberId)
+              .maybeSingle();
+            tableNumber = tm?.display_name || null;
+          }
+          // Left NULL rather than invented when Square genuinely doesn't
+          // say. A booking with no table shows in the "no table" banner on
+          // the day view, where someone can see it and fix it -- which is
+          // far better than a confident wrong number nobody questions.
 
           // Real booking_code convention, confirmed directly against live
           // rows: booking-YYYYMMDD-<8 random lowercase alphanumeric>.
@@ -2958,6 +2970,7 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
             studio_id: STUDIO_ID,
             booking_code: bookingCode,
             square_booking_id: b.id,
+            square_team_member_id: teamMemberId,
             customer_name: customerName,
             session_start: b.start_at,
             session_end: endAt ? endAt.toISOString() : null,
@@ -4461,8 +4474,13 @@ export function registerSquareTablesRoutes(app, supabase, STUDIO_ID, logger, axi
         .select('team_member_id, display_name')
         .eq('studio_id', STUDIO_ID);
       const nameById = new Map((staff || []).map((s) => [s.team_member_id, s.display_name]));
+      // On a studio that has never synced, this used to 400. Harmless by
+      // hand, but it now runs on the five-minute loop, so it would have
+      // been a guaranteed error every five minutes forever on any new
+      // studio -- noise that trains people to ignore the logs. Nothing
+      // cached simply means nothing to match yet, which is a quiet no-op.
       if (!nameById.size) {
-        return res.status(400).json({ error: 'No team members cached yet — run sync-team-members first', updated: 0 });
+        return res.json({ updated: 0, unchanged: 0, no_match: 0, reason: 'no_team_members_cached', changes: [] });
       }
 
       const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', { headers });
@@ -4536,7 +4554,7 @@ export function registerSquareTablesRoutes(app, supabase, STUDIO_ID, logger, axi
 
       const { data: bookings, error } = await supabase
         .from('bookings')
-        .select('booking_code, customer_name, session_start, session_end, table_number, party_size, square_team_member_id')
+        .select('booking_code, customer_name, session_start, session_end, table_number, party_size, square_team_member_id, space_name')
         .eq('studio_id', STUDIO_ID)
         .gte('session_start', dayStart.toISOString())
         .lte('session_start', dayEnd.toISOString())

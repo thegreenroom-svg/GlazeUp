@@ -1630,6 +1630,24 @@ app.listen(PORT, () => {
       const finishRes = await fetch(`${SELF_URL}/api/spec/bookings/sync-finished-from-square`, { method: 'POST' });
       const finishData = await finishRes.json().catch(() => ({}));
       if (finishData.finished) logger.info(`[auto-sync] ${finishData.finished} booking(s) marked finished from real Square payment`, finishData.changes);
+
+      // Keeps tables true to Square Appointments without anyone pressing a
+      // button. Daisy asked whether the sync is a one-off or something she
+      // has to do every time -- neither is a good answer, so it just keeps
+      // itself current: a table moved in Square shows up here within five
+      // minutes, which is how staff already expect the calendar to behave.
+      //
+      // Unlike the piece-identification sweep I built and correctly got
+      // told to take out, this costs nothing per run. It's a plain Square
+      // read on a connection already open, with no AI call behind it, so
+      // there's no bill to run up and no reason to ration it.
+      const tablesRes = await fetch(`${SELF_URL}/api/spec/square/sync-booking-tables`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const tablesData = await tablesRes.json().catch(() => ({}));
+      if (tablesData.updated) logger.info(`[auto-sync] ${tablesData.updated} booking(s) moved to their real Square table`, tablesData.changes);
     } catch (err) {
       logger.warn('[auto-sync] periodic sync failed', err.message);
     }

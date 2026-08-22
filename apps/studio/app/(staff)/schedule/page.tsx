@@ -24,7 +24,24 @@ interface ScheduleBooking {
   session_end: string | null;
   table_number: string | null;
   party_size: number | null;
+  space_name: string | null;
   finished: boolean;
+}
+
+// Same shortener the printed cards use, so a room is called the same thing
+// on the screen and on the card in the customer's hand. 'The Vault -
+// perfect for private parties!' -> 'Vault'.
+function shortSpaceLabel(spaceName: string | null): string | null {
+  if (!spaceName) return null;
+  const s = spaceName.toLowerCase();
+  if (s.includes('vault')) return 'Vault';
+  if (s.includes('lounge')) return 'Lounge';
+  if (s.includes('main studio')) return 'Main Studio';
+  if (s.includes('evening')) return 'Evening Session';
+  if (s.includes('thursdays')) return 'Thursdays';
+  if (s.includes('wheel hire')) return 'Wheel Hire';
+  if (s.includes('throwing taster')) return 'Throwing Taster';
+  return null;
 }
 
 interface Collection {
@@ -196,6 +213,7 @@ export default function SchedulePage() {
                   style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderRadius: 999, border: '1px solid #E0B463', background: 'white', color: '#7A5B00', cursor: 'pointer' }}
                 >
                   {b.customer_name} · {new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                  {shortSpaceLabel(b.space_name) ? ` · ${shortSpaceLabel(b.space_name)}` : ''}
                 </button>
               ))}
             </div>
@@ -274,6 +292,14 @@ export default function SchedulePage() {
                       </span>
                       <span style={{ display: 'block', fontWeight: 600 }}>{b.customer_name}</span>
                       {b.party_size ? <span style={{ display: 'block', opacity: 0.85 }}>{b.party_size} painting</span> : null}
+                      {/* The room, from the Square service name. Worth
+                          showing because table and room disagree until
+                          tables are synced -- a Vault booking currently
+                          reads as "Main Studio 14", which is nonsense that
+                          would otherwise be invisible. */}
+                      {shortSpaceLabel(b.space_name) && (
+                        <span style={{ display: 'block', opacity: 0.75, fontStyle: 'italic' }}>{shortSpaceLabel(b.space_name)}</span>
+                      )}
                     </button>
                   ))}
                 </div>
