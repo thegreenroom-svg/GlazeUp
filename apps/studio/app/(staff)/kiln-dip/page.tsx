@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Flame, Search, Mail, Package, CalendarDays } from 'lucide-react';
+import { Flame, Search, Mail, MailX, Package, CalendarDays } from 'lucide-react';
 
 interface BookingInfo {
   booking_code: string;
@@ -32,6 +32,15 @@ function KilnPageInner() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailResult, setEmailResult] = useState<{ sent: boolean; reason?: string } | null>(null);
+  // The real position, read from the server rather than guessed, so the
+  // screen can say what will happen BEFORE anyone presses anything.
+  const [emailState, setEmailState] = useState<{ enabled: boolean; configured: boolean; live: boolean } | null>(null);
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/customer-emails/state`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setEmailState(d); })
+      .catch(() => {});
+  }, []);
 
   const lookup = async (refOverride?: string) => {
     const ref = (refOverride ?? bookingRef).trim();
@@ -167,17 +176,45 @@ function KilnPageInner() {
             </button>
           </div>
 
+          {/* Says the position up front. The old button read "Send
+              ready-for-collection email" and looked exactly the same
+              whether it would email a customer or do nothing at all --
+              you only found out after pressing it. */}
+          {emailState && !emailState.live && (
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', padding: '0.65rem 0.75rem', borderRadius: 8, backgroundColor: '#FFF6E8', border: '1px solid #F0C987', marginBottom: '0.6rem' }}>
+              <MailX size={16} style={{ color: '#B8860B', flexShrink: 0, marginTop: 1 }} />
+              <div>
+                <p style={{ fontSize: '0.8rem', fontWeight: 700, color: '#7A5B00' }}>Customer emails are switched off</p>
+                <p style={{ fontSize: '0.75rem', color: '#7A5B00', marginTop: '0.15rem' }}>
+                  Nothing is sent to anyone. Pressing this records nothing and contacts nobody.
+                  {!emailState.enabled && !emailState.configured && ' Needs CUSTOMER_EMAILS_ENABLED=true and a Resend key on the server.'}
+                  {emailState.enabled && !emailState.configured && ' Switched on, but still needs a Resend API key on the server.'}
+                  {!emailState.enabled && emailState.configured && ' A Resend key is set, but sending is deliberately switched off.'}
+                </p>
+              </div>
+            </div>
+          )}
+
           <button
             onClick={sendEmail}
-            disabled={sending}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%', padding: '0.7rem', borderRadius: 8, border: 'none', backgroundColor: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+            disabled={sending || (emailState ? !emailState.live : false)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%',
+              padding: '0.7rem', borderRadius: 8, fontWeight: 700, fontSize: '0.85rem',
+              cursor: emailState && !emailState.live ? 'not-allowed' : 'pointer',
+              border: emailState && !emailState.live ? '1px solid #ddd' : 'none',
+              backgroundColor: emailState && !emailState.live ? '#f4f4f4' : 'var(--clay)',
+              color: emailState && !emailState.live ? '#999' : 'white',
+            }}
           >
-            <Mail size={15} /> {sending ? 'Sending...' : 'Send ready-for-collection email'}
+            {emailState && !emailState.live
+              ? <><MailX size={15} /> Ready-for-collection email (off)</>
+              : <><Mail size={15} /> {sending ? 'Sending...' : 'Send ready-for-collection email'}</>}
           </button>
 
           {emailResult && (
             <div style={{ marginTop: '0.6rem', padding: '0.7rem', borderRadius: 8, fontSize: '0.8rem', backgroundColor: emailResult.sent ? '#e8f5e9' : '#fff3e0', border: `1px solid ${emailResult.sent ? '#66bb6a' : '#e0a020'}` }}>
-              {emailResult.sent ? 'Email sent.' : emailResult.reason === 'not_configured' ? "Email isn't connected yet — needs a real Resend API key added to the server." : emailResult.reason === 'no_customer_email' ? 'This booking has no email address on file.' : (emailResult.reason || 'Could not send the email.')}
+              {emailResult.sent ? 'Email sent.' : emailResult.reason === 'switched_off' ? 'Customer emails are switched off — nothing was sent.' : emailResult.reason === 'not_configured' ? "Email isn't connected yet — needs a real Resend API key added to the server." : emailResult.reason === 'no_customer_email' ? 'This booking has no email address on file.' : (emailResult.reason || 'Could not send the email.')}
             </div>
           )}
         </div>

@@ -2109,6 +2109,10 @@ export function registerKilnSimplifiedRoute(app, supabase, STUDIO_ID, logger) {
   // out and found on the shelf (via Shelf Sweep), rather than it being
   // gated behind a staged pipeline. Reuses the exact same real
   // sendCollectionEmail used before this simplification.
+  // Lets the screen state the real position instead of only finding out
+  // after someone has pressed send.
+  app.get('/api/spec/customer-emails/state', (req, res) => res.json(customerEmailState()));
+
   app.post('/api/spec/kiln/send-ready-email', async (req, res) => {
     try {
       const bookingCode = (req.body || {}).booking_code;
@@ -2157,7 +2161,28 @@ export function registerKilnSimplifiedRoute(app, supabase, STUDIO_ID, logger) {
 // than pretending an email went out. FROM_EMAIL also needs to be a real
 // verified sender address once that account exists.
 // ============================================================================
+// Parked, per Daisy: keep the code, send nothing until it is deliberately
+// switched on. A SECOND, separate switch on purpose -- the gate used to be
+// RESEND_API_KEY alone, which meant the day anyone added that key to Render
+// for any reason, real "Your pottery is fired and ready!" emails would start
+// going to real customers with no further decision taken by anybody. A key
+// is configuration; sending to customers is a choice, and the two should not
+// be the same act.
+//
+// To switch on: set CUSTOMER_EMAILS_ENABLED=true (and a real RESEND_API_KEY
+// with a verified sending domain). Nothing else is needed -- the code below
+// is complete and real.
+export function customerEmailState() {
+  const enabled = process.env.CUSTOMER_EMAILS_ENABLED === 'true';
+  const configured = !!process.env.RESEND_API_KEY;
+  return { enabled, configured, live: enabled && configured };
+}
+
 async function sendCollectionEmail({ to, customerName, collectionDate, logger }) {
+  if (process.env.CUSTOMER_EMAILS_ENABLED !== 'true') {
+    logger.warn('[collection-email] parked -- CUSTOMER_EMAILS_ENABLED is not "true", no email sent');
+    return { sent: false, reason: 'switched_off' };
+  }
   if (!process.env.RESEND_API_KEY) {
     logger.warn('[collection-email] RESEND_API_KEY not set -- not configured, no email sent');
     return { sent: false, reason: 'not_configured' };
