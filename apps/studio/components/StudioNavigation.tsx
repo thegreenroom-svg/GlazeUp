@@ -35,7 +35,7 @@ import {
   HeartPulse,
   GraduationCap,
   Library,
-  CalendarClock,
+  CalendarClock, CalendarDays,
   Globe2,
   UserSquare2,
   Stamp,
@@ -95,6 +95,7 @@ export function StudioNavigation() {
       section: 'Today',
       items: [
         { label: 'Start Floor', icon: <Footprints className="w-5 h-5" />, href: '/floor' },
+        { label: 'Schedule', icon: <CalendarDays className="w-5 h-5" />, href: '/schedule' },
         { label: 'Bookings', icon: <Calendar className="w-5 h-5" />, href: '/bookings' },
         { label: 'Print Cards', icon: <PrinterIcon className="w-5 h-5" />, href: '/daily-cards' },
         { label: 'Alerts', icon: <Bell className="w-5 h-5" />, href: '/alerts' },

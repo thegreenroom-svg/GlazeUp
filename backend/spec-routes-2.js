@@ -4359,3 +4359,223 @@ export function registerReidentifyRoute(app, supabase, STUDIO_ID, logger, axios,
     }
   });
 }
+
+// ============================================================================
+// SQUARE APPOINTMENTS TABLES -- read the real table, stop inventing one
+// ----------------------------------------------------------------------------
+// Daisy sent a photo of the actual Square Appointments day view the studio
+// runs on: columns headed T2 a, T2 b, T3 a, T4 a, T4 b, "Staff 62 selected".
+// Her tables are modelled in Square as bookable STAFF, and every appointment
+// already carries which one it's on as team_member_id.
+//
+// The app was not reading it. registerRealBookingSyncRoute invented a table
+// instead -- sequential allocation cycling 1-8, stored as "Main Studio 4".
+// Checked against the live database: that is what's in there, plus 38
+// bookings in the last ten days with no table at all.
+//
+// That matters more than it sounds, because the live till matcher works on
+// TABLE DIGITS. "Main Studio 4" reduces to "4"; the real ticket "T4 a" also
+// reduces to "4", so it half-worked by coincidence. But T4 a and T4 b both
+// reduce to "4" as well -- meaning the "multiple candidates" branch in the
+// live-order lookup isn't a defensive edge case, it's an ordinary Saturday
+// with both halves of table 4 occupied.
+//
+// This replaces the guess with the fact.
+// ============================================================================
+export function registerSquareTablesRoutes(app, supabase, STUDIO_ID, logger, axios) {
+  const squareHeaders = async () => {
+    const { data: connection } = await supabase
+      .from('square_connections')
+      .select('square_access_token, square_token_expires_at')
+      .eq('studio_id', STUDIO_ID)
+      .single();
+    if (!connection || new Date(connection.square_token_expires_at) < new Date()) return null;
+    return {
+      Authorization: `Bearer ${connection.square_access_token}`,
+      'Square-Version': '2024-01-18',
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    };
+  };
+
+  // Caches the staff list so every later lookup is a local join rather than
+  // a live Square call. Names change rarely; a table is added maybe once a
+  // year. Re-run it when the studio layout changes.
+  app.post('/api/spec/square/sync-team-members', async (req, res) => {
+    try {
+      const headers = await squareHeaders();
+      if (!headers) return res.status(400).json({ error: 'No valid Square connection', synced: 0 });
+
+      const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', { headers });
+      const locationIds = (locationsRes.data.locations || []).map((l) => l.id);
+      if (!locationIds.length) return res.json({ synced: 0, reason: 'no_square_locations' });
+
+      let members = [];
+      let cursor;
+      do {
+        const body = { query: { filter: { location_ids: locationIds, status: 'ACTIVE' } }, limit: 200 };
+        if (cursor) body.cursor = cursor;
+        const r = await axios.post('https://connect.squareup.com/v2/team-members/search', body, { headers });
+        members = members.concat(r.data.team_members || []);
+        cursor = r.data.cursor;
+      } while (cursor);
+
+      const rows = members.map((m) => ({
+        studio_id: STUDIO_ID,
+        team_member_id: m.id,
+        // Tables are named in the given-name field ("T4 a"); real people
+        // have both names. Either way this is what Square shows as the
+        // column header, which is what staff read off the screen.
+        display_name: [m.given_name, m.family_name].filter(Boolean).join(' ').trim() || m.email_address || m.id,
+        is_bookable: m.status === 'ACTIVE',
+        updated_at: new Date().toISOString(),
+      }));
+
+      if (rows.length) {
+        const { error } = await supabase
+          .from('square_team_members')
+          .upsert(rows, { onConflict: 'studio_id,team_member_id' });
+        if (error) throw error;
+      }
+
+      res.json({ synced: rows.length, names: rows.map((r) => r.display_name).sort() });
+    } catch (err) {
+      logger.error('sync-team-members failed', err.response?.data || err.message);
+      res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message });
+    }
+  });
+
+  // Fills in the real table on bookings that have a square_booking_id.
+  // Deliberately re-reads from Square rather than trusting what's stored:
+  // the whole point is that the appointment is the source of truth and the
+  // stored value was a guess.
+  app.post('/api/spec/square/sync-booking-tables', async (req, res) => {
+    const DAYS_BACK = Math.min(parseInt(req.body?.days_back, 10) || 3, 31);
+    const DAYS_FORWARD = Math.min(parseInt(req.body?.days_forward, 10) || 27, 31);
+    try {
+      const headers = await squareHeaders();
+      if (!headers) return res.status(400).json({ error: 'No valid Square connection', updated: 0 });
+
+      const { data: staff } = await supabase
+        .from('square_team_members')
+        .select('team_member_id, display_name')
+        .eq('studio_id', STUDIO_ID);
+      const nameById = new Map((staff || []).map((s) => [s.team_member_id, s.display_name]));
+      if (!nameById.size) {
+        return res.status(400).json({ error: 'No team members cached yet — run sync-team-members first', updated: 0 });
+      }
+
+      const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', { headers });
+      const locations = locationsRes.data.locations || [];
+      if (!locations.length) return res.json({ updated: 0, reason: 'no_square_locations' });
+
+      // Square rejects a bookings window longer than 31 days, which is the
+      // documented cause of earlier sync gaps -- kept safely inside it.
+      const startMin = new Date();
+      startMin.setDate(startMin.getDate() - DAYS_BACK);
+      const startMax = new Date();
+      startMax.setDate(startMax.getDate() + DAYS_FORWARD);
+
+      let appts = [];
+      let cursor;
+      do {
+        const params = {
+          location_id: locations[0].id,
+          start_at_min: startMin.toISOString(),
+          start_at_max: startMax.toISOString(),
+          limit: 100,
+        };
+        if (cursor) params.cursor = cursor;
+        const r = await axios.get('https://connect.squareup.com/v2/bookings', { headers, params });
+        appts = appts.concat(r.data.bookings || []);
+        cursor = r.data.cursor;
+      } while (cursor);
+
+      const tableByBookingId = new Map();
+      for (const a of appts) {
+        const tmId = a.appointment_segments?.[0]?.team_member_id;
+        if (tmId && nameById.has(tmId)) tableByBookingId.set(a.id, { tmId, name: nameById.get(tmId) });
+      }
+
+      const { data: rows } = await supabase
+        .from('bookings')
+        .select('id, booking_code, square_booking_id, table_number')
+        .eq('studio_id', STUDIO_ID)
+        .not('square_booking_id', 'is', null);
+
+      let updated = 0, unchanged = 0, noMatch = 0;
+      const changes = [];
+      for (const b of rows || []) {
+        const hit = tableByBookingId.get(b.square_booking_id);
+        if (!hit) { noMatch++; continue; }
+        if (b.table_number === hit.name) { unchanged++; continue; }
+        const { error } = await supabase
+          .from('bookings')
+          .update({ table_number: hit.name, square_team_member_id: hit.tmId })
+          .eq('id', b.id);
+        if (error) { logger.error('table update failed', error.message); continue; }
+        changes.push({ booking_code: b.booking_code, from: b.table_number, to: hit.name });
+        updated++;
+      }
+
+      res.json({ appointments_seen: appts.length, updated, unchanged, no_match: noMatch, changes: changes.slice(0, 40) });
+    } catch (err) {
+      logger.error('sync-booking-tables failed', err.response?.data || err.message);
+      res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message });
+    }
+  });
+
+  // Feeds the schedule view: bookings for one day, grouped by table, in the
+  // shape the Square Appointments side-by-side day view uses -- because
+  // that's the screen the girls already read fluently every shift.
+  app.get('/api/spec/schedule/:date', async (req, res) => {
+    try {
+      const date = req.params.date;
+      const dayStart = new Date(`${date}T00:00:00.000Z`);
+      const dayEnd = new Date(`${date}T23:59:59.999Z`);
+
+      const { data: bookings, error } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, session_start, session_end, table_number, party_size, square_team_member_id')
+        .eq('studio_id', STUDIO_ID)
+        .gte('session_start', dayStart.toISOString())
+        .lte('session_start', dayEnd.toISOString())
+        .order('session_start', { ascending: true });
+      if (error) throw error;
+
+      const { data: staff } = await supabase
+        .from('square_team_members')
+        .select('team_member_id, display_name')
+        .eq('studio_id', STUDIO_ID);
+
+      // Columns are the tables that Square knows about, ordered the way the
+      // Square screen orders them (T2 a, T2 b, T3 a...), plus any table a
+      // booking actually references that isn't in the cache -- so nothing
+      // is ever silently dropped off the end of the schedule.
+      const known = (staff || []).map((s) => s.display_name).filter(Boolean);
+      const used = (bookings || []).map((b) => b.table_number).filter(Boolean);
+      const columns = Array.from(new Set([...known, ...used])).sort((a, b) =>
+        a.localeCompare(b, 'en', { numeric: true, sensitivity: 'base' })
+      );
+
+      // demo_app_session_status, NOT booking_status -- there is no such
+      // table, and querying it would have 500'd this whole endpoint.
+      const { data: statuses } = await supabase
+        .from('demo_app_session_status')
+        .select('booking_code, finished_at')
+        .eq('studio_id', STUDIO_ID)
+        .in('booking_code', (bookings || []).map((b) => b.booking_code).concat(['__none__']));
+      const finished = new Set((statuses || []).filter((s) => s.finished_at).map((s) => s.booking_code));
+
+      res.json({
+        date,
+        columns,
+        bookings: (bookings || []).map((b) => ({ ...b, finished: finished.has(b.booking_code) })),
+        unassigned: (bookings || []).filter((b) => !b.table_number).length,
+      });
+    } catch (err) {
+      logger.error('schedule failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
