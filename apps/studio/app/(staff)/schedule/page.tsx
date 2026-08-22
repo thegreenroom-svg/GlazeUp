@@ -65,6 +65,36 @@ interface ScheduleData {
   collections: Collection[];
 }
 
+type PieceBox = { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number };
+
+interface PanelPiece {
+  id: string;
+  piece_type: string | null;
+  description: string | null;
+  status: string | null;
+  reference_photo_url: string | null;
+  photo_box: PieceBox | null;
+  assigned_to: string | null;
+  fulfilment: string | null;
+}
+
+const PIECE_COLOURS = ['#e0392b', '#1a8a3c', '#2b6fe0', '#c77a0a', '#8b3ec7', '#0a9aa8'];
+
+// Crops the shared table photo to one piece, same as the booking and packing
+// screens. Every piece shares ONE photo, so without this the panel shows the
+// same picture of the whole table on every row.
+function cropStyle(url: string, box: PieceBox): React.CSSProperties {
+  const w = box.right_pct - box.left_pct;
+  const h = box.bottom_pct - box.top_pct;
+  if (!(w > 0) || !(h > 0)) return { backgroundImage: `url(${url})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+  return {
+    backgroundImage: `url(${url})`,
+    backgroundSize: `${(100 / w) * 100}% ${(100 / h) * 100}%`,
+    backgroundPosition: `${w >= 100 ? 0 : (box.left_pct / (100 - w)) * 100}% ${h >= 100 ? 0 : (box.top_pct / (100 - h)) * 100}%`,
+    backgroundRepeat: 'no-repeat',
+  };
+}
+
 const HOUR_PX = 64;
 const START_HOUR = 9;
 const END_HOUR = 19;
@@ -106,6 +136,27 @@ export default function SchedulePage() {
   const [syncing, setSyncing] = useState(false);
   const [syncNote, setSyncNote] = useState<string | null>(null);
 
+  // Tapping a session opens a panel BESIDE the day rather than navigating
+  // away. The common question mid-shift is "what's on table 4, how many
+  // pieces, is it done" -- that's a glance, and on an interrupted Saturday
+  // the real cost of a page navigation is losing your place in the day.
+  // Anything deeper still gets a proper page.
+  const [selected, setSelected] = useState<ScheduleBooking | null>(null);
+  const [panelPieces, setPanelPieces] = useState<PanelPiece[]>([]);
+  const [panelLoading, setPanelLoading] = useState(false);
+
+  // The studio runs on iPads and Android tablets, so side-by-side is the
+  // case worth optimising: calendar left, detail right, both live. A phone
+  // gets the panel stacked above the grid instead, because a 340px panel
+  // next to a grid on a phone leaves a letterbox of each.
+  const [wide, setWide] = useState(true);
+  useEffect(() => {
+    const check = () => setWide(window.innerWidth >= 820);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -122,6 +173,20 @@ export default function SchedulePage() {
   }, [date]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!selected) { setPanelPieces([]); return; }
+    let cancelled = false;
+    setPanelLoading(true);
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${selected.booking_code}/detail`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelled) setPanelPieces(d?.pieces || []); })
+      .catch(() => { if (!cancelled) setPanelPieces([]); })
+      .finally(() => { if (!cancelled) setPanelLoading(false); });
+    // Guarded so a fast tap through three sessions can't land an earlier
+    // booking's pieces in a later booking's panel.
+    return () => { cancelled = true; };
+  }, [selected]);
 
   // Pulls the real table off each Square appointment. Two steps because the
   // staff list is cached separately -- it changes maybe once a year, the
@@ -237,11 +302,14 @@ export default function SchedulePage() {
         </div>
       )}
 
+      {/* Calendar and detail side by side on a tablet, stacked on a phone.
+          The day stays on screen either way -- that's the whole point. */}
+      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', flexDirection: wide ? 'row' : 'column-reverse' }}>
       {!loading && columns.length > 0 && (
         // Horizontal scroll rather than squeezing every table onto a phone
         // screen: five columns at a legible width beats eight illegible
         // ones, and swiping sideways is exactly what Square does here too.
-        <div style={{ display: 'flex', overflowX: 'auto', border: '1px solid #eee', borderRadius: 10, background: 'white' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', overflowX: 'auto', border: '1px solid #eee', borderRadius: 10, background: 'white' }}>
           <div style={{ flexShrink: 0, width: 46, borderRight: '1px solid #eee' }}>
             <div style={{ height: 34, borderBottom: '1px solid #eee' }} />
             {hours.map((h) => (
@@ -269,7 +337,7 @@ export default function SchedulePage() {
                       // firing you want the pieces. The schedule already
                       // knows which of those a session is, so it sends you
                       // to the right one instead of making you pick.
-                      onClick={() => router.push(b.finished ? `/bookings?code=${b.booking_code}` : `/floor?code=${b.booking_code}`)}
+                      onClick={() => setSelected(b)}
                       style={{
                         position: 'absolute',
                         top: topFor(b.session_start),
@@ -312,6 +380,73 @@ export default function SchedulePage() {
           })}
         </div>
       )}
+      {selected && (
+        <div style={{
+          width: wide ? 330 : '100%', flexShrink: 0,
+          border: '1px solid #eee', borderRadius: 10, background: 'white',
+          padding: '0.85rem',
+          // Sticks alongside as you scroll the day on a tablet, so the
+          // panel doesn't slide off while you're reading it.
+          position: wide ? 'sticky' : 'static', top: wide ? 12 : undefined,
+          maxHeight: wide ? 'calc(100dvh - 40px)' : undefined,
+          overflowY: wide ? 'auto' : undefined,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+            <div>
+              <p style={{ fontSize: '1rem', fontWeight: 700 }}>{selected.customer_name}</p>
+              <p style={{ fontSize: '0.76rem', color: '#777' }}>
+                {new Date(selected.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                {selected.table_number ? ` · ${selected.table_number}` : ' · no table'}
+                {shortSpaceLabel(selected.space_name) ? ` · ${shortSpaceLabel(selected.space_name)}` : ''}
+                {selected.party_size ? ` · ${selected.party_size} painting` : ''}
+              </p>
+            </div>
+            <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', fontSize: '1.1rem', color: '#999', cursor: 'pointer', lineHeight: 1, padding: 0 }} aria-label="Close">×</button>
+          </div>
+
+          {/* The glance: which pieces, cropped to themselves. Anything
+              deeper -- assignment, the full photo, re-identifying -- is a
+              proper page, because a 330px column is the wrong place to do
+              real work. */}
+          <div style={{ marginTop: '0.7rem' }}>
+            {panelLoading && <p style={{ fontSize: '0.78rem', color: '#888' }}>Loading pieces...</p>}
+            {!panelLoading && panelPieces.length === 0 && (
+              <p style={{ fontSize: '0.78rem', color: '#888' }}>No pieces recorded yet.</p>
+            )}
+            {panelPieces.map((p, i) => (
+              <div key={p.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', padding: '0.3rem 0' }}>
+                {p.reference_photo_url ? (
+                  <div style={{
+                    width: 42, height: 42, borderRadius: 5, flexShrink: 0,
+                    border: `2px solid ${PIECE_COLOURS[i % 6]}`,
+                    ...(p.photo_box ? cropStyle(p.reference_photo_url, p.photo_box)
+                      : { backgroundImage: `url(${p.reference_photo_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }),
+                  }} />
+                ) : (
+                  <div style={{ width: 42, height: 42, borderRadius: 5, flexShrink: 0, background: '#f7f7f7' }} />
+                )}
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontSize: '0.78rem', fontWeight: 600 }}>{p.piece_type || 'Piece'}</p>
+                  {p.assigned_to && <p style={{ fontSize: '0.7rem', color: 'var(--clay)', fontWeight: 600 }}>For {p.assigned_to}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.75rem', paddingTop: '0.7rem', borderTop: '1px solid #f0f0f0' }}>
+            {!selected.finished && (
+              <button onClick={() => router.push(`/floor?code=${selected.booking_code}`)} style={panelBtn(true)}>Run session</button>
+            )}
+            <button onClick={() => router.push(`/bookings?code=${selected.booking_code}`)} style={panelBtn(false)}>Full booking</button>
+            <button onClick={() => router.push(`/daily-cards?code=${selected.booking_code}&date=${selected.session_start.slice(0, 10)}`)} style={panelBtn(false)}>Card</button>
+            {panelPieces.length > 0 && (
+              <button onClick={() => router.push(`/packing?code=${selected.booking_code}`)} style={panelBtn(false)}>Pack</button>
+            )}
+          </div>
+        </div>
+      )}
+      </div>
+
       {/* Collections due today. Deliberately BELOW the grid: sessions are
           the live thing, this is the second lane. But it's the reason
           this view beats the Square calendar it's modelled on -- Square
@@ -390,3 +525,14 @@ const navBtn: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
 };
+
+const panelBtn = (primary: boolean): React.CSSProperties => ({
+  padding: '0.4rem 0.65rem',
+  fontSize: '0.75rem',
+  fontWeight: 600,
+  borderRadius: 7,
+  cursor: 'pointer',
+  border: primary ? 'none' : '1px solid #ddd',
+  backgroundColor: primary ? 'var(--clay)' : 'white',
+  color: primary ? 'white' : 'var(--charcoal)',
+});
