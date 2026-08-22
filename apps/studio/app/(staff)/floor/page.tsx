@@ -380,10 +380,47 @@ export default function FloorPage() {
     })();
   }, [searchParams]);
 
-  // Sensible default for the collection date field -- 14 days out, a
-  // typical bisque + glaze firing turnaround. Staff can change it; this
-  // just saves re-typing the same date on every booking.
+  // The studio's REAL current collection date, not a generic turnaround.
+  //
+  // This used to be today + 14 days, which is why Daisy's four bookings
+  // from 21 Aug came out as 4 September when the studio's actual
+  // collection date was the 28th. Everything else in the diary -- around
+  // thirty bookings -- correctly says 28 Aug, because it was set on the
+  // studio record and read from there. Only the Floor completion screen
+  // invented its own, so the bookings taken through the app were the odd
+  // ones out.
+  //
+  // It also quietly broke the whole point of kiln batches: pieces that
+  // belong on the same shelf were being promised different dates, which
+  // splits one physical firing into two batches that don't exist.
+  const [studioCollectionDate, setStudioCollectionDate] = useState<string | null>(null);
+  const collectionDateTouched = useRef(false);
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/studio/collection-date`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d?.current_collection_date) return;
+        setStudioCollectionDate(d.current_collection_date);
+        // The default is computed the moment a booking is tapped, so on a
+        // slow studio connection that can happen BEFORE this fetch lands --
+        // and the booking would silently get the +14 fallback, which is the
+        // exact bug being fixed. So correct it when the real date arrives,
+        // unless someone has already deliberately changed it.
+        const today = new Date().toISOString().slice(0, 10);
+        if (!collectionDateTouched.current && d.current_collection_date >= today) {
+          setCollectionDate(d.current_collection_date);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const defaultCollectionDate = () => {
+    // Falls back to +14 days only if the studio has never set one, and
+    // never to a date already in the past -- a stale studio date left
+    // over from last month would otherwise promise customers a
+    // collection day that has already been and gone.
+    const today = new Date().toISOString().slice(0, 10);
+    if (studioCollectionDate && studioCollectionDate >= today) return studioCollectionDate;
     const d = new Date();
     d.setDate(d.getDate() + 14);
     return d.toISOString().slice(0, 10);
@@ -1274,7 +1311,7 @@ export default function FloorPage() {
                   type="date"
                   value={collectionDate}
                   min={new Date().toISOString().slice(0, 10)}
-                  onChange={(e) => setCollectionDate(e.target.value)}
+                  onChange={(e) => { collectionDateTouched.current = true; setCollectionDate(e.target.value); }}
                   style={{ width: '100%', padding: '0.5rem 0.6rem', borderRadius: 8, border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: '0.85rem', colorScheme: 'dark' }}
                 />
                 <p style={{ color: B.stone, fontSize: '0.7rem', marginTop: '0.3rem' }}>
