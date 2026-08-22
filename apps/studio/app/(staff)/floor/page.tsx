@@ -93,12 +93,30 @@ export default function FloorPage() {
   // Defaults true so a slow/failed load never hides functionality.
   const [tillEnabled, setTillEnabled] = useState(true);
 
-  useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/studio/features`)
+  // Kept as a promise, not just state, because the phase decision is made
+  // the instant a booking is tapped -- which on a studio connection can
+  // easily happen BEFORE this fetch lands. With tillEnabled defaulting to
+  // true, that race sent staff into the till screen even though the flag
+  // is false for this studio, which is exactly what Daisy hit: category
+  // tiles for a till that isn't in use.
+  //
+  // Same class of bug as the collection date defaulting to +14 before the
+  // studio's real date arrived. A default that's only correct once a fetch
+  // resolves has to be waited for, not guessed at.
+  const featuresRef = useRef<Promise<boolean> | null>(null);
+  if (featuresRef.current === null && typeof window !== 'undefined') {
+    featuresRef.current = fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/studio/features`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d && typeof d.feature_in_app_till === 'boolean') setTillEnabled(d.feature_in_app_till); })
-      .catch(() => {});
-  }, []);
+      .then((d) => {
+        const on = d && typeof d.feature_in_app_till === 'boolean' ? d.feature_in_app_till : true;
+        setTillEnabled(on);
+        return on;
+      })
+      // Still defaults to ON if the request genuinely fails -- a studio
+      // that depends on the in-app till must not lose it because one
+      // request timed out.
+      .catch(() => true);
+  }
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [allBookings, setAllBookings] = useState<Booking[]>([]);
   const [floorDate, setFloorDate] = useState(new Date().toISOString().slice(0, 10));
@@ -337,7 +355,10 @@ export default function FloorPage() {
     // sellable to studios with genuinely different setups -- The Kiln
     // Cafe skips straight to Completion; a studio that needs the in-app
     // till still gets it.
-    setPhase(tillEnabled ? 3 : 4);
+    // Wait for the real answer rather than trusting the optimistic
+    // default. Resolved after the first call, so this costs nothing.
+    const tillOn = featuresRef.current ? await featuresRef.current : tillEnabled;
+    setPhase(tillOn ? 3 : 4);
   };
 
   // Deep link from the Schedule. The old phase 1 was a splash screen of
