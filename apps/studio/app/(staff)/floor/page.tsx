@@ -1078,8 +1078,17 @@ export default function FloorPage() {
 
   // ============ PHASE 4: COMPLETION (real photo, real finish) ============
   if (phase === 4) {
+    // Payment is no longer a gate. It doesn't take any money -- Square
+    // does the charging, and sync-finished-from-square already reads the
+    // real payment back off Square afterwards. Requiring it here forced
+    // a tap to re-declare something the system finds out on its own, and
+    // on a £0.00 table it demanded card-or-cash about nothing.
+    //
+    // Collection stays required: studio pickup vs postal genuinely
+    // changes what happens to the pottery, and nothing outside this app
+    // knows which it is.
     const finishDisabled =
-      saving || !paymentMethod || !collectionMethod ||
+      saving || !collectionMethod ||
       (collectionMethod === 'postal' && !postalPostcode.trim()) ||
       !collectionDate;
     // Real per-person breakdown -- only shows up if anyone was actually
@@ -1229,9 +1238,16 @@ export default function FloorPage() {
             )}
           </div>
 
-          {/* Payment method (Square) */}
-          <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
-            <p style={{ color: B.stone, fontSize: '0.75rem', marginBottom: '0.5rem' }}>Payment · £{(tillTotal / 100).toFixed(2)}</p>
+          {/* Payment method. Hidden entirely when nothing is owed -- a
+              £0.00 table asking card-or-cash is a question about nothing.
+              Optional when it does show: worth recording for cash that
+              never goes through Square, which is the one case where this
+              app is the only record the money changed hands. */}
+          {tillTotal > 0 && (
+          <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: B.sand + '18', border: `1px solid ${B.stone}` }}>
+            <p style={{ color: B.stone, fontSize: '0.75rem', marginBottom: '0.5rem' }}>
+              Payment · £{(tillTotal / 100).toFixed(2)} <span style={{ opacity: 0.7 }}>· optional</span>
+            </p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
               <button
                 onClick={() => setPaymentMethod('card')}
@@ -1247,6 +1263,7 @@ export default function FloorPage() {
               </button>
             </div>
           </div>
+          )}
 
           {/* Photo */}
           <div className="rounded-lg p-6" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
@@ -1336,8 +1353,8 @@ export default function FloorPage() {
             >
               {saving ? <><Loader size={18} className="animate-spin" /> Saving...</> : <>Finish &amp; Hand off <ChevronRight size={20} /></>}
             </button>
-            {(!paymentMethod || !collectionMethod || !collectionDate) && (
-              <p style={{ color: B.stone, fontSize: '0.7rem', textAlign: 'center', marginTop: '0.5rem' }}>Choose collection, a date and payment above to finish</p>
+            {(!collectionMethod || !collectionDate) && (
+              <p style={{ color: B.stone, fontSize: '0.7rem', textAlign: 'center', marginTop: '0.5rem' }}>Choose collection and a date above to finish</p>
             )}
           </div>
         </div>
