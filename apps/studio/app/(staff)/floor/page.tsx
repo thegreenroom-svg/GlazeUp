@@ -118,7 +118,6 @@ export default function FloorPage() {
   const [splitBillCount, setSplitBillCount] = useState(1);
   const [quickAccessMode, setQuickAccessMode] = useState(false);
   const [tableTotals, setTableTotals] = useState<Record<string, number>>({});
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash' | null>(null);
   const [collectionMethod, setCollectionMethod] = useState<'studio' | 'postal' | null>(null);
   const [postalPostcode, setPostalPostcode] = useState('');
   const [collectionDate, setCollectionDate] = useState('');
@@ -305,7 +304,6 @@ export default function FloorPage() {
     setActiveSubsection(null);
     setActiveBucket(null);
     setShowAllItems(false);
-    setPaymentMethod(null);
     setCollectionMethod(null);
     setPostalPostcode('');
     setCollectionDate(defaultCollectionDate());
@@ -470,7 +468,8 @@ export default function FloorPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           finished_by: 'start-floor',
-          payment_method: paymentMethod,
+          // Not collected here any more -- the till owns this.
+          payment_method: null,
           collection_method: collectionMethod,
           postal_postcode: collectionMethod === 'postal' ? postalPostcode.trim() : undefined,
           collection_date: collectionDate || undefined,
@@ -507,7 +506,6 @@ export default function FloorPage() {
     setSaved(false);
     setFinished(false);
     setQrUrl(null);
-    setPaymentMethod(null);
     setCollectionMethod(null);
     setPostalPostcode('');
     setCollectionDate('');
@@ -1238,30 +1236,34 @@ export default function FloorPage() {
             )}
           </div>
 
-          {/* Payment method. Hidden entirely when nothing is owed -- a
-              £0.00 table asking card-or-cash is a question about nothing.
-              Optional when it does show: worth recording for cash that
-              never goes through Square, which is the one case where this
-              app is the only record the money changed hands. */}
+          {/* Payment is not taken here at all. The money happens on the
+              Square till; this app's job is to KNOW the position, not to
+              ask someone to retype it. Per Daisy: "we're just using the
+              Square till points now... they'll have their own payment
+              system as long as the system knows that it's been paid for."
+              That generalises -- a studio on Zettle or SumUp gets the
+              same read-only line, and nothing here assumes Square.
+
+              So this reports what the till says and offers nothing to
+              tap. An open ticket means money still to take; no open
+              ticket for a table that had items means it's been rung
+              through and closed. */}
           {tillTotal > 0 && (
           <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: B.sand + '18', border: `1px solid ${B.stone}` }}>
-            <p style={{ color: B.stone, fontSize: '0.75rem', marginBottom: '0.5rem' }}>
-              Payment · £{(tillTotal / 100).toFixed(2)} <span style={{ opacity: 0.7 }}>· optional</span>
-            </p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-              <button
-                onClick={() => setPaymentMethod('card')}
-                style={{ padding: '0.7rem', borderRadius: 8, border: paymentMethod === 'card' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: paymentMethod === 'card' ? B.clay + '30' : 'transparent', color: B.ivory, fontSize: '0.85rem', fontWeight: 600 }}
-              >
-                💳 Card (Square)
-              </button>
-              <button
-                onClick={() => setPaymentMethod('cash')}
-                style={{ padding: '0.7rem', borderRadius: 8, border: paymentMethod === 'cash' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: paymentMethod === 'cash' ? B.clay + '30' : 'transparent', color: B.ivory, fontSize: '0.85rem', fontWeight: 600 }}
-              >
-                💵 Cash
-              </button>
-            </div>
+            <p style={{ color: B.stone, fontSize: '0.75rem', marginBottom: '0.35rem' }}>Payment · taken on the till</p>
+            {liveSquareOrder?.matched && liveSquareOrder.order ? (
+              <p style={{ color: B.ivory, fontSize: '0.85rem', fontWeight: 600 }}>
+                Ticket &quot;{liveSquareOrder.order.ticket_name}&quot; still open · £{(liveSquareOrder.order.total_gbp ?? 0).toFixed(2)} to take
+              </p>
+            ) : liveSquareOrder?.reason === 'no_open_ticket_for_table' ? (
+              <p style={{ color: '#7BB661', fontSize: '0.85rem', fontWeight: 600 }}>
+                No open ticket for this table — looks settled
+              </p>
+            ) : (
+              <p style={{ color: B.stone, fontSize: '0.8rem' }}>
+                £{(tillTotal / 100).toFixed(2)} on this table. Settle it on the till as usual.
+              </p>
+            )}
           </div>
           )}
 
@@ -1386,9 +1388,9 @@ export default function FloorPage() {
               <p style={{ color: B.stone }} className="text-xs mt-2">
                 {pieceCount} piece{pieceCount === 1 ? '' : 's'} · £{(tillTotal / 100).toFixed(2)} till total{finished ? ' · marked finished' : ''}
               </p>
-              {paymentMethod && (
+              {collectionMethod && (
                 <p style={{ color: B.stone }} className="text-xs mt-1">
-                  {paymentMethod === 'card' ? '💳 Card' : '💵 Cash'} · {collectionMethod === 'postal' ? `📮 Postal to ${postalPostcode}` : '🏠 Studio pickup'}
+                  {collectionMethod === 'postal' ? `📮 Postal to ${postalPostcode}` : '🏠 Studio pickup'}
                 </p>
               )}
               {collectionDate && (
