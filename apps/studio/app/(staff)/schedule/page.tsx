@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/PageShell';
-import { ChevronLeft, ChevronRight, RefreshCw, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw, AlertCircle, MapPin, Package, Flame, Printer, PoundSterling, Users, ShieldCheck, Palette } from 'lucide-react';
 
 // Deliberately mirrors the Square Appointments side-by-side day view --
 // tables as columns, time down the side, sessions as blocks. Not for the
@@ -51,6 +51,30 @@ const END_HOUR = 19;
 // Same clay/sand palette as the rest of the app rather than Square's blue,
 // so it reads as part of this product and not an embedded iframe.
 const COL_W = 132;
+
+// Per Daisy: "if it is a landing page, do we need all the other hidden
+// stuff... little square tiles referencing those actions on this page so we
+// can click through to everything from there. No huge menu page."
+//
+// One tile per JOB, not per page. The menu had 40 entries grouped six ways,
+// which is a fine index and a poor landing pad -- you have to read it. These
+// are the eight things someone actually walks up to this iPad to do that
+// aren't "run a session", and a session is already the grid above.
+//
+// Deliberately eight and not fourteen: a tile grid stops being scannable at
+// about that point and becomes a menu with bigger fonts, which is the thing
+// being replaced. Everything else stays reachable through the menu, which is
+// now genuinely the back door rather than the front.
+const TILES: { label: string; href: string; icon: React.ReactNode }[] = [
+  { label: 'Find a piece', href: '/find-on-table', icon: <MapPin size={18} /> },
+  { label: 'Packing', href: '/packing', icon: <Package size={18} /> },
+  { label: 'Kiln', href: '/kiln-dip', icon: <Flame size={18} /> },
+  { label: 'All pieces', href: '/pieces', icon: <Palette size={18} /> },
+  { label: 'Print cards', href: '/daily-cards', icon: <Printer size={18} /> },
+  { label: 'Finance', href: '/money', icon: <PoundSterling size={18} /> },
+  { label: 'Customers', href: '/customers', icon: <Users size={18} /> },
+  { label: 'Admin', href: '/roles', icon: <ShieldCheck size={18} /> },
+];
 
 export default function SchedulePage() {
   const router = useRouter();
@@ -298,6 +322,28 @@ export default function SchedulePage() {
           </div>
         </div>
       )}
+      {/* Below the day and the collections, because the day is what you
+          came for. Four across on a phone, eight across on the iPad. */}
+      <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #eee' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(78px, 1fr))', gap: '0.5rem' }}>
+          {TILES.map((t) => (
+            <button
+              key={t.href}
+              onClick={() => router.push(t.href)}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                gap: '0.3rem', padding: '0.7rem 0.35rem', borderRadius: 10,
+                border: '1px solid #eee', background: 'white', cursor: 'pointer',
+                color: 'var(--charcoal)', fontSize: '0.7rem', fontWeight: 600, lineHeight: 1.2,
+                textAlign: 'center', minHeight: 68,
+              }}
+            >
+              <span style={{ color: 'var(--clay)' }}>{t.icon}</span>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
     </PageShell>
   );
 }
