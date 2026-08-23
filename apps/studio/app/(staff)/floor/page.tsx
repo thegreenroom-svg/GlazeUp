@@ -349,6 +349,20 @@ export default function FloorPage() {
   // It also answers "which table" before anyone taps, now that the real
   // table comes from Square Appointments. That step only ever existed
   // because the app didn't know.
+  // Who is on shift, read from the same session the PIN gate writes. Per
+  // Daisy: "I want whoever's on the app referenced against the photo so we
+  // can trace back who took the photos, so we can explain what we need if
+  // it goes wrong." Attribution for coaching, not blame -- if one person's
+  // photos keep missing pieces, that is a two-minute conversation, but only
+  // if you know whose they are.
+  const [shiftName, setShiftName] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('glazeup_shift');
+      if (raw) setShiftName(JSON.parse(raw)?.name || null);
+    } catch { /* private mode, or nobody signed in */ }
+  }, []);
+
   const searchParams = useSearchParams();
   const deepLinked = useRef(false);
   useEffect(() => {
@@ -536,6 +550,9 @@ export default function FloorPage() {
         // something Find on Table can genuinely search on later.
         if (identifiedPieces?.length) {
           formData.append('pieces_json', JSON.stringify(identifiedPieces.map((p) => ({ piece_type: p.piece_type, description: p.description, box: p.box }))));
+        }
+        if (shiftName) {
+          formData.append('photo_taken_by', shiftName);
         }
         await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/photo-match/confirm`, { method: 'POST', body: formData });
       }
@@ -1306,6 +1323,26 @@ export default function FloorPage() {
               <h2 className="text-xl font-bold" style={{ color: B.ivory }}>Photograph the pieces</h2>
               <p style={{ color: B.stone, fontSize: '0.8rem' }}>Real photo, confirmed against {current?.customer_name}&apos;s booking</p>
             </div>
+
+            {/* The gentle nudge, per Daisy: "if a bad photograph's taken and
+                nothing's visible for the initial AI, then we've got a
+                problem." This is the single point in the whole app where a
+                careless moment cannot be recovered later -- the table gets
+                cleared, the pieces go on a shelf, and no amount of
+                re-identifying will find what was never in frame.
+                Framed as help rather than a warning: the person holding
+                the iPad is busy, not careless. */}
+            {!photoPreview && (
+              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start', padding: '0.7rem 0.8rem', borderRadius: 8, backgroundColor: B.clay + '22', border: `1px solid ${B.clay}`, marginBottom: '1rem' }}>
+                <Camera size={17} color={B.clay} style={{ flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <p style={{ color: B.ivory, fontSize: '0.82rem', fontWeight: 700 }}>Get every piece in the shot</p>
+                  <p style={{ color: B.stone, fontSize: '0.76rem', marginTop: '0.15rem', lineHeight: 1.35 }}>
+                    Anything not in the photo can&apos;t be found on the shelf later. Stand back, get all {pieceCount > 0 ? pieceCount : 'the'} piece{pieceCount === 1 ? '' : 's'} in frame, and keep the painted side showing.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{ display: 'none' }} />
             {!photoPreview ? (

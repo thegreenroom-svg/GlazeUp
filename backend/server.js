@@ -741,7 +741,7 @@ app.get('/api/demo/bookings/:code/detail', async (req, res) => {
     if (!JUNK_BOOKING_LABELS.includes(booking.customer_name)) {
       const { data: pieceData } = await supabase
         .from('pottery_pieces')
-        .select('id, piece_type, description, status, reference_photo_url, reference_photo_taken_at, mark_code, assigned_to, fulfilment, postal_postcode, hold_reason, photo_box')
+        .select('id, piece_type, description, status, reference_photo_url, reference_photo_taken_at, mark_code, assigned_to, fulfilment, postal_postcode, hold_reason, photo_box, photo_taken_by')
         .eq('studio_id', DEMO_STUDIO_ID)
         .in('booking_id', [booking.booking_code, booking.customer_name])
         .neq('archived', true);
@@ -930,7 +930,7 @@ app.post('/api/demo/photo-match', upload.single('photo'), async (req, res) => {
 // touches pottery_pieces, bookings, or any real production table/storage path.
 app.post('/api/demo/photo-match/confirm', upload.single('photo'), async (req, res) => {
   try {
-    const { booking_code, chalk_tag_name, description, confirmed_by } = req.body;
+    const { booking_code, chalk_tag_name, description, confirmed_by, photo_taken_by } = req.body;
     if (!req.file || !booking_code) {
       return res.status(400).json({ error: 'photo and booking_code are required' });
     }
@@ -950,6 +950,7 @@ app.post('/api/demo/photo-match/confirm', upload.single('photo'), async (req, re
         {
           studio_id: DEMO_STUDIO_ID,
           booking_code,
+          photo_taken_by: photo_taken_by || null,
           photo_url: urlData.publicUrl,
           chalk_tag_name: chalk_tag_name || null,
           ai_description: description || null,
@@ -1009,6 +1010,11 @@ app.post('/api/demo/photo-match/confirm', upload.single('photo'), async (req, re
             // a photo of four similar pots. Storing it is what makes the
             // breakdown genuinely reviewable afterwards.
             photo_box: info?.box || null,
+            // Who was holding the iPad. Attribution for coaching, not
+            // blame -- if one person's photos keep missing pieces, that's
+            // a two-minute conversation, but only if you know whose they
+            // are. Null when nobody is signed in rather than guessed.
+            photo_taken_by: photo_taken_by || null,
           };
         });
         const { data: created, error: piecesErr } = await supabase.from('pottery_pieces').insert(rows).select('id');

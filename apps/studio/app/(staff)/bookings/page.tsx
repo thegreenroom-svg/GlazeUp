@@ -47,7 +47,7 @@ interface BookingDetail {
   booking: Booking & { customer_phone: string | null };
   session: { id: string; table_number: string; status: string; number_of_places: number } | null;
   orders: { id: string; item_name: string; quantity: number; unit_price_cents: number; notes: string | null }[];
-  pieces: { id: string; piece_type: string | null; description: string | null; status: string; reference_photo_url: string | null; reference_photo_taken_at: string | null; mark_code: string | null; assigned_to: string | null; fulfilment: string | null; postal_postcode: string | null; hold_reason: string | null; photo_box: { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number } | null }[];
+  pieces: { id: string; piece_type: string | null; description: string | null; status: string; reference_photo_url: string | null; reference_photo_taken_at: string | null; mark_code: string | null; assigned_to: string | null; fulfilment: string | null; postal_postcode: string | null; hold_reason: string | null; photo_taken_by: string | null; photo_box: { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number } | null }[];
 }
 
 interface TillItem {
@@ -867,6 +867,14 @@ function BookingsPageInner() {
                             {photoOpen ? 'Hide table photo' : 'Show table photo'}
                             <span style={{ fontSize: '0.65rem' }}>{photoOpen ? '▲' : '▼'}</span>
                           </button>
+                          {/* Who took it. Only useful if it is visible at
+                              the moment someone is looking at a photo and
+                              wondering why a piece is missing from it. */}
+                          {photoOpen && detail.pieces.find((p) => p.photo_taken_by)?.photo_taken_by && (
+                            <p style={{ fontSize: '0.72rem', color: '#888', marginTop: '0.4rem' }}>
+                              Photographed by {detail.pieces.find((p) => p.photo_taken_by)?.photo_taken_by}
+                            </p>
+                          )}
                           {photoOpen && (
                             <div style={{ position: 'relative', marginTop: '0.5rem' }}>
                               <img
