@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { PageShell } from '@/components/PageShell';
 import { AiCostCounter } from '@/components/AiCostCounter';
 import { Camera, Loader, XCircle, Check, RotateCcw, Truck, Home as HomeIcon, Printer } from 'lucide-react';
@@ -41,7 +42,11 @@ const PIN_COLOURS = ['#e0392b', '#2b7de0', '#1a8a3c', '#b8860b', '#7a3d99', '#d1
 // here vs still missing, and surfaces the real postal/collection info
 // right there so a packer doesn't have to go looking for it separately.
 export default function FindOnTablePage() {
-  const [bookingCode, setBookingCode] = useState('');
+  // Arriving from Packing with a booking already in mind. The packer is
+  // stood at the shelf holding a box -- making them re-pick from a list of
+  // sixty names they've just come from is a pointless step.
+  const searchParams = useSearchParams();
+  const [bookingCode, setBookingCode] = useState(() => searchParams.get('code') || '');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [fulfilment, setFulfilment] = useState<Fulfilment | null>(null);
   const [preview, setPreview] = useState<string | null>(null);

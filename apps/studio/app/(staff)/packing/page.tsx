@@ -4,8 +4,8 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { PageShell } from '@/components/PageShell';
-import { useSearchParams } from 'next/navigation';
-import { Package, ChevronLeft, Check } from 'lucide-react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { Package, ChevronLeft, Check, Search } from 'lucide-react';
 
 // The screen for whoever is actually boxing the pottery. There wasn't one:
 // kiln-dip is a lookup-by-code tool for collection dates and emails and
@@ -90,6 +90,7 @@ export default function PackingPage() {
   // Opened from a booking rather than from the queue. Packing is a job you
   // reach FROM a booking as often as you reach it from a list -- the pieces
   // are in your hand and the booking is what you're looking at.
+  const router = useRouter();
   const searchParams = useSearchParams();
   const linkedCode = searchParams.get('code');
 
@@ -255,6 +256,20 @@ export default function PackingPage() {
             </button>
           ))}
         </div>
+
+        {/* The other half of packing. The list tells you WHAT is in the
+            parcel; this finds it on a shelf of two hundred fired pieces
+            that all look alike. It was reachable only from the landing
+            tiles, which meant leaving the booking and re-picking it from a
+            list of sixty names -- so it carries the booking with it. */}
+        {!piecesLoading && pieces.length > 0 && (
+          <button
+            onClick={() => router.push(`/find-on-table?code=${openBooking.booking_code}`)}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%', marginTop: '0.85rem', padding: '0.7rem', borderRadius: 8, border: '1px solid var(--clay)', background: 'white', color: 'var(--clay)', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+          >
+            <Search size={15} /> Find these on the shelf
+          </button>
+        )}
 
         {!piecesLoading && photo && (
           <div style={{ marginTop: '1rem' }}>
