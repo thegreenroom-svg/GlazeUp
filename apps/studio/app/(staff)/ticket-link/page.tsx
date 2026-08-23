@@ -14,6 +14,9 @@ interface Result {
   window_days: number;
   orders_scanned: number;
   bookings_in_window: number;
+  locations_checked: number;
+  appointments_read: number;
+  appointment_read_errors: string[];
   appointments_with_a_square_customer: number;
   rung_1_customer: { orders_with_customer_id: number; of_those_matching_a_booking: number };
   rung_2_reference_id: { orders_with_reference_id: number };
@@ -90,7 +93,8 @@ export default function TicketLinkPage() {
             rows={[
               ['Orders carrying a customer', `${data.rung_1_customer.orders_with_customer_id} of ${data.orders_scanned} (${pct(data.rung_1_customer.orders_with_customer_id, data.orders_scanned)})`],
               ['Of those, matching an appointment', `${data.rung_1_customer.of_those_matching_a_booking}`],
-              ['Appointments with a customer at all', `${data.appointments_with_a_square_customer}`],
+              ['Appointments read from Square', `${data.appointments_read}`],
+              ['Of those, with a customer', `${data.appointments_with_a_square_customer}`],
             ]}
           />
 

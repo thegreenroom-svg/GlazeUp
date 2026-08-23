@@ -5154,24 +5154,39 @@ export function registerTicketLinkDiagnosticRoute(app, supabase, STUDIO_ID, logg
       // assuming: reading it from Supabase would have compared orders
       // against an empty set and concluded rung 1 was useless when it may
       // be the best option available.
+      // EVERY location, not just the first. The first run of this reported
+      // "appointments with a customer: 0", which was wrong -- checked the
+      // Square Bookings API directly and every single appointment carries a
+      // customer_id. The cause was this querying locationIds[0] while the
+      // appointments live at a different location of the same account, so
+      // it silently read an empty list and made rung 1 look dead when it
+      // had simply never been measured.
+      //
+      // Also reports appointments_read, so a zero can never again be
+      // mistaken for a finding rather than a failure.
       let bookingCustomerIds = new Set();
-      try {
-        let appts = [], cursor;
-        do {
-          const params = {
-            location_id: locationIds[0],
-            start_at_min: since.toISOString(),
-            start_at_max: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-            limit: 100,
-          };
-          if (cursor) params.cursor = cursor;
-          const r = await axios.get('https://connect.squareup.com/v2/bookings', { headers, params });
-          appts = appts.concat(r.data.bookings || []);
-          cursor = r.data.cursor;
-        } while (cursor);
-        bookingCustomerIds = new Set(appts.map((a) => a.customer_id).filter(Boolean));
-      } catch (err) {
-        logger.warn('ticket-link diagnostic: could not read appointments', err.message);
+      let apptsRead = 0;
+      const apptErrors = [];
+      for (const locId of locationIds) {
+        try {
+          let cursor;
+          do {
+            const params = {
+              location_id: locId,
+              start_at_min: since.toISOString(),
+              start_at_max: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+              limit: 100,
+            };
+            if (cursor) params.cursor = cursor;
+            const r = await axios.get('https://connect.squareup.com/v2/bookings', { headers, params });
+            const got = r.data.bookings || [];
+            apptsRead += got.length;
+            for (const a of got) if (a.customer_id) bookingCustomerIds.add(a.customer_id);
+            cursor = r.data.cursor;
+          } while (cursor);
+        } catch (err) {
+          apptErrors.push(`${locId}: ${err.response?.data?.errors?.[0]?.detail || err.message}`);
+        }
       }
       const bookingTableDigits = new Set(
         (bookings || []).map((b) => digitsOf(b.table_number)).filter(Boolean)
@@ -5207,6 +5222,9 @@ export function registerTicketLinkDiagnosticRoute(app, supabase, STUDIO_ID, logg
         window_days: daysBack,
         orders_scanned: orders.length,
         bookings_in_window: (bookings || []).length,
+        locations_checked: locationIds.length,
+        appointments_read: apptsRead,
+        appointment_read_errors: apptErrors,
         appointments_with_a_square_customer: bookingCustomerIds.size,
         rung_1_customer: {
           orders_with_customer_id: withCustomer,
