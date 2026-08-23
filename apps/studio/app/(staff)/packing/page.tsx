@@ -241,6 +241,10 @@ export default function PackingPage() {
   // ---------- LEVEL 2: one booking's pieces ----------
   if (openBooking) {
     const photo = pieces.find((p) => p.reference_photo_url)?.reference_photo_url;
+    // ONE list drives both the rows and the boxes. They were filtered
+    // separately, which is exactly how a numbering drift gets introduced
+    // later -- piece 2 in the list quietly becoming piece 3 on the photo.
+    const packablePieces = pieces.filter((p) => p.fulfilment !== 'return_visit');
     return (
       <PageShell title="Packing" subtitle={openBooking.customer_name}>
         <button onClick={() => { setOpenBooking(null); loadQueue(); }} style={backBtn}>
@@ -257,7 +261,7 @@ export default function PackingPage() {
         {piecesLoading && <p style={{ fontSize: '0.85rem', color: '#888' }}>Loading the pieces...</p>}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {pieces.filter((p) => p.fulfilment !== 'return_visit').map((p, i) => (
+          {packablePieces.map((p, i) => (
             <button
               key={p.id}
               onClick={() => setOpenPiece({ piece: p, index: i })}
@@ -304,7 +308,43 @@ export default function PackingPage() {
         {!piecesLoading && photo && (
           <div style={{ marginTop: '1rem' }}>
             <p style={{ fontSize: '0.72rem', color: '#888', marginBottom: '0.3rem' }}>The whole table</p>
-            <img src={photo} alt="" style={{ width: '100%', borderRadius: 8, display: 'block' }} />
+            {/* Numbered coloured boxes, same as everywhere else. Without
+                them this was a plain photo of a table -- two rabbits in the
+                list, both called "Rabbit figurine", and nothing tying row 1
+                to a position in the shot. On a booking of near-identical
+                blanks the list and the photo have to be readable together
+                or neither is much use. Colours and numbers match the rows
+                above, so piece 2 is green in both places. */}
+            <div style={{ position: 'relative' }}>
+              <img src={photo} alt="" style={{ width: '100%', borderRadius: 8, display: 'block' }} />
+              {packablePieces.map((p, i) => p.photo_box && p.reference_photo_url === photo && (
+                <div
+                  key={p.id}
+                  style={{
+                    position: 'absolute',
+                    left: `${p.photo_box.left_pct}%`,
+                    top: `${p.photo_box.top_pct}%`,
+                    width: `${p.photo_box.right_pct - p.photo_box.left_pct}%`,
+                    height: `${p.photo_box.bottom_pct - p.photo_box.top_pct}%`,
+                    border: `3px solid ${PIECE_COLOURS[i % 6]}`,
+                    borderRadius: 4,
+                    boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  <span style={{ position: 'absolute', top: -9, left: -9, width: 20, height: 20, borderRadius: '50%', backgroundColor: PIECE_COLOURS[i % 6], color: 'white', fontSize: '0.68rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px white' }}>
+                    {i + 1}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {/* Said plainly rather than leaving someone to wonder why a
+                piece has no square on it. */}
+            {packablePieces.some((p) => !p.photo_box) && (
+              <p style={{ fontSize: '0.7rem', color: '#A6761D', marginTop: '0.3rem' }}>
+                {packablePieces.filter((p) => !p.photo_box).length} piece{packablePieces.filter((p) => !p.photo_box).length === 1 ? '' : 's'} have no marked position on this photo.
+              </p>
+            )}
           </div>
         )}
       </PageShell>
