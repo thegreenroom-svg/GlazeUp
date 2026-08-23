@@ -4473,18 +4473,40 @@ export function registerScheduleRoute(app, supabase, STUDIO_ID, logger) {
       // SERVICE name already on every booking, so it needs no extra
       // permission and no cache -- and four columns that mean something to
       // anyone standing in the building beat eight numbered ones.
+      // THE REAL ROOMS: Main Studio, Lounge, Party Room. Confirmed against
+      // the live Square bookable resources rather than guessed -- 59 of
+      // them, and they group cleanly:
+      //   T1a..T9 (15 tables)  -> Main Studio
+      //   Lounge 1..5          -> Lounge
+      //   Party Room           -> Party Room  (one resource, the annex)
+      //   Wheel 1..4           -> Wheel
+      //   Evening 1..19, Thursdays 1..12 -> session types, not rooms
+      //
+      // THE VAULT IS THE PARTY ROOM. Same Square resource --
+      // TMYVfH7VAWAr3WnT -- which used to back "The Vault - perfect for
+      // private parties!" and is now simply named "Party Room". So Daisy's
+      // earlier "it's been renamed" was right; I mapped it to the wrong
+      // pair (Lounge -> Vault) and reverted, when the real rename was
+      // Vault -> Party Room. Old bookings still carry the Vault service
+      // name, so both resolve here and history stays readable.
+      //
+      // Parties and the ceramics-experience sessions live in the Party
+      // Room -- Daisy: "generally used for bigger parties or these new
+      // ceramics experience things" -- so they group there rather than in
+      // a vague "Parties" bucket that named a booking type, not a place.
       const roomOf = (spaceName) => {
         const t = String(spaceName || '').toLowerCase();
-        if (t.includes('vault')) return 'Vault';
         if (t.includes('lounge')) return 'Lounge';
         if (t.includes('main studio')) return 'Main Studio';
+        if (t.includes('vault') || t.includes('party room')) return 'Party Room';
+        if (t.includes('party') || t.includes('grotto') || t.includes('experience')
+            || t.includes('pop') || t.includes('ultimate')) return 'Party Room';
+        if (t.includes('wheel') || t.includes('throwing')) return 'Wheel';
         if (t.includes('evening')) return 'Evening';
         if (t.includes('thursdays')) return 'Thursdays';
-        if (t.includes('wheel') || t.includes('throwing')) return 'Wheel';
-        if (t.includes('party') || t.includes('grotto') || t.includes('pop')) return 'Parties';
         return 'Other';
       };
-      const ORDER = ['Main Studio', 'Lounge', 'Vault', 'Thursdays', 'Evening', 'Wheel', 'Parties', 'Other'];
+      const ORDER = ['Main Studio', 'Lounge', 'Party Room', 'Wheel', 'Evening', 'Thursdays', 'Other'];
       const usedRooms = Array.from(new Set((bookings || []).map((b) => roomOf(b.space_name))));
       const columns = ORDER.filter((r) => usedRooms.includes(r));
 

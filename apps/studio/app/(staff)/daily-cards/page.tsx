@@ -43,7 +43,11 @@ interface Booking {
 function shortSpaceLabel(spaceName: string | null): string | null {
   if (!spaceName) return null;
   const s = spaceName.toLowerCase();
-  if (s.includes('vault')) return 'Vault';
+  // The Vault was renamed the Party Room -- same Square resource,
+  // TMYVfH7VAWAr3WnT. Old bookings still carry the Vault service name, so
+  // both resolve to the room's current name and a card printed today for a
+  // July session sends someone to the right door.
+  if (s.includes('vault') || s.includes('party room')) return 'Party Room';
   if (s.includes('lounge')) return 'Lounge';
   if (s.includes('main studio')) return 'Main Studio';
   if (s.includes('evening')) return 'Evening Session';
