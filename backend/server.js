@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerIdentifyPiecesRoute, registerPieceFulfilmentRoutes, registerReidentifyRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute, registerScheduleRoute, registerPackingRoutes, registerKilnShelfRoutes, registerTicketLinkDiagnosticRoute, registerTicketMatchRoutes, registerShelfSweepRoute, registerSquareAccessCheckRoute } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerIdentifyPiecesRoute, registerPieceFulfilmentRoutes, registerReidentifyRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute, registerScheduleRoute, registerSpaceBackfillRoute, registerPackingRoutes, registerKilnShelfRoutes, registerTicketLinkDiagnosticRoute, registerTicketMatchRoutes, registerShelfSweepRoute, registerSquareAccessCheckRoute } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -1589,6 +1589,7 @@ registerIdentifyPiecesRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload
 registerPieceFulfilmentRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 registerReidentifyRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, fs, logGeminiUsage);
 registerScheduleRoute(app, supabase, DEMO_STUDIO_ID, logger);
+registerSpaceBackfillRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerPackingRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 registerKilnShelfRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 registerTicketLinkDiagnosticRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
@@ -1653,6 +1654,19 @@ app.listen(PORT, () => {
       });
       const ticketData = await ticketRes.json().catch(() => ({}));
       if (ticketData.bookings_matched) logger.info(`[auto-sync] ${ticketData.tickets_matched} till ticket(s) attached to ${ticketData.bookings_matched} booking(s)`);
+
+      // Fills in the room on bookings synced before the sync stored it.
+      // Self-healing rather than a button, because a booking with no room
+      // silently lands in an "Other" column and nobody thinks to go and
+      // fix it. Costs nothing: a Square read on an open connection plus a
+      // lookup against the already-cached service list.
+      const spaceRes = await fetch(`${SELF_URL}/api/spec/bookings/backfill-space`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const spaceData = await spaceRes.json().catch(() => ({}));
+      if (spaceData.updated) logger.info(`[auto-sync] room filled in on ${spaceData.updated} booking(s)`);
     } catch (err) {
       logger.warn('[auto-sync] periodic sync failed', err.message);
     }

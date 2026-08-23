@@ -2927,6 +2927,13 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
           // no extra live Catalog call needed.
           const variationId = b.appointment_segments?.[0]?.service_variation_id || null;
           let partySize = null;
+          // The service name gives BOTH the party size and the room, and
+          // this was already fetching it and throwing the name away. That
+          // is why 12 of 15 of today's bookings had space_name null and
+          // every one of them fell into an "Other" column: nothing in the
+          // sync had ever written the field the schedule groups on. The
+          // three that did have it were set by something else, long ago.
+          let serviceName = null;
           if (variationId) {
             const { data: item } = await supabase
               .from('square_items')
@@ -2934,7 +2941,8 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
               .eq('studio_id', STUDIO_ID)
               .eq('variation_id', variationId)
               .maybeSingle();
-            partySize = partySizeFromItemName(item?.item_name || null);
+            serviceName = item?.item_name || null;
+            partySize = partySizeFromItemName(serviceName);
           }
 
           const durationMin = b.appointment_segments?.[0]?.duration_minutes || null;
@@ -2988,6 +2996,11 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
             session_end: endAt ? endAt.toISOString() : null,
             party_size: partySize,
             table_number: tableNumber,
+            // The room, which the schedule groups on. Stored as the raw
+            // Square service name rather than a resolved room, so if the
+            // studio adds a space later the mapping can change without
+            // every historic booking being wrong.
+            space_name: serviceName,
             synced_from_square: new Date().toISOString(),
           });
           if (insertErr) throw insertErr;
@@ -4453,6 +4466,88 @@ export function registerReidentifyRoute(app, supabase, STUDIO_ID, logger, axios,
 // Now it stands on its own, which is where it should have been: the day view is
 // the app's home screen and has nothing to do with syncing Square resources.
 // ============================================================================
+// Backfill space_name on bookings that were synced before the sync stored it.
+// Runs off the appointment's service_variation_id, matched against the cached
+// square_items -- no extra Square permission, and the cache already holds all
+// 1,190 variations. Without this, every booking synced before today stays in
+// an "Other" column forever, which is what Daisy was looking at.
+export function registerSpaceBackfillRoute(app, supabase, STUDIO_ID, logger, axios) {
+  app.post('/api/spec/bookings/backfill-space', async (req, res) => {
+    const daysBack = Math.min(parseInt(req.body?.days_back, 10) || 3, 31);
+    const daysForward = Math.min(parseInt(req.body?.days_forward, 10) || 27, 31);
+    try {
+      const { data: connection } = await supabase
+        .from('square_connections')
+        .select('square_access_token, square_token_expires_at')
+        .eq('studio_id', STUDIO_ID)
+        .single();
+      if (!connection || new Date(connection.square_token_expires_at) < new Date()) {
+        return res.status(400).json({ error: 'No valid Square connection', updated: 0 });
+      }
+      const headers = {
+        Authorization: `Bearer ${connection.square_access_token}`,
+        'Square-Version': '2024-01-18',
+        'Content-Type': 'application/json',
+      };
+
+      const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', { headers });
+      const locationIds = (locationsRes.data.locations || []).map((l) => l.id);
+      if (!locationIds.length) return res.json({ updated: 0, reason: 'no_square_locations' });
+
+      const startMin = new Date(); startMin.setDate(startMin.getDate() - daysBack);
+      const startMax = new Date(); startMax.setDate(startMax.getDate() + daysForward);
+
+      // Every location, not just the first -- the appointments live at one
+      // location and the locations list does not necessarily start with it.
+      let appts = [];
+      for (const locId of locationIds) {
+        let cursor;
+        do {
+          const params = { location_id: locId, start_at_min: startMin.toISOString(), start_at_max: startMax.toISOString(), limit: 100 };
+          if (cursor) params.cursor = cursor;
+          const r = await axios.get('https://connect.squareup.com/v2/bookings', { headers, params });
+          appts = appts.concat(r.data.bookings || []);
+          cursor = r.data.cursor;
+        } while (cursor);
+      }
+
+      const variationByBooking = new Map();
+      for (const a of appts) {
+        const v = a.appointment_segments?.[0]?.service_variation_id;
+        if (v) variationByBooking.set(a.id, v);
+      }
+
+      const { data: items } = await supabase
+        .from('square_items')
+        .select('variation_id, item_name')
+        .eq('studio_id', STUDIO_ID);
+      const nameByVariation = new Map((items || []).map((i) => [i.variation_id, i.item_name]));
+
+      const { data: rows } = await supabase
+        .from('bookings')
+        .select('id, booking_code, square_booking_id, space_name')
+        .eq('studio_id', STUDIO_ID)
+        .not('square_booking_id', 'is', null)
+        .is('space_name', null);
+
+      let updated = 0, noAppointment = 0, noService = 0;
+      for (const b of rows || []) {
+        const v = variationByBooking.get(b.square_booking_id);
+        if (!v) { noAppointment++; continue; }
+        const name = nameByVariation.get(v);
+        if (!name) { noService++; continue; }
+        const { error } = await supabase.from('bookings').update({ space_name: name }).eq('id', b.id);
+        if (!error) updated++;
+      }
+
+      res.json({ appointments_seen: appts.length, candidates: (rows || []).length, updated, no_appointment: noAppointment, no_service_name: noService });
+    } catch (err) {
+      logger.error('backfill-space failed', err.response?.data || err.message);
+      res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message });
+    }
+  });
+}
+
 export function registerScheduleRoute(app, supabase, STUDIO_ID, logger) {
   app.get('/api/spec/schedule/:date', async (req, res) => {
     try {
