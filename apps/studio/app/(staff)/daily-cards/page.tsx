@@ -98,9 +98,6 @@ export default function DailyCardsPage() {
   const cardDateRef = useRef(cardDate);
   const knownCodes = useRef<Set<string>>(new Set());
   const firstLoadDone = useRef(false);
-  const [editingTableCode, setEditingTableCode] = useState<string | null>(null);
-  const [tableDraft, setTableDraft] = useState('');
-  const [savingTableCode, setSavingTableCode] = useState<string | null>(null);
   const [editingCollectionCode, setEditingCollectionCode] = useState<string | null>(null);
   const [collectionDraft, setCollectionDraft] = useState('');
   const [savingCollectionCode, setSavingCollectionCode] = useState<string | null>(null);
@@ -125,25 +122,6 @@ export default function DailyCardsPage() {
   // flags, checking which tables have room for a pram etc.), and the same
   // control covers moving a booking to a different table later if the
   // party changes -- one place, always reachable from the card itself.
-  const saveTableNumber = async (bookingCode: string) => {
-    const value = tableDraft.trim();
-    if (!value) return;
-    setSavingTableCode(bookingCode);
-    try {
-      const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${bookingCode}/table-number`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ table_number: value }),
-      });
-      if (!res.ok) throw new Error();
-      setBookings((prev) => prev.map((b) => (b.booking_code === bookingCode ? { ...b, table_number: value } : b)));
-      setEditingTableCode(null);
-    } catch (err: any) {
-      setError(err?.name === 'AbortError' ? 'Taking too long -- try again' : 'Could not save table number.');
-    } finally {
-      setSavingTableCode(null);
-    }
-  };
 
   // Collection date, set right at print time -- per Daisy, this needs to
   // happen the morning of, before the session's even run, not only at
@@ -503,44 +481,14 @@ export default function DailyCardsPage() {
                 {new Date(b.session_start).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
               </p>
 
-              {/* Table -- set at print/placement time, or changed later if
-                  the party moves. Same real endpoint as the Bookings page. */}
-              <div onClick={(e) => e.stopPropagation()} style={{ marginTop: '0.3rem' }}>
-                {editingTableCode === b.booking_code ? (
-                  <span className="no-print" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <input
-                      type="text"
-                      value={tableDraft}
-                      onChange={(e) => setTableDraft(e.target.value)}
-                      placeholder="e.g. 3A"
-                      autoFocus
-                      maxLength={20}
-                      style={{ width: '5rem', padding: '0.2rem 0.35rem', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.8rem' }}
-                    />
-                    <button
-                      onClick={() => saveTableNumber(b.booking_code)}
-                      disabled={savingTableCode === b.booking_code || !tableDraft.trim()}
-                      style={{ padding: '0.2rem 0.5rem', backgroundColor: 'var(--clay)', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.72rem', cursor: 'pointer' }}
-                    >
-                      {savingTableCode === b.booking_code ? '...' : 'Save'}
-                    </button>
-                    <button
-                      onClick={() => setEditingTableCode(null)}
-                      style={{ padding: '0.2rem 0.4rem', background: 'none', border: 'none', color: '#999', fontSize: '0.72rem', cursor: 'pointer' }}
-                    >
-                      Cancel
-                    </button>
-                  </span>
-                ) : (
-                  <button
-                    onClick={() => { setTableDraft(b.table_number || ''); setEditingTableCode(b.booking_code); }}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '0.8rem', color: b.table_number ? '#666' : 'var(--clay)', fontWeight: b.table_number ? 400 : 600 }}
-                  >
-                    {b.table_number ? `Table ${b.table_number}` : 'Set table'}
-                    <span className="no-print" style={{ fontSize: '0.65rem', color: '#999' }}>✎</span>
-                  </button>
-                )}
-              </div>
+              {/* Table, read-only. Per Daisy: the girls set the table in
+                  Square and then physically put the card on it -- the app
+                  printing an editable table field made it a second source
+                  of truth for something it doesn't decide. Shown only when
+                  Square actually says one. */}
+              {b.table_number && (
+                <div style={{ marginTop: '0.3rem', fontSize: '0.8rem', color: '#666' }}>Table {b.table_number}</div>
+              )}
 
               {/* Collection date -- set right here at print time, per
                   Daisy: staff need this the morning of, before the session

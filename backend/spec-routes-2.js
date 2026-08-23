@@ -2488,32 +2488,19 @@ export function registerFulfilmentRoute(app, supabase, STUDIO_ID, logger) {
   // enum, no split/combine picker needed): staff can already type any real
   // arrangement -- '3A', '3B', '3+4', '1&2' -- for splitting one table into
   // two smaller ones or combining several into a group, same as they'd
-  // write it on paper. Same guard pattern as party-size above.
-  app.post('/api/spec/bookings/:code/table-number', async (req, res) => {
-    try {
-      const raw = (req.body || {}).table_number;
-      const table_number = typeof raw === 'string' ? raw.trim() : '';
-      if (!table_number) {
-        return res.status(400).json({ error: 'table_number must be a non-empty string' });
-      }
-      if (table_number.length > 20) {
-        return res.status(400).json({ error: 'table_number must be 20 characters or fewer' });
-      }
-      const { data, error } = await supabase
-        .from('bookings')
-        .update({ table_number })
-        .eq('booking_code', req.params.code)
-        .eq('studio_id', STUDIO_ID)
-        .select('booking_code, table_number')
-        .maybeSingle();
-      if (error) throw error;
-      if (!data) return res.status(404).json({ error: 'Booking not found' });
-      res.json(data);
-    } catch (err) {
-      logger.error(err);
-      res.status(500).json({ error: err.message });
-    }
-  });
+  // The manual table setter is GONE. Per Daisy: "we don't in this app
+  // really need to worry about which table anyone's on. That's for the
+  // girls, it's for Square -- they set it."
+  //
+  // It let staff type an arrangement like '3A' or '3+4'. Real enough, but
+  // it made the app a third source of truth for something Square already
+  // owns, and every source of truth has to be reconciled with the others.
+  // The table is now written in exactly ONE place -- the mirror of Square
+  // Appointments in registerSquareTablesRoutes -- and read everywhere else.
+  //
+  // If a studio ever genuinely needs to split or combine tables inside the
+  // app, this comes back as a real feature with a real reconciliation
+  // story, not as a free-text field that silently disagrees with Square.
 
   // Collection date, settable independently of the Floor completion flow --
   // per Daisy: staff need to set this at print time (morning), before the
@@ -3145,13 +3132,22 @@ export function registerLiveTableSyncRoute(app, supabase, STUDIO_ID, logger, axi
         if (claimedTickets.has(pair.ticket.id) || claimedBookings.has(pair.booking.booking_code)) continue;
         claimedTickets.add(pair.ticket.id);
         claimedBookings.add(pair.booking.booking_code);
-        const newTable = `Main Studio ${pair.ticket.digits}`;
-        const { error } = await supabase
-          .from('bookings')
-          .update({ table_number: newTable })
-          .eq('studio_id', STUDIO_ID)
-          .eq('booking_code', pair.booking.booking_code);
-        if (!error) {
+        // NO LONGER WRITES THE TABLE. Per Daisy: the app has no business
+        // deciding which table anyone is on -- the girls set that in Square
+        // and Square is the record.
+        //
+        // This was the worst offender of the three writers. It took a real
+        // Square ticket, extracted its digits, and wrote back the invented
+        // "Main Studio N" format -- so every five minutes on the auto-sync
+        // loop it overwrote the genuine Square Appointments table name
+        // ("T4 a") with a fabrication. The table sync added earlier today
+        // was fighting this on a five-minute cycle and would have lost.
+        //
+        // The matching itself is still worth doing: it is how a booking is
+        // tied to its open till ticket. So it still pairs them and still
+        // reports what it found -- it just no longer writes.
+        const newTable = pair.booking.table_number;
+        {
           updated++;
           changes.push({
             booking_code: pair.booking.booking_code,
@@ -3164,7 +3160,12 @@ export function registerLiveTableSyncRoute(app, supabase, STUDIO_ID, logger, axi
       }
 
       res.json({
-        updated,
+        // "matched", not "updated" -- nothing is written any more, and a
+        // field called updated that updates nothing is how the next person
+        // gets misled.
+        matched: updated,
+        updated: 0,
+        read_only: true,
         changes,
         open_tickets_today: openTickets.length,
         active_bookings_now: activeBookings.length,
