@@ -97,13 +97,20 @@ export default function PackingPage() {
     note?: string;
     bookings: {
       booking_code: string; customer_name: string; found: number; expected: number; complete: boolean;
-      pieces: { id: string; piece_type: string | null; description: string | null; confidence: number }[];
+      pieces: { id: string; piece_type: string | null; description: string | null; confidence: number;
+                box: { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number } | null }[];
     }[];
   } | null>(null);
   const [sweepError, setSweepError] = useState<string | null>(null);
+  // The photo just taken, kept so the matches can be shown ON it. Without
+  // this the sweep answered "whose is this?" with a list of names and no
+  // picture -- which is exactly the point of photographing a shelf: seeing
+  // WHICH pot on the shelf is whose.
+  const [sweepPhoto, setSweepPhoto] = useState<string | null>(null);
 
   const runSweep = async (file: File) => {
     setSweeping(true); setSweep(null); setSweepError(null);
+    setSweepPhoto((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file); });
     try {
       const fd = new FormData();
       fd.append('photo', file);
@@ -368,6 +375,9 @@ export default function PackingPage() {
 
         {sweepError && <p style={{ fontSize: '0.78rem', color: '#c0392b', marginTop: '0.5rem' }}>{sweepError}</p>}
 
+        {sweep && sweep.bookings.length === 0 && sweepPhoto && (
+          <img src={sweepPhoto} alt="" style={{ width: '100%', borderRadius: 8, display: 'block', marginTop: '0.6rem', opacity: 0.7 }} />
+        )}
         {sweep && sweep.bookings.length === 0 && (
           <p style={{ fontSize: '0.78rem', color: '#A6761D', marginTop: '0.6rem' }}>
             {sweep.note || `Nothing recognised out of ${sweep.candidates} piece${sweep.candidates === 1 ? '' : 's'} waiting. Worth trying a closer photo.`}
@@ -376,6 +386,61 @@ export default function PackingPage() {
 
         {sweep && sweep.bookings.length > 0 && (
           <div style={{ marginTop: '0.7rem' }}>
+            {/* The photo back, with a numbered box on every piece it
+                recognised. A list of names alone doesn't tell a packer
+                which pot on the shelf is whose -- and that is the whole
+                reason for photographing the shelf. Numbers and colours
+                match the rows below. */}
+            {sweepPhoto && (
+              <div style={{ position: 'relative', marginBottom: '0.6rem' }}>
+                <img src={sweepPhoto} alt="" style={{ width: '100%', borderRadius: 8, display: 'block' }} />
+                {sweep.bookings.flatMap((b) => b.pieces).map((p, pi) => ({ p, colour: PIECE_COLOURS[pi % 6], n: pi + 1 }))
+                 .map(({ p, colour, n }) => p.box && (
+                  <div
+                    key={p.id}
+                    style={{
+                      position: 'absolute',
+                      left: `${p.box.left_pct}%`,
+                      top: `${p.box.top_pct}%`,
+                      width: `${p.box.right_pct - p.box.left_pct}%`,
+                      height: `${p.box.bottom_pct - p.box.top_pct}%`,
+                      border: `3px solid ${colour}`,
+                      borderRadius: 4,
+                      boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <span style={{ position: 'absolute', top: -9, left: -9, width: 20, height: 20, borderRadius: '50%', backgroundColor: colour, color: 'white', fontSize: '0.68rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px white' }}>
+                      {n}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* What each numbered square actually is. Per Daisy: "marked
+                clearly with one, two, three in their squares with
+                descriptions" -- a box with no description tells you where
+                something is but not what it is, which on a shelf of
+                similar pots is only half an answer. */}
+            <div style={{ marginBottom: '0.6rem' }}>
+              {sweep.bookings.flatMap((b) => b.pieces.map((p) => ({ p, who: b.customer_name })))
+                .map(({ p, who }, pi) => (
+                <div key={p.id} style={{ display: 'flex', gap: '0.45rem', alignItems: 'flex-start', padding: '0.2rem 0' }}>
+                  <span style={{ flexShrink: 0, width: 18, height: 18, borderRadius: '50%', backgroundColor: PIECE_COLOURS[pi % 6], color: 'white', fontSize: '0.62rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
+                    {pi + 1}
+                  </span>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600 }}>
+                      {p.piece_type || 'Piece'} · {who}
+                    </span>
+                    {p.description && (
+                      <span style={{ display: 'block', fontSize: '0.72rem', color: '#777' }}>{p.description}</span>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+
             <p style={{ fontSize: '0.75rem', color: '#666', marginBottom: '0.4rem' }}>
               Checked against {sweep.candidates} piece{sweep.candidates === 1 ? '' : 's'} still waiting
             </p>

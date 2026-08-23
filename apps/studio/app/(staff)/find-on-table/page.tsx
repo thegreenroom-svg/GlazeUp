@@ -87,7 +87,15 @@ export default function FindOnTablePage() {
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (!f || !bookingCode) return;
+    if (!f) return;
+    // Said out loud rather than returning silently. Without a booking
+    // selected this did nothing at all -- the camera opened, a photo was
+    // taken, and the screen simply never changed, which looks exactly like
+    // the feature being broken.
+    if (!bookingCode) {
+      setError('Pick the booking first, then photograph the table.');
+      return;
+    }
     setPreview(URL.createObjectURL(f));
     setError(null);
     setLoading(true);
@@ -217,6 +225,14 @@ export default function FindOnTablePage() {
           style={{ position: 'relative', width: '100%', marginBottom: '1rem', cursor: 'zoom-in', borderRadius: '8px', overflow: 'hidden' }}
         >
           <img src={preview} alt="Table" style={{ width: '100%', display: 'block' }} />
+          {/* Says plainly when the photo yielded nothing, instead of
+              returning a picture with no marks and leaving the packer to
+              guess whether it worked or the pottery simply isn't there. */}
+          {results && results.length > 0 && !results.some((r) => r.found) && (
+            <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '0.5rem 0.7rem', backgroundColor: 'rgba(0,0,0,0.62)', color: 'white', fontSize: '0.78rem', fontWeight: 600 }}>
+              Nothing from this booking recognised in this photo
+            </div>
+          )}
           {/* Real bounding boxes sized to the actual detected object,
               replacing fixed-size circles -- per Daisy: "both circles
               are over the same piece... they need to be very defined
