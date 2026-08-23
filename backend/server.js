@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerIdentifyPiecesRoute, registerPieceFulfilmentRoutes, registerReidentifyRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute, registerSquareTablesRoutes, registerPackingRoutes, registerKilnBatchRoutes, registerTicketLinkDiagnosticRoute, registerTicketMatchRoutes, registerShelfSweepRoute, registerSquareAccessCheckRoute } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerIdentifyPiecesRoute, registerPieceFulfilmentRoutes, registerReidentifyRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute, registerPackingRoutes, registerKilnBatchRoutes, registerTicketLinkDiagnosticRoute, registerTicketMatchRoutes, registerShelfSweepRoute, registerSquareAccessCheckRoute } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -1588,7 +1588,6 @@ registerStudioFeaturesRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerIdentifyPiecesRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage);
 registerPieceFulfilmentRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 registerReidentifyRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, fs, logGeminiUsage);
-registerSquareTablesRoutes(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerPackingRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 registerKilnBatchRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 registerTicketLinkDiagnosticRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
@@ -1642,28 +1641,10 @@ app.listen(PORT, () => {
       const finishData = await finishRes.json().catch(() => ({}));
       if (finishData.finished) logger.info(`[auto-sync] ${finishData.finished} booking(s) marked finished from real Square payment`, finishData.changes);
 
-      // Keeps tables true to Square Appointments without anyone pressing a
-      // button. Daisy asked whether the sync is a one-off or something she
-      // has to do every time -- neither is a good answer, so it just keeps
-      // itself current: a table moved in Square shows up here within five
-      // minutes, which is how staff already expect the calendar to behave.
-      //
-      // Unlike the piece-identification sweep I built and correctly got
-      // told to take out, this costs nothing per run. It's a plain Square
-      // read on a connection already open, with no AI call behind it, so
-      // there's no bill to run up and no reason to ration it.
-      const tablesRes = await fetch(`${SELF_URL}/api/spec/square/sync-booking-tables`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      const tablesData = await tablesRes.json().catch(() => ({}));
-      if (tablesData.updated) logger.info(`[auto-sync] ${tablesData.updated} booking(s) moved to their real Square table`, tablesData.changes);
-
-      // Attaches live till tickets to bookings by table code and customer
-      // first name -- the two ways the girls actually name them, measured
-      // rather than assumed. A plain Square read on a connection already
-      // open, no AI behind it, so there is nothing to ration.
+      // Attaches live till tickets to bookings by the customer's first
+      // name -- how the girls actually name them ("Party Holly", "Tabby -
+      // 2"), measured across 271 real orders. A plain Square read on a
+      // connection already open, no AI behind it, nothing to ration.
       const ticketRes = await fetch(`${SELF_URL}/api/spec/bookings/match-tickets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

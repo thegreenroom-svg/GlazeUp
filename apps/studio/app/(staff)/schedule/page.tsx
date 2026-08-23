@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/PageShell';
-import { ChevronLeft, ChevronRight, RefreshCw, AlertCircle, MapPin, Camera, Package, Flame, Printer, PoundSterling, Users, ShieldCheck, Palette } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Camera, Package, Flame, Printer, PoundSterling, Users, ShieldCheck, Palette } from 'lucide-react';
 
 // Deliberately mirrors the Square Appointments side-by-side day view --
 // tables as columns, time down the side, sessions as blocks. Not for the
@@ -22,7 +22,7 @@ interface ScheduleBooking {
   customer_name: string;
   session_start: string;
   session_end: string | null;
-  table_number: string | null;
+  room: string;
   party_size: number | null;
   space_name: string | null;
   live_ticket_name: string | null;
@@ -30,25 +30,6 @@ interface ScheduleBooking {
   finished: boolean;
 }
 
-// Same shortener the printed cards use, so a room is called the same thing
-// on the screen and on the card in the customer's hand. 'The Vault -
-// perfect for private parties!' -> 'Vault'.
-function shortSpaceLabel(spaceName: string | null): string | null {
-  if (!spaceName) return null;
-  const s = spaceName.toLowerCase();
-  if (s.includes('vault')) return 'Vault';
-  if (s.includes('lounge')) return 'Lounge';
-  if (s.includes('main studio')) return 'Main Studio';
-  if (s.includes('evening')) return 'Evening Session';
-  if (s.includes('thursdays')) return 'Thursdays';
-  if (s.includes('wheel hire')) return 'Wheel Hire';
-  if (s.includes('throwing taster')) return 'Throwing Taster';
-  if (s.includes('kids party')) return 'Kids Party';
-  if (s.includes('ultimate')) return 'Ultimate Party';
-  if (s.includes('pop-up') || s.includes('pop up')) return 'Pop-Up';
-  if (s.includes('grotto')) return 'Grotto';
-  return null;
-}
 
 interface Collection {
   booking_code: string;
@@ -137,8 +118,6 @@ export default function SchedulePage() {
   const [data, setData] = useState<ScheduleData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
-  const [syncNote, setSyncNote] = useState<string | null>(null);
 
   // Tapping a session opens a panel BESIDE the day rather than navigating
   // away. The common question mid-shift is "what's on table 4, how many
@@ -192,58 +171,6 @@ export default function SchedulePage() {
     return () => { cancelled = true; };
   }, [selected]);
 
-  // Pulls the real table off each Square appointment. Two steps because the
-  // staff list is cached separately -- it changes maybe once a year, the
-  // bookings change hourly.
-  const syncTables = async () => {
-    setSyncing(true);
-    setSyncNote(null);
-    try {
-      // Stage one used to be fired and forgotten. When it failed, stage two
-      // reported "0 bookings moved" -- technically true, completely
-      // unhelpful, and two steps removed from the actual cause. Daisy
-      // pressed Sync, saw nothing move, and had no way to know the table
-      // names had never been fetched at all.
-      const tm = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/square/sync-team-members`, { method: 'POST' });
-      const tmData = await tm.json().catch(() => ({}));
-      if (!tm.ok || !tmData.synced) {
-        // Ask the access check what the token can actually reach, rather
-        // than reporting Square's raw error and leaving Daisy to work out
-        // whether it's a bug, a deploy that hasn't landed, or a permission
-        // Square never granted.
-        let extra = '';
-        try {
-          const ac = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/diagnostics/square-access`);
-          const acd = await ac.json();
-          if (acd?.missing_scopes?.length) {
-            extra = ` Square hasn't granted this app: ${Array.from(new Set(acd.missing_scopes)).join(', ')}. That needs re-authorising in Square, not a code change.`;
-          }
-        } catch { /* the check is a nicety, not a dependency */ }
-        throw new Error(`Couldn't fetch table names from Square: ${tmData.error || tm.status}.${extra}`);
-      }
-
-      const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/square/sync-booking-tables`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Sync failed');
-      // Says what happened at BOTH stages, so a zero is diagnosable rather
-      // than mysterious.
-      setSyncNote(
-        `${tmData.synced} table${tmData.synced === 1 ? '' : 's'} read from Square · ` +
-        `${d.updated} booking${d.updated === 1 ? '' : 's'} moved` +
-        (d.no_match ? ` · ${d.no_match} with no matching appointment` : '')
-      );
-      await load();
-    } catch (e) {
-      setSyncNote(e instanceof Error ? e.message : 'Sync failed');
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   const shiftDay = (n: number) => {
     const d = new Date(`${date}T12:00:00`);
     d.setDate(d.getDate() + n);
@@ -266,7 +193,6 @@ export default function SchedulePage() {
 
   const hours = Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => START_HOUR + i);
   const columns = data?.columns || [];
-  const unassignedBookings = (data?.bookings || []).filter((b) => !b.table_number);
 
   return (
     <PageShell title="Schedule" subtitle="The day, table by table">
@@ -282,54 +208,16 @@ export default function SchedulePage() {
         <button onClick={() => setDate(new Date().toISOString().slice(0, 10))} style={{ ...navBtn, width: 'auto', padding: '0 0.7rem', fontSize: '0.8rem' }}>
           Today
         </button>
-        <button
-          onClick={syncTables}
-          disabled={syncing}
-          style={{ ...navBtn, width: 'auto', padding: '0 0.7rem', fontSize: '0.8rem', opacity: syncing ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-        >
-          <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
-          {syncing ? 'Syncing' : 'Sync tables'}
-        </button>
       </div>
-
-      {syncNote && (
-        <p style={{ fontSize: '0.78rem', color: 'var(--clay)', marginBottom: '0.6rem' }}>{syncNote}</p>
-      )}
-
-      {/* Bookings Square knows about but that have no table yet. Shown
-          rather than hidden -- a session with no table is exactly the one
-          that gets missed on a busy day. */}
-      {unassignedBookings.length > 0 && (
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', padding: '0.6rem 0.75rem', borderRadius: 8, backgroundColor: '#FFF6E8', border: '1px solid #F0C987', marginBottom: '0.75rem' }}>
-          <AlertCircle size={16} style={{ color: '#B8860B', flexShrink: 0, marginTop: 2 }} />
-          <div>
-            <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#7A5B00' }}>
-              {unassignedBookings.length} booking{unassignedBookings.length === 1 ? '' : 's'} with no table
-            </p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.35rem' }}>
-              {unassignedBookings.map((b) => (
-                <button
-                  key={b.booking_code}
-                  onClick={() => router.push(`/floor?code=${b.booking_code}`)}
-                  style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderRadius: 999, border: '1px solid #E0B463', background: 'white', color: '#7A5B00', cursor: 'pointer' }}
-                >
-                  {b.customer_name} · {new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-                  {shortSpaceLabel(b.space_name) ? ` · ${shortSpaceLabel(b.space_name)}` : ''}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {loading && <p style={{ fontSize: '0.85rem', color: '#888' }}>Loading the day...</p>}
       {error && <p style={{ fontSize: '0.85rem', color: '#c0392b' }}>{error}</p>}
 
       {!loading && !error && columns.length === 0 && (
         <div style={{ padding: '1.5rem', textAlign: 'center', border: '1px dashed #ddd', borderRadius: 10 }}>
-          <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--charcoal)' }}>No tables known yet</p>
+          <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--charcoal)' }}>Nothing booked</p>
           <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '0.3rem' }}>
-            Tap Sync tables to pull them from Square Appointments.
+            No sessions in the diary for this day.
           </p>
         </div>
       )}
@@ -352,7 +240,7 @@ export default function SchedulePage() {
           </div>
 
           {columns.map((col) => {
-            const inCol = (data?.bookings || []).filter((b) => b.table_number === col);
+            const inCol = (data?.bookings || []).filter((b) => b.room === col);
             return (
               <div key={col} style={{ flexShrink: 0, width: COL_W, borderRight: '1px solid #f0f0f0', position: 'relative' }}>
                 <div style={{ height: 34, borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700, color: 'var(--charcoal)', position: 'sticky', top: 0, background: 'white', zIndex: 2 }}>
@@ -396,14 +284,6 @@ export default function SchedulePage() {
                       </span>
                       <span style={{ display: 'block', fontWeight: 600 }}>{b.customer_name}</span>
                       {b.party_size ? <span style={{ display: 'block', opacity: 0.85 }}>{b.party_size} painting</span> : null}
-                      {/* The room, from the Square service name. Worth
-                          showing because table and room disagree until
-                          tables are synced -- a Vault booking currently
-                          reads as "Main Studio 14", which is nonsense that
-                          would otherwise be invisible. */}
-                      {shortSpaceLabel(b.space_name) && (
-                        <span style={{ display: 'block', opacity: 0.75, fontStyle: 'italic' }}>{shortSpaceLabel(b.space_name)}</span>
-                      )}
                     </button>
                   ))}
                 </div>
@@ -440,8 +320,7 @@ export default function SchedulePage() {
               <p style={{ fontSize: '1rem', fontWeight: 700 }}>{selected.customer_name}</p>
               <p style={{ fontSize: '0.76rem', color: '#777' }}>
                 {new Date(selected.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-                {selected.table_number ? ` · ${selected.table_number}` : ' · no table'}
-                {shortSpaceLabel(selected.space_name) ? ` · ${shortSpaceLabel(selected.space_name)}` : ''}
+                {selected.room ? ` · ${selected.room}` : ''}
                 {selected.party_size ? ` · ${selected.party_size} painting` : ''}
               </p>
               {/* What the girls actually called it on the till. Shown

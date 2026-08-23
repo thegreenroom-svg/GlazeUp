@@ -2496,7 +2496,7 @@ export function registerFulfilmentRoute(app, supabase, STUDIO_ID, logger) {
   // it made the app a third source of truth for something Square already
   // owns, and every source of truth has to be reconciled with the others.
   // The table is now written in exactly ONE place -- the mirror of Square
-  // Appointments in registerSquareTablesRoutes -- and read everywhere else.
+  // Appointments -- and read everywhere else. Now removed entirely.
   //
   // If a studio ever genuinely needs to split or combine tables inside the
   // app, this comes back as a real feature with a real reconciliation
@@ -3078,7 +3078,7 @@ export function registerLiveTableSyncRoute(app, supabase, STUDIO_ID, logger, axi
       const activeSince = new Date(now.getTime() - 3 * 60 * 60 * 1000);
       const { data: bookings } = await supabase
         .from('bookings')
-        .select('booking_code, table_number, session_start')
+        .select('booking_code, customer_name, session_start')
         .eq('studio_id', STUDIO_ID)
         .gte('session_start', activeSince.toISOString())
         .lte('session_start', now.toISOString());
@@ -3616,12 +3616,17 @@ export function registerSquarePaymentFinishRoute(app, supabase, STUDIO_ID, logge
         },
         { headers }
       );
-      const digitsOf = (s) => (String(s || '').match(/\d+/g) || []).join('');
+      // Matched on the CUSTOMER'S FIRST NAME in the ticket name, not on
+      // table digits. Tables are gone from this app, and the measurement of
+      // 271 real orders showed first name was the stronger signal anyway --
+      // "Party Holly", "Tabby - 2" -- because it survives a table being
+      // renamed, moved or mistyped, which digits never do.
       const completedTickets = (ordersRes.data.orders || [])
-        .filter((o) => o.ticket_name && digitsOf(o.ticket_name))
+        .filter((o) => o.ticket_name || o.source?.name)
         .map((o) => ({
           id: o.id,
-          digits: digitsOf(o.ticket_name),
+          ticket_name: o.ticket_name || o.source?.name,
+          words: parseTicketName(o.ticket_name || o.source?.name).words,
           completed_at: o.closed_at || o.updated_at,
           total_cents: o.total_money?.amount ?? null,
         }));
@@ -3643,16 +3648,23 @@ export function registerSquarePaymentFinishRoute(app, supabase, STUDIO_ID, logge
         .eq('studio_id', STUDIO_ID)
         .in('booking_code', (bookings || []).map((b) => b.booking_code));
       const finishedCodes = new Set((statuses || []).filter((s) => s.finished_at).map((s) => s.booking_code));
-      const unfinished = (bookings || []).filter((b) => !finishedCodes.has(b.booking_code) && digitsOf(b.table_number));
+      const unfinished = (bookings || [])
+        .filter((b) => !finishedCodes.has(b.booking_code))
+        .map((b) => ({ ...b, first_name: String(b.customer_name || '').trim().split(/\s+/)[0].toLowerCase() }))
+        .filter((b) => b.first_name);
 
       // Same real greedy nearest-time matching as the live table sync --
       // match a completed order to the booking at that same real table
       // whose session_start is closest to when the order actually closed.
       const MAX_GAP_MS = 4 * 60 * 60 * 1000;
+      // The name must match. Time alone is never enough -- a cafe order
+      // closing mid-session would otherwise mark a table finished and paid
+      // while the customer is still painting.
       const candidatePairs = [];
       for (const ticket of completedTickets) {
+        if (!ticket.words.length) continue;
         for (const booking of unfinished) {
-          if (digitsOf(booking.table_number) !== ticket.digits) continue;
+          if (!ticket.words.includes(booking.first_name)) continue;
           const gap = Math.abs(new Date(ticket.completed_at).getTime() - new Date(booking.session_start).getTime());
           if (gap <= MAX_GAP_MS) candidatePairs.push({ ticket, booking, gap });
         }
@@ -3677,7 +3689,7 @@ export function registerSquarePaymentFinishRoute(app, supabase, STUDIO_ID, logge
           }], { onConflict: 'booking_code' });
         if (!error) {
           finished++;
-          changes.push({ booking_code: pair.booking.booking_code, table: pair.booking.table_number, till_total_cents: pair.ticket.total_cents });
+          changes.push({ booking_code: pair.booking.booking_code, matched_ticket: pair.ticket.ticket_name, till_total_cents: pair.ticket.total_cents });
         }
       }
 
@@ -4400,323 +4412,34 @@ export function registerReidentifyRoute(app, supabase, STUDIO_ID, logger, axios,
 }
 
 // ============================================================================
-// SQUARE APPOINTMENTS TABLES -- read the real table, stop inventing one
+// SQUARE APPOINTMENTS TABLES -- REMOVED
 // ----------------------------------------------------------------------------
-// Daisy sent a photo of the actual Square Appointments day view the studio
-// runs on: columns headed T2 a, T2 b, T3 a, T4 a, T4 b, "Staff 62 selected".
-// Her tables are modelled in Square as bookable STAFF, and every appointment
-// already carries which one it's on as team_member_id.
+// Daisy: "I don't think we need to bother with table names or table numbers
+// on this whole app. So maybe just strip this bit out."
 //
-// The app was not reading it. registerRealBookingSyncRoute invented a table
-// instead -- sequential allocation cycling 1-8, stored as "Main Studio 4".
-// Checked against the live database: that is what's in there, plus 38
-// bookings in the last ten days with no table at all.
+// Gone: sync-team-members, sync-booking-tables, the schedule's dependency on
+// cached table names, and the five-minute job that kept them in step.
 //
-// That matters more than it sounds, because the live till matcher works on
-// TABLE DIGITS. "Main Studio 4" reduces to "4"; the real ticket "T4 a" also
-// reduces to "4", so it half-worked by coincidence. But T4 a and T4 b both
-// reduce to "4" as well -- meaning the "multiple candidates" branch in the
-// live-order lookup isn't a defensive edge case, it's an ordinary Saturday
-// with both halves of table 4 occupied.
+// It was never going to work here regardless -- reading table names needs
+// APPOINTMENTS_BUSINESS_SETTINGS_READ or EMPLOYEES_READ, and Square has
+// granted this app neither. But the better argument is the one Daisy made:
+// the girls set the table on the Square terminal and then physically put the
+// card on it. The app was maintaining a copy of a fact it never used for
+// anything a human needed.
 //
-// This replaces the guess with the fact.
+// What replaced each thing it was load-bearing for:
+//  - Schedule columns  -> the ROOM, derived from the Square service name
+//                         already on every booking. No extra permission, and
+//                         four meaningful columns instead of eight numbered
+//                         ones.
+//  - Ticket matching   -> the customer's first name, which measurement showed
+//                         was the stronger signal anyway (12 against 10).
+//  - Finished-from-pay -> the same first-name match.
+//
+// bookings.table_number and square_team_members are left in the database
+// rather than dropped. Nothing reads them, they cost nothing, and deleting
+// columns is the one change here that could not be undone.
 // ============================================================================
-export function registerSquareTablesRoutes(app, supabase, STUDIO_ID, logger, axios) {
-  const squareHeaders = async () => {
-    const { data: connection } = await supabase
-      .from('square_connections')
-      .select('square_access_token, square_token_expires_at')
-      .eq('studio_id', STUDIO_ID)
-      .single();
-    if (!connection || new Date(connection.square_token_expires_at) < new Date()) return null;
-    return {
-      Authorization: `Bearer ${connection.square_access_token}`,
-      'Square-Version': '2024-01-18',
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    };
-  };
-
-  // Caches the staff list so every later lookup is a local join rather than
-  // a live Square call. Names change rarely; a table is added maybe once a
-  // year. Re-run it when the studio layout changes.
-  app.post('/api/spec/square/sync-team-members', async (req, res) => {
-    try {
-      const headers = await squareHeaders();
-      if (!headers) return res.status(400).json({ error: 'No valid Square connection', synced: 0 });
-
-      const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', { headers });
-      const locationIds = (locationsRes.data.locations || []).map((l) => l.id);
-      if (!locationIds.length) return res.json({ synced: 0, reason: 'no_square_locations' });
-
-      // TEAM MEMBER BOOKING PROFILES, not the team-members search.
-      //
-      // The search needs EMPLOYEES_READ, which this app's Square token does
-      // not have -- Square said so plainly once the UI stopped swallowing
-      // the error: "The merchant must authorize your application for the
-      // following scopes: EMPLOYEES_READ".
-      //
-      // This endpoint returns exactly what's needed -- team_member_id,
-      // display_name, is_bookable -- under APPOINTMENTS_BUSINESS_SETTINGS_
-      // READ, the appointments family the app is already using to read
-      // bookings. Verified against the live API: it returns "Thursdays 3",
-      // "Lounge 5" and so on, which is precisely the naming the matcher
-      // wants.
-      //
-      // It is also the more honest source. These are BOOKABLE RESOURCES --
-      // tables and session slots -- not employees, and asking for staff
-      // records to find out what a table is called was always the wrong
-      // question. A studio would rightly hesitate before granting an app
-      // access to its employee records.
-      let profiles = [];
-      let cursor;
-      let usedFallback = false;
-      try {
-        do {
-          const params = { limit: 100 };
-          if (cursor) params.cursor = cursor;
-          const r = await axios.get('https://connect.squareup.com/v2/bookings/team-member-booking-profiles', { headers, params });
-          profiles = profiles.concat(r.data.team_member_booking_profiles || []);
-          cursor = r.data.cursor;
-        } while (cursor);
-      } catch (profErr) {
-        // Falls back to the employee search for any studio that happens to
-        // have granted EMPLOYEES_READ but not the appointments settings
-        // scope. Reported either way rather than silently degrading.
-        logger.warn('booking profiles unavailable, trying team-members search', profErr.response?.data?.errors?.[0]?.detail || profErr.message);
-        usedFallback = true;
-        let members = [], c2;
-        do {
-          const body = { query: { filter: { location_ids: locationIds, status: 'ACTIVE' } }, limit: 100 };
-          if (c2) body.cursor = c2;
-          const r = await axios.post('https://connect.squareup.com/v2/team-members/search', body, { headers });
-          members = members.concat(r.data.team_members || []);
-          c2 = r.data.cursor;
-        } while (c2);
-        profiles = members.map((m) => ({
-          team_member_id: m.id,
-          display_name: [m.given_name, m.family_name].filter(Boolean).join(' ').trim() || m.email_address || m.id,
-          is_bookable: m.status === 'ACTIVE',
-        }));
-      }
-
-      const rows = profiles.map((p) => ({
-        studio_id: STUDIO_ID,
-        team_member_id: p.team_member_id,
-        display_name: p.display_name || p.team_member_id,
-        is_bookable: p.is_bookable !== false,
-        updated_at: new Date().toISOString(),
-      }));
-
-      if (rows.length) {
-        const { error } = await supabase
-          .from('square_team_members')
-          .upsert(rows, { onConflict: 'studio_id,team_member_id' });
-        if (error) throw error;
-      }
-
-      res.json({ synced: rows.length, source: usedFallback ? 'team-members-search' : 'booking-profiles', names: rows.map((r) => r.display_name).sort() });
-    } catch (err) {
-      logger.error('sync-team-members failed', err.response?.data || err.message);
-      res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message });
-    }
-  });
-
-  // Fills in the real table on bookings that have a square_booking_id.
-  // Deliberately re-reads from Square rather than trusting what's stored:
-  // the whole point is that the appointment is the source of truth and the
-  // stored value was a guess.
-  app.post('/api/spec/square/sync-booking-tables', async (req, res) => {
-    const DAYS_BACK = Math.min(parseInt(req.body?.days_back, 10) || 3, 31);
-    const DAYS_FORWARD = Math.min(parseInt(req.body?.days_forward, 10) || 27, 31);
-    try {
-      const headers = await squareHeaders();
-      if (!headers) return res.status(400).json({ error: 'No valid Square connection', updated: 0 });
-
-      const { data: staff } = await supabase
-        .from('square_team_members')
-        .select('team_member_id, display_name')
-        .eq('studio_id', STUDIO_ID);
-      const nameById = new Map((staff || []).map((s) => [s.team_member_id, s.display_name]));
-      // On a studio that has never synced, this used to 400. Harmless by
-      // hand, but it now runs on the five-minute loop, so it would have
-      // been a guaranteed error every five minutes forever on any new
-      // studio -- noise that trains people to ignore the logs. Nothing
-      // cached simply means nothing to match yet, which is a quiet no-op.
-      if (!nameById.size) {
-        return res.json({ updated: 0, unchanged: 0, no_match: 0, reason: 'no_team_members_cached', changes: [] });
-      }
-
-      const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', { headers });
-      const locations = locationsRes.data.locations || [];
-      if (!locations.length) return res.json({ updated: 0, reason: 'no_square_locations' });
-
-      // Square rejects a bookings window longer than 31 days, which is the
-      // documented cause of earlier sync gaps -- kept safely inside it.
-      const startMin = new Date();
-      startMin.setDate(startMin.getDate() - DAYS_BACK);
-      const startMax = new Date();
-      startMax.setDate(startMax.getDate() + DAYS_FORWARD);
-
-      let appts = [];
-      let cursor;
-      do {
-        const params = {
-          location_id: locations[0].id,
-          start_at_min: startMin.toISOString(),
-          start_at_max: startMax.toISOString(),
-          limit: 100,
-        };
-        if (cursor) params.cursor = cursor;
-        const r = await axios.get('https://connect.squareup.com/v2/bookings', { headers, params });
-        appts = appts.concat(r.data.bookings || []);
-        cursor = r.data.cursor;
-      } while (cursor);
-
-      const tableByBookingId = new Map();
-      for (const a of appts) {
-        const tmId = a.appointment_segments?.[0]?.team_member_id;
-        if (tmId && nameById.has(tmId)) tableByBookingId.set(a.id, { tmId, name: nameById.get(tmId) });
-      }
-
-      const { data: rows } = await supabase
-        .from('bookings')
-        .select('id, booking_code, square_booking_id, table_number')
-        .eq('studio_id', STUDIO_ID)
-        .not('square_booking_id', 'is', null);
-
-      let updated = 0, unchanged = 0, noMatch = 0;
-      const changes = [];
-      for (const b of rows || []) {
-        const hit = tableByBookingId.get(b.square_booking_id);
-        if (!hit) { noMatch++; continue; }
-        if (b.table_number === hit.name) { unchanged++; continue; }
-        const { error } = await supabase
-          .from('bookings')
-          .update({ table_number: hit.name, square_team_member_id: hit.tmId })
-          .eq('id', b.id);
-        if (error) { logger.error('table update failed', error.message); continue; }
-        changes.push({ booking_code: b.booking_code, from: b.table_number, to: hit.name });
-        updated++;
-      }
-
-      res.json({ appointments_seen: appts.length, updated, unchanged, no_match: noMatch, changes: changes.slice(0, 40) });
-    } catch (err) {
-      logger.error('sync-booking-tables failed', err.response?.data || err.message);
-      res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message });
-    }
-  });
-
-  // Feeds the schedule view: bookings for one day, grouped by table, in the
-  // shape the Square Appointments side-by-side day view uses -- because
-  // that's the screen the girls already read fluently every shift.
-  app.get('/api/spec/schedule/:date', async (req, res) => {
-    try {
-      const date = req.params.date;
-      const dayStart = new Date(`${date}T00:00:00.000Z`);
-      const dayEnd = new Date(`${date}T23:59:59.999Z`);
-
-      const { data: bookings, error } = await supabase
-        .from('bookings')
-        .select('booking_code, customer_name, session_start, session_end, table_number, party_size, square_team_member_id, space_name, live_ticket_name, live_ticket_total_cents')
-        .eq('studio_id', STUDIO_ID)
-        .gte('session_start', dayStart.toISOString())
-        .lte('session_start', dayEnd.toISOString())
-        .order('session_start', { ascending: true });
-      if (error) throw error;
-
-      const { data: staff } = await supabase
-        .from('square_team_members')
-        .select('team_member_id, display_name')
-        .eq('studio_id', STUDIO_ID);
-
-      // Columns are the tables that Square knows about, ordered the way the
-      // Square screen orders them (T2 a, T2 b, T3 a...), plus any table a
-      // booking actually references that isn't in the cache -- so nothing
-      // is ever silently dropped off the end of the schedule.
-      const known = (staff || []).map((s) => s.display_name).filter(Boolean);
-      const used = (bookings || []).map((b) => b.table_number).filter(Boolean);
-      const columns = Array.from(new Set([...known, ...used])).sort((a, b) =>
-        a.localeCompare(b, 'en', { numeric: true, sensitivity: 'base' })
-      );
-
-      // demo_app_session_status, NOT booking_status -- there is no such
-      // table, and querying it would have 500'd this whole endpoint.
-      const { data: statuses } = await supabase
-        .from('demo_app_session_status')
-        .select('booking_code, finished_at')
-        .eq('studio_id', STUDIO_ID)
-        .in('booking_code', (bookings || []).map((b) => b.booking_code).concat(['__none__']));
-      const finished = new Set((statuses || []).filter((s) => s.finished_at).map((s) => s.booking_code));
-
-      // Pottery due back TODAY, from sessions that happened weeks ago.
-      // This is the thing a Square calendar structurally cannot show,
-      // because Square doesn't know the pottery exists -- it sees a
-      // 90-minute appointment that ended a fortnight back and is done
-      // with it. A collection is a real event happening today with
-      // someone walking through the door for it, and it belongs on the
-      // day view next to the sessions.
-      // collection_date/method live on demo_app_session_status, NOT on
-      // bookings -- checked against the live schema rather than assumed.
-      // Querying bookings for them would have thrown and taken the whole
-      // day view down with it.
-      const { data: dueStatuses } = await supabase
-        .from('demo_app_session_status')
-        .select('booking_code, collection_date, collection_method, postal_postcode')
-        .eq('studio_id', STUDIO_ID)
-        .eq('collection_date', date);
-
-      const dueCodes = (dueStatuses || []).map((s2) => s2.booking_code);
-
-      // Names come from bookings, so a collection card says "Charlie
-      // Marlow" rather than a booking code nobody can read at a counter.
-      let nameByCode = new Map();
-      if (dueCodes.length) {
-        const { data: dueBookingRows } = await supabase
-          .from('bookings')
-          .select('booking_code, customer_name')
-          .eq('studio_id', STUDIO_ID)
-          .in('booking_code', dueCodes);
-        nameByCode = new Map((dueBookingRows || []).map((b) => [b.booking_code, b.customer_name]));
-      }
-      let piecesByBooking = {};
-      if (dueCodes.length) {
-        const { data: duePieces } = await supabase
-          .from('pottery_pieces')
-          .select('booking_id, status, piece_type')
-          .eq('studio_id', STUDIO_ID)
-          .in('booking_id', dueCodes)
-          .neq('archived', true);
-        for (const p of duePieces || []) {
-          if (!piecesByBooking[p.booking_id]) piecesByBooking[p.booking_id] = [];
-          piecesByBooking[p.booking_id].push(p);
-        }
-      }
-
-      res.json({
-        date,
-        columns,
-        bookings: (bookings || []).map((b) => ({ ...b, finished: finished.has(b.booking_code) })),
-        unassigned: (bookings || []).filter((b) => !b.table_number).length,
-        collections: (dueStatuses || []).map((b) => ({
-          booking_code: b.booking_code,
-          customer_name: nameByCode.get(b.booking_code) || b.booking_code,
-          collection_method: b.collection_method,
-          postal_postcode: b.postal_postcode,
-          piece_count: (piecesByBooking[b.booking_code] || []).length,
-          // "Ready" means every piece has cleared the kiln stages. Counted
-          // rather than assumed, so the lane tells the truth about what can
-          // actually be handed over when someone arrives.
-          ready: (piecesByBooking[b.booking_code] || []).length > 0
-            && (piecesByBooking[b.booking_code] || []).every((p) => ['ready', 'collected', 'complete'].includes(String(p.status || '').toLowerCase())),
-        })),
-      });
-    } catch (err) {
-      logger.error('schedule failed', err.message);
-      res.status(500).json({ error: err.message });
-    }
-  });
-}
 
 // ============================================================================
 // PACKING -- the screen for whoever is actually boxing the pottery
@@ -5337,32 +5060,6 @@ export function parseTicketName(raw) {
   return { code, words, seq };
 }
 
-// Base code of a table name from Square Appointments: "T4 a" -> "T4".
-// Ticket names carry no a/b suffix, so both halves of table 4 reduce to T4
-// and are separated by time and by name instead.
-export function baseTableCode(tableName) {
-  const raw = String(tableName || '').trim();
-  if (!raw) return null;
-
-  // Square names these in full -- "Table 6", "Lounge 5", "Evening 3",
-  // "Thursdays 8", "Pop Up Event" -- NOT the "T2 a" shorthand the
-  // Appointments calendar column headers display. I had built the matcher
-  // against the column headers in Daisy's photo, which are an abbreviation
-  // of the real record. Checked against the live team-members API.
-  //
-  // The girls' ticket names use the shorthand (T6, L15), so this is the
-  // translation between the two, and without it every code match failed
-  // silently while looking perfectly reasonable in the code.
-  const full = raw.match(/^(table|lounge)\s*(\d{1,2})/i);
-  if (full) return `${full[1][0].toUpperCase()}${parseInt(full[2], 10)}`;
-
-  const short = raw.match(/^([TL])\s*(\d{1,2})/i);
-  if (short) return `${short[1].toUpperCase()}${parseInt(short[2], 10)}`;
-
-  // Evening / Thursdays / Pop Up sessions are real bookable resources but
-  // carry no table code the till would ever use. Null, not a guess.
-  return null;
-}
 
 export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axios) {
   app.post('/api/spec/bookings/match-tickets', async (req, res) => {
@@ -5401,7 +5098,7 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
 
       const { data: bookings } = await supabase
         .from('bookings')
-        .select('booking_code, customer_name, table_number, session_start, session_end')
+        .select('booking_code, customer_name, session_start, session_end')
         .eq('studio_id', STUDIO_ID)
         .gte('session_start', since.toISOString());
 
@@ -5410,7 +5107,6 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
         return {
           ...b,
           first_name: first,
-          base_code: baseTableCode(b.table_number),
           start: new Date(b.session_start).getTime(),
           end: b.session_end ? new Date(b.session_end).getTime() : new Date(b.session_start).getTime() + 2 * 60 * 60 * 1000,
         };
@@ -5427,9 +5123,11 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
         const created = new Date(o.created_at).getTime();
         for (const b of prepared) {
           if (created < b.start - WINDOW || created > b.end + WINDOW) continue;
+          // First name only. Table-code matching is gone with the tables --
+          // it was the weaker of the two signals anyway (10 against 12) and
+          // it depended on a Square permission the app was never granted.
           let score = 0;
           const basis = [];
-          if (parsed.code && b.base_code && parsed.code === b.base_code) { score += 10; basis.push('table code'); }
           if (parsed.words.length && b.first_name && parsed.words.includes(b.first_name)) { score += 12; basis.push('first name'); }
           // Time is a tie-breaker only. On its own it would happily attach a
           // cafe order to whichever session happened to be running.
