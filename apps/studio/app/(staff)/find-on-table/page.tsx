@@ -28,7 +28,6 @@ interface PieceResult {
 interface Fulfilment {
   fulfilment_method: 'collection' | 'posted' | null;
   postal_postcode: string | null;
-  collection_date: string | null;
   people: { person_name: string; collection_method: string | null; postal_postcode: string | null }[];
 }
 
@@ -171,12 +170,6 @@ export default function FindOnTablePage() {
             {isPostal ? 'Postal — needs a label' : 'Studio collection'}
           </p>
           {fulfilment.postal_postcode && <p style={{ fontSize: '0.78rem', color: '#666', marginTop: '0.2rem' }}>Postcode: {fulfilment.postal_postcode}</p>}
-          {fulfilment.collection_date && (
-            <p style={{ fontSize: '0.78rem', color: '#666', marginTop: '0.2rem' }}>
-              Collection date: {new Date(fulfilment.collection_date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
-            </p>
-          )}
-          {!fulfilment.collection_date && <p style={{ fontSize: '0.78rem', color: '#999', marginTop: '0.2rem' }}>No collection date set yet</p>}
           <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem' }}>
             <a
               href={`/kiln-dip?booking=${bookingCode}`}

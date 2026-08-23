@@ -241,7 +241,7 @@ app.get('/api/demo/pieces', async (req, res) => {
 
     const { data, error } = await supabase
       .from('pottery_pieces')
-      .select('id, piece_type, status, is_complete, created_at, scheduled_firing_date, reference_photo_url, mark_code, description, damaged, requires_second_firing, transfer_stage, glaze_fired_at, photo_phash, booking_id')
+      .select('id, piece_type, status, is_complete, created_at, scheduled_firing_date, reference_photo_url, photo_box, mark_code, description, damaged, requires_second_firing, transfer_stage, glaze_fired_at, photo_phash, booking_id')
       .eq('studio_id', DEMO_STUDIO_ID)
       .order('created_at', { ascending: false })
       .limit(100);
@@ -259,7 +259,6 @@ app.get('/api/demo/pieces', async (req, res) => {
     // from demo_app_session_status.
     const codes = [...new Set(filtered.map((p) => p.booking_id).filter(Boolean))];
     let bookingsByCode = {};
-    let collectionByCode = {};
     if (codes.length) {
       const { data: bks } = await supabase
         .from('bookings')
@@ -268,19 +267,15 @@ app.get('/api/demo/pieces', async (req, res) => {
         .in('booking_code', codes);
       bookingsByCode = Object.fromEntries((bks || []).map((b) => [b.booking_code, b]));
 
-      const { data: sts } = await supabase
-        .from('demo_app_session_status')
-        .select('booking_code, collection_date')
-        .eq('studio_id', DEMO_STUDIO_ID)
-        .in('booking_code', codes);
-      collectionByCode = Object.fromEntries((sts || []).map((s) => [s.booking_code, s.collection_date]));
+      // The collection date is no longer maintained by the app -- it is a
+      // promise made to the customer, not a state of the pottery. Showing
+      // it here was showing a stale field nothing updates.
     }
 
     const enriched = filtered.map((p) => ({
       ...p,
       customer_name: bookingsByCode[p.booking_id]?.customer_name || null,
       session_start: bookingsByCode[p.booking_id]?.session_start || null,
-      collection_date: collectionByCode[p.booking_id] || null,
     }));
 
     res.json(enriched);

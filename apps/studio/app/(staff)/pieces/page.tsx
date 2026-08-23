@@ -25,7 +25,7 @@ interface Piece {
   booking_id: string | null;
   customer_name: string | null;
   session_start: string | null;
-  collection_date: string | null;
+  photo_box: PieceBox | null;
 }
 
 interface Match {
@@ -34,6 +34,25 @@ interface Match {
   reference_photo_url: string | null;
   mark_code: string | null;
   distance: number;
+}
+
+type PieceBox = { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number };
+
+// Crops the shared table photo down to one piece. Every piece from a
+// booking carries the SAME photo of the whole table, so without this a
+// grid of pieces is a grid of identical table shots -- two rabbits from
+// one booking looked like the same picture twice, with the actual rabbits
+// barely visible. The same crop the booking, packing and shelf views use.
+function cropStyle(url: string, box: PieceBox): React.CSSProperties {
+  const w = box.right_pct - box.left_pct;
+  const h = box.bottom_pct - box.top_pct;
+  if (!(w > 0) || !(h > 0)) return { backgroundImage: `url(${url})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+  return {
+    backgroundImage: `url(${url})`,
+    backgroundSize: `${(100 / w) * 100}% ${(100 / h) * 100}%`,
+    backgroundPosition: `${w >= 100 ? 0 : (box.left_pct / (100 - w)) * 100}% ${h >= 100 ? 0 : (box.top_pct / (100 - h)) * 100}%`,
+    backgroundRepeat: 'no-repeat',
+  };
 }
 
 export default function PiecesPage() {
@@ -149,7 +168,15 @@ export default function PiecesPage() {
             >
               <div style={{ width: '100%', aspectRatio: '1', backgroundColor: '#f0f0f0', position: 'relative' }}>
                 {piece.reference_photo_url ? (
-                  <img src={piece.reference_photo_url} alt={piece.piece_type} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <div
+                    aria-label={piece.piece_type}
+                    style={{
+                      width: '100%', height: '100%',
+                      ...(piece.photo_box
+                        ? cropStyle(piece.reference_photo_url, piece.photo_box)
+                        : { backgroundImage: `url(${piece.reference_photo_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }),
+                    }}
+                  />
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#999', fontSize: '0.75rem' }}>No photo</div>
                 )}
@@ -174,11 +201,6 @@ export default function PiecesPage() {
                     Painted {new Date(piece.session_start).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
                   </p>
                 )}
-                {piece.collection_date && (
-                  <p style={{ fontSize: '0.72rem', color: 'var(--clay)', fontWeight: 600, marginBottom: '0.25rem' }}>
-                    Collect {new Date(piece.collection_date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
-                  </p>
-                )}
                 {piece.mark_code && <p style={{ fontSize: '0.75rem', color: 'var(--clay)', fontFamily: 'monospace', marginBottom: '0.25rem' }}>№ {piece.mark_code}</p>}
                 <span style={{ display: 'inline-block', padding: '0.15rem 0.6rem', backgroundColor: '#eef', borderRadius: '9999px', fontSize: '0.7rem', textTransform: 'capitalize' }}>
                   {piece.status.replace(/_/g, ' ')}
@@ -196,7 +218,18 @@ export default function PiecesPage() {
         >
           <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: 'white', borderRadius: '8px', maxWidth: '500px', width: '100%', maxHeight: '90vh', overflow: 'auto' }}>
             {selected.reference_photo_url && (
-              <img src={selected.reference_photo_url} alt={selected.piece_type} style={{ width: '100%', maxHeight: '350px', objectFit: 'cover' }} />
+              <>
+                {selected.photo_box ? (
+                  <div style={{ width: '100%', aspectRatio: '1', maxHeight: '350px', ...cropStyle(selected.reference_photo_url, selected.photo_box) }} />
+                ) : (
+                  <img src={selected.reference_photo_url} alt={selected.piece_type} style={{ width: '100%', maxHeight: '350px', objectFit: 'cover' }} />
+                )}
+                {/* The whole table underneath, because sometimes the only
+                    way to identify a piece is seeing what it sat next to. */}
+                {selected.photo_box && (
+                  <img src={selected.reference_photo_url} alt="" style={{ width: '100%', display: 'block', opacity: 0.85 }} />
+                )}
+              </>
             )}
             <div style={{ padding: '1.5rem' }}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>{selected.piece_type}</h2>
