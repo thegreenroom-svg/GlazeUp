@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { SkeletonRows } from '@/components/Skeleton';
-import { Receipt, Calendar } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 
 // Same fix already applied elsewhere (PinGate.tsx, daily-cards, floor):
 // a plain fetch() has no timeout, and this file gates real Save buttons
@@ -35,7 +35,6 @@ interface Booking {
   session_end: string;
   room: string | null;
   current_stage: string;
-  table_number: string | null;
   notes: string | null;
   booking_type: string | null;
   arrived_at: string | null;
@@ -45,7 +44,6 @@ interface Booking {
 
 interface BookingDetail {
   booking: Booking & { customer_phone: string | null };
-  session: { id: string; table_number: string; status: string; number_of_places: number } | null;
   orders: { id: string; item_name: string; quantity: number; unit_price_cents: number; notes: string | null }[];
   pieces: { id: string; piece_type: string | null; description: string | null; status: string; reference_photo_url: string | null; reference_photo_taken_at: string | null; mark_code: string | null; assigned_to: string | null; fulfilment: string | null; postal_postcode: string | null; hold_reason: string | null; photo_taken_by: string | null; photo_box: { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number } | null }[];
 }
@@ -83,10 +81,23 @@ function BookingsPageInner() {
   // Captured once at mount rather than read live: opening a booking from
   // the list shouldn't retroactively turn into full-page mode.
   const [deepLinked] = useState<boolean>(() => !!searchParams.get('code'));
+
+  // The same studio flag Floor already honours. The Till section was
+  // showing on a studio whose in-app till is switched off -- offering to
+  // add items to a till nobody uses, labelled "demo table only", which is
+  // the sort of thing that quietly erodes trust in everything around it.
+  // Defaults to ON so a studio that genuinely uses the in-app till never
+  // loses it to a slow or failed request.
+  const [tillEnabled, setTillEnabled] = useState(true);
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/studio/features`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d && typeof d.feature_in_app_till === 'boolean') setTillEnabled(d.feature_in_app_till); })
+      .catch(() => {});
+  }, []);
   const [showWalkIn, setShowWalkIn] = useState(false);
   const [walkInName, setWalkInName] = useState('');
   const [walkInParty, setWalkInParty] = useState('');
-  const [walkInTable, setWalkInTable] = useState('');
   const [walkInBusy, setWalkInBusy] = useState(false);
 
   const createWalkIn = async () => {
@@ -99,14 +110,13 @@ function BookingsPageInner() {
         body: JSON.stringify({
           customer_name: walkInName,
           party_size: walkInParty ? Number(walkInParty) : null,
-          table_number: walkInTable || null,
         }),
       });
       if (!res.ok) throw new Error();
       const created = await res.json();
       setBookings((prev) => [{ ...created, current_stage: 'booking', status: 'active', notes: null, booking_type: 'walk-in', arrived_at: null } as Booking, ...prev]);
       setShowWalkIn(false);
-      setWalkInName(''); setWalkInParty(''); setWalkInTable('');
+      setWalkInName(''); setWalkInParty('');
     } catch {
       setError('Could not create that walk-in booking.');
     } finally {
@@ -314,8 +324,7 @@ function BookingsPageInner() {
     const matchesSearch =
       b.customer_name.toLowerCase().includes(search.toLowerCase()) ||
       (b.customer_email || '').toLowerCase().includes(search.toLowerCase()) ||
-      (b.room || '').toLowerCase().includes(search.toLowerCase()) ||
-      (b.table_number || '').toLowerCase().includes(search.toLowerCase());
+      (b.room || '').toLowerCase().includes(search.toLowerCase());
     const matchesDate = showAllDates || b.session_start.startsWith(dateFilter);
     return matchesSearch && matchesDate;
   });
@@ -400,16 +409,6 @@ function BookingsPageInner() {
                 placeholder="Party size"
                 style={{ flex: 1, padding: '0.5rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box' }}
               />
-              <select
-                value={walkInTable}
-                onChange={(e) => setWalkInTable(e.target.value)}
-                style={{ flex: 1, padding: '0.5rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box', color: '#333', backgroundColor: 'white' }}
-              >
-                <option value="">Table (optional)</option>
-                {Array.from({ length: 8 }, (_, i) => `Main Studio ${i + 1}`).map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button onClick={() => setShowWalkIn(false)} style={{ flex: 1, padding: '0.55rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Cancel</button>
@@ -439,7 +438,7 @@ function BookingsPageInner() {
                 <th style={{ textAlign: 'left', padding: '0.75rem' }}>Customer</th>
                 <th style={{ textAlign: 'left', padding: '0.75rem' }}>Party</th>
                 <th style={{ textAlign: 'left', padding: '0.75rem' }}>Session</th>
-                <th style={{ textAlign: 'left', padding: '0.75rem' }}>Room / Table</th>
+                <th style={{ textAlign: 'left', padding: '0.75rem' }}>Room</th>
                 <th style={{ textAlign: 'left', padding: '0.75rem' }}>Stage</th>
                 <th style={{ textAlign: 'left', padding: '0.75rem' }}>Status</th>
               </tr>
@@ -478,7 +477,7 @@ function BookingsPageInner() {
                   </td>
                   <td style={{ padding: '0.75rem' }}>{b.party_size ?? '—'}</td>
                   <td style={{ padding: '0.75rem' }}>{new Date(b.session_start).toLocaleString()}</td>
-                  <td style={{ padding: '0.75rem' }}>{[b.room, b.table_number].filter(Boolean).join(' / ') || '—'}</td>
+                  <td style={{ padding: '0.75rem' }}>{b.room || '—'}</td>
                   <td style={{ padding: '0.75rem', textTransform: 'capitalize' }}>{b.current_stage}</td>
                   <td style={{ padding: '0.75rem' }}>
                     <span style={{ padding: '0.25rem 0.75rem', backgroundColor: '#eef', borderRadius: '9999px', fontSize: '0.75rem', textTransform: 'capitalize' }}>
@@ -577,12 +576,6 @@ function BookingsPageInner() {
                       </button>
                     )}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#999' }}>Table</span>
-                    {/* Read-only. The table comes from the Square
-                        appointment; the app doesn't decide it. */}
-                    <span>{detail.booking.table_number || '—'}</span>
-                  </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#999' }}>Session</span><span>{new Date(detail.booking.session_start).toLocaleString()}</span></div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#999' }}>Stage</span><span style={{ textTransform: 'capitalize' }}>{detail.booking.current_stage}</span></div>
                   {detail.booking.notes && (
@@ -590,42 +583,9 @@ function BookingsPageInner() {
                   )}
                 </div>
 
-                <div style={{ paddingTop: '1rem', borderTop: '1px solid #eee' }}>
-                  <h3 style={{ fontSize: '0.95rem', fontWeight: '600', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Receipt size={16} /> Table Session
-                  </h3>
-                  {!detail.session ? (
-                    <p style={{ fontSize: '0.85rem', color: '#999' }}>No table session linked to this booking yet.</p>
-                  ) : (
-                    <>
-                      <p style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.5rem' }}>
-                        Table {detail.session.table_number} · {detail.session.number_of_places} places · <span style={{ textTransform: 'capitalize' }}>{detail.session.status}</span>
-                      </p>
-                      {detail.orders.length === 0 ? (
-                        <p style={{ fontSize: '0.85rem', color: '#999' }}>No items ordered yet.</p>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                          {detail.orders.map((o) => (
-                            <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                              <span>{o.quantity}× {o.item_name}</span>
-                              <span>£{((o.unit_price_cents * o.quantity) / 100).toFixed(2)}</span>
-                            </div>
-                          ))}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', paddingTop: '0.4rem', borderTop: '1px solid #eee', marginTop: '0.2rem' }}>
-                            <span>Total</span>
-                            <span>£{orderTotal(detail.orders).toFixed(2)}</span>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-
+                {tillEnabled && (
                 <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #eee' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                    <h3 style={{ fontSize: '0.95rem', fontWeight: '600' }}>Till</h3>
-                    <span style={{ fontSize: '0.7rem', color: '#999' }}>demo table only</span>
-                  </div>
+                  <h3 style={{ fontSize: '0.95rem', fontWeight: '600', marginBottom: '0.75rem' }}>Till</h3>
 
                   {tillItems.length === 0 ? (
                     <p style={{ fontSize: '0.85rem', color: '#999', marginBottom: '0.75rem' }}>Nothing added yet.</p>
@@ -693,6 +653,7 @@ function BookingsPageInner() {
                     </>
                   )}
                 </div>
+                )}
 
                 {/* The booking is the hub. Everything operational in the
                     studio happens TO a booking -- running the session,
