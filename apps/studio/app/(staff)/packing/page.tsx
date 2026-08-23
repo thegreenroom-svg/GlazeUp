@@ -29,14 +29,15 @@ type PieceBox = { left_pct: number; top_pct: number; right_pct: number; bottom_p
 interface QueueItem {
   booking_code: string;
   customer_name: string;
-  collection_date: string;
-  days_until: number;
-  collection_method: string | null;
-  postal_postcode: string | null;
   piece_count: number;
   on_hold: number;
-  collected: number;
+  ready: number;
+  out_of_kiln: boolean;
+  posting: number;
+  postal_postcode: string | null;
+  shelf_label: string | null;
   has_photo: boolean;
+  collected: number;
   done: boolean;
 }
 
@@ -66,15 +67,6 @@ function cropStyle(url: string, box: PieceBox): React.CSSProperties {
   };
 }
 
-// "due in 13 days" beats a bare date someone has to subtract from today
-// in their head while holding a box of pottery.
-function dueLabel(days: number): { text: string; colour: string } {
-  if (days < 0) return { text: `${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} overdue`, colour: '#C0392B' };
-  if (days === 0) return { text: 'Due today', colour: '#C0392B' };
-  if (days === 1) return { text: 'Due tomorrow', colour: '#A6761D' };
-  if (days <= 3) return { text: `Due in ${days} days`, colour: '#A6761D' };
-  return { text: `Due in ${days} days`, colour: '#777' };
-}
 
 export default function PackingPage() {
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -252,8 +244,8 @@ export default function PackingPage() {
         </button>
 
         <p style={{ fontSize: '0.82rem', color: '#666', margin: '0.6rem 0 0.75rem' }}>
-          {openBooking.collection_method === 'postal'
-            ? `Posting${openBooking.postal_postcode ? ` to ${openBooking.postal_postcode}` : ''}`
+          {openBooking.posting > 0
+            ? `${openBooking.posting} to post${openBooking.postal_postcode ? ` · ${openBooking.postal_postcode}` : ''}`
             : 'Collecting from the studio'}
           {openBooking.on_hold > 0 && ` · ${openBooking.on_hold} on hold, not in this parcel`}
         </p>
@@ -416,7 +408,7 @@ export default function PackingPage() {
         <div style={{ padding: '1.5rem', textAlign: 'center', border: '1px dashed #ddd', borderRadius: 10 }}>
           <Package size={26} style={{ color: '#ccc' }} />
           <p style={{ fontSize: '0.9rem', fontWeight: 600, marginTop: '0.5rem' }}>Nothing due to go out</p>
-          <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '0.25rem' }}>Bookings appear here as soon as they have pieces, so you can pack ahead of the collection date.</p>
+          <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '0.25rem' }}>Bookings appear here as soon as they have pieces. Oldest first.</p>
         </div>
       )}
 
@@ -435,20 +427,23 @@ export default function PackingPage() {
             <div style={{ minWidth: 0 }}>
               <p style={{ fontSize: '0.9rem', fontWeight: 700 }}>{q.customer_name}</p>
               <p style={{ fontSize: '0.75rem', color: '#777' }}>
-                {q.piece_count} piece{q.piece_count === 1 ? '' : 's'}
-                {q.collection_method === 'postal' ? ' · posting' : ' · collecting'}
+                {q.posting > 0 ? `${q.posting} to post` : 'Collecting'}
                 {q.on_hold > 0 ? ` · ${q.on_hold} on hold` : ''}
+                {q.shelf_label ? ` · ${q.shelf_label}` : ''}
               </p>
               {/* Said up front so nobody walks to the shelf expecting a
                   photo that was never taken. */}
               {!q.has_photo && <p style={{ fontSize: '0.72rem', color: '#A6761D' }}>No photo — identify by description</p>}
             </div>
             <div style={{ flexShrink: 0, marginLeft: '0.5rem', textAlign: 'right' }}>
-              <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: q.done ? '#2E7D32' : 'var(--clay)' }}>
-                {q.done ? 'Packed' : `${q.collected}/${q.piece_count}`}
+              <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: q.out_of_kiln ? '#2E7D32' : 'var(--clay)' }}>
+                {q.piece_count} piece{q.piece_count === 1 ? '' : 's'}
               </span>
-              <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 600, color: dueLabel(q.days_until).colour }}>
-                {dueLabel(q.days_until).text}
+              {/* Out of the kiln and on a shelf, or still waiting to be
+                  fired -- which is what a packer needs to know before
+                  walking anywhere. No dates involved. */}
+              <span style={{ display: 'block', fontSize: '0.68rem', fontWeight: 600, color: q.out_of_kiln ? '#2E7D32' : '#A6761D' }}>
+                {q.out_of_kiln ? (q.shelf_label || 'Out of the kiln') : `${q.ready}/${q.piece_count} fired`}
               </span>
             </div>
           </button>

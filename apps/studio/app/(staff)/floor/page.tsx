@@ -138,7 +138,6 @@ export default function FloorPage() {
   const [tableTotals, setTableTotals] = useState<Record<string, number>>({});
   const [collectionMethod, setCollectionMethod] = useState<'studio' | 'postal' | null>(null);
   const [postalPostcode, setPostalPostcode] = useState('');
-  const [collectionDate, setCollectionDate] = useState('');
   const [liveSquareOrder, setLiveSquareOrder] = useState<{
     matched: boolean; reason?: string; multiple_candidates?: boolean; table_number?: string;
     order: { ticket_name: string; total_gbp: number | null; items: { name: string; quantity: number; total_gbp: number | null }[]; updated_at: string } | null;
@@ -303,7 +302,6 @@ export default function FloorPage() {
     setShowAllItems(false);
     setCollectionMethod(null);
     setPostalPostcode('');
-    setCollectionDate(defaultCollectionDate());
     setLiveSquareOrder(null);
     setActivePersonTag(null);
     setNewPersonInput('');
@@ -393,52 +391,6 @@ export default function FloorPage() {
       }
     })();
   }, [searchParams]);
-
-  // The studio's REAL current collection date, not a generic turnaround.
-  //
-  // This used to be today + 14 days, which is why Daisy's four bookings
-  // from 21 Aug came out as 4 September when the studio's actual
-  // collection date was the 28th. Everything else in the diary -- around
-  // thirty bookings -- correctly says 28 Aug, because it was set on the
-  // studio record and read from there. Only the Floor completion screen
-  // invented its own, so the bookings taken through the app were the odd
-  // ones out.
-  //
-  // It also quietly broke the whole point of kiln batches: pieces that
-  // belong on the same shelf were being promised different dates, which
-  // splits one physical firing into two batches that don't exist.
-  const [studioCollectionDate, setStudioCollectionDate] = useState<string | null>(null);
-  const collectionDateTouched = useRef(false);
-  useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/studio/collection-date`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (!d?.current_collection_date) return;
-        setStudioCollectionDate(d.current_collection_date);
-        // The default is computed the moment a booking is tapped, so on a
-        // slow studio connection that can happen BEFORE this fetch lands --
-        // and the booking would silently get the +14 fallback, which is the
-        // exact bug being fixed. So correct it when the real date arrives,
-        // unless someone has already deliberately changed it.
-        const today = new Date().toISOString().slice(0, 10);
-        if (!collectionDateTouched.current && d.current_collection_date >= today) {
-          setCollectionDate(d.current_collection_date);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  const defaultCollectionDate = () => {
-    // Falls back to +14 days only if the studio has never set one, and
-    // never to a date already in the past -- a stale studio date left
-    // over from last month would otherwise promise customers a
-    // collection day that has already been and gone.
-    const today = new Date().toISOString().slice(0, 10);
-    if (studioCollectionDate && studioCollectionDate >= today) return studioCollectionDate;
-    const d = new Date();
-    d.setDate(d.getDate() + 14);
-    return d.toISOString().slice(0, 10);
-  };
 
   // Single-tap return from any depth (bucket, subsection, or item grid)
   // straight to the top-level Till group tiles -- Cafe or Pottery Blanks
@@ -566,7 +518,6 @@ export default function FloorPage() {
           payment_method: null,
           collection_method: collectionMethod,
           postal_postcode: collectionMethod === 'postal' ? postalPostcode.trim() : undefined,
-          collection_date: collectionDate || undefined,
           till_total_cents: tillTotal,
           split_bill_count: splitBillCount > 1 ? splitBillCount : undefined,
         }),
@@ -602,7 +553,6 @@ export default function FloorPage() {
     setQrUrl(null);
     setCollectionMethod(null);
     setPostalPostcode('');
-    setCollectionDate('');
     setActivePersonTag(null);
     setNewPersonInput('');
     setAddingPerson(false);
@@ -1135,10 +1085,16 @@ export default function FloorPage() {
     // Collection stays required: studio pickup vs postal genuinely
     // changes what happens to the pottery, and nothing outside this app
     // knows which it is.
+    // The collection date is gone. Per Daisy it is a promise made to the
+    // customer, not a state of the pottery -- the studio tells them when it
+    // will be ready and fires the kiln in good time. Keeping it here made
+    // the app the third place that opinion lived, and it caused three real
+    // bugs in a day: a +14 default that promised the wrong week, a packing
+    // queue that showed nothing until the date arrived, and a batch move
+    // that needed a date to move to.
     const finishDisabled =
       saving || !collectionMethod ||
-      (collectionMethod === 'postal' && !postalPostcode.trim()) ||
-      !collectionDate;
+      (collectionMethod === 'postal' && !postalPostcode.trim());
     // Real per-person breakdown -- only shows up if anyone was actually
     // tagged while adding items. Bookings that never use this feature look
     // exactly as they always have.
@@ -1266,23 +1222,6 @@ export default function FloorPage() {
                 placeholder="Destination postcode"
                 style={{ marginTop: '0.6rem', width: '100%', padding: '0.5rem 0.6rem', borderRadius: 8, border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: '0.85rem' }}
               />
-            )}
-            {collectionMethod && (
-              <div style={{ marginTop: '0.6rem' }}>
-                <label style={{ display: 'block', color: B.stone, fontSize: '0.75rem', marginBottom: '0.3rem' }}>
-                  {collectionMethod === 'postal' ? 'Ready to post from' : 'Ready for collection on'}
-                </label>
-                <input
-                  type="date"
-                  value={collectionDate}
-                  min={new Date().toISOString().slice(0, 10)}
-                  onChange={(e) => { collectionDateTouched.current = true; setCollectionDate(e.target.value); }}
-                  style={{ width: '100%', padding: '0.5rem 0.6rem', borderRadius: 8, border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: '0.85rem', colorScheme: 'dark' }}
-                />
-                <p style={{ color: B.stone, fontSize: '0.7rem', marginTop: '0.3rem' }}>
-                  Told to the customer at hand-off · defaults to 14 days for firing, change if needed
-                </p>
-              </div>
             )}
           </div>
 
@@ -1425,8 +1364,8 @@ export default function FloorPage() {
             >
               {saving ? <><Loader size={18} className="animate-spin" /> Saving...</> : <>Finish &amp; Hand off <ChevronRight size={20} /></>}
             </button>
-            {(!collectionMethod || !collectionDate) && (
-              <p style={{ color: B.stone, fontSize: '0.7rem', textAlign: 'center', marginTop: '0.5rem' }}>Choose collection and a date above to finish</p>
+            {!collectionMethod && (
+              <p style={{ color: B.stone, fontSize: '0.7rem', textAlign: 'center', marginTop: '0.5rem' }}>Choose collecting or posting above to finish</p>
             )}
           </div>
         </div>
@@ -1461,11 +1400,6 @@ export default function FloorPage() {
               {collectionMethod && (
                 <p style={{ color: B.stone }} className="text-xs mt-1">
                   {collectionMethod === 'postal' ? `📮 Postal to ${postalPostcode}` : '🏠 Studio pickup'}
-                </p>
-              )}
-              {collectionDate && (
-                <p style={{ color: B.ivory }} className="text-xs mt-2 font-semibold">
-                  📅 {collectionMethod === 'postal' ? 'Posting from' : 'Ready for collection'}: {new Date(collectionDate + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
                 </p>
               )}
               {photo && <p style={{ color: '#7ec98a' }} className="text-xs mt-1 flex items-center gap-1"><Check size={12} /> Photo confirmed to booking</p>}

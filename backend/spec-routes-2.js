@@ -4519,49 +4519,11 @@ export function registerScheduleRoute(app, supabase, STUDIO_ID, logger) {
         .in('booking_code', (bookings || []).map((b) => b.booking_code).concat(['__none__']));
       const finished = new Set((statuses || []).filter((s) => s.finished_at).map((s) => s.booking_code));
 
-      // Pottery due back TODAY, from sessions that happened weeks ago.
-      // This is the thing a Square calendar structurally cannot show,
-      // because Square doesn't know the pottery exists -- it sees a
-      // 90-minute appointment that ended a fortnight back and is done
-      // with it. A collection is a real event happening today with
-      // someone walking through the door for it, and it belongs on the
-      // day view next to the sessions.
-      // collection_date/method live on demo_app_session_status, NOT on
-      // bookings -- checked against the live schema rather than assumed.
-      // Querying bookings for them would have thrown and taken the whole
-      // day view down with it.
-      const { data: dueStatuses } = await supabase
-        .from('demo_app_session_status')
-        .select('booking_code, collection_date, collection_method, postal_postcode')
-        .eq('studio_id', STUDIO_ID)
-        .eq('collection_date', date);
-
-      const dueCodes = (dueStatuses || []).map((s2) => s2.booking_code);
-
-      // Names come from bookings, so a collection card says "Charlie
-      // Marlow" rather than a booking code nobody can read at a counter.
-      let nameByCode = new Map();
-      if (dueCodes.length) {
-        const { data: dueBookingRows } = await supabase
-          .from('bookings')
-          .select('booking_code, customer_name')
-          .eq('studio_id', STUDIO_ID)
-          .in('booking_code', dueCodes);
-        nameByCode = new Map((dueBookingRows || []).map((b) => [b.booking_code, b.customer_name]));
-      }
-      let piecesByBooking = {};
-      if (dueCodes.length) {
-        const { data: duePieces } = await supabase
-          .from('pottery_pieces')
-          .select('booking_id, status, piece_type')
-          .eq('studio_id', STUDIO_ID)
-          .in('booking_id', dueCodes)
-          .neq('archived', true);
-        for (const p of duePieces || []) {
-          if (!piecesByBooking[p.booking_id]) piecesByBooking[p.booking_id] = [];
-          piecesByBooking[p.booking_id].push(p);
-        }
-      }
+      // The collections-due lane is gone with the collection date. It
+      // predicted arrivals from a date the app had stopped trusting -- and
+      // per Daisy the customer comes when they know it's ready, which the
+      // studio tells them, not the app. Honest to lose it rather than keep
+      // showing a projection built on a guess.
 
       res.json({
         date,
@@ -4574,18 +4536,7 @@ export function registerScheduleRoute(app, supabase, STUDIO_ID, logger) {
         // Nothing can be unassigned -- every booking has a service, so
         // every booking has a room.
         unassigned: 0,
-        collections: (dueStatuses || []).map((b) => ({
-          booking_code: b.booking_code,
-          customer_name: nameByCode.get(b.booking_code) || b.booking_code,
-          collection_method: b.collection_method,
-          postal_postcode: b.postal_postcode,
-          piece_count: (piecesByBooking[b.booking_code] || []).length,
-          // "Ready" means every piece has cleared the kiln stages. Counted
-          // rather than assumed, so the lane tells the truth about what can
-          // actually be handed over when someone arrives.
-          ready: (piecesByBooking[b.booking_code] || []).length > 0
-            && (piecesByBooking[b.booking_code] || []).every((p) => ['ready', 'collected', 'complete'].includes(String(p.status || '').toLowerCase())),
-        })),
+        collections: [],
       });
     } catch (err) {
       logger.error('schedule failed', err.message);
@@ -4616,90 +4567,76 @@ export function registerScheduleRoute(app, supabase, STUDIO_ID, logger) {
 export function registerPackingRoutes(app, supabase, STUDIO_ID, logger) {
   app.get('/api/spec/packing/queue', async (req, res) => {
     try {
-      // Packing happens when the pottery comes OUT OF THE KILN, which is
-      // days before the collection date -- Daisy's point, and the reason
-      // this screen was empty. The first version filtered to collection
-      // dates that had already arrived, so all four of today's bookings
-      // (collection 4 Sept, thirteen days out) were invisible to the
-      // packer who has the fired pieces in front of them right now.
+      // Driven by the pottery, not by a promised date. Per Daisy: the
+      // collection date is projected forward to the customer and does not
+      // belong in the app -- packing happens when the kiln comes out, and
+      // it always finishes before the customer is due.
       //
-      // A collection date is a PROMISE TO THE CUSTOMER, not a signal that
-      // work can start. So the queue shows everything still to pack,
-      // soonest promise first, and lets the packer work as far ahead as
-      // they like.
-      const horizonDays = Math.min(parseInt(req.query.days, 10) || 60, 180);
-      const horizon = new Date(Date.now() + horizonDays * 24 * 60 * 60 * 1000)
-        .toISOString().slice(0, 10);
-
-      const { data: statuses, error } = await supabase
-        .from('demo_app_session_status')
-        .select('booking_code, collection_date, collection_method, postal_postcode, finished_at')
+      // Oldest first, because that is the honest priority order once dates
+      // are gone: whatever has been waiting longest goes out next.
+      const { data: pieces, error } = await supabase
+        .from('pottery_pieces')
+        .select('id, booking_id, status, fulfilment, assigned_to, postal_postcode, reference_photo_url, shelf_id, reference_photo_taken_at, created_at')
         .eq('studio_id', STUDIO_ID)
-        .not('collection_date', 'is', null)
-        .lte('collection_date', horizon)
-        .order('collection_date', { ascending: true });
+        .neq('archived', true)
+        .neq('status', 'collected')
+        .order('created_at', { ascending: true });
       if (error) throw error;
 
-      const codes = (statuses || []).map((s) => s.booking_code);
-      if (!codes.length) return res.json({ upto, queue: [] });
+      const live = (pieces || []).filter((p) => p.fulfilment !== 'return_visit');
+      const heldByBooking = {};
+      for (const p of pieces || []) {
+        if (p.fulfilment === 'return_visit') heldByBooking[p.booking_id] = (heldByBooking[p.booking_id] || 0) + 1;
+      }
+      if (!live.length) return res.json({ queue: [] });
 
+      const codes = Array.from(new Set(live.map((p) => p.booking_id)));
       const { data: bookingRows } = await supabase
         .from('bookings')
         .select('booking_code, customer_name, session_start')
         .eq('studio_id', STUDIO_ID)
         .in('booking_code', codes);
-      const bookingByCode = new Map((bookingRows || []).map((b) => [b.booking_code, b]));
+      const byCode = new Map((bookingRows || []).map((b) => [b.booking_code, b]));
 
-      const { data: pieces } = await supabase
-        .from('pottery_pieces')
-        .select('booking_id, status, fulfilment, assigned_to, reference_photo_url')
-        .eq('studio_id', STUDIO_ID)
-        .in('booking_id', codes)
-        .neq('archived', true);
-
-      const byBooking = {};
-      for (const p of pieces || []) {
-        (byBooking[p.booking_id] = byBooking[p.booking_id] || []).push(p);
+      const shelfIds = Array.from(new Set(live.map((p) => p.shelf_id).filter(Boolean)));
+      let shelfById = new Map();
+      if (shelfIds.length) {
+        const { data: shelves } = await supabase
+          .from('kiln_shelves')
+          .select('id, label, out_of_kiln_at')
+          .eq('studio_id', STUDIO_ID)
+          .in('id', shelfIds);
+        shelfById = new Map((shelves || []).map((sh) => [sh.id, sh]));
       }
 
-      const queue = (statuses || []).map((st) => {
-        const ps = byBooking[st.booking_code] || [];
-        // Pieces on hold are genuinely not part of this parcel -- the
-        // customer is coming back to finish them -- so they're counted
-        // separately rather than making a booking look incomplete forever.
-        const onHold = ps.filter((p) => p.fulfilment === 'return_visit').length;
-        const live = ps.filter((p) => p.fulfilment !== 'return_visit');
-        const collected = live.filter((p) => String(p.status || '').toLowerCase() === 'collected').length;
+      const queue = codes.map((code) => {
+        const ps = live.filter((p) => p.booking_id === code);
+        const shelf = ps.map((p) => p.shelf_id).find(Boolean);
+        const ready = ps.filter((p) => ['ready', 'collected', 'complete'].includes(String(p.status || '').toLowerCase())).length;
+        const posting = ps.filter((p) => p.fulfilment === 'post').length;
         return {
-          booking_code: st.booking_code,
-          customer_name: bookingByCode.get(st.booking_code)?.customer_name || st.booking_code,
-          session_start: bookingByCode.get(st.booking_code)?.session_start || null,
-          collection_date: st.collection_date,
-          // Negative = overdue. Lets the queue say "due in 13 days" or
-          // "OVERDUE" rather than a bare date the packer has to subtract
-          // from today's in their head while holding a box.
-          days_until: Math.round(
-            (new Date(`${st.collection_date}T00:00:00Z`).getTime()
-              - new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00Z').getTime())
-            / 86400000
-          ),
-          collection_method: st.collection_method,
-          postal_postcode: st.postal_postcode,
-          piece_count: live.length,
-          on_hold: onHold,
-          collected,
-          // Whether there's a reference photo to pack against at all. Shown
-          // honestly in the queue so a packer knows before they walk to the
-          // shelf that this is one they'll be identifying by hand.
+          booking_code: code,
+          customer_name: byCode.get(code)?.customer_name || code,
+          session_start: byCode.get(code)?.session_start || null,
+          piece_count: ps.length,
+          on_hold: heldByBooking[code] || 0,
+          // Out of the kiln and genuinely on a shelf, which is what a
+          // packer needs to know before walking anywhere.
+          ready,
+          out_of_kiln: ready === ps.length && ps.length > 0,
+          posting,
+          postal_postcode: ps.map((p) => p.postal_postcode).find(Boolean) || null,
+          shelf_id: shelf || null,
+          shelf_label: shelf ? (shelfById.get(shelf)?.label || null) : null,
           has_photo: ps.some((p) => p.reference_photo_url),
-          done: live.length > 0 && collected === live.length,
+          collected: 0,
+          done: false,
         };
       })
-      // Anything with no pieces at all isn't packable -- keeping it in the
-      // queue would just be noise on a screen used under time pressure.
-      .filter((b) => b.piece_count > 0 || b.on_hold > 0);
+      // Longest-waiting first.
+      .sort((a, b) => String(a.session_start || '').localeCompare(String(b.session_start || '')));
 
-      res.json({ horizon, queue });
+      res.json({ queue });
     } catch (err) {
       logger.error('packing queue failed', err.message);
       res.status(500).json({ error: err.message });
@@ -4735,257 +4672,186 @@ export function registerPackingRoutes(app, supabase, STUDIO_ID, logger) {
 }
 
 // ============================================================================
-// KILN BATCHES -- one scan takes a whole shelf out of the kiln
+// KILN SHELVES -- a batch is a physical shelf, not a date
 // ----------------------------------------------------------------------------
-// Daisy: "Out of kiln actions... maybe we have a master QR for the collection
-// date."
+// Daisy: "collection date will always be projected forward to the customer as
+// opposed to needed to be on the app... our second time stamp is the QR for
+// kiln firing. Third time stamp is really the packing process."
 //
-// The right unit, and not the obvious one. Pieces are fired and shelved as a
-// BATCH sharing a collection date, so the natural action is "this whole
-// trolley is out", not forty individual taps -- and forty taps is the kind of
-// job that quietly stops being done on a busy Saturday.
+// She's right, and this is the structural consequence. A batch used to be
+// DEFINED by its collection date -- that was the grouping key and what the QR
+// encoded. But a collection date is a promise to a customer, not a state of
+// the pottery, and treating it as both caused three real bugs in one day: a
+// +14 default that promised the wrong week, a packing queue that showed
+// nothing because it waited for the date to arrive, and a batch move that
+// needed a date to move to.
 //
-// So a batch is every piece promised for one collection date. Print its QR
-// once, tape it to the shelf or trolley, and whoever unloads the kiln scans
-// it. Physical object, physical action, one scan.
+// So a batch is now what it physically is: a SHELF. Print a sticker, the
+// shelf exists, pieces join it when they come out of the kiln. It survives a
+// delayed firing with nothing to reschedule, because a shelf has no due date
+// -- it just has pottery on it.
 //
-// This introduces 'ready' as the status meaning out of the kiln and on the
-// shelf. Until now every piece in the studio sat at 'queued' from the moment
-// it was painted to the moment it was collected, so nothing could tell a
-// packer which pottery actually existed on a shelf yet.
+// The three timestamps, all of which already existed and none of which need a
+// date:
+//   1. Table photographed        -> reference_photo_taken_at on each piece
+//   2. Shelf out of the kiln     -> kiln_shelves.out_of_kiln_at, pieces 'ready'
+//   3. Packed                    -> piece status 'collected'
 // ============================================================================
-export function registerKilnBatchRoutes(app, supabase, STUDIO_ID, logger) {
-  // Shared: the pieces belonging to one collection date.
-  const batchPieces = async (date) => {
-    const { data: statuses } = await supabase
-      .from('demo_app_session_status')
-      .select('booking_code')
-      .eq('studio_id', STUDIO_ID)
-      .eq('collection_date', date);
-    const codes = (statuses || []).map((s) => s.booking_code);
-    if (!codes.length) return { codes: [], pieces: [] };
-
-    const { data: pieces } = await supabase
-      .from('pottery_pieces')
-      .select('id, booking_id, status, fulfilment, piece_type')
-      .eq('studio_id', STUDIO_ID)
-      .in('booking_id', codes)
-      .neq('archived', true);
-    return { codes, pieces: pieces || [] };
-  };
-
-  // The list of batches -- what's in the kiln and what's coming.
-  app.get('/api/spec/kiln/batches', async (req, res) => {
+export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
+  // Create a shelf. The label is just a human handle for the sticker -- what
+  // identifies it is the id, so two shelves can share a label without the
+  // scan ever becoming ambiguous.
+  app.post('/api/spec/kiln/shelves', async (req, res) => {
     try {
-      const { data: statuses, error } = await supabase
-        .from('demo_app_session_status')
-        .select('booking_code, collection_date')
-        .eq('studio_id', STUDIO_ID)
-        .not('collection_date', 'is', null)
-        .order('collection_date', { ascending: true });
+      const label = String(req.body?.label || '').trim()
+        || `Shelf ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
+      const { data, error } = await supabase
+        .from('kiln_shelves')
+        .insert({ studio_id: STUDIO_ID, label })
+        .select('id, label, created_at, out_of_kiln_at')
+        .single();
       if (error) throw error;
-
-      const codes = (statuses || []).map((s) => s.booking_code);
-      const dateByCode = new Map((statuses || []).map((s) => [s.booking_code, s.collection_date]));
-      if (!codes.length) return res.json({ batches: [] });
-
-      const { data: pieces } = await supabase
-        .from('pottery_pieces')
-        .select('booking_id, status, fulfilment')
-        .eq('studio_id', STUDIO_ID)
-        .in('booking_id', codes)
-        .neq('archived', true);
-
-      const byDate = {};
-      for (const p of pieces || []) {
-        const d = dateByCode.get(p.booking_id);
-        if (!d) continue;
-        // A piece held for a return visit is not in this firing -- the
-        // customer hasn't finished painting it. Counted separately so the
-        // batch total matches what's physically on the shelf.
-        if (p.fulfilment === 'return_visit') {
-          byDate[d] = byDate[d] || { date: d, pieces: 0, out: 0, on_hold: 0, bookings: new Set() };
-          byDate[d].on_hold++;
-          continue;
-        }
-        byDate[d] = byDate[d] || { date: d, pieces: 0, out: 0, on_hold: 0, bookings: new Set() };
-        byDate[d].pieces++;
-        byDate[d].bookings.add(p.booking_id);
-        if (['ready', 'collected', 'complete'].includes(String(p.status || '').toLowerCase())) byDate[d].out++;
-      }
-
-      const today = new Date().toISOString().slice(0, 10);
-      const batches = Object.values(byDate)
-        .map((b) => ({
-          date: b.date,
-          pieces: b.pieces,
-          out: b.out,
-          on_hold: b.on_hold,
-          bookings: b.bookings.size,
-          all_out: b.pieces > 0 && b.out === b.pieces,
-          days_until: Math.round(
-            (new Date(`${b.date}T00:00:00Z`).getTime() - new Date(`${today}T00:00:00Z`).getTime()) / 86400000
-          ),
-        }))
-        .filter((b) => b.pieces > 0)
-        .sort((a, b) => a.date.localeCompare(b.date));
-
-      res.json({ batches });
+      res.json(data);
     } catch (err) {
-      logger.error('kiln batches failed', err.message);
+      logger.error('create shelf failed', err.message);
       res.status(500).json({ error: err.message });
     }
   });
 
-  // One batch, as the QR lands on it.
-  app.get('/api/spec/kiln/batch/:date', async (req, res) => {
+  app.get('/api/spec/kiln/shelves', async (req, res) => {
     try {
-      const { codes, pieces } = await batchPieces(req.params.date);
+      const { data: shelves, error } = await supabase
+        .from('kiln_shelves')
+        .select('id, label, created_at, out_of_kiln_at, closed_at')
+        .eq('studio_id', STUDIO_ID)
+        .is('closed_at', null)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
 
-      // A printed card taped to a trolley outlives the date on it. If this
-      // batch has been moved, say so instead of reporting an empty shelf.
-      if (!codes.length) {
-        const { data: move } = await supabase
-          .from('kiln_batch_moves')
-          .select('to_date, moved_bookings, created_at')
+      const ids = (shelves || []).map((s) => s.id);
+      let counts = {};
+      if (ids.length) {
+        const { data: pieces } = await supabase
+          .from('pottery_pieces')
+          .select('shelf_id, status')
           .eq('studio_id', STUDIO_ID)
-          .eq('from_date', req.params.date)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (move) {
-          return res.json({
-            date: req.params.date, bookings: [], piece_count: 0, already_out: 0, on_hold: 0,
-            moved_to: move.to_date, moved_bookings: move.moved_bookings,
-          });
+          .in('shelf_id', ids)
+          .neq('archived', true);
+        for (const p of pieces || []) {
+          const c = counts[p.shelf_id] || { total: 0, packed: 0 };
+          c.total++;
+          if (String(p.status || '').toLowerCase() === 'collected') c.packed++;
+          counts[p.shelf_id] = c;
         }
       }
 
-      const live = pieces.filter((p) => p.fulfilment !== 'return_visit');
-      const out = live.filter((p) => ['ready', 'collected', 'complete'].includes(String(p.status || '').toLowerCase()));
+      res.json({
+        shelves: (shelves || []).map((s) => ({
+          ...s,
+          pieces: counts[s.id]?.total || 0,
+          packed: counts[s.id]?.packed || 0,
+          all_packed: (counts[s.id]?.total || 0) > 0 && counts[s.id].total === counts[s.id].packed,
+        })),
+      });
+    } catch (err) {
+      logger.error('list shelves failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
 
+  app.get('/api/spec/kiln/shelves/:id', async (req, res) => {
+    try {
+      const { data: shelf, error } = await supabase
+        .from('kiln_shelves')
+        .select('id, label, created_at, out_of_kiln_at, closed_at')
+        .eq('studio_id', STUDIO_ID)
+        .eq('id', req.params.id)
+        .maybeSingle();
+      if (error) throw error;
+      if (!shelf) return res.status(404).json({ error: 'That shelf does not exist' });
+
+      const { data: pieces } = await supabase
+        .from('pottery_pieces')
+        .select('id, booking_id, piece_type, description, status, fulfilment, reference_photo_url, photo_box')
+        .eq('studio_id', STUDIO_ID)
+        .eq('shelf_id', req.params.id)
+        .neq('archived', true);
+
+      const codes = Array.from(new Set((pieces || []).map((p) => p.booking_id)));
       const { data: bookingRows } = codes.length
         ? await supabase.from('bookings').select('booking_code, customer_name')
             .eq('studio_id', STUDIO_ID).in('booking_code', codes)
         : { data: [] };
+      const nameByCode = new Map((bookingRows || []).map((b) => [b.booking_code, b.customer_name]));
 
       res.json({
-        date: req.params.date,
-        bookings: (bookingRows || []).map((b) => ({
-          booking_code: b.booking_code,
-          customer_name: b.customer_name,
-          pieces: live.filter((p) => p.booking_id === b.booking_code).length,
-        })).filter((b) => b.pieces > 0),
-        piece_count: live.length,
-        already_out: out.length,
-        on_hold: pieces.length - live.length,
+        ...shelf,
+        bookings: codes.map((code) => ({
+          booking_code: code,
+          customer_name: nameByCode.get(code) || code,
+          pieces: (pieces || []).filter((p) => p.booking_id === code),
+        })),
+        piece_count: (pieces || []).length,
       });
     } catch (err) {
-      logger.error('kiln batch failed', err.message);
+      logger.error('get shelf failed', err.message);
       res.status(500).json({ error: err.message });
     }
   });
 
-  // ==========================================================================
-  // MOVING A BATCH -- "the kiln broke, everything on the 28th is now the 4th"
-  // --------------------------------------------------------------------------
-  // Daisy: "if the collection date is changed... it's a global change across
-  // everything that's affecting... But the global date for the other
-  // collections on bookings that have happened that haven't been sequenced
-  // and changed needed to stay the same."
-  //
-  // Two genuinely different operations that were sharing one field:
-  //
-  //   1. MOVE A BATCH (this route). A real firing slipped. Every booking
-  //      promised that date moves together, because they are one physical
-  //      shelf. Packing, collections and the day view all read
-  //      collection_date, so they all follow from this single write --
-  //      there is no second place to remember to update.
-  //
-  //   2. THE STUDIO DEFAULT (/api/spec/studio/collection-date). What NEW
-  //      bookings get promised. Deliberately untouched here: a broken kiln
-  //      today says nothing about what a session three weeks out should be
-  //      promised, and bookings already given a date must not be dragged
-  //      along behind a default change. That route already only fills in
-  //      today's bookings that have no date yet, which is the correct half.
-  //
-  // The response reports whether the studio default happens to match the
-  // date being moved, so the decision to change it too is made deliberately
-  // rather than by accident in either direction.
-  app.post('/api/spec/kiln/batch/:date/move', async (req, res) => {
+  // The scan. Marks the whole shelf out of the kiln.
+  app.post('/api/spec/kiln/shelves/:id/out', async (req, res) => {
     try {
-      const from = req.params.date;
-      const to = req.body?.to_date;
-      if (!to || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
-        return res.status(400).json({ error: 'to_date must be a YYYY-MM-DD date' });
-      }
-      if (to === from) return res.status(400).json({ error: 'That is already the batch date' });
-
-      const { data: affected } = await supabase
-        .from('demo_app_session_status')
-        .select('booking_code')
+      const { data: pieces } = await supabase
+        .from('pottery_pieces')
+        .select('id, status, fulfilment')
         .eq('studio_id', STUDIO_ID)
-        .eq('collection_date', from);
-      const codes = (affected || []).map((r) => r.booking_code);
-      if (!codes.length) return res.status(404).json({ error: 'No bookings are on that collection date' });
+        .eq('shelf_id', req.params.id)
+        .neq('archived', true);
 
-      const { error } = await supabase
-        .from('demo_app_session_status')
-        .update({ collection_date: to })
-        .eq('studio_id', STUDIO_ID)
-        .eq('collection_date', from);
-      if (error) throw error;
-
-      // Recorded because the QR cards are PHYSICAL. A card printed for the
-      // 28th is taped to a trolley and will still be scanned after the move
-      // -- without this it would land on an empty batch and read as "no
-      // pieces", which looks like the app losing a shelf of pottery. With
-      // it, the scan says where the batch went.
-      await supabase.from('kiln_batch_moves').insert({
-        studio_id: STUDIO_ID, from_date: from, to_date: to, moved_bookings: codes.length,
-      });
-
-      const { data: studio } = await supabase
-        .from('studios').select('current_collection_date').eq('id', STUDIO_ID).maybeSingle();
-
-      res.json({
-        moved: codes.length,
-        from,
-        to,
-        studio_default: studio?.current_collection_date || null,
-        // True when the studio's default for NEW bookings is the date just
-        // vacated -- worth deciding about, but never changed silently.
-        studio_default_matches_old_date: studio?.current_collection_date === from,
-      });
-    } catch (err) {
-      logger.error('kiln batch move failed', err.message);
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // The scan action itself.
-  app.post('/api/spec/kiln/batch/:date/out', async (req, res) => {
-    try {
-      const { pieces } = await batchPieces(req.params.date);
-      // Only move pieces genuinely still waiting. Deliberately excludes
-      // anything already collected -- a second scan of a QR still taped to
-      // a shelf must never drag a collected piece backwards into 'ready'.
-      const toMove = pieces
+      // Never drag an already-collected piece backwards, and never pull a
+      // piece held for a return visit out of a kiln it was never in. A QR
+      // taped to a shelf WILL be scanned twice.
+      const toMove = (pieces || [])
         .filter((p) => p.fulfilment !== 'return_visit')
         .filter((p) => !['ready', 'collected', 'complete'].includes(String(p.status || '').toLowerCase()))
         .map((p) => p.id);
 
-      if (!toMove.length) return res.json({ moved: 0, already_out: true });
+      if (toMove.length) {
+        const { error } = await supabase
+          .from('pottery_pieces')
+          .update({ status: 'ready', updated_at: new Date().toISOString() })
+          .in('id', toMove);
+        if (error) throw error;
+      }
+      await supabase.from('kiln_shelves')
+        .update({ out_of_kiln_at: new Date().toISOString() })
+        .eq('studio_id', STUDIO_ID).eq('id', req.params.id);
 
-      const { error } = await supabase
-        .from('pottery_pieces')
-        .update({ status: 'ready', updated_at: new Date().toISOString() })
-        .in('id', toMove);
-      if (error) throw error;
-
-      res.json({ moved: toMove.length, already_out: false });
+      res.json({ moved: toMove.length, already_out: toMove.length === 0 });
     } catch (err) {
-      logger.error('kiln batch out failed', err.message);
+      logger.error('shelf out failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Put pieces on a shelf -- how a booking's pottery joins a batch. Called
+  // with the ids the shelf sweep matched, or by hand from a booking.
+  app.post('/api/spec/kiln/shelves/:id/pieces', async (req, res) => {
+    try {
+      const ids = Array.isArray(req.body?.piece_ids) ? req.body.piece_ids : [];
+      if (!ids.length) return res.status(400).json({ error: 'piece_ids is required' });
+      const { data, error } = await supabase
+        .from('pottery_pieces')
+        .update({ shelf_id: req.params.id, updated_at: new Date().toISOString() })
+        .eq('studio_id', STUDIO_ID)
+        .in('id', ids)
+        .neq('archived', true)
+        .select('id');
+      if (error) throw error;
+      res.json({ added: (data || []).length });
+    } catch (err) {
+      logger.error('add to shelf failed', err.message);
       res.status(500).json({ error: err.message });
     }
   });
@@ -5383,26 +5249,17 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
       // Candidate pool: pieces still waiting to go out. Optionally narrowed
       // to one collection date, which is the normal case -- a shelf IS a
       // kiln batch.
-      const batchDate = req.body?.collection_date || null;
-      let codes = null;
-      if (batchDate) {
-        const { data: st } = await supabase
-          .from('demo_app_session_status')
-          .select('booking_code')
-          .eq('studio_id', STUDIO_ID)
-          .eq('collection_date', batchDate);
-        codes = (st || []).map((r) => r.booking_code);
-        if (!codes.length) return res.json({ candidates: 0, bookings: [], note: 'No bookings on that collection date' });
-      }
+      // Optionally scoped to a shelf. When a shelf id comes in, whatever
+      // the photo matches is PUT ON that shelf -- which is how pottery
+      // joins a batch now that batches are shelves rather than dates.
+      const shelfId = req.body?.shelf_id || null;
 
-      let q = supabase
+      const { data: allPieces } = await supabase
         .from('pottery_pieces')
         .select('id, booking_id, description, piece_type, status, fulfilment, reference_photo_url')
         .eq('studio_id', STUDIO_ID)
         .neq('archived', true)
         .neq('status', 'collected');
-      if (codes) q = q.in('booking_id', codes);
-      const { data: allPieces } = await q;
 
       // A piece with no description can't be looked for, and one held for a
       // return visit was never in the kiln -- including either would send
@@ -5505,8 +5362,26 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
         v.total_in_booking = pieces.filter((p) => p.booking_id === code).length;
       }
 
+      // Put what was recognised on the shelf. Only the confident matches --
+      // the same 0.55 floor -- because a wrong assignment here would put a
+      // customer's pottery on someone else's trolley.
+      let placed = 0;
+      if (shelfId) {
+        const matchedIds = Array.from(byBooking.values()).flatMap((v) => v.pieces.map((p) => p.id));
+        if (matchedIds.length) {
+          const { data: upd } = await supabase
+            .from('pottery_pieces')
+            .update({ shelf_id: shelfId, updated_at: new Date().toISOString() })
+            .eq('studio_id', STUDIO_ID)
+            .in('id', matchedIds)
+            .select('id');
+          placed = (upd || []).length;
+        }
+      }
+
       res.json({
         candidates: pieces.length,
+        placed_on_shelf: placed,
         bookings: Array.from(byBooking.entries())
           .map(([code, v]) => ({
             booking_code: code,
