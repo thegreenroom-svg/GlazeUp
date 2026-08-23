@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/PageShell';
-import { ChevronLeft, ChevronRight, RefreshCw, AlertCircle, MapPin, Package, Flame, Printer, PoundSterling, Users, ShieldCheck, Palette } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw, AlertCircle, MapPin, Camera, Package, Flame, Printer, PoundSterling, Users, ShieldCheck, Palette } from 'lucide-react';
 
 // Deliberately mirrors the Square Appointments side-by-side day view --
 // tables as columns, time down the side, sessions as blocks. Not for the
@@ -119,6 +119,8 @@ const COL_W = 132;
 // being replaced. Everything else stays reachable through the menu, which is
 // now genuinely the back door rather than the front.
 const TILES: { label: string; href: string; icon: React.ReactNode }[] = [
+  // Photo first, name unknown -- the way pottery actually turns up.
+  { label: 'Whose is this?', href: '/photo-match', icon: <Camera size={18} /> },
   { label: 'Find a piece', href: '/find-on-table', icon: <MapPin size={18} /> },
   { label: 'Packing', href: '/packing', icon: <Package size={18} /> },
   { label: 'Kiln', href: '/kiln-batch', icon: <Flame size={18} /> },

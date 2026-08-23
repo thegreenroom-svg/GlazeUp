@@ -125,6 +125,13 @@ export function StudioNavigation() {
         { label: 'All Pieces', icon: <Palette className="w-5 h-5" />, href: '/pieces' },
         { label: 'Stamp a Piece', icon: <Stamp className="w-5 h-5" />, href: '/completion' },
         { label: 'Kiln Batches', icon: <Flame className="w-5 h-5" />, href: '/kiln-batch' },
+        // Photograph a table and it reads the chalk tag to find the
+        // booking -- no need to know whose pottery it is first. I filed
+        // this under Diagnostics during the navigation cleanup because of
+        // its name; it is not a diagnostic, it is one of the few tools
+        // that works the way the studio actually works: pottery in front
+        // of you, name unknown. Hiding it took away a daily capability.
+        { label: 'Whose is this?', icon: <Camera className="w-5 h-5" />, href: '/photo-match' },
         { label: 'Find on Table', icon: <MapPin className="w-5 h-5" />, href: '/find-on-table' },
         { label: 'Packing', icon: <Package className="w-5 h-5" />, href: '/packing' },
         // Renamed from "Kiln — Collection & Post". It was competing with
@@ -204,7 +211,6 @@ export function StudioNavigation() {
       items: [
         { label: 'Test AI', icon: <FlaskConical className="w-5 h-5" />, href: '/test-ai' },
         { label: 'Ticket Link Check', icon: <FlaskConical className="w-5 h-5" />, href: '/ticket-link' },
-        { label: 'Photo Match', icon: <Camera className="w-5 h-5" />, href: '/photo-match' },
         { label: 'Needs Verification', icon: <ShieldCheck className="w-5 h-5" />, href: '/needs-verification' },
         { label: 'Recover Party Sizes', icon: <RefreshIcon className="w-5 h-5" />, href: '/backfill-party-sizes' },
       ],

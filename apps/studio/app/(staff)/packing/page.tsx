@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Package, ChevronLeft, Check, Search } from 'lucide-react';
+import { Package, ChevronLeft, Check, Search, Camera, Loader } from 'lucide-react';
 
 // The screen for whoever is actually boxing the pottery. There wasn't one:
 // kiln-dip is a lookup-by-code tool for collection dates and emails and
@@ -93,6 +93,36 @@ export default function PackingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const linkedCode = searchParams.get('code');
+
+  // Photograph the shelf and find out whose pottery is on it. Everything
+  // else works the other way round -- pick a booking, then confirm its
+  // pieces are there -- which is the wrong order when a kiln has just been
+  // unloaded and nobody knows whose anything is. Here the photo is the
+  // question, not the answer.
+  const [sweeping, setSweeping] = useState(false);
+  const [sweep, setSweep] = useState<{
+    candidates: number;
+    note?: string;
+    bookings: {
+      booking_code: string; customer_name: string; found: number; expected: number; complete: boolean;
+      pieces: { id: string; piece_type: string | null; description: string | null; confidence: number }[];
+    }[];
+  } | null>(null);
+  const [sweepError, setSweepError] = useState<string | null>(null);
+
+  const runSweep = async (file: File) => {
+    setSweeping(true); setSweep(null); setSweepError(null);
+    try {
+      const fd = new FormData();
+      fd.append('photo', file);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweep`, { method: 'POST', body: fd });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Could not read the shelf');
+      setSweep(d);
+    } catch (e) {
+      setSweepError(e instanceof Error ? e.message : 'Could not read the shelf');
+    } finally { setSweeping(false); }
+  };
 
   const loadQueue = useCallback(async () => {
     setLoading(true);
@@ -284,6 +314,62 @@ export default function PackingPage() {
   // ---------- LEVEL 1: the queue ----------
   return (
     <PageShell title="Packing" subtitle="Pottery due out">
+      {/* Top of the queue, because after a kiln comes out this is the first
+          thing you do -- before you know which booking you're looking at. */}
+      <div style={{ border: '1px solid #eee', borderRadius: 10, padding: '0.75rem', marginBottom: '0.9rem' }}>
+        <p style={{ fontSize: '0.85rem', fontWeight: 700 }}>Just unloaded the kiln?</p>
+        <p style={{ fontSize: '0.75rem', color: '#777', margin: '0.15rem 0 0.55rem' }}>
+          Photograph the shelf and it&apos;ll tell you whose pottery is on it.
+        </p>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.55rem 0.85rem', borderRadius: 8, background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: '0.83rem', cursor: 'pointer' }}>
+          {sweeping ? <Loader size={15} className="animate-spin" /> : <Camera size={15} />}
+          {sweeping ? 'Reading the shelf...' : 'Photograph the shelf'}
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            style={{ display: 'none' }}
+            disabled={sweeping}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) runSweep(f); e.target.value = ''; }}
+          />
+        </label>
+
+        {sweepError && <p style={{ fontSize: '0.78rem', color: '#c0392b', marginTop: '0.5rem' }}>{sweepError}</p>}
+
+        {sweep && sweep.bookings.length === 0 && (
+          <p style={{ fontSize: '0.78rem', color: '#A6761D', marginTop: '0.6rem' }}>
+            {sweep.note || `Nothing recognised out of ${sweep.candidates} piece${sweep.candidates === 1 ? '' : 's'} waiting. Worth trying a closer photo.`}
+          </p>
+        )}
+
+        {sweep && sweep.bookings.length > 0 && (
+          <div style={{ marginTop: '0.7rem' }}>
+            <p style={{ fontSize: '0.75rem', color: '#666', marginBottom: '0.4rem' }}>
+              Checked against {sweep.candidates} piece{sweep.candidates === 1 ? '' : 's'} still waiting
+            </p>
+            {sweep.bookings.map((b) => (
+              <button
+                key={b.booking_code}
+                onClick={() => { const q = queue.find((x) => x.booking_code === b.booking_code); if (q) openIt(q); }}
+                style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%',
+                  textAlign: 'left', padding: '0.5rem 0.6rem', marginBottom: '0.3rem', borderRadius: 7,
+                  border: `1px solid ${b.complete ? '#9CC79C' : '#E4D8C8'}`,
+                  background: b.complete ? '#F1F8F1' : '#FBF7F1', cursor: 'pointer',
+                }}
+              >
+                <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>{b.customer_name}</span>
+                {/* "2 of 4" is the useful number -- a part-found booking
+                    means the rest are still somewhere else. */}
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: b.complete ? '#2E7D32' : '#A6761D' }}>
+                  {b.found} of {b.expected}{b.complete ? ' · all here' : ''}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       {loading && <p style={{ fontSize: '0.85rem', color: '#888' }}>Loading...</p>}
       {error && <p style={{ fontSize: '0.85rem', color: '#c0392b' }}>{error}</p>}
       {!loading && !error && queue.length === 0 && (

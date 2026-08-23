@@ -5455,3 +5455,190 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
     }
   });
 }
+
+// ============================================================================
+// SHELF SWEEP -- photograph the shelf, find out whose pottery is on it
+// ----------------------------------------------------------------------------
+// Daisy: "I've got some kiln stuff out now. I just want to see if any of the
+// bookings are on it... I can't just take a picture and have it tell me if
+// there's any bookings there."
+//
+// She's right that it didn't exist. Everything else works the other way
+// round: Find on Table needs you to pick a booking FIRST and then confirms
+// its pieces are present. That's the wrong order for the job in front of
+// her -- a shelf of fired pottery just came out of the kiln and nobody knows
+// whose it is. The photo is the question, not the answer.
+//
+// So this compares one shelf photo against the descriptions already written
+// for every piece still waiting, in ONE Gemini call. It reuses the
+// descriptions generated at photo time rather than re-describing anything,
+// which is why this is cheap.
+// ============================================================================
+// Gemini returns [ymin, xmin, ymax, xmax] normalized 0-1000; everything that
+// stores or draws a box in this app uses percentages.
+//
+// This existed once and vanished when the automatic identification sweep was
+// reverted earlier today -- the revert took a helper the rest of the file had
+// started to rely on. node --check passes either way, because calling an
+// undefined function is a RUNTIME error, not a syntax one: it would have
+// thrown on the first successful shelf match and nowhere else.
+export function boxFromGemini(box_2d) {
+  if (!Array.isArray(box_2d) || box_2d.length !== 4) return null;
+  const [ymin, xmin, ymax, xmax] = box_2d;
+  return { left_pct: xmin / 10, top_pct: ymin / 10, right_pct: xmax / 10, bottom_pct: ymax / 10 };
+}
+
+export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios, upload, fs, logGeminiUsage) {
+  app.post('/api/spec/shelf/sweep', upload.single('photo'), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
+      const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+      if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured on this service.' });
+
+      // Candidate pool: pieces still waiting to go out. Optionally narrowed
+      // to one collection date, which is the normal case -- a shelf IS a
+      // kiln batch.
+      const batchDate = req.body?.collection_date || null;
+      let codes = null;
+      if (batchDate) {
+        const { data: st } = await supabase
+          .from('demo_app_session_status')
+          .select('booking_code')
+          .eq('studio_id', STUDIO_ID)
+          .eq('collection_date', batchDate);
+        codes = (st || []).map((r) => r.booking_code);
+        if (!codes.length) return res.json({ candidates: 0, bookings: [], note: 'No bookings on that collection date' });
+      }
+
+      let q = supabase
+        .from('pottery_pieces')
+        .select('id, booking_id, description, piece_type, status, fulfilment, reference_photo_url')
+        .eq('studio_id', STUDIO_ID)
+        .neq('archived', true)
+        .neq('status', 'collected');
+      if (codes) q = q.in('booking_id', codes);
+      const { data: allPieces } = await q;
+
+      // A piece with no description can't be looked for, and one held for a
+      // return visit was never in the kiln -- including either would send
+      // someone hunting a shelf for something that isn't there.
+      const pieces = (allPieces || [])
+        .filter((p) => (p.description || p.piece_type) && p.fulfilment !== 'return_visit')
+        .slice(0, 80);
+
+      if (!pieces.length) return res.json({ candidates: 0, bookings: [], note: 'Nothing is waiting to go out' });
+
+      const { data: bookingRows } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name')
+        .eq('studio_id', STUDIO_ID)
+        .in('booking_code', Array.from(new Set(pieces.map((p) => p.booking_id))));
+      const nameByCode = new Map((bookingRows || []).map((b) => [b.booking_code, b.customer_name]));
+
+      const list = pieces
+        .map((p, i) => `${i + 1}. ${p.piece_type || 'Piece'} — ${p.description || 'no description'}`)
+        .join('\n');
+
+      const base64 = fs.readFileSync(req.file.path).toString('base64');
+      const prompt = `This photo shows a shelf of finished, fired pottery in a paint-your-own-pottery studio.
+
+Below is a numbered list of pieces the studio is currently waiting to hand out. Each was photographed and described when it was painted.
+
+${list}
+
+Look at the shelf photo and decide which of the numbered pieces you can actually see.
+
+Be strict. Only include a number if the piece in the photo genuinely matches that description in form AND painted detail. Studio pottery is repetitive — many customers paint the same blank — so a "mug" alone is never enough to match on; the painted decoration has to agree. If you are unsure, leave it out. A missed piece is a minor nuisance; a wrong match sends someone home with someone else's pottery.
+
+For each match give the number, a confidence from 0 to 1, and its bounding box in the photo.`;
+
+      const schema = {
+        type: 'object',
+        properties: {
+          matches: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                number: { type: 'integer', description: 'The number from the list' },
+                confidence: { type: 'number', description: '0 to 1' },
+                box_2d: { type: 'array', items: { type: 'integer' }, description: '[ymin, xmin, ymax, xmax] normalized 0-1000' },
+              },
+              required: ['number', 'confidence'],
+            },
+          },
+        },
+        required: ['matches'],
+      };
+
+      let aiRes, modelUsed;
+      try {
+        ({ response: aiRes, modelUsed } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
+          input: [
+            { type: 'text', text: prompt },
+            { type: 'image', data: base64, mime_type: req.file.mimetype || 'image/jpeg' },
+          ],
+          response_format: { type: 'text', mime_type: 'application/json', schema },
+        }));
+      } catch (err) {
+        logger.error('shelf sweep: Gemini call failed', err.response?.data || err.message);
+        return res.status(500).json({ error: friendlyGeminiError(err) });
+      } finally {
+        try { fs.unlinkSync(req.file.path); } catch { /* temp file */ }
+      }
+
+      const usage = extractGeminiUsage(aiRes.data);
+      if (usage) await logGeminiUsage(supabase, STUDIO_ID, 'shelf-sweep-gemini', usage, modelUsed);
+
+      let parsed;
+      try {
+        const raw = extractGeminiText(aiRes.data);
+        parsed = JSON.parse((raw.match(/\{[\s\S]*\}/) || [])[0] || '{}');
+      } catch {
+        return res.status(500).json({ error: 'Could not read the response from Gemini' });
+      }
+
+      // Deliberately strict floor. Below this the guess is worse than
+      // useless on a shelf of near-identical mugs.
+      const MIN_CONFIDENCE = 0.55;
+      const byBooking = new Map();
+      for (const m of parsed.matches || []) {
+        const piece = pieces[m.number - 1];
+        if (!piece) continue;
+        if ((m.confidence ?? 0) < MIN_CONFIDENCE) continue;
+        const cur = byBooking.get(piece.booking_id) || { pieces: [], total_in_booking: 0 };
+        cur.pieces.push({
+          id: piece.id,
+          piece_type: piece.piece_type,
+          description: piece.description,
+          confidence: Math.round((m.confidence ?? 0) * 100) / 100,
+          box: boxFromGemini(m.box_2d),
+        });
+        byBooking.set(piece.booking_id, cur);
+      }
+      for (const [code, v] of byBooking) {
+        v.total_in_booking = pieces.filter((p) => p.booking_id === code).length;
+      }
+
+      res.json({
+        candidates: pieces.length,
+        bookings: Array.from(byBooking.entries())
+          .map(([code, v]) => ({
+            booking_code: code,
+            customer_name: nameByCode.get(code) || code,
+            found: v.pieces.length,
+            // How many of that booking's waiting pieces are on this shelf --
+            // "2 of 4" is the useful number, because a part-found booking
+            // means the rest are still somewhere else.
+            expected: v.total_in_booking,
+            complete: v.pieces.length === v.total_in_booking,
+            pieces: v.pieces,
+          }))
+          .sort((a, b) => b.found - a.found),
+      });
+    } catch (err) {
+      logger.error('shelf sweep failed', err.response?.data || err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
