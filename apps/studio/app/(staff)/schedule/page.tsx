@@ -25,6 +25,8 @@ interface ScheduleBooking {
   table_number: string | null;
   party_size: number | null;
   space_name: string | null;
+  live_ticket_name: string | null;
+  live_ticket_total_cents: number | null;
   finished: boolean;
 }
 
@@ -412,6 +414,17 @@ export default function SchedulePage() {
                 {shortSpaceLabel(selected.space_name) ? ` · ${shortSpaceLabel(selected.space_name)}` : ''}
                 {selected.party_size ? ` · ${selected.party_size} painting` : ''}
               </p>
+              {/* What the girls actually called it on the till. Shown
+                  alongside the appointment's table rather than instead of
+                  it, because they answer different questions: the
+                  appointment says where the party was booked, the ticket
+                  says what the terminal is calling them right now. */}
+              {selected.live_ticket_name && (
+                <p style={{ fontSize: '0.74rem', color: 'var(--clay)', fontWeight: 600, marginTop: '0.15rem' }}>
+                  Till: {selected.live_ticket_name}
+                  {selected.live_ticket_total_cents ? ` · £${(selected.live_ticket_total_cents / 100).toFixed(2)}` : ''}
+                </p>
+              )}
             </div>
             <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', fontSize: '1.1rem', color: '#999', cursor: 'pointer', lineHeight: 1, padding: 0 }} aria-label="Close">×</button>
           </div>

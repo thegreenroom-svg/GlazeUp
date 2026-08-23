@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerIdentifyPiecesRoute, registerPieceFulfilmentRoutes, registerReidentifyRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute, registerSquareTablesRoutes, registerPackingRoutes, registerKilnBatchRoutes, registerTicketLinkDiagnosticRoute } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerIdentifyPiecesRoute, registerPieceFulfilmentRoutes, registerReidentifyRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute, registerSquareTablesRoutes, registerPackingRoutes, registerKilnBatchRoutes, registerTicketLinkDiagnosticRoute, registerTicketMatchRoutes } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -1586,6 +1586,7 @@ registerSquareTablesRoutes(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerPackingRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 registerKilnBatchRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 registerTicketLinkDiagnosticRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
+registerTicketMatchRoutes(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerQuickAddPieceRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerFindOnTableRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage);
 registerTestAiFindRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage);
@@ -1650,6 +1651,18 @@ app.listen(PORT, () => {
       });
       const tablesData = await tablesRes.json().catch(() => ({}));
       if (tablesData.updated) logger.info(`[auto-sync] ${tablesData.updated} booking(s) moved to their real Square table`, tablesData.changes);
+
+      // Attaches live till tickets to bookings by table code and customer
+      // first name -- the two ways the girls actually name them, measured
+      // rather than assumed. A plain Square read on a connection already
+      // open, no AI behind it, so there is nothing to ration.
+      const ticketRes = await fetch(`${SELF_URL}/api/spec/bookings/match-tickets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ days: 1 }),
+      });
+      const ticketData = await ticketRes.json().catch(() => ({}));
+      if (ticketData.bookings_matched) logger.info(`[auto-sync] ${ticketData.tickets_matched} till ticket(s) attached to ${ticketData.bookings_matched} booking(s)`);
     } catch (err) {
       logger.warn('[auto-sync] periodic sync failed', err.message);
     }

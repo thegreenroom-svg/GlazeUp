@@ -4580,7 +4580,7 @@ export function registerSquareTablesRoutes(app, supabase, STUDIO_ID, logger, axi
 
       const { data: bookings, error } = await supabase
         .from('bookings')
-        .select('booking_code, customer_name, session_start, session_end, table_number, party_size, square_team_member_id, space_name')
+        .select('booking_code, customer_name, session_start, session_end, table_number, party_size, square_team_member_id, space_name, live_ticket_name, live_ticket_total_cents')
         .eq('studio_id', STUDIO_ID)
         .gte('session_start', dayStart.toISOString())
         .lte('session_start', dayEnd.toISOString())
@@ -5241,6 +5241,193 @@ export function registerTicketLinkDiagnosticRoute(app, supabase, STUDIO_ID, logg
       });
     } catch (err) {
       logger.error('ticket-link diagnostic failed', err.response?.data || err.message);
+      res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message });
+    }
+  });
+}
+
+// ============================================================================
+// TICKET MATCHING -- the terminal wins
+// ----------------------------------------------------------------------------
+// Built on what the girls ACTUALLY type, measured from 271 real orders over
+// seven days rather than assumed. Two naming habits, both common:
+//
+//   TABLE CODE   T2a, T7, T3, L14, L15, "T4 - 3", "T2A - 2"
+//   FIRST NAME   "Party Holly", "Party Chloe", "Party natalie", "Tabby - 2"
+//
+// Three things that measurement exposed, none of which I would have guessed:
+//
+//  1. "L" is the Lounge and "T" is Main Studio. Matching on DIGITS alone --
+//     which is what the app did -- conflates T4 with L4. The letter matters.
+//  2. "T4 - 3" is table T4, ticket 3. digitsOf() turned that into "43",
+//     matching no table at all. That is almost certainly most of the gap
+//     between 89 ticket names containing digits and only 76 that matched.
+//  3. 156 of 271 orders have no ticket name at all -- counter and cafe sales
+//     with no table. Those SHOULD stay unmatched, so the real denominator is
+//     107, not 271. Any "match rate" quoted against 271 is meaningless.
+//
+// One booking can have several tickets ("Tabby - 2", "T2A - 2"), so totals
+// are summed rather than one ticket winning.
+// ============================================================================
+
+// "T4 - 3" -> { code: 'T4', seq: 3 }; "T2a" -> { code: 'T2A' }; "L15" -> 'L15'
+export function parseTicketName(raw) {
+  const name = String(raw || '').trim();
+  if (!name) return { code: null, words: [], seq: null };
+
+  // Table code at the START only. A ticket called "Party Holly" has no code,
+  // and hunting for a letter+number anywhere would find one in a surname.
+  const codeMatch = name.match(/^([TL])\s*(\d{1,2})\s*([A-Za-z])?/i);
+  let code = null;
+  if (codeMatch) {
+    code = `${codeMatch[1].toUpperCase()}${parseInt(codeMatch[2], 10)}`;
+  }
+
+  // Trailing "- 2" is a ticket sequence, not part of the table.
+  const seqMatch = name.match(/[-–]\s*(\d{1,2})\s*$/);
+  const seq = seqMatch ? parseInt(seqMatch[1], 10) : null;
+
+  // Words that could be a person. "party" is a label, not a name.
+  const STOP = new Set(['party', 'parties', 'pots', 'pottery', 'table', 'the', 'and', 'x']);
+  const words = name
+    .replace(/[-–]\s*\d{1,2}\s*$/, '')
+    .replace(/^[TL]\s*\d{1,2}\s*[A-Za-z]?/i, '')
+    .split(/[\s,&]+/)
+    .map((w) => w.replace(/[^A-Za-z]/g, '').toLowerCase())
+    .filter((w) => w.length >= 3 && !STOP.has(w));
+
+  return { code, words, seq };
+}
+
+// Base code of a table name from Square Appointments: "T4 a" -> "T4".
+// Ticket names carry no a/b suffix, so both halves of table 4 reduce to T4
+// and are separated by time and by name instead.
+export function baseTableCode(tableName) {
+  const m = String(tableName || '').trim().match(/^([TL])\s*(\d{1,2})/i);
+  return m ? `${m[1].toUpperCase()}${parseInt(m[2], 10)}` : null;
+}
+
+export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axios) {
+  app.post('/api/spec/bookings/match-tickets', async (req, res) => {
+    const dryRun = req.body?.dry_run === true;
+    const daysBack = Math.min(parseInt(req.body?.days, 10) || 1, 30);
+    try {
+      const { data: connection } = await supabase
+        .from('square_connections')
+        .select('square_access_token, square_token_expires_at')
+        .eq('studio_id', STUDIO_ID)
+        .single();
+      if (!connection || new Date(connection.square_token_expires_at) < new Date()) {
+        return res.status(400).json({ error: 'No valid Square connection', matched: 0 });
+      }
+      const headers = {
+        Authorization: `Bearer ${connection.square_access_token}`,
+        'Square-Version': '2024-01-18',
+        'Content-Type': 'application/json',
+      };
+
+      const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', { headers });
+      const locationIds = (locationsRes.data.locations || []).map((l) => l.id);
+      if (!locationIds.length) return res.json({ matched: 0, reason: 'no_square_locations' });
+
+      const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+      const ordersRes = await axios.post(
+        'https://connect.squareup.com/v2/orders/search',
+        {
+          location_ids: locationIds,
+          query: { filter: { date_time_filter: { created_at: { start_at: since.toISOString() } } } },
+          limit: 500,
+        },
+        { headers }
+      );
+      const orders = (ordersRes.data.orders || []).filter((o) => o.ticket_name || o.source?.name);
+
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, table_number, session_start, session_end')
+        .eq('studio_id', STUDIO_ID)
+        .gte('session_start', since.toISOString());
+
+      const prepared = (bookings || []).map((b) => {
+        const first = String(b.customer_name || '').trim().split(/\s+/)[0].toLowerCase();
+        return {
+          ...b,
+          first_name: first,
+          base_code: baseTableCode(b.table_number),
+          start: new Date(b.session_start).getTime(),
+          end: b.session_end ? new Date(b.session_end).getTime() : new Date(b.session_start).getTime() + 2 * 60 * 60 * 1000,
+        };
+      });
+
+      // Score every plausible pairing, then assign best-first. A ticket opened
+      // slightly before or after a session still belongs to it, so the window
+      // is generous -- but time alone never matches anything, it only ranks.
+      const WINDOW = 3 * 60 * 60 * 1000;
+      const pairs = [];
+      for (const o of orders) {
+        const ticketName = o.ticket_name || o.source?.name;
+        const parsed = parseTicketName(ticketName);
+        const created = new Date(o.created_at).getTime();
+        for (const b of prepared) {
+          if (created < b.start - WINDOW || created > b.end + WINDOW) continue;
+          let score = 0;
+          const basis = [];
+          if (parsed.code && b.base_code && parsed.code === b.base_code) { score += 10; basis.push('table code'); }
+          if (parsed.words.length && b.first_name && parsed.words.includes(b.first_name)) { score += 12; basis.push('first name'); }
+          // Time is a tie-breaker only. On its own it would happily attach a
+          // cafe order to whichever session happened to be running.
+          if (score === 0) continue;
+          const gap = Math.abs(created - b.start);
+          pairs.push({ order: o, ticketName, booking: b, score, gap, basis: basis.join(' + ') });
+        }
+      }
+      pairs.sort((a, b) => (b.score - a.score) || (a.gap - b.gap));
+
+      const claimedOrders = new Set();
+      const byBooking = new Map();
+      for (const p of pairs) {
+        if (claimedOrders.has(p.order.id)) continue;
+        claimedOrders.add(p.order.id);
+        // Several tickets can belong to one booking, so accumulate.
+        const cur = byBooking.get(p.booking.booking_code) || { names: [], total: 0, basis: new Set() };
+        cur.names.push(p.ticketName);
+        cur.total += (p.order.total_money?.amount || 0);
+        cur.basis.add(p.basis);
+        byBooking.set(p.booking.booking_code, cur);
+      }
+
+      const changes = [];
+      for (const [code, v] of byBooking) {
+        changes.push({
+          booking_code: code,
+          ticket_names: v.names,
+          tickets: v.names.length,
+          total_cents: v.total,
+          basis: Array.from(v.basis).join(', '),
+        });
+        if (!dryRun) {
+          await supabase.from('bookings').update({
+            live_ticket_name: v.names.join(' + '),
+            live_ticket_total_cents: v.total,
+            live_ticket_matched_at: new Date().toISOString(),
+            live_ticket_match_basis: Array.from(v.basis).join(', '),
+          }).eq('studio_id', STUDIO_ID).eq('booking_code', code);
+        }
+      }
+
+      res.json({
+        dry_run: dryRun,
+        named_tickets: orders.length,
+        tickets_matched: claimedOrders.size,
+        bookings_matched: byBooking.size,
+        unmatched_tickets: orders
+          .filter((o) => !claimedOrders.has(o.id))
+          .map((o) => o.ticket_name || o.source?.name)
+          .slice(0, 30),
+        changes: changes.slice(0, 60),
+      });
+    } catch (err) {
+      logger.error('match-tickets failed', err.response?.data || err.message);
       res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message });
     }
   });
