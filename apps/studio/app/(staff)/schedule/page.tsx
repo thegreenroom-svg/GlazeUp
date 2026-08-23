@@ -206,8 +206,21 @@ export default function SchedulePage() {
       // names had never been fetched at all.
       const tm = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/square/sync-team-members`, { method: 'POST' });
       const tmData = await tm.json().catch(() => ({}));
-      if (!tm.ok) throw new Error(`Couldn't fetch table names from Square: ${tmData.error || tm.status}`);
-      if (!tmData.synced) throw new Error('Square returned no tables — nothing to match against.');
+      if (!tm.ok || !tmData.synced) {
+        // Ask the access check what the token can actually reach, rather
+        // than reporting Square's raw error and leaving Daisy to work out
+        // whether it's a bug, a deploy that hasn't landed, or a permission
+        // Square never granted.
+        let extra = '';
+        try {
+          const ac = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/diagnostics/square-access`);
+          const acd = await ac.json();
+          if (acd?.missing_scopes?.length) {
+            extra = ` Square hasn't granted this app: ${Array.from(new Set(acd.missing_scopes)).join(', ')}. That needs re-authorising in Square, not a code change.`;
+          }
+        } catch { /* the check is a nicety, not a dependency */ }
+        throw new Error(`Couldn't fetch table names from Square: ${tmData.error || tm.status}.${extra}`);
+      }
 
       const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/square/sync-booking-tables`, {
         method: 'POST',

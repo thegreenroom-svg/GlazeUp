@@ -211,6 +211,7 @@ export function StudioNavigation() {
       items: [
         { label: 'Test AI', icon: <FlaskConical className="w-5 h-5" />, href: '/test-ai' },
         { label: 'Ticket Link Check', icon: <FlaskConical className="w-5 h-5" />, href: '/ticket-link' },
+        { label: 'Square Access Check', icon: <ShieldCheck className="w-5 h-5" />, href: '/square-access' },
         { label: 'Needs Verification', icon: <ShieldCheck className="w-5 h-5" />, href: '/needs-verification' },
         { label: 'Recover Party Sizes', icon: <RefreshIcon className="w-5 h-5" />, href: '/backfill-party-sizes' },
       ],
@@ -229,6 +230,7 @@ export function StudioNavigation() {
     { label: 'Schedule', href: '/schedule' },
     { label: 'Test AI', href: '/test-ai' },
     { label: 'Ticket Link Check', href: '/ticket-link' },
+    { label: 'Square Access Check', href: '/square-access' },
     { label: 'Kiln Workflow', href: '/kiln-workflow' },
     { label: 'Piece Lifecycle', href: '/lifecycle' },
     { label: 'Photo Match', href: '/photo-match' },

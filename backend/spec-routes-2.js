@@ -5676,3 +5676,107 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
     }
   });
 }
+
+// ============================================================================
+// SQUARE ACCESS CHECK -- which endpoints can this token actually reach?
+// ----------------------------------------------------------------------------
+// Table sync has now failed twice for two different reasons (a limit Square
+// rejects, then a missing EMPLOYEES_READ scope), and each time the diagnosis
+// cost a round trip: Daisy presses a button, sends a screenshot, I guess.
+//
+// This replaces guessing with a fact. It probes each Square endpoint the app
+// depends on and reports reachable / denied / failed, with Square's own
+// wording. Read-only and deliberately harmless -- every probe is a GET or a
+// search with the smallest possible limit.
+// ============================================================================
+export function registerSquareAccessCheckRoute(app, supabase, STUDIO_ID, logger, axios) {
+  app.get('/api/spec/diagnostics/square-access', async (req, res) => {
+    try {
+      const { data: connection } = await supabase
+        .from('square_connections')
+        .select('square_access_token, square_token_expires_at')
+        .eq('studio_id', STUDIO_ID)
+        .single();
+      if (!connection) return res.status(400).json({ error: 'No Square connection at all' });
+      const expired = new Date(connection.square_token_expires_at) < new Date();
+      const headers = {
+        Authorization: `Bearer ${connection.square_access_token}`,
+        'Square-Version': '2024-01-18',
+        'Content-Type': 'application/json',
+      };
+
+      let locationId = null;
+      const probe = async (label, needs, fn) => {
+        try {
+          const r = await fn();
+          return { label, needs, ok: true, detail: r };
+        } catch (err) {
+          const sq = err.response?.data?.errors?.[0];
+          return {
+            label,
+            needs,
+            ok: false,
+            code: sq?.code || err.response?.status || 'ERROR',
+            detail: sq?.detail || err.message,
+          };
+        }
+      };
+
+      const results = [];
+
+      results.push(await probe('Locations', 'MERCHANT_PROFILE_READ', async () => {
+        const r = await axios.get('https://connect.squareup.com/v2/locations', { headers });
+        locationId = (r.data.locations || [])[0]?.id || null;
+        return `${(r.data.locations || []).length} location(s)`;
+      }));
+
+      results.push(await probe('Appointments (bookings)', 'APPOINTMENTS_READ', async () => {
+        const r = await axios.get('https://connect.squareup.com/v2/bookings', {
+          headers,
+          params: { location_id: locationId, limit: 1, start_at_min: new Date().toISOString() },
+        });
+        return `${(r.data.bookings || []).length} returned`;
+      }));
+
+      // The one that matters for table names.
+      results.push(await probe('Table names (booking profiles)', 'APPOINTMENTS_BUSINESS_SETTINGS_READ', async () => {
+        const r = await axios.get('https://connect.squareup.com/v2/bookings/team-member-booking-profiles', {
+          headers, params: { limit: 5 },
+        });
+        const names = (r.data.team_member_booking_profiles || []).map((p) => p.display_name).filter(Boolean);
+        return names.length ? `e.g. ${names.slice(0, 3).join(', ')}` : 'none returned';
+      }));
+
+      results.push(await probe('Team members (fallback)', 'EMPLOYEES_READ', async () => {
+        const r = await axios.post('https://connect.squareup.com/v2/team-members/search',
+          { query: { filter: { status: 'ACTIVE' } }, limit: 1 }, { headers });
+        return `${(r.data.team_members || []).length} returned`;
+      }));
+
+      results.push(await probe('Orders / tickets', 'ORDERS_READ', async () => {
+        const r = await axios.post('https://connect.squareup.com/v2/orders/search',
+          { location_ids: locationId ? [locationId] : [], limit: 1 }, { headers });
+        return `${(r.data.orders || []).length} returned`;
+      }));
+
+      results.push(await probe('Catalogue', 'ITEMS_READ', async () => {
+        const r = await axios.get('https://connect.squareup.com/v2/catalog/list', { headers, params: { types: 'ITEM' } });
+        return `${(r.data.objects || []).length} object(s)`;
+      }));
+
+      const denied = results.filter((r) => !r.ok);
+      res.json({
+        token_expired: expired,
+        // Named plainly so the answer to "why didn't the tables sync" is on
+        // the screen rather than in a log nobody reads.
+        table_names_available: results.find((r) => r.label.startsWith('Table names'))?.ok === true
+          || results.find((r) => r.label.startsWith('Team members'))?.ok === true,
+        missing_scopes: denied.map((r) => r.needs),
+        results,
+      });
+    } catch (err) {
+      logger.error('square access check failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
