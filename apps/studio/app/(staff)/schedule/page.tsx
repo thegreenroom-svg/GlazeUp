@@ -78,13 +78,66 @@ function cropStyle(url: string, box: PieceBox): React.CSSProperties {
   };
 }
 
+// Sessions that overlap in the same room have to sit SIDE BY SIDE, or they
+// stack on top of each other and all but the last one vanish. That is exactly
+// what happened when columns became rooms: a table-per-column layout never
+// needed this, because two bookings at 10:00 were on two different tables and
+// therefore in two different columns. Group them by room and eight concurrent
+// sessions become one visible session.
+//
+// Standard interval-packing: walk sessions in start order, keep a cluster of
+// everything that overlaps, and give each member a lane. Width is shared
+// across the widest point of the cluster so nothing ever overlaps visually.
+function layOut<T extends { session_start: string; session_end: string | null }>(items: T[]) {
+  const withTimes = items
+    .map((b) => ({
+      b,
+      start: new Date(b.session_start).getTime(),
+      end: b.session_end
+        ? new Date(b.session_end).getTime()
+        : new Date(b.session_start).getTime() + 90 * 60 * 1000,
+    }))
+    .sort((x, y) => x.start - y.start);
+
+  const out: { b: T; lane: number; lanes: number }[] = [];
+  let cluster: typeof withTimes = [];
+  let clusterEnd = -Infinity;
+
+  const flush = () => {
+    if (!cluster.length) return;
+    const laneEnds: number[] = [];
+    const placed = cluster.map((it) => {
+      let lane = laneEnds.findIndex((e) => e <= it.start);
+      if (lane === -1) { lane = laneEnds.length; laneEnds.push(it.end); }
+      else laneEnds[lane] = it.end;
+      return { it, lane };
+    });
+    const lanes = laneEnds.length;
+    for (const p of placed) out.push({ b: p.it.b, lane: p.lane, lanes });
+    cluster = [];
+    clusterEnd = -Infinity;
+  };
+
+  for (const it of withTimes) {
+    if (it.start >= clusterEnd) flush();
+    cluster.push(it);
+    clusterEnd = Math.max(clusterEnd, it.end);
+  }
+  flush();
+  return out;
+}
+
 const HOUR_PX = 64;
 const START_HOUR = 9;
 const END_HOUR = 19;
 
 // Same clay/sand palette as the rest of the app rather than Square's blue,
 // so it reads as part of this product and not an embedded iframe.
-const COL_W = 132;
+// Minimum room-column width, and the minimum a single session can shrink to
+// before the column widens instead. 104px still fits a time, a first name and
+// a party size, which is everything a block needs to be useful at a glance.
+const COL_W = 220;
+const LANE_MIN_W = 104;
 
 // Per Daisy: "if it is a landing page, do we need all the other hidden
 // stuff... little square tiles referencing those actions on this page so we
@@ -240,9 +293,16 @@ export default function SchedulePage() {
           </div>
 
           {columns.map((col) => {
-            const inCol = (data?.bookings || []).filter((b) => b.room === col);
+            const inCol = layOut((data?.bookings || []).filter((b) => b.room === col));
+            // A room column has to be wide enough for its busiest moment.
+            // Today's real day peaks at 10 concurrent sessions in Main
+            // Studio; at a fixed 220px that is 19px each -- present, but
+            // unreadable. So the column grows with the load and the grid
+            // scrolls sideways, which it already does.
+            const maxLanes = Math.max(1, ...inCol.map((x) => x.lanes));
+            const colW = Math.max(COL_W, maxLanes * LANE_MIN_W);
             return (
-              <div key={col} style={{ flexShrink: 0, width: COL_W, borderRight: '1px solid #f0f0f0', position: 'relative' }}>
+              <div key={col} style={{ flexShrink: 0, width: colW, borderRight: '1px solid #f0f0f0', position: 'relative' }}>
                 <div style={{ height: 34, borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700, color: 'var(--charcoal)', position: 'sticky', top: 0, background: 'white', zIndex: 2 }}>
                   {col}
                 </div>
@@ -250,7 +310,7 @@ export default function SchedulePage() {
                   {hours.map((h, i) => (
                     <div key={h} style={{ position: 'absolute', top: i * HOUR_PX, left: 0, right: 0, height: HOUR_PX, borderBottom: '1px solid #f4f4f4' }} />
                   ))}
-                  {inCol.map((b) => (
+                  {inCol.map(({ b, lane, lanes }) => (
                     <button
                       key={b.booking_code}
                       // Mid-shift you want the till and the photo; after
@@ -261,8 +321,9 @@ export default function SchedulePage() {
                       style={{
                         position: 'absolute',
                         top: topFor(b.session_start),
-                        left: 3,
-                        width: COL_W - 9,
+                        // Each session gets its own lane within the room.
+                        left: 3 + lane * ((colW - 6) / lanes),
+                        width: (colW - 6) / lanes - 3,
                         height: heightFor(b),
                         // Finished sessions fade back so the eye lands on
                         // what still needs doing -- the actual question
