@@ -35,6 +35,7 @@ import {
   HeartPulse,
   GraduationCap,
   Library,
+  Truck,
   CalendarClock, CalendarDays,
   Globe2,
   UserSquare2,
@@ -110,16 +111,27 @@ export function StudioNavigation() {
       // The piece's whole journey, in the order it actually happens.
       // These five were scattered across two groups and a "rarely
       // needed" bin, despite being the core of what the studio does.
+      // Ordered by the piece's actual life -- stamped, fired, found,
+      // packed, posted -- rather than by when each screen happened to get
+      // built. Eight entries down to six, and every one of these can
+      // CHANGE something. The three read-only views that used to sit here
+      // (Kiln Workflow, Collections, Lifecycle) moved to Business, because
+      // that is what they are: reports. Between them they were 324 lines
+      // and zero writes -- three separate front doors onto the same
+      // question, "where are pieces up to", none of which could act on the
+      // answer, cluttering the group used with pottery in hand.
       section: 'Pieces',
       items: [
         { label: 'All Pieces', icon: <Palette className="w-5 h-5" />, href: '/pieces' },
-        { label: 'Packing', icon: <Package className="w-5 h-5" />, href: '/packing' },
-        { label: 'Find on Table', icon: <MapPin className="w-5 h-5" />, href: '/find-on-table' },
         { label: 'Stamp a Piece', icon: <Stamp className="w-5 h-5" />, href: '/completion' },
         { label: 'Kiln Batches', icon: <Flame className="w-5 h-5" />, href: '/kiln-batch' },
-        { label: 'Kiln — Collection & Post', icon: <Flame className="w-5 h-5" />, href: '/kiln-dip' },
-        { label: 'Collections', icon: <Library className="w-5 h-5" />, href: '/collections' },
-        { label: 'Kiln Workflow', icon: <Zap className="w-5 h-5" />, href: '/kiln-workflow' },
+        { label: 'Find on Table', icon: <MapPin className="w-5 h-5" />, href: '/find-on-table' },
+        { label: 'Packing', icon: <Package className="w-5 h-5" />, href: '/packing' },
+        // Renamed from "Kiln — Collection & Post". It was competing with
+        // Kiln Batches for the same mental slot while its genuinely unique
+        // job is postal labels and the (parked) ready email. Named for
+        // what it actually does.
+        { label: 'Postal & Labels', icon: <Truck className="w-5 h-5" />, href: '/kiln-dip' },
       ],
     },
     {
@@ -135,6 +147,18 @@ export function StudioNavigation() {
         { label: 'Bisque Stock', icon: <Package className="w-5 h-5" />, href: '/inventory' },
         { label: 'Reports', icon: <TrendingUp className="w-5 h-5" />, href: '/reports' },
         { label: 'Analytics', icon: <BarChart3 className="w-5 h-5" />, href: '/analytics' },
+        // One read-only view kept, not three. Kiln Workflow, Collections
+        // Due and Piece Lifecycle were three separate front doors onto the
+        // same question -- "where are pieces up to" -- with 324 lines and
+        // zero writes between them. Moving all three here would have taken
+        // Business from 6 entries to 9, which is reshuffling clutter
+        // rather than removing it.
+        //
+        // Collections Due is the one with an operational use (who is owed
+        // pottery), so it stays in the menu. The other two remain fully
+        // working pages and stay in the Jump-to search -- findable by name,
+        // just not occupying a slot in a list read at a counter.
+        { label: 'Collections Due', icon: <Library className="w-5 h-5" />, href: '/collections' },
       ],
     },
     {
@@ -173,7 +197,6 @@ export function StudioNavigation() {
         { label: 'Community', icon: <Sparkles className="w-5 h-5" />, href: '/community' },
         { label: 'Studios Worldwide', icon: <Globe2 className="w-5 h-5" />, href: '/studios-worldwide' },
         { label: 'KDS', icon: <ChefHat className="w-5 h-5" />, href: '/kds' },
-        { label: 'Lifecycle', icon: <GitBranch className="w-5 h-5" />, href: '/lifecycle' },
       ],
     },
     ...(showDiagnostics ? [{
@@ -200,6 +223,8 @@ export function StudioNavigation() {
     { label: 'Schedule', href: '/schedule' },
     { label: 'Test AI', href: '/test-ai' },
     { label: 'Ticket Link Check', href: '/ticket-link' },
+    { label: 'Kiln Workflow', href: '/kiln-workflow' },
+    { label: 'Piece Lifecycle', href: '/lifecycle' },
     { label: 'Photo Match', href: '/photo-match' },
     { label: 'Needs Verification', href: '/needs-verification' },
     { label: 'Recover Party Sizes', href: '/backfill-party-sizes' },
