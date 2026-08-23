@@ -4452,7 +4452,11 @@ export function registerSquareTablesRoutes(app, supabase, STUDIO_ID, logger, axi
       let members = [];
       let cursor;
       do {
-        const body = { query: { filter: { location_ids: locationIds, status: 'ACTIVE' } }, limit: 200 };
+        // Square caps SearchTeamMembers at 100. Sending 200 is rejected
+        // outright, which is why this returned nothing and the table sync
+        // then had no names to match against -- "0 bookings moved to their
+        // real table" was the symptom, two stages downstream of the cause.
+        const body = { query: { filter: { location_ids: locationIds, status: 'ACTIVE' } }, limit: 100 };
         if (cursor) body.cursor = cursor;
         const r = await axios.post('https://connect.squareup.com/v2/team-members/search', body, { headers });
         members = members.concat(r.data.team_members || []);
@@ -5303,8 +5307,27 @@ export function parseTicketName(raw) {
 // Ticket names carry no a/b suffix, so both halves of table 4 reduce to T4
 // and are separated by time and by name instead.
 export function baseTableCode(tableName) {
-  const m = String(tableName || '').trim().match(/^([TL])\s*(\d{1,2})/i);
-  return m ? `${m[1].toUpperCase()}${parseInt(m[2], 10)}` : null;
+  const raw = String(tableName || '').trim();
+  if (!raw) return null;
+
+  // Square names these in full -- "Table 6", "Lounge 5", "Evening 3",
+  // "Thursdays 8", "Pop Up Event" -- NOT the "T2 a" shorthand the
+  // Appointments calendar column headers display. I had built the matcher
+  // against the column headers in Daisy's photo, which are an abbreviation
+  // of the real record. Checked against the live team-members API.
+  //
+  // The girls' ticket names use the shorthand (T6, L15), so this is the
+  // translation between the two, and without it every code match failed
+  // silently while looking perfectly reasonable in the code.
+  const full = raw.match(/^(table|lounge)\s*(\d{1,2})/i);
+  if (full) return `${full[1][0].toUpperCase()}${parseInt(full[2], 10)}`;
+
+  const short = raw.match(/^([TL])\s*(\d{1,2})/i);
+  if (short) return `${short[1].toUpperCase()}${parseInt(short[2], 10)}`;
+
+  // Evening / Thursdays / Pop Up sessions are real bookable resources but
+  // carry no table code the till would ever use. Null, not a guess.
+  return null;
 }
 
 export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axios) {

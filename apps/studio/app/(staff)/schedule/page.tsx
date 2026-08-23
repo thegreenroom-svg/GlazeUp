@@ -197,7 +197,16 @@ export default function SchedulePage() {
     setSyncing(true);
     setSyncNote(null);
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/square/sync-team-members`, { method: 'POST' });
+      // Stage one used to be fired and forgotten. When it failed, stage two
+      // reported "0 bookings moved" -- technically true, completely
+      // unhelpful, and two steps removed from the actual cause. Daisy
+      // pressed Sync, saw nothing move, and had no way to know the table
+      // names had never been fetched at all.
+      const tm = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/square/sync-team-members`, { method: 'POST' });
+      const tmData = await tm.json().catch(() => ({}));
+      if (!tm.ok) throw new Error(`Couldn't fetch table names from Square: ${tmData.error || tm.status}`);
+      if (!tmData.synced) throw new Error('Square returned no tables — nothing to match against.');
+
       const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/square/sync-booking-tables`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -205,7 +214,13 @@ export default function SchedulePage() {
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Sync failed');
-      setSyncNote(`${d.updated} booking${d.updated === 1 ? '' : 's'} moved to their real table${d.no_match ? `, ${d.no_match} with no matching appointment` : ''}`);
+      // Says what happened at BOTH stages, so a zero is diagnosable rather
+      // than mysterious.
+      setSyncNote(
+        `${tmData.synced} table${tmData.synced === 1 ? '' : 's'} read from Square · ` +
+        `${d.updated} booking${d.updated === 1 ? '' : 's'} moved` +
+        (d.no_match ? ` · ${d.no_match} with no matching appointment` : '')
+      );
       await load();
     } catch (e) {
       setSyncNote(e instanceof Error ? e.message : 'Sync failed');
