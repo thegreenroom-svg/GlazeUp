@@ -4441,6 +4441,137 @@ export function registerReidentifyRoute(app, supabase, STUDIO_ID, logger, axios,
 // columns is the one change here that could not be undone.
 // ============================================================================
 
+
+// ============================================================================
+// THE DAY -- bookings for one date, grouped by room
+// ----------------------------------------------------------------------------
+// This route was deleted by accident. It lived inside registerSquareTablesRoutes
+// alongside the table sync, so stripping tables took the schedule endpoint with
+// it and the day view 404'd -- the whole home screen, gone, because two
+// unrelated things shared a module.
+//
+// Now it stands on its own, which is where it should have been: the day view is
+// the app's home screen and has nothing to do with syncing Square resources.
+// ============================================================================
+export function registerScheduleRoute(app, supabase, STUDIO_ID, logger) {
+  app.get('/api/spec/schedule/:date', async (req, res) => {
+    try {
+      const date = req.params.date;
+      const dayStart = new Date(`${date}T00:00:00.000Z`);
+      const dayEnd = new Date(`${date}T23:59:59.999Z`);
+
+      const { data: bookings, error } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, session_start, session_end, party_size, space_name, live_ticket_name, live_ticket_total_cents')
+        .eq('studio_id', STUDIO_ID)
+        .gte('session_start', dayStart.toISOString())
+        .lte('session_start', dayEnd.toISOString())
+        .order('session_start', { ascending: true });
+      if (error) throw error;
+
+      // Columns are ROOMS, not tables. The room comes from the Square
+      // SERVICE name already on every booking, so it needs no extra
+      // permission and no cache -- and four columns that mean something to
+      // anyone standing in the building beat eight numbered ones.
+      const roomOf = (spaceName) => {
+        const t = String(spaceName || '').toLowerCase();
+        if (t.includes('vault')) return 'Vault';
+        if (t.includes('lounge')) return 'Lounge';
+        if (t.includes('main studio')) return 'Main Studio';
+        if (t.includes('evening')) return 'Evening';
+        if (t.includes('thursdays')) return 'Thursdays';
+        if (t.includes('wheel') || t.includes('throwing')) return 'Wheel';
+        if (t.includes('party') || t.includes('grotto') || t.includes('pop')) return 'Parties';
+        return 'Other';
+      };
+      const ORDER = ['Main Studio', 'Lounge', 'Vault', 'Thursdays', 'Evening', 'Wheel', 'Parties', 'Other'];
+      const usedRooms = Array.from(new Set((bookings || []).map((b) => roomOf(b.space_name))));
+      const columns = ORDER.filter((r) => usedRooms.includes(r));
+
+      // demo_app_session_status, NOT booking_status -- there is no such
+      // table, and querying it would have 500'd this whole endpoint.
+      const { data: statuses } = await supabase
+        .from('demo_app_session_status')
+        .select('booking_code, finished_at')
+        .eq('studio_id', STUDIO_ID)
+        .in('booking_code', (bookings || []).map((b) => b.booking_code).concat(['__none__']));
+      const finished = new Set((statuses || []).filter((s) => s.finished_at).map((s) => s.booking_code));
+
+      // Pottery due back TODAY, from sessions that happened weeks ago.
+      // This is the thing a Square calendar structurally cannot show,
+      // because Square doesn't know the pottery exists -- it sees a
+      // 90-minute appointment that ended a fortnight back and is done
+      // with it. A collection is a real event happening today with
+      // someone walking through the door for it, and it belongs on the
+      // day view next to the sessions.
+      // collection_date/method live on demo_app_session_status, NOT on
+      // bookings -- checked against the live schema rather than assumed.
+      // Querying bookings for them would have thrown and taken the whole
+      // day view down with it.
+      const { data: dueStatuses } = await supabase
+        .from('demo_app_session_status')
+        .select('booking_code, collection_date, collection_method, postal_postcode')
+        .eq('studio_id', STUDIO_ID)
+        .eq('collection_date', date);
+
+      const dueCodes = (dueStatuses || []).map((s2) => s2.booking_code);
+
+      // Names come from bookings, so a collection card says "Charlie
+      // Marlow" rather than a booking code nobody can read at a counter.
+      let nameByCode = new Map();
+      if (dueCodes.length) {
+        const { data: dueBookingRows } = await supabase
+          .from('bookings')
+          .select('booking_code, customer_name')
+          .eq('studio_id', STUDIO_ID)
+          .in('booking_code', dueCodes);
+        nameByCode = new Map((dueBookingRows || []).map((b) => [b.booking_code, b.customer_name]));
+      }
+      let piecesByBooking = {};
+      if (dueCodes.length) {
+        const { data: duePieces } = await supabase
+          .from('pottery_pieces')
+          .select('booking_id, status, piece_type')
+          .eq('studio_id', STUDIO_ID)
+          .in('booking_id', dueCodes)
+          .neq('archived', true);
+        for (const p of duePieces || []) {
+          if (!piecesByBooking[p.booking_id]) piecesByBooking[p.booking_id] = [];
+          piecesByBooking[p.booking_id].push(p);
+        }
+      }
+
+      res.json({
+        date,
+        columns,
+        bookings: (bookings || []).map((b) => ({
+          ...b,
+          room: roomOf(b.space_name),
+          finished: finished.has(b.booking_code),
+        })),
+        // Nothing can be unassigned -- every booking has a service, so
+        // every booking has a room.
+        unassigned: 0,
+        collections: (dueStatuses || []).map((b) => ({
+          booking_code: b.booking_code,
+          customer_name: nameByCode.get(b.booking_code) || b.booking_code,
+          collection_method: b.collection_method,
+          postal_postcode: b.postal_postcode,
+          piece_count: (piecesByBooking[b.booking_code] || []).length,
+          // "Ready" means every piece has cleared the kiln stages. Counted
+          // rather than assumed, so the lane tells the truth about what can
+          // actually be handed over when someone arrives.
+          ready: (piecesByBooking[b.booking_code] || []).length > 0
+            && (piecesByBooking[b.booking_code] || []).every((p) => ['ready', 'collected', 'complete'].includes(String(p.status || '').toLowerCase())),
+        })),
+      });
+    } catch (err) {
+      logger.error('schedule failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
+
 // ============================================================================
 // PACKING -- the screen for whoever is actually boxing the pottery
 // ----------------------------------------------------------------------------
