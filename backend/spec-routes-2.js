@@ -5076,3 +5076,154 @@ export function registerKilnBatchRoutes(app, supabase, STUDIO_ID, logger) {
     }
   });
 }
+
+// ============================================================================
+// TICKET LINK DIAGNOSTIC -- what can we actually match a booking on?
+// ----------------------------------------------------------------------------
+// Daisy wants the TERMINAL to win: whatever the girls name a ticket when they
+// start taking drinks orders should attach to the booking, whether they type
+// "L3", "main studio four b" or "6b". Fair, and it generalises -- other
+// studios will have their own till entirely.
+//
+// The question is what to match ON. There are four candidate rungs, best
+// first, and which are available depends entirely on how this studio actually
+// rings things up:
+//
+//   1. customer_id on the order == customer_id on the appointment. Exact,
+//      needs nobody to type anything, survives any naming at all.
+//   2. A short booking code typed into the ticket name (the code would be
+//      printed on the table card). Exact, but costs three keystrokes.
+//   3. Digits shared between ticket name and table. What happens today, and
+//      it fails silently on "L3" or on any name without a number.
+//   4. Last resort: one unmatched ticket, one active session, no other
+//      candidate in the window.
+//
+// Rather than build a matcher on an assumption about how staff work, this
+// MEASURES it against real open tickets. Read-only, writes nothing, and
+// deliberately reports the raw counts instead of a verdict -- the point is to
+// look at the real numbers and then decide.
+// ============================================================================
+export function registerTicketLinkDiagnosticRoute(app, supabase, STUDIO_ID, logger, axios) {
+  const digitsOf = (s) => (String(s || '').match(/\d+/g) || []).join('');
+
+  app.get('/api/spec/diagnostics/ticket-link', async (req, res) => {
+    try {
+      const daysBack = Math.min(parseInt(req.query.days, 10) || 7, 30);
+
+      const { data: connection } = await supabase
+        .from('square_connections')
+        .select('square_access_token, square_token_expires_at')
+        .eq('studio_id', STUDIO_ID)
+        .single();
+      if (!connection || new Date(connection.square_token_expires_at) < new Date()) {
+        return res.status(400).json({ error: 'No valid Square connection' });
+      }
+      const headers = {
+        Authorization: `Bearer ${connection.square_access_token}`,
+        'Square-Version': '2024-01-18',
+        'Content-Type': 'application/json',
+      };
+
+      const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', { headers });
+      const locationIds = (locationsRes.data.locations || []).map((l) => l.id);
+      if (!locationIds.length) return res.json({ error: 'no_square_locations' });
+
+      const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000);
+      const ordersRes = await axios.post(
+        'https://connect.squareup.com/v2/orders/search',
+        {
+          location_ids: locationIds,
+          query: { filter: { date_time_filter: { created_at: { start_at: since.toISOString() } } } },
+          limit: 500,
+        },
+        { headers }
+      );
+      const orders = ordersRes.data.orders || [];
+
+      // Bookings over the same window, to see whether a customer on a ticket
+      // could actually be tied back to an appointment.
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, table_number, session_start')
+        .eq('studio_id', STUDIO_ID)
+        .gte('session_start', since.toISOString());
+
+      // Appointment customer IDs come from SQUARE, not from our bookings
+      // table -- which has customer_name, email and phone but no
+      // square_customer_id at all. Checked the live schema rather than
+      // assuming: reading it from Supabase would have compared orders
+      // against an empty set and concluded rung 1 was useless when it may
+      // be the best option available.
+      let bookingCustomerIds = new Set();
+      try {
+        let appts = [], cursor;
+        do {
+          const params = {
+            location_id: locationIds[0],
+            start_at_min: since.toISOString(),
+            start_at_max: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            limit: 100,
+          };
+          if (cursor) params.cursor = cursor;
+          const r = await axios.get('https://connect.squareup.com/v2/bookings', { headers, params });
+          appts = appts.concat(r.data.bookings || []);
+          cursor = r.data.cursor;
+        } while (cursor);
+        bookingCustomerIds = new Set(appts.map((a) => a.customer_id).filter(Boolean));
+      } catch (err) {
+        logger.warn('ticket-link diagnostic: could not read appointments', err.message);
+      }
+      const bookingTableDigits = new Set(
+        (bookings || []).map((b) => digitsOf(b.table_number)).filter(Boolean)
+      );
+
+      let withCustomer = 0, customerMatchesBooking = 0;
+      let withTicketName = 0, ticketNameHasDigits = 0, digitsMatchATable = 0;
+      let withReferenceId = 0, withNothingUsable = 0;
+      const sampleNames = [];
+
+      for (const o of orders) {
+        const ticketName = o.ticket_name || o.source?.name || null;
+        if (o.customer_id) {
+          withCustomer++;
+          if (bookingCustomerIds.has(o.customer_id)) customerMatchesBooking++;
+        }
+        if (o.reference_id) withReferenceId++;
+        if (ticketName) {
+          withTicketName++;
+          const d = digitsOf(ticketName);
+          if (d) {
+            ticketNameHasDigits++;
+            if (bookingTableDigits.has(d)) digitsMatchATable++;
+          }
+          // A handful of real names, so the actual naming habits are visible
+          // rather than guessed at. Capped -- this is a sample, not a dump.
+          if (sampleNames.length < 25 && !sampleNames.includes(ticketName)) sampleNames.push(ticketName);
+        }
+        if (!o.customer_id && !ticketName) withNothingUsable++;
+      }
+
+      res.json({
+        window_days: daysBack,
+        orders_scanned: orders.length,
+        bookings_in_window: (bookings || []).length,
+        appointments_with_a_square_customer: bookingCustomerIds.size,
+        rung_1_customer: {
+          orders_with_customer_id: withCustomer,
+          of_those_matching_a_booking: customerMatchesBooking,
+        },
+        rung_2_reference_id: { orders_with_reference_id: withReferenceId },
+        rung_3_digits: {
+          orders_with_ticket_name: withTicketName,
+          ticket_names_containing_digits: ticketNameHasDigits,
+          digits_matching_a_known_table: digitsMatchATable,
+        },
+        orders_with_nothing_usable: withNothingUsable,
+        sample_ticket_names: sampleNames,
+      });
+    } catch (err) {
+      logger.error('ticket-link diagnostic failed', err.response?.data || err.message);
+      res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message });
+    }
+  });
+}

@@ -180,6 +180,7 @@ export function StudioNavigation() {
       section: 'Diagnostics',
       items: [
         { label: 'Test AI', icon: <FlaskConical className="w-5 h-5" />, href: '/test-ai' },
+        { label: 'Ticket Link Check', icon: <FlaskConical className="w-5 h-5" />, href: '/ticket-link' },
         { label: 'Photo Match', icon: <Camera className="w-5 h-5" />, href: '/photo-match' },
         { label: 'Needs Verification', icon: <ShieldCheck className="w-5 h-5" />, href: '/needs-verification' },
         { label: 'Recover Party Sizes', icon: <RefreshIcon className="w-5 h-5" />, href: '/backfill-party-sizes' },
@@ -198,6 +199,7 @@ export function StudioNavigation() {
     { label: 'Dashboard', href: '/dashboard' },
     { label: 'Schedule', href: '/schedule' },
     { label: 'Test AI', href: '/test-ai' },
+    { label: 'Ticket Link Check', href: '/ticket-link' },
     { label: 'Photo Match', href: '/photo-match' },
     { label: 'Needs Verification', href: '/needs-verification' },
     { label: 'Recover Party Sizes', href: '/backfill-party-sizes' },
