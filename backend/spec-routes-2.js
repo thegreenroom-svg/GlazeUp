@@ -2900,11 +2900,51 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
       // real identifier every already-synced row carries.
       const { data: existing } = await supabase
         .from('bookings')
-        .select('square_booking_id')
+        // session_start too, or the reschedule comparison below reads
+        // undefined on every row and rewrites the whole diary each run.
+        .select('square_booking_id, session_start')
         .eq('studio_id', STUDIO_ID)
         .not('square_booking_id', 'is', null);
       const existingIds = new Set((existing || []).map((b) => b.square_booking_id));
       const newBookings = allBookings.filter((b) => !existingIds.has(b.id));
+
+      // RESCHEDULES. Existing bookings were skipped outright, so a session
+      // moved in Square never moved in the app. Found live: Sophie Dunn's
+      // 23 Aug booking had been moved to 29 Aug and Daisy Maine's to 6
+      // Sept, and both were still sitting on today's schedule -- two
+      // sessions the studio would have been set up for that were never
+      // going to arrive, and two customers missing from the days they
+      // actually booked.
+      //
+      // Only the fields Square owns are updated -- when it starts, how
+      // long, which service. Everything the studio has added since (photos,
+      // pieces, who is packing it) is left alone: this is a sync, not a
+      // reset.
+      let rescheduled = 0;
+      const rescheduleChanges = [];
+      const existingBySquareId = new Map((existing || []).map((b) => [b.square_booking_id, b]));
+      for (const b of allBookings) {
+        const row = existingBySquareId.get(b.id);
+        if (!row) continue;
+        const durationMin = b.appointment_segments?.[0]?.duration_minutes || null;
+        const newStart = new Date(b.start_at).toISOString();
+        const newEnd = durationMin
+          ? new Date(new Date(b.start_at).getTime() + durationMin * 60000).toISOString()
+          : null;
+        const oldStart = row.session_start ? new Date(row.session_start).toISOString() : null;
+        if (oldStart === newStart) continue;
+        const { error: upErr } = await supabase
+          .from('bookings')
+          .update({ session_start: newStart, session_end: newEnd })
+          .eq('studio_id', STUDIO_ID)
+          .eq('square_booking_id', b.id);
+        if (!upErr) {
+          rescheduled++;
+          if (rescheduleChanges.length < 20) {
+            rescheduleChanges.push({ square_booking_id: b.id, from: oldStart, to: newStart });
+          }
+        }
+      }
 
       let synced = 0, errored = 0;
       const errors = [];
@@ -3018,6 +3058,8 @@ export function registerRealBookingSyncRoute(app, supabase, STUDIO_ID, logger, a
         status: 'synced',
         synced,
         skipped_existing: allBookings.length - newBookings.length,
+        rescheduled,
+        reschedule_changes: rescheduleChanges,
         errored,
         total_from_square: allBookings.length,
         errors,
