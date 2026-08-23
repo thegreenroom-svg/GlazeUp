@@ -4449,28 +4449,62 @@ export function registerSquareTablesRoutes(app, supabase, STUDIO_ID, logger, axi
       const locationIds = (locationsRes.data.locations || []).map((l) => l.id);
       if (!locationIds.length) return res.json({ synced: 0, reason: 'no_square_locations' });
 
-      let members = [];
+      // TEAM MEMBER BOOKING PROFILES, not the team-members search.
+      //
+      // The search needs EMPLOYEES_READ, which this app's Square token does
+      // not have -- Square said so plainly once the UI stopped swallowing
+      // the error: "The merchant must authorize your application for the
+      // following scopes: EMPLOYEES_READ".
+      //
+      // This endpoint returns exactly what's needed -- team_member_id,
+      // display_name, is_bookable -- under APPOINTMENTS_BUSINESS_SETTINGS_
+      // READ, the appointments family the app is already using to read
+      // bookings. Verified against the live API: it returns "Thursdays 3",
+      // "Lounge 5" and so on, which is precisely the naming the matcher
+      // wants.
+      //
+      // It is also the more honest source. These are BOOKABLE RESOURCES --
+      // tables and session slots -- not employees, and asking for staff
+      // records to find out what a table is called was always the wrong
+      // question. A studio would rightly hesitate before granting an app
+      // access to its employee records.
+      let profiles = [];
       let cursor;
-      do {
-        // Square caps SearchTeamMembers at 100. Sending 200 is rejected
-        // outright, which is why this returned nothing and the table sync
-        // then had no names to match against -- "0 bookings moved to their
-        // real table" was the symptom, two stages downstream of the cause.
-        const body = { query: { filter: { location_ids: locationIds, status: 'ACTIVE' } }, limit: 100 };
-        if (cursor) body.cursor = cursor;
-        const r = await axios.post('https://connect.squareup.com/v2/team-members/search', body, { headers });
-        members = members.concat(r.data.team_members || []);
-        cursor = r.data.cursor;
-      } while (cursor);
+      let usedFallback = false;
+      try {
+        do {
+          const params = { limit: 100 };
+          if (cursor) params.cursor = cursor;
+          const r = await axios.get('https://connect.squareup.com/v2/bookings/team-member-booking-profiles', { headers, params });
+          profiles = profiles.concat(r.data.team_member_booking_profiles || []);
+          cursor = r.data.cursor;
+        } while (cursor);
+      } catch (profErr) {
+        // Falls back to the employee search for any studio that happens to
+        // have granted EMPLOYEES_READ but not the appointments settings
+        // scope. Reported either way rather than silently degrading.
+        logger.warn('booking profiles unavailable, trying team-members search', profErr.response?.data?.errors?.[0]?.detail || profErr.message);
+        usedFallback = true;
+        let members = [], c2;
+        do {
+          const body = { query: { filter: { location_ids: locationIds, status: 'ACTIVE' } }, limit: 100 };
+          if (c2) body.cursor = c2;
+          const r = await axios.post('https://connect.squareup.com/v2/team-members/search', body, { headers });
+          members = members.concat(r.data.team_members || []);
+          c2 = r.data.cursor;
+        } while (c2);
+        profiles = members.map((m) => ({
+          team_member_id: m.id,
+          display_name: [m.given_name, m.family_name].filter(Boolean).join(' ').trim() || m.email_address || m.id,
+          is_bookable: m.status === 'ACTIVE',
+        }));
+      }
 
-      const rows = members.map((m) => ({
+      const rows = profiles.map((p) => ({
         studio_id: STUDIO_ID,
-        team_member_id: m.id,
-        // Tables are named in the given-name field ("T4 a"); real people
-        // have both names. Either way this is what Square shows as the
-        // column header, which is what staff read off the screen.
-        display_name: [m.given_name, m.family_name].filter(Boolean).join(' ').trim() || m.email_address || m.id,
-        is_bookable: m.status === 'ACTIVE',
+        team_member_id: p.team_member_id,
+        display_name: p.display_name || p.team_member_id,
+        is_bookable: p.is_bookable !== false,
         updated_at: new Date().toISOString(),
       }));
 
@@ -4481,7 +4515,7 @@ export function registerSquareTablesRoutes(app, supabase, STUDIO_ID, logger, axi
         if (error) throw error;
       }
 
-      res.json({ synced: rows.length, names: rows.map((r) => r.display_name).sort() });
+      res.json({ synced: rows.length, source: usedFallback ? 'team-members-search' : 'booking-profiles', names: rows.map((r) => r.display_name).sort() });
     } catch (err) {
       logger.error('sync-team-members failed', err.response?.data || err.message);
       res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message });
