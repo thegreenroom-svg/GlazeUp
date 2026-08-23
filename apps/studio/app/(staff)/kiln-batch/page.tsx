@@ -36,6 +36,8 @@ interface BatchDetail {
   piece_count: number;
   already_out: number;
   on_hold: number;
+  moved_to?: string;
+  moved_bookings?: number;
 }
 
 const fmtDate = (d: string) =>
@@ -53,6 +55,16 @@ export default function KilnBatchesPage() {
   const [error, setError] = useState<string | null>(null);
   const [marking, setMarking] = useState(false);
   const [done, setDone] = useState<number | null>(null);
+
+  // Kiln operator controls. A kiln breaking is the ordinary case, not the
+  // exception -- and when it does, every booking on that shelf moves
+  // together. But sometimes only ONE piece slips (a crack, a refire), and
+  // that booking alone needs a different date. Both, from the same screen.
+  const [moveTo, setMoveTo] = useState('');
+  const [moving, setMoving] = useState(false);
+  const [moveNote, setMoveNote] = useState<string | null>(null);
+  const [movingOne, setMovingOne] = useState<string | null>(null);
+  const [detailQr, setDetailQr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -84,6 +96,47 @@ export default function KilnBatchesPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    if (!date) { setDetailQr(null); return; }
+    QRCode.toDataURL(`${window.location.origin}/kiln-batch?date=${date}`, { width: 260, margin: 1 })
+      .then(setDetailQr).catch(() => setDetailQr(null));
+  }, [date]);
+
+  const moveBatch = async () => {
+    if (!date || !moveTo) return;
+    setMoving(true); setMoveNote(null);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/kiln/batch/${date}/move`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to_date: moveTo }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Could not move the batch');
+      // Straight to the new batch, because the next thing anyone does after
+      // moving a shelf is print its new sticker.
+      router.push(`/kiln-batch?date=${moveTo}`);
+    } catch (e) {
+      setMoveNote(e instanceof Error ? e.message : 'Could not move the batch');
+      setMoving(false);
+    }
+  };
+
+  const moveOne = async (code: string) => {
+    if (!moveTo) { setMoveNote('Pick the new date first.'); return; }
+    setMovingOne(code); setMoveNote(null);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${code}/collection-date`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ collection_date: moveTo }),
+      });
+      if (!res.ok) throw new Error('Could not move that booking');
+      setMoveNote(`That booking alone moved to ${fmtDate(moveTo)}. The rest of the batch is unchanged.`);
+      await load();
+    } catch (e) {
+      setMoveNote(e instanceof Error ? e.message : 'Could not move that booking');
+    } finally { setMovingOne(null); }
+  };
+
   const markOut = async () => {
     if (!date) return;
     setMarking(true);
@@ -108,7 +161,23 @@ export default function KilnBatchesPage() {
         {loading && <p style={{ fontSize: '0.85rem', color: '#888' }}>Loading the batch...</p>}
         {error && <p style={{ fontSize: '0.85rem', color: '#c0392b' }}>{error}</p>}
 
-        {detail && (
+        {/* A card taped to a trolley outlives the date printed on it. If
+            this batch has moved, the scan says where it went instead of
+            reporting an empty shelf, which would read as the app losing a
+            trolley of pottery. */}
+        {detail?.moved_to && (
+          <div style={{ padding: '0.9rem', borderRadius: 10, backgroundColor: '#FFF6E8', border: '1px solid #F0C987', marginBottom: '0.9rem' }}>
+            <p style={{ fontSize: '0.9rem', fontWeight: 700, color: '#7A5B00' }}>This batch moved to {fmtDate(detail.moved_to)}</p>
+            <p style={{ fontSize: '0.78rem', color: '#7A5B00', marginTop: '0.2rem' }}>
+              {detail.moved_bookings} booking{detail.moved_bookings === 1 ? '' : 's'} went with it. The sticker on this shelf is out of date.
+            </p>
+            <button onClick={() => router.push(`/kiln-batch?date=${detail.moved_to}`)} style={{ marginTop: '0.5rem', padding: '0.5rem 0.8rem', borderRadius: 8, border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>
+              Open the new batch and reprint
+            </button>
+          </div>
+        )}
+
+        {detail && !detail.moved_to && (
           <>
             {done !== null && (
               <div style={{ padding: '0.8rem', borderRadius: 8, backgroundColor: '#F1F8F1', border: '1px solid #9CC79C', marginBottom: '0.9rem' }}>
@@ -131,14 +200,21 @@ export default function KilnBatchesPage() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', margin: '0.9rem 0' }}>
               {detail.bookings.map((b) => (
-                <button
-                  key={b.booking_code}
-                  onClick={() => router.push(`/bookings?code=${b.booking_code}`)}
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.65rem', border: '1px solid #eee', borderRadius: 7, background: 'white', cursor: 'pointer', textAlign: 'left' }}
-                >
-                  <span style={{ fontSize: '0.84rem', fontWeight: 600 }}>{b.customer_name}</span>
-                  <span style={{ fontSize: '0.75rem', color: '#777' }}>{b.pieces} piece{b.pieces === 1 ? '' : 's'}</span>
-                </button>
+                <div key={b.booking_code} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.65rem', border: '1px solid #eee', borderRadius: 7, background: 'white' }}>
+                  <button onClick={() => router.push(`/bookings?code=${b.booking_code}`)} style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+                    <span style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600 }}>{b.customer_name}</span>
+                    <span style={{ fontSize: '0.75rem', color: '#777' }}>{b.pieces} piece{b.pieces === 1 ? '' : 's'}</span>
+                  </button>
+                  {/* Just this one. A single cracked piece needing a refire
+                      shouldn't drag the whole shelf's promise with it. */}
+                  <button
+                    onClick={() => moveOne(b.booking_code)}
+                    disabled={movingOne === b.booking_code}
+                    style={{ flexShrink: 0, padding: '0.3rem 0.5rem', borderRadius: 6, border: '1px solid #ddd', background: 'white', color: 'var(--clay)', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    {movingOne === b.booking_code ? '...' : 'Move just this'}
+                  </button>
+                </div>
               ))}
             </div>
 
@@ -157,6 +233,51 @@ export default function KilnBatchesPage() {
               <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.88rem', fontWeight: 600, color: '#2E7D32' }}>
                 <Check size={17} /> This whole batch is already out
               </p>
+            )}
+
+            {/* Move the shelf. Every booking promised this date moves
+                together, because they are one physical shelf -- packing,
+                collections and the day view all read the same field, so
+                one write moves all of them and there is no second place to
+                remember. The studio's default for NEW bookings is
+                deliberately left alone: a kiln breaking today says nothing
+                about what a session three weeks out should be promised. */}
+            <div className="no-print" style={{ marginTop: '1.1rem', paddingTop: '0.9rem', borderTop: '1px solid #eee' }}>
+              <p style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.15rem' }}>Kiln delayed?</p>
+              <p style={{ fontSize: '0.74rem', color: '#777', marginBottom: '0.5rem' }}>
+                Moves every booking on this shelf. New bookings keep the studio&apos;s usual date.
+              </p>
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <input
+                  type="date"
+                  value={moveTo}
+                  onChange={(e) => setMoveTo(e.target.value)}
+                  style={{ padding: '0.45rem 0.6rem', borderRadius: 8, border: '1px solid #ddd', fontSize: '0.82rem' }}
+                />
+                <button
+                  onClick={moveBatch}
+                  disabled={!moveTo || moving}
+                  style={{ padding: '0.5rem 0.8rem', borderRadius: 8, border: 'none', background: moveTo ? 'var(--clay)' : '#eee', color: moveTo ? 'white' : '#aaa', fontWeight: 700, fontSize: '0.8rem', cursor: moveTo ? 'pointer' : 'not-allowed' }}
+                >
+                  {moving ? 'Moving...' : `Move all ${detail.bookings.length}`}
+                </button>
+              </div>
+              {moveNote && <p style={{ fontSize: '0.76rem', color: 'var(--clay)', marginTop: '0.45rem' }}>{moveNote}</p>}
+            </div>
+
+            {/* The sticker for this shelf, reprintable on the spot -- which
+                is the whole point after a date change. */}
+            {detailQr && (
+              <div style={{ marginTop: '1.1rem', paddingTop: '0.9rem', borderTop: '1px solid #eee', textAlign: 'center', breakInside: 'avoid' }}>
+                <p style={{ fontSize: '1rem', fontWeight: 700 }}>{fmtDate(date)}</p>
+                <p style={{ fontSize: '0.75rem', color: '#777', marginBottom: '0.4rem' }}>
+                  {detail.piece_count} piece{detail.piece_count === 1 ? '' : 's'} · {detail.bookings.length} booking{detail.bookings.length === 1 ? '' : 's'}
+                </p>
+                <img src={detailQr} alt="" style={{ width: 160, height: 160, margin: '0 auto', display: 'block' }} />
+                <button onClick={() => window.print()} className="no-print" style={{ marginTop: '0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.5rem 0.8rem', borderRadius: 8, border: '1px solid #ddd', background: 'white', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>
+                  <Printer size={14} /> Print this sticker
+                </button>
+              </div>
             )}
           </>
         )}

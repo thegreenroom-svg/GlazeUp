@@ -4926,6 +4926,26 @@ export function registerKilnBatchRoutes(app, supabase, STUDIO_ID, logger) {
   app.get('/api/spec/kiln/batch/:date', async (req, res) => {
     try {
       const { codes, pieces } = await batchPieces(req.params.date);
+
+      // A printed card taped to a trolley outlives the date on it. If this
+      // batch has been moved, say so instead of reporting an empty shelf.
+      if (!codes.length) {
+        const { data: move } = await supabase
+          .from('kiln_batch_moves')
+          .select('to_date, moved_bookings, created_at')
+          .eq('studio_id', STUDIO_ID)
+          .eq('from_date', req.params.date)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (move) {
+          return res.json({
+            date: req.params.date, bookings: [], piece_count: 0, already_out: 0, on_hold: 0,
+            moved_to: move.to_date, moved_bookings: move.moved_bookings,
+          });
+        }
+      }
+
       const live = pieces.filter((p) => p.fulfilment !== 'return_visit');
       const out = live.filter((p) => ['ready', 'collected', 'complete'].includes(String(p.status || '').toLowerCase()));
 
@@ -4947,6 +4967,83 @@ export function registerKilnBatchRoutes(app, supabase, STUDIO_ID, logger) {
       });
     } catch (err) {
       logger.error('kiln batch failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ==========================================================================
+  // MOVING A BATCH -- "the kiln broke, everything on the 28th is now the 4th"
+  // --------------------------------------------------------------------------
+  // Daisy: "if the collection date is changed... it's a global change across
+  // everything that's affecting... But the global date for the other
+  // collections on bookings that have happened that haven't been sequenced
+  // and changed needed to stay the same."
+  //
+  // Two genuinely different operations that were sharing one field:
+  //
+  //   1. MOVE A BATCH (this route). A real firing slipped. Every booking
+  //      promised that date moves together, because they are one physical
+  //      shelf. Packing, collections and the day view all read
+  //      collection_date, so they all follow from this single write --
+  //      there is no second place to remember to update.
+  //
+  //   2. THE STUDIO DEFAULT (/api/spec/studio/collection-date). What NEW
+  //      bookings get promised. Deliberately untouched here: a broken kiln
+  //      today says nothing about what a session three weeks out should be
+  //      promised, and bookings already given a date must not be dragged
+  //      along behind a default change. That route already only fills in
+  //      today's bookings that have no date yet, which is the correct half.
+  //
+  // The response reports whether the studio default happens to match the
+  // date being moved, so the decision to change it too is made deliberately
+  // rather than by accident in either direction.
+  app.post('/api/spec/kiln/batch/:date/move', async (req, res) => {
+    try {
+      const from = req.params.date;
+      const to = req.body?.to_date;
+      if (!to || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+        return res.status(400).json({ error: 'to_date must be a YYYY-MM-DD date' });
+      }
+      if (to === from) return res.status(400).json({ error: 'That is already the batch date' });
+
+      const { data: affected } = await supabase
+        .from('demo_app_session_status')
+        .select('booking_code')
+        .eq('studio_id', STUDIO_ID)
+        .eq('collection_date', from);
+      const codes = (affected || []).map((r) => r.booking_code);
+      if (!codes.length) return res.status(404).json({ error: 'No bookings are on that collection date' });
+
+      const { error } = await supabase
+        .from('demo_app_session_status')
+        .update({ collection_date: to })
+        .eq('studio_id', STUDIO_ID)
+        .eq('collection_date', from);
+      if (error) throw error;
+
+      // Recorded because the QR cards are PHYSICAL. A card printed for the
+      // 28th is taped to a trolley and will still be scanned after the move
+      // -- without this it would land on an empty batch and read as "no
+      // pieces", which looks like the app losing a shelf of pottery. With
+      // it, the scan says where the batch went.
+      await supabase.from('kiln_batch_moves').insert({
+        studio_id: STUDIO_ID, from_date: from, to_date: to, moved_bookings: codes.length,
+      });
+
+      const { data: studio } = await supabase
+        .from('studios').select('current_collection_date').eq('id', STUDIO_ID).maybeSingle();
+
+      res.json({
+        moved: codes.length,
+        from,
+        to,
+        studio_default: studio?.current_collection_date || null,
+        // True when the studio's default for NEW bookings is the date just
+        // vacated -- worth deciding about, but never changed silently.
+        studio_default_matches_old_date: studio?.current_collection_date === from,
+      });
+    } catch (err) {
+      logger.error('kiln batch move failed', err.message);
       res.status(500).json({ error: err.message });
     }
   });
