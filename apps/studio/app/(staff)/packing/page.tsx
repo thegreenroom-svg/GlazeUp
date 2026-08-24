@@ -78,6 +78,11 @@ export default function PackingPage() {
   const [piecesLoading, setPiecesLoading] = useState(false);
   const [openPiece, setOpenPiece] = useState<{ piece: Piece; index: number } | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  // Breakage. The draft comes back from the server for a human to send --
+  // "we broke your pottery" is exactly the message that must never go out
+  // by accident, so nothing here emails anyone.
+  const [breaking, setBreaking] = useState(false);
+  const [breakResult, setBreakResult] = useState<{ message_draft: string; customer_phone: string | null; customer_email: string | null } | null>(null);
 
   // Opened from a booking rather than from the queue. Packing is a job you
   // reach FROM a booking as often as you reach it from a list -- the pieces
@@ -232,6 +237,55 @@ export default function PackingPage() {
           >
             {p.status === 'collected' ? '✓ Packed' : saving === p.id ? 'Saving...' : 'Mark this one packed'}
           </button>
+
+          {/* The bad moment, handled while the piece is in hand. Marks it,
+              and drafts the message so the customer conversation starts
+              from a written offer rather than an apology improvised at the
+              till. */}
+          {p.status !== 'collected' && !breakResult && (
+            <button
+              onClick={async () => {
+                setBreaking(true);
+                try {
+                  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/${p.id}/breakage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({}),
+                  });
+                  const d = await res.json();
+                  if (res.ok) setBreakResult(d);
+                } finally { setBreaking(false); }
+              }}
+              disabled={breaking}
+              style={{ width: '100%', marginTop: '0.5rem', padding: '0.7rem', borderRadius: 10, border: '1px solid #E5B8B8', background: '#FBF3F3', color: '#A33', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+            >
+              {breaking ? 'Marking...' : 'It broke in the kiln'}
+            </button>
+          )}
+
+          {breakResult && (
+            <div style={{ marginTop: '0.7rem', padding: '0.75rem', borderRadius: 10, border: '1px solid #E5B8B8', background: '#FBF3F3' }}>
+              <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#A33' }}>Marked as broken in firing</p>
+              <p style={{ fontSize: '0.78rem', color: '#555', margin: '0.4rem 0', lineHeight: 1.4 }}>{breakResult.message_draft}</p>
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => navigator.clipboard?.writeText(breakResult.message_draft)}
+                  style={{ padding: '0.45rem 0.7rem', borderRadius: 8, border: '1px solid #ddd', background: 'white', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Copy message
+                </button>
+                {breakResult.customer_phone && (
+                  <a href={`sms:${breakResult.customer_phone}&body=${encodeURIComponent(breakResult.message_draft)}`}
+                     style={{ padding: '0.45rem 0.7rem', borderRadius: 8, border: '1px solid #ddd', background: 'white', fontSize: '0.78rem', fontWeight: 600, textDecoration: 'none', color: 'var(--charcoal)' }}>
+                    Text it
+                  </a>
+                )}
+              </div>
+              <p style={{ fontSize: '0.68rem', color: '#999', marginTop: '0.4rem' }}>
+                Nothing has been sent — this is a draft for you to use.
+              </p>
+            </div>
+          )}
         </div>
       </PageShell>
     );

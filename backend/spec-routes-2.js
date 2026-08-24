@@ -2133,10 +2133,29 @@ export function registerKilnSimplifiedRoute(app, supabase, STUDIO_ID, logger) {
         .eq('booking_code', bookingCode)
         .maybeSingle();
 
+      // The customer's actual pottery in the email. Per Daisy's list of
+      // ideas: "sending the customer a photo of their finished piece rather
+      // than a plain ready-for-collection note". The reference photo is of
+      // the whole table, so only pieces whose photo URL is publicly
+      // reachable are included, capped at four -- an email with nine large
+      // images goes straight to spam.
+      const { data: pieces } = await supabase
+        .from('pottery_pieces')
+        .select('piece_type, reference_photo_url')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_id', bookingCode)
+        .neq('archived', true)
+        .neq('fulfilment', 'return_visit');
+      const photoUrls = Array.from(new Set(
+        (pieces || []).map((p) => p.reference_photo_url).filter((u) => u && u.startsWith('http'))
+      )).slice(0, 4);
+
       const result = await sendCollectionEmail({
         to: booking.customer_email,
         customerName: booking.customer_name,
         collectionDate: status?.collection_date || null,
+        photoUrls,
+        pieceCount: (pieces || []).length,
         logger,
       });
       res.json({ booking_code: bookingCode, ...result });
@@ -2178,7 +2197,7 @@ export function customerEmailState() {
   return { enabled, configured, live: enabled && configured };
 }
 
-async function sendCollectionEmail({ to, customerName, collectionDate, logger }) {
+async function sendCollectionEmail({ to, customerName, collectionDate, photoUrls = [], pieceCount = 0, logger }) {
   if (process.env.CUSTOMER_EMAILS_ENABLED !== 'true') {
     logger.warn('[collection-email] parked -- CUSTOMER_EMAILS_ENABLED is not "true", no email sent');
     return { sent: false, reason: 'switched_off' };
@@ -2204,7 +2223,19 @@ async function sendCollectionEmail({ to, customerName, collectionDate, logger })
         from: process.env.FROM_EMAIL || 'The Kiln Cafe <hello@thekilncafe.com>',
         to: [to],
         subject: 'Your pottery is fired and ready!',
-        html: `<p>Hi ${customerName || 'there'},</p><p>Great news -- your pottery has come out of the kiln and is ready for collection${collectionDate ? ` from <strong>${dateText}</strong>` : ''}.</p><p>See you soon!</p><p>The Kiln Cafe</p>`,
+        // The photo of their own pottery is the whole point of this email
+        // -- it's the difference between a notification and something that
+        // gets shown around. Falls back to plain text when no public photo
+        // exists rather than embedding a broken image.
+        html: [
+          `<p>Hi ${customerName || 'there'},</p>`,
+          `<p>Great news -- your pottery has come out of the kiln and is ready for collection${collectionDate ? ` from <strong>${dateText}</strong>` : ''}.</p>`,
+          photoUrls.length
+            ? `<p>Here ${pieceCount === 1 ? 'it is' : 'they are'}, fresh from the kiln:</p>` +
+              photoUrls.map((u) => `<img src="${u}" alt="Your pottery" style="max-width:100%;border-radius:8px;margin:6px 0;" />`).join('')
+            : '',
+          `<p>See you soon!</p><p>The Kiln Cafe</p>`,
+        ].join(''),
       }),
     });
     const body = await res.json().catch(() => ({}));
@@ -5640,6 +5671,371 @@ export function registerSquareAccessCheckRoute(app, supabase, STUDIO_ID, logger,
     } catch (err) {
       logger.error('square access check failed', err.message);
       res.status(500).json({ error: err.message });
+    }
+  });
+}
+
+// ============================================================================
+// COLLECTION MODE -- the front desk moment
+// ----------------------------------------------------------------------------
+// A customer walks in and says a first name. The chaotic version of what
+// happens next is someone wandering shelves reading chalk tags. This gives
+// the ten-second version: type the name, see which shelf, see the pottery
+// cropped from the table photo, see whether it is actually all out and who
+// packed it. Read-only until the hand-over itself.
+// ============================================================================
+export function registerCollectionModeRoutes(app, supabase, STUDIO_ID, logger) {
+  app.get('/api/spec/collection/search', async (req, res) => {
+    try {
+      const q = String(req.query.q || '').trim();
+      if (q.length < 2) return res.json({ matches: [] });
+
+      // Name search across bookings that still have uncollected pottery.
+      // Escapes the wildcard characters rather than interpolating raw user
+      // input into the pattern.
+      const safe = q.replace(/[%_]/g, '');
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, session_start')
+        .eq('studio_id', STUDIO_ID)
+        .ilike('customer_name', `%${safe}%`)
+        .order('session_start', { ascending: false })
+        .limit(25);
+      if (!bookings?.length) return res.json({ matches: [] });
+
+      const codes = bookings.map((b) => b.booking_code);
+      const { data: pieces } = await supabase
+        .from('pottery_pieces')
+        .select('id, booking_id, piece_type, description, status, fulfilment, reference_photo_url, photo_box, shelf_id, photo_taken_by')
+        .eq('studio_id', STUDIO_ID)
+        .in('booking_id', codes)
+        .neq('archived', true);
+
+      const shelfIds = Array.from(new Set((pieces || []).map((p) => p.shelf_id).filter(Boolean)));
+      let shelfById = new Map();
+      if (shelfIds.length) {
+        const { data: shelves } = await supabase
+          .from('kiln_shelves').select('id, label')
+          .eq('studio_id', STUDIO_ID).in('id', shelfIds);
+        shelfById = new Map((shelves || []).map((sh) => [sh.id, sh.label]));
+      }
+
+      const isOut = (p) => ['ready', 'collected', 'complete'].includes(String(p.status || '').toLowerCase());
+      const matches = bookings
+        .map((b) => {
+          const ps = (pieces || []).filter((p) => p.booking_id === b.booking_code && p.fulfilment !== 'return_visit');
+          const uncollected = ps.filter((p) => String(p.status || '').toLowerCase() !== 'collected');
+          return {
+            booking_code: b.booking_code,
+            customer_name: b.customer_name,
+            session_start: b.session_start,
+            piece_count: ps.length,
+            uncollected: uncollected.length,
+            all_out_of_kiln: ps.length > 0 && ps.every(isOut),
+            shelf_label: ps.map((p) => p.shelf_id && shelfById.get(p.shelf_id)).find(Boolean) || null,
+            posting: ps.filter((p) => p.fulfilment === 'post').length,
+            pieces: ps.map((p) => ({
+              id: p.id, piece_type: p.piece_type, description: p.description,
+              status: p.status, out: isOut(p),
+              reference_photo_url: p.reference_photo_url, photo_box: p.photo_box,
+            })),
+          };
+        })
+        // Only people with pottery to collect -- a front desk search is not
+        // a booking browser, and showing collected bookings would send
+        // someone hunting for a box that already went home.
+        .filter((m) => m.piece_count > 0 && m.uncollected > 0);
+
+      res.json({ matches });
+    } catch (err) {
+      logger.error('collection search failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // The hand-over. Marks every remaining piece collected in one go.
+  app.post('/api/spec/collection/:code/handover', async (req, res) => {
+    try {
+      const { data: pieces } = await supabase
+        .from('pottery_pieces')
+        .select('id, status, fulfilment')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_id', req.params.code)
+        .neq('archived', true);
+      const ids = (pieces || [])
+        .filter((p) => p.fulfilment !== 'return_visit')
+        .filter((p) => String(p.status || '').toLowerCase() !== 'collected')
+        .map((p) => p.id);
+      if (ids.length) {
+        const { error } = await supabase
+          .from('pottery_pieces')
+          .update({ status: 'collected', updated_at: new Date().toISOString() })
+          .in('id', ids);
+        if (error) throw error;
+      }
+      res.json({ handed_over: ids.length });
+    } catch (err) {
+      logger.error('handover failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
+
+// ============================================================================
+// BREAKAGE -- pottery breaks in firing, and studios handle it badly on paper
+// ----------------------------------------------------------------------------
+// Marks the piece, records what happened and who found it, and drafts the
+// awkward message so the conversation with the customer starts from a written
+// offer rather than an apology improvised at the till. The draft is returned
+// for a human to send -- it is NEVER emailed automatically, because "we broke
+// your pottery" is exactly the message that must not go out by accident.
+// ============================================================================
+export function registerBreakageRoutes(app, supabase, STUDIO_ID, logger) {
+  app.post('/api/spec/pieces/:id/breakage', async (req, res) => {
+    try {
+      const note = String(req.body?.note || '').trim();
+      const foundBy = String(req.body?.found_by || '').trim() || null;
+
+      const { data: piece } = await supabase
+        .from('pottery_pieces')
+        .select('id, booking_id, piece_type, description')
+        .eq('studio_id', STUDIO_ID)
+        .eq('id', req.params.id)
+        .maybeSingle();
+      if (!piece) return res.status(404).json({ error: 'That piece does not exist' });
+
+      const { error } = await supabase
+        .from('pottery_pieces')
+        .update({
+          damaged: true,
+          status: 'damaged',
+          hold_reason: note ? `Broke in firing: ${note}` : 'Broke in firing',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('studio_id', STUDIO_ID)
+        .eq('id', req.params.id);
+      if (error) throw error;
+
+      const { data: booking } = await supabase
+        .from('bookings')
+        .select('customer_name, customer_email, customer_phone')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_code', piece.booking_id)
+        .maybeSingle();
+
+      const first = String(booking?.customer_name || '').split(/\s+/)[0] || 'there';
+      const what = piece.piece_type ? piece.piece_type.toLowerCase() : 'piece';
+
+      // A draft, not a send. Warm, honest, and makes the studio's offer in
+      // the first breath -- the shape of every good breakage conversation.
+      const draft =
+        `Hi ${first}, it's The Kiln Cafe. We're really sorry to say your ${what} ` +
+        `didn't survive the kiln -- very occasionally the firing finds a hidden ` +
+        `air bubble or hairline crack and there's nothing anyone painted wrong. ` +
+        `We'd love to put it right: come back and repaint on us, and we'll fast-` +
+        `track the firing. Give us a ring or just drop in whenever suits.`;
+
+      res.json({
+        marked: true,
+        booking_code: piece.booking_id,
+        customer_name: booking?.customer_name || null,
+        customer_email: booking?.customer_email || null,
+        customer_phone: booking?.customer_phone || null,
+        found_by: foundBy,
+        message_draft: draft,
+      });
+    } catch (err) {
+      logger.error('breakage failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
+
+// ============================================================================
+// TURNAROUND -- what the three timestamps are worth
+// ----------------------------------------------------------------------------
+// Photo taken -> out of the kiln -> packed. Now that all three are real, the
+// gap between them is the studio's actual turnaround -- an ops number for
+// Daisy and the headline chart when GlazeUp is pitched to other studios
+// ("average 9 days from painting to packed", measured, not claimed).
+// Read-only.
+// ============================================================================
+export function registerTurnaroundRoute(app, supabase, STUDIO_ID, logger) {
+  app.get('/api/spec/analytics/turnaround', async (req, res) => {
+    try {
+      const daysBack = Math.min(parseInt(req.query.days, 10) || 90, 365);
+      const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString();
+
+      const { data: pieces } = await supabase
+        .from('pottery_pieces')
+        .select('id, booking_id, status, created_at, reference_photo_taken_at, updated_at, shelf_id, fulfilment')
+        .eq('studio_id', STUDIO_ID)
+        .neq('archived', true)
+        .gte('created_at', since);
+
+      const { data: shelves } = await supabase
+        .from('kiln_shelves')
+        .select('id, out_of_kiln_at')
+        .eq('studio_id', STUDIO_ID);
+      const outBySshelf = new Map((shelves || []).map((sh) => [sh.id, sh.out_of_kiln_at]));
+
+      const live = (pieces || []).filter((p) => p.fulfilment !== 'return_visit');
+      const days = (a, b) => (new Date(b).getTime() - new Date(a).getTime()) / 86400000;
+
+      // Painted -> out of the kiln, where both ends are known.
+      const firedSpans = live
+        .map((p) => {
+          const start = p.reference_photo_taken_at || p.created_at;
+          const out = p.shelf_id ? outBySshelf.get(p.shelf_id) : null;
+          return start && out ? days(start, out) : null;
+        })
+        .filter((d) => d !== null && d >= 0 && d < 120);
+
+      // Painted -> packed. updated_at is the best available proxy for the
+      // packing moment on collected pieces; stated as a proxy rather than
+      // dressed up as an exact timestamp.
+      const packedSpans = live
+        .filter((p) => String(p.status || '').toLowerCase() === 'collected')
+        .map((p) => {
+          const start = p.reference_photo_taken_at || p.created_at;
+          return start && p.updated_at ? days(start, p.updated_at) : null;
+        })
+        .filter((d) => d !== null && d >= 0 && d < 120);
+
+      const stats = (arr) => {
+        if (!arr.length) return null;
+        const sorted = [...arr].sort((a, b) => a - b);
+        return {
+          count: arr.length,
+          median_days: Math.round(sorted[Math.floor(sorted.length / 2)] * 10) / 10,
+          average_days: Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10,
+          worst_days: Math.round(sorted[sorted.length - 1] * 10) / 10,
+        };
+      };
+
+      const waiting = live.filter((p) => String(p.status || '').toLowerCase() !== 'collected');
+      const oldestWaiting = waiting
+        .map((p) => days(p.reference_photo_taken_at || p.created_at, new Date().toISOString()))
+        .filter((d) => d >= 0)
+        .sort((a, b) => b - a)[0];
+
+      res.json({
+        window_days: daysBack,
+        pieces_in_window: live.length,
+        painted_to_fired: stats(firedSpans),
+        painted_to_packed: stats(packedSpans),
+        // Stated plainly because a proxy presented as a measurement is how
+        // numbers stop being trusted.
+        packed_timestamp_note: 'painted_to_packed uses the piece\'s last update time as the packing moment',
+        currently_waiting: waiting.length,
+        oldest_waiting_days: oldestWaiting !== undefined ? Math.round(oldestWaiting * 10) / 10 : null,
+      });
+    } catch (err) {
+      logger.error('turnaround failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
+
+// ============================================================================
+// SQUARE CONNECT -- OAuth, for studios that are not us
+// ----------------------------------------------------------------------------
+// The Kiln Cafe's Square token is a personal access token pasted into Render.
+// That is fine for one studio run by the people who built the app; it is not
+// something you can ask a paying customer to do, and it expires -- this one on
+// 3 September 2026.
+//
+// Real OAuth: send the studio to Square, take the code back, exchange it for a
+// token, store it against the studio. Needs SQUARE_APP_ID and
+// SQUARE_APP_SECRET in the environment; without them this reports honestly
+// that it is not configured rather than rendering a button that fails.
+//
+// The scopes asked for are exactly what the app uses and nothing more --
+// including APPOINTMENTS_BUSINESS_SETTINGS_READ, whose absence cost most of a
+// day, and deliberately NOT EMPLOYEES_READ, which we learned is the wrong
+// question for reading room names.
+// ============================================================================
+const SQUARE_SCOPES = [
+  'MERCHANT_PROFILE_READ',
+  'APPOINTMENTS_READ',
+  'APPOINTMENTS_BUSINESS_SETTINGS_READ',
+  'ORDERS_READ',
+  'ITEMS_READ',
+  'CUSTOMERS_READ',
+  'PAYMENTS_READ',
+];
+
+export function registerSquareConnectRoutes(app, supabase, STUDIO_ID, logger, axios) {
+  const configured = () => !!(process.env.SQUARE_APP_ID && process.env.SQUARE_APP_SECRET);
+
+  app.get('/api/spec/square/connect-status', async (req, res) => {
+    try {
+      const { data: conn } = await supabase
+        .from('square_connections')
+        .select('square_token_expires_at, updated_at')
+        .eq('studio_id', STUDIO_ID)
+        .maybeSingle();
+      const expiresAt = conn?.square_token_expires_at || null;
+      const daysLeft = expiresAt
+        ? Math.round((new Date(expiresAt).getTime() - Date.now()) / 86400000)
+        : null;
+      res.json({
+        oauth_configured: configured(),
+        connected: !!conn,
+        expires_at: expiresAt,
+        days_left: daysLeft,
+        // Named plainly so an expiring token is visible before it expires
+        // rather than the morning everything silently stops syncing.
+        expiring_soon: daysLeft !== null && daysLeft <= 14,
+        scopes: SQUARE_SCOPES,
+      });
+    } catch (err) {
+      logger.error('connect-status failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/spec/square/connect-url', async (req, res) => {
+    if (!configured()) {
+      return res.status(400).json({ error: 'Square OAuth is not configured on this server (SQUARE_APP_ID / SQUARE_APP_SECRET).' });
+    }
+    const redirect = process.env.SQUARE_REDIRECT_URL || `${process.env.SELF_URL || ''}/api/spec/square/callback`;
+    const url = `https://connect.squareup.com/oauth2/authorize`
+      + `?client_id=${encodeURIComponent(process.env.SQUARE_APP_ID)}`
+      + `&scope=${encodeURIComponent(SQUARE_SCOPES.join(' '))}`
+      + `&session=false`
+      + `&redirect_uri=${encodeURIComponent(redirect)}`;
+    res.json({ url, scopes: SQUARE_SCOPES });
+  });
+
+  app.get('/api/spec/square/callback', async (req, res) => {
+    const code = req.query.code;
+    if (!code) return res.status(400).send('Square did not return an authorisation code.');
+    if (!configured()) return res.status(400).send('Square OAuth is not configured on this server.');
+    try {
+      const r = await axios.post('https://connect.squareup.com/oauth2/token', {
+        client_id: process.env.SQUARE_APP_ID,
+        client_secret: process.env.SQUARE_APP_SECRET,
+        code,
+        grant_type: 'authorization_code',
+      }, { headers: { 'Square-Version': '2024-01-18', 'Content-Type': 'application/json' } });
+
+      const { access_token, refresh_token, expires_at, merchant_id } = r.data || {};
+      if (!access_token) throw new Error('Square returned no access token');
+
+      await supabase.from('square_connections').upsert({
+        studio_id: STUDIO_ID,
+        square_access_token: access_token,
+        square_refresh_token: refresh_token || null,
+        square_token_expires_at: expires_at || null,
+        square_merchant_id: merchant_id || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'studio_id' });
+
+      res.send('<p style="font-family:system-ui;padding:2rem">Square connected. You can close this window and go back to the app.</p>');
+    } catch (err) {
+      logger.error('square callback failed', err.response?.data || err.message);
+      res.status(500).send('Could not complete the Square connection. Nothing has been changed.');
     }
   });
 }

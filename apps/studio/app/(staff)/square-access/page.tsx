@@ -22,6 +22,10 @@ interface Result {
 
 export default function SquareAccessPage() {
   const [data, setData] = useState<Result | null>(null);
+  // Token expiry, surfaced BEFORE it bites. The Kiln Cafe's token expires
+  // 3 September 2026 and nothing in the app would have said so -- the first
+  // sign would have been a morning where nothing synced.
+  const [conn, setConn] = useState<{ days_left: number | null; expires_at: string | null; expiring_soon: boolean; oauth_configured: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,6 +36,10 @@ export default function SquareAccessPage() {
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || `Failed (${res.status})`);
       setData(d);
+      try {
+        const c = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/square/connect-status`);
+        if (c.ok) setConn(await c.json());
+      } catch { /* the expiry note is a nicety, not a dependency */ }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not run the check');
     } finally { setLoading(false); }
@@ -46,6 +54,16 @@ export default function SquareAccessPage() {
 
       {data && !loading && (
         <>
+          {conn?.expires_at && !data.token_expired && (
+            <p style={{
+              fontSize: '0.82rem', marginBottom: '0.75rem', fontWeight: conn.expiring_soon ? 700 : 400,
+              color: conn.expiring_soon ? '#A6761D' : '#666',
+            }}>
+              Square connection expires {new Date(conn.expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}
+              {conn.days_left !== null ? ` — ${conn.days_left} day${conn.days_left === 1 ? '' : 's'} left` : ''}
+              {conn.expiring_soon ? '. Worth renewing now rather than the morning it stops.' : ''}
+            </p>
+          )}
           {data.token_expired && (
             <p style={{ fontSize: '0.85rem', color: '#c0392b', marginBottom: '0.75rem' }}>
               The Square connection has expired — it needs reconnecting.

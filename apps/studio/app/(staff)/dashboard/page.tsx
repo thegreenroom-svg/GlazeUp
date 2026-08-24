@@ -98,81 +98,18 @@ export default function Dashboard() {
   const [isAdmin, setIsAdmin] = useState(false);
   const router = useRouter();
 
-  // Real, per-day staff value -- per Daisy directly: "the very first
-  // thing that needs to happen in this whole app... every day check...
-  // apply to all bookings until changed." Not per-booking -- one current
-  // value, checked/updated daily, used as the default everywhere a
-  // collection date is needed until it's next changed.
-  const [collectionDate, setCollectionDateState] = useState<string | null>(null);
-  const [editingDate, setEditingDate] = useState(false);
-  const [dateDraft, setDateDraft] = useState('');
-  const [savingDate, setSavingDate] = useState(false);
+  // The studio's real turnaround, from the three timestamps that now
+  // exist: painted, out of the kiln, packed. An ops number for the studio
+  // and the headline figure when GlazeUp is pitched to another one --
+  // measured, not claimed.
+  const [turnaround, setTurnaround] = useState<{
+    painted_to_fired: { median_days: number; count: number } | null;
+    painted_to_packed: { median_days: number; count: number } | null;
+    currently_waiting: number;
+    oldest_waiting_days: number | null;
+  } | null>(null);
 
-  const loadCollectionDate = useCallback(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/studio/collection-date`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setCollectionDateState(d?.current_collection_date || null))
-      .catch(() => {});
-  }, []);
 
-  useEffect(loadCollectionDate, [loadCollectionDate]);
-
-  const [appliedMsg, setAppliedMsg] = useState<string | null>(null);
-
-  const saveCollectionDate = async (explicitDate?: string) => {
-    // Real, correct fix for the preset buttons -- setDateDraft(iso) above
-    // updates React state asynchronously, so calling saveCollectionDate()
-    // immediately after would still read the OLD dateDraft value. Passing
-    // the real date explicitly avoids that stale-closure bug entirely.
-    const dateToSave = explicitDate || dateDraft;
-    if (!dateToSave) {
-      // Real, visible feedback instead of silently doing nothing --
-      // this exact silent path is a plausible real cause of "not
-      // working" with zero visible sign anything happened.
-      setAppliedMsg('No date selected in the field — please pick a date first, then tap the tick.');
-      return;
-    }
-    setSavingDate(true);
-    setAppliedMsg(null);
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/studio/collection-date`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateToSave }),
-      });
-      const d = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setCollectionDateState(d.current_collection_date);
-        setEditingDate(false);
-        // Real, direct confirmation of what actually happened -- per
-        // Daisy: "apply to all bookings until changed." This is a real
-        // write, not just a display default, so it's worth showing
-        // exactly how many bookings it genuinely applied to.
-        if (typeof d.applied_to_bookings === 'number') {
-          // Real error surfaced explicitly -- a genuine write failure
-          // previously showed as an innocuous "0 applied", which is
-          // exactly how it went unnoticed that nothing was saving.
-          if (d.upsert_error) {
-            setAppliedMsg(`Save failed applying to bookings: ${d.upsert_error}`);
-          } else {
-            setAppliedMsg(
-              d.applied_to_bookings > 0
-                ? `Applied to ${d.applied_to_bookings} of ${d.total_bookings_today} bookings today (rest already had their own date set)`
-                : `No bookings needed it — all ${d.total_bookings_today} already had their own date set`
-            );
-          }
-        }
-      } else {
-        // Real error surfaced, not silent -- previously failed with no
-        // visible sign anything went wrong, which is exactly how it went
-        // unnoticed that the save wasn't actually persisting.
-        setAppliedMsg(`Save failed: ${d.error || `HTTP ${res.status}`}`);
-      }
-    } catch (err: any) {
-      setAppliedMsg(`Could not reach the server: ${err?.message || err}`);
-    }
-    finally { setSavingDate(false); }
-  };
 
   useEffect(() => {
     try {
@@ -305,86 +242,39 @@ export default function Dashboard() {
         <p style={{ fontSize: '0.8rem', color: '#999', marginBottom: '1.25rem' }}>{studioName}</p>
       )}
 
-      {/* Real, prominent widget -- per Daisy: "the very first thing that
-          needs to happen in this whole app... every day check." Right
-          at the top, above Start Floor, since she's calling it the
-          first thing. */}
-      <div style={{ maxWidth: '520px', margin: '0 auto 0.9rem', padding: '0.75rem 1.1rem', borderRadius: '14px', background: 'linear-gradient(155deg, var(--clay) 0%, #9A6435 100%)', boxShadow: '0 3px 10px rgba(184,121,70,0.25)' }}>
-        <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>
-          <Flame size={13} /> Today's collection date
-        </p>
-        {!editingDate ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <p style={{ fontSize: '1.1rem', fontWeight: 800, color: 'white' }}>
-              {collectionDate
-                ? new Date(collectionDate + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })
-                : 'Not set yet — check and set for today'}
-            </p>
-            <button
-              onClick={() => { setDateDraft(collectionDate || new Date().toISOString().slice(0, 10)); setEditingDate(true); }}
-              style={{ padding: '0.4rem 0.8rem', backgroundColor: 'rgba(255,255,255,0.2)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}
-            >
-              {collectionDate ? 'Change' : 'Set'}
-            </button>
-          </div>
-        ) : (
-          <div>
-            {/* Real, robust fix -- "calendar won't load" confirmed the
-                native date picker itself wasn't opening on tap, a
-                different and more fundamental failure point than
-                anything chased so far today. Rather than keep fighting
-                an unreliable native picker, quick presets sidestep it
-                entirely -- and are genuinely the faster real workflow
-                for "check daily, set the current turnaround" anyway. */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.4rem', marginBottom: '0.6rem' }}>
-              {[1, 2, 3, 4].map((weeks) => (
-                <button
-                  key={weeks}
-                  onClick={() => {
-                    const d = new Date();
-                    d.setDate(d.getDate() + weeks * 7);
-                    const iso = d.toISOString().slice(0, 10);
-                    setDateDraft(iso);
-                    saveCollectionDate(iso);
-                  }}
-                  disabled={savingDate}
-                  style={{ padding: '0.6rem 0.3rem', backgroundColor: 'rgba(255,255,255,0.2)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600, cursor: savingDate ? 'default' : 'pointer' }}
-                >
-                  {weeks} wk{weeks > 1 ? 's' : ''}
-                </button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <input
-                type="date"
-                value={dateDraft}
-                onChange={(e) => setDateDraft(e.target.value)}
-                style={{ flex: 1, padding: '0.5rem', borderRadius: '8px', border: 'none', fontSize: '0.9rem' }}
-              />
-              <button
-                onClick={() => saveCollectionDate()}
-                disabled={savingDate}
-                style={{ padding: '0.5rem 0.7rem', backgroundColor: 'white', color: 'var(--clay)', border: 'none', borderRadius: '8px', cursor: savingDate ? 'default' : 'pointer', display: 'flex', alignItems: 'center' }}
-              >
-                <Check size={16} />
-              </button>
-            </div>
-            <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.7)', marginTop: '0.4rem' }}>
-              Quick presets above save straight away. Or pick an exact date below, then tap the tick.
-            </p>
-          </div>
-        )}
-        {appliedMsg && (
-          <p style={{
-            fontSize: '0.75rem',
-            fontWeight: appliedMsg.startsWith('Save failed') || appliedMsg.startsWith('Could not reach') ? 700 : 400,
-            color: appliedMsg.startsWith('Save failed') || appliedMsg.startsWith('Could not reach') ? '#FFD9D0' : 'rgba(255,255,255,0.85)',
-            marginTop: '0.5rem',
-          }}>
-            {appliedMsg}
+      {/* Turnaround, from the three real timestamps: painted, out of the
+          kiln, packed. This replaces the collection-date widget that sat
+          here -- the collection date is gone from the app as a concept,
+          and a big prominent control for setting a value nothing reads any
+          more is worse than empty space. This is the number that IS real
+          now: how long pottery actually takes, and how much is waiting. */}
+      {turnaround && (
+        <div style={{ maxWidth: '520px', margin: '0 auto 0.9rem', padding: '0.75rem 1.1rem', borderRadius: '14px', background: 'linear-gradient(155deg, var(--clay) 0%, #9A6435 100%)', boxShadow: '0 3px 10px rgba(184,121,70,0.25)' }}>
+          <p style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>
+            <Flame size={13} /> Turnaround, last 90 days
           </p>
-        )}
-      </div>
+          <div style={{ display: 'flex', gap: '1.2rem', flexWrap: 'wrap' }}>
+            <div>
+              <p style={{ fontSize: '1.35rem', fontWeight: 800, color: 'white', lineHeight: 1 }}>
+                {turnaround.painted_to_packed ? `${turnaround.painted_to_packed.median_days}d` : '—'}
+              </p>
+              <p style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.8)', marginTop: '0.2rem' }}>painted → packed</p>
+            </div>
+            <div>
+              <p style={{ fontSize: '1.35rem', fontWeight: 800, color: 'white', lineHeight: 1 }}>
+                {turnaround.painted_to_fired ? `${turnaround.painted_to_fired.median_days}d` : '—'}
+              </p>
+              <p style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.8)', marginTop: '0.2rem' }}>painted → fired</p>
+            </div>
+            <div>
+              <p style={{ fontSize: '1.35rem', fontWeight: 800, color: 'white', lineHeight: 1 }}>{turnaround.currently_waiting}</p>
+              <p style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.8)', marginTop: '0.2rem' }}>
+                waiting{turnaround.oldest_waiting_days ? ` · oldest ${Math.round(turnaround.oldest_waiting_days)}d` : ''}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: '0.6rem', maxWidth: '520px', margin: '0 auto 0.9rem' }}>
         <button

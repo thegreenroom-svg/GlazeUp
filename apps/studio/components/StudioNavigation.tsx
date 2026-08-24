@@ -101,6 +101,7 @@ export function StudioNavigation() {
       section: 'Today',
       items: [
         { label: 'The Day', icon: <CalendarDays className="w-5 h-5" />, href: '/schedule' },
+        { label: 'Collection', icon: <Package className="w-5 h-5" />, href: '/collect' },
         { label: 'Bookings', icon: <Calendar className="w-5 h-5" />, href: '/bookings' },
         { label: 'Start Floor', icon: <Footprints className="w-5 h-5" />, href: '/floor' },
         { label: 'Print Cards', icon: <PrinterIcon className="w-5 h-5" />, href: '/daily-cards' },
