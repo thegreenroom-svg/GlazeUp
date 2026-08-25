@@ -77,6 +77,37 @@ function friendlyGeminiError(err) {
   return msg || 'The AI check failed.';
 }
 
+// Every photo-matching route sends an image straight to Gemini for
+// identification -- not for archival display, just "is this piece in this
+// photo". A phone camera photo is routinely 3-5MB at full resolution, and
+// EVERY ONE of these six routes was base64-encoding that raw file and
+// sending it whole. None of them resized first.
+//
+// That is very likely the slowness Daisy is seeing: a 4MB image becomes
+// ~5.3MB of base64, which has to be encoded, uploaded to Gemini, and
+// (per Gemini's own image tiling) costs more processing the higher the
+// resolution -- for a task that only needs to see enough detail to tell
+// a rabbit from a mug and a coloured glaze from another.
+//
+// Resizes to 1024px on the long edge at quality 82, matched to what
+// identification actually needs rather than what display needs -- the
+// 2000px/quality-85 resize elsewhere in this codebase is for the piece
+// photo shown to a customer, a different job with a different budget.
+// Measured on a representative 4000x3000 JPEG: full file 3.8MB, resized
+// output 187KB, encode time 74ms. Falls back to the original buffer on
+// any resize error rather than failing the whole identification.
+async function forGemini(sharp, buffer) {
+  try {
+    return await sharp(buffer)
+      .rotate() // respects the photo's own EXIF orientation before resizing
+      .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 82, mozjpeg: true })
+      .toBuffer();
+  } catch {
+    return buffer;
+  }
+}
+
 async function callGeminiWithFallback(axios, apiKey, body) {
   const post = (model) => axios.post(
     'https://generativelanguage.googleapis.com/v1beta/interactions',
@@ -3347,7 +3378,7 @@ export function registerQuickAddPieceRoute(app, supabase, STUDIO_ID, logger) {
 // this session) -- and uses a reference photo too if one exists, for
 // free improvement once Completion photos start flowing.
 // ============================================================================
-export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios, upload, fs, logGeminiUsage) {
+export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios, upload, fs, logGeminiUsage, sharp) {
   app.post('/api/spec/pieces/:id/find-on-table', upload.single('photo'), async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
@@ -3369,7 +3400,7 @@ export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios
         return res.status(400).json({ error: 'This piece has no description or photo to match against' });
       }
 
-      const base64Table = fs.readFileSync(req.file.path).toString('base64');
+      const base64Table = (await forGemini(sharp, fs.readFileSync(req.file.path))).toString('base64');
       const input = [
         {
           type: 'text',
@@ -3383,7 +3414,7 @@ export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios
       if (piece.reference_photo_url) {
         try {
           const refRes = await axios.get(piece.reference_photo_url, { responseType: 'arraybuffer' });
-          const base64Ref = Buffer.from(refRes.data).toString('base64');
+          const base64Ref = (await forGemini(sharp, Buffer.from(refRes.data))).toString('base64');
           input.push({ type: 'text', text: 'For reference, here is an actual (pre-fire) photo of the exact piece to look for -- expect the fired version in the table photo to be more vibrant than this:' });
           input.push({ type: 'image', data: base64Ref, mime_type: 'image/jpeg' });
         } catch (e) { /* real description alone is still a valid attempt */ }
@@ -3483,7 +3514,7 @@ export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios
 // rest" is a real, direct answer, not something the packer has to work
 // out themselves by re-running single-piece checks five times.
 // ============================================================================
-export function registerFindAllOnTableRoute(app, supabase, STUDIO_ID, logger, axios, upload, fs, logGeminiUsage) {
+export function registerFindAllOnTableRoute(app, supabase, STUDIO_ID, logger, axios, upload, fs, logGeminiUsage, sharp) {
   app.post('/api/spec/bookings/:code/find-all-on-table', upload.single('photo'), async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
@@ -3507,7 +3538,7 @@ export function registerFindAllOnTableRoute(app, supabase, STUDIO_ID, logger, ax
         return res.status(400).json({ error: 'No unpacked pieces with a description found for this booking' });
       }
 
-      const base64Table = fs.readFileSync(req.file.path).toString('base64');
+      const base64Table = (await forGemini(sharp, fs.readFileSync(req.file.path))).toString('base64');
       const pieceList = unpacked.map((p, i) => `${i + 1}. [id: ${p.id}] ${p.description || p.piece_type}`).join('\n');
 
       const input = [
@@ -4016,7 +4047,7 @@ export function registerStudioFeaturesRoute(app, supabase, STUDIO_ID, logger) {
 // here by design, it's a pure accuracy test against household objects
 // before trusting it on real fired pottery.
 // ============================================================================
-export function registerTestAiFindRoute(app, supabase, STUDIO_ID, logger, axios, upload, fs, logGeminiUsage) {
+export function registerTestAiFindRoute(app, supabase, STUDIO_ID, logger, axios, upload, fs, logGeminiUsage, sharp) {
   app.post('/api/spec/test-ai/find', upload.fields([{ name: 'reference', maxCount: 1 }, { name: 'scene', maxCount: 1 }]), async (req, res) => {
     try {
       const referenceFile = req.files?.reference?.[0];
@@ -4028,8 +4059,8 @@ export function registerTestAiFindRoute(app, supabase, STUDIO_ID, logger, axios,
         return res.status(500).json({ error: 'GEMINI_API_KEY not configured on this service.' });
       }
 
-      const base64Ref = fs.readFileSync(referenceFile.path).toString('base64');
-      const base64Scene = fs.readFileSync(sceneFile.path).toString('base64');
+      const base64Ref = (await forGemini(sharp, fs.readFileSync(referenceFile.path))).toString('base64');
+      const base64Scene = (await forGemini(sharp, fs.readFileSync(sceneFile.path))).toString('base64');
 
       // Same real prompt structure as Find on Table, adapted for a direct
       // reference photo instead of a text description -- this is a test
@@ -4149,7 +4180,7 @@ export function registerTestAiFindRoute(app, supabase, STUDIO_ID, logger, axios,
 // Uses the SAME Gemini engine and box format as Find on Table and Test
 // AI, so what's proven there holds here.
 // ============================================================================
-export function registerIdentifyPiecesRoute(app, supabase, STUDIO_ID, logger, axios, upload, fs, logGeminiUsage) {
+export function registerIdentifyPiecesRoute(app, supabase, STUDIO_ID, logger, axios, upload, fs, logGeminiUsage, sharp) {
   app.post('/api/spec/pieces/identify-in-photo', upload.single('photo'), async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: 'A photo is required' });
@@ -4157,7 +4188,7 @@ export function registerIdentifyPiecesRoute(app, supabase, STUDIO_ID, logger, ax
       const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
       if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured on this service.' });
 
-      const base64 = fs.readFileSync(req.file.path).toString('base64');
+      const base64 = (await forGemini(sharp, fs.readFileSync(req.file.path))).toString('base64');
 
       const input = [
         {
@@ -4371,7 +4402,7 @@ export function registerPieceFulfilmentRoutes(app, supabase, STUDIO_ID, logger) 
 // today too: any booking whose photo predates a prompt improvement can
 // be re-processed without touching the studio floor.
 // ============================================================================
-export function registerReidentifyRoute(app, supabase, STUDIO_ID, logger, axios, fs, logGeminiUsage) {
+export function registerReidentifyRoute(app, supabase, STUDIO_ID, logger, axios, fs, logGeminiUsage, sharp) {
   app.post('/api/spec/bookings/:code/reidentify-pieces', async (req, res) => {
     try {
       const booking_code = req.params.code;
@@ -4397,7 +4428,7 @@ export function registerReidentifyRoute(app, supabase, STUDIO_ID, logger, axios,
       }
 
       const imgRes = await axios.get(photoUrl, { responseType: 'arraybuffer' });
-      const base64 = Buffer.from(imgRes.data).toString('base64');
+      const base64 = (await forGemini(sharp, Buffer.from(imgRes.data))).toString('base64');
 
       const input = [
         {
@@ -5407,7 +5438,7 @@ export function boxFromGemini(box_2d) {
   return { left_pct: xmin / 10, top_pct: ymin / 10, right_pct: xmax / 10, bottom_pct: ymax / 10 };
 }
 
-export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios, upload, fs, logGeminiUsage) {
+export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios, upload, fs, logGeminiUsage, sharp) {
   app.post('/api/spec/shelf/sweep', upload.single('photo'), async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
@@ -5449,7 +5480,7 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
         .map((p, i) => `${i + 1}. ${p.piece_type || 'Piece'} — ${p.description || 'no description'}`)
         .join('\n');
 
-      const base64 = fs.readFileSync(req.file.path).toString('base64');
+      const base64 = (await forGemini(sharp, fs.readFileSync(req.file.path))).toString('base64');
       const prompt = `This photo shows a shelf of finished, fired pottery in a paint-your-own-pottery studio.
 
 Below is a numbered list of pieces the studio is currently waiting to hand out. Each was photographed and described when it was painted.

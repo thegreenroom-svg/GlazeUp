@@ -1580,9 +1580,9 @@ registerSquarePaymentFinishRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerCurrentCollectionDateRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerBisqueInventoryRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerStudioFeaturesRoute(app, supabase, DEMO_STUDIO_ID, logger);
-registerIdentifyPiecesRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage);
+registerIdentifyPiecesRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage, sharp);
 registerPieceFulfilmentRoutes(app, supabase, DEMO_STUDIO_ID, logger);
-registerReidentifyRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, fs, logGeminiUsage);
+registerReidentifyRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, fs, logGeminiUsage, sharp);
 registerScheduleRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerSpaceBackfillRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerPackingRoutes(app, supabase, DEMO_STUDIO_ID, logger);
@@ -1593,12 +1593,12 @@ registerTurnaroundRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerSquareConnectRoutes(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerTicketLinkDiagnosticRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerTicketMatchRoutes(app, supabase, DEMO_STUDIO_ID, logger, axios);
-registerShelfSweepRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage);
+registerShelfSweepRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage, sharp);
 registerSquareAccessCheckRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerQuickAddPieceRoute(app, supabase, DEMO_STUDIO_ID, logger);
-registerFindOnTableRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage);
-registerTestAiFindRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage);
-registerFindAllOnTableRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage);
+registerFindOnTableRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage, sharp);
+registerTestAiFindRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage, sharp);
+registerFindAllOnTableRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage, sharp);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
