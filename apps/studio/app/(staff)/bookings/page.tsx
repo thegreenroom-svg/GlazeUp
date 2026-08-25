@@ -355,7 +355,7 @@ function BookingsPageInner() {
               type="date"
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
-              style={{ padding: '0.55rem 0.7rem 0.55rem 2rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem', minWidth: '150px' }}
+              style={{ padding: '0.55rem 0.7rem 0.55rem 2rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem', minWidth: '150px', color: 'var(--charcoal)', backgroundColor: 'white' }}
             />
           </div>
           <button

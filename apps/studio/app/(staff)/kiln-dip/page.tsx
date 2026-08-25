@@ -165,7 +165,7 @@ function KilnPageInner() {
               type="date"
               value={collectionDate}
               onChange={(e) => setCollectionDate(e.target.value)}
-              style={{ padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid #ddd', fontSize: '0.85rem' }}
+              style={{ padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid #ddd', fontSize: '0.85rem', color: 'var(--charcoal)', backgroundColor: 'white' }}
             />
             <button
               onClick={saveDate}

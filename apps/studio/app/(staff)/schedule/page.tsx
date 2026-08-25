@@ -255,7 +255,14 @@ export default function SchedulePage() {
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          style={{ padding: '0.4rem 0.6rem', borderRadius: 8, border: '1px solid #ddd', fontSize: '0.85rem' }}
+          // Explicit colour AND background, not just border. A native
+          // <input type="date"> keeps its own white box regardless of the
+          // page's theme, so in dark mode this was inheriting the body's
+          // pale text colour onto that white box and becoming unreadable --
+          // exactly what Daisy saw at 21:08, evening, system dark mode on.
+          // navBtn right next to it survived only because it already
+          // hardcoded both colours; nothing here did.
+          style={{ padding: '0.4rem 0.6rem', borderRadius: 8, border: '1px solid #ddd', fontSize: '0.85rem', color: 'var(--charcoal)', backgroundColor: 'white' }}
         />
         <button onClick={() => shiftDay(1)} style={navBtn}><ChevronRight size={18} /></button>
         <button onClick={() => setDate(new Date().toISOString().slice(0, 10))} style={{ ...navBtn, width: 'auto', padding: '0 0.7rem', fontSize: '0.8rem' }}>
@@ -267,7 +274,13 @@ export default function SchedulePage() {
       {error && <p style={{ fontSize: '0.85rem', color: '#c0392b' }}>{error}</p>}
 
       {!loading && !error && columns.length === 0 && (
-        <div style={{ padding: '1.5rem', textAlign: 'center', border: '1px dashed #ddd', borderRadius: 10 }}>
+        // Same root cause as the date input: --charcoal is a fixed dark
+        // colour, not theme-aware, so this only stayed readable because
+        // every other card on this page hardcodes a white background
+        // under it. This one didn't -- on a day with zero bookings, in
+        // dark mode, dark text would sit on the page's own dark
+        // background and simply never appear.
+        <div style={{ padding: '1.5rem', textAlign: 'center', border: '1px dashed #ddd', borderRadius: 10, backgroundColor: 'white' }}>
           <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--charcoal)' }}>Nothing booked</p>
           <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '0.3rem' }}>
             No sessions in the diary for this day.

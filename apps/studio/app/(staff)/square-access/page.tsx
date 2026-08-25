@@ -26,6 +26,7 @@ export default function SquareAccessPage() {
   // 3 September 2026 and nothing in the app would have said so -- the first
   // sign would have been a morning where nothing synced.
   const [conn, setConn] = useState<{ days_left: number | null; expires_at: string | null; expiring_soon: boolean; oauth_configured: boolean } | null>(null);
+  const [connecting, setConnecting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,6 +55,32 @@ export default function SquareAccessPage() {
 
       {data && !loading && (
         <>
+          {/* The actual button. The backend OAuth flow existed with nothing
+              in the app that could reach it -- exactly the gap Daisy caught.
+              Only shown when the server has app credentials configured;
+              otherwise there is nothing this button could do. */}
+          {conn?.oauth_configured && (
+            <button
+              onClick={async () => {
+                setConnecting(true);
+                try {
+                  const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/square/connect-url`);
+                  const d = await r.json();
+                  if (r.ok && d.url) window.location.href = d.url;
+                } finally { setConnecting(false); }
+              }}
+              disabled={connecting}
+              style={{ marginBottom: '0.9rem', padding: '0.6rem 0.9rem', borderRadius: 8, border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+            >
+              {connecting ? 'Opening Square...' : 'Reconnect Square'}
+            </button>
+          )}
+          {conn && !conn.oauth_configured && (
+            <p style={{ fontSize: '0.78rem', color: '#999', marginBottom: '0.9rem' }}>
+              Reconnecting from here needs SQUARE_APP_ID and SQUARE_APP_SECRET set on the server. Until then, a new token has to be pasted into Render by hand, the same way this one was.
+            </p>
+          )}
+
           {conn?.expires_at && !data.token_expired && (
             <p style={{
               fontSize: '0.82rem', marginBottom: '0.75rem', fontWeight: conn.expiring_soon ? 700 : 400,
