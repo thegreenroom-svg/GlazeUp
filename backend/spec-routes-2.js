@@ -74,6 +74,17 @@ function friendlyGeminiError(err) {
   if (status === 401 || status === 403) {
     return 'The AI service rejected the request — the API key may need checking.';
   }
+  // A genuine, exhausted timeout -- axios's own message is literally
+  // "timeout of 14994ms exceeded", which is exactly what reached Daisy's
+  // screen. That number is meaningless to anyone reading it and reveals
+  // nothing about what to actually do next. This is what callGeminiWith-
+  // Fallback throws once its whole 40s retry-and-fallback budget is
+  // genuinely used up -- not a bug in the deadline logic, which was
+  // proven separately to hold -- just Gemini staying slow across every
+  // attempt within that window.
+  if (err.code === 'ECONNABORTED' || /timeout of \d+ms exceeded/i.test(msg)) {
+    return 'The AI check is taking longer than usual. Try again in a moment — a smaller or clearer photo often helps too.';
+  }
   return msg || 'The AI check failed.';
 }
 
