@@ -7,6 +7,7 @@ import { PageShell } from '@/components/PageShell';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Package, ChevronLeft, Check, Search, Camera, Loader } from 'lucide-react';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
+import { EngineToggle, fetchDefaultEngine } from '@/components/EngineToggle';
 
 // The screen for whoever is actually boxing the pottery. There wasn't one:
 // kiln-dip is a lookup-by-code tool for collection dates and emails and
@@ -97,19 +98,20 @@ export default function PackingPage() {
   // pieces are there -- which is the wrong order when a kiln has just been
   // unloaded and nobody knows whose anything is. Here the photo is the
   // question, not the answer.
-  // Which matching engine the shelf sweep uses. Off by default -- Daisy:
-  // "to have two tools is always better than one." This is the in-house
-  // engine picked back up from the July prototype, kept entirely
-  // separate from the proven Gemini path: same UI, same response shape,
-  // one flag decides which backend actually does the work. Flipping it
-  // off is the whole rollback.
-  const [inhouseMatching, setInhouseMatching] = useState(false);
+  // A real, visible switch, not just a hidden studio-wide flag. Per
+  // Daisy: "switch on all instances in case no internet etc or if one
+  // is better for certain things" -- a global-only setting could not
+  // give a fallback for a specific bad connection or let one photo be
+  // tried on the other engine, only pick one for everyone forever.
+  // Still DEFAULTS to the studio-wide setting, so ordinary use stays
+  // consistent without anyone touching this -- it's a starting point
+  // per page load, not a second place that setting has to be kept in
+  // sync.
+  const [engine, setEngine] = useState<'gemini' | 'inhouse'>('gemini');
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/studio/features`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d && typeof d.feature_inhouse_matching === 'boolean') setInhouseMatching(d.feature_inhouse_matching); })
-      .catch(() => {});
+    fetchDefaultEngine(process.env.NEXT_PUBLIC_API_URL || '').then(setEngine);
   }, []);
+  const inhouseMatching = engine === 'inhouse';
   const [sweeping, setSweeping] = useState(false);
   const [sweep, setSweep] = useState<{
     candidates: number;
@@ -475,6 +477,7 @@ export default function PackingPage() {
         <p style={{ fontSize: '0.75rem', color: '#777', margin: '0.15rem 0 0.55rem' }}>
           Photograph the shelf and it&apos;ll tell you whose pottery is on it.
         </p>
+        <EngineToggle engine={engine} onChange={setEngine} />
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.55rem 0.85rem', borderRadius: 8, background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: '0.83rem', cursor: 'pointer' }}>
           {sweeping ? <Loader size={15} className="animate-spin" /> : <Camera size={15} />}
           {sweeping ? 'Reading the shelf...' : 'Photograph the shelf'}

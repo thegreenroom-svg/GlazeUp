@@ -8,6 +8,7 @@ import { PageShell } from '@/components/PageShell';
 import { AiCostCounter } from '@/components/AiCostCounter';
 import { Camera, Loader, XCircle, Check, RotateCcw, Truck, Home as HomeIcon, Printer } from 'lucide-react';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
+import { EngineToggle, fetchDefaultEngine } from '@/components/EngineToggle';
 
 interface Booking {
   booking_code: string;
@@ -47,6 +48,8 @@ export default function FindOnTablePage() {
   // sixty names they've just come from is a pointless step.
   const searchParams = useSearchParams();
   const [bookingCode, setBookingCode] = useState(() => searchParams.get('code') || '');
+  const [engine, setEngine] = useState<'gemini' | 'inhouse'>('gemini');
+  useEffect(() => { fetchDefaultEngine(process.env.NEXT_PUBLIC_API_URL || '').then(setEngine); }, []);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [fulfilment, setFulfilment] = useState<Fulfilment | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -114,7 +117,12 @@ export default function FindOnTablePage() {
       const compressed = await compressPhotoForUpload(f);
       const formData = new FormData();
       formData.append('photo', compressed, 'table.jpg');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${bookingCode}/find-all-on-table`, {
+      // Two literal calls, one per branch -- a shared URL variable
+      // hides both from the route-coverage check, confirmed the hard
+      // way once already today.
+      const res = engine === 'inhouse'
+        ? await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${bookingCode}/find-all-on-table-inhouse`, { method: 'POST', body: formData, signal: controller.signal })
+        : await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${bookingCode}/find-all-on-table`, {
         method: 'POST',
         body: formData,
         signal: controller.signal,
@@ -204,6 +212,7 @@ export default function FindOnTablePage() {
         </div>
       )}
 
+      <EngineToggle engine={engine} onChange={setEngine} />
       <input
         ref={fileRef}
         type="file"

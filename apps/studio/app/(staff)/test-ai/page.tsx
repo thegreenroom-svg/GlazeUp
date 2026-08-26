@@ -2,11 +2,12 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { AiCostCounter } from '@/components/AiCostCounter';
 import { Camera, Loader, XCircle, Check, RotateCcw } from 'lucide-react';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
+import { EngineToggle, fetchDefaultEngine } from '@/components/EngineToggle';
 
 interface ItemResult {
   id: string;
@@ -28,6 +29,8 @@ const PIN_COLOURS = ['#e0392b', '#1a8a3c', '#2b6fe0', '#c77a0a', '#8b3ec7', '#0a
 
 export default function TestAiPage() {
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
+  const [engine, setEngine] = useState<'gemini' | 'inhouse'>('gemini');
+  useEffect(() => { fetchDefaultEngine(process.env.NEXT_PUBLIC_API_URL || '').then(setEngine); }, []);
   const [referencePreview, setReferencePreview] = useState<string | null>(null);
   const [scenePreview, setScenePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -107,7 +110,11 @@ export default function TestAiPage() {
       const formData = new FormData();
       formData.append('reference', referenceFile);
       formData.append('scene', compressedScene, 'scene.jpg');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/test-ai/find`, {
+      // Two literal calls -- a shared URL variable hides both from the
+      // route-coverage check, confirmed the hard way once already today.
+      const res = engine === 'inhouse'
+        ? await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/test-ai/find-inhouse`, { method: 'POST', body: formData, signal: controller.signal })
+        : await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/test-ai/find`, {
         method: 'POST',
         body: formData,
         signal: controller.signal,
@@ -147,9 +154,20 @@ export default function TestAiPage() {
     <PageShell title="Test AI" subtitle="Runs exactly the same matching as Find on Table. Photograph one or more reference items, then photograph them mixed among other objects.">
       <AiCostCounter />
 
-      <div style={{ padding: '0.7rem 0.9rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '1.25rem' }}>
-        Uses Google Gemini for real pixel-level detection — roughly £0.0015–0.0025 per test, logged into the same running AI cost total.
-      </div>
+      {/* Was a fixed line claiming Gemini + a real cost no matter what --
+          wrong and misleading the moment the in-house engine (free, no
+          API call at all) is selected. Now says what's actually true
+          for whichever engine is picked. */}
+      {engine === 'gemini' ? (
+        <div style={{ padding: '0.7rem 0.9rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
+          Uses Google Gemini for real pixel-level detection — roughly £0.0015–0.0025 per test, logged into the same running AI cost total.
+        </div>
+      ) : (
+        <div style={{ padding: '0.7rem 0.9rem', backgroundColor: '#F1F8F1', border: '1px solid #9CC79C', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
+          In-house colour + structure matching. No API call, no cost, runs entirely on this server.
+        </div>
+      )}
+      <EngineToggle engine={engine} onChange={setEngine} />
 
       {!results && (
         <>

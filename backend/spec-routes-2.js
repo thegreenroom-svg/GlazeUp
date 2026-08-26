@@ -6525,3 +6525,173 @@ export function registerInHouseMatchRoutes(app, supabase, STUDIO_ID, logger, axi
     }
   });
 }
+
+// ============================================================================
+// SHARED IN-HOUSE MATCH CORE -- one engine, three thin wrappers
+// ----------------------------------------------------------------------------
+// Daisy: "switch on all instances in case no internet etc or if one is
+// better for certain things." Reuses the exact scanning/scoring machinery
+// proven against shelf/sweep-inhouse (colour-first narrowing, structure
+// re-scoring, margin-based self-calibrating confidence) for the other three
+// places Gemini currently does reference-vs-scene matching.
+//
+// ONE HONEST GAP, stated plainly rather than papered over: Floor's
+// identify-in-photo has NO reference photo at all -- it generates fresh
+// descriptions of pieces nobody has described yet. This engine can only
+// compare a KNOWN reference against a scene; it cannot invent a
+// description of something it has never seen. There is no in-house
+// equivalent for that one screen, and building a fake one (arbitrary
+// blobs labelled "Piece 1/2/3" with no real description) would be a
+// regression dressed up as parity, not a genuine second tool. Floor stays
+// Gemini-only.
+// ============================================================================
+
+// refs: [{id, description, buffer}]. Returns Gemini-shaped results so every
+// wrapper route can return the identical envelope its Gemini sibling does.
+export async function runInhouseMatch(sharp, sceneBuffer, refs) {
+  const windows = await scanWindows(sharp, sceneBuffer);
+  const built = [];
+  for (const r of refs) {
+    built.push({ ...r, colour: await colourSignature(sharp, r.buffer), structure: await structurePatch(sharp, r.buffer) });
+  }
+
+  const results = [];
+  for (const ref of built) {
+    const colourScored = [];
+    for (const w of windows) {
+      const wColour = await colourSignature(sharp, w.crop);
+      colourScored.push({ w, d: histDistance(ref.colour, wColour) });
+    }
+    colourScored.sort((a, b) => a.d - b.d);
+    const shortlist = colourScored.slice(0, 15);
+    const restaged = shortlist.map(({ w }) => ({ w, d: structureDistance(ref.structure, w.patch) })).sort((a, b) => a.d - b.d);
+
+    if (!restaged.length) {
+      results.push({ id: ref.id, description: ref.description, found: false, confidence: 'low', x_pct: null, y_pct: null, box: null, reasoning: 'Nothing to compare against in the scene.' });
+      continue;
+    }
+
+    const best = restaged[0];
+    const median = restaged[Math.floor(restaged.length / 2)].d;
+    const margin = median - best.d;
+
+    // Same margin bands as the shelf sweep's report threshold, mapped
+    // onto Gemini's own high/medium/low vocabulary so a frontend badge
+    // that colours off that string works unmodified for either engine.
+    let confidence, found;
+    if (margin >= 16) { confidence = 'high'; found = true; }
+    else if (margin >= 8) { confidence = 'medium'; found = true; }
+    else { confidence = 'low'; found = false; }
+
+    const box = found ? {
+      left_pct: (best.w.x / 1200) * 100,
+      top_pct: (best.w.y / 1200) * 100,
+      right_pct: ((best.w.x + best.w.size) / 1200) * 100,
+      bottom_pct: ((best.w.y + best.w.size) / 1200) * 100,
+    } : null;
+
+    results.push({
+      id: ref.id,
+      description: ref.description,
+      found,
+      confidence,
+      x_pct: box ? (box.left_pct + box.right_pct) / 2 : null,
+      y_pct: box ? (box.top_pct + box.bottom_pct) / 2 : null,
+      box,
+      // Real numbers, not a vague sentence -- matches the honesty
+      // standard the margin-based approach was built on: a low margin
+      // IS the reason, and saying so is more useful than hiding it
+      // behind "not found".
+      reasoning: found
+        ? `Stands out from the rest of the photo by ${margin.toFixed(1)} points (in-house colour + structure match).`
+        : `Best guess only ${margin.toFixed(1)} points clearer than background -- not confident enough to call it found.`,
+    });
+  }
+  return results;
+}
+
+export function registerInHouseFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios, upload, fs, sharp) {
+  app.post('/api/spec/pieces/:id/find-on-table-inhouse', upload.single('photo'), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
+      const { data: piece } = await supabase
+        .from('pottery_pieces')
+        .select('id, description, piece_type, reference_photo_url, photo_box')
+        .eq('studio_id', STUDIO_ID)
+        .eq('id', req.params.id)
+        .maybeSingle();
+      if (!piece) return res.status(404).json({ error: 'Piece not found' });
+      const targetDescription = piece.description || piece.piece_type;
+      if (!piece.reference_photo_url) {
+        return res.status(400).json({ error: 'This piece has no reference photo to compare against -- the in-house engine needs a known photo, unlike Gemini which can work from a text description alone.' });
+      }
+      const imgRes = await axios.get(piece.reference_photo_url, { responseType: 'arraybuffer', timeout: 8000 });
+      const refBuffer = await cropByBox(sharp, Buffer.from(imgRes.data), piece.photo_box);
+      const sceneBuffer = fs.readFileSync(req.file.path);
+      const [result] = await runInhouseMatch(sharp, sceneBuffer, [{ id: piece.id, description: targetDescription, buffer: refBuffer }]);
+      try { fs.unlinkSync(req.file.path); } catch { /* temp file */ }
+      res.json({ piece_description: targetDescription, found: result.found, confidence: result.confidence, x_pct: result.x_pct, y_pct: result.y_pct, box: result.box, reasoning: result.reasoning, engine: 'inhouse' });
+    } catch (err) {
+      logger.error('find-on-table-inhouse failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/spec/bookings/:code/find-all-on-table-inhouse', upload.single('photo'), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
+      const { data: pieces } = await supabase
+        .from('pottery_pieces')
+        .select('id, description, piece_type, reference_photo_url, photo_box, fulfilment')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_id', req.params.code)
+        .neq('archived', true);
+      const unpacked = (pieces || []).filter((p) => (p.description || p.piece_type) && p.fulfilment !== 'return_visit' && p.reference_photo_url);
+      if (!unpacked.length) return res.status(400).json({ error: 'No unpacked pieces with a reference photo found for this booking' });
+
+      const refs = [];
+      for (const p of unpacked) {
+        try {
+          const imgRes = await axios.get(p.reference_photo_url, { responseType: 'arraybuffer', timeout: 8000 });
+          const refBuffer = await cropByBox(sharp, Buffer.from(imgRes.data), p.photo_box);
+          refs.push({ id: p.id, description: p.description || p.piece_type, buffer: refBuffer, reference_photo_url: p.reference_photo_url });
+        } catch (err) {
+          logger.warn(`[find-all-inhouse] could not build reference for piece ${p.id}: ${err.message}`);
+        }
+      }
+      const sceneBuffer = fs.readFileSync(req.file.path);
+      const matched = await runInhouseMatch(sharp, sceneBuffer, refs);
+      try { fs.unlinkSync(req.file.path); } catch { /* temp file */ }
+
+      const results = matched.map((r) => ({ ...r, reference_photo_url: refs.find((x) => x.id === r.id)?.reference_photo_url || null }));
+      const foundCount = results.filter((r) => r.found).length;
+      res.json({ total: unpacked.length, found_count: foundCount, results, all_found: foundCount === unpacked.length, engine: 'inhouse' });
+    } catch (err) {
+      logger.error('find-all-on-table-inhouse failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/spec/test-ai/find-inhouse', upload.fields([{ name: 'reference', maxCount: 1 }, { name: 'scene', maxCount: 1 }]), async (req, res) => {
+    try {
+      const referenceFile = req.files?.reference?.[0];
+      const sceneFile = req.files?.scene?.[0];
+      if (!referenceFile || !sceneFile) return res.status(400).json({ error: 'Both a reference photo and a scene photo are required' });
+
+      const refBuffer = fs.readFileSync(referenceFile.path);
+      const sceneBuffer = fs.readFileSync(sceneFile.path);
+      // ONE real limit, said plainly rather than hidden: unlike Gemini,
+      // which can split several distinct objects out of one reference
+      // photo, this engine builds a single colour+structure signature
+      // from the whole reference image. Photographing one item at a
+      // time is the honest way to use this side of the comparison.
+      const [result] = await runInhouseMatch(sharp, sceneBuffer, [{ id: '1', description: 'Reference item', buffer: refBuffer }]);
+      try { fs.unlinkSync(referenceFile.path); fs.unlinkSync(sceneFile.path); } catch { /* temp files */ }
+
+      res.json({ total: 1, found_count: result.found ? 1 : 0, results: [result], engine: 'inhouse' });
+    } catch (err) {
+      logger.error('test-ai/find-inhouse failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
