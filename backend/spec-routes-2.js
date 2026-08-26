@@ -107,15 +107,51 @@ function friendlyGeminiError(err) {
 // Measured on a representative 4000x3000 JPEG: full file 3.8MB, resized
 // output 187KB, encode time 74ms. Falls back to the original buffer on
 // any resize error rather than failing the whole identification.
-async function forGemini(sharp, buffer) {
+// Timed, with a soft budget of its own. Daisy asked directly whether the
+// resize step could be the source of the timeouts -- fair question, and
+// one this file had no real evidence to answer either way. Logging the
+// actual milliseconds turns "I think it's unrelated" into something
+// checkable in the server logs next time it happens, rather than
+// reasoning about it after the fact from the shape of an error message.
+//
+// Also guards against the resize itself becoming the hang: 8s is
+// generous for encoding a photo-sized image (a worst-case 4000x3000
+// frame of pure noise measured at 345ms locally), but if it somehow
+// stalls -- a genuinely corrupt upload, an exotic HEIC variant sharp
+// can decode into but chokes formatting back out of -- this falls back
+// to the original buffer rather than joining the exact class of hang
+// this whole timeout effort exists to prevent.
+//
+// Returns {buffer, mimeType} rather than a bare buffer -- THE ACTUAL BUG
+// Daisy caught. This always re-encodes to JPEG, but every call site was
+// still labelling the result with the ORIGINAL upload's mime type. An
+// iPhone or iPad camera capture is very often HEIC, not JPEG -- so since
+// the resize went in, Gemini has potentially been sent real JPEG bytes
+// declared as "image/heic" on every photo from a device that captures
+// that way. That is not a slowdown, that is every call possibly failing
+// to decode at all, which matches "doesn't work at all" far better than
+// it matches ordinary Gemini slowness.
+async function forGemini(sharp, buffer, logger) {
+  const t0 = Date.now();
   try {
-    return await sharp(buffer)
-      .rotate() // respects the photo's own EXIF orientation before resizing
-      .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 82, mozjpeg: true })
-      .toBuffer();
-  } catch {
-    return buffer;
+    const resized = await Promise.race([
+      sharp(buffer)
+        .rotate() // respects the photo's own EXIF orientation before resizing
+        .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 82, mozjpeg: true })
+        .toBuffer(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('resize took too long')), 8000)),
+    ]);
+    if (logger) logger.info(`[gemini-resize] ${buffer.length} -> ${resized.length} bytes in ${Date.now() - t0}ms`);
+    // Always JPEG on success -- that is what .jpeg() just produced,
+    // regardless of what format the buffer arrived in.
+    return { buffer: resized, mimeType: 'image/jpeg' };
+  } catch (err) {
+    if (logger) logger.warn(`[gemini-resize] failed after ${Date.now() - t0}ms, sending original: ${err.message}`);
+    // Falling back to the ORIGINAL bytes, so the ORIGINAL mime type is
+    // correct here -- the caller supplies it since only it knows what
+    // the upload actually claimed to be.
+    return { buffer, mimeType: null };
   }
 }
 
@@ -3469,13 +3505,14 @@ export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios
         return res.status(400).json({ error: 'This piece has no description or photo to match against' });
       }
 
-      const base64Table = (await forGemini(sharp, fs.readFileSync(req.file.path))).toString('base64');
+      const tableGemini = await forGemini(sharp, fs.readFileSync(req.file.path), logger);
+      const base64Table = tableGemini.buffer.toString('base64');
       const input = [
         {
           type: 'text',
           text: `You are looking for ONE specific fired pottery piece on this photo of a table/tray of several fired pieces.\n\nWhat to look for -- its real, distinguishing description, written before firing (shape barely changes through firing; colour and pattern are the most reliable clues):\n"${targetDescription}"\n\nImportant: that description was written pre-fire. Underglaze fires MORE vibrant and saturated than it looks when painted -- pale pastels turn bright and glossy. Expect the fired piece in the photo to look more intense than the description suggests, and match on the underlying colour/pattern relationship, not the exact painted shade.\n\nIf you can identify this specific piece in the photo, provide its bounding box. If you cannot confidently identify it, say so honestly -- a wrong box is worse than admitting it isn't there.`,
         },
-        { type: 'image', data: base64Table, mime_type: req.file.mimetype || 'image/jpeg' },
+        { type: 'image', data: base64Table, mime_type: tableGemini.mimeType || req.file.mimetype || 'image/jpeg' },
       ];
       // Free improvement once real reference photos exist -- include it
       // as a second image so the AI can compare directly, not just
@@ -3483,7 +3520,7 @@ export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios
       if (piece.reference_photo_url) {
         try {
           const refRes = await axios.get(piece.reference_photo_url, { responseType: 'arraybuffer' });
-          const base64Ref = (await forGemini(sharp, Buffer.from(refRes.data))).toString('base64');
+          const base64Ref = (await forGemini(sharp, Buffer.from(refRes.data), logger)).buffer.toString('base64');
           input.push({ type: 'text', text: 'For reference, here is an actual (pre-fire) photo of the exact piece to look for -- expect the fired version in the table photo to be more vibrant than this:' });
           input.push({ type: 'image', data: base64Ref, mime_type: 'image/jpeg' });
         } catch (e) { /* real description alone is still a valid attempt */ }
@@ -3607,7 +3644,8 @@ export function registerFindAllOnTableRoute(app, supabase, STUDIO_ID, logger, ax
         return res.status(400).json({ error: 'No unpacked pieces with a description found for this booking' });
       }
 
-      const base64Table = (await forGemini(sharp, fs.readFileSync(req.file.path))).toString('base64');
+      const tableGemini = await forGemini(sharp, fs.readFileSync(req.file.path), logger);
+      const base64Table = tableGemini.buffer.toString('base64');
       const pieceList = unpacked.map((p, i) => `${i + 1}. [id: ${p.id}] ${p.description || p.piece_type}`).join('\n');
 
       const input = [
@@ -3615,7 +3653,7 @@ export function registerFindAllOnTableRoute(app, supabase, STUDIO_ID, logger, ax
           type: 'text',
           text: `This photo shows a table/tray of several fired pottery pieces. You are checking it against a list of SPECIFIC pieces we're looking for, from one real booking:\n\n${pieceList}\n\nEach description was written pre-fire. Underglaze fires MORE vibrant and saturated than it looks when painted -- expect fired pieces to look more intense than their description suggests. Match on the underlying colour/pattern relationship, shape barely changes through firing.\n\nFor EACH piece in the list above, say whether you can see it in this photo. Not every piece needs to be found here -- some may genuinely be on a different table. Be honest -- a wrong match is worse than saying not found.`,
         },
-        { type: 'image', data: base64Table, mime_type: req.file.mimetype || 'image/jpeg' },
+        { type: 'image', data: base64Table, mime_type: tableGemini.mimeType || req.file.mimetype || 'image/jpeg' },
       ];
 
       const responseSchema = {
@@ -4128,8 +4166,10 @@ export function registerTestAiFindRoute(app, supabase, STUDIO_ID, logger, axios,
         return res.status(500).json({ error: 'GEMINI_API_KEY not configured on this service.' });
       }
 
-      const base64Ref = (await forGemini(sharp, fs.readFileSync(referenceFile.path))).toString('base64');
-      const base64Scene = (await forGemini(sharp, fs.readFileSync(sceneFile.path))).toString('base64');
+      const refGemini = await forGemini(sharp, fs.readFileSync(referenceFile.path), logger);
+      const sceneGemini = await forGemini(sharp, fs.readFileSync(sceneFile.path), logger);
+      const base64Ref = refGemini.buffer.toString('base64');
+      const base64Scene = sceneGemini.buffer.toString('base64');
 
       // Same real prompt structure as Find on Table, adapted for a direct
       // reference photo instead of a text description -- this is a test
@@ -4140,8 +4180,8 @@ export function registerTestAiFindRoute(app, supabase, STUDIO_ID, logger, axios,
           type: 'text',
           text: `The first image is a reference photo showing one or more distinct objects. The second image is a scene where those objects have been mixed in among other similar objects.\n\nFirst, identify EVERY distinct object visible in the reference photo -- there may be one, or there may be several. Then, for EACH of them independently, look for that same object in the second (scene) image.\n\nReturn one result per reference object. For each, give a short description of the object (so it can be told apart from the others), whether you found it in the scene, and if found, its bounding box in the SCENE image.\n\nJudge each object separately -- finding one does not mean the others are present, and missing one does not mean the others are absent. If you cannot confidently identify a particular object, say so honestly for that one -- a wrong box is worse than admitting it isn't there.`,
         },
-        { type: 'image', data: base64Ref, mime_type: referenceFile.mimetype || 'image/jpeg' },
-        { type: 'image', data: base64Scene, mime_type: sceneFile.mimetype || 'image/jpeg' },
+        { type: 'image', data: base64Ref, mime_type: refGemini.mimeType || referenceFile.mimetype || 'image/jpeg' },
+        { type: 'image', data: base64Scene, mime_type: sceneGemini.mimeType || sceneFile.mimetype || 'image/jpeg' },
       ];
 
       const responseSchema = {
@@ -4257,14 +4297,15 @@ export function registerIdentifyPiecesRoute(app, supabase, STUDIO_ID, logger, ax
       const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
       if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured on this service.' });
 
-      const base64 = (await forGemini(sharp, fs.readFileSync(req.file.path))).toString('base64');
+      const photoGemini = await forGemini(sharp, fs.readFileSync(req.file.path), logger);
+      const base64 = photoGemini.buffer.toString('base64');
 
       const input = [
         {
           type: 'text',
           text: `This is a photo of a table in a pottery painting studio, taken at the end of a customer's session.\n\nIdentify every PAINTED POTTERY PIECE belonging to the customer -- the items they have painted and will be taking home after firing.\n\nInclude: mugs, bowls, plates, figurines, vases, jugs, money boxes, ornaments and similar ceramic pieces that have been painted.\n\nDo NOT include: paint pots, brushes, water pots, palettes, paint-mixing dishes or trays holding wet blobs or pools of paint, colour charts, menus, price cards, chalk boards, drinks, cans, glasses, phones, bags, or anything belonging to the studio rather than the customer. A shallow white dish with pools of wet paint in it is a palette, not a customer piece.\n\nFor each real piece, give a short specific description that would help someone find that exact piece later on a shelf of similar fired pottery -- mention its form and its distinguishing painted detail (e.g. "seated rabbit with pink flowers on its side", not just "rabbit").\n\nAlso give its bounding box in the photo.`,
         },
-        { type: 'image', data: base64, mime_type: req.file.mimetype || 'image/jpeg' },
+        { type: 'image', data: base64, mime_type: photoGemini.mimeType || req.file.mimetype || 'image/jpeg' },
       ];
 
       const responseSchema = {
@@ -4497,7 +4538,7 @@ export function registerReidentifyRoute(app, supabase, STUDIO_ID, logger, axios,
       }
 
       const imgRes = await axios.get(photoUrl, { responseType: 'arraybuffer' });
-      const base64 = (await forGemini(sharp, Buffer.from(imgRes.data))).toString('base64');
+      const base64 = (await forGemini(sharp, Buffer.from(imgRes.data), logger)).buffer.toString('base64');
 
       const input = [
         {
@@ -5549,7 +5590,8 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
         .map((p, i) => `${i + 1}. ${p.piece_type || 'Piece'} — ${p.description || 'no description'}`)
         .join('\n');
 
-      const base64 = (await forGemini(sharp, fs.readFileSync(req.file.path))).toString('base64');
+      const shelfGemini = await forGemini(sharp, fs.readFileSync(req.file.path), logger);
+      const base64 = shelfGemini.buffer.toString('base64');
       const prompt = `This photo shows a shelf of finished, fired pottery in a paint-your-own-pottery studio.
 
 Below is a numbered list of pieces the studio is currently waiting to hand out. Each was photographed and described when it was painted.
@@ -5586,7 +5628,7 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
         ({ response: aiRes, modelUsed } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
           input: [
             { type: 'text', text: prompt },
-            { type: 'image', data: base64, mime_type: req.file.mimetype || 'image/jpeg' },
+            { type: 'image', data: base64, mime_type: shelfGemini.mimeType || req.file.mimetype || 'image/jpeg' },
           ],
           response_format: { type: 'text', mime_type: 'application/json', schema },
         }));
