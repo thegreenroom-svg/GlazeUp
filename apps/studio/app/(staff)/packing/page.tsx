@@ -116,16 +116,31 @@ export default function PackingPage() {
   const runSweep = async (file: File) => {
     setSweeping(true); setSweep(null); setSweepError(null);
     setSweepPhoto((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file); });
+    // A hard stop on the button itself, independent of whatever the
+    // backend does. The backend now times out its own Gemini call, but a
+    // spinner that only trusts the server to eventually respond is one
+    // slow layer away from being stuck again -- this one gives up on its
+    // own after 30s and says so, rather than spinning until the page is
+    // closed.
+    const controller = new AbortController();
+    const killSwitch = setTimeout(() => controller.abort(), 30000);
     try {
       const fd = new FormData();
       fd.append('photo', file);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweep`, { method: 'POST', body: fd });
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweep`, { method: 'POST', body: fd, signal: controller.signal });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || 'Could not read the shelf');
       setSweep(d);
     } catch (e) {
-      setSweepError(e instanceof Error ? e.message : 'Could not read the shelf');
-    } finally { setSweeping(false); }
+      if (e instanceof Error && e.name === 'AbortError') {
+        setSweepError('That took too long and was cancelled. Try again — a smaller or clearer photo often helps.');
+      } else {
+        setSweepError(e instanceof Error ? e.message : 'Could not read the shelf');
+      }
+    } finally {
+      clearTimeout(killSwitch);
+      setSweeping(false);
+    }
   };
 
   const loadQueue = useCallback(async () => {

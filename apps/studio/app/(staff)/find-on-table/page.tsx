@@ -98,12 +98,19 @@ export default function FindOnTablePage() {
     setPreview(URL.createObjectURL(f));
     setError(null);
     setLoading(true);
+    // Nothing here had an upper bound. Gemini calls had no timeout
+    // anywhere in the app, so a genuine stall left this spinning with no
+    // way for the person to know whether it had failed or was simply
+    // slow -- indistinguishable from the screen being broken.
+    const controller = new AbortController();
+    const killSwitch = setTimeout(() => controller.abort(), 30000);
     try {
       const formData = new FormData();
       formData.append('photo', f);
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${bookingCode}/find-all-on-table`, {
         method: 'POST',
         body: formData,
+        signal: controller.signal,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Could not check the photo');
@@ -129,8 +136,11 @@ export default function FindOnTablePage() {
       setResults(fresh);
       setTotals({ total: data.total, found_count: data.found_count });
     } catch (err: any) {
-      setError(err.message || 'Something went wrong.');
+      setError(err.name === 'AbortError'
+        ? 'That took too long and was cancelled. Try again — a smaller or clearer photo often helps.'
+        : (err.message || 'Something went wrong.'));
     } finally {
+      clearTimeout(killSwitch);
       setLoading(false);
     }
   };

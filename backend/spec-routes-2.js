@@ -109,10 +109,22 @@ async function forGemini(sharp, buffer) {
 }
 
 async function callGeminiWithFallback(axios, apiKey, body) {
+  // No axios call anywhere in this file had a timeout -- Gemini, Square,
+  // Supabase Storage fetches, none of them. If Gemini ever genuinely
+  // stalls -- not slow, actually hung, no response ever arriving -- the
+  // request waits forever and the "Reading the shelf..." spinner has no
+  // way to know anything is wrong. That's a STUCK spinner, not a slow
+  // one, and it looks identical to the app being broken.
+  //
+  // 25s per attempt: generous for a real identification call (measured
+  // ones complete in a few seconds even before today's image-resize fix),
+  // short enough that a genuine hang surfaces as an error a person can
+  // act on rather than a wheel that spins until the tab is closed.
+  const GEMINI_TIMEOUT_MS = 25000;
   const post = (model) => axios.post(
     'https://generativelanguage.googleapis.com/v1beta/interactions',
     { ...body, model },
-    { headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' } }
+    { headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' }, timeout: GEMINI_TIMEOUT_MS }
   );
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -133,6 +145,13 @@ async function callGeminiWithFallback(axios, apiKey, body) {
       return { kind: 'rate_limit', waitMs };
     }
     if (status === 503 || /overloaded|high demand|try again later/i.test(msg)) {
+      return { kind: 'overloaded' };
+    }
+    // A timed-out request has no response at all -- axios marks it
+    // ECONNABORTED. Treated the same as "overloaded": worth trying the
+    // other model once, since a stall on 3.7 doesn't mean 3.6 will also
+    // stall, rather than giving up on the first hang.
+    if (err.code === 'ECONNABORTED' || /timeout of \d+ms exceeded/i.test(err.message || '')) {
       return { kind: 'overloaded' };
     }
     return { kind: 'other' };

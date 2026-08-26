@@ -87,6 +87,12 @@ export default function TestAiPage() {
     setScenePreview(URL.createObjectURL(f));
     setError(null);
     setLoading(true);
+    // Same fix as Find on Table and the packing shelf sweep: no fetch to
+    // a Gemini-backed endpoint anywhere in the app had an upper bound,
+    // so a genuine stall left the spinner running with nothing to show
+    // for it.
+    const controller = new AbortController();
+    const killSwitch = setTimeout(() => controller.abort(), 30000);
     try {
       const formData = new FormData();
       formData.append('reference', referenceFile);
@@ -94,6 +100,7 @@ export default function TestAiPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/test-ai/find`, {
         method: 'POST',
         body: formData,
+        signal: controller.signal,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Could not check the photo');
@@ -117,8 +124,11 @@ export default function TestAiPage() {
       setResults(fresh);
       setTotals({ total: data.total, found_count: data.found_count });
     } catch (err: any) {
-      setError(err.message || 'Something went wrong.');
+      setError(err.name === 'AbortError'
+        ? 'That took too long and was cancelled. Try again.'
+        : (err.message || 'Something went wrong.'));
     } finally {
+      clearTimeout(killSwitch);
       setLoading(false);
     }
   };
