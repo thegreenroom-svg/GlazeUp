@@ -8,6 +8,7 @@ import { motion } from 'framer-motion';
 import { ChevronRight, Home, Camera, Printer, Check, Loader, RefreshCw } from 'lucide-react';
 import QRCode from 'qrcode';
 import { NudgeCard, HelpButton } from '@/components/NudgeSystem';
+import { compressPhotoForUpload } from '@/lib/compressPhoto';
 
 // Same fix already applied in PinGate.tsx and daily-cards/page.tsx: a
 // plain fetch() has no timeout, and this file gates real controls (table
@@ -468,8 +469,13 @@ export default function FloorPage() {
     setIdentifying(true);
     setIdentifiedPieces(null);
     try {
+      // Compressed for the AI call only -- a throwaway copy used just for
+      // this request. `photo` (the state used by saveAndFinish below,
+      // which becomes the real stored, displayed-everywhere booking
+      // photo) stays the original, untouched, full-quality file.
+      const compressed = await compressPhotoForUpload(f);
       const fd = new FormData();
-      fd.append('photo', f);
+      fd.append('photo', compressed, 'table.jpg');
       // fetchWithTimeout, not a plain fetch. Gemini calls had no upper
       // bound anywhere, and this one's own finally block only protects
       // against a REJECTED promise -- a call that never resolves at all

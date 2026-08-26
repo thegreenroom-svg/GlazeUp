@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { AiCostCounter } from '@/components/AiCostCounter';
 import { Camera, Loader, XCircle, Check, RotateCcw } from 'lucide-react';
+import { compressPhotoForUpload } from '@/lib/compressPhoto';
 
 interface ItemResult {
   id: string;
@@ -64,10 +65,15 @@ export default function TestAiPage() {
     setViewingPhoto(null);
   };
 
-  const onReference = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onReference = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    setReferenceFile(f);
+    // Compressed on-device, same fix as the packing shelf sweep. This
+    // page never got it the first time -- Daisy's real cluttered-table
+    // test photo hit the exact "taking longer than usual" timeout the
+    // fix exists to prevent, on the one page that was missed.
+    const compressed = await compressPhotoForUpload(f);
+    setReferenceFile(compressed instanceof File ? compressed : new File([compressed], 'reference.jpg', { type: 'image/jpeg' }));
     setReferencePreview(URL.createObjectURL(f));
     setScenePreview(null);
     setResults(null);
@@ -87,6 +93,7 @@ export default function TestAiPage() {
     setScenePreview(URL.createObjectURL(f));
     setError(null);
     setLoading(true);
+    const compressedScene = await compressPhotoForUpload(f);
     // Same fix as Find on Table and the packing shelf sweep: no fetch to
     // a Gemini-backed endpoint anywhere in the app had an upper bound,
     // so a genuine stall left the spinner running with nothing to show
@@ -99,7 +106,7 @@ export default function TestAiPage() {
     try {
       const formData = new FormData();
       formData.append('reference', referenceFile);
-      formData.append('scene', f);
+      formData.append('scene', compressedScene, 'scene.jpg');
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/test-ai/find`, {
         method: 'POST',
         body: formData,

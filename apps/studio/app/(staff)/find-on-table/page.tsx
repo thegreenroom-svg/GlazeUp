@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation';
 import { PageShell } from '@/components/PageShell';
 import { AiCostCounter } from '@/components/AiCostCounter';
 import { Camera, Loader, XCircle, Check, RotateCcw, Truck, Home as HomeIcon, Printer } from 'lucide-react';
+import { compressPhotoForUpload } from '@/lib/compressPhoto';
 
 interface Booking {
   booking_code: string;
@@ -108,8 +109,11 @@ export default function FindOnTablePage() {
     // cancel that legitimate recovery before it could finish.
     const killSwitch = setTimeout(() => controller.abort(), 55000);
     try {
+      // Compressed on-device, same fix as the packing shelf sweep --
+      // this page was one of the ones that had NOT been given it yet.
+      const compressed = await compressPhotoForUpload(f);
       const formData = new FormData();
-      formData.append('photo', f);
+      formData.append('photo', compressed, 'table.jpg');
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${bookingCode}/find-all-on-table`, {
         method: 'POST',
         body: formData,
