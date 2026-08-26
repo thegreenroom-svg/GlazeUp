@@ -131,8 +131,51 @@ function friendlyGeminiError(err) {
 // that way. That is not a slowdown, that is every call possibly failing
 // to decode at all, which matches "doesn't work at all" far better than
 // it matches ordinary Gemini slowness.
-async function forGemini(sharp, buffer, logger) {
+// Real magic-byte sniffing, no library needed -- so a log line can say
+// what a photo actually IS, not just what the browser claimed it was.
+// Worth having because iOS camera captures and Safari's own upload
+// behaviour around HEIC have genuine, documented inconsistency, and
+// because sharp's HEIC decode depends on libheif being present in
+// whatever environment it's actually running in -- proven to work in
+// THIS sandbox, never proven on Render's real build image, which may be
+// a different base entirely. Guessing which of those is true has cost
+// three attempted fixes already; this makes the next failure provable
+// from the server logs instead of guessed at again.
+function sniffFormat(buffer) {
+  if (!buffer || buffer.length < 12) return 'unknown (too short)';
+  const hex = buffer.subarray(0, 12).toString('hex');
+  if (hex.startsWith('ffd8ff')) return 'jpeg';
+  if (hex.startsWith('89504e470d0a1a0a')) return 'png';
+  if (hex.startsWith('47494638')) return 'gif';
+  if (hex.slice(8, 16) === '52494646' /* never matches, RIFF is at offset 0 */) return 'unknown';
+  if (buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP') return 'webp';
+  const brand = buffer.subarray(4, 8).toString('ascii');
+  const sub = buffer.subarray(8, 12).toString('ascii');
+  if (brand === 'ftyp' && /^(heic|heix|hevc|hevx|mif1|msf1)/.test(sub)) return `heic/heif (${sub.trim()})`;
+  if (brand === 'ftyp') return `ftyp/${sub.trim()} (mp4-family, not a still image)`;
+  return `unknown (starts ${hex.slice(0, 8)})`;
+}
+
+async function forGemini(sharp, buffer, logger, claimedMimeType) {
   const t0 = Date.now();
+  const detected = sniffFormat(buffer);
+
+  // HEIC/HEIF is skipped entirely -- not resized, not re-encoded. Proven
+  // directly, in this exact environment, minutes before Daisy caught it
+  // live: sharp's own .heif() ENCODER throws "heifsave: Unsupported
+  // compression" here. That's not a corrupt-input edge case, it's this
+  // build lacking a working HEIC encode path outright. Since Daisy
+  // confirms full-size HEIC was reaching Gemini successfully BEFORE
+  // today's resize step existed, the correct, evidence-based fix is to
+  // restore exactly that path for HEIC specifically -- send the original
+  // bytes through untouched, with their real mime type -- while keeping
+  // the resize (proven to work end-to-end for jpeg/png in this same
+  // environment) for the formats it actually handles.
+  if (/^heic\/heif/.test(detected)) {
+    if (logger) logger.info(`[gemini-resize] skipped: detected=${detected} -- HEIC encode unsupported in this environment, sending original ${buffer.length} bytes as-is (this is what worked before today)`);
+    return { buffer, mimeType: null };
+  }
+
   try {
     const resized = await Promise.race([
       sharp(buffer)
@@ -142,15 +185,10 @@ async function forGemini(sharp, buffer, logger) {
         .toBuffer(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('resize took too long')), 8000)),
     ]);
-    if (logger) logger.info(`[gemini-resize] ${buffer.length} -> ${resized.length} bytes in ${Date.now() - t0}ms`);
-    // Always JPEG on success -- that is what .jpeg() just produced,
-    // regardless of what format the buffer arrived in.
+    if (logger) logger.info(`[gemini-resize] ok: detected=${detected} claimed=${claimedMimeType || 'n/a'} ${buffer.length}->${resized.length} bytes in ${Date.now() - t0}ms`);
     return { buffer: resized, mimeType: 'image/jpeg' };
   } catch (err) {
-    if (logger) logger.warn(`[gemini-resize] failed after ${Date.now() - t0}ms, sending original: ${err.message}`);
-    // Falling back to the ORIGINAL bytes, so the ORIGINAL mime type is
-    // correct here -- the caller supplies it since only it knows what
-    // the upload actually claimed to be.
+    if (logger) logger.warn(`[gemini-resize] FAILED after ${Date.now() - t0}ms: detected=${detected} claimed=${claimedMimeType || 'n/a'} reason="${err.message}" -- sending ORIGINAL ${detected} bytes to Gemini unresized`);
     return { buffer, mimeType: null };
   }
 }
