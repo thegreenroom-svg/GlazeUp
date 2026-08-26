@@ -1,5 +1,7 @@
 'use client';
 
+import { useState, useEffect, useRef } from 'react';
+
 // One small shared control, used on every screen that can compare the two
 // matching engines: Packing's shelf sweep, Find on Table, and Test AI.
 //
@@ -53,4 +55,41 @@ export async function fetchDefaultEngine(apiUrl: string): Promise<'gemini' | 'in
   } catch {
     return 'gemini';
   }
+}
+
+// The race this guards against, caught live: on a slow connection --
+// exactly what this studio's wifi has been all evening -- a person can
+// tap "In-house" and start photographing before the studio-wide default
+// has finished loading. Without a guard, that fetch resolving AFTER the
+// manual tap silently overwrites the choice back to Gemini, with no
+// visual sign anything changed -- so a test believed to be running
+// in-house was actually hitting Gemini, and Gemini's OWN timeout message
+// is what showed up on screen while the person had every reason to think
+// they'd picked the engine that makes no network call at all.
+//
+// Fix: once the person has touched the toggle, the async default is
+// never allowed to apply again for the rest of that page's life. A ref,
+// not state, because it's a guard flag, not something that should ever
+// itself trigger a re-render.
+export function useEngineSelection(apiUrl: string): ['gemini' | 'inhouse', (e: 'gemini' | 'inhouse') => void] {
+  const [engine, setEngineState] = useState<'gemini' | 'inhouse'>('gemini');
+  const manuallySet = useRef(false);
+
+  useEffect(() => {
+    fetchDefaultEngine(apiUrl).then((d) => {
+      if (!manuallySet.current) setEngineState(d);
+    });
+    // Deliberately empty deps -- this should only ever run once, on
+    // mount. Re-running on every apiUrl reference change (a new string
+    // each render in some setups) would reopen exactly the race this
+    // exists to close.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const setEngine = (e: 'gemini' | 'inhouse') => {
+    manuallySet.current = true;
+    setEngineState(e);
+  };
+
+  return [engine, setEngine];
 }

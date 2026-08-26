@@ -8,7 +8,7 @@ import { PageShell } from '@/components/PageShell';
 import { AiCostCounter } from '@/components/AiCostCounter';
 import { Camera, Loader, XCircle, Check, RotateCcw, Truck, Home as HomeIcon, Printer } from 'lucide-react';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
-import { EngineToggle, fetchDefaultEngine } from '@/components/EngineToggle';
+import { EngineToggle, useEngineSelection } from '@/components/EngineToggle';
 
 interface Booking {
   booking_code: string;
@@ -48,8 +48,7 @@ export default function FindOnTablePage() {
   // sixty names they've just come from is a pointless step.
   const searchParams = useSearchParams();
   const [bookingCode, setBookingCode] = useState(() => searchParams.get('code') || '');
-  const [engine, setEngine] = useState<'gemini' | 'inhouse'>('gemini');
-  useEffect(() => { fetchDefaultEngine(process.env.NEXT_PUBLIC_API_URL || '').then(setEngine); }, []);
+  const [engine, setEngine] = useEngineSelection(process.env.NEXT_PUBLIC_API_URL || '');
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [fulfilment, setFulfilment] = useState<Fulfilment | null>(null);
   const [preview, setPreview] = useState<string | null>(null);

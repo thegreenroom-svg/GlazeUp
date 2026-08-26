@@ -7,7 +7,7 @@ import { PageShell } from '@/components/PageShell';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Package, ChevronLeft, Check, Search, Camera, Loader } from 'lucide-react';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
-import { EngineToggle, fetchDefaultEngine } from '@/components/EngineToggle';
+import { EngineToggle, useEngineSelection } from '@/components/EngineToggle';
 
 // The screen for whoever is actually boxing the pottery. There wasn't one:
 // kiln-dip is a lookup-by-code tool for collection dates and emails and
@@ -107,10 +107,7 @@ export default function PackingPage() {
   // consistent without anyone touching this -- it's a starting point
   // per page load, not a second place that setting has to be kept in
   // sync.
-  const [engine, setEngine] = useState<'gemini' | 'inhouse'>('gemini');
-  useEffect(() => {
-    fetchDefaultEngine(process.env.NEXT_PUBLIC_API_URL || '').then(setEngine);
-  }, []);
+  const [engine, setEngine] = useEngineSelection(process.env.NEXT_PUBLIC_API_URL || '');
   const inhouseMatching = engine === 'inhouse';
   const [sweeping, setSweeping] = useState(false);
   const [sweep, setSweep] = useState<{

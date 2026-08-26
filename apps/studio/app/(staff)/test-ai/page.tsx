@@ -7,7 +7,7 @@ import { PageShell } from '@/components/PageShell';
 import { AiCostCounter } from '@/components/AiCostCounter';
 import { Camera, Loader, XCircle, Check, RotateCcw } from 'lucide-react';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
-import { EngineToggle, fetchDefaultEngine } from '@/components/EngineToggle';
+import { EngineToggle, useEngineSelection } from '@/components/EngineToggle';
 
 interface ItemResult {
   id: string;
@@ -29,8 +29,7 @@ const PIN_COLOURS = ['#e0392b', '#1a8a3c', '#2b6fe0', '#c77a0a', '#8b3ec7', '#0a
 
 export default function TestAiPage() {
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
-  const [engine, setEngine] = useState<'gemini' | 'inhouse'>('gemini');
-  useEffect(() => { fetchDefaultEngine(process.env.NEXT_PUBLIC_API_URL || '').then(setEngine); }, []);
+  const [engine, setEngine] = useEngineSelection(process.env.NEXT_PUBLIC_API_URL || '');
   const [referencePreview, setReferencePreview] = useState<string | null>(null);
   const [scenePreview, setScenePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
