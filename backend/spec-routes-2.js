@@ -121,10 +121,35 @@ async function callGeminiWithFallback(axios, apiKey, body) {
   // short enough that a genuine hang surfaces as an error a person can
   // act on rather than a wheel that spins until the tab is closed.
   const GEMINI_TIMEOUT_MS = 25000;
+
+  // THE MISTAKE FROM THE LAST FIX, caught by Daisy within the hour: this
+  // function's own legitimate retry chain -- wait out a real rate limit,
+  // retry, fall back to the other model -- can take up to 65s in a real
+  // worst case (15s wait + 25s retry + 25s fallback). The frontend's own
+  // abort was set to 30s. So the client was cancelling requests the
+  // backend was still correctly, successfully working on -- not fixing
+  // the stuck spinner, just moving the failure earlier and making it
+  // fire on ordinary rate-limit recovery instead of only on a genuine
+  // hang. The two timeouts were chosen independently and never checked
+  // against each other.
+  //
+  // Now there is ONE overall deadline for the whole chain -- every sleep,
+  // retry and fallback attempt included -- and everything client-side is
+  // set comfortably above it, not the other way round.
+  const OVERALL_DEADLINE_MS = 40000;
+  const deadlineAt = Date.now() + OVERALL_DEADLINE_MS;
+
+  // Each individual call is capped at whichever is SMALLER: its own
+  // sensible per-attempt limit, or whatever is actually left of the
+  // overall budget. Without this, a fallback attempt starting with only
+  // 15s of budget left could still run its own full 25s timeout and blow
+  // straight through the overall deadline -- caught by testing this
+  // directly against a genuinely hung connection: the first version of
+  // this fix measured 50s elapsed against a stated 40s cap.
   const post = (model) => axios.post(
     'https://generativelanguage.googleapis.com/v1beta/interactions',
     { ...body, model },
-    { headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' }, timeout: GEMINI_TIMEOUT_MS }
+    { headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' }, timeout: Math.max(1000, Math.min(GEMINI_TIMEOUT_MS, deadlineAt - Date.now())) }
   );
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -157,6 +182,14 @@ async function callGeminiWithFallback(axios, apiKey, body) {
     return { kind: 'other' };
   };
 
+  // The one thing that guards the overall deadline: before starting any
+  // NEW attempt -- the retry after a rate-limit wait, or the fallback
+  // model -- check whether there is meaningfully enough of the budget
+  // left to bother. Skipping a doomed attempt is better than starting
+  // one that the deadline will cut off mid-flight anyway.
+  const timeLeft = () => deadlineAt - Date.now();
+  const MIN_USEFUL_MS = 3000;
+
   try {
     const response = await post('gemini-3.7-flash');
     return { response, modelUsed: 'gemini-3.7-flash' };
@@ -164,8 +197,12 @@ async function callGeminiWithFallback(axios, apiKey, body) {
     const first = classify(err);
 
     if (first.kind === 'rate_limit') {
-      // Wait out the real stated window, then try once more on 3.7.
-      await sleep(first.waitMs);
+      // Wait out the real stated window, but never past the overall
+      // deadline -- capped to whatever is actually left.
+      const wait = Math.min(first.waitMs, Math.max(0, timeLeft() - MIN_USEFUL_MS));
+      if (wait > 0) await sleep(wait);
+      if (timeLeft() < MIN_USEFUL_MS) throw err;
+
       try {
         const response = await post('gemini-3.7-flash');
         return { response, modelUsed: 'gemini-3.7-flash' };
@@ -175,12 +212,14 @@ async function callGeminiWithFallback(axios, apiKey, body) {
         // just failing twice on the same limit.
         const second = classify(retryErr);
         if (second.kind === 'other') throw retryErr;
+        if (timeLeft() < MIN_USEFUL_MS) throw retryErr;
         const response = await post('gemini-3.6-flash');
         return { response, modelUsed: 'gemini-3.6-flash' };
       }
     }
 
     if (first.kind === 'overloaded') {
+      if (timeLeft() < MIN_USEFUL_MS) throw err;
       const response = await post('gemini-3.6-flash');
       return { response, modelUsed: 'gemini-3.6-flash' };
     }

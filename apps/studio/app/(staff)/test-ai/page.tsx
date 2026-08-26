@@ -92,7 +92,10 @@ export default function TestAiPage() {
     // so a genuine stall left the spinner running with nothing to show
     // for it.
     const controller = new AbortController();
-    const killSwitch = setTimeout(() => controller.abort(), 30000);
+    // 55s -- see the shelf sweep for the full reasoning. The server's own
+    // retry-and-fallback chain is a proven 40s worst case; 30s here would
+    // cancel that legitimate recovery before it could finish.
+    const killSwitch = setTimeout(() => controller.abort(), 55000);
     try {
       const formData = new FormData();
       formData.append('reference', referenceFile);

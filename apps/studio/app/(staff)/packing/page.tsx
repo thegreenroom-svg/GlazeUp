@@ -123,7 +123,16 @@ export default function PackingPage() {
     // own after 30s and says so, rather than spinning until the page is
     // closed.
     const controller = new AbortController();
-    const killSwitch = setTimeout(() => controller.abort(), 30000);
+    // 55s, not 30s. The server's own retry chain -- a real rate-limit
+    // wait, a retry, a fallback model -- is now a PROVEN 40s worst case
+    // (tested directly against a hung connection). 30s here would cancel
+    // that legitimate recovery before it finished, which is exactly what
+    // happened minutes after the first version of this fix shipped: the
+    // spinner stopped being stuck and started failing too early instead.
+    // 55s gives the server's 40s room to breathe plus real margin for the
+    // photo itself uploading over whatever signal the iPad has, which
+    // happens before the server-side clock even starts.
+    const killSwitch = setTimeout(() => controller.abort(), 55000);
     try {
       const fd = new FormData();
       fd.append('photo', file);
