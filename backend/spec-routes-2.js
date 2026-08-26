@@ -4141,7 +4141,7 @@ export function registerStudioFeaturesRoute(app, supabase, STUDIO_ID, logger) {
     try {
       const { data, error } = await supabase
         .from('studios')
-        .select('feature_in_app_till, feature_kds')
+        .select('feature_in_app_till, feature_kds, feature_inhouse_matching')
         .eq('id', STUDIO_ID)
         .single();
       if (error) throw error;
@@ -4150,24 +4150,27 @@ export function registerStudioFeaturesRoute(app, supabase, STUDIO_ID, logger) {
       logger.error('studio features failed', err.message);
       // Real fallback -- if this ever fails, default to the full
       // feature set rather than silently hiding functionality a studio
-      // may depend on.
-      res.json({ feature_in_app_till: true, feature_kds: true });
+      // may depend on. feature_inhouse_matching is the exception: it is
+      // a new, experimental, opt-in engine, not something a studio could
+      // already depend on, so its safe failure default is off, not on.
+      res.json({ feature_in_app_till: true, feature_kds: true, feature_inhouse_matching: false });
     }
   });
 
   app.post('/api/spec/studio/features', async (req, res) => {
     try {
-      const { feature_in_app_till, feature_kds } = req.body || {};
+      const { feature_in_app_till, feature_kds, feature_inhouse_matching } = req.body || {};
       const update = {};
       if (typeof feature_in_app_till === 'boolean') update.feature_in_app_till = feature_in_app_till;
       if (typeof feature_kds === 'boolean') update.feature_kds = feature_kds;
+      if (typeof feature_inhouse_matching === 'boolean') update.feature_inhouse_matching = feature_inhouse_matching;
       if (!Object.keys(update).length) return res.status(400).json({ error: 'No valid feature flags supplied' });
 
       const { data, error } = await supabase
         .from('studios')
         .update(update)
         .eq('id', STUDIO_ID)
-        .select('feature_in_app_till, feature_kds')
+        .select('feature_in_app_till, feature_kds, feature_inhouse_matching')
         .single();
       if (error) throw error;
       res.json(data);
@@ -6216,6 +6219,309 @@ export function registerSquareConnectRoutes(app, supabase, STUDIO_ID, logger, ax
     } catch (err) {
       logger.error('square callback failed', err.response?.data || err.message);
       res.status(500).send('Could not complete the Square connection. Nothing has been changed.');
+    }
+  });
+}
+
+// ============================================================================
+// IN-HOUSE MATCHING ENGINE -- a second tool, not a replacement
+// ----------------------------------------------------------------------------
+// Daisy: "to have two tools is always better than one." Picks back up the
+// in-house engine from the July prototype (a different codebase --
+// dashboard-local.html, a single-file app) rather than the current one.
+//
+// THAT WORK WAS SERIOUS AND REAL: a colour-first histogram, then a staged
+// cascade (colour narrows, shape decides, rivals must be beaten), then a
+// genuine keypoint engine (BRISK via OpenCV) that scored 16 matching points
+// on the right object against 6 on the best wrong one in offline testing.
+//
+// IT WAS ALSO NEVER PROVEN WORKING ON A REAL DEVICE. The OpenCV engine needed
+// a 10MB download into the browser and failed twice for two different
+// reasons -- once it wouldn't download on weak studio wifi, once it
+// downloaded but the WASM never finished starting. And the one evening that
+// looked like a real test turned out to be scored against leftover seeded
+// demo rows, not real pottery -- so its true accuracy was never actually
+// established either way before Daisy deliberately set it aside for the
+// AI-description approach, for three specific structural reasons: viewpoint
+// changes, low-contrast pieces, and the kiln shifting colour.
+//
+// So this keeps the parts that were genuinely proven sound -- colour-first
+// narrowing, hue-only matching so firing doesn't break things, margin-based
+// self-calibrating scoring rather than a fixed threshold, a rivals check so
+// background can't win by matching everything equally -- and drops the one
+// thing that actually failed: the heavy browser-side WASM dependency. This
+// runs entirely server-side with sharp, which is already a proven, reliable
+// dependency in this app. No API, no per-photo cost, no external rate limit.
+//
+// Deliberately a SEPARATE route with the SAME response shape as
+// /api/spec/shelf/sweep, gated on a studio feature flag defaulting to off.
+// The existing Gemini-based sweep is completely untouched. Trying this is a
+// flag flip; abandoning it again is the same flag flip back.
+// ============================================================================
+
+function rgbToHsv(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const d = max - min;
+  let h = 0;
+  if (d !== 0) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  const s = max === 0 ? 0 : d / max;
+  return [h, s, max];
+}
+
+// 12 hue x 3 sat x 3 val = 108-bin histogram, PLUS a 12-bin hue-only
+// histogram weighted by sat*value. The hue-only branch is what survives
+// firing: the July notes measured unfired-vs-fired at the SAME hue but
+// opposite saturation/value scoring 2.0 on this branch, against 43.4 for a
+// genuinely different piece -- the shift is absorbed without opening the
+// door to false matches. Both returned; matching takes whichever is closer.
+async function colourSignature(sharp, buffer) {
+  const { data, info } = await sharp(buffer)
+    .resize(48, 48, { fit: 'fill' })
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const full = new Array(108).fill(0);
+  const hueOnly = new Array(12).fill(0);
+  const n = info.width * info.height;
+  for (let i = 0; i < n; i++) {
+    const r = data[i * 3], g = data[i * 3 + 1], b = data[i * 3 + 2];
+    const [h, s, v] = rgbToHsv(r, g, b);
+    const hueBin = Math.min(11, Math.floor(h / 30));
+    const satBin = Math.min(2, Math.floor(s * 3));
+    const valBin = Math.min(2, Math.floor(v * 3));
+    full[hueBin * 9 + satBin * 3 + valBin]++;
+    hueOnly[hueBin] += s * v; // near-greys (low s*v) contribute almost nothing
+  }
+  const normFull = full.map((x) => x / n);
+  const hueSum = hueOnly.reduce((a, b) => a + b, 0) || 1;
+  const normHue = hueOnly.map((x) => x / hueSum);
+  return { full: normFull, hueOnly: normHue };
+}
+
+// Histogram INTERSECTION, not Euclidean -- position- and rotation-
+// independent, which is the property that survives a piece being found at
+// a different angle to its reference photo. 0-64 scale to match the rest
+// of this engine's confidence bands.
+function histIntersection(a, b) {
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) sum += Math.min(a[i], b[i]);
+  return (1 - sum) * 64;
+}
+
+function histDistance(a, b) {
+  const dFull = histIntersection(a.full, b.full);
+  // +2 penalty on the looser hue-only test, same as the July engine --
+  // it should only win when the strict test is genuinely worse, i.e. a
+  // real firing-colour shift, not as a way to make every match easier.
+  const dHue = histIntersection(a.hueOnly, b.hueOnly) + 2;
+  return Math.min(dFull, dHue);
+}
+
+// A small greyscale patch, compared by normalized pixel difference. This is
+// NOT keypoint matching -- true keypoint/RANSAC needs a real CV library,
+// and getting one running reliably in this environment wasn't attempted
+// given today's proof that even sharp's bundled HEIC codec is incomplete
+// here. This is the STRUCTURE tier of the staged cascade: colour narrows
+// the field, this decides among close colour matches, both in service of
+// the margin+rivals logic below, which is what actually did the
+// discriminating work in the July engine.
+async function structurePatch(sharp, buffer) {
+  const { data } = await sharp(buffer)
+    .resize(16, 16, { fit: 'fill' })
+    .greyscale()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  return Array.from(data);
+}
+
+function structureDistance(a, b) {
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) sum += Math.abs(a[i] - b[i]);
+  return Math.min(64, (sum / a.length / 255) * 64);
+}
+
+// Crops a buffer by the same left/top/right/bottom PERCENT box this app
+// already stores on every piece (photo_box) -- reuses real data rather
+// than needing anything new photographed.
+async function cropByBox(sharp, buffer, box) {
+  const meta = await sharp(buffer).metadata();
+  const w = meta.width, h = meta.height;
+  if (!box) return buffer;
+  const left = Math.max(0, Math.round((box.left_pct / 100) * w));
+  const top = Math.max(0, Math.round((box.top_pct / 100) * h));
+  const width = Math.max(1, Math.min(w - left, Math.round(((box.right_pct - box.left_pct) / 100) * w)));
+  const height = Math.max(1, Math.min(h - top, Math.round(((box.bottom_pct - box.top_pct) / 100) * h)));
+  return sharp(buffer).extract({ left, top, width, height }).toBuffer();
+}
+
+// The sliding-window scene scan. Multiple window sizes at half-overlap
+// stepping, same shape as the July engine's sweep. A STRUCTURE GATE first
+// -- skip windows with very low edge energy relative to the photo's own
+// median -- so blank shelf/table/wall never reaches the expensive per-
+// candidate scoring at all. Cheap early exit, same as "Stage 0" in the
+// original cascade.
+async function scanWindows(sharp, sceneBuffer) {
+  const work = await sharp(sceneBuffer).resize(1200, 1200, { fit: 'inside', withoutEnlargement: true }).toBuffer();
+  const meta = await sharp(work).metadata();
+  const shortEdge = Math.min(meta.width, meta.height);
+  const sizes = [0.18, 0.28, 0.40].map((f) => Math.round(shortEdge * f));
+  const windows = [];
+  for (const size of sizes) {
+    const step = Math.max(8, Math.round(size * 0.5));
+    for (let y = 0; y + size <= meta.height; y += step) {
+      for (let x = 0; x + size <= meta.width; x += step) {
+        windows.push({ x, y, size });
+      }
+    }
+  }
+  // Structure gate: edge energy via the same greyscale-patch machinery,
+  // compared against a flat patch -- a cheap, real signal for "is there
+  // anything here at all" without a full Sobel implementation.
+  const scored = [];
+  for (const win of windows) {
+    const crop = await sharp(work).extract({ left: win.x, top: win.y, width: win.size, height: win.size }).toBuffer();
+    const patch = await structurePatch(sharp, crop);
+    const mean = patch.reduce((a, b) => a + b, 0) / patch.length;
+    const variance = patch.reduce((a, b) => a + (b - mean) ** 2, 0) / patch.length;
+    scored.push({ ...win, crop, patch, edgeEnergy: Math.sqrt(variance) });
+  }
+  const medianEnergy = [...scored].sort((a, b) => a.edgeEnergy - b.edgeEnergy)[Math.floor(scored.length / 2)]?.edgeEnergy || 0;
+  return scored.filter((w) => w.edgeEnergy > medianEnergy * 0.35);
+}
+
+export { colourSignature, histDistance, structurePatch, structureDistance, cropByBox, scanWindows };
+export function registerInHouseMatchRoutes(app, supabase, STUDIO_ID, logger, axios, upload, fs, sharp) {
+  app.post('/api/spec/shelf/sweep-inhouse', upload.single('photo'), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
+
+      const { data: allPieces } = await supabase
+        .from('pottery_pieces')
+        .select('id, booking_id, description, piece_type, status, fulfilment, reference_photo_url, photo_box')
+        .eq('studio_id', STUDIO_ID)
+        .neq('archived', true)
+        .neq('status', 'collected');
+
+      const pieces = (allPieces || [])
+        .filter((p) => p.reference_photo_url && p.fulfilment !== 'return_visit')
+        .slice(0, 60);
+      if (!pieces.length) return res.json({ candidates: 0, bookings: [], note: 'Nothing is waiting to go out', engine: 'inhouse' });
+
+      const { data: bookingRows } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name')
+        .eq('studio_id', STUDIO_ID)
+        .in('booking_code', Array.from(new Set(pieces.map((p) => p.booking_id))));
+      const nameByCode = new Map((bookingRows || []).map((b) => [b.booking_code, b.customer_name]));
+
+      // Reference signature per candidate piece, computed fresh from its
+      // stored crop -- not pre-stored, so this stays fully self-contained
+      // and reversible: no schema change beyond the studio feature flag.
+      const refs = [];
+      for (const p of pieces) {
+        try {
+          const imgRes = await axios.get(p.reference_photo_url, { responseType: 'arraybuffer', timeout: 8000 });
+          const cropped = await cropByBox(sharp, Buffer.from(imgRes.data), p.photo_box);
+          const colour = await colourSignature(sharp, cropped);
+          const structure = await structurePatch(sharp, cropped);
+          refs.push({ piece: p, colour, structure });
+        } catch (err) {
+          logger.warn(`[inhouse-match] could not build reference for piece ${p.id}: ${err.message}`);
+        }
+      }
+      if (!refs.length) return res.json({ candidates: pieces.length, bookings: [], note: 'No usable reference photos', engine: 'inhouse' });
+
+      const sceneBuffer = fs.readFileSync(req.file.path);
+      const windows = await scanWindows(sharp, sceneBuffer);
+
+      // STAGED: colour narrows to a shortlist, structure re-scores it --
+      // never one blended score, which was the exact fault the July
+      // notes traced (colour led by construction, shape could never
+      // overturn a bad colour match).
+      const perPieceScores = new Map();
+      for (const ref of refs) {
+        const colourScored = [];
+        for (const w of windows) {
+          const wColour = await colourSignature(sharp, w.crop);
+          colourScored.push({ w, d: histDistance(ref.colour, wColour) });
+        }
+        colourScored.sort((a, b) => a.d - b.d);
+        const shortlist = colourScored.slice(0, 15);
+        const restaged = shortlist.map(({ w }) => ({ w, d: structureDistance(ref.structure, w.patch) }));
+        perPieceScores.set(ref.piece.id, restaged.sort((a, b) => a.d - b.d));
+      }
+
+      // MARGIN-BASED, self-calibrating: a piece's own best score is judged
+      // against the median of ITS OWN scores across the scene, not a fixed
+      // number. This was the single most important fix in the whole July
+      // history -- an absolute cutoff just rewards whichever noise happens
+      // to dip lowest.
+      const byBooking = new Map();
+      for (const ref of refs) {
+        const scores = perPieceScores.get(ref.piece.id);
+        if (!scores.length) continue;
+        const best = scores[0];
+        const median = scores[Math.floor(scores.length / 2)].d;
+        const margin = median - best.d;
+
+        // RIVALS: the winning spot must beat every OTHER piece's score at
+        // that same location, or a patch that merely suits everything
+        // equally (background) can win by default.
+        let rivalBeat = true;
+        for (const other of refs) {
+          if (other.piece.id === ref.piece.id) continue;
+          const otherScores = perPieceScores.get(other.piece.id);
+          const atSameSpot = otherScores.find((s) => s.w.x === best.w.x && s.w.y === best.w.y && s.w.size === best.w.size);
+          if (atSameSpot && atSameSpot.d < best.d - 2) { rivalBeat = false; break; }
+        }
+
+        if (margin < 8 || !rivalBeat) continue; // amber-and-below discarded, per the July false-confidence lesson
+        const confidence = Math.max(0, Math.min(1, margin / 30));
+        const cur = byBooking.get(ref.piece.booking_id) || { pieces: [], total_in_booking: 0 };
+        cur.pieces.push({
+          id: ref.piece.id,
+          piece_type: ref.piece.piece_type,
+          description: ref.piece.description,
+          confidence: Math.round(confidence * 100) / 100,
+          box: {
+            left_pct: (best.w.x / 1200) * 100,
+            top_pct: (best.w.y / 1200) * 100,
+            right_pct: ((best.w.x + best.w.size) / 1200) * 100,
+            bottom_pct: ((best.w.y + best.w.size) / 1200) * 100,
+          },
+        });
+        byBooking.set(ref.piece.booking_id, cur);
+      }
+      for (const [code, v] of byBooking) {
+        v.total_in_booking = pieces.filter((p) => p.booking_id === code).length;
+      }
+
+      try { fs.unlinkSync(req.file.path); } catch { /* temp file */ }
+
+      res.json({
+        engine: 'inhouse',
+        candidates: pieces.length,
+        bookings: Array.from(byBooking.entries())
+          .map(([code, v]) => ({
+            booking_code: code,
+            customer_name: nameByCode.get(code) || code,
+            found: v.pieces.length,
+            expected: v.total_in_booking,
+            complete: v.pieces.length === v.total_in_booking,
+            pieces: v.pieces,
+          }))
+          .sort((a, b) => b.found - a.found),
+      });
+    } catch (err) {
+      logger.error('inhouse sweep failed', err.message);
+      res.status(500).json({ error: err.message });
     }
   });
 }

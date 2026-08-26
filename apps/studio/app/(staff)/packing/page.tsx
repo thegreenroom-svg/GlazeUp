@@ -97,9 +97,23 @@ export default function PackingPage() {
   // pieces are there -- which is the wrong order when a kiln has just been
   // unloaded and nobody knows whose anything is. Here the photo is the
   // question, not the answer.
+  // Which matching engine the shelf sweep uses. Off by default -- Daisy:
+  // "to have two tools is always better than one." This is the in-house
+  // engine picked back up from the July prototype, kept entirely
+  // separate from the proven Gemini path: same UI, same response shape,
+  // one flag decides which backend actually does the work. Flipping it
+  // off is the whole rollback.
+  const [inhouseMatching, setInhouseMatching] = useState(false);
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/studio/features`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d && typeof d.feature_inhouse_matching === 'boolean') setInhouseMatching(d.feature_inhouse_matching); })
+      .catch(() => {});
+  }, []);
   const [sweeping, setSweeping] = useState(false);
   const [sweep, setSweep] = useState<{
     candidates: number;
+    engine?: string;
     note?: string;
     bookings: {
       booking_code: string; customer_name: string; found: number; expected: number; complete: boolean;
@@ -150,7 +164,16 @@ export default function PackingPage() {
       const compressed = await compressPhotoForUpload(file);
       const fd = new FormData();
       fd.append('photo', compressed, 'shelf.jpg');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweep`, { method: 'POST', body: fd, signal: controller.signal });
+      // Two literal fetch calls, not one hidden behind a variable. The
+      // boot check verifies every /api/ literal it can find in the
+      // frontend against the backend's real routes -- a URL built from a
+      // variable is invisible to that simple, deliberately literal scan,
+      // which is precisely the class of gap the check exists to close.
+      // Confirmed directly: with the URL behind a variable, the checker
+      // found zero calls to either sweep route at all.
+      const res = inhouseMatching
+        ? await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweep-inhouse`, { method: 'POST', body: fd, signal: controller.signal })
+        : await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweep`, { method: 'POST', body: fd, signal: controller.signal });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || 'Could not read the shelf');
       setSweep(d);
@@ -534,7 +557,7 @@ export default function PackingPage() {
             </div>
 
             <p style={{ fontSize: '0.75rem', color: '#666', marginBottom: '0.4rem' }}>
-              Checked against {sweep.candidates} piece{sweep.candidates === 1 ? '' : 's'} still waiting
+              Checked against {sweep.candidates} piece{sweep.candidates === 1 ? '' : 's'} still waiting{sweep.engine === 'inhouse' ? ' · in-house engine' : ''}
             </p>
             {sweep.bookings.map((b) => (
               <button
