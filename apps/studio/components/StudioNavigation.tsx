@@ -140,6 +140,16 @@ export function StudioNavigation() {
         // job is postal labels and the (parked) ready email. Named for
         // what it actually does.
         { label: 'Postal & Labels', icon: <Truck className="w-5 h-5" />, href: '/kiln-dip' },
+        // Daisy: "I seem to have lost my test AI page... it emulates
+        // exactly what the packing find on table section produces." It
+        // was never deleted -- filed under a hidden Diagnostics menu
+        // during the earlier nav cleanup, on the same mistaken
+        // reasoning as "Whose is this?" got filed there: the name
+        // sounded like a diagnostic. It is a genuinely used tool --
+        // check a reference photo against a scene without needing a
+        // real booking -- and hiding it took away something she reaches
+        // for.
+        { label: 'Test AI', icon: <FlaskConical className="w-5 h-5" />, href: '/test-ai' },
       ],
     },
     {
@@ -210,7 +220,6 @@ export function StudioNavigation() {
     ...(showDiagnostics ? [{
       section: 'Diagnostics',
       items: [
-        { label: 'Test AI', icon: <FlaskConical className="w-5 h-5" />, href: '/test-ai' },
         { label: 'Ticket Link Check', icon: <FlaskConical className="w-5 h-5" />, href: '/ticket-link' },
         { label: 'Square Access Check', icon: <ShieldCheck className="w-5 h-5" />, href: '/square-access' },
         { label: 'Needs Verification', icon: <ShieldCheck className="w-5 h-5" />, href: '/needs-verification' },

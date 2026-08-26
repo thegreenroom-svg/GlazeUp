@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Package, ChevronLeft, Check, Search, Camera, Loader } from 'lucide-react';
+import { compressPhotoForUpload } from '@/lib/compressPhoto';
 
 // The screen for whoever is actually boxing the pottery. There wasn't one:
 // kiln-dip is a lookup-by-code tool for collection dates and emails and
@@ -134,8 +135,21 @@ export default function PackingPage() {
     // happens before the server-side clock even starts.
     const killSwitch = setTimeout(() => controller.abort(), 55000);
     try {
+      // Compressed ON THE DEVICE before it ever leaves, not just at the
+      // server. The server's resize genuinely cannot handle HEIC in this
+      // environment -- proven directly against a real HEIC file, both
+      // the encoder and the decoder fail -- so a HEIC photo from an iPad
+      // camera was going up at full size again, undoing the whole point
+      // of today's speed fix. Safari can decode HEIC natively, since
+      // it's Apple's own format, so doing the resize here sidesteps the
+      // server's gap entirely and cuts the upload itself, which matters
+      // on the studio's own wifi. Falls back to the original file if
+      // this fails for any reason -- the server's own resize (or its
+      // HEIC-aware skip) is still there underneath as the real safety
+      // net.
+      const compressed = await compressPhotoForUpload(file);
       const fd = new FormData();
-      fd.append('photo', file);
+      fd.append('photo', compressed, 'shelf.jpg');
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweep`, { method: 'POST', body: fd, signal: controller.signal });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || 'Could not read the shelf');
