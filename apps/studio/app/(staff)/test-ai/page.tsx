@@ -28,6 +28,20 @@ const PIN_COLOURS = ['#e0392b', '#1a8a3c', '#2b6fe0', '#c77a0a', '#8b3ec7', '#0a
 
 export default function TestAiPage() {
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
+  // Local only -- no async default to fetch, so no race to guard against
+  // this time. Plain state, defaulting to Gemini.
+  const [engine, setEngine] = useState<'gemini' | 'claude'>('gemini');
+  // Checked live rather than assumed -- there is no way to know from the
+  // frontend alone whether ANTHROPIC_API_KEY has actually been added on
+  // Render, or whether it's genuinely working, without asking the server.
+  const [claudeStatus, setClaudeStatus] = useState<{ configured: boolean; working: boolean; message: string } | null>(null);
+  useEffect(() => {
+    if (engine !== 'claude' || claudeStatus) return;
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/claude/status`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setClaudeStatus(d); })
+      .catch(() => {});
+  }, [engine, claudeStatus]);
   const [referencePreview, setReferencePreview] = useState<string | null>(null);
   const [scenePreview, setScenePreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -107,7 +121,11 @@ export default function TestAiPage() {
       const formData = new FormData();
       formData.append('reference', referenceFile);
       formData.append('scene', compressedScene, 'scene.jpg');
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/test-ai/find`, {
+      // Two literal calls -- a shared URL variable hides both from the
+      // route-coverage check, confirmed the hard way earlier tonight.
+      const res = engine === 'claude'
+        ? await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/test-ai/find-claude`, { method: 'POST', body: formData, signal: controller.signal })
+        : await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/test-ai/find`, {
         method: 'POST',
         body: formData,
         signal: controller.signal,
@@ -147,9 +165,41 @@ export default function TestAiPage() {
     <PageShell title="Test AI" subtitle="Runs exactly the same matching as Find on Table. Photograph one or more reference items, then photograph them mixed among other objects.">
       <AiCostCounter />
 
-      <div style={{ padding: '0.7rem 0.9rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '1.25rem' }}>
-        Uses Google Gemini for real pixel-level detection — roughly £0.0015–0.0025 per test, logged into the same running AI cost total.
+      {/* Real switch, real second vendor -- not the abandoned in-house
+          maths. Claude genuinely understands what it's looking at, same
+          category of tool as Gemini, so this is a fair comparison rather
+          than the earlier one. The cost line changes with it rather than
+          claiming a fixed number no matter which is picked. */}
+      <div style={{ display: 'inline-flex', border: '1px solid #ddd', borderRadius: 8, overflow: 'hidden', marginBottom: '0.75rem' }}>
+        {(['gemini', 'claude'] as const).map((opt) => (
+          <button
+            key={opt}
+            onClick={() => setEngine(opt)}
+            style={{
+              padding: '0.4rem 0.8rem', border: 'none', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer',
+              backgroundColor: engine === opt ? 'var(--clay)' : 'white',
+              color: engine === opt ? 'white' : 'var(--charcoal)',
+            }}
+          >
+            {opt === 'gemini' ? 'Gemini' : 'Claude'}
+          </button>
+        ))}
       </div>
+
+      {engine === 'gemini' ? (
+        <div style={{ padding: '0.7rem 0.9rem', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '1.25rem' }}>
+          Uses Google Gemini for real pixel-level detection — roughly £0.0015–0.0025 per test, logged into the same running AI cost total.
+        </div>
+      ) : (
+        <div style={{ padding: '0.7rem 0.9rem', backgroundColor: '#EAE6FF', border: '1px solid #C4B5FD', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '0.5rem' }}>
+          Uses Claude (Anthropic) for real vision understanding — roughly £0.006–0.01 per test, a rough estimate not yet measured against real photos. Billed to the Kiln Cafe&apos;s own Anthropic account, separate from the Gemini cost above.
+        </div>
+      )}
+      {engine === 'claude' && claudeStatus && (
+        <p style={{ fontSize: '0.76rem', fontWeight: 600, marginBottom: '0.75rem', color: claudeStatus.working ? '#2E7D32' : '#A6761D' }}>
+          {claudeStatus.working ? '✓ ' : '⚠ '}{claudeStatus.message}
+        </p>
+      )}
 
       {!results && (
         <>

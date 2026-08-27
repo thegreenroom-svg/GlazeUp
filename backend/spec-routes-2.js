@@ -6220,3 +6220,169 @@ export function registerSquareConnectRoutes(app, supabase, STUDIO_ID, logger, ax
   });
 }
 
+
+// ============================================================================
+// CLAUDE VISION -- a genuine third option, same shape as the Gemini path
+// ----------------------------------------------------------------------------
+// Daisy: has a paid Anthropic account billed to the business, wants a real
+// comparison. Claude has genuine vision understanding -- not the colour/
+// structure maths of the abandoned in-house engine, an actual model that
+// understands what it's looking at, same category of tool as Gemini.
+//
+// Built to the same standard as tonight's Gemini work: a timeout so a stall
+// can't hang forever, a friendly error translator, and a JSON-extraction
+// step that doesn't assume the model's text response is pure JSON with
+// nothing around it.
+//
+// ONE HONEST LIMIT, stated plainly: this could not be tested against a real
+// live call from here -- there is no Anthropic API key in this environment.
+// Everything that COULD be verified without one -- request shape, response
+// parsing, error handling -- was. The first real call happens once a key is
+// live on Render, via the diagnostic route at the bottom of this section.
+// ============================================================================
+
+const CLAUDE_TIMEOUT_MS = 30000;
+
+function friendlyClaudeError(err) {
+  const msg = err.response?.data?.error?.message || err.message || '';
+  const status = err.response?.status;
+  if (status === 429 || /rate limit/i.test(msg)) {
+    return 'Too many AI checks in a short time — this is a per-minute limit, not a spending cap. Wait about a minute and try again.';
+  }
+  if (status === 529 || /overloaded/i.test(msg)) {
+    return 'Claude is busy right now. Give it a moment and try again.';
+  }
+  if (status === 401 || status === 403) {
+    return 'Claude rejected the request — the API key may need checking.';
+  }
+  if (err.code === 'ECONNABORTED' || /timeout of \d+ms exceeded/i.test(msg)) {
+    return 'The AI check is taking longer than usual. Try again in a moment — a smaller or clearer photo often helps too.';
+  }
+  return msg || 'The AI check failed.';
+}
+
+// images: [{base64, mimeType}]. Returns the parsed JSON object Claude
+// replied with, or throws. The prompt must ask for JSON explicitly --
+// unlike the Gemini calls elsewhere in this file, the Messages API has no
+// built-in structured-output schema parameter, so this extracts the first
+// {...} block from the reply rather than assuming the whole response is
+// bare JSON with nothing around it (a model will often add a sentence of
+// preamble even when asked not to).
+async function callClaudeVision(axios, apiKey, { images, prompt }) {
+  const content = [
+    ...images.map((img) => ({
+      type: 'image',
+      source: { type: 'base64', media_type: img.mimeType || 'image/jpeg', data: img.base64 },
+    })),
+    { type: 'text', text: prompt },
+  ];
+
+  let response;
+  try {
+    response = await axios.post(
+      'https://api.anthropic.com/v1/messages',
+      {
+        model: 'claude-sonnet-5',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content }],
+      },
+      {
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        timeout: CLAUDE_TIMEOUT_MS,
+      }
+    );
+  } catch (err) {
+    throw new Error(friendlyClaudeError(err));
+  }
+
+  const text = (response.data?.content || [])
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text)
+    .join('');
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('Claude did not return a usable JSON reply.');
+  let parsed;
+  try {
+    parsed = JSON.parse(match[0]);
+  } catch {
+    throw new Error('Claude replied, but the response could not be read as JSON.');
+  }
+  return { parsed, usage: response.data?.usage || null };
+}
+
+export function registerClaudeVisionRoutes(app, supabase, STUDIO_ID, logger, axios, upload, fs, sharp) {
+  // A one-tap check, same purpose as the existing Square Access page: once
+  // Daisy adds ANTHROPIC_API_KEY on Render, this confirms the connection
+  // actually works with a trivial real call, rather than trusting it
+  // blind on the first real photo.
+  app.get('/api/spec/claude/status', async (req, res) => {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      return res.json({ configured: false, working: false, message: 'ANTHROPIC_API_KEY is not set on this server yet.' });
+    }
+    try {
+      await axios.post(
+        'https://api.anthropic.com/v1/messages',
+        { model: 'claude-sonnet-5', max_tokens: 8, messages: [{ role: 'user', content: 'Reply with the single word OK.' }] },
+        { headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, timeout: 10000 }
+      );
+      res.json({ configured: true, working: true, message: 'Claude is connected and responding.' });
+    } catch (err) {
+      res.json({ configured: true, working: false, message: friendlyClaudeError(err) });
+    }
+  });
+
+  app.post('/api/spec/test-ai/find-claude', upload.fields([{ name: 'reference', maxCount: 1 }, { name: 'scene', maxCount: 1 }]), async (req, res) => {
+    try {
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not configured on this server.' });
+      const referenceFile = req.files?.reference?.[0];
+      const sceneFile = req.files?.scene?.[0];
+      if (!referenceFile || !sceneFile) return res.status(400).json({ error: 'Both a reference photo and a scene photo are required' });
+
+      const refCompressed = await forGemini(sharp, fs.readFileSync(referenceFile.path), logger);
+      const sceneCompressed = await forGemini(sharp, fs.readFileSync(sceneFile.path), logger);
+
+      const prompt = `The first image shows one or more reference items. The second image shows a scene where those items may or may not be visible, mixed among other objects.
+
+For EVERY distinct item visible in the reference image, decide whether it also appears in the scene image.
+
+Reply with ONLY a JSON object, no other text, in exactly this shape:
+{"results": [{"id": "1", "description": "short description of the item", "found": true, "confidence": "high", "x_pct": 42.0, "y_pct": 55.0, "reasoning": "one sentence explaining the match or non-match"}]}
+
+confidence must be "high", "medium", or "low". x_pct/y_pct are the item's centre position in the SCENE image as a percentage (0-100) of width/height, or null if not found. If nothing from the reference is visible, return an empty results array.`;
+
+      const { parsed, usage } = await callClaudeVision(axios, apiKey, {
+        images: [
+          { base64: refCompressed.buffer.toString('base64'), mimeType: refCompressed.mimeType || 'image/jpeg' },
+          { base64: sceneCompressed.buffer.toString('base64'), mimeType: sceneCompressed.mimeType || 'image/jpeg' },
+        ],
+        prompt,
+      });
+
+      try { fs.unlinkSync(referenceFile.path); fs.unlinkSync(sceneFile.path); } catch { /* temp files */ }
+
+      const results = (parsed.results || []).map((r) => ({
+        id: String(r.id ?? '1'),
+        description: r.description || null,
+        found: !!r.found,
+        confidence: ['high', 'medium', 'low'].includes(r.confidence) ? r.confidence : 'low',
+        x_pct: typeof r.x_pct === 'number' ? r.x_pct : null,
+        y_pct: typeof r.y_pct === 'number' ? r.y_pct : null,
+        box: null, // Claude gives a centre point, not a box -- said plainly rather than fabricating corners
+        reasoning: r.reasoning || null,
+      }));
+
+      if (usage) logger.info(`[claude-vision] test-ai: ${usage.input_tokens} in / ${usage.output_tokens} out`);
+
+      res.json({ total: results.length, found_count: results.filter((r) => r.found).length, results, engine: 'claude' });
+    } catch (err) {
+      logger.error('test-ai/find-claude failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
