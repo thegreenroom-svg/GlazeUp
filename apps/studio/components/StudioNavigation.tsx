@@ -150,11 +150,6 @@ export function StudioNavigation() {
         // real booking -- and hiding it took away something she reaches
         // for.
         { label: 'Test AI', icon: <FlaskConical className="w-5 h-5" />, href: '/test-ai' },
-        // Daisy has ~1,000 session photos on the iPad and no time to set up
-        // the QR table cards before the next kiln run. This reads a Photos
-        // grid screenshot and fills in the bookings and pieces from the
-        // chalk tags.
-        { label: 'Backfill from photos', icon: <Palette className="w-5 h-5" />, href: '/backfill-grid' },
       ],
     },
     {
@@ -244,7 +239,6 @@ export function StudioNavigation() {
     { label: 'Dashboard', href: '/dashboard' },
     { label: 'Schedule', href: '/schedule' },
     { label: 'Test AI', href: '/test-ai' },
-    { label: 'Backfill from photos', href: '/backfill-grid' },
     { label: 'Ticket Link Check', href: '/ticket-link' },
     { label: 'Square Access Check', href: '/square-access' },
     { label: 'Kiln Workflow', href: '/kiln-workflow' },
