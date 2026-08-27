@@ -6386,3 +6386,292 @@ confidence must be "high", "medium", or "low". x_pct/y_pct are the item's centre
     }
   });
 }
+
+// ============================================================================
+// GRID BACKFILL -- read a Photos-app screenshot, create real bookings + pieces
+// ----------------------------------------------------------------------------
+// Daisy has ~1,000 session photos on the studio iPad and no time to set up the
+// QR-code table cards before the next kiln run. She wants reference photos and
+// piece descriptions in the system NOW so the shelf-matching can be tested for
+// real. Her route in: open the Photos app, screenshot the grid, send that.
+//
+// WHY THIS IS WORTH TRYING despite each tile being ~640x500 rather than the
+// original 4000x3000: since the July rebuild, shelf matching works off AI
+// DESCRIPTIONS, not pixel comparison. "Blue mug with a yellow fish" is the
+// payload that matters, and that is legible at grid resolution -- verified by
+// reading several tags and pieces directly off exactly these screenshots.
+// It is genuinely less certain than a full-resolution photo, so this is built
+// to be judged on its output and thrown away cheaply if the descriptions come
+// back vague.
+//
+// EVERYTHING IT CREATES IS MARKED, so rollback is one call, not archaeology:
+//   bookings.booking_type   = 'backfill_grid'
+//   pottery_pieces.photo_taken_by = 'Backfilled from camera roll'
+// DELETE /api/spec/backfill/grid removes exactly those rows and nothing else.
+//
+// It never touches a booking that already has pieces, so re-running is safe
+// and a real Square-synced booking can never be overwritten by a guess.
+// ============================================================================
+
+export function registerGridBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, upload, fs, sharp, logGeminiUsage) {
+  app.post('/api/spec/backfill/grid', upload.single('photo'), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'A screenshot is required' });
+      const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+      if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured on this service.' });
+
+      const dryRun = req.body?.dry_run === 'true' || req.body?.dry_run === true;
+      const original = fs.readFileSync(req.file.path);
+      const meta = await sharp(original).metadata();
+
+      // Sent at full screenshot resolution, NOT through forGemini() -- the
+      // usual 1024px downscale is right for a single table photo but would
+      // throw away exactly the detail that makes small grid tiles readable.
+      const forRead = await sharp(original)
+        .resize(2000, 2000, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 92 })
+        .toBuffer();
+
+      const prompt = `This is a screenshot of an iPhone/iPad Photos app grid. Each tile is a separate photograph taken in a pottery painting studio at the end of a customer's session.
+
+Most tiles contain a small BLACK CHALKBOARD TAG with handwriting on it, in this format:
+  line 1: session date and time (e.g. "14/8  1.30-3.30")
+  line 2: the customer's name (e.g. "Esther Bower")
+  line 3: collection date, table number, piece count (e.g. "28/8  T7  x2")
+
+For EVERY tile where you can read a chalk tag, return an entry.
+
+Also identify the customer's PAINTED POTTERY PIECES in that tile. Include mugs, bowls, plates, figurines, vases, jugs, trays, money boxes and similar ceramics the customer has painted.
+Do NOT include: the burgundy/pink paper placemats with studio logos, paint pots, paintbrushes, brush holders, water pots, palettes, paint-mixing dishes, colour charts, menus, price cards, the chalkboard itself, drinks, phones, bags, black tables, or black chairs. Those are all studio equipment, not customer pieces.
+
+For each piece give a SHORT SPECIFIC description that would help someone find that exact piece later on a shelf of similar fired pottery -- mention its form AND its distinguishing painted detail. Good: "blue mug with a yellow fish painted on the side". Bad: "mug".
+
+If a tile's tag is unreadable or absent, skip that tile entirely rather than guessing.
+
+Return the tile's bounding box in the screenshot as box_2d [ymin, xmin, ymax, xmax] normalized 0-1000.`;
+
+      const responseSchema = {
+        type: 'object',
+        properties: {
+          tiles: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                customer_name: { type: 'string' },
+                session_date: { type: 'string', description: 'As written, e.g. 14/8' },
+                session_time: { type: 'string', description: 'As written, e.g. 1.30-3.30' },
+                table_number: { type: 'string' },
+                piece_count: { type: 'integer' },
+                tag_confidence: { type: 'string', description: 'high, medium or low -- how clearly the tag reads' },
+                box_2d: { type: 'array', items: { type: 'integer' } },
+                pieces: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      description: { type: 'string' },
+                      piece_type: { type: 'string' },
+                    },
+                    required: ['description', 'piece_type'],
+                  },
+                },
+              },
+              required: ['customer_name', 'pieces'],
+            },
+          },
+        },
+        required: ['tiles'],
+      };
+
+      let aiRes, modelUsed;
+      try {
+        ({ response: aiRes, modelUsed } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
+          input: [
+            { type: 'text', text: prompt },
+            { type: 'image', data: forRead.toString('base64'), mime_type: 'image/jpeg' },
+          ],
+          response_format: { type: 'text', mime_type: 'application/json', schema: responseSchema },
+        }));
+      } catch (err) {
+        logger.error('grid backfill: Gemini call failed', err.response?.data || err.message);
+        return res.status(500).json({ error: friendlyGeminiError(err) });
+      }
+
+      const usage = extractGeminiUsage(aiRes.data);
+      if (usage) await logGeminiUsage(supabase, STUDIO_ID, 'grid-backfill', usage, modelUsed);
+
+      let parsed;
+      try {
+        const raw = extractGeminiText(aiRes.data);
+        parsed = JSON.parse((raw.match(/\{[\s\S]*\}/) || [])[0] || '{}');
+      } catch {
+        return res.status(500).json({ error: 'Could not parse the Gemini response' });
+      }
+
+      const tiles = (parsed.tiles || []).filter((t) => t.customer_name && (t.pieces || []).length);
+      if (!tiles.length) return res.json({ read: 0, created: 0, tiles: [], note: 'No readable chalk tags found in this screenshot.' });
+
+      // Real bookings to match against, so a walk-in is only ever created
+      // when there genuinely is no existing record to attach to.
+      const { data: allBookings } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, session_start')
+        .eq('studio_id', STUDIO_ID);
+
+      const norm = (s) => (s || '').toLowerCase().replace(/[^a-z ]/g, '').trim();
+      const results = [];
+
+      for (const tile of tiles) {
+        const entry = {
+          customer_name: tile.customer_name,
+          session_date: tile.session_date || null,
+          table_number: tile.table_number || null,
+          tag_confidence: tile.tag_confidence || 'unknown',
+          pieces: tile.pieces.map((p) => ({ piece_type: p.piece_type, description: p.description })),
+          matched_booking: null,
+          created: false,
+          skipped_reason: null,
+        };
+
+        // Exact-ish name match against real bookings first.
+        const nameMatch = (allBookings || []).find((b) => norm(b.customer_name) === norm(tile.customer_name));
+        let bookingCode = nameMatch?.booking_code || null;
+        entry.matched_booking = bookingCode;
+
+        if (dryRun) { results.push(entry); continue; }
+
+        // Crop this tile out of the ORIGINAL screenshot at full resolution.
+        let tileBuffer = null;
+        if (Array.isArray(tile.box_2d) && tile.box_2d.length === 4) {
+          const [ymin, xmin, ymax, xmax] = tile.box_2d;
+          const left = Math.max(0, Math.round((xmin / 1000) * meta.width));
+          const top = Math.max(0, Math.round((ymin / 1000) * meta.height));
+          const width = Math.min(meta.width - left, Math.round(((xmax - xmin) / 1000) * meta.width));
+          const height = Math.min(meta.height - top, Math.round(((ymax - ymin) / 1000) * meta.height));
+          if (width > 20 && height > 20) {
+            try {
+              tileBuffer = await sharp(original).extract({ left, top, width, height }).jpeg({ quality: 92 }).toBuffer();
+            } catch (err) {
+              logger.warn(`grid backfill: crop failed for ${tile.customer_name}: ${err.message}`);
+            }
+          }
+        }
+        if (!tileBuffer) { entry.skipped_reason = 'Could not crop this tile from the screenshot'; results.push(entry); continue; }
+
+        // Parse "14/8" into a real date. Year comes from the screenshot's own
+        // era -- these are 2026 photos. Anything unparseable is skipped
+        // rather than guessed, since a wrong date puts pottery on the wrong
+        // shelf sweep.
+        let sessionStart = null;
+        const dm = (tile.session_date || '').match(/(\d{1,2})\s*[\/.]\s*(\d{1,2})/);
+        if (dm) {
+          const day = parseInt(dm[1], 10), month = parseInt(dm[2], 10);
+          const hm = (tile.session_time || '').match(/(\d{1,2})[.:](\d{2})/);
+          const hh = hm ? parseInt(hm[1], 10) : 10;
+          const mm = hm ? parseInt(hm[2], 10) : 0;
+          const hh24 = hh < 8 ? hh + 12 : hh; // 1.30 means 13:30 in a studio day
+          sessionStart = new Date(Date.UTC(2026, month - 1, day, hh24, mm)).toISOString();
+        }
+
+        if (!bookingCode) {
+          if (!sessionStart) { entry.skipped_reason = 'No readable date, and no existing booking to attach to'; results.push(entry); continue; }
+          bookingCode = `walkin-${sessionStart.slice(0, 10).replace(/-/g, '')}-${norm(tile.customer_name).replace(/ /g, '')}`.slice(0, 60);
+          const { error: bErr } = await supabase.from('bookings').insert([{
+            studio_id: STUDIO_ID,
+            booking_code: bookingCode,
+            customer_name: tile.customer_name,
+            session_start: sessionStart,
+            session_end: sessionStart,
+            party_size: null,
+            table_number: tile.table_number || null,
+            booking_type: 'backfill_grid',
+            notes: 'Created from a camera-roll screenshot. Walk-in: no Square Appointments record.',
+          }]);
+          if (bErr && !/duplicate|unique/i.test(bErr.message)) {
+            entry.skipped_reason = `Could not create booking: ${bErr.message}`;
+            results.push(entry); continue;
+          }
+          entry.matched_booking = bookingCode;
+          entry.created_booking = true;
+        }
+
+        // Never overwrite pieces that already exist -- a real photographed
+        // session always wins over a grid-thumbnail backfill.
+        const { count: existing } = await supabase
+          .from('pottery_pieces')
+          .select('id', { count: 'exact', head: true })
+          .eq('studio_id', STUDIO_ID)
+          .eq('booking_id', bookingCode);
+        if (existing) { entry.skipped_reason = `Already has ${existing} piece(s) -- left untouched`; results.push(entry); continue; }
+
+        const filename = `backfill-grid/${STUDIO_ID}/${bookingCode}-${Date.now()}.jpg`;
+        const { error: upErr } = await supabase.storage
+          .from('booking-photos')
+          .upload(filename, tileBuffer, { contentType: 'image/jpeg' });
+        if (upErr) { entry.skipped_reason = `Photo upload failed: ${upErr.message}`; results.push(entry); continue; }
+        const { data: pub } = supabase.storage.from('booking-photos').getPublicUrl(filename);
+
+        const rows = tile.pieces.map((p) => ({
+          studio_id: STUDIO_ID,
+          booking_id: bookingCode,
+          piece_type: p.piece_type || 'Piece',
+          description: p.description || null,
+          status: 'queued',
+          reference_photo_url: pub.publicUrl,
+          reference_photo_taken_at: new Date().toISOString(),
+          photo_taken_by: 'Backfilled from camera roll',
+        }));
+        const { error: pErr } = await supabase.from('pottery_pieces').insert(rows);
+        if (pErr) { entry.skipped_reason = `Could not create pieces: ${pErr.message}`; results.push(entry); continue; }
+
+        entry.created = true;
+        entry.photo_url = pub.publicUrl;
+        results.push(entry);
+      }
+
+      try { fs.unlinkSync(req.file.path); } catch { /* temp file */ }
+
+      res.json({
+        read: tiles.length,
+        created: results.filter((r) => r.created).length,
+        skipped: results.filter((r) => r.skipped_reason).length,
+        dry_run: dryRun,
+        tiles: results,
+      });
+    } catch (err) {
+      logger.error('grid backfill failed', err.response?.data || err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // The rollback Daisy explicitly asked for. Removes ONLY what this route
+  // created -- pieces marked as backfilled, and walk-in bookings marked
+  // backfill_grid. A real Square booking that had backfilled pieces
+  // attached keeps the booking and loses only the pieces, which is the
+  // correct outcome: the booking was never ours to delete.
+  app.delete('/api/spec/backfill/grid', async (req, res) => {
+    try {
+      const { data: pieces, error: pErr } = await supabase
+        .from('pottery_pieces')
+        .delete()
+        .eq('studio_id', STUDIO_ID)
+        .eq('photo_taken_by', 'Backfilled from camera roll')
+        .select('id');
+      if (pErr) throw pErr;
+
+      const { data: bookings, error: bErr } = await supabase
+        .from('bookings')
+        .delete()
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_type', 'backfill_grid')
+        .select('booking_code');
+      if (bErr) throw bErr;
+
+      res.json({ pieces_removed: (pieces || []).length, bookings_removed: (bookings || []).length });
+    } catch (err) {
+      logger.error('grid backfill rollback failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
