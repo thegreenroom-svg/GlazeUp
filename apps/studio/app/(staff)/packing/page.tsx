@@ -7,7 +7,6 @@ import { PageShell } from '@/components/PageShell';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Package, ChevronLeft, Check, Search, Camera, Loader } from 'lucide-react';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
-import { EngineToggle, useEngineSelection } from '@/components/EngineToggle';
 
 // The screen for whoever is actually boxing the pottery. There wasn't one:
 // kiln-dip is a lookup-by-code tool for collection dates and emails and
@@ -98,21 +97,9 @@ export default function PackingPage() {
   // pieces are there -- which is the wrong order when a kiln has just been
   // unloaded and nobody knows whose anything is. Here the photo is the
   // question, not the answer.
-  // A real, visible switch, not just a hidden studio-wide flag. Per
-  // Daisy: "switch on all instances in case no internet etc or if one
-  // is better for certain things" -- a global-only setting could not
-  // give a fallback for a specific bad connection or let one photo be
-  // tried on the other engine, only pick one for everyone forever.
-  // Still DEFAULTS to the studio-wide setting, so ordinary use stays
-  // consistent without anyone touching this -- it's a starting point
-  // per page load, not a second place that setting has to be kept in
-  // sync.
-  const [engine, setEngine] = useEngineSelection(process.env.NEXT_PUBLIC_API_URL || '');
-  const inhouseMatching = engine === 'inhouse';
   const [sweeping, setSweeping] = useState(false);
   const [sweep, setSweep] = useState<{
     candidates: number;
-    engine?: string;
     note?: string;
     bookings: {
       booking_code: string; customer_name: string; found: number; expected: number; complete: boolean;
@@ -163,16 +150,7 @@ export default function PackingPage() {
       const compressed = await compressPhotoForUpload(file);
       const fd = new FormData();
       fd.append('photo', compressed, 'shelf.jpg');
-      // Two literal fetch calls, not one hidden behind a variable. The
-      // boot check verifies every /api/ literal it can find in the
-      // frontend against the backend's real routes -- a URL built from a
-      // variable is invisible to that simple, deliberately literal scan,
-      // which is precisely the class of gap the check exists to close.
-      // Confirmed directly: with the URL behind a variable, the checker
-      // found zero calls to either sweep route at all.
-      const res = inhouseMatching
-        ? await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweep-inhouse`, { method: 'POST', body: fd, signal: controller.signal })
-        : await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweep`, { method: 'POST', body: fd, signal: controller.signal });
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweep`, { method: 'POST', body: fd, signal: controller.signal });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || 'Could not read the shelf');
       setSweep(d);
@@ -474,7 +452,6 @@ export default function PackingPage() {
         <p style={{ fontSize: '0.75rem', color: '#777', margin: '0.15rem 0 0.55rem' }}>
           Photograph the shelf and it&apos;ll tell you whose pottery is on it.
         </p>
-        <EngineToggle engine={engine} onChange={setEngine} />
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.55rem 0.85rem', borderRadius: 8, background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: '0.83rem', cursor: 'pointer' }}>
           {sweeping ? <Loader size={15} className="animate-spin" /> : <Camera size={15} />}
           {sweeping ? 'Reading the shelf...' : 'Photograph the shelf'}
@@ -557,7 +534,7 @@ export default function PackingPage() {
             </div>
 
             <p style={{ fontSize: '0.75rem', color: '#666', marginBottom: '0.4rem' }}>
-              Checked against {sweep.candidates} piece{sweep.candidates === 1 ? '' : 's'} still waiting{sweep.engine === 'inhouse' ? ' · in-house engine' : ''}
+              Checked against {sweep.candidates} piece{sweep.candidates === 1 ? '' : 's'} still waiting
             </p>
             {sweep.bookings.map((b) => (
               <button
