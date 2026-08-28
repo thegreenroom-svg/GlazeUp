@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerIdentifyPiecesRoute, registerPieceFulfilmentRoutes, registerReidentifyRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute, registerScheduleRoute, registerSpaceBackfillRoute, registerPackingRoutes, registerKilnShelfRoutes, registerCollectionModeRoutes, registerBreakageRoutes, registerTurnaroundRoute, registerSquareConnectRoutes, registerTicketLinkDiagnosticRoute, registerTicketMatchRoutes, registerShelfSweepRoute, registerSquareAccessCheckRoute, registerTestBookingRoutes, registerDriveBackupRoutes, registerCollectionRoutes, registerUpgradeAfterIdentifyRoute, registerRedescribePieceRoute } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerIdentifyPiecesRoute, registerPieceFulfilmentRoutes, registerReidentifyRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute, registerScheduleRoute, registerSpaceBackfillRoute, registerPackingRoutes, registerKilnShelfRoutes, registerCollectionModeRoutes, registerBreakageRoutes, registerTurnaroundRoute, registerSquareConnectRoutes, registerTicketLinkDiagnosticRoute, registerTicketMatchRoutes, registerShelfSweepRoute, registerSquareAccessCheckRoute, registerTestBookingRoutes, registerDriveBackupRoutes, registerCollectionRoutes, registerUpgradeAfterIdentifyRoute, registerRedescribePieceRoute, registerPackingLabelRoute } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -618,6 +618,8 @@ app.post('/api/demo/bookings/:code/finish', async (req, res) => {
       payment_method,
       collection_method,
       postal_postcode,
+      postal_address_line1,
+      postal_city,
       collection_date,
       till_total_cents,
       split_bill_count,
@@ -632,6 +634,11 @@ app.post('/api/demo/bookings/:code/finish', async (req, res) => {
         payment_method: payment_method || null,
         collection_method: collection_method || null,
         postal_postcode: postal_postcode || null,
+        // Postcode alone was never enough to actually create a label --
+        // the Royal Mail route this feeds requires a real street address
+        // and refuses without one.
+        postal_address_line1: postal_address_line1 || null,
+        postal_city: postal_city || null,
         collection_date: collection_date || null,
         till_total_cents: till_total_cents ?? null,
         split_bill_count: split_bill_count ?? null,
@@ -1600,6 +1607,7 @@ registerTestBookingRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 registerCollectionRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 registerUpgradeAfterIdentifyRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerRedescribePieceRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, fs, logGeminiUsage, sharp);
+registerPackingLabelRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerQuickAddPieceRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerFindOnTableRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage, sharp);
 registerTestAiFindRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage, sharp);

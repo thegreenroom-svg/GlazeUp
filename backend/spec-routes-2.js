@@ -6979,3 +6979,61 @@ If more than one distinct object is visible in this crop, describe them together
     }
   });
 }
+
+// ============================================================================
+// PACKING LABEL -- what goes on the actual parcel, at the point of packing
+// ----------------------------------------------------------------------------
+// Daisy: "we need to be able to print a label at that point of packing...
+// either for collection with a very big name and surname and collection
+// date with pieces itemized, or postage with the full postage address."
+//
+// Two genuinely different documents, not one template with fields hidden
+// depending on collection method -- a collection label needs to be readable
+// from across a counter (big name), a postal label needs to be readable by
+// a courier and carries a real address. Assembles everything either variant
+// needs in one call so the print page itself stays simple.
+// ============================================================================
+
+export function registerPackingLabelRoute(app, supabase, STUDIO_ID, logger) {
+  app.get('/api/spec/packing/label/:code', async (req, res) => {
+    try {
+      const { data: booking, error } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, collection_date')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_code', req.params.code)
+        .maybeSingle();
+      if (error) throw error;
+      if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+      const { data: session } = await supabase
+        .from('demo_app_session_status')
+        .select('collection_method, postal_postcode, postal_address_line1, postal_city')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_code', req.params.code)
+        .maybeSingle();
+
+      const { data: pieces } = await supabase
+        .from('pottery_pieces')
+        .select('id, piece_type, description')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_id', req.params.code)
+        .neq('status', 'collected')
+        .neq('archived', true);
+
+      res.json({
+        booking_code: booking.booking_code,
+        customer_name: booking.customer_name,
+        collection_date: booking.collection_date,
+        collection_method: session?.collection_method || null,
+        postal_address_line1: session?.postal_address_line1 || null,
+        postal_city: session?.postal_city || null,
+        postal_postcode: session?.postal_postcode || null,
+        pieces: (pieces || []).map((p) => p.description || p.piece_type || 'Piece'),
+      });
+    } catch (err) {
+      logger.error('packing label failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}

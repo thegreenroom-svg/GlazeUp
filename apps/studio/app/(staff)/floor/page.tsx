@@ -140,6 +140,8 @@ export default function FloorPage() {
   const [tableTotals, setTableTotals] = useState<Record<string, number>>({});
   const [collectionMethod, setCollectionMethod] = useState<'studio' | 'postal' | null>(null);
   const [postalPostcode, setPostalPostcode] = useState('');
+  const [postalAddressLine1, setPostalAddressLine1] = useState('');
+  const [postalCity, setPostalCity] = useState(''); // for the Royal Mail label route, which requires address_line1 -- postcode alone was never enough to create a real label
   const [liveSquareOrder, setLiveSquareOrder] = useState<{
     matched: boolean; reason?: string; multiple_candidates?: boolean; table_number?: string;
     order: { ticket_name: string; total_gbp: number | null; items: { name: string; quantity: number; total_gbp: number | null }[]; updated_at: string } | null;
@@ -616,6 +618,8 @@ export default function FloorPage() {
           payment_method: null,
           collection_method: collectionMethod,
           postal_postcode: collectionMethod === 'postal' ? postalPostcode.trim() : undefined,
+          postal_address_line1: collectionMethod === 'postal' ? postalAddressLine1.trim() : undefined,
+          postal_city: collectionMethod === 'postal' ? postalCity.trim() || undefined : undefined,
           till_total_cents: tillTotal,
           split_bill_count: splitBillCount > 1 ? splitBillCount : undefined,
         }),
@@ -1199,7 +1203,7 @@ export default function FloorPage() {
     // that needed a date to move to.
     const finishDisabled =
       saving || !collectionMethod ||
-      (collectionMethod === 'postal' && !postalPostcode.trim());
+      (collectionMethod === 'postal' && (!postalPostcode.trim() || !postalAddressLine1.trim()));
     // Real per-person breakdown -- only shows up if anyone was actually
     // tagged while adding items. Bookings that never use this feature look
     // exactly as they always have.
@@ -1320,13 +1324,33 @@ export default function FloorPage() {
               </button>
             </div>
             {collectionMethod === 'postal' && (
-              <input
-                type="text"
-                value={postalPostcode}
-                onChange={(e) => setPostalPostcode(e.target.value)}
-                placeholder="Destination postcode"
-                style={{ marginTop: '0.6rem', width: '100%', padding: '0.5rem 0.6rem', borderRadius: 8, border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: '0.85rem' }}
-              />
+              <div style={{ marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                {/* Postcode alone was never enough -- the Royal Mail label
+                    route this feeds requires a real street address_line1
+                    and refuses without one. Both saved to the booking now,
+                    ready for whenever a real label gets printed. */}
+                <input
+                  type="text"
+                  value={postalAddressLine1}
+                  onChange={(e) => setPostalAddressLine1(e.target.value)}
+                  placeholder="Address line (house number, street)"
+                  style={{ width: '100%', padding: '0.5rem 0.6rem', borderRadius: 8, border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: '0.85rem' }}
+                />
+                <input
+                  type="text"
+                  value={postalCity}
+                  onChange={(e) => setPostalCity(e.target.value)}
+                  placeholder="Town / city"
+                  style={{ width: '100%', padding: '0.5rem 0.6rem', borderRadius: 8, border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: '0.85rem' }}
+                />
+                <input
+                  type="text"
+                  value={postalPostcode}
+                  onChange={(e) => setPostalPostcode(e.target.value)}
+                  placeholder="Postcode"
+                  style={{ width: '100%', padding: '0.5rem 0.6rem', borderRadius: 8, border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: '0.85rem' }}
+                />
+              </div>
             )}
           </div>
 

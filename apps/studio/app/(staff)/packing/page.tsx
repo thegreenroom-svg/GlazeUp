@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Package, ChevronLeft, Check, Search, Camera, Loader, RefreshCw, Trash2 } from 'lucide-react';
+import { Package, ChevronLeft, Check, Search, Camera, Loader, RefreshCw, Trash2, Printer } from 'lucide-react';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
 
 // The screen for whoever is actually boxing the pottery. There wasn't one:
@@ -638,6 +638,16 @@ export default function PackingPage() {
             />
           </label>
         )}
+
+        {/* Daisy: "print a label at that point of packing... for
+            collection with a very big name and collection date with
+            pieces itemized, or postage with the full postage address." */}
+        <button
+          onClick={() => router.push(`/print-label?code=${encodeURIComponent(openBooking.booking_code)}`)}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%', marginTop: '0.5rem', padding: '0.7rem', borderRadius: 8, border: '1px solid #ccc', background: 'white', color: 'var(--charcoal)', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+        >
+          <Printer size={15} /> Print label
+        </button>
 
         {!piecesLoading && photo && (
           <div style={{ marginTop: '1rem' }}>
