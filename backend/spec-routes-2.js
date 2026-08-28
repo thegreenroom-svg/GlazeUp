@@ -4622,7 +4622,10 @@ export function registerReidentifyRoute(app, supabase, STUDIO_ID, logger, axios,
       }
 
       const imgRes = await axios.get(photoUrl, { responseType: 'arraybuffer' });
-      const base64 = (await forGemini(sharp, Buffer.from(imgRes.data), logger)).buffer.toString('base64');
+      // 1600px, same reasoning as identify-in-photo -- this is the same
+      // multi-piece detection task and needs the same detail to tell
+      // adjacent pieces apart.
+      const base64 = (await forGemini(sharp, Buffer.from(imgRes.data), logger, null, 1600)).buffer.toString('base64');
 
       const input = [
         {
@@ -4653,10 +4656,14 @@ export function registerReidentifyRoute(app, supabase, STUDIO_ID, logger, axios,
 
       let aiRes, modelUsed;
       try {
+        // Same reasoning as identify-in-photo, applied consistently: this
+        // is the identical task -- count and box several pieces on one
+        // table -- so it gets the same fast-first chain rather than the
+        // file-wide default.
         ({ response: aiRes, modelUsed } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
           input,
           response_format: { type: 'text', mime_type: 'application/json', schema: responseSchema },
-        }));
+        }, 'gemini-3.5-flash-lite', 'gemini-3.7-flash'));
       } catch (err) {
         logger.error('reidentify: Gemini call failed', err.response?.data || err.message);
         return res.status(500).json({ error: friendlyGeminiError(err) });
