@@ -5703,11 +5703,18 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
         excludeIds = req.body?.exclude_piece_ids ? JSON.parse(req.body.exclude_piece_ids) : [];
       } catch { /* malformed input -- treat as no exclusions rather than fail the whole sweep */ }
 
+      // Scopes the search to one booking's own pieces -- this is what
+      // used to be a separate page, "Find on Table", now folded into the
+      // same engine everything else here already uses rather than a
+      // second, differently-maintained copy of the same idea.
+      const onlyBookingCode = req.body?.only_booking_code || null;
+
       // A piece with no description can't be looked for, and one held for a
       // return visit was never in the kiln -- including either would send
       // someone hunting a shelf for something that isn't there.
       const pieces = (allPieces || [])
         .filter((p) => (p.description || p.piece_type) && p.fulfilment !== 'return_visit' && !excludeIds.includes(p.id))
+        .filter((p) => !onlyBookingCode || p.booking_id === onlyBookingCode)
         .slice(0, 80);
 
       if (!pieces.length) {
@@ -5716,7 +5723,9 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
           bookings: [],
           note: excludeIds.length
             ? 'Everything found across your photos so far -- nothing left to search for.'
-            : 'Nothing is waiting to go out',
+            : onlyBookingCode
+              ? 'Nothing waiting for this booking -- it may already be fully packed.'
+              : 'Nothing is waiting to go out',
         });
       }
 

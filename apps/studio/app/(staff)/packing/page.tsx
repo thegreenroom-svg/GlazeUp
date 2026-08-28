@@ -121,7 +121,7 @@ export default function PackingPage() {
   // deliberately starts a fresh search.
   const [foundSoFar, setFoundSoFar] = useState<{ id: string; piece_type: string | null; description: string | null; booking_code: string; customer_name: string }[]>([]);
 
-  const runSweep = async (file: File) => {
+  const runSweep = async (file: File, onlyBookingCode?: string) => {
     setSweeping(true); setSweep(null); setSweepError(null);
     // Always accumulates -- foundSoFar is only ever cleared by the
     // explicit "Start a new search" action below, never as a side effect
@@ -166,6 +166,10 @@ export default function PackingPage() {
       // this photo can only ever add to what's been found, never re-ask
       // about something a previous photo already confirmed.
       if (foundSoFar.length) fd.append('exclude_piece_ids', JSON.stringify(foundSoFar.map((f) => f.id)));
+      // Set when opened from a specific booking's own detail view -- this
+      // is what used to be the separate "Find on Table" page, folded into
+      // the same engine everything else here already uses.
+      if (onlyBookingCode) fd.append('only_booking_code', onlyBookingCode);
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweep`, { method: 'POST', body: fd, signal: controller.signal });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || 'Could not read the shelf');
@@ -407,13 +411,34 @@ export default function PackingPage() {
             that all look alike. It was reachable only from the landing
             tiles, which meant leaving the booking and re-picking it from a
             list of sixty names -- so it carries the booking with it. */}
+        {/* Was a link to a page called Find on Table that no longer
+            exists -- removed hours ago in the same evening's stripping-
+            down, leaving this button pointing nowhere. Daisy: "the 404
+            was under the test booking... it shows me all the pieces
+            with photographs. Find these pieces." Same idea, rebuilt on
+            the sweep engine everything else on this page already uses,
+            scoped to just this booking's own pieces rather than
+            searching everything waiting. Closes this detail view first
+            so the result shows where every other sweep result already
+            shows, at the top of Packing, rather than needing a second
+            copy of that whole display built just for this one button. */}
         {!piecesLoading && pieces.length > 0 && (
-          <button
-            onClick={() => router.push(`/find-on-table?code=${openBooking.booking_code}`)}
+          <label
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%', marginTop: '0.85rem', padding: '0.7rem', borderRadius: 8, border: '1px solid var(--clay)', background: 'white', color: 'var(--clay)', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
           >
             <Search size={15} /> Find these on the shelf
-          </button>
+            <input
+              type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                const code = openBooking.booking_code;
+                setOpenBooking(null);
+                runSweep(f, code);
+                e.target.value = '';
+              }}
+            />
+          </label>
         )}
 
         {!piecesLoading && photo && (
