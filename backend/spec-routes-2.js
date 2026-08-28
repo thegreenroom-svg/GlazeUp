@@ -3613,10 +3613,13 @@ export function registerFindOnTableRoute(app, supabase, STUDIO_ID, logger, axios
 
       let aiRes, modelUsed;
       try {
+        // Same fast-first chain as identify-in-photo, applied consistently
+        // across every Gemini vision route rather than leaving it a
+        // trickle Daisy discovers one screen at a time.
         ({ response: aiRes, modelUsed } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
           input,
           response_format: { type: 'text', mime_type: 'application/json', schema: responseSchema },
-        }));
+        }, 'gemini-3.5-flash-lite', 'gemini-3.7-flash'));
       } catch (err) {
         logger.error('find-on-table: Gemini call failed', err.response?.data || err.message);
         return res.status(500).json({ error: friendlyGeminiError(err), gemini_error: err.response?.data || null });
@@ -3753,10 +3756,13 @@ export function registerFindAllOnTableRoute(app, supabase, STUDIO_ID, logger, ax
 
       let aiRes, modelUsed;
       try {
+        // Same fast-first chain as identify-in-photo, applied consistently
+        // across every Gemini vision route rather than leaving it a
+        // trickle Daisy discovers one screen at a time.
         ({ response: aiRes, modelUsed } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
           input,
           response_format: { type: 'text', mime_type: 'application/json', schema: responseSchema },
-        }));
+        }, 'gemini-3.5-flash-lite', 'gemini-3.7-flash'));
       } catch (err) {
         logger.error('find-all-on-table: Gemini call failed', err.response?.data || err.message);
         return res.status(500).json({ error: friendlyGeminiError(err) });
@@ -4282,10 +4288,13 @@ export function registerTestAiFindRoute(app, supabase, STUDIO_ID, logger, axios,
 
       let aiRes, modelUsed;
       try {
+        // Same fast-first chain as identify-in-photo, applied consistently
+        // across every Gemini vision route rather than leaving it a
+        // trickle Daisy discovers one screen at a time.
         ({ response: aiRes, modelUsed } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
           input,
           response_format: { type: 'text', mime_type: 'application/json', schema: responseSchema },
-        }));
+        }, 'gemini-3.5-flash-lite', 'gemini-3.7-flash'));
       } catch (err) {
         logger.error('test-ai/find: Gemini call failed', err.response?.data || err.message);
         return res.status(500).json({ error: friendlyGeminiError(err) });
@@ -5716,13 +5725,14 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
 
       let aiRes, modelUsed;
       try {
+        // Same fast-first chain, applied consistently.
         ({ response: aiRes, modelUsed } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
           input: [
             { type: 'text', text: prompt },
             { type: 'image', data: base64, mime_type: shelfGemini.mimeType || req.file.mimetype || 'image/jpeg' },
           ],
           response_format: { type: 'text', mime_type: 'application/json', schema },
-        }));
+        }, 'gemini-3.5-flash-lite', 'gemini-3.7-flash'));
       } catch (err) {
         logger.error('shelf sweep: Gemini call failed', err.response?.data || err.message);
         return res.status(500).json({ error: friendlyGeminiError(err) });
