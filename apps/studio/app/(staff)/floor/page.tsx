@@ -481,6 +481,14 @@ export default function FloorPage() {
     setIdentifying(true);
     setIdentifiedPieces(null);
     setIdentifyError(null); // clear any error from a previous attempt
+    // Captured now, not read from `current` later -- by the time this
+    // resolves, staff may already have finished this booking and moved to
+    // the next one. `current` would then point at the WRONG booking. This
+    // is what makes the flow genuinely non-blocking rather than just
+    // "usually fast enough": whoever this photo belongs to is fixed at
+    // the moment it's taken, not at whatever the screen happens to show
+    // when Gemini eventually replies.
+    const forBookingCode = current?.booking_code;
     try {
       // Compressed for the AI call only -- a throwaway copy used just for
       // this request. `photo` (the state used by saveAndFinish below,
@@ -500,6 +508,24 @@ export default function FloorPage() {
         setIdentifiedPieces(d.pieces);
         setPieceCount(d.pieces.length);
         setIdentifyError(null);
+        // Daisy: "it needs to be almost instant to work in the studio."
+        // Staff were never actually blocked from finishing before this
+        // resolved -- but if they had, this result used to be silently
+        // dropped. Now it's ALSO sent here, unconditionally, regardless
+        // of whether the screen has already moved on. If the booking
+        // hasn't been saved yet, the server correctly does nothing (the
+        // normal save path already has this same data waiting for it).
+        // If it HAS already been saved with a placeholder because staff
+        // didn't wait, this replaces that placeholder with the real,
+        // described pieces in the background -- nobody has to notice or
+        // come back to it.
+        if (forBookingCode && d.pieces.length) {
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/upgrade-after-identify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ booking_code: forBookingCode, pieces: d.pieces }),
+          }).catch(() => { /* best-effort; the visible flow never depended on this succeeding */ });
+        }
       } else {
         // A real failure, said out loud. This branch used to fall through
         // silently.

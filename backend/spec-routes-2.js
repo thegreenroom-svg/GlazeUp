@@ -202,7 +202,19 @@ async function forGemini(sharp, buffer, logger, claimedMimeType, targetSize = 10
   }
 }
 
-async function callGeminiWithFallback(axios, apiKey, body) {
+// primaryModel/fallbackModel default to the original pair so every
+// existing route is completely unaffected. identify-in-photo passes its
+// own pair: Daisy needs this specific call fast, in a busy studio, and
+// Gemini 3.5 Flash-Lite is Google's own fastest current model, purpose-
+// built for low-latency interactive use -- genuinely faster than 3.7,
+// not just a different flavour of the same speed. 3.6 Flash is
+// deliberately NOT in that route's chain: an independent vision
+// benchmark (Roboflow, checked directly rather than assumed) found it
+// specifically weak at object detection -- the exact task identify-in-
+// photo needs -- while the app's usage graph showed it being used
+// often. That may explain degraded box quality as much as the timeouts
+// did. Every other route keeps the original, proven pair.
+async function callGeminiWithFallback(axios, apiKey, body, primaryModel = 'gemini-3.7-flash', fallbackModel = 'gemini-3.6-flash') {
   // No axios call anywhere in this file had a timeout -- Gemini, Square,
   // Supabase Storage fetches, none of them. If Gemini ever genuinely
   // stalls -- not slow, actually hung, no response ever arriving -- the
@@ -300,8 +312,8 @@ async function callGeminiWithFallback(axios, apiKey, body) {
   const MIN_USEFUL_MS = 3000;
 
   try {
-    const response = await post('gemini-3.7-flash');
-    return { response, modelUsed: 'gemini-3.7-flash' };
+    const response = await post(primaryModel);
+    return { response, modelUsed: primaryModel };
   } catch (err) {
     const first = classify(err);
 
@@ -313,8 +325,8 @@ async function callGeminiWithFallback(axios, apiKey, body) {
       if (timeLeft() < MIN_USEFUL_MS) throw err;
 
       try {
-        const response = await post('gemini-3.7-flash');
-        return { response, modelUsed: 'gemini-3.7-flash' };
+        const response = await post(primaryModel);
+        return { response, modelUsed: primaryModel };
       } catch (retryErr) {
         // Still limited (or now overloaded) -- 3.6 has its own separate
         // real quota, so falling back genuinely helps here rather than
@@ -322,15 +334,15 @@ async function callGeminiWithFallback(axios, apiKey, body) {
         const second = classify(retryErr);
         if (second.kind === 'other') throw retryErr;
         if (timeLeft() < MIN_USEFUL_MS) throw retryErr;
-        const response = await post('gemini-3.6-flash');
-        return { response, modelUsed: 'gemini-3.6-flash' };
+        const response = await post(fallbackModel);
+        return { response, modelUsed: fallbackModel };
       }
     }
 
     if (first.kind === 'overloaded') {
       if (timeLeft() < MIN_USEFUL_MS) throw err;
-      const response = await post('gemini-3.6-flash');
-      return { response, modelUsed: 'gemini-3.6-flash' };
+      const response = await post(fallbackModel);
+      return { response, modelUsed: fallbackModel };
     }
 
     throw err;
@@ -4395,10 +4407,16 @@ export function registerIdentifyPiecesRoute(app, supabase, STUDIO_ID, logger, ax
 
       let aiRes, modelUsed;
       try {
+        // 3.5-flash-lite first, not the file-wide default -- Google's
+        // fastest current model, purpose-built for exactly this
+        // interactive, low-latency case. Falls back to 3.7 if it's
+        // struggling, deliberately skipping 3.6 -- proven weak at object
+        // detection specifically, the one thing this route can't afford
+        // to be bad at.
         ({ response: aiRes, modelUsed } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
           input,
           response_format: { type: 'text', mime_type: 'application/json', schema: responseSchema },
-        }));
+        }, 'gemini-3.5-flash-lite', 'gemini-3.7-flash'));
       } catch (err) {
         logger.error('identify-in-photo: Gemini call failed', err.response?.data || err.message);
         return res.status(500).json({ error: friendlyGeminiError(err) });
@@ -6636,6 +6654,82 @@ export function registerCollectionRoutes(app, supabase, STUDIO_ID, logger) {
       res.json({ ...booking, pieces: pieces || [] });
     } catch (err) {
       logger.error('collection card failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
+
+// ============================================================================
+// UPGRADE AFTER IDENTIFY -- lets identification finish in the background
+// ----------------------------------------------------------------------------
+// Daisy: "it needs to be almost instant to work in the studio." The finish
+// button was never actually gated on identification completing -- but if a
+// result arrived after someone had already moved on, it was silently
+// dropped, and the booking kept its generic placeholder piece forever. This
+// closes that gap: whenever identification finishes, this is called
+// regardless of whether the person is still looking at that booking, and it
+// replaces the placeholder with the real pieces if the booking has already
+// been saved -- or does nothing, harmlessly, if it hasn't been saved yet
+// (the common, fast case, where the normal save path already has the real
+// data waiting for it).
+//
+// ONLY EVER TOUCHES A GENUINE PLACEHOLDER. Checked by exact shape, not just
+// "does a piece exist" -- a real piece someone has already reviewed, edited,
+// or started packing must never be silently overwritten by a late AI result.
+// ============================================================================
+
+export function registerUpgradeAfterIdentifyRoute(app, supabase, STUDIO_ID, logger) {
+  app.post('/api/spec/pieces/upgrade-after-identify', async (req, res) => {
+    try {
+      const { booking_code, pieces } = req.body || {};
+      if (!booking_code || !Array.isArray(pieces) || !pieces.length) {
+        return res.status(400).json({ error: 'booking_code and a non-empty pieces array are required' });
+      }
+
+      const { data: existing } = await supabase
+        .from('pottery_pieces')
+        .select('id, piece_type, description, reference_photo_url, reference_photo_taken_at, photo_taken_by')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_id', booking_code);
+
+      if (!existing || !existing.length) {
+        // Not saved yet -- the normal, fast path will use the real data
+        // directly when it does save. Nothing to upgrade.
+        return res.json({ upgraded: false, reason: 'not_saved_yet' });
+      }
+
+      const isPlaceholder = existing.length === 1
+        && existing[0].piece_type === 'Piece 1 of 1'
+        && /^(0 pieces, photographed at table|Photographed at table \(pieces not identified\))$/.test(existing[0].description || '');
+
+      if (!isPlaceholder) {
+        // Real pieces already exist -- someone may already be reviewing or
+        // packing them. A late AI result must never overwrite that.
+        return res.json({ upgraded: false, reason: 'already_has_real_pieces' });
+      }
+
+      const placeholder = existing[0];
+      const rows = pieces.map((p) => ({
+        studio_id: STUDIO_ID,
+        booking_id: booking_code,
+        piece_type: p.piece_type || 'Piece',
+        description: p.description || null,
+        status: 'queued',
+        reference_photo_url: placeholder.reference_photo_url,
+        reference_photo_taken_at: placeholder.reference_photo_taken_at,
+        photo_taken_by: placeholder.photo_taken_by,
+        photo_box: p.box || null,
+      }));
+
+      const { error: insErr } = await supabase.from('pottery_pieces').insert(rows);
+      if (insErr) throw insErr;
+
+      const { error: delErr } = await supabase.from('pottery_pieces').delete().eq('id', placeholder.id);
+      if (delErr) logger.warn(`upgrade-after-identify: new pieces inserted but placeholder ${placeholder.id} could not be removed: ${delErr.message}`);
+
+      res.json({ upgraded: true, pieces_created: rows.length });
+    } catch (err) {
+      logger.error('upgrade-after-identify failed', err.message);
       res.status(500).json({ error: err.message });
     }
   });
