@@ -153,13 +153,12 @@ const LANE_MIN_W = 104;
 // being replaced. Everything else stays reachable through the menu, which is
 // now genuinely the back door rather than the front.
 const TILES: { label: string; href: string; icon: React.ReactNode }[] = [
-  // Photo first, name unknown -- the way pottery actually turns up.
-  { label: 'Whose is this?', href: '/photo-match', icon: <Camera size={18} /> },
-  { label: 'Find a piece', href: '/find-on-table', icon: <MapPin size={18} /> },
-  { label: 'Packing', href: '/packing', icon: <Package size={18} /> },
-  { label: 'Kiln', href: '/kiln-batch', icon: <Flame size={18} /> },
-  { label: 'All pieces', href: '/pieces', icon: <Palette size={18} /> },
+  // The same four steps as the home screen, in the same order, so the
+  // shortcut bar and the front door never disagree about what the app
+  // does. (Also fixes a duplicate Packing entry left by the last pass.)
   { label: 'Print cards', href: '/daily-cards', icon: <Printer size={18} /> },
+  { label: 'Table photo', href: '/floor', icon: <Camera size={18} /> },
+  { label: 'Kiln', href: '/kiln-batch', icon: <Flame size={18} /> },
   { label: 'Packing', href: '/packing', icon: <Package size={18} /> },
   { label: 'Collection', href: '/collect', icon: <Package size={18} /> },
 ];

@@ -98,25 +98,24 @@ export function StudioNavigation() {
       // from the booking itself. These stay listed because a menu you
       // can't find a page in is its own problem, but the day comes first
       // and the rest are the back door.
-      section: 'Today',
+      section: 'The four steps',
       items: [
-        { label: 'The Day', icon: <CalendarDays className="w-5 h-5" />, href: '/schedule' },
-        { label: 'Collection', icon: <Package className="w-5 h-5" />, href: '/collect' },
-        { label: 'Bookings', icon: <CalendarDays className="w-5 h-5" />, href: '/bookings' },
-        { label: 'Start Floor', icon: <Palette className="w-5 h-5" />, href: '/floor' },
-        { label: 'Print Cards', icon: <PrinterIcon className="w-5 h-5" />, href: '/daily-cards' },
-        { label: 'Alerts', icon: <Bell className="w-5 h-5" />, href: '/alerts' },
+        { label: 'Print cards', icon: <PrinterIcon className="w-5 h-5" />, href: '/daily-cards' },
+        { label: 'Photograph the table', icon: <Camera className="w-5 h-5" />, href: '/floor' },
+        { label: 'Into the kiln', icon: <Flame className="w-5 h-5" />, href: '/kiln-batch' },
+        { label: 'Packing', icon: <Package className="w-5 h-5" />, href: '/packing' },
       ],
     },
     {
-      section: 'Pieces',
+      // Not steps in the workflow -- the things the four steps refer TO.
+      // The day is how you find a booking in the first place, collection
+      // is the handover at the end, and postal covers what doesn't get
+      // collected in person.
+      section: 'Around the day',
       items: [
-        { label: 'All Pieces', icon: <Palette className="w-5 h-5" />, href: '/pieces' },
-        { label: 'Stamp a Piece', icon: <Stamp className="w-5 h-5" />, href: '/completion' },
-        { label: 'Kiln Batches', icon: <Flame className="w-5 h-5" />, href: '/kiln-batch' },
-        { label: 'Whose is this?', icon: <Search className="w-5 h-5" />, href: '/photo-match' },
-        { label: 'Find on Table', icon: <Search className="w-5 h-5" />, href: '/find-on-table' },
-        { label: 'Packing', icon: <Package className="w-5 h-5" />, href: '/packing' },
+        { label: 'The Day', icon: <CalendarDays className="w-5 h-5" />, href: '/schedule' },
+        { label: 'Bookings', icon: <CalendarDays className="w-5 h-5" />, href: '/bookings' },
+        { label: 'Collection', icon: <Package className="w-5 h-5" />, href: '/collect' },
         { label: 'Postal & Labels', icon: <Truck className="w-5 h-5" />, href: '/kiln-dip' },
         { label: 'Test AI', icon: <FlaskConical className="w-5 h-5" />, href: '/test-ai' },
       ],
@@ -141,10 +140,8 @@ export function StudioNavigation() {
     // Pinned above the groups rather than inside one, so it isn't in
     // menuGroups -- but it still needs to be findable by name.
     { label: 'Schedule', href: '/schedule' },
-    { label: 'Test AI', href: '/test-ai' },
     { label: 'Ticket Link Check', href: '/ticket-link' },
     { label: 'Square Access Check', href: '/square-access' },
-    { label: 'Photo Match', href: '/photo-match' },
     { label: 'Needs Verification', href: '/needs-verification' },
     { label: 'Recover Party Sizes', href: '/backfill-party-sizes' },
   ];
