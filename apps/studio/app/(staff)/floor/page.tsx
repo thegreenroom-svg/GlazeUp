@@ -8,6 +8,7 @@ import { motion } from 'framer-motion';
 import { ChevronRight, Home, Camera, Printer, Check, Loader, RefreshCw } from 'lucide-react';
 import { NudgeCard, HelpButton } from '@/components/NudgeSystem';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
+import { QrScanner } from '@/components/QrScanner';
 
 // Same fix already applied in PinGate.tsx and daily-cards/page.tsx: a
 // plain fetch() has no timeout, and this file gates real controls (table
@@ -360,6 +361,7 @@ export default function FloorPage() {
   }, []);
 
   const searchParams = useSearchParams();
+  const [scanning, setScanning] = useState(false);
   const deepLinked = useRef(false);
   useEffect(() => {
     const code = searchParams.get('code');
@@ -515,6 +517,18 @@ export default function FloorPage() {
           formData.append('photo_taken_by', shiftName);
         }
         await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/photo-match/confirm`, { method: 'POST', body: formData });
+
+        // Archival safety copy, entirely separate from the save above --
+        // Daisy: "for the safety of storage on the iPhone... this app
+        // can send those photos to the Google Drive." Fire-and-forget on
+        // purpose: the real save already succeeded, so a Drive hiccup
+        // here must never surface as an error to whoever is standing at
+        // the table. The original full-quality file goes up, not the
+        // compressed AI copy -- this is a backup, not a thumbnail.
+        const backupData = new FormData();
+        backupData.append('photo', photo);
+        backupData.append('booking_code', current.booking_code);
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/drive/backup-photo`, { method: 'POST', body: backupData }).catch(() => { /* best-effort; already logged server-side if it fails */ });
       }
 
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${current.booking_code}/finish`, {
@@ -591,23 +605,39 @@ export default function FloorPage() {
               schedule / booking list / seated-bookings launchpad is gone,
               along with the till it fed. Browsing for a booking by hand
               is the thing the QR code exists to replace. */}
+          {/* Real in-app scanner now -- Daisy: "it needs its own scanner
+              like it had before... I don't want the tablet [to leave]
+              the app." No dependency on the system Camera app; this
+              opens the device camera directly and decodes in-app. */}
           <div className="space-y-4">
-            {/* Daisy landed here and asked how to photograph a QR code
-                from this screen -- the honest answer was "you can't, and
-                nothing here explained that." There is no in-app scanner;
-                it relies entirely on iOS recognising a URL in a QR code
-                through the ordinary Camera app. That's zero extra code,
-                but it's invisible unless someone actually says so. */}
-            <div className="rounded-lg p-4" style={{ backgroundColor: B.charcoal, border: `1px solid ${B.stone}` }}>
-              <p className="font-bold text-sm" style={{ color: B.ivory }}>To open a booking, scan its card</p>
-              <p className="text-xs mt-2" style={{ color: B.stone, lineHeight: 1.5 }}>
-                Use the iPad's own Camera app -- not this one. Point it at the QR code on the table card. iOS shows a banner to open the link; tap it, and this screen loads with that booking ready.
-              </p>
-            </div>
+            <button
+              onClick={() => setScanning(true)}
+              className="w-full py-5 rounded-lg font-bold flex items-center justify-center gap-3 text-lg"
+              style={{ backgroundColor: B.clay, color: B.ivory }}
+            >
+              <Camera size={24} /> Scan the table card
+            </button>
             <button onClick={loadBookings} disabled={loading} className="w-full py-4 rounded-lg font-semibold flex items-center justify-center gap-3" style={{ backgroundColor: 'transparent', color: B.ivory, border: `1px solid ${B.stone}` }}>
               {loading ? 'Loading...' : 'No card? Find the booking by hand'}
             </button>
           </div>
+          {scanning && (
+            <QrScanner
+              onClose={() => setScanning(false)}
+              onScan={(text) => {
+                setScanning(false);
+                // The card encodes a full URL (…/floor?code=XXXX). Pull
+                // just the code back out rather than navigate to the raw
+                // scanned URL -- this stays correct even if the card was
+                // printed pointing at a different host (e.g. a staging
+                // deploy) than whatever's serving the app right now.
+                let code: string | null = null;
+                try { code = new URL(text).searchParams.get('code'); } catch { /* not a URL */ }
+                if (!code) code = text.trim(); // fallback: treat the raw text as the code itself
+                if (code) router.replace(`/floor?code=${encodeURIComponent(code)}`);
+              }}
+            />
+          )}
         </div>
         <NudgeCard id="floor_home" />
       </div>

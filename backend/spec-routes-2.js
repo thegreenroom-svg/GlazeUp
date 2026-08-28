@@ -6488,3 +6488,93 @@ export function registerTestBookingRoutes(app, supabase, STUDIO_ID, logger) {
     }
   });
 }
+
+// ============================================================================
+// GOOGLE DRIVE BACKUP -- an archival safety copy, not the app's storage
+// ----------------------------------------------------------------------------
+// Daisy: "why don't we let the girls also take it on the iPad, for the
+// safety of storage on the iPhone... this app can send those photos to
+// the... Google Drive." A second, independent copy of every table photo,
+// landing in a real Drive folder rather than filling up a tablet's local
+// storage -- which has visibly been an issue tonight ("Storage Full" was
+// on screen in more than one of her own screenshots).
+//
+// DELIBERATELY A SEPARATE, BEST-EFFORT SIDE CALL, not part of the real
+// save path. A Drive hiccup must never stop a table photo saving to the
+// app's own storage, which is the thing everything downstream (shelf
+// matching, packing) actually depends on. The frontend fires this AFTER
+// its real save succeeds and does not wait on or fail because of it.
+//
+// GATED HONESTLY, same pattern as the Claude integration earlier tonight:
+// this needs a real Google service account before it can do anything.
+// Building the code now; it reports plainly that it isn't configured
+// until GOOGLE_SERVICE_ACCOUNT_JSON exists on Render AND the target
+// folder has been shared with that service account's own email address
+// (service accounts have no Drive storage or folders of their own --
+// they only see what's explicitly shared with them).
+// ============================================================================
+
+const DRIVE_FOLDER_ID = '1EBj3FTQzjTOUFU1O_zWzzps5ugh9f70C'; // "GlazeUp Table Photos"
+
+async function getDriveClient() {
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (!raw) return null;
+  const { google } = await import('googleapis');
+  let credentials;
+  try {
+    credentials = JSON.parse(raw);
+  } catch {
+    throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is set but is not valid JSON.');
+  }
+  const auth = new google.auth.JWT({
+    email: credentials.client_email,
+    key: credentials.private_key,
+    scopes: ['https://www.googleapis.com/auth/drive.file'],
+  });
+  return google.drive({ version: 'v3', auth });
+}
+
+export function registerDriveBackupRoutes(app, supabase, STUDIO_ID, logger, upload, fs) {
+  // Same purpose as the Claude status check: a real, one-tap way to know
+  // whether this is actually working, rather than finding out the hard
+  // way when a photo silently fails to back up.
+  app.get('/api/spec/drive/status', async (req, res) => {
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+      return res.json({ configured: false, working: false, message: 'GOOGLE_SERVICE_ACCOUNT_JSON is not set on this server yet.' });
+    }
+    try {
+      const drive = await getDriveClient();
+      const folder = await drive.files.get({ fileId: DRIVE_FOLDER_ID, fields: 'id, name' });
+      res.json({ configured: true, working: true, message: `Connected. Backing up to "${folder.data.name}".` });
+    } catch (err) {
+      const msg = err.response?.status === 404
+        ? 'Connected, but the service account cannot see the target folder -- it needs to be shared with the service account\'s own email address first.'
+        : (err.message || 'Could not reach Google Drive.');
+      res.json({ configured: true, working: false, message: msg });
+    }
+  });
+
+  app.post('/api/spec/drive/backup-photo', upload.single('photo'), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
+      const drive = await getDriveClient();
+      if (!drive) return res.status(200).json({ backed_up: false, reason: 'not_configured' }); // 200, not an error -- this is an optional extra, never something that should look like a failure to the caller
+
+      const bookingCode = req.body?.booking_code || 'unknown';
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      await drive.files.create({
+        requestBody: { name: `${bookingCode}-${stamp}.jpg`, parents: [DRIVE_FOLDER_ID] },
+        media: { mimeType: req.file.mimetype || 'image/jpeg', body: fs.createReadStream(req.file.path) },
+        fields: 'id',
+      });
+      try { fs.unlinkSync(req.file.path); } catch { /* temp file */ }
+      res.json({ backed_up: true });
+    } catch (err) {
+      logger.warn(`drive backup failed (non-fatal): ${err.message}`);
+      // Still 200 -- the caller already saved the photo through the real
+      // path. A failed backup is worth logging, never worth surfacing as
+      // an error to whoever is standing at the table.
+      res.json({ backed_up: false, reason: err.message });
+    }
+  });
+}
