@@ -362,6 +362,18 @@ export default function FloorPage() {
 
   const searchParams = useSearchParams();
   const [scanning, setScanning] = useState(false);
+  // Daisy's revelation: the girls write a collection card by hand at the end
+  // of every session, when the customer pays -- so the date is genuinely
+  // known HERE, at the table, not at some separate kiln stage. Pre-filled
+  // from the studio's remembered default so a girl doing five bookings in a
+  // row types it once, and it sticks until someone changes it.
+  const [collectionDate, setCollectionDate] = useState('');
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/collection/default-date`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.collection_date) setCollectionDate(d.collection_date); })
+      .catch(() => { /* no default yet -- the field just starts empty */ });
+  }, []);
   const deepLinked = useRef(false);
   useEffect(() => {
     const code = searchParams.get('code');
@@ -525,6 +537,16 @@ export default function FloorPage() {
         // here must never surface as an error to whoever is standing at
         // the table. The original full-quality file goes up, not the
         // compressed AI copy -- this is a backup, not a thumbnail.
+        // Saved to the booking AND remembered as the studio default in one
+        // call -- that is exactly how it's used at the counter.
+        if (collectionDate) {
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/collection/set-date`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ booking_code: current.booking_code, collection_date: collectionDate }),
+          }).catch(() => { /* best-effort; the photo save is what must not fail */ });
+        }
+
         const backupData = new FormData();
         backupData.append('photo', photo);
         backupData.append('booking_code', current.booking_code);
@@ -1384,6 +1406,30 @@ export default function FloorPage() {
                 )}
               </>
             )}
+
+            <div style={{ marginBottom: '0.9rem' }}>
+              <label style={{ display: 'block', color: B.ivory, fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+                Collection date
+              </label>
+              <input
+                type="date"
+                value={collectionDate}
+                onChange={(e) => setCollectionDate(e.target.value)}
+                style={{
+                  width: '100%', padding: '0.75rem', borderRadius: 8,
+                  border: `1px solid ${B.stone}`,
+                  // Explicit colours, not inherited. Native date inputs render
+                  // on a white background regardless of page theme, so an
+                  // inherited light colour makes the text invisible -- the same
+                  // dark-mode bug already fixed on three other screens.
+                  color: B.charcoal, backgroundColor: 'white',
+                  fontSize: '1rem',
+                }}
+              />
+              <p style={{ color: B.stone, fontSize: '0.7rem', marginTop: '0.3rem' }}>
+                Stays set for the next booking until you change it.
+              </p>
+            </div>
 
             <button
               onClick={saveAndFinish}

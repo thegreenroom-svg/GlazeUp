@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Printer, Camera, Flame, Package } from 'lucide-react';
+import { Printer, Camera, Package, Check } from 'lucide-react';
 
 // THE WHOLE APP, on one page.
 //
@@ -27,8 +27,8 @@ import { Printer, Camera, Flame, Package } from 'lucide-react';
 const STEPS = [
   { key: 'cards',   n: 1, label: 'Print cards',           detail: 'Booking references for today',      href: '/daily-cards', icon: Printer, tint: '#8C6A4A' },
   { key: 'table',   n: 2, label: 'Photograph the table',  detail: 'All pieces clear, QR code in shot', href: '/floor',       icon: Camera,  tint: '#A8763E' },
-  { key: 'kiln',    n: 3, label: 'Into the kiln',         detail: 'Shelf code and collection date',    href: '/kiln-batch',  icon: Flame,   tint: '#9C5A3C' },
-  { key: 'packing', n: 4, label: 'Packing',               detail: 'Match what came out, hand it over', href: '/packing',     icon: Package, tint: '#6E7A55' },
+  { key: 'packing',    n: 3, label: 'Packing',    detail: 'Match what came out of the kiln',   href: '/packing',    icon: Package, tint: '#9C5A3C' },
+  { key: 'collection', n: 4, label: 'Collection', detail: 'Print the card, hand pottery over',  href: '/collection', icon: Check,   tint: '#6E7A55' },
 ];
 
 export default function StudioHome() {

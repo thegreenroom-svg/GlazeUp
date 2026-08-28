@@ -6425,3 +6425,203 @@ export function registerDriveBackupRoutes(app, supabase, STUDIO_ID, logger, uplo
     }
   });
 }
+
+// ============================================================================
+// COLLECTION -- the date is set at the table, and it drives everything after
+// ----------------------------------------------------------------------------
+// Daisy's revelation, watching the girls actually work: they write a
+// collection card by hand at the end of every session, when the customer
+// pays. So the collection date is genuinely known at that moment -- not
+// earlier, and not at some separate kiln stage.
+//
+// That makes the collection date the spine of the whole workflow. Her words:
+// "we don't need to have the kiln shelf timing for when it's going into the
+// kiln batches, because we all know those bookings have got a collection date
+// and the kiln would be fired in time for that collection date."
+//
+// PERSISTENT DEFAULT, per Daisy: "a pop up for collection date, which can be
+// persistently populated until it's changed." studios.current_collection_date
+// already existed for exactly this and is reused rather than reinvented -- the
+// girls set it once and every following booking that shift inherits it until
+// someone changes it.
+// ============================================================================
+
+export function registerCollectionRoutes(app, supabase, STUDIO_ID, logger) {
+  // The remembered default the popup pre-fills with.
+  app.get('/api/spec/collection/default-date', async (req, res) => {
+    try {
+      const { data } = await supabase
+        .from('studios')
+        .select('current_collection_date')
+        .eq('id', STUDIO_ID)
+        .single();
+      res.json({ collection_date: data?.current_collection_date || null });
+    } catch (err) {
+      logger.error('collection default-date failed', err.message);
+      res.json({ collection_date: null });
+    }
+  });
+
+  // Set on a booking AND remembered as the new default in one call, because
+  // that is exactly how it's used: the girl types it once for this booking
+  // and every following booking should inherit it.
+  app.post('/api/spec/collection/set-date', async (req, res) => {
+    try {
+      const { booking_code, collection_date } = req.body || {};
+      if (!booking_code || !collection_date) {
+        return res.status(400).json({ error: 'booking_code and collection_date are both required' });
+      }
+
+      const { error: bErr } = await supabase
+        .from('bookings')
+        .update({ collection_date })
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_code', booking_code);
+      if (bErr) throw bErr;
+
+      const { error: sErr } = await supabase
+        .from('studios')
+        .update({ current_collection_date: collection_date, current_collection_date_updated_at: new Date().toISOString() })
+        .eq('id', STUDIO_ID);
+      if (sErr) logger.warn(`collection date saved to booking but not remembered as default: ${sErr.message}`);
+
+      res.json({ booking_code, collection_date, remembered: !sErr });
+    } catch (err) {
+      logger.error('collection set-date failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Daisy: "if the collection date has to shift, we'll go back into the
+  // booking and do a global select all those dates and move them forward."
+  // Moves every booking on one date to another in a single call.
+  app.post('/api/spec/collection/shift-date', async (req, res) => {
+    try {
+      const { from_date, to_date } = req.body || {};
+      if (!from_date || !to_date) return res.status(400).json({ error: 'from_date and to_date are both required' });
+
+      const { data, error } = await supabase
+        .from('bookings')
+        .update({ collection_date: to_date })
+        .eq('studio_id', STUDIO_ID)
+        .eq('collection_date', from_date)
+        .is('collected_at', null) // never move something already handed over
+        .select('booking_code');
+      if (error) throw error;
+
+      res.json({ moved: (data || []).length, from_date, to_date });
+    } catch (err) {
+      logger.error('collection shift-date failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // What's due, grouped by collection date -- this replaces the kiln-shelf
+  // view as the way to see what needs firing and when.
+  app.get('/api/spec/collection/due', async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, collection_date, collected_at')
+        .eq('studio_id', STUDIO_ID)
+        .not('collection_date', 'is', null)
+        .is('collected_at', null)
+        .order('collection_date', { ascending: true });
+      if (error) throw error;
+
+      const codes = (data || []).map((b) => b.booking_code);
+      let pieceCounts = {};
+      if (codes.length) {
+        const { data: pieces } = await supabase
+          .from('pottery_pieces')
+          .select('booking_id')
+          .eq('studio_id', STUDIO_ID)
+          .in('booking_id', codes)
+          .neq('status', 'collected');
+        for (const p of pieces || []) {
+          pieceCounts[p.booking_id] = (pieceCounts[p.booking_id] || 0) + 1;
+        }
+      }
+
+      const byDate = {};
+      for (const b of data || []) {
+        (byDate[b.collection_date] ||= []).push({
+          booking_code: b.booking_code,
+          customer_name: b.customer_name,
+          piece_count: pieceCounts[b.booking_code] || 0,
+        });
+      }
+
+      res.json({
+        dates: Object.entries(byDate).map(([date, bookings]) => ({
+          collection_date: date,
+          bookings,
+          total_pieces: bookings.reduce((n, b) => n + b.piece_count, 0),
+        })),
+      });
+    } catch (err) {
+      logger.error('collection due failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Handing it over. Daisy: "the app could just scan it, and it's completed.
+  // If they don't bring it in... just take off collected." Same route either
+  // way -- scanning the card and tapping the booking by hand both land here,
+  // because the card is a convenience, never a requirement for a customer
+  // who forgot it.
+  app.post('/api/spec/collection/collect', async (req, res) => {
+    try {
+      const { booking_code, uncollect } = req.body || {};
+      if (!booking_code) return res.status(400).json({ error: 'booking_code is required' });
+
+      const collectedAt = uncollect ? null : new Date().toISOString();
+
+      const { error: bErr } = await supabase
+        .from('bookings')
+        .update({ collected_at: collectedAt })
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_code', booking_code);
+      if (bErr) throw bErr;
+
+      const { data: pieces, error: pErr } = await supabase
+        .from('pottery_pieces')
+        .update({ status: uncollect ? 'queued' : 'collected' })
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_id', booking_code)
+        .select('id');
+      if (pErr) throw pErr;
+
+      res.json({ booking_code, collected: !uncollect, pieces_updated: (pieces || []).length });
+    } catch (err) {
+      logger.error('collection collect failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Everything the printed collection card needs, in one call.
+  app.get('/api/spec/collection/card/:code', async (req, res) => {
+    try {
+      const { data: booking, error } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, collection_date, session_start')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_code', req.params.code)
+        .maybeSingle();
+      if (error) throw error;
+      if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+      const { data: pieces } = await supabase
+        .from('pottery_pieces')
+        .select('id, piece_type, description')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_id', req.params.code)
+        .neq('status', 'collected');
+
+      res.json({ ...booking, pieces: pieces || [] });
+    } catch (err) {
+      logger.error('collection card failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
