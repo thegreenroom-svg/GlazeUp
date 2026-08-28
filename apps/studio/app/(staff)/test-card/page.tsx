@@ -3,9 +3,10 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
 import { PageShell } from '@/components/PageShell';
-import { Loader, Printer, Trash2 } from 'lucide-react';
+import { Loader, Printer, Trash2, ArrowRight } from 'lucide-react';
 
 // Daisy: "one test booking button... print off one test QR code. I can add
 // a few pieces. I can then do my own tests in the kiln... and then I can do
@@ -22,6 +23,7 @@ interface TestBooking {
 }
 
 export default function TestCardPage() {
+  const router = useRouter();
   const [bookings, setBookings] = useState<TestBooking[]>([]);
   const [qrs, setQrs] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -103,9 +105,20 @@ export default function TestCardPage() {
             : <Loader size={20} className="animate-spin" />}
           <p style={{ fontWeight: 700, fontSize: '0.95rem', margin: '0.5rem 0 0.15rem' }}>{b.customer_name}</p>
           <p style={{ fontSize: '0.75rem', color: '#777', margin: 0 }}>{b.booking_code}</p>
-          <p style={{ fontSize: '0.72rem', color: '#999', margin: '0.35rem 0 0' }}>
+          <p style={{ fontSize: '0.72rem', color: '#999', margin: '0.35rem 0 0.7rem' }}>
             Scan to open the table step with this booking loaded
           </p>
+          {/* Daisy: "if we're actually on a booking or a test booking, I
+              don't want to have to print a card... use internal scanning
+              rather than have to actually physically scan." Same
+              destination a real scan reaches -- just skips pointing this
+              device's camera at its own screen to prove a point. */}
+          <button
+            onClick={() => router.push(`/floor?code=${encodeURIComponent(b.booking_code)}`)}
+            style={{ width: '100%', padding: '0.65rem', borderRadius: 8, border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+          >
+            Open this booking <ArrowRight size={15} />
+          </button>
         </div>
       ))}
 
