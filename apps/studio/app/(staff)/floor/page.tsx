@@ -1556,12 +1556,36 @@ export default function FloorPage() {
               <p style={{ color: B.stone }} className="text-xs mt-2">
                 {pieceCount} piece{pieceCount === 1 ? '' : 's'} · £{(tillTotal / 100).toFixed(2)} till total{finished ? ' · marked finished' : ''}
               </p>
+
+              {/* The collection date set just moments ago on this exact
+                  booking never showed up on its own confirmation screen --
+                  the one place it's most worth confirming before moving
+                  on to the next person. */}
+              {collectionDate && (
+                <p style={{ color: B.sand }} className="text-xs mt-1 font-semibold">
+                  📅 Ready to collect: {new Date(collectionDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+                </p>
+              )}
+
               {collectionMethod && (
                 <p style={{ color: B.stone }} className="text-xs mt-1">
-                  {collectionMethod === 'postal' ? `📮 Postal to ${postalPostcode}` : '🏠 Studio pickup'}
+                  {collectionMethod === 'postal'
+                    ? `📮 Postal to ${[postalAddressLine1, postalCity, postalPostcode].filter(Boolean).join(', ')}`
+                    : '🏠 Studio pickup'}
                 </p>
               )}
               {photo && <p style={{ color: '#7ec98a' }} className="text-xs mt-1 flex items-center gap-1"><Check size={12} /> Photo confirmed to booking</p>}
+
+              {/* A count alone doesn't confirm anything -- the actual
+                  descriptions are what let someone catch a wrong
+                  identification before it's too late to fix easily. */}
+              {identifiedPieces && identifiedPieces.length > 0 && (
+                <ul style={{ marginTop: '0.6rem', paddingLeft: '1.1rem' }} className="text-xs">
+                  {identifiedPieces.map((p, i) => (
+                    <li key={i} style={{ color: B.stone, marginBottom: '0.15rem' }}>{p.description || p.piece_type}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
           <button onClick={() => window.print()} className="w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 mb-2" style={{ backgroundColor: B.stone, color: B.charcoal }}>
