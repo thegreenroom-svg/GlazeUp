@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Home } from 'lucide-react';
 import { ThemeProvider } from '@/components/ThemeContext';
-import { StudioNavigation } from '@/components/StudioNavigation';
 import { NudgeProvider, HelpPanel, NudgeSettingsPanel } from '@/components/NudgeSystem';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -47,14 +46,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
       <NudgeProvider>
+        {/* No StudioNavigation here on purpose. Daisy: "I don't wanna
+            really see any of these other buttons, like, packing and
+            things separately. It's all part of that one button core
+            flow." The hamburger menu let someone jump sideways between
+            steps without ever going back through the four tiles --
+            exactly the thing a closed loop isn't supposed to allow. The
+            floating Home button below is now the ONLY way out of a
+            flow: home -> one tile, full screen -> Home button -> back
+            to the tiles. No lateral menu, no drawer, nothing else. */}
         <div className="flex" style={{ height: '100dvh' }}>
-          <StudioNavigation />
-          {/* Real fix for the floating menu button overlapping content
-              (Daisy: "the menu tab, which is currently sitting over one
-              of the tiles on my iPhone"). The button is fixed
-              bottom-right on mobile; this reserves real space beneath
-              every page's content so nothing can sit under it. */}
-          <main className="flex-1 overflow-auto pb-24 md:pb-0" style={{ position: 'relative' }}>
+          <main className="flex-1 overflow-auto" style={{ position: 'relative' }}>
             {pathname !== '/' && (
               <button
                 onClick={() => router.push('/')}

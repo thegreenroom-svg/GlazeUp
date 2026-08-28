@@ -6,7 +6,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ChevronRight, Home, Camera, Printer, Check, Loader, RefreshCw } from 'lucide-react';
-import { NudgeCard, HelpButton } from '@/components/NudgeSystem';
+import { NudgeCard } from '@/components/NudgeSystem';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
 import { QrScanner } from '@/components/QrScanner';
 
@@ -586,7 +586,6 @@ export default function FloorPage() {
   if (phase === 1) {
     return (
       <div className="min-h-screen p-4" style={{ backgroundColor: B.charcoal }}>
-        <HelpButton pageIds={['floor_home', 'floor_select_table', 'floor_seated_totals', 'floor_till', 'floor_split_bill', 'floor_completion', 'floor_photo', 'floor_handoff']} />
         <div className="max-w-2xl mx-auto">
           <div className="pt-6 pb-8 text-center">
             <h1 className="text-2xl font-bold" style={{ color: B.ivory }}>Start Floor</h1>
