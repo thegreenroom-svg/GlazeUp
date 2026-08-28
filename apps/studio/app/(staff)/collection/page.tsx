@@ -19,7 +19,26 @@ import { Camera, Printer, Check, Loader, Undo2 } from 'lucide-react';
 // requirement: every booking due is listed and tappable by hand for anyone
 // who forgot their card.
 
-interface Piece { id: string; piece_type: string; description: string | null }
+type PieceBox = { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number };
+interface Piece {
+  id: string; piece_type: string; description: string | null;
+  reference_photo_url: string | null; photo_box: PieceBox | null;
+}
+
+// Same crop maths already used in Packing -- one small helper duplicated
+// here rather than a shared import, matching how the app already handles
+// small utilities like this elsewhere.
+function cropStyle(url: string, box: PieceBox): React.CSSProperties {
+  const w = box.right_pct - box.left_pct;
+  const h = box.bottom_pct - box.top_pct;
+  if (!(w > 0) || !(h > 0)) return { backgroundImage: `url(${url})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+  return {
+    backgroundImage: `url(${url})`,
+    backgroundSize: `${(100 / w) * 100}% ${(100 / h) * 100}%`,
+    backgroundPosition: `${w >= 100 ? 0 : (box.left_pct / (100 - w)) * 100}% ${h >= 100 ? 0 : (box.top_pct / (100 - h)) * 100}%`,
+    backgroundRepeat: 'no-repeat',
+  };
+}
 interface CardData {
   booking_code: string;
   customer_name: string;
@@ -37,6 +56,7 @@ export default function CollectionPage() {
   const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [fullscreen, setFullscreen] = useState<{ url: string; box: PieceBox | null } | null>(null); // Daisy: small thumbnails here, opening full screen when tapped
 
   const loadCard = useCallback(async (code: string) => {
     setBusy(true);
@@ -130,13 +150,43 @@ export default function CollectionPage() {
               Ready to collect: {card.collection_date ? new Date(card.collection_date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) : 'date not set'}
             </p>
             {card.pieces.length > 0 && (
-              <ul style={{ margin: '0.7rem 0 0', paddingLeft: '1.1rem', fontSize: '0.8rem', color: '#444' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.7rem' }}>
                 {card.pieces.map((p) => (
-                  <li key={p.id} style={{ marginBottom: '0.15rem' }}>{p.description || p.piece_type}</li>
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                    {p.reference_photo_url ? (
+                      <button
+                        onClick={() => setFullscreen({ url: p.reference_photo_url as string, box: p.photo_box })}
+                        style={{
+                          width: 44, height: 44, borderRadius: 6, flexShrink: 0, border: '1px solid #ddd', padding: 0, cursor: 'pointer',
+                          ...(p.photo_box ? cropStyle(p.reference_photo_url, p.photo_box)
+                            : { backgroundImage: `url(${p.reference_photo_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }),
+                        }}
+                        aria-label="View full screen"
+                      />
+                    ) : (
+                      <div style={{ width: 44, height: 44, borderRadius: 6, flexShrink: 0, background: '#f2f2f2' }} />
+                    )}
+                    <span style={{ fontSize: '0.8rem', color: '#444', textAlign: 'left' }}>{p.description || p.piece_type}</span>
+                  </div>
                 ))}
-              </ul>
+              </div>
             )}
           </div>
+
+          {/* Tapping a thumbnail opens the real photo full screen -- the
+              small version is just for scanning the list quickly. */}
+          {fullscreen && (
+            <div
+              onClick={() => setFullscreen(null)}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.2rem' }}
+            >
+              <img
+                src={fullscreen.url}
+                alt=""
+                style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 10, objectFit: 'contain' }}
+              />
+            </div>
+          )}
 
           <button
             onClick={() => window.print()}

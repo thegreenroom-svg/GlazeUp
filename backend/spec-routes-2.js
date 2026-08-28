@@ -6798,7 +6798,7 @@ export function registerCollectionRoutes(app, supabase, STUDIO_ID, logger) {
 
       const { data: pieces } = await supabase
         .from('pottery_pieces')
-        .select('id, piece_type, description')
+        .select('id, piece_type, description, reference_photo_url, photo_box')
         .eq('studio_id', STUDIO_ID)
         .eq('booking_id', req.params.code)
         .neq('status', 'collected');
