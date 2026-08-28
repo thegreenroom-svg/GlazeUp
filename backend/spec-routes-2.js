@@ -156,7 +156,16 @@ function sniffFormat(buffer) {
   return `unknown (starts ${hex.slice(0, 8)})`;
 }
 
-async function forGemini(sharp, buffer, logger, claimedMimeType) {
+// targetSize defaults to 1024 -- proven fast and reliable for every
+// simple one-to-one comparison (find-on-table, shelf sweep, reidentify).
+// identify-in-photo passes a higher value deliberately: Daisy, after
+// today's speed fix -- "I was getting one, two, three pieces with
+// different squares" -- the AI missing pieces or drawing imprecise boxes
+// on a table with several items close together. That specific task
+// benefits from resolution in a way a single reference-vs-scene
+// comparison does not; the other routes stay at 1024px, which was never
+// the one she flagged.
+async function forGemini(sharp, buffer, logger, claimedMimeType, targetSize = 1024) {
   const t0 = Date.now();
   const detected = sniffFormat(buffer);
 
@@ -180,7 +189,7 @@ async function forGemini(sharp, buffer, logger, claimedMimeType) {
     const resized = await Promise.race([
       sharp(buffer)
         .rotate() // respects the photo's own EXIF orientation before resizing
-        .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
+        .resize(targetSize, targetSize, { fit: 'inside', withoutEnlargement: true })
         .jpeg({ quality: 82, mozjpeg: true })
         .toBuffer(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('resize took too long')), 8000)),
@@ -4335,7 +4344,11 @@ export function registerIdentifyPiecesRoute(app, supabase, STUDIO_ID, logger, ax
       const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
       if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured on this service.' });
 
-      const photoGemini = await forGemini(sharp, fs.readFileSync(req.file.path), logger);
+      // 1600px, not the usual 1024 -- this route counts and boxes SEVERAL
+      // pieces on one table, which needs real detail to tell adjacent
+      // items apart. Every other Gemini call in this file stays at
+      // 1024px on purpose; that resolution was never what Daisy flagged.
+      const photoGemini = await forGemini(sharp, fs.readFileSync(req.file.path), logger, null, 1600);
       const base64 = photoGemini.buffer.toString('base64');
 
       const input = [
