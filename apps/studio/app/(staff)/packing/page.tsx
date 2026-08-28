@@ -133,7 +133,7 @@ export default function PackingPage() {
     // 55s gives the server's 40s room to breathe plus real margin for the
     // photo itself uploading over whatever signal the iPad has, which
     // happens before the server-side clock even starts.
-    const killSwitch = setTimeout(() => controller.abort(), 55000);
+    const killSwitch = setTimeout(() => controller.abort(), 70000); // 15s above the server's 55s overall deadline -- these two numbers move together, never independently
     try {
       // Compressed ON THE DEVICE before it ever leaves, not just at the
       // server. The server's resize genuinely cannot handle HEIC in this

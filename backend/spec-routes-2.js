@@ -214,7 +214,17 @@ async function callGeminiWithFallback(axios, apiKey, body) {
   // ones complete in a few seconds even before today's image-resize fix),
   // short enough that a genuine hang surfaces as an error a person can
   // act on rather than a wheel that spins until the tab is closed.
-  const GEMINI_TIMEOUT_MS = 25000;
+  // Raised from 25s. Daisy kept hitting "taking longer than usual" on
+  // real table photos, and the numbers explain why: identify-in-photo now
+  // sends a 1600px image (raised deliberately so several pieces on one
+  // table can be told apart) AND asks for a structured JSON reply
+  // describing every piece with a bounding box. That is genuinely more
+  // work than a yes/no "is this piece here" call, and 25s was cutting off
+  // calls that were still legitimately running rather than hung. The
+  // client already waits 55s, so a 25s per-attempt cap was leaving real
+  // headroom unused and converting slow-but-successful calls into
+  // failures.
+  const GEMINI_TIMEOUT_MS = 35000;
 
   // THE MISTAKE FROM THE LAST FIX, caught by Daisy within the hour: this
   // function's own legitimate retry chain -- wait out a real rate limit,
@@ -230,7 +240,12 @@ async function callGeminiWithFallback(axios, apiKey, body) {
   // Now there is ONE overall deadline for the whole chain -- every sleep,
   // retry and fallback attempt included -- and everything client-side is
   // set comfortably above it, not the other way round.
-  const OVERALL_DEADLINE_MS = 40000;
+  // Raised from 40s to match, keeping the same principle as before:
+  // everything client-side stays comfortably ABOVE this, never below.
+  // The client abort moves to 70s in the same change, preserving the 15s
+  // margin the original fix established -- the two numbers are still
+  // chosen together, not independently.
+  const OVERALL_DEADLINE_MS = 55000;
   const deadlineAt = Date.now() + OVERALL_DEADLINE_MS;
 
   // Each individual call is capped at whichever is SMALLER: its own

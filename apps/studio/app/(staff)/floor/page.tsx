@@ -494,7 +494,7 @@ export default function FloorPage() {
       // against a REJECTED promise -- a call that never resolves at all
       // (a genuine network stall) would leave "identifying" spinning with
       // no explanation for as long as the connection stayed open.
-      const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/identify-in-photo`, { method: 'POST', body: fd }, 55000); // server's own retry chain is a proven 40s worst case
+      const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/identify-in-photo`, { method: 'POST', body: fd }, 70000); // 70s: stays 15s ABOVE the server's own 55s overall deadline, same margin as before
       const d = await res.json();
       if (res.ok && Array.isArray(d.pieces)) {
         setIdentifiedPieces(d.pieces);
