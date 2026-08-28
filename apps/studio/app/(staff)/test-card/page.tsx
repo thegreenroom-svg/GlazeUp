@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
 import { PageShell } from '@/components/PageShell';
-import { Loader, Printer, Trash2, ArrowRight } from 'lucide-react';
+import { Loader, Printer, Trash2, ArrowRight, RefreshCw } from 'lucide-react';
 
 // Daisy: "one test booking button... print off one test QR code. I can add
 // a few pieces. I can then do my own tests in the kiln... and then I can do
@@ -25,6 +25,8 @@ interface TestBooking {
 export default function TestCardPage() {
   const router = useRouter();
   const [bookings, setBookings] = useState<TestBooking[]>([]);
+  const [reidentifying, setReidentifying] = useState<string | null>(null);
+  const [reidentifyMsg, setReidentifyMsg] = useState<string | null>(null);
   const [qrs, setQrs] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +121,33 @@ export default function TestCardPage() {
           >
             Open this booking <ArrowRight size={15} />
           </button>
+          {/* For pieces stuck as the old placeholder from before tonight's
+              speed fixes -- re-runs identification against the photo
+              already on file, using the current fast model, without
+              retaking anything. */}
+          <button
+            onClick={async () => {
+              setReidentifying(b.booking_code);
+              setReidentifyMsg(null);
+              try {
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/bookings/${encodeURIComponent(b.booking_code)}/reidentify-pieces`, { method: 'POST' });
+                const data = await res.json();
+                setReidentifyMsg(res.ok ? `Re-checked — ${data.pieces?.length ?? 0} piece(s) found.` : (data?.error || 'Could not re-check this booking.'));
+              } catch {
+                setReidentifyMsg('Could not reach the server.');
+              } finally {
+                setReidentifying(null);
+              }
+            }}
+            disabled={reidentifying === b.booking_code}
+            style={{ width: '100%', padding: '0.6rem', borderRadius: 8, border: '1px solid #ccc', background: 'white', color: 'var(--charcoal)', fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginTop: '0.5rem' }}
+          >
+            <RefreshCw size={13} className={reidentifying === b.booking_code ? 'animate-spin' : ''} />
+            {reidentifying === b.booking_code ? 'Re-checking…' : 'Re-check pieces from stored photo'}
+          </button>
+          {reidentifyMsg && b.booking_code === (reidentifying || b.booking_code) && (
+            <p style={{ fontSize: '0.72rem', color: '#666', marginTop: '0.35rem' }}>{reidentifyMsg}</p>
+          )}
         </div>
       ))}
 
