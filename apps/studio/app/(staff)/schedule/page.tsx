@@ -160,9 +160,8 @@ const TILES: { label: string; href: string; icon: React.ReactNode }[] = [
   { label: 'Kiln', href: '/kiln-batch', icon: <Flame size={18} /> },
   { label: 'All pieces', href: '/pieces', icon: <Palette size={18} /> },
   { label: 'Print cards', href: '/daily-cards', icon: <Printer size={18} /> },
-  { label: 'Finance', href: '/money', icon: <PoundSterling size={18} /> },
-  { label: 'Customers', href: '/customers', icon: <Users size={18} /> },
-  { label: 'Admin', href: '/roles', icon: <ShieldCheck size={18} /> },
+  { label: 'Packing', href: '/packing', icon: <Package size={18} /> },
+  { label: 'Collection', href: '/collect', icon: <Package size={18} /> },
 ];
 
 export default function SchedulePage() {

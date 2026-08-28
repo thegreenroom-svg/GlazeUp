@@ -102,119 +102,23 @@ export function StudioNavigation() {
       items: [
         { label: 'The Day', icon: <CalendarDays className="w-5 h-5" />, href: '/schedule' },
         { label: 'Collection', icon: <Package className="w-5 h-5" />, href: '/collect' },
-        { label: 'Bookings', icon: <Calendar className="w-5 h-5" />, href: '/bookings' },
-        { label: 'Start Floor', icon: <Footprints className="w-5 h-5" />, href: '/floor' },
+        { label: 'Bookings', icon: <CalendarDays className="w-5 h-5" />, href: '/bookings' },
+        { label: 'Start Floor', icon: <Palette className="w-5 h-5" />, href: '/floor' },
         { label: 'Print Cards', icon: <PrinterIcon className="w-5 h-5" />, href: '/daily-cards' },
         { label: 'Alerts', icon: <Bell className="w-5 h-5" />, href: '/alerts' },
       ],
     },
     {
-      // The piece's whole journey, in the order it actually happens.
-      // These five were scattered across two groups and a "rarely
-      // needed" bin, despite being the core of what the studio does.
-      // Ordered by the piece's actual life -- stamped, fired, found,
-      // packed, posted -- rather than by when each screen happened to get
-      // built. Eight entries down to six, and every one of these can
-      // CHANGE something. The three read-only views that used to sit here
-      // (Kiln Workflow, Collections, Lifecycle) moved to Business, because
-      // that is what they are: reports. Between them they were 324 lines
-      // and zero writes -- three separate front doors onto the same
-      // question, "where are pieces up to", none of which could act on the
-      // answer, cluttering the group used with pottery in hand.
       section: 'Pieces',
       items: [
         { label: 'All Pieces', icon: <Palette className="w-5 h-5" />, href: '/pieces' },
         { label: 'Stamp a Piece', icon: <Stamp className="w-5 h-5" />, href: '/completion' },
         { label: 'Kiln Batches', icon: <Flame className="w-5 h-5" />, href: '/kiln-batch' },
-        // Photograph a table and it reads the chalk tag to find the
-        // booking -- no need to know whose pottery it is first. I filed
-        // this under Diagnostics during the navigation cleanup because of
-        // its name; it is not a diagnostic, it is one of the few tools
-        // that works the way the studio actually works: pottery in front
-        // of you, name unknown. Hiding it took away a daily capability.
-        { label: 'Whose is this?', icon: <Camera className="w-5 h-5" />, href: '/photo-match' },
-        { label: 'Find on Table', icon: <MapPin className="w-5 h-5" />, href: '/find-on-table' },
+        { label: 'Whose is this?', icon: <Search className="w-5 h-5" />, href: '/photo-match' },
+        { label: 'Find on Table', icon: <Search className="w-5 h-5" />, href: '/find-on-table' },
         { label: 'Packing', icon: <Package className="w-5 h-5" />, href: '/packing' },
-        // Renamed from "Kiln — Collection & Post". It was competing with
-        // Kiln Batches for the same mental slot while its genuinely unique
-        // job is postal labels and the (parked) ready email. Named for
-        // what it actually does.
         { label: 'Postal & Labels', icon: <Truck className="w-5 h-5" />, href: '/kiln-dip' },
-        // Daisy: "I seem to have lost my test AI page... it emulates
-        // exactly what the packing find on table section produces." It
-        // was never deleted -- filed under a hidden Diagnostics menu
-        // during the earlier nav cleanup, on the same mistaken
-        // reasoning as "Whose is this?" got filed there: the name
-        // sounded like a diagnostic. It is a genuinely used tool --
-        // check a reference photo against a scene without needing a
-        // real booking -- and hiding it took away something she reaches
-        // for.
         { label: 'Test AI', icon: <FlaskConical className="w-5 h-5" />, href: '/test-ai' },
-      ],
-    },
-    {
-      // Per Daisy: "all the reporting stuff, the finances, that could be
-      // separate, find somewhere else." Nobody opens the finances with a
-      // customer at the counter, so it sits below the two sections that
-      // are used with pottery in hand.
-      section: 'Business',
-      items: [
-        { label: 'Dashboard', icon: <Home className="w-5 h-5" />, href: '/dashboard' },
-        { label: 'Takings', icon: <PoundSterling className="w-5 h-5" />, href: '/money' },
-        { label: 'Customers', icon: <Users className="w-5 h-5" />, href: '/customers' },
-        { label: 'Bisque Stock', icon: <Package className="w-5 h-5" />, href: '/inventory' },
-        { label: 'Reports', icon: <TrendingUp className="w-5 h-5" />, href: '/reports' },
-        { label: 'Analytics', icon: <BarChart3 className="w-5 h-5" />, href: '/analytics' },
-        // One read-only view kept, not three. Kiln Workflow, Collections
-        // Due and Piece Lifecycle were three separate front doors onto the
-        // same question -- "where are pieces up to" -- with 324 lines and
-        // zero writes between them. Moving all three here would have taken
-        // Business from 6 entries to 9, which is reshuffling clutter
-        // rather than removing it.
-        //
-        // Collections Due is the one with an operational use (who is owed
-        // pottery), so it stays in the menu. The other two remain fully
-        // working pages and stay in the Jump-to search -- findable by name,
-        // just not occupying a slot in a list read at a counter.
-        { label: 'Collections Due', icon: <Library className="w-5 h-5" />, href: '/collections' },
-      ],
-    },
-    {
-      // Set up once, touched rarely. Grouping these together is what
-      // lets the three sections above stay short.
-      section: 'Studio',
-      items: [
-        { label: 'Team', icon: <UserCircle className="w-5 h-5" />, href: '/team' },
-        { label: 'Roles & Studio', icon: <ShieldCheck className="w-5 h-5" />, href: '/roles' },
-        { label: 'Health & Safety', icon: <HeartPulse className="w-5 h-5" />, href: '/health-safety' },
-        { label: 'Training', icon: <GraduationCap className="w-5 h-5" />, href: '/training' },
-        { label: 'Catalogue', icon: <Boxes className="w-5 h-5" />, href: '/catalogue' },
-        { label: 'Our Profile', icon: <UserSquare2 className="w-5 h-5" />, href: '/our-profile' },
-        { label: 'Notifications', icon: <BellRing className="w-5 h-5" />, href: '/notifications' },
-        { label: 'Billing', icon: <CreditCard className="w-5 h-5" />, href: '/billing' },
-      ],
-    },
-    {
-      // Customer-facing surfaces. Separated because they're a different
-      // audience -- staff open these to hand the iPad over.
-      section: 'For customers',
-      items: [
-        { label: 'Colour Picker', icon: <Pipette className="w-5 h-5" />, href: '/colour-picker' },
-        { label: 'Design Preview', icon: <Eye className="w-5 h-5" />, href: '/design-preview' },
-        { label: 'Transfer Designer', icon: <PenTool className="w-5 h-5" />, href: '/transfer-designer' },
-        { label: 'Customer View', icon: <QrCode className="w-5 h-5" />, href: '/customer' },
-        { label: 'My Bookings', icon: <CalendarClock className="w-5 h-5" />, href: '/my-bookings' },
-      ],
-    },
-    {
-      // Platform-level features that belong to GlazeUp-the-business
-      // rather than to running a studio on a Tuesday.
-      section: 'Platform',
-      items: [
-        { label: 'Loyalty', icon: <Award className="w-5 h-5" />, href: '/loyalty' },
-        { label: 'Community', icon: <Sparkles className="w-5 h-5" />, href: '/community' },
-        { label: 'Studios Worldwide', icon: <Globe2 className="w-5 h-5" />, href: '/studios-worldwide' },
-        { label: 'KDS', icon: <ChefHat className="w-5 h-5" />, href: '/kds' },
       ],
     },
     ...(showDiagnostics ? [{
@@ -236,18 +140,13 @@ export function StudioNavigation() {
     ...menuGroups.flatMap((g) => g.items),
     // Pinned above the groups rather than inside one, so it isn't in
     // menuGroups -- but it still needs to be findable by name.
-    { label: 'Dashboard', href: '/dashboard' },
     { label: 'Schedule', href: '/schedule' },
     { label: 'Test AI', href: '/test-ai' },
     { label: 'Ticket Link Check', href: '/ticket-link' },
     { label: 'Square Access Check', href: '/square-access' },
-    { label: 'Kiln Workflow', href: '/kiln-workflow' },
-    { label: 'Piece Lifecycle', href: '/lifecycle' },
     { label: 'Photo Match', href: '/photo-match' },
     { label: 'Needs Verification', href: '/needs-verification' },
     { label: 'Recover Party Sizes', href: '/backfill-party-sizes' },
-    { label: 'Square Diagnostic', href: '/square-diagnostic' },
-    { label: 'Square Bookings Diagnostic', href: '/square-bookings-diagnostic' },
   ];
 
   const isActive = (href: string) => {

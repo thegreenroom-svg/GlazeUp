@@ -4,10 +4,6 @@ import { redirect } from 'next/navigation';
 // the way to the day. Per Daisy: everyone in the studio already reads the
 // Square Appointments calendar fluently, so the calendar is the home
 // screen and the whole shift hangs off tapping a session.
-//
-// The old dashboard isn't deleted -- takings, alerts and piece counts are
-// genuinely useful, just not the first thing you need at 09:00 with a
-// customer at the counter. It lives at /dashboard and is still in the menu.
 export default function StaffHome() {
   redirect('/schedule');
 }
