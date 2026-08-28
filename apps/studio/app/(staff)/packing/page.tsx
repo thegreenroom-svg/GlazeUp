@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Package, ChevronLeft, Check, Search, Camera, Loader } from 'lucide-react';
+import { Package, ChevronLeft, Check, Search, Camera, Loader, RefreshCw, Trash2 } from 'lucide-react';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
 
 // The screen for whoever is actually boxing the pottery. There wasn't one:
@@ -51,6 +51,7 @@ interface Piece {
   photo_box: PieceBox | null;
   assigned_to: string | null;
   fulfilment: string | null;
+  notes: string | null;
 }
 
 // Crops the shared table photo to one piece. Every piece on a booking shares
@@ -79,6 +80,28 @@ export default function PackingPage() {
   const [piecesLoading, setPiecesLoading] = useState(false);
   const [openPiece, setOpenPiece] = useState<{ piece: Piece; index: number } | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  // Daisy: "item 1 identified as a sheep figurine, clearly two different
+  // jugs... click on it and take this photo again, try again to
+  // decipher, or failing that, make description [yourself]." Four
+  // actions on one piece: ask the AI again from its own stored crop,
+  // type the description by hand, remove a wrongly-identified "piece"
+  // entirely, or leave a note. All reuse routes that mostly already
+  // existed -- manual description edit and archive were already built,
+  // only the AI re-check and notes were genuinely new.
+  const [redescribing, setRedescribing] = useState(false);
+  const [suggestion, setSuggestion] = useState<{ piece_type: string | null; description: string } | null>(null);
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [descriptionDraft, setDescriptionDraft] = useState('');
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesDraft, setNotesDraft] = useState('');
+  const [removing, setRemoving] = useState(false);
+  // Reset on every piece change, not just on open -- without this, a
+  // half-typed note or an AI suggestion for piece 3 could still be
+  // sitting there after tapping straight through to piece 4.
+  useEffect(() => {
+    setSuggestion(null); setEditingDescription(false); setDescriptionDraft('');
+    setEditingNotes(false); setNotesDraft('');
+  }, [openPiece?.piece.id]);
   // Breakage. The draft comes back from the server for a human to send --
   // "we broke your pottery" is exactly the message that must never go out
   // by accident, so nothing here emails anyone.
@@ -259,8 +282,156 @@ export default function PackingPage() {
             <span style={{ width: 24, height: 24, borderRadius: '50%', backgroundColor: colour, color: 'white', fontSize: '0.75rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</span>
             {p.piece_type || 'Piece'}
           </p>
-          {p.description && <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.35rem' }}>{p.description}</p>}
+          {p.description && !editingDescription && <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.35rem' }}>{p.description}</p>}
           {p.assigned_to && <p style={{ fontSize: '0.85rem', marginTop: '0.35rem' }}>For <strong>{p.assigned_to}</strong></p>}
+
+          {/* A wrong description caught directly: item 1 called "a sheep
+              figurine" when it's genuinely two different jugs. Three ways
+              to fix it -- ask the AI again from its own crop, type the
+              real description by hand, or (below) remove it entirely if
+              it was never a real piece at all. */}
+          {!editingDescription && (
+            <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={async () => {
+                  setRedescribing(true); setSuggestion(null);
+                  try {
+                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/${p.id}/redescribe`, { method: 'POST' });
+                    const d = await res.json();
+                    if (res.ok) setSuggestion(d); else setSuggestion({ piece_type: null, description: `Could not check it: ${d?.error || 'unknown error'}` });
+                  } catch { setSuggestion({ piece_type: null, description: 'Could not reach the server.' }); }
+                  finally { setRedescribing(false); }
+                }}
+                disabled={redescribing}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.65rem', borderRadius: 7, border: '1px solid var(--clay)', background: 'white', color: 'var(--clay)', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
+              >
+                {redescribing ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                {redescribing ? 'Asking again…' : 'Try again'}
+              </button>
+              <button
+                onClick={() => { setDescriptionDraft(p.description || ''); setEditingDescription(true); }}
+                style={{ padding: '0.4rem 0.65rem', borderRadius: 7, border: '1px solid #ccc', background: 'white', color: 'var(--charcoal)', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
+              >
+                Type it myself
+              </button>
+            </div>
+          )}
+
+          {/* The AI's second attempt -- shown, never saved automatically.
+              Accepting it reuses the exact same manual-edit route as
+              typing it by hand; the only difference is who typed it. */}
+          {suggestion && !editingDescription && (
+            <div style={{ marginTop: '0.6rem', padding: '0.65rem', borderRadius: 8, border: '1px solid #ddd', background: '#FAFAFA' }}>
+              <p style={{ fontSize: '0.72rem', color: '#888', marginBottom: '0.2rem' }}>Suggested:</p>
+              <p style={{ fontSize: '0.85rem' }}>{suggestion.description}</p>
+              <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem' }}>
+                <button
+                  onClick={async () => {
+                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/${p.id}/description`, {
+                      method: 'POST', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ description: suggestion.description }),
+                    });
+                    if (res.ok) {
+                      setOpenPiece({ piece: { ...p, description: suggestion.description, piece_type: suggestion.piece_type || p.piece_type }, index: i });
+                      setPieces((prev) => prev.map((x) => (x.id === p.id ? { ...x, description: suggestion.description, piece_type: suggestion.piece_type || x.piece_type } : x)));
+                      setSuggestion(null);
+                    }
+                  }}
+                  style={{ padding: '0.4rem 0.7rem', borderRadius: 7, border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
+                >
+                  Keep this
+                </button>
+                <button
+                  onClick={() => setSuggestion(null)}
+                  style={{ padding: '0.4rem 0.7rem', borderRadius: 7, border: '1px solid #ccc', background: 'white', fontWeight: 600, fontSize: '0.75rem', cursor: 'pointer' }}
+                >
+                  No, discard
+                </button>
+              </div>
+            </div>
+          )}
+
+          {editingDescription && (
+            <div style={{ marginTop: '0.6rem' }}>
+              <textarea
+                value={descriptionDraft}
+                onChange={(e) => setDescriptionDraft(e.target.value)}
+                rows={2}
+                style={{ width: '100%', padding: '0.5rem', borderRadius: 7, border: '1px solid #ccc', fontSize: '0.85rem', color: 'var(--charcoal)', backgroundColor: 'white' }}
+                placeholder="What is this piece, really?"
+              />
+              <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
+                <button
+                  onClick={async () => {
+                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/${p.id}/description`, {
+                      method: 'POST', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ description: descriptionDraft }),
+                    });
+                    if (res.ok) {
+                      setOpenPiece({ piece: { ...p, description: descriptionDraft }, index: i });
+                      setPieces((prev) => prev.map((x) => (x.id === p.id ? { ...x, description: descriptionDraft } : x)));
+                      setEditingDescription(false);
+                    }
+                  }}
+                  style={{ padding: '0.4rem 0.7rem', borderRadius: 7, border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setEditingDescription(false)}
+                  style={{ padding: '0.4rem 0.7rem', borderRadius: 7, border: '1px solid #ccc', background: 'white', fontWeight: 600, fontSize: '0.75rem', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Free-text notes, separate from the description -- "chipped on
+              the base", the kind of thing a packer needs to know that
+              isn't a visual description of the piece itself. */}
+          {!editingNotes && (
+            <button
+              onClick={() => { setNotesDraft(p.notes || ''); setEditingNotes(true); }}
+              style={{ display: 'block', marginTop: '0.5rem', padding: 0, border: 'none', background: 'none', color: p.notes ? 'var(--charcoal)' : '#999', fontSize: '0.78rem', textAlign: 'left', cursor: 'pointer' }}
+            >
+              {p.notes ? `Note: ${p.notes}` : '+ Add a note'}
+            </button>
+          )}
+          {editingNotes && (
+            <div style={{ marginTop: '0.5rem' }}>
+              <input
+                value={notesDraft}
+                onChange={(e) => setNotesDraft(e.target.value)}
+                style={{ width: '100%', padding: '0.5rem', borderRadius: 7, border: '1px solid #ccc', fontSize: '0.82rem', color: 'var(--charcoal)', backgroundColor: 'white' }}
+                placeholder="e.g. chipped on the base"
+              />
+              <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
+                <button
+                  onClick={async () => {
+                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/${p.id}/notes`, {
+                      method: 'POST', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ notes: notesDraft }),
+                    });
+                    if (res.ok) {
+                      setOpenPiece({ piece: { ...p, notes: notesDraft || null }, index: i });
+                      setPieces((prev) => prev.map((x) => (x.id === p.id ? { ...x, notes: notesDraft || null } : x)));
+                      setEditingNotes(false);
+                    }
+                  }}
+                  style={{ padding: '0.4rem 0.7rem', borderRadius: 7, border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setEditingNotes(false)}
+                  style={{ padding: '0.4rem 0.7rem', borderRadius: 7, border: '1px solid #ccc', background: 'white', fontWeight: 600, fontSize: '0.75rem', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Big cropped view first: this is what you hold up against the
               shelf. The full table photo sits underneath for context, with
@@ -348,6 +519,33 @@ export default function PackingPage() {
               </p>
             </div>
           )}
+
+          {/* For when the AI mistook something that was never a piece at
+              all -- a shopping bag, a matchbox -- for one. Archived, not
+              deleted, so nothing genuinely disappears; it just leaves the
+              booking's active list. Confirmed first, since it removes the
+              row from view immediately. */}
+          <button
+            onClick={async () => {
+              if (!confirm('Remove this from the booking? It will no longer count toward what needs packing.')) return;
+              setRemoving(true);
+              try {
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/${p.id}/archive`, {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ archived: true }),
+                });
+                if (res.ok) {
+                  setPieces((prev) => prev.filter((x) => x.id !== p.id));
+                  setOpenPiece(null);
+                }
+              } finally { setRemoving(false); }
+            }}
+            disabled={removing}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', width: '100%', marginTop: '0.5rem', padding: '0.6rem', borderRadius: 10, border: 'none', background: 'transparent', color: '#999', fontWeight: 600, fontSize: '0.78rem', cursor: 'pointer' }}
+          >
+            <Trash2 size={13} />
+            {removing ? 'Removing…' : 'This isn\'t a real piece — remove it'}
+          </button>
         </div>
       </PageShell>
     );

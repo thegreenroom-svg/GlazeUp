@@ -773,6 +773,30 @@ export function registerGapRoutes(app, supabase, STUDIO_ID, logger, JUNK_BOOKING
   // --------------------------------------------------------------------------
   // MANUAL DESCRIPTION EDIT — AI writes, a human corrects
   // --------------------------------------------------------------------------
+  // Free-text notes, separate from the description -- "chipped on the
+  // base", "customer wants this posted separately", the kind of thing a
+  // packer needs to know that isn't a visual description of the piece
+  // itself. The column already existed with nothing writing to it.
+  app.post('/api/spec/pieces/:id/notes', async (req, res) => {
+    try {
+      const { notes } = req.body || {};
+      if (typeof notes !== 'string') return res.status(400).json({ error: 'notes required' });
+      const { data, error } = await supabase
+        .from('pottery_pieces')
+        .update({ notes: notes.trim() || null })
+        .eq('id', req.params.id)
+        .eq('studio_id', STUDIO_ID)
+        .select('id, notes')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return res.status(404).json({ error: 'Piece not found' });
+      res.json(data);
+    } catch (err) {
+      logger.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.post('/api/spec/pieces/:id/description', async (req, res) => {
     try {
       const { description } = req.body || {};
@@ -4992,7 +5016,11 @@ export function registerPackingRoutes(app, supabase, STUDIO_ID, logger) {
         .order('created_at', { ascending: true });
       if (error) throw error;
 
-      const live = (pieces || []).filter((p) => p.fulfilment !== 'return_visit');
+      // Daisy: a broken piece shouldn't be something the booking is
+      // still waiting on -- it's never coming, and leaving it counted
+      // would mean that booking can never show as complete. Same
+      // exclusion pattern already used for a held return-visit piece.
+      const live = (pieces || []).filter((p) => p.fulfilment !== 'return_visit' && p.status !== 'damaged');
       const heldByBooking = {};
       for (const p of pieces || []) {
         if (p.fulfilment === 'return_visit') heldByBooking[p.booking_id] = (heldByBooking[p.booking_id] || 0) + 1;
@@ -6854,6 +6882,99 @@ export function registerUpgradeAfterIdentifyRoute(app, supabase, STUDIO_ID, logg
       res.json({ upgraded: true, pieces_created: rows.length });
     } catch (err) {
       logger.error('upgrade-after-identify failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
+
+// ============================================================================
+// RE-CHECK ONE PIECE -- Daisy: "click on it and say take this photo again,
+// try again to decipher, or failing that, make description [herself]."
+// ----------------------------------------------------------------------------
+// A real miss she caught directly: item 1 identified as "a sheep figurine"
+// when it's genuinely two different jugs. reidentify-pieces already existed
+// but re-runs the WHOLE booking from its whole-table photo, replacing every
+// piece at once -- overkill, and slow, for fixing one wrong description.
+// This re-checks exactly the one piece's own existing crop, touches nothing
+// else, and never overwrites without a person choosing to keep the result --
+// manually editing (already built, /api/spec/pieces/:id/description) stays
+// available as the honest fallback when the AI gets it wrong twice.
+// ============================================================================
+
+export function registerRedescribePieceRoute(app, supabase, STUDIO_ID, logger, axios, fs, logGeminiUsage, sharp) {
+  app.post('/api/spec/pieces/:id/redescribe', async (req, res) => {
+    try {
+      const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+      if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured on this service.' });
+
+      const { data: piece, error: fetchErr } = await supabase
+        .from('pottery_pieces')
+        .select('id, reference_photo_url, photo_box')
+        .eq('id', req.params.id)
+        .eq('studio_id', STUDIO_ID)
+        .maybeSingle();
+      if (fetchErr) throw fetchErr;
+      if (!piece) return res.status(404).json({ error: 'Piece not found' });
+      if (!piece.reference_photo_url) return res.status(400).json({ error: 'This piece has no stored photo to check.' });
+
+      const imgRes = await axios.get(piece.reference_photo_url, { responseType: 'arraybuffer', timeout: 8000 });
+      const cropped = await cropReferenceByBox(sharp, Buffer.from(imgRes.data), piece.photo_box);
+      // 900px -- bigger than the small reference crops sent alongside a
+      // shelf sweep (this crop IS the whole subject here, not one of
+      // several thumbnails), smaller than a full table photo (there's
+      // only ever one object in frame).
+      const forGeminiResult = await forGemini(sharp, cropped, logger, null, 900);
+      const base64 = forGeminiResult.buffer.toString('base64');
+
+      const prompt = `This photo shows ONE fired, painted pottery piece from a paint-your-own-pottery studio, cropped from a larger table photo.
+
+Give a short, specific description that would help someone find this exact piece later on a shelf of similar fired pottery. Mention its form AND its distinguishing painted detail -- colour, pattern, glaze. Good: "blue mug with a yellow fish painted on the side". Bad: "mug".
+
+Also give a short piece_type (e.g. "Mug", "Jug", "Bowl", "Figurine").
+
+If more than one distinct object is visible in this crop, describe them together as one entry rather than guessing which is the "real" one -- say so plainly, e.g. "Two different jugs sitting together: one tall cream jug and one shorter brown jug."`;
+
+      const schema = {
+        type: 'object',
+        properties: {
+          piece_type: { type: 'string' },
+          description: { type: 'string' },
+        },
+        required: ['piece_type', 'description'],
+      };
+
+      let aiRes, modelUsed;
+      try {
+        ({ response: aiRes, modelUsed } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
+          input: [
+            { type: 'text', text: prompt },
+            { type: 'image', data: base64, mime_type: forGeminiResult.mimeType || 'image/jpeg' },
+          ],
+          response_format: { type: 'text', mime_type: 'application/json', schema },
+        }, 'gemini-3.5-flash-lite', 'gemini-3.7-flash'));
+      } catch (err) {
+        logger.error('redescribe: Gemini call failed', err.response?.data || err.message);
+        return res.status(500).json({ error: friendlyGeminiError(err) });
+      }
+
+      const usage = extractGeminiUsage(aiRes.data);
+      if (usage) await logGeminiUsage(supabase, STUDIO_ID, 'redescribe-piece', usage, modelUsed);
+
+      let parsed;
+      try {
+        const raw = extractGeminiText(aiRes.data);
+        parsed = JSON.parse((raw.match(/\{[\s\S]*\}/) || [])[0] || '{}');
+      } catch {
+        return res.status(500).json({ error: 'Could not parse the Gemini response' });
+      }
+      if (!parsed.description) return res.status(500).json({ error: 'Gemini did not return a usable description' });
+
+      // Suggested, not saved. Daisy chooses whether to keep it -- the
+      // existing manual-edit route already covers "no, let me type it
+      // myself" if this is still wrong.
+      res.json({ piece_type: parsed.piece_type || null, description: parsed.description });
+    } catch (err) {
+      logger.error('redescribe failed', err.response?.data || err.message);
       res.status(500).json({ error: err.message });
     }
   });
