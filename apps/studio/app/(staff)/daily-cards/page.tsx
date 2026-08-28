@@ -36,29 +36,6 @@ interface Booking {
   photo_count?: number;
 }
 
-// Clean short label from the real (verbose) space_name text -- e.g.
-// 'The Vault - perfect for private parties!' -> 'Vault'. Falls back to
-// showing nothing rather than a guess when it doesn't match a known space.
-function shortSpaceLabel(spaceName: string | null): string | null {
-  if (!spaceName) return null;
-  const s = spaceName.toLowerCase();
-  // The Vault was renamed the Party Room -- same Square resource,
-  // TMYVfH7VAWAr3WnT. Old bookings still carry the Vault service name, so
-  // both resolve to the room's current name and a card printed today for a
-  // July session sends someone to the right door.
-  if (s.includes('vault') || s.includes('party room')) return 'Party Room';
-  if (s.includes('lounge')) return 'Lounge';
-  if (s.includes('main studio')) return 'Main Studio';
-  if (s.includes('evening')) return 'Evening Session';
-  if (s.includes('thursdays')) return 'Thursdays';
-  if (s.includes('wheel hire')) return 'Wheel Hire';
-  if (s.includes('throwing taster')) return 'Throwing Taster';
-  if (s.includes('kids party')) return 'Kids Party';
-  if (s.includes('ultimate')) return 'Ultimate Party';
-  if (s.includes('pop-up') || s.includes('pop up')) return 'Pop-Up';
-  if (s.includes('grotto')) return 'Grotto';
-  return null;
-}
 
 // Table-setup flags for the printed card -- deliberately NOT the raw note.
 // Girls placing cards need to know at a glance whether a table needs extra
@@ -460,20 +437,22 @@ export default function DailyCardsPage() {
                 {new Date(b.session_start).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
               </p>
 
-              {/* Table, read-only. Per Daisy: the girls set the table in
-                  Square and then physically put the card on it -- the app
-                  printing an editable table field made it a second source
-                  of truth for something it doesn't decide. Shown only when
-                  Square actually says one. */}
-              {b.table_number && (
-                <div style={{ marginTop: '0.3rem', fontSize: '0.8rem', color: '#666' }}>Table {b.table_number}</div>
-              )}
+              {/* No printed table number or room. Daisy: "they get seated
+                  anyway. It's the photograph and the card that counts...
+                  all we need is the identification of the booking." The
+                  app never decided the table -- it was reprinting what
+                  Square said, which was often blank or just "Main Studio"
+                  and stale the moment anyone moved. A blank box the girls
+                  fill in by hand is both more accurate and less work than
+                  keeping two systems agreeing about it. */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginTop: '0.45rem' }}>
+                <span style={{ fontSize: '0.72rem', color: '#888', fontWeight: 600 }}>Table</span>
+                <span style={{ display: 'inline-block', width: 46, height: 26, border: '1.5px solid #bbb', borderRadius: 4 }} />
+              </div>
 
-              {(b.party_size || shortSpaceLabel(b.space_name)) && (
-                <p style={{ fontSize: '0.78rem', color: 'var(--clay)', fontWeight: 600, marginTop: '0.2rem' }}>
-                  {b.party_size ? `${b.party_size} seat${b.party_size === 1 ? '' : 's'}` : ''}
-                  {b.party_size && shortSpaceLabel(b.space_name) ? ' · ' : ''}
-                  {shortSpaceLabel(b.space_name) || ''}
+              {b.party_size && (
+                <p style={{ fontSize: '0.78rem', color: 'var(--clay)', fontWeight: 600, marginTop: '0.35rem' }}>
+                  {b.party_size} seat{b.party_size === 1 ? '' : 's'}
                 </p>
               )}
               {setupFlags.length > 0 && (
