@@ -661,26 +661,39 @@ export default function PackingPage() {
                 above, so piece 2 is green in both places. */}
             <div style={{ position: 'relative' }}>
               <img src={photo} alt="" style={{ width: '100%', borderRadius: 8, display: 'block' }} />
-              {packablePieces.map((p, i) => p.photo_box && p.reference_photo_url === photo && (
-                <div
-                  key={p.id}
-                  style={{
-                    position: 'absolute',
-                    left: `${p.photo_box.left_pct}%`,
-                    top: `${p.photo_box.top_pct}%`,
-                    width: `${p.photo_box.right_pct - p.photo_box.left_pct}%`,
-                    height: `${p.photo_box.bottom_pct - p.photo_box.top_pct}%`,
-                    border: `3px solid ${PIECE_COLOURS[i % 6]}`,
-                    borderRadius: 4,
-                    boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
-                    pointerEvents: 'none',
-                  }}
-                >
-                  <span style={{ position: 'absolute', top: -9, left: -9, width: 20, height: 20, borderRadius: '50%', backgroundColor: PIECE_COLOURS[i % 6], color: 'white', fontSize: '0.68rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px white' }}>
-                    {i + 1}
-                  </span>
-                </div>
-              ))}
+              {/* Daisy: "see these table with identified pieces for
+                  location finding persist until packed." This view stays
+                  up for as long as the booking has anything left to find
+                  -- but every box used to look identical whether a piece
+                  was still on a shelf somewhere or already handed over,
+                  which cluttered the one thing meant to help find what's
+                  LEFT. A packed piece now greys out with a check instead
+                  of competing for attention with what's still needed. */}
+              {packablePieces.map((p, i) => {
+                if (!p.photo_box || p.reference_photo_url !== photo) return null;
+                const packed = p.status === 'collected';
+                return (
+                  <div
+                    key={p.id}
+                    style={{
+                      position: 'absolute',
+                      left: `${p.photo_box.left_pct}%`,
+                      top: `${p.photo_box.top_pct}%`,
+                      width: `${p.photo_box.right_pct - p.photo_box.left_pct}%`,
+                      height: `${p.photo_box.bottom_pct - p.photo_box.top_pct}%`,
+                      border: `3px solid ${packed ? '#bbb' : PIECE_COLOURS[i % 6]}`,
+                      borderRadius: 4,
+                      boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
+                      opacity: packed ? 0.45 : 1,
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <span style={{ position: 'absolute', top: -9, left: -9, width: 20, height: 20, borderRadius: '50%', backgroundColor: packed ? '#bbb' : PIECE_COLOURS[i % 6], color: 'white', fontSize: '0.68rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px white' }}>
+                      {packed ? '✓' : i + 1}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
             {/* Said plainly rather than leaving someone to wonder why a
                 piece has no square on it. */}
