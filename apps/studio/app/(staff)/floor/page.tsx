@@ -6,7 +6,6 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ChevronRight, Home, Camera, Printer, Check, Loader, RefreshCw } from 'lucide-react';
-import QRCode from 'qrcode';
 import { NudgeCard, HelpButton } from '@/components/NudgeSystem';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
 
@@ -161,8 +160,6 @@ export default function FloorPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [finished, setFinished] = useState(false);
-  const [qrUrl, setQrUrl] = useState<string | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const tillTotal = tillItems.reduce((s, i) => s + i.unit_price_cents * i.quantity, 0);
@@ -535,18 +532,8 @@ export default function FloorPage() {
       });
       setFinished(true);
 
-      const url = `${window.location.origin}/customer?booking=${encodeURIComponent(current.booking_code)}`;
-      setQrUrl(url);
       setSaved(true);
       setPhase(5);
-      setTimeout(async () => {
-        const c = canvasRef.current;
-        if (!c) return;
-        const dataUrl = await QRCode.toDataURL(url, { margin: 1, width: 160 });
-        const img = new Image();
-        img.onload = () => c.getContext('2d')?.drawImage(img, 0, 0, 160, 160);
-        img.src = dataUrl;
-      }, 50);
     } finally {
       setSaving(false);
     }
@@ -561,7 +548,6 @@ export default function FloorPage() {
     setPhotoPreview(null);
     setSaved(false);
     setFinished(false);
-    setQrUrl(null);
     setCollectionMethod(null);
     setPostalPostcode('');
     setActivePersonTag(null);
@@ -597,27 +583,21 @@ export default function FloorPage() {
               {syncWarning}
             </div>
           )}
+          {/* The QR card on the table IS the way in now. Daisy: "we don't
+              need anything else on this apart from photograph table
+              because the QR code will be picked up, and that will open
+              the booking." So: scan, and this screen is skipped entirely
+              -- ?code= deep-links straight to the table step. The old
+              schedule / booking list / seated-bookings launchpad is gone,
+              along with the till it fed. Browsing for a booking by hand
+              is the thing the QR code exists to replace. */}
           <div className="space-y-3">
-            {/* The Schedule is now the way in: it shows the day by table,
-                in the Square Appointments layout the studio already reads,
-                and tapping a session comes straight back here with that
-                booking loaded. Kept first and prominent. */}
-            <a href="/schedule" className="w-full py-5 rounded-lg font-bold flex items-center justify-center gap-3 text-lg" style={{ backgroundColor: B.clay, color: B.ivory, textDecoration: 'none' }}>
-              📅 Open the Schedule <ChevronRight size={24} />
-            </a>
-            <p style={{ color: B.stone, fontSize: '0.75rem', textAlign: 'center' }}>The day by table · tap a session to run it</p>
             <button onClick={loadBookings} disabled={loading} className="w-full py-4 rounded-lg font-semibold flex items-center justify-center gap-3" style={{ backgroundColor: 'transparent', color: B.ivory, border: `1px solid ${B.stone}` }}>
-              {loading ? 'Loading...' : 'Booking list instead'}
+              {loading ? 'Loading...' : 'No card? Find the booking by hand'}
             </button>
-            <button onClick={loadSeatedBookings} disabled={loading} className="w-full py-4 rounded-lg font-semibold flex items-center justify-center gap-3" style={{ backgroundColor: B.sand, color: B.charcoal }}>
-              {loading ? 'Loading...' : '🪑 Seated Bookings'}
-              {!loading && <ChevronRight size={20} />}
-            </button>
-            <p style={{ color: B.stone, fontSize: '0.75rem', textAlign: 'center' }}>Already-seated tables · more drinks or pieces · running totals</p>
-            {/* Find on Table moved to the Pieces section of the menu. It's
-                a different job -- locating fired pottery on a shelf, not
-                running a live table -- and it was only here because this
-                screen was the only launchpad. */}
+            <p style={{ color: B.stone, fontSize: '0.75rem', textAlign: 'center' }}>
+              Normally you scan the QR card on the table and come straight here with the booking loaded.
+            </p>
           </div>
         </div>
         <NudgeCard id="floor_home" />
@@ -1398,9 +1378,7 @@ export default function FloorPage() {
           </div>
           <div className="space-y-4 mb-8">
             <div className="p-4 rounded-lg text-center" style={{ backgroundColor: B.charcoal }}>
-              <p style={{ color: B.ivory }} className="font-bold text-sm mb-2">📱 Scan to track your pieces &amp; order drinks</p>
-              <canvas ref={canvasRef} width={160} height={160} style={{ margin: '0 auto', borderRadius: 6, backgroundColor: 'white' }} />
-              <p style={{ color: B.sand }} className="text-xs font-mono mt-2">{current?.booking_code}</p>
+              <p style={{ color: B.sand }} className="text-xs font-mono">{current?.booking_code}</p>
               <p style={{ color: B.stone }} className="text-xs mt-1">{current?.customer_name}</p>
             </div>
             <div className="p-4 rounded-lg" style={{ backgroundColor: B.charcoal }}>

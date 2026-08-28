@@ -6386,3 +6386,105 @@ confidence must be "high", "medium", or "low". x_pct/y_pct are the item's centre
     }
   });
 }
+
+// ============================================================================
+// TEST BOOKING -- one throwaway card to run the whole process against
+// ----------------------------------------------------------------------------
+// Daisy: "I would like to have one test booking button. Maybe just a small
+// button I can hit that allows me to print off one test QR code. I can add a
+// few pieces. I can then do my own tests in the kiln... and then I can do the
+// whole process with one test QR code card."
+//
+// Creates a real booking so every step downstream treats it exactly like a
+// customer's -- scan, photograph, kiln, pack. The only difference is the
+// marker, which is what makes it disposable: booking_type='test' and a
+// booking_code starting TEST-, so it can be told apart at a glance in the
+// data and removed without touching anything real.
+// ============================================================================
+
+export function registerTestBookingRoutes(app, supabase, STUDIO_ID, logger) {
+  app.post('/api/spec/test-booking', async (req, res) => {
+    try {
+      const now = new Date();
+      const stamp = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+      const bookingCode = `TEST-${now.toISOString().slice(0, 10).replace(/-/g, '')}-${stamp}`;
+
+      const { data, error } = await supabase
+        .from('bookings')
+        .insert([{
+          studio_id: STUDIO_ID,
+          booking_code: bookingCode,
+          customer_name: 'Test booking',
+          session_start: now.toISOString(),
+          session_end: new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString(),
+          party_size: 1,
+          booking_type: 'test',
+          space_name: 'Main Studio',
+          room: 'Main Studio',
+          notes: 'Created from the Test booking button. Safe to delete.',
+        }])
+        .select('booking_code, customer_name, session_start')
+        .single();
+      if (error) throw error;
+
+      res.json(data);
+    } catch (err) {
+      logger.error('test booking create failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/spec/test-booking', async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, session_start')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_type', 'test')
+        .order('session_start', { ascending: false });
+      if (error) throw error;
+      res.json(data || []);
+    } catch (err) {
+      logger.error('test booking list failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Clears every test booking AND its pieces, so repeated testing doesn't
+  // silently fill the packing queue with practice pottery. Scoped by the
+  // marker only -- a real booking can never be caught by this.
+  app.delete('/api/spec/test-booking', async (req, res) => {
+    try {
+      const { data: tests } = await supabase
+        .from('bookings')
+        .select('booking_code')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_type', 'test');
+      const codes = (tests || []).map((t) => t.booking_code);
+
+      let piecesRemoved = 0;
+      if (codes.length) {
+        const { data: pieces } = await supabase
+          .from('pottery_pieces')
+          .delete()
+          .eq('studio_id', STUDIO_ID)
+          .in('booking_id', codes)
+          .select('id');
+        piecesRemoved = (pieces || []).length;
+      }
+
+      const { data: removed, error } = await supabase
+        .from('bookings')
+        .delete()
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_type', 'test')
+        .select('booking_code');
+      if (error) throw error;
+
+      res.json({ bookings_removed: (removed || []).length, pieces_removed: piecesRemoved });
+    } catch (err) {
+      logger.error('test booking clear failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}

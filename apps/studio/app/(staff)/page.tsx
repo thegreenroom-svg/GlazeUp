@@ -90,6 +90,18 @@ export default function StudioHome() {
           );
         })}
       </div>
+
+      <button
+        onClick={() => router.push('/test-card')}
+        disabled={!!opening}
+        style={{
+          marginTop: '1.6rem', width: '100%', padding: '0.7rem',
+          borderRadius: 10, border: '1px dashed #c9c0b4', background: 'transparent',
+          color: '#8a8178', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer',
+        }}
+      >
+        Make a test card
+      </button>
     </div>
   );
 }

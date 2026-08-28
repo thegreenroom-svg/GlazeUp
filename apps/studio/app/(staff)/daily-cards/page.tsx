@@ -182,7 +182,12 @@ export default function DailyCardsPage() {
       await Promise.all(
         today.map(async (b: Booking) => {
           urls[b.booking_code] = await QRCode.toDataURL(
-            `${window.location.origin}/customer?booking=${encodeURIComponent(b.booking_code)}`,
+            // Points at the staff table step, NOT the old customer page.
+            // Two reasons: the customer route group is gone, so these QR
+            // codes had silently started leading to a 404; and this is
+            // now the app's actual way in -- scan the card on the table
+            // and land on that booking's photo step with it loaded.
+            `${window.location.origin}/floor?code=${encodeURIComponent(b.booking_code)}`,
             { margin: 1, width: 140 }
           );
         })

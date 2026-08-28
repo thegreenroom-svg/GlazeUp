@@ -104,20 +104,7 @@ export function StudioNavigation() {
         { label: 'Photograph the table', icon: <Camera className="w-5 h-5" />, href: '/floor' },
         { label: 'Into the kiln', icon: <Flame className="w-5 h-5" />, href: '/kiln-batch' },
         { label: 'Packing', icon: <Package className="w-5 h-5" />, href: '/packing' },
-      ],
-    },
-    {
-      // Not steps in the workflow -- the things the four steps refer TO.
-      // The day is how you find a booking in the first place, collection
-      // is the handover at the end, and postal covers what doesn't get
-      // collected in person.
-      section: 'Around the day',
-      items: [
-        { label: 'The Day', icon: <CalendarDays className="w-5 h-5" />, href: '/schedule' },
-        { label: 'Bookings', icon: <CalendarDays className="w-5 h-5" />, href: '/bookings' },
-        { label: 'Collection', icon: <Package className="w-5 h-5" />, href: '/collect' },
-        { label: 'Postal & Labels', icon: <Truck className="w-5 h-5" />, href: '/kiln-dip' },
-        { label: 'Test AI', icon: <FlaskConical className="w-5 h-5" />, href: '/test-ai' },
+        { label: 'Test card', icon: <QrCode className="w-5 h-5" />, href: '/test-card' },
       ],
     },
     ...(showDiagnostics ? [{
@@ -139,7 +126,6 @@ export function StudioNavigation() {
     ...menuGroups.flatMap((g) => g.items),
     // Pinned above the groups rather than inside one, so it isn't in
     // menuGroups -- but it still needs to be findable by name.
-    { label: 'Schedule', href: '/schedule' },
     { label: 'Ticket Link Check', href: '/ticket-link' },
     { label: 'Square Access Check', href: '/square-access' },
     { label: 'Needs Verification', href: '/needs-verification' },
@@ -225,7 +211,7 @@ export function StudioNavigation() {
   const menuList = (
     <div className="py-3">
       <div style={{ padding: '0 0.75rem 0.5rem' }}>
-        {itemLink({ label: 'The Day', icon: <CalendarDays className="w-5 h-5" />, href: '/schedule' })}
+        {itemLink({ label: 'Home', icon: <CalendarDays className="w-5 h-5" />, href: '/' })}
       </div>
       {menuGroups.map((g) => (
         <div key={g.section} style={{ marginBottom: '0.5rem' }}>
