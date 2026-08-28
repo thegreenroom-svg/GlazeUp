@@ -131,6 +131,7 @@ export default function FloorPage() {
   const [loading, setLoading] = useState(false);
   const [current, setCurrent] = useState<Booking | null>(null);
   const [pieceCount, setPieceCount] = useState(0);
+  const [identifyError, setIdentifyError] = useState<string | null>(null);
   // Real per-piece identification from the table photo.
   const [identifiedPieces, setIdentifiedPieces] = useState<{ index: number; piece_type: string; description: string; box: { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number } | null }[] | null>(null);
   const [identifying, setIdentifying] = useState(false);
@@ -479,6 +480,7 @@ export default function FloorPage() {
     // d'Ambrumenil's photo showed two rabbits but recorded "0 pieces").
     setIdentifying(true);
     setIdentifiedPieces(null);
+    setIdentifyError(null); // clear any error from a previous attempt
     try {
       // Compressed for the AI call only -- a throwaway copy used just for
       // this request. `photo` (the state used by saveAndFinish below,
@@ -497,8 +499,28 @@ export default function FloorPage() {
       if (res.ok && Array.isArray(d.pieces)) {
         setIdentifiedPieces(d.pieces);
         setPieceCount(d.pieces.length);
+        setIdentifyError(null);
+      } else {
+        // A real failure, said out loud. This branch used to fall through
+        // silently.
+        setIdentifyError(d?.error || 'The AI could not read that photo.');
       }
-    } catch { /* identification is a helper, not a blocker -- staff can still finish */ }
+    } catch (err) {
+      // THE BUG Daisy hit: this catch swallowed everything. If the AI call
+      // timed out or errored, pieceCount stayed 0, identifiedPieces stayed
+      // null, and the booking saved ONE placeholder piece described as
+      // "0 pieces, photographed at table" -- with nothing on screen saying
+      // anything had gone wrong. It looked exactly like the AI had got
+      // worse, when in fact it had never answered. Identification is still
+      // not a blocker (staff must be able to finish a table regardless),
+      // but a silent failure that quietly writes bad data is worse than no
+      // help at all.
+      setIdentifyError(
+        err instanceof Error && /abort/i.test(err.message)
+          ? 'The AI check took too long and was cancelled. Retake the photo to try again.'
+          : 'Could not reach the AI check. Retake the photo to try again.'
+      );
+    }
     finally { setIdentifying(false); }
   };
 
@@ -514,7 +536,13 @@ export default function FloorPage() {
         formData.append('photo', photo);
         formData.append('booking_code', current.booking_code);
         formData.append('chalk_tag_name', current.customer_name);
-        formData.append('description', `${pieceCount} pieces, photographed at table`);
+        // Honest description either way. Previously this always wrote
+        // "<n> pieces, photographed at table" even when n was 0 because
+        // the AI call had failed -- which is how "0 pieces, photographed
+        // at table" ended up stored as a real piece description.
+        formData.append('description', pieceCount > 0
+          ? `${pieceCount} pieces, photographed at table`
+          : 'Photographed at table (pieces not identified)');
         formData.append('confirmed_by', 'start-floor');
         // Real pipeline connection: this one photo also creates the
         // piece records with itself attached, so Find on Table can
@@ -1399,6 +1427,14 @@ export default function FloorPage() {
                   </div>
                 )}
 
+                {identifyError && !identifying && (
+                  <div style={{ padding: '0.7rem 0.85rem', backgroundColor: '#3a2420', border: '1px solid #7a4a3a', borderRadius: 8, marginBottom: '1rem' }}>
+                    <p style={{ color: '#ffb4a2', fontSize: '0.82rem', fontWeight: 600 }}>{identifyError}</p>
+                    <p style={{ color: B.stone, fontSize: '0.72rem', marginTop: '0.3rem' }}>
+                      You can still finish, but the pieces won&apos;t be described and won&apos;t be findable on the shelf later.
+                    </p>
+                  </div>
+                )}
                 {identifiedPieces && identifiedPieces.length === 0 && !identifying && (
                   <p style={{ color: B.stone, fontSize: '0.8rem', marginBottom: '1rem' }}>
                     No pieces identified — tap the photo to retake, or carry on and add them later.
