@@ -2501,6 +2501,23 @@ async function sendCollectionEmail({ to, customerName, collectionDate, photoUrls
 // service expects to read.
 // ============================================================================
 export function registerPostalLabelRoute(app, supabase, STUDIO_ID, logger) {
+  // Daisy: "sure have key from way back" -- may already be set on Render
+  // from earlier in this project's life, not something I can see from
+  // here. This checks PRESENCE only, not validity -- I don't have
+  // confirmed knowledge of a safe, side-effect-free Royal Mail endpoint
+  // to test the key against, so this doesn't guess at one. A real label
+  // creation is still the only way to know for certain it actually
+  // works; this just answers the first, faster question honestly.
+  app.get('/api/spec/postal/status', async (req, res) => {
+    const configured = !!process.env.ROYAL_MAIL_API_KEY;
+    res.json({
+      configured,
+      message: configured
+        ? 'A Royal Mail API key is set on this server. Whether it actually works can only be confirmed by creating a real label.'
+        : 'No Royal Mail API key is set on this server yet.',
+    });
+  });
+
   app.post('/api/spec/postal/create-label', async (req, res) => {
     try {
       const { booking_code, person_name, recipient_name, postcode, address_line1, city, weight_grams } = req.body || {};

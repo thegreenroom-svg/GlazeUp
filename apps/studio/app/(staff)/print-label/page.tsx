@@ -30,6 +30,7 @@ export default function PrintLabelPage() {
   const searchParams = useSearchParams();
   const [data, setData] = useState<LabelData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [royalMail, setRoyalMail] = useState<{ configured: boolean; message: string } | null>(null);
 
   const load = useCallback(async (code: string) => {
     setError(null);
@@ -46,6 +47,10 @@ export default function PrintLabelPage() {
   useEffect(() => {
     const code = searchParams.get('code');
     if (code) load(code);
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/postal/status`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setRoyalMail(d); })
+      .catch(() => { /* status just stays unknown */ });
   }, [searchParams, load]);
 
   const isPostal = data?.collection_method === 'postal';
@@ -106,6 +111,11 @@ export default function PrintLabelPage() {
           {isPostal && !data.postal_address_line1 && (
             <p style={{ fontSize: '0.75rem', color: '#A6761D', marginTop: '0.6rem' }}>
               No street address was captured for this booking — go back to the table step to add one before posting.
+            </p>
+          )}
+          {isPostal && royalMail && (
+            <p style={{ fontSize: '0.72rem', color: royalMail.configured ? '#2E7D32' : '#999', marginTop: '0.5rem' }}>
+              {royalMail.configured ? '✓ ' : ''}{royalMail.message}
             </p>
           )}
         </>
