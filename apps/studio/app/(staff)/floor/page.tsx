@@ -500,7 +500,7 @@ export default function FloorPage() {
         formData.append('photo', photo);
         formData.append('booking_code', current.booking_code);
         formData.append('chalk_tag_name', current.customer_name);
-        formData.append('description', `${pieceCount} pieces, Start Floor hand-off`);
+        formData.append('description', `${pieceCount} pieces, photographed at table`);
         formData.append('confirmed_by', 'start-floor');
         // Real pipeline connection: this one photo also creates the
         // piece records with itself attached, so Find on Table can
@@ -576,7 +576,7 @@ export default function FloorPage() {
         <div className="max-w-2xl mx-auto">
           <div className="pt-6 pb-8 text-center">
             <h1 className="text-2xl font-bold" style={{ color: B.ivory }}>Start Floor</h1>
-            <p className="text-sm mt-1" style={{ color: B.stone }}>Table → till → photo → hand-off. Real data throughout.</p>
+            <p className="text-sm mt-1" style={{ color: B.stone }}>Table → photo. Scan the QR card with your camera to begin.</p>
           </div>
           {syncWarning && (
             <div style={{ backgroundColor: '#5a2a2a', color: '#ffcccc', padding: '0.7rem 0.9rem', borderRadius: 8, fontSize: '0.8rem', marginBottom: '1rem' }}>
@@ -591,13 +591,22 @@ export default function FloorPage() {
               schedule / booking list / seated-bookings launchpad is gone,
               along with the till it fed. Browsing for a booking by hand
               is the thing the QR code exists to replace. */}
-          <div className="space-y-3">
+          <div className="space-y-4">
+            {/* Daisy landed here and asked how to photograph a QR code
+                from this screen -- the honest answer was "you can't, and
+                nothing here explained that." There is no in-app scanner;
+                it relies entirely on iOS recognising a URL in a QR code
+                through the ordinary Camera app. That's zero extra code,
+                but it's invisible unless someone actually says so. */}
+            <div className="rounded-lg p-4" style={{ backgroundColor: B.charcoal, border: `1px solid ${B.stone}` }}>
+              <p className="font-bold text-sm" style={{ color: B.ivory }}>To open a booking, scan its card</p>
+              <p className="text-xs mt-2" style={{ color: B.stone, lineHeight: 1.5 }}>
+                Use the iPad's own Camera app -- not this one. Point it at the QR code on the table card. iOS shows a banner to open the link; tap it, and this screen loads with that booking ready.
+              </p>
+            </div>
             <button onClick={loadBookings} disabled={loading} className="w-full py-4 rounded-lg font-semibold flex items-center justify-center gap-3" style={{ backgroundColor: 'transparent', color: B.ivory, border: `1px solid ${B.stone}` }}>
               {loading ? 'Loading...' : 'No card? Find the booking by hand'}
             </button>
-            <p style={{ color: B.stone, fontSize: '0.75rem', textAlign: 'center' }}>
-              Normally you scan the QR card on the table and come straight here with the booking loaded.
-            </p>
           </div>
         </div>
         <NudgeCard id="floor_home" />
