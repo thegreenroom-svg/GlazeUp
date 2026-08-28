@@ -5690,14 +5690,35 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
         .neq('archived', true)
         .neq('status', 'collected');
 
+      // Daisy: "it needs to be able to have a second option if they're
+      // not in that photo to take another shelf... and tell they're all
+      // found for that booking." One shelf photo was never guaranteed to
+      // show everything -- a kiln has more than one shelf. This is what
+      // makes a second, third, fourth photo build on the last rather than
+      // starting the search over: already-found pieces are excluded from
+      // the candidate pool entirely, so a later photo can only ever add
+      // to what's been found, never re-ask about something already there.
+      let excludeIds = [];
+      try {
+        excludeIds = req.body?.exclude_piece_ids ? JSON.parse(req.body.exclude_piece_ids) : [];
+      } catch { /* malformed input -- treat as no exclusions rather than fail the whole sweep */ }
+
       // A piece with no description can't be looked for, and one held for a
       // return visit was never in the kiln -- including either would send
       // someone hunting a shelf for something that isn't there.
       const pieces = (allPieces || [])
-        .filter((p) => (p.description || p.piece_type) && p.fulfilment !== 'return_visit')
+        .filter((p) => (p.description || p.piece_type) && p.fulfilment !== 'return_visit' && !excludeIds.includes(p.id))
         .slice(0, 80);
 
-      if (!pieces.length) return res.json({ candidates: 0, bookings: [], note: 'Nothing is waiting to go out' });
+      if (!pieces.length) {
+        return res.json({
+          candidates: 0,
+          bookings: [],
+          note: excludeIds.length
+            ? 'Everything found across your photos so far -- nothing left to search for.'
+            : 'Nothing is waiting to go out',
+        });
+      }
 
       const { data: bookingRows } = await supabase
         .from('bookings')

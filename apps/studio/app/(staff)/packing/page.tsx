@@ -113,9 +113,21 @@ export default function PackingPage() {
   // picture -- which is exactly the point of photographing a shelf: seeing
   // WHICH pot on the shelf is whose.
   const [sweepPhoto, setSweepPhoto] = useState<string | null>(null);
+  // Daisy: "it needs to be able to have a second option if they're not in
+  // that photo to take another shelf... and tell they're all found for
+  // that booking." One shelf photo was never guaranteed to show
+  // everything -- a kiln room has more than one shelf. Accumulated across
+  // however many photos it takes this session; reset only when someone
+  // deliberately starts a fresh search.
+  const [foundSoFar, setFoundSoFar] = useState<{ id: string; piece_type: string | null; description: string | null; booking_code: string; customer_name: string }[]>([]);
 
   const runSweep = async (file: File) => {
     setSweeping(true); setSweep(null); setSweepError(null);
+    // Always accumulates -- foundSoFar is only ever cleared by the
+    // explicit "Start a new search" action below, never as a side effect
+    // of which button happened to be tapped. A second photo that finds
+    // nothing NEW must never look like a reason to throw away what a
+    // first photo already found.
     setSweepPhoto((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file); });
     // A hard stop on the button itself, independent of whatever the
     // backend does. The backend now times out its own Gemini call, but a
@@ -150,10 +162,18 @@ export default function PackingPage() {
       const compressed = await compressPhotoForUpload(file);
       const fd = new FormData();
       fd.append('photo', compressed, 'shelf.jpg');
+      // Already-found pieces are excluded from the search entirely --
+      // this photo can only ever add to what's been found, never re-ask
+      // about something a previous photo already confirmed.
+      if (foundSoFar.length) fd.append('exclude_piece_ids', JSON.stringify(foundSoFar.map((f) => f.id)));
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweep`, { method: 'POST', body: fd, signal: controller.signal });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || 'Could not read the shelf');
       setSweep(d);
+      const newlyFound = (d.bookings || []).flatMap((b: typeof d.bookings[number]) =>
+        b.pieces.map((p: typeof b.pieces[number]) => ({ id: p.id, piece_type: p.piece_type, description: p.description, booking_code: b.booking_code, customer_name: b.customer_name }))
+      );
+      if (newlyFound.length) setFoundSoFar((prev) => [...prev, ...newlyFound]);
     } catch (e) {
       if (e instanceof Error && e.name === 'AbortError') {
         setSweepError('That took too long and was cancelled. Try again — a smaller or clearer photo often helps.');
@@ -471,9 +491,16 @@ export default function PackingPage() {
           <img src={sweepPhoto} alt="" style={{ width: '100%', borderRadius: 8, display: 'block', marginTop: '0.6rem', opacity: 0.7 }} />
         )}
         {sweep && sweep.bookings.length === 0 && (
-          <p style={{ fontSize: '0.78rem', color: '#A6761D', marginTop: '0.6rem' }}>
-            {sweep.note || `Nothing recognised out of ${sweep.candidates} piece${sweep.candidates === 1 ? '' : 's'} waiting. Worth trying a closer photo.`}
-          </p>
+          <>
+            <p style={{ fontSize: '0.78rem', color: '#A6761D', marginTop: '0.6rem' }}>
+              {sweep.note || `Nothing recognised out of ${sweep.candidates} piece${sweep.candidates === 1 ? '' : 's'} waiting. Worth trying a closer photo.`}
+            </p>
+            {foundSoFar.length > 0 && (
+              <p style={{ fontSize: '0.72rem', color: '#777', marginTop: '0.3rem' }}>
+                {foundSoFar.length} found across earlier photos this search -- still here, tap &quot;Photograph the shelf&quot; above to keep going.
+              </p>
+            )}
+          </>
         )}
 
         {sweep && sweep.bookings.length > 0 && (
@@ -555,7 +582,39 @@ export default function PackingPage() {
                 </span>
               </button>
             ))}
+            {/* Daisy: "it needs to be able to have a second option if
+                they're not in that photo to take another shelf." A kiln
+                room has more than one shelf -- one photo was never
+                guaranteed to be the whole story. */}
+            <label
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+                width: '100%', padding: '0.6rem', marginTop: '0.5rem', borderRadius: 8,
+                border: '1px dashed var(--clay)', color: 'var(--clay)', fontWeight: 700, fontSize: '0.8rem',
+                cursor: sweeping ? 'default' : 'pointer', opacity: sweeping ? 0.5 : 1,
+              }}
+            >
+              {sweeping ? <Loader size={14} className="animate-spin" /> : <Camera size={14} />}
+              {sweeping ? 'Reading the shelf...' : 'Not all here? Photograph another shelf'}
+              <input
+                type="file" accept="image/*" capture="environment" style={{ display: 'none' }} disabled={sweeping}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) runSweep(f); e.target.value = ''; }}
+              />
+            </label>
+            {foundSoFar.length > sweep.bookings.reduce((n, b) => n + b.pieces.length, 0) && (
+              <p style={{ fontSize: '0.72rem', color: '#777', textAlign: 'center', marginTop: '0.4rem' }}>
+                {foundSoFar.length} found in total across your photos so far
+              </p>
+            )}
           </div>
+        )}
+        {foundSoFar.length > 0 && (
+          <button
+            onClick={() => { setFoundSoFar([]); setSweep(null); setSweepPhoto((old) => { if (old) URL.revokeObjectURL(old); return null; }); }}
+            style={{ width: '100%', padding: '0.4rem', marginTop: '0.6rem', border: 'none', background: 'transparent', color: '#999', fontSize: '0.75rem', textDecoration: 'underline', cursor: 'pointer' }}
+          >
+            Start a new search
+          </button>
         )}
       </div>
 
