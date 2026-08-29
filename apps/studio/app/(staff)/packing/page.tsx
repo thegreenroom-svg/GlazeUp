@@ -941,10 +941,21 @@ export default function PackingPage() {
                   background: b.complete ? '#F1F8F1' : '#FBF7F1', cursor: 'pointer',
                 }}
               >
-                <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>{b.customer_name}</span>
-                {/* "2 of 4" is the useful number -- a part-found booking
-                    means the rest are still somewhere else. */}
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: b.complete ? '#2E7D32' : '#A6761D' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>{b.customer_name}</span>
+                  {/* Daisy caught a brown owl jug reported as a green fish
+                      vase. Colour and form are now hard disqualifiers in
+                      the prompt, but a shaky match should also LOOK shaky
+                      rather than sit there as confident as a solid one --
+                      the number was already coming back from the server
+                      and had simply never been shown. */}
+                  {b.pieces.some((pc) => pc.confidence < 0.8) && (
+                    <span title="Some of these matches are uncertain — worth a look before packing" style={{ fontSize: '0.68rem', fontWeight: 700, color: '#A6761D', background: '#FFF4DB', borderRadius: 4, padding: '0.1rem 0.3rem', flexShrink: 0 }}>
+                      check
+                    </span>
+                  )}
+                </span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: b.complete ? '#2E7D32' : '#A6761D', flexShrink: 0 }}>
                   {b.found} of {b.expected}{b.complete ? ' · all here' : ''}
                 </span>
               </button>

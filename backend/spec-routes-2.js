@@ -5838,7 +5838,7 @@ ${referenceImages.length
 
 Look at the shelf photo and decide which of the numbered pieces you can actually see.
 
-Be strict. Only include a number if the piece in the photo genuinely matches in form AND painted detail. Studio pottery is repetitive — many customers paint the same blank — so a "mug" alone is never enough to match on; the painted decoration has to agree. If you are unsure, leave it out. A missed piece is a minor nuisance; a wrong match sends someone home with someone else's pottery.
+HARD DISQUALIFIERS -- check these FIRST, before considering any match, and never override them with an overall impression:\n- COLOUR. If the candidate is described as green and the object in the photo is brown, they are not the same piece. Not a low-confidence match -- not a match at all. Glaze colour survives firing and does not change on a shelf.\n- FORM. A jug is not a vase is not a mug is not a bowl. Different form means different piece, however similar the decoration looks.\nIf either disagrees, the answer is no. Do not report it at any confidence.\n\nOnly once both pass, be strict on the rest. Studio pottery is repetitive -- many customers paint the same blank -- so a \"mug\" alone is never enough to match on; the painted decoration has to agree too.\n\nIf several candidates in the list have near-identical descriptions and you cannot tell WHICH one an object in the photo is, report the most likely at LOW confidence (below 0.5) rather than picking arbitrarily at high confidence. Guessing between look-alikes with false certainty is worse than admitting the ambiguity.\n\nIf you are unsure at all, leave it out. A missed piece is a minor nuisance; a wrong match sends someone home with someone else's pottery.
 
 For each match give the number, a confidence from 0 to 1, and its bounding box in the photo.`;
 
@@ -5905,7 +5905,14 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
 
       // Deliberately strict floor. Below this the guess is worse than
       // useless on a shelf of near-identical mugs.
-      const MIN_CONFIDENCE = 0.55;
+      // Raised from 0.55. Daisy caught a brown owl jug reported as a
+      // match for a green fish vase -- a colour contradiction that should
+      // never have scored at all. The prompt now treats colour and form
+      // as hard disqualifiers, and the threshold moves in the direction
+      // the prompt itself argues for: a missed piece is a nuisance, a
+      // wrong match sends someone home with someone else's pottery.
+      // Multi-shelf sweeping already makes misses cheap to recover from.
+      const MIN_CONFIDENCE = 0.65;
       const byBooking = new Map();
       for (const m of parsed.matches || []) {
         const piece = pieces[m.number - 1];
