@@ -6681,13 +6681,25 @@ export function registerCollectionRoutes(app, supabase, STUDIO_ID, logger) {
         .eq('booking_code', booking_code);
       if (bErr) throw bErr;
 
-      const { error: sErr } = await supabase
-        .from('studios')
-        .update({ current_collection_date: collection_date, current_collection_date_updated_at: new Date().toISOString() })
-        .eq('id', STUDIO_ID);
-      if (sErr) logger.warn(`collection date saved to booking but not remembered as default: ${sErr.message}`);
+      // Caught directly: a test booking saved yesterday's date as the
+      // NEXT booking's default too, because nothing stopped a past date
+      // being remembered forward. The booking itself can still be set to
+      // whatever date is given -- there may be a genuine reason to
+      // backdate one specific booking -- but a past date is never worth
+      // carrying forward as tomorrow's starting point, so it's simply
+      // not remembered as the default.
+      const today = new Date().toISOString().slice(0, 10);
+      let remembered = false;
+      if (collection_date >= today) {
+        const { error: sErr } = await supabase
+          .from('studios')
+          .update({ current_collection_date: collection_date, current_collection_date_updated_at: new Date().toISOString() })
+          .eq('id', STUDIO_ID);
+        if (sErr) logger.warn(`collection date saved to booking but not remembered as default: ${sErr.message}`);
+        remembered = !sErr;
+      }
 
-      res.json({ booking_code, collection_date, remembered: !sErr });
+      res.json({ booking_code, collection_date, remembered });
     } catch (err) {
       logger.error('collection set-date failed', err.message);
       res.status(500).json({ error: err.message });

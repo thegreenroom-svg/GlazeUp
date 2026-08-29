@@ -374,7 +374,19 @@ export default function FloorPage() {
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/collection/default-date`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d?.collection_date) setCollectionDate(d.collection_date); })
+      .then((d) => {
+        // A remembered default from a previous day can be genuinely
+        // stale by the time it's next loaded -- caught directly: a real
+        // test booking saved "yesterday" as its collection date because
+        // nobody had touched the field since the day before, and the
+        // app happily carried a past date forward without anyone
+        // consciously choosing it. A default is only worth pre-filling
+        // if it's still today or later; a past one is left blank rather
+        // than silently resaved.
+        if (d?.collection_date && d.collection_date >= new Date().toISOString().slice(0, 10)) {
+          setCollectionDate(d.collection_date);
+        }
+      })
       .catch(() => { /* no default yet -- the field just starts empty */ });
   }, []);
   const deepLinked = useRef(false);
@@ -1500,6 +1512,7 @@ export default function FloorPage() {
               <input
                 type="date"
                 value={collectionDate}
+                min={new Date().toISOString().slice(0, 10)}
                 onChange={(e) => setCollectionDate(e.target.value)}
                 style={{
                   width: '100%', padding: '0.75rem', borderRadius: 8,
