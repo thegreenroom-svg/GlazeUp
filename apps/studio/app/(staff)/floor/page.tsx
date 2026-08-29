@@ -1613,8 +1613,14 @@ export default function FloorPage() {
               )}
             </div>
           </div>
-          <button onClick={() => window.print()} className="w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 mb-2" style={{ backgroundColor: B.stone, color: B.charcoal }}>
-            <Printer size={18} /> Print card
+          {/* From the app review: this used to window.print() the hand-off
+              screen itself -- charcoal background and all, ink-soaked and
+              never designed for paper. The real collection card, with its
+              QR and print styling, already exists one route away. Renamed
+              too: four printable things existed and two were called just
+              "Print card". */}
+          <button onClick={() => { if (current) router.push(`/collection?code=${encodeURIComponent(current.booking_code)}`); }} className="w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 mb-2" style={{ backgroundColor: B.stone, color: B.charcoal }}>
+            <Printer size={18} /> Print collection card
           </button>
           <button onClick={nextBooking} className="w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2" style={{ backgroundColor: B.clay, color: B.ivory }}>
             Next Booking <ChevronRight size={20} />

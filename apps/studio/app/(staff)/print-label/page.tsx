@@ -105,7 +105,7 @@ export default function PrintLabelPage() {
             onClick={() => window.print()}
             style={{ width: '100%', marginTop: '1rem', padding: '0.8rem', borderRadius: 10, border: '1px solid #ccc', background: 'white', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
           >
-            <Printer size={15} /> Print
+            <Printer size={15} /> {isPostal ? 'Print postage label' : 'Print collection label'}
           </button>
 
           {isPostal && !data.postal_address_line1 && (

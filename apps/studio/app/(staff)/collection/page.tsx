@@ -199,7 +199,7 @@ export default function CollectionPage() {
             onClick={() => window.print()}
             style={{ width: '100%', padding: '0.8rem', borderRadius: 10, border: '1px solid #ccc', background: 'white', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginBottom: '0.6rem' }}
           >
-            <Printer size={15} /> Print this card
+            <Printer size={15} /> Print collection card
           </button>
           <button
             onClick={() => collect(card.booking_code)}

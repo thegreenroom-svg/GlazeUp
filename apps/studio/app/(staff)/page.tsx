@@ -125,6 +125,28 @@ export default function StudioHome() {
       >
         Make a test card
       </button>
+
+      {/* From the app review: four maintenance pages existed with no way
+          in except typing their URLs -- including the Square access
+          checker, which matters urgently before the token expires. Kept
+          deliberately quiet: tiny, grey, below everything, invisible in
+          normal use. */}
+      <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'center', gap: '0.9rem', flexWrap: 'wrap' }}>
+        {[
+          ['Square access', '/square-access'],
+          ['Ticket link', '/ticket-link'],
+          ['Verification', '/needs-verification'],
+          ['Party sizes', '/backfill-party-sizes'],
+        ].map(([label, href]) => (
+          <button
+            key={href}
+            onClick={() => router.push(href)}
+            style={{ border: 'none', background: 'none', color: '#c2bab0', fontSize: '0.68rem', cursor: 'pointer', padding: '0.3rem 0.2rem' }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

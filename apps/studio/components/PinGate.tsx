@@ -6,6 +6,12 @@ import { motion } from 'framer-motion';
 import { Delete } from 'lucide-react';
 
 const SESSION_KEY = 'glazeup_shift';
+// localStorage, not sessionStorage -- deliberately, from the app review.
+// The 14-hour shift expiry below existed all along but sessionStorage
+// dies whenever Safari kills the tab, so in practice the PIN re-asked
+// far more often than once a shift. Daisy approved the trade: PIN once
+// a working morning, held across tab closes, still expiring daily and
+// still cleared instantly by sign-out.
 
 // A plain fetch() has no timeout of its own -- if the request genuinely
 // hangs (not just a slow-but-working cold start, a real stalled
@@ -152,11 +158,11 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
-      const raw = sessionStorage.getItem(SESSION_KEY);
+      const raw = localStorage.getItem(SESSION_KEY);
       if (raw) {
         const s: Shift = JSON.parse(raw);
         if (Date.now() - s.at < SHIFT_MS) setShift(s);
-        else sessionStorage.removeItem(SESSION_KEY);
+        else localStorage.removeItem(SESSION_KEY);
       }
     } catch { /* first run or private mode */ }
     setChecked(true);
@@ -174,7 +180,7 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
   };
 
   const finishLogin = (s: Shift) => {
-    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(s)); } catch { /* private mode */ }
+    try { localStorage.setItem(SESSION_KEY, JSON.stringify(s)); } catch { /* private mode */ }
     setShift(s);
     setMode('enter');
     setPin('');
@@ -300,7 +306,7 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = () => {
-    try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
+    try { localStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
     setShift(null);
     setPin('');
     setMode('enter');

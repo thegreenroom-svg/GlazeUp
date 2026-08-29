@@ -317,14 +317,14 @@ export default function PackingPage() {
                   finally { setRedescribing(false); }
                 }}
                 disabled={redescribing}
-                style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.65rem', borderRadius: 7, border: '1px solid var(--clay)', background: 'white', color: 'var(--clay)', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.65rem 0.85rem', minHeight: 44, borderRadius: 7, border: '1px solid var(--clay)', background: 'white', color: 'var(--clay)', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
               >
                 {redescribing ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />}
                 {redescribing ? 'Asking again…' : 'Try again'}
               </button>
               <button
                 onClick={() => { setDescriptionDraft(p.description || ''); setEditingDescription(true); }}
-                style={{ padding: '0.4rem 0.65rem', borderRadius: 7, border: '1px solid #ccc', background: 'white', color: 'var(--charcoal)', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
+                style={{ padding: '0.65rem 0.85rem', minHeight: 44, borderRadius: 7, border: '1px solid #ccc', background: 'white', color: 'var(--charcoal)', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
               >
                 Type it myself
               </button>
@@ -351,13 +351,13 @@ export default function PackingPage() {
                       setSuggestion(null);
                     }
                   }}
-                  style={{ padding: '0.4rem 0.7rem', borderRadius: 7, border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
+                  style={{ padding: '0.65rem 0.9rem', minHeight: 44, borderRadius: 7, border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
                 >
                   Keep this
                 </button>
                 <button
                   onClick={() => setSuggestion(null)}
-                  style={{ padding: '0.4rem 0.7rem', borderRadius: 7, border: '1px solid #ccc', background: 'white', fontWeight: 600, fontSize: '0.75rem', cursor: 'pointer' }}
+                  style={{ padding: '0.65rem 0.9rem', minHeight: 44, borderRadius: 7, border: '1px solid #ccc', background: 'white', fontWeight: 600, fontSize: '0.75rem', cursor: 'pointer' }}
                 >
                   No, discard
                 </button>
@@ -387,13 +387,13 @@ export default function PackingPage() {
                       setEditingDescription(false);
                     }
                   }}
-                  style={{ padding: '0.4rem 0.7rem', borderRadius: 7, border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
+                  style={{ padding: '0.65rem 0.9rem', minHeight: 44, borderRadius: 7, border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
                 >
                   Save
                 </button>
                 <button
                   onClick={() => setEditingDescription(false)}
-                  style={{ padding: '0.4rem 0.7rem', borderRadius: 7, border: '1px solid #ccc', background: 'white', fontWeight: 600, fontSize: '0.75rem', cursor: 'pointer' }}
+                  style={{ padding: '0.65rem 0.9rem', minHeight: 44, borderRadius: 7, border: '1px solid #ccc', background: 'white', fontWeight: 600, fontSize: '0.75rem', cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
@@ -433,13 +433,13 @@ export default function PackingPage() {
                       setEditingNotes(false);
                     }
                   }}
-                  style={{ padding: '0.4rem 0.7rem', borderRadius: 7, border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
+                  style={{ padding: '0.65rem 0.9rem', minHeight: 44, borderRadius: 7, border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer' }}
                 >
                   Save
                 </button>
                 <button
                   onClick={() => setEditingNotes(false)}
-                  style={{ padding: '0.4rem 0.7rem', borderRadius: 7, border: '1px solid #ccc', background: 'white', fontWeight: 600, fontSize: '0.75rem', cursor: 'pointer' }}
+                  style={{ padding: '0.65rem 0.9rem', minHeight: 44, borderRadius: 7, border: '1px solid #ccc', background: 'white', fontWeight: 600, fontSize: '0.75rem', cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
@@ -627,7 +627,7 @@ export default function PackingPage() {
                   type="checkbox"
                   checked={selected.has(p.id)}
                   onChange={() => toggleSelected(p.id)}
-                  style={{ width: 20, height: 20, flexShrink: 0, cursor: 'pointer' }}
+                  style={{ width: 26, height: 26, flexShrink: 0, cursor: 'pointer' }}
                   aria-label={`Select ${p.piece_type || 'piece'} ${i + 1}`}
                 />
               )}
@@ -664,6 +664,14 @@ export default function PackingPage() {
                 const toPack = packablePieces.filter((p) => selected.has(p.id));
                 for (const p of toPack) await markCollected(p);
                 setSelected(new Set());
+                // From the app review: printing the label is the natural
+                // next physical action once everything's boxed -- offered
+                // here at that exact moment, rather than relying on
+                // someone knowing to look for the button further up.
+                const remaining = packablePieces.filter((p) => p.status !== 'collected' && !selected.has(p.id)).length;
+                if (remaining === 0 && confirm('All packed. Print the label now?')) {
+                  router.push(`/print-label?code=${encodeURIComponent(openBooking.booking_code)}`);
+                }
               } finally { setBulkPacking(false); }
             }}
             disabled={bulkPacking}
