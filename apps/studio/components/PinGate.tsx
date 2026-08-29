@@ -506,21 +506,57 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-      <div className="no-print" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.9rem', padding: '0.4rem 0.8rem' }}>
-        {isAdmin && (
+      {/* Daisy: "We need a big headline who's using this tablet... the
+          last user logged in, or switch user, because tablets get used by
+          multiple staff."
+
+          This existed before as tiny grey right-aligned text -- and in
+          nearly every screenshot this session, Safari's own chrome sat
+          directly on top of it. Worthless for the job it now has to do:
+          every table photo is attributed to whoever is signed in, so
+          someone shooting a table under a colleague's name is a real,
+          silent error. Made it the first thing on the screen, at a size
+          that's readable across a room, with "Switch user" as its own
+          named action rather than hidden behind the word "sign out". */}
+      <div
+        className="no-print"
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem',
+          padding: '0.6rem 0.9rem', background: 'var(--charcoal)', color: 'var(--ivory)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', minWidth: 0 }}>
+          <span style={{
+            flexShrink: 0, width: 30, height: 30, borderRadius: '50%', background: 'var(--clay)',
+            color: 'white', fontWeight: 800, fontSize: '0.85rem',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {(shift.name || '?').trim().charAt(0).toUpperCase()}
+          </span>
+          <span style={{ fontSize: '1.05rem', fontWeight: 800, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {shift.name || 'Signed in'}
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+          {isAdmin && (
+            <button
+              onClick={openAdminReset}
+              style={{ background: 'none', border: 'none', color: 'var(--stone)', fontSize: '0.75rem', cursor: 'pointer', padding: '0.5rem 0.3rem', minHeight: 44 }}
+            >
+              Reset a PIN
+            </button>
+          )}
           <button
-            onClick={openAdminReset}
-            style={{ background: 'none', border: 'none', color: '#999', fontSize: '0.75rem', cursor: 'pointer' }}
+            onClick={signOut}
+            style={{
+              background: 'rgba(255,255,255,0.14)', border: 'none', color: 'var(--ivory)',
+              fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
+              padding: '0.5rem 0.8rem', borderRadius: 8, minHeight: 44,
+            }}
           >
-            Reset a PIN
+            Switch user
           </button>
-        )}
-        <button
-          onClick={signOut}
-          style={{ background: 'none', border: 'none', color: '#999', fontSize: '0.75rem', cursor: 'pointer' }}
-        >
-          {shift.name ? `${shift.name} · sign out` : 'Sign out'}
-        </button>
+        </div>
       </div>
       {children}
 
