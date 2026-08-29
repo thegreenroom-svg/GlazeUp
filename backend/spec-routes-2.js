@@ -6751,7 +6751,8 @@ export function registerCollectionRoutes(app, supabase, STUDIO_ID, logger) {
           .select('booking_id')
           .eq('studio_id', STUDIO_ID)
           .in('booking_id', codes)
-          .neq('status', 'collected');
+          .neq('status', 'collected')
+          .neq('archived', true);
         for (const p of pieces || []) {
           pieceCounts[p.booking_id] = (pieceCounts[p.booking_id] || 0) + 1;
         }
@@ -6803,6 +6804,7 @@ export function registerCollectionRoutes(app, supabase, STUDIO_ID, logger) {
         .update({ status: uncollect ? 'queued' : 'collected' })
         .eq('studio_id', STUDIO_ID)
         .eq('booking_id', booking_code)
+        .neq('archived', true)
         .select('id');
       if (pErr) throw pErr;
 
@@ -6830,7 +6832,11 @@ export function registerCollectionRoutes(app, supabase, STUDIO_ID, logger) {
         .select('id, piece_type, description, reference_photo_url, photo_box')
         .eq('studio_id', STUDIO_ID)
         .eq('booking_id', req.params.code)
-        .neq('status', 'collected');
+        .neq('status', 'collected')
+        // The screenshot bug: every re-check archives its predecessors,
+        // and this card was listing the archived generations too -- the
+        // same two mugs three times over.
+        .neq('archived', true);
 
       res.json({ ...booking, pieces: pieces || [] });
     } catch (err) {
@@ -6871,7 +6877,8 @@ export function registerUpgradeAfterIdentifyRoute(app, supabase, STUDIO_ID, logg
         .from('pottery_pieces')
         .select('id, piece_type, description, reference_photo_url, reference_photo_taken_at, photo_taken_by')
         .eq('studio_id', STUDIO_ID)
-        .eq('booking_id', booking_code);
+        .eq('booking_id', booking_code)
+        .neq('archived', true);
 
       if (!existing || !existing.length) {
         // Not saved yet -- the normal, fast path will use the real data
