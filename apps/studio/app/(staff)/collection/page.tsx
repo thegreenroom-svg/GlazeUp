@@ -66,7 +66,14 @@ export default function CollectionPage() {
       if (!res.ok) throw new Error('Booking not found');
       const data = await res.json();
       setCard(data);
-      setQr(await QRCode.toDataURL(`${window.location.origin}/collection?code=${encodeURIComponent(code)}`, { margin: 1, width: 200 }));
+      // Points at the customer's own page, not the staff one -- Daisy:
+      // "just make sure it's one QR code for the booking." Staff's own
+      // scanner already extracts the code from any URL regardless of
+      // path, so this still works for scanning here exactly as before.
+      // It ALSO means a customer who taps or scans the same printed
+      // code themselves lands somewhere genuinely appropriate for
+      // them, instead of hitting a staff login wall.
+      setQr(await QRCode.toDataURL(`${window.location.origin}/my-booking?code=${encodeURIComponent(code)}`, { margin: 1, width: 200 }));
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Could not load that booking');
     } finally {

@@ -7054,3 +7054,62 @@ export function registerPackingLabelRoute(app, supabase, STUDIO_ID, logger) {
     }
   });
 }
+
+// ============================================================================
+// CUSTOMER BOOKING VIEW -- public, no login, scoped to exactly one booking
+// ----------------------------------------------------------------------------
+// Daisy: "scan this QR code for your collection time and details of your
+// booking... it can tell us if it's packed and ready." A genuinely separate
+// audience from every other route in this file -- the customer themselves,
+// with no PIN and no access to anything beyond the one booking their own
+// code names.
+//
+// Deliberately minimal: name, collection date, whether it's ready, and
+// (once ready) what's in it. No pricing, no other bookings, no way to
+// enumerate anyone else's data -- a booking_code is effectively a bearer
+// token here, the same trust model as any "track your order" link.
+// ============================================================================
+
+export function registerCustomerBookingRoute(app, supabase, STUDIO_ID, logger) {
+  app.get('/api/public/booking/:code', async (req, res) => {
+    try {
+      const { data: booking, error } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, collection_date, collected_at')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_code', req.params.code)
+        .maybeSingle();
+      if (error) throw error;
+      if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+      const { data: pieces } = await supabase
+        .from('pottery_pieces')
+        .select('id, status')
+        .eq('studio_id', STUDIO_ID)
+        .eq('booking_id', req.params.code)
+        .neq('archived', true);
+
+      const total = (pieces || []).length;
+      // A piece with status='collected' means packed and sitting ready --
+      // the SAME status this schema uses once a customer has actually
+      // been handed their order too. The two are told apart only by
+      // bookings.collected_at, set once by the real handover in
+      // Collection, never by packing alone. Checked directly against the
+      // route that sets it before writing this, rather than assumed.
+      const allPacked = total > 0 && (pieces || []).every((p) => p.status === 'collected');
+      const alreadyCollected = !!booking.collected_at;
+
+      res.json({
+        booking_code: booking.booking_code,
+        customer_name: booking.customer_name,
+        collection_date: booking.collection_date,
+        piece_count: total,
+        ready: allPacked && !alreadyCollected,
+        already_collected: alreadyCollected,
+      });
+    } catch (err) {
+      logger.error('customer booking view failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
