@@ -79,6 +79,16 @@ export default function PackingPage() {
   const [pieces, setPieces] = useState<Piece[]>([]);
   const [piecesLoading, setPiecesLoading] = useState(false);
   const [openPiece, setOpenPiece] = useState<{ piece: Piece; index: number } | null>(null);
+  // Daisy: "select each thumbnail or select all once collected from the
+  // table... mark as packed here." Picking pieces one at a time by
+  // opening each one was real friction for something this routine.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkPacking, setBulkPacking] = useState(false);
+  const toggleSelected = (id: string) => setSelected((prev) => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
   const [saving, setSaving] = useState<string | null>(null);
   // Daisy: "item 1 identified as a sheep figurine, clearly two different
   // jugs... click on it and take this photo again, try again to
@@ -102,6 +112,10 @@ export default function PackingPage() {
     setSuggestion(null); setEditingDescription(false); setDescriptionDraft('');
     setEditingNotes(false); setNotesDraft('');
   }, [openPiece?.piece.id]);
+
+  // Selection is per-booking, not per-session -- opening a different
+  // booking must never carry a stale selection into it.
+  useEffect(() => { setSelected(new Set()); }, [openBooking?.booking_code]);
   // Breakage. The draft comes back from the server for a human to send --
   // "we broke your pottery" is exactly the message that must never go out
   // by accident, so nothing here emails anyone.
@@ -573,36 +587,92 @@ export default function PackingPage() {
 
         {piecesLoading && <p style={{ fontSize: '0.85rem', color: '#888' }}>Loading the pieces...</p>}
 
+        {/* Select individual pieces, or all at once, and pack them
+            together -- opening each one just to tick it off was real
+            friction for something this routine. A piece already packed
+            is left off the count (nothing to select) but still shown,
+            same as everywhere else on this screen. */}
+        {packablePieces.length > 0 && (() => {
+          const outstanding = packablePieces.filter((p) => p.status !== 'collected').length;
+          return outstanding > 0 && (
+            <p style={{ fontSize: '0.78rem', color: '#A6761D', fontWeight: 600, marginBottom: '0.3rem' }}>
+              {outstanding} still to pack
+            </p>
+          );
+        })()}
+        {packablePieces.length > 0 && (
+          <button
+            onClick={() => {
+              const stillToPack = packablePieces.filter((p) => p.status !== 'collected').map((p) => p.id);
+              setSelected((prev) => (prev.size === stillToPack.length ? new Set() : new Set(stillToPack)));
+            }}
+            style={{ padding: 0, marginBottom: '0.4rem', border: 'none', background: 'none', color: 'var(--clay)', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}
+          >
+            {selected.size === packablePieces.filter((p) => p.status !== 'collected').length && selected.size > 0 ? 'Deselect all' : 'Select all'}
+          </button>
+        )}
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {packablePieces.map((p, i) => (
-            <button
+            <div
               key={p.id}
-              onClick={() => setOpenPiece({ piece: p, index: i })}
               style={{
-                display: 'flex', gap: '0.65rem', alignItems: 'center', textAlign: 'left',
+                display: 'flex', gap: '0.65rem', alignItems: 'center',
                 padding: '0.5rem', border: '1px solid #eee', borderRadius: 8,
-                background: p.status === 'collected' ? '#F4F8F4' : 'white', cursor: 'pointer',
+                background: p.status === 'collected' ? '#F4F8F4' : 'white',
               }}
             >
-              {p.reference_photo_url ? (
-                <div style={{
-                  width: 60, height: 60, borderRadius: 6, flexShrink: 0,
-                  border: `2px solid ${PIECE_COLOURS[i % 6]}`,
-                  ...(p.photo_box ? cropStyle(p.reference_photo_url, p.photo_box)
-                    : { backgroundImage: `url(${p.reference_photo_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }),
-                }} />
-              ) : (
-                <div style={{ width: 60, height: 60, borderRadius: 6, flexShrink: 0, backgroundColor: '#f7f7f7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: '#bbb' }}>no photo</div>
+              {p.status !== 'collected' && (
+                <input
+                  type="checkbox"
+                  checked={selected.has(p.id)}
+                  onChange={() => toggleSelected(p.id)}
+                  style={{ width: 20, height: 20, flexShrink: 0, cursor: 'pointer' }}
+                  aria-label={`Select ${p.piece_type || 'piece'} ${i + 1}`}
+                />
               )}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: '0.85rem', fontWeight: 600 }}>{i + 1}. {p.piece_type || 'Piece'}</p>
-                {p.description && <p style={{ fontSize: '0.72rem', color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.description}</p>}
-                {p.assigned_to && <p style={{ fontSize: '0.72rem', color: 'var(--clay)', fontWeight: 600 }}>For {p.assigned_to}</p>}
-              </div>
-              {p.status === 'collected' && <Check size={18} style={{ color: '#2E7D32', flexShrink: 0 }} />}
-            </button>
+              <button
+                onClick={() => setOpenPiece({ piece: p, index: i })}
+                style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', textAlign: 'left', flex: 1, minWidth: 0, border: 'none', background: 'none', padding: 0, cursor: 'pointer' }}
+              >
+                {p.reference_photo_url ? (
+                  <div style={{
+                    width: 60, height: 60, borderRadius: 6, flexShrink: 0,
+                    border: `2px solid ${PIECE_COLOURS[i % 6]}`,
+                    ...(p.photo_box ? cropStyle(p.reference_photo_url, p.photo_box)
+                      : { backgroundImage: `url(${p.reference_photo_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }),
+                  }} />
+                ) : (
+                  <div style={{ width: 60, height: 60, borderRadius: 6, flexShrink: 0, backgroundColor: '#f7f7f7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: '#bbb' }}>no photo</div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: '0.85rem', fontWeight: 600 }}>{i + 1}. {p.piece_type || 'Piece'}</p>
+                  {p.description && <p style={{ fontSize: '0.72rem', color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.description}</p>}
+                  {p.assigned_to && <p style={{ fontSize: '0.72rem', color: 'var(--clay)', fontWeight: 600 }}>For {p.assigned_to}</p>}
+                </div>
+                {p.status === 'collected' && <Check size={18} style={{ color: '#2E7D32', flexShrink: 0 }} />}
+              </button>
+            </div>
           ))}
         </div>
+
+        {selected.size > 0 && (
+          <button
+            onClick={async () => {
+              setBulkPacking(true);
+              try {
+                const toPack = packablePieces.filter((p) => selected.has(p.id));
+                for (const p of toPack) await markCollected(p);
+                setSelected(new Set());
+              } finally { setBulkPacking(false); }
+            }}
+            disabled={bulkPacking}
+            style={{ ...primaryBtn, marginTop: '0.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+          >
+            {bulkPacking ? <Loader size={16} className="animate-spin" /> : <Check size={16} />}
+            {bulkPacking ? 'Packing…' : `Mark ${selected.size} selected as packed`}
+          </button>
+        )}
 
         {/* The other half of packing. The list tells you WHAT is in the
             parcel; this finds it on a shelf of two hundred fired pieces
@@ -672,9 +742,17 @@ export default function PackingPage() {
               {packablePieces.map((p, i) => {
                 if (!p.photo_box || p.reference_photo_url !== photo) return null;
                 const packed = p.status === 'collected';
+                const isSelected = selected.has(p.id);
+                // Daisy: "see the kiln shot with all the pieces laid out
+                // on the table so they're easily pickable from here."
+                // Tappable directly on the photo, not just the thumbnail
+                // list above -- a piece already packed has nothing left
+                // to select and stays a plain marker.
                 return (
-                  <div
+                  <button
                     key={p.id}
+                    onClick={packed ? undefined : () => toggleSelected(p.id)}
+                    aria-label={packed ? undefined : `Select ${p.piece_type || 'piece'} ${i + 1}`}
                     style={{
                       position: 'absolute',
                       left: `${p.photo_box.left_pct}%`,
@@ -684,14 +762,16 @@ export default function PackingPage() {
                       border: `3px solid ${packed ? '#bbb' : PIECE_COLOURS[i % 6]}`,
                       borderRadius: 4,
                       boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
+                      backgroundColor: isSelected ? `${PIECE_COLOURS[i % 6]}33` : 'transparent',
                       opacity: packed ? 0.45 : 1,
-                      pointerEvents: 'none',
+                      padding: 0,
+                      cursor: packed ? 'default' : 'pointer',
                     }}
                   >
                     <span style={{ position: 'absolute', top: -9, left: -9, width: 20, height: 20, borderRadius: '50%', backgroundColor: packed ? '#bbb' : PIECE_COLOURS[i % 6], color: 'white', fontSize: '0.68rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px white' }}>
-                      {packed ? '✓' : i + 1}
+                      {packed ? '✓' : isSelected ? '✓' : i + 1}
                     </span>
-                  </div>
+                  </button>
                 );
               })}
             </div>
