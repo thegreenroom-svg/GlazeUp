@@ -1579,7 +1579,13 @@ export default function FloorPage() {
             <div className="p-4 rounded-lg" style={{ backgroundColor: B.charcoal }}>
               <p style={{ color: B.ivory }} className="font-bold text-sm">Session complete</p>
               <p style={{ color: B.stone }} className="text-xs mt-2">
-                {pieceCount} piece{pieceCount === 1 ? '' : 's'} · £{(tillTotal / 100).toFixed(2)} till total{finished ? ' · marked finished' : ''}
+                {/* Till total removed here. Payment moved entirely to the
+                    real Square terminal, so this was almost always
+                    "£0.00 till total" -- a confusing zero on the one
+                    screen that confirms a session is done. Where a total
+                    genuinely exists it's still shown on the table step
+                    itself, which is where it's actionable. */}
+                {pieceCount} piece{pieceCount === 1 ? '' : 's'}{finished ? ' · marked finished' : ''}
               </p>
 
               {/* The collection date set just moments ago on this exact
