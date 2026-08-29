@@ -34,6 +34,16 @@ const STEPS = [
 export default function StudioHome() {
   const router = useRouter();
   const [opening, setOpening] = useState<string | null>(null);
+  // From the app review: the tiles said what each step IS but nothing
+  // about whether it needs you right now. Fetched after render -- the
+  // tiles never wait on this, the numbers just appear.
+  const [counts, setCounts] = useState<{ today_bookings: number; to_pack: number; due_collection: number } | null>(null);
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/home/counts`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setCounts(d); })
+      .catch(() => { /* tiles simply stay unbadged */ });
+  }, []);
 
   // Prefetched on arrival. A tile that expands and then sits waiting on a
   // network fetch reads as broken, and this studio's wifi has been the
@@ -86,6 +96,19 @@ export default function StudioHome() {
                 </div>
                 <div style={{ fontSize: '0.78rem', opacity: 0.82, marginTop: '0.1rem' }}>{step.detail}</div>
               </div>
+              {(() => {
+                if (!counts) return null;
+                const n = step.key === 'cards' ? counts.today_bookings
+                  : step.key === 'packing' ? counts.to_pack
+                  : step.key === 'collection' ? counts.due_collection
+                  : null;
+                if (!n) return null;
+                return (
+                  <span style={{ flexShrink: 0, minWidth: 30, height: 30, padding: '0 0.5rem', borderRadius: 15, background: 'rgba(255,255,255,0.25)', color: 'white', fontWeight: 800, fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {n}
+                  </span>
+                );
+              })()}
             </motion.button>
           );
         })}

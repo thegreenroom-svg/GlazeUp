@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Home } from 'lucide-react';
 import { ThemeProvider } from '@/components/ThemeContext';
 import { NudgeProvider, HelpPanel, NudgeSettingsPanel } from '@/components/NudgeSystem';
+import { confirmLeaveIfGuarded } from '@/lib/leaveGuard';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -31,6 +32,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       const mostlyHorizontal = deltaY < 50;
 
       if (startedNearLeftEdge && swipedRightEnough && mostlyHorizontal) {
+        if (!confirmLeaveIfGuarded()) return; // mid-session state deserves a "sure?" before it's thrown away
         router.back();
       }
     };
@@ -59,7 +61,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <main className="flex-1 overflow-auto" style={{ position: 'relative' }}>
             {pathname !== '/' && (
               <button
-                onClick={() => router.push('/')}
+                onClick={() => { if (confirmLeaveIfGuarded()) router.push('/'); }}
                 aria-label="Return to home"
                 className="no-print"
                 style={{

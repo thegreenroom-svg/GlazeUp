@@ -7125,3 +7125,58 @@ export function registerCustomerBookingRoute(app, supabase, STUDIO_ID, logger) {
     }
   });
 }
+
+// ============================================================================
+// HOME COUNTS -- the four tiles show the real state of the day
+// ----------------------------------------------------------------------------
+// From the app review: the home tiles were completely static -- they said
+// what each step IS but nothing about whether it needs you. "3 to pack"
+// on a tile answers the question the girls actually walk up to the iPad
+// with: is there anything waiting for me? One cheap route, three counts,
+// fetched after the tiles render so home never waits on it.
+// ============================================================================
+
+export function registerHomeCountsRoute(app, supabase, STUDIO_ID, logger) {
+  app.get('/api/spec/home/counts', async (req, res) => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+
+      // Today's bookings (the Print cards step).
+      const { count: todayBookings } = await supabase
+        .from('bookings')
+        .select('booking_code', { count: 'exact', head: true })
+        .eq('studio_id', STUDIO_ID)
+        .gte('session_start', `${today}T00:00:00`)
+        .lt('session_start', `${today}T23:59:59`);
+
+      // Bookings with anything still to pack -- same exclusions as the
+      // packing queue itself (collected done, damaged never coming,
+      // return-visit never fired).
+      const { data: packPieces } = await supabase
+        .from('pottery_pieces')
+        .select('booking_id, status, fulfilment')
+        .eq('studio_id', STUDIO_ID)
+        .neq('archived', true)
+        .neq('status', 'collected');
+      const toPack = new Set(
+        (packPieces || [])
+          .filter((p) => p.status !== 'damaged' && p.fulfilment !== 'return_visit')
+          .map((p) => p.booking_id)
+      ).size;
+
+      // Due for collection: date reached, not yet handed over.
+      const { count: dueCollection } = await supabase
+        .from('bookings')
+        .select('booking_code', { count: 'exact', head: true })
+        .eq('studio_id', STUDIO_ID)
+        .is('collected_at', null)
+        .not('collection_date', 'is', null)
+        .lte('collection_date', today);
+
+      res.json({ today_bookings: todayBookings || 0, to_pack: toPack, due_collection: dueCollection || 0 });
+    } catch (err) {
+      logger.error('home counts failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}

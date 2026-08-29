@@ -8,6 +8,7 @@ import { motion } from 'framer-motion';
 import { ChevronRight, Home, Camera, Printer, Check, Loader, RefreshCw } from 'lucide-react';
 import { NudgeCard } from '@/components/NudgeSystem';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
+import { setLeaveGuard } from '@/lib/leaveGuard';
 import { QrScanner } from '@/components/QrScanner';
 
 // Same fix already applied in PinGate.tsx and daily-cards/page.tsx: a
@@ -390,6 +391,17 @@ export default function FloorPage() {
       .catch(() => { /* no default yet -- the field just starts empty */ });
   }, []);
   const deepLinked = useRef(false);
+
+  // Guard is live exactly while there's something real to lose: a photo
+  // taken against a booking that hasn't been finished. Cleared the
+  // moment it's finished, and on unmount, so no other page inherits it.
+  useEffect(() => {
+    const somethingToLose = !!current && !!photo && !finished;
+    setLeaveGuard(somethingToLose
+      ? 'This table isn\'t finished — leaving now loses the photo and till items for this booking. Re-scanning the table card starts it over. Leave anyway?'
+      : null);
+    return () => setLeaveGuard(null);
+  }, [current, photo, finished]);
   useEffect(() => {
     const code = searchParams.get('code');
     if (!code || deepLinked.current) return;
