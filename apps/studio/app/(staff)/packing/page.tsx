@@ -52,6 +52,8 @@ interface Piece {
   assigned_to: string | null;
   fulfilment: string | null;
   notes: string | null;
+  photo_taken_by: string | null;
+  reference_photo_taken_at: string | null;
 }
 
 // Crops the shared table photo to one piece. Every piece on a booking shares
@@ -456,7 +458,16 @@ export default function PackingPage() {
           )}
           {p.reference_photo_url && (
             <div style={{ position: 'relative', marginTop: '0.75rem' }}>
-              <p style={{ fontSize: '0.72rem', color: '#888', marginBottom: '0.3rem' }}>On the table</p>
+              {/* Same accountability line as the booking view -- this is
+                  the other place a bad photo actually gets noticed. */}
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.3rem' }}>
+                <p style={{ fontSize: '0.72rem', color: '#888', margin: 0 }}>On the table</p>
+                {p.photo_taken_by && (
+                  <p style={{ fontSize: '0.72rem', color: '#888', margin: 0 }}>
+                    Photographed by <strong style={{ color: 'var(--charcoal)' }}>{p.photo_taken_by}</strong>
+                  </p>
+                )}
+              </div>
               <img src={p.reference_photo_url} alt="" style={{ width: '100%', borderRadius: 8, display: 'block' }} />
               {p.photo_box && (
                 <div style={{
@@ -729,7 +740,29 @@ export default function PackingPage() {
 
         {!piecesLoading && photo && (
           <div style={{ marginTop: '1rem' }}>
-            <p style={{ fontSize: '0.72rem', color: '#888', marginBottom: '0.3rem' }}>The whole table</p>
+            {/* Daisy: "it would be good to have the name of the person who
+                took the photograph referenced on the photograph of the
+                table, so we can check people are putting the right
+                groupings, the right patterns at the front, making sure
+                the QR code is in place, and there aren't any missing
+                pieces." The name was already being captured on every
+                piece -- it had simply never been shown anywhere. Put
+                here, against the photo itself, which is the thing being
+                judged. */}
+            {(() => {
+              const shot = packablePieces.find((p) => p.reference_photo_url === photo && (p.photo_taken_by || p.reference_photo_taken_at));
+              return (
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.3rem' }}>
+                  <p style={{ fontSize: '0.72rem', color: '#888', margin: 0 }}>The whole table</p>
+                  {shot && (
+                    <p style={{ fontSize: '0.72rem', color: '#888', margin: 0, textAlign: 'right' }}>
+                      {shot.photo_taken_by ? <>Photographed by <strong style={{ color: 'var(--charcoal)' }}>{shot.photo_taken_by}</strong></> : 'Photographer not recorded'}
+                      {shot.reference_photo_taken_at && ` · ${new Date(shot.reference_photo_taken_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
             {/* Numbered coloured boxes, same as everywhere else. Without
                 them this was a plain photo of a table -- two rabbits in the
                 list, both called "Rabbit figurine", and nothing tying row 1
