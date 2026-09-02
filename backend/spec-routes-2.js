@@ -5776,10 +5776,11 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
 
       const { data: bookingRows } = await supabase
         .from('bookings')
-        .select('booking_code, customer_name')
+        .select('booking_code, customer_name, collection_date')
         .eq('studio_id', STUDIO_ID)
         .in('booking_code', Array.from(new Set(pieces.map((p) => p.booking_id))));
       const nameByCode = new Map((bookingRows || []).map((b) => [b.booking_code, b.customer_name]));
+      const collectionDateByCode = new Map((bookingRows || []).map((b) => [b.booking_code, b.collection_date]));
 
       // Daisy, direct: "it needs to look at images surely not just
       // descriptions, that's the point." Fair, and correct -- this route
@@ -5955,9 +5956,32 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
             // means the rest are still somewhere else.
             expected: v.total_in_booking,
             complete: v.pieces.length === v.total_in_booking,
+            collection_date: collectionDateByCode.get(code) || null,
             pieces: v.pieces,
           }))
-          .sort((a, b) => b.found - a.found),
+          // Daisy: "is it set to find the most chronologically expected
+          // full orders on the table? Not part orders... that will speed
+          // up the whole packing process."
+          //
+          // A complete booking is work someone can finish RIGHT NOW: box
+          // it, label it, done. A part-found booking is a dead end until
+          // the missing pieces turn up on another shelf -- so surfacing
+          // it alongside finishable work just adds noise to the decision.
+          // Complete ones first, and within those the earliest collection
+          // date first, so packing follows the order things are actually
+          // due rather than whatever the camera happened to see most of.
+          //
+          // Partials are still listed, just below the line -- they're how
+          // you notice a piece has gone missing, so hiding them outright
+          // would trade one problem for a worse one.
+          .sort((a, b) => {
+            if (a.complete !== b.complete) return a.complete ? -1 : 1;
+            const ad = a.collection_date, bd = b.collection_date;
+            if (ad && bd && ad !== bd) return ad < bd ? -1 : 1;
+            if (ad && !bd) return -1;   // a dated booking beats an undated one
+            if (!ad && bd) return 1;
+            return b.found - a.found;   // last resort: whichever is furthest along
+          }),
       });
     } catch (err) {
       logger.error('shelf sweep failed', err.response?.data || err.message);

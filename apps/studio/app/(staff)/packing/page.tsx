@@ -141,7 +141,7 @@ export default function PackingPage() {
     candidates: number;
     note?: string;
     bookings: {
-      booking_code: string; customer_name: string; found: number; expected: number; complete: boolean;
+      booking_code: string; customer_name: string; found: number; expected: number; complete: boolean; collection_date?: string | null;
       pieces: { id: string; piece_type: string | null; description: string | null; confidence: number;
                 box: { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number } | null }[];
     }[];
@@ -930,9 +930,16 @@ export default function PackingPage() {
             <p style={{ fontSize: '0.75rem', color: '#666', marginBottom: '0.4rem' }}>
               Checked against {sweep.candidates} piece{sweep.candidates === 1 ? '' : 's'} still waiting
             </p>
-            {sweep.bookings.map((b) => (
+            {sweep.bookings.map((b, bi) => (
+              <div key={b.booking_code}>
+              {/* The line between work you can finish now and work you
+                  can't. Drawn once, at the first partial booking. */}
+              {!b.complete && bi > 0 && sweep.bookings[bi - 1].complete && (
+                <p style={{ fontSize: '0.68rem', color: '#999', margin: '0.6rem 0 0.3rem', textAlign: 'center' }}>
+                  Still missing pieces — leave these until more turn up
+                </p>
+              )}
               <button
-                key={b.booking_code}
                 onClick={() => { const q = queue.find((x) => x.booking_code === b.booking_code); if (q) openIt(q); }}
                 style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%',
@@ -941,13 +948,23 @@ export default function PackingPage() {
                   background: b.complete ? '#F1F8F1' : '#FBF7F1', cursor: 'pointer',
                 }}
               >
-                <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>{b.customer_name}</span>
+                <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0, textAlign: 'left' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>{b.customer_name}</span>
+                  {/* The date the order is sorted by -- shown so the
+                      ordering reads as deliberate rather than arbitrary. */}
+                  {b.collection_date && (
+                    <span style={{ fontSize: '0.68rem', color: '#888' }}>
+                      for {new Date(b.collection_date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    </span>
+                  )}
+                </span>
                 {/* "2 of 4" is the useful number -- a part-found booking
                     means the rest are still somewhere else. */}
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: b.complete ? '#2E7D32' : '#A6761D' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, flexShrink: 0, color: b.complete ? '#2E7D32' : '#A6761D' }}>
                   {b.found} of {b.expected}{b.complete ? ' · all here' : ''}
                 </span>
               </button>
+              </div>
             ))}
             {/* Daisy: "it needs to be able to have a second option if
                 they're not in that photo to take another shelf." A kiln
