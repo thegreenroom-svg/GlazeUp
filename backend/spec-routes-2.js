@@ -4843,6 +4843,9 @@ export function registerSpaceBackfillRoute(app, supabase, STUDIO_ID, logger, axi
         Authorization: `Bearer ${connection.square_access_token}`,
         'Square-Version': '2024-01-18',
         'Content-Type': 'application/json',
+        // Square's bookings endpoint returns 406 without this. Every
+        // header block that feeds a /v2/bookings call needs it.
+        Accept: 'application/json',
       };
 
       const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', { headers });
@@ -5356,6 +5359,9 @@ export function registerTicketLinkDiagnosticRoute(app, supabase, STUDIO_ID, logg
         Authorization: `Bearer ${connection.square_access_token}`,
         'Square-Version': '2024-01-18',
         'Content-Type': 'application/json',
+        // Square's bookings endpoint returns 406 without this. Every
+        // header block that feeds a /v2/bookings call needs it.
+        Accept: 'application/json',
       };
 
       const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', { headers });
@@ -5551,6 +5557,9 @@ export function registerTicketMatchRoutes(app, supabase, STUDIO_ID, logger, axio
         Authorization: `Bearer ${connection.square_access_token}`,
         'Square-Version': '2024-01-18',
         'Content-Type': 'application/json',
+        // Square's bookings endpoint returns 406 without this. Every
+        // header block that feeds a /v2/bookings call needs it.
+        Accept: 'application/json',
       };
 
       const locationsRes = await axios.get('https://connect.squareup.com/v2/locations', { headers });
@@ -6016,6 +6025,13 @@ export function registerSquareAccessCheckRoute(app, supabase, STUDIO_ID, logger,
         Authorization: `Bearer ${connection.square_access_token}`,
         'Square-Version': '2024-01-18',
         'Content-Type': 'application/json',
+        // 406 Not Acceptable is literally "I cannot produce a response in
+        // a format you will accept" -- and this diagnostic was the only
+        // Square caller in the file missing an Accept header. The real
+        // booking sync has always sent one, which is why bookings synced
+        // fine while this page reported them broken. The check was
+        // failing on its own bug and blaming the connection.
+        Accept: 'application/json',
       };
 
       let locationId = null;
