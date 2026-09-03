@@ -6,7 +6,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
-import { Printer, RefreshCw, AlertCircle } from 'lucide-react';
+import { Printer, RefreshCw, AlertCircle, CalendarDays } from 'lucide-react';
+import { EmptyState } from '@/components/EmptyState';
 
 // Same fix as PinGate.tsx: a plain fetch() has no timeout of its own. This
 // page gates real controls (Check for new bookings, Save on the table
@@ -348,7 +349,11 @@ export default function DailyCardsPage() {
         )}
 
         {!loading && bookings.length === 0 && (
-          <p style={{ color: '#999', fontSize: 'var(--text-md)' }}>No bookings found for {new Date(cardDate).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}.</p>
+          <EmptyState
+            icon={<CalendarDays size={24} />}
+            title="No bookings that day"
+            hint={`Nothing is booked for ${new Date(cardDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}. Try another date, or check Square if you were expecting some.`}
+          />
         )}
 
         {bookings.length > 0 && (

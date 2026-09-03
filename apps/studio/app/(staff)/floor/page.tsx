@@ -76,12 +76,23 @@ interface TillItem {
   person_name: string | null;
 }
 
+// Floor was the only dark screen in an otherwise light app -- staff
+// crossed a jarring visual boundary at the busiest moment of their
+// workflow, and it read as two apps stitched together rather than one.
+//
+// Every colour on this page already routed through this one object, so
+// reconciling it is a change of MEANING here rather than 1600 lines of
+// hand-editing: `charcoal` was this page's page-background and `ivory`
+// its text. Those two roles simply swap. The two places that used
+// charcoal as genuine dark-text-on-a-light-surface are pinned to
+// textOnLight above, so they stay dark and correct either way.
 const B = {
-  charcoal: 'var(--charcoal)',
+  charcoal: 'var(--ivory)',      // page background -- now light
   clay: 'var(--clay)',
   sand: 'var(--sand)',
-  ivory: 'var(--ivory)',
+  ivory: 'var(--charcoal)',      // text on that background -- now dark
   stone: 'var(--stone)',
+  textOnLight: 'var(--charcoal)',
 };
 
 type Phase = 1 | 2 | 3 | 4 | 5;
@@ -787,7 +798,7 @@ export default function FloorPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     {quickAccessMode && tableTotals[b.booking_code] !== undefined && (
-                      <span style={{ color: B.sand, fontWeight: 700, fontSize: 'var(--text-base)' }}>
+                      <span style={{ color: B.clay, fontWeight: 700, fontSize: 'var(--text-base)' }}>
                         £{(tableTotals[b.booking_code] / 100).toFixed(2)}
                       </span>
                     )}
@@ -1255,7 +1266,7 @@ export default function FloorPage() {
             {splitBillCount > 1 && (
               <div className="flex justify-between mt-1">
                 <span style={{ color: B.stone, fontSize: 'var(--text-xs)' }}>Split {splitBillCount} ways</span>
-                <span style={{ color: B.sand, fontSize: 'var(--text-sm)' }}>£{((tillTotal / splitBillCount) / 100).toFixed(2)} each</span>
+                <span style={{ color: B.clay, fontSize: 'var(--text-sm)' }}>£{((tillTotal / splitBillCount) / 100).toFixed(2)} each</span>
               </div>
             )}
           </div>
@@ -1269,7 +1280,7 @@ export default function FloorPage() {
               {sharedTotal > 0 && (
                 <div className="flex justify-between mb-2" style={{ paddingBottom: '0.5rem', borderBottom: `1px solid ${B.stone}30` }}>
                   <span style={{ color: B.ivory, fontSize: 'var(--text-sm)' }}>Shared (whole table)</span>
-                  <span style={{ color: B.sand, fontWeight: 700, fontSize: 'var(--text-sm)' }}>£{(sharedTotal / 100).toFixed(2)}</span>
+                  <span style={{ color: B.clay, fontWeight: 700, fontSize: 'var(--text-sm)' }}>£{(sharedTotal / 100).toFixed(2)}</span>
                 </div>
               )}
               {namedPeople.map((name) => {
@@ -1278,7 +1289,7 @@ export default function FloorPage() {
                   <div key={name} style={{ marginBottom: '0.9rem', paddingBottom: '0.9rem', borderBottom: `1px solid ${B.stone}30` }}>
                     <div className="flex justify-between mb-2">
                       <span style={{ color: B.ivory, fontWeight: 700, fontSize: 'var(--text-base)' }}>{name}</span>
-                      <span style={{ color: B.sand, fontWeight: 700, fontSize: 'var(--text-base)' }}>£{(personTotal(name) / 100).toFixed(2)}</span>
+                      <span style={{ color: B.clay, fontWeight: 700, fontSize: 'var(--text-base)' }}>£{(personTotal(name) / 100).toFixed(2)}</span>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginBottom: '0.4rem' }}>
                       <button
@@ -1533,7 +1544,7 @@ export default function FloorPage() {
                   // on a white background regardless of page theme, so an
                   // inherited light colour makes the text invisible -- the same
                   // dark-mode bug already fixed on three other screens.
-                  color: B.charcoal, backgroundColor: 'white',
+                  color: B.textOnLight, backgroundColor: 'white',
                   fontSize: 'var(--text-md)',
                 }}
               />
@@ -1573,7 +1584,7 @@ export default function FloorPage() {
           </div>
           <div className="space-y-4 mb-8">
             <div className="p-4 rounded-lg text-center" style={{ backgroundColor: B.charcoal }}>
-              <p style={{ color: B.sand }} className="text-xs font-mono">{current?.booking_code}</p>
+              <p style={{ color: B.clay }} className="text-xs font-mono">{current?.booking_code}</p>
               <p style={{ color: B.stone }} className="text-xs mt-1">{current?.customer_name}</p>
             </div>
             <div className="p-4 rounded-lg" style={{ backgroundColor: B.charcoal }}>
@@ -1593,7 +1604,7 @@ export default function FloorPage() {
                   the one place it's most worth confirming before moving
                   on to the next person. */}
               {collectionDate && (
-                <p style={{ color: B.sand }} className="text-xs mt-1 font-semibold">
+                <p style={{ color: B.clay }} className="text-xs mt-1 font-semibold">
                   <CalendarDays size={13} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 4 }} />Ready to collect: {new Date(collectionDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </p>
               )}
@@ -1625,7 +1636,7 @@ export default function FloorPage() {
               QR and print styling, already exists one route away. Renamed
               too: four printable things existed and two were called just
               "Print card". */}
-          <button onClick={() => { if (current) router.push(`/collection?code=${encodeURIComponent(current.booking_code)}`); }} className="w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 mb-2" style={{ backgroundColor: B.stone, color: B.charcoal }}>
+          <button onClick={() => { if (current) router.push(`/collection?code=${encodeURIComponent(current.booking_code)}`); }} className="w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 mb-2" style={{ backgroundColor: B.stone, color: B.textOnLight }}>
             <Printer size={18} /> Print collection card
           </button>
           <button onClick={nextBooking} className="w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2" style={{ backgroundColor: B.clay, color: B.ivory }}>

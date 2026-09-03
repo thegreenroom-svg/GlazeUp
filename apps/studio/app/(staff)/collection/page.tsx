@@ -7,7 +7,8 @@ import { useSearchParams } from 'next/navigation';
 import QRCode from 'qrcode';
 import { PageShell } from '@/components/PageShell';
 import { QrScanner } from '@/components/QrScanner';
-import { Camera, Printer, Check, Loader, Undo2 } from 'lucide-react';
+import { Camera, Printer, Check, Loader, Undo2, PackageCheck } from 'lucide-react';
+import { EmptyState } from '@/components/EmptyState';
 
 // Collection, per Daisy's afternoon revelation: the girls already hand out a
 // written card at the end of every session. This is that card, printed --
@@ -238,7 +239,11 @@ export default function CollectionPage() {
       )}
 
       {!card && due.length === 0 && !busy && (
-        <p style={{ fontSize: 'var(--text-base)', color: '#777' }}>Nothing waiting to be collected.</p>
+        <EmptyState
+          icon={<PackageCheck size={24} />}
+          title="Nothing to collect today"
+          hint="Bookings appear here once their collection date arrives and their pieces are packed."
+        />
       )}
 
       {/* Only the card prints -- not the buttons or the due list. */}

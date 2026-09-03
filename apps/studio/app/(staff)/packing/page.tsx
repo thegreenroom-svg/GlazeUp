@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Package, ChevronLeft, Check, Search, Camera, Loader, RefreshCw, Trash2, Printer } from 'lucide-react';
+import { EmptyState } from '@/components/EmptyState';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
 
@@ -1037,11 +1038,11 @@ export default function PackingPage() {
       {loading && <p style={{ fontSize: 'var(--text-base)', color: '#888' }}>Loading...</p>}
       {error && <p style={{ fontSize: 'var(--text-base)', color: '#c0392b' }}>{error}</p>}
       {!loading && !error && queue.length === 0 && (
-        <div style={{ padding: '1.5rem', textAlign: 'center', border: '1px dashed #ddd', borderRadius: 10 }}>
-          <Package size={26} style={{ color: '#ccc' }} />
-          <p style={{ fontSize: 'var(--text-md)', fontWeight: 600, marginTop: '0.5rem' }}>Nothing due to go out</p>
-          <p style={{ fontSize: 'var(--text-sm)', color: '#888', marginTop: '0.25rem' }}>Bookings appear here as soon as they have pieces. Oldest first.</p>
-        </div>
+        <EmptyState
+          icon={<Package size={24} />}
+          title="Nothing due to go out"
+          hint="Bookings appear here as soon as they have pieces, soonest collection first."
+        />
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
