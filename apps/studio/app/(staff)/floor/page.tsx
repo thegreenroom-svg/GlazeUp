@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ChevronRight, Home, Camera, Printer, Check, Loader, RefreshCw } from 'lucide-react';
+import { ChevronRight, Home, Camera, Printer, Check, Loader, RefreshCw, Mail, CalendarDays, CheckCircle2 } from 'lucide-react';
 import { NudgeCard } from '@/components/NudgeSystem';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
 import { setLeaveGuard } from '@/lib/leaveGuard';
@@ -696,7 +696,7 @@ export default function FloorPage() {
             <p className="text-sm mt-1" style={{ color: B.stone }}>Table → photo. Scan the QR card with your camera to begin.</p>
           </div>
           {syncWarning && (
-            <div style={{ backgroundColor: '#5a2a2a', color: '#ffcccc', padding: '0.7rem 0.9rem', borderRadius: 8, fontSize: '0.8rem', marginBottom: '1rem' }}>
+            <div style={{ backgroundColor: '#5a2a2a', color: '#ffcccc', padding: '0.7rem 0.9rem', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginBottom: '1rem' }}>
               {syncWarning}
             </div>
           )}
@@ -754,7 +754,7 @@ export default function FloorPage() {
         <div className="max-w-2xl mx-auto">
           <Header label={quickAccessMode ? 'Seated Bookings' : `Step 2/${tillEnabled ? 5 : 4} · Table`} />
           {syncWarning && (
-            <div style={{ backgroundColor: '#5a2a2a', color: '#ffcccc', padding: '0.7rem 0.9rem', borderRadius: 8, fontSize: '0.8rem', marginBottom: '1rem' }}>
+            <div style={{ backgroundColor: '#5a2a2a', color: '#ffcccc', padding: '0.7rem 0.9rem', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', marginBottom: '1rem' }}>
               {syncWarning}
             </div>
           )}
@@ -762,32 +762,32 @@ export default function FloorPage() {
             <div className="text-center mb-6">
               <span className="text-4xl">{quickAccessMode ? '🪑' : '🎨'}</span>
               <h2 className="text-xl font-bold mt-3" style={{ color: B.ivory }}>{quickAccessMode ? 'Active Tables' : 'Select Table'}</h2>
-              {quickAccessMode && <p style={{ color: B.stone, fontSize: '0.8rem', marginTop: '0.3rem' }}>Tap a table to add more drinks or pieces</p>}
+              {quickAccessMode && <p style={{ color: B.stone, fontSize: 'var(--text-sm)', marginTop: '0.3rem' }}>Tap a table to add more drinks or pieces</p>}
               <input
                 type="date"
                 value={floorDate}
                 onChange={(e) => setFloorDate(e.target.value)}
-                style={{ marginTop: '0.6rem', padding: '0.4rem 0.6rem', borderRadius: 8, border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: '0.85rem' }}
+                style={{ marginTop: '0.6rem', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-md)', border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: 'var(--text-base)' }}
               />
-              <p style={{ color: B.stone, fontSize: '0.8rem', marginTop: '0.4rem' }}>{bookings.length} real booking{bookings.length === 1 ? '' : 's'} on this day</p>
+              <p style={{ color: B.stone, fontSize: 'var(--text-sm)', marginTop: '0.4rem' }}>{bookings.length} real booking{bookings.length === 1 ? '' : 's'} on this day</p>
             </div>
-            {bookings.length === 0 && <p style={{ color: B.stone, textAlign: 'center', fontSize: '0.85rem' }}>No bookings found for today.</p>}
+            {bookings.length === 0 && <p style={{ color: B.stone, textAlign: 'center', fontSize: 'var(--text-base)' }}>No bookings found for today.</p>}
             <div className="space-y-2" style={{ maxHeight: '55vh', overflowY: 'auto' }}>
               {bookings.map((b) => (
                 <button key={b.booking_code} onClick={() => selectBooking(b)} className="w-full text-left p-3 rounded-lg flex justify-between items-center" style={{ backgroundColor: B.charcoal, border: `1px solid ${B.stone}40` }}>
                   <div>
-                    <p style={{ color: B.ivory, fontWeight: 600, fontSize: '0.9rem' }}>
+                    <p style={{ color: B.ivory, fontWeight: 600, fontSize: 'var(--text-md)' }}>
                       {b.customer_name}
                       {b.notes && <span style={{ color: '#e0c060', marginLeft: '0.4rem' }} title="Has a note">●</span>}
                     </p>
-                    <p style={{ color: B.stone, fontSize: '0.75rem' }}>
+                    <p style={{ color: B.stone, fontSize: 'var(--text-xs)' }}>
                       {new Date(b.session_start).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
                       {b.table_number ? ` · Table ${b.table_number}` : ''}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
                     {quickAccessMode && tableTotals[b.booking_code] !== undefined && (
-                      <span style={{ color: B.sand, fontWeight: 700, fontSize: '0.85rem' }}>
+                      <span style={{ color: B.sand, fontWeight: 700, fontSize: 'var(--text-base)' }}>
                         £{(tableTotals[b.booking_code] / 100).toFixed(2)}
                       </span>
                     )}
@@ -833,29 +833,29 @@ export default function FloorPage() {
         {/* Header bar -- ticket name, receipt icon, standard Square-style top strip */}
         <div style={{ backgroundColor: SQ.panel, borderBottom: `1px solid ${SQ.line}`, padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: SQ.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 32, height: 32, borderRadius: 'var(--radius-md)', backgroundColor: SQ.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Printer size={16} color="white" />
             </div>
             <div>
-              <p style={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.1 }}>{current?.customer_name || 'Ticket'}</p>
+              <p style={{ fontWeight: 700, fontSize: 'var(--text-md)', lineHeight: 1.1 }}>{current?.customer_name || 'Ticket'}</p>
               {/* Read-only. Per Daisy: "we don't in this app really need to
                   worry about which table anyone's on. That's for the girls,
                   it's for Square -- they set it." The table shown here comes
                   from the Square appointment and is a label, not something
                   this app decides. Nothing is offered to tap. */}
               {current?.table_number && (
-                <p style={{ color: SQ.sub, fontSize: '0.72rem' }}>Table {current.table_number}</p>
+                <p style={{ color: SQ.sub, fontSize: 'var(--text-xs)' }}>Table {current.table_number}</p>
               )}
             </div>
           </div>
-          <button onClick={() => router.push('/floor')} style={{ background: 'none', border: 'none', color: SQ.sub, fontSize: '0.8rem', cursor: 'pointer' }}>
+          <button onClick={() => router.push('/floor')} style={{ background: 'none', border: 'none', color: SQ.sub, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
             <Home size={20} />
           </button>
         </div>
 
 
         {current?.notes && (
-          <div style={{ backgroundColor: '#FFF4D6', borderBottom: '1px solid #E0C060', padding: '0.5rem 1rem', fontSize: '0.8rem' }}>
+          <div style={{ backgroundColor: '#FFF4D6', borderBottom: '1px solid #E0C060', padding: '0.5rem 1rem', fontSize: 'var(--text-sm)' }}>
             <strong>Note:</strong> {current.notes}
           </div>
         )}
@@ -865,10 +865,10 @@ export default function FloorPage() {
             Picking a name here just tags whatever's added next; nothing
             retroactively changes for items already on the till. */}
         <div style={{ backgroundColor: SQ.panel, borderBottom: `1px solid ${SQ.line}`, padding: '0.6rem 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.72rem', color: SQ.sub, marginRight: '0.2rem' }}>Adding for:</span>
+          <span style={{ fontSize: 'var(--text-xs)', color: SQ.sub, marginRight: '0.2rem' }}>Adding for:</span>
           <button
             onClick={() => setActivePersonTag(null)}
-            style={{ padding: '0.3rem 0.7rem', borderRadius: 999, fontSize: '0.78rem', cursor: 'pointer', border: activePersonTag === null ? `1.5px solid ${SQ.accent}` : `1px solid ${SQ.line}`, backgroundColor: activePersonTag === null ? SQ.accent + '15' : 'transparent', color: activePersonTag === null ? SQ.accentDark : SQ.ink, fontWeight: activePersonTag === null ? 700 : 400 }}
+            style={{ padding: '0.3rem 0.7rem', borderRadius: 999, fontSize: 'var(--text-sm)', cursor: 'pointer', border: activePersonTag === null ? `1.5px solid ${SQ.accent}` : `1px solid ${SQ.line}`, backgroundColor: activePersonTag === null ? SQ.accent + '15' : 'transparent', color: activePersonTag === null ? SQ.accentDark : SQ.ink, fontWeight: activePersonTag === null ? 700 : 400 }}
           >
             Shared
           </button>
@@ -876,7 +876,7 @@ export default function FloorPage() {
             <button
               key={name}
               onClick={() => setActivePersonTag(name)}
-              style={{ padding: '0.3rem 0.7rem', borderRadius: 999, fontSize: '0.78rem', cursor: 'pointer', border: activePersonTag === name ? `1.5px solid ${SQ.accent}` : `1px solid ${SQ.line}`, backgroundColor: activePersonTag === name ? SQ.accent + '15' : 'transparent', color: activePersonTag === name ? SQ.accentDark : SQ.ink, fontWeight: activePersonTag === name ? 700 : 400 }}
+              style={{ padding: '0.3rem 0.7rem', borderRadius: 999, fontSize: 'var(--text-sm)', cursor: 'pointer', border: activePersonTag === name ? `1.5px solid ${SQ.accent}` : `1px solid ${SQ.line}`, backgroundColor: activePersonTag === name ? SQ.accent + '15' : 'transparent', color: activePersonTag === name ? SQ.accentDark : SQ.ink, fontWeight: activePersonTag === name ? 700 : 400 }}
             >
               {name}
             </button>
@@ -884,7 +884,7 @@ export default function FloorPage() {
           {!addingPerson ? (
             <button
               onClick={() => setAddingPerson(true)}
-              style={{ padding: '0.3rem 0.6rem', borderRadius: 999, fontSize: '0.78rem', cursor: 'pointer', border: `1px dashed ${SQ.line}`, background: 'transparent', color: SQ.sub }}
+              style={{ padding: '0.3rem 0.6rem', borderRadius: 999, fontSize: 'var(--text-sm)', cursor: 'pointer', border: `1px dashed ${SQ.line}`, background: 'transparent', color: SQ.sub }}
             >
               + Add person
             </button>
@@ -904,11 +904,11 @@ export default function FloorPage() {
                 placeholder="Name"
                 autoFocus
                 maxLength={30}
-                style={{ width: '7rem', padding: '0.25rem 0.5rem', borderRadius: 6, border: `1px solid ${SQ.line}`, fontSize: '0.78rem' }}
+                style={{ width: '7rem', padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-sm)', border: `1px solid ${SQ.line}`, fontSize: 'var(--text-sm)' }}
               />
               <button
                 onClick={() => { if (newPersonInput.trim()) { setActivePersonTag(newPersonInput.trim()); setNewPersonInput(''); } setAddingPerson(false); }}
-                style={{ padding: '0.25rem 0.5rem', borderRadius: 6, border: 'none', backgroundColor: SQ.accent, color: 'white', fontSize: '0.72rem', cursor: 'pointer' }}
+                style={{ padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-sm)', border: 'none', backgroundColor: SQ.accent, color: 'white', fontSize: 'var(--text-xs)', cursor: 'pointer' }}
               >
                 Add
               </button>
@@ -921,13 +921,13 @@ export default function FloorPage() {
           <div style={{ flex: '1 1 60%', minWidth: 300 }}>
             {menu.length > 0 && !activeGroup && (
               <>
-                <p style={{ color: SQ.sub, fontSize: '0.75rem', marginBottom: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Categories</p>
+                <p style={{ color: SQ.sub, fontSize: 'var(--text-xs)', marginBottom: '0.6rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Categories</p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.6rem' }}>
                   {menu.map((g, idx) => (
                     <button
                       key={g.key}
                       onClick={() => setActiveGroup(g)}
-                      style={{ aspectRatio: '1.4', borderRadius: 8, border: 'none', backgroundColor: colourFor(idx), color: 'white', fontWeight: 700, fontSize: '0.9rem', textAlign: 'left', padding: '0.8rem', cursor: 'pointer' }}
+                      style={{ aspectRatio: '1.4', borderRadius: 'var(--radius-md)', border: 'none', backgroundColor: colourFor(idx), color: 'white', fontWeight: 700, fontSize: 'var(--text-md)', textAlign: 'left', padding: '0.8rem', cursor: 'pointer' }}
                     >
                       {g.label}
                     </button>
@@ -938,7 +938,7 @@ export default function FloorPage() {
 
             {activeGroup && !activeSubsection && (
               <>
-                <button onClick={backToTillMenu} style={{ color: SQ.accent, background: 'none', border: 'none', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.7rem', padding: 0, cursor: 'pointer' }}>
+                <button onClick={backToTillMenu} style={{ color: SQ.accent, background: 'none', border: 'none', fontSize: 'var(--text-base)', fontWeight: 600, marginBottom: '0.7rem', padding: 0, cursor: 'pointer' }}>
                   ← Back to Till
                 </button>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.6rem' }}>
@@ -946,10 +946,10 @@ export default function FloorPage() {
                     <button
                       key={s.category}
                       onClick={() => { setActiveSubsection(s); setActiveBucket(null); setShowAllItems(false); }}
-                      style={{ aspectRatio: '1.4', borderRadius: 8, border: 'none', backgroundColor: colourFor(idx), color: 'white', fontWeight: 700, fontSize: '0.88rem', textAlign: 'left', padding: '0.8rem', cursor: 'pointer' }}
+                      style={{ aspectRatio: '1.4', borderRadius: 'var(--radius-md)', border: 'none', backgroundColor: colourFor(idx), color: 'white', fontWeight: 700, fontSize: 'var(--text-base)', textAlign: 'left', padding: '0.8rem', cursor: 'pointer' }}
                     >
                       {s.label}
-                      <span style={{ display: 'block', fontWeight: 400, fontSize: '0.72rem', opacity: 0.85, marginTop: '0.2rem' }}>{s.items.length} items</span>
+                      <span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', opacity: 0.85, marginTop: '0.2rem' }}>{s.items.length} items</span>
                     </button>
                   ))}
                 </div>
@@ -958,7 +958,7 @@ export default function FloorPage() {
 
             {activeSubsection && (
               <>
-                <button onClick={backToTillMenu} style={{ color: SQ.accent, background: 'none', border: 'none', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.7rem', padding: 0, cursor: 'pointer' }}>
+                <button onClick={backToTillMenu} style={{ color: SQ.accent, background: 'none', border: 'none', fontSize: 'var(--text-base)', fontWeight: 600, marginBottom: '0.7rem', padding: 0, cursor: 'pointer' }}>
                   ← Back to Till
                 </button>
 
@@ -968,10 +968,10 @@ export default function FloorPage() {
                       <button
                         key={bk.label}
                         onClick={() => { setActiveBucket(bk); setShowAllItems(false); }}
-                        style={{ aspectRatio: '1.4', borderRadius: 8, border: 'none', backgroundColor: colourFor(idx), color: 'white', fontWeight: 700, fontSize: '0.88rem', textAlign: 'left', padding: '0.8rem', cursor: 'pointer' }}
+                        style={{ aspectRatio: '1.4', borderRadius: 'var(--radius-md)', border: 'none', backgroundColor: colourFor(idx), color: 'white', fontWeight: 700, fontSize: 'var(--text-base)', textAlign: 'left', padding: '0.8rem', cursor: 'pointer' }}
                       >
                         {bk.label}
-                        <span style={{ display: 'block', fontWeight: 400, fontSize: '0.72rem', opacity: 0.85, marginTop: '0.2rem' }}>{bk.items.length} items</span>
+                        <span style={{ display: 'block', fontWeight: 400, fontSize: 'var(--text-xs)', opacity: 0.85, marginTop: '0.2rem' }}>{bk.items.length} items</span>
                       </button>
                     ))}
                   </div>
@@ -985,10 +985,10 @@ export default function FloorPage() {
                             <button
                               key={idx}
                               onClick={() => { setCustomising(entry); setPickedFlavour(null); }}
-                              style={{ aspectRatio: '1', borderRadius: 8, border: `1px solid ${SQ.line}`, backgroundColor: SQ.panel, borderTop: `4px solid ${colour}`, color: SQ.ink, fontSize: '0.8rem', textAlign: 'left', padding: '0.6rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
+                              style={{ aspectRatio: '1', borderRadius: 'var(--radius-md)', border: `1px solid ${SQ.line}`, backgroundColor: SQ.panel, borderTop: `4px solid ${colour}`, color: SQ.ink, fontSize: 'var(--text-sm)', textAlign: 'left', padding: '0.6rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
                             >
                               <span style={{ fontWeight: 600 }}>{entry.base}</span>
-                              <span style={{ color: SQ.sub, fontSize: '0.75rem' }}>from £{(entry.from_price_cents / 100).toFixed(2)}</span>
+                              <span style={{ color: SQ.sub, fontSize: 'var(--text-xs)' }}>from £{(entry.from_price_cents / 100).toFixed(2)}</span>
                             </button>
                           );
                         }
@@ -997,16 +997,16 @@ export default function FloorPage() {
                             key={idx}
                             onClick={() => addTillItem(entry)}
                             disabled={tillBusy}
-                            style={{ aspectRatio: '1', borderRadius: 8, border: `1px solid ${SQ.line}`, backgroundColor: SQ.panel, borderTop: `4px solid ${colour}`, color: SQ.ink, fontSize: '0.8rem', textAlign: 'left', padding: '0.6rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', opacity: tillBusy ? 0.6 : 1 }}
+                            style={{ aspectRatio: '1', borderRadius: 'var(--radius-md)', border: `1px solid ${SQ.line}`, backgroundColor: SQ.panel, borderTop: `4px solid ${colour}`, color: SQ.ink, fontSize: 'var(--text-sm)', textAlign: 'left', padding: '0.6rem', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', opacity: tillBusy ? 0.6 : 1 }}
                           >
                             <span style={{ fontWeight: 600, lineHeight: 1.2 }}>{entry.item_name}</span>
-                            {entry.price_cents ? <span style={{ color: SQ.sub, fontSize: '0.75rem' }}>£{(entry.price_cents / 100).toFixed(2)}</span> : null}
+                            {entry.price_cents ? <span style={{ color: SQ.sub, fontSize: 'var(--text-xs)' }}>£{(entry.price_cents / 100).toFixed(2)}</span> : null}
                           </button>
                         );
                       })}
                     </div>
                     {!showAllItems && (activeList?.length || 0) > 12 && (
-                      <button onClick={() => setShowAllItems(true)} style={{ width: '100%', marginTop: '0.6rem', padding: '0.6rem', borderRadius: 8, border: `1px solid ${SQ.line}`, background: SQ.panel, color: SQ.sub, fontSize: '0.82rem', cursor: 'pointer' }}>
+                      <button onClick={() => setShowAllItems(true)} style={{ width: '100%', marginTop: '0.6rem', padding: '0.6rem', borderRadius: 'var(--radius-md)', border: `1px solid ${SQ.line}`, background: SQ.panel, color: SQ.sub, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
                         + {(activeList?.length || 0) - 12} more
                       </button>
                     )}
@@ -1021,9 +1021,9 @@ export default function FloorPage() {
             {/* Live from Square -- read-only, separate from GlazeUp's own
                 till below. What's actually been rung up on the real
                 handheld right now, per Daisy's request. */}
-            <div style={{ backgroundColor: SQ.panel, borderRadius: 10, border: `1px solid ${SQ.accent}`, overflow: 'hidden', marginBottom: '0.8rem' }}>
+            <div style={{ backgroundColor: SQ.panel, borderRadius: 'var(--radius-md)', border: `1px solid ${SQ.accent}`, overflow: 'hidden', marginBottom: '0.8rem' }}>
               <div style={{ padding: '0.7rem 1rem', borderBottom: `1px solid ${SQ.line}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontWeight: 700, fontSize: '0.82rem', color: SQ.accentDark }}>Live from Square</span>
+                <span style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: SQ.accentDark }}>Live from Square</span>
                 <button
                   onClick={() => current && loadLiveSquareOrder(current.booking_code)}
                   disabled={liveSquareLoading}
@@ -1035,65 +1035,65 @@ export default function FloorPage() {
               </div>
               <div style={{ padding: '0.7rem 1rem' }}>
                 {liveSquareLoading && !liveSquareOrder ? (
-                  <p style={{ color: SQ.sub, fontSize: '0.78rem' }}>Checking Square...</p>
+                  <p style={{ color: SQ.sub, fontSize: 'var(--text-sm)' }}>Checking Square...</p>
                 ) : liveSquareOrder?.matched && liveSquareOrder.order ? (
                   <>
                     {liveSquareOrder.multiple_candidates && (
-                      <p style={{ color: '#B8860B', fontSize: '0.72rem', marginBottom: '0.4rem' }}>
+                      <p style={{ color: '#B8860B', fontSize: 'var(--text-xs)', marginBottom: '0.4rem' }}>
                         ⚠ More than one open ticket matches this table — showing the most recently updated.
                       </p>
                     )}
-                    <p style={{ fontWeight: 600, fontSize: '0.8rem', marginBottom: '0.3rem' }}>"{liveSquareOrder.order.ticket_name}"</p>
+                    <p style={{ fontWeight: 600, fontSize: 'var(--text-sm)', marginBottom: '0.3rem' }}>"{liveSquareOrder.order.ticket_name}"</p>
                     <div style={{ maxHeight: '16vh', overflowY: 'auto', marginBottom: '0.4rem' }}>
                       {liveSquareOrder.order.items.map((it, idx) => (
-                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem', padding: '0.15rem 0' }}>
+                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', padding: '0.15rem 0' }}>
                           <span>{it.quantity > 1 ? `${it.quantity}x ` : ''}{it.name}</span>
                           {it.total_gbp !== null && <span style={{ color: SQ.sub }}>£{it.total_gbp.toFixed(2)}</span>}
                         </div>
                       ))}
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.4rem', borderTop: `1px solid ${SQ.line}` }}>
-                      <span style={{ color: SQ.sub, fontSize: '0.78rem' }}>Square total</span>
-                      <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>£{(liveSquareOrder.order.total_gbp ?? 0).toFixed(2)}</span>
+                      <span style={{ color: SQ.sub, fontSize: 'var(--text-sm)' }}>Square total</span>
+                      <span style={{ fontWeight: 700, fontSize: 'var(--text-base)' }}>£{(liveSquareOrder.order.total_gbp ?? 0).toFixed(2)}</span>
                     </div>
                   </>
                 ) : liveSquareOrder?.reason === 'no_table_set' ? (
-                  <p style={{ color: SQ.sub, fontSize: '0.78rem' }}>Set a table number to match against Square.</p>
+                  <p style={{ color: SQ.sub, fontSize: 'var(--text-sm)' }}>Set a table number to match against Square.</p>
                 ) : liveSquareOrder?.reason === 'no_open_ticket_for_table' ? (
-                  <p style={{ color: SQ.sub, fontSize: '0.78rem' }}>No open Square ticket found for {current?.table_number ? `Table ${current.table_number}` : 'this table'}.</p>
+                  <p style={{ color: SQ.sub, fontSize: 'var(--text-sm)' }}>No open Square ticket found for {current?.table_number ? `Table ${current.table_number}` : 'this table'}.</p>
                 ) : liveSquareOrder?.reason === 'table_number_has_no_digits' ? (
-                  <p style={{ color: SQ.sub, fontSize: '0.78rem' }}>Table "{liveSquareOrder.table_number}" has no number to match on Square.</p>
+                  <p style={{ color: SQ.sub, fontSize: 'var(--text-sm)' }}>Table "{liveSquareOrder.table_number}" has no number to match on Square.</p>
                 ) : (
-                  <p style={{ color: SQ.sub, fontSize: '0.78rem' }}>Could not check Square right now.</p>
+                  <p style={{ color: SQ.sub, fontSize: 'var(--text-sm)' }}>Could not check Square right now.</p>
                 )}
               </div>
             </div>
 
-            <div style={{ backgroundColor: SQ.panel, borderRadius: 10, border: `1px solid ${SQ.line}`, overflow: 'hidden', position: 'sticky', top: '1rem' }}>
+            <div style={{ backgroundColor: SQ.panel, borderRadius: 'var(--radius-md)', border: `1px solid ${SQ.line}`, overflow: 'hidden', position: 'sticky', top: '1rem' }}>
               <div style={{ padding: '0.8rem 1rem', borderBottom: `1px solid ${SQ.line}`, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Printer size={16} color={SQ.sub} />
-                <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>GlazeUp Till</span>
+                <span style={{ fontWeight: 700, fontSize: 'var(--text-md)' }}>GlazeUp Till</span>
               </div>
 
               {pieceCount > 0 && (
-                <div style={{ padding: '0.5rem 1rem', borderBottom: `1px solid ${SQ.line}`, fontSize: '0.78rem', color: SQ.sub }}>
+                <div style={{ padding: '0.5rem 1rem', borderBottom: `1px solid ${SQ.line}`, fontSize: 'var(--text-sm)', color: SQ.sub }}>
                   {pieceCount} piece{pieceCount === 1 ? '' : 's'} captured from photo
                 </div>
               )}
 
               <div style={{ maxHeight: '32vh', overflowY: 'auto' }}>
                 {tillItems.length === 0 ? (
-                  <p style={{ padding: '1.2rem 1rem', color: SQ.sub, fontSize: '0.82rem', textAlign: 'center' }}>No items yet</p>
+                  <p style={{ padding: '1.2rem 1rem', color: SQ.sub, fontSize: 'var(--text-sm)', textAlign: 'center' }}>No items yet</p>
                 ) : (
                   tillItems.map((i) => (
                     <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 1rem', borderBottom: `1px solid ${SQ.line}` }}>
-                      <span style={{ fontSize: '0.85rem' }}>
+                      <span style={{ fontSize: 'var(--text-base)' }}>
                         {i.quantity > 1 ? `${i.quantity}x ` : ''}{i.item_name}
-                        {i.person_name && <span style={{ display: 'block', fontSize: '0.68rem', color: SQ.accent, fontWeight: 600 }}>{i.person_name}</span>}
+                        {i.person_name && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: SQ.accent, fontWeight: 600 }}>{i.person_name}</span>}
                       </span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>£{((i.unit_price_cents * i.quantity) / 100).toFixed(2)}</span>
-                        <button onClick={() => removeTillItem(i.id)} style={{ color: '#C0392B', background: 'none', border: 'none', fontSize: '1rem', cursor: 'pointer', lineHeight: 1 }}>×</button>
+                        <span style={{ fontWeight: 600, fontSize: 'var(--text-base)' }}>£{((i.unit_price_cents * i.quantity) / 100).toFixed(2)}</span>
+                        <button onClick={() => removeTillItem(i.id)} style={{ color: '#C0392B', background: 'none', border: 'none', fontSize: 'var(--text-md)', cursor: 'pointer', lineHeight: 1 }}>×</button>
                       </span>
                     </div>
                   ))
@@ -1102,20 +1102,20 @@ export default function FloorPage() {
 
               <div style={{ padding: '0.8rem 1rem', borderTop: `1px solid ${SQ.line}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                  <span style={{ color: SQ.sub, fontSize: '0.85rem' }}>Total</span>
-                  <span style={{ fontWeight: 700, fontSize: '1.1rem' }}>£{(tillTotal / 100).toFixed(2)}</span>
+                  <span style={{ color: SQ.sub, fontSize: 'var(--text-base)' }}>Total</span>
+                  <span style={{ fontWeight: 700, fontSize: 'var(--text-lg)' }}>£{(tillTotal / 100).toFixed(2)}</span>
                 </div>
 
                 {tillItems.length > 0 && (
                   <div style={{ marginTop: '0.6rem', marginBottom: '0.6rem' }}>
-                    <p style={{ color: SQ.sub, fontSize: '0.72rem', marginBottom: '0.4rem' }}>Split bill</p>
+                    <p style={{ color: SQ.sub, fontSize: 'var(--text-xs)', marginBottom: '0.4rem' }}>Split bill</p>
                     <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
                       {[1, 2, 3, 4, 5, 6].map((n) => (
                         <button
                           key={n}
                           onClick={() => setSplitBillCount(n)}
                           style={{
-                            padding: '0.3rem 0.6rem', borderRadius: 6, fontSize: '0.75rem', cursor: 'pointer',
+                            padding: '0.3rem 0.6rem', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', cursor: 'pointer',
                             border: splitBillCount === n ? `1.5px solid ${SQ.accent}` : `1px solid ${SQ.line}`,
                             backgroundColor: splitBillCount === n ? SQ.accent + '15' : 'transparent',
                             color: splitBillCount === n ? SQ.accentDark : SQ.sub,
@@ -1127,7 +1127,7 @@ export default function FloorPage() {
                       ))}
                     </div>
                     {splitBillCount > 1 && (
-                      <p style={{ color: SQ.accentDark, fontSize: '0.78rem', fontWeight: 600, marginTop: '0.4rem' }}>
+                      <p style={{ color: SQ.accentDark, fontSize: 'var(--text-sm)', fontWeight: 600, marginTop: '0.4rem' }}>
                         £{((tillTotal / splitBillCount) / 100).toFixed(2)} each
                       </p>
                     )}
@@ -1136,7 +1136,7 @@ export default function FloorPage() {
 
                 <button
                   onClick={() => setPhase(4)}
-                  style={{ width: '100%', padding: '0.8rem', borderRadius: 8, border: 'none', backgroundColor: SQ.accent, color: 'white', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                  style={{ width: '100%', padding: '0.8rem', borderRadius: 'var(--radius-md)', border: 'none', backgroundColor: SQ.accent, color: 'white', fontWeight: 700, fontSize: 'var(--text-md)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
                 >
                   Continue to Completion <ChevronRight size={18} />
                 </button>
@@ -1153,9 +1153,9 @@ export default function FloorPage() {
             onClick={() => setCustomising(null)}
             style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', zIndex: 70 }}
           >
-            <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: SQ.panel, borderRadius: 14, padding: '1.5rem', maxWidth: 360, width: '100%', border: `1px solid ${SQ.line}` }}>
-              <h3 style={{ color: SQ.ink, fontWeight: 700, fontSize: '1.1rem', marginBottom: '0.3rem' }}>{customising.base}</h3>
-              <p style={{ color: SQ.sub, fontSize: '0.8rem', marginBottom: '1rem' }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ backgroundColor: SQ.panel, borderRadius: 'var(--radius-lg)', padding: '1.5rem', maxWidth: 360, width: '100%', border: `1px solid ${SQ.line}` }}>
+              <h3 style={{ color: SQ.ink, fontWeight: 700, fontSize: 'var(--text-lg)', marginBottom: '0.3rem' }}>{customising.base}</h3>
+              <p style={{ color: SQ.sub, fontSize: 'var(--text-sm)', marginBottom: '1rem' }}>
                 {pickedFlavour ? 'Milk?' : customising.flavours.length > 1 || customising.flavours[0] !== '(plain)' ? 'Syrup?' : 'Milk?'}
               </p>
 
@@ -1165,7 +1165,7 @@ export default function FloorPage() {
                     <button
                       key={f}
                       onClick={() => setPickedFlavour(f)}
-                      style={{ padding: '0.7rem 0.5rem', borderRadius: 8, border: 'none', backgroundColor: f === '(plain)' ? SQ.sub : SQ.accent, color: 'white', fontSize: '0.82rem', cursor: 'pointer' }}
+                      style={{ padding: '0.7rem 0.5rem', borderRadius: 'var(--radius-md)', border: 'none', backgroundColor: f === '(plain)' ? SQ.sub : SQ.accent, color: 'white', fontSize: 'var(--text-sm)', cursor: 'pointer' }}
                     >
                       {f === '(plain)' ? 'No syrup' : f}
                     </button>
@@ -1180,10 +1180,10 @@ export default function FloorPage() {
                         key={m}
                         onClick={() => { if (match) { addTillItem(match); setCustomising(null); } }}
                         disabled={!match || tillBusy}
-                        style={{ padding: '0.7rem 0.5rem', borderRadius: 8, border: 'none', backgroundColor: SQ.accent, color: 'white', fontSize: '0.82rem', textAlign: 'left', cursor: 'pointer', opacity: !match || tillBusy ? 0.5 : 1 }}
+                        style={{ padding: '0.7rem 0.5rem', borderRadius: 'var(--radius-md)', border: 'none', backgroundColor: SQ.accent, color: 'white', fontSize: 'var(--text-sm)', textAlign: 'left', cursor: 'pointer', opacity: !match || tillBusy ? 0.5 : 1 }}
                       >
                         {m}
-                        {match?.price_cents ? <span style={{ display: 'block', fontSize: '0.7rem', opacity: 0.85 }}>£{(match.price_cents / 100).toFixed(2)}</span> : null}
+                        {match?.price_cents ? <span style={{ display: 'block', fontSize: 'var(--text-xs)', opacity: 0.85 }}>£{(match.price_cents / 100).toFixed(2)}</span> : null}
                       </button>
                     );
                   })}
@@ -1192,11 +1192,11 @@ export default function FloorPage() {
 
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
                 {pickedFlavour && (
-                  <button onClick={() => setPickedFlavour(null)} style={{ flex: 1, padding: '0.5rem', borderRadius: 8, border: `1px solid ${SQ.line}`, backgroundColor: 'transparent', color: SQ.ink, fontSize: '0.8rem', cursor: 'pointer' }}>
+                  <button onClick={() => setPickedFlavour(null)} style={{ flex: 1, padding: '0.5rem', borderRadius: 'var(--radius-md)', border: `1px solid ${SQ.line}`, backgroundColor: 'transparent', color: SQ.ink, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
                     ← Back
                   </button>
                 )}
-                <button onClick={() => setCustomising(null)} style={{ flex: 1, padding: '0.5rem', borderRadius: 8, border: `1px solid ${SQ.line}`, backgroundColor: 'transparent', color: SQ.ink, fontSize: '0.8rem', cursor: 'pointer' }}>
+                <button onClick={() => setCustomising(null)} style={{ flex: 1, padding: '0.5rem', borderRadius: 'var(--radius-md)', border: `1px solid ${SQ.line}`, backgroundColor: 'transparent', color: SQ.ink, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
                   Cancel
                 </button>
               </div>
@@ -1241,21 +1241,21 @@ export default function FloorPage() {
 
           {/* Totals summary */}
           <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
-            <p style={{ color: B.ivory, fontWeight: 700, fontSize: '0.95rem' }}>{current?.customer_name}</p>
+            <p style={{ color: B.ivory, fontWeight: 700, fontSize: 'var(--text-md)' }}>{current?.customer_name}</p>
             {/* Payment is taken on the real Square till, not in the app --
                 so this only shows if a total genuinely exists (e.g. an
                 older booking that used the in-app till), rather than
                 displaying a meaningless £0.00 on every table. */}
             {tillTotal > 0 && (
               <div className="flex justify-between mt-1">
-                <span style={{ color: B.stone, fontSize: '0.8rem' }}>Till total</span>
-                <span style={{ color: B.ivory, fontWeight: 700, fontSize: '0.9rem' }}>£{(tillTotal / 100).toFixed(2)}</span>
+                <span style={{ color: B.stone, fontSize: 'var(--text-sm)' }}>Till total</span>
+                <span style={{ color: B.ivory, fontWeight: 700, fontSize: 'var(--text-md)' }}>£{(tillTotal / 100).toFixed(2)}</span>
               </div>
             )}
             {splitBillCount > 1 && (
               <div className="flex justify-between mt-1">
-                <span style={{ color: B.stone, fontSize: '0.75rem' }}>Split {splitBillCount} ways</span>
-                <span style={{ color: B.sand, fontSize: '0.8rem' }}>£{((tillTotal / splitBillCount) / 100).toFixed(2)} each</span>
+                <span style={{ color: B.stone, fontSize: 'var(--text-xs)' }}>Split {splitBillCount} ways</span>
+                <span style={{ color: B.sand, fontSize: 'var(--text-sm)' }}>£{((tillTotal / splitBillCount) / 100).toFixed(2)} each</span>
               </div>
             )}
           </div>
@@ -1265,11 +1265,11 @@ export default function FloorPage() {
               below, which still applies to anything left 'Shared'. */}
           {namedPeople.length > 0 && (
             <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
-              <p style={{ color: B.stone, fontSize: '0.75rem', marginBottom: '0.7rem' }}>Paying/collecting separately</p>
+              <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginBottom: '0.7rem' }}>Paying/collecting separately</p>
               {sharedTotal > 0 && (
                 <div className="flex justify-between mb-2" style={{ paddingBottom: '0.5rem', borderBottom: `1px solid ${B.stone}30` }}>
-                  <span style={{ color: B.ivory, fontSize: '0.82rem' }}>Shared (whole table)</span>
-                  <span style={{ color: B.sand, fontWeight: 700, fontSize: '0.82rem' }}>£{(sharedTotal / 100).toFixed(2)}</span>
+                  <span style={{ color: B.ivory, fontSize: 'var(--text-sm)' }}>Shared (whole table)</span>
+                  <span style={{ color: B.sand, fontWeight: 700, fontSize: 'var(--text-sm)' }}>£{(sharedTotal / 100).toFixed(2)}</span>
                 </div>
               )}
               {namedPeople.map((name) => {
@@ -1277,21 +1277,21 @@ export default function FloorPage() {
                 return (
                   <div key={name} style={{ marginBottom: '0.9rem', paddingBottom: '0.9rem', borderBottom: `1px solid ${B.stone}30` }}>
                     <div className="flex justify-between mb-2">
-                      <span style={{ color: B.ivory, fontWeight: 700, fontSize: '0.85rem' }}>{name}</span>
-                      <span style={{ color: B.sand, fontWeight: 700, fontSize: '0.85rem' }}>£{(personTotal(name) / 100).toFixed(2)}</span>
+                      <span style={{ color: B.ivory, fontWeight: 700, fontSize: 'var(--text-base)' }}>{name}</span>
+                      <span style={{ color: B.sand, fontWeight: 700, fontSize: 'var(--text-base)' }}>£{(personTotal(name) / 100).toFixed(2)}</span>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginBottom: '0.4rem' }}>
                       <button
                         onClick={() => setPersonCollection((prev) => ({ ...prev, [name]: { ...pref, collection_method: 'studio' } }))}
-                        style={{ padding: '0.5rem', borderRadius: 6, fontSize: '0.75rem', border: pref.collection_method === 'studio' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: pref.collection_method === 'studio' ? B.clay + '30' : 'transparent', color: B.ivory }}
+                        style={{ padding: '0.5rem', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', border: pref.collection_method === 'studio' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: pref.collection_method === 'studio' ? B.clay + '30' : 'transparent', color: B.ivory }}
                       >
-                        🏠 Studio
+                        <Home size={14} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 4 }} /> Studio
                       </button>
                       <button
                         onClick={() => setPersonCollection((prev) => ({ ...prev, [name]: { ...pref, collection_method: 'postal' } }))}
-                        style={{ padding: '0.5rem', borderRadius: 6, fontSize: '0.75rem', border: pref.collection_method === 'postal' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: pref.collection_method === 'postal' ? B.clay + '30' : 'transparent', color: B.ivory }}
+                        style={{ padding: '0.5rem', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', border: pref.collection_method === 'postal' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: pref.collection_method === 'postal' ? B.clay + '30' : 'transparent', color: B.ivory }}
                       >
-                        📮 Postal
+                        <Mail size={14} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 4 }} /> Postal
                       </button>
                     </div>
                     {pref.collection_method === 'postal' && (
@@ -1300,19 +1300,19 @@ export default function FloorPage() {
                         value={pref.postal_postcode}
                         onChange={(e) => setPersonCollection((prev) => ({ ...prev, [name]: { ...pref, postal_postcode: e.target.value } }))}
                         placeholder="Their postcode"
-                        style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: 6, border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: '0.78rem', marginBottom: '0.4rem' }}
+                        style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: 'var(--text-sm)', marginBottom: '0.4rem' }}
                       />
                     )}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', marginBottom: '0.4rem' }}>
                       <button
                         onClick={() => setPersonCollection((prev) => ({ ...prev, [name]: { ...pref, payment_method: 'card' } }))}
-                        style={{ padding: '0.5rem', borderRadius: 6, fontSize: '0.75rem', border: pref.payment_method === 'card' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: pref.payment_method === 'card' ? B.clay + '30' : 'transparent', color: B.ivory }}
+                        style={{ padding: '0.5rem', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', border: pref.payment_method === 'card' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: pref.payment_method === 'card' ? B.clay + '30' : 'transparent', color: B.ivory }}
                       >
                         💳 Card
                       </button>
                       <button
                         onClick={() => setPersonCollection((prev) => ({ ...prev, [name]: { ...pref, payment_method: 'cash' } }))}
-                        style={{ padding: '0.5rem', borderRadius: 6, fontSize: '0.75rem', border: pref.payment_method === 'cash' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: pref.payment_method === 'cash' ? B.clay + '30' : 'transparent', color: B.ivory }}
+                        style={{ padding: '0.5rem', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-xs)', border: pref.payment_method === 'cash' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: pref.payment_method === 'cash' ? B.clay + '30' : 'transparent', color: B.ivory }}
                       >
                         💵 Cash
                       </button>
@@ -1320,7 +1320,7 @@ export default function FloorPage() {
                     <button
                       onClick={() => savePersonCollection(name)}
                       disabled={savingPersonCollection === name || !pref.collection_method}
-                      style={{ width: '100%', padding: '0.4rem', borderRadius: 6, border: 'none', backgroundColor: B.clay, color: B.ivory, fontSize: '0.75rem', fontWeight: 700, opacity: !pref.collection_method ? 0.5 : 1 }}
+                      style={{ width: '100%', padding: '0.4rem', borderRadius: 'var(--radius-sm)', border: 'none', backgroundColor: B.clay, color: B.ivory, fontSize: 'var(--text-xs)', fontWeight: 700, opacity: !pref.collection_method ? 0.5 : 1 }}
                     >
                       {savingPersonCollection === name ? 'Saving...' : `Save ${name}'s choice`}
                     </button>
@@ -1332,19 +1332,19 @@ export default function FloorPage() {
 
           {/* Collection method */}
           <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
-            <p style={{ color: B.stone, fontSize: '0.75rem', marginBottom: '0.5rem' }}>{namedPeople.length > 0 ? 'Collection — shared items / whole booking fallback' : 'Collection'}</p>
+            <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginBottom: '0.5rem' }}>{namedPeople.length > 0 ? 'Collection — shared items / whole booking fallback' : 'Collection'}</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
               <button
                 onClick={() => setCollectionMethod('studio')}
-                style={{ padding: '0.7rem', borderRadius: 8, border: collectionMethod === 'studio' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: collectionMethod === 'studio' ? B.clay + '30' : 'transparent', color: B.ivory, fontSize: '0.85rem', fontWeight: 600 }}
+                style={{ padding: '0.7rem', borderRadius: 'var(--radius-md)', border: collectionMethod === 'studio' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: collectionMethod === 'studio' ? B.clay + '30' : 'transparent', color: B.ivory, fontSize: 'var(--text-base)', fontWeight: 600 }}
               >
-                🏠 Studio pickup
+                <Home size={14} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 4 }} /> Studio pickup
               </button>
               <button
                 onClick={() => setCollectionMethod('postal')}
-                style={{ padding: '0.7rem', borderRadius: 8, border: collectionMethod === 'postal' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: collectionMethod === 'postal' ? B.clay + '30' : 'transparent', color: B.ivory, fontSize: '0.85rem', fontWeight: 600 }}
+                style={{ padding: '0.7rem', borderRadius: 'var(--radius-md)', border: collectionMethod === 'postal' ? `2px solid ${B.clay}` : `1px solid ${B.stone}`, backgroundColor: collectionMethod === 'postal' ? B.clay + '30' : 'transparent', color: B.ivory, fontSize: 'var(--text-base)', fontWeight: 600 }}
               >
-                📮 Postal
+                <Mail size={14} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 4 }} /> Postal
               </button>
             </div>
             {collectionMethod === 'postal' && (
@@ -1358,21 +1358,21 @@ export default function FloorPage() {
                   value={postalAddressLine1}
                   onChange={(e) => setPostalAddressLine1(e.target.value)}
                   placeholder="Address line (house number, street)"
-                  style={{ width: '100%', padding: '0.5rem 0.6rem', borderRadius: 8, border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: '0.85rem' }}
+                  style={{ width: '100%', padding: '0.5rem 0.6rem', borderRadius: 'var(--radius-md)', border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: 'var(--text-base)' }}
                 />
                 <input
                   type="text"
                   value={postalCity}
                   onChange={(e) => setPostalCity(e.target.value)}
                   placeholder="Town / city"
-                  style={{ width: '100%', padding: '0.5rem 0.6rem', borderRadius: 8, border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: '0.85rem' }}
+                  style={{ width: '100%', padding: '0.5rem 0.6rem', borderRadius: 'var(--radius-md)', border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: 'var(--text-base)' }}
                 />
                 <input
                   type="text"
                   value={postalPostcode}
                   onChange={(e) => setPostalPostcode(e.target.value)}
                   placeholder="Postcode"
-                  style={{ width: '100%', padding: '0.5rem 0.6rem', borderRadius: 8, border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: '0.85rem' }}
+                  style={{ width: '100%', padding: '0.5rem 0.6rem', borderRadius: 'var(--radius-md)', border: `1px solid ${B.stone}`, backgroundColor: B.charcoal, color: B.ivory, fontSize: 'var(--text-base)' }}
                 />
               </div>
             )}
@@ -1392,17 +1392,17 @@ export default function FloorPage() {
               through and closed. */}
           {tillTotal > 0 && (
           <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: B.sand + '18', border: `1px solid ${B.stone}` }}>
-            <p style={{ color: B.stone, fontSize: '0.75rem', marginBottom: '0.35rem' }}>Payment · taken on the till</p>
+            <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginBottom: '0.35rem' }}>Payment · taken on the till</p>
             {liveSquareOrder?.matched && liveSquareOrder.order ? (
-              <p style={{ color: B.ivory, fontSize: '0.85rem', fontWeight: 600 }}>
+              <p style={{ color: B.ivory, fontSize: 'var(--text-base)', fontWeight: 600 }}>
                 Ticket &quot;{liveSquareOrder.order.ticket_name}&quot; still open · £{(liveSquareOrder.order.total_gbp ?? 0).toFixed(2)} to take
               </p>
             ) : liveSquareOrder?.reason === 'no_open_ticket_for_table' ? (
-              <p style={{ color: '#7BB661', fontSize: '0.85rem', fontWeight: 600 }}>
+              <p style={{ color: '#7BB661', fontSize: 'var(--text-base)', fontWeight: 600 }}>
                 No open ticket for this table — looks settled
               </p>
             ) : (
-              <p style={{ color: B.stone, fontSize: '0.8rem' }}>
+              <p style={{ color: B.stone, fontSize: 'var(--text-sm)' }}>
                 £{(tillTotal / 100).toFixed(2)} on this table. Settle it on the till as usual.
               </p>
             )}
@@ -1413,7 +1413,7 @@ export default function FloorPage() {
           <div className="rounded-lg p-6" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
             <div className="text-center mb-5">
               <h2 className="text-xl font-bold" style={{ color: B.ivory }}>Photograph the pieces</h2>
-              <p style={{ color: B.stone, fontSize: '0.8rem' }}>Real photo, confirmed against {current?.customer_name}&apos;s booking</p>
+              <p style={{ color: B.stone, fontSize: 'var(--text-sm)' }}>Real photo, confirmed against {current?.customer_name}&apos;s booking</p>
             </div>
 
             {/* The gentle nudge, per Daisy: "if a bad photograph's taken and
@@ -1425,11 +1425,11 @@ export default function FloorPage() {
                 Framed as help rather than a warning: the person holding
                 the iPad is busy, not careless. */}
             {!photoPreview && (
-              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start', padding: '0.7rem 0.8rem', borderRadius: 8, backgroundColor: B.clay + '22', border: `1px solid ${B.clay}`, marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start', padding: '0.7rem 0.8rem', borderRadius: 'var(--radius-md)', backgroundColor: B.clay + '22', border: `1px solid ${B.clay}`, marginBottom: '1rem' }}>
                 <Camera size={17} color={B.clay} style={{ flexShrink: 0, marginTop: 2 }} />
                 <div>
-                  <p style={{ color: B.ivory, fontSize: '0.82rem', fontWeight: 700 }}>Get every piece in the shot</p>
-                  <p style={{ color: B.stone, fontSize: '0.76rem', marginTop: '0.15rem', lineHeight: 1.35 }}>
+                  <p style={{ color: B.ivory, fontSize: 'var(--text-sm)', fontWeight: 700 }}>Get every piece in the shot</p>
+                  <p style={{ color: B.stone, fontSize: 'var(--text-sm)', marginTop: '0.15rem', lineHeight: 1.35 }}>
                     Anything not in the photo can&apos;t be found on the shelf later. Stand back, get all {pieceCount > 0 ? pieceCount : 'the'} piece{pieceCount === 1 ? '' : 's'} in frame, and keep the painted side showing.
                   </p>
                 </div>
@@ -1440,7 +1440,7 @@ export default function FloorPage() {
             {!photoPreview ? (
               <button onClick={() => fileRef.current?.click()} className="w-full py-8 rounded-lg flex flex-col items-center gap-2 mb-4" style={{ backgroundColor: B.charcoal, border: `2px dashed ${B.stone}` }}>
                 <Camera size={28} color={B.clay} />
-                <span style={{ color: B.stone, fontSize: '0.85rem' }}>Tap to photograph</span>
+                <span style={{ color: B.stone, fontSize: 'var(--text-base)' }}>Tap to photograph</span>
               </button>
             ) : (
               <>
@@ -1448,7 +1448,7 @@ export default function FloorPage() {
                     staff can check the AI got them all before finishing.
                     Same box format and colours as Find on Table. */}
                 <div style={{ position: 'relative', marginBottom: '1rem' }}>
-                  <img src={photoPreview} alt="" style={{ width: '100%', borderRadius: 8, display: 'block' }} onClick={() => fileRef.current?.click()} />
+                  <img src={photoPreview} alt="" style={{ width: '100%', borderRadius: 'var(--radius-md)', display: 'block' }} onClick={() => fileRef.current?.click()} />
                   {identifiedPieces?.map((p, i) => (
                     p.box && (
                       <div
@@ -1460,12 +1460,12 @@ export default function FloorPage() {
                           width: `${p.box.right_pct - p.box.left_pct}%`,
                           height: `${p.box.bottom_pct - p.box.top_pct}%`,
                           border: `3px solid ${['#e0392b', '#1a8a3c', '#2b6fe0', '#c77a0a', '#8b3ec7', '#0a9aa8'][i % 6]}`,
-                          borderRadius: 4,
+                          borderRadius: 'var(--radius-sm)',
                           boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
                           pointerEvents: 'none',
                         }}
                       >
-                        <span style={{ position: 'absolute', top: -9, left: -9, width: 20, height: 20, borderRadius: '50%', backgroundColor: ['#e0392b', '#1a8a3c', '#2b6fe0', '#c77a0a', '#8b3ec7', '#0a9aa8'][i % 6], color: 'white', fontSize: '0.68rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px white' }}>
+                        <span style={{ position: 'absolute', top: -9, left: -9, width: 20, height: 20, borderRadius: '50%', backgroundColor: ['#e0392b', '#1a8a3c', '#2b6fe0', '#c77a0a', '#8b3ec7', '#0a9aa8'][i % 6], color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px white' }}>
                           {p.index}
                         </span>
                       </div>
@@ -1474,43 +1474,43 @@ export default function FloorPage() {
                 </div>
 
                 {identifying && (
-                  <p style={{ color: B.stone, fontSize: '0.8rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <p style={{ color: B.stone, fontSize: 'var(--text-sm)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <Loader size={14} className="animate-spin" /> Identifying pieces...
                   </p>
                 )}
 
                 {identifiedPieces && identifiedPieces.length > 0 && (
                   <div style={{ marginBottom: '1rem' }}>
-                    <p style={{ color: B.ivory, fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+                    <p style={{ color: B.ivory, fontSize: 'var(--text-base)', fontWeight: 700, marginBottom: '0.5rem' }}>
                       {identifiedPieces.length} piece{identifiedPieces.length === 1 ? '' : 's'} identified — check before finishing
                     </p>
                     {identifiedPieces.map((p, i) => (
                       <div key={p.index} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', padding: '0.4rem 0' }}>
-                        <span style={{ flexShrink: 0, width: 18, height: 18, borderRadius: '50%', backgroundColor: ['#e0392b', '#1a8a3c', '#2b6fe0', '#c77a0a', '#8b3ec7', '#0a9aa8'][i % 6], color: 'white', fontSize: '0.62rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2 }}>
+                        <span style={{ flexShrink: 0, width: 18, height: 18, borderRadius: '50%', backgroundColor: ['#e0392b', '#1a8a3c', '#2b6fe0', '#c77a0a', '#8b3ec7', '#0a9aa8'][i % 6], color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2 }}>
                           {p.index}
                         </span>
                         <div style={{ flex: 1 }}>
-                          <p style={{ color: B.ivory, fontSize: '0.8rem', fontWeight: 600 }}>{p.piece_type}</p>
-                          <p style={{ color: B.stone, fontSize: '0.72rem' }}>{p.description}</p>
+                          <p style={{ color: B.ivory, fontSize: 'var(--text-sm)', fontWeight: 600 }}>{p.piece_type}</p>
+                          <p style={{ color: B.stone, fontSize: 'var(--text-xs)' }}>{p.description}</p>
                         </div>
                       </div>
                     ))}
-                    <p style={{ color: B.stone, fontSize: '0.72rem', marginTop: '0.4rem' }}>
+                    <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginTop: '0.4rem' }}>
                       Wrong count? Tap the photo to retake it.
                     </p>
                   </div>
                 )}
 
                 {identifyError && !identifying && (
-                  <div style={{ padding: '0.7rem 0.85rem', backgroundColor: '#3a2420', border: '1px solid #7a4a3a', borderRadius: 8, marginBottom: '1rem' }}>
-                    <p style={{ color: '#ffb4a2', fontSize: '0.82rem', fontWeight: 600 }}>{identifyError}</p>
-                    <p style={{ color: B.stone, fontSize: '0.72rem', marginTop: '0.3rem' }}>
+                  <div style={{ padding: '0.7rem 0.85rem', backgroundColor: '#3a2420', border: '1px solid #7a4a3a', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
+                    <p style={{ color: '#ffb4a2', fontSize: 'var(--text-sm)', fontWeight: 600 }}>{identifyError}</p>
+                    <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginTop: '0.3rem' }}>
                       You can still finish, but the pieces won&apos;t be described and won&apos;t be findable on the shelf later.
                     </p>
                   </div>
                 )}
                 {identifiedPieces && identifiedPieces.length === 0 && !identifying && (
-                  <p style={{ color: B.stone, fontSize: '0.8rem', marginBottom: '1rem' }}>
+                  <p style={{ color: B.stone, fontSize: 'var(--text-sm)', marginBottom: '1rem' }}>
                     No pieces identified — tap the photo to retake, or carry on and add them later.
                   </p>
                 )}
@@ -1518,7 +1518,7 @@ export default function FloorPage() {
             )}
 
             <div style={{ marginBottom: '0.9rem' }}>
-              <label style={{ display: 'block', color: B.ivory, fontSize: '0.82rem', fontWeight: 700, marginBottom: '0.35rem' }}>
+              <label style={{ display: 'block', color: B.ivory, fontSize: 'var(--text-sm)', fontWeight: 700, marginBottom: '0.35rem' }}>
                 Collection date
               </label>
               <input
@@ -1527,17 +1527,17 @@ export default function FloorPage() {
                 min={new Date().toISOString().slice(0, 10)}
                 onChange={(e) => setCollectionDate(e.target.value)}
                 style={{
-                  width: '100%', padding: '0.75rem', borderRadius: 8,
+                  width: '100%', padding: '0.75rem', borderRadius: 'var(--radius-md)',
                   border: `1px solid ${B.stone}`,
                   // Explicit colours, not inherited. Native date inputs render
                   // on a white background regardless of page theme, so an
                   // inherited light colour makes the text invisible -- the same
                   // dark-mode bug already fixed on three other screens.
                   color: B.charcoal, backgroundColor: 'white',
-                  fontSize: '1rem',
+                  fontSize: 'var(--text-md)',
                 }}
               />
-              <p style={{ color: B.stone, fontSize: '0.7rem', marginTop: '0.3rem' }}>
+              <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginTop: '0.3rem' }}>
                 Stays set for the next booking until you change it.
               </p>
             </div>
@@ -1551,7 +1551,7 @@ export default function FloorPage() {
               {saving ? <><Loader size={18} className="animate-spin" /> Saving...</> : <>Finish &amp; Hand off <ChevronRight size={20} /></>}
             </button>
             {!collectionMethod && (
-              <p style={{ color: B.stone, fontSize: '0.7rem', textAlign: 'center', marginTop: '0.5rem' }}>Choose collecting or posting above to finish</p>
+              <p style={{ color: B.stone, fontSize: 'var(--text-xs)', textAlign: 'center', marginTop: '0.5rem' }}>Choose collecting or posting above to finish</p>
             )}
           </div>
         </div>
@@ -1568,7 +1568,7 @@ export default function FloorPage() {
         <Header label={`Step ${tillEnabled ? 5 : 4}/${tillEnabled ? 5 : 4} · Hand-off`} />
         <div className="rounded-lg p-8" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
           <div className="text-center mb-6">
-            <span className="text-4xl">✅</span>
+            <CheckCircle2 size={40} style={{ color: 'var(--success)' }} />
             <h2 className="text-xl font-bold mt-3" style={{ color: B.ivory }}>Hand-off</h2>
           </div>
           <div className="space-y-4 mb-8">
@@ -1594,15 +1594,15 @@ export default function FloorPage() {
                   on to the next person. */}
               {collectionDate && (
                 <p style={{ color: B.sand }} className="text-xs mt-1 font-semibold">
-                  📅 Ready to collect: {new Date(collectionDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  <CalendarDays size={13} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 4 }} />Ready to collect: {new Date(collectionDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </p>
               )}
 
               {collectionMethod && (
                 <p style={{ color: B.stone }} className="text-xs mt-1">
                   {collectionMethod === 'postal'
-                    ? `📮 Postal to ${[postalAddressLine1, postalCity, postalPostcode].filter(Boolean).join(', ')}`
-                    : '🏠 Studio pickup'}
+                    ? `Postal to ${[postalAddressLine1, postalCity, postalPostcode].filter(Boolean).join(', ')}`
+                    : 'Studio pickup'}
                 </p>
               )}
               {photo && <p style={{ color: '#7ec98a' }} className="text-xs mt-1 flex items-center gap-1"><Check size={12} /> Photo confirmed to booking</p>}

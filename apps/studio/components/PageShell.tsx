@@ -40,7 +40,7 @@ export function PageShell({
     >
       <h1
         style={{
-          fontSize: '1.55rem',
+          fontSize: 'var(--text-xl)',
           fontWeight: 800,
           letterSpacing: '-0.02em',
           color: 'var(--charcoal)',
@@ -50,7 +50,7 @@ export function PageShell({
         {title}
       </h1>
       {subtitle && (
-        <p style={{ color: 'var(--charcoal)', opacity: 0.6, fontSize: '0.88rem', lineHeight: 1.5, marginBottom: '1.4rem' }}>
+        <p style={{ color: 'var(--charcoal)', opacity: 0.6, fontSize: 'var(--text-base)', lineHeight: 1.5, marginBottom: '1.4rem' }}>
           {subtitle}
         </p>
       )}
@@ -64,7 +64,7 @@ export function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <p
       style={{
-        fontSize: '0.7rem',
+        fontSize: 'var(--text-xs)',
         fontWeight: 700,
         color: 'var(--clay)',
         textTransform: 'uppercase',
@@ -81,7 +81,7 @@ export function SectionLabel({ children }: { children: React.ReactNode }) {
 // instead of each page inventing its own wording and styling.
 export function EmptyState({ message }: { message: string }) {
   return (
-    <p style={{ color: 'var(--stone)', fontSize: '0.9rem', padding: '1.5rem 0', textAlign: 'center' }}>
+    <p style={{ color: 'var(--stone)', fontSize: 'var(--text-md)', padding: '1.5rem 0', textAlign: 'center' }}>
       {message}
     </p>
   );

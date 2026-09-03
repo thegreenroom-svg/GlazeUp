@@ -63,11 +63,11 @@ export default function TicketLinkPage() {
             key={d}
             onClick={() => setDays(d)}
             style={{
-              padding: '0.4rem 0.7rem', borderRadius: 8, cursor: 'pointer',
+              padding: '0.4rem 0.7rem', borderRadius: 'var(--radius-md)', cursor: 'pointer',
               border: days === d ? 'none' : '1px solid #ddd',
               background: days === d ? 'var(--clay)' : 'white',
               color: days === d ? 'white' : 'var(--charcoal)',
-              fontSize: '0.8rem', fontWeight: 600,
+              fontSize: 'var(--text-sm)', fontWeight: 600,
             }}
           >
             {d === 1 ? 'Today' : `${d} days`}
@@ -75,12 +75,12 @@ export default function TicketLinkPage() {
         ))}
       </div>
 
-      {loading && <p style={{ fontSize: '0.85rem', color: '#888' }}>Reading Square...</p>}
-      {error && <p style={{ fontSize: '0.85rem', color: '#c0392b' }}>{error}</p>}
+      {loading && <p style={{ fontSize: 'var(--text-base)', color: '#888' }}>Reading Square...</p>}
+      {error && <p style={{ fontSize: 'var(--text-base)', color: '#c0392b' }}>{error}</p>}
 
       {data && !loading && (
         <>
-          <p style={{ fontSize: '0.8rem', color: '#666', marginBottom: '0.9rem' }}>
+          <p style={{ fontSize: 'var(--text-sm)', color: '#666', marginBottom: '0.9rem' }}>
             {data.orders_scanned} order{data.orders_scanned === 1 ? '' : 's'} · {data.bookings_in_window} booking{data.bookings_in_window === 1 ? '' : 's'} in the window
           </p>
 
@@ -125,10 +125,10 @@ export default function TicketLinkPage() {
 
           {data.sample_ticket_names.length > 0 && (
             <div style={{ marginTop: '1rem' }}>
-              <p style={{ fontSize: '0.78rem', fontWeight: 700, marginBottom: '0.35rem' }}>How tickets are actually named</p>
+              <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, marginBottom: '0.35rem' }}>How tickets are actually named</p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
                 {data.sample_ticket_names.map((n) => (
-                  <span key={n} style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: 999, background: '#f4f4f4', color: '#444' }}>{n}</span>
+                  <span key={n} style={{ fontSize: 'var(--text-xs)', padding: '0.2rem 0.5rem', borderRadius: 999, background: '#f4f4f4', color: '#444' }}>{n}</span>
                 ))}
               </div>
             </div>
@@ -141,11 +141,11 @@ export default function TicketLinkPage() {
 
 function Rung({ n, title, note, rows }: { n: number; title: string; note: string; rows: [string, string][] }) {
   return (
-    <div style={{ border: '1px solid #eee', borderRadius: 10, padding: '0.75rem', marginBottom: '0.6rem' }}>
-      <p style={{ fontSize: '0.85rem', fontWeight: 700 }}>{n}. {title}</p>
-      <p style={{ fontSize: '0.74rem', color: '#888', marginTop: '0.1rem', marginBottom: '0.5rem' }}>{note}</p>
+    <div style={{ border: '1px solid #eee', borderRadius: 'var(--radius-md)', padding: '0.75rem', marginBottom: '0.6rem' }}>
+      <p style={{ fontSize: 'var(--text-base)', fontWeight: 700 }}>{n}. {title}</p>
+      <p style={{ fontSize: 'var(--text-xs)', color: '#888', marginTop: '0.1rem', marginBottom: '0.5rem' }}>{note}</p>
       {rows.map(([k, v]) => (
-        <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', padding: '0.15rem 0' }}>
+        <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', padding: '0.15rem 0' }}>
           <span style={{ color: '#666' }}>{k}</span>
           <span style={{ fontWeight: 600 }}>{v}</span>
         </div>

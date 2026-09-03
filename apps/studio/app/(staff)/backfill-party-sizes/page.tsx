@@ -84,27 +84,27 @@ export default function BackfillPartySizesPage() {
       
 
       <div style={{ padding: '0.9rem', backgroundColor: 'white', border: '1px solid #eee', borderRadius: '10px', marginBottom: '1.25rem' }}>
-        <p style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.4rem' }}>Real, authoritative — from booking notes</p>
-        <p style={{ color: '#666', fontSize: '0.85rem', marginBottom: '0.8rem' }}>
+        <p style={{ fontWeight: 600, fontSize: 'var(--text-md)', marginBottom: '0.4rem' }}>Real, authoritative — from booking notes</p>
+        <p style={{ color: '#666', fontSize: 'var(--text-base)', marginBottom: '0.8rem' }}>
           Customers often state a headcount directly in their booking note ({'"'}6 people{'"'}, {'"'}party of 4{'"'}). Purely local, no live Square call, runs in a couple of seconds.
         </p>
         <button
           onClick={runNotesPass}
           disabled={notesRunning}
-          style={{ width: '100%', padding: '0.7rem', backgroundColor: '#1a8a3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600, cursor: notesRunning ? 'not-allowed' : 'pointer', opacity: notesRunning ? 0.7 : 1 }}
+          style={{ width: '100%', padding: '0.7rem', backgroundColor: '#1a8a3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: 'var(--text-md)', fontWeight: 600, cursor: notesRunning ? 'not-allowed' : 'pointer', opacity: notesRunning ? 0.7 : 1 }}
         >
           {notesRunning ? 'Checking notes...' : 'Recover from notes'}
         </button>
-        {notesError && <p style={{ color: '#c33', fontSize: '0.82rem', marginTop: '0.5rem' }}>{notesError}</p>}
+        {notesError && <p style={{ color: '#c33', fontSize: 'var(--text-sm)', marginTop: '0.5rem' }}>{notesError}</p>}
         {notesResult && (
-          <p style={{ color: '#1a8a3c', fontSize: '0.85rem', marginTop: '0.6rem', fontWeight: 600 }}>
+          <p style={{ color: '#1a8a3c', fontSize: 'var(--text-base)', marginTop: '0.6rem', fontWeight: 600 }}>
             {notesResult.recovered} recovered from {notesResult.total} real bookings with a note
           </p>
         )}
       </div>
 
-      <p style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.3rem' }}>Fallback — from catalog pricing tier</p>
-      <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
+      <p style={{ fontWeight: 600, fontSize: 'var(--text-md)', marginBottom: '0.3rem' }}>Fallback — from catalog pricing tier</p>
+      <p style={{ color: '#666', fontSize: 'var(--text-md)', marginBottom: '1.25rem' }}>
         A weaker proxy (which priced table size was booked, not a real stated headcount) — worth running on whatever&apos;s left after the notes pass above. Real Square lookups, runs in the background, checks in every 2 seconds.
       </p>
 
@@ -112,7 +112,7 @@ export default function BackfillPartySizesPage() {
         <button
           onClick={run}
           disabled={starting}
-          style={{ width: '100%', padding: '1rem', backgroundColor: 'var(--clay)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '1.05rem', fontWeight: 700, cursor: starting ? 'not-allowed' : 'pointer', opacity: starting ? 0.7 : 1 }}
+          style={{ width: '100%', padding: '1rem', backgroundColor: 'var(--clay)', color: 'white', border: 'none', borderRadius: '10px', fontSize: 'var(--text-lg)', fontWeight: 700, cursor: starting ? 'not-allowed' : 'pointer', opacity: starting ? 0.7 : 1 }}
         >
           {starting ? 'Starting...' : 'Run the catalog-tier fallback'}
         </button>
@@ -130,11 +130,11 @@ export default function BackfillPartySizesPage() {
             <Loader size={20} /> Running in the background — {status.checked} of {status.total || '?'} checked
           </div>
           {status.total > 0 && (
-            <div style={{ height: 8, backgroundColor: '#f0e0b0', borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{ height: 8, backgroundColor: '#f0e0b0', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
               <div style={{ width: `${pct}%`, height: '100%', backgroundColor: '#e0a020', transition: 'width 0.3s' }} />
             </div>
           )}
-          <p style={{ fontSize: '0.78rem', marginTop: '0.5rem' }}>Feel free to leave this page — it keeps running on the server either way.</p>
+          <p style={{ fontSize: 'var(--text-sm)', marginTop: '0.5rem' }}>Feel free to leave this page — it keeps running on the server either way.</p>
         </div>
       )}
 
@@ -149,13 +149,13 @@ export default function BackfillPartySizesPage() {
               <CheckCircle2 size={22} />
               <div>
                 <p style={{ fontWeight: 700 }}>Done</p>
-                <p style={{ fontSize: '0.85rem' }}>{status.recovered} recovered · {status.not_found} had nothing to recover · {status.errored} errored · {status.total} checked</p>
+                <p style={{ fontSize: 'var(--text-base)' }}>{status.recovered} recovered · {status.not_found} had nothing to recover · {status.errored} errored · {status.total} checked</p>
               </div>
             </div>
           )}
 
           {status.errors.length > 0 && (
-            <div style={{ padding: '0.9rem', backgroundColor: '#fdf6e3', borderRadius: '8px', fontSize: '0.82rem' }}>
+            <div style={{ padding: '0.9rem', backgroundColor: '#fdf6e3', borderRadius: '8px', fontSize: 'var(--text-sm)' }}>
               <p style={{ fontWeight: 600, marginBottom: '0.4rem' }}>First {status.errors.length} real errors:</p>
               {status.errors.map((e, i) => (
                 <p key={i} style={{ color: '#8a6a20', marginBottom: '0.2rem' }}>{e.booking_code}: {e.error}</p>

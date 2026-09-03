@@ -105,8 +105,8 @@ export function QrScanner({ onScan, onClose }: QrScannerProps) {
 
       {error ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center', color: 'white' }}>
-          <p style={{ fontSize: '0.95rem', marginBottom: '1rem' }}>{error}</p>
-          <button onClick={onClose} style={{ padding: '0.7rem 1.4rem', borderRadius: 8, border: '1px solid white', background: 'transparent', color: 'white', fontWeight: 700 }}>
+          <p style={{ fontSize: 'var(--text-md)', marginBottom: '1rem' }}>{error}</p>
+          <button onClick={onClose} style={{ padding: '0.7rem 1.4rem', borderRadius: 'var(--radius-md)', border: '1px solid white', background: 'transparent', color: 'white', fontWeight: 700 }}>
             Close
           </button>
         </div>
@@ -119,11 +119,11 @@ export function QrScanner({ onScan, onClose }: QrScannerProps) {
           <video ref={videoRef} playsInline muted style={{ flex: 1, objectFit: 'cover', width: '100%' }} />
           <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '68vw', maxWidth: 320, aspectRatio: '1', border: '3px solid white', borderRadius: 16, boxShadow: '0 0 0 2000px rgba(0,0,0,0.45)', pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '68vw', maxWidth: 320, aspectRatio: '1', border: '3px solid white', borderRadius: 'var(--radius-lg)', boxShadow: '0 0 0 2000px rgba(0,0,0,0.45)', pointerEvents: 'none' }} />
 
           <div style={{ position: 'absolute', bottom: '3.5rem', left: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', color: 'white', pointerEvents: 'none' }}>
             <ScanLine size={22} />
-            <p style={{ fontSize: '0.85rem', fontWeight: 600 }}>Line the card's QR code up in the box</p>
+            <p style={{ fontSize: 'var(--text-base)', fontWeight: 600 }}>Line the card's QR code up in the box</p>
           </div>
         </>
       )}

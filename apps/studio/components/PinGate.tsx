@@ -85,7 +85,7 @@ function PinPad({
       </div>
 
       {error && (
-        <p style={{ color: 'var(--charcoal)', fontSize: '0.85rem', marginBottom: '1rem', fontWeight: 600, backgroundColor: 'rgba(255,255,255,0.85)', padding: '0.4rem 0.8rem', borderRadius: '6px' }}>{error}</p>
+        <p style={{ color: 'var(--charcoal)', fontSize: 'var(--text-base)', marginBottom: '1rem', fontWeight: 600, backgroundColor: 'rgba(255,255,255,0.85)', padding: '0.4rem 0.8rem', borderRadius: '6px' }}>{error}</p>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 72px)', gap: '0.7rem' }}>
@@ -95,7 +95,7 @@ function PinPad({
             onClick={() => onPress(d)}
             style={{
               height: 72, borderRadius: '50%', border: 'none', cursor: 'pointer',
-              background: 'rgba(255,255,255,0.2)', color: 'white', fontSize: '1.5rem', fontWeight: 300,
+              background: 'rgba(255,255,255,0.2)', color: 'white', fontSize: 'var(--text-xl)', fontWeight: 300,
             }}
           >
             {d}
@@ -104,7 +104,7 @@ function PinPad({
         <div />
         <button
           onClick={() => onPress('0')}
-          style={{ height: 72, borderRadius: '50%', border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.2)', color: 'white', fontSize: '1.5rem', fontWeight: 300 }}
+          style={{ height: 72, borderRadius: '50%', border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.2)', color: 'white', fontSize: 'var(--text-xl)', fontWeight: 300 }}
         >
           0
         </button>
@@ -420,17 +420,17 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
     if (mode === 'offer-personalize') {
       return lockScreenShell(
         <div style={{ textAlign: 'center', maxWidth: 300 }}>
-          <p style={{ color: 'white', fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem' }}>This PIN is shared by the team</p>
-          <p style={{ color: 'white', opacity: 0.75, fontSize: '0.85rem', marginBottom: '1.75rem' }}>Want to set your own, just for you?</p>
+          <p style={{ color: 'white', fontSize: 'var(--text-md)', fontWeight: 600, marginBottom: '0.5rem' }}>This PIN is shared by the team</p>
+          <p style={{ color: 'white', opacity: 0.75, fontSize: 'var(--text-base)', marginBottom: '1.75rem' }}>Want to set your own, just for you?</p>
           <button
             onClick={startPersonalize}
-            style={{ width: '100%', padding: '0.9rem', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'white', color: 'var(--clay)', fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.7rem' }}
+            style={{ width: '100%', padding: '0.9rem', borderRadius: 'var(--radius-md)', border: 'none', cursor: 'pointer', background: 'white', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-md)', marginBottom: '0.7rem' }}
           >
             Set my own PIN
           </button>
           <button
             onClick={skipPersonalize}
-            style={{ width: '100%', padding: '0.9rem', borderRadius: 10, border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', background: 'transparent', color: 'white', fontWeight: 600, fontSize: '0.9rem' }}
+            style={{ width: '100%', padding: '0.9rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', background: 'transparent', color: 'white', fontWeight: 600, fontSize: 'var(--text-md)' }}
           >
             Not now
           </button>
@@ -441,23 +441,23 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
     if (mode === 'personalize-name') {
       return lockScreenShell(
         <div style={{ textAlign: 'center', maxWidth: 300, width: '100%' }}>
-          <p style={{ color: 'white', fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>Which one are you?</p>
-          {teamLoading && <p style={{ color: 'white', opacity: 0.7, fontSize: '0.85rem' }}>Loading team...</p>}
+          <p style={{ color: 'white', fontSize: 'var(--text-md)', fontWeight: 600, marginBottom: '1rem' }}>Which one are you?</p>
+          {teamLoading && <p style={{ color: 'white', opacity: 0.7, fontSize: 'var(--text-base)' }}>Loading team...</p>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {team.map((m) => (
               <button
                 key={m.id}
                 onClick={() => pickPersonalizeName(m)}
-                style={{ padding: '0.8rem', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.15)', color: 'white', fontWeight: 600, fontSize: '0.95rem', textAlign: 'left' }}
+                style={{ padding: '0.8rem', borderRadius: 'var(--radius-md)', border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.15)', color: 'white', fontWeight: 600, fontSize: 'var(--text-md)', textAlign: 'left' }}
               >
                 {m.name}
-                {m.role && <span style={{ display: 'block', fontSize: '0.75rem', opacity: 0.7, fontWeight: 400 }}>{m.role}</span>}
+                {m.role && <span style={{ display: 'block', fontSize: 'var(--text-xs)', opacity: 0.7, fontWeight: 400 }}>{m.role}</span>}
               </button>
             ))}
           </div>
           <button
             onClick={() => setMode('offer-personalize')}
-            style={{ marginTop: '1.25rem', background: 'none', border: 'none', color: 'white', opacity: 0.7, fontSize: '0.8rem', cursor: 'pointer' }}
+            style={{ marginTop: '1.25rem', background: 'none', border: 'none', color: 'white', opacity: 0.7, fontSize: 'var(--text-sm)', cursor: 'pointer' }}
           >
             ← Back
           </button>
@@ -468,7 +468,7 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
     if (mode === 'personalize-pin') {
       return lockScreenShell(
         <>
-          <p style={{ color: 'white', fontSize: '0.95rem', fontWeight: 600, marginBottom: '1.25rem' }}>
+          <p style={{ color: 'white', fontSize: 'var(--text-md)', fontWeight: 600, marginBottom: '1.25rem' }}>
             {personalizing?.name}, choose your new PIN
           </p>
           <PinPad value={newPin1} onPress={pressNewPin1} onDelete={() => setNewPin1(newPin1.slice(0, -1))} error={personalizeError} />
@@ -479,11 +479,11 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
     if (mode === 'personalize-confirm') {
       return lockScreenShell(
         <>
-          <p style={{ color: 'white', fontSize: '0.95rem', fontWeight: 600, marginBottom: '1.25rem' }}>
+          <p style={{ color: 'white', fontSize: 'var(--text-md)', fontWeight: 600, marginBottom: '1.25rem' }}>
             Enter it again to confirm
           </p>
           <PinPad value={newPin2} onPress={pressNewPin2} onDelete={() => setNewPin2(newPin2.slice(0, -1))} error={personalizeError} />
-          {personalizeBusy && <p style={{ color: 'white', opacity: 0.7, fontSize: '0.8rem', marginTop: '1rem' }}>Saving...</p>}
+          {personalizeBusy && <p style={{ color: 'white', opacity: 0.7, fontSize: 'var(--text-sm)', marginTop: '1rem' }}>Saving...</p>}
         </>
       );
     }
@@ -492,9 +492,9 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
       <>
         <PinPad value={pin} onPress={press} onDelete={() => setPin(pin.slice(0, -1))} error={error} />
         {busy ? (
-          <p style={{ color: 'white', opacity: 0.75, fontSize: '0.8rem', marginTop: '1.5rem' }}>Checking...</p>
+          <p style={{ color: 'white', opacity: 0.75, fontSize: 'var(--text-sm)', marginTop: '1.5rem' }}>Checking...</p>
         ) : (
-          <p style={{ color: 'white', opacity: 0.65, fontSize: '0.75rem', marginTop: '1.5rem', textAlign: 'center', maxWidth: 260 }}>
+          <p style={{ color: 'white', opacity: 0.65, fontSize: 'var(--text-xs)', marginTop: '1.5rem', textAlign: 'center', maxWidth: 260 }}>
             Staff PIN to open the studio app.
           </p>
         )}
@@ -528,12 +528,12 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', minWidth: 0 }}>
           <span style={{
             flexShrink: 0, width: 30, height: 30, borderRadius: '50%', background: 'var(--clay)',
-            color: 'white', fontWeight: 800, fontSize: '0.85rem',
+            color: 'white', fontWeight: 800, fontSize: 'var(--text-base)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             {(shift.name || '?').trim().charAt(0).toUpperCase()}
           </span>
-          <span style={{ fontSize: '1.05rem', fontWeight: 800, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 'var(--text-lg)', fontWeight: 800, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {shift.name || 'Signed in'}
           </span>
         </div>
@@ -541,7 +541,7 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
           {isAdmin && (
             <button
               onClick={openAdminReset}
-              style={{ background: 'none', border: 'none', color: 'var(--stone)', fontSize: '0.75rem', cursor: 'pointer', padding: '0.5rem 0.3rem', minHeight: 44 }}
+              style={{ background: 'none', border: 'none', color: 'var(--stone)', fontSize: 'var(--text-xs)', cursor: 'pointer', padding: '0.5rem 0.3rem', minHeight: 44 }}
             >
               Reset a PIN
             </button>
@@ -550,8 +550,8 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
             onClick={signOut}
             style={{
               background: 'rgba(255,255,255,0.14)', border: 'none', color: 'var(--ivory)',
-              fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
-              padding: '0.5rem 0.8rem', borderRadius: 8, minHeight: 44,
+              fontSize: 'var(--text-sm)', fontWeight: 700, cursor: 'pointer',
+              padding: '0.5rem 0.8rem', borderRadius: 'var(--radius-md)', minHeight: 44,
             }}
           >
             Switch user
@@ -567,14 +567,14 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ background: 'linear-gradient(135deg, var(--clay) 0%, #9A6435 100%)', borderRadius: 14, padding: '1.75rem', maxWidth: 340, width: '100%', textAlign: 'center' }}
+            style={{ background: 'linear-gradient(135deg, var(--clay) 0%, #9A6435 100%)', borderRadius: 'var(--radius-lg)', padding: '1.75rem', maxWidth: 340, width: '100%', textAlign: 'center' }}
           >
             {adminResetDone ? (
               <>
-                <p style={{ color: 'white', fontWeight: 700, fontSize: '1rem', marginBottom: '1.5rem' }}>{adminResetDone}</p>
+                <p style={{ color: 'white', fontWeight: 700, fontSize: 'var(--text-md)', marginBottom: '1.5rem' }}>{adminResetDone}</p>
                 <button
                   onClick={closeAdminReset}
-                  style={{ width: '100%', padding: '0.8rem', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'white', color: 'var(--clay)', fontWeight: 700 }}
+                  style={{ width: '100%', padding: '0.8rem', borderRadius: 'var(--radius-md)', border: 'none', cursor: 'pointer', background: 'white', color: 'var(--clay)', fontWeight: 700 }}
                 >
                   Done
                 </button>
@@ -590,16 +590,16 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
                 {adminResetStage === 'pick-target' && (
                   <>
                     <p style={{ color: 'white', fontWeight: 600, marginBottom: '1rem' }}>Reset whose PIN?</p>
-                    {teamLoading && <p style={{ color: 'white', opacity: 0.7, fontSize: '0.85rem' }}>Loading team...</p>}
+                    {teamLoading && <p style={{ color: 'white', opacity: 0.7, fontSize: 'var(--text-base)' }}>Loading team...</p>}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                       {team.map((m) => (
                         <button
                           key={m.id}
                           onClick={() => pickResetTarget(m)}
-                          style={{ padding: '0.7rem', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.15)', color: 'white', fontWeight: 600, fontSize: '0.9rem', textAlign: 'left' }}
+                          style={{ padding: '0.7rem', borderRadius: 'var(--radius-md)', border: 'none', cursor: 'pointer', background: 'rgba(255,255,255,0.15)', color: 'white', fontWeight: 600, fontSize: 'var(--text-md)', textAlign: 'left' }}
                         >
                           {m.name}
-                          {m.role && <span style={{ display: 'block', fontSize: '0.72rem', opacity: 0.7, fontWeight: 400 }}>{m.role}</span>}
+                          {m.role && <span style={{ display: 'block', fontSize: 'var(--text-xs)', opacity: 0.7, fontWeight: 400 }}>{m.role}</span>}
                         </button>
                       ))}
                     </div>
@@ -615,12 +615,12 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
                   <>
                     <p style={{ color: 'white', fontWeight: 600, marginBottom: '1.25rem' }}>Confirm the new PIN</p>
                     <PinPad value={resetPin2} onPress={pressResetPin2} onDelete={() => setResetPin2(resetPin2.slice(0, -1))} error={adminResetError} />
-                    {adminResetBusy && <p style={{ color: 'white', opacity: 0.7, fontSize: '0.8rem', marginTop: '1rem' }}>Saving...</p>}
+                    {adminResetBusy && <p style={{ color: 'white', opacity: 0.7, fontSize: 'var(--text-sm)', marginTop: '1rem' }}>Saving...</p>}
                   </>
                 )}
                 <button
                   onClick={closeAdminReset}
-                  style={{ marginTop: '1.25rem', background: 'none', border: 'none', color: 'white', opacity: 0.7, fontSize: '0.8rem', cursor: 'pointer' }}
+                  style={{ marginTop: '1.25rem', background: 'none', border: 'none', color: 'white', opacity: 0.7, fontSize: 'var(--text-sm)', cursor: 'pointer' }}
                 >
                   Cancel
                 </button>

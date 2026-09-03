@@ -19,7 +19,7 @@ export function AiCostCounter() {
     <div style={{
       display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
       padding: '0.35rem 0.7rem', borderRadius: '999px', backgroundColor: '#f0f0f0',
-      fontSize: '0.75rem', color: '#555', marginBottom: '1rem',
+      fontSize: 'var(--text-xs)', color: '#555', marginBottom: '1rem',
     }}>
       <Cpu size={13} />
       <span>

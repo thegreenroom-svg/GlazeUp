@@ -62,8 +62,8 @@ export default function StudioHome() {
   return (
     <div style={{ padding: '1rem 0.9rem 2rem' }}>
       <div style={{ marginBottom: '1.4rem' }}>
-        <h1 style={{ fontSize: '1.6rem', fontWeight: 800, letterSpacing: '-0.02em', margin: 0 }}>The Kiln Cafe</h1>
-        <p style={{ fontSize: '0.85rem', color: '#777', margin: '0.2rem 0 0' }}>Four steps, start to finish.</p>
+        <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 800, letterSpacing: '-0.02em', margin: 0 }}>The Kiln Cafe</h1>
+        <p style={{ fontSize: 'var(--text-base)', color: '#777', margin: '0.2rem 0 0' }}>Four steps, start to finish.</p>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
@@ -80,21 +80,21 @@ export default function StudioHome() {
               whileTap={{ scale: 0.985 }}
               style={{
                 display: 'flex', alignItems: 'center', gap: '0.9rem', width: '100%',
-                padding: '1.15rem 1rem', borderRadius: 16, border: 'none',
+                padding: '1.15rem 1rem', borderRadius: 'var(--radius-lg)', border: 'none',
                 background: step.tint, color: 'white',
                 cursor: opening ? 'default' : 'pointer', textAlign: 'left',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
               }}
             >
-              <div style={{ flexShrink: 0, width: 46, height: 46, borderRadius: 12, background: 'rgba(255,255,255,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ flexShrink: 0, width: 46, height: 46, borderRadius: 'var(--radius-lg)', background: 'rgba(255,255,255,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Icon size={22} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.45rem' }}>
-                  <span style={{ fontSize: '0.72rem', fontWeight: 800, opacity: 0.7 }}>{step.n}</span>
-                  <span style={{ fontSize: '1.02rem', fontWeight: 700 }}>{step.label}</span>
+                  <span style={{ fontSize: 'var(--text-xs)', fontWeight: 800, opacity: 0.7 }}>{step.n}</span>
+                  <span style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>{step.label}</span>
                 </div>
-                <div style={{ fontSize: '0.78rem', opacity: 0.82, marginTop: '0.1rem' }}>{step.detail}</div>
+                <div style={{ fontSize: 'var(--text-sm)', opacity: 0.82, marginTop: '0.1rem' }}>{step.detail}</div>
               </div>
               {(() => {
                 if (!counts) return null;
@@ -104,7 +104,7 @@ export default function StudioHome() {
                   : null;
                 if (!n) return null;
                 return (
-                  <span style={{ flexShrink: 0, minWidth: 30, height: 30, padding: '0 0.5rem', borderRadius: 15, background: 'rgba(255,255,255,0.25)', color: 'white', fontWeight: 800, fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ flexShrink: 0, minWidth: 30, height: 30, padding: '0 0.5rem', borderRadius: 15, background: 'rgba(255,255,255,0.25)', color: 'white', fontWeight: 800, fontSize: 'var(--text-base)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {n}
                   </span>
                 );
@@ -119,8 +119,8 @@ export default function StudioHome() {
         disabled={!!opening}
         style={{
           marginTop: '1.6rem', width: '100%', padding: '0.7rem',
-          borderRadius: 10, border: '1px dashed #c9c0b4', background: 'transparent',
-          color: '#8a8178', fontWeight: 600, fontSize: '0.8rem', cursor: 'pointer',
+          borderRadius: 'var(--radius-md)', border: '1px dashed #c9c0b4', background: 'transparent',
+          color: '#8a8178', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: 'pointer',
         }}
       >
         Make a test card
@@ -141,7 +141,7 @@ export default function StudioHome() {
           <button
             key={href}
             onClick={() => router.push(href)}
-            style={{ border: 'none', background: 'none', color: '#c2bab0', fontSize: '0.68rem', cursor: 'pointer', padding: '0.3rem 0.2rem' }}
+            style={{ border: 'none', background: 'none', color: '#c2bab0', fontSize: 'var(--text-xs)', cursor: 'pointer', padding: '0.3rem 0.2rem' }}
           >
             {label}
           </button>

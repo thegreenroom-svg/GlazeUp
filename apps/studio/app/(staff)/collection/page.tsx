@@ -119,7 +119,7 @@ export default function CollectionPage() {
     <PageShell title="Collection" subtitle="Print the card, or hand pottery over.">
       <button
         onClick={() => setScanning(true)}
-        style={{ width: '100%', padding: '0.9rem', borderRadius: 10, border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: '0.92rem', cursor: 'pointer', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+        style={{ width: '100%', padding: '0.9rem', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-md)', cursor: 'pointer', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
       >
         <Camera size={18} /> Scan a collection card
       </button>
@@ -138,22 +138,22 @@ export default function CollectionPage() {
       )}
 
       {message && (
-        <div style={{ padding: '0.7rem 0.9rem', backgroundColor: '#F1F8F1', border: '1px solid #9CC79C', borderRadius: 6, fontSize: '0.85rem', marginBottom: '1rem' }}>
+        <div style={{ padding: '0.7rem 0.9rem', backgroundColor: '#F1F8F1', border: '1px solid #9CC79C', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-base)', marginBottom: '1rem' }}>
           {message}
         </div>
       )}
 
-      {busy && <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#666' }}><Loader size={16} className="animate-spin" /> Working…</p>}
+      {busy && <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--text-base)', color: '#666' }}><Loader size={16} className="animate-spin" /> Working…</p>}
 
       {card && (
         <>
-          <div className="collection-card" style={{ border: '1px solid #ddd', borderRadius: 10, padding: '1.1rem', marginBottom: '0.8rem', background: 'white' }}>
+          <div className="collection-card" style={{ border: '1px solid #ddd', borderRadius: 'var(--radius-md)', padding: '1.1rem', marginBottom: '0.8rem', background: 'white' }}>
             <div style={{ textAlign: 'center' }}>
               {qr && <img src={qr} alt="" style={{ width: 170, height: 170 }} />}
             </div>
-            <p style={{ fontWeight: 800, fontSize: '1.05rem', margin: '0.6rem 0 0.1rem', textAlign: 'center' }}>{card.customer_name}</p>
-            <p style={{ fontSize: '0.75rem', color: '#777', margin: 0, textAlign: 'center' }}>{card.booking_code}</p>
-            <p style={{ fontSize: '0.95rem', fontWeight: 700, margin: '0.7rem 0 0.2rem', textAlign: 'center' }}>
+            <p style={{ fontWeight: 800, fontSize: 'var(--text-lg)', margin: '0.6rem 0 0.1rem', textAlign: 'center' }}>{card.customer_name}</p>
+            <p style={{ fontSize: 'var(--text-xs)', color: '#777', margin: 0, textAlign: 'center' }}>{card.booking_code}</p>
+            <p style={{ fontSize: 'var(--text-md)', fontWeight: 700, margin: '0.7rem 0 0.2rem', textAlign: 'center' }}>
               Ready to collect: {card.collection_date ? new Date(card.collection_date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) : 'date not set'}
             </p>
             {card.pieces.length > 0 && (
@@ -164,16 +164,16 @@ export default function CollectionPage() {
                       <button
                         onClick={() => setFullscreen({ url: p.reference_photo_url as string, box: p.photo_box })}
                         style={{
-                          width: 44, height: 44, borderRadius: 6, flexShrink: 0, border: '1px solid #ddd', padding: 0, cursor: 'pointer',
+                          width: 44, height: 44, borderRadius: 'var(--radius-sm)', flexShrink: 0, border: '1px solid #ddd', padding: 0, cursor: 'pointer',
                           ...(p.photo_box ? cropStyle(p.reference_photo_url, p.photo_box)
                             : { backgroundImage: `url(${p.reference_photo_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }),
                         }}
                         aria-label="View full screen"
                       />
                     ) : (
-                      <div style={{ width: 44, height: 44, borderRadius: 6, flexShrink: 0, background: '#f2f2f2' }} />
+                      <div style={{ width: 44, height: 44, borderRadius: 'var(--radius-sm)', flexShrink: 0, background: '#f2f2f2' }} />
                     )}
-                    <span style={{ fontSize: '0.8rem', color: '#444', textAlign: 'left' }}>{p.description || p.piece_type}</span>
+                    <span style={{ fontSize: 'var(--text-sm)', color: '#444', textAlign: 'left' }}>{p.description || p.piece_type}</span>
                   </div>
                 ))}
               </div>
@@ -190,21 +190,21 @@ export default function CollectionPage() {
               <img
                 src={fullscreen.url}
                 alt=""
-                style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 10, objectFit: 'contain' }}
+                style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 'var(--radius-md)', objectFit: 'contain' }}
               />
             </div>
           )}
 
           <button
             onClick={() => window.print()}
-            style={{ width: '100%', padding: '0.8rem', borderRadius: 10, border: '1px solid #ccc', background: 'white', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginBottom: '0.6rem' }}
+            style={{ width: '100%', padding: '0.8rem', borderRadius: 'var(--radius-md)', border: '1px solid #ccc', background: 'white', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginBottom: '0.6rem' }}
           >
             <Printer size={15} /> Print collection card
           </button>
           <button
             onClick={() => collect(card.booking_code)}
             disabled={busy}
-            style={{ width: '100%', padding: '0.9rem', borderRadius: 10, border: 'none', background: '#2E7D32', color: 'white', fontWeight: 700, fontSize: '0.92rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+            style={{ width: '100%', padding: '0.9rem', borderRadius: 'var(--radius-md)', border: 'none', background: '#2E7D32', color: 'white', fontWeight: 700, fontSize: 'var(--text-md)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
           >
             <Check size={17} /> Hand over {card.pieces.length} piece{card.pieces.length === 1 ? '' : 's'}
           </button>
@@ -213,12 +213,12 @@ export default function CollectionPage() {
 
       {!card && due.length > 0 && (
         <>
-          <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#777', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0.5rem 0 0.6rem' }}>
+          <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: '#777', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0.5rem 0 0.6rem' }}>
             Due to collect
           </p>
           {due.map((d) => (
             <div key={d.collection_date} style={{ marginBottom: '1rem' }}>
-              <p style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.4rem' }}>
+              <p style={{ fontSize: 'var(--text-base)', fontWeight: 700, marginBottom: '0.4rem' }}>
                 {new Date(d.collection_date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
                 <span style={{ color: '#777', fontWeight: 500 }}> · {d.total_pieces} piece{d.total_pieces === 1 ? '' : 's'}</span>
               </p>
@@ -226,10 +226,10 @@ export default function CollectionPage() {
                 <button
                   key={b.booking_code}
                   onClick={() => loadCard(b.booking_code)}
-                  style={{ width: '100%', textAlign: 'left', border: '1px solid #eee', borderRadius: 8, padding: '0.7rem 0.85rem', marginBottom: '0.4rem', background: 'white', cursor: 'pointer' }}
+                  style={{ width: '100%', textAlign: 'left', border: '1px solid #eee', borderRadius: 'var(--radius-md)', padding: '0.7rem 0.85rem', marginBottom: '0.4rem', background: 'white', cursor: 'pointer' }}
                 >
-                  <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{b.customer_name}</span>
-                  <span style={{ float: 'right', fontSize: '0.8rem', color: '#8C6A4A', fontWeight: 700 }}>{b.piece_count} piece{b.piece_count === 1 ? '' : 's'}</span>
+                  <span style={{ fontWeight: 700, fontSize: 'var(--text-md)' }}>{b.customer_name}</span>
+                  <span style={{ float: 'right', fontSize: 'var(--text-sm)', color: '#8C6A4A', fontWeight: 700 }}>{b.piece_count} piece{b.piece_count === 1 ? '' : 's'}</span>
                 </button>
               ))}
             </div>
@@ -238,7 +238,7 @@ export default function CollectionPage() {
       )}
 
       {!card && due.length === 0 && !busy && (
-        <p style={{ fontSize: '0.85rem', color: '#777' }}>Nothing waiting to be collected.</p>
+        <p style={{ fontSize: 'var(--text-base)', color: '#777' }}>Nothing waiting to be collected.</p>
       )}
 
       {/* Only the card prints -- not the buttons or the due list. */}

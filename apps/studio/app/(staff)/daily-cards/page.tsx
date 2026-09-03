@@ -265,14 +265,14 @@ export default function DailyCardsPage() {
     <PageShell title="Print Booking Cards">
       <div className="no-print">
         
-        <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1rem' }}>
+        <p style={{ color: '#666', fontSize: 'var(--text-md)', marginBottom: '1rem' }}>
           One real QR card per booking — scan to view the session, order drinks, or track pieces. Go forward or back to print ahead for a party or a busy day.
         </p>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
           <button
             onClick={() => setCardDate((d) => new Date(new Date(d).getTime() - 86400000).toISOString().slice(0, 10))}
-            style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.9rem', color: '#333' }}
+            style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--text-md)', color: '#333' }}
           >
             ← Prev day
           </button>
@@ -280,23 +280,23 @@ export default function DailyCardsPage() {
             type="date"
             value={cardDate}
             onChange={(e) => setCardDate(e.target.value)}
-            style={{ padding: '0.5rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem', color: '#333', backgroundColor: 'white' }}
+            style={{ padding: '0.5rem 0.7rem', border: '1px solid #ddd', borderRadius: '6px', fontSize: 'var(--text-md)', color: '#333', backgroundColor: 'white' }}
           />
           <button
             onClick={() => setCardDate((d) => new Date(new Date(d).getTime() + 86400000).toISOString().slice(0, 10))}
-            style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.9rem', color: '#333' }}
+            style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--text-md)', color: '#333' }}
           >
             Next day →
           </button>
           <button
             onClick={() => setCardDate(new Date().toISOString().slice(0, 10))}
-            style={{ padding: '0.5rem 0.8rem', backgroundColor: cardDate === new Date().toISOString().slice(0, 10) ? 'var(--clay)' : '#f0f0f0', color: cardDate === new Date().toISOString().slice(0, 10) ? 'white' : '#333', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}
+            style={{ padding: '0.5rem 0.8rem', backgroundColor: cardDate === new Date().toISOString().slice(0, 10) ? 'var(--clay)' : '#f0f0f0', color: cardDate === new Date().toISOString().slice(0, 10) ? 'white' : '#333', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--text-base)' }}
           >
             Today
           </button>
           <button
             onClick={() => setCardDate((d) => new Date(new Date(d).getTime() + 7 * 86400000).toISOString().slice(0, 10))}
-            style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', color: '#333' }}
+            style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--text-base)', color: '#333' }}
           >
             +1 week
           </button>
@@ -307,11 +307,11 @@ export default function DailyCardsPage() {
             <button
               onClick={goToPrevSession}
               disabled={selectedSessionIdx === null}
-              style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', cursor: selectedSessionIdx === null ? 'default' : 'pointer', fontSize: '0.85rem', opacity: selectedSessionIdx === null ? 0.5 : 1 }}
+              style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', cursor: selectedSessionIdx === null ? 'default' : 'pointer', fontSize: 'var(--text-base)', opacity: selectedSessionIdx === null ? 0.5 : 1 }}
             >
               ← Previous session
             </button>
-            <span style={{ padding: '0.4rem 0.7rem', fontSize: '0.85rem', color: '#666', fontWeight: 600 }}>
+            <span style={{ padding: '0.4rem 0.7rem', fontSize: 'var(--text-base)', color: '#666', fontWeight: 600 }}>
               {selectedSessionIdx === null
                 ? `All sessions (${sessionTimes.length})`
                 : new Date(sessionTimes[selectedSessionIdx]).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
@@ -319,7 +319,7 @@ export default function DailyCardsPage() {
             <button
               onClick={goToNextSession}
               disabled={selectedSessionIdx !== null && selectedSessionIdx === sessionTimes.length - 1}
-              style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', cursor: (selectedSessionIdx !== null && selectedSessionIdx === sessionTimes.length - 1) ? 'default' : 'pointer', fontSize: '0.85rem', opacity: (selectedSessionIdx !== null && selectedSessionIdx === sessionTimes.length - 1) ? 0.5 : 1 }}
+              style={{ padding: '0.5rem 0.8rem', backgroundColor: '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', cursor: (selectedSessionIdx !== null && selectedSessionIdx === sessionTimes.length - 1) ? 'default' : 'pointer', fontSize: 'var(--text-base)', opacity: (selectedSessionIdx !== null && selectedSessionIdx === sessionTimes.length - 1) ? 0.5 : 1 }}
             >
               Next session →
             </button>
@@ -334,21 +334,21 @@ export default function DailyCardsPage() {
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', padding: '0.9rem', backgroundColor: '#fdf6e3', border: '1px solid #e0a020', borderRadius: '8px', marginBottom: '1.25rem' }}>
             <AlertCircle size={18} color="#e0a020" style={{ flexShrink: 0, marginTop: 2 }} />
             <div style={{ flex: 1 }}>
-              <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+              <p style={{ fontWeight: 600, fontSize: 'var(--text-md)' }}>
                 {newSinceLoad.length} new booking{newSinceLoad.length === 1 ? '' : 's'} since you loaded this page
               </p>
-              <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.2rem' }}>
+              <p style={{ fontSize: 'var(--text-sm)', color: '#666', marginTop: '0.2rem' }}>
                 {newSinceLoad.map((b) => b.customer_name).join(', ')} — marked below, print those too.
               </p>
             </div>
-            <button onClick={acceptNew} style={{ background: 'none', border: 'none', color: '#e0a020', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <button onClick={acceptNew} style={{ background: 'none', border: 'none', color: '#e0a020', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               Dismiss
             </button>
           </div>
         )}
 
         {!loading && bookings.length === 0 && (
-          <p style={{ color: '#999', fontSize: '0.9rem' }}>No bookings found for {new Date(cardDate).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}.</p>
+          <p style={{ color: '#999', fontSize: 'var(--text-md)' }}>No bookings found for {new Date(cardDate).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}.</p>
         )}
 
         {bookings.length > 0 && (
@@ -356,25 +356,25 @@ export default function DailyCardsPage() {
             <button
               onClick={handlePrintSelected}
               disabled={selected.size === 0}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', backgroundColor: selected.size === 0 ? '#ccc' : 'var(--clay)', color: 'white', border: 'none', borderRadius: '6px', cursor: selected.size === 0 ? 'not-allowed' : 'pointer', fontSize: '0.9rem', fontWeight: 600 }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', backgroundColor: selected.size === 0 ? '#ccc' : 'var(--clay)', color: 'white', border: 'none', borderRadius: '6px', cursor: selected.size === 0 ? 'not-allowed' : 'pointer', fontSize: 'var(--text-md)', fontWeight: 600 }}
             >
               <Printer size={16} /> Print selected {selected.size > 0 ? `(${selected.size})` : ''}
             </button>
             <button
               onClick={selectAll}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', backgroundColor: '#f0f0f0', color: '#333', border: '1px solid #ddd', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', backgroundColor: '#f0f0f0', color: '#333', border: '1px solid #ddd', borderRadius: '6px', cursor: 'pointer', fontSize: 'var(--text-base)' }}
             >
               {selected.size === visibleBookings.length ? '✓ Deselect all' : '◯ Select all'}
             </button>
             <button
               onClick={handleManualSync}
               disabled={syncing}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', backgroundColor: syncing ? '#e0e0e0' : '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', cursor: syncing ? 'wait' : 'pointer', fontSize: '0.9rem', opacity: syncing ? 0.6 : 1 }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1rem', backgroundColor: syncing ? '#e0e0e0' : '#f0f0f0', color: '#333', border: 'none', borderRadius: '6px', cursor: syncing ? 'wait' : 'pointer', fontSize: 'var(--text-md)', opacity: syncing ? 0.6 : 1 }}
             >
               <RefreshCw size={14} style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} /> {syncing ? 'Checking...' : 'Check for new bookings now'}
             </button>
             {lastSyncTime && (
-              <div style={{ fontSize: '0.75rem', color: '#999', alignSelf: 'center' }}>
+              <div style={{ fontSize: 'var(--text-xs)', color: '#999', alignSelf: 'center' }}>
                 Last checked: {lastSyncTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
               </div>
             )}
@@ -411,13 +411,13 @@ export default function DailyCardsPage() {
                 onClick={(e) => e.stopPropagation()}
                 style={{ position: 'absolute', top: '0.8rem', right: '0.8rem', cursor: 'pointer', width: '18px', height: '18px' }}
               />
-              {isNew && <p style={{ fontSize: '0.7rem', color: '#e0a020', fontWeight: 700, marginBottom: '0.3rem' }}>NEW</p>}
+              {isNew && <p style={{ fontSize: 'var(--text-xs)', color: '#e0a020', fontWeight: 700, marginBottom: '0.3rem' }}>NEW</p>}
               {qrUrls[b.booking_code] ? (
                 <img src={qrUrls[b.booking_code]} alt="" style={{ width: 120, height: 120, margin: '0 auto' }} />
               ) : (
                 <div style={{ width: 120, height: 120, margin: '0 auto', backgroundColor: '#f0f0f0' }} />
               )}
-              <p style={{ fontWeight: 700, fontSize: '1rem', marginTop: '0.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
+              <p style={{ fontWeight: 700, fontSize: 'var(--text-md)', marginTop: '0.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
                 {/* Same real photo indicator as the bookings list -- at end
                     of day this is how a missed table gets spotted without
                     opening every booking. Hidden when printing: a status
@@ -426,14 +426,14 @@ export default function DailyCardsPage() {
                   <span
                     className="no-print"
                     title={`${b.photo_count} piece${b.photo_count === 1 ? '' : 's'} photographed`}
-                    style={{ flexShrink: 0, width: 18, height: 18, borderRadius: '50%', backgroundColor: '#1a8a3c', color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.58rem', fontWeight: 700 }}
+                    style={{ flexShrink: 0, width: 18, height: 18, borderRadius: '50%', backgroundColor: '#1a8a3c', color: 'white', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--text-xs)', fontWeight: 700 }}
                   >
                     {b.photo_count}
                   </span>
                 )}
                 {b.customer_name}
               </p>
-              <p style={{ fontSize: '0.8rem', color: '#666' }}>
+              <p style={{ fontSize: 'var(--text-sm)', color: '#666' }}>
                 {new Date(b.session_start).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
               </p>
 
@@ -446,12 +446,12 @@ export default function DailyCardsPage() {
                   fill in by hand is both more accurate and less work than
                   keeping two systems agreeing about it. */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', marginTop: '0.45rem' }}>
-                <span style={{ fontSize: '0.72rem', color: '#888', fontWeight: 600 }}>Table</span>
+                <span style={{ fontSize: 'var(--text-xs)', color: '#888', fontWeight: 600 }}>Table</span>
                 <span style={{ display: 'inline-block', width: 46, height: 26, border: '1.5px solid #bbb', borderRadius: 4 }} />
               </div>
 
               {b.party_size && (
-                <p style={{ fontSize: '0.78rem', color: 'var(--clay)', fontWeight: 600, marginTop: '0.35rem' }}>
+                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--clay)', fontWeight: 600, marginTop: '0.35rem' }}>
                   {b.party_size} seat{b.party_size === 1 ? '' : 's'}
                 </p>
               )}
@@ -460,7 +460,7 @@ export default function DailyCardsPage() {
                   {setupFlags.map((flag) => (
                     <span
                       key={flag}
-                      style={{ fontSize: '0.7rem', fontWeight: 700, color: '#8a5a00', backgroundColor: '#fff4d6', border: '1px solid #e0c060', borderRadius: 999, padding: '0.15rem 0.55rem' }}
+                      style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: '#8a5a00', backgroundColor: '#fff4d6', border: '1px solid #e0c060', borderRadius: 999, padding: '0.15rem 0.55rem' }}
                     >
                       {flag}
                     </span>
@@ -468,11 +468,11 @@ export default function DailyCardsPage() {
                 </div>
               )}
               {b.notes && (
-                <p style={{ fontSize: '0.72rem', color: '#8a5a00', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: 6, padding: '0.35rem 0.5rem', marginTop: '0.4rem', textAlign: 'left' }}>
+                <p style={{ fontSize: 'var(--text-xs)', color: '#8a5a00', backgroundColor: '#fff8e1', border: '1px solid #ffca28', borderRadius: 'var(--radius-sm)', padding: '0.35rem 0.5rem', marginTop: '0.4rem', textAlign: 'left' }}>
                   {b.notes}
                 </p>
               )}
-              <p style={{ fontSize: '0.7rem', color: '#aaa', fontFamily: 'monospace', marginTop: '0.3rem' }}>{b.booking_code}</p>
+              <p style={{ fontSize: 'var(--text-xs)', color: '#aaa', fontFamily: 'monospace', marginTop: '0.3rem' }}>{b.booking_code}</p>
             </div>
           );
         })}

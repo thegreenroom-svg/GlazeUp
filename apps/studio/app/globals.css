@@ -15,6 +15,40 @@
   --sand:     #E8D9C4;  /* backgrounds */
   --ivory:    #F7F4EE;  /* main app background */
   --stone:    #C8BFB2;  /* borders, secondary text */
+
+  /* ── TYPE SCALE ──────────────────────────────────────────────────
+     Was 27 distinct font sizes, including 0.72 / 0.75 / 0.78 / 0.80 /
+     0.82 / 0.85rem -- differences too small to read as intentional,
+     but which accumulate into a subtly ragged page. Every serious
+     system (Apple HIG, Material, Tailwind) uses a constrained ramp;
+     this is seven steps, and everything maps onto one of them. */
+  --text-xs:   0.75rem;   /* captions, metadata, timestamps */
+  --text-sm:   0.8125rem; /* secondary body, list detail */
+  --text-base: 0.875rem;  /* body -- the workhorse */
+  --text-md:   1rem;      /* emphasised body, button labels */
+  --text-lg:   1.125rem;  /* card titles, section heads */
+  --text-xl:   1.375rem;  /* page titles */
+  --text-2xl:  1.75rem;   /* the one big number or name on a screen */
+
+  /* ── RADIUS SCALE ────────────────────────────────────────────────
+     Was 11 distinct values with no rhythm. Four is plenty: small for
+     chips and inputs, medium for buttons, large for cards, full for
+     pills and avatars. */
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   14px;
+  --radius-full: 999px;
+
+  /* ── SEMANTIC COLOUR ─────────────────────────────────────────────
+     Success/warning/danger were previously written as raw hex inline
+     (#2E7D32, #A6761D, #a5342f...) with small variations between
+     files. Named here so they are consistent and themeable. */
+  --success:    #2E7D32;
+  --success-bg: #F1F8F1;
+  --warning:    #A6761D;
+  --warning-bg: #FFF8E1;
+  --danger:     #A5342F;
+  --muted:      #8A8178;  /* secondary text on light backgrounds */
 }
 
 * {

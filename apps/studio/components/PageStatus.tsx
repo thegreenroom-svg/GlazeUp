@@ -7,8 +7,8 @@
 export function PageHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <>
-      <h1 style={{ fontSize: '1.55rem', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--charcoal)', marginBottom: '0.3rem' }}>{title}</h1>
-      <p style={{ color: 'var(--charcoal)', opacity: 0.6, fontSize: '0.88rem', lineHeight: 1.5, marginBottom: '1.4rem' }}>{subtitle}</p>
+      <h1 style={{ fontSize: 'var(--text-xl)', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--charcoal)', marginBottom: '0.3rem' }}>{title}</h1>
+      <p style={{ color: 'var(--charcoal)', opacity: 0.6, fontSize: 'var(--text-base)', lineHeight: 1.5, marginBottom: '1.4rem' }}>{subtitle}</p>
     </>
   );
 }

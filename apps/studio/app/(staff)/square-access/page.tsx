@@ -50,8 +50,8 @@ export default function SquareAccessPage() {
 
   return (
     <PageShell title="Square access" subtitle="What this app is allowed to read">
-      {loading && <p style={{ fontSize: '0.85rem', color: '#888' }}>Checking...</p>}
-      {error && <p style={{ fontSize: '0.85rem', color: '#c0392b' }}>{error}</p>}
+      {loading && <p style={{ fontSize: 'var(--text-base)', color: '#888' }}>Checking...</p>}
+      {error && <p style={{ fontSize: 'var(--text-base)', color: '#c0392b' }}>{error}</p>}
 
       {data && !loading && (
         <>
@@ -70,20 +70,20 @@ export default function SquareAccessPage() {
                 } finally { setConnecting(false); }
               }}
               disabled={connecting}
-              style={{ marginBottom: '0.9rem', padding: '0.6rem 0.9rem', borderRadius: 8, border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer' }}
+              style={{ marginBottom: '0.9rem', padding: '0.6rem 0.9rem', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer' }}
             >
               {connecting ? 'Opening Square...' : 'Reconnect Square'}
             </button>
           )}
           {conn && !conn.oauth_configured && (
-            <p style={{ fontSize: '0.78rem', color: '#999', marginBottom: '0.9rem' }}>
+            <p style={{ fontSize: 'var(--text-sm)', color: '#999', marginBottom: '0.9rem' }}>
               Reconnecting from here needs SQUARE_APP_ID and SQUARE_APP_SECRET set on the server. Until then, a new token has to be pasted into Render by hand, the same way this one was.
             </p>
           )}
 
           {conn?.expires_at && !data.token_expired && (
             <p style={{
-              fontSize: '0.82rem', marginBottom: '0.75rem', fontWeight: conn.expiring_soon ? 700 : 400,
+              fontSize: 'var(--text-sm)', marginBottom: '0.75rem', fontWeight: conn.expiring_soon ? 700 : 400,
               color: conn.expiring_soon ? '#A6761D' : '#666',
             }}>
               Square connection expires {new Date(conn.expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}
@@ -92,7 +92,7 @@ export default function SquareAccessPage() {
             </p>
           )}
           {data.token_expired && (
-            <p style={{ fontSize: '0.85rem', color: '#c0392b', marginBottom: '0.75rem' }}>
+            <p style={{ fontSize: 'var(--text-base)', color: '#c0392b', marginBottom: '0.75rem' }}>
               The Square connection has expired — it needs reconnecting.
             </p>
           )}
@@ -100,17 +100,17 @@ export default function SquareAccessPage() {
           {/* The headline answers the question that keeps coming up, rather
               than making someone read six rows to work it out. */}
           <div style={{
-            padding: '0.8rem', borderRadius: 10, marginBottom: '1rem',
+            padding: '0.8rem', borderRadius: 'var(--radius-md)', marginBottom: '1rem',
             backgroundColor: data.table_names_available ? '#F1F8F1' : '#FFF6E8',
             border: `1px solid ${data.table_names_available ? '#9CC79C' : '#F0C987'}`,
           }}>
-            <p style={{ fontSize: '0.88rem', fontWeight: 700, color: data.table_names_available ? '#2E7D32' : '#7A5B00' }}>
+            <p style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: data.table_names_available ? '#2E7D32' : '#7A5B00' }}>
               {data.table_names_available
                 ? 'Table names can be read — Sync tables should work'
                 : 'Table names cannot be read'}
             </p>
             {!data.table_names_available && (
-              <p style={{ fontSize: '0.78rem', color: '#7A5B00', marginTop: '0.2rem' }}>
+              <p style={{ fontSize: 'var(--text-sm)', color: '#7A5B00', marginTop: '0.2rem' }}>
                 Square hasn&apos;t granted this app the permission. That needs re-authorising in Square — no code change will fix it.
               </p>
             )}
@@ -122,10 +122,10 @@ export default function SquareAccessPage() {
                 ? <Check size={16} style={{ color: '#2E7D32', flexShrink: 0, marginTop: 2 }} />
                 : <X size={16} style={{ color: '#C0392B', flexShrink: 0, marginTop: 2 }} />}
               <div style={{ minWidth: 0 }}>
-                <p style={{ fontSize: '0.84rem', fontWeight: 600 }}>{r.label}</p>
-                <p style={{ fontSize: '0.72rem', color: '#888' }}>{r.needs}</p>
+                <p style={{ fontSize: 'var(--text-base)', fontWeight: 600 }}>{r.label}</p>
+                <p style={{ fontSize: 'var(--text-xs)', color: '#888' }}>{r.needs}</p>
                 {r.detail && (
-                  <p style={{ fontSize: '0.74rem', color: r.ok ? '#666' : '#C0392B', marginTop: '0.15rem' }}>{r.detail}</p>
+                  <p style={{ fontSize: 'var(--text-xs)', color: r.ok ? '#666' : '#C0392B', marginTop: '0.15rem' }}>{r.detail}</p>
                 )}
               </div>
             </div>
@@ -133,7 +133,7 @@ export default function SquareAccessPage() {
 
           <button
             onClick={load}
-            style={{ marginTop: '1rem', padding: '0.5rem 0.85rem', borderRadius: 8, border: '1px solid #ddd', background: 'white', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
+            style={{ marginTop: '1rem', padding: '0.5rem 0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid #ddd', background: 'white', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer' }}
           >
             Check again
           </button>

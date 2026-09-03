@@ -59,32 +59,32 @@ function MyBookingContent() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#FBF7F1', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2rem 1.2rem', fontFamily: 'system-ui, sans-serif' }}>
-      <h1 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#3a2420', marginBottom: '1.5rem' }}>The Kiln Cafe</h1>
+      <h1 style={{ fontSize: 'var(--text-xl)', fontWeight: 800, color: '#3a2420', marginBottom: '1.5rem' }}>The Kiln Cafe</h1>
 
-      {error && <p style={{ color: '#a5342f', fontSize: '0.9rem' }}>{error}</p>}
+      {error && <p style={{ color: '#a5342f', fontSize: 'var(--text-md)' }}>{error}</p>}
 
       {data && (
-        <div style={{ width: '100%', maxWidth: 360, background: 'white', borderRadius: 14, padding: '1.6rem', textAlign: 'center', boxShadow: '0 1px 6px rgba(0,0,0,0.08)' }}>
-          <p style={{ fontSize: '1.1rem', fontWeight: 700, color: '#3a2420', margin: 0 }}>{data.customer_name}</p>
+        <div style={{ width: '100%', maxWidth: 360, background: 'white', borderRadius: 'var(--radius-lg)', padding: '1.6rem', textAlign: 'center', boxShadow: '0 1px 6px rgba(0,0,0,0.08)' }}>
+          <p style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: '#3a2420', margin: 0 }}>{data.customer_name}</p>
 
           {data.already_collected ? (
-            <div style={{ margin: '1.2rem 0', padding: '0.9rem', borderRadius: 10, background: '#F1F8F1' }}>
-              <p style={{ fontSize: '1rem', fontWeight: 700, color: '#2E7D32', margin: 0 }}>✓ Already collected</p>
+            <div style={{ margin: '1.2rem 0', padding: '0.9rem', borderRadius: 'var(--radius-md)', background: '#F1F8F1' }}>
+              <p style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: '#2E7D32', margin: 0 }}>✓ Already collected</p>
             </div>
           ) : data.ready ? (
-            <div style={{ margin: '1.2rem 0', padding: '0.9rem', borderRadius: 10, background: '#F1F8F1' }}>
-              <p style={{ fontSize: '1rem', fontWeight: 700, color: '#2E7D32', margin: 0 }}>✓ Ready to collect</p>
-              <p style={{ fontSize: '0.8rem', color: '#5a5a5a', margin: '0.3rem 0 0' }}>{data.piece_count} piece{data.piece_count === 1 ? '' : 's'}</p>
+            <div style={{ margin: '1.2rem 0', padding: '0.9rem', borderRadius: 'var(--radius-md)', background: '#F1F8F1' }}>
+              <p style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: '#2E7D32', margin: 0 }}>✓ Ready to collect</p>
+              <p style={{ fontSize: 'var(--text-sm)', color: '#5a5a5a', margin: '0.3rem 0 0' }}>{data.piece_count} piece{data.piece_count === 1 ? '' : 's'}</p>
             </div>
           ) : (
-            <div style={{ margin: '1.2rem 0', padding: '0.9rem', borderRadius: 10, background: '#FFF8E1' }}>
-              <p style={{ fontSize: '0.95rem', fontWeight: 700, color: '#8a6d1a', margin: 0 }}>Still being fired</p>
-              <p style={{ fontSize: '0.8rem', color: '#5a5a5a', margin: '0.3rem 0 0' }}>Not ready yet — check back closer to your collection date.</p>
+            <div style={{ margin: '1.2rem 0', padding: '0.9rem', borderRadius: 'var(--radius-md)', background: '#FFF8E1' }}>
+              <p style={{ fontSize: 'var(--text-md)', fontWeight: 700, color: '#8a6d1a', margin: 0 }}>Still being fired</p>
+              <p style={{ fontSize: 'var(--text-sm)', color: '#5a5a5a', margin: '0.3rem 0 0' }}>Not ready yet — check back closer to your collection date.</p>
             </div>
           )}
 
           {data.collection_date && (
-            <p style={{ fontSize: '0.85rem', color: '#5a5a5a', margin: '0.4rem 0' }}>
+            <p style={{ fontSize: 'var(--text-base)', color: '#5a5a5a', margin: '0.4rem 0' }}>
               Collection date: <strong>{new Date(data.collection_date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</strong>
             </p>
           )}
@@ -92,11 +92,11 @@ function MyBookingContent() {
           {qr && (
             <>
               <img src={qr} alt="" style={{ width: 160, height: 160, margin: '1rem auto 0.4rem' }} />
-              <p style={{ fontSize: '0.72rem', color: '#999' }}>Show this at the counter to collect</p>
+              <p style={{ fontSize: 'var(--text-xs)', color: '#999' }}>Show this at the counter to collect</p>
             </>
           )}
 
-          <p style={{ fontSize: '0.68rem', color: '#bbb', marginTop: '1rem' }}>
+          <p style={{ fontSize: 'var(--text-xs)', color: '#bbb', marginTop: '1rem' }}>
             Save this page — Share → Add to Home Screen — so it's easy to find when you come back.
           </p>
         </div>

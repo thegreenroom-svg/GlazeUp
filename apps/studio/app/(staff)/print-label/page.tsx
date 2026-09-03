@@ -58,31 +58,31 @@ export default function PrintLabelPage() {
   return (
     <PageShell title="Print label" subtitle="What goes on the parcel">
       {!data && !error && (
-        <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+        <p style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--text-base)', color: '#666' }}>
           <Loader size={16} className="animate-spin" /> Loading…
         </p>
       )}
       {error && (
-        <p style={{ fontSize: '0.85rem', color: '#a5342f' }}>{error}</p>
+        <p style={{ fontSize: 'var(--text-base)', color: '#a5342f' }}>{error}</p>
       )}
 
       {data && (
         <>
           {/* COLLECTION variant -- big, readable from across a counter. */}
           {!isPostal && (
-            <div className="print-label" style={{ border: '2px solid #222', borderRadius: 10, padding: '1.4rem', textAlign: 'center', background: 'white' }}>
-              <p style={{ fontSize: '1.8rem', fontWeight: 800, lineHeight: 1.15, margin: 0 }}>{data.customer_name}</p>
-              <p style={{ fontSize: '1.1rem', fontWeight: 700, color: '#8C6A4A', margin: '0.6rem 0 0' }}>
+            <div className="print-label" style={{ border: '2px solid #222', borderRadius: 'var(--radius-md)', padding: '1.4rem', textAlign: 'center', background: 'white' }}>
+              <p style={{ fontSize: 'var(--text-2xl)', fontWeight: 800, lineHeight: 1.15, margin: 0 }}>{data.customer_name}</p>
+              <p style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: '#8C6A4A', margin: '0.6rem 0 0' }}>
                 {data.collection_date
                   ? new Date(data.collection_date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
                   : 'Collection date not set'}
               </p>
               {data.pieces.length > 0 && (
-                <ul style={{ textAlign: 'left', margin: '1rem auto 0', maxWidth: 320, fontSize: '0.85rem', color: '#333' }}>
+                <ul style={{ textAlign: 'left', margin: '1rem auto 0', maxWidth: 320, fontSize: 'var(--text-base)', color: '#333' }}>
                   {data.pieces.map((p, i) => <li key={i} style={{ marginBottom: '0.2rem' }}>{p}</li>)}
                 </ul>
               )}
-              <p style={{ fontSize: '0.7rem', color: '#999', marginTop: '1rem' }}>{data.booking_code}</p>
+              <p style={{ fontSize: 'var(--text-xs)', color: '#999', marginTop: '1rem' }}>{data.booking_code}</p>
             </div>
           )}
 
@@ -90,10 +90,10 @@ export default function PrintLabelPage() {
               itemized contents (a courier doesn't need to know what's
               inside, only where it's going). */}
           {isPostal && (
-            <div className="print-label" style={{ border: '2px solid #222', borderRadius: 10, padding: '1.4rem', background: 'white' }}>
-              <p style={{ fontSize: '0.7rem', color: '#999', margin: '0 0 0.6rem' }}>{data.booking_code}</p>
-              <p style={{ fontSize: '1.3rem', fontWeight: 800, lineHeight: 1.3, margin: 0 }}>{data.customer_name}</p>
-              <p style={{ fontSize: '1.1rem', lineHeight: 1.4, margin: '0.3rem 0 0' }}>
+            <div className="print-label" style={{ border: '2px solid #222', borderRadius: 'var(--radius-md)', padding: '1.4rem', background: 'white' }}>
+              <p style={{ fontSize: 'var(--text-xs)', color: '#999', margin: '0 0 0.6rem' }}>{data.booking_code}</p>
+              <p style={{ fontSize: 'var(--text-xl)', fontWeight: 800, lineHeight: 1.3, margin: 0 }}>{data.customer_name}</p>
+              <p style={{ fontSize: 'var(--text-lg)', lineHeight: 1.4, margin: '0.3rem 0 0' }}>
                 {data.postal_address_line1 || <span style={{ color: '#c0392b' }}>No address on file</span>}
                 {data.postal_city && <><br />{data.postal_city}</>}
                 {data.postal_postcode && <><br /><strong>{data.postal_postcode}</strong></>}
@@ -103,18 +103,18 @@ export default function PrintLabelPage() {
 
           <button
             onClick={() => window.print()}
-            style={{ width: '100%', marginTop: '1rem', padding: '0.8rem', borderRadius: 10, border: '1px solid #ccc', background: 'white', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+            style={{ width: '100%', marginTop: '1rem', padding: '0.8rem', borderRadius: 'var(--radius-md)', border: '1px solid #ccc', background: 'white', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
           >
             <Printer size={15} /> {isPostal ? 'Print postage label' : 'Print collection label'}
           </button>
 
           {isPostal && !data.postal_address_line1 && (
-            <p style={{ fontSize: '0.75rem', color: '#A6761D', marginTop: '0.6rem' }}>
+            <p style={{ fontSize: 'var(--text-xs)', color: '#A6761D', marginTop: '0.6rem' }}>
               No street address was captured for this booking — go back to the table step to add one before posting.
             </p>
           )}
           {isPostal && royalMail && (
-            <p style={{ fontSize: '0.72rem', color: royalMail.configured ? '#2E7D32' : '#999', marginTop: '0.5rem' }}>
+            <p style={{ fontSize: 'var(--text-xs)', color: royalMail.configured ? '#2E7D32' : '#999', marginTop: '0.5rem' }}>
               {royalMail.configured ? '✓ ' : ''}{royalMail.message}
             </p>
           )}
