@@ -33,6 +33,7 @@ interface Booking {
   table_number: string | null;
   party_size: number | null;
   notes: string | null;
+  finished_at: string | null;
 }
 
 interface MenuItem {
@@ -813,13 +814,19 @@ export default function FloorPage() {
                 <div key={time} style={{ marginBottom: '1.1rem' }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginBottom: '0.4rem' }}>
                     <span style={{ color: B.clay, fontWeight: 800, fontSize: 'var(--text-md)' }}>{time}</span>
+                    {/* Daisy: "as I've finished them up they disappear off
+                        the list... so you know where you stand." The
+                        count now reports what is LEFT, which is the
+                        number that actually matters mid-sitting. */}
                     <span style={{ color: B.stone, fontSize: 'var(--text-xs)' }}>
-                      {group.length} booking{group.length === 1 ? '' : 's'}
+                      {group.filter((b) => !b.finished_at).length === 0
+                        ? 'all done'
+                        : `${group.filter((b) => !b.finished_at).length} of ${group.length} left`}
                     </span>
                     <span style={{ flex: 1, height: 1, background: `${B.stone}55` }} />
                   </div>
                   <div className="space-y-2">
-              {group.map((b) => (
+              {group.filter((b) => !b.finished_at).map((b) => (
                 <button key={b.booking_code} onClick={() => selectBooking(b)} className="w-full text-left p-3 rounded-lg flex justify-between items-center" style={{ backgroundColor: B.charcoal, border: `1px solid ${B.stone}40` }}>
                   <div>
                     <p style={{ color: B.ivory, fontWeight: 600, fontSize: 'var(--text-md)' }}>
@@ -842,6 +849,25 @@ export default function FloorPage() {
                 </button>
               ))}
                   </div>
+                  {/* Done, but not hidden outright -- a finished table
+                      sometimes needs reopening (a piece missed, a wrong
+                      collection date), and silently vanishing would make
+                      that impossible. Collapsed to one quiet line. */}
+                  {group.some((b) => b.finished_at) && (
+                    <details style={{ marginTop: '0.5rem' }}>
+                      <summary style={{ color: B.stone, fontSize: 'var(--text-xs)', cursor: 'pointer', listStyle: 'none' }}>
+                        {group.filter((b) => b.finished_at).length} finished — tap to show
+                      </summary>
+                      <div className="space-y-2" style={{ marginTop: '0.4rem', opacity: 0.6 }}>
+                        {group.filter((b) => b.finished_at).map((b) => (
+                          <button key={b.booking_code} onClick={() => selectBooking(b)} className="w-full text-left p-2 rounded-lg flex justify-between items-center" style={{ backgroundColor: B.charcoal, border: `1px solid ${B.stone}30` }}>
+                            <span style={{ color: B.ivory, fontSize: 'var(--text-sm)' }}>{b.customer_name}</span>
+                            <Check size={14} color={B.clay} />
+                          </button>
+                        ))}
+                      </div>
+                    </details>
+                  )}
                 </div>
               ))}
             </div>

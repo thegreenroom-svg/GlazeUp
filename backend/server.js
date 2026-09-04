@@ -186,13 +186,21 @@ app.get('/api/demo/bookings', async (req, res) => {
     // embedding).
     const codes = data.map((b) => b.booking_code);
     let collectionDates = {};
+    let finishedAt = {};
     if (codes.length) {
       const { data: statuses } = await supabase
         .from('demo_app_session_status')
-        .select('booking_code, collection_date')
+        .select('booking_code, collection_date, finished_at')
         .eq('studio_id', DEMO_STUDIO_ID)
         .in('booking_code', codes);
-      (statuses || []).forEach((s) => { if (s.collection_date) collectionDates[s.booking_code] = s.collection_date; });
+      (statuses || []).forEach((s) => {
+        if (s.collection_date) collectionDates[s.booking_code] = s.collection_date;
+        // Daisy: as she works down a sitting photographing tables, the
+        // ones she has finished should drop off, "so you know where you
+        // stand". The table was already being read here for collection
+        // dates -- finished_at simply came along unused.
+        if (s.finished_at) finishedAt[s.booking_code] = s.finished_at;
+      });
     }
 
     // Real per-booking piece/photo counts -- per Daisy: "it would be
@@ -221,6 +229,7 @@ app.get('/api/demo/bookings', async (req, res) => {
     const merged = data.map((b) => ({
       ...b,
       collection_date: collectionDates[b.booking_code] || null,
+      finished_at: finishedAt[b.booking_code] || null,
       piece_count: pieceCounts[b.booking_code]?.pieces || 0,
       photo_count: pieceCounts[b.booking_code]?.with_photo || 0,
     }));
