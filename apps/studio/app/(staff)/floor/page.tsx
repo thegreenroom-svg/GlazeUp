@@ -732,7 +732,14 @@ export default function FloorPage() {
               <Camera size={24} /> Scan the table card
             </button>
             <button onClick={loadBookings} disabled={loading} className="w-full py-4 rounded-lg font-semibold flex items-center justify-center gap-3" style={{ backgroundColor: 'transparent', color: B.ivory, border: `1px solid ${B.stone}` }}>
-              {loading ? 'Loading...' : 'No card? Find the booking by hand'}
+              {/* Daisy is testing the whole workflow before any QR cards
+                  are printed and in place on tables. This path already
+                  did the job -- same booking, same steps, same result --
+                  but "No card?" framed it as a fallback for when
+                  something has gone wrong, which reads as second-best
+                  when it's currently the ONLY way in. Named as a real
+                  equal option instead. */}
+              {loading ? 'Loading...' : 'Choose a booking from today'}
             </button>
           </div>
           {scanning && (
