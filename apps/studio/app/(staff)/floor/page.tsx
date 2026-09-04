@@ -368,7 +368,23 @@ export default function FloorPage() {
   // it goes wrong." Attribution for coaching, not blame -- if one person's
   // photos keep missing pieces, that is a two-minute conversation, but only
   // if you know whose they are.
+  // Was declared, read once when saving a photo, and NEVER SET -- so
+  // photo_taken_by was silently never sent, and all 26 of today's real
+  // pieces recorded no photographer despite someone being signed in the
+  // whole time. The accountability feature built for exactly this was
+  // reporting "not recorded" honestly; the name simply never arrived.
+  // PinGate already keeps the signed-in shift in localStorage; this
+  // reads the same record rather than inventing a second source.
   const [shiftName, setShiftName] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('glazeup_shift');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.name) setShiftName(parsed.name);
+      }
+    } catch { /* signed out, or private mode -- stays null and the photo saves without a name */ }
+  }, []);
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem('glazeup_shift');

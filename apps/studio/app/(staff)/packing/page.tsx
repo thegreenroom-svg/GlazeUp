@@ -178,6 +178,10 @@ export default function PackingPage() {
   } | null>(null);
   const [sweepError, setSweepError] = useState<string | null>(null);
   const [showTablePhotos, setShowTablePhotos] = useState(false);
+  // Shelf photos are archived now rather than discarded after use, so a
+  // failed sweep can be revisited without walking back to the shelf.
+  const [pastSweeps, setPastSweeps] = useState<{ id: string; photo_url: string; succeeded: boolean; matches_found: number | null; candidates_checked: number | null; created_at: string }[] | null>(null);
+  const [showPastSweeps, setShowPastSweeps] = useState(false);
   // The photo just taken, kept so the matches can be shown ON it. Without
   // this the sweep answered "whose is this?" with a list of names and no
   // picture -- which is exactly the point of photographing a shelf: seeing
@@ -926,12 +930,48 @@ export default function PackingPage() {
                 Now the fallback is what a person would do anyway: look
                 at the pictures. */}
             <button
+              onClick={() => {
+                setShowPastSweeps((v) => !v);
+                if (!pastSweeps) {
+                  fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweeps`)
+                    .then((r) => (r.ok ? r.json() : null))
+                    .then((d) => setPastSweeps(d?.sweeps || []))
+                    .catch(() => setPastSweeps([]));
+                }
+              }}
+              style={{ marginTop: '0.5rem', marginRight: '0.9rem', padding: 0, border: 'none', background: 'none', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer' }}
+            >
+              {showPastSweeps ? 'Hide earlier shelf photos' : 'Earlier shelf photos'}
+            </button>
+            <button
               onClick={() => setShowTablePhotos((v) => !v)}
               style={{ marginTop: '0.5rem', padding: 0, border: 'none', background: 'none', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer' }}
             >
               {showTablePhotos ? 'Hide table photos' : 'Show the table photos instead'}
             </button>
           </>
+        )}
+
+        {showPastSweeps && (
+          <div style={{ marginTop: '0.7rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            {pastSweeps === null && <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)' }}>Loading…</p>}
+            {pastSweeps?.length === 0 && (
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)' }}>
+                No shelf photos kept yet — they start being saved from now on.
+              </p>
+            )}
+            {pastSweeps?.map((sw) => (
+              <div key={sw.id} style={{ border: '1px solid #eee', borderRadius: 'var(--radius-md)', padding: '0.5rem', background: 'white' }}>
+                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginBottom: '0.3rem' }}>
+                  {new Date(sw.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  {sw.succeeded
+                    ? ` · found ${sw.matches_found ?? 0} of ${sw.candidates_checked ?? 0}`
+                    : ' · the check failed'}
+                </p>
+                <img src={sw.photo_url} alt="" style={{ width: '100%', borderRadius: 'var(--radius-sm)', display: 'block' }} />
+              </div>
+            ))}
+          </div>
         )}
 
         {showTablePhotos && (

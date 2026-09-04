@@ -5724,10 +5724,43 @@ async function cropReferenceByBox(sharp, buffer, box) {
 
 export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios, upload, fs, logGeminiUsage, sharp) {
   app.post('/api/spec/shelf/sweep', upload.single('photo'), async (req, res) => {
+    // Daisy: "So I took a photo of shelves today. It failed -- is that
+    // still available?" It wasn't. Shelf photos were used in the moment
+    // and thrown away, so a failed sweep cost the photo as well as the
+    // result, and meant walking back to the shelf to try again.
+    //
+    // Saved BEFORE the AI runs, deliberately -- that is the whole point.
+    // A photo only kept on success would still be lost in exactly the
+    // case it is wanted. Fire-and-forget: a storage failure must never
+    // stop a sweep that would otherwise have worked.
+    let sweepId = null;
+    const recordSweep = async (extra) => {
+      try {
+        const filename = `shelf-sweeps/${STUDIO_ID}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+        const { error: upErr } = await supabase.storage
+          .from('booking-photos')
+          .upload(filename, fs.readFileSync(req.file.path), { contentType: req.file.mimetype || 'image/jpeg' });
+        if (upErr) throw upErr;
+        const { data: pub } = supabase.storage.from('booking-photos').getPublicUrl(filename);
+        const { data } = await supabase.from('shelf_sweeps').insert({
+          studio_id: STUDIO_ID,
+          photo_url: pub.publicUrl,
+          taken_by: req.body?.taken_by || null,
+          ...extra,
+        }).select('id').maybeSingle();
+        sweepId = data?.id || null;
+      } catch (err) {
+        logger.warn(`[shelf-sweep] could not archive photo: ${err.message}`);
+      }
+    };
+
     try {
       if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
       const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-      if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured on this service.' });
+      if (!GEMINI_API_KEY) {
+        await recordSweep({ succeeded: false, error_message: 'GEMINI_API_KEY not configured' });
+        return res.status(500).json({ error: 'GEMINI_API_KEY not configured on this service.' });
+      }
 
       // Candidate pool: pieces still waiting to go out. Optionally narrowed
       // to one collection date, which is the normal case -- a shelf IS a
@@ -5883,6 +5916,12 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
         { type: 'image', data: r.buffer.toString('base64'), mime_type: r.mimeType },
       ]));
 
+      // Archived here, before the call: the temp file is deleted as soon
+      // as the AI finishes, so this is the only moment the photo exists
+      // for BOTH outcomes. A failed sweep keeps its photo, which was the
+      // whole ask.
+      await recordSweep({ candidates_checked: pieces.length });
+
       let aiRes, modelUsed;
       try {
         // Same fast-first chain, applied consistently.
@@ -5897,6 +5936,12 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
         }, 'gemini-3.5-flash-lite', 'gemini-3.7-flash'));
       } catch (err) {
         logger.error('shelf sweep: Gemini call failed', err.response?.data || err.message);
+        if (sweepId) {
+          await supabase.from('shelf_sweeps').update({
+            succeeded: false,
+            error_message: (err.response?.data?.error?.message || err.message || '').slice(0, 400),
+          }).eq('id', sweepId);
+        }
         return res.status(500).json({ error: friendlyGeminiError(err) });
       } finally {
         try { fs.unlinkSync(req.file.path); } catch { /* temp file */ }
@@ -5950,6 +5995,14 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
             .select('id');
           placed = (upd || []).length;
         }
+      }
+
+      // Result recorded against the archived photo, so the history shows
+      // what each sweep actually found rather than only that it ran.
+      if (sweepId) {
+        await supabase.from('shelf_sweeps')
+          .update({ matches_found: Array.from(byBooking.values()).reduce((n, v) => n + v.pieces.length, 0) })
+          .eq('id', sweepId);
       }
 
       res.json({
@@ -7223,6 +7276,33 @@ export function registerHomeCountsRoute(app, supabase, STUDIO_ID, logger) {
       res.json({ today_bookings: todayBookings || 0, to_pack: toPack, due_collection: dueCollection || 0 });
     } catch (err) {
       logger.error('home counts failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
+
+// ============================================================================
+// SHELF SWEEP HISTORY -- the photos, kept
+// ----------------------------------------------------------------------------
+// Daisy took a shelf photo, the AI failed, and the photo was gone -- because
+// shelf photos were used in the moment and discarded. Now they're archived
+// before the AI runs, and this reads them back: recent sweeps, whether each
+// worked, and what it found.
+// ============================================================================
+
+export function registerShelfSweepHistoryRoute(app, supabase, STUDIO_ID, logger) {
+  app.get('/api/spec/shelf/sweeps', async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from('shelf_sweeps')
+        .select('id, photo_url, taken_by, candidates_checked, matches_found, succeeded, error_message, created_at')
+        .eq('studio_id', STUDIO_ID)
+        .order('created_at', { ascending: false })
+        .limit(30);
+      if (error) throw error;
+      res.json({ sweeps: data || [] });
+    } catch (err) {
+      logger.error('shelf sweep history failed', err.message);
       res.status(500).json({ error: err.message });
     }
   });
