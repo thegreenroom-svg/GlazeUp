@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ChevronRight, Home, Camera, Printer, Check, Loader, RefreshCw, Mail, CalendarDays, CheckCircle2 } from 'lucide-react';
+import { ChevronRight, Home, Camera, Printer, Check, Loader, RefreshCw, Mail, CalendarDays, CheckCircle2, Palette, Armchair } from 'lucide-react';
 import { NudgeCard } from '@/components/NudgeSystem';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
 import { setLeaveGuard } from '@/lib/leaveGuard';
@@ -778,7 +778,9 @@ export default function FloorPage() {
           )}
           <div className="rounded-lg p-6" style={{ backgroundColor: B.sand + '18', border: `2px solid ${B.clay}` }}>
             <div className="text-center mb-6">
-              <span className="text-4xl">{quickAccessMode ? '🪑' : '🎨'}</span>
+              {quickAccessMode
+                ? <Armchair size={36} style={{ color: 'var(--clay)' }} />
+                : <Palette size={36} style={{ color: 'var(--clay)' }} />}
               <h2 className="text-xl font-bold mt-3" style={{ color: B.ivory }}>{quickAccessMode ? 'Active Tables' : 'Select Table'}</h2>
               {quickAccessMode && <p style={{ color: B.stone, fontSize: 'var(--text-sm)', marginTop: '0.3rem' }}>Tap a table to add more drinks or pieces</p>}
               <input
@@ -790,18 +792,44 @@ export default function FloorPage() {
               <p style={{ color: B.stone, fontSize: 'var(--text-sm)', marginTop: '0.4rem' }}>{bookings.length} real booking{bookings.length === 1 ? '' : 's'} on this day</p>
             </div>
             {bookings.length === 0 && <p style={{ color: B.stone, textAlign: 'center', fontSize: 'var(--text-base)' }}>No bookings found for today.</p>}
-            <div className="space-y-2" style={{ maxHeight: '55vh', overflowY: 'auto' }}>
-              {bookings.map((b) => (
+            <div className="space-y-2">
+              {/* Daisy: "split by session times". The studio runs in
+                  sittings, not as one flat queue -- several bookings
+                  share a start time, and that grouping is how the girls
+                  already think about the day. A flat list of sixteen
+                  names made them scan every row to find the sitting
+                  they were working; grouped, the right handful is
+                  obvious. Times come from the bookings themselves, so
+                  this adapts to whatever the day's sittings actually
+                  are rather than assuming fixed slots. */}
+              {Array.from(
+                bookings.reduce((groups, b) => {
+                  const t = new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                  if (!groups.has(t)) groups.set(t, []);
+                  groups.get(t)!.push(b);
+                  return groups;
+                }, new Map<string, typeof bookings>())
+              ).map(([time, group]) => (
+                <div key={time} style={{ marginBottom: '1.1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                    <span style={{ color: B.clay, fontWeight: 800, fontSize: 'var(--text-md)' }}>{time}</span>
+                    <span style={{ color: B.stone, fontSize: 'var(--text-xs)' }}>
+                      {group.length} booking{group.length === 1 ? '' : 's'}
+                    </span>
+                    <span style={{ flex: 1, height: 1, background: `${B.stone}55` }} />
+                  </div>
+                  <div className="space-y-2">
+              {group.map((b) => (
                 <button key={b.booking_code} onClick={() => selectBooking(b)} className="w-full text-left p-3 rounded-lg flex justify-between items-center" style={{ backgroundColor: B.charcoal, border: `1px solid ${B.stone}40` }}>
                   <div>
                     <p style={{ color: B.ivory, fontWeight: 600, fontSize: 'var(--text-md)' }}>
                       {b.customer_name}
                       {b.notes && <span style={{ color: '#e0c060', marginLeft: '0.4rem' }} title="Has a note">●</span>}
                     </p>
-                    <p style={{ color: B.stone, fontSize: 'var(--text-xs)' }}>
-                      {new Date(b.session_start).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-                      {b.table_number ? ` · Table ${b.table_number}` : ''}
-                    </p>
+                    {/* Time removed here -- it's the group heading now. */}
+                    {b.table_number && (
+                      <p style={{ color: B.stone, fontSize: 'var(--text-xs)' }}>Table {b.table_number}</p>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     {quickAccessMode && tableTotals[b.booking_code] !== undefined && (
@@ -812,6 +840,9 @@ export default function FloorPage() {
                     <ChevronRight size={18} color={B.ivory} />
                   </div>
                 </button>
+              ))}
+                  </div>
+                </div>
               ))}
             </div>
           </div>
