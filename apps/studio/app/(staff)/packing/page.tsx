@@ -74,6 +74,33 @@ function cropStyle(url: string, box: PieceBox): React.CSSProperties {
 }
 
 
+
+// The table photo for one booking, fetched from the record rather than
+// generated. Used as the fallback when the AI shelf search is slow or
+// down: the pictures were always on file, they just had nowhere to be
+// seen at the moment they were needed.
+function TablePhoto({ bookingCode }: { bookingCode: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${encodeURIComponent(bookingCode)}/detail`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled) return;
+        const found = (d?.pieces || []).find((p: { reference_photo_url?: string }) => p.reference_photo_url);
+        if (found?.reference_photo_url) setUrl(found.reference_photo_url); else setFailed(true);
+      })
+      .catch(() => { if (!cancelled) setFailed(true); });
+    return () => { cancelled = true; };
+  }, [bookingCode]);
+
+  if (failed) return <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)' }}>Photo could not be loaded.</p>;
+  if (!url) return <div style={{ height: 120, borderRadius: 'var(--radius-sm)', background: '#f4f2ef' }} />;
+  return <img src={url} alt="" style={{ width: '100%', borderRadius: 'var(--radius-sm)', display: 'block' }} />;
+}
+
 export default function PackingPage() {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,6 +177,7 @@ export default function PackingPage() {
     }[];
   } | null>(null);
   const [sweepError, setSweepError] = useState<string | null>(null);
+  const [showTablePhotos, setShowTablePhotos] = useState(false);
   // The photo just taken, kept so the matches can be shown ON it. Without
   // this the sweep answered "whose is this?" with a list of names and no
   // picture -- which is exactly the point of photographing a shelf: seeing
@@ -885,7 +913,46 @@ export default function PackingPage() {
           />
         </label>
 
-        {sweepError && <p style={{ fontSize: 'var(--text-sm)', color: '#c0392b', marginTop: '0.5rem' }}>{sweepError}</p>}
+        {sweepError && (
+          <>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--danger)', marginTop: '0.5rem' }}>{sweepError}</p>
+            {/* Daisy: "is there a way to keep the photo of the table when
+                packing on file for recall if the AI is too long or not
+                working." The photos were always there -- stored on the
+                piece record, nothing to do with the AI -- but this screen
+                showed an error and nothing else, so a failure left you
+                with no way forward at all. The AI only ever made these
+                faster to search; it was never the thing holding them.
+                Now the fallback is what a person would do anyway: look
+                at the pictures. */}
+            <button
+              onClick={() => setShowTablePhotos((v) => !v)}
+              style={{ marginTop: '0.5rem', padding: 0, border: 'none', background: 'none', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer' }}
+            >
+              {showTablePhotos ? 'Hide table photos' : 'Show the table photos instead'}
+            </button>
+          </>
+        )}
+
+        {showTablePhotos && (
+          <div style={{ marginTop: '0.7rem', display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+            {queue.filter((q) => q.has_photo).length === 0 && (
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)' }}>None of the waiting bookings have a table photo.</p>
+            )}
+            {queue.filter((q) => q.has_photo).map((q) => (
+              <button
+                key={q.booking_code}
+                onClick={() => openIt(q)}
+                style={{ textAlign: 'left', border: '1px solid #eee', borderRadius: 'var(--radius-md)', background: 'white', padding: '0.5rem', cursor: 'pointer' }}
+              >
+                <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, marginBottom: '0.3rem' }}>
+                  {q.customer_name} · {q.piece_count} piece{q.piece_count === 1 ? '' : 's'}
+                </p>
+                <TablePhoto bookingCode={q.booking_code} />
+              </button>
+            ))}
+          </div>
+        )}
 
         {sweep && sweep.bookings.length === 0 && sweepPhoto && (
           <img src={sweepPhoto} alt="" style={{ width: '100%', borderRadius: 'var(--radius-md)', display: 'block', marginTop: '0.6rem', opacity: 0.7 }} />
