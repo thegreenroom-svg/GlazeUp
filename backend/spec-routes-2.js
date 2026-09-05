@@ -6027,6 +6027,25 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
         await supabase.from('shelf_sweeps')
           .update({ matches_found: Array.from(byBooking.values()).reduce((n, v) => n + v.pieces.length, 0) })
           .eq('id', sweepId);
+
+        // Daisy wanted the hybrid: know roughly where a booking's pieces
+        // are without photographing first, then confirm with a photo if
+        // it isn't obvious. This is the "roughly" half, and it costs
+        // nothing -- every sweep already establishes that these pieces
+        // were on the shelf in this photo at this moment. Recording it
+        // turns work she already does into a location she can walk to.
+        //
+        // Stored as LAST SEEN, never as "is". Pieces move, and the UI
+        // says so -- a confident wrong shelf would be worse than no
+        // answer at all.
+        const matchedIds = Array.from(byBooking.values()).flatMap((v) => v.pieces.map((p) => p.id));
+        if (matchedIds.length) {
+          const { error: seenErr } = await supabase
+            .from('pottery_pieces')
+            .update({ last_seen_sweep_id: sweepId, last_seen_at: new Date().toISOString() })
+            .in('id', matchedIds);
+          if (seenErr) logger.warn(`[shelf-sweep] could not record last-seen: ${seenErr.message}`);
+        }
       }
 
       res.json({

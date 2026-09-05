@@ -752,14 +752,29 @@ app.get('/api/demo/bookings/:code/detail', async (req, res) => {
     if (!JUNK_BOOKING_LABELS.includes(booking.customer_name)) {
       const { data: pieceData } = await supabase
         .from('pottery_pieces')
-        .select('id, piece_type, description, status, reference_photo_url, reference_photo_taken_at, mark_code, assigned_to, fulfilment, postal_postcode, hold_reason, photo_box, photo_taken_by, notes')
+        .select('id, piece_type, description, status, reference_photo_url, reference_photo_taken_at, mark_code, assigned_to, fulfilment, postal_postcode, hold_reason, photo_box, photo_taken_by, notes, last_seen_sweep_id, last_seen_at')
         .eq('studio_id', DEMO_STUDIO_ID)
         .in('booking_id', [booking.booking_code, booking.customer_name])
         .neq('archived', true);
       pieces = pieceData || [];
     }
 
-    res.json({ booking, session, orders, pieces });
+    // The "last seen here" half of the hybrid: the most recent shelf
+    // photo any of this booking's pieces was matched in. Lets the
+    // booking say where to walk before anyone photographs anything.
+    // One extra query, and only when a piece has been matched before.
+    let last_seen = null;
+    const seenId = pieces.map((p) => p.last_seen_sweep_id).filter(Boolean)[0];
+    if (seenId) {
+      const { data: sw } = await supabase
+        .from('shelf_sweeps')
+        .select('id, photo_url, created_at')
+        .eq('id', seenId)
+        .maybeSingle();
+      if (sw) last_seen = sw;
+    }
+
+    res.json({ booking, session, orders, pieces, last_seen });
   } catch (err) {
     logger.error(err);
     res.status(500).json({ error: err.message });

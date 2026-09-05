@@ -108,6 +108,10 @@ export default function PackingPage() {
 
   const [openBooking, setOpenBooking] = useState<QueueItem | null>(null);
   const [pieces, setPieces] = useState<Piece[]>([]);
+  // Where this booking's pieces were last matched on a shelf -- the
+  // "walk here first" half of the hybrid.
+  const [lastSeen, setLastSeen] = useState<{ id: string; photo_url: string; created_at: string } | null>(null);
+  const [showLastSeen, setShowLastSeen] = useState(false);
   const [piecesLoading, setPiecesLoading] = useState(false);
   const [openPiece, setOpenPiece] = useState<{ piece: Piece; index: number } | null>(null);
   // Daisy: "select each thumbnail or select all once collected from the
@@ -301,6 +305,7 @@ export default function PackingPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${item.booking_code}/detail`);
       const d = res.ok ? await res.json() : null;
       setPieces(d?.pieces || []);
+      setLastSeen(d?.last_seen || null);
     } catch { setPieces([]); } finally { setPiecesLoading(false); }
   };
 
@@ -765,6 +770,35 @@ export default function PackingPage() {
             so the result shows where every other sweep result already
             shows, at the top of Packing, rather than needing a second
             copy of that whole display built just for this one button. */}
+        {/* Daisy chose the hybrid: know roughly where to walk without
+            photographing, then confirm with a photo only if it isn't
+            obvious. This is the first half -- it appears directly above
+            "Find these on the shelf", so the cheap answer is read
+            before the expensive one is offered.
+
+            Deliberately says LAST SEEN with a timestamp, never "is on".
+            Pieces move between shelves, and a confidently wrong shelf
+            would waste more time than no answer at all. */}
+        {!piecesLoading && lastSeen && (
+          <div style={{ marginTop: '0.85rem', border: '1px solid #e6ded3', borderRadius: 'var(--radius-md)', padding: '0.7rem', background: '#FBF7F1' }}>
+            <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--charcoal)', margin: 0 }}>
+              Last seen on a shelf {new Date(lastSeen.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+            </p>
+            <button
+              onClick={() => setShowLastSeen((v) => !v)}
+              style={{ marginTop: '0.35rem', padding: 0, border: 'none', background: 'none', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer' }}
+            >
+              {showLastSeen ? 'Hide that shelf photo' : 'Show me that shelf'}
+            </button>
+            {showLastSeen && (
+              <img src={lastSeen.photo_url} alt="" style={{ width: '100%', borderRadius: 'var(--radius-sm)', marginTop: '0.5rem', display: 'block' }} />
+            )}
+            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginTop: '0.4rem', marginBottom: 0 }}>
+              Pieces do get moved — photograph the shelf below if they aren&apos;t there.
+            </p>
+          </div>
+        )}
+
         {!piecesLoading && pieces.length > 0 && (
           <label
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%', marginTop: '0.85rem', padding: '0.7rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--clay)', background: 'white', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer' }}
