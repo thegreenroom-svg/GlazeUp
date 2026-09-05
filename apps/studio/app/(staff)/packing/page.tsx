@@ -56,6 +56,7 @@ interface Piece {
   notes: string | null;
   photo_taken_by: string | null;
   reference_photo_taken_at: string | null;
+  last_seen_box: PieceBox | null;
 }
 
 // Crops the shared table photo to one piece. Every piece on a booking shares
@@ -791,7 +792,38 @@ export default function PackingPage() {
               {showLastSeen ? 'Hide that shelf photo' : 'Show me that shelf'}
             </button>
             {showLastSeen && (
-              <img src={lastSeen.photo_url} alt="" style={{ width: '100%', borderRadius: 'var(--radius-sm)', marginTop: '0.5rem', display: 'block' }} />
+              <div style={{ position: 'relative', marginTop: '0.5rem' }}>
+                <img src={lastSeen.photo_url} alt="" style={{ width: '100%', borderRadius: 'var(--radius-sm)', display: 'block' }} />
+                {/* Same numbers and same colours as the table photo
+                    above, deliberately: piece 2 on the table is piece 2
+                    on the shelf. A shelf photo with no boxes is barely
+                    better than walking over and looking. */}
+                {packablePieces.map((pc, i) => pc.last_seen_box && (
+                  <div
+                    key={pc.id}
+                    style={{
+                      position: 'absolute',
+                      left: `${pc.last_seen_box.left_pct}%`,
+                      top: `${pc.last_seen_box.top_pct}%`,
+                      width: `${pc.last_seen_box.right_pct - pc.last_seen_box.left_pct}%`,
+                      height: `${pc.last_seen_box.bottom_pct - pc.last_seen_box.top_pct}%`,
+                      border: `3px solid ${PIECE_COLOURS[i % 6]}`,
+                      borderRadius: 'var(--radius-sm)',
+                      boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <span style={{ position: 'absolute', top: -9, left: -9, width: 20, height: 20, borderRadius: 'var(--radius-full)', backgroundColor: PIECE_COLOURS[i % 6], color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px white' }}>
+                      {i + 1}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {showLastSeen && !packablePieces.some((pc) => pc.last_seen_box) && (
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--warning)', marginTop: '0.35rem' }}>
+                This photo was taken before positions were recorded, so nothing is boxed on it.
+              </p>
             )}
             <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginTop: '0.4rem', marginBottom: 0 }}>
               Pieces do get moved — photograph the shelf below if they aren&apos;t there.

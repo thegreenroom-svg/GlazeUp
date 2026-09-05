@@ -6051,11 +6051,26 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
           .eq('id', sweepId);
 
         if (matchedIds.length) {
-          const { error: seenErr } = await supabase
-            .from('pottery_pieces')
-            .update({ last_seen_sweep_id: sweepId, last_seen_at: new Date().toISOString() })
-            .in('id', matchedIds);
-          if (seenErr) logger.warn(`[shelf-sweep] could not record last-seen: ${seenErr.message}`);
+          // Daisy: "where are they? They need to be itemized. One, two,
+          // three, four, box, like they were originally so that we can
+          // spot them." Right -- a photo of a full shelf with no boxes
+          // is barely better than walking over and looking yourself.
+          //
+          // The sweep ALREADY worked out exactly where each piece was;
+          // the box was computed, returned to the screen, and then
+          // thrown away. Now stored per piece, so the location survives
+          // as long as the photo does. Written individually because
+          // each piece has its own box -- one bulk update cannot carry
+          // per-row values.
+          const seenAt = new Date().toISOString();
+          const boxByPiece = new Map(
+            Array.from(byBooking.values()).flatMap((v) => v.pieces.map((p) => [p.id, p.box]))
+          );
+          await Promise.all(matchedIds.map((id) =>
+            supabase.from('pottery_pieces')
+              .update({ last_seen_sweep_id: sweepId, last_seen_at: seenAt, last_seen_box: boxByPiece.get(id) || null })
+              .eq('id', id)
+          ));
         }
       }
 
