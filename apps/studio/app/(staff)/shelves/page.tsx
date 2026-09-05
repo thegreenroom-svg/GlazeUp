@@ -50,7 +50,16 @@ export default function ShelvesPage() {
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweeps`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setSweeps(d?.sweeps || []))
+      // Daisy: "remove any on wall without any matches." A photo with
+      // nothing marked on it is clutter on a wall whose entire job is
+      // spotting pieces -- it cannot answer the question the page
+      // exists to answer. Filtered on arrival so the empty state stays
+      // truthful rather than the page rendering a run of blanks.
+      .then((d) => setSweeps(
+        ((d?.sweeps || []) as Sweep[]).filter(
+          (sw) => (sw.matched_details || []).some((m) => m.box)
+        )
+      ))
       .catch(() => setSweeps([]));
   }, []);
 
@@ -66,7 +75,7 @@ export default function ShelvesPage() {
         <EmptyState
           icon={<Layers size={24} />}
           title="No shelf photos yet"
-          hint="Photograph a shelf from Packing and it'll appear here, with every piece it recognised marked on it."
+          hint="Photograph a shelf from Packing and it'll appear here once pieces are recognised on it."
         />
       )}
 
@@ -74,7 +83,7 @@ export default function ShelvesPage() {
         {sweeps?.map((sw) => {
           const details = (sw.matched_details || []).filter((d) => d.box);
           return (
-            <div key={sw.id}>
+            <div key={sw.id} style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.7rem' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.4rem' }}>
                 <span style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--charcoal)' }}>
                   {new Date(sw.created_at).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
@@ -123,18 +132,23 @@ export default function ShelvesPage() {
                       <span style={{ flexShrink: 0, width: 18, height: 18, borderRadius: 'var(--radius-full)', backgroundColor: PIECE_COLOURS[i % 6], color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {i + 1}
                       </span>
-                      <span style={{ minWidth: 0 }}>
-                        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--charcoal)' }}>{d.customer_name}</span>
-                        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--muted)' }}> · {d.description || d.piece_type || 'Piece'}</span>
+                      {/* Daisy: "Needs bookings referenced." The name now
+                          leads on its own line rather than trailing after
+                          a bullet, so a glance down the list reads as a
+                          list of PEOPLE -- which is what you are actually
+                          looking for when packing. */}
+                      <span style={{ minWidth: 0, flex: 1 }}>
+                        <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--charcoal)' }}>
+                          {d.customer_name || 'Unknown booking'}
+                        </span>
+                        <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--muted)' }}>
+                          {d.description || d.piece_type || 'Piece'}
+                        </span>
                       </span>
                     </button>
                   ))}
                 </div>
-              ) : (
-                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginTop: '0.4rem' }}>
-                  {sw.succeeded ? 'Nothing was recognised on this shelf.' : 'This check failed, so nothing is marked.'}
-                </p>
-              )}
+              ) : null}
             </div>
           );
         })}

@@ -9,7 +9,24 @@
    brand values; earlier work in this app used generic greys and a
    blue link colour, which was off-brief. Defined as variables so a
    white-label tenant can override the whole app from one place. */
+/* ── DARK MODE ────────────────────────────────────────────────────
+   Daisy on the new shelf wall: "Needs bookings referenced" -- the
+   customer name was missing from every line. It wasn't missing. It was
+   rendered in --charcoal (near black) on a page with no background of
+   its own, so on a phone in dark mode iOS supplied a dark background
+   and the name became black-on-black. The grey description survived,
+   which is why the line looked half-written rather than broken.
+
+   Every OTHER page escaped this only by accident: they happen to put
+   all their content on explicit white cards. So the bug was waiting
+   for the next screen anyone wrote, which is exactly what happened.
+
+   Fixed at the root rather than per page. This app is a light-surface
+   design -- brand ivory, clay, sand -- with no dark variant, so the
+   honest thing is to say so once and stop the browser guessing. */
 :root {
+  color-scheme: light;
+
   --charcoal: #2B2724;  /* primary text, dark UI, sidebar */
   --clay:     #B87946;  /* buttons, accents, the kiln arch */
   --sand:     #E8D9C4;  /* backgrounds */
@@ -60,6 +77,8 @@ html {
 }
 
 body {
+  background: var(--ivory);
+  color: var(--charcoal);
   background-color: var(--ivory);
   color: var(--charcoal);
   -webkit-font-smoothing: antialiased;

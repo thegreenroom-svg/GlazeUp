@@ -998,7 +998,7 @@ export default function PackingPage() {
           onClick={() => router.push('/shelves')}
           style={{ padding: '0.4rem 0', marginTop: '0.6rem', border: 'none', background: 'none', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer', minHeight: 44 }}
         >
-          See every shelf photographed
+          Wall of shelves — every box photographed
         </button>
 
 

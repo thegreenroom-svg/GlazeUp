@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Printer, Camera, Package, Check } from 'lucide-react';
+import { Printer, Camera, Package, Check, Layers } from 'lucide-react';
 
 // THE WHOLE APP, on one page.
 //
@@ -29,6 +29,12 @@ const STEPS = [
   { key: 'table',   n: 2, label: 'Photograph the table',  detail: 'All pieces clear, QR code in shot', href: '/floor',       icon: Camera,  tint: '#A8763E' },
   { key: 'packing',    n: 3, label: 'Packing',    detail: 'Match what came out of the kiln',   href: '/packing',    icon: Package, tint: '#9C5A3C' },
   { key: 'collection', n: 4, label: 'Collection', detail: 'Print the card, hand pottery over',  href: '/collection', icon: Check,   tint: '#6E7A55' },
+  // Daisy has now said three times that she cannot find something I
+  // built, and the cause is mine: I kept adding entry points as small
+  // text links buried inside other screens. The wall of boxes is a
+  // place she wants to GO, not a footnote on the packing screen, so it
+  // gets a tile like everything else she reaches for.
+  { key: 'shelves',    n: 5, label: 'Wall of shelves', detail: 'Every box photographed, with what is in it', href: '/shelves', icon: Layers, tint: '#7A6A8C' },
 ];
 
 export default function StudioHome() {
