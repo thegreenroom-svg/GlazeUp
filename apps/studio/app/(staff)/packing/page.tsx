@@ -88,6 +88,7 @@ export default function PackingPage() {
   // "walk here first" half of the hybrid.
   const [lastSeen, setLastSeen] = useState<{ id: string; photo_url: string; created_at: string } | null>(null);
   const [showLastSeen, setShowLastSeen] = useState(false);
+  const [boxNumber, setBoxNumber] = useState('');
   const [piecesLoading, setPiecesLoading] = useState(false);
   const [openPiece, setOpenPiece] = useState<{ piece: Piece; index: number } | null>(null);
   // Daisy: "select each thumbnail or select all once collected from the
@@ -159,8 +160,6 @@ export default function PackingPage() {
   const [sweepError, setSweepError] = useState<string | null>(null);
   // Shelf photos are archived now rather than discarded after use, so a
   // failed sweep can be revisited without walking back to the shelf.
-  const [pastSweeps, setPastSweeps] = useState<{ id: string; photo_url: string; succeeded: boolean; matches_found: number | null; candidates_checked: number | null; created_at: string }[] | null>(null);
-  const [showPastSweeps, setShowPastSweeps] = useState(false);
   // The photo just taken, kept so the matches can be shown ON it. Without
   // this the sweep answered "whose is this?" with a list of names and no
   // picture -- which is exactly the point of photographing a shelf: seeing
@@ -983,77 +982,18 @@ export default function PackingPage() {
             them as a fallback, but she asked for them as a feature. The
             photos are hers, they are always relevant, so they are always
             here -- below the camera button, quiet, and permanent. */}
-        <div style={{ display: 'flex', gap: '1rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => {
-              setShowPastSweeps((v) => !v);
-              if (!pastSweeps) {
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweeps`)
-                  .then((r) => (r.ok ? r.json() : null))
-                  .then((d) => setPastSweeps(d?.sweeps || []))
-                  .catch(() => setPastSweeps([]));
-              }
-            }}
-            style={{ padding: '0.4rem 0', border: 'none', background: 'none', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer', minHeight: 44 }}
-          >
-            {showPastSweeps ? 'Hide earlier shelf photos' : 'Earlier shelf photos'}
-          </button>
-        </div>
+        {/* Daisy: "if I want to check other photos and see other
+            shelves, I lose this one." Opening a shelf photo inline
+            closed the last one, so comparing shelves meant remembering
+            what you had just seen. Its own page holds them all in one
+            continuous scroll instead. */}
+        <button
+          onClick={() => router.push('/shelves')}
+          style={{ padding: '0.4rem 0', marginTop: '0.6rem', border: 'none', background: 'none', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer', minHeight: 44 }}
+        >
+          See every shelf photographed
+        </button>
 
-        {showPastSweeps && (
-          <div style={{ marginTop: '0.7rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-            {pastSweeps === null && <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)' }}>Loading…</p>}
-            {pastSweeps?.length === 0 && (
-              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)' }}>
-                No shelf photos kept yet — they start being saved from now on.
-              </p>
-            )}
-            {pastSweeps?.map((sw) => (
-              <div key={sw.id} style={{ border: '1px solid #eee', borderRadius: 'var(--radius-md)', padding: '0.5rem', background: 'white' }}>
-                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginBottom: '0.3rem' }}>
-                  {new Date(sw.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                  {sw.succeeded
-                    ? ` · found ${sw.matches_found ?? 0} of ${sw.candidates_checked ?? 0}`
-                    : ' · the check failed'}
-                </p>
-                <img src={sw.photo_url} alt="" style={{ width: '100%', borderRadius: 'var(--radius-sm)', display: 'block' }} />
-                {/* Daisy: "want re run ai these". Same photo, fresh
-                    attempt -- no walk back to the shelf. Especially for
-                    the ones that failed, which is why they were kept. */}
-                <button
-                  onClick={async () => {
-                    setSweeping(true); setSweep(null); setSweepError(null);
-                    setSweepPhoto(sw.photo_url);
-                    setShowPastSweeps(false);
-                    try {
-                      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweep`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          retry_sweep_id: sw.id,
-                          ...(foundSoFar.length ? { exclude_piece_ids: JSON.stringify(foundSoFar.map((f) => f.id)) } : {}),
-                        }),
-                      });
-                      const d = await res.json();
-                      if (!res.ok) throw new Error(d.error || 'Could not read the shelf');
-                      setSweep(d);
-                      const newly = (d.bookings || []).flatMap((b: typeof d.bookings[number]) =>
-                        b.pieces.map((pc: typeof b.pieces[number]) => ({ id: pc.id, piece_type: pc.piece_type, description: pc.description, booking_code: b.booking_code, customer_name: b.customer_name }))
-                      );
-                      if (newly.length) setFoundSoFar((prev) => [...prev, ...newly]);
-                    } catch (err) {
-                      setSweepError(err instanceof Error ? err.message : 'Could not read the shelf');
-                    } finally { setSweeping(false); }
-                  }}
-                  disabled={sweeping}
-                  style={{ marginTop: '0.4rem', padding: '0.5rem 0.8rem', minHeight: 44, borderRadius: 'var(--radius-md)', border: '1px solid var(--clay)', background: 'white', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer' }}
-                >
-                  {sweeping ? 'Checking…' : 'Try this photo again'}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
 
         {sweep && sweep.bookings.length === 0 && sweepPhoto && (
           <img src={sweepPhoto} alt="" style={{ width: '100%', borderRadius: 'var(--radius-md)', display: 'block', marginTop: '0.6rem', opacity: 0.7 }} />

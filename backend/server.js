@@ -752,7 +752,7 @@ app.get('/api/demo/bookings/:code/detail', async (req, res) => {
     if (!JUNK_BOOKING_LABELS.includes(booking.customer_name)) {
       const { data: pieceData } = await supabase
         .from('pottery_pieces')
-        .select('id, piece_type, description, status, reference_photo_url, reference_photo_taken_at, mark_code, assigned_to, fulfilment, postal_postcode, hold_reason, photo_box, photo_taken_by, notes, last_seen_sweep_id, last_seen_at, last_seen_box')
+        .select('id, piece_type, description, status, reference_photo_url, reference_photo_taken_at, mark_code, assigned_to, fulfilment, postal_postcode, hold_reason, photo_box, photo_taken_by, notes, last_seen_sweep_id, last_seen_at, last_seen_box, last_seen_box_number')
         .eq('studio_id', DEMO_STUDIO_ID)
         .in('booking_id', [booking.booking_code, booking.customer_name])
         .neq('archived', true);

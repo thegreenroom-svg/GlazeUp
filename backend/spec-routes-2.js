@@ -5752,6 +5752,11 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
           studio_id: STUDIO_ID,
           photo_url: pub.publicUrl,
           taken_by: req.body?.taken_by || null,
+          // Daisy: boxes are numbered by hand in marker pen, 1 to 30,
+          // reused freely. The number is not an identity to maintain --
+          // it is just where something was last seen, and packing
+          // clears it. So no register, no QR, no lifecycle to manage.
+          box_number: (req.body?.box_number || '').toString().trim() || null,
           ...extra,
         }).select('id').maybeSingle();
         sweepId = data?.id || null;
@@ -5903,6 +5908,8 @@ ${referenceImages.length
   ? `The reference photos that follow show what each of those pieces actually looks like -- marked "[reference photo attached]" above, in the same order as this sentence. COMPARE THEM VISUALLY against the shelf photo. Colour, glaze pattern and painted decoration matter far more than the text description alone -- the description is a hint, the reference photo is the real evidence.`
   : `No reference photos are attached this time -- go on the written descriptions alone.`}
 
+If a number is written by hand on the box or shelf in this photo -- usually in thick black marker, and often repeated on several faces -- report it as box_number, digits only. If you cannot read one clearly, return an empty string rather than guessing.
+
 Look at the shelf photo and decide which of the numbered pieces you can actually see.
 
 Be strict. Only include a number if the piece in the photo genuinely matches in form AND painted detail. Studio pottery is repetitive — many customers paint the same blank — so a "mug" alone is never enough to match on; the painted decoration has to agree. If you are unsure, leave it out. A missed piece is a minor nuisance; a wrong match sends someone home with someone else's pottery.
@@ -5923,6 +5930,17 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
               },
               required: ['number', 'confidence'],
             },
+          },
+          // Daisy: boxes are numbered by hand in thick marker on every
+          // corner and face, so the number is in the photo already --
+          // no reason to make anyone type it. Read here, but NEVER
+          // trusted silently: handwritten digits misread easily (3 for
+          // 8, 1 for 7), and a wrong box number sends someone
+          // confidently to the wrong box. The app shows it back for
+          // confirmation instead.
+          box_number: {
+            type: 'string',
+            description: 'Any box number written by hand on the box in this photo, digits only. Empty string if none is legible.',
           },
         },
         required: ['matches'],
@@ -6046,8 +6064,26 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
         // so today's four sweeps are unrecoverable, and any future
         // change to how last-seen works would lose its history again.
         // The sweep should be independently meaningful.
+        // Each sweep carries its OWN boxes and descriptions, not just
+        // piece ids. A piece only ever holds its MOST RECENT position,
+        // so without this an older shelf photo could never be annotated
+        // -- which is exactly what a scrollable wall of shelves needs.
+        // The sweep should be able to describe itself completely.
+        const matchedDetails = Array.from(byBooking.entries()).flatMap(([code, v]) =>
+          v.pieces.map((pc) => ({
+            piece_id: pc.id,
+            piece_type: pc.piece_type,
+            description: pc.description,
+            box: pc.box,
+            booking_code: code,
+            customer_name: nameByCode.get(code) || code,
+          }))
+        );
+        // A typed box number always wins over a read one -- if someone
+        // corrected it, that correction is the truth.
+        const boxNum = (req.body?.box_number || '').toString().trim() || (parsed.box_number || '').toString().trim() || null;
         await supabase.from('shelf_sweeps')
-          .update({ matched_piece_ids: matchedIds })
+          .update({ matched_piece_ids: matchedIds, matched_details: matchedDetails, box_number: boxNum })
           .eq('id', sweepId);
 
         if (matchedIds.length) {
@@ -6068,7 +6104,7 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
           );
           await Promise.all(matchedIds.map((id) =>
             supabase.from('pottery_pieces')
-              .update({ last_seen_sweep_id: sweepId, last_seen_at: seenAt, last_seen_box: boxByPiece.get(id) || null })
+              .update({ last_seen_sweep_id: sweepId, last_seen_at: seenAt, last_seen_box: boxByPiece.get(id) || null, last_seen_box_number: boxNum })
               .eq('id', id)
           ));
         }
@@ -6076,6 +6112,7 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
 
       res.json({
         candidates: pieces.length,
+        box_number_read: (parsed.box_number || '').toString().trim() || null,
         placed_on_shelf: placed,
         bookings: Array.from(byBooking.entries())
           .map(([code, v]) => ({
@@ -7364,7 +7401,7 @@ export function registerShelfSweepHistoryRoute(app, supabase, STUDIO_ID, logger)
     try {
       const { data, error } = await supabase
         .from('shelf_sweeps')
-        .select('id, photo_url, taken_by, candidates_checked, matches_found, succeeded, error_message, created_at')
+        .select('id, photo_url, taken_by, candidates_checked, matches_found, succeeded, error_message, created_at, matched_details, box_number')
         .eq('studio_id', STUDIO_ID)
         .order('created_at', { ascending: false })
         .limit(30);
