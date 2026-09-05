@@ -5734,12 +5734,18 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
     // case it is wanted. Fire-and-forget: a storage failure must never
     // stop a sweep that would otherwise have worked.
     let sweepId = null;
+    // Daisy: "want re run ai these". Photos are archived now, so a retry
+    // sources the same image from storage instead of another trip to the
+    // shelf. Hoisted here because recordSweep is a closure defined
+    // before the source is resolved.
+    let sourceBuffer = null;
+    let sourceMime = 'image/jpeg';
     const recordSweep = async (extra) => {
       try {
         const filename = `shelf-sweeps/${STUDIO_ID}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
         const { error: upErr } = await supabase.storage
           .from('booking-photos')
-          .upload(filename, fs.readFileSync(req.file.path), { contentType: req.file.mimetype || 'image/jpeg' });
+          .upload(filename, sourceBuffer, { contentType: sourceMime });
         if (upErr) throw upErr;
         const { data: pub } = supabase.storage.from('booking-photos').getPublicUrl(filename);
         const { data } = await supabase.from('shelf_sweeps').insert({
@@ -5755,7 +5761,25 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
     };
 
     try {
-      if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
+      if (req.body?.retry_sweep_id) {
+        const { data: prior } = await supabase
+          .from('shelf_sweeps')
+          .select('photo_url')
+          .eq('id', req.body.retry_sweep_id)
+          .eq('studio_id', STUDIO_ID)
+          .maybeSingle();
+        if (!prior?.photo_url) return res.status(404).json({ error: 'That earlier photo could not be found.' });
+        try {
+          const img = await axios.get(prior.photo_url, { responseType: 'arraybuffer', timeout: 15000 });
+          sourceBuffer = Buffer.from(img.data);
+        } catch {
+          return res.status(502).json({ error: 'The stored photo could not be downloaded.' });
+        }
+      } else {
+        if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
+        sourceBuffer = fs.readFileSync(req.file.path);
+        sourceMime = req.file.mimetype || 'image/jpeg';
+      }
       const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
       if (!GEMINI_API_KEY) {
         await recordSweep({ succeeded: false, error_message: 'GEMINI_API_KEY not configured' });
@@ -5867,7 +5891,7 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
         })
         .join('\n');
 
-      const shelfGemini = await forGemini(sharp, fs.readFileSync(req.file.path), logger, null, 1600);
+      const shelfGemini = await forGemini(sharp, sourceBuffer, logger, null, 1600);
       const base64 = shelfGemini.buffer.toString('base64');
       const prompt = `This first photo shows a shelf of finished, fired pottery in a paint-your-own-pottery studio.
 
@@ -5929,7 +5953,7 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
           input: [
             { type: 'text', text: prompt },
             { type: 'text', text: 'Shelf photo:' },
-            { type: 'image', data: base64, mime_type: shelfGemini.mimeType || req.file.mimetype || 'image/jpeg' },
+            { type: 'image', data: base64, mime_type: shelfGemini.mimeType || sourceMime },
             ...referenceInputBlocks,
           ],
           response_format: { type: 'text', mime_type: 'application/json', schema },
@@ -5944,7 +5968,7 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
         }
         return res.status(500).json({ error: friendlyGeminiError(err) });
       } finally {
-        try { fs.unlinkSync(req.file.path); } catch { /* temp file */ }
+        try { if (req.file) fs.unlinkSync(req.file.path); } catch { /* temp file */ }
       }
 
       const usage = extractGeminiUsage(aiRes.data);

@@ -968,6 +968,39 @@ export default function PackingPage() {
                     : ' · the check failed'}
                 </p>
                 <img src={sw.photo_url} alt="" style={{ width: '100%', borderRadius: 'var(--radius-sm)', display: 'block' }} />
+                {/* Daisy: "want re run ai these". Same photo, fresh
+                    attempt -- no walk back to the shelf. Especially for
+                    the ones that failed, which is why they were kept. */}
+                <button
+                  onClick={async () => {
+                    setSweeping(true); setSweep(null); setSweepError(null);
+                    setSweepPhoto(sw.photo_url);
+                    setShowPastSweeps(false);
+                    try {
+                      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweep`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          retry_sweep_id: sw.id,
+                          ...(foundSoFar.length ? { exclude_piece_ids: JSON.stringify(foundSoFar.map((f) => f.id)) } : {}),
+                        }),
+                      });
+                      const d = await res.json();
+                      if (!res.ok) throw new Error(d.error || 'Could not read the shelf');
+                      setSweep(d);
+                      const newly = (d.bookings || []).flatMap((b: typeof d.bookings[number]) =>
+                        b.pieces.map((pc: typeof b.pieces[number]) => ({ id: pc.id, piece_type: pc.piece_type, description: pc.description, booking_code: b.booking_code, customer_name: b.customer_name }))
+                      );
+                      if (newly.length) setFoundSoFar((prev) => [...prev, ...newly]);
+                    } catch (err) {
+                      setSweepError(err instanceof Error ? err.message : 'Could not read the shelf');
+                    } finally { setSweeping(false); }
+                  }}
+                  disabled={sweeping}
+                  style={{ marginTop: '0.4rem', padding: '0.5rem 0.8rem', minHeight: 44, borderRadius: 'var(--radius-md)', border: '1px solid var(--clay)', background: 'white', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer' }}
+                >
+                  {sweeping ? 'Checking…' : 'Try this photo again'}
+                </button>
               </div>
             ))}
           </div>
