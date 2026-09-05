@@ -7413,3 +7413,133 @@ export function registerShelfSweepHistoryRoute(app, supabase, STUDIO_ID, logger)
     }
   });
 }
+
+// ============================================================================
+// FIND THE NEXT PACKING
+// ----------------------------------------------------------------------------
+// Daisy's design, in her words: "the AI has a button to say find the next
+// packing from this kiln... it picks up every piece from the first
+// chronologically full picking order for a full booking of pieces that's
+// ready. And that is the first one that it prompts you to pick out and pack."
+//
+// The key word is FULL. It only ever offers a booking where every piece has
+// been seen in a box -- because packing a booking you cannot complete means
+// putting it back down again, which is the waste this is meant to remove.
+//
+// Chronological by collection date where there is one, then by session date.
+// Right now none of the live bookings carry a collection date, so the
+// fallback is doing the real work and needed to exist rather than being a
+// tidy afterthought.
+// ============================================================================
+
+export function registerNextPackingRoute(app, supabase, STUDIO_ID, logger) {
+  app.get('/api/spec/packing/next', async (req, res) => {
+    try {
+      const { data: bookings, error: bErr } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, session_start')
+        .eq('studio_id', STUDIO_ID)
+        .order('session_start', { ascending: true });
+      if (bErr) throw bErr;
+      if (!bookings?.length) return res.json({ booking: null, reason: 'no bookings' });
+
+      const codes = bookings.map((b) => b.booking_code);
+
+      const { data: pieces, error: pErr } = await supabase
+        .from('pottery_pieces')
+        .select('id, booking_id, piece_type, description, status, reference_photo_url, photo_box, last_seen_at, last_seen_box, last_seen_box_number, last_seen_sweep_id')
+        .eq('studio_id', STUDIO_ID)
+        .in('booking_id', codes)
+        .or('archived.is.null,archived.eq.false');
+      if (pErr) throw pErr;
+
+      const { data: statuses } = await supabase
+        .from('demo_app_session_status')
+        .select('booking_code, collection_date, finished_at')
+        .eq('studio_id', STUDIO_ID)
+        .in('booking_code', codes);
+      const collectionDate = {};
+      (statuses || []).forEach((s) => { if (s.collection_date) collectionDate[s.booking_code] = s.collection_date; });
+
+      const byBooking = new Map();
+      for (const p of pieces || []) {
+        if (!byBooking.has(p.booking_id)) byBooking.set(p.booking_id, []);
+        byBooking.get(p.booking_id).push(p);
+      }
+
+      // A booking is ready when it has pieces, none are already collected,
+      // and EVERY remaining piece has been seen in a box.
+      const ready = [];
+      for (const b of bookings) {
+        const ps = byBooking.get(b.booking_code) || [];
+        if (!ps.length) continue;
+        const outstanding = ps.filter((p) => p.status !== 'collected' && p.status !== 'damaged');
+        if (!outstanding.length) continue;
+        if (!outstanding.every((p) => p.last_seen_at)) continue;
+        ready.push({
+          booking_code: b.booking_code,
+          customer_name: b.customer_name,
+          collection_date: collectionDate[b.booking_code] || null,
+          session_start: b.session_start,
+          pieces: outstanding,
+        });
+      }
+
+      if (!ready.length) {
+        // Say WHY there is nothing, not just that there is nothing -- the
+        // difference between "photograph more boxes" and "nothing is due"
+        // is the whole answer.
+        const partial = bookings.filter((b) => {
+          const ps = (byBooking.get(b.booking_code) || []).filter((p) => p.status !== 'collected' && p.status !== 'damaged');
+          return ps.length && !ps.every((p) => p.last_seen_at);
+        }).length;
+        return res.json({ booking: null, waiting_on_boxes: partial });
+      }
+
+      ready.sort((a, b) => {
+        const ad = a.collection_date, bd = b.collection_date;
+        if (ad && bd && ad !== bd) return ad < bd ? -1 : 1;
+        if (ad && !bd) return -1;
+        if (!ad && bd) return 1;
+        return (a.session_start || '') < (b.session_start || '') ? -1 : 1;
+      });
+
+      const next = ready[0];
+
+      // The shelf photo each piece was last seen in, so the screen can crop
+      // a thumbnail of the piece as it actually sits in its box right now --
+      // not as it looked on the table.
+      const sweepIds = [...new Set(next.pieces.map((p) => p.last_seen_sweep_id).filter(Boolean))];
+      let sweepById = {};
+      if (sweepIds.length) {
+        const { data: sws } = await supabase
+          .from('shelf_sweeps')
+          .select('id, photo_url')
+          .in('id', sweepIds);
+        (sws || []).forEach((s) => { sweepById[s.id] = s.photo_url; });
+      }
+
+      res.json({
+        booking: {
+          booking_code: next.booking_code,
+          customer_name: next.customer_name,
+          collection_date: next.collection_date,
+          pieces: next.pieces.map((p) => ({
+            id: p.id,
+            piece_type: p.piece_type,
+            description: p.description,
+            box_number: p.last_seen_box_number,
+            shelf_photo_url: sweepById[p.last_seen_sweep_id] || null,
+            shelf_box: p.last_seen_box,
+            reference_photo_url: p.reference_photo_url,
+            photo_box: p.photo_box,
+          })),
+        },
+        also_ready: ready.length - 1,
+      });
+    } catch (err) {
+      logger.error('next packing failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}

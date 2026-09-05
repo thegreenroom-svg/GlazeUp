@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Package, ChevronLeft, Check, Search, Camera, Loader, RefreshCw, Trash2, Printer } from 'lucide-react';
+import { Package, PackageCheck, ChevronLeft, Check, Search, Camera, Loader, RefreshCw, Trash2, Printer } from 'lucide-react';
 import { EmptyState } from '@/components/EmptyState';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
@@ -987,6 +987,13 @@ export default function PackingPage() {
             closed the last one, so comparing shelves meant remembering
             what you had just seen. Its own page holds them all in one
             continuous scroll instead. */}
+        <button
+          onClick={() => router.push('/next-packing')}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%', marginTop: '0.8rem', padding: '0.8rem', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer', minHeight: 48 }}
+        >
+          <PackageCheck size={16} /> Find the next packing
+        </button>
+
         <button
           onClick={() => router.push('/shelves')}
           style={{ padding: '0.4rem 0', marginTop: '0.6rem', border: 'none', background: 'none', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer', minHeight: 44 }}
