@@ -918,39 +918,38 @@ export default function PackingPage() {
         </label>
 
         {sweepError && (
-          <>
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--danger)', marginTop: '0.5rem' }}>{sweepError}</p>
-            {/* Daisy: "is there a way to keep the photo of the table when
-                packing on file for recall if the AI is too long or not
-                working." The photos were always there -- stored on the
-                piece record, nothing to do with the AI -- but this screen
-                showed an error and nothing else, so a failure left you
-                with no way forward at all. The AI only ever made these
-                faster to search; it was never the thing holding them.
-                Now the fallback is what a person would do anyway: look
-                at the pictures. */}
-            <button
-              onClick={() => {
-                setShowPastSweeps((v) => !v);
-                if (!pastSweeps) {
-                  fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweeps`)
-                    .then((r) => (r.ok ? r.json() : null))
-                    .then((d) => setPastSweeps(d?.sweeps || []))
-                    .catch(() => setPastSweeps([]));
-                }
-              }}
-              style={{ marginTop: '0.5rem', marginRight: '0.9rem', padding: 0, border: 'none', background: 'none', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer' }}
-            >
-              {showPastSweeps ? 'Hide earlier shelf photos' : 'Earlier shelf photos'}
-            </button>
-            <button
-              onClick={() => setShowTablePhotos((v) => !v)}
-              style={{ marginTop: '0.5rem', padding: 0, border: 'none', background: 'none', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer' }}
-            >
-              {showTablePhotos ? 'Hide table photos' : 'Show the table photos instead'}
-            </button>
-          </>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--danger)', marginTop: '0.5rem' }}>{sweepError}</p>
         )}
+
+        {/* Daisy, having asked for these twice: "Can't see previous
+            photos". They were only rendered after a sweep FAILED --
+            which meant looking at your own photos required something to
+            break first. That was my design being too clever: I built
+            them as a fallback, but she asked for them as a feature. The
+            photos are hers, they are always relevant, so they are always
+            here -- below the camera button, quiet, and permanent. */}
+        <div style={{ display: 'flex', gap: '1rem', marginTop: '0.6rem', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => {
+              setShowPastSweeps((v) => !v);
+              if (!pastSweeps) {
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweeps`)
+                  .then((r) => (r.ok ? r.json() : null))
+                  .then((d) => setPastSweeps(d?.sweeps || []))
+                  .catch(() => setPastSweeps([]));
+              }
+            }}
+            style={{ padding: '0.4rem 0', border: 'none', background: 'none', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer', minHeight: 44 }}
+          >
+            {showPastSweeps ? 'Hide earlier shelf photos' : 'Earlier shelf photos'}
+          </button>
+          <button
+            onClick={() => setShowTablePhotos((v) => !v)}
+            style={{ padding: '0.4rem 0', border: 'none', background: 'none', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer', minHeight: 44 }}
+          >
+            {showTablePhotos ? 'Hide table photos' : 'Table photos'}
+          </button>
+        </div>
 
         {showPastSweeps && (
           <div style={{ marginTop: '0.7rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
