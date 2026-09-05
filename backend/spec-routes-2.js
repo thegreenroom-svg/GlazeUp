@@ -6039,6 +6039,17 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
         // says so -- a confident wrong shelf would be worse than no
         // answer at all.
         const matchedIds = Array.from(byBooking.values()).flatMap((v) => v.pieces.map((p) => p.id));
+
+        // Recorded on the sweep itself as well as on each piece. The
+        // first version only wrote to the pieces, which meant an
+        // archived sweep knew HOW MANY it matched but never WHICH --
+        // so today's four sweeps are unrecoverable, and any future
+        // change to how last-seen works would lose its history again.
+        // The sweep should be independently meaningful.
+        await supabase.from('shelf_sweeps')
+          .update({ matched_piece_ids: matchedIds })
+          .eq('id', sweepId);
+
         if (matchedIds.length) {
           const { error: seenErr } = await supabase
             .from('pottery_pieces')
