@@ -76,31 +76,6 @@ function cropStyle(url: string, box: PieceBox): React.CSSProperties {
 
 
 
-// The table photo for one booking, fetched from the record rather than
-// generated. Used as the fallback when the AI shelf search is slow or
-// down: the pictures were always on file, they just had nowhere to be
-// seen at the moment they were needed.
-function TablePhoto({ bookingCode }: { bookingCode: string }) {
-  const [url, setUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings/${encodeURIComponent(bookingCode)}/detail`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (cancelled) return;
-        const found = (d?.pieces || []).find((p: { reference_photo_url?: string }) => p.reference_photo_url);
-        if (found?.reference_photo_url) setUrl(found.reference_photo_url); else setFailed(true);
-      })
-      .catch(() => { if (!cancelled) setFailed(true); });
-    return () => { cancelled = true; };
-  }, [bookingCode]);
-
-  if (failed) return <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)' }}>Photo could not be loaded.</p>;
-  if (!url) return <div style={{ height: 120, borderRadius: 'var(--radius-sm)', background: '#f4f2ef' }} />;
-  return <img src={url} alt="" style={{ width: '100%', borderRadius: 'var(--radius-sm)', display: 'block' }} />;
-}
 
 export default function PackingPage() {
   const [queue, setQueue] = useState<QueueItem[]>([]);
@@ -182,7 +157,6 @@ export default function PackingPage() {
     }[];
   } | null>(null);
   const [sweepError, setSweepError] = useState<string | null>(null);
-  const [showTablePhotos, setShowTablePhotos] = useState(false);
   // Shelf photos are archived now rather than discarded after use, so a
   // failed sweep can be revisited without walking back to the shelf.
   const [pastSweeps, setPastSweeps] = useState<{ id: string; photo_url: string; succeeded: boolean; matches_found: number | null; candidates_checked: number | null; created_at: string }[] | null>(null);
@@ -780,8 +754,11 @@ export default function PackingPage() {
             Deliberately says LAST SEEN with a timestamp, never "is on".
             Pieces move between shelves, and a confidently wrong shelf
             would waste more time than no answer at all. */}
-        {!piecesLoading && lastSeen && (
+        {!piecesLoading && lastSeen && pieces.length > 0 && (
           <div style={{ marginTop: '0.85rem', border: '1px solid #e6ded3', borderRadius: 'var(--radius-md)', padding: '0.7rem', background: '#FBF7F1' }}>
+            <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--charcoal)', marginTop: 0, marginBottom: '0.5rem' }}>
+              Where are these pieces?
+            </p>
             <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--charcoal)', margin: 0 }}>
               Last seen on a shelf {new Date(lastSeen.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
             </p>
@@ -825,29 +802,41 @@ export default function PackingPage() {
                 This photo was taken before positions were recorded, so nothing is boxed on it.
               </p>
             )}
-            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', marginTop: '0.4rem', marginBottom: 0 }}>
-              Pieces do get moved — photograph the shelf below if they aren&apos;t there.
-            </p>
           </div>
         )}
 
+        {/* ONE section for the backward question, not two scattered
+            controls. Daisy: "it's like part of the app, and there's lots
+            of buttons... it needs to split into the workflow better."
+            She was right -- "last seen" and "find these on the shelf"
+            were separate things in separate places, but they answer the
+            same question: WHERE ARE THESE PIECES. Now one block, headed
+            by that question, with the free answer above and the camera
+            below it as the follow-up rather than a rival. */}
         {!piecesLoading && pieces.length > 0 && (
-          <label
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%', marginTop: '0.85rem', padding: '0.7rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--clay)', background: 'white', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer' }}
-          >
-            <Search size={15} /> Find these on the shelf
-            <input
-              type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (!f) return;
-                const code = openBooking.booking_code;
-                setOpenBooking(null);
-                runSweep(f, code);
-                e.target.value = '';
-              }}
-            />
-          </label>
+          <div style={{ marginTop: '0.85rem' }}>
+            {!lastSeen && (
+              <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--charcoal)', marginBottom: '0.5rem' }}>
+                Where are these pieces?
+              </p>
+            )}
+            <label
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', width: '100%', padding: '0.7rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--clay)', background: 'white', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer' }}
+            >
+              <Search size={15} /> {lastSeen ? 'Not there? Photograph the shelf' : 'Photograph the shelf to find them'}
+              <input
+                type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  const code = openBooking.booking_code;
+                  setOpenBooking(null);
+                  runSweep(f, code);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+          </div>
         )}
 
         {/* Daisy: "print a label at that point of packing... for
@@ -1009,12 +998,6 @@ export default function PackingPage() {
           >
             {showPastSweeps ? 'Hide earlier shelf photos' : 'Earlier shelf photos'}
           </button>
-          <button
-            onClick={() => setShowTablePhotos((v) => !v)}
-            style={{ padding: '0.4rem 0', border: 'none', background: 'none', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer', minHeight: 44 }}
-          >
-            {showTablePhotos ? 'Hide table photos' : 'Table photos'}
-          </button>
         </div>
 
         {showPastSweeps && (
@@ -1068,26 +1051,6 @@ export default function PackingPage() {
                   {sweeping ? 'Checking…' : 'Try this photo again'}
                 </button>
               </div>
-            ))}
-          </div>
-        )}
-
-        {showTablePhotos && (
-          <div style={{ marginTop: '0.7rem', display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
-            {queue.filter((q) => q.has_photo).length === 0 && (
-              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)' }}>None of the waiting bookings have a table photo.</p>
-            )}
-            {queue.filter((q) => q.has_photo).map((q) => (
-              <button
-                key={q.booking_code}
-                onClick={() => openIt(q)}
-                style={{ textAlign: 'left', border: '1px solid #eee', borderRadius: 'var(--radius-md)', background: 'white', padding: '0.5rem', cursor: 'pointer' }}
-              >
-                <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, marginBottom: '0.3rem' }}>
-                  {q.customer_name} · {q.piece_count} piece{q.piece_count === 1 ? '' : 's'}
-                </p>
-                <TablePhoto bookingCode={q.booking_code} />
-              </button>
             ))}
           </div>
         )}
