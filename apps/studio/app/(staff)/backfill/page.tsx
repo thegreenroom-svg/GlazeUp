@@ -130,7 +130,9 @@ export default function BackfillPage() {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/backfill/run`, { method: 'POST' });
         const d = await res.json();
         await loadProgress();
-        if (!res.ok || !d.remaining) break;
+        // Stop on a run that is matching nothing. Continuing would just
+        // spend the remaining AI calls to reach the same answer.
+        if (!res.ok || !d.remaining || d.stalled) break;
       }
     } finally { setRunning(false); loadProgress(); }
   };

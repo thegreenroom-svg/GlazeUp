@@ -7718,25 +7718,46 @@ const BACKFILL_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'ba
 
 // Same instructions as identify-in-photo, plus the chalk board, because
 // nothing selected a booking first.
-const BACKFILL_PROMPT = `This is a photo of a table in a pottery painting studio, taken at the end of a customer's session.
+// [6 Sep] REWRITTEN AFTER 39 STRAIGHT FAILURES.
+//
+// The first version returned "chalk board not readable" on every single
+// photo while identifying the pottery perfectly. Two things in my own
+// prompt caused that, and both were mine, not the model's:
+//
+//   - the board was asked for LAST, after a long paragraph listing
+//     things to ignore -- which included chalk boards, because they are
+//     not pottery. Telling it to ignore the board and then read it, in
+//     that order, is a contradiction it resolved the obvious way.
+//   - tag_name was optional in the schema and the prompt said "omit the
+//     field entirely rather than offer a maybe". Omitting always is the
+//     obedient reading of that.
+//
+// So: the board comes first and is the job, the exclusion list no
+// longer mentions it, and the field is REQUIRED with an explicit empty
+// string for genuinely unreadable. Required fields get answered.
+const BACKFILL_PROMPT = `This is a photo of one table in a pottery painting studio, taken at the end of a customer's session.
 
-Identify every PAINTED POTTERY PIECE belonging to the customer -- the items they have painted and will be taking home after firing.
+FIRST, AND MOST IMPORTANT: READ THE CHALK TAG.
+Somewhere on this table is a small black chalkboard tag with white chalk handwriting on it. It carries the paint date and time along the top, the CUSTOMER'S NAME in the middle in the largest writing, a collection date at the bottom left, and a table number and piece count like "x3" at the bottom right.
 
-Include: mugs, bowls, plates, figurines, vases, jugs, money boxes, ornaments and similar ceramic pieces that have been painted.
+Read the customer's name and return it as tag_name. The name is the single most important thing in this photo -- without it the pottery cannot be given back to the right person.
 
-Do NOT include: paint pots, brushes, water pots, palettes, paint-mixing dishes or trays holding wet blobs or pools of paint, colour charts, menus, price cards, chalk boards, drinks, cans, glasses, phones, bags, or anything belonging to the studio rather than the customer.
+The tags are wiped and reused, so faint ghost writing from previous bookings often shows underneath the current writing. Report only the clearest, most recent name. Handwriting varies and some names are unusual: give your best faithful reading of the letters you can see rather than holding out for certainty. Only if there is genuinely no legible tag in the photo at all, return tag_name as an empty string.
 
-ONE ENTRY PER PHYSICAL OBJECT. Never split one object across two entries: a mug and its handle, a lid and its pot, a figurine and its base are ONE piece each. Never merge two objects into one entry: two mugs side by side, even identical ones, are TWO entries.
+SECOND: LIST THE POTTERY.
+Identify every painted pottery piece belonging to this customer -- what they will take home after firing. Mugs, bowls, plates, figurines, vases, jugs, money boxes, ornaments and similar.
 
-BE COMPLETE. Work across the whole photo including the edges and anything partly hidden. A piece missed here cannot be found on the shelf later.
+Do not list studio equipment as pieces: paint pots, brushes, water pots, palettes, paint-mixing trays, colour charts, menus, price cards, drinks, glasses, phones or bags.
 
-DESCRIPTIONS: one short line each -- colour, then form, then what distinguishes it. If another piece in THIS SAME photo shares the colour and form, add a detail that genuinely separates them. Good: "white mug, black panda face". Never describe the table or the background.
+ONE ENTRY PER PHYSICAL OBJECT. A lid and its pot are one piece. Two identical mugs side by side are two pieces.
 
-Also give each piece's bounding box.
+BE COMPLETE, including the edges of the photo and anything partly hidden behind another piece. A piece missed here cannot be found on the shelf later.
 
-THIS PHOTO IS OF A SCREEN, so colours carry a warm cast and there is some moire banding. Judge colour against the pink paper placemat rather than at face value, and prefer form and pattern over fine colour distinctions when describing.
+DESCRIPTIONS: one short line each -- colour, then form, then what distinguishes it. If two pieces share colour and form, add a detail that separates them. Good: "white mug, black panda face". Never describe the table or the background.
 
-ALSO READ THE CHALKBOARD. These tables carry a small black chalk tag. Read the customer's NAME from it -- usually the largest handwriting, in the middle. Tags are wiped and reused, so faint ghost writing from earlier bookings often shows underneath: report only the clearest, most recent name. Never guess -- a wrong name attaches someone's pottery to the wrong person, so omit the field entirely rather than offer a maybe.`;
+Give a bounding box for each piece.
+
+This photo is of a screen, so colours carry a warm cast and there is some moire banding. Judge colour against the pink paper placemat and prefer form and pattern over fine colour distinctions.`;
 
 const BACKFILL_SCHEMA = {
   type: 'object',
@@ -7753,9 +7774,11 @@ const BACKFILL_SCHEMA = {
         required: ['description', 'piece_type'],
       },
     },
-    tag_name: { type: 'string', description: 'Customer name from the chalk tag, omitted if not confidently readable' },
+    tag_name: { type: 'string', description: 'Customer name read from the chalk tag. Empty string ONLY if no legible tag is visible at all.' },
   },
-  required: ['pieces'],
+  // Required, deliberately. Optional plus "omit rather than guess" got
+  // it omitted every single time across 39 photos.
+  required: ['pieces', 'tag_name'],
 };
 
 // Grouping prompt. Deliberately blunt about the failure mode, because
@@ -7899,8 +7922,18 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
       const DEADLINE = Date.now() + 50000;
       let done = 0, matched = 0, unmatched = 0, failed = 0;
 
+      // [6 Sep] CIRCUIT BREAKER. The first run read the pottery
+      // perfectly and the chalk tag never once, so it would happily
+      // have spent 138 AI calls producing nothing while reporting
+      // progress. If the opening run cannot match anything at all, that
+      // is a fault in the prompt, not in the photos -- so stop and say
+      // so rather than working through the money to find out.
+      const BREAK_AFTER = 8;
+
       for (const row of pending || []) {
         if (Date.now() > DEADLINE) break;
+        // Nothing has ever matched and we have tried enough to know.
+        if (matched === 0 && done >= BREAK_AFTER) break;
         // Claim it first. Everything below costs money; this line is
         // what stops it being spent twice on the same photo.
         const { data: claimed } = await supabase
@@ -7998,7 +8031,13 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
         .from('backfill_photos').select('id', { count: 'exact', head: true })
         .eq('studio_id', STUDIO_ID).in('status', ['pending', 'processing']);
 
-      res.json({ processed: done, matched, unmatched, failed, remaining: remaining || 0, total: files.length });
+      res.json({
+        processed: done, matched, unmatched, failed,
+        remaining: remaining || 0, total: files.length,
+        // Said out loud so the screen can stop rather than loop through
+        // the whole backlog getting nothing.
+        stalled: matched === 0 && done >= BREAK_AFTER,
+      });
     } catch (err) {
       logger.error(`[backfill] ${err.message}`);
       res.status(500).json({ error: err.message });
