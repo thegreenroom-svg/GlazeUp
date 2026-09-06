@@ -5907,7 +5907,26 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
         }
       }
 
-      const CANDIDATE_CAP = 80;
+      // [6 Sep] Daisy: "search all? less steps."
+      //
+      // She is right and the batch picker was the wrong answer to the
+      // wrong problem. I added it this morning because 80 candidates
+      // sorted oldest-first meant a sweep only ever looked at the
+      // earliest batch -- but the fix for "it searches the wrong 80"
+      // is not to make somebody choose which 80. It is to stop capping
+      // at a number that no longer means anything.
+      //
+      // 80 was picked when the studio held about thirty pieces, so it
+      // never cut. The pool is 369 now. These are short text
+      // descriptions -- roughly ten words each -- so the whole pool is
+      // a few thousand tokens, comfortably within one prompt. The cap
+      // that matters is the image one below, which is a real cost and
+      // stays at 15.
+      //
+      // So: search everything, and lose the tap. Standing at a shelf
+      // with a box in both hands is the worst possible moment to ask
+      // someone a question the system can answer itself.
+      const CANDIDATE_CAP = 500;
       const dueKey = (p) => collectionDateByCode.get(p.booking_id) || '9999-12-31';
       eligible.sort((a, b) => {
         const da = dueKey(a), db = dueKey(b);
