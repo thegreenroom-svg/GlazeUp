@@ -30,6 +30,29 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
   }
 }
 
+// Daisy: "every time I commit your pushes on Render and refresh the app,
+// the login always seems to take forever and then times out just on the
+// first time, and then it's fine after that."
+//
+// That is a cold start, not a bug in the login. The API sleeps when idle
+// and every deploy restarts it, so the first request has to wait for the
+// server to boot -- routinely longer than the 20s ceiling above, which
+// is why it failed once and then never again.
+//
+// Raising the ceiling for everything would be the wrong fix: 20s is
+// right for a genuinely stalled connection, and a stuck PIN pad is worse
+// than a slow one. So the FIRST call of a session gets one retry with a
+// long window, which is exactly the shape of the problem -- one slow
+// boot, then a warm server.
+async function fetchWakingServer(url: string, options: RequestInit = {}, onWaking?: () => void): Promise<Response> {
+  try {
+    return await fetchWithTimeout(url, options, 12000);
+  } catch {
+    onWaking?.();
+    return await fetchWithTimeout(url, options, 75000);
+  }
+}
+
 interface Shift {
   id: string | null;
   name: string | null;
@@ -135,6 +158,10 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
   const [sharedPinUsed, setSharedPinUsed] = useState('');
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [teamLoading, setTeamLoading] = useState(false);
+  // Shown only once a first attempt has actually timed out, so it never
+  // appears on a warm server -- telling someone the server is waking up
+  // when it is already awake would just be noise.
+  const [waking, setWaking] = useState(false);
   const [personalizing, setPersonalizing] = useState<TeamMember | null>(null);
   const [newPin1, setNewPin1] = useState('');
   const [newPin2, setNewPin2] = useState('');
@@ -172,7 +199,7 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
     if (team.length > 0 || teamLoading) return;
     setTeamLoading(true);
     try {
-      const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/team`);
+      const res = await fetchWakingServer(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/team`, {}, () => setWaking(true));
       const data = res.ok ? await res.json() : [];
       setTeam((Array.isArray(data) ? data : []).filter((m: TeamMember) => m.active));
     } catch { /* leave team empty, pickers will just show nothing to choose */ }
@@ -198,11 +225,11 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pin/verify`, {
+      const res = await fetchWakingServer(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pin/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pin: value }),
-      });
+      }, () => setWaking(true));
       if (!res.ok) {
         setError('PIN not recognised');
         setPin('');
@@ -442,7 +469,11 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
       return lockScreenShell(
         <div style={{ textAlign: 'center', maxWidth: 300, width: '100%' }}>
           <p style={{ color: 'white', fontSize: 'var(--text-md)', fontWeight: 600, marginBottom: '1rem' }}>Which one are you?</p>
-          {teamLoading && <p style={{ color: 'white', opacity: 0.7, fontSize: 'var(--text-base)' }}>Loading team...</p>}
+          {teamLoading && (
+                    <p style={{ color: 'white', opacity: 0.7, fontSize: 'var(--text-base)' }}>
+                      {waking ? 'Waking the server up — this takes a moment after an update.' : 'Loading team...'}
+                    </p>
+                  )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {team.map((m) => (
               <button
@@ -590,7 +621,11 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
                 {adminResetStage === 'pick-target' && (
                   <>
                     <p style={{ color: 'white', fontWeight: 600, marginBottom: '1rem' }}>Reset whose PIN?</p>
-                    {teamLoading && <p style={{ color: 'white', opacity: 0.7, fontSize: 'var(--text-base)' }}>Loading team...</p>}
+                    {teamLoading && (
+                    <p style={{ color: 'white', opacity: 0.7, fontSize: 'var(--text-base)' }}>
+                      {waking ? 'Waking the server up — this takes a moment after an update.' : 'Loading team...'}
+                    </p>
+                  )}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                       {team.map((m) => (
                         <button

@@ -46,6 +46,13 @@ interface Sweep {
 export default function ShelvesPage() {
   const router = useRouter();
   const [sweeps, setSweeps] = useState<Sweep[] | null>(null);
+  // Blank photos are hidden by default -- Daisy: "remove any on wall
+  // without any matches" -- but NOT thrown away, because nothing
+  // re-matches them in the background. A photo that found nothing
+  // stays blank until someone re-runs it, so hiding it with no way
+  // back would strand it permanently.
+  const [showBlanks, setShowBlanks] = useState(false);
+  const [retrying, setRetrying] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweeps`)
@@ -55,11 +62,7 @@ export default function ShelvesPage() {
       // spotting pieces -- it cannot answer the question the page
       // exists to answer. Filtered on arrival so the empty state stays
       // truthful rather than the page rendering a run of blanks.
-      .then((d) => setSweeps(
-        ((d?.sweeps || []) as Sweep[]).filter(
-          (sw) => (sw.matched_details || []).some((m) => m.box)
-        )
-      ))
+      .then((d) => setSweeps((d?.sweeps || []) as Sweep[]))
       .catch(() => setSweeps([]));
   }, []);
 
@@ -79,8 +82,23 @@ export default function ShelvesPage() {
         />
       )}
 
+      {(() => {
+        const blanks = (sweeps || []).filter((sw) => !(sw.matched_details || []).some((m) => m.box)).length;
+        if (!blanks) return null;
+        return (
+          <button
+            onClick={() => setShowBlanks((v) => !v)}
+            style={{ padding: '0.4rem 0', marginBottom: '0.9rem', border: 'none', background: 'none', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer', minHeight: 44 }}
+          >
+            {showBlanks
+              ? 'Hide the ones that found nothing'
+              : `${blanks} photo${blanks === 1 ? '' : 's'} found nothing — show ${blanks === 1 ? 'it' : 'them'}`}
+          </button>
+        );
+      })()}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.6rem' }}>
-        {sweeps?.map((sw) => {
+        {sweeps?.filter((sw) => showBlanks || (sw.matched_details || []).some((m) => m.box)).map((sw) => {
           const details = (sw.matched_details || []).filter((d) => d.box);
           return (
             <div key={sw.id} style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.7rem' }}>
@@ -149,6 +167,34 @@ export default function ShelvesPage() {
                   ))}
                 </div>
               ) : null}
+
+              {/* Re-runs the AI against this stored photo. Nothing
+                  re-matches in the background, so a photo that found
+                  nothing needs this to ever find anything -- and pieces
+                  photographed AFTER this shelf was taken only become
+                  candidates on a re-run. */}
+              <button
+                onClick={async () => {
+                  setRetrying(sw.id);
+                  try {
+                    const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweep`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ retry_sweep_id: sw.id }),
+                    });
+                    if (r.ok) {
+                      const fresh = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweeps`);
+                      const d = fresh.ok ? await fresh.json() : null;
+                      if (d?.sweeps) setSweeps(d.sweeps as Sweep[]);
+                    }
+                  } catch { /* leave the wall as it was */ }
+                  finally { setRetrying(null); }
+                }}
+                disabled={retrying === sw.id}
+                style={{ marginTop: '0.5rem', padding: '0.5rem 0.8rem', minHeight: 44, borderRadius: 'var(--radius-md)', border: '1px solid var(--clay)', background: 'white', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: 'pointer' }}
+              >
+                {retrying === sw.id ? 'Checking again…' : 'Check this photo again'}
+              </button>
             </div>
           );
         })}
