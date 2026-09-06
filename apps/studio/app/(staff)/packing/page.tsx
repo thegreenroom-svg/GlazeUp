@@ -91,6 +91,12 @@ export default function PackingPage() {
   // Where this booking's pieces were last matched on a shelf -- the
   // "walk here first" half of the hybrid.
   const [lastSeen, setLastSeen] = useState<{ id: string; photo_url: string; created_at: string } | null>(null);
+
+  // The piece as it was last seen on a shelf, cropped out of that shelf
+  // photo. Null when no sweep has found it yet, which is when the table
+  // photo has to do instead.
+  const shelfCrop = (p: Piece): React.CSSProperties | null =>
+    lastSeen?.photo_url && p.last_seen_box ? cropStyle(lastSeen.photo_url, p.last_seen_box) : null;
   const [showLastSeen, setShowLastSeen] = useState(false);
   const [boxNumber, setBoxNumber] = useState('');
   const [piecesLoading, setPiecesLoading] = useState(false);
@@ -473,8 +479,15 @@ export default function PackingPage() {
               shelf. The full table photo sits underneath for context, with
               this piece ringed, because sometimes the only way to identify
               a plate is seeing what it was sitting next to. */}
-          {p.reference_photo_url && p.photo_box && (
-            <div style={{ marginTop: '0.75rem', width: '100%', aspectRatio: '1', borderRadius: 'var(--radius-md)', border: `3px solid ${colour}`, ...cropStyle(p.reference_photo_url, p.photo_box) }} />
+          {/* [6 Sep] Daisy: the shelf crop "should be with booking now...
+              eventually it would follow into packing and handover."
+              So it prefers the piece as last seen ON THE SHELF -- fired,
+              glazed, in the state the person packing it is holding --
+              over the table photo, which shows it chalky and unfired.
+              The table shot is still the fallback for anything a sweep
+              has not found yet. */}
+          {(shelfCrop(p) || (p.reference_photo_url && p.photo_box)) && (
+            <div style={{ marginTop: '0.75rem', width: '100%', aspectRatio: '1', borderRadius: 'var(--radius-md)', border: `3px solid ${colour}`, ...(shelfCrop(p) || cropStyle(p.reference_photo_url as string, p.photo_box as PieceBox)) }} />
           )}
           {p.reference_photo_url && (
             <div style={{ position: 'relative', marginTop: '0.75rem' }}>
@@ -682,12 +695,13 @@ export default function PackingPage() {
                 onClick={() => setOpenPiece({ piece: p, index: i })}
                 style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', textAlign: 'left', flex: 1, minWidth: 0, border: 'none', background: 'none', padding: 0, cursor: 'pointer' }}
               >
-                {p.reference_photo_url ? (
+                {shelfCrop(p) || p.reference_photo_url ? (
                   <div style={{
                     width: 60, height: 60, borderRadius: 'var(--radius-sm)', flexShrink: 0,
                     border: `2px solid ${PIECE_COLOURS[i % 6]}`,
-                    ...(p.photo_box ? cropStyle(p.reference_photo_url, p.photo_box)
-                      : { backgroundImage: `url(${p.reference_photo_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }),
+                    ...(shelfCrop(p)
+                      || (p.photo_box ? cropStyle(p.reference_photo_url as string, p.photo_box)
+                        : { backgroundImage: `url(${p.reference_photo_url})`, backgroundSize: 'cover', backgroundPosition: 'center' })),
                   }} />
                 ) : (
                   <div style={{ width: 60, height: 60, borderRadius: 'var(--radius-sm)', flexShrink: 0, backgroundColor: '#f7f7f7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--text-xs)', color: '#bbb' }}>no photo</div>

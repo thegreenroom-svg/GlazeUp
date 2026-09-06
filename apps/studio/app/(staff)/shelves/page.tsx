@@ -336,7 +336,23 @@ export default function ShelvesPage() {
                                 cropped to this piece's own box, so five
                                 rows are five different pictures rather
                                 than the same table five times. */}
-                            <PieceThumb url={d.reference_photo_url} box={d.reference_box} size={44} ring={PIECE_COLOURS[i % 6]} />
+                            {/* [6 Sep] Daisy: "the cropped image in square should be
+                                with booking now... eventually it would
+                                follow into packing and handover."
+                                So the crop comes from THIS shelf photo,
+                                not the table photo. It is the piece as
+                                it is now -- fired, glazed, sitting where
+                                someone has to find it -- which is what a
+                                packer and a customer are both looking
+                                at. The table shot shows it chalky and
+                                unfired and is only the fallback for a
+                                piece with no box on this shelf. */}
+                            <PieceThumb
+                              url={d.box ? sw.photo_url : d.reference_photo_url}
+                              box={d.box || d.reference_box}
+                              size={44}
+                              ring={PIECE_COLOURS[i % 6]}
+                            />
                             <span style={{ flexShrink: 0, width: 17, height: 17, borderRadius: 'var(--radius-full)', backgroundColor: PIECE_COLOURS[i % 6], color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2 }}>
                               {i + 1}
                             </span>
