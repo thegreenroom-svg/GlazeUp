@@ -7835,7 +7835,7 @@ const MULTI_TABLE_SCHEMA = {
   required: ['tables'],
 };
 
-export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, sharp, upload) {
+export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, sharp, upload, logGeminiUsage) {
   // [6 Sep] BACKFILL, RUN SERVER-SIDE.
   //
   // Daisy: "I don't wanna use a zip file. I want you to do it on the
@@ -7963,7 +7963,23 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
           // the raw text is kept when a photo does not match: "not
           // readable" and "the model said something I did not parse"
           // are completely different faults and were indistinguishable.
-          const rawText = extractGeminiText(aiRes) || '';
+          // [6 Sep] THE ACTUAL BUG, after two prompt rewrites chasing a
+          // fault that was never in the prompt. callGeminiWithFallback
+          // returns the AXIOS RESPONSE, and every other Gemini call in
+          // this file unwraps it -- extractGeminiText(aiRes.data). I
+          // wrote extractGeminiText(aiRes). It quietly returned
+          // undefined, the parse produced {}, and the code recorded
+          // "chalk board not readable" on all 39 photos. The board was
+          // legible the whole time; the reply was never being read.
+          //
+          // The misleading part was my own error message: a parse that
+          // returned nothing and a genuinely unreadable tag were
+          // recorded identically, so the log pointed at the tag. Keeping
+          // the raw text is what found it in one run.
+          const usage = extractGeminiUsage(aiRes.data);
+          if (usage) await logGeminiUsage(supabase, STUDIO_ID, 'backfill-identify', usage, 'gemini-3.5-flash-lite');
+
+          const rawText = extractGeminiText(aiRes.data) || '';
           let parsed = {};
           try { parsed = JSON.parse((rawText.match(/\{[\s\S]*\}/) || [])[0] || '{}'); } catch { parsed = {}; }
           const pieces = (parsed.pieces || []).filter((p) => p && p.description);
@@ -8089,7 +8105,9 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
       }, 'gemini-3.5-flash-lite', 'gemini-3.7-flash');
 
       let parsed = {};
-      try { parsed = JSON.parse((extractGeminiText(aiRes).match(/\{[\s\S]*\}/) || [])[0] || '{}'); } catch { parsed = {}; }
+      // Same unwrap as everywhere else: the helper hands back the axios
+      // response, not its body.
+      try { parsed = JSON.parse((extractGeminiText(aiRes.data) || '').match(/\{[\s\S]*\}/)?.[0] || '{}'); } catch { parsed = {}; }
 
       // Numbering restarts per table, not across the photo, because the
       // numbers are read next to one customer's pieces and "3 of 4"
