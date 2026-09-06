@@ -5870,6 +5870,24 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
       // actually on the shelf being photographed. Sorting by that makes
       // the cap cut the right end. Undated pieces sort last rather than
       // first -- an unknown date is not an urgent one.
+      // [6 Sep] A SHELF IS A KILN BATCH, SO SCOPE TO ONE.
+      // Sorting earliest-due-first fixed the unordered cap, but it
+      // exposed the real shape of the problem: with 352 pieces across
+      // three collection dates, the 80 nearest are ALL one batch --
+      // and if that batch is already collected, every sweep searches
+      // pottery that left the building and finds nothing on a shelf
+      // that is actually full.
+      //
+      // Scoping to a collection date is what the pool always wanted:
+      // one batch out of the kiln, one shelf, one search. Optional,
+      // so an unscoped sweep still behaves as before.
+      const onlyCollectionDate = req.body?.collection_date || null;
+      if (onlyCollectionDate) {
+        for (let i = eligible.length - 1; i >= 0; i--) {
+          if (collectionDateByCode.get(eligible[i].booking_id) !== onlyCollectionDate) eligible.splice(i, 1);
+        }
+      }
+
       const CANDIDATE_CAP = 80;
       const dueKey = (p) => collectionDateByCode.get(p.booking_id) || '9999-12-31';
       eligible.sort((a, b) => {
@@ -6141,6 +6159,7 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
 
       res.json({
         candidates: pieces.length,
+        collection_date_searched: onlyCollectionDate,
         waiting_total: eligible.length,
         not_searched: notSearched,
         box_number_read: (parsed.box_number || '').toString().trim() || null,
@@ -7428,6 +7447,41 @@ export function registerHomeCountsRoute(app, supabase, STUDIO_ID, logger) {
 // ============================================================================
 
 export function registerShelfSweepHistoryRoute(app, supabase, STUDIO_ID, logger) {
+  // [6 Sep] The batches waiting to come out of the kiln, so the sweep
+  // screen can ask WHICH shelf before searching rather than assuming
+  // there is only one. Counts come from the same pool the sweep uses,
+  // so what this offers and what that searches cannot drift apart.
+  app.get('/api/spec/shelf/batches', async (req, res) => {
+    try {
+      const { data: pieces } = await supabase
+        .from('pottery_pieces')
+        .select('booking_id')
+        .eq('studio_id', STUDIO_ID)
+        .neq('archived', true)
+        .neq('status', 'collected');
+      const codes = Array.from(new Set((pieces || []).map((p) => p.booking_id).filter(Boolean)));
+      if (!codes.length) return res.json({ batches: [] });
+      const { data: rows } = await supabase
+        .from('bookings')
+        .select('booking_code, collection_date')
+        .eq('studio_id', STUDIO_ID)
+        .in('booking_code', codes);
+      const dateByCode = new Map((rows || []).map((b) => [b.booking_code, b.collection_date]));
+      const counts = new Map();
+      for (const p of pieces || []) {
+        const d = dateByCode.get(p.booking_id) || null;
+        counts.set(d, (counts.get(d) || 0) + 1);
+      }
+      const batches = Array.from(counts.entries())
+        .map(([collection_date, pieces_waiting]) => ({ collection_date, pieces_waiting }))
+        .sort((a, b) => (a.collection_date || '9999').localeCompare(b.collection_date || '9999'));
+      res.json({ batches });
+    } catch (err) {
+      logger.error(`[shelf-batches] ${err.message}`);
+      res.status(500).json({ error: 'Could not load the batches' });
+    }
+  });
+
   app.get('/api/spec/shelf/sweeps', async (req, res) => {
     try {
       const { data, error } = await supabase

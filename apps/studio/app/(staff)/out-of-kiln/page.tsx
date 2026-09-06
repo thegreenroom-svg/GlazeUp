@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/PageShell';
 import { Camera, Loader, Check, Boxes } from 'lucide-react';
@@ -36,6 +36,27 @@ export default function OutOfKilnPage() {
   const [boxRead, setBoxRead] = useState<string | null>(null);
   const [boxTyped, setBoxTyped] = useState('');
   const [candidates, setCandidates] = useState(0);
+  // Which kiln batch is on this shelf. Without it every sweep searches
+  // the whole studio, and with 350 pieces across three collection dates
+  // that means searching the oldest batch and finding nothing.
+  const [batches, setBatches] = useState<{ collection_date: string | null; pieces_waiting: number }[]>([]);
+  const [batch, setBatch] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/batches`)
+      .then((r) => r.json())
+      .then((d) => {
+        const list = (d?.batches || []) as { collection_date: string | null; pieces_waiting: number }[];
+        setBatches(list);
+        // Default to the first batch not yet collected rather than the
+        // oldest outright -- a date that has already passed is usually
+        // pottery that has gone home, not pottery on the shelf.
+        const today = new Date().toISOString().slice(0, 10);
+        const next = list.find((b) => b.collection_date && b.collection_date >= today) || list[0];
+        if (next) setBatch(next.collection_date);
+      })
+      .catch(() => {});
+  }, []);
 
   const send = async (file: File) => {
     setBusy(true);
@@ -46,6 +67,7 @@ export default function OutOfKilnPage() {
       const fd = new FormData();
       fd.append('photo', file);
       if (boxTyped.trim()) fd.append('box_number', boxTyped.trim());
+      if (batch) fd.append('collection_date', batch);
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweep`, {
         method: 'POST',
         body: fd,
@@ -66,6 +88,39 @@ export default function OutOfKilnPage() {
 
   return (
     <PageShell title="Out of the kiln" subtitle="Box it up, photograph it, carry on">
+      {batches.length > 1 && (
+        <div style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.9rem', marginBottom: '1rem' }}>
+          <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--charcoal)', margin: '0 0 0.5rem' }}>
+            Which batch is this shelf?
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+            {batches.map((b) => {
+              const on = b.collection_date === batch;
+              return (
+                <button
+                  key={b.collection_date || 'none'}
+                  onClick={() => setBatch(b.collection_date)}
+                  style={{
+                    padding: '0.55rem 0.8rem', minHeight: 44, cursor: 'pointer',
+                    borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-sm)', fontWeight: on ? 700 : 500,
+                    border: on ? '2px solid var(--clay)' : '1px solid #ece5db',
+                    background: on ? 'var(--sand, #faf6f0)' : 'white', color: 'var(--charcoal)',
+                  }}
+                >
+                  {b.collection_date
+                    ? new Date(b.collection_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+                    : 'No date'}
+                  <span style={{ fontWeight: 400, color: '#777' }}> · {b.pieces_waiting}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p style={{ fontSize: 'var(--text-xs)', color: '#777', margin: '0.5rem 0 0' }}>
+            Only this batch is searched, so a shelf of one batch is not checked against another.
+          </p>
+        </div>
+      )}
+
       <div style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.9rem', marginBottom: '1rem' }}>
         <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--charcoal)', margin: '0 0 0.5rem' }}>
           Packing the box
