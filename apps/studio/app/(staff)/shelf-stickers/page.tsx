@@ -30,111 +30,95 @@ export const dynamic = 'force-dynamic';
 interface Batch { collection_date: string | null; pieces_waiting: number }
 
 export default function ShelfStickersPage() {
-  const [batches, setBatches] = useState<Batch[]>([]);
-  const [qrs, setQrs] = useState<Record<string, string>>({});
-  // Copies per date, because a batch spreads over however many shelves
-  // it needs and every edge wants one.
-  const [copies, setCopies] = useState<Record<string, number>>({});
+  // [6 Sep] Daisy: "need to just have a date picker here. No other
+  // collection dates. Not needed."
+  //
+  // Listing the batches that already exist was backwards, and the
+  // sticker's own timing is why. It goes on the shelf BEFORE glazing,
+  // often before a single booking on that date has been given a
+  // collection date at all -- so the date you want to print is
+  // frequently one the database has never heard of. Offering only
+  // known dates meant the label you actually needed was the one you
+  // could not print.
+  //
+  // A date and a number of copies. That is the whole screen.
+  const [date, setDate] = useState('');
+  const [copies, setCopies] = useState(2);
+  const [qr, setQr] = useState('');
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/batches`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then(async (d) => {
-        const list: Batch[] = (d?.batches || []).filter((b: Batch) => b.collection_date);
-        setBatches(list);
-        const made: Record<string, string> = {};
-        for (const b of list) {
-          if (!b.collection_date) continue;
-          // Encodes the app URL, not a bare date: scanning it with any
-          // phone camera should land on the manifest, not show a string
-          // of digits that means nothing to whoever picked it up.
-          made[b.collection_date] = await QRCode.toDataURL(
-            `${window.location.origin}/batch/${b.collection_date}`,
-            { margin: 1, width: 420, errorCorrectionLevel: 'M' }
-          );
-        }
-        setQrs(made);
-      })
-      .catch(() => {});
-  }, []);
+    if (!date) { setQr(''); return; }
+    // Encodes the app URL, so any phone camera lands on the batch --
+    // where scanning it moves the whole lot off the shelves and into
+    // the kiln -- rather than showing a string of digits.
+    QRCode.toDataURL(`${window.location.origin}/batch/${date}`, { margin: 1, width: 420, errorCorrectionLevel: 'M' })
+      .then(setQr)
+      .catch(() => setQr(''));
+  }, [date]);
 
   const pretty = (d: string) =>
     new Date(d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return (
-    <PageShell title="Shelf stickers" subtitle="One per collection date, for the greenware shelves">
-      <p style={{ fontSize: 'var(--text-sm)', color: '#777', margin: '0 0 0.8rem', lineHeight: 1.45 }}>
-        One label per collection date. Print as many as you have shelf edges to stick them on —
-        they are all the same label. Scanning any of them shows everything due that day and
-        flags anything still missing.
-      </p>
+    <PageShell title="Shelf stickers" subtitle="One collection date, as many labels as you need">
+      <div style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.9rem', marginBottom: '1rem' }}>
+        <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 700, marginBottom: '0.4rem' }}>
+          Collection date
+        </label>
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          style={{ width: '100%', minHeight: 48, padding: '0.6rem 0.7rem', borderRadius: 'var(--radius-md)', border: '1px solid #ece5db', fontSize: 'var(--text-base)', background: 'white', color: 'var(--charcoal)' }}
+        />
 
-      {/* [6 Sep] Daisy: "what's this makes no sense."
-          The date and the copy buttons were fighting for one row, so
-          "19 Sep · 206 pieces" wrapped across three lines behind a wall
-          of numbers and the batch -- the actual subject -- became the
-          least readable thing on screen. Date on its own line, copies
-          underneath. */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
-        {batches.map((b) => b.collection_date && (
-          <div key={b.collection_date} style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.7rem 0.8rem' }}>
-            <p style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--charcoal)' }}>
-              {new Date(b.collection_date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long' })}
-            </p>
-            <p style={{ margin: '0.1rem 0 0.5rem', fontSize: 'var(--text-xs)', color: '#777' }}>
-              {b.pieces_waiting} piece{b.pieces_waiting === 1 ? '' : 's'} waiting
-            </p>
-            <div style={{ display: 'flex', gap: '0.35rem' }}>
-              {[0, 1, 2, 3, 4, 6].map((n) => {
-                const on = (copies[b.collection_date as string] ?? 0) === n;
-                return (
-                  <button
-                    key={n}
-                    onClick={() => setCopies((c) => ({ ...c, [b.collection_date as string]: n }))}
-                    style={{
-                      flex: 1, minHeight: 40, borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                      fontSize: 'var(--text-sm)', fontWeight: 700,
-                      border: on ? '2px solid var(--clay)' : '1px solid #ece5db',
-                      background: on ? 'var(--clay)' : 'white',
-                      color: on ? 'white' : 'var(--charcoal)',
-                    }}
-                  >
-                    {n}
-                  </button>
-                );
-              })}
+        <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, margin: '0.9rem 0 0.4rem' }}>How many labels</p>
+        <div style={{ display: 'flex', gap: '0.35rem' }}>
+          {[1, 2, 3, 4, 6, 8].map((n) => (
+            <button
+              key={n}
+              onClick={() => setCopies(n)}
+              style={{
+                flex: 1, minHeight: 44, borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                fontSize: 'var(--text-base)', fontWeight: 700,
+                border: copies === n ? '2px solid var(--clay)' : '1px solid #ece5db',
+                background: copies === n ? 'var(--clay)' : 'white',
+                color: copies === n ? 'white' : 'var(--charcoal)',
+              }}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+        <p style={{ fontSize: 'var(--text-xs)', color: '#777', margin: '0.5rem 0 0', lineHeight: 1.45 }}>
+          One per shelf edge holding this batch. They are all the same label — the date is what matters,
+          not which shelf, because the shelves get broken up when the kiln is loaded.
+        </p>
+      </div>
+
+      {date && (
+        <button
+          onClick={() => window.print()}
+          style={{ width: '100%', minHeight: 48, marginBottom: '1rem', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+        >
+          <Printer size={18} /> Print {copies} label{copies === 1 ? '' : 's'}
+        </button>
+      )}
+
+      <div className="stickers">
+        {date && qr && Array.from({ length: copies }, (_, n) => (
+          <div key={n} className="sticker">
+            <img className="qr" src={qr} alt="" />
+            <div className="txt">
+              <p className="kicker">COLLECTION</p>
+              {/* The date is the label. Most of the time nobody scans
+                  anything -- they want to know which shelf is which
+                  from across the studio. */}
+              <p className="big">{new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
+              <p className="sub">{pretty(date)}</p>
             </div>
           </div>
         ))}
-      </div>
-
-      <button
-        onClick={() => window.print()}
-        style={{ width: '100%', minHeight: 48, marginBottom: '1rem', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-      >
-        <Printer size={18} /> Print these
-      </button>
-
-      <div className="stickers">
-        {batches.flatMap((b) =>
-          Array.from({ length: copies[b.collection_date as string] ?? 0 }, (_, n) => {
-            const d = b.collection_date as string;
-            return (
-              <div key={`${d}-${n}`} className="sticker">
-                {qrs[d] && <img className="qr" src={qrs[d]} alt="" />}
-                <div className="txt">
-                  <p className="kicker">COLLECTION</p>
-                  {/* The date is the label. Most of the time nobody scans
-                      anything -- they want to know which shelf is which
-                      from across the studio, and only reach for a phone
-                      when something is actually wrong. */}
-                  <p className="big">{new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
-                  <p className="sub">{pretty(d)}</p>
-                </div>
-              </div>
-            );
-          })
-        )}
       </div>
 
       <style>{`

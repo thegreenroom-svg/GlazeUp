@@ -7651,6 +7651,10 @@ export function registerShelfSweepHistoryRoute(app, supabase, STUDIO_ID, logger)
       const date = String(req.params.date || '').slice(0, 10);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Expected a date like 2026-09-19' });
 
+      const { data: stage } = await supabase
+        .from('collection_batches').select('shelved_at, into_kiln_at, out_of_kiln_at, moved_by')
+        .eq('studio_id', STUDIO_ID).eq('collection_date', date).maybeSingle();
+
       const { data: bookings } = await supabase
         .from('bookings')
         .select('booking_code, customer_name, session_start, collection_date, table_number, collection_notes')
@@ -7658,7 +7662,7 @@ export function registerShelfSweepHistoryRoute(app, supabase, STUDIO_ID, logger)
         .eq('collection_date', date)
         .order('session_start');
 
-      if (!bookings?.length) return res.json({ date, bookings: [], totals: { bookings: 0, pieces: 0 } });
+      if (!bookings?.length) return res.json({ date, stage: stage || null, bookings: [], totals: { bookings: 0, pieces: 0 } });
 
       const { data: pieces } = await supabase
         .from('pottery_pieces')
@@ -7711,11 +7715,72 @@ export function registerShelfSweepHistoryRoute(app, supabase, STUDIO_ID, logger)
 
       res.json({
         date,
+        stage: stage || null,
         bookings: out,
         totals: { bookings: out.length, pieces: total, packed, missing, part_missing: halves },
       });
     } catch (err) {
       logger.error(`[batch] ${err.message}`);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // [6 Sep] SCANNING THE STICKER MOVES THE BATCH.
+  //
+  // Daisy: "so scan shelf stickers before glazing and firing and let
+  // the app know off shelves and in kiln."
+  //
+  // That turns the sticker from a label into a control. The batch is
+  // the only thing that survives a kiln load being made up -- the
+  // shelves get broken apart, the pieces come back in a different
+  // arrangement -- so the batch is what carries the state, and one scan
+  // at the shelf moves everything on that date at once. No selecting,
+  // no counting: the person doing it has both hands full of greenware.
+  app.post('/api/spec/batch/:date/move', async (req, res) => {
+    try {
+      const date = String(req.params.date || '').slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Expected a date like 2026-09-19' });
+      const stage = String(req.body?.stage || '');
+      const by = (req.body?.by || 'staff').toString().slice(0, 60);
+
+      const column = { shelved: 'shelved_at', kiln: 'into_kiln_at', out: 'out_of_kiln_at' }[stage];
+      if (!column) return res.status(400).json({ error: 'stage must be shelved, kiln or out' });
+
+      // Undo is a real need, not a nicety: the commonest mistake is
+      // scanning the wrong shelf's sticker, and it should cost one tap
+      // to put right rather than a call to me.
+      const undo = req.body?.undo === true;
+      const patch = { studio_id: STUDIO_ID, collection_date: date, moved_by: by };
+      patch[column] = undo ? null : new Date().toISOString();
+
+      const { error } = await supabase
+        .from('collection_batches')
+        .upsert(patch, { onConflict: 'studio_id,collection_date' });
+      if (error) throw error;
+
+      // The pieces follow the batch. Out of the kiln means ready to
+      // pack, which is the state the packing queue already reads.
+      if (stage === 'out' && !undo) {
+        const { data: bookings } = await supabase
+          .from('bookings').select('booking_code')
+          .eq('studio_id', STUDIO_ID).eq('collection_date', date);
+        const codes = (bookings || []).map((b) => b.booking_code);
+        if (codes.length) {
+          await supabase.from('pottery_pieces')
+            .update({ status: 'ready', updated_at: new Date().toISOString() })
+            .eq('studio_id', STUDIO_ID)
+            .in('booking_id', codes)
+            .neq('status', 'collected')
+            .is('packed_at', null);
+        }
+      }
+
+      const { data: row } = await supabase
+        .from('collection_batches').select('*')
+        .eq('studio_id', STUDIO_ID).eq('collection_date', date).maybeSingle();
+      res.json({ batch: row });
+    } catch (err) {
+      logger.error(`[batch-move] ${err.message}`);
       res.status(500).json({ error: err.message });
     }
   });
