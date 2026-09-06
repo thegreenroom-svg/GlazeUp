@@ -54,6 +54,16 @@ export default function ShelvesPage() {
   // same. Standing at a shelf about to put pottery in a bag, the only
   // thing that settles it is seeing the piece as it was painted.
   const [looking, setLooking] = useState<MatchedDetail | null>(null);
+  // [6 Sep] Daisy: "I thought here we were gonna see thumbnails of each
+  // shelf on one page and then click on them to expand and then click
+  // on the items to go to each booking."
+  //
+  // That is what I built for the backfill an hour earlier and did not
+  // carry across to here. This page was a vertical scroll of full-width
+  // photos with every match expanded underneath, so finding the shelf
+  // you had in mind meant scrolling past four screens of a shelf you
+  // did not. A wall of shelves should look like a wall.
+  const [openSweep, setOpenSweep] = useState<string | null>(null);
   // Blank photos are hidden by default -- Daisy: "remove any on wall
   // without any matches" -- but NOT thrown away, because nothing
   // re-matches them in the background. A photo that found nothing
@@ -105,8 +115,34 @@ export default function ShelvesPage() {
         );
       })()}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.6rem' }}>
+      {/* The wall itself: every shelf photo at a glance, newest first,
+          badged with how many pieces it holds. Tap one to open it. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.4rem', marginBottom: '1rem' }}>
         {sweeps?.filter((sw) => showBlanks || (sw.matched_details || []).some((m) => m.box)).map((sw) => {
+          const n = (sw.matched_details || []).filter((d) => d.box).length;
+          const isOpen = openSweep === sw.id;
+          return (
+            <button
+              key={sw.id}
+              onClick={() => setOpenSweep(isOpen ? null : sw.id)}
+              style={{ position: 'relative', padding: 0, aspectRatio: '1', overflow: 'hidden', cursor: 'pointer', background: 'white', borderRadius: 'var(--radius-sm)', border: isOpen ? '2px solid var(--clay)' : '1px solid #ece5db' }}
+            >
+              <img src={sw.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '0.2rem', fontSize: 'var(--text-xs)', fontWeight: 700, color: 'white', background: 'rgba(0,0,0,0.55)' }}>
+                {new Date(sw.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+              </span>
+              {n > 0 && (
+                <span style={{ position: 'absolute', top: 3, right: 3, minWidth: 19, height: 19, padding: '0 5px', borderRadius: 10, background: 'var(--clay)', color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {n}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.6rem' }}>
+        {sweeps?.filter((sw) => sw.id === openSweep).map((sw) => {
           const details = (sw.matched_details || []).filter((d) => d.box);
           return (
             <div key={sw.id} style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.7rem' }}>
