@@ -1012,6 +1012,28 @@ app.post('/api/demo/photo-match/confirm', upload.single('photo'), async (req, re
       : parseInt(req.body.piece_count, 10);
     let piecesCreated = 0;
     if (Number.isFinite(pieceCount) && pieceCount > 0) {
+      // [6 Sep] BACKFILL. Pieces read from the iPad library screenshots
+      // exist with descriptions but no photo and no box, which makes
+      // them text-only in a sweep -- exactly the weak mode Daisy does
+      // not want. When the ORIGINAL table photo is fed back through
+      // this same route, those placeholders must give way, or the
+      // existing-count check below silently keeps the worse rows and
+      // discards the real ones.
+      //
+      // Deliberately narrow: only rows with no reference photo go.
+      // Anything already carrying a real photo is untouched, so this
+      // can never destroy a genuine capture.
+      if (req.body.replace_backfilled === 'true') {
+        const { data: gone } = await supabase
+          .from('pottery_pieces')
+          .delete()
+          .eq('studio_id', DEMO_STUDIO_ID)
+          .eq('booking_id', booking_code)
+          .is('reference_photo_url', null)
+          .select('id');
+        if ((gone || []).length) logger.info(`[photo-match/confirm] replaced ${gone.length} photo-less piece(s) for ${booking_code}`);
+      }
+
       const { count: existing } = await supabase
         .from('pottery_pieces')
         .select('id', { count: 'exact', head: true })

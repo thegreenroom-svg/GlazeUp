@@ -4431,7 +4431,7 @@ export function registerIdentifyPiecesRoute(app, supabase, STUDIO_ID, logger, ax
       const input = [
         {
           type: 'text',
-          text: `This is a photo of a table in a pottery painting studio, taken at the end of a customer's session.\n\nIdentify every PAINTED POTTERY PIECE belonging to the customer -- the items they have painted and will be taking home after firing.\n\nInclude: mugs, bowls, plates, figurines, vases, jugs, money boxes, ornaments and similar ceramic pieces that have been painted.\n\nDo NOT include: paint pots, brushes, water pots, palettes, paint-mixing dishes or trays holding wet blobs or pools of paint, colour charts, menus, price cards, chalk boards, drinks, cans, glasses, phones, bags, or anything belonging to the studio rather than the customer. A shallow white dish with pools of wet paint in it is a palette, not a customer piece.\n\nONE ENTRY PER PHYSICAL OBJECT. This matters more than anything else here. Never split a single object across two entries: a mug and its handle, a lid and its pot, a figurine and its base are ONE piece each. Never merge two separate objects into one entry: two mugs side by side, even identical ones, are TWO entries. Where objects overlap or touch, look carefully at where one ends and the next begins and give each its own entry and its own box. If you genuinely cannot tell whether something is one object or two, say so in the description rather than guessing silently.\n\nBE COMPLETE. Work systematically across the whole photo, left to right and front to back, including the edges and anything partly hidden behind another piece. A piece missed here cannot be found on the shelf later, so a piece you are unsure about is better included with an honest description than left out entirely.\n\nDESCRIPTIONS: one short line each, same shape every time -- colour, then form, then what actually distinguishes it. Usually one detail is enough. But if another piece in THIS SAME photo shares the same colour and form, one detail is not enough: add a second that genuinely separates them (size relative to the others, a different motif, a handle or lid one has and the other does not). Three vases described as \"large\", \"medium\" and \"small\" are nearly useless to match against later, so reach for a real visual difference before falling back on size. Good: \"white mug, black panda face\". Good: \"blue bowl, yellow star inside\". Bad: \"a lovely hand-painted mug featuring a charming panda illustration with a geometric border pattern around the base\" -- too long, and the extra words come out different every time the same piece is looked at, which makes matching harder rather than easier. Never describe the table, the background, or where the piece is sitting.\n\nAlso give its bounding box in the photo.`,
+          text: `This is a photo of a table in a pottery painting studio, taken at the end of a customer's session.\n\nIdentify every PAINTED POTTERY PIECE belonging to the customer -- the items they have painted and will be taking home after firing.\n\nInclude: mugs, bowls, plates, figurines, vases, jugs, money boxes, ornaments and similar ceramic pieces that have been painted.\n\nDo NOT include: paint pots, brushes, water pots, palettes, paint-mixing dishes or trays holding wet blobs or pools of paint, colour charts, menus, price cards, chalk boards, drinks, cans, glasses, phones, bags, or anything belonging to the studio rather than the customer. A shallow white dish with pools of wet paint in it is a palette, not a customer piece.\n\nONE ENTRY PER PHYSICAL OBJECT. This matters more than anything else here. Never split a single object across two entries: a mug and its handle, a lid and its pot, a figurine and its base are ONE piece each. Never merge two separate objects into one entry: two mugs side by side, even identical ones, are TWO entries. Where objects overlap or touch, look carefully at where one ends and the next begins and give each its own entry and its own box. If you genuinely cannot tell whether something is one object or two, say so in the description rather than guessing silently.\n\nBE COMPLETE. Work systematically across the whole photo, left to right and front to back, including the edges and anything partly hidden behind another piece. A piece missed here cannot be found on the shelf later, so a piece you are unsure about is better included with an honest description than left out entirely.\n\nDESCRIPTIONS: one short line each, same shape every time -- colour, then form, then what actually distinguishes it. Usually one detail is enough. But if another piece in THIS SAME photo shares the same colour and form, one detail is not enough: add a second that genuinely separates them (size relative to the others, a different motif, a handle or lid one has and the other does not). Three vases described as \"large\", \"medium\" and \"small\" are nearly useless to match against later, so reach for a real visual difference before falling back on size. Good: \"white mug, black panda face\". Good: \"blue bowl, yellow star inside\". Bad: \"a lovely hand-painted mug featuring a charming panda illustration with a geometric border pattern around the base\" -- too long, and the extra words come out different every time the same piece is looked at, which makes matching harder rather than easier. Never describe the table, the background, or where the piece is sitting.\n\nAlso give its bounding box in the photo.${req.body?.read_tag === 'true' ? `\n\nALSO READ THE CHALKBOARD. These tables carry a small black chalk tag. If one is visible, read the customer's NAME from it -- usually the largest handwriting, in the middle. Tags are wiped and reused, so faint ghost writing from earlier bookings often shows underneath: report only the clearest, most recent name. Never guess -- a wrong name attaches someone's pottery to the wrong person, which is worse than no name at all, so omit the field entirely rather than offer a maybe.` : ''}`,
         },
         { type: 'image', data: base64, mime_type: photoGemini.mimeType || req.file.mimetype || 'image/jpeg' },
       ];
@@ -4451,6 +4451,9 @@ export function registerIdentifyPiecesRoute(app, supabase, STUDIO_ID, logger, ax
               required: ['description', 'piece_type'],
             },
           },
+          // Optional, only asked for on the backfill path, and omitted
+          // by the model when the board cannot be read rather than guessed.
+          tag_name: { type: 'string', description: 'Customer name read from the chalk tag, omitted if not confidently readable' },
         },
         required: ['pieces'],
       };
@@ -4502,7 +4505,9 @@ export function registerIdentifyPiecesRoute(app, supabase, STUDIO_ID, logger, ax
         };
       });
 
-      res.json({ count: pieces.length, pieces });
+      // tag_name only comes back when the backfill asked for it, and
+      // only when the board was actually legible.
+      res.json({ count: pieces.length, pieces, tag_name: (parsed.tag_name || '').trim() || null });
     } catch (err) {
       logger.error('identify-in-photo failed', err.response?.data || err.message);
       res.status(500).json({ error: err.response?.data?.error?.message || err.message });
@@ -5050,7 +5055,7 @@ export function registerPackingRoutes(app, supabase, STUDIO_ID, logger) {
       const codes = Array.from(new Set(live.map((p) => p.booking_id)));
       const { data: bookingRows } = await supabase
         .from('bookings')
-        .select('booking_code, customer_name, session_start')
+        .select('booking_code, customer_name, session_start, collection_date')
         .eq('studio_id', STUDIO_ID)
         .in('booking_code', codes);
       const byCode = new Map((bookingRows || []).map((b) => [b.booking_code, b]));
@@ -5075,6 +5080,12 @@ export function registerPackingRoutes(app, supabase, STUDIO_ID, logger) {
           booking_code: code,
           customer_name: byCode.get(code)?.customer_name || code,
           session_start: byCode.get(code)?.session_start || null,
+          // [6 Sep] Daisy: "and these need dates." With three kiln
+          // batches waiting at once, "Collecting" alone does not say
+          // which pile a booking belongs to or whether it is already
+          // late -- and the queue is now long enough that scrolling for
+          // it is the whole job.
+          collection_date: byCode.get(code)?.collection_date || null,
           piece_count: ps.length,
           on_hold: heldByBooking[code] || 0,
           // Out of the kiln and genuinely on a shelf, which is what a
@@ -5090,8 +5101,16 @@ export function registerPackingRoutes(app, supabase, STUDIO_ID, logger) {
           done: false,
         };
       })
-      // Longest-waiting first.
-      .sort((a, b) => String(a.session_start || '').localeCompare(String(b.session_start || '')));
+      // Due first, then longest-waiting within a date. Collection date
+      // is what actually decides the order of work now -- session order
+      // only breaks ties inside one batch. Undated last: an unknown
+      // date is not an urgent one.
+      .sort((a, b) => {
+        const da = a.collection_date || '9999-12-31';
+        const db = b.collection_date || '9999-12-31';
+        if (da !== db) return da < db ? -1 : 1;
+        return String(a.session_start || '').localeCompare(String(b.session_start || ''));
+      });
 
       res.json({ queue });
     } catch (err) {
@@ -7451,6 +7470,63 @@ export function registerShelfSweepHistoryRoute(app, supabase, STUDIO_ID, logger)
   // screen can ask WHICH shelf before searching rather than assuming
   // there is only one. Counts come from the same pool the sweep uses,
   // so what this offers and what that searches cannot drift apart.
+  // [6 Sep] FIND A BOOKING. Daisy: "if I wanted to go back and see a
+  // booking four weeks ago... I wanted to go find that booking easily."
+  // Until now the only list was the most recent 250 bookings, which is
+  // about a fortnight at current volume -- so anything older was
+  // genuinely unreachable in the app.
+  //
+  // Searches the whole history by name, optionally bounded by date, and
+  // carries the piece and photo counts so the result answers the actual
+  // question ("did that one ever get photographed?") without a second tap.
+  app.get('/api/spec/bookings/search', async (req, res) => {
+    try {
+      const q = (req.query.q || '').toString().trim();
+      const from = (req.query.from || '').toString().trim();
+      const to = (req.query.to || '').toString().trim();
+      if (!q && !from && !to) return res.json({ bookings: [] });
+
+      let sel = supabase
+        .from('bookings')
+        .select('booking_code, customer_name, session_start, collection_date, table_number, room')
+        .eq('studio_id', STUDIO_ID)
+        .order('session_start', { ascending: false })
+        .limit(60);
+      if (q) sel = sel.ilike('customer_name', `%${q}%`);
+      if (from) sel = sel.gte('session_start', `${from}T00:00:00`);
+      if (to) sel = sel.lte('session_start', `${to}T23:59:59`);
+
+      const { data: rows, error } = await sel;
+      if (error) throw error;
+      if (!rows?.length) return res.json({ bookings: [] });
+
+      const { data: pieces } = await supabase
+        .from('pottery_pieces')
+        .select('booking_id, reference_photo_url, status')
+        .eq('studio_id', STUDIO_ID)
+        .in('booking_id', rows.map((b) => b.booking_code));
+
+      const byCode = new Map();
+      for (const p of pieces || []) {
+        const cur = byCode.get(p.booking_id) || { pieces: 0, with_photo: 0, collected: 0 };
+        cur.pieces += 1;
+        if (p.reference_photo_url) cur.with_photo += 1;
+        if (String(p.status || '').toLowerCase() === 'collected') cur.collected += 1;
+        byCode.set(p.booking_id, cur);
+      }
+
+      res.json({
+        bookings: rows.map((b) => ({
+          ...b,
+          ...(byCode.get(b.booking_code) || { pieces: 0, with_photo: 0, collected: 0 }),
+        })),
+      });
+    } catch (err) {
+      logger.error(`[bookings-search] ${err.message}`);
+      res.status(500).json({ error: 'Could not search bookings' });
+    }
+  });
+
   app.get('/api/spec/shelf/batches', async (req, res) => {
     try {
       const { data: pieces } = await supabase

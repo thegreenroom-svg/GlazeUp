@@ -39,6 +39,7 @@ interface QueueItem {
   posting: number;
   postal_postcode: string | null;
   shelf_label: string | null;
+  collection_date: string | null;
   has_photo: boolean;
   collected: number;
   done: boolean;
@@ -1186,6 +1187,20 @@ export default function PackingPage() {
                 {q.on_hold > 0 ? ` · ${q.on_hold} on hold` : ''}
                 {q.shelf_label ? ` · ${q.shelf_label}` : ''}
               </p>
+              {/* Daisy: "and these need dates." Three batches wait at
+                  once now, so which pile a booking is in, and whether
+                  it is already late, matters more than anything else
+                  on this row. Overdue is coloured, not just stated. */}
+              {q.collection_date && (() => {
+                const today = new Date().toISOString().slice(0, 10);
+                const late = q.collection_date < today;
+                return (
+                  <p style={{ fontSize: 'var(--text-xs)', fontWeight: late ? 700 : 600, color: late ? '#C0392B' : 'var(--clay)' }}>
+                    {late ? 'Was due ' : 'Collect '}
+                    {new Date(q.collection_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                  </p>
+                );
+              })()}
               {/* Said up front so nobody walks to the shelf expecting a
                   photo that was never taken. */}
               {!q.has_photo && <p style={{ fontSize: 'var(--text-xs)', color: '#A6761D' }}>No photo — identify by description</p>}

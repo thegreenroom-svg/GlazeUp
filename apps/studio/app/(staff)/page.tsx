@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Printer, Camera, Package, Check, Layers, Boxes } from 'lucide-react';
+import { Printer, Camera, Package, Check, Layers, Boxes, Image as ImageIcon, Search } from 'lucide-react';
 
 // THE WHOLE APP, on one page.
 //
@@ -41,6 +41,15 @@ const STEPS = [
   // place she wants to GO, not a footnote on the packing screen, so it
   // gets a tile like everything else she reaches for.
   { key: 'shelves',    n: 6, label: 'Wall of shelves', detail: 'Every box photographed, with what is in it', href: '/shelves', icon: Layers, tint: '#7A6A8C' },
+  // A tile, not a hidden link, for the same reason as the wall above.
+  // This is the recovery path for any day the iPad got used the normal
+  // way instead of the app -- which will keep happening, so it needs a
+  // permanent home rather than being treated as a one-off import.
+  // Searching the whole history, not just this week. Its own tile for
+  // the same reason as the others: a link buried in another screen is a
+  // thing Daisy cannot find, three times over now.
+  { key: 'find',       n: 7, label: 'Find a booking', detail: 'Search the whole history by name or date', href: '/find', icon: Search, tint: '#4F6D7A' },
+  { key: 'backfill',   n: 8, label: 'Backfill from photos', detail: 'Tables photographed outside the app', href: '/backfill', icon: ImageIcon, tint: '#5F7A8C' },
 ];
 
 export default function StudioHome() {
