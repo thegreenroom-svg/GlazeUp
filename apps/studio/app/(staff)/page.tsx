@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Printer, Camera, Package, Check, Layers, Boxes, Image as ImageIcon, Search } from 'lucide-react';
+import { Printer, Camera, Package, Check, Layers, Boxes, Image as ImageIcon, Search, QrCode } from 'lucide-react';
 
 // THE WHOLE APP, on one page.
 //
@@ -65,6 +65,10 @@ const STEPS = [
 const TOOLS = [
   { key: 'shelves',  label: 'Wall of shelves',      detail: 'Every box, and what is in it',        href: '/shelves',  icon: Layers,    tint: '#7A6A8C' },
   { key: 'find',     label: 'Find a booking',       detail: 'Any name or date, whole history',     href: '/find',     icon: Search,    tint: '#4F6D7A' },
+  // The sticker that goes on a greenware shelf before dipping. Sits
+  // with the tools rather than in the numbered day: it happens once per
+  // batch, not once per session.
+  { key: 'stickers',   label: 'Shelf stickers',       detail: 'QR labels for each collection date',   href: '/shelf-stickers', icon: QrCode, tint: '#6B7A5F' },
   { key: 'backfill', label: 'Backfill from photos', detail: 'Tables photographed outside the app', href: '/backfill', icon: ImageIcon, tint: '#5F7A8C' },
 ];
 
