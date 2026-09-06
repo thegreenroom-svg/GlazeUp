@@ -7704,3 +7704,248 @@ export function registerNextPackingRoute(app, supabase, STUDIO_ID, logger) {
     }
   });
 }
+
+// ============================================================================
+// BACKFILL FROM THE IPAD LIBRARY
+// Its own register function because it needs axios, sharp and the file
+// system, none of which the kiln-shelf routes are handed.
+// ============================================================================
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const BACKFILL_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'backfill-photos');
+
+// Same instructions as identify-in-photo, plus the chalk board, because
+// nothing selected a booking first.
+const BACKFILL_PROMPT = `This is a photo of a table in a pottery painting studio, taken at the end of a customer's session.
+
+Identify every PAINTED POTTERY PIECE belonging to the customer -- the items they have painted and will be taking home after firing.
+
+Include: mugs, bowls, plates, figurines, vases, jugs, money boxes, ornaments and similar ceramic pieces that have been painted.
+
+Do NOT include: paint pots, brushes, water pots, palettes, paint-mixing dishes or trays holding wet blobs or pools of paint, colour charts, menus, price cards, chalk boards, drinks, cans, glasses, phones, bags, or anything belonging to the studio rather than the customer.
+
+ONE ENTRY PER PHYSICAL OBJECT. Never split one object across two entries: a mug and its handle, a lid and its pot, a figurine and its base are ONE piece each. Never merge two objects into one entry: two mugs side by side, even identical ones, are TWO entries.
+
+BE COMPLETE. Work across the whole photo including the edges and anything partly hidden. A piece missed here cannot be found on the shelf later.
+
+DESCRIPTIONS: one short line each -- colour, then form, then what distinguishes it. If another piece in THIS SAME photo shares the colour and form, add a detail that genuinely separates them. Good: "white mug, black panda face". Never describe the table or the background.
+
+Also give each piece's bounding box.
+
+THIS PHOTO IS OF A SCREEN, so colours carry a warm cast and there is some moire banding. Judge colour against the pink paper placemat rather than at face value, and prefer form and pattern over fine colour distinctions when describing.
+
+ALSO READ THE CHALKBOARD. These tables carry a small black chalk tag. Read the customer's NAME from it -- usually the largest handwriting, in the middle. Tags are wiped and reused, so faint ghost writing from earlier bookings often shows underneath: report only the clearest, most recent name. Never guess -- a wrong name attaches someone's pottery to the wrong person, so omit the field entirely rather than offer a maybe.`;
+
+const BACKFILL_SCHEMA = {
+  type: 'object',
+  properties: {
+    pieces: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          description: { type: 'string' },
+          piece_type: { type: 'string' },
+          box_2d: { type: 'array', items: { type: 'integer' }, description: '[ymin, xmin, ymax, xmax] normalized 0-1000' },
+        },
+        required: ['description', 'piece_type'],
+      },
+    },
+    tag_name: { type: 'string', description: 'Customer name from the chalk tag, omitted if not confidently readable' },
+  },
+  required: ['pieces'],
+};
+
+export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, sharp) {
+  // [6 Sep] BACKFILL, RUN SERVER-SIDE.
+  //
+  // Daisy: "I don't wanna use a zip file. I want you to do it on the
+  // database internally. So literally crop every photograph, identify
+  // the pieces using the Gemini AI, run it into the database."
+  //
+  // Fair -- shuttling files through a browser was my limitation, not a
+  // sensible workflow. The cropped table photos ship in the repo at
+  // backend/backfill-photos, so they arrive on Render where the Gemini
+  // key and the Supabase service role actually live, and the whole job
+  // runs here.
+  //
+  // It uses the SAME prompt and the SAME storage bucket as a live
+  // capture, because the entire point is that a backfilled booking is
+  // indistinguishable from one photographed through the app.
+  //
+  // Resumable by design: every photo gets a row in backfill_photos, and
+  // this processes only what is still pending, within a time budget, so
+  // a request can never run past a proxy timeout. Call it repeatedly
+  // until remaining hits zero.
+  app.post('/api/spec/backfill/run', async (req, res) => {
+    const DIR = BACKFILL_DIR;
+    try {
+      const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+      if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured on this service.' });
+      if (!fs.existsSync(DIR)) return res.status(500).json({ error: 'No backfill photos are deployed with this build.' });
+
+      const files = fs.readdirSync(DIR).filter((f) => /\.jpe?g$/i.test(f)).sort();
+
+      // Register any photo not yet seen. Unique on (studio, filename),
+      // so a redeploy cannot queue the same photo twice.
+      const { data: known } = await supabase
+        .from('backfill_photos').select('filename').eq('studio_id', STUDIO_ID);
+      const seen = new Set((known || []).map((r) => r.filename));
+      const fresh = files.filter((f) => !seen.has(f)).map((filename) => ({ studio_id: STUDIO_ID, filename }));
+      if (fresh.length) await supabase.from('backfill_photos').insert(fresh);
+
+      const { data: pending } = await supabase
+        .from('backfill_photos').select('id, filename')
+        .eq('studio_id', STUDIO_ID).eq('status', 'pending')
+        .order('filename', { ascending: true }).limit(40);
+
+      // Every booking, once, for name matching. Bookings that already
+      // carry a real photo are removed from the pool: process of
+      // elimination, so a repeat customer's earlier visit stops
+      // competing with the one still waiting to be recovered.
+      const { data: allBookings } = await supabase
+        .from('bookings').select('booking_code, customer_name, session_start')
+        .eq('studio_id', STUDIO_ID).limit(1000);
+      const { data: photographed } = await supabase
+        .from('pottery_pieces').select('booking_id')
+        .eq('studio_id', STUDIO_ID).not('reference_photo_url', 'is', null);
+      const taken = new Set((photographed || []).map((p) => p.booking_id));
+
+      const norm = (x) => (x || '').toLowerCase().replace(/[^a-z ]/g, '').trim();
+      const score = (tag, name) => {
+        const a = norm(tag), b = norm(name);
+        if (!a || !b) return 0;
+        if (a === b) return 1;
+        const at = a.split(/\s+/), bt = b.split(/\s+/);
+        const shared = at.filter((t) => t.length > 2 && bt.some((u) => u.startsWith(t) || t.startsWith(u)));
+        return shared.length / Math.max(at.length, bt.length);
+      };
+
+      // Well inside any sensible proxy limit. Whatever is left stays
+      // pending and the next call picks it up.
+      const DEADLINE = Date.now() + 50000;
+      let done = 0, matched = 0, unmatched = 0, failed = 0;
+
+      for (const row of pending || []) {
+        if (Date.now() > DEADLINE) break;
+        try {
+          const buf = fs.readFileSync(path.join(DIR, row.filename));
+          const forAi = await forGemini(sharp, buf, logger, null, 1600);
+          const base64 = forAi.buffer.toString('base64');
+
+          const { response: aiRes } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
+            input: [
+              { type: 'text', text: BACKFILL_PROMPT },
+              { type: 'image', data: base64, mime_type: forAi.mimeType || 'image/jpeg' },
+            ],
+            response_format: { type: 'text', mime_type: 'application/json', schema: BACKFILL_SCHEMA },
+          }, 'gemini-3.5-flash-lite', 'gemini-3.7-flash');
+
+          let parsed = {};
+          try { parsed = JSON.parse((extractGeminiText(aiRes).match(/\{[\s\S]*\}/) || [])[0] || '{}'); } catch { parsed = {}; }
+          const pieces = (parsed.pieces || []).filter((p) => p && p.description);
+          const tag = (parsed.tag_name || '').trim() || null;
+
+          if (!tag || !pieces.length) {
+            await supabase.from('backfill_photos').update({
+              status: 'unmatched', tag_name: tag,
+              error_message: !tag ? 'Chalk board not readable' : 'No pieces identified',
+              processed_at: new Date().toISOString(),
+            }).eq('id', row.id);
+            unmatched++; done++; continue;
+          }
+
+          const ranked = (allBookings || [])
+            .map((b) => ({ b, sc: score(tag, b.customer_name) }))
+            .filter((x) => x.sc >= 0.5 && !taken.has(x.b.booking_code))
+            .sort((x, y) => y.sc - x.sc);
+
+          // Only attach on a clear winner. A tie is exactly when a
+          // person should decide, so it is left unmatched rather than
+          // gambling someone's pottery onto the wrong name.
+          const win = ranked.length === 1 || (ranked.length > 1 && ranked[0].sc > ranked[1].sc) ? ranked[0].b : null;
+          if (!win) {
+            await supabase.from('backfill_photos').update({
+              status: 'unmatched', tag_name: tag,
+              error_message: ranked.length ? 'More than one booking matches that name' : 'No booking matches that name',
+              processed_at: new Date().toISOString(),
+            }).eq('id', row.id);
+            unmatched++; done++; continue;
+          }
+
+          const filename = `backfill/${STUDIO_ID}/${row.filename}`;
+          await supabase.storage.from('booking-photos').upload(filename, buf, { contentType: 'image/jpeg', upsert: true });
+          const { data: urlData } = supabase.storage.from('booking-photos').getPublicUrl(filename);
+
+          // The photo-less placeholders read from the screenshots give
+          // way. Narrow on purpose: only rows with no reference photo,
+          // so a genuine capture can never be destroyed by this.
+          await supabase.from('pottery_pieces').delete()
+            .eq('studio_id', STUDIO_ID).eq('booking_id', win.booking_code).is('reference_photo_url', null);
+
+          const rows = pieces.map((pc) => ({
+            studio_id: STUDIO_ID,
+            booking_id: win.booking_code,
+            piece_type: pc.piece_type || 'Piece',
+            description: pc.description,
+            status: 'queued',
+            reference_photo_url: urlData.publicUrl,
+            reference_photo_taken_at: new Date().toISOString(),
+            photo_box: boxFromGemini(pc.box_2d) || null,
+            photo_taken_by: 'backfill',
+            notes: 'Recovered from the iPad library, identified by the same AI step as a live capture',
+          }));
+          const { data: created } = await supabase.from('pottery_pieces').insert(rows).select('id');
+
+          taken.add(win.booking_code);
+          await supabase.from('backfill_photos').update({
+            status: 'done', tag_name: tag, booking_code: win.booking_code,
+            pieces_created: (created || []).length, processed_at: new Date().toISOString(),
+          }).eq('id', row.id);
+          matched++; done++;
+        } catch (err) {
+          await supabase.from('backfill_photos').update({
+            status: 'failed', error_message: String(err.message || err).slice(0, 300),
+            processed_at: new Date().toISOString(),
+          }).eq('id', row.id);
+          failed++; done++;
+        }
+      }
+
+      const { count: remaining } = await supabase
+        .from('backfill_photos').select('id', { count: 'exact', head: true })
+        .eq('studio_id', STUDIO_ID).eq('status', 'pending');
+
+      res.json({ processed: done, matched, unmatched, failed, remaining: remaining || 0, total: files.length });
+    } catch (err) {
+      logger.error(`[backfill] ${err.message}`);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // What the run has done so far, including the ones it refused to
+  // guess at -- those are the list a person still needs to look at.
+  app.get('/api/spec/backfill/status', async (req, res) => {
+    try {
+      const { data } = await supabase
+        .from('backfill_photos')
+        .select('filename, status, tag_name, booking_code, pieces_created, error_message')
+        .eq('studio_id', STUDIO_ID).order('filename');
+      const rows = data || [];
+      res.json({
+        total: rows.length,
+        pending: rows.filter((r) => r.status === 'pending').length,
+        done: rows.filter((r) => r.status === 'done').length,
+        unmatched: rows.filter((r) => r.status === 'unmatched').length,
+        failed: rows.filter((r) => r.status === 'failed').length,
+        pieces: rows.reduce((n, r) => n + (r.pieces_created || 0), 0),
+        needs_a_look: rows.filter((r) => r.status === 'unmatched' || r.status === 'failed'),
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+}

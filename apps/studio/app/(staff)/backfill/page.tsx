@@ -62,6 +62,39 @@ export default function BackfillPage() {
   const [busy, setBusy] = useState(false);
   const picker = useRef<HTMLInputElement>(null);
 
+  // The backlog already sitting on the server. Daisy: "I want you to do
+  // it on the database internally." These photos ship with the build,
+  // so nothing has to be picked, uploaded or carried between devices --
+  // the run happens where the AI key and the database already are.
+  const [prog, setProg] = useState<{ total: number; pending: number; done: number; unmatched: number; failed: number; pieces: number; needs_a_look: { filename: string; tag_name: string | null; error_message: string | null }[] } | null>(null);
+  const [running, setRunning] = useState(false);
+
+  const loadProgress = () =>
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/backfill/status`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setProg(d))
+      .catch(() => {});
+
+  useEffect(() => { loadProgress(); }, []);
+
+  // Each call works to a time budget and returns what is left, so this
+  // keeps going until the queue empties rather than one huge request
+  // that a proxy would cut off halfway.
+  const runBatch = async () => {
+    setRunning(true);
+    try {
+      for (let pass = 0; pass < 30; pass++) {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/backfill/run`, { method: 'POST' });
+        const d = await res.json();
+        await loadProgress();
+        if (!res.ok || !d.remaining) break;
+      }
+    } finally {
+      setRunning(false);
+      loadProgress();
+    }
+  };
+
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings`)
       .then((r) => (r.ok ? r.json() : []))
@@ -200,6 +233,40 @@ export default function BackfillPage() {
           the matching depends on.
         </p>
       </div>
+
+      {prog && prog.total > 0 && (
+        <div style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.9rem', marginBottom: '1rem' }}>
+          <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, margin: '0 0 0.3rem' }}>
+            The 27 Aug – 5 Sep backlog
+          </p>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--charcoal)', margin: '0 0 0.6rem' }}>
+            {prog.done} of {prog.total} photos done · {prog.pieces} piece{prog.pieces === 1 ? '' : 's'} with real photos
+            {prog.unmatched ? ` · ${prog.unmatched} need a look` : ''}
+            {prog.failed ? ` · ${prog.failed} failed` : ''}
+          </p>
+          {prog.pending > 0 && (
+            <button
+              onClick={runBatch}
+              disabled={running}
+              style={{ width: '100%', minHeight: 48, borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer', opacity: running ? 0.6 : 1 }}
+            >
+              {running ? `Working… ${prog.pending} left` : `Run the AI over ${prog.pending} photo${prog.pending === 1 ? '' : 's'}`}
+            </button>
+          )}
+          {prog.needs_a_look.length > 0 && (
+            <div style={{ marginTop: '0.7rem' }}>
+              <p style={{ fontSize: 'var(--text-xs)', color: '#A6761D', fontWeight: 700, margin: '0 0 0.3rem' }}>
+                Left alone rather than guessed at:
+              </p>
+              {prog.needs_a_look.slice(0, 20).map((r) => (
+                <p key={r.filename} style={{ fontSize: 'var(--text-xs)', color: '#777', margin: '0.1rem 0' }}>
+                  {r.tag_name ? `"${r.tag_name}"` : 'board unreadable'} — {r.error_message}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <input
         ref={picker}
