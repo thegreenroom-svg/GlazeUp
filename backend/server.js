@@ -1658,7 +1658,7 @@ registerCustomerBookingRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerHomeCountsRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerShelfSweepHistoryRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerNextPackingRoute(app, supabase, DEMO_STUDIO_ID, logger);
-registerBackfillRoutes(app, supabase, DEMO_STUDIO_ID, logger, axios, sharp);
+registerBackfillRoutes(app, supabase, DEMO_STUDIO_ID, logger, axios, sharp, upload);
 registerQuickAddPieceRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerFindOnTableRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage, sharp);
 registerTestAiFindRoute(app, supabase, DEMO_STUDIO_ID, logger, axios, upload, fs, logGeminiUsage, sharp);

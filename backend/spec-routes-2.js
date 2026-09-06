@@ -7758,7 +7758,61 @@ const BACKFILL_SCHEMA = {
   required: ['pieces'],
 };
 
-export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, sharp) {
+// Grouping prompt. Deliberately blunt about the failure mode, because
+// the cost of merging two customers is far higher than the cost of
+// reporting one table as two.
+const MULTI_TABLE_PROMPT = `This photo may show SEVERAL different customers' tables at once -- it can be a wide shot of a studio, or a screenshot of a photo library showing many separate table photos in a grid.
+
+Your job is to GROUP, not just to list.
+
+STEP 1. Find every small black chalk tag in the photo. Each one marks one customer's table. Read the customer's NAME from it -- usually the largest handwriting, in the middle. Tags are wiped and reused, so faint ghost writing from earlier bookings often shows underneath: report only the clearest, most recent name. If a tag is present but unreadable, still report the table with no name rather than dropping it.
+
+STEP 2. Assign every PAINTED POTTERY PIECE to the table it belongs with -- the one whose chalk tag sits with it, on the same table surface or within the same photo tile of a grid. A piece must belong to exactly one table. Never let a piece from one table drift into another group: that would put a customer's pottery on someone else's shelf, which is the worst thing this can do.
+
+If you genuinely cannot tell which table a piece belongs to, leave it out and say nothing rather than guessing at a group.
+
+Include as pieces: mugs, bowls, plates, figurines, vases, jugs, money boxes, ornaments and similar painted ceramics the customer takes home.
+Do NOT include: paint pots, brushes, water pots, palettes, paint-mixing trays, colour charts, menus, price cards, the chalk tags themselves, drinks, glasses, phones or bags.
+
+ONE ENTRY PER PHYSICAL OBJECT. A lid and its pot are one piece. Two identical mugs side by side are two pieces.
+
+DESCRIPTIONS: one short line each -- colour, then form, then what distinguishes it. If two pieces on the SAME table share colour and form, add a detail that separates them. Never describe the table or background.
+
+Give a bounding box for each piece, and a bounding box for each table covering all of its pieces and its tag.
+
+If this is a photograph of a screen, colours carry a warm cast and there is moire banding -- judge colour against the pink paper placemat and prefer form and pattern over fine colour distinctions.`;
+
+const MULTI_TABLE_SCHEMA = {
+  type: 'object',
+  properties: {
+    tables: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          tag_name: { type: 'string', description: 'Customer name from this table\'s chalk tag, omitted if unreadable' },
+          box_2d: { type: 'array', items: { type: 'integer' }, description: '[ymin, xmin, ymax, xmax] normalized 0-1000, covering this table' },
+          pieces: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                description: { type: 'string' },
+                piece_type: { type: 'string' },
+                box_2d: { type: 'array', items: { type: 'integer' }, description: '[ymin, xmin, ymax, xmax] normalized 0-1000' },
+              },
+              required: ['description', 'piece_type'],
+            },
+          },
+        },
+        required: ['pieces'],
+      },
+    },
+  },
+  required: ['tables'],
+};
+
+export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, sharp, upload) {
   // [6 Sep] BACKFILL, RUN SERVER-SIDE.
   //
   // Daisy: "I don't wanna use a zip file. I want you to do it on the
@@ -7922,6 +7976,69 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
     } catch (err) {
       logger.error(`[backfill] ${err.message}`);
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // [6 Sep] TWO STEPS, BECAUSE ONE PHOTO CAN HOLD SEVERAL TABLES.
+  //
+  // Daisy, looking at a grid screenshot read as a single table: "it
+  // identifies all the different pieces and all the different
+  // screenshots, but it only shows one booking... we need to have all
+  // the bookings that it shows, and then it has to tell you if other
+  // pieces are in any of the other photos somehow."
+  //
+  // The old shape assumed one photo, one table, one chalk board. That
+  // is wrong for a library screenshot, and wrong in the studio too --
+  // a photo taken standing back catches the next table along, and its
+  // pieces were being silently attached to the wrong customer.
+  //
+  // So the model is asked to group first: find each chalk board, then
+  // assign every piece to the board it belongs with. Grouping is the
+  // whole job here, which is why it gets its own prompt rather than a
+  // flag on the single-table one -- a piece put in the wrong group is
+  // a customer's pottery on someone else's shelf.
+  app.post('/api/spec/backfill/identify-tables', upload.single('photo'), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'A photo is required' });
+      const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+      if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured on this service.' });
+
+      const forAi = await forGemini(sharp, fs.readFileSync(req.file.path), logger, null, 1600);
+      const base64 = forAi.buffer.toString('base64');
+
+      const { response: aiRes } = await callGeminiWithFallback(axios, GEMINI_API_KEY, {
+        input: [
+          { type: 'text', text: MULTI_TABLE_PROMPT },
+          { type: 'image', data: base64, mime_type: forAi.mimeType || 'image/jpeg' },
+        ],
+        response_format: { type: 'text', mime_type: 'application/json', schema: MULTI_TABLE_SCHEMA },
+      }, 'gemini-3.5-flash-lite', 'gemini-3.7-flash');
+
+      let parsed = {};
+      try { parsed = JSON.parse((extractGeminiText(aiRes).match(/\{[\s\S]*\}/) || [])[0] || '{}'); } catch { parsed = {}; }
+
+      // Numbering restarts per table, not across the photo, because the
+      // numbers are read next to one customer's pieces and "3 of 4"
+      // only means anything inside its own group.
+      const tables = (parsed.tables || [])
+        .map((t) => ({
+          tag_name: (t.tag_name || '').trim() || null,
+          box: boxFromGemini(t.box_2d) || null,
+          pieces: (t.pieces || [])
+            .filter((p) => p && p.description)
+            .map((p, i) => ({
+              index: i + 1,
+              piece_type: p.piece_type || 'Piece',
+              description: p.description,
+              box: boxFromGemini(p.box_2d) || null,
+            })),
+        }))
+        .filter((t) => t.pieces.length);
+
+      res.json({ tables, table_count: tables.length });
+    } catch (err) {
+      logger.error(`[identify-tables] ${err.message}`);
+      res.status(500).json({ error: 'Could not read that photo' });
     }
   });
 

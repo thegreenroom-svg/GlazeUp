@@ -2,50 +2,55 @@
 
 // [6 Sep] BACKFILL FROM THE CAMERA ROLL.
 //
-// Daisy: "those photos need to be identified prompt as they are in
-// anything else... the whole thing needs to be the same."
+// Two faults Daisy found, both real:
 //
-// So this is not a separate importer with its own logic. It calls the
-// SAME identify-in-photo route the Floor screen calls at the end of a
-// session, and posts to the SAME photo-match/confirm that stores the
-// photo against the booking. Identical prompt, identical boxes,
-// identical storage. The only difference is that the photo comes from
-// the library rather than the camera, and the chalk tag is read to
-// work out whose table it was, because nobody selected a booking first.
+// 1. "It only shows one booking." A photo can hold SEVERAL tables --
+//    always true of a library screenshot, and true in the studio when
+//    someone stands back far enough to catch the next table along. The
+//    old page read one photo as one table, which quietly put other
+//    customers' pieces onto one booking. Identification is now two
+//    steps: find every chalk board, then assign each piece to the
+//    board it sits with. Each table saves separately, with the photo
+//    CROPPED to that table, so a booking's reference image shows its
+//    own pottery and nobody else's.
 //
-// It earns its place permanently, not just for the August backlog:
-// whenever someone photographs tables on the iPad the normal way
-// instead of going through the app, this is how that day gets
-// recovered rather than lost.
+// 2. "Do we need to see the photos in a huge scroll down -- can there
+//    not be a smaller grid to expand?" Right. Full-bleed photos meant
+//    scrolling four screens to reach the one needing a decision. Now
+//    it is a thumbnail grid, each tile badged with what was found and
+//    whether a person is still needed, and only the opened tile draws
+//    its boxes.
+//
+// It stays after the backlog clears: any day the iPad gets used the
+// normal way instead of the app is recoverable through this.
 
 import { useEffect, useRef, useState } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
-import { Camera, Loader, Check } from 'lucide-react';
+import { Camera, Loader, Check, AlertCircle } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
 interface Box { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number }
 interface Piece { index: number; piece_type: string; description: string; box: Box | null }
+interface Table {
+  tag_name: string | null;
+  box: Box | null;
+  pieces: Piece[];
+  bookingCode: string | null;
+  saved: boolean;
+}
 interface Booking { booking_code: string; customer_name: string; session_start: string }
-
 interface Shot {
   file: File;
   url: string;
-  takenOn: string;          // yyyy-mm-dd from the file's own timestamp
-  status: 'waiting' | 'reading' | 'read' | 'saving' | 'saved' | 'failed';
-  pieces: Piece[];
-  tagName: string | null;
-  bookingCode: string | null;
+  status: 'waiting' | 'reading' | 'read' | 'saving' | 'failed';
+  tables: Table[];
   error: string | null;
 }
 
 const COLOURS = ['#e0392b', '#1a8a3c', '#2b6fe0', '#c77a0a', '#8b3ec7', '#0a9aa8'];
 
-// Loose enough to survive a chalk misread ("Jackie" for "Jack"), strict
-// enough not to pair two different people. Deliberately conservative:
-// no match at all is better than a confident wrong one, because a wrong
-// name here attaches someone's pottery to another customer.
 function scoreName(tag: string, name: string) {
   const a = tag.toLowerCase().replace(/[^a-z ]/g, '').trim();
   const b = name.toLowerCase().replace(/[^a-z ]/g, '').trim();
@@ -56,17 +61,52 @@ function scoreName(tag: string, name: string) {
   return shared.length / Math.max(at.length, bt.length);
 }
 
+// A booking's reference photo must show that booking's table and
+// nothing else, or the shelf matcher ends up comparing against other
+// people's pottery. Padded slightly so an edge piece is not sliced.
+async function cropToTable(file: File, box: Box | null): Promise<Blob> {
+  if (!box) return compressPhotoForUpload(file, 1600);
+  const bmp = await createImageBitmap(file);
+  const pad = 2;
+  const l = Math.max(0, box.left_pct - pad) / 100 * bmp.width;
+  const t = Math.max(0, box.top_pct - pad) / 100 * bmp.height;
+  const r = Math.min(100, box.right_pct + pad) / 100 * bmp.width;
+  const b = Math.min(100, box.bottom_pct + pad) / 100 * bmp.height;
+  const w = Math.max(1, Math.round(r - l)), h = Math.max(1, Math.round(b - t));
+  const scale = Math.min(1, 1600 / Math.max(w, h));
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(w * scale); cv.height = Math.round(h * scale);
+  cv.getContext('2d')!.drawImage(bmp, l, t, w, h, 0, 0, cv.width, cv.height);
+  bmp.close();
+  return new Promise((res) => cv.toBlob((bl) => res(bl!), 'image/jpeg', 0.85));
+}
+
+// A piece box is measured against the WHOLE photo; once the photo is
+// cropped to one table it has to be re-expressed against the crop, or
+// every box on the booking page points at empty space.
+function reboxToTable(piece: Box, table: Box | null): Box {
+  if (!table) return piece;
+  const pad = 2;
+  const l = Math.max(0, table.left_pct - pad), t = Math.max(0, table.top_pct - pad);
+  const r = Math.min(100, table.right_pct + pad), b = Math.min(100, table.bottom_pct + pad);
+  const w = Math.max(0.01, r - l), h = Math.max(0.01, b - t);
+  const clamp = (v: number) => Math.max(0, Math.min(100, v));
+  return {
+    left_pct: clamp((piece.left_pct - l) / w * 100),
+    top_pct: clamp((piece.top_pct - t) / h * 100),
+    right_pct: clamp((piece.right_pct - l) / w * 100),
+    bottom_pct: clamp((piece.bottom_pct - t) / h * 100),
+  };
+}
+
 export default function BackfillPage() {
   const [shots, setShots] = useState<Shot[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [open, setOpen] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const picker = useRef<HTMLInputElement>(null);
 
-  // The backlog already sitting on the server. Daisy: "I want you to do
-  // it on the database internally." These photos ship with the build,
-  // so nothing has to be picked, uploaded or carried between devices --
-  // the run happens where the AI key and the database already are.
-  const [prog, setProg] = useState<{ total: number; pending: number; done: number; unmatched: number; failed: number; pieces: number; needs_a_look: { filename: string; tag_name: string | null; error_message: string | null }[] } | null>(null);
+  const [prog, setProg] = useState<{ total: number; pending: number; done: number; unmatched: number; failed: number; pieces: number } | null>(null);
   const [running, setRunning] = useState(false);
 
   const loadProgress = () =>
@@ -75,11 +115,14 @@ export default function BackfillPage() {
       .then((d) => d && setProg(d))
       .catch(() => {});
 
-  useEffect(() => { loadProgress(); }, []);
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setBookings(Array.isArray(d) ? d : []))
+      .catch(() => {});
+    loadProgress();
+  }, []);
 
-  // Each call works to a time budget and returns what is left, so this
-  // keeps going until the queue empties rather than one huge request
-  // that a proxy would cut off halfway.
   const runBatch = async () => {
     setRunning(true);
     try {
@@ -89,51 +132,15 @@ export default function BackfillPage() {
         await loadProgress();
         if (!res.ok || !d.remaining) break;
       }
-    } finally {
-      setRunning(false);
-      loadProgress();
-    }
+    } finally { setRunning(false); loadProgress(); }
   };
-
-  useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/bookings`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((d) => setBookings(Array.isArray(d) ? d : []))
-      .catch(() => {});
-  }, []);
-
-  const dayOf = (iso: string) => new Date(iso).toISOString().slice(0, 10);
-
-  // [6 Sep] NAME FIRST, DATE ONLY AS A TIEBREAK.
-  //
-  // Daisy: "why do you need to check the dates... when you can just
-  // check the booking name against the booking and use your common
-  // sense and the process of elimination?" She is right, and my first
-  // version was worse for a reason worth writing down: it filtered
-  // candidates to bookings on the file's date. But a file's timestamp
-  // is its MODIFICATION date, not when the shutter fired -- copying,
-  // editing, airdropping or restoring from a backup all rewrite it. So
-  // a wrong date silently emptied the candidate list and a perfectly
-  // readable chalk name matched nothing at all.
-  //
-  // The name is the strong signal and the whole booking history is
-  // searchable, so search all of it. The date only breaks ties between
-  // equally good name matches, where it is a hint rather than a gate.
-  const candidates = () => bookings;
 
   const pick = (files: FileList | null) => {
     if (!files?.length) return;
-    const next: Shot[] = Array.from(files).map((file) => ({
-      file,
-      url: URL.createObjectURL(file),
-      takenOn: new Date(file.lastModified).toISOString().slice(0, 10),
-      status: 'waiting',
-      pieces: [],
-      tagName: null,
-      bookingCode: null,
-      error: null,
-    }));
-    setShots((s) => [...s, ...next]);
+    setShots((s) => [...s, ...Array.from(files).map((file) => ({
+      file, url: URL.createObjectURL(file),
+      status: 'waiting' as const, tables: [] as Table[], error: null,
+    }))]);
   };
 
   const update = (i: number, patch: Partial<Shot>) =>
@@ -141,48 +148,41 @@ export default function BackfillPage() {
 
   const readAll = async () => {
     setBusy(true);
+    // Elimination across the whole batch, not just within one photo:
+    // overlapping screenshots show the same table twice, and the second
+    // sighting should not compete for a booking already claimed.
+    const claimed = new Set<string>();
+    for (const sh of shots) for (const t of sh.tables) if (t.bookingCode) claimed.add(t.bookingCode);
+
     for (let i = 0; i < shots.length; i++) {
-      if (shots[i].status !== 'waiting' && shots[i].status !== 'failed') continue;
+      if (shots[i].status === 'read' || shots[i].status === 'reading') continue;
       update(i, { status: 'reading', error: null });
       try {
-        const small = await compressPhotoForUpload(shots[i].file);
+        const small = await compressPhotoForUpload(shots[i].file, 1600);
         const fd = new FormData();
         fd.append('photo', small, 'table.jpg');
-        fd.append('read_tag', 'true');
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/pieces/identify-in-photo`, { method: 'POST', body: fd });
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/backfill/identify-tables`, { method: 'POST', body: fd });
         const d = await res.json();
-        if (!res.ok) throw new Error(d?.error || 'The AI could not read that photo');
-        const tag: string | null = d.tag_name || null;
-        let code: string | null = null;
-        if (tag) {
-          // Score every booking on the name, then eliminate: a booking
-          // that already has a table photo is not the one being
-          // recovered, so an earlier visit by a repeat customer stops
-          // competing with the one that still needs its photo.
-          const alreadyUsed = new Set(
-            shots.filter((o, n) => n !== i && o.bookingCode).map((o) => o.bookingCode as string)
-          );
-          const scored = bookings
-            .map((b) => ({ b, sc: scoreName(tag, b.customer_name) }))
-            .filter((x) => x.sc >= 0.5 && !alreadyUsed.has(x.b.booking_code))
-            .sort((x, y) => {
-              if (y.sc !== x.sc) return y.sc - x.sc;
-              // Equal names: prefer the session nearest the file's date.
-              // A hint, never a filter -- if the timestamp is wrong the
-              // match still stands, just possibly on the wrong visit,
-              // which the dropdown can fix in one tap.
-              const t = new Date(shots[i].takenOn).getTime();
-              return Math.abs(new Date(x.b.session_start).getTime() - t)
-                   - Math.abs(new Date(y.b.session_start).getTime() - t);
-            });
-          // Only auto-attach when one booking clearly wins. Two people
-          // scoring the same on a chalk name is exactly when a human
-          // should choose, so it drops to the dropdown instead.
-          if (scored.length === 1 || (scored.length > 1 && scored[0].sc > scored[1].sc)) {
-            code = scored[0].b.booking_code;
+        if (!res.ok) throw new Error(d?.error || 'Could not read that photo');
+
+        const tables: Table[] = (d.tables || []).map((t: Omit<Table, 'bookingCode' | 'saved'>) => {
+          let code: string | null = null;
+          if (t.tag_name) {
+            const ranked = bookings
+              .map((b) => ({ b, sc: scoreName(t.tag_name as string, b.customer_name) }))
+              .filter((x) => x.sc >= 0.5 && !claimed.has(x.b.booking_code))
+              .sort((x, y) => y.sc - x.sc);
+            // Only on a clear winner. A tie is when a person should
+            // decide, so it drops to the dropdown rather than gambling
+            // someone's pottery onto the wrong name.
+            if (ranked.length === 1 || (ranked.length > 1 && ranked[0].sc > ranked[1].sc)) {
+              code = ranked[0].b.booking_code;
+              claimed.add(code);
+            }
           }
-        }
-        update(i, { status: 'read', pieces: d.pieces || [], tagName: tag, bookingCode: code });
+          return { ...t, bookingCode: code, saved: false };
+        });
+        update(i, { status: 'read', tables });
       } catch (err) {
         update(i, { status: 'failed', error: err instanceof Error ? err.message : 'Could not read that photo' });
       }
@@ -190,202 +190,180 @@ export default function BackfillPage() {
     setBusy(false);
   };
 
-  const saveAll = async () => {
-    setBusy(true);
-    for (let i = 0; i < shots.length; i++) {
-      const sh = shots[i];
-      if (sh.status !== 'read' || !sh.bookingCode || !sh.pieces.length) continue;
-      update(i, { status: 'saving' });
+  const saveShot = async (i: number) => {
+    const sh = shots[i];
+    update(i, { status: 'saving' });
+    const tables = [...sh.tables];
+    for (let t = 0; t < tables.length; t++) {
+      const tb = tables[t];
+      if (tb.saved || !tb.bookingCode || !tb.pieces.length) continue;
       try {
+        const crop = await cropToTable(sh.file, tb.box);
         const fd = new FormData();
-        fd.append('photo', sh.file);
-        fd.append('booking_code', sh.bookingCode);
-        fd.append('description', `${sh.pieces.length} pieces, photographed at table`);
+        fd.append('photo', crop, 'table.jpg');
+        fd.append('booking_code', tb.bookingCode);
+        fd.append('description', `${tb.pieces.length} pieces, photographed at table`);
         fd.append('confirmed_by', 'backfill');
-        fd.append('piece_count', String(sh.pieces.length));
-        fd.append('pieces_json', JSON.stringify(sh.pieces.map((p) => ({ piece_type: p.piece_type, description: p.description, box: p.box }))));
-        // The whole point: text-only placeholders from the screenshot
-        // read step give way to the real photo and its boxes.
+        fd.append('piece_count', String(tb.pieces.length));
+        fd.append('pieces_json', JSON.stringify(tb.pieces.map((p) => ({
+          piece_type: p.piece_type,
+          description: p.description,
+          box: p.box ? reboxToTable(p.box, tb.box) : null,
+        }))));
         fd.append('replace_backfilled', 'true');
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/demo/photo-match/confirm`, { method: 'POST', body: fd });
-        if (!res.ok) throw new Error('Save failed');
-        update(i, { status: 'saved' });
+        if (!res.ok) throw new Error('save failed');
+        tables[t] = { ...tb, saved: true };
       } catch {
-        update(i, { status: 'failed', error: 'Could not save that one' });
+        // Left unsaved rather than ticked off, so a retry picks it up.
       }
     }
-    setBusy(false);
+    update(i, { status: 'read', tables });
   };
 
-  const readable = shots.filter((s) => s.status === 'read' && s.bookingCode).length;
-  const unmatched = shots.filter((s) => s.status === 'read' && !s.bookingCode).length;
+  const ready = (sh: Shot) => sh.tables.filter((t) => t.bookingCode && !t.saved).length;
+  const needsLook = (sh: Shot) => sh.tables.filter((t) => !t.bookingCode).length;
+
+  const field = { width: '100%', minHeight: 44, padding: '0.5rem', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-sm)', background: 'white', color: 'var(--charcoal)' } as const;
 
   return (
     <PageShell title="Backfill from photos" subtitle="Tables photographed outside the app">
-      <div style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.9rem', marginBottom: '1rem' }}>
-        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--charcoal)', margin: 0, lineHeight: 1.4 }}>
-          Pick the original table photos from the iPad library. Each one goes through exactly the
-          same identification a live session uses, so the pieces get real photos and numbered boxes,
-          not just descriptions.
-        </p>
-        <p style={{ fontSize: 'var(--text-xs)', color: '#777', margin: '0.5rem 0 0' }}>
-          Choose the originals, not a screenshot of the library — a photo of a screen loses the detail
-          the matching depends on.
-        </p>
-      </div>
-
       {prog && prog.total > 0 && (
         <div style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.9rem', marginBottom: '1rem' }}>
-          <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, margin: '0 0 0.3rem' }}>
-            The 27 Aug – 5 Sep backlog
-          </p>
+          <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, margin: '0 0 0.3rem' }}>The 27 Aug – 5 Sep backlog</p>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--charcoal)', margin: '0 0 0.6rem' }}>
-            {prog.done} of {prog.total} photos done · {prog.pieces} piece{prog.pieces === 1 ? '' : 's'} with real photos
+            {prog.done} of {prog.total} done · {prog.pieces} piece{prog.pieces === 1 ? '' : 's'} with photos
             {prog.unmatched ? ` · ${prog.unmatched} need a look` : ''}
             {prog.failed ? ` · ${prog.failed} failed` : ''}
           </p>
           {prog.pending > 0 && (
-            <button
-              onClick={runBatch}
-              disabled={running}
-              style={{ width: '100%', minHeight: 48, borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer', opacity: running ? 0.6 : 1 }}
-            >
+            <button onClick={runBatch} disabled={running}
+              style={{ width: '100%', minHeight: 48, borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer', opacity: running ? 0.6 : 1 }}>
               {running ? `Working… ${prog.pending} left` : `Run the AI over ${prog.pending} photo${prog.pending === 1 ? '' : 's'}`}
             </button>
-          )}
-          {prog.needs_a_look.length > 0 && (
-            <div style={{ marginTop: '0.7rem' }}>
-              <p style={{ fontSize: 'var(--text-xs)', color: '#A6761D', fontWeight: 700, margin: '0 0 0.3rem' }}>
-                Left alone rather than guessed at:
-              </p>
-              {prog.needs_a_look.slice(0, 20).map((r) => (
-                <p key={r.filename} style={{ fontSize: 'var(--text-xs)', color: '#777', margin: '0.1rem 0' }}>
-                  {r.tag_name ? `"${r.tag_name}"` : 'board unreadable'} — {r.error_message}
-                </p>
-              ))}
-            </div>
           )}
         </div>
       )}
 
-      <input
-        ref={picker}
-        type="file"
-        accept="image/*"
-        multiple
-        onChange={(e) => pick(e.target.files)}
-        style={{ display: 'none' }}
-      />
+      <input ref={picker} type="file" accept="image/*" multiple onChange={(e) => pick(e.target.files)} style={{ display: 'none' }} />
 
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        <button
-          onClick={() => picker.current?.click()}
-          style={{ flex: '1 1 auto', minHeight: 48, padding: '0.8rem', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-        >
+        <button onClick={() => picker.current?.click()}
+          style={{ flex: '1 1 auto', minHeight: 48, padding: '0.8rem', borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
           <Camera size={18} /> Choose photos
         </button>
         {shots.some((s) => s.status === 'waiting' || s.status === 'failed') && (
-          <button
-            onClick={readAll}
-            disabled={busy}
-            style={{ flex: '1 1 auto', minHeight: 48, padding: '0.8rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--clay)', background: 'white', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer', opacity: busy ? 0.6 : 1 }}
-          >
+          <button onClick={readAll} disabled={busy}
+            style={{ flex: '1 1 auto', minHeight: 48, padding: '0.8rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--clay)', background: 'white', color: 'var(--clay)', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer', opacity: busy ? 0.6 : 1 }}>
             {busy ? 'Reading…' : `Identify ${shots.filter((s) => s.status === 'waiting' || s.status === 'failed').length}`}
           </button>
         )}
       </div>
 
-      {readable > 0 && (
-        <button
-          onClick={saveAll}
-          disabled={busy}
-          style={{ width: '100%', minHeight: 48, padding: '0.8rem', borderRadius: 'var(--radius-md)', border: 'none', background: '#2E7D32', color: 'white', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer', marginBottom: '1rem', opacity: busy ? 0.6 : 1 }}
-        >
-          Save {readable} to their bookings
-        </button>
-      )}
+      {/* Thumbnails rather than full-bleed photos, each badged with what
+          is in it, so the ones needing a decision can be found without
+          scrolling past the ones that are fine. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.4rem' }}>
+        {shots.map((sh, i) => {
+          const r = ready(sh), n = needsLook(sh);
+          const done = sh.tables.length > 0 && sh.tables.every((t) => t.saved);
+          return (
+            <button key={i} onClick={() => setOpen(open === i ? null : i)}
+              style={{ position: 'relative', padding: 0, border: open === i ? '2px solid var(--clay)' : '1px solid #ece5db', borderRadius: 'var(--radius-sm)', overflow: 'hidden', cursor: 'pointer', background: 'white', aspectRatio: '1' }}>
+              <img src={sh.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: done ? 0.55 : 1 }} />
+              <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '0.2rem 0.3rem', fontSize: 'var(--text-xs)', fontWeight: 700, color: 'white', background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+                {sh.status === 'reading' && <Loader size={11} className="animate-spin" />}
+                {sh.status === 'waiting' && 'not read'}
+                {sh.status === 'failed' && <AlertCircle size={11} />}
+                {sh.status === 'saving' && 'saving'}
+                {done && <Check size={11} />}
+                {sh.status === 'read' && !done && `${sh.tables.length} table${sh.tables.length === 1 ? '' : 's'}`}
+              </span>
+              {n > 0 && (
+                <span style={{ position: 'absolute', top: 3, right: 3, minWidth: 18, height: 18, borderRadius: 9, background: '#A6761D', color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>
+                  {n}
+                </span>
+              )}
+              {r > 0 && n === 0 && (
+                <span style={{ position: 'absolute', top: 3, right: 3, minWidth: 18, height: 18, borderRadius: 9, background: '#2E7D32', color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>
+                  {r}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
 
-      {unmatched > 0 && (
-        <p style={{ fontSize: 'var(--text-sm)', color: '#A6761D', marginBottom: '1rem' }}>
-          {unmatched} photo{unmatched === 1 ? '' : 's'} had no readable chalk name. Pick the booking by
-          hand below — they are skipped until you do, rather than guessed at.
-        </p>
-      )}
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {shots.map((sh, i) => (
-          <div key={i} style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+      {open !== null && shots[open] && (() => {
+        const sh = shots[open];
+        const idx = open;
+        return (
+          <div style={{ marginTop: '1rem', background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
             <div style={{ position: 'relative' }}>
               <img src={sh.url} alt="" style={{ width: '100%', display: 'block' }} />
-              {sh.pieces.map((p, n) => p.box && (
-                <div
-                  key={n}
-                  style={{
-                    position: 'absolute',
-                    left: `${p.box.left_pct}%`, top: `${p.box.top_pct}%`,
-                    width: `${p.box.right_pct - p.box.left_pct}%`,
-                    height: `${p.box.bottom_pct - p.box.top_pct}%`,
-                    border: `3px solid ${COLOURS[n % 6]}`, borderRadius: 'var(--radius-sm)',
-                    boxShadow: '0 0 0 1px rgba(255,255,255,0.9)', pointerEvents: 'none',
-                  }}
-                >
-                  <span style={{ position: 'absolute', top: -9, left: -9, width: 20, height: 20, borderRadius: '50%', background: COLOURS[n % 6], color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px white' }}>
-                    {p.index}
+              {sh.tables.map((t, ti) => t.box && (
+                <div key={ti} style={{
+                  position: 'absolute', left: `${t.box.left_pct}%`, top: `${t.box.top_pct}%`,
+                  width: `${t.box.right_pct - t.box.left_pct}%`, height: `${t.box.bottom_pct - t.box.top_pct}%`,
+                  border: `3px solid ${COLOURS[ti % 6]}`, borderRadius: 'var(--radius-sm)', pointerEvents: 'none',
+                }}>
+                  <span style={{ position: 'absolute', top: 0, left: 0, background: COLOURS[ti % 6], color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, padding: '1px 5px', borderRadius: '0 0 4px 0' }}>
+                    {t.tag_name || '?'} · {t.pieces.length}
                   </span>
                 </div>
               ))}
             </div>
 
             <div style={{ padding: '0.8rem' }}>
-              <p style={{ fontSize: 'var(--text-xs)', color: '#777', margin: '0 0 0.4rem' }}>
-                Taken {new Date(sh.takenOn).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
-                {sh.tagName ? ` · chalk board reads "${sh.tagName}"` : ''}
-              </p>
+              {sh.error && <p style={{ fontSize: 'var(--text-sm)', color: '#C0392B', margin: '0 0 0.5rem' }}>{sh.error}</p>}
 
-              {sh.status === 'reading' && (
-                <p style={{ fontSize: 'var(--text-sm)', color: '#777', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Loader size={14} className="animate-spin" /> Identifying pieces…
-                </p>
-              )}
-
-              {sh.status === 'saved' && (
-                <p style={{ fontSize: 'var(--text-sm)', color: '#2E7D32', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Check size={15} /> Saved with {sh.pieces.length} piece{sh.pieces.length === 1 ? '' : 's'}
-                </p>
-              )}
-
-              {sh.error && <p style={{ fontSize: 'var(--text-sm)', color: '#C0392B' }}>{sh.error}</p>}
-
-              {(sh.status === 'read' || sh.status === 'saving') && (
-                <>
+              {sh.tables.map((t, ti) => (
+                <div key={ti} style={{ borderTop: ti ? '1px solid #f0ece6' : 'none', paddingTop: ti ? '0.7rem' : 0, marginTop: ti ? '0.7rem' : 0 }}>
+                  <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, margin: '0 0 0.3rem', color: COLOURS[ti % 6] }}>
+                    {t.tag_name ? `Board reads "${t.tag_name}"` : 'Board not readable'} · {t.pieces.length} piece{t.pieces.length === 1 ? '' : 's'}
+                    {t.saved ? ' · saved' : ''}
+                  </p>
                   <select
-                    value={sh.bookingCode || ''}
-                    onChange={(e) => update(i, { bookingCode: e.target.value || null })}
-                    style={{ width: '100%', minHeight: 44, padding: '0.5rem', marginBottom: '0.5rem', borderRadius: 'var(--radius-sm)', border: sh.bookingCode ? '1px solid #ece5db' : '2px solid #A6761D', fontSize: 'var(--text-sm)', background: 'white', color: 'var(--charcoal)' }}
+                    value={t.bookingCode || ''}
+                    disabled={t.saved}
+                    onChange={(e) => {
+                      const tables = [...sh.tables];
+                      tables[ti] = { ...t, bookingCode: e.target.value || null };
+                      update(idx, { tables });
+                    }}
+                    style={{ ...field, marginBottom: '0.4rem', border: t.bookingCode ? '1px solid #ece5db' : '2px solid #A6761D' }}
                   >
                     <option value="">Which booking?</option>
-                    {candidates().map((b) => (
+                    {bookings.map((b) => (
                       <option key={b.booking_code} value={b.booking_code}>
-                        {b.customer_name} · {new Date(b.session_start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} {new Date(b.session_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                        {b.customer_name} · {new Date(b.session_start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                       </option>
                     ))}
                   </select>
-                  {sh.pieces.map((p, n) => (
-                    <div key={n} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', padding: '0.2rem 0' }}>
-                      <span style={{ flexShrink: 0, width: 18, height: 18, borderRadius: '50%', background: COLOURS[n % 6], color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2 }}>
-                        {p.index}
-                      </span>
-                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--charcoal)' }}>
-                        <b>{p.piece_type}</b> — {p.description}
-                      </span>
-                    </div>
+                  {t.pieces.map((p, n) => (
+                    <p key={n} style={{ fontSize: 'var(--text-xs)', color: 'var(--charcoal)', margin: '0.1rem 0' }}>
+                      {p.index}. <b>{p.piece_type}</b> — {p.description}
+                    </p>
                   ))}
-                </>
+                </div>
+              ))}
+
+              {ready(sh) > 0 && (
+                <button onClick={() => saveShot(idx)} disabled={sh.status === 'saving'}
+                  style={{ width: '100%', minHeight: 48, marginTop: '0.8rem', borderRadius: 'var(--radius-md)', border: 'none', background: '#2E7D32', color: 'white', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer', opacity: sh.status === 'saving' ? 0.6 : 1 }}>
+                  {sh.status === 'saving' ? 'Saving…' : `Save ${ready(sh)} booking${ready(sh) === 1 ? '' : 's'}`}
+                </button>
+              )}
+              {needsLook(sh) > 0 && (
+                <p style={{ fontSize: 'var(--text-xs)', color: '#A6761D', marginTop: '0.5rem' }}>
+                  {needsLook(sh)} table{needsLook(sh) === 1 ? '' : 's'} here had no readable name — skipped until you pick
+                  the booking, rather than guessed at.
+                </p>
               )}
             </div>
           </div>
-        ))}
-      </div>
+        );
+      })()}
     </PageShell>
   );
 }
