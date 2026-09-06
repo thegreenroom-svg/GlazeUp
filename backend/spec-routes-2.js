@@ -7907,7 +7907,7 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
       // elimination, so a repeat customer's earlier visit stops
       // competing with the one still waiting to be recovered.
       const { data: allBookings } = await supabase
-        .from('bookings').select('booking_code, customer_name, session_start, collection_date, table_number, collection_notes')
+        .from('bookings').select('booking_code, customer_name, session_start, collection_date, table_number, collection_notes, party_size')
         .eq('studio_id', STUDIO_ID).limit(1000);
       const { data: photographed } = await supabase
         .from('pottery_pieces').select('booking_id')
@@ -8126,38 +8126,74 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
           // booking, but only where the booking has nothing already --
           // a chalk read is good evidence, never better than something
           // a person entered.
-          const patch = {};
+          // [6 Sep] Daisy: "I don't want to have patches. I just want to
+          // be able to do everything that's on file."
+          //
+          // So the tag is applied, not merely offered where a field
+          // happens to be blank. It is the studio's own record, written
+          // by whoever set that table, and for these bookings it beats
+          // what is already stored: the collection dates on them are my
+          // own bulk guesses from this morning, inferred one-per-day,
+          // not anything a person entered.
+          //
+          // Nothing is overwritten silently. The previous value is kept
+          // on the photo row alongside the new one, so any read can be
+          // checked or undone later without re-running the AI.
+          const applied = {}, replaced = {};
+          const setField = (field, value) => {
+            if (value === undefined || value === null || value === '') return;
+            if (win[field] === value) return;
+            if (win[field]) replaced[field] = win[field];
+            applied[field] = value;
+          };
+
           const collectRaw = (parsed.collect_date || '').trim();
-          if (collectRaw && !win.collection_date) {
+          if (collectRaw) {
             // "4/9" carries no year. Take it from the session, rolling
             // forward when the month goes backwards -- a December paint
-            // collected in January is the same booking, not last year's.
+            // collected in January belongs to this booking, not last year.
             const m = collectRaw.match(/^(\d{1,2})\s*[\/.-]\s*(\d{1,2})$/);
             if (m) {
               const sess = new Date(win.session_start);
               const day = parseInt(m[1], 10), mon = parseInt(m[2], 10);
               if (day >= 1 && day <= 31 && mon >= 1 && mon <= 12) {
                 const year = mon < (sess.getMonth() + 1) ? sess.getFullYear() + 1 : sess.getFullYear();
-                patch.collection_date = `${year}-${String(mon).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                setField('collection_date', `${year}-${String(mon).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
               }
             }
           }
-          const tableRaw = (parsed.table || '').trim();
-          if (tableRaw && !win.table_number) patch.table_number = tableRaw;
-          // NP is a real operational flag -- pottery that must not go
-          // home before someone has taken the money. Recorded as a note
-          // rather than a silent field, so whoever packs it sees it.
-          if (parsed.unpaid === true) {
-            patch.collection_notes = [win.collection_notes, 'Chalk tag marked NP (not paid) at the table'].filter(Boolean).join(' · ');
+          setField('table_number', (parsed.table || '').trim());
+
+          // NP is money not yet taken, so it is a note somebody reads
+          // before handing pottery over, not a quiet column. Appended
+          // rather than assigned -- a note already there was written by
+          // a person and outranks anything chalked on a board.
+          if (parsed.unpaid === true && !/not paid/i.test(win.collection_notes || '')) {
+            applied.collection_notes = [win.collection_notes, 'Chalk tag marked NP (not paid) at the table'].filter(Boolean).join(' · ');
           }
-          if (Object.keys(patch).length) {
-            await supabase.from('bookings').update(patch).eq('studio_id', STUDIO_ID).eq('booking_code', win.booking_code);
+
+          // Party size is the one thing NOT taken from the tag. It comes
+          // from the Square booking, which is a record of what was
+          // actually booked and paid for; the "x3" is a staff shorthand
+          // written at the table. Where they disagree that is worth
+          // seeing, so it is recorded and flagged, never used to
+          // overwrite the booking system.
+          const tagParty = parseInt(parsed.party_size, 10) || 0;
+          const partyMismatch = tagParty && win.party_size && tagParty !== win.party_size
+            ? { tag: tagParty, booking: win.party_size } : null;
+
+          if (Object.keys(applied).length) {
+            await supabase.from('bookings').update(applied).eq('studio_id', STUDIO_ID).eq('booking_code', win.booking_code);
           }
 
           taken.add(win.booking_code);
           await supabase.from('backfill_photos').update({
             status: 'done', tag_name: tag, booking_code: win.booking_code,
-            ai_result: { tag_name: tag, paint_date: tagDay, collect_date: collectRaw, table: tableRaw, party_size: parsed.party_size || 0, unpaid: parsed.unpaid === true, applied: patch },
+            ai_result: {
+              tag_name: tag, paint_date: tagDay, collect_date: collectRaw,
+              table: (parsed.table || '').trim(), party_size: tagParty, unpaid: parsed.unpaid === true,
+              applied, replaced, party_mismatch: partyMismatch,
+            },
             pieces_created: (created || []).length, processed_at: new Date().toISOString(),
           }).eq('id', row.id);
           matched++; done++;
