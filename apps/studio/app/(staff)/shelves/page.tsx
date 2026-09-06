@@ -27,7 +27,7 @@ import { Loader, Layers } from 'lucide-react';
 // packing and a different red on this screen all along. Exactly the
 // drift the shared component was meant to end, in a file I had already
 // edited twice today without noticing.
-import { PieceThumb, PIECE_COLOURS } from '@/components/PieceBoxes';
+import { PieceThumb, PIECE_COLOURS, PhotoWithBoxes } from '@/components/PieceBoxes';
 
 interface MatchedDetail {
   piece_id: string;
@@ -70,6 +70,8 @@ export default function ShelvesPage() {
   // you had in mind meant scrolling past four screens of a shelf you
   // did not. A wall of shelves should look like a wall.
   const [openSweep, setOpenSweep] = useState<string | null>(null);
+  // Which box on which photo is currently pointed at.
+  const [picked, setPicked] = useState<{ sweep: string; index: number } | null>(null);
   // Unnumbered photos are indistinguishable from one another on a wall,
   // so only the latest few show until asked.
   const [showAllUnnumbered, setShowAllUnnumbered] = useState(false);
@@ -223,28 +225,38 @@ export default function ShelvesPage() {
                 </span>
               </div>
 
-              <div style={{ position: 'relative' }}>
-                <img src={sw.photo_url} alt="" style={{ width: '100%', borderRadius: 'var(--radius-md)', display: 'block' }} />
-                {details.map((d, i) => d.box && (
-                  <div
-                    key={d.piece_id}
-                    style={{
-                      position: 'absolute',
-                      left: `${d.box.left_pct}%`,
-                      top: `${d.box.top_pct}%`,
-                      width: `${d.box.right_pct - d.box.left_pct}%`,
-                      height: `${d.box.bottom_pct - d.box.top_pct}%`,
-                      border: `3px solid ${PIECE_COLOURS[i % 6]}`,
-                      borderRadius: 'var(--radius-sm)',
-                      boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
-                      pointerEvents: 'none',
-                    }}
-                  >
-                    <span style={{ position: 'absolute', top: -9, left: -9, width: 20, height: 20, borderRadius: 'var(--radius-full)', backgroundColor: PIECE_COLOURS[i % 6], color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px white' }}>
-                      {i + 1}
-                    </span>
-                  </div>
-                ))}
+              {/* [6 Sep] Daisy: "should click and group and take to
+                  booking for packing."
+                  The boxes on the photo are the most natural thing to
+                  reach for -- you can see the piece, so you point at it
+                  -- and they were the one part that did nothing. Now a
+                  tap on a box selects that piece: it dims the others,
+                  scrolls its booking into view and highlights it, so
+                  the picture and the list stay tied together. Tapping
+                  the same box again clears it.
+
+                  Drawn by the shared component, so this photo finally
+                  numbers and colours pieces the same way packing does. */}
+              <div style={{ borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+                <PhotoWithBoxes
+                  src={sw.photo_url}
+                  pieces={details.map((d) => ({ piece_type: d.piece_type, description: d.description, box: d.box }))}
+                  activeIndex={picked?.sweep === sw.id ? picked.index : null}
+                  onPick={(i) => {
+                    const same = picked?.sweep === sw.id && picked.index === i;
+                    setPicked(same ? null : { sweep: sw.id, index: i });
+                    if (!same) {
+                      const code = details[i]?.booking_code;
+                      if (code) {
+                        // Scrolled to rather than navigated to. Jumping
+                        // straight to packing would lose the shelf you
+                        // are standing in front of, and the next thing
+                        // you point at is usually on the same photo.
+                        document.getElementById(`grp-${sw.id}-${code}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
+                    }
+                  }}
+                />
               </div>
 
               {/* The list under each photo is what makes this worth
@@ -288,8 +300,13 @@ export default function ShelvesPage() {
                     .map((g) => (
                       <button
                         key={g.code || g.name}
+                        id={`grp-${sw.id}-${g.code}`}
                         onClick={() => router.push(`/packing?code=${encodeURIComponent(g.code)}`)}
-                        style={{ display: 'block', width: '100%', textAlign: 'left', border: '1px solid #ece5db', borderRadius: 'var(--radius-sm)', background: 'white', padding: '0.5rem 0.6rem', cursor: 'pointer' }}
+                        style={{
+                          display: 'block', width: '100%', textAlign: 'left',
+                          border: picked?.sweep === sw.id && details[picked.index]?.booking_code === g.code ? '2px solid var(--clay)' : '1px solid #ece5db',
+                          borderRadius: 'var(--radius-sm)', background: 'white', padding: '0.5rem 0.6rem', cursor: 'pointer',
+                        }}
                       >
                         <span style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.5rem' }}>
                           <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--charcoal)' }}>
