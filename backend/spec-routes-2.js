@@ -6109,7 +6109,20 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
           piece_type: piece.piece_type,
           description: piece.description,
           confidence: Math.round((m.confidence ?? 0) * 100) / 100,
+          // Where it is on the SHELF photo.
           box: boxFromGemini(m.box_2d),
+          // [6 Sep] And where it was on its TABLE photo, plus that
+          // photo. These were being dropped here: the match copies the
+          // piece into a fresh object with five fields, so the
+          // reference photo I added to matched_details further down was
+          // always reading undefined, and every thumbnail said "no
+          // photo" even for bookings that plainly had one.
+          //
+          // Two different boxes on two different photos, both needed:
+          // one rings the piece on the shelf, the other crops its
+          // thumbnail out of the table shot.
+          reference_photo_url: piece.reference_photo_url || null,
+          photo_box: piece.photo_box || null,
         });
         byBooking.set(piece.booking_id, cur);
       }
