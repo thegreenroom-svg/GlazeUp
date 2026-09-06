@@ -107,7 +107,7 @@ export default function BackfillPage() {
   const [busy, setBusy] = useState(false);
   const picker = useRef<HTMLInputElement>(null);
 
-  const [prog, setProg] = useState<{ on_disk: number; total: number; pending: number; done: number; unmatched: number; failed: number; pieces: number } | null>(null);
+  const [prog, setProg] = useState<{ on_disk: number; total: number; pending: number; done: number; unmatched: number; failed: number; duplicate: number; pieces: number } | null>(null);
   const [running, setRunning] = useState(false);
 
   const loadProgress = () =>
@@ -236,6 +236,7 @@ export default function BackfillPage() {
           <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, margin: '0 0 0.3rem' }}>The 27 Aug – 5 Sep backlog</p>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--charcoal)', margin: '0 0 0.6rem' }}>
             {prog.done} of {prog.total} done · {prog.pieces} piece{prog.pieces === 1 ? '' : 's'} with photos
+            {prog.duplicate ? ` · ${prog.duplicate} second shots skipped` : ''}
             {prog.unmatched ? ` · ${prog.unmatched} need a look` : ''}
             {prog.failed ? ` · ${prog.failed} failed` : ''}
           </p>

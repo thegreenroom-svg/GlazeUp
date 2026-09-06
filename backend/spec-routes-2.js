@@ -7913,6 +7913,16 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
       // eligible again. Ten minutes is far longer than one call and far
       // shorter than a working day.
       const staleBefore = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      // [6 Sep] 'assigned' means a person (or Claude, from the data)
+      // has picked the booking for a photo whose name was ambiguous.
+      // The expensive half -- the read -- is already stored on the row,
+      // so these finish with an upload and an insert and no AI call at
+      // all. Handled before the pending queue so hand-decided ones land
+      // first.
+      const { data: assigned } = await supabase
+        .from('backfill_photos').select('id, filename, booking_code, ai_result')
+        .eq('studio_id', STUDIO_ID).eq('status', 'assigned').limit(60);
+
       const { data: readyRows } = await supabase
         .from('backfill_photos').select('id, filename, status, processed_at')
         .eq('studio_id', STUDIO_ID).in('status', ['pending', 'processing'])
@@ -7987,6 +7997,50 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
       // is a fault in the prompt, not in the photos -- so stop and say
       // so rather than working through the money to find out.
       const BREAK_AFTER = 8;
+
+      // Finish the hand-assigned ones first. No Gemini call: the read
+      // was paid for already and is sitting on the row.
+      for (const row of assigned || []) {
+        if (Date.now() > DEADLINE) break;
+        try {
+          const stored = row.ai_result || {};
+          const storedPieces = (stored.pieces || []).filter((p) => p && p.description);
+          if (!row.booking_code || !storedPieces.length) {
+            await supabase.from('backfill_photos').update({ status: 'unmatched', error_message: 'Assigned but no stored read to apply' }).eq('id', row.id);
+            continue;
+          }
+          const buf = fs.readFileSync(path.join(DIR, row.filename));
+          const fname = `backfill/${STUDIO_ID}/${row.filename}`;
+          await supabase.storage.from('booking-photos').upload(fname, buf, { contentType: 'image/jpeg', upsert: true });
+          const { data: urlData } = supabase.storage.from('booking-photos').getPublicUrl(fname);
+
+          await supabase.from('pottery_pieces').delete()
+            .eq('studio_id', STUDIO_ID).eq('booking_id', row.booking_code).is('reference_photo_url', null);
+
+          const { data: created } = await supabase.from('pottery_pieces').insert(storedPieces.map((pc) => ({
+            studio_id: STUDIO_ID,
+            booking_id: row.booking_code,
+            piece_type: pc.piece_type || 'Piece',
+            description: pc.description,
+            status: 'queued',
+            reference_photo_url: urlData.publicUrl,
+            reference_photo_taken_at: new Date().toISOString(),
+            photo_box: boxFromGemini(pc.box_2d) || pc.box || null,
+            photo_taken_by: 'backfill',
+            notes: 'Recovered from the iPad library, booking chosen by hand',
+          }))).select('id');
+
+          await supabase.from('backfill_photos').update({
+            status: 'done', pieces_created: (created || []).length, processed_at: new Date().toISOString(),
+          }).eq('id', row.id);
+          matched++; done++;
+        } catch (err) {
+          await supabase.from('backfill_photos').update({
+            status: 'failed', error_message: String(err.message || err).slice(0, 300),
+          }).eq('id', row.id);
+          failed++; done++;
+        }
+      }
 
       for (const row of pending || []) {
         if (Date.now() > DEADLINE) break;
@@ -8104,6 +8158,19 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
           if (!win) {
             await supabase.from('backfill_photos').update({
               status: 'unmatched', tag_name: tag,
+              // [6 Sep] The read is kept HERE TOO. It was stored in the
+              // other no-match branch and not this one, so every photo
+              // whose name was ambiguous threw its AI result away and
+              // could only be finished by paying to read it again.
+              // Same shape of mistake as the crash earlier today: the
+              // unhappy path got less care than the happy one.
+              ai_result: {
+                tag_name: tag, paint_date: tagDay, collect_date: (parsed.collect_date || '').trim(),
+                table: (parsed.table || '').trim(), party_size: parseInt(parsed.party_size, 10) || 0,
+                unpaid: parsed.unpaid === true, pieces,
+                candidates: ranked.slice(0, 5).map((x) => ({ booking_code: x.b.booking_code, name: x.b.customer_name, day: dayOf(x.b.session_start), score: Math.round(x.sc * 100) })),
+              },
+              pieces_created: pieces.length,
               error_message: !ranked.length
                 ? `No booking matches "${tag}"`
                 : pool.length === 0
@@ -8349,6 +8416,10 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
         pending: rows.filter((r) => r.status === 'pending' || r.status === 'processing').length,
         done: rows.filter((r) => r.status === 'done').length,
         unmatched: rows.filter((r) => r.status === 'unmatched').length,
+        // A second shot of a table already captured is not a failure and
+        // should not sit in a pile labelled "needs a look" forever.
+        duplicate: rows.filter((r) => r.status === 'duplicate').length,
+        assigned: rows.filter((r) => r.status === 'assigned').length,
         failed: rows.filter((r) => r.status === 'failed').length,
         pieces: rows.reduce((n, r) => n + (r.pieces_created || 0), 0),
         needs_a_look: rows.filter((r) => r.status === 'unmatched' || r.status === 'failed'),
