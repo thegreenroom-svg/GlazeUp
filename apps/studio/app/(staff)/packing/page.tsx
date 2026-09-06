@@ -150,6 +150,8 @@ export default function PackingPage() {
   const [sweeping, setSweeping] = useState(false);
   const [sweep, setSweep] = useState<{
     candidates: number;
+    waiting_total?: number;
+    not_searched?: number;
     note?: string;
     bookings: {
       booking_code: string; customer_name: string; found: number; expected: number; complete: boolean; collection_date?: string | null;
@@ -1009,6 +1011,10 @@ export default function PackingPage() {
           <>
             <p style={{ fontSize: 'var(--text-sm)', color: '#A6761D', marginTop: '0.6rem' }}>
               {sweep.note || `Nothing recognised out of ${sweep.candidates} piece${sweep.candidates === 1 ? '' : 's'} waiting. Worth trying a closer photo.`}
+              {/* "Nothing found" and "nothing found in the part I looked
+                  at" are different answers, and only one of them means
+                  the photo was bad. */}
+              {!!sweep.not_searched && ` ${sweep.not_searched} more weren't searched this time — they're due later.`}
             </p>
             {foundSoFar.length > 0 && (
               <p style={{ fontSize: 'var(--text-xs)', color: '#777', marginTop: '0.3rem' }}>
@@ -1077,6 +1083,7 @@ export default function PackingPage() {
 
             <p style={{ fontSize: 'var(--text-xs)', color: '#666', marginBottom: '0.4rem' }}>
               Checked against {sweep.candidates} piece{sweep.candidates === 1 ? '' : 's'} still waiting
+              {!!sweep.not_searched && ` (of ${sweep.waiting_total}, earliest collection dates first)`}
             </p>
             {sweep.bookings.map((b, bi) => (
               <div key={b.booking_code}>

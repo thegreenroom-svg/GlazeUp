@@ -5828,12 +5828,11 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
       // A piece with no description can't be looked for, and one held for a
       // return visit was never in the kiln -- including either would send
       // someone hunting a shelf for something that isn't there.
-      const pieces = (allPieces || [])
+      const eligible = (allPieces || [])
         .filter((p) => (p.description || p.piece_type) && p.fulfilment !== 'return_visit' && !excludeIds.includes(p.id))
-        .filter((p) => !onlyBookingCode || p.booking_id === onlyBookingCode)
-        .slice(0, 80);
+        .filter((p) => !onlyBookingCode || p.booking_id === onlyBookingCode);
 
-      if (!pieces.length) {
+      if (!eligible.length) {
         return res.json({
           candidates: 0,
           bookings: [],
@@ -5845,13 +5844,43 @@ export function registerShelfSweepRoute(app, supabase, STUDIO_ID, logger, axios,
         });
       }
 
+      // Fetched for the WHOLE eligible pool, not just the slice, because
+      // the collection date is what decides which pieces make the slice
+      // at all. Previously this ran after the cut, which was fine only
+      // while the pool was smaller than the cap.
       const { data: bookingRows } = await supabase
         .from('bookings')
         .select('booking_code, customer_name, collection_date')
         .eq('studio_id', STUDIO_ID)
-        .in('booking_code', Array.from(new Set(pieces.map((p) => p.booking_id))));
+        .in('booking_code', Array.from(new Set(eligible.map((p) => p.booking_id))));
       const nameByCode = new Map((bookingRows || []).map((b) => [b.booking_code, b.customer_name]));
       const collectionDateByCode = new Map((bookingRows || []).map((b) => [b.booking_code, b.collection_date]));
+
+      // [6 Sep] THE CAP HAD NO ORDER. 80 was written when the whole
+      // studio held about thirty pieces, so the slice never actually
+      // cut anything and the arbitrary order it cut in did not matter.
+      // Backfilling three weeks of table photos took the pool past 300
+      // in one go, at which point an unordered slice quietly means "any
+      // 80 rows Postgres felt like returning" -- a shelf could be swept,
+      // report nothing found, and be completely right about the 80 it
+      // was allowed to look at while the real pieces sat outside the cut.
+      //
+      // A shelf is a kiln batch, and a kiln batch comes out in
+      // collection-date order, so the earliest due pieces are the ones
+      // actually on the shelf being photographed. Sorting by that makes
+      // the cap cut the right end. Undated pieces sort last rather than
+      // first -- an unknown date is not an urgent one.
+      const CANDIDATE_CAP = 80;
+      const dueKey = (p) => collectionDateByCode.get(p.booking_id) || '9999-12-31';
+      eligible.sort((a, b) => {
+        const da = dueKey(a), db = dueKey(b);
+        return da < db ? -1 : da > db ? 1 : 0;
+      });
+      const pieces = eligible.slice(0, CANDIDATE_CAP);
+      // Said out loud rather than hidden. If a sweep only looked at part
+      // of what is waiting, whoever is standing at the shelf needs to
+      // know that "not found" might mean "not searched".
+      const notSearched = Math.max(0, eligible.length - pieces.length);
 
       // Daisy, direct: "it needs to look at images surely not just
       // descriptions, that's the point." Fair, and correct -- this route
@@ -6112,6 +6141,8 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
 
       res.json({
         candidates: pieces.length,
+        waiting_total: eligible.length,
+        not_searched: notSearched,
         box_number_read: (parsed.box_number || '').toString().trim() || null,
         placed_on_shelf: placed,
         bookings: Array.from(byBooking.entries())
