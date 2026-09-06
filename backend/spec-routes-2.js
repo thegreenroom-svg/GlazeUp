@@ -8043,6 +8043,26 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
           const pieces = (parsed.pieces || []).filter((p) => p && p.description);
           const tag = (parsed.tag_name || '').trim() || null;
 
+          // [6 Sep] DECLARED HERE, not further down where it is used for
+          // matching. It was below the no-match early return, which
+          // reads it when storing the AI result -- so every photo that
+          // failed to match threw "Cannot access 'tagDay' before
+          // initialization" instead of being recorded. 16 photos hit it.
+          // A crash in the branch that handles the unhappy path is easy
+          // to miss precisely because the happy path is fine.
+          //
+          // REPEAT CUSTOMERS. Daisy: "some people come in two or three
+          // times a week." Kari Clarke has bookings on the 28th and
+          // 29th; Vikki Waterman has three. The paint date on the chalk
+          // board is what separates them, and it is written there
+          // precisely so a person can do this. Not the file's date --
+          // that one lies, which is why it was dropped earlier.
+          const tagDay = (parsed.paint_date || '').trim();
+          const dayOf = (iso) => {
+            const d = new Date(iso);
+            return `${d.getDate()}/${d.getMonth() + 1}`;
+          };
+
           if (!tag || !pieces.length) {
             await supabase.from('backfill_photos').update({
               status: 'unmatched', tag_name: tag,
@@ -8057,24 +8077,6 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
             }).eq('id', row.id);
             unmatched++; done++; continue;
           }
-
-          // [6 Sep] REPEAT CUSTOMERS. Daisy: "some people come in two or
-          // three times a week." Kari Clarke has bookings on the 28th
-          // and 29th; Vikki Waterman has three; Chelsea Elson has three
-          // on one day. Excluding every booking that already has a
-          // photo treated a genuine second visit as a duplicate and
-          // discarded it.
-          //
-          // The paint date written on the chalk board is what separates
-          // them, and it is on the board precisely so a human can do
-          // this. Note this is NOT the file's date -- that one lies,
-          // which is why it was dropped earlier. This one is written by
-          // the person who set the table.
-          const tagDay = (parsed.paint_date || '').trim();
-          const dayOf = (iso) => {
-            const d = new Date(iso);
-            return `${d.getDate()}/${d.getMonth() + 1}`;
-          };
 
           const ranked = (allBookings || [])
             .map((b) => ({ b, sc: score(tag, b.customer_name) }))
