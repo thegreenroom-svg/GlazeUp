@@ -139,32 +139,58 @@ export default function ShelvesPage() {
                   scrolling -- a box alone tells you something is there,
                   the description tells you whose it is and what to
                   reach for. */}
+              {/* [6 Sep] Daisy: "need grouping into booking."
+                  A flat list of pieces is the wrong unit of work. You do
+                  not pack a butter dish, you pack Tiegan Stoodley -- and
+                  when a sweep finds thirty pieces across a whole
+                  shelving unit, a flat list means reading every line to
+                  work out how many people are actually represented.
+                  Grouped by customer, the same result answers the
+                  question you had when you took the photo.
+
+                  The numbers and colours stay tied to their original
+                  position in the list, because they label the boxes on
+                  the photo above -- regrouping the text must not
+                  renumber the picture. */}
               {details.length > 0 ? (
-                <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                  {details.map((d, i) => (
-                    <button
-                      key={d.piece_id}
-                      onClick={() => router.push(`/packing?code=${encodeURIComponent(d.booking_code)}`)}
-                      style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', textAlign: 'left', border: 'none', background: 'none', padding: '0.2rem 0', cursor: 'pointer' }}
-                    >
-                      <span style={{ flexShrink: 0, width: 18, height: 18, borderRadius: 'var(--radius-full)', backgroundColor: PIECE_COLOURS[i % 6], color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {i + 1}
-                      </span>
-                      {/* Daisy: "Needs bookings referenced." The name now
-                          leads on its own line rather than trailing after
-                          a bullet, so a glance down the list reads as a
-                          list of PEOPLE -- which is what you are actually
-                          looking for when packing. */}
-                      <span style={{ minWidth: 0, flex: 1 }}>
-                        <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--charcoal)' }}>
-                          {d.customer_name || 'Unknown booking'}
+                <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+                  {Object.values(
+                    details.reduce((acc, d, i) => {
+                      const key = d.booking_code || 'unknown';
+                      (acc[key] ||= { code: d.booking_code, name: d.customer_name, items: [] }).items.push({ d, i });
+                      return acc;
+                    }, {} as Record<string, { code: string; name: string; items: { d: MatchedDetail; i: number }[] }>)
+                  )
+                    // Most pieces first: a booking with four on this
+                    // shelf is more likely to be packable than one with a
+                    // single stray.
+                    .sort((a, b) => b.items.length - a.items.length)
+                    .map((g) => (
+                      <button
+                        key={g.code || g.name}
+                        onClick={() => router.push(`/packing?code=${encodeURIComponent(g.code)}`)}
+                        style={{ display: 'block', width: '100%', textAlign: 'left', border: '1px solid #ece5db', borderRadius: 'var(--radius-sm)', background: 'white', padding: '0.5rem 0.6rem', cursor: 'pointer' }}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.5rem' }}>
+                          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--charcoal)' }}>
+                            {g.name || 'Unknown booking'}
+                          </span>
+                          <span style={{ flexShrink: 0, fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--clay)' }}>
+                            {g.items.length} here
+                          </span>
                         </span>
-                        <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--muted)' }}>
-                          {d.description || d.piece_type || 'Piece'}
-                        </span>
-                      </span>
-                    </button>
-                  ))}
+                        {g.items.map(({ d, i }) => (
+                          <span key={d.piece_id} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', marginTop: '0.25rem' }}>
+                            <span style={{ flexShrink: 0, width: 17, height: 17, borderRadius: 'var(--radius-full)', backgroundColor: PIECE_COLOURS[i % 6], color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {i + 1}
+                            </span>
+                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)' }}>
+                              {d.description || d.piece_type || 'Piece'}
+                            </span>
+                          </span>
+                        ))}
+                      </button>
+                    ))}
                 </div>
               ) : null}
 
