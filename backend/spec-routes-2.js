@@ -5990,7 +5990,7 @@ Below is a numbered list of pieces the studio is currently waiting to hand out. 
 ${list}
 
 ${referenceImages.length
-  ? `The reference photos that follow show what each of those pieces actually looks like -- marked "[reference photo attached]" above, in the same order as this sentence. COMPARE THEM VISUALLY against the shelf photo. Colour, glaze pattern and painted decoration matter far more than the text description alone -- the description is a hint, the reference photo is the real evidence.`
+  ? `The reference photos that follow show what each of those pieces actually looks like -- marked "[reference photo attached]" above, in the same order as this sentence. Those were taken AT THE TABLE, BEFORE FIRING. COMPARE THEM VISUALLY against the shelf photo, but expect the fired piece to be more saturated and glossier than its reference. Shape, decoration and where the pattern sits are the reliable evidence; exact colour is not.`
   : `No reference photos are attached this time -- go on the written descriptions alone.`}
 
 If a number is written by hand ON A CARDBOARD BOX in this photo -- usually in thick black marker, and often repeated on several faces -- report it as box_number, digits only.
@@ -6002,6 +6002,10 @@ Writing on the POTTERY ITSELF is different and does still count -- a name or mes
 Look at the shelf photo and decide which of the numbered pieces you can actually see.
 
 A shelving unit holds several batches at once, so pieces due on different dates sit on different shelves in the same photo. Judge every piece on what it looks like. Do not use the chalked dates to decide what is or is not on the shelf -- they label the wood, not the pottery, and a piece can easily sit on the wrong shelf.
+
+CRITICAL -- THE TWO PHOTOS SHOW DIFFERENT STAGES. The reference photos and descriptions were made at the table BEFORE firing, when the paint is chalky and pale. The shelf photo is AFTER firing and glazing, when that same paint is far more saturated, glossy and often several shades deeper. A piece recorded as "pale green" can come out of the kiln a strong green, and the white clay warms up.
+
+So judge on FORM, PATTERN and MOTIF, none of which change in the kiln -- the shape of the piece, where the decoration sits, the drawing, any lettering, the number and arrangement of elements. Treat colour as a hint about which family a piece is in, never as the deciding evidence, and never rule a piece out because it looks brighter or darker than its description.
 
 Be strict. Only include a number if the piece in the photo genuinely matches in form AND painted detail. Studio pottery is repetitive — many customers paint the same blank — so a "mug" alone is never enough to match on; the painted decoration has to agree. If you are unsure, leave it out. A missed piece is a minor nuisance; a wrong match sends someone home with someone else's pottery.
 
