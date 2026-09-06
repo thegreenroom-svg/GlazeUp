@@ -25,7 +25,10 @@ import { compressPhotoForUpload } from '@/lib/compressPhoto';
 // Photos are loaded per booking on drill-down rather than for the whole
 // queue at once, so opening this page doesn't pull every image for the week.
 
-const PIECE_COLOURS = ['#e0392b', '#1a8a3c', '#2b6fe0', '#c77a0a', '#8b3ec7', '#0a9aa8'];
+// Palette and box drawing now live in the shared component, so a piece
+// numbered 3 is the same colour on this screen, the floor and the
+// backfill. They were three separate copies of these six hex codes.
+import { PIECE_COLOURS, pieceColour, PhotoWithBoxes } from '@/components/PieceBoxes';
 
 type PieceBox = { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number };
 
@@ -770,33 +773,22 @@ export default function PackingPage() {
             >
               {showLastSeen ? 'Hide that shelf photo' : 'Show me that shelf'}
             </button>
+            {/* Same numbers and same colours as the table photo above,
+                deliberately: piece 2 on the table is piece 2 on the
+                shelf. A shelf photo with no boxes is barely better than
+                walking over and looking. Drawn by the shared component
+                now, so that promise holds by construction rather than by
+                me keeping four copies in step. */}
             {showLastSeen && (
-              <div style={{ position: 'relative', marginTop: '0.5rem' }}>
-                <img src={lastSeen.photo_url} alt="" style={{ width: '100%', borderRadius: 'var(--radius-sm)', display: 'block' }} />
-                {/* Same numbers and same colours as the table photo
-                    above, deliberately: piece 2 on the table is piece 2
-                    on the shelf. A shelf photo with no boxes is barely
-                    better than walking over and looking. */}
-                {packablePieces.map((pc, i) => pc.last_seen_box && (
-                  <div
-                    key={pc.id}
-                    style={{
-                      position: 'absolute',
-                      left: `${pc.last_seen_box.left_pct}%`,
-                      top: `${pc.last_seen_box.top_pct}%`,
-                      width: `${pc.last_seen_box.right_pct - pc.last_seen_box.left_pct}%`,
-                      height: `${pc.last_seen_box.bottom_pct - pc.last_seen_box.top_pct}%`,
-                      border: `3px solid ${PIECE_COLOURS[i % 6]}`,
-                      borderRadius: 'var(--radius-sm)',
-                      boxShadow: '0 0 0 1px rgba(255,255,255,0.9)',
-                      pointerEvents: 'none',
-                    }}
-                  >
-                    <span style={{ position: 'absolute', top: -9, left: -9, width: 20, height: 20, borderRadius: 'var(--radius-full)', backgroundColor: PIECE_COLOURS[i % 6], color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px white' }}>
-                      {i + 1}
-                    </span>
-                  </div>
-                ))}
+              <div style={{ marginTop: '0.5rem', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
+                <PhotoWithBoxes
+                  src={lastSeen.photo_url}
+                  pieces={packablePieces.map((pc) => ({
+                    piece_type: pc.piece_type,
+                    description: pc.description,
+                    box: pc.last_seen_box,
+                  }))}
+                />
               </div>
             )}
             {showLastSeen && !packablePieces.some((pc) => pc.last_seen_box) && (

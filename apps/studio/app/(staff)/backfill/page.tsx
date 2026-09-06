@@ -28,10 +28,13 @@ import { useEffect, useRef, useState } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
 import { Camera, Loader, Check, AlertCircle } from 'lucide-react';
+import { PhotoWithBoxes, PieceList, pieceColour, type PieceBox } from '@/components/PieceBoxes';
 
 export const dynamic = 'force-dynamic';
 
-interface Box { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number }
+// Box and the colour palette now come from the shared component, so a
+// piece is the same colour here as it is on packing and on the floor.
+type Box = PieceBox;
 interface Piece { index: number; piece_type: string; description: string; box: Box | null }
 interface Table {
   tag_name: string | null;
@@ -48,8 +51,6 @@ interface Shot {
   tables: Table[];
   error: string | null;
 }
-
-const COLOURS = ['#e0392b', '#1a8a3c', '#2b6fe0', '#c77a0a', '#8b3ec7', '#0a9aa8'];
 
 function scoreName(tag: string, name: string) {
   const a = tag.toLowerCase().replace(/[^a-z ]/g, '').trim();
@@ -306,27 +307,18 @@ export default function BackfillPage() {
         const idx = open;
         return (
           <div style={{ marginTop: '1rem', background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-            <div style={{ position: 'relative' }}>
-              <img src={sh.url} alt="" style={{ width: '100%', display: 'block' }} />
-              {sh.tables.map((t, ti) => t.box && (
-                <div key={ti} style={{
-                  position: 'absolute', left: `${t.box.left_pct}%`, top: `${t.box.top_pct}%`,
-                  width: `${t.box.right_pct - t.box.left_pct}%`, height: `${t.box.bottom_pct - t.box.top_pct}%`,
-                  border: `3px solid ${COLOURS[ti % 6]}`, borderRadius: 'var(--radius-sm)', pointerEvents: 'none',
-                }}>
-                  <span style={{ position: 'absolute', top: 0, left: 0, background: COLOURS[ti % 6], color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, padding: '1px 5px', borderRadius: '0 0 4px 0' }}>
-                    {t.tag_name || '?'} · {t.pieces.length}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <PhotoWithBoxes
+              src={sh.url}
+              pieces={sh.tables.map((t) => ({ box: t.box, description: t.tag_name || '?' }))}
+              label={(_, ti) => `${sh.tables[ti].tag_name || '?'} · ${sh.tables[ti].pieces.length}`}
+            />
 
             <div style={{ padding: '0.8rem' }}>
               {sh.error && <p style={{ fontSize: 'var(--text-sm)', color: '#C0392B', margin: '0 0 0.5rem' }}>{sh.error}</p>}
 
               {sh.tables.map((t, ti) => (
                 <div key={ti} style={{ borderTop: ti ? '1px solid #f0ece6' : 'none', paddingTop: ti ? '0.7rem' : 0, marginTop: ti ? '0.7rem' : 0 }}>
-                  <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, margin: '0 0 0.3rem', color: COLOURS[ti % 6] }}>
+                  <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, margin: '0 0 0.3rem', color: pieceColour(ti) }}>
                     {t.tag_name ? `Board reads "${t.tag_name}"` : 'Board not readable'} · {t.pieces.length} piece{t.pieces.length === 1 ? '' : 's'}
                     {t.saved ? ' · saved' : ''}
                   </p>
@@ -347,11 +339,7 @@ export default function BackfillPage() {
                       </option>
                     ))}
                   </select>
-                  {t.pieces.map((p, n) => (
-                    <p key={n} style={{ fontSize: 'var(--text-xs)', color: 'var(--charcoal)', margin: '0.1rem 0' }}>
-                      {p.index}. <b>{p.piece_type}</b> — {p.description}
-                    </p>
-                  ))}
+                  <PieceList pieces={t.pieces} />
                 </div>
               ))}
 
