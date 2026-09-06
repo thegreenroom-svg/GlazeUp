@@ -5993,9 +5993,15 @@ ${referenceImages.length
   ? `The reference photos that follow show what each of those pieces actually looks like -- marked "[reference photo attached]" above, in the same order as this sentence. COMPARE THEM VISUALLY against the shelf photo. Colour, glaze pattern and painted decoration matter far more than the text description alone -- the description is a hint, the reference photo is the real evidence.`
   : `No reference photos are attached this time -- go on the written descriptions alone.`}
 
-If a number is written by hand on the box or shelf in this photo -- usually in thick black marker, and often repeated on several faces -- report it as box_number, digits only. If you cannot read one clearly, return an empty string rather than guessing.
+If a number is written by hand ON A CARDBOARD BOX in this photo -- usually in thick black marker, and often repeated on several faces -- report it as box_number, digits only.
+
+IGNORE ALL OTHER WRITING. The wooden shelf edges are chalked with collection dates like "19/9" or "26/9", and those are kiln batch labels for the whole shelf, not box numbers. Never report one as a box number. Ignore writing on cardboard sheets, paper, packaging and printed labels too. If there is no cardboard box with a marker number on it, return an empty string rather than offering a date.
+
+Writing on the POTTERY ITSELF is different and does still count -- a name or message painted onto a plate or mug is part of that piece and is worth using to identify it.
 
 Look at the shelf photo and decide which of the numbered pieces you can actually see.
+
+A shelving unit holds several batches at once, so pieces due on different dates sit on different shelves in the same photo. Judge every piece on what it looks like. Do not use the chalked dates to decide what is or is not on the shelf -- they label the wood, not the pottery, and a piece can easily sit on the wrong shelf.
 
 Be strict. Only include a number if the piece in the photo genuinely matches in form AND painted detail. Studio pottery is repetitive — many customers paint the same blank — so a "mug" alone is never enough to match on; the painted decoration has to agree. If you are unsure, leave it out. A missed piece is a minor nuisance; a wrong match sends someone home with someone else's pottery.
 
@@ -6025,7 +6031,7 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
           // confirmation instead.
           box_number: {
             type: 'string',
-            description: 'Any box number written by hand on the box in this photo, digits only. Empty string if none is legible.',
+            description: 'Number written in marker on a CARDBOARD BOX, digits only. Never a date chalked on a shelf edge. Empty string if there is no box number.',
           },
         },
         required: ['matches'],
