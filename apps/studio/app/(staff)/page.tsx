@@ -40,17 +40,34 @@ const STEPS = [
   // text links buried inside other screens. The wall of boxes is a
   // place she wants to GO, not a footnote on the packing screen, so it
   // gets a tile like everything else she reaches for.
-  { key: 'shelves',    n: 6, label: 'Wall of shelves', detail: 'Every box photographed, with what is in it', href: '/shelves', icon: Layers, tint: '#7A6A8C' },
-  // A tile, not a hidden link, for the same reason as the wall above.
-  // This is the recovery path for any day the iPad got used the normal
-  // way instead of the app -- which will keep happening, so it needs a
-  // permanent home rather than being treated as a one-off import.
-  // Searching the whole history, not just this week. Its own tile for
-  // the same reason as the others: a link buried in another screen is a
-  // thing Daisy cannot find, three times over now.
-  { key: 'find',       n: 7, label: 'Find a booking', detail: 'Search the whole history by name or date', href: '/find', icon: Search, tint: '#4F6D7A' },
-  { key: 'backfill',   n: 8, label: 'Backfill from photos', detail: 'Tables photographed outside the app', href: '/backfill', icon: ImageIcon, tint: '#5F7A8C' },
 ];
+
+// [6 Sep] Daisy: "it's all looking very messy... rationalise the
+// navigation again and consolidate."
+//
+// The mess was structural, and mine. This screen is a NUMBERED list,
+// which promises "do these in order today". Steps 1 to 5 genuinely are
+// that -- print, photograph, unload, pack, hand over -- and they happen
+// in that order every open day.
+//
+// Then I bolted three more onto the end and numbered them 6, 7 and 8,
+// because a tile was the only shape available and each one had a real
+// reason to be reachable. But the shelf wall, the booking search and
+// the photo backfill are not steps in a day. Nobody does them after
+// collection. Numbering them said they were part of the sequence, so
+// the sequence stopped meaning anything and the screen just read as a
+// list of eight things.
+//
+// Two lists now, because there are two kinds of thing. The day in
+// order, then the tools you reach for when something needs finding or
+// fixing. Same destinations, no invented ordering, and the tools are
+// visibly secondary rather than competing with the work.
+const TOOLS = [
+  { key: 'shelves',  label: 'Wall of shelves',      detail: 'Every box, and what is in it',        href: '/shelves',  icon: Layers,    tint: '#7A6A8C' },
+  { key: 'find',     label: 'Find a booking',       detail: 'Any name or date, whole history',     href: '/find',     icon: Search,    tint: '#4F6D7A' },
+  { key: 'backfill', label: 'Backfill from photos', detail: 'Tables photographed outside the app', href: '/backfill', icon: ImageIcon, tint: '#5F7A8C' },
+];
+
 
 export default function StudioHome() {
   const router = useRouter();
@@ -70,10 +87,10 @@ export default function StudioHome() {
   // network fetch reads as broken, and this studio's wifi has been the
   // slowest part of every test this week.
   useEffect(() => {
-    STEPS.forEach((s) => router.prefetch(s.href));
+    [...STEPS, ...TOOLS].forEach((s) => router.prefetch(s.href));
   }, [router]);
 
-  const open = (step: typeof STEPS[number]) => {
+  const open = (step: { key: string; href: string }) => {
     setOpening(step.key);
     // Let the expand actually play before navigating, so the tile grows
     // into the screen rather than the page snapping over the top of it.
@@ -84,7 +101,7 @@ export default function StudioHome() {
     <div style={{ padding: '1rem 0.9rem 2rem' }}>
       <div style={{ marginBottom: '1.4rem' }}>
         <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 800, letterSpacing: '-0.02em', margin: 0 }}>The Kiln Cafe</h1>
-        <p style={{ fontSize: 'var(--text-base)', color: '#777', margin: '0.2rem 0 0' }}>Four steps, start to finish.</p>
+        <p style={{ fontSize: 'var(--text-base)', color: '#777', margin: '0.2rem 0 0' }}>Five steps, start to finish.</p>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
@@ -130,6 +147,42 @@ export default function StudioHome() {
                   </span>
                 );
               })()}
+            </motion.button>
+          );
+        })}
+      </div>
+
+      {/* Deliberately quieter than the steps above: smaller, paler, no
+          numbers. These are places to go when something needs finding
+          or fixing, not work waiting to be done today. */}
+      <p style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '1.6rem 0 0.6rem' }}>
+        Anytime
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        {TOOLS.map((tool) => {
+          const Icon = tool.icon;
+          return (
+            <motion.button
+              key={tool.key}
+              onClick={() => open(tool)}
+              disabled={!!opening}
+              animate={opening === tool.key ? { scale: 1.03, opacity: 0.92 } : { scale: 1, opacity: opening ? 0.35 : 1 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+              whileTap={{ scale: 0.985 }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.75rem', width: '100%',
+                padding: '0.8rem 0.9rem', borderRadius: 'var(--radius-md)',
+                border: '1px solid #ece5db', background: 'white', color: 'var(--charcoal)',
+                cursor: opening ? 'default' : 'pointer', textAlign: 'left',
+              }}
+            >
+              <div style={{ flexShrink: 0, width: 34, height: 34, borderRadius: 'var(--radius-md)', background: tool.tint, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icon size={17} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 'var(--text-base)', fontWeight: 700 }}>{tool.label}</div>
+                <div style={{ fontSize: 'var(--text-xs)', color: '#777' }}>{tool.detail}</div>
+              </div>
             </motion.button>
           );
         })}
