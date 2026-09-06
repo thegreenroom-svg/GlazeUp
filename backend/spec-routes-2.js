@@ -4431,7 +4431,9 @@ export function registerIdentifyPiecesRoute(app, supabase, STUDIO_ID, logger, ax
       const input = [
         {
           type: 'text',
-          text: `This is a photo of a table in a pottery painting studio, taken at the end of a customer's session.\n\nIdentify every PAINTED POTTERY PIECE belonging to the customer -- the items they have painted and will be taking home after firing.\n\nInclude: mugs, bowls, plates, figurines, vases, jugs, money boxes, ornaments and similar ceramic pieces that have been painted.\n\nDo NOT include: paint pots, brushes, water pots, palettes, paint-mixing dishes or trays holding wet blobs or pools of paint, colour charts, menus, price cards, chalk boards, drinks, cans, glasses, phones, bags, or anything belonging to the studio rather than the customer. A shallow white dish with pools of wet paint in it is a palette, not a customer piece.\n\nONE ENTRY PER PHYSICAL OBJECT. This matters more than anything else here. Never split a single object across two entries: a mug and its handle, a lid and its pot, a figurine and its base are ONE piece each. Never merge two separate objects into one entry: two mugs side by side, even identical ones, are TWO entries. Where objects overlap or touch, look carefully at where one ends and the next begins and give each its own entry and its own box. If you genuinely cannot tell whether something is one object or two, say so in the description rather than guessing silently.\n\nBE COMPLETE. Work systematically across the whole photo, left to right and front to back, including the edges and anything partly hidden behind another piece. A piece missed here cannot be found on the shelf later, so a piece you are unsure about is better included with an honest description than left out entirely.\n\nDESCRIPTIONS: one short line each, same shape every time -- colour, then form, then what actually distinguishes it. Usually one detail is enough. But if another piece in THIS SAME photo shares the same colour and form, one detail is not enough: add a second that genuinely separates them (size relative to the others, a different motif, a handle or lid one has and the other does not). Three vases described as \"large\", \"medium\" and \"small\" are nearly useless to match against later, so reach for a real visual difference before falling back on size. Good: \"white mug, black panda face\". Good: \"blue bowl, yellow star inside\". Bad: \"a lovely hand-painted mug featuring a charming panda illustration with a geometric border pattern around the base\" -- too long, and the extra words come out different every time the same piece is looked at, which makes matching harder rather than easier. Never describe the table, the background, or where the piece is sitting.\n\nAlso give its bounding box in the photo.${req.body?.read_tag === 'true' ? `\n\nALSO READ THE CHALKBOARD. These tables carry a small black chalk tag. If one is visible, read the customer's NAME from it -- usually the largest handwriting, in the middle. Tags are wiped and reused, so faint ghost writing from earlier bookings often shows underneath: report only the clearest, most recent name. Never guess -- a wrong name attaches someone's pottery to the wrong person, which is worse than no name at all, so omit the field entirely rather than offer a maybe.` : ''}`,
+          text: `This is a photo of a table in a pottery painting studio, taken at the end of a customer's session.\n\nIdentify every PAINTED POTTERY PIECE belonging to the customer -- the items they have painted and will be taking home after firing.\n\nInclude: mugs, bowls, plates, figurines, vases, jugs, money boxes, ornaments and similar ceramic pieces that have been painted.\n\nDo NOT include: paint pots, brushes, water pots, palettes, paint-mixing dishes or trays holding wet blobs or pools of paint, colour charts, menus, price cards, chalk boards, drinks, cans, glasses, phones, bags, or anything belonging to the studio rather than the customer. A shallow white dish with pools of wet paint in it is a palette, not a customer piece.\n\nSEPARABLE PARTS. Some pieces come apart: a butter dish and its lid, a teapot and its lid, a lidded jar, a two-part planter. Those are still ONE piece the customer takes home, but the parts are packed on different kiln shelves and come out at different moments, so report parts as the number of separable components -- 2 for a lidded pot, 1 for a plate. Getting this right is what stops a lid being left on a shelf after its base has gone home.
+
+ONE ENTRY PER PHYSICAL OBJECT. This matters more than anything else here. Never split a single object across two entries: a mug and its handle, a lid and its pot, a figurine and its base are ONE piece each. Never merge two separate objects into one entry: two mugs side by side, even identical ones, are TWO entries. Where objects overlap or touch, look carefully at where one ends and the next begins and give each its own entry and its own box. If you genuinely cannot tell whether something is one object or two, say so in the description rather than guessing silently.\n\nBE COMPLETE. Work systematically across the whole photo, left to right and front to back, including the edges and anything partly hidden behind another piece. A piece missed here cannot be found on the shelf later, so a piece you are unsure about is better included with an honest description than left out entirely.\n\nDESCRIPTIONS: one short line each, same shape every time -- colour, then form, then what actually distinguishes it. Usually one detail is enough. But if another piece in THIS SAME photo shares the same colour and form, one detail is not enough: add a second that genuinely separates them (size relative to the others, a different motif, a handle or lid one has and the other does not). Three vases described as \"large\", \"medium\" and \"small\" are nearly useless to match against later, so reach for a real visual difference before falling back on size. Good: \"white mug, black panda face\". Good: \"blue bowl, yellow star inside\". Bad: \"a lovely hand-painted mug featuring a charming panda illustration with a geometric border pattern around the base\" -- too long, and the extra words come out different every time the same piece is looked at, which makes matching harder rather than easier. Never describe the table, the background, or where the piece is sitting.\n\nAlso give its bounding box in the photo.${req.body?.read_tag === 'true' ? `\n\nALSO READ THE CHALKBOARD. These tables carry a small black chalk tag. If one is visible, read the customer's NAME from it -- usually the largest handwriting, in the middle. Tags are wiped and reused, so faint ghost writing from earlier bookings often shows underneath: report only the clearest, most recent name. Never guess -- a wrong name attaches someone's pottery to the wrong person, which is worse than no name at all, so omit the field entirely rather than offer a maybe.` : ''}`,
         },
         { type: 'image', data: base64, mime_type: photoGemini.mimeType || req.file.mimetype || 'image/jpeg' },
       ];
@@ -4446,6 +4448,7 @@ export function registerIdentifyPiecesRoute(app, supabase, STUDIO_ID, logger, ax
               properties: {
                 description: { type: 'string', description: 'Short specific description to identify this piece later' },
                 piece_type: { type: 'string', description: 'The form, e.g. Mug, Rabbit figurine, Bowl' },
+                parts: { type: 'integer', description: 'Separable components: 2 for a lidded pot or butter dish, 1 for a plate or mug.' },
                 box_2d: { type: 'array', items: { type: 'integer' }, description: '[ymin, xmin, ymax, xmax] normalized 0-1000' },
               },
               required: ['description', 'piece_type'],
@@ -4685,7 +4688,9 @@ export function registerReidentifyRoute(app, supabase, STUDIO_ID, logger, axios,
       const input = [
         {
           type: 'text',
-          text: `This is a photo of a table in a pottery painting studio, taken at the end of a customer's session.\n\nIdentify every PAINTED POTTERY PIECE belonging to the customer -- the items they have painted and will be taking home after firing.\n\nInclude: mugs, bowls, plates, figurines, vases, jugs, money boxes, ornaments and similar ceramic pieces that have been painted.\n\nDo NOT include: paint pots, brushes, water pots, palettes, paint-mixing dishes or trays holding wet blobs or pools of paint, colour charts, menus, price cards, chalk boards, drinks, cans, glasses, phones, bags, or anything belonging to the studio rather than the customer. A shallow white dish with pools of wet paint in it is a palette, not a customer piece.\n\nONE ENTRY PER PHYSICAL OBJECT. This matters more than anything else here. Never split a single object across two entries: a mug and its handle, a lid and its pot, a figurine and its base are ONE piece each. Never merge two separate objects into one entry: two mugs side by side, even identical ones, are TWO entries. Where objects overlap or touch, look carefully at where one ends and the next begins and give each its own entry and its own box. If you genuinely cannot tell whether something is one object or two, say so in the description rather than guessing silently.\n\nBE COMPLETE. Work systematically across the whole photo, left to right and front to back, including the edges and anything partly hidden behind another piece. A piece missed here cannot be found on the shelf later, so a piece you are unsure about is better included with an honest description than left out entirely.\n\nDESCRIPTIONS: one short line each, same shape every time -- colour, then form, then what actually distinguishes it. Usually one detail is enough. But if another piece in THIS SAME photo shares the same colour and form, one detail is not enough: add a second that genuinely separates them (size relative to the others, a different motif, a handle or lid one has and the other does not). Three vases described as \"large\", \"medium\" and \"small\" are nearly useless to match against later, so reach for a real visual difference before falling back on size. Good: \"white mug, black panda face\". Good: \"blue bowl, yellow star inside\". Bad: \"a lovely hand-painted mug featuring a charming panda illustration with a geometric border pattern around the base\" -- too long, and the extra words come out different every time the same piece is looked at, which makes matching harder rather than easier. Never describe the table, the background, or where the piece is sitting.\n\nAlso give its bounding box in the photo.`,
+          text: `This is a photo of a table in a pottery painting studio, taken at the end of a customer's session.\n\nIdentify every PAINTED POTTERY PIECE belonging to the customer -- the items they have painted and will be taking home after firing.\n\nInclude: mugs, bowls, plates, figurines, vases, jugs, money boxes, ornaments and similar ceramic pieces that have been painted.\n\nDo NOT include: paint pots, brushes, water pots, palettes, paint-mixing dishes or trays holding wet blobs or pools of paint, colour charts, menus, price cards, chalk boards, drinks, cans, glasses, phones, bags, or anything belonging to the studio rather than the customer. A shallow white dish with pools of wet paint in it is a palette, not a customer piece.\n\nSEPARABLE PARTS. Some pieces come apart: a butter dish and its lid, a teapot and its lid, a lidded jar, a two-part planter. Those are still ONE piece the customer takes home, but the parts are packed on different kiln shelves and come out at different moments, so report parts as the number of separable components -- 2 for a lidded pot, 1 for a plate. Getting this right is what stops a lid being left on a shelf after its base has gone home.
+
+ONE ENTRY PER PHYSICAL OBJECT. This matters more than anything else here. Never split a single object across two entries: a mug and its handle, a lid and its pot, a figurine and its base are ONE piece each. Never merge two separate objects into one entry: two mugs side by side, even identical ones, are TWO entries. Where objects overlap or touch, look carefully at where one ends and the next begins and give each its own entry and its own box. If you genuinely cannot tell whether something is one object or two, say so in the description rather than guessing silently.\n\nBE COMPLETE. Work systematically across the whole photo, left to right and front to back, including the edges and anything partly hidden behind another piece. A piece missed here cannot be found on the shelf later, so a piece you are unsure about is better included with an honest description than left out entirely.\n\nDESCRIPTIONS: one short line each, same shape every time -- colour, then form, then what actually distinguishes it. Usually one detail is enough. But if another piece in THIS SAME photo shares the same colour and form, one detail is not enough: add a second that genuinely separates them (size relative to the others, a different motif, a handle or lid one has and the other does not). Three vases described as \"large\", \"medium\" and \"small\" are nearly useless to match against later, so reach for a real visual difference before falling back on size. Good: \"white mug, black panda face\". Good: \"blue bowl, yellow star inside\". Bad: \"a lovely hand-painted mug featuring a charming panda illustration with a geometric border pattern around the base\" -- too long, and the extra words come out different every time the same piece is looked at, which makes matching harder rather than easier. Never describe the table, the background, or where the piece is sitting.\n\nAlso give its bounding box in the photo.`,
         },
         { type: 'image', data: base64, mime_type: 'image/jpeg' },
       ];
@@ -4700,6 +4705,7 @@ export function registerReidentifyRoute(app, supabase, STUDIO_ID, logger, axios,
               properties: {
                 description: { type: 'string' },
                 piece_type: { type: 'string' },
+                parts: { type: 'integer', description: 'Separable components: 2 for a lidded pot or butter dish, 1 otherwise.' },
                 box_2d: { type: 'array', items: { type: 'integer' } },
               },
               required: ['description', 'piece_type'],
@@ -7625,6 +7631,95 @@ export function registerShelfSweepHistoryRoute(app, supabase, STUDIO_ID, logger)
     }
   });
 
+  // [6 Sep] THE COLLECTION BATCH, AND ITS STICKER.
+  //
+  // Daisy: "everything from those dates after the last collection date
+  // up to when they're fired go into a shelf, and that shelf has a
+  // sticker with a QR code on it which contains all the bookings
+  // pieces... we need to make sure that everything is fine for the
+  // collection date."
+  //
+  // The batch already exists and needed no new table: it IS the
+  // collection date. Every booking sharing one is one batch, so the
+  // sticker encodes a date and this answers for it.
+  //
+  // The question it exists to answer is not "what is in this batch" but
+  // "is anything missing" -- so it reports by exception, and the
+  // exceptions are ordered by how bad they are on collection day.
+  app.get('/api/spec/batch/:date', async (req, res) => {
+    try {
+      const date = String(req.params.date || '').slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Expected a date like 2026-09-19' });
+
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select('booking_code, customer_name, session_start, collection_date, table_number, collection_notes')
+        .eq('studio_id', STUDIO_ID)
+        .eq('collection_date', date)
+        .order('session_start');
+
+      if (!bookings?.length) return res.json({ date, bookings: [], totals: { bookings: 0, pieces: 0 } });
+
+      const { data: pieces } = await supabase
+        .from('pottery_pieces')
+        .select('id, booking_id, piece_type, description, status, damaged, parts, parts_seen, packed_at, shelf_id, last_seen_at, last_seen_box_number, reference_photo_url, photo_box')
+        .eq('studio_id', STUDIO_ID)
+        .neq('archived', true)
+        .in('booking_id', bookings.map((b) => b.booking_code));
+
+      const byBooking = new Map();
+      for (const p of pieces || []) {
+        if (!byBooking.has(p.booking_id)) byBooking.set(p.booking_id, []);
+        byBooking.get(p.booking_id).push(p);
+      }
+
+      let missing = 0, halves = 0, packed = 0, total = 0;
+      const out = bookings.map((b) => {
+        const ps = byBooking.get(b.booking_code) || [];
+        const rows = ps.map((p) => {
+          const seen = p.parts_seen ?? (p.last_seen_at ? p.parts : 0);
+          // A piece with a lid still on a kiln shelf is the failure
+          // Daisy described: the base goes home, the lid does not, and
+          // nobody notices until the customer opens the box.
+          const partsShort = p.parts > 1 && seen > 0 && seen < p.parts;
+          const neverSeen = !p.packed_at && !p.last_seen_at;
+          if (p.packed_at) packed += 1;
+          if (partsShort) halves += 1;
+          else if (neverSeen) missing += 1;
+          total += 1;
+          return {
+            id: p.id, piece_type: p.piece_type, description: p.description,
+            parts: p.parts, parts_seen: seen, damaged: p.damaged,
+            packed: !!p.packed_at, box: p.last_seen_box_number || null,
+            last_seen_at: p.last_seen_at,
+            reference_photo_url: p.reference_photo_url, photo_box: p.photo_box,
+            state: p.packed_at ? 'packed' : partsShort ? 'part missing' : p.last_seen_at ? 'on a shelf' : 'not found yet',
+          };
+        });
+        return {
+          booking_code: b.booking_code,
+          customer_name: b.customer_name,
+          session_start: b.session_start,
+          collection_notes: b.collection_notes,
+          pieces: rows,
+          ready: rows.length > 0 && rows.every((r) => r.packed || (r.parts_seen >= r.parts && r.last_seen_at)),
+        };
+      })
+      // Anything with a problem first. On collection morning the
+      // complete bookings are not the ones needing attention.
+      .sort((a, b) => Number(a.ready) - Number(b.ready));
+
+      res.json({
+        date,
+        bookings: out,
+        totals: { bookings: out.length, pieces: total, packed, missing, part_missing: halves },
+      });
+    } catch (err) {
+      logger.error(`[batch] ${err.message}`);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.get('/api/spec/shelf/sweeps', async (req, res) => {
     try {
       const { data, error } = await supabase
@@ -7859,6 +7954,8 @@ Identify every painted pottery piece belonging to this customer -- what they wil
 
 Do not list studio equipment as pieces: paint pots, brushes, water pots, palettes, paint-mixing trays, colour charts, menus, price cards, drinks, glasses, phones or bags.
 
+SEPARABLE PARTS. Some pieces come apart: a butter dish and its lid, a teapot and its lid, a lidded jar, a two-part planter. Those are still ONE piece the customer takes home, but the parts are packed on different kiln shelves and come out at different moments, so report parts as the number of separable components -- 2 for a lidded pot, 1 for a plate. Getting this right is what stops a lid being left on a shelf after its base has gone home.
+
 ONE ENTRY PER PHYSICAL OBJECT. A lid and its pot are one piece. Two identical mugs side by side are two pieces.
 
 BE COMPLETE, including the edges of the photo and anything partly hidden behind another piece. A piece missed here cannot be found on the shelf later.
@@ -7879,6 +7976,7 @@ const BACKFILL_SCHEMA = {
         properties: {
           description: { type: 'string' },
           piece_type: { type: 'string' },
+          parts: { type: 'integer', description: 'Separable components: 2 for a lidded pot or butter dish, 1 otherwise.' },
           box_2d: { type: 'array', items: { type: 'integer' }, description: '[ymin, xmin, ymax, xmax] normalized 0-1000' },
         },
         required: ['description', 'piece_type'],
@@ -7912,6 +8010,8 @@ If you genuinely cannot tell which table a piece belongs to, leave it out and sa
 Include as pieces: mugs, bowls, plates, figurines, vases, jugs, money boxes, ornaments and similar painted ceramics the customer takes home.
 Do NOT include: paint pots, brushes, water pots, palettes, paint-mixing trays, colour charts, menus, price cards, the chalk tags themselves, drinks, glasses, phones or bags.
 
+SEPARABLE PARTS. Some pieces come apart: a butter dish and its lid, a teapot and its lid, a lidded jar, a two-part planter. Those are still ONE piece the customer takes home, but the parts are packed on different kiln shelves and come out at different moments, so report parts as the number of separable components -- 2 for a lidded pot, 1 for a plate. Getting this right is what stops a lid being left on a shelf after its base has gone home.
+
 ONE ENTRY PER PHYSICAL OBJECT. A lid and its pot are one piece. Two identical mugs side by side are two pieces.
 
 DESCRIPTIONS: one short line each -- colour, then form, then what distinguishes it. If two pieces on the SAME table share colour and form, add a detail that separates them. Never describe the table or background.
@@ -7937,6 +8037,7 @@ const MULTI_TABLE_SCHEMA = {
               properties: {
                 description: { type: 'string' },
                 piece_type: { type: 'string' },
+                parts: { type: 'integer', description: 'Separable components: 2 for a lidded pot or butter dish, 1 otherwise.' },
                 box_2d: { type: 'array', items: { type: 'integer' }, description: '[ymin, xmin, ymax, xmax] normalized 0-1000' },
               },
               required: ['description', 'piece_type'],
@@ -8116,6 +8217,7 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
             reference_photo_taken_at: new Date().toISOString(),
             photo_box: boxFromGemini(pc.box_2d) || pc.box || null,
             photo_taken_by: 'backfill',
+            parts: Math.max(1, Math.min(4, parseInt(pc.parts, 10) || 1)),
             notes: 'Recovered from the iPad library, booking chosen by hand',
           }))).select('id');
 
@@ -8290,6 +8392,7 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
             reference_photo_taken_at: new Date().toISOString(),
             photo_box: boxFromGemini(pc.box_2d) || null,
             photo_taken_by: 'backfill',
+            parts: Math.max(1, Math.min(4, parseInt(pc.parts, 10) || 1)),
             notes: 'Recovered from the iPad library, identified by the same AI step as a live capture',
           }));
           const { data: created } = await supabase.from('pottery_pieces').insert(rows).select('id');
