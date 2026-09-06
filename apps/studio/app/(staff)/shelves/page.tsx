@@ -31,6 +31,7 @@ interface MatchedDetail {
   box: { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number } | null;
   booking_code: string;
   customer_name: string;
+  booking_waiting?: number | null;
 }
 
 interface Sweep {
@@ -157,14 +158,22 @@ export default function ShelvesPage() {
                   {Object.values(
                     details.reduce((acc, d, i) => {
                       const key = d.booking_code || 'unknown';
-                      (acc[key] ||= { code: d.booking_code, name: d.customer_name, items: [] }).items.push({ d, i });
+                      (acc[key] ||= { code: d.booking_code, name: d.customer_name, waiting: d.booking_waiting ?? null, items: [] }).items.push({ d, i });
                       return acc;
-                    }, {} as Record<string, { code: string; name: string; items: { d: MatchedDetail; i: number }[] }>)
+                    }, {} as Record<string, { code: string; name: string; waiting: number | null; items: { d: MatchedDetail; i: number }[] }>)
                   )
                     // Most pieces first: a booking with four on this
                     // shelf is more likely to be packable than one with a
                     // single stray.
-                    .sort((a, b) => b.items.length - a.items.length)
+                    // Complete bookings first, then most pieces. A
+                    // booking you can finish outranks one you cannot,
+                    // whatever the raw count.
+                    .sort((a, b) => {
+                      const aDone = a.waiting ? a.items.length >= a.waiting : false;
+                      const bDone = b.waiting ? b.items.length >= b.waiting : false;
+                      if (aDone !== bDone) return aDone ? -1 : 1;
+                      return b.items.length - a.items.length;
+                    })
                     .map((g) => (
                       <button
                         key={g.code || g.name}
@@ -175,8 +184,14 @@ export default function ShelvesPage() {
                           <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--charcoal)' }}>
                             {g.name || 'Unknown booking'}
                           </span>
-                          <span style={{ flexShrink: 0, fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--clay)' }}>
-                            {g.items.length} here
+                          {/* "4 of 4" is the whole answer: pack it. "4 of
+                              6" means two are elsewhere and packing now
+                              sends someone home short. Complete is
+                              coloured differently because that is the
+                              only case you can act on without thinking. */}
+                          <span style={{ flexShrink: 0, fontSize: 'var(--text-xs)', fontWeight: 700, color: g.waiting && g.items.length >= g.waiting ? '#2E7D32' : 'var(--clay)' }}>
+                            {g.waiting ? `${g.items.length} of ${g.waiting}` : `${g.items.length} here`}
+                            {g.waiting && g.items.length >= g.waiting ? ' · all here' : ''}
                           </span>
                         </span>
                         {g.items.map(({ d, i }) => (

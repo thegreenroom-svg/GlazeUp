@@ -6160,6 +6160,22 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
         // so without this an older shelf photo could never be annotated
         // -- which is exactly what a scrollable wall of shelves needs.
         // The sweep should be able to describe itself completely.
+        // [6 Sep] Daisy: "you know how many pieces on table photo."
+        // Quite right -- the table photo already recorded how many
+        // pieces that booking has, so a sweep saying "4 here" is
+        // withholding the number that decides what happens next.
+        // 4 of 4 means pack it; 4 of 6 means two are still somewhere
+        // else and packing now would send someone home short.
+        //
+        // Counted over the candidate pool, which is every piece still
+        // waiting -- so it reads as "of the ones still to find", not of
+        // the whole original booking. A piece already collected should
+        // not make a shelf look incomplete.
+        const waitingByBooking = new Map();
+        for (const p of eligible) {
+          waitingByBooking.set(p.booking_id, (waitingByBooking.get(p.booking_id) || 0) + 1);
+        }
+
         const matchedDetails = Array.from(byBooking.entries()).flatMap(([code, v]) =>
           v.pieces.map((pc) => ({
             piece_id: pc.id,
@@ -6168,6 +6184,7 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
             box: pc.box,
             booking_code: code,
             customer_name: nameByCode.get(code) || code,
+            booking_waiting: waitingByBooking.get(code) || v.pieces.length,
           }))
         );
         // A typed box number always wins over a read one -- if someone
