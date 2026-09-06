@@ -12,10 +12,13 @@
 // come back in a different arrangement. A number chalked on the shelf
 // edge says which batch it is; the QR says what is supposed to be in it.
 //
-// Deliberately not a label-printer job. These are big stickers going on
-// a wooden shelf edge that people scan from a metre away with wet
-// hands, so they print several to an A4 sheet at a size you can read
-// across the room, rather than at 50mm.
+// Label printer, one label per collection date. The number of shelves a
+// batch spans does not matter and is not tracked -- Daisy: "doesn't
+// matter how many shelves, just collection date catch." So a label
+// carries a DATE, not a shelf identity, and you print as many copies as
+// there are shelf edges to stick them on. Two labels showing 19 Sep are
+// the same label, not two different shelves, which is what lets the
+// batch survive being split across kiln loads later.
 
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
@@ -29,6 +32,9 @@ interface Batch { collection_date: string | null; pieces_waiting: number }
 export default function ShelfStickersPage() {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [qrs, setQrs] = useState<Record<string, string>>({});
+  // Copies per date, because a batch spreads over however many shelves
+  // it needs and every edge wants one.
+  const [copies, setCopies] = useState<Record<string, number>>({});
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/batches`)
@@ -58,9 +64,37 @@ export default function ShelfStickersPage() {
   return (
     <PageShell title="Shelf stickers" subtitle="One per collection date, for the greenware shelves">
       <p style={{ fontSize: 'var(--text-sm)', color: '#777', margin: '0 0 0.8rem', lineHeight: 1.45 }}>
-        Stick one on the edge of every shelf holding this batch, before the pieces are dipped.
-        Scanning it shows everything due that day and flags anything still missing.
+        One label per collection date. Print as many as you have shelf edges to stick them on —
+        they are all the same label. Scanning any of them shows everything due that day and
+        flags anything still missing.
       </p>
+
+      <div style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.7rem', marginBottom: '0.8rem' }}>
+        {batches.map((b) => b.collection_date && (
+          <div key={b.collection_date} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.35rem 0' }}>
+            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>
+              {new Date(b.collection_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+              <span style={{ fontWeight: 400, color: '#777' }}> · {b.pieces_waiting} pieces</span>
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              {[0, 1, 2, 3, 4, 6].map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setCopies((c) => ({ ...c, [b.collection_date as string]: n }))}
+                  style={{
+                    minWidth: 34, minHeight: 34, borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                    fontSize: 'var(--text-sm)', fontWeight: 700,
+                    border: (copies[b.collection_date as string] ?? 0) === n ? '2px solid var(--clay)' : '1px solid #ece5db',
+                    background: 'white', color: 'var(--charcoal)',
+                  }}
+                >
+                  {n}
+                </button>
+              ))}
+            </span>
+          </div>
+        ))}
+      </div>
 
       <button
         onClick={() => window.print()}
@@ -70,42 +104,52 @@ export default function ShelfStickersPage() {
       </button>
 
       <div className="stickers">
-        {batches.map((b) => b.collection_date && (
-          <div
-            key={b.collection_date}
-            className="sticker"
-            style={{ border: '2px solid #2f2a25', borderRadius: 12, padding: '0.9rem', marginBottom: '0.8rem', background: 'white', display: 'flex', gap: '0.9rem', alignItems: 'center', breakInside: 'avoid' }}
-          >
-            {qrs[b.collection_date] && (
-              <img src={qrs[b.collection_date]} alt="" style={{ width: 130, height: 130, flexShrink: 0 }} />
-            )}
-            <div style={{ minWidth: 0 }}>
-              <p style={{ margin: 0, fontSize: 12, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#777', fontWeight: 700 }}>
-                Collection
-              </p>
-              {/* The date is set big enough to read from across the
-                  studio, because most of the time nobody scans anything
-                  -- they just want to know which shelf is which. */}
-              <p style={{ margin: '0.1rem 0 0', fontSize: 30, fontWeight: 800, lineHeight: 1.05, color: '#2f2a25' }}>
-                {new Date(b.collection_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-              </p>
-              <p style={{ margin: '0.15rem 0 0', fontSize: 13, color: '#555' }}>{pretty(b.collection_date)}</p>
-              <p style={{ margin: '0.3rem 0 0', fontSize: 13, fontWeight: 700, color: '#8a5a2b' }}>
-                {b.pieces_waiting} pieces · scan to check nothing is missing
-              </p>
-            </div>
-          </div>
-        ))}
+        {batches.flatMap((b) =>
+          Array.from({ length: copies[b.collection_date as string] ?? 0 }, (_, n) => {
+            const d = b.collection_date as string;
+            return (
+              <div key={`${d}-${n}`} className="sticker">
+                {qrs[d] && <img className="qr" src={qrs[d]} alt="" />}
+                <div className="txt">
+                  <p className="kicker">COLLECTION</p>
+                  {/* The date is the label. Most of the time nobody scans
+                      anything -- they want to know which shelf is which
+                      from across the studio, and only reach for a phone
+                      when something is actually wrong. */}
+                  <p className="big">{new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</p>
+                  <p className="sub">{pretty(d)}</p>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       <style>{`
+        .sticker {
+          display: flex; align-items: center; gap: 4mm;
+          width: 62mm; height: 29mm; padding: 2mm 3mm;
+          border: 1px solid #ddd; border-radius: 2mm; background: white;
+          margin-bottom: 3mm; box-sizing: border-box; overflow: hidden;
+        }
+        .sticker .qr { width: 24mm; height: 24mm; flex-shrink: 0; }
+        .sticker .txt { min-width: 0; }
+        .sticker .kicker { margin: 0; font-size: 6pt; letter-spacing: 0.09em; color: #777; font-weight: 700; }
+        .sticker .big { margin: 0.4mm 0 0; font-size: 19pt; font-weight: 800; line-height: 1; color: #000; }
+        .sticker .sub { margin: 0.6mm 0 0; font-size: 7pt; color: #444; }
+
         @media print {
           body * { visibility: hidden; }
           .stickers, .stickers * { visibility: visible; }
-          .stickers { position: absolute; left: 0; top: 0; width: 100%; }
-          /* Several to a sheet, none split across a page break -- half a
-             QR code on the shelf is worse than none. */
-          .sticker { break-inside: avoid; page-break-inside: avoid; }
+          .stickers { position: absolute; left: 0; top: 0; }
+          /* One label per page: a label printer feeds a roll, so each
+             sticker is its own page and the borders come off. */
+          @page { size: 62mm 29mm; margin: 0; }
+          .sticker {
+            border: none; margin: 0; page-break-after: always;
+            break-after: page; width: 62mm; height: 29mm;
+          }
+          .sticker:last-child { page-break-after: auto; break-after: auto; }
         }
       `}</style>
     </PageShell>
