@@ -175,3 +175,65 @@ export function PieceList({
     </div>
   );
 }
+
+/**
+ * One piece, cropped out of the table photo it shares with the rest of
+ * its booking.
+ *
+ * Every piece on a booking shares ONE photo, so showing that photo
+ * unmodified on each row gives a packer the same picture of the whole
+ * table five times over -- which is useless for telling which is which.
+ * Cropping to the recorded box is what makes a row identifiable at a
+ * glance, and glancing is the whole job when you are holding a box.
+ *
+ * Lifted out of the packing screen so the shelf wall can use it too,
+ * rather than becoming a fifth copy of the same maths.
+ */
+export function pieceCropStyle(url: string, box: PieceBox | null | undefined): React.CSSProperties {
+  if (!box) return { backgroundImage: `url(${url})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+  const w = box.right_pct - box.left_pct;
+  const h = box.bottom_pct - box.top_pct;
+  if (!(w > 0) || !(h > 0)) return { backgroundImage: `url(${url})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+  return {
+    backgroundImage: `url(${url})`,
+    backgroundSize: `${(100 / w) * 100}% ${(100 / h) * 100}%`,
+    backgroundPosition: `${w >= 100 ? 0 : (box.left_pct / (100 - w)) * 100}% ${h >= 100 ? 0 : (box.top_pct / (100 - h)) * 100}%`,
+    backgroundRepeat: 'no-repeat',
+  };
+}
+
+export function PieceThumb({
+  url,
+  box,
+  size = 46,
+  ring,
+}: {
+  url?: string | null;
+  box?: PieceBox | null;
+  size?: number;
+  ring?: string;
+}) {
+  // No photo is said plainly rather than shown as an empty grey square,
+  // because 42 bookings are still text-only from the screenshot read and
+  // a blank tile reads as a loading failure.
+  if (!url) {
+    return (
+      <span style={{
+        flexShrink: 0, width: size, height: size, borderRadius: 'var(--radius-sm)',
+        background: '#f4efe8', color: '#b9ada0', fontSize: 9, fontWeight: 700,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', lineHeight: 1.1,
+      }}>
+        no<br />photo
+      </span>
+    );
+  }
+  return (
+    <span
+      style={{
+        flexShrink: 0, width: size, height: size, borderRadius: 'var(--radius-sm)',
+        border: ring ? `2px solid ${ring}` : '1px solid #ece5db',
+        ...pieceCropStyle(url, box),
+      }}
+    />
+  );
+}

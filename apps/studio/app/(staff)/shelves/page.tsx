@@ -22,7 +22,12 @@ import { Loader, Layers } from 'lucide-react';
 // older shelf still shows what was found on it -- pieces only remember
 // their MOST RECENT position, which would have made older photos blank.
 
-const PIECE_COLOURS = ['#C0392B', '#27853F', '#2E6FB7', '#B8791F', '#6C3FA8', '#0F8F86'];
+// [6 Sep] A FOURTH copy of the palette lived here, and with different
+// hex values from the other three -- so piece 1 has been one red on
+// packing and a different red on this screen all along. Exactly the
+// drift the shared component was meant to end, in a file I had already
+// edited twice today without noticing.
+import { PieceThumb, PIECE_COLOURS } from '@/components/PieceBoxes';
 
 interface MatchedDetail {
   piece_id: string;
@@ -307,7 +312,15 @@ export default function ShelvesPage() {
                             onClick={(e) => { e.stopPropagation(); if (d.reference_photo_url) setLooking(d); }}
                             style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', marginTop: '0.25rem', cursor: d.reference_photo_url ? 'zoom-in' : 'default' }}
                           >
-                            <span style={{ flexShrink: 0, width: 17, height: 17, borderRadius: 'var(--radius-full)', backgroundColor: PIECE_COLOURS[i % 6], color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {/* [6 Sep] Daisy: "keeping thumbnails of
+                                pieces." A line of text tells you what to
+                                look for; the crop shows you. It is the
+                                same photo the whole booking shares,
+                                cropped to this piece's own box, so five
+                                rows are five different pictures rather
+                                than the same table five times. */}
+                            <PieceThumb url={d.reference_photo_url} box={d.reference_box} size={44} ring={PIECE_COLOURS[i % 6]} />
+                            <span style={{ flexShrink: 0, width: 17, height: 17, borderRadius: 'var(--radius-full)', backgroundColor: PIECE_COLOURS[i % 6], color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2 }}>
                               {i + 1}
                             </span>
                             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', textDecoration: d.reference_photo_url ? 'underline dotted' : 'none' }}>
