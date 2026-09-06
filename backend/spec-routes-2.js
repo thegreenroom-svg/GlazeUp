@@ -7850,10 +7850,27 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
       const fresh = files.filter((f) => !seen.has(f)).map((filename) => ({ studio_id: STUDIO_ID, filename }));
       if (fresh.length) await supabase.from('backfill_photos').insert(fresh);
 
-      const { data: pending } = await supabase
-        .from('backfill_photos').select('id, filename')
-        .eq('studio_id', STUDIO_ID).eq('status', 'pending')
-        .order('filename', { ascending: true }).limit(40);
+      // [6 Sep] Daisy: "don't want duplicate AI calls."
+      //
+      // Two ways a photo could be paid for twice, both closed here.
+      //
+      // First, a row is claimed BEFORE its Gemini call, not after. If a
+      // request dies mid-photo -- deploy, timeout, closed tab -- the
+      // row is already 'processing' rather than still 'pending', so the
+      // retry does not send it again.
+      //
+      // Second, a genuinely stuck claim must not strand the photo
+      // forever, so anything claimed more than ten minutes ago is
+      // eligible again. Ten minutes is far longer than one call and far
+      // shorter than a working day.
+      const staleBefore = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      const { data: readyRows } = await supabase
+        .from('backfill_photos').select('id, filename, status, processed_at')
+        .eq('studio_id', STUDIO_ID).in('status', ['pending', 'processing'])
+        .order('filename', { ascending: true }).limit(60);
+      const pending = (readyRows || []).filter(
+        (r) => r.status === 'pending' || (r.processed_at && r.processed_at < staleBefore)
+      ).slice(0, 40);
 
       // Every booking, once, for name matching. Bookings that already
       // carry a real photo are removed from the pool: process of
@@ -7884,6 +7901,15 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
 
       for (const row of pending || []) {
         if (Date.now() > DEADLINE) break;
+        // Claim it first. Everything below costs money; this line is
+        // what stops it being spent twice on the same photo.
+        const { data: claimed } = await supabase
+          .from('backfill_photos')
+          .update({ status: 'processing', processed_at: new Date().toISOString() })
+          .eq('id', row.id).in('status', ['pending', 'processing'])
+          .select('id');
+        if (!claimed?.length) continue;
+
         try {
           const buf = fs.readFileSync(path.join(DIR, row.filename));
           const forAi = await forGemini(sharp, buf, logger, null, 1600);
@@ -7970,7 +7996,7 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
 
       const { count: remaining } = await supabase
         .from('backfill_photos').select('id', { count: 'exact', head: true })
-        .eq('studio_id', STUDIO_ID).eq('status', 'pending');
+        .eq('studio_id', STUDIO_ID).in('status', ['pending', 'processing']);
 
       res.json({ processed: done, matched, unmatched, failed, remaining: remaining || 0, total: files.length });
     } catch (err) {
@@ -8046,14 +8072,40 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
   // guess at -- those are the list a person still needs to look at.
   app.get('/api/spec/backfill/status', async (req, res) => {
     try {
+      // [6 Sep] Daisy, on a page showing only "Choose photos": "Where?"
+      // My fault: photos were registered ONLY by the run route, but the
+      // page hides the run button until status reports some. Nothing
+      // ever called the thing that would have made it appear.
+      //
+      // Registering here as well makes the page self-starting: opening
+      // it is enough for the backlog to show up. Unique on
+      // (studio, filename), so doing it in both places cannot double up.
+      let onDisk = 0;
+      try {
+        if (fs.existsSync(BACKFILL_DIR)) {
+          const files = fs.readdirSync(BACKFILL_DIR).filter((f) => /\.jpe?g$/i.test(f));
+          onDisk = files.length;
+          const { data: known } = await supabase
+            .from('backfill_photos').select('filename').eq('studio_id', STUDIO_ID);
+          const seen = new Set((known || []).map((r) => r.filename));
+          const fresh = files.filter((f) => !seen.has(f)).map((filename) => ({ studio_id: STUDIO_ID, filename }));
+          if (fresh.length) await supabase.from('backfill_photos').insert(fresh);
+        }
+      } catch (err) {
+        logger.warn(`[backfill-status] could not register photos: ${err.message}`);
+      }
+
       const { data } = await supabase
         .from('backfill_photos')
         .select('filename, status, tag_name, booking_code, pieces_created, error_message')
         .eq('studio_id', STUDIO_ID).order('filename');
       const rows = data || [];
       res.json({
+        // on_disk distinguishes "not deployed yet" from "all done",
+        // which otherwise both show as nothing to do.
+        on_disk: onDisk,
         total: rows.length,
-        pending: rows.filter((r) => r.status === 'pending').length,
+        pending: rows.filter((r) => r.status === 'pending' || r.status === 'processing').length,
         done: rows.filter((r) => r.status === 'done').length,
         unmatched: rows.filter((r) => r.status === 'unmatched').length,
         failed: rows.filter((r) => r.status === 'failed').length,

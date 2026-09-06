@@ -106,7 +106,7 @@ export default function BackfillPage() {
   const [busy, setBusy] = useState(false);
   const picker = useRef<HTMLInputElement>(null);
 
-  const [prog, setProg] = useState<{ total: number; pending: number; done: number; unmatched: number; failed: number; pieces: number } | null>(null);
+  const [prog, setProg] = useState<{ on_disk: number; total: number; pending: number; done: number; unmatched: number; failed: number; pieces: number } | null>(null);
   const [running, setRunning] = useState(false);
 
   const loadProgress = () =>
@@ -228,7 +228,7 @@ export default function BackfillPage() {
 
   return (
     <PageShell title="Backfill from photos" subtitle="Tables photographed outside the app">
-      {prog && prog.total > 0 && (
+      {prog && (prog.total > 0 || prog.on_disk > 0) && (
         <div style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.9rem', marginBottom: '1rem' }}>
           <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, margin: '0 0 0.3rem' }}>The 27 Aug – 5 Sep backlog</p>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--charcoal)', margin: '0 0 0.6rem' }}>
@@ -236,6 +236,11 @@ export default function BackfillPage() {
             {prog.unmatched ? ` · ${prog.unmatched} need a look` : ''}
             {prog.failed ? ` · ${prog.failed} failed` : ''}
           </p>
+          {prog.pending === 0 && prog.done > 0 && (
+            <p style={{ fontSize: 'var(--text-sm)', color: '#2E7D32', fontWeight: 700, margin: 0 }}>
+              All done — nothing left to run.
+            </p>
+          )}
           {prog.pending > 0 && (
             <button onClick={runBatch} disabled={running}
               style={{ width: '100%', minHeight: 48, borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer', opacity: running ? 0.6 : 1 }}>
