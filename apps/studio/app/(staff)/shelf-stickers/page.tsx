@@ -42,7 +42,15 @@ export default function ShelfStickersPage() {
   // could not print.
   //
   // A date and a number of copies. That is the whole screen.
-  const [date, setDate] = useState('');
+  // [6 Sep] Starts on the next Saturday rather than empty. An empty
+  // date input on iOS renders as a blank box with no visible text, so
+  // the screen opened looking broken -- and the answer is nearly always
+  // a Saturday anyway, since that is when collections happen.
+  const [date, setDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7 || 7));
+    return d.toISOString().slice(0, 10);
+  });
   const [copies, setCopies] = useState(2);
   const [qr, setQr] = useState('');
 
@@ -61,18 +69,29 @@ export default function ShelfStickersPage() {
 
   return (
     <PageShell title="Shelf stickers" subtitle="One collection date, as many labels as you need">
-      <div style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.9rem', marginBottom: '1rem' }}>
-        <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 700, marginBottom: '0.4rem' }}>
+      {/* [6 Sep] glaze-surface, which is how every other card in the app
+          survives dark mode. Mine was a bare white div, so in dark mode
+          the body colour -- ivory -- was inherited by any text that did
+          not set its own, and the label went near-white on a white
+          card. Present the whole time, and invisible. */}
+      <div className="glaze-surface" style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.9rem', marginBottom: '1rem' }}>
+        {/* Colours stated outright rather than inherited. This card is
+            white in both themes, so a label taking its colour from the
+            theme went near-white on white and disappeared. */}
+        <label style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 700, marginBottom: '0.4rem', color: '#2f2a25' }}>
           Collection date
         </label>
         <input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          style={{ width: '100%', minHeight: 48, padding: '0.6rem 0.7rem', borderRadius: 'var(--radius-md)', border: '1px solid #ece5db', fontSize: 'var(--text-base)', background: 'white', color: 'var(--charcoal)' }}
+          // colorScheme light forces the native picker to draw dark text
+          // on white. Without it the system renders it for dark mode and
+          // the date is white on a white card -- present, but invisible.
+          style={{ width: '100%', minHeight: 48, padding: '0.6rem 0.7rem', borderRadius: 'var(--radius-md)', border: '1px solid #ece5db', fontSize: 'var(--text-base)', background: 'white', color: '#2f2a25', colorScheme: 'light', WebkitAppearance: 'none', appearance: 'none' }}
         />
 
-        <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, margin: '0.9rem 0 0.4rem' }}>How many labels</p>
+        <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, margin: '0.9rem 0 0.4rem', color: '#2f2a25' }}>How many labels</p>
         <div style={{ display: 'flex', gap: '0.35rem' }}>
           {[1, 2, 3, 4, 6, 8].map((n) => (
             <button
@@ -83,14 +102,14 @@ export default function ShelfStickersPage() {
                 fontSize: 'var(--text-base)', fontWeight: 700,
                 border: copies === n ? '2px solid var(--clay)' : '1px solid #ece5db',
                 background: copies === n ? 'var(--clay)' : 'white',
-                color: copies === n ? 'white' : 'var(--charcoal)',
+                color: copies === n ? 'white' : '#2f2a25',
               }}
             >
               {n}
             </button>
           ))}
         </div>
-        <p style={{ fontSize: 'var(--text-xs)', color: '#777', margin: '0.5rem 0 0', lineHeight: 1.45 }}>
+        <p style={{ fontSize: 'var(--text-xs)', color: '#6b625a', margin: '0.5rem 0 0', lineHeight: 1.45 }}>
           One per shelf edge holding this batch. They are all the same label — the date is what matters,
           not which shelf, because the shelves get broken up when the kiln is loaded.
         </p>
