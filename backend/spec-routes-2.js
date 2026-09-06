@@ -7956,15 +7956,24 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
             response_format: { type: 'text', mime_type: 'application/json', schema: BACKFILL_SCHEMA },
           }, 'gemini-3.5-flash-lite', 'gemini-3.7-flash');
 
+          // [6 Sep] Diagnosing rather than guessing again. Two prompt
+          // rewrites both produced a null name on every photo, which
+          // stopped looking like a reading problem and started looking
+          // like the response never arriving in the shape expected. So
+          // the raw text is kept when a photo does not match: "not
+          // readable" and "the model said something I did not parse"
+          // are completely different faults and were indistinguishable.
+          const rawText = extractGeminiText(aiRes) || '';
           let parsed = {};
-          try { parsed = JSON.parse((extractGeminiText(aiRes).match(/\{[\s\S]*\}/) || [])[0] || '{}'); } catch { parsed = {}; }
+          try { parsed = JSON.parse((rawText.match(/\{[\s\S]*\}/) || [])[0] || '{}'); } catch { parsed = {}; }
           const pieces = (parsed.pieces || []).filter((p) => p && p.description);
           const tag = (parsed.tag_name || '').trim() || null;
 
           if (!tag || !pieces.length) {
             await supabase.from('backfill_photos').update({
               status: 'unmatched', tag_name: tag,
-              error_message: !tag ? 'Chalk board not readable' : 'No pieces identified',
+              pieces_created: pieces.length,
+              error_message: `${!tag ? 'no name' : 'no pieces'} · pieces=${pieces.length} · keys=${Object.keys(parsed).join(',') || 'none'} · raw=${rawText.slice(0, 400).replace(/\s+/g, ' ')}`,
               processed_at: new Date().toISOString(),
             }).eq('id', row.id);
             unmatched++; done++; continue;
