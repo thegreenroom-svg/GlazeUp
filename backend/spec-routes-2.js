@@ -7634,7 +7634,48 @@ export function registerShelfSweepHistoryRoute(app, supabase, STUDIO_ID, logger)
         .order('created_at', { ascending: false })
         .limit(30);
       if (error) throw error;
-      res.json({ sweeps: data || [] });
+
+      // [6 Sep] Daisy, three fixes later: "still no photos. What's going
+      // on?"
+      //
+      // matched_details is a SNAPSHOT written when the sweep ran, and I
+      // kept adding fields to it -- reference photo, boxes, booking
+      // totals -- then telling her to re-run every shelf to see them.
+      // The latest sweep was three hours old, so of course it still had
+      // reference_photo_url: null frozen into it.
+      //
+      // Freezing a copy of the piece was the mistake. A reference photo
+      // belongs to the PIECE and can arrive later -- exactly what
+      // happened here, when the backfill filled it in after the sweep.
+      // So it is looked up now, at read time, from the pieces
+      // themselves. Old sweeps gain their thumbnails without being
+      // re-run, and a photo added tomorrow shows up on a sweep from
+      // last week.
+      const sweeps = data || [];
+      const pieceIds = Array.from(new Set(
+        sweeps.flatMap((sw) => (sw.matched_details || []).map((d) => d.piece_id).filter(Boolean))
+      ));
+      if (pieceIds.length) {
+        const { data: live } = await supabase
+          .from('pottery_pieces')
+          .select('id, reference_photo_url, photo_box, status')
+          .eq('studio_id', STUDIO_ID)
+          .in('id', pieceIds);
+        const byId = new Map((live || []).map((p) => [p.id, p]));
+        for (const sw of sweeps) {
+          sw.matched_details = (sw.matched_details || []).map((d) => {
+            const p = byId.get(d.piece_id);
+            return p ? {
+              ...d,
+              reference_photo_url: p.reference_photo_url || null,
+              reference_box: p.photo_box || null,
+              piece_status: p.status || null,
+            } : d;
+          });
+        }
+      }
+
+      res.json({ sweeps });
     } catch (err) {
       logger.error('shelf sweep history failed', err.message);
       res.status(500).json({ error: err.message });
