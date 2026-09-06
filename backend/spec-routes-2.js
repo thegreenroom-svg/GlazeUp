@@ -7740,7 +7740,9 @@ const BACKFILL_PROMPT = `This is a photo of one table in a pottery painting stud
 FIRST, AND MOST IMPORTANT: READ THE CHALK TAG.
 Somewhere on this table is a small black chalkboard tag with white chalk handwriting on it. It carries the paint date and time along the top, the CUSTOMER'S NAME in the middle in the largest writing, a collection date at the bottom left, and a table number and piece count like "x3" at the bottom right.
 
-Read the customer's name and return it as tag_name. The name is the single most important thing in this photo -- without it the pottery cannot be given back to the right person.
+Read the customer's name and return it as tag_name. Also return the paint date from the top of the tag as paint_date, and the collection date from the bottom left as collect_date, both exactly as written (for example "28/8" and "4/9"). These are how we tell apart two visits by the same customer, so copy the digits faithfully and return an empty string if a date is not legible.
+
+Read the rest of the tag too. Bottom right usually carries the room or table, written like "T6", "T4b", "Lounge" or "Vault" -- return it as table. Next to it is a count like "x3" -- return just the number as party_size. If the tag says "NP", usually underlined, that means not paid: return unpaid as true. Any of these can be missing; return an empty string or false rather than inventing one. The name is the single most important thing in this photo -- without it the pottery cannot be given back to the right person.
 
 The tags are wiped and reused, so faint ghost writing from previous bookings often shows underneath the current writing. Report only the clearest, most recent name. Handwriting varies and some names are unusual: give your best faithful reading of the letters you can see rather than holding out for certainty. Only if there is genuinely no legible tag in the photo at all, return tag_name as an empty string.
 
@@ -7775,6 +7777,11 @@ const BACKFILL_SCHEMA = {
       },
     },
     tag_name: { type: 'string', description: 'Customer name read from the chalk tag. Empty string ONLY if no legible tag is visible at all.' },
+    paint_date: { type: 'string', description: 'Paint date from the top of the tag, as written, e.g. "28/8". Empty string if not legible.' },
+    collect_date: { type: 'string', description: 'Collection date from the bottom left of the tag, as written, e.g. "4/9". Empty string if not legible.' },
+    table: { type: 'string', description: 'Room or table from the bottom right, e.g. "T6", "T4b", "Lounge". Empty string if absent.' },
+    party_size: { type: 'integer', description: 'The number after the x on the tag, e.g. 3 from "x3". 0 if absent.' },
+    unpaid: { type: 'boolean', description: 'True only if the tag shows NP for not paid.' },
   },
   // Required, deliberately. Optional plus "omit rather than guess" got
   // it omitted every single time across 39 photos.
@@ -7900,21 +7907,53 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
       // elimination, so a repeat customer's earlier visit stops
       // competing with the one still waiting to be recovered.
       const { data: allBookings } = await supabase
-        .from('bookings').select('booking_code, customer_name, session_start')
+        .from('bookings').select('booking_code, customer_name, session_start, collection_date, table_number, collection_notes')
         .eq('studio_id', STUDIO_ID).limit(1000);
       const { data: photographed } = await supabase
         .from('pottery_pieces').select('booking_id')
         .eq('studio_id', STUDIO_ID).not('reference_photo_url', 'is', null);
       const taken = new Set((photographed || []).map((p) => p.booking_id));
 
-      const norm = (x) => (x || '').toLowerCase().replace(/[^a-z ]/g, '').trim();
+      // [6 Sep] WHOLE-WORD MATCHING WAS TOO BLUNT.
+      // The old score counted shared words, so a tag reading "Sophie
+      // Martin" scored exactly the same against Sophie Merchant as
+      // against Sophie Dunn -- a tie, so it refused both. Every common
+      // first name behaved that way, and 34 photos stalled on it.
+      // Chalk misreads are almost always a letter or two out
+      // ("Wylic"/"Wylie", "Blackstone"/"Brackstone", "Steodley"/
+      // "Stoodley"), which needs character distance, not word equality.
+      const norm = (x) => (x || '').toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
+      const lev = (a, b) => {
+        if (a === b) return 0;
+        const m = a.length, n2 = b.length;
+        if (!m || !n2) return Math.max(m, n2);
+        let prev = Array.from({ length: n2 + 1 }, (_, i) => i);
+        for (let i = 1; i <= m; i++) {
+          const cur = [i];
+          for (let j = 1; j <= n2; j++) {
+            cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+          }
+          prev = cur;
+        }
+        return prev[n2];
+      };
+      const closeness = (a, b) => (!a || !b) ? 0 : 1 - lev(a, b) / Math.max(a.length, b.length);
+
       const score = (tag, name) => {
         const a = norm(tag), b = norm(name);
         if (!a || !b) return 0;
         if (a === b) return 1;
-        const at = a.split(/\s+/), bt = b.split(/\s+/);
-        const shared = at.filter((t) => t.length > 2 && bt.some((u) => u.startsWith(t) || t.startsWith(u)));
-        return shared.length / Math.max(at.length, bt.length);
+        const at = a.split(' '), bt = b.split(' ');
+        // Surname carries the weight. First names repeat constantly in a
+        // studio; surnames are what actually separate two customers.
+        const surnameScore = closeness(at[at.length - 1], bt[bt.length - 1]);
+        const firstScore = closeness(at[0], bt[0]);
+        const whole = closeness(a, b);
+        // A single first name on the board ("Amy", "Katie") cannot
+        // identify anyone on its own, so it scores low on purpose and
+        // falls through to a human rather than picking one of three.
+        if (at.length === 1) return Math.max(whole, firstScore) * 0.55;
+        return Math.max(whole, surnameScore * 0.65 + firstScore * 0.35);
       };
 
       // Well inside any sensible proxy limit. Whatever is left stays
@@ -7989,25 +8028,66 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
             await supabase.from('backfill_photos').update({
               status: 'unmatched', tag_name: tag,
               pieces_created: pieces.length,
+              // [6 Sep] The read is the expensive half and the match is
+              // the cheap half, but a failed match was throwing the read
+              // away -- so improving the matcher meant paying Gemini
+              // again for work already done. Kept now: a re-match is free.
+              ai_result: { tag_name: tag, paint_date: tagDay, collect_date: (parsed.collect_date || '').trim(), table: (parsed.table || '').trim(), party_size: parsed.party_size || 0, unpaid: parsed.unpaid === true, pieces },
               error_message: `${!tag ? 'no name' : 'no pieces'} · pieces=${pieces.length} · keys=${Object.keys(parsed).join(',') || 'none'} · raw=${rawText.slice(0, 400).replace(/\s+/g, ' ')}`,
               processed_at: new Date().toISOString(),
             }).eq('id', row.id);
             unmatched++; done++; continue;
           }
 
+          // [6 Sep] REPEAT CUSTOMERS. Daisy: "some people come in two or
+          // three times a week." Kari Clarke has bookings on the 28th
+          // and 29th; Vikki Waterman has three; Chelsea Elson has three
+          // on one day. Excluding every booking that already has a
+          // photo treated a genuine second visit as a duplicate and
+          // discarded it.
+          //
+          // The paint date written on the chalk board is what separates
+          // them, and it is on the board precisely so a human can do
+          // this. Note this is NOT the file's date -- that one lies,
+          // which is why it was dropped earlier. This one is written by
+          // the person who set the table.
+          const tagDay = (parsed.paint_date || '').trim();
+          const dayOf = (iso) => {
+            const d = new Date(iso);
+            return `${d.getDate()}/${d.getMonth() + 1}`;
+          };
+
           const ranked = (allBookings || [])
             .map((b) => ({ b, sc: score(tag, b.customer_name) }))
-            .filter((x) => x.sc >= 0.5 && !taken.has(x.b.booking_code))
+            .filter((x) => x.sc >= 0.62)
             .sort((x, y) => y.sc - x.sc);
+
+          // Among equally-named candidates, the tag's own date decides.
+          // Only ever used to separate a tie -- never to reject a name
+          // that matched, because a misread date should not cost a
+          // booking its photo.
+          const best = ranked.length ? ranked[0].sc : 0;
+          const topTier = ranked.filter((x) => x.sc >= best - 0.02);
+          const sameDay = tagDay ? topTier.filter((x) => dayOf(x.b.session_start) === tagDay) : [];
+          const pool = (sameDay.length ? sameDay : topTier).filter((x) => !taken.has(x.b.booking_code));
+          const runnerUp = ranked.find((x) => !pool.includes(x) && x.sc >= best - 0.02 && !taken.has(x.b.booking_code));
 
           // Only attach on a clear winner. A tie is exactly when a
           // person should decide, so it is left unmatched rather than
           // gambling someone's pottery onto the wrong name.
-          const win = ranked.length === 1 || (ranked.length > 1 && ranked[0].sc > ranked[1].sc) ? ranked[0].b : null;
+          // One clear candidate wins. Two still tied after the date has
+          // had its say is exactly when a person should choose.
+          const win = pool.length === 1 ? pool[0].b
+            : (pool.length > 1 && !runnerUp && pool[0].sc > pool[1].sc) ? pool[0].b
+            : null;
           if (!win) {
             await supabase.from('backfill_photos').update({
               status: 'unmatched', tag_name: tag,
-              error_message: ranked.length ? 'More than one booking matches that name' : 'No booking matches that name',
+              error_message: !ranked.length
+                ? `No booking matches "${tag}"`
+                : pool.length === 0
+                  ? `"${tag}" already has a photo — likely a second shot of the same table`
+                  : `"${tag}" matches ${pool.length} bookings${tagDay ? ` even after the ${tagDay} date` : ' and the tag date was not readable'}`,
               processed_at: new Date().toISOString(),
             }).eq('id', row.id);
             unmatched++; done++; continue;
@@ -8037,9 +8117,47 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
           }));
           const { data: created } = await supabase.from('pottery_pieces').insert(rows).select('id');
 
+          // [6 Sep] Daisy: "you might as well add all that information,
+          // collection date and everything if it's present... then it
+          // can flow through the workflow."
+          //
+          // The tag is the studio's own record of the session and it was
+          // being read for one field out of five. The rest goes onto the
+          // booking, but only where the booking has nothing already --
+          // a chalk read is good evidence, never better than something
+          // a person entered.
+          const patch = {};
+          const collectRaw = (parsed.collect_date || '').trim();
+          if (collectRaw && !win.collection_date) {
+            // "4/9" carries no year. Take it from the session, rolling
+            // forward when the month goes backwards -- a December paint
+            // collected in January is the same booking, not last year's.
+            const m = collectRaw.match(/^(\d{1,2})\s*[\/.-]\s*(\d{1,2})$/);
+            if (m) {
+              const sess = new Date(win.session_start);
+              const day = parseInt(m[1], 10), mon = parseInt(m[2], 10);
+              if (day >= 1 && day <= 31 && mon >= 1 && mon <= 12) {
+                const year = mon < (sess.getMonth() + 1) ? sess.getFullYear() + 1 : sess.getFullYear();
+                patch.collection_date = `${year}-${String(mon).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              }
+            }
+          }
+          const tableRaw = (parsed.table || '').trim();
+          if (tableRaw && !win.table_number) patch.table_number = tableRaw;
+          // NP is a real operational flag -- pottery that must not go
+          // home before someone has taken the money. Recorded as a note
+          // rather than a silent field, so whoever packs it sees it.
+          if (parsed.unpaid === true) {
+            patch.collection_notes = [win.collection_notes, 'Chalk tag marked NP (not paid) at the table'].filter(Boolean).join(' · ');
+          }
+          if (Object.keys(patch).length) {
+            await supabase.from('bookings').update(patch).eq('studio_id', STUDIO_ID).eq('booking_code', win.booking_code);
+          }
+
           taken.add(win.booking_code);
           await supabase.from('backfill_photos').update({
             status: 'done', tag_name: tag, booking_code: win.booking_code,
+            ai_result: { tag_name: tag, paint_date: tagDay, collect_date: collectRaw, table: tableRaw, party_size: parsed.party_size || 0, unpaid: parsed.unpaid === true, applied: patch },
             pieces_created: (created || []).length, processed_at: new Date().toISOString(),
           }).eq('id', row.id);
           matched++; done++;
