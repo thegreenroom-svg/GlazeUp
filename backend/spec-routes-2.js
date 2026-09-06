@@ -8427,6 +8427,32 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
             applied[field] = value;
           };
 
+          // [6 Sep] A CHALK DATE MUST AGREE WITH ITS DAY.
+          //
+          // Applying the tag outright let one misread digit invent a
+          // whole collection batch. Four appeared: 31 Aug, 6 Sep,
+          // 11 Sep and 17 Sep, one booking each, sitting between real
+          // batches of 58, 86 and 30. Daisy: "what's this, makes no
+          // sense" -- and it did not.
+          //
+          // Everyone painting on the same day collects on the same day;
+          // that is what a kiln batch IS. So a date read off chalk has
+          // to be corroborated by the rest of its session. Where the day
+          // already has a clear consensus and this tag disagrees, the
+          // tag lost a digit and the consensus wins.
+          //
+          // Only where the consensus is strong. Early in a day, before
+          // enough tags have been read, there is nothing to check
+          // against and the tag is simply believed.
+          const sameSession = (allBookings || []).filter((x) =>
+            x.collection_date &&
+            new Date(x.session_start).toDateString() === new Date(win.session_start).toDateString()
+          );
+          const tally = new Map();
+          for (const x of sameSession) tally.set(x.collection_date, (tally.get(x.collection_date) || 0) + 1);
+          let consensus = null, consensusCount = 0;
+          for (const [d, n] of tally) if (n > consensusCount) { consensusCount = n; consensus = d; }
+
           const collectRaw = (parsed.collect_date || '').trim();
           if (collectRaw) {
             // "4/9" carries no year. Take it from the session, rolling
@@ -8438,7 +8464,15 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
               const day = parseInt(m[1], 10), mon = parseInt(m[2], 10);
               if (day >= 1 && day <= 31 && mon >= 1 && mon <= 12) {
                 const year = mon < (sess.getMonth() + 1) ? sess.getFullYear() + 1 : sess.getFullYear();
-                setField('collection_date', `${year}-${String(mon).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
+                const read = `${year}-${String(mon).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                if (consensus && consensusCount >= 5 && read !== consensus) {
+                  // Believed the room, not the tag. Recorded either way
+                  // so a genuine oddity can be spotted later.
+                  applied.collection_date = consensus;
+                  replaced.chalk_said = read;
+                } else {
+                  setField('collection_date', read);
+                }
               }
             }
           }

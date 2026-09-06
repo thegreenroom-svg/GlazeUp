@@ -69,29 +69,41 @@ export default function ShelfStickersPage() {
         flags anything still missing.
       </p>
 
-      <div style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.7rem', marginBottom: '0.8rem' }}>
+      {/* [6 Sep] Daisy: "what's this makes no sense."
+          The date and the copy buttons were fighting for one row, so
+          "19 Sep · 206 pieces" wrapped across three lines behind a wall
+          of numbers and the batch -- the actual subject -- became the
+          least readable thing on screen. Date on its own line, copies
+          underneath. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1rem' }}>
         {batches.map((b) => b.collection_date && (
-          <div key={b.collection_date} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.35rem 0' }}>
-            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>
-              {new Date(b.collection_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-              <span style={{ fontWeight: 400, color: '#777' }}> · {b.pieces_waiting} pieces</span>
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              {[0, 1, 2, 3, 4, 6].map((n) => (
-                <button
-                  key={n}
-                  onClick={() => setCopies((c) => ({ ...c, [b.collection_date as string]: n }))}
-                  style={{
-                    minWidth: 34, minHeight: 34, borderRadius: 'var(--radius-sm)', cursor: 'pointer',
-                    fontSize: 'var(--text-sm)', fontWeight: 700,
-                    border: (copies[b.collection_date as string] ?? 0) === n ? '2px solid var(--clay)' : '1px solid #ece5db',
-                    background: 'white', color: 'var(--charcoal)',
-                  }}
-                >
-                  {n}
-                </button>
-              ))}
-            </span>
+          <div key={b.collection_date} style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.7rem 0.8rem' }}>
+            <p style={{ margin: 0, fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--charcoal)' }}>
+              {new Date(b.collection_date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long' })}
+            </p>
+            <p style={{ margin: '0.1rem 0 0.5rem', fontSize: 'var(--text-xs)', color: '#777' }}>
+              {b.pieces_waiting} piece{b.pieces_waiting === 1 ? '' : 's'} waiting
+            </p>
+            <div style={{ display: 'flex', gap: '0.35rem' }}>
+              {[0, 1, 2, 3, 4, 6].map((n) => {
+                const on = (copies[b.collection_date as string] ?? 0) === n;
+                return (
+                  <button
+                    key={n}
+                    onClick={() => setCopies((c) => ({ ...c, [b.collection_date as string]: n }))}
+                    style={{
+                      flex: 1, minHeight: 40, borderRadius: 'var(--radius-sm)', cursor: 'pointer',
+                      fontSize: 'var(--text-sm)', fontWeight: 700,
+                      border: on ? '2px solid var(--clay)' : '1px solid #ece5db',
+                      background: on ? 'var(--clay)' : 'white',
+                      color: on ? 'white' : 'var(--charcoal)',
+                    }}
+                  >
+                    {n}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         ))}
       </div>
