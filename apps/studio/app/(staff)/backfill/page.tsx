@@ -107,7 +107,7 @@ export default function BackfillPage() {
   const [busy, setBusy] = useState(false);
   const picker = useRef<HTMLInputElement>(null);
 
-  const [prog, setProg] = useState<{ on_disk: number; total: number; pending: number; done: number; unmatched: number; failed: number; duplicate: number; pieces: number } | null>(null);
+  const [prog, setProg] = useState<{ on_disk: number; total: number; pending: number; done: number; unmatched: number; failed: number; duplicate: number; assigned: number; pieces: number } | null>(null);
   const [running, setRunning] = useState(false);
 
   const loadProgress = () =>
@@ -133,7 +133,11 @@ export default function BackfillPage() {
         await loadProgress();
         // Stop on a run that is matching nothing. Continuing would just
         // spend the remaining AI calls to reach the same answer.
-        if (!res.ok || !d.remaining || d.stalled) break;
+        // 'remaining' counts pending only, so a run that had nothing
+        // but assigned rows to finish stopped after one pass without
+        // saying so. Keep going while either queue has work.
+        if (!res.ok || d.stalled) break;
+        if (!d.remaining && !d.matched) break;
       }
     } finally { setRunning(false); loadProgress(); }
   };
@@ -236,6 +240,7 @@ export default function BackfillPage() {
           <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, margin: '0 0 0.3rem' }}>The 27 Aug – 5 Sep backlog</p>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--charcoal)', margin: '0 0 0.6rem' }}>
             {prog.done} of {prog.total} done · {prog.pieces} piece{prog.pieces === 1 ? '' : 's'} with photos
+            {prog.assigned ? ` · ${prog.assigned} waiting to finish` : ''}
             {prog.duplicate ? ` · ${prog.duplicate} second shots skipped` : ''}
             {prog.unmatched ? ` · ${prog.unmatched} need a look` : ''}
             {prog.failed ? ` · ${prog.failed} failed` : ''}
@@ -245,10 +250,24 @@ export default function BackfillPage() {
               All done — nothing left to run.
             </p>
           )}
-          {prog.pending > 0 && (
+          {/* [6 Sep] Daisy: "still no photos."
+              Because this button only appeared when something was
+              PENDING, and the eleven photos whose booking I picked by
+              hand sit in 'assigned' -- a status I added and then never
+              counted here. Pending hit zero, the button vanished, and
+              the assigned ones had no way to be run at all. They had
+              been stuck since the moment they were assigned. */}
+          {prog.pending + (prog.assigned || 0) > 0 && (
             <button onClick={runBatch} disabled={running}
               style={{ width: '100%', minHeight: 48, borderRadius: 'var(--radius-md)', border: 'none', background: 'var(--clay)', color: 'white', fontWeight: 700, fontSize: 'var(--text-base)', cursor: 'pointer', opacity: running ? 0.6 : 1 }}>
-              {running ? `Working… ${prog.pending} left` : `Run the AI over ${prog.pending} photo${prog.pending === 1 ? '' : 's'}`}
+              {running
+                ? `Working… ${prog.pending + (prog.assigned || 0)} left`
+                : prog.pending === 0
+                  // Worth saying plainly: finishing a hand-picked
+                  // booking costs nothing, because its read is already
+                  // stored on the row.
+                  ? `Finish ${prog.assigned} hand-picked booking${prog.assigned === 1 ? '' : 's'} — no AI calls`
+                  : `Run the AI over ${prog.pending} photo${prog.pending === 1 ? '' : 's'}${prog.assigned ? ` and finish ${prog.assigned} picked by hand` : ''}`}
             </button>
           )}
         </div>
