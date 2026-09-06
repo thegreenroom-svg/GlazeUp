@@ -6185,6 +6185,14 @@ For each match give the number, a confidence from 0 to 1, and its bounding box i
             booking_code: code,
             customer_name: nameByCode.get(code) || code,
             booking_waiting: waitingByBooking.get(code) || v.pieces.length,
+            // [6 Sep] Daisy: "click on individual open image."
+            // Carried so a match can be checked against what the piece
+            // actually looked like when it was painted. A description
+            // and a box on a shelf photo say the AI thinks these are
+            // the same thing; only the two pictures side by side let a
+            // person confirm it before putting pottery in a bag.
+            reference_photo_url: pc.reference_photo_url || null,
+            reference_box: pc.photo_box || null,
           }))
         );
         // A typed box number always wins over a read one -- if someone

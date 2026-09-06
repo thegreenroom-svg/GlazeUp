@@ -32,6 +32,8 @@ interface MatchedDetail {
   booking_code: string;
   customer_name: string;
   booking_waiting?: number | null;
+  reference_photo_url?: string | null;
+  reference_box?: { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number } | null;
 }
 
 interface Sweep {
@@ -47,6 +49,11 @@ interface Sweep {
 export default function ShelvesPage() {
   const router = useRouter();
   const [sweeps, setSweeps] = useState<Sweep[] | null>(null);
+  // [6 Sep] Daisy: "click on individual open image."
+  // A description and a box say the AI believes two things are the
+  // same. Standing at a shelf about to put pottery in a bag, the only
+  // thing that settles it is seeing the piece as it was painted.
+  const [looking, setLooking] = useState<MatchedDetail | null>(null);
   // Blank photos are hidden by default -- Daisy: "remove any on wall
   // without any matches" -- but NOT thrown away, because nothing
   // re-matches them in the background. A photo that found nothing
@@ -195,11 +202,16 @@ export default function ShelvesPage() {
                           </span>
                         </span>
                         {g.items.map(({ d, i }) => (
-                          <span key={d.piece_id} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', marginTop: '0.25rem' }}>
+                          <span
+                            key={d.piece_id}
+                            role="button"
+                            onClick={(e) => { e.stopPropagation(); if (d.reference_photo_url) setLooking(d); }}
+                            style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', marginTop: '0.25rem', cursor: d.reference_photo_url ? 'zoom-in' : 'default' }}
+                          >
                             <span style={{ flexShrink: 0, width: 17, height: 17, borderRadius: 'var(--radius-full)', backgroundColor: PIECE_COLOURS[i % 6], color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               {i + 1}
                             </span>
-                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)' }}>
+                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', textDecoration: d.reference_photo_url ? 'underline dotted' : 'none' }}>
                               {d.description || d.piece_type || 'Piece'}
                             </span>
                           </span>
@@ -240,6 +252,46 @@ export default function ShelvesPage() {
           );
         })}
       </div>
+
+      {/* The piece as it was painted, ringed on its own table photo.
+          Full width and dark behind, because this gets used standing at
+          a shelf with a box in one hand -- it has to be readable at
+          arm's length, and one tap anywhere closes it. */}
+      {looking && (
+        <div
+          onClick={() => setLooking(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.82)',
+            display: 'flex', flexDirection: 'column', justifyContent: 'center',
+            padding: '1rem', cursor: 'zoom-out',
+          }}
+        >
+          <p style={{ color: 'white', fontSize: 'var(--text-sm)', fontWeight: 700, margin: '0 0 0.15rem' }}>
+            {looking.customer_name}
+          </p>
+          <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 'var(--text-xs)', margin: '0 0 0.6rem' }}>
+            {looking.description || looking.piece_type}
+          </p>
+          <div style={{ position: 'relative', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+            <img src={looking.reference_photo_url || ''} alt="" style={{ width: '100%', display: 'block' }} />
+            {looking.reference_box && (
+              <div style={{
+                position: 'absolute',
+                left: `${looking.reference_box.left_pct}%`,
+                top: `${looking.reference_box.top_pct}%`,
+                width: `${looking.reference_box.right_pct - looking.reference_box.left_pct}%`,
+                height: `${looking.reference_box.bottom_pct - looking.reference_box.top_pct}%`,
+                border: '3px solid #e0392b',
+                borderRadius: 'var(--radius-sm)',
+                boxShadow: '0 0 0 1px rgba(255,255,255,0.9), 0 0 0 9999px rgba(0,0,0,0.45)',
+              }} />
+            )}
+          </div>
+          <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 'var(--text-xs)', textAlign: 'center', margin: '0.7rem 0 0' }}>
+            Photographed at the table. Tap anywhere to close.
+          </p>
+        </div>
+      )}
     </PageShell>
   );
 }
