@@ -6005,6 +6005,10 @@ IGNORE ALL OTHER WRITING. The wooden shelf edges are chalked with collection dat
 
 Writing on the POTTERY ITSELF is different and does still count -- a name or message painted onto a plate or mug is part of that piece and is worth using to identify it.
 
+FIRST, WHAT IS NOT POTTERY. A studio shelf is full of things that are not customer pieces: cardboard boxes and flat-packed card, shipping cartons with printed labels or barcodes, paper and tissue, bubble wrap, crates and trays of stock, kiln furniture and shelf props, tools, cleaning bottles, drinks. Never match any of those to a piece.
+
+Be especially careful with rectangular cardboard: a flat brown box is not a tray, a dish or a plaque, however close the shape. Painted pottery is glazed and coloured and sits ON a shelf as a finished object; packaging is brown, matte, printed on, and usually stacked or folded. If something is cardboard, it is not a match, no matter how well its outline fits a description.
+
 Look at the shelf photo and decide which of the numbered pieces you can actually see.
 
 A shelving unit holds several batches at once, so pieces due on different dates sit on different shelves in the same photo. Judge every piece on what it looks like. Do not use the chalked dates to decide what is or is not on the shelf -- they label the wood, not the pottery, and a piece can easily sit on the wrong shelf.
@@ -7781,6 +7785,50 @@ export function registerShelfSweepHistoryRoute(app, supabase, STUDIO_ID, logger)
       res.json({ batch: row });
     } catch (err) {
       logger.error(`[batch-move] ${err.message}`);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // [7 Sep] SAYING NO TO A MATCH.
+  //
+  // Daisy, on a cardboard shipping box matched as a pale yellow tray:
+  // "clearly a box."
+  //
+  // Wrong matches will keep happening, and until now there was nothing
+  // to do about one except ignore it -- while the piece went on
+  // claiming to be found, so it never appeared as missing and nobody
+  // went looking for the real one. A wrong match is worse than no
+  // match for exactly that reason: it is a confident answer that stops
+  // the search.
+  //
+  // So a match can be rejected. It clears the piece's last-seen
+  // position, putting it straight back into "not found yet" where it
+  // belongs, and drops it from the sweep so the shelf photo stops
+  // showing a box with a number on it.
+  app.post('/api/spec/shelf/sweeps/:id/reject/:pieceId', async (req, res) => {
+    try {
+      const { id, pieceId } = req.params;
+      const { data: sweep } = await supabase
+        .from('shelf_sweeps').select('id, matched_piece_ids, matched_details')
+        .eq('studio_id', STUDIO_ID).eq('id', id).maybeSingle();
+      if (!sweep) return res.status(404).json({ error: 'No such sweep' });
+
+      const details = (sweep.matched_details || []).filter((d) => d.piece_id !== pieceId);
+      const ids = (sweep.matched_piece_ids || []).filter((x) => x !== pieceId);
+      await supabase.from('shelf_sweeps')
+        .update({ matched_details: details, matched_piece_ids: ids, matches_found: details.length })
+        .eq('id', id);
+
+      // Only cleared if THIS sweep is the one that placed it. A later
+      // sweep may have found the piece properly since, and rejecting an
+      // old bad match should not undo a good one.
+      await supabase.from('pottery_pieces')
+        .update({ last_seen_at: null, last_seen_box: null, last_seen_box_number: null, last_seen_sweep_id: null })
+        .eq('studio_id', STUDIO_ID).eq('id', pieceId).eq('last_seen_sweep_id', id);
+
+      res.json({ ok: true, remaining: details.length });
+    } catch (err) {
+      logger.error(`[sweep-reject] ${err.message}`);
       res.status(500).json({ error: err.message });
     }
   });

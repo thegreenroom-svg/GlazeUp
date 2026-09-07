@@ -83,6 +83,14 @@ export default function ShelvesPage() {
   const [showBlanks, setShowBlanks] = useState(false);
   const [retrying, setRetrying] = useState<string | null>(null);
 
+  // Pulled out of the effect so rejecting a match can refresh from the
+  // same place the page first loaded from.
+  const load = () =>
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweeps`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setSweeps((d?.sweeps || []) as Sweep[]))
+      .catch(() => setSweeps([]));
+
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweeps`)
       .then((r) => (r.ok ? r.json() : null))
@@ -356,8 +364,23 @@ export default function ShelvesPage() {
                             <span style={{ flexShrink: 0, width: 17, height: 17, borderRadius: 'var(--radius-full)', backgroundColor: PIECE_COLOURS[i % 6], color: 'white', fontSize: 'var(--text-xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2 }}>
                               {i + 1}
                             </span>
-                            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--muted)', textDecoration: d.reference_photo_url ? 'underline dotted' : 'none' }}>
+                            <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-xs)', color: 'var(--muted)', textDecoration: d.reference_photo_url ? 'underline dotted' : 'none' }}>
                               {d.description || d.piece_type || 'Piece'}
+                            </span>
+                            {/* [7 Sep] A wrong match is worse than no
+                                match: it keeps claiming the piece is
+                                found, so it never shows as missing and
+                                nobody goes looking for the real one. */}
+                            <span
+                              role="button"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/shelf/sweeps/${sw.id}/reject/${d.piece_id}`, { method: 'POST' });
+                                load();
+                              }}
+                              style={{ flexShrink: 0, fontSize: 'var(--text-xs)', fontWeight: 700, color: '#A6761D', cursor: 'pointer', padding: '0 0.2rem' }}
+                            >
+                              not this
                             </span>
                           </span>
                         ))}
