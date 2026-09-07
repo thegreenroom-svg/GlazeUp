@@ -6019,6 +6019,12 @@ So judge on FORM, PATTERN and MOTIF, none of which change in the kiln -- the sha
 
 Be strict. Only include a number if the piece in the photo genuinely matches in form AND painted detail. Studio pottery is repetitive — many customers paint the same blank — so a "mug" alone is never enough to match on; the painted decoration has to agree. If you are unsure, leave it out. A missed piece is a minor nuisance; a wrong match sends someone home with someone else's pottery.
 
+WORDS BEAT EVERYTHING. If a description mentions a name, a word or lettering, that lettering decides it. A mug described as carrying the name FLO is NOT the mug in the photo reading MILL -- different words mean a different piece, however well the shape, colour and glaze agree. Painted lettering is the most reliable evidence on a shelf because it is unique to one customer, so treat any disagreement in it as a rejection rather than a detail to overlook. Lettering you cannot read clearly is not agreement either: leave it out.
+
+THE DISTINGUISHING DETAIL MUST BE VISIBLE. Each description ends with whatever separates that piece from its neighbours -- an embossed leaf, a brown stalk, green and grey leaves, a grid texture. That part IS the match. If you can see the general form but not the specific detail, you have found the right SHAPE and not the right PIECE, and a studio shelf is nothing but repeated shapes. Leave it out.
+
+CHECK IT IS THE SAME KIND OF OBJECT. A spoon rest is not a butter dish, a teapot is not a bowl, a jug is not a vase. Getting the class of object wrong is not a near miss, it is a different piece.
+
 For each match give the number, a confidence from 0 to 1, and its bounding box in the photo.`;
 
       const schema = {
