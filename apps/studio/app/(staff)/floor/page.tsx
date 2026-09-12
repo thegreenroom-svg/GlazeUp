@@ -146,6 +146,9 @@ export default function FloorPage() {
   const [pieceCount, setPieceCount] = useState(0);
   const [identifyError, setIdentifyError] = useState<string | null>(null);
   // Real per-piece identification from the table photo.
+  // Daisy: a piece can be marked as returning right here on the table photo,
+  // which takes it off this collection date and puts it on the returns shelf.
+  const [returning, setReturning] = useState<Record<number, string>>({});
   const [identifiedPieces, setIdentifiedPieces] = useState<{ index: number; piece_type: string; description: string; box: { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number } | null }[] | null>(null);
   const [identifying, setIdentifying] = useState(false);
   const [splitBillCount, setSplitBillCount] = useState(1);
@@ -534,6 +537,7 @@ export default function FloorPage() {
     // d'Ambrumenil's photo showed two rabbits but recorded "0 pieces").
     setIdentifying(true);
     setIdentifiedPieces(null);
+    setReturning({});
     setIdentifyError(null); // clear any error from a previous attempt
     // Captured now, not read from `current` later -- by the time this
     // resolves, staff may already have finished this booking and moved to
@@ -631,7 +635,14 @@ export default function FloorPage() {
         // Real per-piece descriptions, so each piece is stored with
         // something Find on Table can genuinely search on later.
         if (identifiedPieces?.length) {
-          formData.append('pieces_json', JSON.stringify(identifiedPieces.map((p) => ({ piece_type: p.piece_type, description: p.description, box: p.box }))));
+          formData.append('pieces_json', JSON.stringify(identifiedPieces.map((p) => ({
+            piece_type: p.piece_type,
+            description: p.description,
+            box: p.box,
+            // Marked on the table photo: this one goes back, not on the shelf for this date.
+            returning: returning[p.index] !== undefined,
+            return_reason: returning[p.index] || null,
+          }))));
         }
         if (shiftName) {
           formData.append('photo_taken_by', shiftName);
@@ -1583,12 +1594,46 @@ export default function FloorPage() {
                         <div style={{ flex: 1 }}>
                           <p style={{ color: B.ivory, fontSize: 'var(--text-sm)', fontWeight: 600 }}>{p.piece_type}</p>
                           <p style={{ color: B.stone, fontSize: 'var(--text-xs)' }}>{p.description}</p>
+                          {returning[p.index] !== undefined && (
+                            <input
+                              autoFocus
+                              value={returning[p.index]}
+                              onChange={(e) => setReturning((r) => ({ ...r, [p.index]: e.target.value }))}
+                              placeholder="Why is it going back? (chipped, wrong colour...)"
+                              style={{
+                                marginTop: '0.35rem', width: '100%', padding: '0.4rem 0.5rem',
+                                borderRadius: 'var(--radius-sm)', border: `1px solid ${B.clay}`,
+                                backgroundColor: B.charcoal, color: B.ivory, fontSize: 'var(--text-xs)',
+                              }}
+                            />
+                          )}
                         </div>
+                        <button
+                          onClick={() => setReturning((r) => {
+                            const n = { ...r };
+                            if (n[p.index] !== undefined) delete n[p.index]; else n[p.index] = '';
+                            return n;
+                          })}
+                          style={{
+                            flexShrink: 0, padding: '0.25rem 0.55rem', borderRadius: 999,
+                            fontSize: 'var(--text-xs)', fontWeight: 700, marginTop: 1,
+                            border: `1px solid ${returning[p.index] !== undefined ? '#c77a0a' : B.stone}`,
+                            backgroundColor: returning[p.index] !== undefined ? '#c77a0a' : 'transparent',
+                            color: returning[p.index] !== undefined ? '#fff' : B.stone,
+                          }}
+                        >
+                          {returning[p.index] !== undefined ? 'Returning' : 'Return'}
+                        </button>
                       </div>
                     ))}
                     <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginTop: '0.4rem' }}>
                       Wrong count? Tap the photo to retake it.
                     </p>
+                    {Object.keys(returning).length > 0 && (
+                      <p style={{ color: '#e8a23c', fontSize: 'var(--text-xs)', marginTop: '0.35rem', fontWeight: 600 }}>
+                        {Object.keys(returning).length} going on the returns shelf, off this collection date.
+                      </p>
+                    )}
                   </div>
                 )}
 

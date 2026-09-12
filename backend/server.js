@@ -1047,7 +1047,6 @@ app.post('/api/demo/photo-match/confirm', upload.single('photo'), async (req, re
             booking_id: booking_code,
             piece_type: info?.piece_type || `Piece ${i + 1} of ${pieceCount}`,
             description: info?.description || description || null,
-            status: 'queued',
             reference_photo_url: urlData.publicUrl,
             reference_photo_taken_at: new Date().toISOString(),
             // Where this piece actually sits in the table photo. Without
@@ -1063,11 +1062,41 @@ app.post('/api/demo/photo-match/confirm', upload.single('photo'), async (req, re
             // a two-minute conversation, but only if you know whose they
             // are. Null when nobody is signed in rather than guessed.
             photo_taken_by: photo_taken_by || null,
+            // Marked as returning on the table photo. It still belongs to
+            // this booking, but it does not go on this collection date's
+            // shelf -- it goes on the returns shelf, and the app has to
+            // know that from the moment it is photographed, not later.
+            returned_at: info?.returning ? new Date().toISOString() : null,
+            return_reason: info?.returning ? (info.return_reason || null) : null,
+            returned_by: info?.returning ? (photo_taken_by || null) : null,
+            status: info?.returning ? 'returned' : 'queued',
           };
         });
         const { data: created, error: piecesErr } = await supabase.from('pottery_pieces').insert(rows).select('id');
         if (piecesErr) logger.error('[photo-match/confirm] piece creation failed', piecesErr);
         else piecesCreated = (created || []).length;
+
+        // A short history of returns, separate from the piece itself, so a
+        // piece that goes back twice reads as twice rather than overwriting
+        // the first time. Best-effort: a failure here must never stop a
+        // table being finished.
+        if (!piecesErr && Array.isArray(created) && Array.isArray(identified)) {
+          const returns = created
+            .map((row, i) => ({ row, info: identified[i] }))
+            .filter((x) => x.info && x.info.returning)
+            .map((x) => ({
+              studio_id: DEMO_STUDIO_ID,
+              piece_id: x.row.id,
+              booking_id: booking_code,
+              reason: x.info.return_reason || null,
+              returned_by: photo_taken_by || null,
+            }));
+          if (returns.length) {
+            const { error: retErr } = await supabase.from('piece_returns').insert(returns);
+            if (retErr) logger.error('[photo-match/confirm] return log failed', retErr);
+            else logger.info(`[photo-match/confirm] ${returns.length} piece(s) sent to the returns shelf for ${booking_code}`);
+          }
+        }
       }
     }
 
