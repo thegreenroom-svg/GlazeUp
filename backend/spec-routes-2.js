@@ -5200,6 +5200,111 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
     }
   });
 
+  // ---- RETURNS SHELF ----------------------------------------------------
+  // Daisy: a piece marked as returning on the table photo comes off its
+  // collection date and goes on the returns shelf. This is what reads it
+  // back out -- without it a return is recorded and then invisible, which
+  // is worse than not recording it at all.
+  app.get('/api/spec/returns', async (req, res) => {
+    try {
+      const { data: pieces, error } = await supabase
+        .from('pottery_pieces')
+        .select('id, booking_id, piece_type, description, reference_photo_url, photo_box, returned_at, return_reason, returned_by, status')
+        .eq('studio_id', STUDIO_ID)
+        .not('returned_at', 'is', null)
+        .neq('archived', true)
+        .order('returned_at', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+
+      // Names, so the list reads as people rather than booking codes.
+      const codes = [...new Set((pieces || []).map((p) => p.booking_id).filter(Boolean))];
+      let names = {};
+      if (codes.length) {
+        const { data: bookings } = await supabase
+          .from('bookings')
+          .select('booking_code, customer_name, collection_date')
+          .eq('studio_id', STUDIO_ID)
+          .in('booking_code', codes);
+        for (const b of bookings || []) names[b.booking_code] = b;
+      }
+
+      res.json({
+        returns: (pieces || []).map((p) => ({
+          ...p,
+          customer_name: names[p.booking_id]?.customer_name || null,
+          collection_date: names[p.booking_id]?.collection_date || null,
+          settled: String(p.status || '').toLowerCase() === 'collected',
+        })),
+      });
+    } catch (err) {
+      logger.error('list returns failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Send a piece back from anywhere, not only the table photo -- a chip is
+  // often spotted at packing, long after the table was cleared.
+  app.post('/api/spec/returns/:pieceId', async (req, res) => {
+    try {
+      const { reason, note, returned_by } = req.body || {};
+      const { data: piece, error: findErr } = await supabase
+        .from('pottery_pieces')
+        .select('id, booking_id, shelf_id')
+        .eq('studio_id', STUDIO_ID)
+        .eq('id', req.params.pieceId)
+        .maybeSingle();
+      if (findErr) throw findErr;
+      if (!piece) return res.status(404).json({ error: 'piece not found' });
+
+      const { error: upErr } = await supabase
+        .from('pottery_pieces')
+        .update({
+          returned_at: new Date().toISOString(),
+          return_reason: reason || null,
+          returned_by: returned_by || null,
+          returned_from_shelf_id: piece.shelf_id || null,
+          status: 'returned',
+        })
+        .eq('id', piece.id);
+      if (upErr) throw upErr;
+
+      // Best-effort history. A failed log must never block the return.
+      const { error: logErr } = await supabase.from('piece_returns').insert({
+        studio_id: STUDIO_ID,
+        piece_id: piece.id,
+        booking_id: piece.booking_id || null,
+        reason: reason || null,
+        note: note || null,
+        from_shelf_id: piece.shelf_id || null,
+        returned_by: returned_by || null,
+      });
+      if (logErr) logger.error('return log failed', logErr.message);
+
+      res.json({ ok: true });
+    } catch (err) {
+      logger.error('return piece failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Undo. Marking something returned by mistake on a busy floor has to be
+  // one tap to reverse, or people stop using it.
+  app.post('/api/spec/returns/:pieceId/undo', async (req, res) => {
+    try {
+      const { error } = await supabase
+        .from('pottery_pieces')
+        .update({ returned_at: null, return_reason: null, returned_by: null, status: 'queued' })
+        .eq('studio_id', STUDIO_ID)
+        .eq('id', req.params.pieceId);
+      if (error) throw error;
+      res.json({ ok: true });
+    } catch (err) {
+      logger.error('undo return failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.get('/api/spec/kiln/shelves', async (req, res) => {
     try {
       const { data: shelves, error } = await supabase
