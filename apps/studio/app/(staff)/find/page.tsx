@@ -37,6 +37,7 @@ export default function FindBookingPage() {
   const [q, setQ] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [range, setRange] = useState(false);
   const [results, setResults] = useState<Result[] | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -58,7 +59,11 @@ export default function FindBookingPage() {
     }
   };
 
-  const field = {
+  const lbl: React.CSSProperties = {
+  display: 'block', fontSize: 'var(--text-xs)', fontWeight: 600,
+  color: '#8A7F74', marginBottom: '0.25rem',
+};
+const field = {
     width: '100%', minHeight: 44, padding: '0.6rem 0.7rem',
     borderRadius: 'var(--radius-md)', border: '1px solid #ece5db',
     fontSize: 'var(--text-base)', background: 'white', color: 'var(--charcoal)',
@@ -74,10 +79,27 @@ export default function FindBookingPage() {
           placeholder="Customer name"
           style={field}
         />
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={field} aria-label="From date" />
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={field} aria-label="To date" />
+        {/* Daisy: "I just want all the bookings with that date." One labelled
+            date field does that. The second only appears if you ask for a
+            range -- two unlabelled boxes read as one broken one. */}
+        <div>
+          <label style={lbl}>Date</label>
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={field} aria-label="Date" />
         </div>
+        {range ? (
+          <div>
+            <label style={lbl}>Up to</label>
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={field} aria-label="Up to date" />
+          </div>
+        ) : (
+          <button
+            onClick={() => setRange(true)}
+            style={{ alignSelf: 'flex-start', background: 'none', border: 'none', padding: 0,
+                     color: 'var(--clay)', fontSize: 'var(--text-xs)', fontWeight: 600, cursor: 'pointer' }}
+          >
+            Search a range instead
+          </button>
+        )}
         <button
           onClick={run}
           disabled={busy}
@@ -86,7 +108,7 @@ export default function FindBookingPage() {
           <Search size={17} /> {busy ? 'Searching…' : 'Search'}
         </button>
         <p style={{ fontSize: 'var(--text-xs)', color: '#777', margin: 0 }}>
-          A name on its own searches every booking. Dates on their own show a whole day or week.
+          A date on its own shows every booking that day, photos and all. A name on its own searches the whole history.
         </p>
       </div>
 

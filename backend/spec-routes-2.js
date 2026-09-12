@@ -7681,8 +7681,17 @@ export function registerShelfSweepHistoryRoute(app, supabase, STUDIO_ID, logger)
         .order('session_start', { ascending: false })
         .limit(60);
       if (q) sel = sel.ilike('customer_name', `%${q}%`);
-      if (from) sel = sel.gte('session_start', `${from}T00:00:00`);
-      if (to) sel = sel.lte('session_start', `${to}T23:59:59`);
+      // Daisy: "I just want all the bookings with that date." A single date
+      // meant 'from then onwards', so picking 14 August returned October and
+      // looked broken. One date now means that day. A range still needs two.
+      if (from && !to) {
+        sel = sel.gte('session_start', `${from}T00:00:00`).lte('session_start', `${from}T23:59:59`);
+      } else {
+        if (from) sel = sel.gte('session_start', `${from}T00:00:00`);
+        if (to) sel = sel.lte('session_start', `${to}T23:59:59`);
+      }
+      // A whole day can be busier than sixty bookings on a weekend.
+      if (from || to) sel = sel.limit(250);
 
       const { data: rows, error } = await sel;
       if (error) throw error;
