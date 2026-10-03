@@ -9321,3 +9321,350 @@ export function registerCatalogueRefreshRoute(app, supabase, STUDIO_ID, logger, 
     }
   });
 }
+
+// ============================================================================
+// SHAPE RECOGNITION -- which bisque shape is this painted piece?
+// ----------------------------------------------------------------------------
+// The table photo step says what a piece looks like ("white mug, black
+// panda face") but never which shape from the range it is. The Square
+// stocktake gave every shape a clean name and a photo (piece_catalogue),
+// so now each piece can be tied to the real shape: its name, price and
+// stock line.
+//
+// Two passes, both against the piece cropped out of its table photo:
+//   1. Shortlist. The crop plus the full list of shape names; the model
+//      picks up to four plausible shapes. Text-heavy, cheap.
+//   2. Compare. The crop next to the catalogue PHOTOS of those four, and
+//      the model judges form only -- silhouette, proportions, handles,
+//      lids, sculpted detail -- because the catalogue shows plain bisque
+//      and the piece has been painted. It may say none of them.
+// Only high and medium confidence answers are saved as the shape; the
+// shortlist is kept either way so staff can correct it in one tap.
+//
+// Runs in the background on the five-minute loop, never at the table:
+// the table photo step was tuned to be near-instant and stays that way.
+// Anything staff have confirmed by hand is never overwritten.
+// ============================================================================
+export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger, axios, logGeminiUsage, sharp) {
+  const KEY = () => process.env.GEMINI_API_KEY;
+  let running = false;
+
+  // ---- catalogue, cached briefly ---------------------------------------
+  let cat = { at: 0, rows: [] };
+  async function catalogue() {
+    if (Date.now() - cat.at < 10 * 60 * 1000 && cat.rows.length) return cat.rows;
+    const rows = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase
+        .from('piece_catalogue')
+        .select('square_item_id, name, category, image_url, price_cents')
+        .eq('studio_id', STUDIO_ID).eq('active', true)
+        .not('square_item_id', 'is', null)
+        .order('category').order('name')
+        .range(from, from + 999);
+      if (error) throw error;
+      rows.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
+    cat = { at: Date.now(), rows };
+    return rows;
+  }
+  const catLabel = (c) => String(c || '').replace(/^PB\s+/, '').trim();
+
+  // ---- images ------------------------------------------------------------
+  async function fetchBuf(url) {
+    const r = await axios.get(url, { responseType: 'arraybuffer', timeout: 20000 });
+    return Buffer.from(r.data);
+  }
+  // The piece cut out of its table photo, with a little margin so the
+  // edges of the form are not lost.
+  async function cropPiece(photo, box, size = 512) {
+    // Upright first (phone photos carry an orientation flag), so the box,
+    // which was drawn on the upright image, lands in the right place.
+    const upright = await sharp(photo).rotate().toBuffer();
+    const { width: W, height: H } = await sharp(upright).metadata();
+    if (box && W && H) {
+      const pad = 4;
+      const l = Math.max(0, (box.left_pct - pad) / 100), t = Math.max(0, (box.top_pct - pad) / 100);
+      const r = Math.min(1, (box.right_pct + pad) / 100), b = Math.min(1, (box.bottom_pct + pad) / 100);
+      const left = Math.floor(l * W), top = Math.floor(t * H);
+      const width = Math.max(8, Math.min(Math.floor((r - l) * W), W - left));
+      const height = Math.max(8, Math.min(Math.floor((b - t) * H), H - top));
+      return sharp(upright).extract({ left, top, width, height }).resize(size, size, { fit: 'inside' }).jpeg({ quality: 82 }).toBuffer();
+    }
+    return sharp(upright).resize(size + 256, size + 256, { fit: 'inside' }).jpeg({ quality: 80 }).toBuffer();
+  }
+  const small = (buf, size = 320) => sharp(buf).rotate().resize(size, size, { fit: 'inside' }).jpeg({ quality: 78 }).toBuffer();
+
+  async function gemini(input, schema, kind, primary, fallback) {
+    const { response, modelUsed } = await callGeminiWithFallback(axios, KEY(), {
+      input,
+      response_format: { type: 'text', mime_type: 'application/json', schema },
+    }, primary, fallback);
+    const usage = extractGeminiUsage(response.data);
+    if (usage) await logGeminiUsage(supabase, STUDIO_ID, kind, usage, modelUsed);
+    const raw = extractGeminiText(response.data) || '';
+    return JSON.parse((raw.match(/\{[\s\S]*\}/) || [])[0] || '{}');
+  }
+
+  // ---- one table photo, all its pieces ------------------------------------
+  async function recognisePhoto(url, pieces) {
+    const shapes = await catalogue();
+    if (!shapes.length) return { skipped: 'catalogue empty' };
+    const photo = await fetchBuf(url);
+    const crops = [];
+    for (const p of pieces) {
+      try { crops.push({ p, img: await cropPiece(photo, p.photo_box) }); }
+      catch (e) { logger.warn('[shapes] crop failed', p.id, e.message); }
+    }
+    if (!crops.length) return { skipped: 'no crops' };
+
+    // Pass 1: shortlist from names.
+    const list = shapes.map((s, i) => `${i + 1}. ${s.name} (${catLabel(s.category)})`).join('\n');
+    const in1 = [{
+      type: 'text',
+      text: `These are painted pottery pieces from a paint-your-own pottery studio. Every piece started as a plain white bisque shape from the studio's range, listed below by number.\n\nFor each piece, pick up to FOUR shapes from the list that it could be, best first, judging by FORM only: overall silhouette, proportions, handles, spouts, lids, feet, sculpted or moulded details, and any letter or number it forms. Ignore the paint completely -- colours and painted designs are the customer's, not part of the shape.\n\nIf the piece is clearly not from this range (wheel-thrown, hand-built, or nothing listed is close), return an empty list for it rather than forcing a match.\n\nSHAPES:\n${list}`,
+    }];
+    crops.forEach((c, i) => {
+      in1.push({ type: 'text', text: `PIECE ${i + 1}: ${c.p.piece_type || ''}${c.p.description ? ' -- ' + c.p.description : ''}` });
+      in1.push({ type: 'image', data: c.img.toString('base64'), mime_type: 'image/jpeg' });
+    });
+    const s1 = await gemini(in1, {
+      type: 'object',
+      properties: {
+        pieces: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              piece: { type: 'integer' },
+              candidates: { type: 'array', items: { type: 'integer' }, description: 'Shape numbers from the list, best first, at most 4' },
+            },
+            required: ['piece', 'candidates'],
+          },
+        },
+      },
+      required: ['pieces'],
+    }, 'shape-shortlist', 'gemini-3.5-flash-lite', 'gemini-3.7-flash');
+
+    const shortlist = new Map();
+    for (const r of s1.pieces || []) {
+      const c = crops[(r.piece || 0) - 1];
+      if (!c) continue;
+      const cands = [...new Set((r.candidates || []).filter((n) => n >= 1 && n <= shapes.length))].slice(0, 4).map((n) => shapes[n - 1]);
+      shortlist.set(c.p.id, cands);
+    }
+
+    // Pass 2: compare against the catalogue photos, a few pieces per call.
+    const results = new Map();
+    const imgCache = new Map();
+    const todo = crops.filter((c) => (shortlist.get(c.p.id) || []).length);
+    for (let i = 0; i < todo.length; i += 4) {
+      const batch = todo.slice(i, i + 4);
+      const in2 = [{
+        type: 'text',
+        text: `Each PIECE below is a painted pottery piece, shown next to up to four OPTIONS: catalogue photos of bisque shapes from the studio's range. Catalogue photos usually show the plain unpainted shape, sometimes an example paint job.\n\nFor each piece, decide which option is the SAME SHAPE, judging FORM only: silhouette, proportions, handle and spout shape, lids, feet, sculpted or moulded details, letters. Ignore colours and painted designs entirely.\n\nAnswer 0 if none of the options is the same shape. Confidence: high = clearly the same moulded shape; medium = very likely but the angle or a hidden part leaves some doubt; low = a guess. Do not inflate confidence -- a wrong shape is worse than no shape.`,
+      }];
+      for (let k = 0; k < batch.length; k++) {
+        const c = batch[k];
+        in2.push({ type: 'text', text: `PIECE ${k + 1}:` });
+        in2.push({ type: 'image', data: c.img.toString('base64'), mime_type: 'image/jpeg' });
+        const cands = shortlist.get(c.p.id);
+        for (let j = 0; j < cands.length; j++) {
+          const s = cands[j];
+          in2.push({ type: 'text', text: `PIECE ${k + 1}, OPTION ${j + 1}: ${s.name}` });
+          if (s.image_url) {
+            try {
+              if (!imgCache.has(s.image_url)) imgCache.set(s.image_url, await small(await fetchBuf(s.image_url)));
+              in2.push({ type: 'image', data: imgCache.get(s.image_url).toString('base64'), mime_type: 'image/jpeg' });
+            } catch { in2.push({ type: 'text', text: '(no catalogue photo available for this option)' }); }
+          } else {
+            in2.push({ type: 'text', text: '(no catalogue photo available for this option)' });
+          }
+        }
+      }
+      const s2 = await gemini(in2, {
+        type: 'object',
+        properties: {
+          results: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                piece: { type: 'integer' },
+                option: { type: 'integer', description: '1-4, or 0 for none of them' },
+                confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+              },
+              required: ['piece', 'option', 'confidence'],
+            },
+          },
+        },
+        required: ['results'],
+      }, 'shape-compare', 'gemini-3.7-flash', 'gemini-3.5-flash-lite');
+      for (const r of s2.results || []) {
+        const c = batch[(r.piece || 0) - 1];
+        if (!c) continue;
+        const cands = shortlist.get(c.p.id) || [];
+        const chosen = r.option >= 1 ? cands[r.option - 1] : null;
+        results.set(c.p.id, { chosen, confidence: chosen ? r.confidence : 'none' });
+      }
+    }
+
+    // Save. Never touch anything a person has confirmed.
+    const now = new Date().toISOString();
+    let matched = 0;
+    for (const c of crops) {
+      const cands = shortlist.get(c.p.id) || [];
+      const r = results.get(c.p.id) || { chosen: null, confidence: cands.length ? 'unsure' : 'none' };
+      const keep = r.chosen && (r.confidence === 'high' || r.confidence === 'medium');
+      if (keep) matched++;
+      await supabase.from('pottery_pieces').update({
+        square_item_id: keep ? r.chosen.square_item_id : null,
+        shape_confidence: r.confidence,
+        shape_candidates: cands.map((s) => ({ square_item_id: s.square_item_id, name: s.name })),
+        shape_checked_at: now,
+      }).eq('id', c.p.id).eq('studio_id', STUDIO_ID).not('shape_confirmed', 'is', true);
+    }
+    // Pieces that could not be cropped are still marked, so they are not retried forever.
+    const done = new Set(crops.map((c) => c.p.id));
+    for (const p of pieces) {
+      if (!done.has(p.id)) {
+        await supabase.from('pottery_pieces').update({ shape_checked_at: now, shape_confidence: 'no_photo' })
+          .eq('id', p.id).eq('studio_id', STUDIO_ID).not('shape_confirmed', 'is', true);
+      }
+    }
+    return { pieces: crops.length, matched };
+  }
+
+  async function sweep({ photos = 3, booking_code = null } = {}) {
+    if (!KEY()) return { error: 'GEMINI_API_KEY not configured' };
+    let q = supabase.from('pottery_pieces')
+      .select('id, piece_type, description, reference_photo_url, photo_box, booking_id')
+      .eq('studio_id', STUDIO_ID)
+      .not('reference_photo_url', 'is', null)
+      .not('archived', 'is', true)
+      .not('shape_confirmed', 'is', true);
+    q = booking_code ? q.eq('booking_id', booking_code) : q.is('shape_checked_at', null);
+    const { data, error } = await q.order('created_at', { ascending: false }).limit(booking_code ? 50 : 60);
+    if (error) throw error;
+    const groups = new Map();
+    for (const p of data || []) {
+      if (!groups.has(p.reference_photo_url)) groups.set(p.reference_photo_url, []);
+      groups.get(p.reference_photo_url).push(p);
+    }
+    const out = { photos: 0, pieces: 0, matched: 0, errors: [] };
+    for (const [url, ps] of [...groups.entries()].slice(0, booking_code ? 20 : photos)) {
+      try {
+        const r = await recognisePhoto(url, ps);
+        out.photos++; out.pieces += r.pieces || 0; out.matched += r.matched || 0;
+      } catch (e) {
+        out.errors.push(e.response?.data?.error?.message || e.message);
+        logger.warn('[shapes] photo failed', url.slice(-40), e.message);
+        // A photo that will not load is marked so the sweep moves on.
+        if (e.response?.status === 404 || /extract_area|unsupported image/i.test(e.message)) {
+          await supabase.from('pottery_pieces').update({ shape_checked_at: new Date().toISOString(), shape_confidence: 'no_photo' })
+            .in('id', ps.map((p) => p.id));
+        }
+      }
+    }
+    return out;
+  }
+
+  // Run now: a booking's pieces (re-checked), or the next few unchecked photos.
+  app.post('/api/spec/shapes/recognise', async (req, res) => {
+    if (running) return res.json({ started: false, reason: 'already running' });
+    running = true;
+    try {
+      const out = await sweep({ booking_code: req.body?.booking_code || null, photos: Math.min(parseInt(req.body?.photos, 10) || 3, 10) });
+      if (out.pieces) logger.info(`[shapes] ${out.matched}/${out.pieces} piece(s) given a shape across ${out.photos} photo(s)`);
+      res.json(out);
+    } catch (err) {
+      logger.error('[shapes] sweep failed', err.message);
+      res.status(500).json({ error: err.message });
+    } finally {
+      running = false;
+    }
+  });
+
+  // The piece as it was cut from the table photo, for the review screen.
+  const cropCache = new Map();
+  app.get('/api/spec/pieces/:id/crop.jpg', async (req, res) => {
+    try {
+      const id = req.params.id;
+      let buf = cropCache.get(id);
+      if (!buf) {
+        const { data: p } = await supabase.from('pottery_pieces')
+          .select('reference_photo_url, photo_box').eq('id', id).eq('studio_id', STUDIO_ID).maybeSingle();
+        if (!p?.reference_photo_url) return res.status(404).end();
+        buf = await cropPiece(await fetchBuf(p.reference_photo_url), p.photo_box, 400);
+        cropCache.set(id, buf);
+        if (cropCache.size > 300) cropCache.delete(cropCache.keys().next().value);
+      }
+      res.set('Content-Type', 'image/jpeg').set('Cache-Control', 'public, max-age=86400').send(buf);
+    } catch (err) {
+      res.status(500).end();
+    }
+  });
+
+  // Recent pieces with what recognition made of them.
+  app.get('/api/spec/shapes/review', async (req, res) => {
+    try {
+      const filter = String(req.query.filter || 'all');
+      let q = supabase.from('pottery_pieces')
+        .select('id, booking_id, piece_type, description, created_at, square_item_id, shape_confidence, shape_candidates, shape_checked_at, shape_confirmed, shape_confirmed_by')
+        .eq('studio_id', STUDIO_ID)
+        .not('reference_photo_url', 'is', null)
+        .not('archived', 'is', true);
+      if (filter === 'unsure') q = q.not('shape_checked_at', 'is', null).is('square_item_id', null).not('shape_confirmed', 'is', true);
+      if (filter === 'matched') q = q.not('square_item_id', 'is', null);
+      if (filter === 'unchecked') q = q.is('shape_checked_at', null);
+      const { data, error } = await q.order('created_at', { ascending: false }).limit(Math.min(parseInt(req.query.limit, 10) || 60, 200));
+      if (error) throw error;
+
+      const shapes = await catalogue();
+      const byId = new Map(shapes.map((s) => [s.square_item_id, s]));
+      const items = (data || []).map((p) => ({
+        ...p,
+        shape: p.square_item_id ? byId.get(p.square_item_id) || null : null,
+        shape_candidates: (p.shape_candidates || []).map((c) => byId.get(c.square_item_id) || c),
+      }));
+
+      const count = async (fn) => {
+        let qq = supabase.from('pottery_pieces').select('id', { count: 'exact', head: true })
+          .eq('studio_id', STUDIO_ID).not('reference_photo_url', 'is', null).not('archived', 'is', true);
+        qq = fn(qq);
+        const { count: n } = await qq;
+        return n || 0;
+      };
+      const stats = {
+        total: await count((x) => x),
+        unchecked: await count((x) => x.is('shape_checked_at', null)),
+        matched: await count((x) => x.not('square_item_id', 'is', null)),
+        confirmed: await count((x) => x.eq('shape_confirmed', true).not('square_item_id', 'is', null)),
+      };
+      res.json({ items, stats });
+    } catch (err) {
+      logger.error('[shapes] review failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Staff say what it is: a shape id, or null for "not one of ours".
+  app.post('/api/spec/pieces/:id/shape', async (req, res) => {
+    try {
+      const sid = req.body?.square_item_id || null;
+      const { data, error } = await supabase.from('pottery_pieces').update({
+        square_item_id: sid,
+        shape_confirmed: true,
+        shape_confirmed_by: req.body?.confirmed_by || null,
+        shape_confidence: sid ? 'confirmed' : 'none',
+        shape_checked_at: new Date().toISOString(),
+      }).eq('id', req.params.id).eq('studio_id', STUDIO_ID)
+        .select('id, square_item_id, shape_confirmed').single();
+      if (error) throw error;
+      res.json(data);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+}

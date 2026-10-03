@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerIdentifyPiecesRoute, registerPieceFulfilmentRoutes, registerReidentifyRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute, registerScheduleRoute, registerSpaceBackfillRoute, registerPackingRoutes, registerKilnShelfRoutes, registerCollectionModeRoutes, registerBreakageRoutes, registerTurnaroundRoute, registerSquareConnectRoutes, registerTicketLinkDiagnosticRoute, registerTicketMatchRoutes, registerShelfSweepRoute, registerSquareAccessCheckRoute, registerTestBookingRoutes, registerDriveBackupRoutes, registerCollectionRoutes, registerUpgradeAfterIdentifyRoute, registerRedescribePieceRoute, registerPackingLabelRoute, registerCustomerBookingRoute, registerHomeCountsRoute, registerShelfSweepHistoryRoute, registerNextPackingRoute, registerBackfillRoutes, registerCatalogueRefreshRoute } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerIdentifyPiecesRoute, registerPieceFulfilmentRoutes, registerReidentifyRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute, registerScheduleRoute, registerSpaceBackfillRoute, registerPackingRoutes, registerKilnShelfRoutes, registerCollectionModeRoutes, registerBreakageRoutes, registerTurnaroundRoute, registerSquareConnectRoutes, registerTicketLinkDiagnosticRoute, registerTicketMatchRoutes, registerShelfSweepRoute, registerSquareAccessCheckRoute, registerTestBookingRoutes, registerDriveBackupRoutes, registerCollectionRoutes, registerUpgradeAfterIdentifyRoute, registerRedescribePieceRoute, registerPackingLabelRoute, registerCustomerBookingRoute, registerHomeCountsRoute, registerShelfSweepHistoryRoute, registerNextPackingRoute, registerBackfillRoutes, registerCatalogueRefreshRoute, registerShapeRecognitionRoutes } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -1650,6 +1650,7 @@ registerLiveSquareOrderRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerNeedsVerificationRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerRevenueCategorySyncRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerCatalogueRefreshRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
+registerShapeRecognitionRoutes(app, supabase, DEMO_STUDIO_ID, logger, axios, logGeminiUsage, sharp);
 registerRevenueBreakdownRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerKilnSimplifiedRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerPostalLabelRoute(app, supabase, DEMO_STUDIO_ID, logger);
@@ -1774,6 +1775,19 @@ app.listen(PORT, () => {
         if (revData.rows_written) logger.info(`[auto-sync] ${revData.rows_written} takings row(s) updated`);
       } catch (err) {
         logger.error('[auto-sync] revenue sync failed', err.message);
+      }
+
+      // Shape recognition for newly photographed pieces, a few table
+      // photos per tick. Works through the backlog of older pieces too,
+      // then just keeps up. Never runs at the table itself.
+      try {
+        const shRes = await fetch(`${SELF_URL}/api/spec/shapes/recognise`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photos: 3 }),
+        });
+        const sh = await shRes.json().catch(() => ({}));
+        if (sh.pieces) logger.info(`[auto-sync] shapes: ${sh.matched}/${sh.pieces} recognised`);
+      } catch (err) {
+        logger.error('[auto-sync] shape recognition failed', err.message);
       }
 
       const bookingRes = await fetch(`${SELF_URL}/api/bookings/sync`, { method: 'POST' });
