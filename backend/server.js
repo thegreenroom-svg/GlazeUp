@@ -1717,8 +1717,37 @@ app.listen(PORT, () => {
   // awake -- genuine real user traffic (or a manual trigger) keeps it
   // running, but this isn't a guaranteed-always-on external cron.
   const SELF_URL = `http://localhost:${PORT}`;
+
+  // The takings sync was never on this schedule, only the bookings one, so
+  // it ran whenever somebody remembered to press it -- which turned out to
+  // be 21 August. Forty three days of takings quietly missing while every
+  // other sync carried on, which is the worst kind of broken because
+  // nothing looks broken.
+  //
+  // Catch up once on boot, then keep it topped up on the interval below.
+  setTimeout(async () => {
+    try {
+      const r = await fetch(`${SELF_URL}/api/spec/revenue/sync?daysBack=90`, { method: 'POST' });
+      const d = await r.json().catch(() => ({}));
+      logger.info(`[revenue-catchup] ${d.rows_written || 0} row(s) written across ${(d.dates_synced || []).length} day(s)`);
+    } catch (err) {
+      logger.error('[revenue-catchup] failed', err.message);
+    }
+  }, 20000);
+
   setInterval(async () => {
     try {
+      // Takings, kept current. Only the last two days each tick -- the
+      // heavy catch-up already ran on boot, and re-pulling 90 days every
+      // five minutes would hammer Square for nothing.
+      try {
+        const revRes = await fetch(`${SELF_URL}/api/spec/revenue/sync?daysBack=2`, { method: 'POST' });
+        const revData = await revRes.json().catch(() => ({}));
+        if (revData.rows_written) logger.info(`[auto-sync] ${revData.rows_written} takings row(s) updated`);
+      } catch (err) {
+        logger.error('[auto-sync] revenue sync failed', err.message);
+      }
+
       const bookingRes = await fetch(`${SELF_URL}/api/bookings/sync`, { method: 'POST' });
       const bookingData = await bookingRes.json().catch(() => ({}));
       if (bookingData.synced) logger.info(`[auto-sync] ${bookingData.synced} new booking(s) pulled from Square`);
