@@ -5305,6 +5305,138 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
     }
   });
 
+  // ---- OWNER DASHBOARD --------------------------------------------------
+  // Daisy: "something to look at every day."
+  //
+  // The one thing this has to get right is the Other category. It is the
+  // biggest line in the takings -- about GBP 328k over four years -- and it
+  // has never had a definition, so it has been quietly meaningless. It is
+  // not parties. It is 190 bisque items that were never given a category in
+  // Square (teapots, lanterns, the big serving bowls), plus a genuinely
+  // small amount of parties, courses and wheel hire.
+  //
+  // So it is split here by item name rather than shown as one lump, and the
+  // uncategorised pieces are surfaced as a job to do rather than hidden.
+  function otherBucket(name) {
+    const n = String(name || '').toLowerCase();
+    if (/party|parties/.test(n)) return 'Parties';
+    if (/throw|wheel|course|workshop|taster|class/.test(n)) return 'Courses & wheel';
+    if (/voucher|gift card/.test(n)) return 'Vouchers';
+    if (/postage|delivery|shipping/.test(n)) return 'Postage';
+    if (/glaz|firing/.test(n)) return 'Glazing & firing';
+    return 'Uncategorised bisque';
+  }
+
+  app.get('/api/spec/owner/dashboard', async (req, res) => {
+    try {
+      const { data: rows, error } = await supabase
+        .from('revenue_category_breakdown')
+        .select('metric_date, category, revenue_cents, item_count')
+        .eq('studio_id', STUDIO_ID)
+        .order('metric_date', { ascending: true })
+        .limit(50000);
+      if (error) throw error;
+
+      const byDay = new Map();
+      const byCat = new Map();
+      for (const r of rows || []) {
+        const d = r.metric_date;
+        byDay.set(d, (byDay.get(d) || 0) + (r.revenue_cents || 0));
+        const c = (r.category || 'Other').trim();
+        byCat.set(c, (byCat.get(c) || 0) + (r.revenue_cents || 0));
+      }
+      const days = [...byDay.entries()].map(([d, v]) => ({ d, v })).sort((a, b) => a.d < b.d ? -1 : 1);
+      const latest = days.length ? days[days.length - 1].d : null;
+
+      // Weeks run Monday to Sunday, because that is how a studio week runs.
+      const weeks = new Map(), months = new Map();
+      for (const { d, v } of days) {
+        const dt = new Date(d + 'T00:00:00Z');
+        const dow = (dt.getUTCDay() + 6) % 7;
+        const mon = new Date(dt); mon.setUTCDate(dt.getUTCDate() - dow);
+        const wk = mon.toISOString().slice(0, 10);
+        weeks.set(wk, (weeks.get(wk) || 0) + v);
+        const mo = d.slice(0, 7);
+        months.set(mo, (months.get(mo) || 0) + v);
+      }
+      const best = (m) => {
+        let k = null, v = 0;
+        for (const [kk, vv] of m) if (vv > v) { v = vv; k = kk; }
+        return { key: k, cents: v };
+      };
+      const sumLast = (n) => days.slice(-n).reduce((a, x) => a + x.v, 0);
+
+      // Other, broken out by what the items actually are.
+      const otherCents = byCat.get('Other') || 0;
+      let split = [], todo = [];
+      if (otherCents > 0) {
+        const { data: items } = await supabase
+          .from('square_items')
+          .select('item_name, price_cents, category')
+          .eq('studio_id', STUDIO_ID)
+          .eq('category', 'Other')
+          .limit(2000);
+        const weight = new Map();
+        for (const it of items || []) {
+          const b = otherBucket(it.item_name);
+          weight.set(b, (weight.get(b) || 0) + (it.price_cents || 0));
+          if (b === 'Uncategorised bisque') todo.push({ name: (it.item_name || '').trim(), price_cents: it.price_cents || 0 });
+        }
+        const total = [...weight.values()].reduce((a, b) => a + b, 0) || 1;
+        // Apportioned by catalogue value, and labelled as an estimate, because
+        // the daily table does not carry item names. Better than one lump
+        // called Other, and honest about what it is.
+        split = [...weight.entries()]
+          .map(([name, w]) => ({ name, cents: Math.round(otherCents * (w / total)), estimated: true }))
+          .sort((a, b) => b.cents - a.cents);
+        todo.sort((a, b) => b.price_cents - a.price_cents);
+      }
+
+      const categories = [...byCat.entries()]
+        .filter(([c]) => c !== 'Other')
+        .map(([name, cents]) => ({ name, cents, estimated: false }))
+        .concat(split)
+        .sort((a, b) => b.cents - a.cents);
+
+      // What the studio is sitting on: painted, fired, and still not gone out.
+      const { count: uncollected } = await supabase
+        .from('pottery_pieces')
+        .select('id', { count: 'exact', head: true })
+        .eq('studio_id', STUDIO_ID)
+        .neq('status', 'collected')
+        .neq('archived', true);
+
+      const { count: bookingsTotal } = await supabase
+        .from('bookings')
+        .select('id', { count: 'exact', head: true })
+        .eq('studio_id', STUDIO_ID);
+
+      res.json({
+        latest_day: latest,
+        latest_day_cents: days.length ? days[days.length - 1].v : 0,
+        last7_cents: sumLast(7),
+        prev7_cents: days.slice(-14, -7).reduce((a, x) => a + x.v, 0),
+        last30_cents: sumLast(30),
+        prev30_cents: days.slice(-60, -30).reduce((a, x) => a + x.v, 0),
+        trading_days: days.length,
+        avg_day_cents: days.length ? Math.round(days.reduce((a, x) => a + x.v, 0) / days.length) : 0,
+        best_day: best(byDay), best_week: best(weeks), best_month: best(months),
+        spark: days.slice(-60),
+        months: [...months.entries()].sort((a, b) => a[0] < b[0] ? -1 : 1).slice(-24)
+          .map(([k, v]) => ({ month: k, cents: v })),
+        categories,
+        other_total_cents: otherCents,
+        uncategorised: todo.slice(0, 200),
+        uncategorised_count: todo.length,
+        uncollected_pieces: uncollected || 0,
+        bookings_total: bookingsTotal || 0,
+      });
+    } catch (err) {
+      logger.error('owner dashboard failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.get('/api/spec/kiln/shelves', async (req, res) => {
     try {
       const { data: shelves, error } = await supabase
