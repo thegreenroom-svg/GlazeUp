@@ -9151,86 +9151,173 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
 // rather than deleted.
 // ============================================================================
 export function registerCatalogueRefreshRoute(app, supabase, STUDIO_ID, logger, axios) {
-  app.post('/api/spec/catalogue/refresh-from-square', async (req, res) => {
+  let refreshing = null;            // one refresh at a time
+  let lastRefresh = 0;
+  const STALE_MS = 15 * 60 * 1000;  // stock moves as things sell
+
+  async function refreshCatalogue() {
+    const { data: connection } = await supabase
+      .from('square_connections')
+      .select('square_access_token, square_token_expires_at')
+      .eq('studio_id', STUDIO_ID)
+      .single();
+    if (!connection || new Date(connection.square_token_expires_at) < new Date()) {
+      return { refreshed: false, error: 'No valid Square connection' };
+    }
+    const headers = { Authorization: `Bearer ${connection.square_access_token}`, 'Square-Version': '2024-01-18' };
+
+    const objects = [];
+    let cursor;
+    do {
+      const params = { types: 'ITEM,IMAGE,CATEGORY' };
+      if (cursor) params.cursor = cursor;
+      const r = await axios.get('https://connect.squareup.com/v2/catalog/list', { headers, params });
+      objects.push(...(r.data.objects || []));
+      cursor = r.data.cursor;
+    } while (cursor);
+
+    const catName = {}, imageUrl = {};
+    for (const o of objects) {
+      if (o.type === 'CATEGORY') catName[o.id] = o.category_data?.name;
+      if (o.type === 'IMAGE' && o.image_data?.url) imageUrl[o.id] = o.image_data.url;
+    }
+    const ov = await loadCategoryOverrides(supabase, STUDIO_ID).catch(() => ({ byId: {}, byName: {} }));
+
+    const now = new Date().toISOString();
+    const rows = [];
+    const trackedVariations = [];
+    for (const o of objects) {
+      if (o.type !== 'ITEM' || o.is_deleted) continue;
+      const d = o.item_data || {};
+      if (d.is_archived) continue;
+      const names = [d.category_id, ...(d.categories || []).map((c) => c.id)]
+        .filter(Boolean).map((id) => catName[id]).filter(Boolean);
+      const squareCat = names.find((n) => /^PB /.test(n)) || null;
+      const category = squareCat || ov.byId[o.id] || null;
+      if (!category || !/^PB /.test(category)) continue;
+
+      const variations = (d.variations || []).filter((v) => !v.is_deleted).map((v) => {
+        const vd = v.item_variation_data || {};
+        const tracked = !!(vd.track_inventory || (vd.location_overrides || []).some((x) => x.track_inventory));
+        if (tracked) trackedVariations.push(v.id);
+        return { id: v.id, name: vd.name || 'Regular', price_cents: Number(vd.price_money?.amount || 0), tracked, stock: null };
+      });
+      const prices = variations.map((v) => v.price_cents).filter((n) => n > 0);
+      rows.push({
+        studio_id: STUDIO_ID,
+        square_item_id: o.id,
+        name: String(d.name || '').trim(),
+        category: category.trim(),
+        category_guessed: !squareCat,
+        description: (d.description_plaintext || d.description || '').trim().slice(0, 1000) || null,
+        price_cents: prices.length ? Math.max(...prices) : 0,
+        price_min_cents: prices.length ? Math.min(...prices) : 0,
+        image_url: imageUrl[(d.image_ids || [])[0]] || null,
+        variations,
+        stock_tracked: variations.some((v) => v.tracked),
+        active: true,
+        refreshed_at: now,
+      });
+    }
+
+    // Live stock from Square, read-only. If the connection can't read
+    // inventory, stock is left as it was rather than shown as zero.
+    let stockOk = false;
     try {
-      const { data: connection } = await supabase
-        .from('square_connections')
-        .select('square_access_token, square_token_expires_at')
-        .eq('studio_id', STUDIO_ID)
-        .single();
-      if (!connection || new Date(connection.square_token_expires_at) < new Date()) {
-        return res.status(400).json({ error: 'No valid Square connection', refreshed: false });
+      const counts = {};
+      for (let i = 0; i < trackedVariations.length; i += 500) {
+        let c;
+        do {
+          const body = { catalog_object_ids: trackedVariations.slice(i, i + 500), states: ['IN_STOCK'] };
+          if (c) body.cursor = c;
+          const r = await axios.post('https://connect.squareup.com/v2/inventory/counts/batch-retrieve', body,
+            { headers: { ...headers, 'Content-Type': 'application/json' } });
+          for (const x of r.data.counts || []) {
+            counts[x.catalog_object_id] = (counts[x.catalog_object_id] || 0) + Number(x.quantity || 0);
+          }
+          c = r.data.cursor;
+        } while (c);
       }
-      const headers = { Authorization: `Bearer ${connection.square_access_token}`, 'Square-Version': '2024-01-18' };
-
-      const objects = [];
-      let cursor;
-      do {
-        const params = { types: 'ITEM,IMAGE,CATEGORY' };
-        if (cursor) params.cursor = cursor;
-        const r = await axios.get('https://connect.squareup.com/v2/catalog/list', { headers, params });
-        objects.push(...(r.data.objects || []));
-        cursor = r.data.cursor;
-      } while (cursor);
-
-      const catName = {}, imageUrl = {};
-      for (const o of objects) {
-        if (o.type === 'CATEGORY') catName[o.id] = o.category_data?.name;
-        if (o.type === 'IMAGE' && o.image_data?.url) imageUrl[o.id] = o.image_data.url;
+      for (const row of rows) {
+        let total = 0;
+        for (const v of row.variations) if (v.tracked) { v.stock = Math.max(0, Math.floor(counts[v.id] || 0)); total += v.stock; }
+        row.stock_count = row.stock_tracked ? total : null;
       }
-      const ov = await loadCategoryOverrides(supabase, STUDIO_ID).catch(() => ({ byId: {}, byName: {} }));
+      stockOk = true;
+    } catch (e) {
+      logger.warn('[catalogue-refresh] stock counts unavailable', e?.response?.data?.errors?.[0]?.code || e.message);
+    }
 
-      const now = new Date().toISOString();
-      const rows = [];
-      for (const o of objects) {
-        if (o.type !== 'ITEM' || o.is_deleted) continue;
-        const d = o.item_data || {};
-        if (d.is_archived) continue;
-        const names = [d.category_id, ...(d.categories || []).map((c) => c.id)]
-          .filter(Boolean).map((id) => catName[id]).filter(Boolean);
-        const squareCat = names.find((n) => /^PB /.test(n)) || null;
-        const category = squareCat || ov.byId[o.id] || null;
-        if (!category || !/^PB /.test(category)) continue;
-        const prices = (d.variations || []).map((v) => Number(v.item_variation_data?.price_money?.amount || 0));
-        rows.push({
-          studio_id: STUDIO_ID,
-          square_item_id: o.id,
-          name: String(d.name || '').trim(),
-          category: category.trim(),
-          category_guessed: !squareCat,
-          description: (d.description_plaintext || d.description || '').trim().slice(0, 1000) || null,
-          price_cents: prices.length ? Math.max(...prices) : 0,
-          image_url: imageUrl[(d.image_ids || [])[0]] || null,
-          active: true,
-          refreshed_at: now,
-        });
-      }
-
-      let written = 0;
-      for (let i = 0; i < rows.length; i += 200) {
-        const { error } = await supabase
-          .from('piece_catalogue')
-          .upsert(rows.slice(i, i + 200), { onConflict: 'studio_id,square_item_id' });
-        if (error) throw error;
-        written += Math.min(200, rows.length - i);
-      }
-
-      // Anything linked to Square that was not seen this time has left the
-      // bisque range or been archived -- keep it, but stop offering it.
-      const { error: staleErr } = await supabase
+    let written = 0;
+    for (let i = 0; i < rows.length; i += 200) {
+      const { error } = await supabase
         .from('piece_catalogue')
-        .update({ active: false })
-        .eq('studio_id', STUDIO_ID)
-        .not('square_item_id', 'is', null)
-        .lt('refreshed_at', now);
-      if (staleErr) logger.warn('[catalogue-refresh] could not mark stale shapes', staleErr.message);
+        .upsert(rows.slice(i, i + 200), { onConflict: 'studio_id,square_item_id' });
+      if (error) throw error;
+      written += Math.min(200, rows.length - i);
+    }
 
-      const withPhoto = rows.filter((r) => r.image_url).length;
-      logger.info(`[catalogue-refresh] ${written} shape(s), ${withPhoto} with a photo`);
-      res.json({ refreshed: true, shapes: written, with_photo: withPhoto, without_photo: written - withPhoto });
+    // Anything linked to Square that was not seen this time has left the
+    // bisque range or been archived -- keep it, but stop offering it.
+    const { error: staleErr } = await supabase
+      .from('piece_catalogue')
+      .update({ active: false })
+      .eq('studio_id', STUDIO_ID)
+      .not('square_item_id', 'is', null)
+      .lt('refreshed_at', now);
+    if (staleErr) logger.warn('[catalogue-refresh] could not mark stale shapes', staleErr.message);
+
+    lastRefresh = Date.now();
+    const withPhoto = rows.filter((r) => r.image_url).length;
+    logger.info(`[catalogue-refresh] ${written} shape(s), ${withPhoto} with a photo, stock ${stockOk ? 'live' : 'unavailable'}`);
+    return { refreshed: true, shapes: written, with_photo: withPhoto, without_photo: written - withPhoto, stock_live: stockOk };
+  }
+
+  function refreshOnce() {
+    if (!refreshing) {
+      refreshing = refreshCatalogue()
+        .catch((err) => {
+          logger.error('[catalogue-refresh] failed', err.response?.data || err.message);
+          return { refreshed: false, error: err.response?.data?.errors?.[0]?.detail || err.message };
+        })
+        .finally(() => { refreshing = null; });
+    }
+    return refreshing;
+  }
+
+  app.post('/api/spec/catalogue/refresh-from-square', async (req, res) => {
+    const out = await refreshOnce();
+    res.status(out.refreshed ? 200 : 500).json(out);
+  });
+
+  // ---- STOCK: what we have, what it costs, where it is in the range -----
+  // Daisy: "a really useful page for stock and finding etc with prices."
+  // Served from piece_catalogue so it is fast; if the copy is more than
+  // fifteen minutes old a refresh starts in the background, so the next
+  // look is current without anyone waiting on Square.
+  app.get('/api/spec/stock', async (req, res) => {
+    try {
+      const rows = [];
+      for (let from = 0; ; from += 1000) {
+        const { data: page, error } = await supabase
+          .from('piece_catalogue')
+          .select('id, square_item_id, name, category, category_guessed, description, price_cents, price_min_cents, image_url, stock_count, stock_tracked, variations, refreshed_at')
+          .eq('studio_id', STUDIO_ID)
+          .eq('active', true)
+          .order('name', { ascending: true })
+          .range(from, from + 999);
+        if (error) throw error;
+        rows.push(...(page || []));
+        if (!page || page.length < 1000) break;
+      }
+      const newest = rows.reduce((m, r) => (r.refreshed_at && r.refreshed_at > m ? r.refreshed_at : m), '');
+      const age = newest ? Date.now() - new Date(newest).getTime() : Infinity;
+      const refreshingNow = age > STALE_MS && Date.now() - lastRefresh > 60000;
+      if (refreshingNow) refreshOnce();
+      res.json({ items: rows, refreshed_at: newest || null, refreshing: refreshingNow || !!refreshing });
     } catch (err) {
-      logger.error('[catalogue-refresh] failed', err.response?.data || err.message);
-      res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message, refreshed: false });
+      logger.error('[stock] failed', err.message);
+      res.status(500).json({ error: err.message });
     }
   });
 }
