@@ -8393,6 +8393,7 @@ export function registerNextPackingRoute(app, supabase, STUDIO_ID, logger) {
 // ============================================================================
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 const BACKFILL_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'backfill-photos');
@@ -8530,6 +8531,114 @@ const MULTI_TABLE_SCHEMA = {
 };
 
 export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, sharp, upload, logGeminiUsage) {
+  // A backfill photo is either bundled with the build (the original
+  // camera-roll backlog) or was sent in from the iPad and sits in storage.
+  async function loadBackfillPhoto(row) {
+    if (row.storage_path) {
+      const { data, error } = await supabase.storage.from('booking-photos').download(row.storage_path);
+      if (error) throw new Error(`stored photo missing: ${error.message}`);
+      return Buffer.from(await data.arrayBuffer());
+    }
+    return fs.readFileSync(path.join(BACKFILL_DIR, row.filename));
+  }
+
+  // ---- DAILY PHOTOS FROM THE IPAD ---------------------------------------
+  // Daisy: "I still really want to daily copy the photos taken with the
+  // iPad into the app" -- so recognition has them to work on.
+  //
+  // An iPad Shortcut runs each evening, finds the day's camera photos and
+  // posts them here one at a time. Each is stored and queued; the backfill
+  // run on the five-minute loop reads the chalk tag, finds the booking and
+  // creates the pieces, exactly as for the original backlog, and shape
+  // recognition picks the pieces up after that. Sending the same photo
+  // twice is harmless -- it is recognised by its contents.
+  //
+  // A studio key stops anyone who finds the address from filling the
+  // queue. It is made the first time the setup screen is opened.
+  async function ingestKey(create = false) {
+    const { data } = await supabase.from('studio_markers').select('detail')
+      .eq('studio_id', STUDIO_ID).eq('key', 'ipad-ingest').maybeSingle();
+    if (data?.detail?.token || !create) return data?.detail?.token || null;
+    const token = crypto.randomBytes(9).toString('base64url');
+    await supabase.from('studio_markers').upsert({
+      studio_id: STUDIO_ID, key: 'ipad-ingest', done_at: new Date().toISOString(), detail: { token },
+    }, { onConflict: 'studio_id,key' });
+    return token;
+  }
+
+  app.get('/api/spec/backfill/ingest-setup', async (req, res) => {
+    try {
+      const token = await ingestKey(true);
+      const { data: recent } = await supabase.from('backfill_photos')
+        .select('status, created_at, pieces_created')
+        .eq('studio_id', STUDIO_ID).eq('source', 'ipad')
+        .order('created_at', { ascending: false }).limit(500);
+      const rows = recent || [];
+      const since = Date.now() - 7 * 86400000;
+      const week = rows.filter((r) => new Date(r.created_at).getTime() > since);
+      res.json({
+        token,
+        last_received_at: rows[0]?.created_at || null,
+        week: {
+          received: week.length,
+          matched: week.filter((r) => r.status === 'done').length,
+          waiting: week.filter((r) => r.status === 'pending' || r.status === 'processing').length,
+          needs_a_look: week.filter((r) => r.status === 'unmatched' || r.status === 'failed').length,
+          pieces: week.reduce((n, r) => n + (r.pieces_created || 0), 0),
+        },
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/spec/backfill/ingest', upload.single('photo'), async (req, res) => {
+    const cleanup = () => { try { if (req.file?.path) fs.unlinkSync(req.file.path); } catch { /* temp file */ } };
+    try {
+      const sent = String(req.body?.token || req.get('x-studio-key') || '');
+      const token = await ingestKey(false);
+      if (!token || sent !== token) { cleanup(); return res.status(401).json({ error: 'Studio key missing or wrong. Copy it again from the Backfill page.' }); }
+      if (!req.file) return res.status(400).json({ error: 'No photo attached. The form field must be called photo.' });
+
+      let buf = req.file.buffer || fs.readFileSync(req.file.path);
+      cleanup();
+      // Stored as JPEG. iPads shoot HEIC; the Shortcut converts, but if
+      // one slips through, try here before giving up.
+      if (!(buf[0] === 0xff && buf[1] === 0xd8)) {
+        try { buf = await sharp(buf).rotate().jpeg({ quality: 88 }).toBuffer(); }
+        catch { return res.status(415).json({ error: 'Not a JPEG and could not be converted. Add "Convert Image to JPEG" before sending in the Shortcut.' }); }
+      }
+
+      const hash = crypto.createHash('sha1').update(buf).digest('hex');
+      const { data: seen } = await supabase.from('backfill_photos').select('id, status')
+        .eq('studio_id', STUDIO_ID).eq('content_hash', hash).maybeSingle();
+      if (seen) return res.json({ ok: true, duplicate: true, status: seen.status });
+
+      const takenRaw = String(req.body?.taken_at || '').trim();
+      const taken = takenRaw && !isNaN(Date.parse(takenRaw)) ? new Date(takenRaw) : new Date();
+      const day = taken.toLocaleDateString('en-CA', { timeZone: 'Europe/London' }); // YYYY-MM-DD
+      const filename = `ipad/${day}/${hash.slice(0, 16)}.jpg`;
+      const storage_path = `backfill/${STUDIO_ID}/${filename}`;
+
+      const { error: upErr } = await supabase.storage.from('booking-photos')
+        .upload(storage_path, buf, { contentType: 'image/jpeg', upsert: true });
+      if (upErr) throw upErr;
+
+      const { error: insErr } = await supabase.from('backfill_photos').insert({
+        studio_id: STUDIO_ID, filename, storage_path, status: 'pending',
+        taken_at: taken.toISOString(), source: 'ipad', content_hash: hash,
+      });
+      // Two copies of the same photo racing each other: the second loses
+      // on the unique index, which is the right outcome.
+      if (insErr && !/duplicate|unique/i.test(insErr.message)) throw insErr;
+      res.json({ ok: true, queued: !insErr, day });
+    } catch (err) {
+      cleanup();
+      logger.error('[ipad-ingest] failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // [6 Sep] BACKFILL, RUN SERVER-SIDE.
   //
   // Daisy: "I don't wanna use a zip file. I want you to do it on the
@@ -8555,9 +8664,10 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
     try {
       const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
       if (!GEMINI_API_KEY) return res.status(500).json({ error: 'GEMINI_API_KEY not configured on this service.' });
-      if (!fs.existsSync(DIR)) return res.status(500).json({ error: 'No backfill photos are deployed with this build.' });
+      // Bundled photos are optional now: the daily iPad photos arrive
+      // through /api/spec/backfill/ingest and live in storage instead.
 
-      const files = fs.readdirSync(DIR).filter((f) => /\.jpe?g$/i.test(f)).sort();
+      const files = fs.existsSync(DIR) ? fs.readdirSync(DIR).filter((f) => /\.jpe?g$/i.test(f)).sort() : [];
 
       // Register any photo not yet seen. Unique on (studio, filename),
       // so a redeploy cannot queue the same photo twice.
@@ -8588,11 +8698,11 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
       // all. Handled before the pending queue so hand-decided ones land
       // first.
       const { data: assigned } = await supabase
-        .from('backfill_photos').select('id, filename, booking_code, ai_result')
+        .from('backfill_photos').select('id, filename, booking_code, ai_result, storage_path, taken_at')
         .eq('studio_id', STUDIO_ID).eq('status', 'assigned').limit(60);
 
       const { data: readyRows } = await supabase
-        .from('backfill_photos').select('id, filename, status, processed_at')
+        .from('backfill_photos').select('id, filename, status, processed_at, storage_path, taken_at')
         .eq('studio_id', STUDIO_ID).in('status', ['pending', 'processing'])
         .order('filename', { ascending: true }).limit(60);
       const pending = (readyRows || []).filter(
@@ -8677,7 +8787,7 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
             await supabase.from('backfill_photos').update({ status: 'unmatched', error_message: 'Assigned but no stored read to apply' }).eq('id', row.id);
             continue;
           }
-          const buf = fs.readFileSync(path.join(DIR, row.filename));
+          const buf = await loadBackfillPhoto(row);
           const fname = `backfill/${STUDIO_ID}/${row.filename}`;
           await supabase.storage.from('booking-photos').upload(fname, buf, { contentType: 'image/jpeg', upsert: true });
           const { data: urlData } = supabase.storage.from('booking-photos').getPublicUrl(fname);
@@ -8725,7 +8835,7 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
         if (!claimed?.length) continue;
 
         try {
-          const buf = fs.readFileSync(path.join(DIR, row.filename));
+          const buf = await loadBackfillPhoto(row);
           const forAi = await forGemini(sharp, buf, logger, null, 1600);
           const base64 = forAi.buffer.toString('base64');
 
@@ -8780,11 +8890,19 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
           // board is what separates them, and it is written there
           // precisely so a person can do this. Not the file's date --
           // that one lies, which is why it was dropped earlier.
-          const tagDay = (parsed.paint_date || '').trim();
           const dayOf = (iso) => {
             const d = new Date(iso);
             return `${d.getDate()}/${d.getMonth() + 1}`;
           };
+          // The date on the board first. Failing that, for photos sent
+          // from the iPad, the day the photo was taken -- the Photos
+          // app's own record, which is reliable, unlike a file's date
+          // after it has been exported and copied around. In UK time,
+          // so an evening photo is not counted as the next day.
+          const takenDay = row.taken_at
+            ? new Date(row.taken_at).toLocaleDateString('en-GB', { timeZone: 'Europe/London', day: 'numeric', month: 'numeric' })
+            : '';
+          const tagDay = (parsed.paint_date || '').trim() || takenDay;
 
           if (!tag || !pieces.length) {
             await supabase.from('backfill_photos').update({

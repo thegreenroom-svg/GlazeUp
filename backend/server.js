@@ -1777,6 +1777,23 @@ app.listen(PORT, () => {
         logger.error('[auto-sync] revenue sync failed', err.message);
       }
 
+      // Photos sent in from the iPad: read the chalk tag, match the
+      // booking, create the pieces. Only when something is waiting, so
+      // a quiet day costs nothing. Runs before shape recognition, so the
+      // pieces it creates are picked up on the same tick.
+      try {
+        const { count: waiting } = await supabase.from('backfill_photos')
+          .select('id', { count: 'exact', head: true })
+          .eq('studio_id', DEMO_STUDIO_ID).in('status', ['pending', 'assigned']);
+        if (waiting) {
+          const bfRes = await fetch(`${SELF_URL}/api/spec/backfill/run`, { method: 'POST' });
+          const bf = await bfRes.json().catch(() => ({}));
+          logger.info(`[auto-sync] iPad photos: ${bf.matched ?? 0} matched, ${bf.unmatched ?? 0} need a look, ${waiting} were waiting`);
+        }
+      } catch (err) {
+        logger.error('[auto-sync] iPad photo backfill failed', err.message);
+      }
+
       // Shape recognition for newly photographed pieces, a few table
       // photos per tick. Works through the backlog of older pieces too,
       // then just keeps up. Never runs at the table itself.

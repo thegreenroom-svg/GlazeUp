@@ -29,6 +29,7 @@ import { PageShell } from '@/components/PageShell';
 import { compressPhotoForUpload } from '@/lib/compressPhoto';
 import { Camera, Loader, Check, AlertCircle } from 'lucide-react';
 import { PhotoWithBoxes, PieceList, pieceColour, type PieceBox } from '@/components/PieceBoxes';
+import { DailyIpadPhotos } from '@/components/DailyIpadPhotos';
 
 export const dynamic = 'force-dynamic';
 
@@ -235,6 +236,7 @@ export default function BackfillPage() {
 
   return (
     <PageShell title="Backfill from photos" subtitle="Tables photographed outside the app">
+      <DailyIpadPhotos />
       {prog && (prog.total > 0 || prog.on_disk > 0) && (
         <div style={{ background: 'white', border: '1px solid #ece5db', borderRadius: 'var(--radius-md)', padding: '0.9rem', marginBottom: '1rem' }}>
           <p style={{ fontSize: 'var(--text-sm)', fontWeight: 700, margin: '0 0 0.3rem' }}>The 27 Aug – 5 Sep backlog</p>
