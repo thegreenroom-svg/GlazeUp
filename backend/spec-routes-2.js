@@ -2050,10 +2050,34 @@ function categorizeItemNameByKeyword(name) {
   return 'Other';
 }
 
+// Categories for Square items that have none in Square. Kept in GlazeUp's
+// own table (square_category_overrides) because Square is read-only from
+// here, by design. A real Square category always wins; this only fills the
+// gap. Matched by item id first, then by name for items since deleted from
+// the catalogue, whose old sales still carry their name.
+async function loadCategoryOverrides(supabase, STUDIO_ID) {
+  const byId = {}, byName = {};
+  const { data } = await supabase
+    .from('square_category_overrides')
+    .select('square_item_id, item_name, category')
+    .eq('studio_id', STUDIO_ID);
+  for (const r of data || []) {
+    byId[r.square_item_id] = r.category;
+    byName[String(r.item_name || '').trim().toLowerCase()] = r.category;
+  }
+  return { byId, byName };
+}
+
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 export function registerRevenueCategorySyncRoute(app, supabase, STUDIO_ID, logger, axios) {
   app.post('/api/spec/revenue/sync', async (req, res) => {
     try {
       const daysBack = Math.min(Math.max(parseInt(req.query.daysBack, 10) || 30, 1), 365);
+      // Optional fixed window (YYYY-MM-DD, inclusive) for the history rebuild.
+      const fromDay = DAY_RE.test(req.query.from || '') ? req.query.from : null;
+      const toDay = DAY_RE.test(req.query.to || '') ? req.query.to : null;
+      const overrides = await loadCategoryOverrides(supabase, STUDIO_ID).catch(() => ({ byId: {}, byName: {} }));
 
       const { data: connection } = await supabase
         .from('square_connections')
@@ -2093,7 +2117,7 @@ export function registerRevenueCategorySyncRoute(app, supabase, STUDIO_ID, logge
           const itemRes = await axios.get('https://connect.squareup.com/v2/catalog/list', { headers, params });
           (itemRes.data.objects || []).forEach((it) => {
             const cid = it.item_data?.category_id || it.item_data?.categories?.[0]?.id;
-            const nm = catNameById[cid];
+            const nm = catNameById[cid] || overrides.byId[it.id];
             if (!nm) return;
             itemCategory[it.id] = nm;
             (it.item_data?.variations || []).forEach((v) => { variationCategory[v.id] = nm; });
@@ -2107,11 +2131,18 @@ export function registerRevenueCategorySyncRoute(app, supabase, STUDIO_ID, logge
       }
 
       const categorizeLineItem = (item) =>
-        variationCategory[item.catalog_object_id] || itemCategory[item.catalog_object_id] || categorizeItemNameByKeyword(item.name);
+        variationCategory[item.catalog_object_id] || itemCategory[item.catalog_object_id]
+        || overrides.byName[String(item.name || '').trim().toLowerCase()]
+        || categorizeItemNameByKeyword(item.name);
 
-      const startDate = new Date();
+      let startDate = new Date();
       startDate.setDate(startDate.getDate() - daysBack);
       startDate.setUTCHours(0, 0, 0, 0);
+      let endDate = null;
+      if (fromDay) {
+        startDate = new Date(fromDay + 'T00:00:00Z');
+        if (toDay) { endDate = new Date(toDay + 'T00:00:00Z'); endDate.setUTCDate(endDate.getUTCDate() + 1); }
+      }
 
       let orders = [];
       let orderCursor;
@@ -2120,7 +2151,9 @@ export function registerRevenueCategorySyncRoute(app, supabase, STUDIO_ID, logge
           location_ids: locations.map((l) => l.id),
           query: {
             filter: {
-              date_time_filter: { created_at: { start_at: startDate.toISOString() } },
+              date_time_filter: { created_at: endDate
+                ? { start_at: startDate.toISOString(), end_at: endDate.toISOString() }
+                : { start_at: startDate.toISOString() } },
               state_filter: { states: ['COMPLETED'] },
             },
           },
@@ -2179,6 +2212,67 @@ export function registerRevenueCategorySyncRoute(app, supabase, STUDIO_ID, logge
       logger.error(err.response?.data || err);
       res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message, synced: false });
     }
+  });
+
+  // ---- FULL HISTORY REBUILD ----------------------------------------------
+  // The sync above only looks back a year at most. When categories change
+  // (square_category_overrides), the older takings still sit under Other
+  // until they are re-read. This walks the whole trading history in 60 day
+  // windows, oldest first, one window at a time so Square is not hammered.
+  // Read-only against Square, as everything here is. Runs in the background;
+  // GET .../rebuild-history shows how far it has got.
+  const rebuild = { running: false, done: 0, total: 0, window: null, rows: 0, errors: [], started_at: null, finished_at: null };
+  const FIRST_TRADING_DAY = '2022-11-01';
+  const iso = (d) => d.toISOString().slice(0, 10);
+
+  async function runRebuild(markerKey) {
+    rebuild.running = true; rebuild.done = 0; rebuild.rows = 0; rebuild.errors = [];
+    rebuild.started_at = new Date().toISOString(); rebuild.finished_at = null;
+    const windows = [];
+    const today = new Date(); today.setUTCHours(0, 0, 0, 0);
+    for (let a = new Date(FIRST_TRADING_DAY + 'T00:00:00Z'); a <= today; ) {
+      const b = new Date(a); b.setUTCDate(b.getUTCDate() + 59);
+      windows.push([iso(a), iso(b > today ? today : b)]);
+      a = new Date(b); a.setUTCDate(a.getUTCDate() + 1);
+    }
+    rebuild.total = windows.length;
+    const port = process.env.PORT || 3001;
+    for (const [from, to] of windows) {
+      rebuild.window = `${from} to ${to}`;
+      try {
+        const r = await fetch(`http://localhost:${port}/api/spec/revenue/sync?from=${from}&to=${to}`, { method: 'POST' });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) rebuild.errors.push(`${from}: ${d.error || r.status}`);
+        rebuild.rows += d.rows_written || 0;
+      } catch (e) {
+        rebuild.errors.push(`${from}: ${e.message}`);
+      }
+      rebuild.done++;
+    }
+    rebuild.running = false; rebuild.window = null; rebuild.finished_at = new Date().toISOString();
+    logger.info(`[revenue-rebuild] ${rebuild.rows} row(s) across ${rebuild.total} window(s), ${rebuild.errors.length} error(s)`);
+    // Only mark it done if it went through cleanly, so a failed run retries
+    // on the next boot rather than leaving the history half re-sorted.
+    if (markerKey && !rebuild.errors.length) {
+      await supabase.from('studio_markers').upsert({
+        studio_id: STUDIO_ID, key: markerKey, done_at: new Date().toISOString(),
+        detail: { rows: rebuild.rows, windows: rebuild.total },
+      }, { onConflict: 'studio_id,key' });
+    }
+  }
+
+  app.get('/api/spec/revenue/rebuild-history', (req, res) => res.json(rebuild));
+
+  app.post('/api/spec/revenue/rebuild-history', async (req, res) => {
+    // ?once=<key>: only run if that key has never completed (used on boot).
+    const once = String(req.query.once || '').slice(0, 60) || null;
+    if (rebuild.running) return res.json({ started: false, reason: 'already running', ...rebuild });
+    if (once) {
+      const { data } = await supabase.from('studio_markers').select('key').eq('studio_id', STUDIO_ID).eq('key', once).maybeSingle();
+      if (data) return res.json({ started: false, reason: 'already done', key: once });
+    }
+    runRebuild(once).catch((e) => { rebuild.running = false; logger.error('[revenue-rebuild] crashed', e.message); });
+    res.json({ started: true });
   });
 }
 
@@ -4174,32 +4268,37 @@ export function registerBisqueInventoryRoute(app, supabase, STUDIO_ID, logger) {
   app.get('/api/spec/inventory/bisque', async (req, res) => {
     try {
       const { search, category } = req.query;
-      let q = supabase
-        .from('square_items')
-        .select('item_name, category, price_cents')
-        .eq('studio_id', STUDIO_ID);
 
       // Bisque only by default -- the real catalog also holds drinks,
       // cakes and studio fees, which aren't what "stock room" means here.
-      // Real category prefix confirmed against the live data: every
-      // paint-your-own bisque category starts "PB ".
-      if (category) q = q.eq('category', category);
-      else q = q.like('category', 'PB %');
+      // Every paint-your-own bisque category starts "PB ". Items with no
+      // category in Square come through as Other; the ones GlazeUp has
+      // given a category (square_category_overrides) are shown under it.
+      // Paged, because Supabase stops at 1,000 rows per request.
+      const ov = await loadCategoryOverrides(supabase, STUDIO_ID).catch(() => ({ byId: {}, byName: {} }));
+      const rows = [];
+      for (let from = 0; ; from += 1000) {
+        let q = supabase
+          .from('square_items')
+          .select('item_id, item_name, category, price_cents')
+          .eq('studio_id', STUDIO_ID)
+          .or('category.like.PB*,category.eq.Other');
+        if (search) q = q.ilike('item_name', `%${String(search).trim()}%`);
+        const { data: page, error } = await q.order('item_name').range(from, from + 999);
+        if (error) throw error;
+        rows.push(...(page || []));
+        if (!page || page.length < 1000) break;
+      }
+      const resolved = rows.map((r) => ({
+        item_name: r.item_name,
+        price_cents: r.price_cents,
+        category: (r.category === 'Other' && ov.byId[r.item_id]) || r.category,
+      }));
+      const bisque = resolved.filter((r) => /^PB /.test(r.category || ''));
+      const items = (category ? bisque.filter((r) => r.category === category) : bisque).slice(0, 500);
+      const categories = [...new Set(bisque.map((r) => r.category))].sort();
 
-      if (search) q = q.ilike('item_name', `%${String(search).trim()}%`);
-
-      const { data, error } = await q.order('item_name').limit(500);
-      if (error) throw error;
-
-      // Real category list for filtering, from the actual data.
-      const { data: allCats } = await supabase
-        .from('square_items')
-        .select('category')
-        .eq('studio_id', STUDIO_ID)
-        .like('category', 'PB %');
-      const categories = [...new Set((allCats || []).map((c) => c.category).filter(Boolean))].sort();
-
-      res.json({ items: data || [], categories, count: (data || []).length });
+      res.json({ items, categories, count: items.length });
     } catch (err) {
       logger.error('bisque inventory failed', err.message);
       res.status(500).json({ error: err.message });
@@ -5383,12 +5482,15 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
       if (otherCents > 0) {
         const { data: items } = await supabase
           .from('square_items')
-          .select('item_name, price_cents, category')
+          .select('item_id, item_name, price_cents, category')
           .eq('studio_id', STUDIO_ID)
           .eq('category', 'Other')
           .limit(2000);
+        // Items given a category in GlazeUp are no longer a job to do.
+        const ov = await loadCategoryOverrides(supabase, STUDIO_ID).catch(() => ({ byId: {}, byName: {} }));
         const weight = new Map();
         for (const it of items || []) {
+          if (ov.byId[it.item_id]) continue;
           const b = otherBucket(it.item_name);
           weight.set(b, (weight.get(b) || 0) + (it.price_cents || 0));
           if (b === 'Uncategorised bisque') todo.push({ name: (it.item_name || '').trim(), price_cents: it.price_cents || 0 });
@@ -9031,4 +9133,104 @@ export function registerBackfillRoutes(app, supabase, STUDIO_ID, logger, axios, 
     }
   });
 
+}
+
+// ============================================================================
+// SHAPE CATALOGUE FROM THE SQUARE STOCKTAKE
+// ----------------------------------------------------------------------------
+// The stocktake put a clean name and a photo on nearly every bisque item in
+// Square. piece_catalogue was empty, so the app had no reference set of
+// shapes. This fills it from Square: every item in a "PB " category (or
+// given one in square_category_overrides), with its first photo and price.
+//
+// Read-only against Square. Upserts by square_item_id, so it is safe to run
+// on every boot and picks up the next stocktake on its own. Only name,
+// category, photo, price and description are written; stock counts and
+// measurements entered in the app are left alone. Items that leave the
+// bisque categories, or are archived in Square, are marked inactive here
+// rather than deleted.
+// ============================================================================
+export function registerCatalogueRefreshRoute(app, supabase, STUDIO_ID, logger, axios) {
+  app.post('/api/spec/catalogue/refresh-from-square', async (req, res) => {
+    try {
+      const { data: connection } = await supabase
+        .from('square_connections')
+        .select('square_access_token, square_token_expires_at')
+        .eq('studio_id', STUDIO_ID)
+        .single();
+      if (!connection || new Date(connection.square_token_expires_at) < new Date()) {
+        return res.status(400).json({ error: 'No valid Square connection', refreshed: false });
+      }
+      const headers = { Authorization: `Bearer ${connection.square_access_token}`, 'Square-Version': '2024-01-18' };
+
+      const objects = [];
+      let cursor;
+      do {
+        const params = { types: 'ITEM,IMAGE,CATEGORY' };
+        if (cursor) params.cursor = cursor;
+        const r = await axios.get('https://connect.squareup.com/v2/catalog/list', { headers, params });
+        objects.push(...(r.data.objects || []));
+        cursor = r.data.cursor;
+      } while (cursor);
+
+      const catName = {}, imageUrl = {};
+      for (const o of objects) {
+        if (o.type === 'CATEGORY') catName[o.id] = o.category_data?.name;
+        if (o.type === 'IMAGE' && o.image_data?.url) imageUrl[o.id] = o.image_data.url;
+      }
+      const ov = await loadCategoryOverrides(supabase, STUDIO_ID).catch(() => ({ byId: {}, byName: {} }));
+
+      const now = new Date().toISOString();
+      const rows = [];
+      for (const o of objects) {
+        if (o.type !== 'ITEM' || o.is_deleted) continue;
+        const d = o.item_data || {};
+        if (d.is_archived) continue;
+        const names = [d.category_id, ...(d.categories || []).map((c) => c.id)]
+          .filter(Boolean).map((id) => catName[id]).filter(Boolean);
+        const squareCat = names.find((n) => /^PB /.test(n)) || null;
+        const category = squareCat || ov.byId[o.id] || null;
+        if (!category || !/^PB /.test(category)) continue;
+        const prices = (d.variations || []).map((v) => Number(v.item_variation_data?.price_money?.amount || 0));
+        rows.push({
+          studio_id: STUDIO_ID,
+          square_item_id: o.id,
+          name: String(d.name || '').trim(),
+          category: category.trim(),
+          category_guessed: !squareCat,
+          description: (d.description_plaintext || d.description || '').trim().slice(0, 1000) || null,
+          price_cents: prices.length ? Math.max(...prices) : 0,
+          image_url: imageUrl[(d.image_ids || [])[0]] || null,
+          active: true,
+          refreshed_at: now,
+        });
+      }
+
+      let written = 0;
+      for (let i = 0; i < rows.length; i += 200) {
+        const { error } = await supabase
+          .from('piece_catalogue')
+          .upsert(rows.slice(i, i + 200), { onConflict: 'studio_id,square_item_id' });
+        if (error) throw error;
+        written += Math.min(200, rows.length - i);
+      }
+
+      // Anything linked to Square that was not seen this time has left the
+      // bisque range or been archived -- keep it, but stop offering it.
+      const { error: staleErr } = await supabase
+        .from('piece_catalogue')
+        .update({ active: false })
+        .eq('studio_id', STUDIO_ID)
+        .not('square_item_id', 'is', null)
+        .lt('refreshed_at', now);
+      if (staleErr) logger.warn('[catalogue-refresh] could not mark stale shapes', staleErr.message);
+
+      const withPhoto = rows.filter((r) => r.image_url).length;
+      logger.info(`[catalogue-refresh] ${written} shape(s), ${withPhoto} with a photo`);
+      res.json({ refreshed: true, shapes: written, with_photo: withPhoto, without_photo: written - withPhoto });
+    } catch (err) {
+      logger.error('[catalogue-refresh] failed', err.response?.data || err.message);
+      res.status(500).json({ error: err.response?.data?.errors?.[0]?.detail || err.message, refreshed: false });
+    }
+  });
 }
