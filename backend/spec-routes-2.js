@@ -5329,13 +5329,24 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
 
   app.get('/api/spec/owner/dashboard', async (req, res) => {
     try {
-      const { data: rows, error } = await supabase
-        .from('revenue_category_breakdown')
-        .select('metric_date, category, revenue_cents, item_count')
-        .eq('studio_id', STUDIO_ID)
-        .order('metric_date', { ascending: true })
-        .limit(50000);
-      if (error) throw error;
+      // Supabase hands back 1,000 rows per request whatever .limit() says.
+      // There are over 13,000 rows here, so a single read stopped at
+      // April 2023 and every figure on the page was built from five months.
+      // Page through until a short page comes back.
+      const rows = [];
+      for (let from = 0; ; from += 1000) {
+        const { data: page, error } = await supabase
+          .from('revenue_category_breakdown')
+          .select('metric_date, category, revenue_cents, item_count')
+          .eq('studio_id', STUDIO_ID)
+          .order('metric_date', { ascending: true })
+          .order('category', { ascending: true })
+          .range(from, from + 999);
+        if (error) throw error;
+        rows.push(...(page || []));
+        if (!page || page.length < 1000) break;
+        if (from > 200000) break; // belt and braces
+      }
 
       const byDay = new Map();
       const byCat = new Map();
