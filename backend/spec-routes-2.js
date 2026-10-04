@@ -2081,6 +2081,101 @@ async function loadCategoryOverrides(supabase, STUDIO_ID) {
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+// ---- OTHER ITEMS THAT NO LONGER EXIST ---------------------------------
+// Square stays read-only throughout. These items were deleted from the
+// catalogue, so no id lookup and no rename will ever find them -- somebody
+// who was there has to say what shape they were. Everything that CAN be
+// resolved by id already has been by the sync, so what reaches this screen
+// is only the genuinely unknowable.
+export function registerOtherMatchRoutes(app, supabase, STUDIO_ID, logger) {
+  app.get('/api/spec/other/unmatched', async (req, res) => {
+    try {
+      const rows = [];
+      let from = 0;
+      // Supabase caps a read at 1,000 rows, which is what left the dashboard
+      // stuck on April 2023 last time. Page it.
+      for (;;) {
+        const { data, error } = await supabase
+          .from('revenue_other_items')
+          .select('item_name, square_item_id, current_name, revenue_cents, item_count, catalog_missing')
+          .eq('studio_id', STUDIO_ID)
+          .eq('catalog_missing', true)
+          .range(from, from + 999);
+        if (error) throw error;
+        rows.push(...(data || []));
+        if (!data || data.length < 1000) break;
+        from += 1000;
+      }
+
+      // Already decided? Then it is not a question any more.
+      const { data: done } = await supabase
+        .from('square_category_overrides')
+        .select('square_item_id')
+        .eq('studio_id', STUDIO_ID)
+        .eq('guessed', false);
+      const settled = new Set((done || []).map((d) => d.square_item_id));
+
+      const byId = new Map();
+      for (const r of rows) {
+        const id = r.square_item_id;
+        if (!id || settled.has(id)) continue;
+        const e = byId.get(id) || { square_item_id: id, item_name: r.item_name, revenue_cents: 0, item_count: 0, days: 0 };
+        e.revenue_cents += Number(r.revenue_cents || 0);
+        e.item_count += Number(r.item_count || 0);
+        e.days += 1;
+        byId.set(id, e);
+      }
+
+      // The shapes to choose from, with their photos.
+      const { data: catalogue } = await supabase
+        .from('piece_catalogue')
+        .select('square_item_id, name, category, image_url, price_cents')
+        .eq('studio_id', STUDIO_ID)
+        .not('category', 'is', null)
+        .order('name')
+        .limit(1000);
+
+      res.json({
+        // Biggest money first. If somebody only does ten of these, they
+        // should be the ten that matter.
+        unmatched: [...byId.values()].sort((a, b) => b.revenue_cents - a.revenue_cents),
+        catalogue: catalogue || [],
+      });
+    } catch (err) {
+      logger.error('other/unmatched failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/spec/other/match', async (req, res) => {
+    try {
+      const { square_item_id, item_name, category } = req.body || {};
+      if (!square_item_id || !category) return res.status(400).json({ error: 'square_item_id and category required' });
+
+      const { error } = await supabase.from('square_category_overrides').upsert({
+        studio_id: STUDIO_ID,
+        square_item_id,
+        item_name: item_name || null,
+        category,
+        guessed: false,
+      }, { onConflict: 'studio_id,square_item_id' });
+      if (error) throw error;
+
+      // A person has now said what this was, so the name-based guess for the
+      // same thing is only in the way.
+      if (item_name) {
+        await supabase.from('square_category_overrides').delete()
+          .eq('studio_id', STUDIO_ID).eq('guessed', true)
+          .eq('square_item_id', 'name:' + String(item_name).toLowerCase());
+      }
+      res.json({ ok: true });
+    } catch (err) {
+      logger.error('other/match failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
+
 export function registerRevenueCategorySyncRoute(app, supabase, STUDIO_ID, logger, axios) {
   app.post('/api/spec/revenue/sync', async (req, res) => {
     try {
@@ -2111,6 +2206,12 @@ export function registerRevenueCategorySyncRoute(app, supabase, STUDIO_ID, logge
       // alone, same graceful degradation as the original.
       const variationCategory = {};
       const itemCategory = {};
+      // Every id Square still knows about, and what it is called today.
+      // An Other line whose id is in here is a live item that has simply
+      // been renamed or left uncategorised. One whose id is absent was
+      // deleted from the catalogue, and no amount of name matching will
+      // ever bring it back -- that is the set a human has to look at.
+      const liveCatalogue = {};
       let catalogVariationsMapped = 0;
       try {
         const catNameById = {};
@@ -2129,6 +2230,13 @@ export function registerRevenueCategorySyncRoute(app, supabase, STUDIO_ID, logge
           (itemRes.data.objects || []).forEach((it) => {
             const cid = it.item_data?.category_id || it.item_data?.categories?.[0]?.id;
             const nm = catNameById[cid] || overrides.byId[it.id];
+            const liveName = String(it.item_data?.name || '').trim() || null;
+            // Recorded whether or not it has a category -- existing is the
+            // question here, not being filed correctly.
+            liveCatalogue[it.id] = { name: liveName, category: nm || null };
+            (it.item_data?.variations || []).forEach((v) => {
+              liveCatalogue[v.id] = { name: liveName, category: nm || null };
+            });
             if (!nm) return;
             itemCategory[it.id] = nm;
             (it.item_data?.variations || []).forEach((v) => { variationCategory[v.id] = nm; });
@@ -2193,8 +2301,14 @@ export function registerRevenueCategorySyncRoute(app, supabase, STUDIO_ID, logge
           const itemTotal = item.total_money ? Number(item.total_money.amount) : 0;
           if (category === 'Other') {
             const nm = (String(item.name || '').trim() || '(custom amount)').slice(0, 200);
+            const sqid = item.catalog_object_id || null;
+            // Keyed by id where there is one, so a rename does not split one
+            // item into two lines, and two items that happen to share a name
+            // do not get merged into one.
+            const key = sqid ? 'id:' + sqid : 'nm:' + nm;
             otherByDay[date] = otherByDay[date] || {};
-            const o = otherByDay[date][nm] || (otherByDay[date][nm] = { revenue_cents: 0, item_count: 0 });
+            const o = otherByDay[date][key]
+              || (otherByDay[date][key] = { item_name: nm, square_item_id: sqid, revenue_cents: 0, item_count: 0 });
             o.revenue_cents += itemTotal; o.item_count += Number(item.quantity || 1);
           }
           if (!dailyCategoryBreakdown[date][category]) dailyCategoryBreakdown[date][category] = { revenue_cents: 0, item_count: 0 };
@@ -2212,8 +2326,50 @@ export function registerRevenueCategorySyncRoute(app, supabase, STUDIO_ID, logge
         await supabase.from('revenue_category_breakdown').delete().eq('studio_id', STUDIO_ID).in('metric_date', syncedDates);
         await supabase.from('revenue_other_items').delete().eq('studio_id', STUDIO_ID).in('metric_date', syncedDates);
         const otherRows = [];
-        for (const [d, names] of Object.entries(otherByDay)) {
-          for (const [item_name, v] of Object.entries(names)) otherRows.push({ studio_id: STUDIO_ID, metric_date: d, item_name, ...v });
+        const catalogueLoaded = Object.keys(liveCatalogue).length > 0;
+        const resolvedIds = new Map();   // id -> { current_name, category }
+        for (const [d, entries] of Object.entries(otherByDay)) {
+          for (const v of Object.values(entries)) {
+            const live = v.square_item_id ? liveCatalogue[v.square_item_id] : null;
+            // Only call something deleted if the catalogue actually loaded.
+            // Otherwise a scope error or a flaky network would mark the whole
+            // catalogue missing and send staff off matching things by hand
+            // that were never lost.
+            const missing = (catalogueLoaded && v.square_item_id) ? !live : null;
+            if (live) resolvedIds.set(v.square_item_id, live);
+            otherRows.push({
+              studio_id: STUDIO_ID, metric_date: d,
+              item_name: v.item_name,
+              square_item_id: v.square_item_id,
+              current_name: live?.name || null,
+              catalog_missing: missing,
+              revenue_cents: v.revenue_cents, item_count: v.item_count,
+            });
+          }
+        }
+
+        // An id that resolved is worth more than a name that was guessed at.
+        // Write the real one and drop the guess, so the next sync stops
+        // leaning on a string match that only happened to work.
+        if (resolvedIds.size) {
+          const rows = [];
+          const staleGuesses = [];
+          for (const [id, live] of resolvedIds) {
+            if (!live.category || !live.name) continue;
+            rows.push({ studio_id: STUDIO_ID, square_item_id: id, item_name: live.name, category: live.category, guessed: false });
+            staleGuesses.push('name:' + live.name.toLowerCase());
+          }
+          for (let i = 0; i < rows.length; i += 500) {
+            const { error } = await supabase.from('square_category_overrides')
+              .upsert(rows.slice(i, i + 500), { onConflict: 'studio_id,square_item_id' });
+            if (error) logger.warn('[revenue-sync] could not save id-based overrides', error.message);
+          }
+          for (let i = 0; i < staleGuesses.length; i += 300) {
+            await supabase.from('square_category_overrides').delete()
+              .eq('studio_id', STUDIO_ID).eq('guessed', true)
+              .in('square_item_id', staleGuesses.slice(i, i + 300));
+          }
+          logger.info(`[revenue-sync] ${rows.length} Other id(s) resolved against the live catalogue`);
         }
         for (let i = 0; i < otherRows.length; i += 500) {
           const { error } = await supabase.from('revenue_other_items').insert(otherRows.slice(i, i + 500));

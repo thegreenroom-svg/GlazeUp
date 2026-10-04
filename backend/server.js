@@ -13,7 +13,7 @@ import axios from 'axios';
 import path from 'path';
 import fs from 'fs';
 import registerSpecRoutes from './spec-routes.js';
-import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerIdentifyPiecesRoute, registerPieceFulfilmentRoutes, registerReidentifyRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute, registerScheduleRoute, registerSpaceBackfillRoute, registerPackingRoutes, registerKilnShelfRoutes, registerCollectionModeRoutes, registerBreakageRoutes, registerTurnaroundRoute, registerSquareConnectRoutes, registerTicketLinkDiagnosticRoute, registerTicketMatchRoutes, registerShelfSweepRoute, registerSquareAccessCheckRoute, registerTestBookingRoutes, registerDriveBackupRoutes, registerCollectionRoutes, registerUpgradeAfterIdentifyRoute, registerRedescribePieceRoute, registerPackingLabelRoute, registerCustomerBookingRoute, registerHomeCountsRoute, registerShelfSweepHistoryRoute, registerNextPackingRoute, registerBackfillRoutes, registerCatalogueRefreshRoute, registerShapeRecognitionRoutes } from './spec-routes-2.js';
+import registerSpecRoutes2, { registerPinRoutes, registerGapRoutes, registerNetworkRoutes, registerWorkflowRoutes, registerTillMenuRoute, registerKdsRoutes, registerAiCostRoute, registerLiveTotalRoute, registerSquareOpenOrdersDiagnosticRoute, registerSquareBookingsDiagnosticRoute, registerLiveSquareOrderRoute, registerNeedsVerificationRoute, registerRevenueCategorySyncRoute, registerRevenueBreakdownRoute, registerKilnSimplifiedRoute, registerPostalLabelRoute, registerRealBookingSyncRoute, registerLiveTableSyncRoute, registerSquarePaymentFinishRoute, registerCurrentCollectionDateRoute, registerBisqueInventoryRoute, registerStudioFeaturesRoute, registerIdentifyPiecesRoute, registerPieceFulfilmentRoutes, registerReidentifyRoute, registerQuickAddPieceRoute, registerFindOnTableRoute, registerFindAllOnTableRoute, registerTestAiFindRoute, registerEquipmentRequestRoute, registerDesignChargeRoute, registerFulfilmentRoute, registerPartySizeRoute, registerScheduleRoute, registerSpaceBackfillRoute, registerPackingRoutes, registerKilnShelfRoutes, registerCollectionModeRoutes, registerBreakageRoutes, registerTurnaroundRoute, registerSquareConnectRoutes, registerTicketLinkDiagnosticRoute, registerTicketMatchRoutes, registerShelfSweepRoute, registerSquareAccessCheckRoute, registerTestBookingRoutes, registerDriveBackupRoutes, registerCollectionRoutes, registerUpgradeAfterIdentifyRoute, registerRedescribePieceRoute, registerPackingLabelRoute, registerCustomerBookingRoute, registerHomeCountsRoute, registerShelfSweepHistoryRoute, registerNextPackingRoute, registerBackfillRoutes, registerCatalogueRefreshRoute, registerShapeRecognitionRoutes, registerOtherMatchRoutes } from './spec-routes-2.js';
 import crypto from 'crypto';
 
 // Load environment variables
@@ -1649,6 +1649,7 @@ registerSquareBookingsDiagnosticRoute(app, supabase, DEMO_STUDIO_ID, logger, axi
 registerLiveSquareOrderRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerNeedsVerificationRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerRevenueCategorySyncRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
+registerOtherMatchRoutes(app, supabase, DEMO_STUDIO_ID, logger);
 registerCatalogueRefreshRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerShapeRecognitionRoutes(app, supabase, DEMO_STUDIO_ID, logger, axios, logGeminiUsage, sharp, upload, fs);
 registerRevenueBreakdownRoute(app, supabase, DEMO_STUDIO_ID, logger);
@@ -1756,7 +1757,7 @@ app.listen(PORT, () => {
   // Bump the key if the categories change enough to need another pass.
   setTimeout(async () => {
     try {
-      const r = await fetch(`${SELF_URL}/api/spec/revenue/rebuild-history?once=categories-v2`, { method: 'POST' });
+      const r = await fetch(`${SELF_URL}/api/spec/revenue/rebuild-history?once=categories-v3`, { method: 'POST' });
       const d = await r.json().catch(() => ({}));
       logger.info(`[revenue-rebuild] ${d.started ? 'started' : 'skipped: ' + (d.reason || 'unknown')}`);
     } catch (err) {
