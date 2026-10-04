@@ -1756,7 +1756,7 @@ app.listen(PORT, () => {
   // Bump the key if the categories change enough to need another pass.
   setTimeout(async () => {
     try {
-      const r = await fetch(`${SELF_URL}/api/spec/revenue/rebuild-history?once=categories-v1`, { method: 'POST' });
+      const r = await fetch(`${SELF_URL}/api/spec/revenue/rebuild-history?once=categories-v2`, { method: 'POST' });
       const d = await r.json().catch(() => ({}));
       logger.info(`[revenue-rebuild] ${d.started ? 'started' : 'skipped: ' + (d.reason || 'unknown')}`);
     } catch (err) {

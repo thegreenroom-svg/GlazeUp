@@ -2042,7 +2042,18 @@ const REVENUE_CATEGORY_KEYWORDS = [
   { category: 'Booking Fees', keywords: ['booking fee', 'deposit', 'reservation'] },
   { category: 'Return / Cancellation Fees', keywords: ['return fee', 'cancellation', 'refund fee', 'no-show'] },
 ];
+// Bookings for session products since deleted from Square ("2.5hr The
+// Lounge adult exclusive", "2.5hr VIP party room") have no category left
+// to find, so they were all landing in Other. Matched by name into the
+// studio's own Square categories, before the generic keywords -- which
+// would otherwise call an evening painting session "Pottery & Glazes".
+// Only reached when an item has no Square category of its own.
+const BOOKING_NAME_RULES = [
+  { category: 'S. Events ', re: /\b(party|parties|vip|hen do|birthday|celebration|workshop|course|class|wheel|throwing)\b/i },
+  { category: 'S. Pottery Painting Sessions ', re: /\b(lounge|vault|evening|session|sessions|table for|walk[ -]?in|studio fee|\d+(\.\d+)?\s?hrs?|hour)\b/i },
+];
 function categorizeItemNameByKeyword(name) {
+  for (const r of BOOKING_NAME_RULES) if (r.re.test(name || '')) return r.category;
   const lower = (name || '').toLowerCase();
   for (const { category, keywords } of REVENUE_CATEGORY_KEYWORDS) {
     if (keywords.some((kw) => lower.includes(kw))) return category;
@@ -2170,6 +2181,9 @@ export function registerRevenueCategorySyncRoute(app, supabase, STUDIO_ID, logge
       } while (orderCursor);
 
       const dailyCategoryBreakdown = {};
+      // What actually lands in Other, by name, so the dashboard can say
+      // what it is rather than estimate.
+      const otherByDay = {};
       orders.forEach((order) => {
         const date = (order.created_at || '').split('T')[0];
         if (!date) return;
@@ -2177,6 +2191,12 @@ export function registerRevenueCategorySyncRoute(app, supabase, STUDIO_ID, logge
         (order.line_items || []).forEach((item) => {
           const category = categorizeLineItem(item);
           const itemTotal = item.total_money ? Number(item.total_money.amount) : 0;
+          if (category === 'Other') {
+            const nm = (String(item.name || '').trim() || '(custom amount)').slice(0, 200);
+            otherByDay[date] = otherByDay[date] || {};
+            const o = otherByDay[date][nm] || (otherByDay[date][nm] = { revenue_cents: 0, item_count: 0 });
+            o.revenue_cents += itemTotal; o.item_count += Number(item.quantity || 1);
+          }
           if (!dailyCategoryBreakdown[date][category]) dailyCategoryBreakdown[date][category] = { revenue_cents: 0, item_count: 0 };
           dailyCategoryBreakdown[date][category].revenue_cents += itemTotal;
           dailyCategoryBreakdown[date][category].item_count += Number(item.quantity || 1);
@@ -2190,6 +2210,15 @@ export function registerRevenueCategorySyncRoute(app, supabase, STUDIO_ID, logge
       const syncedDates = Object.keys(dailyCategoryBreakdown);
       if (syncedDates.length) {
         await supabase.from('revenue_category_breakdown').delete().eq('studio_id', STUDIO_ID).in('metric_date', syncedDates);
+        await supabase.from('revenue_other_items').delete().eq('studio_id', STUDIO_ID).in('metric_date', syncedDates);
+        const otherRows = [];
+        for (const [d, names] of Object.entries(otherByDay)) {
+          for (const [item_name, v] of Object.entries(names)) otherRows.push({ studio_id: STUDIO_ID, metric_date: d, item_name, ...v });
+        }
+        for (let i = 0; i < otherRows.length; i += 500) {
+          const { error } = await supabase.from('revenue_other_items').insert(otherRows.slice(i, i + 500));
+          if (error) logger.warn('[revenue-sync] could not record Other items', error.message);
+        }
       }
       let rowsWritten = 0;
       for (const [date, categories] of Object.entries(dailyCategoryBreakdown)) {
@@ -5477,9 +5506,38 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
       const sumLast = (n) => days.slice(-n).reduce((a, x) => a + x.v, 0);
 
       // Other, broken out by what the items actually are.
+      //
+      // Since categories-v2 the sync records every line that still lands in
+      // Other by its item name (revenue_other_items), so this is the real
+      // list with real takings. Before that history has been rebuilt the
+      // table is empty, and the old estimate by catalogue value is used.
       const otherCents = byCat.get('Other') || 0;
-      let split = [], todo = [];
+      let split = [], todo = [], otherItems = [];
       if (otherCents > 0) {
+        const byName = new Map();
+        for (let from = 0; ; from += 1000) {
+          const { data: page, error } = await supabase
+            .from('revenue_other_items')
+            .select('item_name, revenue_cents, item_count, metric_date')
+            .eq('studio_id', STUDIO_ID)
+            .order('metric_date', { ascending: true })
+            .order('item_name', { ascending: true })
+            .range(from, from + 999);
+          if (error) break;
+          for (const r of page || []) {
+            const k = (r.item_name || '(custom amount)').trim();
+            const cur = byName.get(k) || { name: k, cents: 0, count: 0, last: null };
+            cur.cents += r.revenue_cents || 0;
+            cur.count += r.item_count || 0;
+            if (!cur.last || r.metric_date > cur.last) cur.last = r.metric_date;
+            byName.set(k, cur);
+          }
+          if (!page || page.length < 1000) break;
+          if (from > 200000) break;
+        }
+        otherItems = [...byName.values()].sort((a, b) => b.cents - a.cents);
+      }
+      if (otherCents > 0 && !otherItems.length) {
         const { data: items } = await supabase
           .from('square_items')
           .select('item_id, item_name, price_cents, category')
@@ -5496,13 +5554,12 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
           if (b === 'Uncategorised bisque') todo.push({ name: (it.item_name || '').trim(), price_cents: it.price_cents || 0 });
         }
         const total = [...weight.values()].reduce((a, b) => a + b, 0) || 1;
-        // Apportioned by catalogue value, and labelled as an estimate, because
-        // the daily table does not carry item names. Better than one lump
-        // called Other, and honest about what it is.
         split = [...weight.entries()]
           .map(([name, w]) => ({ name, cents: Math.round(otherCents * (w / total)), estimated: true }))
           .sort((a, b) => b.cents - a.cents);
         todo.sort((a, b) => b.price_cents - a.price_cents);
+      } else if (otherCents > 0) {
+        split = [{ name: 'Other', cents: otherCents, estimated: false }];
       }
 
       const categories = [...byCat.entries()]
@@ -5541,6 +5598,8 @@ export function registerKilnShelfRoutes(app, supabase, STUDIO_ID, logger) {
         other_total_cents: otherCents,
         uncategorised: todo.slice(0, 200),
         uncategorised_count: todo.length,
+        other_items: otherItems.slice(0, 100),
+        other_items_count: otherItems.length,
         uncollected_pieces: uncollected || 0,
         bookings_total: bookingsTotal || 0,
       });

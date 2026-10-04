@@ -48,6 +48,8 @@ interface Dash {
   other_total_cents: number;
   uncategorised: { name: string; price_cents: number }[];
   uncategorised_count: number;
+  other_items?: { name: string; cents: number; count: number; last: string | null }[];
+  other_items_count?: number;
   uncollected_pieces: number;
   bookings_total: number;
 }
@@ -244,7 +246,40 @@ export default function OwnerPage() {
         ))}
       </Card>
 
-      {d.uncategorised_count > 0 && (
+      {(d.other_items?.length ?? 0) > 0 && (
+        <Card>
+          <p style={{ color: B.text, fontWeight: 700 }}>What is in Other</p>
+          <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginTop: '0.25rem', lineHeight: 1.5 }}>
+            {money(d.other_total_cents)} across {d.other_items_count} things that had no
+            category in Square when they were sold, mostly items since deleted. Old
+            sessions and parties are already moved to their own lines by name.
+          </p>
+          <button
+            onClick={() => setShowTodo((v) => !v)}
+            style={{
+              marginTop: '0.5rem', background: 'none', border: 'none', padding: 0,
+              color: 'var(--clay)', fontSize: 'var(--text-xs)', fontWeight: 700, cursor: 'pointer',
+            }}
+          >
+            {showTodo ? 'Hide the list' : 'Show me what they are'}
+          </button>
+          {showTodo && (
+            <div style={{ marginTop: '0.7rem', borderTop: `1px solid ${B.sand}`, paddingTop: '0.5rem' }}>
+              {d.other_items!.map((it, i) => (
+                <div key={i} style={{
+                  display: 'flex', justifyContent: 'space-between', gap: '0.5rem',
+                  fontSize: 'var(--text-xs)', padding: '0.22rem 0', color: B.text,
+                }}>
+                  <span>{it.name} <span style={{ color: B.stone }}>×{it.count}</span></span>
+                  <span style={{ color: B.stone, flexShrink: 0 }}>{money(it.cents)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {!(d.other_items?.length) && d.uncategorised_count > 0 && (
         <Card>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
             <AlertCircle size={17} color="#a8651a" style={{ flexShrink: 0, marginTop: 2 }} />
