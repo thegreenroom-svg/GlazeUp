@@ -2126,7 +2126,20 @@ export function registerOtherMatchRoutes(app, supabase, STUDIO_ID, logger) {
         byId.set(id, e);
       }
 
-      // The shapes to choose from, with their photos.
+      // Every category the studio actually uses, not just the ones with a
+      // bisque shape behind them. A third of this money is cafe -- drinks,
+      // cake, cards -- whose catalogue entries were deleted when the menu
+      // changed. Offering only pottery shapes would wall staff in a third
+      // of the way down the list.
+      const { data: used } = await supabase
+        .from('revenue_category_breakdown')
+        .select('category, revenue_cents')
+        .eq('studio_id', STUDIO_ID)
+        .neq('category', 'Other')
+        .limit(20000);
+      const weight = new Map();
+      for (const u of used || []) weight.set(u.category, (weight.get(u.category) || 0) + Number(u.revenue_cents || 0));
+
       const { data: catalogue } = await supabase
         .from('piece_catalogue')
         .select('square_item_id, name, category, image_url, price_cents')
@@ -2135,7 +2148,33 @@ export function registerOtherMatchRoutes(app, supabase, STUDIO_ID, logger) {
         .order('name')
         .limit(1000);
 
+      // A photo per category where one exists. Cafe categories will not have
+      // one, and that is fine -- nobody needs a picture to recognise a
+      // milkshake.
+      const photoFor = new Map();
+      for (const c of catalogue || []) {
+        if (!c.category) continue;
+        if (!photoFor.has(c.category) && c.image_url) photoFor.set(c.category, c.image_url);
+      }
+
+      const groupOf = (name) => {
+        const n = String(name || '');
+        if (/^PB /i.test(n)) return 'Bisque';
+        if (/^S\. /i.test(n)) return 'Studio';
+        if (/drink|cake|food|milkshake|smoothie|coffee|alcohol|cafe/i.test(n)) return 'Cafe';
+        return 'Everything else';
+      };
+
+      const choices = [...weight.entries()]
+        .map(([category, cents]) => ({
+          category, group: groupOf(category),
+          image_url: photoFor.get(category) || null,
+          revenue_cents: cents,
+        }))
+        .sort((a, b) => b.revenue_cents - a.revenue_cents);
+
       res.json({
+        choices,
         // Biggest money first. If somebody only does ten of these, they
         // should be the ten that matter.
         unmatched: [...byId.values()].sort((a, b) => b.revenue_cents - a.revenue_cents),

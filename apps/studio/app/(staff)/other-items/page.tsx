@@ -35,17 +35,17 @@ interface Unmatched {
   item_count: number;
   days: number;
 }
-interface Shape {
-  square_item_id: string | null;
-  name: string;
+interface Choice {
   category: string;
+  group: string;       // Bisque, Cafe, Studio, Everything else
   image_url: string | null;
-  price_cents: number | null;
+  revenue_cents: number;
 }
 
 export default function OtherItemsPage() {
   const [rows, setRows] = useState<Unmatched[] | null>(null);
-  const [shapes, setShapes] = useState<Shape[]>([]);
+  const [choicesAll, setChoicesAll] = useState<Choice[]>([]);
+  const [group, setGroup] = useState<string>('Bisque');
   const [open, setOpen] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [saving, setSaving] = useState<string | null>(null);
@@ -54,23 +54,25 @@ export default function OtherItemsPage() {
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/other/unmatched`, { cache: 'no-store' })
       .then((r) => r.json())
-      .then((d) => { setRows(d.unmatched || []); setShapes(d.catalogue || []); })
+      .then((d) => { setRows(d.unmatched || []); setChoicesAll(d.choices || []); })
       .catch(() => setRows([]));
   }, []);
 
-  // One row per category, with a photo to recognise it by. Staff think in
-  // shapes, not category names, so the picture has to lead.
+  // Grouped, because a third of this money is cafe rather than pottery and
+  // the two lists have nothing to do with each other. Bisque leads since it
+  // is most of the items, but the tabs are right there.
+  const groups = useMemo(() => {
+    const order = ['Bisque', 'Cafe', 'Studio', 'Everything else'];
+    const present = new Set(choicesAll.map((c) => c.group));
+    return order.filter((g) => present.has(g));
+  }, [choicesAll]);
+
   const choices = useMemo(() => {
-    const seen = new Map<string, Shape>();
-    for (const s of shapes) {
-      if (!s.category) continue;
-      const cur = seen.get(s.category);
-      if (!cur || (!cur.image_url && s.image_url)) seen.set(s.category, s);
-    }
-    const all = [...seen.values()].sort((a, b) => a.category.localeCompare(b.category));
     const term = q.trim().toLowerCase();
-    return term ? all.filter((s) => s.category.toLowerCase().includes(term) || s.name.toLowerCase().includes(term)) : all;
-  }, [shapes, q]);
+    // A search looks everywhere. Only the browse view is grouped.
+    const pool = term ? choicesAll : choicesAll.filter((c) => c.group === group);
+    return term ? pool.filter((c) => c.category.toLowerCase().includes(term)) : pool;
+  }, [choicesAll, group, q]);
 
   const save = async (row: Unmatched, category: string) => {
     setSaving(row.square_item_id);
@@ -111,7 +113,7 @@ export default function OtherItemsPage() {
         <p style={{ color: B.stone, fontSize: 'var(--text-sm)', lineHeight: 1.55, marginBottom: '0.9rem' }}>
           <b style={{ color: B.text }}>{left.length}</b> items worth{' '}
           <b style={{ color: B.text }}>{money(totalLeft)}</b> were deleted from Square,
-          so there is nothing left to look them up by. Tap a shape for each one.
+          so there is nothing left to look them up by. Tap what it was. Bisque and cafe are on separate tabs.
           Biggest first, and you can stop whenever you like.
         </p>
       )}
@@ -153,7 +155,7 @@ export default function OtherItemsPage() {
                   autoFocus
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  placeholder="Mug, plate, bauble..."
+                  placeholder="Mug, plate, milkshake..."
                   style={{
                     width: '100%', padding: '0.5rem 0.6rem 0.5rem 2rem',
                     borderRadius: 'var(--radius-sm)', border: `1px solid ${B.sand}`,
@@ -161,6 +163,22 @@ export default function OtherItemsPage() {
                   }}
                 />
               </div>
+              {!q.trim() && (
+                <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.6rem', flexWrap: 'wrap' }}>
+                  {groups.map((g) => (
+                    <button
+                      key={g}
+                      onClick={() => setGroup(g)}
+                      style={{
+                        padding: '0.28rem 0.7rem', borderRadius: 999, fontSize: 'var(--text-xs)',
+                        fontWeight: 700, border: `1px solid ${g === group ? 'var(--clay)' : B.sand}`,
+                        backgroundColor: g === group ? 'var(--clay)' : 'transparent',
+                        color: g === group ? '#fff' : B.stone,
+                      }}
+                    >{g}</button>
+                  ))}
+                </div>
+              )}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
                 {choices.map((s) => (
                   <button
@@ -176,7 +194,11 @@ export default function OtherItemsPage() {
                     {s.image_url ? (
                       <img src={s.image_url} alt="" style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 4 }} />
                     ) : (
-                      <div style={{ width: '100%', aspectRatio: '1', borderRadius: 4, backgroundColor: B.sand }} />
+                      // Cafe lines have no photo and do not need one.
+                      <div style={{
+                        width: '100%', aspectRatio: '1', borderRadius: 4, backgroundColor: B.sand,
+                        display: 'grid', placeItems: 'center', color: B.stone, fontSize: '1.1rem', fontWeight: 700,
+                      }}>{s.category.replace(/^(PB |S\. )/, '').charAt(0).toUpperCase()}</div>
                     )}
                     <span style={{ display: 'block', fontSize: '0.64rem', lineHeight: 1.25, color: B.text, marginTop: '0.25rem' }}>
                       {s.category}
