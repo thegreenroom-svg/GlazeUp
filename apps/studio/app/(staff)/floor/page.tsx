@@ -149,6 +149,12 @@ export default function FloorPage() {
   // Daisy: a piece can be marked as returning right here on the table photo,
   // which takes it off this collection date and puts it on the returns shelf.
   const [returning, setReturning] = useState<Record<number, string>>({});
+  // Daisy: the table photo should tell you what they owe as well as what
+  // they made. Same photo, same recognition -- the only thing missing was
+  // the prices, so pull those too rather than making staff shoot it twice
+  // on a different screen.
+  const [priced, setPriced] = useState<{ index: number; name: string | null; price_cents: number | null; confidence: string }[] | null>(null);
+  const [pricing, setPricing] = useState(false);
   const [identifiedPieces, setIdentifiedPieces] = useState<{ index: number; piece_type: string; description: string; box: { left_pct: number; top_pct: number; right_pct: number; bottom_pct: number } | null }[] | null>(null);
   const [identifying, setIdentifying] = useState(false);
   const [splitBillCount, setSplitBillCount] = useState(1);
@@ -538,6 +544,7 @@ export default function FloorPage() {
     setIdentifying(true);
     setIdentifiedPieces(null);
     setReturning({});
+    setPriced(null);
     setIdentifyError(null); // clear any error from a previous attempt
     // Captured now, not read from `current` later -- by the time this
     // resolves, staff may already have finished this booking and moved to
@@ -566,6 +573,35 @@ export default function FloorPage() {
         setIdentifiedPieces(d.pieces);
         setPieceCount(d.pieces.length);
         setIdentifyError(null);
+
+        // Prices, off the same photo. Deliberately not awaited: the piece
+        // list is what staff need to carry on, and a slow or failed price
+        // lookup must never hold up finishing a table. It shows nothing at
+        // all if it cannot work them out, rather than a wrong total.
+        if (d.pieces.length) {
+          setPricing(true);
+          (async () => {
+            try {
+              const fd2 = new FormData();
+              fd2.append('photo', compressed, 'table.jpg');
+              fd2.append('pieces', JSON.stringify(d.pieces));
+              const pr = await fetchWithTimeout(`${process.env.NEXT_PUBLIC_API_URL}/api/spec/table-total/price`, { method: 'POST', body: fd2 }, 70000);
+              const pd = await pr.json();
+              if (pr.ok && Array.isArray(pd.pieces)) {
+                setPriced(pd.pieces.map((x: { index: number; shape: { name?: string; price_cents?: number } | null; confidence: string }) => ({
+                  index: x.index,
+                  name: x.shape?.name || null,
+                  price_cents: typeof x.shape?.price_cents === 'number' ? x.shape.price_cents : null,
+                  confidence: x.confidence,
+                })));
+              }
+            } catch {
+              /* a price is a nicety here; the table still finishes without it */
+            } finally {
+              setPricing(false);
+            }
+          })();
+        }
         // Daisy: "it needs to be almost instant to work in the studio."
         // Staff were never actually blocked from finishing before this
         // resolved -- but if they had, this result used to be silently
@@ -1594,6 +1630,17 @@ export default function FloorPage() {
                         <div style={{ flex: 1 }}>
                           <p style={{ color: B.ivory, fontSize: 'var(--text-sm)', fontWeight: 600 }}>{p.piece_type}</p>
                           <p style={{ color: B.stone, fontSize: 'var(--text-xs)' }}>{p.description}</p>
+                          {(() => {
+                            const pr = priced?.find((x) => x.index === p.index);
+                            if (!pr) return null;
+                            return (
+                              <p style={{ color: pr.price_cents != null ? B.clay : B.stone, fontSize: 'var(--text-xs)', fontWeight: 600, marginTop: '0.12rem' }}>
+                                {pr.price_cents != null
+                                  ? `${pr.name} · £${(pr.price_cents / 100).toFixed(2)}`
+                                  : 'shape not recognised'}
+                              </p>
+                            );
+                          })()}
                           {returning[p.index] !== undefined && (
                             <input
                               autoFocus
@@ -1629,6 +1676,33 @@ export default function FloorPage() {
                     <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginTop: '0.4rem' }}>
                       Wrong count? Tap the photo to retake it.
                     </p>
+                    {pricing && !priced && (
+                      <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginTop: '0.35rem' }}>
+                        Working out what they owe...
+                      </p>
+                    )}
+                    {priced && (() => {
+                      // Only the pieces actually recognised are counted, and
+                      // the rest are named, because a total that quietly
+                      // leaves two pots out is worse than no total.
+                      const got = priced.filter((x) => x.price_cents != null && !(returning[x.index] !== undefined));
+                      const missing = priced.length - got.length - Object.keys(returning).length;
+                      const total = got.reduce((a, x) => a + (x.price_cents || 0), 0);
+                      if (!got.length) return null;
+                      return (
+                        <div style={{ marginTop: '0.5rem', paddingTop: '0.45rem', borderTop: `1px solid ${B.stone}33` }}>
+                          <p style={{ color: B.ivory, fontSize: 'var(--text-sm)', fontWeight: 700 }}>
+                            Pottery so far £{(total / 100).toFixed(2)}
+                          </p>
+                          <p style={{ color: B.stone, fontSize: 'var(--text-xs)', marginTop: '0.15rem', lineHeight: 1.45 }}>
+                            {got.length} of {priced.length} priced
+                            {missing > 0 ? `, ${missing} not recognised` : ''}.
+                            Drinks and cake are not in this. Nothing is charged here —
+                            ring it up on the till as usual.
+                          </p>
+                        </div>
+                      );
+                    })()}
                     {Object.keys(returning).length > 0 && (
                       <p style={{ color: '#e8a23c', fontSize: 'var(--text-xs)', marginTop: '0.35rem', fontWeight: 600 }}>
                         {Object.keys(returning).length} going on the returns shelf, off this collection date.
