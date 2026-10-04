@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Printer, Camera, Package, Check, Layers, Boxes, Image as ImageIcon, Search, QrCode, RotateCcw, TrendingUp, Tags, ScanSearch } from 'lucide-react';
+import { Printer, Camera, Package, Check, Layers, Boxes, Image as ImageIcon, Search, QrCode, RotateCcw, TrendingUp, Tags, ScanSearch, Calculator } from 'lucide-react';
 
 // THE WHOLE APP, on one page.
 //
@@ -63,6 +63,7 @@ const STEPS = [
 // fixing. Same destinations, no invented ordering, and the tools are
 // visibly secondary rather than competing with the work.
 const TOOLS = [
+  { key: 'total',    label: 'Table total',          detail: 'Photograph the table, see what everyone owes', href: '/table-total', icon: Calculator, tint: '#2E7D6B' },
   { key: 'stock',    label: 'Stock',                detail: 'Every shape, price and how many are in', href: '/stock', icon: Tags, tint: '#B87946' },
   { key: 'shapes',   label: 'Shape recognition',    detail: 'Which shape each painted piece is', href: '/recognition', icon: ScanSearch, tint: '#5B6E8C' },
   { key: 'shelves',  label: 'Wall of shelves',      detail: 'Every box, and what is in it',        href: '/shelves',  icon: Layers,    tint: '#7A6A8C' },

@@ -9463,7 +9463,7 @@ export function registerCatalogueRefreshRoute(app, supabase, STUDIO_ID, logger, 
 // the table photo step was tuned to be near-instant and stays that way.
 // Anything staff have confirmed by hand is never overwritten.
 // ============================================================================
-export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger, axios, logGeminiUsage, sharp) {
+export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger, axios, logGeminiUsage, sharp, upload, fs) {
   const KEY = () => process.env.GEMINI_API_KEY;
   let running = false;
 
@@ -9475,7 +9475,7 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
     for (let from = 0; ; from += 1000) {
       const { data, error } = await supabase
         .from('piece_catalogue')
-        .select('square_item_id, name, category, image_url, price_cents')
+        .select('square_item_id, name, category, image_url, price_cents, price_min_cents, variations')
         .eq('studio_id', STUDIO_ID).eq('active', true)
         .not('square_item_id', 'is', null)
         .order('category').order('name')
@@ -9525,17 +9525,13 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
     return JSON.parse((raw.match(/\{[\s\S]*\}/) || [])[0] || '{}');
   }
 
-  // ---- one table photo, all its pieces ------------------------------------
-  async function recognisePhoto(url, pieces) {
+  // ---- the matching itself: crops in, shapes out --------------------------
+  // crops: [{ key, img (jpeg buffer), piece_type, description }]
+  // Returns Map key -> { shortlist: [shape], chosen: shape|null, confidence }
+  async function matchCrops(crops) {
     const shapes = await catalogue();
-    if (!shapes.length) return { skipped: 'catalogue empty' };
-    const photo = await fetchBuf(url);
-    const crops = [];
-    for (const p of pieces) {
-      try { crops.push({ p, img: await cropPiece(photo, p.photo_box) }); }
-      catch (e) { logger.warn('[shapes] crop failed', p.id, e.message); }
-    }
-    if (!crops.length) return { skipped: 'no crops' };
+    const out = new Map();
+    if (!shapes.length || !crops.length) return out;
 
     // Pass 1: shortlist from names.
     const list = shapes.map((s, i) => `${i + 1}. ${s.name} (${catLabel(s.category)})`).join('\n');
@@ -9544,7 +9540,7 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
       text: `These are painted pottery pieces from a paint-your-own pottery studio. Every piece started as a plain white bisque shape from the studio's range, listed below by number.\n\nFor each piece, pick up to FOUR shapes from the list that it could be, best first, judging by FORM only: overall silhouette, proportions, handles, spouts, lids, feet, sculpted or moulded details, and any letter or number it forms. Ignore the paint completely -- colours and painted designs are the customer's, not part of the shape.\n\nIf the piece is clearly not from this range (wheel-thrown, hand-built, or nothing listed is close), return an empty list for it rather than forcing a match.\n\nSHAPES:\n${list}`,
     }];
     crops.forEach((c, i) => {
-      in1.push({ type: 'text', text: `PIECE ${i + 1}: ${c.p.piece_type || ''}${c.p.description ? ' -- ' + c.p.description : ''}` });
+      in1.push({ type: 'text', text: `PIECE ${i + 1}: ${c.piece_type || ''}${c.description ? ' -- ' + c.description : ''}` });
       in1.push({ type: 'image', data: c.img.toString('base64'), mime_type: 'image/jpeg' });
     });
     const s1 = await gemini(in1, {
@@ -9570,13 +9566,13 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
       const c = crops[(r.piece || 0) - 1];
       if (!c) continue;
       const cands = [...new Set((r.candidates || []).filter((n) => n >= 1 && n <= shapes.length))].slice(0, 4).map((n) => shapes[n - 1]);
-      shortlist.set(c.p.id, cands);
+      shortlist.set(c.key, cands);
     }
 
     // Pass 2: compare against the catalogue photos, a few pieces per call.
     const results = new Map();
     const imgCache = new Map();
-    const todo = crops.filter((c) => (shortlist.get(c.p.id) || []).length);
+    const todo = crops.filter((c) => (shortlist.get(c.key) || []).length);
     for (let i = 0; i < todo.length; i += 4) {
       const batch = todo.slice(i, i + 4);
       const in2 = [{
@@ -9587,7 +9583,7 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
         const c = batch[k];
         in2.push({ type: 'text', text: `PIECE ${k + 1}:` });
         in2.push({ type: 'image', data: c.img.toString('base64'), mime_type: 'image/jpeg' });
-        const cands = shortlist.get(c.p.id);
+        const cands = shortlist.get(c.key);
         for (let j = 0; j < cands.length; j++) {
           const s = cands[j];
           in2.push({ type: 'text', text: `PIECE ${k + 1}, OPTION ${j + 1}: ${s.name}` });
@@ -9622,18 +9618,39 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
       for (const r of s2.results || []) {
         const c = batch[(r.piece || 0) - 1];
         if (!c) continue;
-        const cands = shortlist.get(c.p.id) || [];
+        const cands = shortlist.get(c.key) || [];
         const chosen = r.option >= 1 ? cands[r.option - 1] : null;
-        results.set(c.p.id, { chosen, confidence: chosen ? r.confidence : 'none' });
+        results.set(c.key, { chosen, confidence: chosen ? r.confidence : 'none' });
       }
     }
+    for (const c of crops) {
+      const cands = shortlist.get(c.key) || [];
+      const r = results.get(c.key) || { chosen: null, confidence: cands.length ? 'unsure' : 'none' };
+      out.set(c.key, { shortlist: cands, chosen: r.chosen, confidence: r.confidence });
+    }
+    return out;
+  }
+
+  // ---- one table photo, all its pieces ------------------------------------
+  async function recognisePhoto(url, pieces) {
+    const shapes = await catalogue();
+    if (!shapes.length) return { skipped: 'catalogue empty' };
+    const photo = await fetchBuf(url);
+    const crops = [];
+    for (const p of pieces) {
+      try { crops.push({ p, key: p.id, img: await cropPiece(photo, p.photo_box), piece_type: p.piece_type, description: p.description }); }
+      catch (e) { logger.warn('[shapes] crop failed', p.id, e.message); }
+    }
+    if (!crops.length) return { skipped: 'no crops' };
+    const matched_ = await matchCrops(crops);
 
     // Save. Never touch anything a person has confirmed.
     const now = new Date().toISOString();
     let matched = 0;
     for (const c of crops) {
-      const cands = shortlist.get(c.p.id) || [];
-      const r = results.get(c.p.id) || { chosen: null, confidence: cands.length ? 'unsure' : 'none' };
+      const m = matched_.get(c.p.id) || { shortlist: [], chosen: null, confidence: 'none' };
+      const cands = m.shortlist;
+      const r = m;
       const keep = r.chosen && (r.confidence === 'high' || r.confidence === 'medium');
       if (keep) matched++;
       await supabase.from('pottery_pieces').update({
@@ -9763,6 +9780,86 @@ export function registerShapeRecognitionRoutes(app, supabase, STUDIO_ID, logger,
       res.json({ items, stats });
     } catch (err) {
       logger.error('[shapes] review failed', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ---- TABLE TOTAL -------------------------------------------------------
+  // Daisy: photograph the whole table, it picks out the pieces and prices
+  // them, split between people, so the total is there straight away.
+  //
+  // Stage 1 of three, on purpose: this only SHOWS a total. Nothing is
+  // saved and nothing is sent to Square -- staff still ring it up on the
+  // till. Every price comes from the stocktake catalogue (Square's own
+  // prices) and every piece can be corrected with a tap, so a wrong
+  // recognition costs a tap, not money.
+  //
+  // The photo step (identify-in-photo) finds the pieces and their boxes;
+  // this prices them. Two calls rather than one so the pieces appear on
+  // screen while the prices are still being worked out.
+  app.post('/api/spec/table-total/price', upload.single('photo'), async (req, res) => {
+    const cleanup = () => { try { if (req.file?.path) fs.unlinkSync(req.file.path); } catch { /* temp */ } };
+    try {
+      if (!KEY()) { cleanup(); return res.status(500).json({ error: 'GEMINI_API_KEY not configured on this service.' }); }
+      if (!req.file) return res.status(400).json({ error: 'A photo is required' });
+      let pieces = [];
+      try { pieces = JSON.parse(req.body?.pieces || '[]'); } catch { pieces = []; }
+      const photo = fs.readFileSync(req.file.path);
+      cleanup();
+      const crops = [];
+      for (let i = 0; i < pieces.length; i++) {
+        const p = pieces[i] || {};
+        try { crops.push({ key: i, img: await cropPiece(photo, p.box || null), piece_type: p.piece_type, description: p.description }); }
+        catch (e) { logger.warn('[table-total] crop failed', i, e.message); }
+      }
+      const m = await matchCrops(crops);
+      const pick = (sh) => sh && ({
+        square_item_id: sh.square_item_id, name: sh.name, category: sh.category, image_url: sh.image_url,
+        price_cents: sh.price_cents, price_min_cents: sh.price_min_cents, variations: sh.variations || null,
+      });
+      res.json({
+        pieces: pieces.map((_, i) => {
+          const r = m.get(i) || { shortlist: [], chosen: null, confidence: 'none' };
+          const sure = r.chosen && (r.confidence === 'high' || r.confidence === 'medium');
+          return { index: i, shape: sure ? pick(r.chosen) : null, confidence: r.confidence, candidates: r.shortlist.map(pick) };
+        }),
+      });
+    } catch (err) {
+      cleanup();
+      logger.error('[table-total] price failed', err.response?.data || err.message);
+      res.status(500).json({ error: friendlyGeminiError(err) });
+    }
+  });
+
+  // Drinks, cakes and studio fees -- added to a person by hand, because a
+  // photo cannot tell a latte from a cappuccino or a slice already eaten.
+  let extrasCache = { at: 0, items: [] };
+  app.get('/api/spec/table-total/extras', async (req, res) => {
+    try {
+      if (Date.now() - extrasCache.at > 30 * 60 * 1000 || !extrasCache.items.length) {
+        const rows = [];
+        for (let from = 0; ; from += 1000) {
+          const { data, error } = await supabase.from('square_items')
+            .select('item_name, category, price_cents').eq('studio_id', STUDIO_ID)
+            .order('item_name').range(from, from + 999);
+          if (error) throw error;
+          rows.push(...(data || []));
+          if (!data || data.length < 1000) break;
+        }
+        const seen = new Set();
+        const items = [];
+        for (const r of rows) {
+          const cat = String(r.category || '');
+          if (/^PB /.test(cat) || !r.price_cents || r.price_cents <= 0) continue;
+          const name = String(r.item_name || '').trim();
+          if (!name || seen.has(name.toLowerCase())) continue;
+          seen.add(name.toLowerCase());
+          items.push({ name, price_cents: r.price_cents, category: cat.replace(/^S\.\s+/, '').trim() || 'Other' });
+        }
+        extrasCache = { at: Date.now(), items };
+      }
+      res.json({ items: extrasCache.items });
+    } catch (err) {
       res.status(500).json({ error: err.message });
     }
   });

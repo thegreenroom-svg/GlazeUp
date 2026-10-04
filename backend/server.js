@@ -1650,7 +1650,7 @@ registerLiveSquareOrderRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerNeedsVerificationRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerRevenueCategorySyncRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
 registerCatalogueRefreshRoute(app, supabase, DEMO_STUDIO_ID, logger, axios);
-registerShapeRecognitionRoutes(app, supabase, DEMO_STUDIO_ID, logger, axios, logGeminiUsage, sharp);
+registerShapeRecognitionRoutes(app, supabase, DEMO_STUDIO_ID, logger, axios, logGeminiUsage, sharp, upload, fs);
 registerRevenueBreakdownRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerKilnSimplifiedRoute(app, supabase, DEMO_STUDIO_ID, logger);
 registerPostalLabelRoute(app, supabase, DEMO_STUDIO_ID, logger);
