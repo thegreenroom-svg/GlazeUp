@@ -65,6 +65,10 @@ export default function DailyCardsPage() {
   const [error, setError] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [newSinceLoad, setNewSinceLoad] = useState<Booking[]>([]);
+  // Daisy: the board does the tracking, so the table card can stop being
+  // a machine-readable thing and just be a nice one. The QR still earns
+  // its place on the collection card -- that is the one they bring back.
+  const [plainCard, setPlainCard] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Arriving from a booking: open that booking's day and preselect only
   // its card. Every booking already HAS a card -- the QR on it points
@@ -267,7 +271,7 @@ export default function DailyCardsPage() {
       <div className="no-print">
         
         <p style={{ color: '#666', fontSize: 'var(--text-md)', marginBottom: '1rem' }}>
-          One real QR card per booking — scan to view the session, order drinks, or track pieces. Go forward or back to print ahead for a party or a busy day.
+          One card per booking. Go forward or back to print ahead for a party or a busy day.
         </p>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
@@ -387,6 +391,26 @@ export default function DailyCardsPage() {
         )}
       </div>
 
+      <div className="no-print" style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem' }}>
+        {[
+          { v: false, label: 'With QR', hint: 'scan to open the booking' },
+          { v: true,  label: 'Plain card', hint: 'nice stock, nothing to scan' },
+        ].map((o) => (
+          <button
+            key={String(o.v)}
+            onClick={() => setPlainCard(o.v)}
+            title={o.hint}
+            style={{
+              padding: '0.45rem 0.9rem', borderRadius: 999, fontSize: 'var(--text-sm)',
+              fontWeight: 700, cursor: 'pointer',
+              border: `1px solid ${plainCard === o.v ? 'var(--clay)' : '#ddd'}`,
+              backgroundColor: plainCard === o.v ? 'var(--clay)' : 'transparent',
+              color: plainCard === o.v ? '#fff' : '#666',
+            }}
+          >{o.label}</button>
+        ))}
+      </div>
+
       <div className="card-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
         {visibleBookings.map((b) => {
           const isNew = newSinceLoad.some((n) => n.booking_code === b.booking_code);
@@ -417,7 +441,22 @@ export default function DailyCardsPage() {
                 style={{ position: 'absolute', top: '0.8rem', right: '0.8rem', cursor: 'pointer', width: '18px', height: '18px' }}
               />
               {isNew && <p style={{ fontSize: 'var(--text-xs)', color: '#e0a020', fontWeight: 700, marginBottom: '0.3rem' }}>NEW</p>}
-              {qrUrls[b.booking_code] ? (
+              {plainCard ? (
+                /* No QR, no booking reference. The chalk board does the
+                   tracking now, so this card only has to look like it was
+                   worth keeping. */
+                <div style={{
+                  width: 120, height: 120, margin: '0 auto', borderRadius: '50%',
+                  border: '1px solid var(--clay)', display: 'grid', placeItems: 'center',
+                }}>
+                  <span style={{
+                    fontFamily: 'Georgia, serif', fontSize: '2.4rem', color: 'var(--clay)',
+                    lineHeight: 1,
+                  }}>
+                    {(b.customer_name || '?').trim().charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              ) : qrUrls[b.booking_code] ? (
                 <img src={qrUrls[b.booking_code]} alt="" style={{ width: 120, height: 120, margin: '0 auto' }} />
               ) : (
                 <div style={{ width: 120, height: 120, margin: '0 auto', backgroundColor: '#f0f0f0' }} />
@@ -477,7 +516,11 @@ export default function DailyCardsPage() {
                   {b.notes}
                 </p>
               )}
-              <p style={{ fontSize: 'var(--text-xs)', color: '#aaa', fontFamily: 'monospace', marginTop: '0.3rem' }}>{b.booking_code}</p>
+              {/* The reference is for us, not for them. A plain card has
+                  nothing on it a customer would not want on their table. */}
+              {!plainCard && (
+                <p style={{ fontSize: 'var(--text-xs)', color: '#aaa', fontFamily: 'monospace', marginTop: '0.3rem' }}>{b.booking_code}</p>
+              )}
             </div>
           );
         })}
