@@ -406,8 +406,8 @@ export default function DailyCardsPage() {
               className="print-card"
               data-selected={isSelected ? "true" : "false"}
               style={{
-                padding: '1rem', 
-                borderRadius: '10px', 
+                padding: '0', 
+                borderRadius: '2px', 
                 backgroundColor: isSelected ? 'var(--clay-light, #f5e6d3)' : 'white', 
                 textAlign: 'center',
                 border: isNew ? '2px solid #e0a020' : isSelected ? '2px solid var(--clay)' : '1px solid #ddd',
@@ -428,35 +428,55 @@ export default function DailyCardsPage() {
               {(() => {
                 const d = new Date(b.session_start);
                 const short = (x: Date) => `${x.getDate()}/${x.getMonth() + 1}`;
+                const longDate = (x: Date) =>
+                  x.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
                 return (
-                  <div style={{ padding: '0.2rem 0 0.1rem' }}>
-                    {/* Painted, and due back. The two dates the board carries,
-                        and the pair that tells two visits by the same person
-                        apart. */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between',
-                                  fontSize: 'var(--text-xs)', color: '#8A7F74', fontWeight: 600 }}>
-                      <span>{short(d)}</span>
-                      <span>{d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
-                    </div>
-                    <div style={{ height: 1, backgroundColor: 'var(--clay)', opacity: .35, margin: '.45rem 0 .55rem' }} />
-                    <p style={{ fontFamily: 'Georgia, serif', fontSize: '1.45rem',
-                                lineHeight: 1.1, color: 'var(--charcoal)' }}>
+                  <div style={{ padding: '1.5rem 1.2rem 1.2rem', textAlign: 'center' }}>
+                    {/* The table box sits on its own at the top, out of the
+                        way of everything. It was crowding the ready date
+                        before, which is the one line a customer reads. */}
+                    <div style={{
+                      width: 46, height: 46, margin: '0 auto 1.1rem',
+                      border: '1px solid #D8CBBC', borderRadius: '50%',
+                    }} />
+
+                    <p style={{
+                      fontFamily: 'Georgia, "Times New Roman", serif',
+                      fontSize: '1.7rem', lineHeight: 1.15, color: 'var(--charcoal)',
+                      margin: 0,
+                    }}>
                       {b.customer_name}
                     </p>
-                    <div style={{ display: 'flex', justifyContent: 'space-between',
-                                  alignItems: 'flex-end', marginTop: '.7rem' }}>
-                      <span style={{ fontSize: 'var(--text-xs)', color: '#8A7F74', fontWeight: 600 }}>
-                        Ready {collectDate ? short(new Date(collectDate)) : '\u2014'}
-                      </span>
-                      {/* Table stays a box to write in. It is the one thing
-                          not known until they sit down. */}
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem',
-                                     fontSize: 'var(--text-xs)', color: '#8A7F74', fontWeight: 600 }}>
-                        Table
-                        <span style={{ display: 'inline-block', width: 30, height: 22,
-                                       border: '1px solid #C9BCAE', borderRadius: 3 }} />
-                      </span>
-                    </div>
+
+                    <div style={{
+                      width: 26, height: 1, backgroundColor: 'var(--clay)',
+                      opacity: .5, margin: '.9rem auto',
+                    }} />
+
+                    {/* Painted, then ready. Said in words rather than
+                        slashes -- this is the bit they take home. */}
+                    <p style={{
+                      fontSize: '0.72rem', letterSpacing: '.14em', textTransform: 'uppercase',
+                      color: '#9B8C85', margin: 0, lineHeight: 1.9,
+                    }}>
+                      Painted {longDate(d)}
+                    </p>
+                    <p style={{
+                      fontFamily: 'Georgia, "Times New Roman", serif',
+                      fontSize: '1rem', color: 'var(--clay)', margin: '.15rem 0 0',
+                    }}>
+                      Ready {collectDate ? longDate(new Date(collectDate)) : 'in about three weeks'}
+                    </p>
+
+                    {/* Small, at the bottom, for us rather than them. The
+                        photo reads it; a customer need never notice it. */}
+                    <p style={{
+                      fontSize: '0.6rem', color: '#C4B8AD', margin: '1.1rem 0 0',
+                      letterSpacing: '.08em',
+                    }}>
+                      {short(d)} · {d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                      {collectDate ? ` · ${short(new Date(collectDate))}` : ''}
+                    </p>
                   </div>
                 );
               })()}
