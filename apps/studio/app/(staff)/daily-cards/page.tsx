@@ -5,7 +5,6 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { PageShell } from '@/components/PageShell';
 import { useSearchParams } from 'next/navigation';
-import QRCode from 'qrcode';
 import { Printer, RefreshCw, AlertCircle, CalendarDays } from 'lucide-react';
 import { EmptyState } from '@/components/EmptyState';
 
@@ -58,7 +57,6 @@ function tableSetupFlags(notes: string | null): string[] {
 
 export default function DailyCardsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [qrUrls, setQrUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
@@ -182,21 +180,6 @@ export default function DailyCardsPage() {
 
       // Real, scannable QR per booking -- same payload every other QR in the
       // app uses, so any of these cards works with the same /customer route.
-      const urls: Record<string, string> = {};
-      await Promise.all(
-        today.map(async (b: Booking) => {
-          urls[b.booking_code] = await QRCode.toDataURL(
-            // Points at the staff table step, NOT the old customer page.
-            // Two reasons: the customer route group is gone, so these QR
-            // codes had silently started leading to a 404; and this is
-            // now the app's actual way in -- scan the card on the table
-            // and land on that booking's photo step with it loaded.
-            `${window.location.origin}/floor?code=${encodeURIComponent(b.booking_code)}`,
-            { margin: 1, width: 140 }
-          );
-        })
-      );
-      setQrUrls((prev) => ({ ...prev, ...urls }));
     } catch (e) {
       console.error('Load error:', e);
       setError('Could not load bookings for that day.');
@@ -207,7 +190,6 @@ export default function DailyCardsPage() {
 
   useEffect(() => {
     setNewSinceLoad([]);
-    setQrUrls({});
     setLoading(true);
     load(true);
     firstLoadDone.current = true;
@@ -478,12 +460,6 @@ export default function DailyCardsPage() {
                   </div>
                 );
               })()}
-              {false ? (
-              ) : qrUrls[b.booking_code] ? (
-                <img src={qrUrls[b.booking_code]} alt="" style={{ width: 120, height: 120, margin: '0 auto' }} />
-              ) : (
-                <div style={{ width: 120, height: 120, margin: '0 auto', backgroundColor: '#f0f0f0' }} />
-              )}
               <p style={{ fontWeight: 700, fontSize: 'var(--text-md)', marginTop: '0.6rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>
                 {/* Same real photo indicator as the bookings list -- at end
                     of day this is how a missed table gets spotted without
